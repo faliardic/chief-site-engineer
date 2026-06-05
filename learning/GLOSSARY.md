@@ -533,3 +533,37 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Cari hesap`: Bir firma ile finansal borc/alacak hareketlerini izleyen hesap yapisi.
 
 `Tedarikci performans puani`: Tedarikcinin kalite, teslimat ve hizmet performansini sayisal olarak degerlendiren puan.
+
+`Saha notu kaydi`: Santiyede gorulen kisa not, gozlem, uyari veya hatirlatmanin kayit altina alinmis hali.
+
+`SiteNoteRecord`: Saha notu bilgisini temsil eden veri modeli.
+
+`note_title`: Saha notunun kisa basligini tutan alan.
+
+`note_type`: Notun gozlem, uyari, hatirlatma veya genel not gibi turunu tutan alan.
+
+`related_subject`: Notun ilgili oldugu konu veya is basligini tutan alan.
+
+`note_date`: Notun alindigi veya gozlemin yapildigi tarihi tutan alan.
+
+`open`: Saha notunun henuz acik durumda oldugunu belirten varsayilan durum degeri.
+
+`Gorev yonetimi`: Islerin sorumlu, tarih, durum ve takip kurallariyla yonetildigi sistem.
+
+`Hatirlatici sistemi`: Belirli tarih veya kosullarda kullaniciya hatirlatma veren sistem.
+
+`Bildirim sistemi`: Kullaniciya uygulama ici, e-posta veya benzeri kanallarla haber veren sistem.
+
+`Gunluk rapor baglantisi`: Bir kaydin gunluk rapor kaydiyla kod seviyesinde iliskilendirilmesi.
+
+`Denetim formu`: Kontrol veya denetim icin hazirlanmis soru ve sonuc alanlari bulunan form.
+
+`Uygunsuzluk kaydi`: Proje, kalite veya uygulama kurallarina uymayan durumun kayit altina alinmis hali.
+
+`Fotograf/dosya eki`: Bir kayda eklenen fotograf, belge veya dosya referansi.
+
+`Takvim baglantisi`: Bir kaydin takvim veya tarih bazli etkinlik sistemiyle iliskilendirilmesi.
+
+`Kisi atama sistemi`: Bir kaydin belirli kisiye sorumluluk olarak atanmasini saglayan sistem.
+
+`Oncelik sistemi`: Kayitlarin aciliyet veya onem seviyesine gore siniflandirilmasini saglayan sistem.

@@ -17,5 +17,6 @@
 - [x] Adim 015 - Basit ekip/iscilik kayit modeli baslangici
 - [x] Adim 016 - Basit ekipman/makine kayit modeli baslangici
 - [x] Adim 017 - Basit tedarikci kayit modeli baslangici
+- [x] Adim 018 - Basit saha notu kayit modeli baslangici
 
-Sonraki kucuk adim onerisi: Adim 018 - Basit iletisim kisisi kayit modeli baslangici
+Sonraki kucuk adim onerisi: Adim 019 - Basit gorev adayi kayit modeli baslangici

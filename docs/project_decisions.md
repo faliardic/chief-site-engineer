@@ -166,3 +166,12 @@
 - Tedarikci adi, tedarikci turu, iletisim kisisi, telefon, e-posta ve hizmet alani ayri alanlar olarak tutuldu.
 - Diger modellerle kod seviyesinde iliski kurulmadi.
 - Veritabani, JSON, API, GUI, arama/filtreleme ve raporlama sonraya birakildi.
+
+## 018 Saha Notu Kaydi Baslangici
+
+- Onceki iletisim kisisi onerisi, `ContactPersonRecord` zaten mevcut oldugu icin saha notu kaydi olarak revize edildi.
+- Saha notlari, gozlemler, uyarilar, hatirlatmalar ve serbest aciklamalar once veri modeli olarak baslatildi.
+- Gercek gorev yonetimi, hatirlatici, bildirim, gunluk rapor, denetim, uygunsuzluk, fotograf/dosya eki, takvim, kisi atama ve oncelik sistemi kurulmadi.
+- Not basligi, not turu, konum, ilgili konu ve not tarihi ayri alanlar olarak tutuldu.
+- Diger modellerle kod seviyesinde iliski kurulmadi.
+- Veritabani, JSON, API, GUI, arama/filtreleme ve raporlama sonraya birakildi.

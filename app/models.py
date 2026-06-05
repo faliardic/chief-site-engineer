@@ -336,3 +336,16 @@ class SupplierRecord:
     service_area: str | None = None
     status: str = "active"
     notes: str | None = None
+
+
+@dataclass
+class SiteNoteRecord:
+    """Represents a simple site note record."""
+
+    note_title: str
+    note_type: str | None = None
+    location: str | None = None
+    related_subject: str | None = None
+    note_date: str | None = None
+    status: str = "open"
+    notes: str | None = None

@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 018
+
+- Added `SiteNoteRecord` model as the starting point for simple site note tracking.
+- Added tests for site note values and default open status.
+- Added documentation and learning material for the revised site note record step.
+
 ## Step 017
 
 - Added `SupplierRecord` model as the starting point for supplier and service provider tracking.

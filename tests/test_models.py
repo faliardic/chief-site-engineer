@@ -16,6 +16,7 @@ from app.models import (
     ProjectPartyRecord,
     RFIRecord,
     SiteLocationRecord,
+    SiteNoteRecord,
     SiteProject,
     SubmittalRecord,
     SupplierRecord,
@@ -476,3 +477,21 @@ def test_supplier_record_holds_values_and_defaults() -> None:
     assert supplier.service_area == "Hazir beton tedariki"
     assert supplier.notes is None
     assert supplier.status == "active"
+
+
+def test_site_note_record_holds_values_and_defaults() -> None:
+    site_note = SiteNoteRecord(
+        note_title="Kuzey cephe iskele kontrolu",
+        note_type="uyari",
+        location="A Blok kuzey cephe",
+        related_subject="Iskele guvenligi",
+        note_date="2026-06-05",
+    )
+
+    assert site_note.note_title == "Kuzey cephe iskele kontrolu"
+    assert site_note.note_type == "uyari"
+    assert site_note.location == "A Blok kuzey cephe"
+    assert site_note.related_subject == "Iskele guvenligi"
+    assert site_note.note_date == "2026-06-05"
+    assert site_note.notes is None
+    assert site_note.status == "open"
