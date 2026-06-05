@@ -203,3 +203,32 @@ class MeetingActionRecord:
     due_date: str | None = None
     status: str = "open"
     notes: str | None = None
+
+
+@dataclass
+class RFIRecord:
+    """Represents a request for information record."""
+
+    subject: str
+    question: str | None = None
+    requested_by: str | None = None
+    assigned_to: str | None = None
+    request_date: str | None = None
+    due_date: str | None = None
+    answer: str | None = None
+    status: str = "open"
+    notes: str | None = None
+
+
+@dataclass
+class SubmittalRecord:
+    """Represents a technical submission record."""
+
+    subject: str
+    submitted_by: str | None = None
+    submitted_to: str | None = None
+    submit_date: str | None = None
+    review_due_date: str | None = None
+    response: str | None = None
+    status: str = "submitted"
+    notes: str | None = None

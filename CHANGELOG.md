@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 011
+
+- Added `RFIRecord` model as the starting point for technical question tracking.
+- Added `SubmittalRecord` model as the starting point for technical submission tracking.
+- Added tests, documentation, and learning material for RFI/Submittal lite records.
+
 ## Step 010
 
 - Added `MeetingRecord` model as the starting point for meeting minutes.

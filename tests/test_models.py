@@ -10,7 +10,9 @@ from app.models import (
     MeetingActionRecord,
     MeetingRecord,
     NonconformityRecord,
+    RFIRecord,
     SiteProject,
+    SubmittalRecord,
     TrackingRecord,
 )
 
@@ -275,3 +277,43 @@ def test_meeting_action_record_holds_values_and_defaults() -> None:
     assert action.due_date == "2026-06-12"
     assert action.notes is None
     assert action.status == "open"
+
+
+def test_rfi_record_holds_values_and_defaults() -> None:
+    rfi = RFIRecord(
+        subject="Temel drenaj detayi",
+        question="Drenaj borusu kotu nasil uygulanacak?",
+        requested_by="Santiye sefi",
+        assigned_to="Proje muellifi",
+        request_date="2026-06-05",
+        due_date="2026-06-12",
+    )
+
+    assert rfi.subject == "Temel drenaj detayi"
+    assert rfi.question == "Drenaj borusu kotu nasil uygulanacak?"
+    assert rfi.requested_by == "Santiye sefi"
+    assert rfi.assigned_to == "Proje muellifi"
+    assert rfi.request_date == "2026-06-05"
+    assert rfi.due_date == "2026-06-12"
+    assert rfi.answer is None
+    assert rfi.notes is None
+    assert rfi.status == "open"
+
+
+def test_submittal_record_holds_values_and_defaults() -> None:
+    submittal = SubmittalRecord(
+        subject="Seramik teknik foyi",
+        submitted_by="Yuklenici",
+        submitted_to="Isveren temsilcisi",
+        submit_date="2026-06-05",
+        review_due_date="2026-06-12",
+    )
+
+    assert submittal.subject == "Seramik teknik foyi"
+    assert submittal.submitted_by == "Yuklenici"
+    assert submittal.submitted_to == "Isveren temsilcisi"
+    assert submittal.submit_date == "2026-06-05"
+    assert submittal.review_due_date == "2026-06-12"
+    assert submittal.response is None
+    assert submittal.notes is None
+    assert submittal.status == "submitted"

@@ -309,3 +309,41 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Termin`: Bir isin tamamlanmasi beklenen hedef tarih.
 
 `Aksiyon kaydi`: Toplantidan cikan takip edilecek is veya gorev kaydi.
+
+`RFI`: Teknik bilgi talebi veya resmi soru kaydi.
+
+`Request for Information`: RFI ifadesinin acilimi; bilgi talebi anlamina gelir.
+
+`RFIRecord`: Teknik soru/cevap takibini temsil eden veri modeli.
+
+`Submittal`: Inceleme veya onay icin yapilan teknik gonderim.
+
+`SubmittalRecord`: Teknik gonderim/onay takibini temsil eden veri modeli.
+
+`subject`: Kaydin konusunu tutan alan.
+
+`question`: RFI icindeki teknik soruyu tutan alan.
+
+`requested_by`: RFI kaydini olusturan kisi veya taraf.
+
+`assigned_to`: RFI cevabindan sorumlu kisi veya taraf.
+
+`request_date`: RFI soru tarihini tutan alan.
+
+`submitted_by`: Submittal kaydini gonderen kisi veya taraf.
+
+`submitted_to`: Submittal kaydini inceleyen veya onaylayan taraf.
+
+`submit_date`: Submittal gonderim tarihini tutan alan.
+
+`review_due_date`: Submittal incelemesi icin hedef tarihi tutan alan.
+
+`response`: Inceleme cevabini tutan alan.
+
+`submitted`: Kaydin gonderildi durumunda oldugunu anlatan status degeri.
+
+`Teknik soru`: Proje veya uygulama belirsizligi icin sorulan teknik aciklama talebi.
+
+`Teknik gonderim`: Onay veya inceleme icin sunulan teknik belge, urun veya bilgi.
+
+`Onay sureci`: Bir teknik bilginin incelenip kabul, ret veya revizyon sonucuna baglanmasi.

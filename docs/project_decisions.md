@@ -101,3 +101,12 @@
 - Katilimcilar, gundem ve kararlar simdilik metinsel alan olarak tutuldu.
 - Veritabani, JSON, API, GUI, takvim ve bildirim sistemi sonraya birakildi.
 - Aksiyonlarin ileride issue/task/punch list moduluyla baglanabilecegi kaydedildi.
+
+## 011 RFI / Submittal Lite Kaydi Baslangici
+
+- RFI/Submittal takibi once veri modeli olarak baslatildi.
+- Gercek onay akisi, retur/revizyon ve e-posta/bildirim sureci bu adimda kurulmadi.
+- RFI ve Submittal kayitlari baska modellere kod seviyesinde baglanmadi.
+- Teknik soru/cevap ve teknik gonderim/onay kavramlari ayri modeller olarak tutuldu.
+- Veritabani, JSON, API, GUI, dosya eki ve raporlama daha sonraki adimlara birakildi.
+- Ileride `AttachmentRecord` ve `MaterialRecord` ile baglanti kurulabilecegi kaydedildi.

@@ -10,5 +10,6 @@
 - [x] Adim 008 - Dosya/ek arsivleme
 - [x] Adim 009 - Malzeme giris/kullanim kaydi baslangici
 - [x] Adim 010 - Toplanti tutanagi ve aksiyon kaydi baslangici
+- [x] Adim 011 - RFI/submittal lite kayit modeli baslangici
 
-Sonraki kucuk adim onerisi: Adim 011 - RFI/submittal lite kayit modeli baslangici
+Sonraki kucuk adim onerisi: Adim 012 - Gunluk rapor ozet modeli baslangici
