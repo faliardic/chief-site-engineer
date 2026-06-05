@@ -102,3 +102,21 @@ class ConcreteSample:
     twenty_eight_day_result_mpa: float | None = None
     laboratory: str | None = None
     status: str = "waiting"
+
+
+@dataclass
+class InspectionRequest:
+    """Represents an inspection request sent to a building inspection company."""
+
+    request_id: str
+    project_id: str
+    requested_date: str
+    inspection_type: str
+    requested_by: str | None = None
+    inspection_company: str | None = None
+    related_pour_id: str | None = None
+    planned_inspection_date: str | None = None
+    completed_date: str | None = None
+    result: str | None = None
+    notes: str | None = None
+    status: str = "requested"

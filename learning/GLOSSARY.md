@@ -173,3 +173,27 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `float`: Ondalik sayilari temsil eden Python veri tipi.
 
 `int`: Tam sayilari temsil eden Python veri tipi.
+
+`Yapi denetim`: Yapinin proje, mevzuat ve uygulama kurallarina uygunlugunu kontrol eden denetim sureci.
+
+`Kontrol cagrisi`: Belirli bir saha kontrolu icin yapi denetim firmasina yapilan talep.
+
+`InspectionRequest`: Yapi denetim kontrol cagrisini temsil eden veri modeli.
+
+`inspection_type`: Kontrolun hangi tipte oldugunu belirten alan.
+
+`requested_date`: Kontrol cagrisinin talep edildigi tarih.
+
+`planned_inspection_date`: Kontrolun yapilmasi planlanan tarih.
+
+`completed_date`: Kontrolun tamamlandigi tarih.
+
+`related_pour_id`: Kontrol cagrisinin iliskili beton dokumu kaydina baglanmasini saglayan alan.
+
+`requested`: Cagrinin talep edildi ama henuz tamamlanmadi durumunu anlatan status degeri.
+
+`result`: Denetim sonucunu tutan alan.
+
+`Denetim sonucu`: Kontrol sonunda ortaya cikan olumlu, olumsuz veya notlu sonuc bilgisi.
+
+`Iliskili kayit`: Bir kaydin baska bir kayitla baglantisini gosteren bilgi.

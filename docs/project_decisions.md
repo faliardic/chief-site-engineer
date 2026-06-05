@@ -56,3 +56,11 @@
 - Veritabani ve JSON kayit sistemi bu asamada yapilmayacak.
 - `ConcretePour` ve `ConcreteSample` modelleri ileride beton takip modulunun temelini olusturacak.
 - 7 gunluk ve 28 gunluk test sonuclari simdilik opsiyonel alan olarak tutulacak.
+
+## 006 Yapi Denetim Kontrol Cagrilari
+
+- Yapi denetim kontrol cagrilari once veri modeli olarak kurulacak.
+- EBIS entegrasyonu bu asamada yapilmayacak.
+- Bildirim veya takvim sistemi bu asamada yapilmayacak.
+- `InspectionRequest` modeli, yapi denetim sureclerinin takip edilmesi icin temel model olacak.
+- `related_pour_id` alani, ileride beton dokum kaydiyla kontrol cagrisi arasinda baglanti kurmak icin opsiyonel tutulacak.

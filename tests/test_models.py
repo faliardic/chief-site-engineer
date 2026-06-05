@@ -4,6 +4,7 @@ from app.models import (
     ConcretePour,
     ConcreteSample,
     DailySiteLog,
+    InspectionRequest,
     SiteProject,
     TrackingRecord,
 )
@@ -138,3 +139,25 @@ def test_concrete_sample_holds_values_and_defaults() -> None:
     assert sample.twenty_eight_day_result_mpa is None
     assert sample.laboratory is None
     assert sample.status == "waiting"
+
+
+def test_inspection_request_holds_values_and_defaults() -> None:
+    request = InspectionRequest(
+        request_id="insp-001",
+        project_id="prj-001",
+        requested_date="2026-06-05",
+        inspection_type="Temel demir kontrolu",
+    )
+
+    assert request.request_id == "insp-001"
+    assert request.project_id == "prj-001"
+    assert request.requested_date == "2026-06-05"
+    assert request.inspection_type == "Temel demir kontrolu"
+    assert request.requested_by is None
+    assert request.inspection_company is None
+    assert request.related_pour_id is None
+    assert request.planned_inspection_date is None
+    assert request.completed_date is None
+    assert request.result is None
+    assert request.notes is None
+    assert request.status == "requested"

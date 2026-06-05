@@ -1,5 +1,13 @@
 # Changelog
 
+## 006 Yapi Denetim Kontrol Cagrilari
+
+- `InspectionRequest` modeli eklendi.
+- Yapi denetim kontrol cagrisi model testi eklendi.
+- Adim 006 docs dosyasi olusturuldu.
+- Adim 006 learning dosyasi yeni kod bloklu standarda gore olusturuldu.
+- `learning/GLOSSARY.md` ve `docs/project_decisions.md` guncellendi.
+
 ## 005 Beton Dokum ve Numune Takip Baslangici
 
 - `ConcretePour` modeli eklendi.
