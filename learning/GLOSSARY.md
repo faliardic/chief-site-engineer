@@ -347,3 +347,35 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Teknik gonderim`: Onay veya inceleme icin sunulan teknik belge, urun veya bilgi.
 
 `Onay sureci`: Bir teknik bilginin incelenip kabul, ret veya revizyon sonucuna baglanmasi.
+
+`Gunluk rapor`: Santiyede bir gune ait is, ekip, malzeme, sorun ve not ozetlerini tutan kayit.
+
+`DailyReportRecord`: Gunluk rapor ozet bilgisini temsil eden veri modeli.
+
+`report_date`: Gunluk rapor tarihini tutan alan.
+
+`weather`: Hava durumu bilgisini tutan alan.
+
+`work_summary`: O gun yapilan islerin ozetini tutan alan.
+
+`manpower_summary`: Iscilik veya ekip durumunu tutan ozet alan.
+
+`equipment_summary`: Makine ve ekipman durumunu tutan ozet alan.
+
+`material_summary`: Malzeme durumunu tutan ozet alan.
+
+`issue_summary`: Sorun veya dikkat edilmesi gereken olay ozetini tutan alan.
+
+`safety_summary`: Is guvenligi ozetini tutan alan.
+
+`prepared_by`: Raporu hazirlayan kisiyi tutan alan.
+
+`Rapor durumu`: Raporun taslak, tamamlandi veya benzeri durumunu anlatan bilgi.
+
+`Gunluk is ozeti`: Bir gunde yapilan imalat ve saha islerinin kisa anlatimi.
+
+`Iscilik ozeti`: Sahadaki ekip veya isci durumunun kisa anlatimi.
+
+`Ekipman ozeti`: Sahadaki makine ve ekipman durumunun kisa anlatimi.
+
+`Is guvenligi ozeti`: O gune ait is guvenligi durumunun kisa anlatimi.

@@ -110,3 +110,12 @@
 - Teknik soru/cevap ve teknik gonderim/onay kavramlari ayri modeller olarak tutuldu.
 - Veritabani, JSON, API, GUI, dosya eki ve raporlama daha sonraki adimlara birakildi.
 - Ileride `AttachmentRecord` ve `MaterialRecord` ile baglanti kurulabilecegi kaydedildi.
+
+## 012 Gunluk Rapor Ozet Modeli Baslangici
+
+- Gunluk rapor takibi once veri modeli olarak baslatildi.
+- Gercek PDF/Excel rapor uretimi bu adimda yapilmadi.
+- Hava durumu yalnizca metinsel alan olarak tutuldu; API entegrasyonu yapilmadi.
+- Gunluk is, iscilik, ekipman, malzeme, sorun ve is guvenligi ozetleri ayri metinsel alanlar olarak tutuldu.
+- Diger modellerle kod seviyesinde iliski kurulmadı.
+- Veritabani, JSON, API, GUI, dosya eki ve raporlama daha sonraki adimlara birakildi.

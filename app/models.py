@@ -232,3 +232,20 @@ class SubmittalRecord:
     response: str | None = None
     status: str = "submitted"
     notes: str | None = None
+
+
+@dataclass
+class DailyReportRecord:
+    """Represents a daily site report summary."""
+
+    report_date: str
+    weather: str | None = None
+    work_summary: str | None = None
+    manpower_summary: str | None = None
+    equipment_summary: str | None = None
+    material_summary: str | None = None
+    issue_summary: str | None = None
+    safety_summary: str | None = None
+    prepared_by: str | None = None
+    status: str = "draft"
+    notes: str | None = None

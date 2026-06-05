@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 012
+
+- Added `DailyReportRecord` model as the starting point for daily site report summaries.
+- Added tests for daily report values and default draft status.
+- Added documentation and learning material for the daily report summary model.
+
 ## Step 011
 
 - Added `RFIRecord` model as the starting point for technical question tracking.

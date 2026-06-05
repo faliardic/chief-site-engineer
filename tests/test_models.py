@@ -4,6 +4,7 @@ from app.models import (
     ChecklistItem,
     ConcretePour,
     ConcreteSample,
+    DailyReportRecord,
     DailySiteLog,
     InspectionRequest,
     MaterialRecord,
@@ -317,3 +318,29 @@ def test_submittal_record_holds_values_and_defaults() -> None:
     assert submittal.response is None
     assert submittal.notes is None
     assert submittal.status == "submitted"
+
+
+def test_daily_report_record_holds_values_and_defaults() -> None:
+    report = DailyReportRecord(
+        report_date="2026-06-05",
+        weather="Gunesli",
+        work_summary="Temel izolasyon imalati tamamlandi.",
+        manpower_summary="12 isci, 1 formen sahada calisti.",
+        equipment_summary="1 ekskavator ve 1 vinc kullanildi.",
+        material_summary="Izolasyon membrani sahaya alindi.",
+        issue_summary="Kuzey cephede drenaj detayi netlestirilecek.",
+        safety_summary="Is guvenligi uygunsuzlugu gorulmedi.",
+        prepared_by="Santiye sefi",
+    )
+
+    assert report.report_date == "2026-06-05"
+    assert report.weather == "Gunesli"
+    assert report.work_summary == "Temel izolasyon imalati tamamlandi."
+    assert report.manpower_summary == "12 isci, 1 formen sahada calisti."
+    assert report.equipment_summary == "1 ekskavator ve 1 vinc kullanildi."
+    assert report.material_summary == "Izolasyon membrani sahaya alindi."
+    assert report.issue_summary == "Kuzey cephede drenaj detayi netlestirilecek."
+    assert report.safety_summary == "Is guvenligi uygunsuzlugu gorulmedi."
+    assert report.prepared_by == "Santiye sefi"
+    assert report.notes is None
+    assert report.status == "draft"
