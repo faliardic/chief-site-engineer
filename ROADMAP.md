@@ -13,5 +13,6 @@
 - [x] Adim 011 - RFI/submittal lite kayit modeli baslangici
 - [x] Adim 012 - Gunluk rapor ozet modeli baslangici
 - [x] Adim 013 - Basit proje tarafi / kisi kayit modeli baslangici
+- [x] Adim 014 - Basit santiye lokasyon / mahal kayit modeli baslangici
 
-Sonraki kucuk adim onerisi: Adim 014 - Basit santiye lokasyon / mahal kayit modeli baslangici
+Sonraki kucuk adim onerisi: Adim 015 - Basit ekip/iscilik kayit modeli baslangici

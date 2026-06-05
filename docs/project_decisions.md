@@ -129,3 +129,13 @@
 - Telefon, e-posta ve vergi/kimlik numarasi dogrulamasi yapilmadi.
 - Veritabani, JSON, API, GUI, arama/filtreleme ve raporlama sonraya birakildi.
 - Ileride bu kayitlarin toplanti, aksiyon, RFI, submittal, malzeme ve gunluk rapor kayitlariyla baglanabilecegi kaydedildi.
+
+## 014 Santiye Lokasyon / Mahal Kaydi Baslangici
+
+- Santiye lokasyon/mahal takibi once veri modeli olarak baslatildi.
+- Gercek lokasyon yonetim sistemi kurulmadı.
+- Kat plani, harita, mahal hiyerarsisi ve arama/filtreleme bu adimda yapilmadi.
+- Blok, kat, bolge, aks ve disiplin bilgileri ayri metinsel alanlar olarak tutuldu.
+- Diger modellerle kod seviyesinde iliski kurulmadı.
+- Veritabani, JSON, API, GUI ve raporlama sonraya birakildi.
+- Ileride bu modelin kontrol, uygunsuzluk, gunluk rapor, malzeme ve ek/fotograf kayitlariyla baglanabilecegi kaydedildi.

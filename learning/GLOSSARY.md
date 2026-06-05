@@ -409,3 +409,33 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Yapi denetim`: Yapinin uygunlugunu denetleyen kurum veya firma.
 
 `Sorumluluk alani`: Kisinin projede takip ettigi konu, bolge veya is kalemi.
+
+`Santiye lokasyonu`: Santiyede belirli bir blok, kat, mahal, cephe veya calisma alani.
+
+`Mahal kaydi`: Bir saha alaninin kayit altina alinmis hali.
+
+`SiteLocationRecord`: Santiye lokasyon veya mahal bilgisini temsil eden veri modeli.
+
+`location_name`: Lokasyon veya mahal adini tutan alan.
+
+`block`: Blok bilgisini tutan alan.
+
+`floor`: Kat bilgisini tutan alan.
+
+`zone`: Bolge veya calisma alani bilgisini tutan alan.
+
+`axis`: Aks bilgisini tutan alan.
+
+`discipline`: Ilgili is disiplinini tutan alan.
+
+`Blok`: Projedeki ana yapi bolumu.
+
+`Kat`: Yapidaki dusey seviye.
+
+`Mahal`: Yapida belirli oda, alan veya bolge.
+
+`Aks`: Projede konum belirlemek icin kullanilan referans cizgisi veya araligi.
+
+`Disiplin`: Betonarme, mimari, mekanik, elektrik gibi is alani.
+
+`Calisma alani`: Sahada is yapilan belirli bolge.

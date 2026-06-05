@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 014
+
+- Added `SiteLocationRecord` model as the starting point for site location and work area tracking.
+- Added tests for site location values and default active status.
+- Added documentation and learning material for the site location record model.
+
 ## Step 013
 
 - Added `ProjectPartyRecord` model as the starting point for project party tracking.

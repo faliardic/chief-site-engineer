@@ -278,3 +278,18 @@ class ContactPersonRecord:
     responsibility_area: str | None = None
     status: str = "active"
     notes: str | None = None
+
+
+@dataclass
+class SiteLocationRecord:
+    """Represents a site location or work area."""
+
+    location_name: str
+    block: str | None = None
+    floor: str | None = None
+    zone: str | None = None
+    axis: str | None = None
+    discipline: str | None = None
+    description: str | None = None
+    status: str = "active"
+    notes: str | None = None

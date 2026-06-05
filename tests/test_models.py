@@ -14,6 +14,7 @@ from app.models import (
     NonconformityRecord,
     ProjectPartyRecord,
     RFIRecord,
+    SiteLocationRecord,
     SiteProject,
     SubmittalRecord,
     TrackingRecord,
@@ -388,3 +389,25 @@ def test_contact_person_record_holds_values_and_defaults() -> None:
     assert person.responsibility_area == "Betonarme imalat"
     assert person.notes is None
     assert person.status == "active"
+
+
+def test_site_location_record_holds_values_and_defaults() -> None:
+    location = SiteLocationRecord(
+        location_name="A Blok 3. Kat Kuzey Cephe",
+        block="A Blok",
+        floor="3. Kat",
+        zone="Kuzey cephe",
+        axis="A-B / 1-4",
+        discipline="Mimari",
+        description="Cephe kaplama calisma alani",
+    )
+
+    assert location.location_name == "A Blok 3. Kat Kuzey Cephe"
+    assert location.block == "A Blok"
+    assert location.floor == "3. Kat"
+    assert location.zone == "Kuzey cephe"
+    assert location.axis == "A-B / 1-4"
+    assert location.discipline == "Mimari"
+    assert location.description == "Cephe kaplama calisma alani"
+    assert location.notes is None
+    assert location.status == "active"
