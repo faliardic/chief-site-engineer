@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 015
+
+- Added `WorkforceRecord` model as the starting point for crew and workforce tracking.
+- Added tests for workforce values and default active status.
+- Added documentation and learning material for the workforce record model.
+
 ## Step 014
 
 - Added `SiteLocationRecord` model as the starting point for site location and work area tracking.

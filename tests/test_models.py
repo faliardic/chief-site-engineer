@@ -18,6 +18,7 @@ from app.models import (
     SiteProject,
     SubmittalRecord,
     TrackingRecord,
+    WorkforceRecord,
 )
 
 
@@ -411,3 +412,25 @@ def test_site_location_record_holds_values_and_defaults() -> None:
     assert location.description == "Cephe kaplama calisma alani"
     assert location.notes is None
     assert location.status == "active"
+
+
+def test_workforce_record_holds_values_and_defaults() -> None:
+    workforce = WorkforceRecord(
+        crew_name="Kalip ekibi",
+        crew_type="kalip",
+        company="ABC Kalip Tas.",
+        worker_count=12,
+        work_area="A Blok 2. Kat",
+        work_date="2026-06-05",
+        task_description="Doseme kalip imalati",
+    )
+
+    assert workforce.crew_name == "Kalip ekibi"
+    assert workforce.crew_type == "kalip"
+    assert workforce.company == "ABC Kalip Tas."
+    assert workforce.worker_count == 12
+    assert workforce.work_area == "A Blok 2. Kat"
+    assert workforce.work_date == "2026-06-05"
+    assert workforce.task_description == "Doseme kalip imalati"
+    assert workforce.notes is None
+    assert workforce.status == "active"

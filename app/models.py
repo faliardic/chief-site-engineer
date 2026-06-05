@@ -293,3 +293,18 @@ class SiteLocationRecord:
     description: str | None = None
     status: str = "active"
     notes: str | None = None
+
+
+@dataclass
+class WorkforceRecord:
+    """Represents a crew or workforce record."""
+
+    crew_name: str
+    crew_type: str | None = None
+    company: str | None = None
+    worker_count: int | None = None
+    work_area: str | None = None
+    work_date: str | None = None
+    task_description: str | None = None
+    status: str = "active"
+    notes: str | None = None

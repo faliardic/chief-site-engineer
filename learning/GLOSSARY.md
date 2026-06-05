@@ -439,3 +439,33 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Disiplin`: Betonarme, mimari, mekanik, elektrik gibi is alani.
 
 `Calisma alani`: Sahada is yapilan belirli bolge.
+
+`Ekip kaydi`: Santiyede belirli bir ekip veya calisma grubunun kayit altina alinmis hali.
+
+`Iscilik kaydi`: Sahadaki isci grubu, kisi sayisi ve yaptigi isin temel bilgisini tutan kayit.
+
+`WorkforceRecord`: Ekip veya iscilik bilgisini temsil eden veri modeli.
+
+`crew_name`: Ekip veya iscilik grubu adini tutan alan.
+
+`crew_type`: Ekibin kalip, demir, mekanik veya elektrik gibi turunu tutan alan.
+
+`company`: Ekibin bagli oldugu firma veya taseron bilgisini tutan alan.
+
+`worker_count`: Ekipteki kisi sayisini tutan alan.
+
+`work_area`: Ekibin calistigi mahal, blok, kat veya alan bilgisini tutan alan.
+
+`work_date`: Ekibin calistigi tarihi tutan alan.
+
+`task_description`: Ekibin yaptigi isin kisa aciklamasini tutan alan.
+
+`Puantaj`: Calisanlarin hangi gun, kac kisi veya kac saat calistigini takip eden kayit sistemi.
+
+`Iscilik grubu`: Ayni is turunde calisan ekip.
+
+`Taseron ekip`: Belirli bir isi yapmak icin ana yukleniciye veya projeye bagli calisan alt ekip.
+
+`Kisi sayisi`: Bir ekipte veya sahada bulunan calisan adedi.
+
+`Calisma tarihi`: Bir isin veya ekip faaliyetinin yapildigi tarih.

@@ -139,3 +139,12 @@
 - Diger modellerle kod seviyesinde iliski kurulmadı.
 - Veritabani, JSON, API, GUI ve raporlama sonraya birakildi.
 - Ileride bu modelin kontrol, uygunsuzluk, gunluk rapor, malzeme ve ek/fotograf kayitlariyla baglanabilecegi kaydedildi.
+
+## 015 Ekip / Iscilik Kaydi Baslangici
+
+- Ekip/iscilik takibi once veri modeli olarak baslatildi.
+- Gercek puantaj, bordro, vardiya ve performans sistemi kurulmadi.
+- Ekip adi, ekip turu, firma, kisi sayisi, calisma alani ve calisma tarihi ayri alanlar olarak tutuldu.
+- Diger modellerle kod seviyesinde iliski kurulmadi.
+- Veritabani, JSON, API, GUI, arama/filtreleme ve raporlama sonraya birakildi.
+- Ileride bu modelin gunluk rapor, lokasyon, taseron/proje tarafi ve saha ilerleme kayitlariyla baglanabilecegi kaydedildi.
