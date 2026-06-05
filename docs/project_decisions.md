@@ -175,3 +175,11 @@
 - Not basligi, not turu, konum, ilgili konu ve not tarihi ayri alanlar olarak tutuldu.
 - Diger modellerle kod seviyesinde iliski kurulmadi.
 - Veritabani, JSON, API, GUI, arama/filtreleme ve raporlama sonraya birakildi.
+
+## 019 Gorev Adayi Kaydi Baslangici
+
+- Goreve donusebilecek kucuk aksiyon adaylari once veri modeli olarak baslatildi.
+- Gercek gorev yonetimi, hatirlatici, bildirim, takvim, kisi atama, oncelik, is emri ve tamamlandi/ertelendi is akisi kurulmadi.
+- Gorev basligi, gorev turu, ilgili alan, kaynak ve hedef tarih ayri alanlar olarak tutuldu.
+- Saha notu veya gunluk raporla kod seviyesinde iliski kurulmadi.
+- Veritabani, JSON, API, GUI, arama/filtreleme ve raporlama sonraya birakildi.

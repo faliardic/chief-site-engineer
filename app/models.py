@@ -349,3 +349,16 @@ class SiteNoteRecord:
     note_date: str | None = None
     status: str = "open"
     notes: str | None = None
+
+
+@dataclass
+class TaskCandidateRecord:
+    """Represents a simple task candidate record."""
+
+    task_title: str
+    task_type: str | None = None
+    related_area: str | None = None
+    source: str | None = None
+    target_date: str | None = None
+    status: str = "open"
+    notes: str | None = None

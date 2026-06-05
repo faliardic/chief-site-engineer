@@ -20,6 +20,7 @@ from app.models import (
     SiteProject,
     SubmittalRecord,
     SupplierRecord,
+    TaskCandidateRecord,
     TrackingRecord,
     WorkforceRecord,
 )
@@ -495,3 +496,21 @@ def test_site_note_record_holds_values_and_defaults() -> None:
     assert site_note.note_date == "2026-06-05"
     assert site_note.notes is None
     assert site_note.status == "open"
+
+
+def test_task_candidate_record_holds_values_and_defaults() -> None:
+    task_candidate = TaskCandidateRecord(
+        task_title="Kuzey cephe iskele kontrolu takip et",
+        task_type="takip",
+        related_area="A Blok kuzey cephe",
+        source="Saha notu",
+        target_date="2026-06-12",
+    )
+
+    assert task_candidate.task_title == "Kuzey cephe iskele kontrolu takip et"
+    assert task_candidate.task_type == "takip"
+    assert task_candidate.related_area == "A Blok kuzey cephe"
+    assert task_candidate.source == "Saha notu"
+    assert task_candidate.target_date == "2026-06-12"
+    assert task_candidate.notes is None
+    assert task_candidate.status == "open"

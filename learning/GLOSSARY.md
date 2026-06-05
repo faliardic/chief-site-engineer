@@ -567,3 +567,25 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Kisi atama sistemi`: Bir kaydin belirli kisiye sorumluluk olarak atanmasini saglayan sistem.
 
 `Oncelik sistemi`: Kayitlarin aciliyet veya onem seviyesine gore siniflandirilmasini saglayan sistem.
+
+`Gorev adayi kaydi`: Henuz gercek gorev olmayan, ileride goreve donusebilecek aksiyon fikrinin kayit altina alinmis hali.
+
+`TaskCandidateRecord`: Gorev adayini temsil eden veri modeli.
+
+`task_title`: Gorev adayinin kisa basligini tutan alan.
+
+`task_type`: Gorev adayinin kontrol, takip, hatirlatma veya koordinasyon gibi turunu tutan alan.
+
+`related_area`: Gorev adayinin ilgili oldugu saha alani, mahal, blok, kat veya konu alanini tutan alan.
+
+`source`: Gorev adayinin hangi not, gozlem veya talep gibi kaynaktan ciktigini metin olarak tutan alan.
+
+`target_date`: Gorev adayinin hedef tarihini veya takip edilmesi dusunulen tarihi tutan alan.
+
+`Gorev yonetimi sistemi`: Gorevlerin sorumlu, tarih, durum, oncelik ve takip kurallariyla yonetildigi sistem.
+
+`Is emri sistemi`: Sahada yapilacak isin resmi veya operasyonel emir kaydi olarak takip edildigi sistem.
+
+`Is akisi`: Bir kaydin durumlar arasinda hangi kurallarla ilerledigini tanimlayan surec.
+
+`Saha notu baglantisi`: Bir kaydin saha notu kaydiyla kod seviyesinde iliskilendirilmesi.

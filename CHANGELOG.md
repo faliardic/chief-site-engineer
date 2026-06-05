@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 019
+
+- Added `TaskCandidateRecord` model as the starting point for simple task candidate tracking.
+- Added tests for task candidate values and default open status.
+- Added documentation and learning material for the task candidate record model.
+
 ## Step 018
 
 - Added `SiteNoteRecord` model as the starting point for simple site note tracking.
