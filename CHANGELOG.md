@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 010
+
+- Added `MeetingRecord` model as the starting point for meeting minutes.
+- Added `MeetingActionRecord` model as the starting point for meeting action tracking.
+- Added tests, documentation, and learning material for meeting/action record models.
+
 ## Step 009
 
 - Added `MaterialRecord` model as the starting point for material entry and usage tracking.

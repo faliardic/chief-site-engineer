@@ -7,6 +7,8 @@ from app.models import (
     DailySiteLog,
     InspectionRequest,
     MaterialRecord,
+    MeetingActionRecord,
+    MeetingRecord,
     NonconformityRecord,
     SiteProject,
     TrackingRecord,
@@ -236,3 +238,40 @@ def test_material_record_holds_values_and_defaults() -> None:
     assert material.used_date is None
     assert material.notes is None
     assert material.status == "received"
+
+
+def test_meeting_record_holds_values_and_defaults() -> None:
+    meeting = MeetingRecord(
+        meeting_title="Haftalik santiye koordinasyon toplantisi",
+        meeting_date="2026-06-05",
+        location="Santiye ofisi",
+        organizer="Santiye sefi",
+        participants="Isveren, yuklenici, taseron temsilcileri",
+        agenda="Imalat ilerlemesi ve kalite kontrolleri",
+    )
+
+    assert meeting.meeting_title == "Haftalik santiye koordinasyon toplantisi"
+    assert meeting.meeting_date == "2026-06-05"
+    assert meeting.location == "Santiye ofisi"
+    assert meeting.organizer == "Santiye sefi"
+    assert meeting.participants == "Isveren, yuklenici, taseron temsilcileri"
+    assert meeting.agenda == "Imalat ilerlemesi ve kalite kontrolleri"
+    assert meeting.decisions is None
+    assert meeting.notes is None
+    assert meeting.status == "draft"
+
+
+def test_meeting_action_record_holds_values_and_defaults() -> None:
+    action = MeetingActionRecord(
+        action_title="Temel izolasyon detayini kontrol et",
+        meeting_title="Haftalik santiye koordinasyon toplantisi",
+        responsible="Saha muhendisi",
+        due_date="2026-06-12",
+    )
+
+    assert action.action_title == "Temel izolasyon detayini kontrol et"
+    assert action.meeting_title == "Haftalik santiye koordinasyon toplantisi"
+    assert action.responsible == "Saha muhendisi"
+    assert action.due_date == "2026-06-12"
+    assert action.notes is None
+    assert action.status == "open"

@@ -9,6 +9,6 @@
 - [x] Adim 007 - Uygunsuzluk kayitlari
 - [x] Adim 008 - Dosya/ek arsivleme
 - [x] Adim 009 - Malzeme giris/kullanim kaydi baslangici
-- [ ] Adim 010 - Raporlama ve disa aktarma
+- [x] Adim 010 - Toplanti tutanagi ve aksiyon kaydi baslangici
 
-Sonraki kucuk adim onerisi: Adim 010 - Malzeme kaydi kalite kontrolu ve commit
+Sonraki kucuk adim onerisi: Adim 011 - RFI/submittal lite kayit modeli baslangici

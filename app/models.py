@@ -176,3 +176,30 @@ class MaterialRecord:
     used_date: str | None = None
     status: str = "received"
     notes: str | None = None
+
+
+@dataclass
+class MeetingRecord:
+    """Represents a meeting minutes record."""
+
+    meeting_title: str
+    meeting_date: str | None = None
+    location: str | None = None
+    organizer: str | None = None
+    participants: str | None = None
+    agenda: str | None = None
+    decisions: str | None = None
+    notes: str | None = None
+    status: str = "draft"
+
+
+@dataclass
+class MeetingActionRecord:
+    """Represents an action item from a meeting."""
+
+    action_title: str
+    meeting_title: str | None = None
+    responsible: str | None = None
+    due_date: str | None = None
+    status: str = "open"
+    notes: str | None = None

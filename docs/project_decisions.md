@@ -88,7 +88,16 @@
 ## 009 Malzeme Giris/Kullanim Kaydi Baslangici
 
 - Malzeme takibi once veri modeli olarak baslatildi.
-- Gercek stok hareketi sistemi kurulmadı.
+- Gercek stok hareketi sistemi kurulmadi.
 - Malzeme giris/kullanim ayrimi simdilik `received_date`, `used_date` ve `status` alanlariyla temsil edildi.
 - Irsaliye/fotograf gibi kanitlar ileride `AttachmentRecord` ile baglanabilir.
 - Veritabani, JSON, API ve GUI daha sonraki adimlara birakildi.
+
+## 010 Toplanti Tutanagi ve Aksiyon Kaydi Baslangici
+
+- Toplanti ve aksiyon takibi once veri modeli olarak baslatildi.
+- Tutanaktan otomatik gorev uretme bu adimda yapilmadi.
+- Toplanti ile aksiyon arasinda kod seviyesinde iliski kurulmadi.
+- Katilimcilar, gundem ve kararlar simdilik metinsel alan olarak tutuldu.
+- Veritabani, JSON, API, GUI, takvim ve bildirim sistemi sonraya birakildi.
+- Aksiyonlarin ileride issue/task/punch list moduluyla baglanabilecegi kaydedildi.

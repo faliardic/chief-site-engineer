@@ -283,3 +283,29 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Malzeme birimi`: Malzemenin m3, ton, kg veya adet gibi olcu birimi.
 
 `Mahal / alan`: Malzemenin geldigi, depolandigi veya kullanildigi saha bolgesi.
+
+`Toplanti tutanagi`: Toplantida konusulan gundem, karar ve notlari tutan kayit.
+
+`MeetingRecord`: Toplanti bilgisini temsil eden veri modeli.
+
+`MeetingActionRecord`: Toplantidan cikan aksiyon veya gorev fikrini temsil eden veri modeli.
+
+`meeting_title`: Toplanti basligini tutan alan.
+
+`meeting_date`: Toplanti tarihini tutan alan.
+
+`organizer`: Toplantiyi organize eden kisi veya taraf.
+
+`participants`: Toplanti katilimcilarini metin olarak tutan alan.
+
+`agenda`: Toplanti gundemini tutan alan.
+
+`decisions`: Toplantida alinan kararlari tutan alan.
+
+`action_title`: Aksiyon basligini tutan alan.
+
+`responsible`: Aksiyondan sorumlu kisiyi tutan alan.
+
+`Termin`: Bir isin tamamlanmasi beklenen hedef tarih.
+
+`Aksiyon kaydi`: Toplantidan cikan takip edilecek is veya gorev kaydi.
