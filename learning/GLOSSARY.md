@@ -1,0 +1,147 @@
+# Glossary
+
+Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini tutar.
+
+`Repo`: Projenin dosyalarini ve Git gecmisini tutan ana calisma alani.
+
+`Proje koku`: Projeye ait ana klasor; komutlar genellikle bu klasorden calistirilir.
+
+`Klasor yapisi`: Dosya ve klasorlerin proje icinde nasil duzenlendigini gosteren yapi.
+
+`__init__.py`: Bir klasorun Python paketi olarak kullanilabilecegini gosteren dosya.
+
+`main.py`: Uygulamanin baslangic noktasi olarak kullanilan Python dosyasi.
+
+`Test`: Kodun beklenen sekilde calisip calismadigini kontrol eden otomatik denetim.
+
+`Smoke test`: Sistemin en temel parcasinin calistigini hizlica kontrol eden basit test.
+
+`pytest`: Python projelerinde test calistirmak icin kullanilan arac.
+
+`requirements.txt`: Projenin ihtiyac duydugu Python paketlerini listeleyen dosya.
+
+`Changelog`: Projede yapilan degisikliklerin zaman sirasiyla tutuldugu kayit.
+
+`Markdown`: Baslik, liste ve kod gibi metinleri sade isaretlerle yazmayi saglayan dokuman bicimi.
+
+`Roadmap`: Projenin hangi adimlarla ilerleyecegini gosteren yol haritasi.
+
+`Archive`: Projede saklanacak eski kayit, belge veya eklerin toplandigi arsiv alani.
+
+`.gitkeep`: Normalde bos klasorleri izlemeyen Git icin, bos klasorun repoda kalmasini saglayan yer tutucu dosya.
+
+`Dataclass`: Veri tutan sade Python siniflarini daha az kodla yazmayi saglayan Python ozelligi.
+
+`Veri modeli`: Sistemde takip edilecek bilgilerin alanlarini ve anlamini tanimlayan yapi.
+
+`Field`: Bir veri modelinin tuttugu tek bilgi alani.
+
+`Type hint`: Bir degiskenin, alanin veya fonksiyon sonucunun hangi veri tipiyle calistigini gosteren ipucu.
+
+`Optional`: Bir alanin deger alabilecegini veya bos kalabilecegini anlatan tip mantigi.
+
+`None`: Python'da degerin henuz olmadigini veya bos oldugunu gosteren ozel deger.
+
+`Varsayilan deger`: Alan icin deger verilmediginde otomatik kullanilan baslangic degeri.
+
+`Model testi`: Veri modelinin olusturulabildigini, alanlari sakladigini ve varsayilan degerleri dogru kullandigini kontrol eden test.
+
+`Gunluk saha kaydi`: Santiyede bir gune ait hava, ekip, is, kontrol, sorun ve not bilgilerinin tutuldugu kayit.
+
+`Daily log`: Gunluk kayit anlamina gelir; bu projede bir gune ait saha notunu ifade eder.
+
+`Zorunlu alan`: Model olusturulurken verilmesi gereken alan.
+
+`Opsiyonel alan`: Degeri ilk anda bilinmeyebilen veya bos kalabilen alan.
+
+`Status`: Bir kaydin mevcut durumunu gosteren alan.
+
+`Draft`: Kaydin henuz taslak durumda oldugunu anlatan durum degeri.
+
+`Saha notu`: Santiyede gorulen is, durum, sorun veya kontrol hakkinda yazilan kisa aciklama.
+
+`Learning standardi`: Learning dosyalarinin hangi basliklarla ve hangi ogretme mantigiyla yazilacagini belirleyen proje kurali.
+
+`Kod akisi`: Kod calistiginda islemlerin hangi sirayla ilerledigini anlatan akis.
+
+`Teknik karar`: Bir yazilim problemini cozerken secilen yol ve bu yolun gerekcesi.
+
+`Scope`: Bir adimda yapilacak isin siniri.
+
+`Scope kontrolu`: Bir adimda sadece planlanan islerin yapilmasini, fazladan ozellik eklenmemesini saglama.
+
+`Test mantigi`: Testin hangi davranisi neden kontrol ettigini anlatan dusunme bicimi.
+
+`Gelistirme adimi`: Projeyi kucuk ve kontrol edilebilir parcalar halinde ilerleten is paketi.
+
+`Yazilim kavrami`: Programlama yaparken kullanilan temel fikir, terim veya yapi.
+
+`Kod blogu`: Dokuman icinde gercek kodu ayri bir blok olarak gosteren bolum.
+
+`Satir satir aciklama`: Kodun her onemli satirinin ne yaptigini tek tek anlatma yontemi.
+
+`Teknik karar tablosu`: Ne yaptik, nasil yaptik, neden yaptik ve ne kazandik sorularini tabloyla gosteren ogrenme araci.
+
+`Kod calisma akisi`: Kod calistiginda islemlerin hangi sirayla ilerledigini adim adim anlatan bolum.
+
+`Test kodu`: Uygulama kodunun beklenen davranisi verip vermedigini kontrol eden kod.
+
+`Varsayilan davranis`: Kullanici ek deger vermediginde kodun otomatik olarak yaptigi beklenen davranis.
+
+`Santiye benzetmesi`: Yazilim kavramini santiye isleyisinden tanidik bir ornekle aciklama yontemi.
+
+`Listeleme`: Kayitlari bir liste olarak geri dondurme islemi.
+
+`Filtreleme`: Liste icinden belirli kosula uyan kayitlari secme islemi.
+
+`getattr`: Bir nesnenin alanini adiyla okumaya yarayan Python fonksiyonu.
+
+`Saf fonksiyon`: Ayni girdiye ayni ciktiyi veren ve dis sistemi degistirmeyen fonksiyon.
+
+`Fonksiyon`: Belirli bir isi yapan adlandirilmis kod parcasi.
+
+`Liste`: Birden fazla degeri sirali sekilde tutan Python yapisi.
+
+`Bellek ici calisma`: Veriyi dosyaya veya veritabanina yazmadan, program calisirken bellekte tutma yaklasimi.
+
+`hasattr`: Bir nesnede belirli alan veya ozellik var mi diye kontrol eden Python fonksiyonu.
+
+`Dummy nesne`: Testte belirli bir durumu denemek icin kullanilan basit sahte nesne.
+
+`Saf yardimci fonksiyon`: Dis sisteme dokunmadan verilen girdiden sonuc ureten yardimci fonksiyon.
+
+`Kayit sistemi`: Verilerin nasil olusturulacagini, saklanacagini, okunacagini ve guncellenecegini belirleyen yapi.
+
+`Geriye uyumluluk`: Eski fonksiyon adlari veya kullanimlarinin yeni duzende de calismaya devam etmesi.
+
+`Yardimci fonksiyon`: Ana is akisini kolaylastiran kucuk ve odakli fonksiyon.
+
+`Class`: Nesne olusturmak icin kullanilan Python sablonu.
+
+`Nesne`: Bir class'tan olusturulan gercek veri ornegi.
+
+`Attribute`: Bir nesnenin icindeki alan veya ozellik degeri.
+
+`assert`: Testlerde bir kosulun dogru olup olmadigini kontrol eden Python ifadesi.
+
+`Model olusturma testi`: Bir veri modelinden nesne olusturulabildigini kontrol eden test.
+
+`Varsayilan deger testi`: Deger verilmediginde modelin beklenen baslangic degerlerini kullandigini kontrol eden test.
+
+`Proje baslangic noktasi`: Uygulamanin ilk calistirilan veya temel davranisini gosteren giris noktasi.
+
+`Test edilebilirlik`: Kodun otomatik testlerle kontrol edilebilir sekilde yazilmasi.
+
+`Calisma anlasmasi`: Projede nasil calisilacagini belirleyen ortak kural ve beklentiler.
+
+`Kod organizasyonu`: Kod, test ve dokuman dosyalarinin duzenli klasorlerde tutulmasi.
+
+`Deprecated`: Bir fonksiyonun veya yapinin artik tercih edilmedigini, ileride kaldirilabilecegini belirten durum.
+
+`Karar kaydi`: Projede alinan teknik kararlarin nedenleriyle birlikte yazildigi dokuman.
+
+`Repo sagligi`: Repo dosya yapisi, testler, dokumanlar ve karar kayitlarinin tutarli durumda olmasi.
+
+`Dokumantasyon hizalama`: Dokumanlarin projenin gercek kod ve ilerleme durumuyla uyumlu hale getirilmesi.
+
+`Commit`: Git icinde belirli bir anda yapilan degisikliklerin kaydedilmis paketi.

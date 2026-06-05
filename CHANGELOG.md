@@ -1,0 +1,65 @@
+# Changelog
+
+## Adim 004 Sonrasi Dokumantasyon ve Repo Sagligi Duzeltmesi
+
+- README guncellendi.
+- ROADMAP durumlari tutarli hale getirildi.
+- `docs/project_decisions.md` Adim 002-004 ve learning kararlariyla genisletildi.
+- `list_records_by_project` geriye uyumluluk karari dokumante edildi.
+- CHANGELOG okunabilir sira ile duzenlendi.
+
+## 001 Repo ve Calisma Anlasmalari Duzeltmesi
+
+- Learning dosyasina mini sozluk eklendi.
+- `learning/GLOSSARY.md` olusturuldu.
+- Yeni teknik terimlerin tanimlanmasi proje kurali haline getirildi.
+
+## 001 Tamamlayici Repo Duzeltmesi
+
+- `ROADMAP.md` eklendi.
+- `archive/` klasoru ve `.gitkeep` eklendi.
+- Roadmap ve archive terimleri learning sozlugune eklendi.
+
+## 002 Cekirdek Veri Modeli
+
+- Cekirdek veri modelleri olusturuldu.
+- Model testleri eklendi.
+- Adim 002 dokumantasyonu olusturuldu.
+- Learning dosyasi ve sozluk guncellendi.
+
+## 003 Gunluk Saha Kaydi
+
+- `DailySiteLog` modeli eklendi.
+- Gunluk saha kaydi model testleri eklendi.
+- Adim 003 dokumantasyonu olusturuldu.
+- Learning dosyasi ve sozluk guncellendi.
+
+## Learning Standardi
+
+- Learning standardi olusturuldu.
+- Learning dosyalarinin yazilim ogretme amaci netlestirildi.
+- Yeni terimlerin tanimlanmasi ve `learning/GLOSSARY.md` guncellemesi guclendirildi.
+
+## Learning Standardi Kod Bloklari Duzeltmesi
+
+- Learning standardi kod bloklari uzerinden aciklama yapacak sekilde guclendirildi.
+- Learning dosyalarinda test kodu aciklamasi zorunlu hale getirildi.
+- Teknik karar tablosu ve kod calisma akisi bolumleri standarda eklendi.
+
+## 004 Listeleme ve Filtreleme Fonksiyonlari
+
+- `app/records.py` icinde basit listeleme ve filtreleme fonksiyonlari eklendi.
+- `tests/test_records.py` icinde fonksiyon testleri eklendi.
+- `learning/004_listeleme_filtreleme_fonksiyonlari.md` gercek kod bloklari uzerinden yazildi.
+
+## 004 Hizalama Duzeltmesi
+
+- Adim 004 fonksiyon isimleri standartlastirildi.
+- `filter_records_by_project_id`, `list_records`, `count_records` ve `filter_records_by_status` yapisi netlestirildi.
+- Learning dosyasi yeni kod bloklu standarda gore hizalandi.
+
+## 001-003 Learning Standardi Genisletmesi
+
+- Adim 001, 002 ve 003 learning dosyalari yeni kod bloklu CSE Learning Standardi'na gore genisletildi.
+- Eski kisa learning notlari detayli yazilim ogretim dosyalarina donusturuldu.
+- `learning/GLOSSARY.md` eksik terimlerle guclendirildi.
