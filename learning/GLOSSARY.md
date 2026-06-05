@@ -469,3 +469,31 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Kisi sayisi`: Bir ekipte veya sahada bulunan calisan adedi.
 
 `Calisma tarihi`: Bir isin veya ekip faaliyetinin yapildigi tarih.
+
+`Ekipman kaydi`: Santiyede kullanilan ekipman, makine veya aracin kayit altina alinmis hali.
+
+`Makine kaydi`: Bir is makinesi veya saha makinesinin temel bilgisini tutan kayit.
+
+`EquipmentRecord`: Ekipman veya makine bilgisini temsil eden veri modeli.
+
+`equipment_name`: Ekipman, makine veya aracin adini tutan alan.
+
+`equipment_type`: Ekipmanin vinc, is makinesi, arac veya olcum cihazi gibi turunu tutan alan.
+
+`owner_company`: Ekipmanin sahibi olan firma, taseron veya kiralama sirketi bilgisini tutan alan.
+
+`serial_or_plate`: Ekipmanin seri numarasi veya plaka bilgisini tutan alan.
+
+`assigned_to`: Ekipmandan sorumlu kisi, ekip veya firma bilgisini tutan alan.
+
+`available`: Ekipman kaydinin kullanilabilir durumda oldugunu belirten varsayilan durum degeri.
+
+`Bakim takibi`: Ekipmanin periyodik veya ariza bakim sureclerini izleyen takip sistemi.
+
+`Yakit takibi`: Makine veya araclarin yakit tuketimini izleyen takip sistemi.
+
+`Zimmet`: Bir ekipmanin belirli kisi veya ekibe sorumluluk olarak verilmesi.
+
+`Seri numarasi`: Ekipmani benzersiz veya ayirt edilebilir yapan uretici ya da kayit numarasi.
+
+`Plaka`: Arac veya is makinesini trafikte veya sahada tanimlayan resmi isaret.

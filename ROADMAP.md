@@ -15,5 +15,6 @@
 - [x] Adim 013 - Basit proje tarafi / kisi kayit modeli baslangici
 - [x] Adim 014 - Basit santiye lokasyon / mahal kayit modeli baslangici
 - [x] Adim 015 - Basit ekip/iscilik kayit modeli baslangici
+- [x] Adim 016 - Basit ekipman/makine kayit modeli baslangici
 
-Sonraki kucuk adim onerisi: Adim 016 - Basit ekipman/makine kayit modeli baslangici
+Sonraki kucuk adim onerisi: Adim 017 - Basit malzeme kayit modeli baslangici

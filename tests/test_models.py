@@ -7,6 +7,7 @@ from app.models import (
     ContactPersonRecord,
     DailyReportRecord,
     DailySiteLog,
+    EquipmentRecord,
     InspectionRequest,
     MaterialRecord,
     MeetingActionRecord,
@@ -434,3 +435,23 @@ def test_workforce_record_holds_values_and_defaults() -> None:
     assert workforce.task_description == "Doseme kalip imalati"
     assert workforce.notes is None
     assert workforce.status == "active"
+
+
+def test_equipment_record_holds_values_and_defaults() -> None:
+    equipment = EquipmentRecord(
+        equipment_name="Kule vinc",
+        equipment_type="vinc",
+        owner_company="ABC Makine Kiralama",
+        serial_or_plate="KV-34-001",
+        work_area="A Blok saha geneli",
+        assigned_to="Kalip ekibi",
+    )
+
+    assert equipment.equipment_name == "Kule vinc"
+    assert equipment.equipment_type == "vinc"
+    assert equipment.owner_company == "ABC Makine Kiralama"
+    assert equipment.serial_or_plate == "KV-34-001"
+    assert equipment.work_area == "A Blok saha geneli"
+    assert equipment.assigned_to == "Kalip ekibi"
+    assert equipment.notes is None
+    assert equipment.status == "available"

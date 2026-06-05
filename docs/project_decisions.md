@@ -148,3 +148,12 @@
 - Diger modellerle kod seviyesinde iliski kurulmadi.
 - Veritabani, JSON, API, GUI, arama/filtreleme ve raporlama sonraya birakildi.
 - Ileride bu modelin gunluk rapor, lokasyon, taseron/proje tarafi ve saha ilerleme kayitlariyla baglanabilecegi kaydedildi.
+
+## 016 Ekipman / Makine Kaydi Baslangici
+
+- Ekipman/makine takibi once veri modeli olarak baslatildi.
+- Gercek bakim, yakit, zimmet, gunluk calisma saati, operator performansi ve makine verimlilik sistemi kurulmadi.
+- Ekipman adi, ekipman turu, sahip firma, seri/plaka bilgisi, calisma alani ve sorumlu kisi/ekip ayri alanlar olarak tutuldu.
+- Diger modellerle kod seviyesinde iliski kurulmadi.
+- Veritabani, JSON, API, GUI, arama/filtreleme ve raporlama sonraya birakildi.
+- Ileride bu modelin gunluk rapor, lokasyon, ekip/iscilik, bakim ve saha ilerleme kayitlariyla baglanabilecegi kaydedildi.

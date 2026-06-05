@@ -308,3 +308,17 @@ class WorkforceRecord:
     task_description: str | None = None
     status: str = "active"
     notes: str | None = None
+
+
+@dataclass
+class EquipmentRecord:
+    """Represents a site equipment or machine record."""
+
+    equipment_name: str
+    equipment_type: str | None = None
+    owner_company: str | None = None
+    serial_or_plate: str | None = None
+    work_area: str | None = None
+    assigned_to: str | None = None
+    status: str = "available"
+    notes: str | None = None

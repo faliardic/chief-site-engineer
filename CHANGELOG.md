@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 016
+
+- Added `EquipmentRecord` model as the starting point for equipment and machine tracking.
+- Added tests for equipment values and default available status.
+- Added documentation and learning material for the equipment record model.
+
 ## Step 015
 
 - Added `WorkforceRecord` model as the starting point for crew and workforce tracking.
