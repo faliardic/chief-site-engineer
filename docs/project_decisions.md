@@ -119,3 +119,13 @@
 - Gunluk is, iscilik, ekipman, malzeme, sorun ve is guvenligi ozetleri ayri metinsel alanlar olarak tutuldu.
 - Diger modellerle kod seviyesinde iliski kurulmadı.
 - Veritabani, JSON, API, GUI, dosya eki ve raporlama daha sonraki adimlara birakildi.
+
+## 013 Proje Tarafi ve Kisi Kaydi Baslangici
+
+- Proje tarafi ve iletisim kisisi takibi once veri modeli olarak baslatildi.
+- Gercek rehber/CRM sistemi kurulmadi.
+- Firma/kurum tarafi ile kisi kaydi ayri modeller olarak tutuldu.
+- Bu iki model arasinda kod seviyesinde iliski kurulmadı.
+- Telefon, e-posta ve vergi/kimlik numarasi dogrulamasi yapilmadi.
+- Veritabani, JSON, API, GUI, arama/filtreleme ve raporlama sonraya birakildi.
+- Ileride bu kayitlarin toplanti, aksiyon, RFI, submittal, malzeme ve gunluk rapor kayitlariyla baglanabilecegi kaydedildi.

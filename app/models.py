@@ -249,3 +249,32 @@ class DailyReportRecord:
     prepared_by: str | None = None
     status: str = "draft"
     notes: str | None = None
+
+
+@dataclass
+class ProjectPartyRecord:
+    """Represents a project party such as an employer or contractor."""
+
+    party_name: str
+    party_type: str | None = None
+    role: str | None = None
+    tax_or_id_no: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    address: str | None = None
+    status: str = "active"
+    notes: str | None = None
+
+
+@dataclass
+class ContactPersonRecord:
+    """Represents a contact person for project communication."""
+
+    full_name: str
+    organization: str | None = None
+    role: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    responsibility_area: str | None = None
+    status: str = "active"
+    notes: str | None = None

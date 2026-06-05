@@ -379,3 +379,33 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Ekipman ozeti`: Sahadaki makine ve ekipman durumunun kisa anlatimi.
 
 `Is guvenligi ozeti`: O gune ait is guvenligi durumunun kisa anlatimi.
+
+`Proje tarafi`: Projede resmi, teknik veya ticari rolu olan firma, kurum ya da paydas.
+
+`ProjectPartyRecord`: Proje tarafi bilgisini temsil eden veri modeli.
+
+`ContactPersonRecord`: Iletisim kisisi bilgisini temsil eden veri modeli.
+
+`party_name`: Firma, kurum veya taraf adini tutan alan.
+
+`party_type`: Tarafin isveren, yuklenici, tedarikci gibi tipini tutan alan.
+
+`tax_or_id_no`: Vergi no, kimlik no veya kurumsal tanimlayiciyi tutan alan.
+
+`full_name`: Kisinin ad soyad bilgisini tutan alan.
+
+`organization`: Kisinin bagli oldugu firma veya kurum bilgisini tutan alan.
+
+`responsibility_area`: Kisinin sorumluluk alanini tutan alan.
+
+`Iletisim kisisi`: Projede belirli konuda ulasilacak kisi.
+
+`Isveren`: Isi yaptiran taraf.
+
+`Yuklenici`: Isi yapmayi ustlenen ana taraf.
+
+`Alt yuklenici`: Yukleniciye bagli belirli isi yapan firma veya ekip.
+
+`Yapi denetim`: Yapinin uygunlugunu denetleyen kurum veya firma.
+
+`Sorumluluk alani`: Kisinin projede takip ettigi konu, bolge veya is kalemi.

@@ -4,6 +4,7 @@ from app.models import (
     ChecklistItem,
     ConcretePour,
     ConcreteSample,
+    ContactPersonRecord,
     DailyReportRecord,
     DailySiteLog,
     InspectionRequest,
@@ -11,6 +12,7 @@ from app.models import (
     MeetingActionRecord,
     MeetingRecord,
     NonconformityRecord,
+    ProjectPartyRecord,
     RFIRecord,
     SiteProject,
     SubmittalRecord,
@@ -344,3 +346,45 @@ def test_daily_report_record_holds_values_and_defaults() -> None:
     assert report.prepared_by == "Santiye sefi"
     assert report.notes is None
     assert report.status == "draft"
+
+
+def test_project_party_record_holds_values_and_defaults() -> None:
+    party = ProjectPartyRecord(
+        party_name="ABC Insaat A.S.",
+        party_type="Yuklenici",
+        role="Ana yuklenici",
+        tax_or_id_no="1234567890",
+        phone="+90 212 000 00 00",
+        email="info@example.com",
+        address="Istanbul",
+    )
+
+    assert party.party_name == "ABC Insaat A.S."
+    assert party.party_type == "Yuklenici"
+    assert party.role == "Ana yuklenici"
+    assert party.tax_or_id_no == "1234567890"
+    assert party.phone == "+90 212 000 00 00"
+    assert party.email == "info@example.com"
+    assert party.address == "Istanbul"
+    assert party.notes is None
+    assert party.status == "active"
+
+
+def test_contact_person_record_holds_values_and_defaults() -> None:
+    person = ContactPersonRecord(
+        full_name="Ali Yilmaz",
+        organization="ABC Insaat A.S.",
+        role="Saha muhendisi",
+        phone="+90 532 000 00 00",
+        email="ali.yilmaz@example.com",
+        responsibility_area="Betonarme imalat",
+    )
+
+    assert person.full_name == "Ali Yilmaz"
+    assert person.organization == "ABC Insaat A.S."
+    assert person.role == "Saha muhendisi"
+    assert person.phone == "+90 532 000 00 00"
+    assert person.email == "ali.yilmaz@example.com"
+    assert person.responsibility_area == "Betonarme imalat"
+    assert person.notes is None
+    assert person.status == "active"

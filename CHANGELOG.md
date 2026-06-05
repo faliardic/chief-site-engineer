@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 013
+
+- Added `ProjectPartyRecord` model as the starting point for project party tracking.
+- Added `ContactPersonRecord` model as the starting point for contact person tracking.
+- Added tests, documentation, and learning material for project party/contact records.
+
 ## Step 012
 
 - Added `DailyReportRecord` model as the starting point for daily site report summaries.
