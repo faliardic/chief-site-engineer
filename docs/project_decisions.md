@@ -64,3 +64,14 @@
 - Bildirim veya takvim sistemi bu asamada yapilmayacak.
 - `InspectionRequest` modeli, yapi denetim sureclerinin takip edilmesi icin temel model olacak.
 - `related_pour_id` alani, ileride beton dokum kaydiyla kontrol cagrisi arasinda baglanti kurmak icin opsiyonel tutulacak.
+
+## 007 Uygunsuzluk Kayitlari
+
+- Uygunsuzluk kayitlari once veri modeli olarak kurulacak.
+- Fotograf/dosya yukleme bu asamada yapilmayacak.
+- Tutanak, PDF veya resmi yazisma uretimi bu asamada yapilmayacak.
+- Veritabani ve JSON kayit sistemi bu asamada yapilmayacak.
+- `NonconformityRecord` modeli, uygunsuzluklarin takip edilmesi icin temel model olacak.
+- `related_inspection_request_id` alani ileride yapi denetim kontrol cagrisiyla iliski kurmak icin opsiyonel tutulacak.
+- `related_pour_id` alani ileride beton dokum kaydiyla iliski kurmak icin opsiyonel tutulacak.
+- `severity` ve `status` alanlari bu asamada serbest metin olarak tutulacak; enum sistemi ileride degerlendirilecek.

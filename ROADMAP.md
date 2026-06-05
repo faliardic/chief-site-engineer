@@ -6,7 +6,7 @@
 - [x] Adim 004 - Bellek ici basit kayit listeleme
 - [x] Adim 005 - Beton dokum ve numune takip baslangici
 - [x] Adim 006 - Yapi denetim kontrol cagrilari
-- [ ] Adim 007 - Uygunsuzluk kayitlari
+- [x] Adim 007 - Uygunsuzluk kayitlari
 - [ ] Adim 008 - Dosya/ek arsivleme
 - [ ] Adim 009 - Santiye sefine ozel notlar ve hatirlaticilar
 - [ ] Adim 010 - Raporlama ve disa aktarma

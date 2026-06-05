@@ -197,3 +197,31 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Denetim sonucu`: Kontrol sonunda ortaya cikan olumlu, olumsuz veya notlu sonuc bilgisi.
 
 `Iliskili kayit`: Bir kaydin baska bir kayitla baglantisini gosteren bilgi.
+
+`Uygunsuzluk`: Proje, sartname, kalite veya is guvenligi beklentisine uymayan durum.
+
+`NonconformityRecord`: Sahadaki uygunsuzluk kaydini temsil eden veri modeli.
+
+`corrective_action`: Uygunsuzlugu gidermek icin planlanan duzeltici faaliyet alani.
+
+`severity`: Bir kaydin onem seviyesini belirten alan.
+
+`medium`: Orta onem seviyesini anlatan varsayilan deger.
+
+`open`: Kaydin acik ve henuz kapatilmamis oldugunu anlatan status degeri.
+
+`due_date`: Bir is veya duzeltici faaliyet icin hedef bitis tarihi.
+
+`closed_date`: Kaydin kapatildigi tarih.
+
+`responsible_party`: Bir isten veya duzeltmeden sorumlu taraf.
+
+`related_inspection_request_id`: Uygunsuzluk kaydini iliskili yapi denetim kontrol cagrisina baglayan alan.
+
+`Kapatma tarihi`: Bir kaydin tamamlanip kapatildigi tarih.
+
+`Duzeltici faaliyet`: Bir uygunsuzlugu gidermek icin planlanan veya yapilan is.
+
+`Sorumlu taraf`: Bir kaydin veya duzeltmenin sorumlusu olan kisi, ekip veya firma.
+
+`Onem seviyesi`: Bir kaydin etkisini veya aciliyetini anlatan seviye bilgisi.

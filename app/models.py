@@ -120,3 +120,25 @@ class InspectionRequest:
     result: str | None = None
     notes: str | None = None
     status: str = "requested"
+
+
+@dataclass
+class NonconformityRecord:
+    """Represents a nonconformity found on site."""
+
+    nonconformity_id: str
+    project_id: str
+    date: str
+    title: str
+    description: str
+    location: str | None = None
+    category: str | None = None
+    severity: str = "medium"
+    responsible_party: str | None = None
+    corrective_action: str | None = None
+    due_date: str | None = None
+    closed_date: str | None = None
+    related_inspection_request_id: str | None = None
+    related_pour_id: str | None = None
+    notes: str | None = None
+    status: str = "open"

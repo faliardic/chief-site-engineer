@@ -5,6 +5,7 @@ from app.models import (
     ConcreteSample,
     DailySiteLog,
     InspectionRequest,
+    NonconformityRecord,
     SiteProject,
     TrackingRecord,
 )
@@ -161,3 +162,30 @@ def test_inspection_request_holds_values_and_defaults() -> None:
     assert request.result is None
     assert request.notes is None
     assert request.status == "requested"
+
+
+def test_nonconformity_record_holds_values_and_defaults() -> None:
+    record = NonconformityRecord(
+        nonconformity_id="ncr-001",
+        project_id="prj-001",
+        date="2026-06-05",
+        title="Eksik donati",
+        description="Temel bolgesinde ek donati eksik goruldu.",
+    )
+
+    assert record.nonconformity_id == "ncr-001"
+    assert record.project_id == "prj-001"
+    assert record.date == "2026-06-05"
+    assert record.title == "Eksik donati"
+    assert record.description == "Temel bolgesinde ek donati eksik goruldu."
+    assert record.location is None
+    assert record.category is None
+    assert record.severity == "medium"
+    assert record.responsible_party is None
+    assert record.corrective_action is None
+    assert record.due_date is None
+    assert record.closed_date is None
+    assert record.related_inspection_request_id is None
+    assert record.related_pour_id is None
+    assert record.notes is None
+    assert record.status == "open"
