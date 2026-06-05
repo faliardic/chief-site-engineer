@@ -84,3 +84,11 @@
 - `AttachmentRecord` modeli, ileride dosya arsivleme modulunun temelini olusturacak.
 - `related_model` ve `related_id` alanlari, dosya eklerinin farkli kayit tipleriyle iliskilendirilmesi icin opsiyonel tutulacak.
 - `file_path` alani simdilik sadece metinsel yol referansi olarak tutulacak.
+
+## 009 Malzeme Giris/Kullanim Kaydi Baslangici
+
+- Malzeme takibi once veri modeli olarak baslatildi.
+- Gercek stok hareketi sistemi kurulmadı.
+- Malzeme giris/kullanim ayrimi simdilik `received_date`, `used_date` ve `status` alanlariyla temsil edildi.
+- Irsaliye/fotograf gibi kanitlar ileride `AttachmentRecord` ile baglanabilir.
+- Veritabani, JSON, API ve GUI daha sonraki adimlara birakildi.

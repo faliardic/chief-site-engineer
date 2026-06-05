@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 009
+
+- Added `MaterialRecord` model as the starting point for material entry and usage tracking.
+- Added tests for material record values and default status.
+- Added documentation and learning material for the material record model.
+
 ## 008 Dosya/Ek Arsivleme Baslangici
 
 - `AttachmentRecord` modeli eklendi.

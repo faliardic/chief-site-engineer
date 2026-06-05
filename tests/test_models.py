@@ -6,6 +6,7 @@ from app.models import (
     ConcreteSample,
     DailySiteLog,
     InspectionRequest,
+    MaterialRecord,
     NonconformityRecord,
     SiteProject,
     TrackingRecord,
@@ -212,3 +213,26 @@ def test_attachment_record_holds_values_and_defaults() -> None:
     assert attachment.uploaded_date is None
     assert attachment.notes is None
     assert attachment.status == "active"
+
+
+def test_material_record_holds_values_and_defaults() -> None:
+    material = MaterialRecord(
+        material_name="C30 beton",
+        supplier="ABC Beton",
+        delivery_note_no="IRS-001",
+        quantity=24.5,
+        unit="m3",
+        area="Temel",
+        received_date="2026-06-05",
+    )
+
+    assert material.material_name == "C30 beton"
+    assert material.supplier == "ABC Beton"
+    assert material.delivery_note_no == "IRS-001"
+    assert material.quantity == 24.5
+    assert material.unit == "m3"
+    assert material.area == "Temel"
+    assert material.received_date == "2026-06-05"
+    assert material.used_date is None
+    assert material.notes is None
+    assert material.status == "received"

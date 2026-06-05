@@ -8,5 +8,7 @@
 - [x] Adim 006 - Yapi denetim kontrol cagrilari
 - [x] Adim 007 - Uygunsuzluk kayitlari
 - [x] Adim 008 - Dosya/ek arsivleme
-- [ ] Adim 009 - Santiye sefine ozel notlar ve hatirlaticilar
+- [x] Adim 009 - Malzeme giris/kullanim kaydi baslangici
 - [ ] Adim 010 - Raporlama ve disa aktarma
+
+Sonraki kucuk adim onerisi: Adim 010 - Malzeme kaydi kalite kontrolu ve commit

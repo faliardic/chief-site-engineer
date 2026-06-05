@@ -255,3 +255,31 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Iliskili model`: Bir kaydin baglandigi model turu.
 
 `Iliskili ID`: Bir kaydin baglandigi diger kaydin kimligi.
+
+`Malzeme kaydi`: Sahaya gelen veya sahada kullanilan malzemeye ait temel takip bilgisi.
+
+`MaterialRecord`: Malzeme giris veya kullanim bilgisini temsil eden veri modeli.
+
+`material_name`: Malzeme adini tutan alan.
+
+`supplier`: Malzemeyi saglayan firma veya tedarikci.
+
+`delivery_note_no`: Irsaliye numarasini tutan alan.
+
+`quantity`: Malzeme miktarini tutan alan.
+
+`unit`: Malzeme birimini tutan alan.
+
+`area`: Malzemenin geldigi veya kullanildigi mahal ya da alan.
+
+`received_date`: Malzemenin santiye giris tarihi.
+
+`used_date`: Malzemenin kullanim tarihi.
+
+`received`: Malzemenin teslim alindigini anlatan status degeri.
+
+`Irsaliye`: Malzeme teslimini gosteren sevk belgesi.
+
+`Malzeme birimi`: Malzemenin m3, ton, kg veya adet gibi olcu birimi.
+
+`Mahal / alan`: Malzemenin geldigi, depolandigi veya kullanildigi saha bolgesi.

@@ -160,3 +160,19 @@ class AttachmentRecord:
     uploaded_date: str | None = None
     notes: str | None = None
     status: str = "active"
+
+
+@dataclass
+class MaterialRecord:
+    """Represents a material entry or usage record."""
+
+    material_name: str
+    supplier: str | None = None
+    delivery_note_no: str | None = None
+    quantity: float | None = None
+    unit: str | None = None
+    area: str | None = None
+    received_date: str | None = None
+    used_date: str | None = None
+    status: str = "received"
+    notes: str | None = None
