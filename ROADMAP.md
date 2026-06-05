@@ -16,5 +16,6 @@
 - [x] Adim 014 - Basit santiye lokasyon / mahal kayit modeli baslangici
 - [x] Adim 015 - Basit ekip/iscilik kayit modeli baslangici
 - [x] Adim 016 - Basit ekipman/makine kayit modeli baslangici
+- [x] Adim 017 - Basit tedarikci kayit modeli baslangici
 
-Sonraki kucuk adim onerisi: Adim 017 - Basit malzeme kayit modeli baslangici
+Sonraki kucuk adim onerisi: Adim 018 - Basit iletisim kisisi kayit modeli baslangici

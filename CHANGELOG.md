@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 017
+
+- Added `SupplierRecord` model as the starting point for supplier and service provider tracking.
+- Added tests for supplier values and default active status.
+- Added documentation and learning material for the revised supplier record step.
+
 ## Step 016
 
 - Added `EquipmentRecord` model as the starting point for equipment and machine tracking.

@@ -157,3 +157,12 @@
 - Diger modellerle kod seviyesinde iliski kurulmadi.
 - Veritabani, JSON, API, GUI, arama/filtreleme ve raporlama sonraya birakildi.
 - Ileride bu modelin gunluk rapor, lokasyon, ekip/iscilik, bakim ve saha ilerleme kayitlariyla baglanabilecegi kaydedildi.
+
+## 017 Tedarikci Kaydi Baslangici
+
+- Onceki malzeme kaydi onerisi, `MaterialRecord` zaten mevcut oldugu icin tedarikci/firma kaydi olarak revize edildi.
+- Tedarikci, hizmet saglayici, ekipman kiralama firmasi ve taseron gibi firmalar once veri modeli olarak baslatildi.
+- Gercek satin alma, sozlesme, fatura, irsaliye, odeme, cari hesap ve tedarikci performans sistemi kurulmadi.
+- Tedarikci adi, tedarikci turu, iletisim kisisi, telefon, e-posta ve hizmet alani ayri alanlar olarak tutuldu.
+- Diger modellerle kod seviyesinde iliski kurulmadi.
+- Veritabani, JSON, API, GUI, arama/filtreleme ve raporlama sonraya birakildi.

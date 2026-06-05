@@ -322,3 +322,17 @@ class EquipmentRecord:
     assigned_to: str | None = None
     status: str = "available"
     notes: str | None = None
+
+
+@dataclass
+class SupplierRecord:
+    """Represents a supplier or service provider record."""
+
+    supplier_name: str
+    supplier_type: str | None = None
+    contact_person: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    service_area: str | None = None
+    status: str = "active"
+    notes: str | None = None

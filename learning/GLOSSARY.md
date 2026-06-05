@@ -497,3 +497,39 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Seri numarasi`: Ekipmani benzersiz veya ayirt edilebilir yapan uretici ya da kayit numarasi.
 
 `Plaka`: Arac veya is makinesini trafikte veya sahada tanimlayan resmi isaret.
+
+`Tedarikci kaydi`: Santiyeye malzeme, ekipman veya hizmet saglayan firmanin kayit altina alinmis hali.
+
+`SupplierRecord`: Tedarikci veya hizmet saglayici firma bilgisini temsil eden veri modeli.
+
+`supplier_name`: Tedarikci veya hizmet saglayici firmanin adini tutan alan.
+
+`supplier_type`: Firmanin malzeme tedarikcisi, ekipman kiralama firmasi, taseron veya hizmet saglayici gibi turunu tutan alan.
+
+`contact_person`: Firma tarafinda iletisim kurulacak kisi bilgisini tutan alan.
+
+`phone`: Telefon bilgisini tutan alan.
+
+`email`: E-posta bilgisini tutan alan.
+
+`service_area`: Firmanin sagladigi hizmet, malzeme, ekipman veya is kapsamini tutan alan.
+
+`Hizmet saglayici`: Santiyeye belirli bir hizmet sunan firma veya kurum.
+
+`Malzeme tedarikcisi`: Santiyeye malzeme saglayan firma.
+
+`Ekipman kiralama firmasi`: Santiyeye makine, arac veya ekipman kiralama hizmeti veren firma.
+
+`Satin alma sistemi`: Mal veya hizmet ihtiyacinin talep, teklif, siparis ve onay sureclerini yoneten sistem.
+
+`Sozlesme takibi`: Firma veya tedarikciyle yapilan sozlesmelerin durumunu izleyen takip yapisi.
+
+`Fatura takibi`: Faturalarin alinma, kontrol ve odeme surecini izleyen takip yapisi.
+
+`Irsaliye takibi`: Sevk veya teslim belgelerinin kayit ve kontrol surecini izleyen takip yapisi.
+
+`Odeme takibi`: Firmalara yapilacak veya yapilmis odemeleri izleyen takip yapisi.
+
+`Cari hesap`: Bir firma ile finansal borc/alacak hareketlerini izleyen hesap yapisi.
+
+`Tedarikci performans puani`: Tedarikcinin kalite, teslimat ve hizmet performansini sayisal olarak degerlendiren puan.

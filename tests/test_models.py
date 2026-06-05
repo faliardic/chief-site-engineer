@@ -18,6 +18,7 @@ from app.models import (
     SiteLocationRecord,
     SiteProject,
     SubmittalRecord,
+    SupplierRecord,
     TrackingRecord,
     WorkforceRecord,
 )
@@ -455,3 +456,23 @@ def test_equipment_record_holds_values_and_defaults() -> None:
     assert equipment.assigned_to == "Kalip ekibi"
     assert equipment.notes is None
     assert equipment.status == "available"
+
+
+def test_supplier_record_holds_values_and_defaults() -> None:
+    supplier = SupplierRecord(
+        supplier_name="ABC Beton",
+        supplier_type="malzeme tedarikcisi",
+        contact_person="Ayse Demir",
+        phone="+90 212 111 22 33",
+        email="ayse.demir@example.com",
+        service_area="Hazir beton tedariki",
+    )
+
+    assert supplier.supplier_name == "ABC Beton"
+    assert supplier.supplier_type == "malzeme tedarikcisi"
+    assert supplier.contact_person == "Ayse Demir"
+    assert supplier.phone == "+90 212 111 22 33"
+    assert supplier.email == "ayse.demir@example.com"
+    assert supplier.service_area == "Hazir beton tedariki"
+    assert supplier.notes is None
+    assert supplier.status == "active"
