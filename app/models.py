@@ -362,3 +362,15 @@ class TaskCandidateRecord:
     target_date: str | None = None
     status: str = "open"
     notes: str | None = None
+
+
+@dataclass
+class ChecklistItemRecord:
+    """Represents a simple checklist item record."""
+
+    item_title: str
+    item_category: str | None = None
+    related_area: str | None = None
+    check_reference: str | None = None
+    status: str = "pending"
+    notes: str | None = None

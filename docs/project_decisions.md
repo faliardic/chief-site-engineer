@@ -183,3 +183,12 @@
 - Gorev basligi, gorev turu, ilgili alan, kaynak ve hedef tarih ayri alanlar olarak tutuldu.
 - Saha notu veya gunluk raporla kod seviyesinde iliski kurulmadi.
 - Veritabani, JSON, API, GUI, arama/filtreleme ve raporlama sonraya birakildi.
+
+## 020 Kontrol Maddesi Kaydi Baslangici
+
+- `ChecklistItem` mevcut oldugu icin `ChecklistItemRecord` ayri ve daha spesifik kayit modeli olarak baslatildi.
+- Tekil kontrol maddeleri once veri modeli olarak baslatildi.
+- Gercek checklist sistemi, denetim formu, uygunsuzluk kaydi, puanlama, onay is akisi, fotograf/dosya eki ve raporlama sistemi kurulmadi.
+- Kontrol maddesi basligi, kategori, ilgili alan ve kontrol referansi ayri alanlar olarak tutuldu.
+- Saha notu, gorev veya gunluk raporla kod seviyesinde iliski kurulmadi.
+- Veritabani, JSON, API, GUI, arama/filtreleme ve raporlama sonraya birakildi.

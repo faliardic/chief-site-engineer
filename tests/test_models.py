@@ -2,6 +2,7 @@ from app.models import (
     ArchiveDocument,
     AttachmentRecord,
     ChecklistItem,
+    ChecklistItemRecord,
     ConcretePour,
     ConcreteSample,
     ContactPersonRecord,
@@ -514,3 +515,19 @@ def test_task_candidate_record_holds_values_and_defaults() -> None:
     assert task_candidate.target_date == "2026-06-12"
     assert task_candidate.notes is None
     assert task_candidate.status == "open"
+
+
+def test_checklist_item_record_holds_values_and_defaults() -> None:
+    checklist_item = ChecklistItemRecord(
+        item_title="Kuzey cephe iskele kontrolu",
+        item_category="is guvenligi",
+        related_area="A Blok kuzey cephe",
+        check_reference="Saha gozlemi",
+    )
+
+    assert checklist_item.item_title == "Kuzey cephe iskele kontrolu"
+    assert checklist_item.item_category == "is guvenligi"
+    assert checklist_item.related_area == "A Blok kuzey cephe"
+    assert checklist_item.check_reference == "Saha gozlemi"
+    assert checklist_item.notes is None
+    assert checklist_item.status == "pending"

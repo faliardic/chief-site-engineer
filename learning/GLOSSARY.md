@@ -589,3 +589,23 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Is akisi`: Bir kaydin durumlar arasinda hangi kurallarla ilerledigini tanimlayan surec.
 
 `Saha notu baglantisi`: Bir kaydin saha notu kaydiyla kod seviyesinde iliskilendirilmesi.
+
+`Kontrol maddesi kaydi`: Tekil kontrol maddesinin kayit altina alinmis hali.
+
+`ChecklistItemRecord`: Kontrol maddesi kaydini temsil eden veri modeli.
+
+`item_title`: Kontrol maddesinin kisa basligini tutan alan.
+
+`item_category`: Kontrol maddesinin kalite, is guvenligi veya saha duzeni gibi kategorisini tutan alan.
+
+`check_reference`: Kontrol maddesinin dayandigi proje notu, gozlem veya sartname gibi referansi tutan alan.
+
+`pending`: Kontrol maddesinin henuz beklemede oldugunu belirten varsayilan durum degeri.
+
+`Checklist sistemi`: Birden fazla kontrol maddesinin liste, durum ve takip kurallariyla yonetildigi sistem.
+
+`Puanlama sistemi`: Kontrol veya degerlendirme sonucunu sayisal puanla ifade eden sistem.
+
+`Onay is akisi`: Bir kaydin onay adimlari ve durum gecisleriyle ilerledigi surec.
+
+`Gorev baglantisi`: Bir kaydin gorev veya gorev adayi kaydiyla kod seviyesinde iliskilendirilmesi.

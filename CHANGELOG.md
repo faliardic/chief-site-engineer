@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 020
+
+- Added `ChecklistItemRecord` model as the starting point for simple checklist item records.
+- Added tests for checklist item record values and default pending status.
+- Added documentation and learning material for the checklist item record model.
+
 ## Step 019
 
 - Added `TaskCandidateRecord` model as the starting point for simple task candidate tracking.
