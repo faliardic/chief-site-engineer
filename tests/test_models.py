@@ -1,5 +1,6 @@
 from app.models import (
     ArchiveDocument,
+    AttachmentRecord,
     ChecklistItem,
     ConcretePour,
     ConcreteSample,
@@ -189,3 +190,25 @@ def test_nonconformity_record_holds_values_and_defaults() -> None:
     assert record.related_pour_id is None
     assert record.notes is None
     assert record.status == "open"
+
+
+def test_attachment_record_holds_values_and_defaults() -> None:
+    attachment = AttachmentRecord(
+        attachment_id="att-001",
+        project_id="prj-001",
+        title="Temel fotografi",
+        file_name="temel-fotografi.jpg",
+    )
+
+    assert attachment.attachment_id == "att-001"
+    assert attachment.project_id == "prj-001"
+    assert attachment.title == "Temel fotografi"
+    assert attachment.file_name == "temel-fotografi.jpg"
+    assert attachment.file_type is None
+    assert attachment.file_path is None
+    assert attachment.related_model is None
+    assert attachment.related_id is None
+    assert attachment.uploaded_by is None
+    assert attachment.uploaded_date is None
+    assert attachment.notes is None
+    assert attachment.status == "active"

@@ -225,3 +225,33 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Sorumlu taraf`: Bir kaydin veya duzeltmenin sorumlusu olan kisi, ekip veya firma.
 
 `Onem seviyesi`: Bir kaydin etkisini veya aciliyetini anlatan seviye bilgisi.
+
+`Dosya eki`: Bir kayitla ilgili belge, fotograf veya diger ek.
+
+`Arsiv referansi`: Dosyanin kendisi yerine dosya hakkindaki takip bilgisinin tutulmasi.
+
+`AttachmentRecord`: Dosya eki arsiv referansini temsil eden veri modeli.
+
+`file_name`: Dosyanin adini tutan alan.
+
+`file_path`: Dosyanin bulundugu yolu metin olarak tutan alan.
+
+`file_type`: Dosyanin turunu belirten alan.
+
+`related_model`: Dosya ekinin hangi model turuyle iliskili oldugunu belirten alan.
+
+`related_id`: Dosya ekinin iliskili oldugu kaydin kimligini belirten alan.
+
+`uploaded_by`: Dosya ekini yukleyen kisi bilgisini tutan alan.
+
+`uploaded_date`: Dosya ekinin yuklendigi tarihi tutan alan.
+
+`active`: Kaydin aktif durumda oldugunu anlatan status degeri.
+
+`Dosya yolu`: Dosyanin bilgisayarda veya depolama alaninda bulundugu konumu anlatan metin.
+
+`Dosya turu`: Dosyanin fotograf, belge, PDF veya benzeri tur bilgisini anlatan ifade.
+
+`Iliskili model`: Bir kaydin baglandigi model turu.
+
+`Iliskili ID`: Bir kaydin baglandigi diger kaydin kimligi.

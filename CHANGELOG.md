@@ -1,5 +1,13 @@
 # Changelog
 
+## 008 Dosya/Ek Arsivleme Baslangici
+
+- `AttachmentRecord` modeli eklendi.
+- Dosya/ek arsiv referansi model testi eklendi.
+- Adim 008 docs dosyasi olusturuldu.
+- Adim 008 learning dosyasi yeni kod bloklu standarda gore olusturuldu.
+- `learning/GLOSSARY.md` ve `docs/project_decisions.md` guncellendi.
+
 ## 007 Uygunsuzluk Kayitlari
 
 - `NonconformityRecord` modeli eklendi.

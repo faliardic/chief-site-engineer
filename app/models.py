@@ -142,3 +142,21 @@ class NonconformityRecord:
     related_pour_id: str | None = None
     notes: str | None = None
     status: str = "open"
+
+
+@dataclass
+class AttachmentRecord:
+    """Represents a file attachment reference."""
+
+    attachment_id: str
+    project_id: str
+    title: str
+    file_name: str
+    file_type: str | None = None
+    file_path: str | None = None
+    related_model: str | None = None
+    related_id: str | None = None
+    uploaded_by: str | None = None
+    uploaded_date: str | None = None
+    notes: str | None = None
+    status: str = "active"

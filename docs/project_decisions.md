@@ -75,3 +75,12 @@
 - `related_inspection_request_id` alani ileride yapi denetim kontrol cagrisiyla iliski kurmak icin opsiyonel tutulacak.
 - `related_pour_id` alani ileride beton dokum kaydiyla iliski kurmak icin opsiyonel tutulacak.
 - `severity` ve `status` alanlari bu asamada serbest metin olarak tutulacak; enum sistemi ileride degerlendirilecek.
+
+## 008 Dosya/Ek Arsivleme Baslangici
+
+- Dosya/ek arsivleme once referans modeli olarak kurulacak.
+- Gercek dosya kopyalama, tasima, silme veya yukleme bu asamada yapilmayacak.
+- Veritabani ve JSON kayit sistemi bu asamada yapilmayacak.
+- `AttachmentRecord` modeli, ileride dosya arsivleme modulunun temelini olusturacak.
+- `related_model` ve `related_id` alanlari, dosya eklerinin farkli kayit tipleriyle iliskilendirilmesi icin opsiyonel tutulacak.
+- `file_path` alani simdilik sadece metinsel yol referansi olarak tutulacak.

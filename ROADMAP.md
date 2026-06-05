@@ -7,6 +7,6 @@
 - [x] Adim 005 - Beton dokum ve numune takip baslangici
 - [x] Adim 006 - Yapi denetim kontrol cagrilari
 - [x] Adim 007 - Uygunsuzluk kayitlari
-- [ ] Adim 008 - Dosya/ek arsivleme
+- [x] Adim 008 - Dosya/ek arsivleme
 - [ ] Adim 009 - Santiye sefine ozel notlar ve hatirlaticilar
 - [ ] Adim 010 - Raporlama ve disa aktarma
