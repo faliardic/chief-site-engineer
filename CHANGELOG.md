@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 021
+
+- Added `CheckResultRecord` model as the starting point for simple check result records.
+- Added tests for check result values and default recorded status.
+- Added documentation and learning material for the check result record model.
+
 ## Step 020
 
 - Added `ChecklistItemRecord` model as the starting point for simple checklist item records.

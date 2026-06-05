@@ -1,6 +1,7 @@
 from app.models import (
     ArchiveDocument,
     AttachmentRecord,
+    CheckResultRecord,
     ChecklistItem,
     ChecklistItemRecord,
     ConcretePour,
@@ -531,3 +532,21 @@ def test_checklist_item_record_holds_values_and_defaults() -> None:
     assert checklist_item.check_reference == "Saha gozlemi"
     assert checklist_item.notes is None
     assert checklist_item.status == "pending"
+
+
+def test_check_result_record_holds_values_and_defaults() -> None:
+    check_result = CheckResultRecord(
+        check_title="Kuzey cephe iskele kontrol sonucu",
+        check_area="A Blok kuzey cephe",
+        result="Uygun",
+        checked_by="Santiye sefi",
+        check_date="2026-06-05",
+    )
+
+    assert check_result.check_title == "Kuzey cephe iskele kontrol sonucu"
+    assert check_result.check_area == "A Blok kuzey cephe"
+    assert check_result.result == "Uygun"
+    assert check_result.checked_by == "Santiye sefi"
+    assert check_result.check_date == "2026-06-05"
+    assert check_result.notes is None
+    assert check_result.status == "recorded"

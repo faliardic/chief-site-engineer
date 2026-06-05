@@ -20,5 +20,6 @@
 - [x] Adim 018 - Basit saha notu kayit modeli baslangici
 - [x] Adim 019 - Basit gorev adayi kayit modeli baslangici
 - [x] Adim 020 - Basit kontrol maddesi kayit modeli baslangici
+- [x] Adim 021 - Basit kontrol sonucu kayit modeli baslangici
 
-Sonraki kucuk adim onerisi: Adim 021 - Basit kontrol sonucu kayit modeli baslangici
+Sonraki kucuk adim onerisi: Adim 022 - Basit uygunsuzluk adayi kayit modeli baslangici

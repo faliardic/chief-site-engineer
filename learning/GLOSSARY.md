@@ -192,7 +192,7 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 
 `requested`: Cagrinin talep edildi ama henuz tamamlanmadi durumunu anlatan status degeri.
 
-`result`: Denetim sonucunu tutan alan.
+`result`: Denetim veya kontrol sonucunu tutan alan.
 
 `Denetim sonucu`: Kontrol sonunda ortaya cikan olumlu, olumsuz veya notlu sonuc bilgisi.
 
@@ -609,3 +609,19 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Onay is akisi`: Bir kaydin onay adimlari ve durum gecisleriyle ilerledigi surec.
 
 `Gorev baglantisi`: Bir kaydin gorev veya gorev adayi kaydiyla kod seviyesinde iliskilendirilmesi.
+
+`Kontrol sonucu kaydi`: Yapilan bir kontrolun basit sonuc bilgisinin kayit altina alinmis hali.
+
+`CheckResultRecord`: Kontrol sonucu bilgisini temsil eden veri modeli.
+
+`check_title`: Yapilan kontrolun kisa basligini tutan alan.
+
+`check_area`: Kontrolun ilgili oldugu saha alani, mahal, blok, kat veya konuyu tutan alan.
+
+`checked_by`: Kontrolu yapan veya kaydi olusturan kisi bilgisini metin olarak tutan alan.
+
+`check_date`: Kontrolun yapildigi veya kaydedildigi tarihi tutan alan.
+
+`recorded`: Kontrol sonucu kaydinin kaydedilmis durumda oldugunu belirten varsayilan durum degeri.
+
+`Kontrol maddesi baglantisi`: Bir kaydin kontrol maddesi kaydiyla kod seviyesinde iliskilendirilmesi.

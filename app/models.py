@@ -374,3 +374,16 @@ class ChecklistItemRecord:
     check_reference: str | None = None
     status: str = "pending"
     notes: str | None = None
+
+
+@dataclass
+class CheckResultRecord:
+    """Represents a simple check result record."""
+
+    check_title: str
+    check_area: str | None = None
+    result: str | None = None
+    checked_by: str | None = None
+    check_date: str | None = None
+    status: str = "recorded"
+    notes: str | None = None
