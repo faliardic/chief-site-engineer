@@ -68,3 +68,37 @@ class DailySiteLog:
     notes: str | None = None
     created_by: str | None = None
     status: str = "draft"
+
+
+@dataclass
+class ConcretePour:
+    """Represents a concrete pour planned or performed on site."""
+
+    pour_id: str
+    project_id: str
+    date: str
+    location: str
+    concrete_class: str
+    volume_m3: float | None = None
+    supplier: str | None = None
+    truck_count: int | None = None
+    weather: str | None = None
+    notes: str | None = None
+    status: str = "planned"
+
+
+@dataclass
+class ConcreteSample:
+    """Represents a concrete sample group taken from a pour."""
+
+    sample_id: str
+    pour_id: str
+    project_id: str
+    sample_date: str
+    sample_count: int
+    seven_day_test_date: str | None = None
+    twenty_eight_day_test_date: str | None = None
+    seven_day_result_mpa: float | None = None
+    twenty_eight_day_result_mpa: float | None = None
+    laboratory: str | None = None
+    status: str = "waiting"

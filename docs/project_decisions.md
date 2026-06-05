@@ -48,3 +48,11 @@
 - Git commit islemi bu gorevde yapilmayacak.
 - Ancak repo ilk uygun stabil noktada commitlenmelidir.
 - Su an Adim 001-004 tamamlandigi icin ilk commit icin uygun aday olusmustur.
+
+## 005 Beton Dokum ve Numune Takip Baslangici
+
+- Beton dokum ve beton numune takibi once veri modeli olarak kurulacak.
+- EBIS entegrasyonu bu asamada yapilmayacak.
+- Veritabani ve JSON kayit sistemi bu asamada yapilmayacak.
+- `ConcretePour` ve `ConcreteSample` modelleri ileride beton takip modulunun temelini olusturacak.
+- 7 gunluk ve 28 gunluk test sonuclari simdilik opsiyonel alan olarak tutulacak.

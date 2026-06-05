@@ -1,5 +1,14 @@
 # Changelog
 
+## 005 Beton Dokum ve Numune Takip Baslangici
+
+- `ConcretePour` modeli eklendi.
+- `ConcreteSample` modeli eklendi.
+- Beton dokum ve numune takip model testleri eklendi.
+- Adim 005 docs dosyasi olusturuldu.
+- Adim 005 learning dosyasi yeni kod bloklu standarda gore olusturuldu.
+- `learning/GLOSSARY.md` ve `docs/project_decisions.md` guncellendi.
+
 ## Adim 004 Sonrasi Dokumantasyon ve Repo Sagligi Duzeltmesi
 
 - README guncellendi.

@@ -145,3 +145,31 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Dokumantasyon hizalama`: Dokumanlarin projenin gercek kod ve ilerleme durumuyla uyumlu hale getirilmesi.
 
 `Commit`: Git icinde belirli bir anda yapilan degisikliklerin kaydedilmis paketi.
+
+`Beton dokum`: Betonun santiyede belirli bir imalat bolgesine yerlestirilmesi islemi.
+
+`Beton numunesi`: Dokulen betondan laboratuvar testi icin alinan ornek.
+
+`ConcretePour`: Beton dokumunu temsil eden veri modeli.
+
+`ConcreteSample`: Beton numunesi grubunu temsil eden veri modeli.
+
+`Beton sinifi`: Betonun dayanim ve performans sinifini belirten ifade.
+
+`Basinc dayanimi`: Betonun basinc kuvvetine karsi gosterdigi dayanim.
+
+`7 gunluk test`: Betonun erken yas dayanimini izlemek icin yapilan test.
+
+`28 gunluk test`: Betonun standart nihai dayanim kontrolu icin yapilan test.
+
+`Laboratuvar`: Numune testlerinin yapildigi kurum veya birim.
+
+`Tedarikci`: Malzeme veya hizmeti saglayan firma.
+
+`planned`: Bir kaydin planlandi durumunda oldugunu anlatan status degeri.
+
+`waiting`: Bir kaydin beklemede oldugunu anlatan status degeri.
+
+`float`: Ondalik sayilari temsil eden Python veri tipi.
+
+`int`: Tam sayilari temsil eden Python veri tipi.

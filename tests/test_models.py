@@ -1,6 +1,8 @@
 from app.models import (
     ArchiveDocument,
     ChecklistItem,
+    ConcretePour,
+    ConcreteSample,
     DailySiteLog,
     SiteProject,
     TrackingRecord,
@@ -92,3 +94,47 @@ def test_daily_site_log_holds_values_and_defaults() -> None:
     assert log.notes is None
     assert log.created_by is None
     assert log.status == "draft"
+
+
+def test_concrete_pour_holds_values_and_defaults() -> None:
+    pour = ConcretePour(
+        pour_id="pour-001",
+        project_id="prj-001",
+        date="2026-06-05",
+        location="Temel",
+        concrete_class="C30/37",
+    )
+
+    assert pour.pour_id == "pour-001"
+    assert pour.project_id == "prj-001"
+    assert pour.date == "2026-06-05"
+    assert pour.location == "Temel"
+    assert pour.concrete_class == "C30/37"
+    assert pour.volume_m3 is None
+    assert pour.supplier is None
+    assert pour.truck_count is None
+    assert pour.weather is None
+    assert pour.notes is None
+    assert pour.status == "planned"
+
+
+def test_concrete_sample_holds_values_and_defaults() -> None:
+    sample = ConcreteSample(
+        sample_id="sample-001",
+        pour_id="pour-001",
+        project_id="prj-001",
+        sample_date="2026-06-05",
+        sample_count=6,
+    )
+
+    assert sample.sample_id == "sample-001"
+    assert sample.pour_id == "pour-001"
+    assert sample.project_id == "prj-001"
+    assert sample.sample_date == "2026-06-05"
+    assert sample.sample_count == 6
+    assert sample.seven_day_test_date is None
+    assert sample.twenty_eight_day_test_date is None
+    assert sample.seven_day_result_mpa is None
+    assert sample.twenty_eight_day_result_mpa is None
+    assert sample.laboratory is None
+    assert sample.status == "waiting"
