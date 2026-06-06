@@ -238,9 +238,9 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 
 `file_type`: Dosyanin turunu belirten alan.
 
-`related_model`: Dosya ekinin hangi model turuyle iliskili oldugunu belirten alan.
+`related_model`: Dosya ekinin hangi model turuyle iliskili oldugunu belirten alan. Ornegin uygunsuzluk adayi eklerinde bu deger `NonconformityCandidateRecord` olabilir.
 
-`related_id`: Dosya ekinin iliskili oldugu kaydin kimligini belirten alan.
+`related_id`: Dosya ekinin iliskili oldugu kaydin kimligini, kodunu veya acik kayit referansini belirten alan.
 
 `uploaded_by`: Dosya ekini yukleyen kisi bilgisini tutan alan.
 
@@ -561,6 +561,13 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Uygunsuzluk kaydi`: Proje, kalite veya uygulama kurallarina uymayan durumun kayit altina alinmis hali.
 
 `Fotograf/dosya eki`: Bir kayda eklenen fotograf, belge veya dosya referansi.
+
+
+`Ek dosya baglantisi`: Bir fotograf, belge veya dosya referansinin belirli bir kayitla iliskilendirilmesi.
+
+`Generic attachment model`: Birden fazla kayit tipine baglanabilecek ortak dosya eki modeli.
+
+`Kanit dosyasi`: Sahadaki bir gozlem, kontrol sonucu, uygunsuzluk adayi veya benzeri kaydi destekleyen fotograf, belge veya dosya.
 
 `Takvim baglantisi`: Bir kaydin takvim veya tarih bazli etkinlik sistemiyle iliskilendirilmesi.
 

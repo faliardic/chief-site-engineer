@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 026
+
+- Documented the use of the existing `AttachmentRecord` model for nonconformity candidate evidence files.
+- Added a test showing `AttachmentRecord.related_model` and `related_id` linking to `NonconformityCandidateRecord`.
+- No new `NonconformityCandidateAttachment` model, database, API, GUI, JSON record system, or file operation was added in this step.
+
 ## Step 025
 
 - Added `NonconformityCandidateTrackingSummaryRecord` model for Step 025.

@@ -25,7 +25,10 @@
 - [x] Adim 023 - Basit uygunsuzluk adayi degerlendirme kayit modeli baslangici
 - [x] Adim 024 - Basit uygunsuzluk adayi aksiyon kayit modeli baslangici
 - [x] Adim 025 - Uygunsuzluk adayi takip durumu ozeti baslangici
+- [x] Adim 026 - AttachmentRecord ile uygunsuzluk adayi ek dosya baglantisi
 
 Adim 021-025 araligi tamamlandi. Bu aralik icin final NotebookLM podcast notu hazirlanacak.
 
-Sonraki kucuk adim onerisi: Adim 026 - Uygunsuzluk adayi surec zinciri gorunum modeli baslangici
+Adim 026'da yeni ek dosya modeli eklenmeden, mevcut `AttachmentRecord` modelinin uygunsuzluk adayi kayitlarina kanit dosyasi baglamak icin kullanilacagi netlestirildi.
+
+Sonraki kucuk adim onerisi: Adim 027 - Uygunsuzluk adayi surec zinciri gorunum modeli baslangici

@@ -234,6 +234,36 @@ def test_attachment_record_holds_values_and_defaults() -> None:
     assert attachment.status == "active"
 
 
+def test_attachment_record_can_reference_nonconformity_candidate_record() -> None:
+    attachment = AttachmentRecord(
+        attachment_id="att-ncr-cand-001",
+        project_id="prj-001",
+        title="Korkuluk eksigi fotografi",
+        file_name="korkuluk-eksigi.jpg",
+        file_type="image/jpeg",
+        file_path="archive/nonconformity-candidates/korkuluk-eksigi.jpg",
+        related_model="NonconformityCandidateRecord",
+        related_id="NCR-CAND-001",
+        uploaded_by="Santiye sefi",
+        uploaded_date="2026-06-12",
+        notes="Aday uygunsuzluk icin kanit fotografi.",
+        status="active",
+    )
+
+    assert attachment.attachment_id == "att-ncr-cand-001"
+    assert attachment.project_id == "prj-001"
+    assert attachment.title == "Korkuluk eksigi fotografi"
+    assert attachment.file_name == "korkuluk-eksigi.jpg"
+    assert attachment.file_type == "image/jpeg"
+    assert attachment.file_path == "archive/nonconformity-candidates/korkuluk-eksigi.jpg"
+    assert attachment.related_model == "NonconformityCandidateRecord"
+    assert attachment.related_id == "NCR-CAND-001"
+    assert attachment.uploaded_by == "Santiye sefi"
+    assert attachment.uploaded_date == "2026-06-12"
+    assert attachment.notes == "Aday uygunsuzluk icin kanit fotografi."
+    assert attachment.status == "active"
+
+
 def test_material_record_holds_values_and_defaults() -> None:
     material = MaterialRecord(
         material_name="C30 beton",

@@ -241,3 +241,13 @@
 - Gorev atama / sorumluluk takip akisi kurulmadı.
 - Otomatik durum guncelleme sistemi kurulmadı.
 - Veritabani, JSON, API, GUI ve dosya islemi eklenmedi.
+
+## 026 AttachmentRecord ile Uygunsuzluk Adayi Ek Dosya Baglantisi
+
+- Uygunsuzluk adayi icin ayri `NonconformityCandidateAttachment` modeli olusturulmadi.
+- Bunun yerine mevcut genel `AttachmentRecord` kullanilacak.
+- Gerekce: Ek dosya mantigi bircok kayit tipiyle ortak oldugu icin tekrar eden ozel modellerden kacinildi.
+- Uygunsuzluk adayi ekleri icin `related_model` degeri `NonconformityCandidateRecord` olarak tutulacak.
+- Ilgili aday kayit kodu `related_id` alaninda tutulacak.
+- Gercek dosya yukleme, kopyalama, silme veya tasima islemi bu adimda eklenmedi.
+- Veritabani, JSON, API ve GUI eklenmedi.
