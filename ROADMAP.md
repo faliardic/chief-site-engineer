@@ -30,6 +30,7 @@
 - [x] Adim 028 - Uygunsuzluk adayi durum gecmisi modeli baslangici
 - [x] Adim 029 - Uygunsuzluk adayi sorumluluk / atama modeli baslangici
 - [x] Adim 030 - Uygunsuzluk adayi kapanis / sonuc modeli baslangici
+- [x] Adim 031 - NotebookLM podcast notu Adim 026-030
 
 Adim 021-025 araligi tamamlandi. Bu aralik icin final NotebookLM podcast notu hazirlanacak.
 
@@ -43,4 +44,6 @@ Adim 029'da uygunsuzluk adayinin kime atandigini, kim tarafindan atandigini, hed
 
 Adim 030'da uygunsuzluk adayinin nasil sonuclandigini, kim tarafindan kapatildigini, takip gerektirip gerektirmedigini ve nihai durumunu temsil eden baslangic kapanis modeli eklendi.
 
-Sonraki kucuk adim onerisi: Adim 031 - Uygunsuzluk adayi surec durum etiketi modeli baslangici
+Adim 031'de Adim 026-030 araliginin final NotebookLM podcast notu hazirlandi.
+
+Sonraki kucuk adim onerisi: Adim 032 - Uygunsuzluk adayi surec durum etiketi modeli baslangici

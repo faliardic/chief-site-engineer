@@ -285,3 +285,9 @@
 - Bu model otomatik kapatma, otomatik durum guncelleme veya kesin uygunsuzluk/NCR olusturma sistemi degildir.
 - `requires_follow_up` alani varsayilan olarak `False` olacak.
 - Veritabani, JSON, API, GUI, otomatik raporlama ve dosya islemi eklenmedi.
+
+## 031 NotebookLM Podcast Notu - Adim 026-030
+
+- Adim 026-030 araligi icin final NotebookLM podcast notu hazirlandi.
+- Podcast notu, uygunsuzluk adayinin kanit baglantisi, surec gorunumu, durum gecmisi, sorumluluk atamasi ve kapanis sonucuyla takip edilebilir bir saha surecine donusmesini ozetler.
+- Bu adimda yeni model, test modeli, veritabani, JSON, API, GUI veya dosya islemi eklenmedi.

@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 031
+
+- Added final NotebookLM podcast notes for Steps 026-030.
+- Summarized attachment evidence, process view, status history, assignment, and closure records as one nonconformity candidate tracking narrative.
+- No new model, test model, database query, API, GUI, JSON record system, or file operation was added in this step.
+
 ## Step 030
 
 - Added `NonconformityCandidateClosureRecord` as the starting closure and result model for nonconformity candidates.
