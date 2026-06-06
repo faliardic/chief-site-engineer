@@ -415,3 +415,17 @@ class NonconformityCandidateReviewRecord:
     next_action: str
     status: str = "reviewed"
     notes: str | None = None
+
+
+@dataclass
+class NonconformityCandidateActionRecord:
+    """Represents a simple nonconformity candidate action record."""
+
+    candidate_title: str
+    review_result: str
+    action_decision: str
+    action_owner: str
+    target_date: str
+    action_description: str
+    status: str = "planned"
+    notes: str | None = None

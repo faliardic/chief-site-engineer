@@ -218,3 +218,14 @@
 - Kesin uygunsuzluk kaydi olusturulmadi.
 - Duzeltici faaliyet sistemi kurulmadı.
 - Veritabani, JSON, API, GUI ve dosya islemi eklenmedi.
+
+## 024 Uygunsuzluk Adayi Aksiyon Kaydi Baslangici
+
+- Uygunsuzluk adayi degerlendirildikten sonra alinan ilk aksiyon karari ayri bir veri modeliyle tutulacak.
+- Bu aksiyon kaydi, kesin uygunsuzluk veya duzeltici faaliyet sistemi degildir.
+- Amac, sahada fark edilen aday sorunlarin degerlendirme sonrasi ne yapilacagina dair ilk karar bilgisini guvenli ve kucuk bir modelle temsil etmektir.
+- Aday basligi, degerlendirme sonucu, aksiyon karari, aksiyon sorumlusu, hedef tarih ve aksiyon aciklamasi ayri alanlar olarak tutuldu.
+- Kesin uygunsuzluk kaydi olusturulmadi.
+- Duzeltici faaliyet sistemi kurulmadı.
+- Gorev atama / sorumluluk takip akisi kurulmadı.
+- Veritabani, JSON, API, GUI ve dosya islemi eklenmedi.

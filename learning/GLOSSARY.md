@@ -580,7 +580,7 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 
 `source`: Gorev adayinin hangi not, gozlem veya talep gibi kaynaktan ciktigini metin olarak tutan alan.
 
-`target_date`: Gorev adayinin hedef tarihini veya takip edilmesi dusunulen tarihi tutan alan.
+`target_date`: Gorev adayinin veya uygunsuzluk adayi aksiyonunun hedef tarihini tutan alan.
 
 `Gorev yonetimi sistemi`: Gorevlerin sorumlu, tarih, durum, oncelik ve takip kurallariyla yonetildigi sistem.
 
@@ -659,3 +659,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `next_action`: Degerlendirme sonrasinda yapilacak sonraki islemi tutan alan.
 
 `reviewed`: Uygunsuzluk adayi degerlendirme kaydinin degerlendirilmis durumda oldugunu belirten varsayilan durum degeri.
+
+`NonconformityCandidateActionRecord`: Degerlendirilmis uygunsuzluk adayi icin alinan basit aksiyon kararini temsil eden veri modeli.
+
+`action_decision`: Degerlendirilmis uygunsuzluk adayi icin alinan karar veya aksiyon turunu tutan alan.
+
+`action_owner`: Aksiyondan sorumlu kisi veya ekip bilgisini tutan alan.
+
+`action_description`: Uygunsuzluk adayi aksiyonunun kisa aciklamasini tutan alan.

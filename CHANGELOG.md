@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 024
+
+- Added `NonconformityCandidateActionRecord` model for Step 024.
+- The model keeps simple action decisions for reviewed nonconformity candidates at the data level.
+- No database, API, GUI, JSON record system, file operation, final nonconformity management, or corrective action system was added in this step.
+
 ## Step 023
 
 - Added `NonconformityCandidateReviewRecord` model for Step 023.

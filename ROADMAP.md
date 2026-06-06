@@ -23,5 +23,6 @@
 - [x] Adim 021 - Basit kontrol sonucu kayit modeli baslangici
 - [x] Adim 022 - Basit uygunsuzluk adayi kayit modeli baslangici
 - [x] Adim 023 - Basit uygunsuzluk adayi degerlendirme kayit modeli baslangici
+- [x] Adim 024 - Basit uygunsuzluk adayi aksiyon kayit modeli baslangici
 
-Sonraki kucuk adim onerisi: Adim 024 - Basit uygunsuzluk karar/aksiyon baglantisi baslangici
+Sonraki kucuk adim onerisi: Adim 025 - Uygunsuzluk adayi takip durumu ozeti baslangici

@@ -14,6 +14,7 @@ from app.models import (
     MaterialRecord,
     MeetingActionRecord,
     MeetingRecord,
+    NonconformityCandidateActionRecord,
     NonconformityCandidateRecord,
     NonconformityCandidateReviewRecord,
     NonconformityRecord,
@@ -592,3 +593,23 @@ def test_nonconformity_candidate_review_record_holds_values_and_defaults() -> No
     assert review.next_action == "Korkuluk eksigi icin gorev adayi ac"
     assert review.status == "reviewed"
     assert review.notes is None
+
+
+def test_nonconformity_candidate_action_record_holds_values_and_defaults() -> None:
+    action = NonconformityCandidateActionRecord(
+        candidate_title="Kuzey cephe korkuluk eksigi",
+        review_result="takip gerekli",
+        action_decision="gorev adayi ac",
+        action_owner="Saha ekibi",
+        target_date="2026-06-10",
+        action_description="Korkuluk ara elemani tamamlanacak",
+    )
+
+    assert action.candidate_title == "Kuzey cephe korkuluk eksigi"
+    assert action.review_result == "takip gerekli"
+    assert action.action_decision == "gorev adayi ac"
+    assert action.action_owner == "Saha ekibi"
+    assert action.target_date == "2026-06-10"
+    assert action.action_description == "Korkuluk ara elemani tamamlanacak"
+    assert action.status == "planned"
+    assert action.notes is None
