@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 034
+
+- Revised the existing `NonconformityRecord` model with additional optional fields for type, detection actor, detection date, and final status.
+- Updated the existing `NonconformityRecord` test to verify the new default values.
+- Did not add `source_candidate_id` or `conversion_record_id`; candidate-to-NCR links remain represented by `NonconformityCandidateConversionRecord`.
+
 ## Step 033
 
 - Added a decision preparation report evaluating the existing `NonconformityRecord` model after the candidate-to-NCR process chain.

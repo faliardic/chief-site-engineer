@@ -204,15 +204,19 @@ def test_nonconformity_record_holds_values_and_defaults() -> None:
     assert record.date == "2026-06-05"
     assert record.title == "Eksik donati"
     assert record.description == "Temel bolgesinde ek donati eksik goruldu."
+    assert record.nonconformity_type is None
     assert record.location is None
     assert record.category is None
     assert record.severity == "medium"
+    assert record.detected_by is None
+    assert record.detection_date is None
     assert record.responsible_party is None
     assert record.corrective_action is None
     assert record.due_date is None
     assert record.closed_date is None
     assert record.related_inspection_request_id is None
     assert record.related_pour_id is None
+    assert record.final_status is None
     assert record.notes is None
     assert record.status == "open"
 

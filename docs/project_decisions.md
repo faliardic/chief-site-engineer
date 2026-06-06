@@ -307,3 +307,11 @@
 - Yeni model veya test modeli eklenmedi.
 - Mevcut modelin Adim 021-032 uygunsuzluk adayi ve donusum zinciriyle iliskisi raporlandi.
 - Olası revizyon alanlari karar raporunda listelendi; revizyon daha sonraki ayri bir adima birakildi.
+
+## 034 NonconformityRecord Alan Revizyonu
+
+- Mevcut `NonconformityRecord` modeli kontrollu sekilde revize edildi.
+- `nonconformity_type`, `detected_by`, `detection_date` ve `final_status` alanlari eklendi.
+- `source_candidate_id` ve `conversion_record_id` alanlari bilincli olarak eklenmedi.
+- Gerekce: Aday kayit ile kesin uygunsuzluk kaydi arasindaki baglanti `NonconformityCandidateConversionRecord` ile temsil ediliyor.
+- Bu adimda yeni model, veritabani, JSON, API, GUI, otomatik NCR olusturma, otomatik donusum, duzeltici faaliyet sistemi, onay akisi veya dosya islemi eklenmedi.

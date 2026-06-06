@@ -771,3 +771,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `source_closure_id`: Donusum kararinin kaynaklandigi kapanis kaydinin kodunu tutan alan.
 
 `converted`: Kaydin donusum islemiyle iliskilendirildigini anlatan status degeri.
+
+`NonconformityRecord alan revizyonu`: Mevcut kesin uygunsuzluk modeline yeni alanlar eklenirken modelin kimligini ve mevcut davranisini koruma islemi.
+
+`nonconformity_type`: Kesin uygunsuzlugun turunu belirten alan.
+
+`source_candidate_id tekrarindan kacinma`: Aday kaynak bilgisini `NonconformityRecord` icinde tekrarlamak yerine donusum kaydinda tutma karari.
+
+`conversion_record_id tekrarindan kacinma`: Donusum baglantisini `NonconformityRecord` icinde ters referansla tekrar etmemeyi anlatan karar.

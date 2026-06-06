@@ -131,15 +131,19 @@ class NonconformityRecord:
     date: str
     title: str
     description: str
+    nonconformity_type: str | None = None
     location: str | None = None
     category: str | None = None
     severity: str = "medium"
+    detected_by: str | None = None
+    detection_date: str | None = None
     responsible_party: str | None = None
     corrective_action: str | None = None
     due_date: str | None = None
     closed_date: str | None = None
     related_inspection_request_id: str | None = None
     related_pour_id: str | None = None
+    final_status: str | None = None
     notes: str | None = None
     status: str = "open"
 
