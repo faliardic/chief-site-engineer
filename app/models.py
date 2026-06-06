@@ -387,3 +387,17 @@ class CheckResultRecord:
     check_date: str | None = None
     status: str = "recorded"
     notes: str | None = None
+
+
+@dataclass
+class NonconformityCandidateRecord:
+    """Represents a simple nonconformity candidate record."""
+
+    candidate_title: str
+    candidate_type: str | None = None
+    location: str | None = None
+    observed_issue: str | None = None
+    detected_by: str | None = None
+    detection_date: str | None = None
+    status: str = "open"
+    notes: str | None = None

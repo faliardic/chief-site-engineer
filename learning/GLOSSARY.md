@@ -625,3 +625,23 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `recorded`: Kontrol sonucu kaydinin kaydedilmis durumda oldugunu belirten varsayilan durum degeri.
 
 `Kontrol maddesi baglantisi`: Bir kaydin kontrol maddesi kaydiyla kod seviyesinde iliskilendirilmesi.
+
+`Uygunsuzluk adayi kaydi`: Henuz gercek uygunsuzluk kaydi olmayan, ileride uygunsuzluk kaydina donusebilecek gozlem, eksik, hata veya risk bilgisinin kayit altina alinmis hali.
+
+`NonconformityCandidateRecord`: Uygunsuzluk adayi bilgisini temsil eden veri modeli.
+
+`candidate_title`: Uygunsuzluk adayinin kisa basligini tutan alan.
+
+`candidate_type`: Uygunsuzluk adayinin eksik, hata, risk, gozlem veya kontrol sonucu notu gibi turunu tutan alan.
+
+`observed_issue`: Uygunsuzluk adayi olarak gorulen sorun, eksik veya risk aciklamasini tutan alan.
+
+`detected_by`: Uygunsuzluk adayini fark eden veya kaydi olusturan kisi bilgisini metin olarak tutan alan.
+
+`detection_date`: Uygunsuzluk adayinin fark edildigi veya kaydedildigi tarihi tutan alan.
+
+`NCR sureci`: Uygunsuzlugun resmi kayit, inceleme, sorumluluk, duzeltme ve kapatma adimlariyla yonetildigi surec.
+
+`Kapatma is akisi`: Bir kaydin tamamlanma, kontrol ve kapatma adimlariyla ilerledigi surec.
+
+`Kontrol sonucu baglantisi`: Bir kaydin kontrol sonucu kaydiyla kod seviyesinde iliskilendirilmesi.

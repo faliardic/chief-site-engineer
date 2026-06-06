@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 022
+
+- Added `NonconformityCandidateRecord` model as the starting point for simple nonconformity candidate records.
+- Added tests for nonconformity candidate values and default open status.
+- Added documentation and learning material for the nonconformity candidate record model.
+
 ## Step 021
 
 - Added `CheckResultRecord` model as the starting point for simple check result records.

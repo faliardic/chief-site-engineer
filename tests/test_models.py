@@ -14,6 +14,7 @@ from app.models import (
     MaterialRecord,
     MeetingActionRecord,
     MeetingRecord,
+    NonconformityCandidateRecord,
     NonconformityRecord,
     ProjectPartyRecord,
     RFIRecord,
@@ -550,3 +551,23 @@ def test_check_result_record_holds_values_and_defaults() -> None:
     assert check_result.check_date == "2026-06-05"
     assert check_result.notes is None
     assert check_result.status == "recorded"
+
+
+def test_nonconformity_candidate_record_holds_values_and_defaults() -> None:
+    candidate = NonconformityCandidateRecord(
+        candidate_title="Kuzey cephe korkuluk eksigi",
+        candidate_type="eksik",
+        location="A Blok kuzey cephe",
+        observed_issue="Korkuluk ara elemani eksik goruldu",
+        detected_by="Santiye sefi",
+        detection_date="2026-06-05",
+    )
+
+    assert candidate.candidate_title == "Kuzey cephe korkuluk eksigi"
+    assert candidate.candidate_type == "eksik"
+    assert candidate.location == "A Blok kuzey cephe"
+    assert candidate.observed_issue == "Korkuluk ara elemani eksik goruldu"
+    assert candidate.detected_by == "Santiye sefi"
+    assert candidate.detection_date == "2026-06-05"
+    assert candidate.notes is None
+    assert candidate.status == "open"
