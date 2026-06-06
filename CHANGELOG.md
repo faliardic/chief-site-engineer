@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 033
+
+- Added a decision preparation report evaluating the existing `NonconformityRecord` model after the candidate-to-NCR process chain.
+- Documented existing fields, potentially missing fields, and the relationship with `NonconformityCandidateConversionRecord`.
+- No model, test model, database query, API, GUI, JSON record system, automatic NCR creation, or corrective action system was added in this step.
+
 ## Step 032
 
 - Added `NonconformityCandidateConversionRecord` as the starting conversion link model between candidate records and existing `NonconformityRecord` NCR records.

@@ -299,3 +299,11 @@
 - Bu model aday kaydin hangi NCR kaydina, kim tarafindan, ne zaman ve hangi gerekceyle donusturuldugunu tutacak.
 - Bu adim otomatik NCR olusturma, otomatik donusum, duzeltici faaliyet sistemi veya onay akisi degildir.
 - Veritabani, JSON, API, GUI ve dosya islemi eklenmedi.
+
+## 033 NonconformityRecord Model Degerlendirme Raporu
+
+- Bu adim sadece degerlendirme ve revizyon karar hazirligi olarak yapildi.
+- `NonconformityRecord` modeli degistirilmedi.
+- Yeni model veya test modeli eklenmedi.
+- Mevcut modelin Adim 021-032 uygunsuzluk adayi ve donusum zinciriyle iliskisi raporlandi.
+- Olası revizyon alanlari karar raporunda listelendi; revizyon daha sonraki ayri bir adima birakildi.
