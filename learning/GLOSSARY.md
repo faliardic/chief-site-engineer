@@ -667,3 +667,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `action_owner`: Aksiyondan sorumlu kisi veya ekip bilgisini tutan alan.
 
 `action_description`: Uygunsuzluk adayi aksiyonunun kisa aciklamasini tutan alan.
+
+`NonconformityCandidateTrackingSummaryRecord`: Uygunsuzluk adayi surecinin guncel takip durumunu ozetleyen veri modeli.
+
+`tracking_status`: Uygunsuzluk adayi surecinin guncel takip durumunu tutan alan.
+
+`last_update_date`: Takip ozeti kaydinin son guncelleme tarihini tutan alan.
+
+`summary_note`: Uygunsuzluk adayi surecinin kisa ozet notunu tutan alan.

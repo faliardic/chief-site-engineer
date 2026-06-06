@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 025
+
+- Added `NonconformityCandidateTrackingSummaryRecord` model for Step 025.
+- The model summarizes the current tracking status of nonconformity candidate processes at the data level.
+- No database, API, GUI, JSON record system, file operation, final nonconformity management, corrective action system, or task tracking workflow was added in this step.
+
 ## Step 024
 
 - Added `NonconformityCandidateActionRecord` model for Step 024.

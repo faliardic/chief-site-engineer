@@ -429,3 +429,18 @@ class NonconformityCandidateActionRecord:
     action_description: str
     status: str = "planned"
     notes: str | None = None
+
+
+@dataclass
+class NonconformityCandidateTrackingSummaryRecord:
+    """Represents a simple nonconformity candidate tracking summary record."""
+
+    candidate_title: str
+    review_result: str
+    action_decision: str
+    action_owner: str
+    tracking_status: str
+    last_update_date: str
+    summary_note: str
+    status: str = "active"
+    notes: str | None = None

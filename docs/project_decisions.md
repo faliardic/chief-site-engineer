@@ -229,3 +229,15 @@
 - Duzeltici faaliyet sistemi kurulmadı.
 - Gorev atama / sorumluluk takip akisi kurulmadı.
 - Veritabani, JSON, API, GUI ve dosya islemi eklenmedi.
+
+## 025 Uygunsuzluk Adayi Takip Durumu Ozeti Baslangici
+
+- Uygunsuzluk adayi surecinin mevcut durumu ayri bir takip ozeti modeliyle temsil edilecek.
+- Bu model gercek bir is akisi motoru degildir.
+- Amac; aday kayit, degerlendirme ve aksiyon kararindan sonra surecin sahada hangi durumda oldugunu veri seviyesinde ozetlemektir.
+- Aday basligi, degerlendirme sonucu, aksiyon karari, aksiyon sorumlusu, takip durumu, son guncelleme tarihi ve ozet not ayri alanlar olarak tutuldu.
+- Kesin uygunsuzluk kaydi olusturulmadi.
+- Duzeltici faaliyet sistemi kurulmadı.
+- Gorev atama / sorumluluk takip akisi kurulmadı.
+- Otomatik durum guncelleme sistemi kurulmadı.
+- Veritabani, JSON, API, GUI ve dosya islemi eklenmedi.

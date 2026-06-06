@@ -24,5 +24,8 @@
 - [x] Adim 022 - Basit uygunsuzluk adayi kayit modeli baslangici
 - [x] Adim 023 - Basit uygunsuzluk adayi degerlendirme kayit modeli baslangici
 - [x] Adim 024 - Basit uygunsuzluk adayi aksiyon kayit modeli baslangici
+- [x] Adim 025 - Uygunsuzluk adayi takip durumu ozeti baslangici
 
-Sonraki kucuk adim onerisi: Adim 025 - Uygunsuzluk adayi takip durumu ozeti baslangici
+Adim 021-025 araligi tamamlandi. Bu aralik icin final NotebookLM podcast notu hazirlanacak.
+
+Sonraki kucuk adim onerisi: Adim 026 - Uygunsuzluk adayi surec zinciri gorunum modeli baslangici

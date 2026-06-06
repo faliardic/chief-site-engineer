@@ -17,6 +17,7 @@ from app.models import (
     NonconformityCandidateActionRecord,
     NonconformityCandidateRecord,
     NonconformityCandidateReviewRecord,
+    NonconformityCandidateTrackingSummaryRecord,
     NonconformityRecord,
     ProjectPartyRecord,
     RFIRecord,
@@ -613,3 +614,25 @@ def test_nonconformity_candidate_action_record_holds_values_and_defaults() -> No
     assert action.action_description == "Korkuluk ara elemani tamamlanacak"
     assert action.status == "planned"
     assert action.notes is None
+
+
+def test_nonconformity_candidate_tracking_summary_record_holds_values_and_defaults() -> None:
+    summary = NonconformityCandidateTrackingSummaryRecord(
+        candidate_title="Kuzey cephe korkuluk eksigi",
+        review_result="takip gerekli",
+        action_decision="gorev adayi ac",
+        action_owner="Saha ekibi",
+        tracking_status="aksiyon bekliyor",
+        last_update_date="2026-06-11",
+        summary_note="Korkuluk eksigi icin saha ekibi aksiyonu bekleniyor",
+    )
+
+    assert summary.candidate_title == "Kuzey cephe korkuluk eksigi"
+    assert summary.review_result == "takip gerekli"
+    assert summary.action_decision == "gorev adayi ac"
+    assert summary.action_owner == "Saha ekibi"
+    assert summary.tracking_status == "aksiyon bekliyor"
+    assert summary.last_update_date == "2026-06-11"
+    assert summary.summary_note == "Korkuluk eksigi icin saha ekibi aksiyonu bekleniyor"
+    assert summary.status == "active"
+    assert summary.notes is None
