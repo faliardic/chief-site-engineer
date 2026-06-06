@@ -260,3 +260,11 @@
 - Baglanti alanlari simdilik metinsel ID alanlari olarak tutulacak.
 - `attachment_count` ek dosya sayisini temsil edecek, gercek dosya sayma islemi yapmayacak.
 - Veritabani, JSON, API, GUI ve otomatik raporlama eklenmedi.
+
+## 028 Uygunsuzluk Adayi Durum Gecmisi Modeli Baslangici
+
+- Uygunsuzluk adayi durum degisiklikleri ayri bir gecmis kaydi modeliyle temsil edilecek.
+- `NonconformityCandidateStatusHistoryRecord`, eski durum, yeni durum, degisiklik sebebi, degistiren kisi ve degisiklik tarihini tutacak.
+- `source_record` alani durum degisikliginin hangi kayit veya surec parcasindan kaynaklandigini metinsel olarak gosterecek.
+- Bu model otomatik durum guncelleme sistemi veya is akisi motoru degildir.
+- Veritabani, JSON, API, GUI, otomatik raporlama ve dosya islemi eklenmedi.

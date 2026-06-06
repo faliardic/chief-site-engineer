@@ -460,3 +460,17 @@ class NonconformityCandidateProcessViewRecord:
     last_update_date: str | None = None
     process_summary: str | None = None
     notes: str | None = None
+
+
+@dataclass
+class NonconformityCandidateStatusHistoryRecord:
+    """Represents a simple nonconformity candidate status history record."""
+
+    candidate_id: str
+    old_status: str
+    new_status: str
+    change_reason: str
+    changed_by: str
+    change_date: str
+    source_record: str | None = None
+    notes: str | None = None

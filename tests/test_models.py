@@ -18,6 +18,7 @@ from app.models import (
     NonconformityCandidateProcessViewRecord,
     NonconformityCandidateRecord,
     NonconformityCandidateReviewRecord,
+    NonconformityCandidateStatusHistoryRecord,
     NonconformityCandidateTrackingSummaryRecord,
     NonconformityRecord,
     ProjectPartyRecord,
@@ -712,3 +713,44 @@ def test_nonconformity_candidate_process_view_record_defaults() -> None:
     assert process_view.last_update_date is None
     assert process_view.process_summary is None
     assert process_view.notes is None
+
+
+def test_nonconformity_candidate_status_history_record_holds_values_and_defaults() -> None:
+    history = NonconformityCandidateStatusHistoryRecord(
+        candidate_id="NCR-CAND-001",
+        old_status="open",
+        new_status="under_review",
+        change_reason="Aday uygunsuzluk degerlendirmeye alindi.",
+        changed_by="Santiye sefi",
+        change_date="2026-06-13",
+        source_record="NonconformityCandidateReviewRecord",
+    )
+
+    assert history.candidate_id == "NCR-CAND-001"
+    assert history.old_status == "open"
+    assert history.new_status == "under_review"
+    assert history.change_reason == "Aday uygunsuzluk degerlendirmeye alindi."
+    assert history.changed_by == "Santiye sefi"
+    assert history.change_date == "2026-06-13"
+    assert history.source_record == "NonconformityCandidateReviewRecord"
+    assert history.notes is None
+
+
+def test_nonconformity_candidate_status_history_record_optional_fields_default_to_none() -> None:
+    history = NonconformityCandidateStatusHistoryRecord(
+        candidate_id="NCR-CAND-002",
+        old_status="under_review",
+        new_status="action_planned",
+        change_reason="Aksiyon karari verildi.",
+        changed_by="Saha muhendisi",
+        change_date="2026-06-14",
+    )
+
+    assert history.candidate_id == "NCR-CAND-002"
+    assert history.old_status == "under_review"
+    assert history.new_status == "action_planned"
+    assert history.change_reason == "Aksiyon karari verildi."
+    assert history.changed_by == "Saha muhendisi"
+    assert history.change_date == "2026-06-14"
+    assert history.source_record is None
+    assert history.notes is None

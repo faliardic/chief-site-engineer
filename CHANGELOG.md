@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 028
+
+- Added `NonconformityCandidateStatusHistoryRecord` as the starting model for nonconformity candidate status change history.
+- Added tests for status history values and optional field defaults.
+- No database query, API, GUI, automatic reporting, JSON record system, or file operation was added in this step.
+
 ## Step 027
 
 - Added `NonconformityCandidateProcessViewRecord` as the starting view model for nonconformity candidate process chains.

@@ -27,6 +27,7 @@
 - [x] Adim 025 - Uygunsuzluk adayi takip durumu ozeti baslangici
 - [x] Adim 026 - AttachmentRecord ile uygunsuzluk adayi ek dosya baglantisi
 - [x] Adim 027 - Uygunsuzluk adayi surec zinciri gorunum modeli baslangici
+- [x] Adim 028 - Uygunsuzluk adayi durum gecmisi modeli baslangici
 
 Adim 021-025 araligi tamamlandi. Bu aralik icin final NotebookLM podcast notu hazirlanacak.
 
@@ -34,4 +35,6 @@ Adim 026'da yeni ek dosya modeli eklenmeden, mevcut `AttachmentRecord` modelinin
 
 Adim 027'de uygunsuzluk adayi surecinin kontrol sonucu, aday kaydi, degerlendirme, aksiyon, takip ozeti ve ek dosya durumunu tek ozet kayitta temsil eden baslangic gorunum modeli eklendi.
 
-Sonraki kucuk adim onerisi: Adim 028 - Uygunsuzluk adayi surec durum etiketi modeli baslangici
+Adim 028'de uygunsuzluk adayi durum degisikliklerinin eski durum, yeni durum, sebep, kisi, tarih ve kaynak kayit bilgisiyle temsil edilmesi icin baslangic durum gecmisi modeli eklendi.
+
+Sonraki kucuk adim onerisi: Adim 029 - Uygunsuzluk adayi surec durum etiketi modeli baslangici

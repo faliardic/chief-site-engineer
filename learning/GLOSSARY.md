@@ -703,3 +703,21 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `current_status`: Surecin guncel durumunu temsil eden alan.
 
 `process_summary`: Surecin genel durumunu kisa metin olarak ozetleyen alan.
+
+`NonconformityCandidateStatusHistoryRecord`: Uygunsuzluk adayi durum degisikliklerini temsil eden veri modeli.
+
+`Durum gecmisi`: Bir kaydin zaman icinde hangi durumlara gectigini gosteren kayit dizisi.
+
+`Status history`: Durum gecmisi kavraminin Ingilizce ifadesi.
+
+`old_status`: Durum degisikliginden onceki durumu tutan alan.
+
+`new_status`: Durum degisikliginden sonraki durumu tutan alan.
+
+`change_reason`: Durum degisikliginin neden yapildigini aciklayan alan.
+
+`changed_by`: Durum degisikligini yapan kisi bilgisini tutan alan.
+
+`change_date`: Durum degisikliginin yapildigi tarihi tutan alan.
+
+`source_record`: Durum degisikliginin hangi kayit veya surec parcasindan kaynaklandigini tutan alan.
