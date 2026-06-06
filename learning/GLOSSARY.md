@@ -645,3 +645,17 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Kapatma is akisi`: Bir kaydin tamamlanma, kontrol ve kapatma adimlariyla ilerledigi surec.
 
 `Kontrol sonucu baglantisi`: Bir kaydin kontrol sonucu kaydiyla kod seviyesinde iliskilendirilmesi.
+
+`NonconformityCandidateReviewRecord`: Uygunsuzluk adayinin kim tarafindan, ne zaman ve hangi kararla degerlendirildigini temsil eden veri modeli.
+
+`reviewed_by`: Uygunsuzluk adayi degerlendirmesini yapan kisi bilgisini tutan alan.
+
+`review_date`: Uygunsuzluk adayi degerlendirmesinin yapildigi tarihi tutan alan.
+
+`review_result`: Uygunsuzluk adayi degerlendirmesinin sonucunu tutan alan.
+
+`decision_reason`: Degerlendirme kararinin gerekcesini tutan alan.
+
+`next_action`: Degerlendirme sonrasinda yapilacak sonraki islemi tutan alan.
+
+`reviewed`: Uygunsuzluk adayi degerlendirme kaydinin degerlendirilmis durumda oldugunu belirten varsayilan durum degeri.

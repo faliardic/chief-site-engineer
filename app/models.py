@@ -401,3 +401,17 @@ class NonconformityCandidateRecord:
     detection_date: str | None = None
     status: str = "open"
     notes: str | None = None
+
+
+@dataclass
+class NonconformityCandidateReviewRecord:
+    """Represents a simple nonconformity candidate review record."""
+
+    candidate_title: str
+    reviewed_by: str
+    review_date: str
+    review_result: str
+    decision_reason: str
+    next_action: str
+    status: str = "reviewed"
+    notes: str | None = None

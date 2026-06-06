@@ -15,6 +15,7 @@ from app.models import (
     MeetingActionRecord,
     MeetingRecord,
     NonconformityCandidateRecord,
+    NonconformityCandidateReviewRecord,
     NonconformityRecord,
     ProjectPartyRecord,
     RFIRecord,
@@ -571,3 +572,23 @@ def test_nonconformity_candidate_record_holds_values_and_defaults() -> None:
     assert candidate.detection_date == "2026-06-05"
     assert candidate.notes is None
     assert candidate.status == "open"
+
+
+def test_nonconformity_candidate_review_record_holds_values_and_defaults() -> None:
+    review = NonconformityCandidateReviewRecord(
+        candidate_title="Kuzey cephe korkuluk eksigi",
+        reviewed_by="Santiye sefi",
+        review_date="2026-06-06",
+        review_result="takip gerekli",
+        decision_reason="Eksik parca guvenlik riski olusturuyor",
+        next_action="Korkuluk eksigi icin gorev adayi ac",
+    )
+
+    assert review.candidate_title == "Kuzey cephe korkuluk eksigi"
+    assert review.reviewed_by == "Santiye sefi"
+    assert review.review_date == "2026-06-06"
+    assert review.review_result == "takip gerekli"
+    assert review.decision_reason == "Eksik parca guvenlik riski olusturuyor"
+    assert review.next_action == "Korkuluk eksigi icin gorev adayi ac"
+    assert review.status == "reviewed"
+    assert review.notes is None

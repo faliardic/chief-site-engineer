@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 023
+
+- Added `NonconformityCandidateReviewRecord` model for Step 023.
+- The model keeps nonconformity candidate review results at the data level.
+- No database, API, GUI, JSON record system, or file operation was added in this step.
+
 ## Step 022
 
 - Added `NonconformityCandidateRecord` model as the starting point for simple nonconformity candidate records.

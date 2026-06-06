@@ -208,3 +208,13 @@
 - Aday basligi, aday turu, konum, gozlenen sorun, tespit eden kisi ve tespit tarihi ayri alanlar olarak tutuldu.
 - Kontrol sonucu, saha notu, gorev veya gunluk raporla kod seviyesinde iliski kurulmadi.
 - Veritabani, JSON, API, GUI, arama/filtreleme ve raporlama sonraya birakildi.
+
+## 023 Uygunsuzluk Adayi Degerlendirme Kaydi Baslangici
+
+- Uygunsuzluk adayi dogrudan kesin uygunsuzluk olarak kabul edilmeyecek.
+- Once degerlendirme kaydi ile incelenecek.
+- Bu sayede sahada gorulen her sorun ile resmi uygunsuzluk ayrimi korunacak.
+- Degerlendiren kisi, degerlendirme tarihi, sonuc, karar gerekcesi ve sonraki aksiyon ayri alanlar olarak tutuldu.
+- Kesin uygunsuzluk kaydi olusturulmadi.
+- Duzeltici faaliyet sistemi kurulmadı.
+- Veritabani, JSON, API, GUI ve dosya islemi eklenmedi.
