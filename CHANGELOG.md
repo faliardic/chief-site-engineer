@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 029
+
+- Added `NonconformityCandidateAssignmentRecord` as the starting responsibility and assignment model for nonconformity candidates.
+- Added tests for assignment values and optional field defaults.
+- No database query, API, GUI, automatic notification, automatic task assignment, JSON record system, or file operation was added in this step.
+
 ## Step 028
 
 - Added `NonconformityCandidateStatusHistoryRecord` as the starting model for nonconformity candidate status change history.

@@ -15,6 +15,7 @@ from app.models import (
     MeetingActionRecord,
     MeetingRecord,
     NonconformityCandidateActionRecord,
+    NonconformityCandidateAssignmentRecord,
     NonconformityCandidateProcessViewRecord,
     NonconformityCandidateRecord,
     NonconformityCandidateReviewRecord,
@@ -754,3 +755,44 @@ def test_nonconformity_candidate_status_history_record_optional_fields_default_t
     assert history.change_date == "2026-06-14"
     assert history.source_record is None
     assert history.notes is None
+
+
+def test_nonconformity_candidate_assignment_record_holds_values_and_defaults() -> None:
+    assignment = NonconformityCandidateAssignmentRecord(
+        candidate_id="NCR-CAND-001",
+        assigned_to="Saha muhendisi",
+        assigned_by="Santiye sefi",
+        assignment_date="2026-06-15",
+        due_date="2026-06-18",
+        responsibility_note="Korkuluk eksigi sahada takip edilecek.",
+        priority="high",
+    )
+
+    assert assignment.candidate_id == "NCR-CAND-001"
+    assert assignment.assigned_to == "Saha muhendisi"
+    assert assignment.assigned_by == "Santiye sefi"
+    assert assignment.assignment_date == "2026-06-15"
+    assert assignment.due_date == "2026-06-18"
+    assert assignment.responsibility_note == "Korkuluk eksigi sahada takip edilecek."
+    assert assignment.priority == "high"
+    assert assignment.status == "assigned"
+    assert assignment.notes is None
+
+
+def test_nonconformity_candidate_assignment_record_optional_fields_default() -> None:
+    assignment = NonconformityCandidateAssignmentRecord(
+        candidate_id="NCR-CAND-002",
+        assigned_to="Kalite sorumlusu",
+        assigned_by="Santiye sefi",
+        assignment_date="2026-06-16",
+    )
+
+    assert assignment.candidate_id == "NCR-CAND-002"
+    assert assignment.assigned_to == "Kalite sorumlusu"
+    assert assignment.assigned_by == "Santiye sefi"
+    assert assignment.assignment_date == "2026-06-16"
+    assert assignment.due_date is None
+    assert assignment.responsibility_note is None
+    assert assignment.priority == "normal"
+    assert assignment.status == "assigned"
+    assert assignment.notes is None

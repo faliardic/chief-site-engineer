@@ -268,3 +268,12 @@
 - `source_record` alani durum degisikliginin hangi kayit veya surec parcasindan kaynaklandigini metinsel olarak gosterecek.
 - Bu model otomatik durum guncelleme sistemi veya is akisi motoru degildir.
 - Veritabani, JSON, API, GUI, otomatik raporlama ve dosya islemi eklenmedi.
+
+## 029 Uygunsuzluk Adayi Sorumluluk / Atama Modeli Baslangici
+
+- Uygunsuzluk adayi sorumluluk ve atama bilgisi ayri bir veri modeliyle temsil edilecek.
+- `NonconformityCandidateAssignmentRecord`, aday kaydin kime atandigini, kim tarafindan atandigini, atama tarihini, hedef tarihi, sorumluluk notunu ve onceligi tutacak.
+- Bu model otomatik gorev atama, bildirim veya is emri sistemi degildir.
+- `priority` alani bu adimda serbest metin olarak tutulacak ve varsayilan degeri `normal` olacak.
+- `status` alani varsayilan olarak `assigned` olacak.
+- Veritabani, JSON, API, GUI, otomatik bildirim ve dosya islemi eklenmedi.

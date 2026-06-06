@@ -474,3 +474,18 @@ class NonconformityCandidateStatusHistoryRecord:
     change_date: str
     source_record: str | None = None
     notes: str | None = None
+
+
+@dataclass
+class NonconformityCandidateAssignmentRecord:
+    """Represents a simple nonconformity candidate assignment record."""
+
+    candidate_id: str
+    assigned_to: str
+    assigned_by: str
+    assignment_date: str
+    due_date: str | None = None
+    responsibility_note: str | None = None
+    priority: str = "normal"
+    status: str = "assigned"
+    notes: str | None = None

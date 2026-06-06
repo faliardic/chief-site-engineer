@@ -721,3 +721,19 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `change_date`: Durum degisikliginin yapildigi tarihi tutan alan.
 
 `source_record`: Durum degisikliginin hangi kayit veya surec parcasindan kaynaklandigini tutan alan.
+
+`NonconformityCandidateAssignmentRecord`: Uygunsuzluk adayinin sorumluluk ve atama bilgisini temsil eden veri modeli.
+
+`Sorumluluk atama kaydi`: Bir kaydin kime, kim tarafindan ve hangi hedef tarihle atandigini gosteren kayit.
+
+`assigned_by`: Bir kaydi veya takibi atayan kisi bilgisini tutan alan.
+
+`assignment_date`: Atamanin yapildigi tarihi tutan alan.
+
+`responsibility_note`: Atanan kisinin neyi takip edecegini aciklayan sorumluluk notu alani.
+
+`priority`: Kaydin oncelik seviyesini tutan alan.
+
+`normal`: Varsayilan oncelik seviyesini anlatan deger.
+
+`assigned`: Kaydin bir kisiye veya ekibe atanmis durumda oldugunu anlatan status degeri.
