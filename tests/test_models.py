@@ -23,6 +23,7 @@ from app.models import (
     NonconformityCandidateReviewRecord,
     NonconformityCandidateStatusHistoryRecord,
     NonconformityCandidateTrackingSummaryRecord,
+    NonconformityProcessViewRecord,
     NonconformityRecord,
     ProjectPartyRecord,
     RFIRecord,
@@ -889,3 +890,54 @@ def test_nonconformity_candidate_conversion_record_optional_fields_default() -> 
     assert conversion.source_closure_id is None
     assert conversion.status == "converted"
     assert conversion.notes is None
+
+
+def test_nonconformity_process_view_record_holds_values_and_defaults() -> None:
+    process_view = NonconformityProcessViewRecord(
+        nonconformity_id="NCR-001",
+        source_candidate_id="NCR-CAND-001",
+        conversion_record_id="NCR-CAND-CONV-001",
+        title="Kuzey cephe korkuluk eksigi",
+        nonconformity_type="is guvenligi",
+        severity="high",
+        responsible_party="Saha ekibi",
+        current_status="in_progress",
+        final_status="open",
+        last_update_date="2026-06-23",
+        process_summary="Aday kayittan kesin uygunsuzluga donustu ve saha ekibi takibinde.",
+    )
+
+    assert process_view.nonconformity_id == "NCR-001"
+    assert process_view.source_candidate_id == "NCR-CAND-001"
+    assert process_view.conversion_record_id == "NCR-CAND-CONV-001"
+    assert process_view.title == "Kuzey cephe korkuluk eksigi"
+    assert process_view.nonconformity_type == "is guvenligi"
+    assert process_view.severity == "high"
+    assert process_view.responsible_party == "Saha ekibi"
+    assert process_view.current_status == "in_progress"
+    assert process_view.final_status == "open"
+    assert process_view.last_update_date == "2026-06-23"
+    assert (
+        process_view.process_summary
+        == "Aday kayittan kesin uygunsuzluga donustu ve saha ekibi takibinde."
+    )
+    assert process_view.notes is None
+
+
+def test_nonconformity_process_view_record_optional_fields_default() -> None:
+    process_view = NonconformityProcessViewRecord(
+        nonconformity_id="NCR-002",
+    )
+
+    assert process_view.nonconformity_id == "NCR-002"
+    assert process_view.source_candidate_id is None
+    assert process_view.conversion_record_id is None
+    assert process_view.title is None
+    assert process_view.nonconformity_type is None
+    assert process_view.severity == "medium"
+    assert process_view.responsible_party is None
+    assert process_view.current_status == "open"
+    assert process_view.final_status is None
+    assert process_view.last_update_date is None
+    assert process_view.process_summary is None
+    assert process_view.notes is None

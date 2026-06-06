@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 035
+
+- Added `NonconformityProcessViewRecord` as the starting view model for definite nonconformity / NCR process summaries.
+- Added tests for NCR process view values and optional field defaults.
+- No database query, API, GUI, automatic NCR creation, automatic conversion, corrective action system, approval workflow, JSON record system, or file operation was added in this step.
+
 ## Step 034
 
 - Revised the existing `NonconformityRecord` model with additional optional fields for type, detection actor, detection date, and final status.

@@ -523,3 +523,21 @@ class NonconformityCandidateConversionRecord:
     source_closure_id: str | None = None
     status: str = "converted"
     notes: str | None = None
+
+
+@dataclass
+class NonconformityProcessViewRecord:
+    """Represents a simple nonconformity process view record."""
+
+    nonconformity_id: str
+    source_candidate_id: str | None = None
+    conversion_record_id: str | None = None
+    title: str | None = None
+    nonconformity_type: str | None = None
+    severity: str = "medium"
+    responsible_party: str | None = None
+    current_status: str = "open"
+    final_status: str | None = None
+    last_update_date: str | None = None
+    process_summary: str | None = None
+    notes: str | None = None

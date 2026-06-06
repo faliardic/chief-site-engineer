@@ -34,6 +34,7 @@
 - [x] Adim 032 - Uygunsuzluk adayindan kesin uygunsuzluga donusum modeli baslangici
 - [x] Adim 033 - NonconformityRecord model degerlendirme raporu
 - [x] Adim 034 - NonconformityRecord alan revizyonu
+- [x] Adim 035 - Kesin uygunsuzluk surec gorunum modeli baslangici
 
 Adim 021-025 araligi tamamlandi. Bu aralik icin final NotebookLM podcast notu hazirlanacak.
 
@@ -55,4 +56,6 @@ Adim 033'te mevcut `NonconformityRecord` modelinin Adim 021-032 zincirinden sonr
 
 Adim 034'te mevcut `NonconformityRecord` modeli kontrollu sekilde revize edilerek `nonconformity_type`, `detected_by`, `detection_date` ve `final_status` alanlari eklendi.
 
-Sonraki kucuk adim onerisi: Adim 035 - Uygunsuzluk adayi surec durum etiketi modeli baslangici
+Adim 035'te kesin uygunsuzluk / NCR surecini tek bakista temsil eden baslangic gorunum modeli eklendi.
+
+Sonraki kucuk adim onerisi: Adim 036 - Uygunsuzluk adayi surec durum etiketi modeli baslangici

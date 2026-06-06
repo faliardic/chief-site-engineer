@@ -779,3 +779,13 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `source_candidate_id tekrarindan kacinma`: Aday kaynak bilgisini `NonconformityRecord` icinde tekrarlamak yerine donusum kaydinda tutma karari.
 
 `conversion_record_id tekrarindan kacinma`: Donusum baglantisini `NonconformityRecord` icinde ters referansla tekrar etmemeyi anlatan karar.
+
+`NonconformityProcessViewRecord`: Kesin uygunsuzluk / NCR surecinin temel bilgilerini tek ozet kayitta gosteren veri modeli.
+
+`NCR surec gorunum modeli`: Kesin uygunsuzluk kaydinin durumunu, donusum baglantisini ve takip ozetini tek bakista temsil eden model.
+
+`source_candidate_id`: Gorunum modeli icinde kesin uygunsuzlugun kaynak aday kaydini gosteren ozet alan.
+
+`conversion_record_id`: Gorunum modeli icinde adaydan NCR'a donusum kaydini gosteren ozet alan.
+
+`NCR process summary`: Kesin uygunsuzluk surecinin mevcut durumunu kisa metinle ozetleyen bilgi.
