@@ -251,3 +251,12 @@
 - Ilgili aday kayit kodu `related_id` alaninda tutulacak.
 - Gercek dosya yukleme, kopyalama, silme veya tasima islemi bu adimda eklenmedi.
 - Veritabani, JSON, API ve GUI eklenmedi.
+
+## 027 Uygunsuzluk Adayi Surec Zinciri Gorunum Modeli Baslangici
+
+- Uygunsuzluk adayi surec parcalari tek ozet gorunum modelinde temsil edilecek.
+- `NonconformityCandidateProcessViewRecord`, kontrol sonucu, aday kaydi, degerlendirme, aksiyon, takip ozeti ve ek dosya sayisini bir arada okuma amaciyla eklendi.
+- Bu model veritabani sorgusu veya otomatik join mekanizmasi degildir.
+- Baglanti alanlari simdilik metinsel ID alanlari olarak tutulacak.
+- `attachment_count` ek dosya sayisini temsil edecek, gercek dosya sayma islemi yapmayacak.
+- Veritabani, JSON, API, GUI ve otomatik raporlama eklenmedi.

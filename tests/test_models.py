@@ -15,6 +15,7 @@ from app.models import (
     MeetingActionRecord,
     MeetingRecord,
     NonconformityCandidateActionRecord,
+    NonconformityCandidateProcessViewRecord,
     NonconformityCandidateRecord,
     NonconformityCandidateReviewRecord,
     NonconformityCandidateTrackingSummaryRecord,
@@ -666,3 +667,48 @@ def test_nonconformity_candidate_tracking_summary_record_holds_values_and_defaul
     assert summary.summary_note == "Korkuluk eksigi icin saha ekibi aksiyonu bekleniyor"
     assert summary.status == "active"
     assert summary.notes is None
+
+
+def test_nonconformity_candidate_process_view_record_holds_values_and_defaults() -> None:
+    process_view = NonconformityCandidateProcessViewRecord(
+        candidate_id="NCR-CAND-001",
+        check_result_id="CHK-RES-001",
+        review_id="NCR-CAND-REV-001",
+        action_id="NCR-CAND-ACT-001",
+        tracking_summary_id="NCR-CAND-TRK-001",
+        attachment_count=2,
+        current_status="aksiyon bekliyor",
+        last_update_date="2026-06-12",
+        process_summary="Korkuluk eksigi degerlendirildi ve saha aksiyonu bekleniyor.",
+    )
+
+    assert process_view.candidate_id == "NCR-CAND-001"
+    assert process_view.check_result_id == "CHK-RES-001"
+    assert process_view.review_id == "NCR-CAND-REV-001"
+    assert process_view.action_id == "NCR-CAND-ACT-001"
+    assert process_view.tracking_summary_id == "NCR-CAND-TRK-001"
+    assert process_view.attachment_count == 2
+    assert process_view.current_status == "aksiyon bekliyor"
+    assert process_view.last_update_date == "2026-06-12"
+    assert (
+        process_view.process_summary
+        == "Korkuluk eksigi degerlendirildi ve saha aksiyonu bekleniyor."
+    )
+    assert process_view.notes is None
+
+
+def test_nonconformity_candidate_process_view_record_defaults() -> None:
+    process_view = NonconformityCandidateProcessViewRecord(
+        candidate_id="NCR-CAND-002",
+    )
+
+    assert process_view.candidate_id == "NCR-CAND-002"
+    assert process_view.check_result_id is None
+    assert process_view.review_id is None
+    assert process_view.action_id is None
+    assert process_view.tracking_summary_id is None
+    assert process_view.attachment_count == 0
+    assert process_view.current_status == "open"
+    assert process_view.last_update_date is None
+    assert process_view.process_summary is None
+    assert process_view.notes is None

@@ -444,3 +444,19 @@ class NonconformityCandidateTrackingSummaryRecord:
     summary_note: str
     status: str = "active"
     notes: str | None = None
+
+
+@dataclass
+class NonconformityCandidateProcessViewRecord:
+    """Represents a simple nonconformity candidate process view record."""
+
+    candidate_id: str
+    check_result_id: str | None = None
+    review_id: str | None = None
+    action_id: str | None = None
+    tracking_summary_id: str | None = None
+    attachment_count: int = 0
+    current_status: str = "open"
+    last_update_date: str | None = None
+    process_summary: str | None = None
+    notes: str | None = None

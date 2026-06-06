@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 027
+
+- Added `NonconformityCandidateProcessViewRecord` as the starting view model for nonconformity candidate process chains.
+- Added tests for process view values and default empty-link state.
+- No database query, API, GUI, automatic reporting, JSON record system, or file operation was added in this step.
+
 ## Step 026
 
 - Documented the use of the existing `AttachmentRecord` model for nonconformity candidate evidence files.

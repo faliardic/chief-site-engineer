@@ -562,7 +562,6 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 
 `Fotograf/dosya eki`: Bir kayda eklenen fotograf, belge veya dosya referansi.
 
-
 `Ek dosya baglantisi`: Bir fotograf, belge veya dosya referansinin belirli bir kayitla iliskilendirilmesi.
 
 `Generic attachment model`: Birden fazla kayit tipine baglanabilecek ortak dosya eki modeli.
@@ -682,3 +681,25 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `last_update_date`: Takip ozeti kaydinin son guncelleme tarihini tutan alan.
 
 `summary_note`: Uygunsuzluk adayi surecinin kisa ozet notunu tutan alan.
+
+`NonconformityCandidateProcessViewRecord`: Uygunsuzluk adayi surecinin parcalarini tek ozet kayitta gosteren veri modeli.
+
+`Surec gorunum modeli`: Birden fazla surec parcasini tek bakista okunacak ozet kayit olarak temsil eden model.
+
+`Surec zinciri`: Bir kaydin kontrol sonucu, aday kayit, degerlendirme, aksiyon, takip ozeti ve ek dosya gibi ard arda gelen parcalari.
+
+`candidate_id`: Uygunsuzluk adayi kaydinin kodunu veya kimligini tutan alan.
+
+`check_result_id`: Uygunsuzluk adayi surecine kaynak olabilecek kontrol sonucu kaydinin kodunu veya kimligini tutan alan.
+
+`review_id`: Uygunsuzluk adayi degerlendirme kaydinin kodunu veya kimligini tutan alan.
+
+`action_id`: Uygunsuzluk adayi aksiyon kaydinin kodunu veya kimligini tutan alan.
+
+`tracking_summary_id`: Uygunsuzluk adayi takip ozeti kaydinin kodunu veya kimligini tutan alan.
+
+`attachment_count`: Bir kayda bagli ek dosya sayisini temsil eden alan.
+
+`current_status`: Surecin guncel durumunu temsil eden alan.
+
+`process_summary`: Surecin genel durumunu kisa metin olarak ozetleyen alan.
