@@ -16,6 +16,7 @@ from app.models import (
     MeetingRecord,
     NonconformityCandidateActionRecord,
     NonconformityCandidateAssignmentRecord,
+    NonconformityCandidateClosureRecord,
     NonconformityCandidateProcessViewRecord,
     NonconformityCandidateRecord,
     NonconformityCandidateReviewRecord,
@@ -796,3 +797,47 @@ def test_nonconformity_candidate_assignment_record_optional_fields_default() -> 
     assert assignment.priority == "normal"
     assert assignment.status == "assigned"
     assert assignment.notes is None
+
+
+def test_nonconformity_candidate_closure_record_holds_values_and_defaults() -> None:
+    closure = NonconformityCandidateClosureRecord(
+        candidate_id="NCR-CAND-001",
+        closure_decision="takip tamamlandi",
+        closure_reason="Korkuluk eksigi sahada giderildi.",
+        closed_by="Santiye sefi",
+        closure_date="2026-06-19",
+        final_status="closed",
+        result_note="Yerinde kontrol sonrasi aday kayit kapatildi.",
+        requires_follow_up=True,
+    )
+
+    assert closure.candidate_id == "NCR-CAND-001"
+    assert closure.closure_decision == "takip tamamlandi"
+    assert closure.closure_reason == "Korkuluk eksigi sahada giderildi."
+    assert closure.closed_by == "Santiye sefi"
+    assert closure.closure_date == "2026-06-19"
+    assert closure.final_status == "closed"
+    assert closure.result_note == "Yerinde kontrol sonrasi aday kayit kapatildi."
+    assert closure.requires_follow_up is True
+    assert closure.notes is None
+
+
+def test_nonconformity_candidate_closure_record_optional_fields_default() -> None:
+    closure = NonconformityCandidateClosureRecord(
+        candidate_id="NCR-CAND-002",
+        closure_decision="kesin uygunsuzluga donustur",
+        closure_reason="Eksik giderilmedigi icin resmi kayit gerekli.",
+        closed_by="Kalite sorumlusu",
+        closure_date="2026-06-20",
+        final_status="converted_to_ncr",
+    )
+
+    assert closure.candidate_id == "NCR-CAND-002"
+    assert closure.closure_decision == "kesin uygunsuzluga donustur"
+    assert closure.closure_reason == "Eksik giderilmedigi icin resmi kayit gerekli."
+    assert closure.closed_by == "Kalite sorumlusu"
+    assert closure.closure_date == "2026-06-20"
+    assert closure.final_status == "converted_to_ncr"
+    assert closure.result_note is None
+    assert closure.requires_follow_up is False
+    assert closure.notes is None

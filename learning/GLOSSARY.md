@@ -737,3 +737,21 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `normal`: Varsayilan oncelik seviyesini anlatan deger.
 
 `assigned`: Kaydin bir kisiye veya ekibe atanmis durumda oldugunu anlatan status degeri.
+
+`NonconformityCandidateClosureRecord`: Uygunsuzluk adayinin kapanis ve sonuc bilgisini temsil eden veri modeli.
+
+`Kapanis kaydi`: Bir kaydin nasil sonuclandigini ve kim tarafindan kapatildigini gosteren kayit.
+
+`closure_decision`: Uygunsuzluk adayinin nasil sonuclandigini anlatan karar alani.
+
+`closure_reason`: Kapanis kararinin gerekcesini tutan alan.
+
+`closed_by`: Kaydi kapatan kisi bilgisini tutan alan.
+
+`closure_date`: Kaydin kapatildigi tarihi tutan alan.
+
+`final_status`: Kapanis sonrasi nihai durum bilgisini tutan alan.
+
+`result_note`: Kapanis sonucunu aciklayan not alani.
+
+`requires_follow_up`: Kapanis sonrasinda ek takip gerekip gerekmedigini gosteren boolean alan.

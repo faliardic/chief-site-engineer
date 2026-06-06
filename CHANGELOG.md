@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 030
+
+- Added `NonconformityCandidateClosureRecord` as the starting closure and result model for nonconformity candidates.
+- Added tests for closure values and optional field defaults.
+- No database query, API, GUI, automatic closure, automatic status update, NCR creation, JSON record system, or file operation was added in this step.
+
 ## Step 029
 
 - Added `NonconformityCandidateAssignmentRecord` as the starting responsibility and assignment model for nonconformity candidates.

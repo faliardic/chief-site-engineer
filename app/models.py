@@ -489,3 +489,18 @@ class NonconformityCandidateAssignmentRecord:
     priority: str = "normal"
     status: str = "assigned"
     notes: str | None = None
+
+
+@dataclass
+class NonconformityCandidateClosureRecord:
+    """Represents a simple nonconformity candidate closure record."""
+
+    candidate_id: str
+    closure_decision: str
+    closure_reason: str
+    closed_by: str
+    closure_date: str
+    final_status: str
+    result_note: str | None = None
+    requires_follow_up: bool = False
+    notes: str | None = None

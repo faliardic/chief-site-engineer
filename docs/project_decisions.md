@@ -277,3 +277,11 @@
 - `priority` alani bu adimda serbest metin olarak tutulacak ve varsayilan degeri `normal` olacak.
 - `status` alani varsayilan olarak `assigned` olacak.
 - Veritabani, JSON, API, GUI, otomatik bildirim ve dosya islemi eklenmedi.
+
+## 030 Uygunsuzluk Adayi Kapanis / Sonuc Modeli Baslangici
+
+- Uygunsuzluk adayi kapanis ve sonuc bilgisi ayri bir veri modeliyle temsil edilecek.
+- `NonconformityCandidateClosureRecord`, kapanis karari, kapanis gerekcesi, kapatan kisi, kapanis tarihi, nihai durum, sonuc notu ve takip gerekliligi bilgisini tutacak.
+- Bu model otomatik kapatma, otomatik durum guncelleme veya kesin uygunsuzluk/NCR olusturma sistemi degildir.
+- `requires_follow_up` alani varsayilan olarak `False` olacak.
+- Veritabani, JSON, API, GUI, otomatik raporlama ve dosya islemi eklenmedi.
