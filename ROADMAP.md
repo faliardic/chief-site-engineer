@@ -31,6 +31,7 @@
 - [x] Adim 029 - Uygunsuzluk adayi sorumluluk / atama modeli baslangici
 - [x] Adim 030 - Uygunsuzluk adayi kapanis / sonuc modeli baslangici
 - [x] Adim 031 - NotebookLM podcast notu Adim 026-030
+- [x] Adim 032 - Uygunsuzluk adayindan kesin uygunsuzluga donusum modeli baslangici
 
 Adim 021-025 araligi tamamlandi. Bu aralik icin final NotebookLM podcast notu hazirlanacak.
 
@@ -46,4 +47,6 @@ Adim 030'da uygunsuzluk adayinin nasil sonuclandigini, kim tarafindan kapatildig
 
 Adim 031'de Adim 026-030 araliginin final NotebookLM podcast notu hazirlandi.
 
-Sonraki kucuk adim onerisi: Adim 032 - Uygunsuzluk adayi surec durum etiketi modeli baslangici
+Adim 032'de mevcut `NonconformityRecord` modeli yeniden olusturulmadan, aday kaydin kesin uygunsuzluk / NCR kaydina donusum baglantisini temsil eden baslangic model eklendi.
+
+Sonraki kucuk adim onerisi: Adim 033 - Uygunsuzluk adayi surec durum etiketi modeli baslangici

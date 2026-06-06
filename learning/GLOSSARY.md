@@ -755,3 +755,19 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `result_note`: Kapanis sonucunu aciklayan not alani.
 
 `requires_follow_up`: Kapanis sonrasinda ek takip gerekip gerekmedigini gosteren boolean alan.
+
+`NonconformityCandidateConversionRecord`: Uygunsuzluk adayinin mevcut kesin uygunsuzluk kaydina donusum baglantisini temsil eden veri modeli.
+
+`Donusum kaydi`: Bir aday kaydin kesin kayda hangi karar ve gerekceyle baglandigini gosteren kayit.
+
+`conversion_decision`: Aday kaydin kesin uygunsuzluga donusturulmesine dair karari tutan alan.
+
+`conversion_reason`: Donusum kararinin gerekcesini tutan alan.
+
+`converted_by`: Donusum kararini veren veya kaydi olusturan kisi bilgisini tutan alan.
+
+`conversion_date`: Aday kaydin kesin uygunsuzluk kaydina donusturuldugu tarihi tutan alan.
+
+`source_closure_id`: Donusum kararinin kaynaklandigi kapanis kaydinin kodunu tutan alan.
+
+`converted`: Kaydin donusum islemiyle iliskilendirildigini anlatan status degeri.

@@ -17,6 +17,7 @@ from app.models import (
     NonconformityCandidateActionRecord,
     NonconformityCandidateAssignmentRecord,
     NonconformityCandidateClosureRecord,
+    NonconformityCandidateConversionRecord,
     NonconformityCandidateProcessViewRecord,
     NonconformityCandidateRecord,
     NonconformityCandidateReviewRecord,
@@ -841,3 +842,46 @@ def test_nonconformity_candidate_closure_record_optional_fields_default() -> Non
     assert closure.result_note is None
     assert closure.requires_follow_up is False
     assert closure.notes is None
+
+
+def test_nonconformity_candidate_conversion_record_holds_values_and_defaults() -> None:
+    conversion = NonconformityCandidateConversionRecord(
+        candidate_id="NCR-CAND-001",
+        nonconformity_id="NCR-001",
+        conversion_decision="kesin uygunsuzluga donustur",
+        conversion_reason="Eksik giderilmedigi icin resmi NCR kaydi acildi.",
+        converted_by="Kalite sorumlusu",
+        conversion_date="2026-06-21",
+        source_closure_id="NCR-CAND-CLOS-001",
+    )
+
+    assert conversion.candidate_id == "NCR-CAND-001"
+    assert conversion.nonconformity_id == "NCR-001"
+    assert conversion.conversion_decision == "kesin uygunsuzluga donustur"
+    assert conversion.conversion_reason == "Eksik giderilmedigi icin resmi NCR kaydi acildi."
+    assert conversion.converted_by == "Kalite sorumlusu"
+    assert conversion.conversion_date == "2026-06-21"
+    assert conversion.source_closure_id == "NCR-CAND-CLOS-001"
+    assert conversion.status == "converted"
+    assert conversion.notes is None
+
+
+def test_nonconformity_candidate_conversion_record_optional_fields_default() -> None:
+    conversion = NonconformityCandidateConversionRecord(
+        candidate_id="NCR-CAND-002",
+        nonconformity_id="NCR-002",
+        conversion_decision="resmi NCR ac",
+        conversion_reason="Aday bulgu kesin uygunsuzluk olarak degerlendirildi.",
+        converted_by="Santiye sefi",
+        conversion_date="2026-06-22",
+    )
+
+    assert conversion.candidate_id == "NCR-CAND-002"
+    assert conversion.nonconformity_id == "NCR-002"
+    assert conversion.conversion_decision == "resmi NCR ac"
+    assert conversion.conversion_reason == "Aday bulgu kesin uygunsuzluk olarak degerlendirildi."
+    assert conversion.converted_by == "Santiye sefi"
+    assert conversion.conversion_date == "2026-06-22"
+    assert conversion.source_closure_id is None
+    assert conversion.status == "converted"
+    assert conversion.notes is None

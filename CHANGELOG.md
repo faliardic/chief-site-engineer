@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 032
+
+- Added `NonconformityCandidateConversionRecord` as the starting conversion link model between candidate records and existing `NonconformityRecord` NCR records.
+- Kept the existing `NonconformityRecord` model from Step 007 unchanged.
+- No database query, API, GUI, automatic NCR creation, automatic conversion, corrective action system, approval workflow, JSON record system, or file operation was added in this step.
+
 ## Step 031
 
 - Added final NotebookLM podcast notes for Steps 026-030.

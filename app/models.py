@@ -504,3 +504,18 @@ class NonconformityCandidateClosureRecord:
     result_note: str | None = None
     requires_follow_up: bool = False
     notes: str | None = None
+
+
+@dataclass
+class NonconformityCandidateConversionRecord:
+    """Represents a simple nonconformity candidate conversion record."""
+
+    candidate_id: str
+    nonconformity_id: str
+    conversion_decision: str
+    conversion_reason: str
+    converted_by: str
+    conversion_date: str
+    source_closure_id: str | None = None
+    status: str = "converted"
+    notes: str | None = None
