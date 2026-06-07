@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 073
+
+- Added example usage scenarios for `FileAttachmentRecord` across concrete pours, NCR records, material deliveries, daily site records, workforce records, chief private notes, and inspection records.
+- Reiterated that attachments store file references and metadata, not embedded file contents or video blobs.
+- No application code, tests, repository, file upload, physical file copy, file delete/move, thumbnail, video playback, streaming, SQLite, JSON persistence, API, GUI, or CLI behavior was changed in this step.
+
 ## Step 072
 
 - Added a usage flow document for `FileAttachmentRecord`.

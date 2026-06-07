@@ -625,3 +625,12 @@
 - Fotograf, video, PDF, belge, ses notu, malzeme teslim irsaliyesi ve is guvenligi gozlemi gibi kullanim senaryolari aciklandi.
 - Bu adim sadece dokumantasyon / kullanim akisi adimidir.
 - Uygulama kodu, test dosyalari, repository, dosya yukleme, fiziksel dosya kopyalama, video oynatma, thumbnail, SQLite, JSON persistence, API, GUI ve CLI degistirilmedi.
+
+## 073 FileAttachmentRecord Ornek Kullanim Senaryolari
+
+- `FileAttachmentRecord` icin santiye kayit turlerine gore ornek kullanim senaryolari dokumante edildi.
+- Beton dokumu, uygunsuzluk / NCR, malzeme teslimi, gunluk saha kaydi, iscilik / ekip kaydi, santiye sefi ozel notu ve denetim / kontrol kaydi senaryolari aciklandi.
+- Dosyalarin veritabanina gomulmeyecegi; dosya referansi ve metadata bilgisinin tutulacagi karar tekrar korundu.
+- Buyuk video dosyalarinin sistem icinde blob olarak saklanmayacagi vurgulandi.
+- Bu adim sadece dokumantasyon ve ornek kullanim senaryosu adimidir.
+- Uygulama kodu, test dosyalari, repository, dosya yukleme, fiziksel dosya kopyalama/silme/tasima, thumbnail, video oynatma, streaming, SQLite, JSON persistence, API, GUI ve CLI degistirilmedi.

@@ -167,4 +167,6 @@ Adim 071'de Adim 061-070 araliginin final NotebookLM podcast notu hazirlandi.
 
 Adim 072'de `FileAttachmentRecord` icin fotograf, video, PDF, belge ve ses dosyalarinin nasil baglanacagini anlatan kullanim akisi dokumante edildi.
 
-Sonraki kucuk adim onerisi: Adim 073 - FileAttachmentRecord repository plani
+Adim 073'te `FileAttachmentRecord` icin beton dokumu, NCR, malzeme teslimi, gunluk saha kaydi, iscilik, ozel not ve denetim kayitlari uzerinden ornek kullanim senaryolari dokumante edildi.
+
+Sonraki kucuk adim onerisi: Adim 074 - FileAttachmentRecord repository plani
