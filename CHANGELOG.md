@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 093
+
+- Added `AttachmentIntegrityReportSummary` to represent the top-level summary of future attachment integrity reports.
+- Added `build_attachment_integrity_report_summary` to count status and severity values from existing `AttachmentIntegrityResult` records.
+- Added tests for empty, OK-only, error, warning, mixed, generated time, negative counter, and inconsistent total cases without adding scanner or file system traversal behavior.
+
 ## Step 092
 
 - Added `build_attachment_integrity_result` to produce a single `AttachmentIntegrityResult` from provided metadata and file existence flags.

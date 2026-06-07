@@ -806,3 +806,11 @@
 - Her hata veya uyari durumu icin makine-dostu `recommended_action` degeri uretilecek.
 - Metadata ve dosya birlikte yoksa anlamli scanner sonucu olmadigi icin `ValueError` ile reddedilecek.
 - Bu adimda dosya sistemi taramasi, klasor gezme, upload service, backup logic, audit event implementasyonu, database, API, GUI, auth, CI veya deployment eklenmedi.
+
+## 093 Attachment Integrity Report Summary Modeli
+
+- Tekil `AttachmentIntegrityResult` listesinden ust rapor ozeti uretmek icin `AttachmentIntegrityReportSummary` modeli eklendi.
+- `build_attachment_integrity_report_summary` helper fonksiyonu eldeki result listesini status ve severity alanlarina gore sayar.
+- Bos result listesi tum sayaclari 0 olan ve UTC `generated_at` alanina sahip bir summary uretir.
+- Summary sayaclari negatif olamaz; `total_checked` status ve severity sayimlariyla uyumlu olmak zorundadir.
+- Bu adimda toplu scanner, dosya sistemi taramasi, klasor gezme, upload service, backup logic, audit event implementasyonu, database, API, GUI, auth, CI veya deployment eklenmedi.

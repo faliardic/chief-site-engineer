@@ -76,6 +76,51 @@ class AttachmentIntegrityResult:
             raise ValueError("severity must be OK, WARNING, or ERROR")
 
 
+@dataclass
+class AttachmentIntegrityReportSummary:
+    total_checked: int
+    ok_count: int
+    error_count: int
+    warning_count: int
+    missing_file_count: int
+    orphan_file_count: int
+    invalid_path_count: int
+    duplicate_metadata_count: int
+    unreadable_file_count: int
+    generated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def __post_init__(self) -> None:
+        counters = {
+            "total_checked": self.total_checked,
+            "ok_count": self.ok_count,
+            "error_count": self.error_count,
+            "warning_count": self.warning_count,
+            "missing_file_count": self.missing_file_count,
+            "orphan_file_count": self.orphan_file_count,
+            "invalid_path_count": self.invalid_path_count,
+            "duplicate_metadata_count": self.duplicate_metadata_count,
+            "unreadable_file_count": self.unreadable_file_count,
+        }
+        for field_name, value in counters.items():
+            if value < 0:
+                raise ValueError(f"{field_name} cannot be negative")
+
+        status_total = (
+            self.ok_count
+            + self.missing_file_count
+            + self.orphan_file_count
+            + self.invalid_path_count
+            + self.duplicate_metadata_count
+            + self.unreadable_file_count
+        )
+        if self.total_checked != status_total:
+            raise ValueError("total_checked must match status counts")
+
+        severity_total = self.ok_count + self.error_count + self.warning_count
+        if self.total_checked != severity_total:
+            raise ValueError("total_checked must match severity counts")
+
+
 def build_attachment_integrity_result(
     attachment_id: str | None,
     expected_path: str | None,
@@ -112,6 +157,36 @@ def build_attachment_integrity_result(
     if checked_at is not None:
         result_values["checked_at"] = checked_at
     return AttachmentIntegrityResult(**result_values)
+
+
+def build_attachment_integrity_report_summary(
+    results: list[AttachmentIntegrityResult],
+) -> AttachmentIntegrityReportSummary:
+    return AttachmentIntegrityReportSummary(
+        total_checked=len(results),
+        ok_count=sum(1 for result in results if result.status_code == OK),
+        error_count=sum(
+            1 for result in results if result.severity == SEVERITY_ERROR
+        ),
+        warning_count=sum(
+            1 for result in results if result.severity == SEVERITY_WARNING
+        ),
+        missing_file_count=sum(
+            1 for result in results if result.status_code == MISSING_FILE
+        ),
+        orphan_file_count=sum(
+            1 for result in results if result.status_code == ORPHAN_FILE
+        ),
+        invalid_path_count=sum(
+            1 for result in results if result.status_code == INVALID_PATH
+        ),
+        duplicate_metadata_count=sum(
+            1 for result in results if result.status_code == DUPLICATE_METADATA
+        ),
+        unreadable_file_count=sum(
+            1 for result in results if result.status_code == UNREADABLE_FILE
+        ),
+    )
 
 
 def _classify_integrity_status(

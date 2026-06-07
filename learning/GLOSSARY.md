@@ -1155,3 +1155,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `recommended_action`: Bir butunluk sonucunda onerilen sonraki adimi makine-dostu metin olarak tutan alan.
 
 `Karar onceligi`: Birden fazla sorun isareti ayni anda varsa hangi status kodunun once secilecegini belirleyen sira.
+
+`Report summary modeli`: Cok sayida tekil kontrol sonucunu toplam, hata, uyari ve status bazli sayaclarla ozetleyen model.
+
+`AttachmentIntegrityReportSummary`: Attachment integrity sonuc listesinden uretilen ust rapor ozeti modeli.
+
+`Status bazli sayac`: Belirli bir status kodundan kac adet oldugunu sayan alan.
+
+`Severity bazli sayac`: Hata, uyari veya OK seviyesinde kac sonuc oldugunu sayan alan.

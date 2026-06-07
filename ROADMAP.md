@@ -98,7 +98,7 @@ Bu fazda hedef yeni urun ozelligi eklemek degil; mevcut dokumantasyon ve proje s
 
 - [x] Adim 091 - Attachment integrity result modeli baslangici.
 - [x] Adim 092 - Attachment integrity single-record check helper baslangici.
-- [ ] Adim 093 - FileAttachmentRepository baslangic plani veya bellek ici baslangic.
+- [x] Adim 093 - Attachment integrity report summary modeli.
 - [ ] Adim 094 - Dosya upload servisi tasarim karari.
 - [ ] Adim 095 - Dosya varlik / integrity scanner plan veya baslangic davranisi.
 - [ ] Adim 096 - Attachment audit trail modeli veya karar dokumani.
@@ -111,4 +111,4 @@ Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistenc
 
 ## Sonraki Calisma Onerisi
 
-Adim 093 ile FileAttachmentRepository baslangic plani veya NotebookLM podcast notlari 071-090 final dosyasi ele alinabilir.
+Adim 094 ile dosya upload servisi tasarim karari veya NotebookLM podcast notlari 071-090 final dosyasi ele alinabilir.

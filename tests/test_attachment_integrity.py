@@ -12,6 +12,7 @@ from app.attachment_integrity import (
     ATTACHMENT_INTEGRITY_SEVERITIES,
     ATTACHMENT_INTEGRITY_STATUSES,
     ATTACHMENT_INTEGRITY_WARNING_STATUSES,
+    AttachmentIntegrityReportSummary,
     AttachmentIntegrityResult,
     DUPLICATE_METADATA,
     INVALID_PATH,
@@ -23,6 +24,7 @@ from app.attachment_integrity import (
     SEVERITY_WARNING,
     UNREADABLE_FILE,
     build_attachment_integrity_result,
+    build_attachment_integrity_report_summary,
 )
 
 
@@ -299,3 +301,147 @@ def test_build_attachment_integrity_result_keeps_checked_at_and_notes() -> None:
 
     assert result.checked_at == checked_at
     assert result.notes == "Manual recheck completed."
+
+
+def test_attachment_integrity_report_summary_empty_results() -> None:
+    summary = build_attachment_integrity_report_summary([])
+
+    assert summary.total_checked == 0
+    assert summary.ok_count == 0
+    assert summary.error_count == 0
+    assert summary.warning_count == 0
+    assert summary.missing_file_count == 0
+    assert summary.orphan_file_count == 0
+    assert summary.invalid_path_count == 0
+    assert summary.duplicate_metadata_count == 0
+    assert summary.unreadable_file_count == 0
+    assert summary.generated_at.tzinfo is not None
+    assert summary.generated_at.utcoffset() is not None
+    assert summary.generated_at.utcoffset().total_seconds() == 0
+
+
+def test_attachment_integrity_report_summary_counts_ok_results() -> None:
+    results = [
+        AttachmentIntegrityResult(
+            status_code=OK,
+            severity=SEVERITY_OK,
+            metadata_exists=True,
+            file_exists=True,
+        ),
+        AttachmentIntegrityResult(
+            status_code=OK,
+            severity=SEVERITY_OK,
+            metadata_exists=True,
+            file_exists=True,
+        ),
+    ]
+
+    summary = build_attachment_integrity_report_summary(results)
+
+    assert summary.total_checked == 2
+    assert summary.ok_count == 2
+    assert summary.error_count == 0
+    assert summary.warning_count == 0
+
+
+def test_attachment_integrity_report_summary_counts_error_statuses() -> None:
+    results = [
+        AttachmentIntegrityResult(status_code=MISSING_FILE, severity=SEVERITY_ERROR),
+        AttachmentIntegrityResult(status_code=INVALID_PATH, severity=SEVERITY_ERROR),
+        AttachmentIntegrityResult(
+            status_code=DUPLICATE_METADATA,
+            severity=SEVERITY_ERROR,
+        ),
+        AttachmentIntegrityResult(
+            status_code=UNREADABLE_FILE,
+            severity=SEVERITY_ERROR,
+        ),
+    ]
+
+    summary = build_attachment_integrity_report_summary(results)
+
+    assert summary.total_checked == 4
+    assert summary.error_count == 4
+    assert summary.missing_file_count == 1
+    assert summary.invalid_path_count == 1
+    assert summary.duplicate_metadata_count == 1
+    assert summary.unreadable_file_count == 1
+
+
+def test_attachment_integrity_report_summary_counts_warning_statuses() -> None:
+    summary = build_attachment_integrity_report_summary(
+        [
+            AttachmentIntegrityResult(
+                status_code=ORPHAN_FILE,
+                severity=SEVERITY_WARNING,
+            )
+        ]
+    )
+
+    assert summary.total_checked == 1
+    assert summary.warning_count == 1
+    assert summary.orphan_file_count == 1
+
+
+def test_attachment_integrity_report_summary_counts_mixed_results() -> None:
+    results = [
+        AttachmentIntegrityResult(status_code=OK, severity=SEVERITY_OK),
+        AttachmentIntegrityResult(status_code=MISSING_FILE, severity=SEVERITY_ERROR),
+        AttachmentIntegrityResult(status_code=ORPHAN_FILE, severity=SEVERITY_WARNING),
+        AttachmentIntegrityResult(status_code=INVALID_PATH, severity=SEVERITY_ERROR),
+    ]
+
+    summary = build_attachment_integrity_report_summary(results)
+
+    assert summary.total_checked == 4
+    assert summary.ok_count == 1
+    assert summary.error_count == 2
+    assert summary.warning_count == 1
+    assert summary.missing_file_count == 1
+    assert summary.orphan_file_count == 1
+    assert summary.invalid_path_count == 1
+
+
+def test_attachment_integrity_report_summary_rejects_negative_counter() -> None:
+    with pytest.raises(ValueError, match="total_checked cannot be negative"):
+        AttachmentIntegrityReportSummary(
+            total_checked=-1,
+            ok_count=0,
+            error_count=0,
+            warning_count=0,
+            missing_file_count=0,
+            orphan_file_count=0,
+            invalid_path_count=0,
+            duplicate_metadata_count=0,
+            unreadable_file_count=0,
+        )
+
+
+def test_attachment_integrity_report_summary_rejects_status_total_mismatch() -> None:
+    with pytest.raises(ValueError, match="total_checked must match status counts"):
+        AttachmentIntegrityReportSummary(
+            total_checked=2,
+            ok_count=1,
+            error_count=1,
+            warning_count=0,
+            missing_file_count=0,
+            orphan_file_count=0,
+            invalid_path_count=0,
+            duplicate_metadata_count=0,
+            unreadable_file_count=0,
+        )
+
+
+def test_attachment_integrity_report_summary_rejects_severity_total_mismatch() -> None:
+    with pytest.raises(ValueError, match="total_checked must match severity counts"):
+        AttachmentIntegrityReportSummary(
+            total_checked=1,
+            ok_count=0,
+            error_count=0,
+            warning_count=0,
+            missing_file_count=1,
+            orphan_file_count=0,
+            invalid_path_count=0,
+            duplicate_metadata_count=0,
+            unreadable_file_count=0,
+        )
