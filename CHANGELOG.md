@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 088
+
+- Added `build_attachment_path` to generate canonical attachment metadata paths.
+- Added tests for string/date/datetime dates, safe file name normalization, empty required values, invalid date strings, and record type lowercasing.
+- No upload service, physical file operation, database, API, GUI, auth, CI, deployment, or `FileAttachmentRecord` field change was added.
+
 ## Step 087
 
 - Added minimal `FileAttachmentRecord` validation for empty required metadata, invalid `file_type`, and negative `file_size`.

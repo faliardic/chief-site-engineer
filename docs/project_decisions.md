@@ -763,3 +763,12 @@
 - `uploaded_by` ve `uploaded_at` alanlari opsiyonel kalmaya devam edecek.
 - `FileAttachmentRecord` icine `status` alani eklenmedi.
 - Bu adimda path helper, upload service, fiziksel dosya islemi, database, API, GUI, auth, CI veya deployment eklenmedi.
+
+## 088 Attachment Path Helper Karari
+
+- Canonical attachment path standardini koda baglamak icin `build_attachment_path` helper fonksiyonu eklendi.
+- Helper `attachments/{project_id}/{record_type}/{yyyy}/{mm}/{dd}/{record_id}/{safe_file_name}` formatinda path string uretir.
+- `uploaded_at` degeri string, `date` veya `datetime` olarak kabul edilir.
+- `file_name` bas/son bosluklardan temizlenir ve klasor ayiricilar guvenli hale getirilir.
+- Helper fiziksel dosya olusturmaz, dosya kopyalamaz, metadata kaydi olusturmaz.
+- Bu adimda upload service, database, API, GUI, auth, CI veya deployment eklenmedi.

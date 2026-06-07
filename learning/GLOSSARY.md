@@ -1113,3 +1113,7 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Metadata integrity`: Dosya ekine ait kimlik, iliski, dosya yolu, dosya turu ve boyut bilgilerinin tutarli ve bozuk olmayan halde kalmasi.
 
 `ValueError`: Python'da bir deger beklenen kurala uymadiginda kullanilabilen hata tipi.
+
+`Path helper`: Standart dosya yolu metnini tek yerden ve tutarli sekilde ureten yardimci fonksiyon.
+
+`Safe filename normalization`: Dosya adindaki bas/son bosluklari ve klasor ayirici gibi riskli karakterleri guvenli hale getirme islemi.
