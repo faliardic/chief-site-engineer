@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 094
+
+- Added `AttachmentIntegrityReport` to carry attachment integrity results together with their report summary.
+- Added `build_attachment_integrity_report` to build a report and summary from existing `AttachmentIntegrityResult` records.
+- Added tests for empty reports, tuple storage, source/notes, generated time behavior, summary mismatch validation, and helper summary generation without adding scanner or file system traversal behavior.
+
 ## Step 093
 
 - Added `AttachmentIntegrityReportSummary` to represent the top-level summary of future attachment integrity reports.

@@ -12,6 +12,7 @@ from app.attachment_integrity import (
     ATTACHMENT_INTEGRITY_SEVERITIES,
     ATTACHMENT_INTEGRITY_STATUSES,
     ATTACHMENT_INTEGRITY_WARNING_STATUSES,
+    AttachmentIntegrityReport,
     AttachmentIntegrityReportSummary,
     AttachmentIntegrityResult,
     DUPLICATE_METADATA,
@@ -25,6 +26,7 @@ from app.attachment_integrity import (
     UNREADABLE_FILE,
     build_attachment_integrity_result,
     build_attachment_integrity_report_summary,
+    build_attachment_integrity_report,
 )
 
 
@@ -445,3 +447,91 @@ def test_attachment_integrity_report_summary_rejects_severity_total_mismatch() -
             duplicate_metadata_count=0,
             unreadable_file_count=0,
         )
+
+
+def test_attachment_integrity_report_can_be_created_with_empty_results() -> None:
+    report = build_attachment_integrity_report([])
+
+    assert report.results == ()
+    assert report.summary.total_checked == 0
+
+
+def test_attachment_integrity_report_summary_matches_multiple_results() -> None:
+    results = [
+        AttachmentIntegrityResult(status_code=OK, severity=SEVERITY_OK),
+        AttachmentIntegrityResult(status_code=MISSING_FILE, severity=SEVERITY_ERROR),
+    ]
+
+    report = build_attachment_integrity_report(results)
+
+    assert report.summary.total_checked == 2
+    assert report.summary.ok_count == 1
+    assert report.summary.error_count == 1
+
+
+def test_attachment_integrity_report_stores_results_as_tuple() -> None:
+    results = [AttachmentIntegrityResult(status_code=OK, severity=SEVERITY_OK)]
+
+    report = build_attachment_integrity_report(results)
+
+    assert isinstance(report.results, tuple)
+    assert report.results == tuple(results)
+
+
+def test_attachment_integrity_report_keeps_source_and_notes() -> None:
+    report = build_attachment_integrity_report(
+        [],
+        source="manual-check",
+        notes="No attachments in scope.",
+    )
+
+    assert report.source == "manual-check"
+    assert report.notes == "No attachments in scope."
+
+
+def test_attachment_integrity_report_sets_generated_at_when_missing() -> None:
+    report = build_attachment_integrity_report([])
+
+    assert report.generated_at.tzinfo is not None
+    assert report.generated_at.utcoffset() is not None
+    assert report.generated_at.utcoffset().total_seconds() == 0
+
+
+def test_attachment_integrity_report_keeps_provided_generated_at() -> None:
+    generated_at = datetime(2026, 6, 7, 14, 32, 10, tzinfo=timezone.utc)
+
+    report = build_attachment_integrity_report([], generated_at=generated_at)
+
+    assert report.generated_at == generated_at
+
+
+def test_attachment_integrity_report_rejects_summary_count_mismatch() -> None:
+    summary = AttachmentIntegrityReportSummary(
+        total_checked=1,
+        ok_count=1,
+        error_count=0,
+        warning_count=0,
+        missing_file_count=0,
+        orphan_file_count=0,
+        invalid_path_count=0,
+        duplicate_metadata_count=0,
+        unreadable_file_count=0,
+    )
+
+    with pytest.raises(ValueError, match="summary.total_checked must match result count"):
+        AttachmentIntegrityReport(results=(), summary=summary)
+
+
+def test_build_attachment_integrity_report_builds_summary() -> None:
+    results = (
+        AttachmentIntegrityResult(status_code=OK, severity=SEVERITY_OK),
+        AttachmentIntegrityResult(status_code=ORPHAN_FILE, severity=SEVERITY_WARNING),
+    )
+
+    report = build_attachment_integrity_report(results)
+
+    assert report.results == results
+    assert report.summary.total_checked == 2
+    assert report.summary.ok_count == 1
+    assert report.summary.warning_count == 1
+    assert report.summary.orphan_file_count == 1

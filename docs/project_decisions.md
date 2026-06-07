@@ -814,3 +814,13 @@
 - Bos result listesi tum sayaclari 0 olan ve UTC `generated_at` alanina sahip bir summary uretir.
 - Summary sayaclari negatif olamaz; `total_checked` status ve severity sayimlariyla uyumlu olmak zorundadir.
 - Bu adimda toplu scanner, dosya sistemi taramasi, klasor gezme, upload service, backup logic, audit event implementasyonu, database, API, GUI, auth, CI veya deployment eklenmedi.
+
+## 094 Attachment Integrity Report Modeli
+
+- Tekil result listesi ile summary bilgisini birlikte tasimak icin `AttachmentIntegrityReport` modeli eklendi.
+- Report modeli `results`, `summary`, `generated_at`, `source` ve `notes` alanlarini tasir.
+- `results` disaridan liste olarak verilse bile model icinde tuple olarak saklanir.
+- `summary.total_checked`, `len(results)` ile uyumlu olmak zorundadir.
+- `generated_at` verilmezse UTC zaman atanir; report ve summary zamanlari timezone-aware UTC olmak zorundadir.
+- `build_attachment_integrity_report` helper fonksiyonu result listesinden summary uretip report dondurur.
+- Bu adimda toplu scanner, dosya sistemi taramasi, klasor gezme, upload service, backup logic, audit event implementasyonu, database, API, GUI, auth, CI veya deployment eklenmedi.

@@ -1163,3 +1163,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Status bazli sayac`: Belirli bir status kodundan kac adet oldugunu sayan alan.
 
 `Severity bazli sayac`: Hata, uyari veya OK seviyesinde kac sonuc oldugunu sayan alan.
+
+`AttachmentIntegrityReport`: Tekil attachment integrity result listesini ve summary bilgisini birlikte tasiyan ust rapor modeli.
+
+`Report result listesi`: Rapor icinde yer alan tekil `AttachmentIntegrityResult` kayitlari.
+
+`Report source`: Raporun hangi kaynak veya calisma baglamindan uretildigini anlatan opsiyonel alan.
+
+`Report notes`: Rapor hakkinda insan tarafindan okunabilir ek aciklama tutan opsiyonel alan.

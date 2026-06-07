@@ -121,6 +121,26 @@ class AttachmentIntegrityReportSummary:
             raise ValueError("total_checked must match severity counts")
 
 
+@dataclass
+class AttachmentIntegrityReport:
+    results: tuple[AttachmentIntegrityResult, ...]
+    summary: AttachmentIntegrityReportSummary
+    generated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    source: str | None = None
+    notes: str | None = None
+
+    def __post_init__(self) -> None:
+        self.results = tuple(self.results)
+        if self.summary.total_checked != len(self.results):
+            raise ValueError("summary.total_checked must match result count")
+        if not _is_utc_datetime(self.generated_at):
+            raise ValueError("generated_at must be a timezone-aware UTC datetime")
+        if not _is_utc_datetime(self.summary.generated_at):
+            raise ValueError(
+                "summary.generated_at must be a timezone-aware UTC datetime"
+            )
+
+
 def build_attachment_integrity_result(
     attachment_id: str | None,
     expected_path: str | None,
@@ -189,6 +209,25 @@ def build_attachment_integrity_report_summary(
     )
 
 
+def build_attachment_integrity_report(
+    results: list[AttachmentIntegrityResult] | tuple[AttachmentIntegrityResult, ...],
+    source: str | None = None,
+    notes: str | None = None,
+    generated_at: datetime | None = None,
+) -> AttachmentIntegrityReport:
+    result_tuple = tuple(results)
+    summary = build_attachment_integrity_report_summary(list(result_tuple))
+    report_values = {
+        "results": result_tuple,
+        "summary": summary,
+        "source": source,
+        "notes": notes,
+    }
+    if generated_at is not None:
+        report_values["generated_at"] = generated_at
+    return AttachmentIntegrityReport(**report_values)
+
+
 def _classify_integrity_status(
     metadata_exists: bool,
     file_exists: bool,
@@ -227,3 +266,11 @@ def _classify_integrity_status(
             ACTION_CHECK_PERMISSIONS_DISK_OR_FILE_CORRUPTION,
         )
     return OK, SEVERITY_OK, None
+
+
+def _is_utc_datetime(value: datetime) -> bool:
+    return (
+        value.tzinfo is not None
+        and value.utcoffset() is not None
+        and value.utcoffset().total_seconds() == 0
+    )
