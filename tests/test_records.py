@@ -602,3 +602,71 @@ def test_nonconformity_repository_exists_returns_boolean_for_record_presence() -
     assert repository.exists("NCR-999") is False
     assert repository.find_by_id("NCR-030") == record
     assert repository.list_all() == [record]
+
+
+def test_nonconformity_repository_count_returns_total_record_count() -> None:
+    repository = NonconformityRepository()
+    first_record = NonconformityRecord(
+        nonconformity_id="NCR-031",
+        project_id="prj-001",
+        date="2026-08-05",
+        title="Ilk sayim NCR",
+        description="Toplam sayim icin ilk kayit.",
+    )
+    second_record = NonconformityRecord(
+        nonconformity_id="NCR-032",
+        project_id="prj-001",
+        date="2026-08-06",
+        title="Ikinci sayim NCR",
+        description="Toplam sayim icin ikinci kayit.",
+    )
+
+    assert repository.count() == 0
+
+    repository.add(first_record)
+    repository.add(second_record)
+
+    assert repository.count() == 2
+    assert repository.list_all() == [first_record, second_record]
+
+
+def test_nonconformity_repository_count_by_status_returns_matching_record_count() -> None:
+    repository = NonconformityRepository()
+    first_open_record = NonconformityRecord(
+        nonconformity_id="NCR-033",
+        project_id="prj-001",
+        date="2026-08-07",
+        title="Ilk acik NCR",
+        description="Status sayimi icin ilk acik kayit.",
+        status="open",
+    )
+    closed_record = NonconformityRecord(
+        nonconformity_id="NCR-034",
+        project_id="prj-001",
+        date="2026-08-08",
+        title="Kapali NCR",
+        description="Status sayimi icin kapali kayit.",
+        status="closed",
+    )
+    second_open_record = NonconformityRecord(
+        nonconformity_id="NCR-035",
+        project_id="prj-001",
+        date="2026-08-09",
+        title="Ikinci acik NCR",
+        description="Status sayimi icin ikinci acik kayit.",
+        status="open",
+    )
+
+    repository.add(first_open_record)
+    repository.add(closed_record)
+    repository.add(second_open_record)
+
+    assert repository.count_by_status("open") == 2
+    assert repository.count_by_status("closed") == 1
+    assert repository.count_by_status("verified") == 0
+    assert repository.list_by_status("open") == [first_open_record, second_open_record]
+    assert repository.list_all() == [
+        first_open_record,
+        closed_record,
+        second_open_record,
+    ]

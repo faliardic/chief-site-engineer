@@ -941,3 +941,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Boolean donus`: Sonucun `True` veya `False` olarak ifade edilmesi.
 
 `Kayit var mi kontrolu`: Bir NCR numarasinin repository icinde mevcut olup olmadigini hizlica anlama yaklasimi.
+
+`count`: Repository icindeki toplam kayit sayisini int olarak donduren metot.
+
+`count_by_status`: Repository icindeki belirli durum degerine sahip kayit sayisini int olarak donduren metot.
+
+`Kayit sayisi`: Repository icindeki kayitlarin adet olarak ifade edilmesi.
+
+`Status bazli sayim`: Kayitlari `status` degerine gore sayma yaklasimi.

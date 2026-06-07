@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 051
+
+- Added `NonconformityRepository.count` and `NonconformityRepository.count_by_status` for in-memory record counting.
+- Added tests for total record counts, empty repository counts, status-specific counts, and missing status counts returning `0`.
+- No JSON, SQLite, API, GUI, CLI, dashboard, file operation, delete, archive, or automatic workflow was added in this step.
+
 ## Step 050
 
 - Added `NonconformityRepository.exists` for in-memory boolean presence checks by `nonconformity_id`.

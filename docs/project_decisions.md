@@ -444,3 +444,12 @@
 - Varlik kontrolu `find_by_id` davranisini bozmayacak ve mevcut kayitlari degistirmeyecek.
 - Bu davranis JSON veya SQLite sorgusu degil, bellek ici Python kontroludur.
 - Silme, arsivleme, API, GUI, CLI, dashboard, dosya islemi ve otomatik is akisi eklenmedi.
+
+## 051 NonconformityRepository Kayit Sayisi
+
+- `NonconformityRepository` icine `count()` davranisi eklendi.
+- `count()` repository icindeki toplam `NonconformityRecord` sayisini int olarak dondurecek.
+- `NonconformityRepository` icine `count_by_status(status)` davranisi eklendi.
+- `count_by_status(status)` verilen durum degerine sahip kayit sayisini int olarak dondurecek; eslesme yoksa `0` dondurecek.
+- Bu davranislar mevcut kayitlari degistirmeyecek ve `list_by_status` davranisini bozmayacak.
+- JSON, SQLite, API, GUI, CLI, dashboard, dosya islemi, silme, arsivleme ve otomatik is akisi eklenmedi.

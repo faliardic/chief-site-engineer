@@ -53,6 +53,9 @@ class NonconformityRepository:
     def list_all(self) -> list[NonconformityRecord]:
         return list(self._records)
 
+    def count(self) -> int:
+        return len(self._records)
+
     def find_by_id(self, nonconformity_id: str) -> NonconformityRecord | None:
         for record in self._records:
             if record.nonconformity_id == nonconformity_id:
@@ -86,6 +89,9 @@ class NonconformityRepository:
 
     def list_by_status(self, status: str) -> list[NonconformityRecord]:
         return [record for record in self._records if record.status == status]
+
+    def count_by_status(self, status: str) -> int:
+        return len(self.list_by_status(status))
 
     def list_by_responsible_party(
         self,
