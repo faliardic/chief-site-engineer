@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 090
+
+- Added centralized attachment integrity status constants for `OK`, `MISSING_FILE`, `ORPHAN_FILE`, `INVALID_PATH`, `DUPLICATE_METADATA`, and `UNREADABLE_FILE`.
+- Added immutable all-status, error-status, and warning-status collections with focused tests.
+- No scanner implementation, file system scan, upload service, backup logic, audit event implementation, database, API, GUI, auth, CI, deployment, push, or ZIP staging was added.
+
 ## Step 089
 
 - Documented attachment metadata integrity rules for a future missing/orphan scanner.

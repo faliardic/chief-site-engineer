@@ -1131,3 +1131,13 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `DUPLICATE_METADATA`: Birden fazla metadata kaydinin ayni fiziksel dosyayi isaret etmesi.
 
 `UNREADABLE_FILE`: Dosyanin var olmasina ragmen izin, disk veya bozulma gibi nedenlerle okunamamasi.
+
+`Status sabiti`: Bir durum kodunu kod icinde tek isim ve tek string degeriyle merkezi olarak temsil eden sabit.
+
+`Attachment integrity status`: Attachment metadata ile fiziksel dosya arasindaki butunluk sonucunu anlatan status kodu.
+
+`Error status`: Kritik hata veya dogrudan duzeltme gerektiren attachment integrity durumu.
+
+`Warning status`: Kritik hata olmayabilir ancak manuel inceleme veya karar gerektiren attachment integrity durumu.
+
+`Immutable koleksiyon`: Disaridan degistirilemeyen koleksiyon; bu projede status gruplari icin `frozenset` kullanildi.

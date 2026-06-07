@@ -780,3 +780,11 @@
 - Scanner raporunda `status_code`, attachment reference, beklenen path, mevcut path, dosya/metadata varligi, severity, onerilen aksiyon ve kontrol zamani gibi alanlar yer alacak.
 - Backup restore, upload service ve audit event hatlariyla iliski karar duzeyinde aciklandi.
 - Bu adimda uygulama kodu, test dosyalari, scanner implementasyonu, dosya sistemi taramasi, upload service, database, API, GUI, auth, CI veya deployment eklenmedi.
+
+## 090 Attachment Integrity Status Sabitleri
+
+- Adim 089'da dokumante edilen attachment metadata butunluk durumlari kod tarafinda merkezi sabitlere donusturuldu.
+- `OK`, `MISSING_FILE`, `ORPHAN_FILE`, `INVALID_PATH`, `DUPLICATE_METADATA` ve `UNREADABLE_FILE` status kodlari ortak sozluk olarak tanimlandi.
+- Tum status kodlari, hata status kodlari ve uyari status kodlari icin immutable `frozenset` koleksiyonlari kullanilacak.
+- `MISSING_FILE`, `INVALID_PATH`, `DUPLICATE_METADATA` ve `UNREADABLE_FILE` hata; `ORPHAN_FILE` uyari; `OK` sorun yok durumu olarak ayrildi.
+- Bu adimda scanner, dosya sistemi taramasi, upload service, backup logic, audit event implementasyonu, database, API, GUI, auth, CI veya deployment eklenmedi.
