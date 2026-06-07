@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 070
+
+- Added a usage summary for `FileAttachmentRecord.related_record_type` and `related_record_id`.
+- Documented how file attachments can link to NCR, site note, daily log, material delivery, inspection, safety observation, concrete pour, and chief private note records.
+- No application code, tests, repository, file upload, foreign key, ORM relation, SQLite, JSON persistence, API, GUI, or CLI behavior was changed in this step.
+
 ## Step 069
 
 - Documented and tested the basic `FileAttachmentRecord.file_type` classification values: `image`, `video`, `pdf`, `document`, `audio`, and `other`.

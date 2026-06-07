@@ -1077,3 +1077,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `audio`: Ses notu veya ses kaydi eklerini anlatan dosya tipi sinifi.
 
 `other`: Standart siniflara girmeyen dosya eklerini anlatan dosya tipi sinifi.
+
+`Ana kayit`: Dosya ekinin bagli oldugu asil saha kaydi; ornegin NCR, gunluk kayit veya malzeme teslim kaydi.
+
+`Ek kayit`: Ana kayda baglanan fotograf, video, PDF, belge veya ses referansi.
+
+`String tabanli iliski`: Foreign key veya ORM kullanmadan, kayit turu ve kayit id degerini metin olarak tutan basit baglanti yaklasimi.
+
+`Iliskili kayit baglantisi`: Bir dosya ekinin hangi ana kayda ait oldugunu `related_record_type` ve `related_record_id` ile ifade etme yaklasimi.

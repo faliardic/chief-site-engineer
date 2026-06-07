@@ -69,6 +69,7 @@
 - [x] Adim 067 - Dosya ve video eki plani
 - [x] Adim 068 - FileAttachmentRecord veri modeli
 - [x] Adim 069 - FileAttachmentRecord dosya tipi siniflandirmasi
+- [x] Adim 070 - FileAttachmentRecord iliskili kayit baglantisi
 
 Adim 021-025 araligi tamamlandi. Bu aralik icin final NotebookLM podcast notu hazirlanacak.
 
@@ -160,4 +161,6 @@ Adim 068'de fotograf, video, PDF, belge ve ses notu gibi eklerin metadata ve ref
 
 Adim 069'da `FileAttachmentRecord.file_type` alaninda kullanilacak `image`, `video`, `pdf`, `document`, `audio` ve `other` siniflari test ve dokumantasyonla netlestirildi.
 
-Sonraki kucuk adim onerisi: Adim 070 - Attachment kayitlarinin NCR ile iliskilendirme plani
+Adim 070'te `FileAttachmentRecord.related_record_type` ve `related_record_id` alanlarinin ana kayit baglantisi icin nasil kullanilacagi dokumante edildi.
+
+Sonraki kucuk adim onerisi: Adim 071 - NotebookLM podcast notu Adim 061-070

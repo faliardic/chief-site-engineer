@@ -600,3 +600,11 @@
 - Dosya tipi siniflandirmasinin model icinde metadata olarak tutulacagi netlestirildi.
 - `mime_type` alaninin teknik dosya turunu, `file_type` alaninin ise proje icindeki sade sinifi temsil ettigi ayrim vurgulandi.
 - Model alani degistirilmedi; repository, dosya yukleme, video oynatma, thumbnail uretme, JSON, SQLite, API, GUI ve CLI eklenmedi.
+
+## 070 FileAttachmentRecord Iliskili Kayit Baglantisi
+
+- `FileAttachmentRecord.related_record_type` ve `related_record_id` alanlarinin kullanim mantigi dokumante edildi.
+- Dosya eklerinin ana kaydi degistirmeden veya silmeden, string tabanli basit iliski bilgisiyle ana kayda baglanacagi netlestirildi.
+- Bir ana kayda birden fazla dosya eki baglanabilecegi ve ayni dosya tipinin birden fazla kez kullanilabilecegi belirtildi.
+- Bu adimda foreign key, ORM relation, SQLite, JSON persistence, API, GUI, CLI, repository ve dosya yukleme davranisi eklenmedi.
+- Uygulama kodu ve test dosyalari degistirilmedi.
