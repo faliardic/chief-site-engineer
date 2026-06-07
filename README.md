@@ -63,6 +63,6 @@ Guncel test sonucu:
 13 passed
 ```
 
-## Sonraki Onerilen Adim
+## Sonraki Adim
 
 Adim 005 - Beton dokum ve numune takip baslangici icin hazirlik veya once Git ilk commit duzeni.
