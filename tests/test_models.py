@@ -225,6 +225,26 @@ def test_nonconformity_record_holds_values_and_defaults() -> None:
     assert record.final_status is None
     assert record.notes is None
     assert record.status == "open"
+    assert record.is_archived is False
+
+
+def test_nonconformity_record_can_be_created_as_archived() -> None:
+    record = NonconformityRecord(
+        nonconformity_id="ncr-archived-001",
+        project_id="prj-001",
+        date="2026-08-10",
+        title="Arsivlenmis NCR",
+        description="Bu kayit arsiv alani testi icin olusturuldu.",
+        is_archived=True,
+    )
+
+    assert record.nonconformity_id == "ncr-archived-001"
+    assert record.project_id == "prj-001"
+    assert record.date == "2026-08-10"
+    assert record.title == "Arsivlenmis NCR"
+    assert record.description == "Bu kayit arsiv alani testi icin olusturuldu."
+    assert record.status == "open"
+    assert record.is_archived is True
 
 
 def test_attachment_record_holds_values_and_defaults() -> None:

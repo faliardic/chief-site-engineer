@@ -453,3 +453,11 @@
 - `count_by_status(status)` verilen durum degerine sahip kayit sayisini int olarak dondurecek; eslesme yoksa `0` dondurecek.
 - Bu davranislar mevcut kayitlari degistirmeyecek ve `list_by_status` davranisini bozmayacak.
 - JSON, SQLite, API, GUI, CLI, dashboard, dosya islemi, silme, arsivleme ve otomatik is akisi eklenmedi.
+
+## 052 NonconformityRecord Arsiv Alani
+
+- `NonconformityRecord` icine `is_archived: bool = False` alani eklendi.
+- Varsayilan deger `False` olarak belirlendi; yeni NCR kayitlari aktif/arsivlenmemis kabul edilecek.
+- `is_archived=True` verilerek kaydin arsivlenmis olarak temsil edilebilmesi saglandi.
+- Bu adimda repository archive/restore davranisi, otomatik arsivleme, silme veya filtreleme eklenmedi.
+- JSON, SQLite, API, GUI, CLI, dashboard, dosya islemi ve otomatik is akisi eklenmedi.

@@ -146,6 +146,7 @@ class NonconformityRecord:
     final_status: str | None = None
     notes: str | None = None
     status: str = "open"
+    is_archived: bool = False
 
 
 @dataclass

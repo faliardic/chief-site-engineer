@@ -949,3 +949,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Kayit sayisi`: Repository icindeki kayitlarin adet olarak ifade edilmesi.
 
 `Status bazli sayim`: Kayitlari `status` degerine gore sayma yaklasimi.
+
+`is_archived`: Bir kaydin arsivlenip arsivlenmedigini boolean olarak tutan model alani.
+
+`Arsiv alani`: Kaydin silinmeden pasif veya arsivlenmis olarak isaretlenmesini saglayan alan.
+
+`Silme yerine arsivleme`: Kaydi tamamen kaldirmak yerine izlenebilir kalacak sekilde arsivli isaretleme yaklasimi.
+
+`Varsayilan False`: Yeni kaydin baslangicta arsivlenmemis kabul edilmesini anlatan boolean varsayilan.

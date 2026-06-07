@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 052
+
+- Added `is_archived: bool = False` to `NonconformityRecord` as a small archive marker field.
+- Added tests proving the default archive state is `False` and records can be created with `is_archived=True`.
+- No repository archive/restore behavior, JSON, SQLite, API, GUI, CLI, dashboard, file operation, delete, or automatic workflow was added in this step.
+
 ## Step 051
 
 - Added `NonconformityRepository.count` and `NonconformityRepository.count_by_status` for in-memory record counting.

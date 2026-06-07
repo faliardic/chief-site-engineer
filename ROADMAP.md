@@ -51,6 +51,7 @@
 - [x] Adim 049 - NonconformityRepository sorumlu taraf guncelleme
 - [x] Adim 050 - NonconformityRepository kayit var mi kontrolu
 - [x] Adim 051 - NonconformityRepository kayit sayisi
+- [x] Adim 052 - NonconformityRecord arsiv alani
 
 Adim 021-025 araligi tamamlandi. Bu aralik icin final NotebookLM podcast notu hazirlanacak.
 
@@ -106,4 +107,6 @@ Adim 050'de `NonconformityRepository` icine verilen `nonconformity_id` degerine 
 
 Adim 051'de `NonconformityRepository` icine toplam kayit sayisini veren `count` ve belirli durumdaki kayit sayisini veren `count_by_status` davranislari eklendi.
 
-Sonraki kucuk adim onerisi: Adim 052 - NotebookLM podcast notu Adim 036-040
+Adim 052'de `NonconformityRecord` icine kaydin arsivlenip arsivlenmedigini temsil eden `is_archived` boolean alani eklendi.
+
+Sonraki kucuk adim onerisi: Adim 053 - NotebookLM podcast notu Adim 036-040
