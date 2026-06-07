@@ -833,3 +833,13 @@
 - Report serializer nested result listesini result dict listesine ve summary bilgisini summary dict yapisina cevirir.
 - Serializer fonksiyonlari orijinal dataclass/model nesnelerini degistirmez.
 - Bu adimda JSON dosyasi yazma, `json.dump`, scanner, dosya sistemi taramasi, klasor gezme, upload service, backup logic, audit event implementasyonu, database, API, GUI, auth, CI veya deployment eklenmedi.
+
+## 096 Ana Proje Ilkeleri ve Veri Politikasi Kararlari
+
+- CSE icin ana proje ilkeleri dokumante edildi: once veri omurgasi, sonra otomasyon, en son AI; kucuk ve guvenilir saha hafizasi; resmi kayit ve ozel alan ayrimi.
+- Resmi proje kayitlarinin fiziksel olarak silinmemesi karar olarak netlestirildi.
+- NCR, tutanak, kalite kontrol, attachment metadata, audit event, fotograf/video metadata ve proje kararlari gibi kanit niteligindeki resmi kayitlarda hard delete yerine arsivleme, hukumden dusurme, revizyon veya superseded yaklasimi kullanilacak.
+- Santiye Sefi Ozel Alani kisisel calisma alani olarak tanimlandi ve resmi proje kayitlarindan izole tutulmasina karar verildi.
+- Yeni santiye sefinin eski santiye sefinin private workspace alanina erisemeyecegi; devir icin gerekli bilgilerin explicit handover package veya official record olarak hazirlanmasi gerektigi dokumante edildi.
+- Ozel alan verileri icin ileride kullanici bazli encryption key ve crypto-shredding yaklasimi degerlendirilecek.
+- Bu adimda uygulama kodu, test dosyalari, database migration, encryption, auth/permission, scanner, upload service, backup/restore implementasyonu, push veya ZIP staging yapilmadi.

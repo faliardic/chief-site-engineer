@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 096
+
+- Added core CSE policy documents for long-term project principles, official-record deletion prevention, private workspace isolation, and site chief handover scenarios.
+- Documented that official project records should not be physically deleted and that private site chief workspace data must stay separate from official project records.
+- Added glossary terms for official records, private workspace, handover packages, soft/hard delete, archive, void, superseded records, crypto-shredding, data isolation, and owner user id without adding code, migrations, auth, encryption, scanner, upload service, push, or ZIP staging.
+
 ## Step 095
 
 - Added serializer helpers for `AttachmentIntegrityResult`, `AttachmentIntegrityReportSummary`, and `AttachmentIntegrityReport`.

@@ -1179,3 +1179,25 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `ISO 8601`: Tarih ve saat bilgisini standart metin formatinda gosteren yaygin format.
 
 `Nested serialization`: Bir rapor icindeki alt result ve summary nesnelerinin de dictionary formatina cevrilmesi.
+
+`Official Project Record`: Proje hafizasinin resmi parcasi olan, denetlenebilir ve izlenebilir kayit.
+
+`Private Site Chief Workspace`: Santiye sefinin kisisel not, taslak ve hatirlaticilari icin ayrilmis resmi olmayan calisma alani.
+
+`Explicit Handover Package`: Devir icin bilincli olarak hazirlanan resmi bilgi paketi.
+
+`Soft Delete`: Kaydi fiziksel olarak silmeden gorunurlugunu veya aktif durumunu degistiren silme yaklasimi.
+
+`Hard Delete`: Kaydin fiziksel olarak sistemden kaldirilmasi.
+
+`Archive`: Kaydi silmeden aktif kullanim listesinden ayirma ve izlenebilir sekilde saklama.
+
+`Void`: Yanlis veya gecersiz kaydi silmeden hukumden dusurme.
+
+`Superseded Record`: Daha yeni veya revize bir kayit tarafindan yerine gecilmis eski kayit.
+
+`Crypto-shredding`: Veriyi fiziksel olarak tek tek silmek yerine encryption key'i yok ederek okunamaz hale getirme yaklasimi.
+
+`Data Isolation`: Farkli veri alanlarinin birbirine karismayacak sekilde ayrilmasi.
+
+`Owner User ID`: Bir private workspace veya kisisel kaydin hangi kullaniciya ait oldugunu gosteren sahiplik kimligi.
