@@ -169,4 +169,6 @@ Adim 072'de `FileAttachmentRecord` icin fotograf, video, PDF, belge ve ses dosya
 
 Adim 073'te `FileAttachmentRecord` icin beton dokumu, NCR, malzeme teslimi, gunluk saha kaydi, iscilik, ozel not ve denetim kayitlari uzerinden ornek kullanim senaryolari dokumante edildi.
 
-Sonraki kucuk adim onerisi: Adim 074 - FileAttachmentRecord repository plani
+Adim 074'te `FileAttachmentRecord` ekleri icin saklama klasor yapisi ve dosya adlandirma standardi dokumante edildi.
+
+Sonraki kucuk adim onerisi: Adim 075 - FileAttachmentRecord repository plani

@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 074
+
+- Added a storage folder and file naming standard document for `FileAttachmentRecord` attachments.
+- Documented proposed attachment folder structure, date-based subfolders, naming template, original filename handling, metadata notes, video-specific rules, and backup/archive considerations.
+- No application code, tests, repository, file upload, physical file copy/delete/move, thumbnail, video playback, preview, streaming, SQLite, JSON persistence, API, GUI, or CLI behavior was changed in this step.
+
 ## Step 073
 
 - Added example usage scenarios for `FileAttachmentRecord` across concrete pours, NCR records, material deliveries, daily site records, workforce records, chief private notes, and inspection records.

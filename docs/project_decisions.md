@@ -634,3 +634,14 @@
 - Buyuk video dosyalarinin sistem icinde blob olarak saklanmayacagi vurgulandi.
 - Bu adim sadece dokumantasyon ve ornek kullanim senaryosu adimidir.
 - Uygulama kodu, test dosyalari, repository, dosya yukleme, fiziksel dosya kopyalama/silme/tasima, thumbnail, video oynatma, streaming, SQLite, JSON persistence, API, GUI ve CLI degistirilmedi.
+
+## 074 FileAttachmentRecord Saklama ve Adlandirma Standardi
+
+- `FileAttachmentRecord` ile temsil edilen dosya ekleri icin saklama klasor yapisi ve dosya adlandirma standardi dokumante edildi.
+- Dosyanin veritabanina gomulmeyecegi; klasor, sunucu veya bulut ortaminda tutulacagi karar tekrar korundu.
+- Dosya yolunun proje, kayit turu, tarih ve kayit id bilgisiyle okunabilir olmasi hedeflendi.
+- Dosya adi icin `YYYYMMDD_HHMMSS__record_type__record_id__file_type__sequence.ext` sablonu onerildi.
+- Orijinal dosya adinin ileride metadata olarak saklanabilecegi, fakat sistem kimligi olarak kullanilmayacagi belirtildi.
+- Video dosyalari icin thumbnail, duration, resolution ve codec gibi bilgilerin ileride ayri metadata olarak degerlendirilebilecegi; bu adimda medya isleme eklenmeyecegi netlestirildi.
+- Bu adim sadece dokumantasyon standardi adimidir.
+- Uygulama kodu, test dosyalari, repository, dosya yukleme, fiziksel dosya kopyalama/silme/tasima, thumbnail, video oynatma, preview, streaming, SQLite, JSON persistence, API, GUI ve CLI degistirilmedi.
