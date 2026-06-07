@@ -113,6 +113,13 @@ class NonconformityRepository:
     def list_archived(self) -> list[NonconformityRecord]:
         return [record for record in self._records if record.is_archived]
 
+    def get_archive_summary(self) -> dict[str, int]:
+        return {
+            "active": len(self.list_active()),
+            "archived": len(self.list_archived()),
+            "total": self.count(),
+        }
+
     def list_by_responsible_party(
         self,
         responsible_party: str,

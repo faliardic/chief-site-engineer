@@ -486,3 +486,11 @@
 - Kayit bulunamazsa `None` dondurulecek.
 - Bu davranis kaydi silmeyecek, mevcut kayit sirasini degistirmeyecek ve `status` alanina dokunmayacak.
 - NonconformityRecord modeli, otomatik arsivleme, otomatik kapanis, otomatik durum gecmisi, JSON, SQLite, API, GUI, CLI, dashboard, dosya islemi ve otomatik is akisi eklenmedi.
+
+## 056 NonconformityRepository Arsiv Ozeti
+
+- `NonconformityRepository` icine `get_archive_summary()` davranisi eklendi.
+- Bu davranis aktif, arsivlenmis ve toplam NCR kayit sayilarini `dict[str, int]` olarak dondurecek.
+- Bos repository icin `{"active": 0, "archived": 0, "total": 0}` dondurulecek.
+- `archive` ve `restore` davranislari sonrasi ozet degerleri guncel `is_archived` alanina gore hesaplanacak.
+- Kayit silme, otomatik history, workflow, status degisimi, JSON, SQLite, API, GUI, CLI, dashboard ve dosya islemi eklenmedi.

@@ -981,3 +981,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Aktife alma`: Arsivlenmis kaydin yeniden normal takip listesine dahil edilmesi.
 
 `Archive / restore ayrimi`: Arsivlemenin `is_archived=True`, restore isleminin `is_archived=False` yapmasi.
+
+`get_archive_summary`: Repository icindeki aktif, arsivlenmis ve toplam kayit sayilarini veren metot.
+
+`Arsiv ozeti`: NCR kayitlarinin aktif, arsivlenmis ve toplam adetlerini gosteren ozet bilgi.
+
+`active sayisi`: `is_archived == False` olan kayitlarin adedi.
+
+`archived sayisi`: `is_archived == True` olan kayitlarin adedi.

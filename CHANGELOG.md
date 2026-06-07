@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 056
+
+- Added `NonconformityRepository.get_archive_summary` for in-memory active, archived, and total NCR counts.
+- Added tests for empty archive summaries, mixed active/archived record counts, and restore updates without changing totals.
+- No delete behavior, JSON, SQLite, API, GUI, CLI, dashboard, automatic history, workflow, or status change was added in this step.
+
 ## Step 055
 
 - Added `NonconformityRepository.restore` for in-memory restore by setting `is_archived=False`.
