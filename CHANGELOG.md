@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 101
+
+- Added a general project audit and architecture health report after the Step 100 safe point.
+- Reviewed project structure, application modules, tests, documentation, learning notes, attachment integrity, data protection policy, roadmap alignment, risks, strengths, and the recommended Step 102-120 path.
+- Identified README freshness, `app/models.py` growth, large test files, scanner complexity, and private workspace / official record separation as key follow-up areas without changing application code or tests.
+
 ## Step 100
 
 - Added the final Step 100 safe point quality-control document for the Step 081-099 work line.
