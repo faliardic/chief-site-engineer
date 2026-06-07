@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 069
+
+- Documented and tested the basic `FileAttachmentRecord.file_type` classification values: `image`, `video`, `pdf`, `document`, `audio`, and `other`.
+- Added model tests showing each file type as metadata/reference, including MIME type and filename examples.
+- No model field change, enum, validation, repository, file upload, video playback, thumbnail generation, JSON, SQLite, API, GUI, or CLI behavior was added in this step.
+
 ## Step 068
 
 - Added `FileAttachmentRecord` as a dataclass model for photo, video, PDF, document, audio, and other file attachment metadata references.

@@ -1067,3 +1067,13 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `uploaded_at`: Dosya ekinin yuklendigi veya kayda alindigi zamani tutan alan.
 
 `file_size`: Dosyanin boyutunu metadata olarak tutan opsiyonel alan.
+
+`Dosya tipi siniflandirmasi`: Dosya eklerini `image`, `video`, `pdf`, `document`, `audio` veya `other` gibi temel gruplara ayirma yaklasimi.
+
+`image`: Fotograf veya gorsel dosya eklerini anlatan dosya tipi sinifi.
+
+`video`: Video dosya eklerini anlatan dosya tipi sinifi.
+
+`audio`: Ses notu veya ses kaydi eklerini anlatan dosya tipi sinifi.
+
+`other`: Standart siniflara girmeyen dosya eklerini anlatan dosya tipi sinifi.

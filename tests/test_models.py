@@ -372,6 +372,125 @@ def test_file_attachment_record_links_to_related_record_by_type_and_id() -> None
     assert attachment.notes == "NCR kaydina bagli kanit PDF'i."
 
 
+def test_file_attachment_record_can_represent_image_type() -> None:
+    attachment = FileAttachmentRecord(
+        attachment_id="file-att-image-001",
+        related_record_type="site_note",
+        related_record_id="NOTE-001",
+        file_name="saha-duzeni.jpg",
+        file_path="attachments/site-notes/NOTE-001/saha-duzeni.jpg",
+        file_type="image",
+        mime_type="image/jpeg",
+        uploaded_by="Santiye sefi",
+        uploaded_at="2026-10-03T09:00:00",
+    )
+
+    assert attachment.file_type == "image"
+    assert attachment.mime_type == "image/jpeg"
+    assert attachment.file_name.endswith(".jpg")
+    assert attachment.file_path == "attachments/site-notes/NOTE-001/saha-duzeni.jpg"
+
+
+def test_file_attachment_record_can_represent_video_type() -> None:
+    attachment = FileAttachmentRecord(
+        attachment_id="file-att-video-002",
+        related_record_type="daily_log",
+        related_record_id="LOG-001",
+        file_name="ilerleme-videosu.mp4",
+        file_path="attachments/daily-logs/LOG-001/ilerleme-videosu.mp4",
+        file_type="video",
+        mime_type="video/mp4",
+        uploaded_by="Santiye sefi",
+        uploaded_at="2026-10-03T09:30:00",
+        description="Gunluk ilerleme videosu metadata referansi.",
+    )
+
+    assert attachment.file_type == "video"
+    assert attachment.mime_type == "video/mp4"
+    assert attachment.file_name.endswith(".mp4")
+    assert attachment.description == "Gunluk ilerleme videosu metadata referansi."
+
+
+def test_file_attachment_record_can_represent_pdf_type() -> None:
+    attachment = FileAttachmentRecord(
+        attachment_id="file-att-pdf-001",
+        related_record_type="nonconformity",
+        related_record_id="NCR-004",
+        file_name="ncr-tutanagi.pdf",
+        file_path="attachments/ncr/NCR-004/ncr-tutanagi.pdf",
+        file_type="pdf",
+        mime_type="application/pdf",
+        uploaded_by="Kalite muhendisi",
+        uploaded_at="2026-10-03T10:00:00",
+    )
+
+    assert attachment.file_type == "pdf"
+    assert attachment.mime_type == "application/pdf"
+    assert attachment.file_name.endswith(".pdf")
+
+
+def test_file_attachment_record_can_represent_document_type() -> None:
+    attachment = FileAttachmentRecord(
+        attachment_id="file-att-document-001",
+        related_record_type="material_delivery",
+        related_record_id="MAT-DEL-001",
+        file_name="malzeme-teslim-formu.docx",
+        file_path="attachments/materials/MAT-DEL-001/malzeme-teslim-formu.docx",
+        file_type="document",
+        mime_type=(
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ),
+        uploaded_by="Depo sorumlusu",
+        uploaded_at="2026-10-03T10:30:00",
+    )
+
+    assert attachment.file_type == "document"
+    assert attachment.mime_type == (
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+    assert attachment.file_name.endswith(".docx")
+
+
+def test_file_attachment_record_can_represent_audio_type() -> None:
+    attachment = FileAttachmentRecord(
+        attachment_id="file-att-audio-001",
+        related_record_type="site_note",
+        related_record_id="NOTE-002",
+        file_name="saha-notu-ses.mp3",
+        file_path="attachments/site-notes/NOTE-002/saha-notu-ses.mp3",
+        file_type="audio",
+        mime_type="audio/mpeg",
+        uploaded_by="Santiye sefi",
+        uploaded_at="2026-10-03T11:00:00",
+        description="Saha notu ses kaydi metadata referansi.",
+    )
+
+    assert attachment.file_type == "audio"
+    assert attachment.mime_type == "audio/mpeg"
+    assert attachment.file_name.endswith(".mp3")
+    assert attachment.description == "Saha notu ses kaydi metadata referansi."
+
+
+def test_file_attachment_record_can_represent_other_type() -> None:
+    attachment = FileAttachmentRecord(
+        attachment_id="file-att-other-001",
+        related_record_type="daily_log",
+        related_record_id="LOG-002",
+        file_name="saha-verisi.bin",
+        file_path="attachments/daily-logs/LOG-002/saha-verisi.bin",
+        file_type="other",
+        mime_type="application/octet-stream",
+        uploaded_by="Santiye sefi",
+        uploaded_at="2026-10-03T11:30:00",
+        notes="Siniflandirilamayan dosya referansi.",
+    )
+
+    assert attachment.file_type == "other"
+    assert attachment.mime_type == "application/octet-stream"
+    assert attachment.file_name.endswith(".bin")
+    assert attachment.notes == "Siniflandirilamayan dosya referansi."
+
+
 def test_material_record_holds_values_and_defaults() -> None:
     material = MaterialRecord(
         material_name="C30 beton",

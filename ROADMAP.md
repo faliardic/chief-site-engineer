@@ -68,6 +68,7 @@
 - [x] Adim 066 - NonconformityRepository konuma gore filtreleme
 - [x] Adim 067 - Dosya ve video eki plani
 - [x] Adim 068 - FileAttachmentRecord veri modeli
+- [x] Adim 069 - FileAttachmentRecord dosya tipi siniflandirmasi
 
 Adim 021-025 araligi tamamlandi. Bu aralik icin final NotebookLM podcast notu hazirlanacak.
 
@@ -157,4 +158,6 @@ Adim 067'de fotograf, video, PDF, belge ve ses notu gibi eklerin ortak attachmen
 
 Adim 068'de fotograf, video, PDF, belge ve ses notu gibi eklerin metadata ve referans bilgisini temsil eden `FileAttachmentRecord` veri modeli eklendi.
 
-Sonraki kucuk adim onerisi: Adim 069 - Dosya tipi siniflandirmasi
+Adim 069'da `FileAttachmentRecord.file_type` alaninda kullanilacak `image`, `video`, `pdf`, `document`, `audio` ve `other` siniflari test ve dokumantasyonla netlestirildi.
+
+Sonraki kucuk adim onerisi: Adim 070 - Attachment kayitlarinin NCR ile iliskilendirme plani

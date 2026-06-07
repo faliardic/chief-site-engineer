@@ -592,3 +592,11 @@
 - Video dosyasi icerigi modele gomulmeyecek; `file_name`, `file_path`, `file_type`, `mime_type`, `file_size` gibi bilgiler tutulacak.
 - Iliskili kayit baglantisi `related_record_type` ve `related_record_id` alanlariyla temsil edilecek.
 - Repository, dosya yukleme, fiziksel dosya kopyalama, video oynatma, thumbnail uretme, JSON, SQLite, API, GUI, CLI ve persistence davranisi eklenmedi.
+
+## 069 FileAttachmentRecord Dosya Tipi Siniflandirmasi
+
+- `FileAttachmentRecord.file_type` icin temel kullanim siniflari `image`, `video`, `pdf`, `document`, `audio` ve `other` olarak dokumante edildi.
+- Bu adimda enum, validation veya hata firlatma davranisi eklenmedi.
+- Dosya tipi siniflandirmasinin model icinde metadata olarak tutulacagi netlestirildi.
+- `mime_type` alaninin teknik dosya turunu, `file_type` alaninin ise proje icindeki sade sinifi temsil ettigi ayrim vurgulandi.
+- Model alani degistirilmedi; repository, dosya yukleme, video oynatma, thumbnail uretme, JSON, SQLite, API, GUI ve CLI eklenmedi.
