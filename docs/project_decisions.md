@@ -584,3 +584,11 @@
 - Mevcut `AttachmentRecord` yaklasiminin ileride `FileAttachmentRecord` veya genisletilmis attachment modeli olarak surdurulebilecegi belirtildi.
 - Ilk asamada video oynatma, sikistirma, thumbnail uretme, streaming, medya isleme, dosya yukleme, JSON, SQLite, API, GUI ve CLI eklenmeyecek.
 - Bu adim sadece plan dokumantasyonu adimidir; uygulama kodu ve test dosyalari degistirilmedi.
+
+## 068 FileAttachmentRecord Veri Modeli
+
+- `FileAttachmentRecord` veri modeli eklendi.
+- Model fotograf, video, PDF, belge, ses notu ve diger dosya ekleri icin dosya metadata ve referans bilgisini temsil edecek.
+- Video dosyasi icerigi modele gomulmeyecek; `file_name`, `file_path`, `file_type`, `mime_type`, `file_size` gibi bilgiler tutulacak.
+- Iliskili kayit baglantisi `related_record_type` ve `related_record_id` alanlariyla temsil edilecek.
+- Repository, dosya yukleme, fiziksel dosya kopyalama, video oynatma, thumbnail uretme, JSON, SQLite, API, GUI, CLI ve persistence davranisi eklenmedi.

@@ -168,6 +168,24 @@ class AttachmentRecord:
 
 
 @dataclass
+class FileAttachmentRecord:
+    """Represents a file attachment metadata reference."""
+
+    attachment_id: str
+    related_record_type: str
+    related_record_id: str
+    file_name: str
+    file_path: str
+    file_type: str
+    mime_type: str
+    uploaded_by: str
+    uploaded_at: str
+    description: str | None = None
+    notes: str | None = None
+    file_size: int | None = None
+
+
+@dataclass
 class MaterialRecord:
     """Represents a material entry or usage record."""
 

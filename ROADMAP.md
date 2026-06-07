@@ -67,6 +67,7 @@
 - [x] Adim 065 - NonconformityRepository duruma gore filtreleme
 - [x] Adim 066 - NonconformityRepository konuma gore filtreleme
 - [x] Adim 067 - Dosya ve video eki plani
+- [x] Adim 068 - FileAttachmentRecord veri modeli
 
 Adim 021-025 araligi tamamlandi. Bu aralik icin final NotebookLM podcast notu hazirlanacak.
 
@@ -154,4 +155,6 @@ Adim 066'da `NonconformityRepository.list_by_location` davranisi konuma gore fil
 
 Adim 067'de fotograf, video, PDF, belge ve ses notu gibi eklerin ortak attachment yaklasimiyla ele alinmasi icin plan dokumani hazirlandi.
 
-Sonraki kucuk adim onerisi: Adim 068 - FileAttachmentRecord veri modeli
+Adim 068'de fotograf, video, PDF, belge ve ses notu gibi eklerin metadata ve referans bilgisini temsil eden `FileAttachmentRecord` veri modeli eklendi.
+
+Sonraki kucuk adim onerisi: Adim 069 - Dosya tipi siniflandirmasi

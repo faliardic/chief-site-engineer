@@ -1059,3 +1059,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Dosya metadata`: Dosyanin kendisi disinda ad, yol, tur, boyut, yukleyen kisi ve tarih gibi aciklayici bilgiler.
 
 `Video referansi`: Video dosyasinin kendisi yerine dosya yolu veya depolama referansi bilgisinin tutulmasi.
+
+`related_record_type`: Dosya ekinin hangi tur ana kayda bagli oldugunu belirten alan.
+
+`related_record_id`: Dosya ekinin bagli oldugu ana kaydin kimligini belirten alan.
+
+`uploaded_at`: Dosya ekinin yuklendigi veya kayda alindigi zamani tutan alan.
+
+`file_size`: Dosyanin boyutunu metadata olarak tutan opsiyonel alan.

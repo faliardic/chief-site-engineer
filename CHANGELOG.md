@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 068
+
+- Added `FileAttachmentRecord` as a dataclass model for photo, video, PDF, document, audio, and other file attachment metadata references.
+- Added tests for required values, optional defaults, video metadata representation, and related record linking.
+- No repository, file upload, physical file copy, video playback, thumbnail generation, JSON, SQLite, API, GUI, CLI, or persistence behavior was added in this step.
+
 ## Step 067
 
 - Added a plan document for file, photo, video, PDF, document, and audio attachments.

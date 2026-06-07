@@ -10,6 +10,7 @@ from app.models import (
     DailyReportRecord,
     DailySiteLog,
     EquipmentRecord,
+    FileAttachmentRecord,
     InspectionRequest,
     MaterialRecord,
     MeetingActionRecord,
@@ -297,6 +298,78 @@ def test_attachment_record_can_reference_nonconformity_candidate_record() -> Non
     assert attachment.uploaded_date == "2026-06-12"
     assert attachment.notes == "Aday uygunsuzluk icin kanit fotografi."
     assert attachment.status == "active"
+
+
+def test_file_attachment_record_holds_values_and_optional_defaults() -> None:
+    attachment = FileAttachmentRecord(
+        attachment_id="file-att-001",
+        related_record_type="nonconformity",
+        related_record_id="NCR-001",
+        file_name="korkuluk-eksigi.jpg",
+        file_path="attachments/ncr/NCR-001/korkuluk-eksigi.jpg",
+        file_type="image",
+        mime_type="image/jpeg",
+        uploaded_by="Santiye sefi",
+        uploaded_at="2026-10-02T09:30:00",
+    )
+
+    assert attachment.attachment_id == "file-att-001"
+    assert attachment.related_record_type == "nonconformity"
+    assert attachment.related_record_id == "NCR-001"
+    assert attachment.file_name == "korkuluk-eksigi.jpg"
+    assert attachment.file_path == "attachments/ncr/NCR-001/korkuluk-eksigi.jpg"
+    assert attachment.file_type == "image"
+    assert attachment.mime_type == "image/jpeg"
+    assert attachment.uploaded_by == "Santiye sefi"
+    assert attachment.uploaded_at == "2026-10-02T09:30:00"
+    assert attachment.description is None
+    assert attachment.notes is None
+    assert attachment.file_size is None
+
+
+def test_file_attachment_record_can_represent_video_metadata_reference() -> None:
+    attachment = FileAttachmentRecord(
+        attachment_id="file-att-video-001",
+        related_record_type="nonconformity",
+        related_record_id="NCR-002",
+        file_name="beton-dokum-oncesi.mp4",
+        file_path="attachments/ncr/NCR-002/beton-dokum-oncesi.mp4",
+        file_type="video",
+        mime_type="video/mp4",
+        uploaded_by="Kalite muhendisi",
+        uploaded_at="2026-10-02T10:15:00",
+        description="Beton dokum oncesi saha videosu.",
+        file_size=52428800,
+    )
+
+    assert attachment.file_type == "video"
+    assert attachment.mime_type == "video/mp4"
+    assert attachment.file_name.endswith(".mp4")
+    assert attachment.file_path == "attachments/ncr/NCR-002/beton-dokum-oncesi.mp4"
+    assert attachment.description == "Beton dokum oncesi saha videosu."
+    assert attachment.file_size == 52428800
+    assert attachment.notes is None
+
+
+def test_file_attachment_record_links_to_related_record_by_type_and_id() -> None:
+    attachment = FileAttachmentRecord(
+        attachment_id="file-att-ncr-001",
+        related_record_type="nonconformity",
+        related_record_id="NCR-003",
+        file_name="ncr-003-kanit.pdf",
+        file_path="attachments/ncr/NCR-003/ncr-003-kanit.pdf",
+        file_type="pdf",
+        mime_type="application/pdf",
+        uploaded_by="Santiye sefi",
+        uploaded_at="2026-10-02T11:00:00",
+        notes="NCR kaydina bagli kanit PDF'i.",
+    )
+
+    assert attachment.related_record_type == "nonconformity"
+    assert attachment.related_record_id == "NCR-003"
+    assert attachment.file_type == "pdf"
+    assert attachment.mime_type == "application/pdf"
+    assert attachment.notes == "NCR kaydina bagli kanit PDF'i."
 
 
 def test_material_record_holds_values_and_defaults() -> None:
