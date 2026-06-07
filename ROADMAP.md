@@ -83,7 +83,7 @@ Bu sinir bilincli olarak korunuyor. Once model, test, dokumantasyon ve karar hat
 
 - [x] Adim 081 - README guncellemesi: Adim 080 guvenli noktasi, 125 test, mevcut kapsam ve olmayan ozellikler.
 - [x] Adim 082 - ROADMAP guncellemesi: Adim 080 sonrasi gercek durum ve 081-100 faz plani.
-- [ ] Adim 083 - CHANGELOG derin temizlik ve standart kontrolu.
+- [x] Adim 083 - Attachment model karari: `FileAttachmentRecord` ana model, `AttachmentRecord` legacy model.
 - [ ] Adim 084 - `docs/project_decisions.md` karar indeksleme ve okunabilirlik kontrolu.
 - [ ] Adim 085 - Learning dosyalari kapsami ve glossary esitleme kontrolu.
 - [ ] Adim 086 - README / ROADMAP / CHANGELOG tutarlilik testi veya kontrol dokumani.
@@ -111,4 +111,4 @@ Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistenc
 
 ## Sonraki Calisma Onerisi
 
-Adim 083 ile CHANGELOG ve proje dokumantasyonu derin temizlik / standart kontrolu baslatilabilir.
+Adim 084 ile `docs/project_decisions.md` karar indeksleme ve okunabilirlik kontrolu baslatilabilir.

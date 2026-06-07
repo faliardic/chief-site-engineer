@@ -716,3 +716,12 @@
 - Adim 091-100 araligi persistence, upload, integrity, audit ve CI omurgasi fazi olarak planlandi.
 - Database, gercek upload servisi, API, GUI, auth, CI ve deployment ozelliklerinin henuz bulunmadigi roadmap icinde acikca belirtildi.
 - Bu adimda uygulama kodu ve test dosyalari degistirilmedi.
+
+## 083 Attachment Model Karari
+
+- Yeni dosya eki hatti icin ana metadata modelinin `FileAttachmentRecord` olmasina karar verildi.
+- `AttachmentRecord`, onceki genel ek dosya referans modeli olarak korunacak ve legacy / onceki model olarak degerlendirilecek.
+- `AttachmentRecord` bu adimda silinmedi; cunku mevcut testler, Adim 008 ve Adim 026 dokumantasyonu bu modeli referans almaya devam ediyor.
+- Yeni upload servisi, integrity scanner, dosya tipi standardi ve iliskili kayit baglantisi calismalari `FileAttachmentRecord` uzerinden ilerleyecek.
+- Bu adimda model alanlari degistirilmedi, veri migrasyonu yapilmadi ve kirici refactor uygulanmadi.
+- Gercek upload servisi, database, API, GUI, auth, CI ve deployment henuz eklenmedi.

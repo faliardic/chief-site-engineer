@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 083
+
+- Clarified the model decision between legacy `AttachmentRecord` and canonical `FileAttachmentRecord`.
+- Documented that new file attachment development should continue through `FileAttachmentRecord` while `AttachmentRecord` remains for compatibility with earlier tests and documentation.
+- No model field, repository behavior, upload service, database, API, GUI, auth, CI, deployment, or breaking refactor was added.
+
 ## Step 082
 
 - Updated `ROADMAP.md` to reflect the real Step 080 safe-point state after the Step 081 README correction.

@@ -151,7 +151,7 @@ class NonconformityRecord:
 
 @dataclass
 class AttachmentRecord:
-    """Represents a file attachment reference."""
+    """Represents the legacy generic attachment reference model."""
 
     attachment_id: str
     project_id: str
@@ -169,7 +169,7 @@ class AttachmentRecord:
 
 @dataclass
 class FileAttachmentRecord:
-    """Represents a file attachment metadata reference."""
+    """Represents the canonical file attachment metadata model."""
 
     attachment_id: str
     related_record_type: str

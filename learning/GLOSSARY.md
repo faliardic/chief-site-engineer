@@ -230,7 +230,7 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 
 `Arsiv referansi`: Dosyanin kendisi yerine dosya hakkindaki takip bilgisinin tutulmasi.
 
-`AttachmentRecord`: Dosya eki arsiv referansini temsil eden veri modeli.
+`AttachmentRecord`: Dosya eki arsiv referansini temsil eden onceki genel veri modeli; yeni dosya eki hattinda legacy model olarak korunur.
 
 `file_name`: Dosyanin adini tutan alan.
 
@@ -1050,7 +1050,7 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 
 `Arsiv dahil konum filtresi`: Konum filtresinin aktif ve arsivlenmis tum kayitlar uzerinde calismasi.
 
-`FileAttachmentRecord`: Ileride dosya, fotograf, video, PDF, belge ve ses notu referanslarini temsil edebilecek genel ek dosya modeli adi.
+`FileAttachmentRecord`: Dosya, fotograf, video, PDF, belge ve ses notu referanslari icin ana/canonical dosya eki metadata modeli.
 
 `Medya eki`: Fotograf, video veya ses gibi gorsel/isitilebilir dosya eklerini anlatan genel kavram.
 
