@@ -1041,3 +1041,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Eslesmeyen status`: Repository icinde karsiligi olmayan durum degeri.
 
 `Arsiv dahil status filtresi`: Status filtresinin aktif ve arsivlenmis tum kayitlar uzerinde calismasi.
+
+`Konuma gore filtreleme`: Kayitlari `location` alanindaki degere gore ayirma davranisi.
+
+`list_by_location`: Repository icindeki kayitlari belirli bir `location` degerine gore listeleyen metot.
+
+`Eslesmeyen konum`: Repository icinde karsiligi olmayan konum degeri.
+
+`Arsiv dahil konum filtresi`: Konum filtresinin aktif ve arsivlenmis tum kayitlar uzerinde calismasi.

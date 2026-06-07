@@ -568,3 +568,11 @@
 - Eslesen kayit yoksa veya repository bos ise bos liste dondurulmesi karari korundu.
 - Bu davranis read-only kalacak; kayit silme, `status` degisimi, `is_archived` degisimi, otomatik history ve workflow olusturmayacak.
 - Uygulama kodu, JSON, SQLite, API, GUI, CLI, query engine ve buyuk refactor eklenmedi.
+
+## 066 NonconformityRepository Konuma Gore Filtreleme
+
+- `NonconformityRepository.list_by_location(location)` davranisi eklendi.
+- Konum filtresinin tum kayit hafizasi uzerinde calisacagi ve arsivlenmis kayitlari varsayilan olarak dislamayacagi netlestirildi.
+- Eslesen kayit yoksa veya repository bos ise bos liste dondurulmesi karari belirlendi.
+- Bu davranis read-only kalacak; kayit silme, `location` degisimi, `status` degisimi, `is_archived` degisimi, otomatik history ve workflow olusturmayacak.
+- JSON, SQLite, API, GUI, CLI, query engine ve buyuk refactor eklenmedi.

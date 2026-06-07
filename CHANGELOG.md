@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 066
+
+- Added `NonconformityRepository.list_by_location` for in-memory NCR filtering by `location`.
+- Added focused tests for empty repositories, matching locations, missing locations, archived records, and restored records.
+- No JSON, SQLite, API, GUI, CLI, query engine, delete behavior, automatic history, or workflow behavior was added in this step.
+
 ## Step 065
 
 - Confirmed the existing `NonconformityRepository.list_by_status` behavior as the NCR status filtering behavior.

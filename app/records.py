@@ -104,6 +104,9 @@ class NonconformityRepository:
     def list_by_status(self, status: str) -> list[NonconformityRecord]:
         return [record for record in self._records if record.status == status]
 
+    def list_by_location(self, location: str) -> list[NonconformityRecord]:
+        return [record for record in self._records if record.location == location]
+
     def count_by_status(self, status: str) -> int:
         return len(self.list_by_status(status))
 

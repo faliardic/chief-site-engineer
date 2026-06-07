@@ -1473,3 +1473,113 @@ def test_nonconformity_repository_list_by_status_includes_restored_records() -> 
     assert record.is_archived is False
     assert record.status == "in_progress"
     assert repository.list_active() == [record]
+
+
+def test_nonconformity_repository_list_by_location_returns_empty_list_when_repository_is_empty() -> None:
+    repository = NonconformityRepository()
+
+    assert repository.list_by_location("A Blok") == []
+
+
+def test_nonconformity_repository_list_by_location_returns_matching_records() -> None:
+    repository = NonconformityRepository()
+    first_a_block_record = NonconformityRecord(
+        nonconformity_id="NCR-083",
+        project_id="prj-001",
+        date="2026-09-26",
+        title="A Blok konum filtresi NCR",
+        description="A Blok ile eslesmesi gereken kayit.",
+        location="A Blok",
+    )
+    b_block_record = NonconformityRecord(
+        nonconformity_id="NCR-084",
+        project_id="prj-001",
+        date="2026-09-27",
+        title="B Blok konum filtresi NCR",
+        description="B Blok ile eslesmesi gereken kayit.",
+        location="B Blok",
+    )
+    second_a_block_record = NonconformityRecord(
+        nonconformity_id="NCR-085",
+        project_id="prj-001",
+        date="2026-09-28",
+        title="A Blok ikinci konum filtresi NCR",
+        description="A Blok ile eslesmesi gereken ikinci kayit.",
+        location="A Blok",
+    )
+
+    repository.add(first_a_block_record)
+    repository.add(b_block_record)
+    repository.add(second_a_block_record)
+
+    assert repository.list_by_location("A Blok") == [
+        first_a_block_record,
+        second_a_block_record,
+    ]
+    assert repository.list_by_location("B Blok") == [b_block_record]
+    assert repository.list_all() == [
+        first_a_block_record,
+        b_block_record,
+        second_a_block_record,
+    ]
+
+
+def test_nonconformity_repository_list_by_location_returns_empty_list_for_missing_location() -> None:
+    repository = NonconformityRepository()
+    record = NonconformityRecord(
+        nonconformity_id="NCR-086",
+        project_id="prj-001",
+        date="2026-09-29",
+        title="Mevcut konum filtresi NCR",
+        description="Farkli konum arandiginda donmemeli.",
+        location="A Blok",
+    )
+
+    repository.add(record)
+
+    assert repository.list_by_location("C Blok") == []
+    assert record.location == "A Blok"
+    assert repository.list_all() == [record]
+
+
+def test_nonconformity_repository_list_by_location_includes_archived_records() -> None:
+    repository = NonconformityRepository()
+    record = NonconformityRecord(
+        nonconformity_id="NCR-087",
+        project_id="prj-001",
+        date="2026-09-30",
+        title="Arsivli konum filtresi NCR",
+        description="Arsivlense de konum filtresinde gorunmeli.",
+        location="A Blok",
+        status="closed",
+    )
+
+    repository.add(record)
+    repository.archive("NCR-087")
+
+    assert repository.list_by_location("A Blok") == [record]
+    assert record.is_archived is True
+    assert record.location == "A Blok"
+    assert repository.list_archived() == [record]
+
+
+def test_nonconformity_repository_list_by_location_includes_restored_records() -> None:
+    repository = NonconformityRepository()
+    record = NonconformityRecord(
+        nonconformity_id="NCR-088",
+        project_id="prj-001",
+        date="2026-10-01",
+        title="Restore sonrasi konum filtresi NCR",
+        description="Restore sonrasi konum filtresinde gorunmeye devam etmeli.",
+        location="A Blok",
+        status="in_progress",
+    )
+
+    repository.add(record)
+    repository.archive("NCR-088")
+    repository.restore("NCR-088")
+
+    assert repository.list_by_location("A Blok") == [record]
+    assert record.is_archived is False
+    assert record.location == "A Blok"
+    assert repository.list_active() == [record]
