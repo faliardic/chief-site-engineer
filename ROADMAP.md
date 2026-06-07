@@ -171,4 +171,6 @@ Adim 073'te `FileAttachmentRecord` icin beton dokumu, NCR, malzeme teslimi, gunl
 
 Adim 074'te `FileAttachmentRecord` ekleri icin saklama klasor yapisi ve dosya adlandirma standardi dokumante edildi.
 
-Sonraki kucuk adim onerisi: Adim 075 - FileAttachmentRecord repository plani
+Adim 075'te `FileAttachmentRecord` ekleri icin silme, tasima, kayip dosya, arsiv guvenligi ve denetim izi karar dokumantasyonu hazirlandi.
+
+Sonraki kucuk adim onerisi: Adim 076 - FileAttachmentRecord repository plani

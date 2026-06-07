@@ -645,3 +645,14 @@
 - Video dosyalari icin thumbnail, duration, resolution ve codec gibi bilgilerin ileride ayri metadata olarak degerlendirilebilecegi; bu adimda medya isleme eklenmeyecegi netlestirildi.
 - Bu adim sadece dokumantasyon standardi adimidir.
 - Uygulama kodu, test dosyalari, repository, dosya yukleme, fiziksel dosya kopyalama/silme/tasima, thumbnail, video oynatma, preview, streaming, SQLite, JSON persistence, API, GUI ve CLI degistirilmedi.
+
+## 075 FileAttachmentRecord Arsiv Guvenligi ve Silme / Tasima Kararlari
+
+- `FileAttachmentRecord` ekleri icin silme, tasima, kayip dosya, arsiv guvenligi ve denetim izi karar dokumantasyonu hazirlandi.
+- Kalici silme yerine ileride kontrollu arsiv disi birakma / soft-delete yaklasiminin degerlendirilmesi kararlastirildi.
+- Fiziksel dosya bulunamazsa bunun `missing file reference` olarak arşiv bütünlüğü uyarısı seklinde ele alinabilecegi belirtildi.
+- Dosya tasinmasi halinde `file_path` veya `storage_reference` bilgisinin guncellenmesi ve tasima gecmisinin ileride loglanmasi gerektigi netlestirildi.
+- Arsiv dosyalarinin uzerine yazilmasi yerine yeni versiyonun yeni dosya eki olarak tutulmasi daha guvenli yaklasim olarak belirlendi.
+- Dosya ekleme, tasima, pasife alma ve silme olaylari icin ileride `AttachmentEventRecord` benzeri denetim izi modeli degerlendirilebilir.
+- Bu adim sadece karar dokumantasyonu adimidir.
+- Uygulama kodu, test dosyalari, yeni model, repository, dosya yukleme/silme/tasima/kopyalama, SQLite, JSON persistence, API, GUI, CLI, thumbnail, preview, streaming ve video oynatma degistirilmedi.

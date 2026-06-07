@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 075
+
+- Added archive safety and delete/move decision documentation for `FileAttachmentRecord` attachments.
+- Documented soft-delete preference, missing file references, move history, no-overwrite guidance, audit trail planning, backup expectations, and video-specific safety notes.
+- No application code, tests, new model, repository, file upload/delete/move/copy, SQLite, JSON persistence, API, GUI, CLI, thumbnail, preview, streaming, or video playback behavior was changed in this step.
+
 ## Step 074
 
 - Added a storage folder and file naming standard document for `FileAttachmentRecord` attachments.
