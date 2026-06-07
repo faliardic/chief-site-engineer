@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 103
+
+- Added `export_attachment_integrity_report_to_json` to convert an `AttachmentIntegrityReport` into a JSON string using the existing report serializer.
+- Added tests for JSON string export, `json.loads` compatibility, summary/results fields, ISO datetime preservation, Turkish character preservation with `ensure_ascii=False`, compact output with `indent=None`, and non-mutating export behavior.
+- No JSON file writing, path handling, scanner, folder traversal, upload service, backup/restore implementation, audit event implementation, README update, push, or ZIP staging was added.
+
 ## Step 102
 
 - Updated `README.md` to reflect the Step 100 safe point, `191 passed` test status, current attachment integrity line, policy documents, podcast notes, and Step 101 audit findings.

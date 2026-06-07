@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 import pytest
@@ -25,8 +26,9 @@ from app.attachment_integrity import (
     SEVERITY_WARNING,
     UNREADABLE_FILE,
     build_attachment_integrity_result,
-    build_attachment_integrity_report_summary,
     build_attachment_integrity_report,
+    build_attachment_integrity_report_summary,
+    export_attachment_integrity_report_to_json,
     serialize_attachment_integrity_report,
     serialize_attachment_integrity_report_summary,
     serialize_attachment_integrity_result,
@@ -680,6 +682,86 @@ def test_serialize_attachment_integrity_helpers_do_not_mutate_models() -> None:
     serialize_attachment_integrity_result(result)
     serialize_attachment_integrity_report_summary(report.summary)
     serialize_attachment_integrity_report(report)
+
+    assert report.results == original_results
+    assert report.summary.total_checked == original_summary_total
+    assert report.source == original_source
+
+
+def test_export_attachment_integrity_report_to_json_returns_string() -> None:
+    report = build_attachment_integrity_report([])
+
+    exported = export_attachment_integrity_report_to_json(report)
+
+    assert isinstance(exported, str)
+
+
+def test_export_attachment_integrity_report_to_json_can_be_loaded() -> None:
+    report = build_attachment_integrity_report(
+        [AttachmentIntegrityResult(status_code=OK, severity=SEVERITY_OK)]
+    )
+
+    exported = export_attachment_integrity_report_to_json(report)
+
+    assert json.loads(exported)["summary"]["total_checked"] == 1
+
+
+def test_export_attachment_integrity_report_to_json_includes_summary_and_results() -> None:
+    report = build_attachment_integrity_report(
+        [AttachmentIntegrityResult(status_code=OK, severity=SEVERITY_OK)]
+    )
+
+    loaded = json.loads(export_attachment_integrity_report_to_json(report))
+
+    assert "summary" in loaded
+    assert "results" in loaded
+    assert isinstance(loaded["results"], list)
+
+
+def test_export_attachment_integrity_report_to_json_keeps_iso_datetime_strings() -> None:
+    generated_at = datetime(2026, 6, 7, 14, 32, 10, tzinfo=timezone.utc)
+    checked_at = datetime(2026, 6, 7, 14, 33, 10, tzinfo=timezone.utc)
+    result = AttachmentIntegrityResult(
+        status_code=OK,
+        severity=SEVERITY_OK,
+        checked_at=checked_at,
+    )
+    report = build_attachment_integrity_report([result], generated_at=generated_at)
+
+    loaded = json.loads(export_attachment_integrity_report_to_json(report))
+
+    assert loaded["generated_at"] == "2026-06-07T14:32:10+00:00"
+    assert loaded["results"][0]["checked_at"] == "2026-06-07T14:33:10+00:00"
+
+
+def test_export_attachment_integrity_report_to_json_preserves_turkish_characters() -> None:
+    report = build_attachment_integrity_report(
+        [AttachmentIntegrityResult(status_code=OK, severity=SEVERITY_OK)],
+        notes="Şantiye eki doğrulandı.",
+    )
+
+    exported = export_attachment_integrity_report_to_json(report)
+
+    assert "Şantiye eki doğrulandı." in exported
+
+
+def test_export_attachment_integrity_report_to_json_supports_compact_output() -> None:
+    report = build_attachment_integrity_report([])
+
+    exported = export_attachment_integrity_report_to_json(report, indent=None)
+
+    assert "\n" not in exported
+    assert json.loads(exported)["summary"]["total_checked"] == 0
+
+
+def test_export_attachment_integrity_report_to_json_does_not_mutate_report() -> None:
+    result = AttachmentIntegrityResult(status_code=OK, severity=SEVERITY_OK)
+    report = build_attachment_integrity_report([result], source="manual-check")
+    original_results = report.results
+    original_summary_total = report.summary.total_checked
+    original_source = report.source
+
+    export_attachment_integrity_report_to_json(report)
 
     assert report.results == original_results
     assert report.summary.total_checked == original_summary_total

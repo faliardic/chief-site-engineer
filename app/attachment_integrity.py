@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -275,6 +276,18 @@ def serialize_attachment_integrity_report(
         "source": report.source,
         "notes": report.notes,
     }
+
+
+def export_attachment_integrity_report_to_json(
+    report: AttachmentIntegrityReport,
+    *,
+    indent: int | None = 2,
+) -> str:
+    return json.dumps(
+        serialize_attachment_integrity_report(report),
+        ensure_ascii=False,
+        indent=indent,
+    )
 
 
 def _classify_integrity_status(
