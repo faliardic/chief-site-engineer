@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 102
+
+- Updated `README.md` to reflect the Step 100 safe point, `191 passed` test status, current attachment integrity line, policy documents, podcast notes, and Step 101 audit findings.
+- Replaced stale Step 080 / `125 passed` README information with the current Step 100 / `191 passed` project state.
+- No application code, tests, scanner, upload service, database, API, GUI, auth, CI, deployment, commit, push, or ZIP staging was added.
+
 ## Step 101
 
 - Added a general project audit and architecture health report after the Step 100 safe point.

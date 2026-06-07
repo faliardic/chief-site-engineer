@@ -114,7 +114,7 @@ Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistenc
 ## Faz 101-120 - Denetim, Attachment Integrity Export, Scanner ve Audit Hazirligi
 
 - [x] Adim 101 - Genel proje denetimi ve mimari saglik raporu.
-- [ ] Adim 102 - README guncellik duzeltmesi: Adim 100 / 191 test ve yeni kapsam bilgisi.
+- [x] Adim 102 - README guncellik duzeltmesi: Adim 100 / 191 test ve yeni kapsam bilgisi.
 - [ ] Adim 103 - Attachment integrity JSON-ready export dokumantasyonu.
 - [ ] Adim 104 - Attachment integrity JSON export helper.
 - [ ] Adim 105 - JSON export testleri.
@@ -138,4 +138,4 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 
 ## Sonraki Calisma Onerisi
 
-Adim 102 ile README dosyasi Adim 100 / 191 test ve Adim 101 denetim bulgularina gore guncellenebilir.
+Adim 103 ile attachment integrity JSON-ready export dokumantasyonu ele alinabilir.
