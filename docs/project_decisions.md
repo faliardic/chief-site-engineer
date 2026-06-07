@@ -461,3 +461,12 @@
 - `is_archived=True` verilerek kaydin arsivlenmis olarak temsil edilebilmesi saglandi.
 - Bu adimda repository archive/restore davranisi, otomatik arsivleme, silme veya filtreleme eklenmedi.
 - JSON, SQLite, API, GUI, CLI, dashboard, dosya islemi ve otomatik is akisi eklenmedi.
+
+## 053 NonconformityRepository Aktif / Arsiv Filtreleme
+
+- `NonconformityRepository` icine `list_active()` davranisi eklendi.
+- `list_active()` `is_archived == False` olan kayitlari mevcut eklenme sirasiyla liste olarak dondurecek.
+- `NonconformityRepository` icine `list_archived()` davranisi eklendi.
+- `list_archived()` `is_archived == True` olan kayitlari mevcut eklenme sirasiyla liste olarak dondurecek.
+- Eslesen kayit yoksa bos liste dondurulecek ve mevcut kayitlar degistirilmeyecek.
+- NonconformityRecord modeli, JSON, SQLite, API, GUI, CLI, dashboard, dosya islemi, silme, otomatik arsivleme, restore ve otomatik is akisi eklenmedi.

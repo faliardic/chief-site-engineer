@@ -957,3 +957,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Silme yerine arsivleme`: Kaydi tamamen kaldirmak yerine izlenebilir kalacak sekilde arsivli isaretleme yaklasimi.
 
 `Varsayilan False`: Yeni kaydin baslangicta arsivlenmemis kabul edilmesini anlatan boolean varsayilan.
+
+`list_active`: Repository icindeki arsivlenmemis kayitlari listeleyen metot.
+
+`list_archived`: Repository icindeki arsivlenmis kayitlari listeleyen metot.
+
+`Aktif kayit`: `is_archived` degeri `False` olan ve normal takipte kalan kayit.
+
+`Arsiv kaydi`: `is_archived` degeri `True` olan ve silinmeden arsivde tutulan kayit.

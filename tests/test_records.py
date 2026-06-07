@@ -670,3 +670,85 @@ def test_nonconformity_repository_count_by_status_returns_matching_record_count(
         closed_record,
         second_open_record,
     ]
+
+
+def test_nonconformity_repository_lists_active_records_in_insert_order() -> None:
+    repository = NonconformityRepository()
+    first_active_record = NonconformityRecord(
+        nonconformity_id="NCR-036",
+        project_id="prj-001",
+        date="2026-08-10",
+        title="Ilk aktif NCR",
+        description="Aktif filtreleme icin ilk kayit.",
+    )
+    archived_record = NonconformityRecord(
+        nonconformity_id="NCR-037",
+        project_id="prj-001",
+        date="2026-08-11",
+        title="Arsiv NCR",
+        description="Aktif listede yer almamasi gereken kayit.",
+        is_archived=True,
+    )
+    second_active_record = NonconformityRecord(
+        nonconformity_id="NCR-038",
+        project_id="prj-001",
+        date="2026-08-12",
+        title="Ikinci aktif NCR",
+        description="Aktif filtreleme icin ikinci kayit.",
+        is_archived=False,
+    )
+
+    repository.add(first_active_record)
+    repository.add(archived_record)
+    repository.add(second_active_record)
+
+    assert repository.list_active() == [first_active_record, second_active_record]
+    assert repository.list_all() == [
+        first_active_record,
+        archived_record,
+        second_active_record,
+    ]
+
+
+def test_nonconformity_repository_lists_archived_records_and_returns_empty_list_when_missing() -> None:
+    repository = NonconformityRepository()
+    active_record = NonconformityRecord(
+        nonconformity_id="NCR-039",
+        project_id="prj-001",
+        date="2026-08-13",
+        title="Aktif NCR",
+        description="Arsiv listesinde yer almamasi gereken kayit.",
+    )
+    first_archived_record = NonconformityRecord(
+        nonconformity_id="NCR-040",
+        project_id="prj-001",
+        date="2026-08-14",
+        title="Ilk arsiv NCR",
+        description="Arsiv filtreleme icin ilk kayit.",
+        is_archived=True,
+    )
+    second_archived_record = NonconformityRecord(
+        nonconformity_id="NCR-041",
+        project_id="prj-001",
+        date="2026-08-15",
+        title="Ikinci arsiv NCR",
+        description="Arsiv filtreleme icin ikinci kayit.",
+        is_archived=True,
+    )
+    active_only_repository = NonconformityRepository()
+
+    repository.add(active_record)
+    repository.add(first_archived_record)
+    repository.add(second_archived_record)
+    active_only_repository.add(active_record)
+
+    assert repository.list_archived() == [
+        first_archived_record,
+        second_archived_record,
+    ]
+    assert active_only_repository.list_archived() == []
+    assert repository.list_all() == [
+        active_record,
+        first_archived_record,
+        second_archived_record,
+    ]

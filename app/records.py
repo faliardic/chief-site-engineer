@@ -93,6 +93,12 @@ class NonconformityRepository:
     def count_by_status(self, status: str) -> int:
         return len(self.list_by_status(status))
 
+    def list_active(self) -> list[NonconformityRecord]:
+        return [record for record in self._records if not record.is_archived]
+
+    def list_archived(self) -> list[NonconformityRecord]:
+        return [record for record in self._records if record.is_archived]
+
     def list_by_responsible_party(
         self,
         responsible_party: str,

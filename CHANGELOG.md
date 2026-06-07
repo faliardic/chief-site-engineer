@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 053
+
+- Added `NonconformityRepository.list_active` and `NonconformityRepository.list_archived` for in-memory filtering by `is_archived`.
+- Added tests proving active and archived records are returned separately, insert order is preserved, and missing archived records return an empty list.
+- No model change, JSON, SQLite, API, GUI, CLI, dashboard, file operation, delete, automatic archive, restore, or automatic workflow was added in this step.
+
 ## Step 052
 
 - Added `is_archived: bool = False` to `NonconformityRecord` as a small archive marker field.
