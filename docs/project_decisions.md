@@ -895,3 +895,11 @@
 - `ensure_ascii=False` kullanilarak Turkce karakterlerin okunabilir kalmasi kararlastirildi.
 - `indent` varsayilan olarak `2` olacak; `indent=None` kompakt JSON uretmek icin kullanilabilecek.
 - Bu adimda JSON dosyasi yazma, path alma, klasor olusturma, scanner, dosya sistemi taramasi, upload service, backup/restore veya audit event implementasyonu eklenmedi.
+
+## 104 Attachment Integrity JSON File Export Tasarimi
+
+- Adim 103'te eklenen JSON string export helper'dan sonra ileride guvenli JSON file export davranisi icin tasarim kurallari dokumante edildi.
+- File export icin UTF-8 encoding, `ensure_ascii=False`, varsayilan `indent=2`, UTC timestamp'li dosya adi, acik export path, overwrite politikasi, atomic write ve JSON dogrulama beklentileri belirlendi.
+- Varsayilan overwrite davranisinin `False` olmasi; ayni dosya varsa hata verilmesi; `overwrite=True` kullaniminin acik karar ve ileride audit event ile iliskilendirilmesi kararlastirildi.
+- Export dosyasinin resmi kayit yerine gecmeyecegi, resmi kayitlarin snapshot ciktisi olarak degerlendirilecegi belirtildi.
+- Bu adimda uygulama kodu, test dosyalari, JSON dosyasi yazma, scanner, backup/restore, audit event, private workspace exportu, API, GUI veya CLI eklenmedi.

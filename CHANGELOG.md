@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 104
+
+- Documented the future attachment integrity JSON file export design after the Step 103 JSON string export helper.
+- Defined UTF-8, `ensure_ascii=False`, default indentation, file naming, export path, overwrite, atomic write, validation, audit/backup relation, and security-risk expectations.
+- No application code, tests, JSON file writing, scanner, backup/restore implementation, audit event implementation, README update, push, or ZIP staging was added.
+
 ## Step 103
 
 - Added `export_attachment_integrity_report_to_json` to convert an `AttachmentIntegrityReport` into a JSON string using the existing report serializer.
