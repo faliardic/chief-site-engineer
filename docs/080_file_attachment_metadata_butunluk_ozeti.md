@@ -72,6 +72,12 @@ Kullanıcının yüklediği dosyanın orijinal adını metadata olarak saklar. S
 
 Dosyanın fiziksel klasör, sunucu veya ileride bulut ortamındaki yolunu / referansını temsil eder.
 
+Adım 085 itibarıyla yeni dosya eki hattı için canonical path standardı şudur:
+
+```text
+attachments/{project_id}/{record_type}/{yyyy}/{mm}/{dd}/{record_id}/{safe_file_name}
+```
+
 ### storage_reference
 
 Gerçek modelde şu an ayrı bir `storage_reference` alanı yoktur. Bu kavram ileride bulut depolama veya harici medya saklama altyapısı eklenirse değerlendirilecek metadata yaklaşımıdır.

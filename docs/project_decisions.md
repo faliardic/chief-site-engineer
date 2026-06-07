@@ -640,7 +640,7 @@
 - `FileAttachmentRecord` ile temsil edilen dosya ekleri icin saklama klasor yapisi ve dosya adlandirma standardi dokumante edildi.
 - Dosyanin veritabanina gomulmeyecegi; klasor, sunucu veya bulut ortaminda tutulacagi karar tekrar korundu.
 - Dosya yolunun proje, kayit turu, tarih ve kayit id bilgisiyle okunabilir olmasi hedeflendi.
-- Dosya adi icin `YYYYMMDD_HHMMSS__record_type__record_id__file_type__sequence.ext` sablonu onerildi.
+- Dosya adi icin once `YYYYMMDD_HHMMSS__record_type__record_id__file_type__sequence.ext` sablonu onerildi; Adim 085 ile yeni canonical path standardi `attachments/{project_id}/{record_type}/{yyyy}/{mm}/{dd}/{record_id}/{safe_file_name}` olarak kilitlendi.
 - Orijinal dosya adinin ileride metadata olarak saklanabilecegi, fakat sistem kimligi olarak kullanilmayacagi belirtildi.
 - Video dosyalari icin thumbnail, duration, resolution ve codec gibi bilgilerin ileride ayri metadata olarak degerlendirilebilecegi; bu adimda medya isleme eklenmeyecegi netlestirildi.
 - Bu adim sadece dokumantasyon standardi adimidir.
@@ -735,3 +735,12 @@
 - Model, servis tarafindan saglanan upload metadata gecmisini tasimaya devam edecek.
 - Model-level optional ile service-level required ayrimi bilincli olarak dokumante edildi.
 - Bu adimda model alani eklenmedi veya silinmedi; test dosyalari degistirilmedi.
+
+## 085 Canonical Attachment Path Standardi
+
+- Yeni dosya eki metadata ve ilerideki upload hatti icin canonical path standardi `attachments/{project_id}/{record_type}/{yyyy}/{mm}/{dd}/{record_id}/{safe_file_name}` olarak belirlendi.
+- `record_type` degerinin kucuk harfli, makine-dostu ve tutarli olmasina karar verildi.
+- Tarih klasorleri `yyyy/mm/dd` formatinda tutulacak.
+- `safe_file_name`, sanitize edilmis ve dosya sistemi icin guvenli hale getirilmis dosya adi anlamina gelecek.
+- Physical file storage ile `FileAttachmentRecord.file_path` metadata alani ayni path standardini referans alacak.
+- Bu adimda path helper fonksiyonu, gercek upload servisi, fiziksel dosya tasima/kopyalama/silme, database, API veya GUI eklenmedi.

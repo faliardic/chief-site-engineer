@@ -85,7 +85,7 @@ Bu sinir bilincli olarak korunuyor. Once model, test, dokumantasyon ve karar hat
 - [x] Adim 082 - ROADMAP guncellemesi: Adim 080 sonrasi gercek durum ve 081-100 faz plani.
 - [x] Adim 083 - Attachment model karari: `FileAttachmentRecord` ana model, `AttachmentRecord` legacy model.
 - [x] Adim 084 - `FileAttachmentRecord` alan sozlesmesi: model-level optional, service-level required ayrimi.
-- [ ] Adim 085 - Learning dosyalari kapsami ve glossary esitleme kontrolu.
+- [x] Adim 085 - Canonical attachment path standardi: `attachments/{project_id}/{record_type}/{yyyy}/{mm}/{dd}/{record_id}/{safe_file_name}`.
 - [ ] Adim 086 - README / ROADMAP / CHANGELOG tutarlilik testi veya kontrol dokumani.
 - [ ] Adim 087 - NotebookLM podcast notlari 071-080 final dosyasi.
 - [ ] Adim 088 - Paketleme ve derin analiz girdi listesi standardi.
@@ -111,4 +111,4 @@ Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistenc
 
 ## Sonraki Calisma Onerisi
 
-Adim 085 ile learning dosyalari kapsami ve glossary esitleme kontrolu baslatilabilir.
+Adim 086 ile README / ROADMAP / CHANGELOG tutarlilik kontrolu baslatilabilir.

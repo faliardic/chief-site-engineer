@@ -56,7 +56,7 @@ related_record_id = "CP-2026-001"
 
 ```text
 file_name = "dokum-oncesi-donati-kontrol.jpg"
-file_path = "attachments/concrete_pour/CP-2026-001/dokum-oncesi-donati-kontrol.jpg"
+file_path = "attachments/PRJ-001/concrete/2026/06/07/CP-2026-001/dokum_oncesi_donati_kontrol.jpg"
 file_type = "image"
 mime_type = "image/jpeg"
 description = "Beton dokumu oncesi donati ve kalip kontrol fotografi."
@@ -66,7 +66,7 @@ description = "Beton dokumu oncesi donati ve kalip kontrol fotografi."
 
 ```text
 file_name = "beton-dokum-ani.mp4"
-file_path = "attachments/concrete_pour/CP-2026-001/beton-dokum-ani.mp4"
+file_path = "attachments/PRJ-001/concrete/2026/06/07/CP-2026-001/beton_dokum_ani.mp4"
 file_type = "video"
 mime_type = "video/mp4"
 description = "Beton dokumu sirasinda alinan kisa saha videosu."
@@ -89,7 +89,7 @@ Fotoğraf örneği:
 
 ```text
 file_name = "hatali-imalat-fotografi.jpg"
-file_path = "attachments/nonconformity/NCR-00012/hatali-imalat-fotografi.jpg"
+file_path = "attachments/PRJ-001/nonconformity/2026/06/07/NCR-00012/hatali_imalat_fotografi.jpg"
 file_type = "image"
 mime_type = "image/jpeg"
 ```
@@ -98,7 +98,7 @@ Video örneği:
 
 ```text
 file_name = "kisa-saha-videosu.mp4"
-file_path = "attachments/nonconformity/NCR-00012/kisa-saha-videosu.mp4"
+file_path = "attachments/PRJ-001/nonconformity/2026/06/07/NCR-00012/kisa_saha_videosu.mp4"
 file_type = "video"
 mime_type = "video/mp4"
 ```
@@ -107,7 +107,7 @@ PDF örneği:
 
 ```text
 file_name = "teknik-rapor.pdf"
-file_path = "attachments/nonconformity/NCR-00012/teknik-rapor.pdf"
+file_path = "attachments/PRJ-001/nonconformity/2026/06/07/NCR-00012/teknik_rapor.pdf"
 file_type = "pdf"
 mime_type = "application/pdf"
 ```
@@ -129,7 +129,7 @@ related_record_id = "MAT-DEL-001"
 
 ```text
 file_name = "irsaliye.pdf"
-file_path = "attachments/material_delivery/MAT-DEL-001/irsaliye.pdf"
+file_path = "attachments/PRJ-001/material_delivery/2026/06/07/MAT-DEL-001/irsaliye.pdf"
 file_type = "pdf"
 mime_type = "application/pdf"
 ```
@@ -138,7 +138,7 @@ Malzeme etiketi fotoğrafı:
 
 ```text
 file_name = "malzeme-etiketi.jpg"
-file_path = "attachments/material_delivery/MAT-DEL-001/malzeme-etiketi.jpg"
+file_path = "attachments/PRJ-001/material_delivery/2026/06/07/MAT-DEL-001/malzeme_etiketi.jpg"
 file_type = "image"
 mime_type = "image/jpeg"
 ```
@@ -160,7 +160,7 @@ Günlük ilerleme fotoğrafı:
 
 ```text
 file_name = "gunluk-ilerleme-a-blok.jpg"
-file_path = "attachments/daily_site/DSR-2026-06-07/gunluk-ilerleme-a-blok.jpg"
+file_path = "attachments/PRJ-001/daily_site/2026/06/07/DSR-2026-06-07/gunluk_ilerleme_a_blok.jpg"
 file_type = "image"
 mime_type = "image/jpeg"
 ```
@@ -169,7 +169,7 @@ Sesli not:
 
 ```text
 file_name = "gun-sonu-notu.mp3"
-file_path = "attachments/daily_site/DSR-2026-06-07/gun-sonu-notu.mp3"
+file_path = "attachments/PRJ-001/daily_site/2026/06/07/DSR-2026-06-07/gun_sonu_notu.mp3"
 file_type = "audio"
 mime_type = "audio/mpeg"
 ```
@@ -191,7 +191,7 @@ related_record_id = "WF-2026-001"
 
 ```text
 file_name = "ekip-calisma-alani.jpg"
-file_path = "attachments/workforce/WF-2026-001/ekip-calisma-alani.jpg"
+file_path = "attachments/PRJ-001/workforce/2026/06/07/WF-2026-001/ekip_calisma_alani.jpg"
 file_type = "image"
 mime_type = "image/jpeg"
 description = "Ekip calisma alani ve gunluk ilerleme gorseli."
@@ -214,7 +214,7 @@ related_record_id = "CPN-0008"
 
 ```text
 file_name = "toplanti-notu.docx"
-file_path = "attachments/chief_private_note/CPN-0008/toplanti-notu.docx"
+file_path = "attachments/PRJ-001/chief_private_note/2026/06/07/CPN-0008/toplanti_notu.docx"
 file_type = "document"
 mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 ```
@@ -236,7 +236,7 @@ Kontrol formu PDF'i:
 
 ```text
 file_name = "kontrol-formu.pdf"
-file_path = "attachments/inspection/INS-2026-014/kontrol-formu.pdf"
+file_path = "attachments/PRJ-001/inspection/2026/06/07/INS-2026-014/kontrol_formu.pdf"
 file_type = "pdf"
 mime_type = "application/pdf"
 ```
@@ -245,7 +245,7 @@ Teknik şartname:
 
 ```text
 file_name = "imalat-onayi.pdf"
-file_path = "attachments/inspection/INS-2026-014/imalat-onayi.pdf"
+file_path = "attachments/PRJ-001/inspection/2026/06/07/INS-2026-014/imalat_onayi.pdf"
 file_type = "pdf"
 mime_type = "application/pdf"
 ```

@@ -12,6 +12,8 @@ Bu adimda yeni model eklenmedi.
 
 Mevcut `AttachmentRecord` modeli kullanilir:
 
+Not: Bu dosyadaki `AttachmentRecord` ornegi Adim 083 sonrasi legacy / onceki genel ek modeli baglaminda okunmalidir. Yeni dosya eki hatti icin canonical model `FileAttachmentRecord`, canonical path standardi ise `attachments/{project_id}/{record_type}/{yyyy}/{mm}/{dd}/{record_id}/{safe_file_name}` olarak belirlenmistir.
+
 - `file_name`: Ekin dosya adi.
 - `file_type`: Ekin fotograf, PDF veya benzeri tur bilgisi.
 - `file_path`: Dosyanin metinsel yol referansi.
@@ -35,7 +37,7 @@ AttachmentRecord(
     title="Korkuluk eksigi fotografi",
     file_name="korkuluk-eksigi.jpg",
     file_type="image/jpeg",
-    file_path="archive/nonconformity-candidates/korkuluk-eksigi.jpg",
+    file_path="archive/nonconformity-candidates/korkuluk-eksigi.jpg",  # legacy example
     related_model="NonconformityCandidateRecord",
     related_id="NCR-CAND-001",
     uploaded_by="Santiye sefi",

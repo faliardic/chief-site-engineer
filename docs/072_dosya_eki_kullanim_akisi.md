@@ -29,7 +29,7 @@ Bir uygunsuzluk kaydında hatalı imalat fotoğrafla desteklenebilir.
 related_record_type = "nonconformity"
 related_record_id = "NCR-00012"
 file_name = "kolon-donati-uygunsuzluk.jpg"
-file_path = "attachments/nonconformity/NCR-00012/kolon-donati-uygunsuzluk.jpg"
+file_path = "attachments/PRJ-001/nonconformity/2026/06/07/NCR-00012/kolon_donati_uygunsuzluk.jpg"
 file_type = "image"
 mime_type = "image/jpeg"
 ```
@@ -44,7 +44,7 @@ Bir uygunsuzluk sahada video ile belgelenebilir.
 related_record_type = "nonconformity"
 related_record_id = "NCR-00012"
 file_name = "beton-dokum-oncesi-kontrol.mp4"
-file_path = "attachments/nonconformity/NCR-00012/beton-dokum-oncesi-kontrol.mp4"
+file_path = "attachments/PRJ-001/nonconformity/2026/06/07/NCR-00012/beton_dokum_oncesi_kontrol.mp4"
 file_type = "video"
 mime_type = "video/mp4"
 ```
@@ -59,7 +59,7 @@ Günlük rapora imzalı PDF veya ek rapor bağlanabilir.
 related_record_type = "daily_log"
 related_record_id = "DL-2026-06-07"
 file_name = "gunluk-rapor-ek.pdf"
-file_path = "attachments/daily_log/DL-2026-06-07/gunluk-rapor-ek.pdf"
+file_path = "attachments/PRJ-001/daily_log/2026/06/07/DL-2026-06-07/gunluk_rapor_ek.pdf"
 file_type = "pdf"
 mime_type = "application/pdf"
 ```
@@ -72,7 +72,7 @@ Malzeme tesliminde irsaliye veya ürün etiketi fotoğrafla saklanabilir.
 related_record_type = "material_delivery"
 related_record_id = "MAT-DEL-001"
 file_name = "irsaliye-fotografi.jpg"
-file_path = "attachments/material_delivery/MAT-DEL-001/irsaliye-fotografi.jpg"
+file_path = "attachments/PRJ-001/material_delivery/2026/06/07/MAT-DEL-001/irsaliye_fotografi.jpg"
 file_type = "image"
 mime_type = "image/jpeg"
 ```
@@ -85,7 +85,7 @@ Riskli bir saha davranışı veya uygunsuz güvenlik durumu video ile belgeleneb
 related_record_type = "safety_observation"
 related_record_id = "SAFE-OBS-004"
 file_name = "iskele-guvenlik-gozlemi.mp4"
-file_path = "attachments/safety_observation/SAFE-OBS-004/iskele-guvenlik-gozlemi.mp4"
+file_path = "attachments/PRJ-001/safety_observation/2026/06/07/SAFE-OBS-004/iskele_guvenlik_gozlemi.mp4"
 file_type = "video"
 mime_type = "video/mp4"
 ```

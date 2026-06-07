@@ -21,79 +21,64 @@ Dosya fiziksel olarak şu ortamlardan birinde tutulabilir:
 
 Büyük video dosyaları sistem içinde blob olarak saklanmayacak. Video dosyası da fotoğraf, PDF veya belge gibi bir dosya referansı üzerinden izlenecek.
 
-## 2. Önerilen Ana Klasör Yapısı
+## 2. Canonical Path Standardı
 
-İlk standart klasör yaklaşımı şu şekilde düşünülebilir:
-
-```text
-attachments/
-  project_id/
-    concrete/
-    nonconformity/
-    material/
-    daily_site/
-    workforce/
-    inspection/
-    site_chief_private/
-    other/
-```
-
-Bu yapı, dosyaları bağlı oldukları ana kayıt türüne göre ayırır. Böylece beton, uygunsuzluk, malzeme, günlük saha, işçilik, denetim ve özel not ekleri aynı kök altında ama ayrı alanlarda saklanabilir.
-
-## 3. Tarih Bazlı Alt Klasör Yaklaşımı
-
-Kayıt sayısı arttıkça tek klasörde çok fazla dosya birikmemesi için tarih bazlı alt klasör kullanılabilir.
-
-Örnek:
+Adım 085 itibarıyla yeni dosya eki hattı için canonical path standardı şudur:
 
 ```text
-attachments/
-  project_id/
-    concrete/
-      2026/
-        06/
-          07/
+attachments/{project_id}/{record_type}/{yyyy}/{mm}/{dd}/{record_id}/{safe_file_name}
 ```
 
-Bu yapı, dosyaların hangi yıl, ay ve güne ait olduğunu klasör yolundan anlaşılır hale getirir.
+Örnekler:
+
+```text
+attachments/PRJ-001/nonconformity/2026/06/07/NCR-00012/photo_001.jpg
+attachments/PRJ-001/concrete/2026/06/07/CP-000123/slump_test.pdf
+attachments/PRJ-001/site_note/2026/06/07/SN-00045/site_photo.jpg
+```
+
+Bu yapı dosyaları proje, kayıt türü, tarih ve ana kayıt kimliğiyle birlikte izlenebilir yapar.
 
 ## 4. Kayıt Türü ve Kayıt ID İlişkisi
 
-Dosya klasörü, `related_record_type` ve `related_record_id` bilgisiyle uyumlu olmalıdır.
+Dosya klasörü, `related_record_type` ve `related_record_id` bilgisiyle uyumlu olmalıdır. Canonical path içinde `related_record_type`, `record_type` klasörü olarak kullanılır.
 
 Örnek mantık:
 
 ```text
-related_record_type = "concrete_pour"
+project_id = "PRJ-001"
+related_record_type = "concrete"
 related_record_id = "CP-000123"
+date = "2026-06-07"
+safe_file_name = "slump_test.pdf"
 ```
 
-Önerilen dosya klasörü:
+Canonical dosya yolu:
 
 ```text
-attachments/project_id/concrete/2026/06/07/CP-000123/
+attachments/PRJ-001/concrete/2026/06/07/CP-000123/slump_test.pdf
 ```
 
 Bu yaklaşım, dosya sistemine bakıldığında dosyanın hangi proje, kayıt türü, tarih ve kayıt id ile ilgili olduğunu gösterir.
 
 ## 5. Dosya Adlandırma Standardı
 
-Önerilen dosya adı şablonu:
+Canonical path içinde son parça `safe_file_name` değeridir.
 
 ```text
-YYYYMMDD_HHMMSS__record_type__record_id__file_type__sequence.ext
+safe_file_name
 ```
 
 Örnekler:
 
 ```text
-20260607_143210__concrete_pour__CP-000123__image__001.jpg
-20260607_143455__concrete_pour__CP-000123__video__001.mp4
-20260607_160030__material_delivery__MD-000045__pdf__001.pdf
-20260607_171500__nonconformity__NCR-000012__image__001.jpg
+photo_001.jpg
+concrete_pour_video_001.mp4
+material_delivery_report.pdf
+ncr_photo_001.jpg
 ```
 
-Bu şablon dosya adının tek başına da anlamlı olmasını sağlar. Dosya adı tarih, kayıt türü, kayıt id, dosya tipi ve sıra bilgisini içerir.
+Dosya adı tek başına da okunabilir olabilir; fakat proje, kayıt türü, tarih ve kayıt id bilgisi artık canonical path içinde açıkça taşınır.
 
 ## 6. Dosya Adı Kuralları
 
@@ -107,11 +92,7 @@ Dosya adlarında şu kurallar tercih edilmelidir:
 - Dosya uzantısı orijinal MIME type ile uyumlu olmalı.
 - Aynı kayda ait çoklu dosyalarda sequence numarası kullanılmalı: `001`, `002`, `003`.
 
-Önerilen ayrım:
-
-- Tarih ve saat içinde tek alt çizgi: `20260607_143210`
-- Ana parçalar arasında çift alt çizgi: `__`
-- Sıra numarası üç haneli: `001`
+`safe_file_name`, kullanıcı tarafından gelen orijinal dosya adından farklı olabilir. Orijinal ad metadata olarak `original_file_name` alanında korunabilir.
 
 ## 7. Orijinal Dosya Adı Yaklaşımı
 

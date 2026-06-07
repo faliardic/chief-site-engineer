@@ -1095,3 +1095,9 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Model-level optional`: Bir alanin dataclass/model olusturulurken verilmek zorunda olmamasi.
 
 `Service-level required`: Bir alanin modelde opsiyonel kalmasina ragmen upload servisi, API veya is akisi tarafindan zorunlu tutulabilmesi.
+
+`Canonical attachment path`: Dosya ekleri icin standart yol semasi; `attachments/{project_id}/{record_type}/{yyyy}/{mm}/{dd}/{record_id}/{safe_file_name}`.
+
+`record_type`: Dosya ekinin bagli oldugu ana kayit turunu makine-dostu ve kucuk harfli ifade eden klasor/kategori degeri.
+
+`safe_file_name`: Bosluk, riskli ozel karakter veya yerel karakter sorunlari azaltacak sekilde sanitize edilmis dosya adi.

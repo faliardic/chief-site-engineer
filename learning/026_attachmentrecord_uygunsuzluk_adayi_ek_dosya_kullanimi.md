@@ -6,6 +6,8 @@ Bu adimda yeni bir model eklemek yerine mevcut genel bir modeli belirli bir is s
 
 `AttachmentRecord`, dosya eki referansi icin daha once eklenmis genel bir modeldir. Adim 026'da bu modelin `NonconformityCandidateRecord` ile nasil iliskilendirilecegi test ve dokumantasyonla netlestirilir.
 
+Not: Adim 083 sonrasi `AttachmentRecord` legacy / onceki genel ek modeli olarak korunur. Yeni dosya eki hatti icin canonical model `FileAttachmentRecord`, canonical path standardi ise `attachments/{project_id}/{record_type}/{yyyy}/{mm}/{dd}/{record_id}/{safe_file_name}` olarak belirlenmistir.
+
 ## 2. Neden Yeni Model Eklenmedi?
 
 On kontrolde `AttachmentRecord` modelinin zaten fotograf, belge veya ek dosya referansi tutabildigi goruldu.
@@ -70,7 +72,7 @@ def test_attachment_record_can_reference_nonconformity_candidate_record() -> Non
         title="Korkuluk eksigi fotografi",
         file_name="korkuluk-eksigi.jpg",
         file_type="image/jpeg",
-        file_path="archive/nonconformity-candidates/korkuluk-eksigi.jpg",
+        file_path="archive/nonconformity-candidates/korkuluk-eksigi.jpg",  # legacy example
         related_model="NonconformityCandidateRecord",
         related_id="NCR-CAND-001",
         uploaded_by="Santiye sefi",
@@ -89,7 +91,7 @@ def test_attachment_record_can_reference_nonconformity_candidate_record() -> Non
 - `attachment = AttachmentRecord(...)` test icin bir dosya eki referansi olusturur.
 - `file_name="korkuluk-eksigi.jpg"` ek dosyanin adini verir.
 - `file_type="image/jpeg"` dosyanin fotograf oldugunu belirtir.
-- `file_path="archive/nonconformity-candidates/korkuluk-eksigi.jpg"` dosyanin metinsel yol referansini verir.
+- `file_path="archive/nonconformity-candidates/korkuluk-eksigi.jpg"` eski `AttachmentRecord` baglaminda legacy yol ornegidir.
 - `related_model="NonconformityCandidateRecord"` ekin uygunsuzluk adayi modeline baglandigini belirtir.
 - `related_id="NCR-CAND-001"` ekin hangi aday kayda ait oldugunu belirtir.
 - `uploaded_by="Santiye sefi"` eki yukleyen kisiyi belirtir.

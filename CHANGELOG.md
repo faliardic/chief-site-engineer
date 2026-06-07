@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 085
+
+- Locked the canonical attachment path standard as `attachments/{project_id}/{record_type}/{yyyy}/{mm}/{dd}/{record_id}/{safe_file_name}`.
+- Updated file attachment documentation examples to align with the canonical path structure where appropriate.
+- No upload service, path helper, physical file operation, database, API, GUI, auth, CI, deployment, test change, or breaking refactor was added.
+
 ## Step 084
 
 - Clarified the `FileAttachmentRecord` field contract for optional model-level upload metadata.

@@ -54,7 +54,7 @@ Video eki icin model sadece metadata ve referans tutar.
 Ornek:
 
 - `file_name`: `beton-dokum-oncesi.mp4`
-- `file_path`: `attachments/ncr/NCR-002/beton-dokum-oncesi.mp4`
+- `file_path`: `attachments/PRJ-001/nonconformity/2026/10/02/NCR-002/beton_dokum_oncesi.mp4`
 - `file_type`: `video`
 - `mime_type`: `video/mp4`
 
