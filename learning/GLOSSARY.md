@@ -1064,7 +1064,7 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 
 `related_record_id`: Dosya ekinin bagli oldugu ana kaydin kimligini belirten alan.
 
-`uploaded_at`: Dosya ekinin yuklendigi veya kayda alindigi zamani tutan alan.
+`uploaded_at`: Dosya ekinin yuklendigi veya kayda alindigi zamani opsiyonel string metadata olarak tutan alan.
 
 `file_size`: Dosyanin boyutunu metadata olarak tutan opsiyonel alan.
 

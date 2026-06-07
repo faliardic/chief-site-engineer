@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 078
+
+- Updated `FileAttachmentRecord.uploaded_at` to be optional string metadata with a default value of `None`.
+- Added tests confirming that `uploaded_at` is stored when provided and defaults to `None` when omitted.
+- No automatic timestamp generation, datetime parsing/formatting, user model, role/permission system, authentication, authorization, file upload, physical file copy/delete/move, repository, persistence, SQLite, JSON, API, GUI, CLI, thumbnail, preview, video playback, or streaming behavior was added in this step.
+
 ## Step 077
 
 - Updated `FileAttachmentRecord.uploaded_by` to be optional string metadata with a default value of `None`.

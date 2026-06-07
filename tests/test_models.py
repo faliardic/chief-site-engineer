@@ -382,6 +382,31 @@ def test_file_attachment_record_uploaded_by_is_optional_metadata() -> None:
     assert attachment_without_uploader.uploaded_by is None
 
 
+def test_file_attachment_record_uploaded_at_is_optional_metadata() -> None:
+    attachment_with_timestamp = FileAttachmentRecord(
+        attachment_id="file-att-uploaded-at-001",
+        related_record_type="nonconformity",
+        related_record_id="NCR-006",
+        file_name="ncr-006-fotograf.jpg",
+        file_path="attachments/nonconformity/NCR-006/ncr-006-fotograf.jpg",
+        file_type="image",
+        mime_type="image/jpeg",
+        uploaded_at="2026-06-07T14:32:10",
+    )
+    attachment_without_timestamp = FileAttachmentRecord(
+        attachment_id="file-att-uploaded-at-002",
+        related_record_type="nonconformity",
+        related_record_id="NCR-007",
+        file_name="ncr-007-fotograf.jpg",
+        file_path="attachments/nonconformity/NCR-007/ncr-007-fotograf.jpg",
+        file_type="image",
+        mime_type="image/jpeg",
+    )
+
+    assert attachment_with_timestamp.uploaded_at == "2026-06-07T14:32:10"
+    assert attachment_without_timestamp.uploaded_at is None
+
+
 def test_file_attachment_record_can_represent_video_metadata_reference() -> None:
     attachment = FileAttachmentRecord(
         attachment_id="file-att-video-001",

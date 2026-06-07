@@ -178,7 +178,7 @@ class FileAttachmentRecord:
     file_path: str
     file_type: str
     mime_type: str
-    uploaded_at: str
+    uploaded_at: str | None = None
     uploaded_by: str | None = None
     original_file_name: str | None = None
     description: str | None = None
