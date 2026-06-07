@@ -519,3 +519,11 @@
 - Arsivlenmis kayitlar veya aktif kayitlar dislanmayacak.
 - `archive` ve `restore` islemleri kaydin tum liste icinde kalmasini saglayacak; toplam liste silme davranisi gibi calismayacak.
 - Kayit silme, status degisimi, `is_archived` degisimi, otomatik history, workflow, JSON, SQLite, API, GUI, CLI ve buyuk refactor eklenmedi.
+
+## 060 NonconformityRepository Arsiv / Listeleme Butunluk Kontrolu
+
+- Bu adimda yeni repository methodu eklenmedi.
+- Mevcut `archive`, `restore`, `list_active`, `list_archived`, `list_all` ve `get_archive_summary` davranislarinin birlikte tutarli calismasi testle sabitlendi.
+- Arsivleme ve restore islemlerinin kayit silmedigi, toplam listeyi korudugu ve `status` alanini otomatik degistirmedigi dogrulandi.
+- Aktif, arsivlenmis ve toplam kayit sayilarinin `get_archive_summary()` ile listeleme davranislariyla uyumlu kalmasi proje karari olarak netlestirildi.
+- JSON, SQLite, API, GUI, CLI, otomatik history, workflow, silme mantigi ve buyuk refactor eklenmedi.

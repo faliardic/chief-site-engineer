@@ -1202,3 +1202,83 @@ def test_nonconformity_repository_list_all_is_unchanged_after_restore() -> None:
     assert repository.count() == 2
     assert repository.list_active() == [first_record, second_record]
     assert repository.list_archived() == []
+
+
+def test_nonconformity_repository_archive_listing_summary_stay_consistent() -> None:
+    repository = NonconformityRepository()
+    open_record = NonconformityRecord(
+        nonconformity_id="NCR-070",
+        project_id="prj-001",
+        date="2026-09-13",
+        title="Acik NCR",
+        description="Butunluk testi icin acik kayit.",
+        status="open",
+    )
+    in_progress_record = NonconformityRecord(
+        nonconformity_id="NCR-071",
+        project_id="prj-001",
+        date="2026-09-14",
+        title="Devam eden NCR",
+        description="Butunluk testi icin devam eden kayit.",
+        status="in_progress",
+    )
+    closed_record = NonconformityRecord(
+        nonconformity_id="NCR-072",
+        project_id="prj-001",
+        date="2026-09-15",
+        title="Kapali NCR",
+        description="Butunluk testi icin kapali kayit.",
+        status="closed",
+    )
+
+    repository.add(open_record)
+    repository.add(in_progress_record)
+    repository.add(closed_record)
+
+    assert [record.nonconformity_id for record in repository.list_all()] == [
+        "NCR-070",
+        "NCR-071",
+        "NCR-072",
+    ]
+    assert repository.list_active() == [open_record, in_progress_record, closed_record]
+    assert repository.list_archived() == []
+    assert repository.get_archive_summary() == {
+        "active": 3,
+        "archived": 0,
+        "total": 3,
+    }
+
+    repository.archive("NCR-071")
+    repository.archive("NCR-072")
+
+    assert [record.title for record in repository.list_all()] == [
+        "Acik NCR",
+        "Devam eden NCR",
+        "Kapali NCR",
+    ]
+    assert repository.list_active() == [open_record]
+    assert repository.list_archived() == [in_progress_record, closed_record]
+    assert repository.get_archive_summary() == {
+        "active": 1,
+        "archived": 2,
+        "total": 3,
+    }
+    assert open_record.status == "open"
+    assert in_progress_record.status == "in_progress"
+    assert closed_record.status == "closed"
+
+    restored_record = repository.restore("NCR-071")
+
+    assert restored_record == in_progress_record
+    assert repository.list_active() == [open_record, in_progress_record]
+    assert repository.list_archived() == [closed_record]
+    assert repository.list_all() == [open_record, in_progress_record, closed_record]
+    assert repository.get_archive_summary() == {
+        "active": 2,
+        "archived": 1,
+        "total": 3,
+    }
+    assert repository.count() == 3
+    assert open_record.status == "open"
+    assert in_progress_record.status == "in_progress"
+    assert closed_record.status == "closed"

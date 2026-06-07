@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 060
+
+- Added an integrated consistency test for `NonconformityRepository` archive, restore, active listing, archived listing, full listing, and archive summary behavior.
+- Confirmed that archive and restore keep the full record list intact and do not change `status` values automatically.
+- No application code change, delete behavior, JSON, SQLite, API, GUI, CLI, large refactor, automatic history, or workflow was added in this step.
+
 ## Step 059
 
 - Confirmed the existing `NonconformityRepository.list_all` behavior as the full NCR listing behavior.

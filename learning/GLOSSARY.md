@@ -1009,3 +1009,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Tam kayit listesi`: Arsiv durumu veya status ayrimi yapmadan repository icindeki butun NCR kayitlarini ifade eden liste.
 
 `Restore sonrasi tam liste`: Restore isleminin toplam kayit listesini degistirmemesi gerektigini anlatan kontrol.
+
+`Butunluk testi`: Birden fazla repository davranisinin ayni is akisi icinde tutarli calistigini dogrulayan test.
+
+`Arsiv / listeleme butunlugu`: `archive`, `restore`, `list_active`, `list_archived`, `list_all` ve `get_archive_summary` sonuclarinin birbiriyle uyumlu kalmasi.
+
+`Status degismeme garantisi`: Arsivleme, restore ve listeleme islemlerinin `status` alanini otomatik degistirmemesi.
+
+`Toplam liste korunumu`: Arsivleme veya restore sonrasi kayitlarin `list_all` sonucunda kalmaya devam etmesi.
