@@ -23,8 +23,13 @@ from app.models import (
     NonconformityCandidateReviewRecord,
     NonconformityCandidateStatusHistoryRecord,
     NonconformityCandidateTrackingSummaryRecord,
+    NonconformityAssignmentRecord,
+    NonconformityClosureRecord,
+    NonconformityCorrectiveActionRecord,
+    NonconformityCorrectiveActionVerificationRecord,
     NonconformityProcessViewRecord,
     NonconformityRecord,
+    NonconformityStatusHistoryRecord,
     ProjectPartyRecord,
     RFIRecord,
     SiteLocationRecord,
@@ -941,3 +946,135 @@ def test_nonconformity_process_view_record_optional_fields_default() -> None:
     assert process_view.last_update_date is None
     assert process_view.process_summary is None
     assert process_view.notes is None
+
+
+def test_nonconformity_status_history_record_holds_values_and_defaults() -> None:
+    history = NonconformityStatusHistoryRecord(
+        nonconformity_id="NCR-001",
+        old_status="open",
+        new_status="in_review",
+        change_reason="Kesin uygunsuzluk kalite incelemesine alindi.",
+        changed_by="Kalite sorumlusu",
+        change_date="2026-06-24",
+        source_record="NonconformityProcessViewRecord",
+    )
+
+    assert history.nonconformity_id == "NCR-001"
+    assert history.old_status == "open"
+    assert history.new_status == "in_review"
+    assert history.change_reason == "Kesin uygunsuzluk kalite incelemesine alindi."
+    assert history.changed_by == "Kalite sorumlusu"
+    assert history.change_date == "2026-06-24"
+    assert history.source_record == "NonconformityProcessViewRecord"
+    assert history.notes is None
+
+
+def test_nonconformity_status_history_record_optional_fields_default() -> None:
+    history = NonconformityStatusHistoryRecord(
+        nonconformity_id="NCR-002",
+        old_status="in_review",
+        new_status="action_waiting",
+        change_reason="Saha aksiyonu bekleniyor.",
+        changed_by="Santiye sefi",
+        change_date="2026-06-25",
+    )
+
+    assert history.nonconformity_id == "NCR-002"
+    assert history.old_status == "in_review"
+    assert history.new_status == "action_waiting"
+    assert history.change_reason == "Saha aksiyonu bekleniyor."
+    assert history.changed_by == "Santiye sefi"
+    assert history.change_date == "2026-06-25"
+    assert history.source_record is None
+    assert history.notes is None
+
+
+def test_nonconformity_assignment_record_holds_values_and_defaults() -> None:
+    assignment = NonconformityAssignmentRecord(
+        nonconformity_id="NCR-001",
+        assigned_to="Saha kalite ekibi",
+        assigned_role="quality_team",
+        assigned_by="Santiye sefi",
+        assigned_date="2026-06-26",
+        responsibility_scope="Korkuluk eksiginin saha aksiyonunu takip et.",
+        due_date="2026-06-30",
+    )
+
+    assert assignment.nonconformity_id == "NCR-001"
+    assert assignment.assigned_to == "Saha kalite ekibi"
+    assert assignment.assigned_role == "quality_team"
+    assert assignment.assigned_by == "Santiye sefi"
+    assert assignment.assigned_date == "2026-06-26"
+    assert assignment.responsibility_scope == "Korkuluk eksiginin saha aksiyonunu takip et."
+    assert assignment.due_date == "2026-06-30"
+    assert assignment.status == "assigned"
+    assert assignment.notes is None
+
+
+def test_nonconformity_corrective_action_record_holds_values_and_defaults() -> None:
+    action = NonconformityCorrectiveActionRecord(
+        nonconformity_id="NCR-001",
+        action_title="Korkuluk eksigini tamamla",
+        action_description="Kuzey cephede eksik korkuluk imalati tamamlanacak.",
+        responsible_party="Alt yuklenici saha ekibi",
+        planned_start_date="2026-06-27",
+        due_date="2026-07-02",
+    )
+
+    assert action.nonconformity_id == "NCR-001"
+    assert action.action_title == "Korkuluk eksigini tamamla"
+    assert action.action_description == "Kuzey cephede eksik korkuluk imalati tamamlanacak."
+    assert action.responsible_party == "Alt yuklenici saha ekibi"
+    assert action.planned_start_date == "2026-06-27"
+    assert action.due_date == "2026-07-02"
+    assert action.completion_date is None
+    assert action.verification_required is True
+    assert action.status == "planned"
+    assert action.notes is None
+
+
+def test_nonconformity_corrective_action_verification_record_holds_values_and_defaults() -> None:
+    verification = NonconformityCorrectiveActionVerificationRecord(
+        corrective_action_id="NCR-CA-001",
+        nonconformity_id="NCR-001",
+        verified_by="Kalite kontrol sorumlusu",
+        verification_date="2026-07-03",
+        verification_result="accepted",
+        verification_notes="Korkuluk imalati yerinde kontrol edildi ve uygun bulundu.",
+    )
+
+    assert verification.corrective_action_id == "NCR-CA-001"
+    assert verification.nonconformity_id == "NCR-001"
+    assert verification.verified_by == "Kalite kontrol sorumlusu"
+    assert verification.verification_date == "2026-07-03"
+    assert verification.verification_result == "accepted"
+    assert (
+        verification.verification_notes
+        == "Korkuluk imalati yerinde kontrol edildi ve uygun bulundu."
+    )
+    assert verification.requires_rework is False
+    assert verification.next_action is None
+    assert verification.status == "verified"
+    assert verification.notes is None
+
+
+def test_nonconformity_closure_record_holds_values_and_defaults() -> None:
+    closure = NonconformityClosureRecord(
+        nonconformity_id="NCR-001",
+        closure_date="2026-07-04",
+        closed_by="Kalite muduru",
+        closure_result="accepted_and_closed",
+        closure_reason="Duzeltici faaliyet dogrulandi ve NCR kapatildi.",
+        verified_action_id="NCR-CAV-001",
+    )
+
+    assert closure.nonconformity_id == "NCR-001"
+    assert closure.closure_date == "2026-07-04"
+    assert closure.closed_by == "Kalite muduru"
+    assert closure.closure_result == "accepted_and_closed"
+    assert closure.closure_reason == "Duzeltici faaliyet dogrulandi ve NCR kapatildi."
+    assert closure.verified_action_id == "NCR-CAV-001"
+    assert closure.final_status == "closed"
+    assert closure.requires_follow_up is False
+    assert closure.follow_up_note is None
+    assert closure.notes is None

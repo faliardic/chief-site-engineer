@@ -323,3 +323,116 @@
 - Asil adaydan NCR'a donusum iliskisi `NonconformityCandidateConversionRecord` ile temsil edilmeye devam edecek.
 - Bu model veritabani sorgusu, API cevabi, GUI tablosu, otomatik NCR olusturma veya duzeltici faaliyet sistemi degildir.
 - Veritabani, JSON, API, GUI, otomatik donusum, onay akisi ve dosya islemi eklenmedi.
+
+## 036 Kesin Uygunsuzluk Durum Gecmisi Modeli Baslangici
+
+- Kesin uygunsuzluk / NCR durum degisiklikleri ayri bir gecmis kaydi modeliyle temsil edilecek.
+- `NonconformityStatusHistoryRecord`, eski durum, yeni durum, degisiklik sebebi, degistiren kisi ve degisiklik tarihini tutacak.
+- `source_record` alani durum degisikliginin hangi NCR kaydi veya surec parcasindan kaynaklandigini metinsel olarak gosterecek.
+- Bu model otomatik durum guncelleme sistemi, is akisi motoru veya duzeltici faaliyet sistemi degildir.
+- Veritabani, JSON, API, GUI, otomatik NCR olusturma, onay akisi ve dosya islemi eklenmedi.
+
+## 037 Kesin Uygunsuzluk Sorumluluk / Atama Modeli Baslangici
+
+- Kesin uygunsuzluk / NCR sorumluluk atamasi ayri bir veri modeliyle temsil edilecek.
+- `NonconformityAssignmentRecord`, NCR kaydinin hangi kisi, ekip, firma veya sorumlu birime atandigini tutacak.
+- Aday uygunsuzluk atama modeli olan `NonconformityCandidateAssignmentRecord` degistirilmedi; bu adim kesin uygunsuzluk kapsamindadir.
+- `status` alani varsayilan olarak `assigned`, `notes` alani varsayilan olarak `None` olacak.
+- Bu model API, GUI, otomatik atama, bildirim, onay akisi veya dosya islemi degildir.
+
+## 038 Kesin Uygunsuzluk Duzeltici Faaliyet Modeli Baslangici
+
+- Kesin uygunsuzluk / NCR icin planlanan duzeltici faaliyet ayri bir veri modeliyle temsil edilecek.
+- `NonconformityCorrectiveActionRecord`, faaliyet basligi, aciklamasi, sorumlusu, planlanan baslangic tarihi, hedef tarihi ve tamamlanma tarihini tutacak.
+- Mevcut `NonconformityRecord.corrective_action` alani degistirilmedi; bu adim daha ayrintili ve izole faaliyet kaydi seklini baslatir.
+- `verification_required` varsayilan olarak `True`, `status` varsayilan olarak `planned`, `completion_date` ve `notes` varsayilan olarak `None` olacak.
+- Bu model API, GUI, otomatik kapatma, onay akisi, bildirim veya dosya islemi degildir.
+
+## 039 Kesin Uygunsuzluk Duzeltici Faaliyet Dogrulama Modeli Baslangici
+
+- Kesin uygunsuzluk / NCR duzeltici faaliyetinin kontrol ve dogrulama sonucu ayri bir veri modeliyle temsil edilecek.
+- `NonconformityCorrectiveActionVerificationRecord`, faaliyetin kim tarafindan, hangi tarihte, hangi sonuc ve notla dogrulandigini tutacak.
+- `NonconformityCorrectiveActionRecord` faaliyetin kendisini; bu yeni model ise faaliyetin kontrol sonucunu temsil eder.
+- `requires_rework` varsayilan olarak `False`, `next_action` varsayilan olarak `None`, `status` varsayilan olarak `verified`, `notes` varsayilan olarak `None` olacak.
+- Bu model API, GUI, otomatik kapatma, otomatik onay, bildirim veya dosya islemi degildir.
+
+## 040 Kesin Uygunsuzluk Kapatma Modeli Baslangici
+
+- Kesin uygunsuzluk / NCR kapanis karari ayri bir veri modeliyle temsil edilecek.
+- `NonconformityClosureRecord`, kapanis tarihini, kapatan kisiyi, kapanis sonucunu, kapanis gerekcesini ve dogrulanmis faaliyet baglantisini tutacak.
+- `NonconformityCorrectiveActionVerificationRecord` duzeltici faaliyetin sahada uygun bulunup bulunmadigini; bu yeni model ise NCR kaydinin kapanis kararini temsil eder.
+- `final_status` varsayilan olarak `closed`, `requires_follow_up` varsayilan olarak `False`, `follow_up_note` ve `notes` varsayilan olarak `None` olacak.
+- Bu model API, GUI, otomatik kapatma, otomatik onay, bildirim veya dosya islemi degildir.
+
+## 041 Kesin Uygunsuzluk Kayit Deposu Baslangici
+
+- `NonconformityRecord` kayitlarini bellek icinde yonetmek icin `NonconformityRepository` sinifi eklendi.
+- Repository sadece `NonconformityRecord` icin calisacak; genel kayit deposu veya kalici saklama katmani degildir.
+- `add`, `list_all` ve `find_by_id` davranislari baslangic kapsaminda tutuldu.
+- Var olmayan `nonconformity_id` aramalarinda `None` dondurulecek.
+- JSON, SQLite, API, GUI, CLI, dosya islemi ve otomatik is akisi eklenmedi.
+
+## 042 NonconformityRepository Duplicate Id Kontrolu
+
+- `NonconformityRepository.add` davranisina ayni `nonconformity_id` degerine sahip ikinci kaydi engelleyen kontrol eklendi.
+- Ayni kimlik tekrar eklenirse acik mesajli `ValueError` yukseltilecek.
+- Farkli `nonconformity_id` degerlerine sahip kayitlar normal sekilde eklenmeye devam edecek.
+- Bu karar veritabani unique constraint degil, bellek ici Python kontroludur.
+- JSON, SQLite, API, GUI, CLI, dosya islemi ve otomatik is akisi eklenmedi.
+
+## 043 NonconformityRepository Durum Filtreleme
+
+- `NonconformityRepository` icine `list_by_status(status)` davranisi eklendi.
+- Bu davranis sadece bellek icindeki `NonconformityRecord.status` alanina gore filtreleme yapacak.
+- Eslesen kayitlar mevcut eklenme sirasini koruyarak liste olarak dondurulecek.
+- Eslesen kayit yoksa bos liste dondurulecek.
+- JSON, SQLite, API, GUI, CLI, dosya islemi, dashboard ve otomatik is akisi eklenmedi.
+
+## 044 NonconformityRepository Sorumlu Filtreleme
+
+- `NonconformityRepository` icine `list_by_responsible_party(responsible_party)` davranisi eklendi.
+- Bu davranis sadece bellek icindeki `NonconformityRecord.responsible_party` alanina gore filtreleme yapacak.
+- Eslesen kayitlar mevcut eklenme sirasini koruyarak liste olarak dondurulecek.
+- Eslesen kayit yoksa bos liste dondurulecek.
+- JSON, SQLite, API, GUI, CLI, dosya islemi, dashboard ve otomatik is akisi eklenmedi.
+
+## 045 NonconformityRepository Durum Ozeti
+
+- `NonconformityRepository` icine `get_status_summary()` davranisi eklendi.
+- Bu davranis repository icindeki `NonconformityRecord.status` degerlerini bellek icinde sayacak.
+- Sonuc `dict[str, int]` olarak dondurulecek; ornegin `{"open": 2, "closed": 1}`.
+- Repository bos ise bos dict dondurulecek.
+- JSON, SQLite, API, GUI, CLI, dashboard, dosya islemi ve otomatik is akisi eklenmedi.
+
+## 046 NonconformityRepository Sorumlu Taraf Ozeti
+
+- `NonconformityRepository` icine `get_responsible_party_summary()` davranisi eklendi.
+- Bu davranis repository icindeki `NonconformityRecord.responsible_party` degerlerini bellek icinde sayacak.
+- `responsible_party` degeri `None` olan kayitlar `unassigned` anahtari altinda sayilacak.
+- Repository bos ise bos dict dondurulecek.
+- JSON, SQLite, API, GUI, CLI, dashboard, dosya islemi ve otomatik is akisi eklenmedi.
+
+## 047 NonconformityRepository Genel Ozet
+
+- `NonconformityRepository` icine `get_overview_summary()` davranisi eklendi.
+- Bu davranis toplam, acik, kapali, atanmis ve atanmamis kayit sayilarini bellek icinde hesaplayacak.
+- Bos repository icin tum sayaclar `0` olacak sekilde sabit anahtarli dict dondurulecek.
+- Bu davranis dashboard degil, dashboard/rapor/AI soru-cevap icin veri hazirlayan bellek ici Python metodudur.
+- JSON, SQLite, API, GUI, CLI, dashboard, dosya islemi ve otomatik is akisi eklenmedi.
+
+## 048 NonconformityRepository Status Guncelleme
+
+- `NonconformityRepository` icine `update_status(nonconformity_id, new_status)` davranisi eklendi.
+- Mevcut kayit bulunursa `status` alani bellek icinde guncellenecek ve guncellenen kayit dondurulecek.
+- Kayit bulunamazsa `None` dondurulecek.
+- Bu davranis otomatik `NonconformityStatusHistoryRecord` olusturmayacak.
+- JSON, SQLite, API, GUI, CLI, dashboard, dosya islemi ve otomatik is akisi eklenmedi.
+
+## 049 NonconformityRepository Sorumlu Taraf Guncelleme
+
+- `NonconformityRepository` icine `update_responsible_party(nonconformity_id, responsible_party)` davranisi eklendi.
+- Mevcut kayit bulunursa `responsible_party` alani bellek icinde guncellenecek ve guncellenen kayit dondurulecek.
+- `responsible_party` degeri `str` veya `None` olabilir; `None` degeri ozetlerde `unassigned` olarak yorumlanmaya devam edecek.
+- Kayit bulunamazsa `None` dondurulecek.
+- Bu davranis otomatik `NonconformityAssignmentRecord` olusturmayacak.
+- JSON, SQLite, API, GUI, CLI, dashboard, dosya islemi ve otomatik is akisi eklenmedi.

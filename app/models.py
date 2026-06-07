@@ -541,3 +541,80 @@ class NonconformityProcessViewRecord:
     last_update_date: str | None = None
     process_summary: str | None = None
     notes: str | None = None
+
+
+@dataclass
+class NonconformityStatusHistoryRecord:
+    """Represents a simple nonconformity status history record."""
+
+    nonconformity_id: str
+    old_status: str
+    new_status: str
+    change_reason: str
+    changed_by: str
+    change_date: str
+    source_record: str | None = None
+    notes: str | None = None
+
+
+@dataclass
+class NonconformityAssignmentRecord:
+    """Represents a simple nonconformity assignment record."""
+
+    nonconformity_id: str
+    assigned_to: str
+    assigned_role: str
+    assigned_by: str
+    assigned_date: str
+    responsibility_scope: str
+    due_date: str | None = None
+    status: str = "assigned"
+    notes: str | None = None
+
+
+@dataclass
+class NonconformityCorrectiveActionRecord:
+    """Represents a simple nonconformity corrective action record."""
+
+    nonconformity_id: str
+    action_title: str
+    action_description: str
+    responsible_party: str
+    planned_start_date: str
+    due_date: str
+    completion_date: str | None = None
+    verification_required: bool = True
+    status: str = "planned"
+    notes: str | None = None
+
+
+@dataclass
+class NonconformityCorrectiveActionVerificationRecord:
+    """Represents a simple nonconformity corrective action verification record."""
+
+    corrective_action_id: str
+    nonconformity_id: str
+    verified_by: str
+    verification_date: str
+    verification_result: str
+    verification_notes: str
+    requires_rework: bool = False
+    next_action: str | None = None
+    status: str = "verified"
+    notes: str | None = None
+
+
+@dataclass
+class NonconformityClosureRecord:
+    """Represents a simple nonconformity closure record."""
+
+    nonconformity_id: str
+    closure_date: str
+    closed_by: str
+    closure_result: str
+    closure_reason: str
+    verified_action_id: str
+    final_status: str = "closed"
+    requires_follow_up: bool = False
+    follow_up_note: str | None = None
+    notes: str | None = None

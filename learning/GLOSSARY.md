@@ -789,3 +789,147 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `conversion_record_id`: Gorunum modeli icinde adaydan NCR'a donusum kaydini gosteren ozet alan.
 
 `NCR process summary`: Kesin uygunsuzluk surecinin mevcut durumunu kisa metinle ozetleyen bilgi.
+
+`NonconformityStatusHistoryRecord`: Kesin uygunsuzluk / NCR durum degisikliklerini temsil eden veri modeli.
+
+`NCR durum gecmisi`: Kesin uygunsuzluk kaydinin eski durumdan yeni duruma ne zaman, neden ve kim tarafindan gectigini gosteren kayit dizisi.
+
+`nonconformity_id`: Kesin uygunsuzluk / NCR kaydini tanimlayan kod alani.
+
+`old_status`: Kesin uygunsuzlugun degisiklikten onceki durumunu tutan alan.
+
+`new_status`: Kesin uygunsuzlugun degisiklikten sonraki durumunu tutan alan.
+
+`change_reason`: NCR durum degisikliginin neden yapildigini aciklayan alan.
+
+`NonconformityAssignmentRecord`: Kesin uygunsuzluk / NCR kaydinin sorumluluk atamasini temsil eden veri modeli.
+
+`NCR sorumluluk atamasi`: Kesin uygunsuzluk kaydinin hangi kisi, ekip, firma veya birim tarafindan takip edilecegini gosteren kayit.
+
+`assigned_role`: Atanan tarafin rolunu veya sorumluluk tipini belirten alan.
+
+`assigned_date`: Kesin uygunsuzluk sorumluluk atamasinin yapildigi tarihi tutan alan.
+
+`responsibility_scope`: Atanan tarafin hangi kapsamda sorumlu oldugunu aciklayan alan.
+
+`NonconformityCorrectiveActionRecord`: Kesin uygunsuzluk / NCR icin planlanan duzeltici faaliyeti temsil eden veri modeli.
+
+`NCR duzeltici faaliyet kaydi`: Kesin uygunsuzlugu gidermek icin yapilacak faaliyetin baslik, aciklama, sorumlu, tarih ve durum bilgisini tutan kayit.
+
+`action_description`: Duzeltici faaliyetin ne yapacagini aciklayan detay alani.
+
+`planned_start_date`: Duzeltici faaliyetin planlanan baslangic tarihini tutan alan.
+
+`completion_date`: Duzeltici faaliyetin tamamlandigi tarihi tutan opsiyonel alan.
+
+`verification_required`: Duzeltici faaliyet tamamlandiktan sonra dogrulama gerekip gerekmedigini gosteren boolean alan.
+
+`planned`: Duzeltici faaliyetin planlanmis durumda oldugunu anlatan status degeri.
+
+`NonconformityCorrectiveActionVerificationRecord`: Kesin uygunsuzluk / NCR duzeltici faaliyetinin kontrol ve dogrulama sonucunu temsil eden veri modeli.
+
+`NCR dogrulama kaydi`: Duzeltici faaliyetin sahada kontrol edilip sonucunun kabul, ret veya tekrar duzeltme ihtiyaci olarak kaydedildigi kayit.
+
+`corrective_action_id`: Dogrulanan duzeltici faaliyet kaydini tanimlayan kod alani.
+
+`verified_by`: Duzeltici faaliyeti kontrol eden veya dogrulayan kisi bilgisini tutan alan.
+
+`verification_date`: Duzeltici faaliyet dogrulamasinin yapildigi tarihi tutan alan.
+
+`verification_result`: Dogrulama sonucunu, ornegin kabul veya ret bilgisini tutan alan.
+
+`verification_notes`: Dogrulama sirasinda gorulen sonucu aciklayan not alani.
+
+`requires_rework`: Duzeltici faaliyetin tekrar calisma gerektirip gerektirmedigini gosteren boolean alan.
+
+`verified`: Duzeltici faaliyet dogrulama kaydinin kontrol edilmis durumda oldugunu anlatan status degeri.
+
+`NonconformityClosureRecord`: Kesin uygunsuzluk / NCR kaydinin kapanis kararini temsil eden veri modeli.
+
+`NCR kapatma kaydi`: Kesin uygunsuzlugun hangi sonuc, tarih, kisi ve gerekceyle kapatildigini gosteren kayit.
+
+`closure_result`: NCR kapanis sonucunu, ornegin kabul edilip kapatildi bilgisini tutan alan.
+
+`verified_action_id`: NCR kapatma kararina kaynak olan dogrulanmis duzeltici faaliyet kaydini gosteren alan.
+
+`follow_up_note`: Kapanis sonrasinda takip gerekiyorsa bu takibi aciklayan opsiyonel not alani.
+
+`closed`: Kesin uygunsuzluk kaydinin kapatilmis durumda oldugunu anlatan final status degeri.
+
+`Repository`: Model nesnelerini eklemek, listelemek veya aramak icin kullanilan kayit yonetimi sinifi.
+
+`NonconformityRepository`: `NonconformityRecord` kayitlarini bellek icinde yoneten baslangic repository sinifi.
+
+`Bellek ici kayit yonetimi`: Kayitlarin program calisirken RAM icinde tutulmasi, dosyaya veya veritabanina yazilmamasi yaklasimi.
+
+`list_all`: Repository icindeki tum kayitlari listeleyen metot.
+
+`find_by_id`: Repository icinde kimlik alanina gore kayit arayan metot.
+
+`None dondurme`: Aranan kayit bulunmadiginda hata firlatmak yerine bos sonuc dondurme yaklasimi.
+
+`Duplicate id`: Ayni kimlik degerinin iki farkli kayit icin tekrar kullanilmasi problemi.
+
+`Repository kimlik benzersizligi`: Repository icinde ayni kayit kimliginin ikinci kez eklenmesini engelleyen kontrol.
+
+`ValueError`: Python'da verilen degerin kabul edilemez oldugunu belirtmek icin kullanilan hata turu.
+
+`Bellek ici duplicate kontrolu`: Tekrarlanan kimlikleri veritabani yerine Python listesi uzerinde kontrol etme yaklasimi.
+
+`list_by_status`: Repository icindeki kayitlari `status` alanina gore filtreleyen metot.
+
+`Durum filtreleme`: Kayitlari acik, kapali veya baska bir durum degerine gore ayirma davranisi.
+
+`Bos liste`: Filtre sonucunda eslesen kayit yoksa hata yerine dondurulen `[]` degeri.
+
+`Bellek ici filtreleme`: Kayitlari veritabani sorgusu yerine Python listesi uzerinde secme yaklasimi.
+
+`list_by_responsible_party`: Repository icindeki kayitlari `responsible_party` alanina gore filtreleyen metot.
+
+`Sorumlu filtreleme`: NCR kayitlarini kisi, ekip, firma veya sorumlu birime gore ayirma davranisi.
+
+`responsible_party filtresi`: Kaydin sorumlu taraf alanini kullanarak kayit secme yaklasimi.
+
+`get_status_summary`: Repository icindeki kayitlari durum degerlerine gore sayan metot.
+
+`Durum ozeti`: Kayitlarin acik, kapali veya devam eden gibi durumlara gore adet dagilimi.
+
+`dict`: Python'da anahtar-deger ciftleriyle veri tutan sozluk yapisi.
+
+`Sayac mantigi`: Her durum degeri icin sayiyi bir artirarak ozet uretme yaklasimi.
+
+`Bos dict`: Ozetlenecek kayit yoksa dondurulen `{}` degeri.
+
+`get_responsible_party_summary`: Repository icindeki kayitlari sorumlu taraf degerlerine gore sayan metot.
+
+`Sorumlu taraf ozeti`: NCR kayitlarinin kisi, ekip, firma veya atanmamis durumuna gore adet dagilimi.
+
+`unassigned`: Sorumlu tarafi henuz belirlenmemis kayitlari temsil eden ozet anahtari.
+
+`None degerini gruplama`: Bos sorumlu taraf bilgisini raporlanabilir bir metin anahtari altinda toplama yaklasimi.
+
+`get_overview_summary`: Repository icindeki toplam, acik, kapali, atanmis ve atanmamis kayit sayilarini veren metot.
+
+`Genel ozet`: Bir kayit deposunun temel sayisal durumunu tek dict icinde gosteren bilgi.
+
+`total`: Repository icindeki toplam kayit sayisini anlatan ozet anahtari.
+
+`assigned`: Sorumlu tarafi belirlenmis kayitlari anlatan ozet anahtari.
+
+`Sabit anahtarli dict`: Bos durumda bile ayni anahtarlari donduren sozluk yapisi.
+
+`update_status`: Repository icindeki mevcut kaydin `status` alanini bellek icinde guncelleyen metot.
+
+`Status guncelleme`: Kaydin mevcut durum degerini yeni bir durum degeriyle degistirme davranisi.
+
+`Bellek ici guncelleme`: Kayit nesnesini dosya veya veritabani kullanmadan program belleginde degistirme yaklasimi.
+
+`Otomatik status history yok`: Durum guncellemesi yapilirken bu adimda gecmis kaydi olusturulmadigini anlatan kapsam karari.
+
+`update_responsible_party`: Repository icindeki mevcut kaydin `responsible_party` alanini bellek icinde guncelleyen metot.
+
+`Sorumlu taraf guncelleme`: NCR kaydinin sorumlu kisi, ekip, firma veya birim bilgisini degistirme davranisi.
+
+`Atanmamis sorumlu`: `responsible_party` degeri `None` olan ve ozetlerde `unassigned` olarak sayilan kayit durumu.
+
+`Otomatik assignment history yok`: Sorumlu taraf guncellemesi yapilirken bu adimda atama gecmisi kaydi olusturulmadigini anlatan kapsam karari.

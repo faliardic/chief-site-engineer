@@ -35,6 +35,20 @@
 - [x] Adim 033 - NonconformityRecord model degerlendirme raporu
 - [x] Adim 034 - NonconformityRecord alan revizyonu
 - [x] Adim 035 - Kesin uygunsuzluk surec gorunum modeli baslangici
+- [x] Adim 036 - Kesin uygunsuzluk durum gecmisi modeli baslangici
+- [x] Adim 037 - Kesin uygunsuzluk sorumluluk / atama modeli baslangici
+- [x] Adim 038 - Kesin uygunsuzluk duzeltici faaliyet modeli baslangici
+- [x] Adim 039 - Kesin uygunsuzluk duzeltici faaliyet dogrulama modeli baslangici
+- [x] Adim 040 - Kesin uygunsuzluk kapatma / sonuc modeli baslangici
+- [x] Adim 041 - Kesin uygunsuzluk kayit deposu baslangici
+- [x] Adim 042 - NonconformityRepository duplicate id kontrolu
+- [x] Adim 043 - NonconformityRepository durum filtreleme
+- [x] Adim 044 - NonconformityRepository sorumlu filtreleme
+- [x] Adim 045 - NonconformityRepository durum ozeti
+- [x] Adim 046 - NonconformityRepository sorumlu taraf ozeti
+- [x] Adim 047 - NonconformityRepository genel ozet
+- [x] Adim 048 - NonconformityRepository status guncelleme
+- [x] Adim 049 - NonconformityRepository sorumlu taraf guncelleme
 
 Adim 021-025 araligi tamamlandi. Bu aralik icin final NotebookLM podcast notu hazirlanacak.
 
@@ -58,4 +72,32 @@ Adim 034'te mevcut `NonconformityRecord` modeli kontrollu sekilde revize edilere
 
 Adim 035'te kesin uygunsuzluk / NCR surecini tek bakista temsil eden baslangic gorunum modeli eklendi.
 
-Sonraki kucuk adim onerisi: Adim 036 - Uygunsuzluk adayi surec durum etiketi modeli baslangici
+Adim 036'da kesin uygunsuzluk / NCR durum degisikliklerinin eski durum, yeni durum, sebep, kisi, tarih ve kaynak kayit bilgisiyle temsil edilmesi icin baslangic durum gecmisi modeli eklendi.
+
+Adim 037'de kesin uygunsuzluk / NCR kaydinin kisi, ekip, firma veya sorumlu birime atanmasini temsil eden baslangic sorumluluk modeli eklendi.
+
+Adim 038'de kesin uygunsuzluk / NCR kaydi icin planlanan duzeltici faaliyeti temsil eden baslangic veri modeli eklendi.
+
+Adim 039'da kesin uygunsuzluk / NCR duzeltici faaliyetinin sahada kontrol edilip sonucunun kayda alinmasini temsil eden baslangic dogrulama modeli eklendi.
+
+Adim 040'ta kesin uygunsuzluk / NCR kaydinin kapatilma kararini, kapatan kisiyi, kapanis tarihini ve sonucunu temsil eden baslangic kapanis modeli eklendi.
+
+Adim 041'de `NonconformityRecord` kayitlarini bellek icinde eklemek, listelemek ve kimlige gore bulmak icin baslangic repository sinifi eklendi.
+
+Adim 042'de `NonconformityRepository.add` icin ayni `nonconformity_id` degerine sahip ikinci kaydi engelleyen bellek ici duplicate id kontrolu eklendi.
+
+Adim 043'te `NonconformityRepository` icine `status` alanina gore bellek ici filtreleme yapan `list_by_status` davranisi eklendi.
+
+Adim 044'te `NonconformityRepository` icine `responsible_party` alanina gore bellek ici filtreleme yapan `list_by_responsible_party` davranisi eklendi.
+
+Adim 045'te `NonconformityRepository` icine kayitlari `status` degerlerine gore sayan `get_status_summary` davranisi eklendi.
+
+Adim 046'da `NonconformityRepository` icine kayitlari `responsible_party` degerlerine gore sayan `get_responsible_party_summary` davranisi eklendi.
+
+Adim 047'de `NonconformityRepository` icine toplam, acik, kapali, atanmis ve atanmamis kayit sayilarini veren `get_overview_summary` davranisi eklendi.
+
+Adim 048'de `NonconformityRepository` icine mevcut kaydin `status` alanini bellek icinde guncelleyen `update_status` davranisi eklendi.
+
+Adim 049'da `NonconformityRepository` icine mevcut kaydin `responsible_party` alanini bellek icinde guncelleyen `update_responsible_party` davranisi eklendi.
+
+Sonraki kucuk adim onerisi: Adim 050 - NotebookLM podcast notu Adim 036-040

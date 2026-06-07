@@ -1,5 +1,89 @@
 # Changelog
 
+## Step 049
+
+- Added `NonconformityRepository.update_responsible_party` for in-memory responsible party updates of existing NCR records.
+- Added tests for updating an existing record, reflecting the new responsible party in filters and summaries, setting the responsible party to `None`, and returning `None` for a missing id.
+- No JSON, SQLite, API, GUI, CLI, dashboard, file operation, automatic workflow, or automatic assignment history record was added in this step.
+
+## Step 048
+
+- Added `NonconformityRepository.update_status` for in-memory status updates of existing NCR records.
+- Added tests for updating an existing record, reflecting the new status in filters and summaries, and returning `None` for a missing id.
+- No JSON, SQLite, API, GUI, CLI, dashboard, file operation, automatic workflow, or automatic status history record was added in this step.
+
+## Step 047
+
+- Added `NonconformityRepository.get_overview_summary` for in-memory total, open, closed, assigned, and unassigned counts.
+- Added tests for populated and empty overview summary results.
+- No JSON, SQLite, API, GUI, CLI, dashboard, file operation, or automatic workflow was added in this step.
+
+## Step 046
+
+- Added `NonconformityRepository.get_responsible_party_summary` for in-memory responsible party count summaries.
+- Added tests for counting responsible parties, grouping missing responsible parties as `unassigned`, and returning an empty dict for an empty repository.
+- No JSON, SQLite, API, GUI, CLI, dashboard, file operation, or automatic workflow was added in this step.
+
+## Step 045
+
+- Added `NonconformityRepository.get_status_summary` for in-memory status count summaries.
+- Added tests for counting multiple status values and returning an empty dict for an empty repository.
+- No JSON, SQLite, API, GUI, CLI, dashboard, file operation, or automatic workflow was added in this step.
+
+## Step 044
+
+- Added `NonconformityRepository.list_by_responsible_party` for in-memory responsible party filtering.
+- Added a test proving records can be filtered separately for Ahmet and Mehmet, with missing responsible parties returning an empty list.
+- No JSON, SQLite, API, GUI, CLI, file operation, dashboard, or automatic workflow was added in this step.
+
+## Step 043
+
+- Added `NonconformityRepository.list_by_status` for in-memory status filtering of `NonconformityRecord` records.
+- Added a test proving open and closed records are filtered separately and missing statuses return an empty list.
+- No JSON, SQLite, API, GUI, CLI, file operation, dashboard, or automatic workflow was added in this step.
+
+## Step 042
+
+- Added duplicate `nonconformity_id` protection to `NonconformityRepository.add`.
+- Added a test proving duplicate ids raise `ValueError` while different ids can still be added.
+- No JSON, SQLite, API, GUI, CLI, file operation, or automatic workflow was added in this step.
+
+## Step 041
+
+- Added `NonconformityRepository` as a small in-memory repository for `NonconformityRecord` records.
+- Added tests for adding, listing, finding by id, and returning `None` for a missing nonconformity id.
+- No JSON, SQLite, API, GUI, CLI, file operation, or automatic workflow was added in this step.
+
+## Step 040
+
+- Added `NonconformityClosureRecord` as the starting closure model for definite nonconformity / NCR records.
+- Added a test for closure values and default final status, follow-up, follow-up note, and notes behavior.
+- No API, GUI, database query, JSON record system, automatic closure, automatic approval, notification, or file operation was added in this step.
+
+## Step 039
+
+- Added `NonconformityCorrectiveActionVerificationRecord` as the starting verification model for NCR corrective action checks.
+- Added a test for verification values and default rework, next action, status, and notes behavior.
+- No API, GUI, database query, JSON record system, automatic closure, automatic approval, notification, or file operation was added in this step.
+
+## Step 038
+
+- Added `NonconformityCorrectiveActionRecord` as the starting corrective action model for definite nonconformity / NCR records.
+- Added a test for corrective action values and default verification, status, completion date, and notes behavior.
+- No API, GUI, database query, JSON record system, automatic closure, approval workflow, notification, or file operation was added in this step.
+
+## Step 037
+
+- Added `NonconformityAssignmentRecord` as the starting responsibility assignment model for definite nonconformity / NCR records.
+- Added a test for assignment values and default `status` / `notes` behavior.
+- No API, GUI, database query, JSON record system, automatic assignment, notification, approval workflow, or file operation was added in this step.
+
+## Step 036
+
+- Added `NonconformityStatusHistoryRecord` as the starting model for definite nonconformity / NCR status change history.
+- Added tests for NCR status history values and optional field defaults.
+- No database query, API, GUI, automatic status update, automatic NCR creation, corrective action system, approval workflow, JSON record system, or file operation was added in this step.
+
 ## Step 035
 
 - Added `NonconformityProcessViewRecord` as the starting view model for definite nonconformity / NCR process summaries.
