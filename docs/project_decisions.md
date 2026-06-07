@@ -788,3 +788,12 @@
 - Tum status kodlari, hata status kodlari ve uyari status kodlari icin immutable `frozenset` koleksiyonlari kullanilacak.
 - `MISSING_FILE`, `INVALID_PATH`, `DUPLICATE_METADATA` ve `UNREADABLE_FILE` hata; `ORPHAN_FILE` uyari; `OK` sorun yok durumu olarak ayrildi.
 - Bu adimda scanner, dosya sistemi taramasi, upload service, backup logic, audit event implementasyonu, database, API, GUI, auth, CI veya deployment eklenmedi.
+
+## 091 Attachment Integrity Result Modeli
+
+- Ileride scanner tarafindan uretilecek tekil attachment butunluk kontrol sonucu icin `AttachmentIntegrityResult` modeli eklendi.
+- Result modeli `status_code`, `severity`, attachment reference, path bilgileri, metadata/dosya varligi, onerilen aksiyon, kontrol zamani ve not alanlarini tasir.
+- `status_code` degeri merkezi attachment integrity status sabitlerinden biri olmak zorundadir.
+- `severity` degeri `OK`, `WARNING` veya `ERROR` olmak zorundadir.
+- `checked_at` verilmezse UTC zaman atanir.
+- Bu adimda scanner, dosya sistemi taramasi, upload service, backup logic, audit event implementasyonu, database, API, GUI, auth, CI veya deployment eklenmedi.

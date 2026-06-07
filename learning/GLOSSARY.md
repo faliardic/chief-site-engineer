@@ -1141,3 +1141,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Warning status`: Kritik hata olmayabilir ancak manuel inceleme veya karar gerektiren attachment integrity durumu.
 
 `Immutable koleksiyon`: Disaridan degistirilemeyen koleksiyon; bu projede status gruplari icin `frozenset` kullanildi.
+
+`Result modeli`: Bir kontrol veya islem sonucunu tek kayit halinde temsil eden veri modeli.
+
+`AttachmentIntegrityResult`: Ileride attachment integrity scanner tarafindan uretilecek tekil kontrol sonucunu temsil eden model.
+
+`severity`: Bir sonuc veya bulgunun onem seviyesini anlatan alan; bu hatta `OK`, `WARNING` veya `ERROR` olabilir.
+
+`checked_at`: Bir kontrolun ne zaman yapildigini gosteren zaman bilgisi.

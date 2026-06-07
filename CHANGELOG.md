@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 091
+
+- Added `AttachmentIntegrityResult` as the single-result model for future attachment integrity scanner output.
+- Added severity constants for `OK`, `WARNING`, and `ERROR`, plus validation for known status and severity values.
+- Added focused tests for default UTC `checked_at`, result field storage, invalid values, and `MISSING_FILE` / `ORPHAN_FILE` / `OK` examples without adding scanner or file system behavior.
+
 ## Step 090
 
 - Added centralized attachment integrity status constants for `OK`, `MISSING_FILE`, `ORPHAN_FILE`, `INVALID_PATH`, `DUPLICATE_METADATA`, and `UNREADABLE_FILE`.

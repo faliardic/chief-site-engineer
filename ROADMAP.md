@@ -96,7 +96,7 @@ Bu fazda hedef yeni urun ozelligi eklemek degil; mevcut dokumantasyon ve proje s
 
 ## Faz 091-100 - Persistence, Upload, Integrity ve Operasyon Omurgasi
 
-- [ ] Adim 091 - Persistence strateji karari: JSON mu SQLite mi, hangi sirayla?
+- [x] Adim 091 - Attachment integrity result modeli baslangici.
 - [ ] Adim 092 - Repository persistence arayuzu veya plan dokumani.
 - [ ] Adim 093 - FileAttachmentRepository baslangic plani veya bellek ici baslangic.
 - [ ] Adim 094 - Dosya upload servisi tasarim karari.
@@ -111,4 +111,4 @@ Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistenc
 
 ## Sonraki Calisma Onerisi
 
-Adim 091 ile persistence strateji karari veya NotebookLM podcast notlari 071-090 final dosyasi ele alinabilir.
+Adim 092 ile repository persistence arayuzu veya NotebookLM podcast notlari 071-090 final dosyasi ele alinabilir.
