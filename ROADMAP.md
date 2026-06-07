@@ -66,6 +66,7 @@
 - [x] Adim 064 - NonconformityRepository id ile kayit bulma
 - [x] Adim 065 - NonconformityRepository duruma gore filtreleme
 - [x] Adim 066 - NonconformityRepository konuma gore filtreleme
+- [x] Adim 067 - Dosya ve video eki plani
 
 Adim 021-025 araligi tamamlandi. Bu aralik icin final NotebookLM podcast notu hazirlanacak.
 
@@ -151,4 +152,6 @@ Adim 065'te mevcut `NonconformityRepository.list_by_status` davranisi duruma gor
 
 Adim 066'da `NonconformityRepository.list_by_location` davranisi konuma gore filtreleme icin eklendi.
 
-Sonraki kucuk adim onerisi: Adim 067 - NonconformityRepository basit metin arama davranisi
+Adim 067'de fotograf, video, PDF, belge ve ses notu gibi eklerin ortak attachment yaklasimiyla ele alinmasi icin plan dokumani hazirlandi.
+
+Sonraki kucuk adim onerisi: Adim 068 - FileAttachmentRecord veri modeli

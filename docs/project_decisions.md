@@ -576,3 +576,11 @@
 - Eslesen kayit yoksa veya repository bos ise bos liste dondurulmesi karari belirlendi.
 - Bu davranis read-only kalacak; kayit silme, `location` degisimi, `status` degisimi, `is_archived` degisimi, otomatik history ve workflow olusturmayacak.
 - JSON, SQLite, API, GUI, CLI, query engine ve buyuk refactor eklenmedi.
+
+## 067 Dosya ve Video Eki Plani
+
+- Fotoğraf, video, PDF, belge, ses notu ve diger dosya ekleri icin ortak attachment yaklasimi planlandi.
+- Video dosyalarinin veritabanina gomulmemesi; dosya yolu / referansi ve metadata bilgisinin tutulmasi karar olarak netlestirildi.
+- Mevcut `AttachmentRecord` yaklasiminin ileride `FileAttachmentRecord` veya genisletilmis attachment modeli olarak surdurulebilecegi belirtildi.
+- Ilk asamada video oynatma, sikistirma, thumbnail uretme, streaming, medya isleme, dosya yukleme, JSON, SQLite, API, GUI ve CLI eklenmeyecek.
+- Bu adim sadece plan dokumantasyonu adimidir; uygulama kodu ve test dosyalari degistirilmedi.

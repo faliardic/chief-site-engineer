@@ -1049,3 +1049,13 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Eslesmeyen konum`: Repository icinde karsiligi olmayan konum degeri.
 
 `Arsiv dahil konum filtresi`: Konum filtresinin aktif ve arsivlenmis tum kayitlar uzerinde calismasi.
+
+`FileAttachmentRecord`: Ileride dosya, fotograf, video, PDF, belge ve ses notu referanslarini temsil edebilecek genel ek dosya modeli adi.
+
+`Medya eki`: Fotograf, video veya ses gibi gorsel/isitilebilir dosya eklerini anlatan genel kavram.
+
+`MIME tipi`: Dosyanin teknik icerik turunu belirten bilgi; ornegin `image/jpeg`, `video/mp4` veya `application/pdf`.
+
+`Dosya metadata`: Dosyanin kendisi disinda ad, yol, tur, boyut, yukleyen kisi ve tarih gibi aciklayici bilgiler.
+
+`Video referansi`: Video dosyasinin kendisi yerine dosya yolu veya depolama referansi bilgisinin tutulmasi.

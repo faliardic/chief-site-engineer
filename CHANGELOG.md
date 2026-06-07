@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 067
+
+- Added a plan document for file, photo, video, PDF, document, and audio attachments.
+- Clarified that video files should not be embedded in the database; only file references and metadata should be stored.
+- No application code, tests, JSON, SQLite, API, GUI, CLI, file upload, video playback, thumbnail generation, streaming, or media processing was added in this step.
+
 ## Step 066
 
 - Added `NonconformityRepository.list_by_location` for in-memory NCR filtering by `location`.
