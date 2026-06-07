@@ -94,6 +94,13 @@ class NonconformityRepository:
         record.is_archived = True
         return record
 
+    def restore(self, nonconformity_id: str) -> NonconformityRecord | None:
+        record = self.find_by_id(nonconformity_id)
+        if record is None:
+            return None
+        record.is_archived = False
+        return record
+
     def list_by_status(self, status: str) -> list[NonconformityRecord]:
         return [record for record in self._records if record.status == status]
 

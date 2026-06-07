@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 055
+
+- Added `NonconformityRepository.restore` for in-memory restore by setting `is_archived=False`.
+- Added tests proving restore returns the updated record, moves it from archived to active filters, preserves status and insert order, and returns `None` for missing ids.
+- No model change, JSON, SQLite, API, GUI, CLI, dashboard, file operation, delete, automatic archive, automatic closure, or automatic workflow was added in this step.
+
 ## Step 054
 
 - Added `NonconformityRepository.archive` for in-memory archiving by setting `is_archived=True`.

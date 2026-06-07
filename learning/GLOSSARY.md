@@ -973,3 +973,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Status korunumu`: Arsivleme sirasinda kaydin `status` alaninin degistirilmemesi.
 
 `Restore yok`: Arsivlenmis kaydi tekrar aktif hale getirme davranisinin bu adimda eklenmedigini anlatan kapsam karari.
+
+`restore`: Repository icindeki arsivlenmis kaydi silmeden tekrar aktif hale getiren metot.
+
+`Restore davranisi`: Kaydin `is_archived` alanini `False` yaparak arsiv grubundan aktif gruba alma yaklasimi.
+
+`Aktife alma`: Arsivlenmis kaydin yeniden normal takip listesine dahil edilmesi.
+
+`Archive / restore ayrimi`: Arsivlemenin `is_archived=True`, restore isleminin `is_archived=False` yapmasi.

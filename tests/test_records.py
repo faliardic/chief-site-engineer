@@ -808,3 +808,62 @@ def test_nonconformity_repository_archive_returns_none_for_missing_id() -> None:
     assert repository.list_active() == [record]
     assert repository.list_archived() == []
     assert repository.list_all() == [record]
+
+
+def test_nonconformity_repository_restore_marks_record_active_and_preserves_status_and_order() -> None:
+    repository = NonconformityRepository()
+    record = NonconformityRecord(
+        nonconformity_id="NCR-045",
+        project_id="prj-001",
+        date="2026-08-19",
+        title="Aktife alinacak NCR",
+        description="Bu kayit repository icinde arsivden cikarilacak.",
+        status="closed",
+        is_archived=True,
+    )
+    other_record = NonconformityRecord(
+        nonconformity_id="NCR-046",
+        project_id="prj-001",
+        date="2026-08-20",
+        title="Arsivde kalacak NCR",
+        description="Bu kayit arsiv listesinde kalacak.",
+        status="open",
+        is_archived=True,
+    )
+
+    repository.add(record)
+    repository.add(other_record)
+
+    restored_record = repository.restore("NCR-045")
+
+    assert restored_record == record
+    assert restored_record is record
+    assert record.is_archived is False
+    assert record.status == "closed"
+    assert repository.list_active() == [record]
+    assert repository.list_archived() == [other_record]
+    assert repository.list_all() == [record, other_record]
+
+
+def test_nonconformity_repository_restore_returns_none_for_missing_id() -> None:
+    repository = NonconformityRepository()
+    record = NonconformityRecord(
+        nonconformity_id="NCR-047",
+        project_id="prj-001",
+        date="2026-08-21",
+        title="Arsivde kalacak NCR",
+        description="Eksik id restore denemesi bu kaydi degistirmemeli.",
+        status="closed",
+        is_archived=True,
+    )
+
+    repository.add(record)
+
+    result = repository.restore("NCR-999")
+
+    assert result is None
+    assert record.is_archived is True
+    assert record.status == "closed"
+    assert repository.list_active() == []
+    assert repository.list_archived() == [record]
+    assert repository.list_all() == [record]

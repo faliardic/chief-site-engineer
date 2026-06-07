@@ -478,3 +478,11 @@
 - Kayit bulunamazsa `None` dondurulecek.
 - Bu davranis kaydi silmeyecek, mevcut kayit sirasini degistirmeyecek ve `status` alanina dokunmayacak.
 - Restore, otomatik kapanis, otomatik durum gecmisi, JSON, SQLite, API, GUI, CLI, dashboard, dosya islemi ve otomatik is akisi eklenmedi.
+
+## 055 NonconformityRepository Restore
+
+- `NonconformityRepository` icine `restore(nonconformity_id)` davranisi eklendi.
+- Mevcut kayit bulunursa `is_archived` alani bellek icinde `False` yapilacak ve guncellenen kayit dondurulecek.
+- Kayit bulunamazsa `None` dondurulecek.
+- Bu davranis kaydi silmeyecek, mevcut kayit sirasini degistirmeyecek ve `status` alanina dokunmayacak.
+- NonconformityRecord modeli, otomatik arsivleme, otomatik kapanis, otomatik durum gecmisi, JSON, SQLite, API, GUI, CLI, dashboard, dosya islemi ve otomatik is akisi eklenmedi.
