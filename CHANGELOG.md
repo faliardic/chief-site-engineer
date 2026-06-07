@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 100
+
+- Added the final Step 100 safe point quality-control document for the Step 081-099 work line.
+- Verified the current branch, latest commits, branch distance from `origin/master`, required podcast/policy/integrity files, and the pytest result.
+- Documented that no application code, tests, new feature behavior, scanner, upload service, database, API, GUI, auth, CI, deployment, push, or ZIP staging was added.
+
 ## Step 099
 
 - Added the final NotebookLM podcast note for Step 091-096.
