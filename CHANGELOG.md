@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 061
+
+- Added the final NotebookLM podcast note for Step 056-060.
+- Summarized NCR archive summary, archived listing, active listing, full listing, and archive/listing consistency behavior for podcast production.
+- No application code, tests, JSON, SQLite, API, GUI, CLI, or workflow behavior was changed in this step.
+
 ## Step 060
 
 - Added an integrated consistency test for `NonconformityRepository` archive, restore, active listing, archived listing, full listing, and archive summary behavior.

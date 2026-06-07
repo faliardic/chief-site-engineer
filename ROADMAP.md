@@ -60,6 +60,7 @@
 - [x] Adim 058 - NonconformityRepository aktif kayitlari listeleme
 - [x] Adim 059 - NonconformityRepository tum kayitlari listeleme
 - [x] Adim 060 - NonconformityRepository arsiv / listeleme butunluk kontrolu
+- [x] Adim 061 - NotebookLM podcast notu Adim 056-060
 
 Adim 021-025 araligi tamamlandi. Bu aralik icin final NotebookLM podcast notu hazirlanacak.
 
@@ -133,4 +134,6 @@ Adim 059'da mevcut `NonconformityRepository.list_all` davranisi tum kayitlari li
 
 Adim 060'ta `archive`, `restore`, `list_active`, `list_archived`, `list_all` ve `get_archive_summary` davranislarinin birlikte tutarli calistigi butunlesik test ve dokumantasyonla sabitlendi.
 
-Sonraki kucuk adim onerisi: Adim 061 - NonconformityRepository aktif kayit sayisi yardimcisi
+Adim 061'de Adim 056-060 araliginin final NotebookLM podcast notu hazirlandi.
+
+Sonraki kucuk adim onerisi: Adim 062 - NonconformityRepository aktif kayit sayisi yardimcisi
