@@ -1,4 +1,25 @@
 from dataclasses import dataclass
+from enum import Enum
+
+
+class FileType(str, Enum):
+    """Canonical file type values for file attachment metadata."""
+
+    IMAGE = "image"
+    VIDEO = "video"
+    PDF = "pdf"
+    DOCUMENT = "document"
+    AUDIO = "audio"
+    OTHER = "other"
+
+
+class AttachmentStatus(str, Enum):
+    """Canonical attachment lifecycle status values."""
+
+    ACTIVE = "active"
+    ARCHIVED = "archived"
+    MISSING = "missing"
+    DELETED = "deleted"
 
 
 @dataclass
@@ -171,6 +192,9 @@ class AttachmentRecord:
 class FileAttachmentRecord:
     """Represents the canonical file attachment metadata model.
 
+    `file_type` should use `FileType` values as the canonical vocabulary.
+    `AttachmentStatus` prepares canonical status values for future attachment
+    lifecycle behavior without adding validation in this step.
     `uploaded_by` and `uploaded_at` stay optional at model level until
     upload/auth services can enforce and populate them at service level.
     """

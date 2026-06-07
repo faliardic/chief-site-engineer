@@ -744,3 +744,12 @@
 - `safe_file_name`, sanitize edilmis ve dosya sistemi icin guvenli hale getirilmis dosya adi anlamina gelecek.
 - Physical file storage ile `FileAttachmentRecord.file_path` metadata alani ayni path standardini referans alacak.
 - Bu adimda path helper fonksiyonu, gercek upload servisi, fiziksel dosya tasima/kopyalama/silme, database, API veya GUI eklenmedi.
+
+## 086 File Type / Attachment Status Enum Hazirligi
+
+- `FileAttachmentRecord.file_type` icin canonical deger sozlugu olarak `FileType` enumu eklendi.
+- Ileride attachment yasam dongusu ve integrity kontrolleri icin `AttachmentStatus` enumu eklendi.
+- `FileAttachmentRecord.file_type` alani string olarak kalmaya devam edecek; bu adimda zorunlu enum donusumu yapilmadi.
+- `FileAttachmentRecord` icine yeni `status` alani eklenmedi; `AttachmentStatus` ilerideki attachment lifecycle davranislari icin hazirliktir.
+- Gecersiz deger validation davranisi bu adimda eklenmedi; Adim 087 ve sonrasi icin zemin hazirlandi.
+- Upload service ve integrity scanner ileride bu enumlari canonical vocabulary olarak kullanabilir.

@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 086
+
+- Added lightweight `FileType` and `AttachmentStatus` enum preparation for canonical file attachment vocabulary.
+- Kept `FileAttachmentRecord.file_type` as a string field and avoided validation or breaking model changes.
+- Added a focused enum value test and documented that stricter validation is deferred to a later step.
+
 ## Step 085
 
 - Locked the canonical attachment path standard as `attachments/{project_id}/{record_type}/{yyyy}/{mm}/{dd}/{record_id}/{safe_file_name}`.

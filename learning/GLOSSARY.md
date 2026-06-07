@@ -1101,3 +1101,9 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `record_type`: Dosya ekinin bagli oldugu ana kayit turunu makine-dostu ve kucuk harfli ifade eden klasor/kategori degeri.
 
 `safe_file_name`: Bosluk, riskli ozel karakter veya yerel karakter sorunlari azaltacak sekilde sanitize edilmis dosya adi.
+
+`Enum`: Sinirli ve anlamli sabit degerleri isimlendirerek tutan Python yapisi.
+
+`FileType`: Dosya eki turleri icin canonical enum; `image`, `video`, `pdf`, `document`, `audio` ve `other` degerlerini toplar.
+
+`AttachmentStatus`: Dosya eki yasam dongusu icin canonical enum; `active`, `archived`, `missing` ve `deleted` degerlerini toplar.

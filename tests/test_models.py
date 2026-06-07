@@ -10,7 +10,9 @@ from app.models import (
     DailyReportRecord,
     DailySiteLog,
     EquipmentRecord,
+    AttachmentStatus,
     FileAttachmentRecord,
+    FileType,
     InspectionRequest,
     MaterialRecord,
     MeetingActionRecord,
@@ -42,6 +44,19 @@ from app.models import (
     TrackingRecord,
     WorkforceRecord,
 )
+
+
+def test_file_attachment_enum_values_define_canonical_vocabulary() -> None:
+    assert FileType.IMAGE.value == "image"
+    assert FileType.VIDEO.value == "video"
+    assert FileType.PDF.value == "pdf"
+    assert FileType.DOCUMENT.value == "document"
+    assert FileType.AUDIO.value == "audio"
+    assert FileType.OTHER.value == "other"
+    assert AttachmentStatus.ACTIVE.value == "active"
+    assert AttachmentStatus.ARCHIVED.value == "archived"
+    assert AttachmentStatus.MISSING.value == "missing"
+    assert AttachmentStatus.DELETED.value == "deleted"
 
 
 def test_site_project_holds_values_and_defaults() -> None:
