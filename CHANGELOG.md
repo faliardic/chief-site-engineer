@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 071
+
+- Added the final NotebookLM podcast note for Step 061-070.
+- Summarized the transition from NCR archive/listing documentation to search/filtering behavior and file attachment metadata/reference modeling.
+- No application code, tests, repository, file upload, video playback, thumbnail generation, SQLite, JSON persistence, API, GUI, or CLI behavior was changed in this step.
+
 ## Step 070
 
 - Added a usage summary for `FileAttachmentRecord.related_record_type` and `related_record_id`.

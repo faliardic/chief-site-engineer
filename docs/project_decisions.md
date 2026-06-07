@@ -608,3 +608,11 @@
 - Bir ana kayda birden fazla dosya eki baglanabilecegi ve ayni dosya tipinin birden fazla kez kullanilabilecegi belirtildi.
 - Bu adimda foreign key, ORM relation, SQLite, JSON persistence, API, GUI, CLI, repository ve dosya yukleme davranisi eklenmedi.
 - Uygulama kodu ve test dosyalari degistirilmedi.
+
+## 071 NotebookLM Podcast Notu Adim 061-070
+
+- Adim 061-070 araligi icin final NotebookLM podcast notu hazirlandi.
+- Bu not NCR arsiv/listeleme kullanim ozetinden arama/filtreleme davranislarina ve dosya/video eki metadata altyapisina gecisi tek anlatimda toplar.
+- Video dosyalarinin veritabanina gomulmeyecegi; dosya yolu/referansi ve metadata tutulacagi karar anlatimi icinde vurgulandi.
+- Bu adim sadece dokumantasyon ve podcast arsivi adimidir.
+- Uygulama kodu, test dosyalari, repository, dosya yukleme, video oynatma, thumbnail, SQLite, JSON persistence, API, GUI ve CLI degistirilmedi.

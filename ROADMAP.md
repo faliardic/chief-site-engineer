@@ -163,4 +163,6 @@ Adim 069'da `FileAttachmentRecord.file_type` alaninda kullanilacak `image`, `vid
 
 Adim 070'te `FileAttachmentRecord.related_record_type` ve `related_record_id` alanlarinin ana kayit baglantisi icin nasil kullanilacagi dokumante edildi.
 
-Sonraki kucuk adim onerisi: Adim 071 - NotebookLM podcast notu Adim 061-070
+Adim 071'de Adim 061-070 araliginin final NotebookLM podcast notu hazirlandi.
+
+Sonraki kucuk adim onerisi: Adim 072 - FileAttachmentRecord kullanim ozeti
