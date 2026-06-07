@@ -616,3 +616,12 @@
 - Video dosyalarinin veritabanina gomulmeyecegi; dosya yolu/referansi ve metadata tutulacagi karar anlatimi icinde vurgulandi.
 - Bu adim sadece dokumantasyon ve podcast arsivi adimidir.
 - Uygulama kodu, test dosyalari, repository, dosya yukleme, video oynatma, thumbnail, SQLite, JSON persistence, API, GUI ve CLI degistirilmedi.
+
+## 072 FileAttachmentRecord Kullanim Akisi
+
+- `FileAttachmentRecord` icin dosya eki kullanim akisi dokumante edildi.
+- Dosya eklerinin ana kayitla `related_record_type` ve `related_record_id` alanlari uzerinden iliskilendirilecegi tekrar netlestirildi.
+- Modelin dosya icerigini degil, dosya yolu/referansi ve metadata bilgisini tutacagi karar olarak korundu.
+- Fotograf, video, PDF, belge, ses notu, malzeme teslim irsaliyesi ve is guvenligi gozlemi gibi kullanim senaryolari aciklandi.
+- Bu adim sadece dokumantasyon / kullanim akisi adimidir.
+- Uygulama kodu, test dosyalari, repository, dosya yukleme, fiziksel dosya kopyalama, video oynatma, thumbnail, SQLite, JSON persistence, API, GUI ve CLI degistirilmedi.

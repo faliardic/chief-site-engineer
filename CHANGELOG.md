@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 072
+
+- Added a usage flow document for `FileAttachmentRecord`.
+- Documented how photo, video, PDF, document, and audio attachments can be linked to main records through file references and metadata.
+- No application code, tests, repository, file upload, physical file copy, video playback, thumbnail generation, SQLite, JSON persistence, API, GUI, or CLI behavior was changed in this step.
+
 ## Step 071
 
 - Added the final NotebookLM podcast note for Step 061-070.

@@ -165,4 +165,6 @@ Adim 070'te `FileAttachmentRecord.related_record_type` ve `related_record_id` al
 
 Adim 071'de Adim 061-070 araliginin final NotebookLM podcast notu hazirlandi.
 
-Sonraki kucuk adim onerisi: Adim 072 - FileAttachmentRecord kullanim ozeti
+Adim 072'de `FileAttachmentRecord` icin fotograf, video, PDF, belge ve ses dosyalarinin nasil baglanacagini anlatan kullanim akisi dokumante edildi.
+
+Sonraki kucuk adim onerisi: Adim 073 - FileAttachmentRecord repository plani
