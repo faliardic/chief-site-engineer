@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 084
+
+- Clarified the `FileAttachmentRecord` field contract for optional model-level upload metadata.
+- Documented that `uploaded_by` and `uploaded_at` remain optional in the dataclass until upload/auth services can enforce or populate them at service level.
+- No model field, test change, repository behavior, upload service, database, API, GUI, auth, CI, deployment, or breaking refactor was added.
+
 ## Step 083
 
 - Clarified the model decision between legacy `AttachmentRecord` and canonical `FileAttachmentRecord`.

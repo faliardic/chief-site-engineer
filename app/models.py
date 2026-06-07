@@ -169,7 +169,11 @@ class AttachmentRecord:
 
 @dataclass
 class FileAttachmentRecord:
-    """Represents the canonical file attachment metadata model."""
+    """Represents the canonical file attachment metadata model.
+
+    `uploaded_by` and `uploaded_at` stay optional at model level until
+    upload/auth services can enforce and populate them at service level.
+    """
 
     attachment_id: str
     related_record_type: str

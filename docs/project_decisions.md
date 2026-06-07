@@ -725,3 +725,13 @@
 - Yeni upload servisi, integrity scanner, dosya tipi standardi ve iliskili kayit baglantisi calismalari `FileAttachmentRecord` uzerinden ilerleyecek.
 - Bu adimda model alanlari degistirilmedi, veri migrasyonu yapilmadi ve kirici refactor uygulanmadi.
 - Gercek upload servisi, database, API, GUI, auth, CI ve deployment henuz eklenmedi.
+
+## 084 FileAttachmentRecord Alan Sozlesmesi
+
+- `FileAttachmentRecord.uploaded_by` ve `uploaded_at` alanlarinin model seviyesinde opsiyonel kalmasina karar verildi.
+- Bu karar, henuz auth / kullanici sistemi ve gercek upload servisi bulunmadigi icin alindi.
+- Ileride upload servisi eklendiginde `uploaded_by` servis seviyesinde zorunlu tutulabilir.
+- Ileride upload servisi eklendiginde `uploaded_at` servis tarafindan otomatik uretilebilir.
+- Model, servis tarafindan saglanan upload metadata gecmisini tasimaya devam edecek.
+- Model-level optional ile service-level required ayrimi bilincli olarak dokumante edildi.
+- Bu adimda model alani eklenmedi veya silinmedi; test dosyalari degistirilmedi.

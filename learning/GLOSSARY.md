@@ -1089,3 +1089,9 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `original_file_name`: Kullanicinin yukledigi dosyanin sistem tarafindan standartlastirilmamis orijinal adini metadata olarak tutan alan.
 
 `attachment notes`: Dosya eki icin saha baglami, uyari veya kisa aciklama tutan opsiyonel not bilgisi.
+
+`Field contract`: Bir model alaninin ne anlama geldigini, hangi seviyede zorunlu veya opsiyonel oldugunu anlatan alan sozlesmesi.
+
+`Model-level optional`: Bir alanin dataclass/model olusturulurken verilmek zorunda olmamasi.
+
+`Service-level required`: Bir alanin modelde opsiyonel kalmasina ragmen upload servisi, API veya is akisi tarafindan zorunlu tutulabilmesi.

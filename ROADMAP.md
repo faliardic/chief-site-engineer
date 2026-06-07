@@ -84,7 +84,7 @@ Bu sinir bilincli olarak korunuyor. Once model, test, dokumantasyon ve karar hat
 - [x] Adim 081 - README guncellemesi: Adim 080 guvenli noktasi, 125 test, mevcut kapsam ve olmayan ozellikler.
 - [x] Adim 082 - ROADMAP guncellemesi: Adim 080 sonrasi gercek durum ve 081-100 faz plani.
 - [x] Adim 083 - Attachment model karari: `FileAttachmentRecord` ana model, `AttachmentRecord` legacy model.
-- [ ] Adim 084 - `docs/project_decisions.md` karar indeksleme ve okunabilirlik kontrolu.
+- [x] Adim 084 - `FileAttachmentRecord` alan sozlesmesi: model-level optional, service-level required ayrimi.
 - [ ] Adim 085 - Learning dosyalari kapsami ve glossary esitleme kontrolu.
 - [ ] Adim 086 - README / ROADMAP / CHANGELOG tutarlilik testi veya kontrol dokumani.
 - [ ] Adim 087 - NotebookLM podcast notlari 071-080 final dosyasi.
@@ -111,4 +111,4 @@ Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistenc
 
 ## Sonraki Calisma Onerisi
 
-Adim 084 ile `docs/project_decisions.md` karar indeksleme ve okunabilirlik kontrolu baslatilabilir.
+Adim 085 ile learning dosyalari kapsami ve glossary esitleme kontrolu baslatilabilir.
