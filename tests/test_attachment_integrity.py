@@ -1,4 +1,13 @@
+from datetime import datetime, timezone
+
+import pytest
+
 from app.attachment_integrity import (
+    ACTION_CHECK_PERMISSIONS_DISK_OR_FILE_CORRUPTION,
+    ACTION_CREATE_METADATA_OR_QUARANTINE_FILE,
+    ACTION_MERGE_OR_DEACTIVATE_DUPLICATE_METADATA,
+    ACTION_REBUILD_PATH_WITH_CANONICAL_HELPER,
+    ACTION_RESTORE_FROM_BACKUP_OR_REVIEW_AUDIT_TRAIL,
     ATTACHMENT_INTEGRITY_ERROR_STATUSES,
     ATTACHMENT_INTEGRITY_SEVERITIES,
     ATTACHMENT_INTEGRITY_STATUSES,
@@ -13,6 +22,7 @@ from app.attachment_integrity import (
     SEVERITY_OK,
     SEVERITY_WARNING,
     UNREADABLE_FILE,
+    build_attachment_integrity_result,
 )
 
 
@@ -171,3 +181,121 @@ def test_attachment_integrity_result_can_represent_ok_file() -> None:
     assert result.status_code == OK
     assert result.metadata_exists is True
     assert result.file_exists is True
+
+
+def test_build_attachment_integrity_result_returns_ok_for_matching_metadata_and_file() -> None:
+    result = build_attachment_integrity_result(
+        attachment_id="ATT-001",
+        expected_path="attachments/PRJ-001/nonconformity/2026/06/07/NCR-1/photo.jpg",
+        metadata_exists=True,
+        file_exists=True,
+    )
+
+    assert result.status_code == OK
+    assert result.severity == SEVERITY_OK
+    assert result.recommended_action is None
+
+
+def test_build_attachment_integrity_result_returns_missing_file() -> None:
+    result = build_attachment_integrity_result(
+        attachment_id="ATT-001",
+        expected_path="attachments/PRJ-001/nonconformity/2026/06/07/NCR-1/photo.jpg",
+        metadata_exists=True,
+        file_exists=False,
+    )
+
+    assert result.status_code == MISSING_FILE
+    assert result.severity == SEVERITY_ERROR
+    assert (
+        result.recommended_action
+        == ACTION_RESTORE_FROM_BACKUP_OR_REVIEW_AUDIT_TRAIL
+    )
+
+
+def test_build_attachment_integrity_result_returns_orphan_file() -> None:
+    result = build_attachment_integrity_result(
+        attachment_id=None,
+        expected_path=None,
+        actual_path="attachments/PRJ-001/nonconformity/2026/06/07/NCR-1/photo.jpg",
+        metadata_exists=False,
+        file_exists=True,
+    )
+
+    assert result.status_code == ORPHAN_FILE
+    assert result.severity == SEVERITY_WARNING
+    assert result.recommended_action == ACTION_CREATE_METADATA_OR_QUARANTINE_FILE
+
+
+def test_build_attachment_integrity_result_returns_invalid_path() -> None:
+    result = build_attachment_integrity_result(
+        attachment_id="ATT-001",
+        expected_path="legacy/photo.jpg",
+        metadata_exists=True,
+        file_exists=True,
+        path_is_valid=False,
+    )
+
+    assert result.status_code == INVALID_PATH
+    assert result.severity == SEVERITY_ERROR
+    assert result.recommended_action == ACTION_REBUILD_PATH_WITH_CANONICAL_HELPER
+
+
+def test_build_attachment_integrity_result_returns_duplicate_metadata_first() -> None:
+    result = build_attachment_integrity_result(
+        attachment_id="ATT-001",
+        expected_path="legacy/photo.jpg",
+        metadata_exists=True,
+        file_exists=True,
+        path_is_valid=False,
+        duplicate_metadata=True,
+    )
+
+    assert result.status_code == DUPLICATE_METADATA
+    assert result.severity == SEVERITY_ERROR
+    assert (
+        result.recommended_action
+        == ACTION_MERGE_OR_DEACTIVATE_DUPLICATE_METADATA
+    )
+
+
+def test_build_attachment_integrity_result_returns_unreadable_file() -> None:
+    result = build_attachment_integrity_result(
+        attachment_id="ATT-001",
+        expected_path="attachments/PRJ-001/nonconformity/2026/06/07/NCR-1/photo.jpg",
+        metadata_exists=True,
+        file_exists=True,
+        file_is_readable=False,
+    )
+
+    assert result.status_code == UNREADABLE_FILE
+    assert result.severity == SEVERITY_ERROR
+    assert (
+        result.recommended_action
+        == ACTION_CHECK_PERMISSIONS_DISK_OR_FILE_CORRUPTION
+    )
+
+
+def test_build_attachment_integrity_result_rejects_missing_metadata_and_file() -> None:
+    with pytest.raises(ValueError, match="metadata and file cannot both be missing"):
+        build_attachment_integrity_result(
+            attachment_id=None,
+            expected_path=None,
+            metadata_exists=False,
+            file_exists=False,
+        )
+
+
+def test_build_attachment_integrity_result_keeps_checked_at_and_notes() -> None:
+    checked_at = datetime(2026, 6, 7, 14, 32, 10, tzinfo=timezone.utc)
+
+    result = build_attachment_integrity_result(
+        attachment_id="ATT-001",
+        expected_path="attachments/PRJ-001/nonconformity/2026/06/07/NCR-1/photo.jpg",
+        metadata_exists=True,
+        file_exists=True,
+        checked_at=checked_at,
+        notes="Manual recheck completed.",
+    )
+
+    assert result.checked_at == checked_at
+    assert result.notes == "Manual recheck completed."

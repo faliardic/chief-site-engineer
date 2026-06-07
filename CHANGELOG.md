@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 092
+
+- Added `build_attachment_integrity_result` to produce a single `AttachmentIntegrityResult` from provided metadata and file existence flags.
+- Added recommended action constants and tests for OK, missing file, orphan file, invalid path, duplicate metadata, unreadable file, rejected empty metadata/file cases, checked time, and notes.
+- No bulk scanner, folder traversal, file system scan, upload service, backup logic, audit event implementation, push, or ZIP staging was added.
+
 ## Step 091
 
 - Added `AttachmentIntegrityResult` as the single-result model for future attachment integrity scanner output.

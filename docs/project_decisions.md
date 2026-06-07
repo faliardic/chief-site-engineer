@@ -797,3 +797,12 @@
 - `severity` degeri `OK`, `WARNING` veya `ERROR` olmak zorundadir.
 - `checked_at` verilmezse UTC zaman atanir.
 - Bu adimda scanner, dosya sistemi taramasi, upload service, backup logic, audit event implementasyonu, database, API, GUI, auth, CI veya deployment eklenmedi.
+
+## 092 Attachment Integrity Single Record Helper
+
+- Tekil metadata ve dosya varligi bilgilerinden `AttachmentIntegrityResult` ureten `build_attachment_integrity_result` helper fonksiyonu eklendi.
+- Helper toplu scanner degildir; yalnizca kendisine verilen boolean ve path bilgileri uzerinden karar verir.
+- Karar sirasi `DUPLICATE_METADATA`, `INVALID_PATH`, `MISSING_FILE` / `ORPHAN_FILE`, `UNREADABLE_FILE`, `OK` olarak belirlendi.
+- Her hata veya uyari durumu icin makine-dostu `recommended_action` degeri uretilecek.
+- Metadata ve dosya birlikte yoksa anlamli scanner sonucu olmadigi icin `ValueError` ile reddedilecek.
+- Bu adimda dosya sistemi taramasi, klasor gezme, upload service, backup logic, audit event implementasyonu, database, API, GUI, auth, CI veya deployment eklenmedi.

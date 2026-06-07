@@ -97,7 +97,7 @@ Bu fazda hedef yeni urun ozelligi eklemek degil; mevcut dokumantasyon ve proje s
 ## Faz 091-100 - Persistence, Upload, Integrity ve Operasyon Omurgasi
 
 - [x] Adim 091 - Attachment integrity result modeli baslangici.
-- [ ] Adim 092 - Repository persistence arayuzu veya plan dokumani.
+- [x] Adim 092 - Attachment integrity single-record check helper baslangici.
 - [ ] Adim 093 - FileAttachmentRepository baslangic plani veya bellek ici baslangic.
 - [ ] Adim 094 - Dosya upload servisi tasarim karari.
 - [ ] Adim 095 - Dosya varlik / integrity scanner plan veya baslangic davranisi.
@@ -111,4 +111,4 @@ Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistenc
 
 ## Sonraki Calisma Onerisi
 
-Adim 092 ile repository persistence arayuzu veya NotebookLM podcast notlari 071-090 final dosyasi ele alinabilir.
+Adim 093 ile FileAttachmentRepository baslangic plani veya NotebookLM podcast notlari 071-090 final dosyasi ele alinabilir.

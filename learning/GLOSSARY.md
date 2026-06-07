@@ -1149,3 +1149,9 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `severity`: Bir sonuc veya bulgunun onem seviyesini anlatan alan; bu hatta `OK`, `WARNING` veya `ERROR` olabilir.
 
 `checked_at`: Bir kontrolun ne zaman yapildigini gosteren zaman bilgisi.
+
+`Tekil integrity helper`: Tek bir attachment icin verilen metadata/dosya varligi bilgilerinden butunluk sonucunu ureten yardimci fonksiyon.
+
+`recommended_action`: Bir butunluk sonucunda onerilen sonraki adimi makine-dostu metin olarak tutan alan.
+
+`Karar onceligi`: Birden fazla sorun isareti ayni anda varsa hangi status kodunun once secilecegini belirleyen sira.
