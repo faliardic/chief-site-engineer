@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 097
+
+- Added the final NotebookLM podcast note for Step 071-080.
+- Summarized the `FileAttachmentRecord` usage flow, usage scenarios, storage/naming decisions, archive safety decisions, metadata field clarifications, and Step 080 safe point.
+- No application code, tests, upload service, scanner, JSON file writing, API, GUI, auth, CI, deployment, push, or ZIP staging was added.
+
 ## Step 096
 
 - Added core CSE policy documents for long-term project principles, official-record deletion prevention, private workspace isolation, and site chief handover scenarios.

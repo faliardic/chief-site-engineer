@@ -843,3 +843,10 @@
 - Yeni santiye sefinin eski santiye sefinin private workspace alanina erisemeyecegi; devir icin gerekli bilgilerin explicit handover package veya official record olarak hazirlanmasi gerektigi dokumante edildi.
 - Ozel alan verileri icin ileride kullanici bazli encryption key ve crypto-shredding yaklasimi degerlendirilecek.
 - Bu adimda uygulama kodu, test dosyalari, database migration, encryption, auth/permission, scanner, upload service, backup/restore implementasyonu, push veya ZIP staging yapilmadi.
+
+## 097 NotebookLM Podcast Notu 071-080
+
+- Adim 071-080 arasindaki `FileAttachmentRecord` metadata hatti icin final NotebookLM podcast notu olusturuldu.
+- Podcast notu kullanim akisi, ornek saha senaryolari, saklama/adlandirma standardi, arsiv guvenligi, metadata alanlari ve Adim 080 guvenli kapanis noktasini birlikte ozetler.
+- Bu adim sadece dokumantasyon/podcast arsivi adimidir.
+- Uygulama kodu, test dosyalari, upload service, scanner, JSON dosyasi yazma, API, GUI, auth, CI veya deployment degistirilmedi.

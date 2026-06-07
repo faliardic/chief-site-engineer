@@ -102,7 +102,7 @@ Bu fazda hedef yeni urun ozelligi eklemek degil; mevcut dokumantasyon ve proje s
 - [x] Adim 094 - Attachment integrity report modeli.
 - [x] Adim 095 - Attachment integrity report serializer baslangici.
 - [x] Adim 096 - Ana proje ilkeleri, veri silme onleme ve ozel alan izolasyon politika dokumanlari.
-- [ ] Adim 097 - NCR + attachment iliskisi icin integrity kontrolu.
+- [x] Adim 097 - Adim 071-080 NotebookLM podcast notu.
 - [ ] Adim 098 - Test kapsami genisletme ve regresyon stratejisi.
 - [ ] Adim 099 - CI stratejisi: pytest otomasyonu ve kalite kapisi.
 - [ ] Adim 100 - Operasyon omurgasi kapanis ozeti ve sonraki faz karari.
@@ -111,4 +111,4 @@ Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistenc
 
 ## Sonraki Calisma Onerisi
 
-Adim 097 ile NCR + attachment iliskisi icin integrity kontrolu veya NotebookLM podcast notlari 071-080 final dosyasi ele alinabilir.
+Adim 098 ile test kapsami genisletme ve regresyon stratejisi veya NotebookLM podcast notlari 081-090 final dosyasi ele alinabilir.
