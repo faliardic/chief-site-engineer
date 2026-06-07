@@ -663,3 +663,11 @@
 - Bu alan sistem tarafindan standartlastirilmis `file_name` degerinden ayri olarak, kullanicinin yukledigi dosyanin orijinal adini metadata olarak saklamak icin kullanilacak.
 - `original_file_name` verilmezse varsayilan deger `None` olacak.
 - Bu adimda dosya adi standartlastirma fonksiyonu, dosya yukleme sistemi, fiziksel dosya kopyalama/silme/tasima, repository, persistence, SQLite, JSON, API, GUI ve CLI eklenmedi.
+
+## 077 FileAttachmentRecord uploaded_by Alani
+
+- `FileAttachmentRecord.uploaded_by` alani opsiyonel string metadata olarak netlestirildi.
+- Bu alan dosya ekinin kim tarafindan sisteme eklendigini saklamak icin kullanilacak.
+- Kullanici modeli, rol sistemi veya yetkilendirme kurulmadan once `uploaded_by` sade bir metin alani olarak tutulacak.
+- `uploaded_by` verilmezse varsayilan deger `None` olacak.
+- Bu adimda kullanici modeli, rol/yetki sistemi, authentication, authorization, dosya yukleme, fiziksel dosya kopyalama/silme/tasima, repository, persistence, SQLite, JSON, API, GUI ve CLI eklenmedi.

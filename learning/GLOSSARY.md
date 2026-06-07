@@ -242,7 +242,7 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 
 `related_id`: Dosya ekinin iliskili oldugu kaydin kimligini, kodunu veya acik kayit referansini belirten alan.
 
-`uploaded_by`: Dosya ekini yukleyen kisi bilgisini tutan alan.
+`uploaded_by`: Dosya ekini yukleyen kisi bilgisini opsiyonel string metadata olarak tutan alan.
 
 `uploaded_date`: Dosya ekinin yuklendigi tarihi tutan alan.
 

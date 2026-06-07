@@ -355,6 +355,33 @@ def test_file_attachment_record_stores_original_file_name() -> None:
     )
 
 
+def test_file_attachment_record_uploaded_by_is_optional_metadata() -> None:
+    attachment_with_uploader = FileAttachmentRecord(
+        attachment_id="file-att-uploader-001",
+        related_record_type="nonconformity",
+        related_record_id="NCR-004",
+        file_name="ncr-004-fotograf.jpg",
+        file_path="attachments/nonconformity/NCR-004/ncr-004-fotograf.jpg",
+        file_type="image",
+        mime_type="image/jpeg",
+        uploaded_at="2026-10-02T12:00:00",
+        uploaded_by="santiye_sefi",
+    )
+    attachment_without_uploader = FileAttachmentRecord(
+        attachment_id="file-att-uploader-002",
+        related_record_type="nonconformity",
+        related_record_id="NCR-005",
+        file_name="ncr-005-fotograf.jpg",
+        file_path="attachments/nonconformity/NCR-005/ncr-005-fotograf.jpg",
+        file_type="image",
+        mime_type="image/jpeg",
+        uploaded_at="2026-10-02T12:10:00",
+    )
+
+    assert attachment_with_uploader.uploaded_by == "santiye_sefi"
+    assert attachment_without_uploader.uploaded_by is None
+
+
 def test_file_attachment_record_can_represent_video_metadata_reference() -> None:
     attachment = FileAttachmentRecord(
         attachment_id="file-att-video-001",
