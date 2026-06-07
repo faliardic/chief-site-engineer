@@ -1027,3 +1027,89 @@ def test_nonconformity_repository_list_archived_excludes_restored_records() -> N
     assert repository.list_archived() == [second_record]
     assert repository.list_active() == [first_record]
     assert repository.list_all() == [first_record, second_record]
+
+
+def test_nonconformity_repository_list_active_returns_empty_list_when_repository_is_empty() -> None:
+    repository = NonconformityRepository()
+
+    assert repository.list_active() == []
+
+
+def test_nonconformity_repository_list_active_returns_all_records_when_only_active_records_exist() -> None:
+    repository = NonconformityRepository()
+    first_record = NonconformityRecord(
+        nonconformity_id="NCR-058",
+        project_id="prj-001",
+        date="2026-09-01",
+        title="Aktif NCR 058",
+        description="Aktif listede gorunmesi gereken ilk kayit.",
+    )
+    second_record = NonconformityRecord(
+        nonconformity_id="NCR-059",
+        project_id="prj-001",
+        date="2026-09-02",
+        title="Aktif NCR 059",
+        description="Aktif listede gorunmesi gereken ikinci kayit.",
+    )
+
+    repository.add(first_record)
+    repository.add(second_record)
+
+    assert repository.list_active() == [first_record, second_record]
+    assert repository.list_archived() == []
+
+
+def test_nonconformity_repository_list_active_excludes_archived_records() -> None:
+    repository = NonconformityRepository()
+    first_record = NonconformityRecord(
+        nonconformity_id="NCR-060",
+        project_id="prj-001",
+        date="2026-09-03",
+        title="Aktif kalacak NCR",
+        description="Aktif listede kalmasi gereken kayit.",
+    )
+    second_record = NonconformityRecord(
+        nonconformity_id="NCR-061",
+        project_id="prj-001",
+        date="2026-09-04",
+        title="Arsivlenecek NCR",
+        description="Aktif listeden cikmasi gereken kayit.",
+    )
+
+    repository.add(first_record)
+    repository.add(second_record)
+    repository.archive("NCR-061")
+
+    assert repository.list_active() == [first_record]
+    assert repository.list_archived() == [second_record]
+    assert repository.list_all() == [first_record, second_record]
+
+
+def test_nonconformity_repository_list_active_includes_restored_records() -> None:
+    repository = NonconformityRepository()
+    first_record = NonconformityRecord(
+        nonconformity_id="NCR-062",
+        project_id="prj-001",
+        date="2026-09-05",
+        title="Restore edilecek NCR",
+        description="Restore sonrasi aktif listeye donmesi gereken kayit.",
+    )
+    second_record = NonconformityRecord(
+        nonconformity_id="NCR-063",
+        project_id="prj-001",
+        date="2026-09-06",
+        title="Aktif kalan NCR",
+        description="Aktif listede surekli kalacak kayit.",
+    )
+
+    repository.add(first_record)
+    repository.add(second_record)
+    repository.archive("NCR-062")
+
+    assert repository.list_active() == [second_record]
+
+    repository.restore("NCR-062")
+
+    assert repository.list_active() == [first_record, second_record]
+    assert repository.list_archived() == []
+    assert repository.list_all() == [first_record, second_record]

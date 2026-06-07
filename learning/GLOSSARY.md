@@ -995,3 +995,9 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Aktif-only repository`: Icinde yalnizca `is_archived == False` kayitlar bulunan repository durumu.
 
 `Restore sonrasi arsiv listesi`: Restore edilen kaydin artik `list_archived` sonucunda yer almamasi gerektigini anlatan kontrol.
+
+`Aktif kayitlari listeleme`: Repository icindeki sadece `is_archived == False` kayitlari ayirma davranisi.
+
+`Arsivden aktif listeye donus`: Restore edilen kaydin tekrar `list_active` sonucunda yer almasi gerektigini anlatan kontrol.
+
+`Tum kayitlar arsivlenmis`: Repository icinde kayit olsa bile aktif liste sonucunun bos dondugu durum.

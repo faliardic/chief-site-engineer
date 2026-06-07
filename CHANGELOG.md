@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 058
+
+- Confirmed the existing `NonconformityRepository.list_active` behavior as the active NCR listing behavior.
+- Added focused tests for empty repositories, active-only repositories, mixed active/archived records, and restore updates returning records to active listings.
+- No delete behavior, JSON, SQLite, API, GUI, CLI, large refactor, automatic history, workflow, or status change was added in this step.
+
 ## Step 057
 
 - Confirmed the existing `NonconformityRepository.list_archived` behavior as the archived NCR listing behavior.

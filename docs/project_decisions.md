@@ -502,3 +502,11 @@
 - Bos repository veya arsivlenmis kayit olmayan repository icin bos liste dondurulecek.
 - `restore` sonrasi aktif hale gelen kayitlar artik arsiv listesinde gorunmeyecek.
 - Kayit silme, status degisimi, otomatik history, workflow, JSON, SQLite, API, GUI, CLI ve buyuk refactor eklenmedi.
+
+## 058 NonconformityRepository Aktif Kayitlari Listeleme
+
+- Mevcut `NonconformityRepository.list_active()` davranisi Adim 058 kapsami icin netlestirildi.
+- Bu davranis sadece `is_archived == False` olan NCR kayitlarini dondurecek.
+- Bos repository veya tum kayitlari arsivlenmis repository icin bos liste dondurulecek.
+- `restore` sonrasi tekrar aktif hale gelen kayitlar aktif listede yeniden gorunecek.
+- Kayit silme, status degisimi, otomatik history, workflow, JSON, SQLite, API, GUI, CLI ve buyuk refactor eklenmedi.
