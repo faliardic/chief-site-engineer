@@ -1107,3 +1107,9 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `FileType`: Dosya eki turleri icin canonical enum; `image`, `video`, `pdf`, `document`, `audio` ve `other` degerlerini toplar.
 
 `AttachmentStatus`: Dosya eki yasam dongusu icin canonical enum; `active`, `archived`, `missing` ve `deleted` degerlerini toplar.
+
+`Validation`: Bir model veya is akisi icine gelen verinin temel kurallara uyup uymadigini kontrol etme davranisi.
+
+`Metadata integrity`: Dosya ekine ait kimlik, iliski, dosya yolu, dosya turu ve boyut bilgilerinin tutarli ve bozuk olmayan halde kalmasi.
+
+`ValueError`: Python'da bir deger beklenen kurala uymadiginda kullanilabilen hata tipi.

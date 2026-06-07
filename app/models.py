@@ -213,6 +213,26 @@ class FileAttachmentRecord:
     notes: str | None = None
     file_size: int | None = None
 
+    def __post_init__(self) -> None:
+        required_fields = (
+            "attachment_id",
+            "related_record_type",
+            "related_record_id",
+            "file_name",
+            "file_path",
+        )
+        for field_name in required_fields:
+            value = getattr(self, field_name)
+            if not value.strip():
+                raise ValueError(f"{field_name} cannot be empty")
+
+        valid_file_types = {file_type.value for file_type in FileType}
+        if self.file_type not in valid_file_types:
+            raise ValueError(f"file_type must be one of {sorted(valid_file_types)}")
+
+        if self.file_size is not None and self.file_size < 0:
+            raise ValueError("file_size cannot be negative")
+
 
 @dataclass
 class MaterialRecord:

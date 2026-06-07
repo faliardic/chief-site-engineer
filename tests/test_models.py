@@ -1,3 +1,5 @@
+import pytest
+
 from app.models import (
     ArchiveDocument,
     AttachmentRecord,
@@ -57,6 +59,75 @@ def test_file_attachment_enum_values_define_canonical_vocabulary() -> None:
     assert AttachmentStatus.ARCHIVED.value == "archived"
     assert AttachmentStatus.MISSING.value == "missing"
     assert AttachmentStatus.DELETED.value == "deleted"
+
+
+def _valid_file_attachment_kwargs() -> dict[str, str | int]:
+    return {
+        "attachment_id": "file-att-valid-001",
+        "related_record_type": "nonconformity",
+        "related_record_id": "NCR-001",
+        "file_name": "photo_001.jpg",
+        "file_path": (
+            "attachments/PRJ-001/nonconformity/2026/06/07/"
+            "NCR-001/photo_001.jpg"
+        ),
+        "file_type": "image",
+        "mime_type": "image/jpeg",
+        "file_size": 2048,
+    }
+
+
+def test_file_attachment_record_validation_accepts_valid_metadata() -> None:
+    attachment = FileAttachmentRecord(**_valid_file_attachment_kwargs())
+
+    assert attachment.attachment_id == "file-att-valid-001"
+    assert attachment.file_type == "image"
+    assert attachment.file_size == 2048
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "attachment_id",
+        "related_record_type",
+        "related_record_id",
+        "file_name",
+        "file_path",
+    ],
+)
+def test_file_attachment_record_validation_rejects_empty_required_fields(
+    field_name: str,
+) -> None:
+    values = _valid_file_attachment_kwargs()
+    values[field_name] = ""
+
+    with pytest.raises(ValueError, match=f"{field_name} cannot be empty"):
+        FileAttachmentRecord(**values)
+
+
+def test_file_attachment_record_validation_rejects_invalid_file_type() -> None:
+    values = _valid_file_attachment_kwargs()
+    values["file_type"] = "photo"
+
+    with pytest.raises(ValueError, match="file_type must be one of"):
+        FileAttachmentRecord(**values)
+
+
+def test_file_attachment_record_validation_rejects_negative_file_size() -> None:
+    values = _valid_file_attachment_kwargs()
+    values["file_size"] = -1
+
+    with pytest.raises(ValueError, match="file_size cannot be negative"):
+        FileAttachmentRecord(**values)
+
+
+def test_file_attachment_record_validation_keeps_uploader_metadata_optional() -> None:
+    values = _valid_file_attachment_kwargs()
+
+    attachment = FileAttachmentRecord(**values)
+
+    assert attachment.uploaded_by is None
+    assert attachment.uploaded_at is None
 
 
 def test_site_project_holds_values_and_defaults() -> None:

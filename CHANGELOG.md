@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 087
+
+- Added minimal `FileAttachmentRecord` validation for empty required metadata, invalid `file_type`, and negative `file_size`.
+- Kept `uploaded_by` and `uploaded_at` optional and did not add an attachment `status` field.
+- Added focused validation tests without adding path helper, upload service, database, API, GUI, auth, CI, deployment, or physical file operations.
+
 ## Step 086
 
 - Added lightweight `FileType` and `AttachmentStatus` enum preparation for canonical file attachment vocabulary.

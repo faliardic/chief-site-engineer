@@ -753,3 +753,13 @@
 - `FileAttachmentRecord` icine yeni `status` alani eklenmedi; `AttachmentStatus` ilerideki attachment lifecycle davranislari icin hazirliktir.
 - Gecersiz deger validation davranisi bu adimda eklenmedi; Adim 087 ve sonrasi icin zemin hazirlandi.
 - Upload service ve integrity scanner ileride bu enumlari canonical vocabulary olarak kullanabilir.
+
+## 087 FileAttachmentRecord Validation Karari
+
+- `FileAttachmentRecord` icin minimal `__post_init__` validation davranisi eklendi.
+- `attachment_id`, `related_record_type`, `related_record_id`, `file_name` ve `file_path` bos string olamayacak.
+- `file_type` degeri `FileType` enumundaki canonical degerlerden biri olmak zorunda olacak.
+- `file_size` negatif olamayacak.
+- `uploaded_by` ve `uploaded_at` alanlari opsiyonel kalmaya devam edecek.
+- `FileAttachmentRecord` icine `status` alani eklenmedi.
+- Bu adimda path helper, upload service, fiziksel dosya islemi, database, API, GUI, auth, CI veya deployment eklenmedi.
