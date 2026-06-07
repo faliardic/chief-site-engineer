@@ -510,3 +510,12 @@
 - Bos repository veya tum kayitlari arsivlenmis repository icin bos liste dondurulecek.
 - `restore` sonrasi tekrar aktif hale gelen kayitlar aktif listede yeniden gorunecek.
 - Kayit silme, status degisimi, otomatik history, workflow, JSON, SQLite, API, GUI, CLI ve buyuk refactor eklenmedi.
+
+## 059 NonconformityRepository Tum Kayitlari Listeleme
+
+- Mevcut `NonconformityRepository.list_all()` davranisi Adim 059 kapsami icin netlestirildi.
+- Bu davranis aktif ve arsivlenmis tum NCR kayitlarini mevcut eklenme sirasiyla dondurecek.
+- Bos repository icin bos liste dondurulecek.
+- Arsivlenmis kayitlar veya aktif kayitlar dislanmayacak.
+- `archive` ve `restore` islemleri kaydin tum liste icinde kalmasini saglayacak; toplam liste silme davranisi gibi calismayacak.
+- Kayit silme, status degisimi, `is_archived` degisimi, otomatik history, workflow, JSON, SQLite, API, GUI, CLI ve buyuk refactor eklenmedi.

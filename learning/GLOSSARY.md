@@ -1001,3 +1001,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Arsivden aktif listeye donus`: Restore edilen kaydin tekrar `list_active` sonucunda yer almasi gerektigini anlatan kontrol.
 
 `Tum kayitlar arsivlenmis`: Repository icinde kayit olsa bile aktif liste sonucunun bos dondugu durum.
+
+`Tum kayitlari listeleme`: Repository icindeki aktif ve arsivlenmis tum kayitlari birlikte donduren davranis.
+
+`list_all`: Repository icindeki tum kayitlari mevcut sirasiyla listeleyen metot.
+
+`Tam kayit listesi`: Arsiv durumu veya status ayrimi yapmadan repository icindeki butun NCR kayitlarini ifade eden liste.
+
+`Restore sonrasi tam liste`: Restore isleminin toplam kayit listesini degistirmemesi gerektigini anlatan kontrol.
