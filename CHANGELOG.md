@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 062
+
+- Added a concise usage summary for NCR archive and listing behavior from Step 056-060.
+- Documented `archive`, `restore`, `list_active`, `list_archived`, `list_all`, and `get_archive_summary` as the core repository usage flow.
+- No application code, tests, JSON, SQLite, API, GUI, CLI, or workflow behavior was changed in this step.
+
 ## Step 061
 
 - Added the final NotebookLM podcast note for Step 056-060.

@@ -61,6 +61,7 @@
 - [x] Adim 059 - NonconformityRepository tum kayitlari listeleme
 - [x] Adim 060 - NonconformityRepository arsiv / listeleme butunluk kontrolu
 - [x] Adim 061 - NotebookLM podcast notu Adim 056-060
+- [x] Adim 062 - NCR arsiv / listeleme kullanim ozeti
 
 Adim 021-025 araligi tamamlandi. Bu aralik icin final NotebookLM podcast notu hazirlanacak.
 
@@ -136,4 +137,6 @@ Adim 060'ta `archive`, `restore`, `list_active`, `list_archived`, `list_all` ve 
 
 Adim 061'de Adim 056-060 araliginin final NotebookLM podcast notu hazirlandi.
 
-Sonraki kucuk adim onerisi: Adim 062 - NonconformityRepository aktif kayit sayisi yardimcisi
+Adim 062'de NCR arsivleme ve listeleme davranislari icin kisa kullanim ozeti hazirlandi.
+
+Sonraki kucuk adim onerisi: Adim 063 - NonconformityRepository aktif kayit sayisi yardimcisi

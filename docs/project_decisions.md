@@ -534,3 +534,11 @@
 - Bu not NCR arsiv ozeti, arsivlenmis kayit listesi, aktif kayit listesi, tum kayit listesi ve arsiv/listeleme butunluk kontrolunu tek anlatimda toplar.
 - Bu adim sadece dokumantasyon ve podcast arsivi adimidir.
 - Uygulama kodu, test dosyalari, JSON, SQLite, API, GUI, CLI ve workflow davranisi degistirilmedi.
+
+## 062 NCR Arsiv / Listeleme Kullanim Ozeti
+
+- Adim 056-060 arasinda netlesen NCR arsivleme ve listeleme davranislari icin kisa kullanim ozeti hazirlandi.
+- `archive`, `restore`, `list_active`, `list_archived`, `list_all` ve `get_archive_summary` davranislarinin nasil birlikte kullanilacagi dokumante edildi.
+- `is_archived` alaninin gorunurluk/arsiv durumunu, `status` alaninin ise is sureci durumunu temsil ettigi ayrim vurgulandi.
+- Bu adim sadece dokumantasyon / kullanim ozeti adimidir.
+- Uygulama kodu, test dosyalari, JSON, SQLite, API, GUI, CLI ve workflow davranisi degistirilmedi.
