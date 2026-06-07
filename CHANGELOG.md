@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 099
+
+- Added the final NotebookLM podcast note for Step 091-096.
+- Summarized the attachment integrity result, single-record helper, report summary, report model, serializer helpers, and CSE data protection/private workspace policy decisions.
+- No application code, tests, scanner, upload service, database, API, GUI, auth, CI, deployment, push, or ZIP staging was added.
+
 ## Step 098
 
 - Added the final NotebookLM podcast note for Step 081-090.

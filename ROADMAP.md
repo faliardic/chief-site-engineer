@@ -104,11 +104,11 @@ Bu fazda hedef yeni urun ozelligi eklemek degil; mevcut dokumantasyon ve proje s
 - [x] Adim 096 - Ana proje ilkeleri, veri silme onleme ve ozel alan izolasyon politika dokumanlari.
 - [x] Adim 097 - Adim 071-080 NotebookLM podcast notu.
 - [x] Adim 098 - Adim 081-090 NotebookLM podcast notu.
-- [ ] Adim 099 - CI stratejisi: pytest otomasyonu ve kalite kapisi.
+- [x] Adim 099 - Adim 091-096 NotebookLM podcast notu.
 - [ ] Adim 100 - Operasyon omurgasi kapanis ozeti ve sonraki faz karari.
 
 Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistence, upload, integrity, audit ve CI omurgasina gecis icin kucuk ve testli adimlar atmaktir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 099 ile CI stratejisi, pytest otomasyonu ve kalite kapisi ele alinabilir.
+Adim 100 ile operasyon omurgasi kapanis ozeti ve sonraki faz karari ele alinabilir.
