@@ -63,6 +63,7 @@
 - [x] Adim 061 - NotebookLM podcast notu Adim 056-060
 - [x] Adim 062 - NCR arsiv / listeleme kullanim ozeti
 - [x] Adim 063 - NCR kayit arama plani
+- [x] Adim 064 - NonconformityRepository id ile kayit bulma
 
 Adim 021-025 araligi tamamlandi. Bu aralik icin final NotebookLM podcast notu hazirlanacak.
 
@@ -142,4 +143,6 @@ Adim 062'de NCR arsivleme ve listeleme davranislari icin kisa kullanim ozeti haz
 
 Adim 063'te NCR kayit arama ve filtreleme davranislari icin uygulanabilir plan dokumani hazirlandi.
 
-Sonraki kucuk adim onerisi: Adim 064 - NonconformityRepository find_by_id davranisinin netlestirilmesi
+Adim 064'te mevcut `NonconformityRepository.find_by_id` davranisi id ile kayit bulma kapsami icin ek test ve dokumantasyonla netlestirildi.
+
+Sonraki kucuk adim onerisi: Adim 065 - NonconformityRepository status filtreleme davranisinin netlestirilmesi

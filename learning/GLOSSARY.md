@@ -1025,3 +1025,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `String arama`: Baslik veya aciklama gibi metin alanlarinda verilen ifadenin aranmasi.
 
 `Filtreleme ilkesi`: Kayit listesinden belirli kosula uyan kayitlari dondururken kayitlari silmeme veya degistirmeme yaklasimi.
+
+`Id ile kayit bulma`: Repository icinde benzersiz kimlik degerine gore tek kayit arama davranisi.
+
+`Eksik id`: Repository icinde karsiligi olmayan kimlik degeri.
+
+`None donusu`: Aranan kayit bulunamadiginda methodun `None` dondurmesi.
+
+`Arsiv dahil id arama`: Id ile aramanin aktif ve arsivlenmis tum kayitlar uzerinde calismasi.

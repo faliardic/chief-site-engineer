@@ -550,3 +550,12 @@
 - Mevcut arama/filtreleme davranislari varsa tekrar yazilmadan, sonraki adimlarda test ve dokumantasyonla netlestirilmesi kararlastirildi.
 - Arama davranislarinin read-only kalmasi, kayit silmemesi ve arsiv gorunurlugunu acik method adi veya parametreyle ifade etmesi ilke olarak belirlendi.
 - Uygulama kodu, test dosyalari, JSON, SQLite, API, GUI, CLI, query engine ve workflow davranisi degistirilmedi.
+
+## 064 NonconformityRepository Id Ile Kayit Bulma
+
+- Mevcut `NonconformityRepository.find_by_id()` davranisi Adim 064 kapsami icin netlestirildi.
+- Bu davranis aktif, arsivlenmis ve restore edilmis NCR kayitlarini id ile bulacak.
+- Eslesen kayit yoksa `None` dondurulmesi karari korundu.
+- Id ile arama tum kayit hafizasi uzerinde calisacak; arsivlenmis kayitlar dislanmayacak.
+- Bu davranis read-only kalacak; kayit silme, `status` degisimi, `is_archived` degisimi, otomatik history ve workflow olusturmayacak.
+- Uygulama kodu, JSON, SQLite, API, GUI, CLI, query engine ve buyuk refactor eklenmedi.

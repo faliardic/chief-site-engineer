@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 064
+
+- Confirmed the existing `NonconformityRepository.find_by_id` behavior as the NCR id lookup behavior.
+- Added focused tests for empty repositories, active records, missing ids, archived records, and restored records.
+- No application code, JSON, SQLite, API, GUI, CLI, query engine, delete behavior, automatic history, or workflow behavior was changed in this step.
+
 ## Step 063
 
 - Added a plan document for future NCR search and filtering behavior in `NonconformityRepository`.

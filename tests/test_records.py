@@ -1282,3 +1282,93 @@ def test_nonconformity_repository_archive_listing_summary_stay_consistent() -> N
     assert open_record.status == "open"
     assert in_progress_record.status == "in_progress"
     assert closed_record.status == "closed"
+
+
+def test_nonconformity_repository_find_by_id_returns_none_when_repository_is_empty() -> None:
+    repository = NonconformityRepository()
+
+    assert repository.find_by_id("missing-id") is None
+
+
+def test_nonconformity_repository_find_by_id_returns_active_record() -> None:
+    repository = NonconformityRepository()
+    record = NonconformityRecord(
+        nonconformity_id="NCR-073",
+        project_id="prj-001",
+        date="2026-09-16",
+        title="Id ile bulunacak aktif NCR",
+        description="Aktif kayit id ile bulunmali.",
+        status="open",
+    )
+
+    repository.add(record)
+
+    result = repository.find_by_id("NCR-073")
+
+    assert result == record
+    assert result is record
+    assert record.status == "open"
+    assert record.is_archived is False
+
+
+def test_nonconformity_repository_find_by_id_returns_none_for_missing_id_when_records_exist() -> None:
+    repository = NonconformityRepository()
+    record = NonconformityRecord(
+        nonconformity_id="NCR-074",
+        project_id="prj-001",
+        date="2026-09-17",
+        title="Mevcut NCR",
+        description="Farkli id arandiginda donmemeli.",
+    )
+
+    repository.add(record)
+
+    assert repository.find_by_id("NCR-MISSING") is None
+    assert repository.list_all() == [record]
+
+
+def test_nonconformity_repository_find_by_id_returns_archived_record() -> None:
+    repository = NonconformityRepository()
+    record = NonconformityRecord(
+        nonconformity_id="NCR-075",
+        project_id="prj-001",
+        date="2026-09-18",
+        title="Id ile bulunacak arsiv NCR",
+        description="Arsivlenmis kayit id ile bulunmali.",
+        status="closed",
+    )
+
+    repository.add(record)
+    repository.archive("NCR-075")
+
+    result = repository.find_by_id("NCR-075")
+
+    assert result == record
+    assert result is record
+    assert record.is_archived is True
+    assert record.status == "closed"
+    assert repository.list_archived() == [record]
+
+
+def test_nonconformity_repository_find_by_id_returns_restored_record() -> None:
+    repository = NonconformityRepository()
+    record = NonconformityRecord(
+        nonconformity_id="NCR-076",
+        project_id="prj-001",
+        date="2026-09-19",
+        title="Restore sonrasi id ile bulunacak NCR",
+        description="Restore edilen kayit id ile bulunmaya devam etmeli.",
+        status="in_progress",
+    )
+
+    repository.add(record)
+    repository.archive("NCR-076")
+    repository.restore("NCR-076")
+
+    result = repository.find_by_id("NCR-076")
+
+    assert result == record
+    assert result is record
+    assert record.is_archived is False
+    assert record.status == "in_progress"
+    assert repository.list_active() == [record]
