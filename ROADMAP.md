@@ -117,7 +117,7 @@ Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistenc
 - [x] Adim 102 - README guncellik duzeltmesi: Adim 100 / 191 test ve yeni kapsam bilgisi.
 - [x] Adim 103 - Attachment integrity JSON string export helper.
 - [x] Adim 104 - Attachment integrity JSON file export tasarim dokumani.
-- [ ] Adim 105 - JSON export testleri.
+- [x] Adim 105 - Attachment integrity JSON file export helper ve testleri.
 - [ ] Adim 106 - Scanner scope plani.
 - [ ] Adim 107 - Scanner input modeli / plani.
 - [ ] Adim 108 - Attachment scanner dry-run helper baslangici.
@@ -138,4 +138,4 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 
 ## Sonraki Calisma Onerisi
 
-Adim 105 ile attachment integrity JSON export icin ek kalite/test veya dosya yazma oncesi kullanim standardi ele alinabilir.
+Adim 106 ile attachment integrity scanner scope plani ele alinabilir.

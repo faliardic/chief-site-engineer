@@ -1,6 +1,7 @@
 import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 
 
 OK = "OK"
@@ -288,6 +289,26 @@ def export_attachment_integrity_report_to_json(
         ensure_ascii=False,
         indent=indent,
     )
+
+
+def export_attachment_integrity_report_to_json_file(
+    report: AttachmentIntegrityReport,
+    output_path: str,
+    *,
+    indent: int | None = 2,
+    overwrite: bool = False,
+) -> str:
+    output = Path(output_path)
+    if not output.parent.exists():
+        raise FileNotFoundError(f"Parent folder does not exist: {output.parent}")
+    if output.exists() and not overwrite:
+        raise FileExistsError(f"Output file already exists: {output_path}")
+
+    output.write_text(
+        export_attachment_integrity_report_to_json(report, indent=indent),
+        encoding="utf-8",
+    )
+    return output_path
 
 
 def _classify_integrity_status(

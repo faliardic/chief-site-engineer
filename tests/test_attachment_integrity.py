@@ -28,6 +28,7 @@ from app.attachment_integrity import (
     build_attachment_integrity_result,
     build_attachment_integrity_report,
     build_attachment_integrity_report_summary,
+    export_attachment_integrity_report_to_json_file,
     export_attachment_integrity_report_to_json,
     serialize_attachment_integrity_report,
     serialize_attachment_integrity_report_summary,
@@ -762,6 +763,140 @@ def test_export_attachment_integrity_report_to_json_does_not_mutate_report() -> 
     original_source = report.source
 
     export_attachment_integrity_report_to_json(report)
+
+    assert report.results == original_results
+    assert report.summary.total_checked == original_summary_total
+    assert report.source == original_source
+
+
+def test_export_attachment_integrity_report_to_json_file_creates_file(tmp_path) -> None:
+    output_path = tmp_path / "report.json"
+    report = build_attachment_integrity_report([])
+
+    export_attachment_integrity_report_to_json_file(report, str(output_path))
+
+    assert output_path.exists()
+
+
+def test_export_attachment_integrity_report_to_json_file_content_can_be_loaded(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "report.json"
+    report = build_attachment_integrity_report(
+        [AttachmentIntegrityResult(status_code=OK, severity=SEVERITY_OK)]
+    )
+
+    export_attachment_integrity_report_to_json_file(report, str(output_path))
+
+    assert json.loads(output_path.read_text(encoding="utf-8"))["summary"][
+        "total_checked"
+    ] == 1
+
+
+def test_export_attachment_integrity_report_to_json_file_writes_summary(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "report.json"
+    report = build_attachment_integrity_report([])
+
+    export_attachment_integrity_report_to_json_file(report, str(output_path))
+
+    assert "summary" in json.loads(output_path.read_text(encoding="utf-8"))
+
+
+def test_export_attachment_integrity_report_to_json_file_writes_results(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "report.json"
+    report = build_attachment_integrity_report(
+        [AttachmentIntegrityResult(status_code=OK, severity=SEVERITY_OK)]
+    )
+
+    export_attachment_integrity_report_to_json_file(report, str(output_path))
+
+    loaded = json.loads(output_path.read_text(encoding="utf-8"))
+    assert isinstance(loaded["results"], list)
+    assert loaded["results"][0]["status_code"] == OK
+
+
+def test_export_attachment_integrity_report_to_json_file_preserves_turkish_text(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "report.json"
+    report = build_attachment_integrity_report(
+        [AttachmentIntegrityResult(status_code=OK, severity=SEVERITY_OK)],
+        notes="Şantiye eki doğrulandı.",
+    )
+
+    export_attachment_integrity_report_to_json_file(report, str(output_path))
+
+    assert "Şantiye eki doğrulandı." in output_path.read_text(encoding="utf-8")
+
+
+def test_export_attachment_integrity_report_to_json_file_rejects_existing_file(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "report.json"
+    output_path.write_text("already exists", encoding="utf-8")
+    report = build_attachment_integrity_report([])
+
+    with pytest.raises(FileExistsError, match="Output file already exists"):
+        export_attachment_integrity_report_to_json_file(report, str(output_path))
+
+
+def test_export_attachment_integrity_report_to_json_file_can_overwrite_file(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "report.json"
+    output_path.write_text("old content", encoding="utf-8")
+    report = build_attachment_integrity_report([], source="manual-check")
+
+    export_attachment_integrity_report_to_json_file(
+        report,
+        str(output_path),
+        overwrite=True,
+    )
+
+    assert json.loads(output_path.read_text(encoding="utf-8"))["source"] == (
+        "manual-check"
+    )
+
+
+def test_export_attachment_integrity_report_to_json_file_rejects_missing_parent(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "missing" / "report.json"
+    report = build_attachment_integrity_report([])
+
+    with pytest.raises(FileNotFoundError, match="Parent folder does not exist"):
+        export_attachment_integrity_report_to_json_file(report, str(output_path))
+
+
+def test_export_attachment_integrity_report_to_json_file_returns_output_path(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "report.json"
+    report = build_attachment_integrity_report([])
+
+    returned_path = export_attachment_integrity_report_to_json_file(
+        report,
+        str(output_path),
+    )
+
+    assert returned_path == str(output_path)
+
+
+def test_export_attachment_integrity_report_to_json_file_does_not_mutate_report(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "report.json"
+    result = AttachmentIntegrityResult(status_code=OK, severity=SEVERITY_OK)
+    report = build_attachment_integrity_report([result], source="manual-check")
+    original_results = report.results
+    original_summary_total = report.summary.total_checked
+    original_source = report.source
+
+    export_attachment_integrity_report_to_json_file(report, str(output_path))
 
     assert report.results == original_results
     assert report.summary.total_checked == original_summary_total

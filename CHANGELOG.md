@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 105
+
+- Added `export_attachment_integrity_report_to_json_file` to write an `AttachmentIntegrityReport` JSON string to an explicitly provided file path.
+- Used the existing JSON string export helper, UTF-8 encoding, `overwrite=False` by default, `FileExistsError` for existing files, and `FileNotFoundError` for missing parent folders.
+- Added `tmp_path` tests for file creation, loadable JSON, summary/results fields, Turkish text preservation, overwrite behavior, missing parent handling, returned path, and non-mutating export behavior without adding scanner, traversal, backup, audit, upload service, push, or ZIP staging.
+
 ## Step 104
 
 - Documented the future attachment integrity JSON file export design after the Step 103 JSON string export helper.

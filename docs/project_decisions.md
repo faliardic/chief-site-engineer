@@ -903,3 +903,13 @@
 - Varsayilan overwrite davranisinin `False` olmasi; ayni dosya varsa hata verilmesi; `overwrite=True` kullaniminin acik karar ve ileride audit event ile iliskilendirilmesi kararlastirildi.
 - Export dosyasinin resmi kayit yerine gecmeyecegi, resmi kayitlarin snapshot ciktisi olarak degerlendirilecegi belirtildi.
 - Bu adimda uygulama kodu, test dosyalari, JSON dosyasi yazma, scanner, backup/restore, audit event, private workspace exportu, API, GUI veya CLI eklenmedi.
+
+## 105 Attachment Integrity JSON File Export Helper
+
+- `AttachmentIntegrityReport` nesnesini verilen JSON dosya yoluna yazan `export_attachment_integrity_report_to_json_file` helper fonksiyonu eklendi.
+- Helper mevcut `export_attachment_integrity_report_to_json` fonksiyonunu kullanir ve dosyayi UTF-8 encoding ile yazar.
+- Varsayilan `overwrite=False` olarak belirlendi; hedef dosya varsa `FileExistsError` verilecek.
+- `overwrite=True` acikca verilirse mevcut dosyanin uzerine yazilabilecek.
+- Parent klasor yoksa otomatik klasor olusturulmayacak ve `FileNotFoundError` verilecek.
+- Testlerde yalnizca pytest `tmp_path` kullanildi; gercek proje klasorune test dosyasi yazilmadi.
+- Bu adimda scanner, klasor taramasi, backup/restore, audit event, upload service, API, GUI veya CLI eklenmedi.
