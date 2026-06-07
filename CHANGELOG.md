@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 050
+
+- Added `NonconformityRepository.exists` for in-memory boolean presence checks by `nonconformity_id`.
+- Added a test proving existing ids return `True`, missing ids return `False`, and existing repository data remains unchanged.
+- No JSON, SQLite, API, GUI, CLI, dashboard, file operation, delete, archive, or automatic workflow was added in this step.
+
 ## Step 049
 
 - Added `NonconformityRepository.update_responsible_party` for in-memory responsible party updates of existing NCR records.

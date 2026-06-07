@@ -933,3 +933,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Atanmamis sorumlu`: `responsible_party` degeri `None` olan ve ozetlerde `unassigned` olarak sayilan kayit durumu.
 
 `Otomatik assignment history yok`: Sorumlu taraf guncellemesi yapilirken bu adimda atama gecmisi kaydi olusturulmadigini anlatan kapsam karari.
+
+`exists`: Repository icinde verilen kimlige sahip kaydin var olup olmadigini boolean olarak donduren metot.
+
+`Varlik kontrolu`: Bir kaydin sistemde bulunup bulunmadigini dogrudan kontrol etme davranisi.
+
+`Boolean donus`: Sonucun `True` veya `False` olarak ifade edilmesi.
+
+`Kayit var mi kontrolu`: Bir NCR numarasinin repository icinde mevcut olup olmadigini hizlica anlama yaklasimi.

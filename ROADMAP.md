@@ -49,6 +49,7 @@
 - [x] Adim 047 - NonconformityRepository genel ozet
 - [x] Adim 048 - NonconformityRepository status guncelleme
 - [x] Adim 049 - NonconformityRepository sorumlu taraf guncelleme
+- [x] Adim 050 - NonconformityRepository kayit var mi kontrolu
 
 Adim 021-025 araligi tamamlandi. Bu aralik icin final NotebookLM podcast notu hazirlanacak.
 
@@ -100,4 +101,6 @@ Adim 048'de `NonconformityRepository` icine mevcut kaydin `status` alanini belle
 
 Adim 049'da `NonconformityRepository` icine mevcut kaydin `responsible_party` alanini bellek icinde guncelleyen `update_responsible_party` davranisi eklendi.
 
-Sonraki kucuk adim onerisi: Adim 050 - NotebookLM podcast notu Adim 036-040
+Adim 050'de `NonconformityRepository` icine verilen `nonconformity_id` degerine sahip kaydin var olup olmadigini boolean olarak donduren `exists` davranisi eklendi.
+
+Sonraki kucuk adim onerisi: Adim 051 - NotebookLM podcast notu Adim 036-040

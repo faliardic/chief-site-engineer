@@ -584,3 +584,21 @@ def test_nonconformity_repository_update_responsible_party_returns_none_for_miss
         "assigned": 0,
         "unassigned": 1,
     }
+
+
+def test_nonconformity_repository_exists_returns_boolean_for_record_presence() -> None:
+    repository = NonconformityRepository()
+    record = NonconformityRecord(
+        nonconformity_id="NCR-030",
+        project_id="prj-001",
+        date="2026-08-04",
+        title="Varligi kontrol edilecek NCR",
+        description="Bu kayit exists davranisi icin referans olacak.",
+    )
+
+    repository.add(record)
+
+    assert repository.exists("NCR-030") is True
+    assert repository.exists("NCR-999") is False
+    assert repository.find_by_id("NCR-030") == record
+    assert repository.list_all() == [record]

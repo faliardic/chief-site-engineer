@@ -59,6 +59,9 @@ class NonconformityRepository:
                 return record
         return None
 
+    def exists(self, nonconformity_id: str) -> bool:
+        return self.find_by_id(nonconformity_id) is not None
+
     def update_status(
         self,
         nonconformity_id: str,

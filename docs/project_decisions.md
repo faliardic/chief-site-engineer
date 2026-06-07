@@ -436,3 +436,11 @@
 - Kayit bulunamazsa `None` dondurulecek.
 - Bu davranis otomatik `NonconformityAssignmentRecord` olusturmayacak.
 - JSON, SQLite, API, GUI, CLI, dashboard, dosya islemi ve otomatik is akisi eklenmedi.
+
+## 050 NonconformityRepository Kayit Var Mi Kontrolu
+
+- `NonconformityRepository` icine `exists(nonconformity_id)` davranisi eklendi.
+- Bu davranis verilen `nonconformity_id` degerine sahip kayit varsa `True`, yoksa `False` dondurecek.
+- Varlik kontrolu `find_by_id` davranisini bozmayacak ve mevcut kayitlari degistirmeyecek.
+- Bu davranis JSON veya SQLite sorgusu degil, bellek ici Python kontroludur.
+- Silme, arsivleme, API, GUI, CLI, dashboard, dosya islemi ve otomatik is akisi eklenmedi.
