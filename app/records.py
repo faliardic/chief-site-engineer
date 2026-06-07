@@ -87,6 +87,13 @@ class NonconformityRepository:
         record.responsible_party = responsible_party
         return record
 
+    def archive(self, nonconformity_id: str) -> NonconformityRecord | None:
+        record = self.find_by_id(nonconformity_id)
+        if record is None:
+            return None
+        record.is_archived = True
+        return record
+
     def list_by_status(self, status: str) -> list[NonconformityRecord]:
         return [record for record in self._records if record.status == status]
 

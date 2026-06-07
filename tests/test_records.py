@@ -752,3 +752,59 @@ def test_nonconformity_repository_lists_archived_records_and_returns_empty_list_
         first_archived_record,
         second_archived_record,
     ]
+
+
+def test_nonconformity_repository_archive_marks_record_archived_and_preserves_status_and_order() -> None:
+    repository = NonconformityRepository()
+    record = NonconformityRecord(
+        nonconformity_id="NCR-042",
+        project_id="prj-001",
+        date="2026-08-16",
+        title="Arsivlenecek NCR",
+        description="Bu kayit repository icinde arsivlenecek.",
+        status="in_progress",
+    )
+    other_record = NonconformityRecord(
+        nonconformity_id="NCR-043",
+        project_id="prj-001",
+        date="2026-08-17",
+        title="Aktif kalacak NCR",
+        description="Bu kayit aktif listede kalacak.",
+        status="open",
+    )
+
+    repository.add(record)
+    repository.add(other_record)
+
+    archived_record = repository.archive("NCR-042")
+
+    assert archived_record == record
+    assert archived_record is record
+    assert record.is_archived is True
+    assert record.status == "in_progress"
+    assert repository.list_archived() == [record]
+    assert repository.list_active() == [other_record]
+    assert repository.list_all() == [record, other_record]
+
+
+def test_nonconformity_repository_archive_returns_none_for_missing_id() -> None:
+    repository = NonconformityRepository()
+    record = NonconformityRecord(
+        nonconformity_id="NCR-044",
+        project_id="prj-001",
+        date="2026-08-18",
+        title="Degismeyecek NCR",
+        description="Eksik id arsivleme denemesi bu kaydi degistirmemeli.",
+        status="open",
+    )
+
+    repository.add(record)
+
+    result = repository.archive("NCR-999")
+
+    assert result is None
+    assert record.is_archived is False
+    assert record.status == "open"
+    assert repository.list_active() == [record]
+    assert repository.list_archived() == []
+    assert repository.list_all() == [record]

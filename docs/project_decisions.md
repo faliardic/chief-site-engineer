@@ -470,3 +470,11 @@
 - `list_archived()` `is_archived == True` olan kayitlari mevcut eklenme sirasiyla liste olarak dondurecek.
 - Eslesen kayit yoksa bos liste dondurulecek ve mevcut kayitlar degistirilmeyecek.
 - NonconformityRecord modeli, JSON, SQLite, API, GUI, CLI, dashboard, dosya islemi, silme, otomatik arsivleme, restore ve otomatik is akisi eklenmedi.
+
+## 054 NonconformityRepository Arsivleme
+
+- `NonconformityRepository` icine `archive(nonconformity_id)` davranisi eklendi.
+- Mevcut kayit bulunursa `is_archived` alani bellek icinde `True` yapilacak ve guncellenen kayit dondurulecek.
+- Kayit bulunamazsa `None` dondurulecek.
+- Bu davranis kaydi silmeyecek, mevcut kayit sirasini degistirmeyecek ve `status` alanina dokunmayacak.
+- Restore, otomatik kapanis, otomatik durum gecmisi, JSON, SQLite, API, GUI, CLI, dashboard, dosya islemi ve otomatik is akisi eklenmedi.

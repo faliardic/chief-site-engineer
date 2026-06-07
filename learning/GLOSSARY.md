@@ -965,3 +965,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Aktif kayit`: `is_archived` degeri `False` olan ve normal takipte kalan kayit.
 
 `Arsiv kaydi`: `is_archived` degeri `True` olan ve silinmeden arsivde tutulan kayit.
+
+`archive`: Repository icindeki mevcut kaydi silmeden arsivli hale getiren metot.
+
+`Arsivleme davranisi`: Kaydin `is_archived` alanini `True` yaparak aktif takipten arsiv grubuna tasima yaklasimi.
+
+`Status korunumu`: Arsivleme sirasinda kaydin `status` alaninin degistirilmemesi.
+
+`Restore yok`: Arsivlenmis kaydi tekrar aktif hale getirme davranisinin bu adimda eklenmedigini anlatan kapsam karari.

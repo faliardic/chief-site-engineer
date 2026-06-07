@@ -53,6 +53,7 @@
 - [x] Adim 051 - NonconformityRepository kayit sayisi
 - [x] Adim 052 - NonconformityRecord arsiv alani
 - [x] Adim 053 - NonconformityRepository aktif / arsiv filtreleme
+- [x] Adim 054 - NonconformityRepository arsivleme davranisi
 
 Adim 021-025 araligi tamamlandi. Bu aralik icin final NotebookLM podcast notu hazirlanacak.
 
@@ -112,4 +113,6 @@ Adim 052'de `NonconformityRecord` icine kaydin arsivlenip arsivlenmedigini temsi
 
 Adim 053'te `NonconformityRepository` icine `is_archived` alanina gore aktif ve arsiv kayitlari ayiran `list_active` ve `list_archived` davranislari eklendi.
 
-Sonraki kucuk adim onerisi: Adim 054 - NotebookLM podcast notu Adim 036-040
+Adim 054'te `NonconformityRepository` icine mevcut kaydi silmeden `is_archived=True` yaparak arsivleyen `archive` davranisi eklendi.
+
+Sonraki kucuk adim onerisi: Adim 055 - NotebookLM podcast notu Adim 036-040
