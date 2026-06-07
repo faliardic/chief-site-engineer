@@ -966,3 +966,64 @@ def test_nonconformity_repository_get_archive_summary_updates_after_restore() ->
         "total": 2,
     }
     assert repository.list_all() == [active_record, archived_record]
+
+
+def test_nonconformity_repository_list_archived_returns_empty_list_when_repository_is_empty() -> None:
+    repository = NonconformityRepository()
+
+    assert repository.list_archived() == []
+
+
+def test_nonconformity_repository_list_archived_returns_empty_list_when_only_active_records_exist() -> None:
+    repository = NonconformityRepository()
+    first_active_record = NonconformityRecord(
+        nonconformity_id="NCR-054",
+        project_id="prj-001",
+        date="2026-08-28",
+        title="Aktif NCR 054",
+        description="Arsiv listesinde gorunmemesi gereken aktif kayit.",
+    )
+    second_active_record = NonconformityRecord(
+        nonconformity_id="NCR-055",
+        project_id="prj-001",
+        date="2026-08-29",
+        title="Aktif NCR 055",
+        description="Arsiv listesinde gorunmemesi gereken ikinci aktif kayit.",
+    )
+
+    repository.add(first_active_record)
+    repository.add(second_active_record)
+
+    assert repository.list_archived() == []
+    assert repository.list_all() == [first_active_record, second_active_record]
+
+
+def test_nonconformity_repository_list_archived_excludes_restored_records() -> None:
+    repository = NonconformityRepository()
+    first_record = NonconformityRecord(
+        nonconformity_id="NCR-056",
+        project_id="prj-001",
+        date="2026-08-30",
+        title="Restore edilecek arsiv NCR",
+        description="Restore sonrasi arsiv listesinden cikmali.",
+    )
+    second_record = NonconformityRecord(
+        nonconformity_id="NCR-057",
+        project_id="prj-001",
+        date="2026-08-31",
+        title="Arsivde kalacak NCR",
+        description="Restore sonrasi arsiv listesinde kalmali.",
+    )
+
+    repository.add(first_record)
+    repository.add(second_record)
+    repository.archive("NCR-056")
+    repository.archive("NCR-057")
+
+    assert repository.list_archived() == [first_record, second_record]
+
+    repository.restore("NCR-056")
+
+    assert repository.list_archived() == [second_record]
+    assert repository.list_active() == [first_record]
+    assert repository.list_all() == [first_record, second_record]

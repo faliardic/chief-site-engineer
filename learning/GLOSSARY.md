@@ -989,3 +989,9 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `active sayisi`: `is_archived == False` olan kayitlarin adedi.
 
 `archived sayisi`: `is_archived == True` olan kayitlarin adedi.
+
+`Arsivlenmis kayitlari listeleme`: Repository icindeki sadece `is_archived == True` kayitlari ayirma davranisi.
+
+`Aktif-only repository`: Icinde yalnizca `is_archived == False` kayitlar bulunan repository durumu.
+
+`Restore sonrasi arsiv listesi`: Restore edilen kaydin artik `list_archived` sonucunda yer almamasi gerektigini anlatan kontrol.

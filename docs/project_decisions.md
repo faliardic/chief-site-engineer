@@ -494,3 +494,11 @@
 - Bos repository icin `{"active": 0, "archived": 0, "total": 0}` dondurulecek.
 - `archive` ve `restore` davranislari sonrasi ozet degerleri guncel `is_archived` alanina gore hesaplanacak.
 - Kayit silme, otomatik history, workflow, status degisimi, JSON, SQLite, API, GUI, CLI, dashboard ve dosya islemi eklenmedi.
+
+## 057 NonconformityRepository Arsivlenmis Kayitlari Listeleme
+
+- Mevcut `NonconformityRepository.list_archived()` davranisi Adim 057 kapsami icin netlestirildi.
+- Bu davranis sadece `is_archived == True` olan NCR kayitlarini dondurecek.
+- Bos repository veya arsivlenmis kayit olmayan repository icin bos liste dondurulecek.
+- `restore` sonrasi aktif hale gelen kayitlar artik arsiv listesinde gorunmeyecek.
+- Kayit silme, status degisimi, otomatik history, workflow, JSON, SQLite, API, GUI, CLI ve buyuk refactor eklenmedi.

@@ -56,6 +56,7 @@
 - [x] Adim 054 - NonconformityRepository arsivleme davranisi
 - [x] Adim 055 - NonconformityRepository restore davranisi
 - [x] Adim 056 - NonconformityRepository arsiv ozeti
+- [x] Adim 057 - NonconformityRepository arsivlenmis kayitlari listeleme
 
 Adim 021-025 araligi tamamlandi. Bu aralik icin final NotebookLM podcast notu hazirlanacak.
 
@@ -121,4 +122,6 @@ Adim 055'te `NonconformityRepository` icine arsivlenmis kaydi silmeden `is_archi
 
 Adim 056'da `NonconformityRepository` icine aktif, arsivlenmis ve toplam NCR kayit sayilarini veren `get_archive_summary` davranisi eklendi.
 
-Sonraki kucuk adim onerisi: Adim 057 - NonconformityRepository arsiv durumu sayim yardimcilari
+Adim 057'de mevcut `NonconformityRepository.list_archived` davranisi arsivlenmis kayitlari listeleme kapsami icin ek test ve dokumantasyonla netlestirildi.
+
+Sonraki kucuk adim onerisi: Adim 058 - NonconformityRepository aktif kayit sayisi yardimcisi
