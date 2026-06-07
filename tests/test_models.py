@@ -322,9 +322,37 @@ def test_file_attachment_record_holds_values_and_optional_defaults() -> None:
     assert attachment.mime_type == "image/jpeg"
     assert attachment.uploaded_by == "Santiye sefi"
     assert attachment.uploaded_at == "2026-10-02T09:30:00"
+    assert attachment.original_file_name is None
     assert attachment.description is None
     assert attachment.notes is None
     assert attachment.file_size is None
+
+
+def test_file_attachment_record_stores_original_file_name() -> None:
+    attachment = FileAttachmentRecord(
+        attachment_id="file-att-original-001",
+        related_record_type="concrete_pour",
+        related_record_id="CP-000123",
+        file_name="20260607_143210__concrete_pour__CP-000123__image__001.jpg",
+        file_path=(
+            "attachments/project-001/concrete/2026/06/07/CP-000123/"
+            "20260607_143210__concrete_pour__CP-000123__image__001.jpg"
+        ),
+        file_type="image",
+        mime_type="image/jpeg",
+        uploaded_by="Santiye sefi",
+        uploaded_at="2026-06-07T14:32:10",
+        original_file_name="WhatsApp Image 2026-06-07 at 14.32.10.jpeg",
+    )
+
+    assert (
+        attachment.file_name
+        == "20260607_143210__concrete_pour__CP-000123__image__001.jpg"
+    )
+    assert (
+        attachment.original_file_name
+        == "WhatsApp Image 2026-06-07 at 14.32.10.jpeg"
+    )
 
 
 def test_file_attachment_record_can_represent_video_metadata_reference() -> None:

@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 076
+
+- Added `original_file_name` as an optional metadata field on `FileAttachmentRecord`.
+- Added tests confirming that the original uploaded filename is stored when provided and defaults to `None` when omitted.
+- No file upload, physical file copy/delete/move, filename standardization function, repository, persistence, SQLite, JSON, API, GUI, CLI, thumbnail, preview, video playback, or streaming behavior was added in this step.
+
 ## Step 075
 
 - Added archive safety and delete/move decision documentation for `FileAttachmentRecord` attachments.

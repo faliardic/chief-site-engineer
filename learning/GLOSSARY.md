@@ -1085,3 +1085,5 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `String tabanli iliski`: Foreign key veya ORM kullanmadan, kayit turu ve kayit id degerini metin olarak tutan basit baglanti yaklasimi.
 
 `Iliskili kayit baglantisi`: Bir dosya ekinin hangi ana kayda ait oldugunu `related_record_type` ve `related_record_id` ile ifade etme yaklasimi.
+
+`original_file_name`: Kullanicinin yukledigi dosyanin sistem tarafindan standartlastirilmamis orijinal adini metadata olarak tutan alan.

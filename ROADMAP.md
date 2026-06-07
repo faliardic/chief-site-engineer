@@ -173,4 +173,6 @@ Adim 074'te `FileAttachmentRecord` ekleri icin saklama klasor yapisi ve dosya ad
 
 Adim 075'te `FileAttachmentRecord` ekleri icin silme, tasima, kayip dosya, arsiv guvenligi ve denetim izi karar dokumantasyonu hazirlandi.
 
-Sonraki kucuk adim onerisi: Adim 076 - FileAttachmentRecord repository plani
+Adim 076'da `FileAttachmentRecord` modeline kullanicinin yukledigi dosyanin ilk adini metadata olarak tutan `original_file_name` alani eklendi.
+
+Sonraki kucuk adim onerisi: Adim 077 - FileAttachmentRecord repository plani

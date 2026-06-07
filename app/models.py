@@ -180,6 +180,7 @@ class FileAttachmentRecord:
     mime_type: str
     uploaded_by: str
     uploaded_at: str
+    original_file_name: str | None = None
     description: str | None = None
     notes: str | None = None
     file_size: int | None = None

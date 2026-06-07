@@ -656,3 +656,10 @@
 - Dosya ekleme, tasima, pasife alma ve silme olaylari icin ileride `AttachmentEventRecord` benzeri denetim izi modeli degerlendirilebilir.
 - Bu adim sadece karar dokumantasyonu adimidir.
 - Uygulama kodu, test dosyalari, yeni model, repository, dosya yukleme/silme/tasima/kopyalama, SQLite, JSON persistence, API, GUI, CLI, thumbnail, preview, streaming ve video oynatma degistirilmedi.
+
+## 076 FileAttachmentRecord original_file_name Alani
+
+- `FileAttachmentRecord` modeline opsiyonel `original_file_name` alani eklendi.
+- Bu alan sistem tarafindan standartlastirilmis `file_name` degerinden ayri olarak, kullanicinin yukledigi dosyanin orijinal adini metadata olarak saklamak icin kullanilacak.
+- `original_file_name` verilmezse varsayilan deger `None` olacak.
+- Bu adimda dosya adi standartlastirma fonksiyonu, dosya yukleme sistemi, fiziksel dosya kopyalama/silme/tasima, repository, persistence, SQLite, JSON, API, GUI ve CLI eklenmedi.
