@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 098
+
+- Added the final NotebookLM podcast note for Step 081-090.
+- Summarized README/ROADMAP correction, canonical attachment model decisions, field contract, canonical path standard, enum preparation, validation, path helper, metadata integrity rules, and status constants.
+- No application code, tests, scanner, upload service, database, API, GUI, auth, CI, deployment, push, or ZIP staging was added.
+
 ## Step 097
 
 - Added the final NotebookLM podcast note for Step 071-080.

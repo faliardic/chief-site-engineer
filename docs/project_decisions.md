@@ -850,3 +850,10 @@
 - Podcast notu kullanim akisi, ornek saha senaryolari, saklama/adlandirma standardi, arsiv guvenligi, metadata alanlari ve Adim 080 guvenli kapanis noktasini birlikte ozetler.
 - Bu adim sadece dokumantasyon/podcast arsivi adimidir.
 - Uygulama kodu, test dosyalari, upload service, scanner, JSON dosyasi yazma, API, GUI, auth, CI veya deployment degistirilmedi.
+
+## 098 NotebookLM Podcast Notu 081-090
+
+- Adim 081-090 arasindaki duzeltme, standart kilitleme ve attachment integrity hazirlik hatti icin final NotebookLM podcast notu olusturuldu.
+- Podcast notu README/ROADMAP guncellemesi, canonical attachment model karari, field contract, path standardi, enum hazirligi, validation, path helper, metadata integrity kurallari ve status sabitlerini birlikte ozetler.
+- Bu adim sadece dokumantasyon/podcast arsivi adimidir.
+- Uygulama kodu, test dosyalari, scanner, upload service, database, API, GUI, auth, CI veya deployment degistirilmedi.
