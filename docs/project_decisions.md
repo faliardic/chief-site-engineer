@@ -559,3 +559,12 @@
 - Id ile arama tum kayit hafizasi uzerinde calisacak; arsivlenmis kayitlar dislanmayacak.
 - Bu davranis read-only kalacak; kayit silme, `status` degisimi, `is_archived` degisimi, otomatik history ve workflow olusturmayacak.
 - Uygulama kodu, JSON, SQLite, API, GUI, CLI, query engine ve buyuk refactor eklenmedi.
+
+## 065 NonconformityRepository Duruma Gore Filtreleme
+
+- Mevcut `NonconformityRepository.list_by_status(status)` davranisi Adim 065 kapsami icin netlestirildi.
+- `filter_by_status(status)` adinda ikinci bir method eklenmedi; mevcut adlandirma korundu.
+- Status filtresinin tum kayit hafizasi uzerinde calisacagi ve arsivlenmis kayitlari varsayilan olarak dislamayacagi netlestirildi.
+- Eslesen kayit yoksa veya repository bos ise bos liste dondurulmesi karari korundu.
+- Bu davranis read-only kalacak; kayit silme, `status` degisimi, `is_archived` degisimi, otomatik history ve workflow olusturmayacak.
+- Uygulama kodu, JSON, SQLite, API, GUI, CLI, query engine ve buyuk refactor eklenmedi.

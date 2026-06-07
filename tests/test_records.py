@@ -1372,3 +1372,104 @@ def test_nonconformity_repository_find_by_id_returns_restored_record() -> None:
     assert record.is_archived is False
     assert record.status == "in_progress"
     assert repository.list_active() == [record]
+
+
+def test_nonconformity_repository_list_by_status_returns_empty_list_when_repository_is_empty() -> None:
+    repository = NonconformityRepository()
+
+    assert repository.list_by_status("open") == []
+
+
+def test_nonconformity_repository_list_by_status_returns_matching_records() -> None:
+    repository = NonconformityRepository()
+    open_record = NonconformityRecord(
+        nonconformity_id="NCR-077",
+        project_id="prj-001",
+        date="2026-09-20",
+        title="Status filtresi acik NCR",
+        description="Open status ile eslesmesi gereken kayit.",
+        status="open",
+    )
+    closed_record = NonconformityRecord(
+        nonconformity_id="NCR-078",
+        project_id="prj-001",
+        date="2026-09-21",
+        title="Status filtresi kapali NCR",
+        description="Closed status ile eslesmesi gereken kayit.",
+        status="closed",
+    )
+    second_open_record = NonconformityRecord(
+        nonconformity_id="NCR-079",
+        project_id="prj-001",
+        date="2026-09-22",
+        title="Status filtresi ikinci acik NCR",
+        description="Open status ile eslesmesi gereken ikinci kayit.",
+        status="open",
+    )
+
+    repository.add(open_record)
+    repository.add(closed_record)
+    repository.add(second_open_record)
+
+    assert repository.list_by_status("open") == [open_record, second_open_record]
+    assert repository.list_by_status("closed") == [closed_record]
+    assert repository.list_all() == [open_record, closed_record, second_open_record]
+
+
+def test_nonconformity_repository_list_by_status_returns_empty_list_for_missing_status() -> None:
+    repository = NonconformityRepository()
+    record = NonconformityRecord(
+        nonconformity_id="NCR-080",
+        project_id="prj-001",
+        date="2026-09-23",
+        title="Status filtresi mevcut NCR",
+        description="Farkli status arandiginda donmemeli.",
+        status="open",
+    )
+
+    repository.add(record)
+
+    assert repository.list_by_status("verified") == []
+    assert record.status == "open"
+    assert repository.list_all() == [record]
+
+
+def test_nonconformity_repository_list_by_status_includes_archived_records() -> None:
+    repository = NonconformityRepository()
+    record = NonconformityRecord(
+        nonconformity_id="NCR-081",
+        project_id="prj-001",
+        date="2026-09-24",
+        title="Arsivli status filtresi NCR",
+        description="Arsivlense de status filtresinde gorunmeli.",
+        status="closed",
+    )
+
+    repository.add(record)
+    repository.archive("NCR-081")
+
+    assert repository.list_by_status("closed") == [record]
+    assert record.is_archived is True
+    assert record.status == "closed"
+    assert repository.list_archived() == [record]
+
+
+def test_nonconformity_repository_list_by_status_includes_restored_records() -> None:
+    repository = NonconformityRepository()
+    record = NonconformityRecord(
+        nonconformity_id="NCR-082",
+        project_id="prj-001",
+        date="2026-09-25",
+        title="Restore sonrasi status filtresi NCR",
+        description="Restore sonrasi status filtresinde gorunmeye devam etmeli.",
+        status="in_progress",
+    )
+
+    repository.add(record)
+    repository.archive("NCR-082")
+    repository.restore("NCR-082")
+
+    assert repository.list_by_status("in_progress") == [record]
+    assert record.is_archived is False
+    assert record.status == "in_progress"
+    assert repository.list_active() == [record]

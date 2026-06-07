@@ -1033,3 +1033,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `None donusu`: Aranan kayit bulunamadiginda methodun `None` dondurmesi.
 
 `Arsiv dahil id arama`: Id ile aramanin aktif ve arsivlenmis tum kayitlar uzerinde calismasi.
+
+`Duruma gore filtreleme`: Kayitlari `status` alanindaki degere gore ayirma davranisi.
+
+`list_by_status`: Repository icindeki kayitlari belirli bir `status` degerine gore listeleyen metot.
+
+`Eslesmeyen status`: Repository icinde karsiligi olmayan durum degeri.
+
+`Arsiv dahil status filtresi`: Status filtresinin aktif ve arsivlenmis tum kayitlar uzerinde calismasi.

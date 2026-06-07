@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 065
+
+- Confirmed the existing `NonconformityRepository.list_by_status` behavior as the NCR status filtering behavior.
+- Added focused tests for empty repositories, matching statuses, missing statuses, archived records, and restored records.
+- No application code, JSON, SQLite, API, GUI, CLI, query engine, delete behavior, automatic history, or workflow behavior was changed in this step.
+
 ## Step 064
 
 - Confirmed the existing `NonconformityRepository.find_by_id` behavior as the NCR id lookup behavior.
