@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 079
+
+- Clarified the `FileAttachmentRecord.notes` field for attachment-specific context, warnings, and short site explanations.
+- Added tests confirming that attachment notes are stored when provided and default to `None` when omitted.
+- No model field change, file upload, physical file copy/delete/move, notes search/filtering, repository, persistence, SQLite, JSON, API, GUI, CLI, thumbnail, preview, video playback, streaming, user/role/permission system, or large service was added in this step.
+
 ## Step 078
 
 - Updated `FileAttachmentRecord.uploaded_at` to be optional string metadata with a default value of `None`.

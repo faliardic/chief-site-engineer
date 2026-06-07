@@ -407,6 +407,31 @@ def test_file_attachment_record_uploaded_at_is_optional_metadata() -> None:
     assert attachment_without_timestamp.uploaded_at is None
 
 
+def test_file_attachment_record_notes_describe_attachment_context() -> None:
+    attachment_with_notes = FileAttachmentRecord(
+        attachment_id="file-att-notes-001",
+        related_record_type="concrete_pour",
+        related_record_id="CP-000123",
+        file_name="beton-oncesi-donati.jpg",
+        file_path="attachments/concrete/CP-000123/beton-oncesi-donati.jpg",
+        file_type="image",
+        mime_type="image/jpeg",
+        notes="Beton oncesi donati kontrol fotografi.",
+    )
+    attachment_without_notes = FileAttachmentRecord(
+        attachment_id="file-att-notes-002",
+        related_record_type="nonconformity",
+        related_record_id="NCR-008",
+        file_name="uygunsuzluk-saha-videosu.mp4",
+        file_path="attachments/nonconformity/NCR-008/uygunsuzluk-saha-videosu.mp4",
+        file_type="video",
+        mime_type="video/mp4",
+    )
+
+    assert attachment_with_notes.notes == "Beton oncesi donati kontrol fotografi."
+    assert attachment_without_notes.notes is None
+
+
 def test_file_attachment_record_can_represent_video_metadata_reference() -> None:
     attachment = FileAttachmentRecord(
         attachment_id="file-att-video-001",

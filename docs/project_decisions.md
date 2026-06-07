@@ -680,3 +680,11 @@
 - `uploaded_by` ve `uploaded_at` birlikte dosya eki icin basit denetim izi baslangici saglayacak.
 - `uploaded_at` verilmezse varsayilan deger `None` olacak.
 - Bu adimda kullanici modeli, rol/yetki sistemi, authentication, authorization, dosya yukleme, fiziksel dosya kopyalama/silme/tasima, repository, persistence, SQLite, JSON, API, GUI ve CLI eklenmedi.
+
+## 079 FileAttachmentRecord notes Alani
+
+- `FileAttachmentRecord.notes` alaninin dosya eki ozelindeki kullanim amaci netlestirildi.
+- `notes` alaninin fotograf, video, PDF, belge veya ses ekleri icin kisa aciklama, saha baglami, uyari veya ek bilgi tutmak icin kullanilacagi belirtildi.
+- `notes` alaninin dosya adi, dosya yolu, dosya tipi veya iliskili kayit bilgisi yerine gecmeyecegi kararlastirildi.
+- `notes` verilmezse varsayilan deger `None` olarak kalacak.
+- Bu adimda model alani degistirilmedi; dosya yukleme, fiziksel dosya kopyalama/silme/tasima, not arama/filtreleme, repository, persistence, SQLite, JSON, API, GUI ve CLI eklenmedi.

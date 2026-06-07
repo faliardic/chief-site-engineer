@@ -179,4 +179,6 @@ Adim 077'de `FileAttachmentRecord.uploaded_by` alani yukleyen kisi bilgisini ops
 
 Adim 078'de `FileAttachmentRecord.uploaded_at` alani dosyanin eklenme zamanini opsiyonel string metadata olarak tutacak sekilde netlestirildi.
 
-Sonraki kucuk adim onerisi: Adim 079 - FileAttachmentRecord repository plani
+Adim 079'da `FileAttachmentRecord.notes` alaninin dosya eki ozelinde saha baglami ve ek aciklama tutma amaci test ve dokumantasyonla netlestirildi.
+
+Sonraki kucuk adim onerisi: Adim 080 - FileAttachmentRecord repository plani
