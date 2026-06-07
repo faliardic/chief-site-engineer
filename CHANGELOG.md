@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 081
+
+- Updated `README.md` to reflect the real Step 080 safe-point repository state.
+- Clarified that the project is currently a domain model, in-memory repository, test, documentation, learning, and podcast-note core rather than a deployed product.
+- Documented the current `125 passed` test result and explicitly listed missing production features such as database, upload service, API, GUI, auth, deployment, and CI.
+
 ## Step 080
 
 - Added a closing metadata summary for the `FileAttachmentRecord` attachment line from Step 072-079.

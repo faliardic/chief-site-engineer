@@ -698,3 +698,11 @@
 - Video dosyalarinin veritabanina gomulmeyecegi; dosya yolu / referans ve metadata ile izlenecegi karar tekrar vurgulandi.
 - Bu adim sadece kapanis dokumantasyonu adimidir.
 - Uygulama kodu, test dosyalari, yeni model alani, repository, persistence, SQLite, JSON, API, GUI, CLI, dosya yukleme/kopyalama/silme/tasima, thumbnail, preview, video oynatma ve streaming degistirilmedi.
+
+## 081 README Guncellik Karari
+
+- `README.md` dosyasinin Adim 080 guvenli noktasindaki gercek repo durumunu yansitacak sekilde guncellenmesine karar verildi.
+- README icinde projenin domain model, bellek ici repository, test, dokumantasyon, learning ve podcast notlari cekirdegi seviyesinde oldugu aciklandi.
+- Guncel test sonucu `125 passed` olarak yazildi.
+- Database, gercek upload servisi, API, GUI, auth, deployment ve CI gibi ozelliklerin henuz bulunmadigi acikca belirtildi.
+- Bu adimda uygulama kodu ve test dosyalari degistirilmedi.

@@ -183,4 +183,6 @@ Adim 079'da `FileAttachmentRecord.notes` alaninin dosya eki ozelinde saha baglam
 
 Adim 080'de Adim 072-079 arasindaki `FileAttachmentRecord` metadata ve dosya eki karar hatti derin analiz oncesi kapanis dokumaniyla ozetlendi.
 
+Adim 081'de `README.md` dosyasi Adim 080 guvenli noktasindaki gercek repo durumuna gore guncellendi.
+
 Sonraki kucuk adim onerisi: Derin analiz - mimari, test kapsami, roadmap, learning dosyalari ve sonraki 20 adim stratejisi

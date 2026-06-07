@@ -1,38 +1,74 @@
 # CHIEF SITE ENGINEER
 
-Santiye sefi icin kontrol, takip, gunluk kayit, arsiv ve ileride raporlama sistemi kurmak icin gelistirilen sade Python projesi.
+CHIEF SITE ENGINEER, santiye sefi icin kontrol, takip, gunluk kayit, kalite kaydi, uygunsuzluk / NCR izleme, dosya eki metadata ve dokumantasyon disiplini gelistirmek amaciyla kurulan sade bir Python projesidir.
 
-## Guncel Repo Koku
+## Guncel Durum
+
+Son guvenli nokta:
+
+```text
+Adim 080 - FileAttachmentRecord metadata butunluk ozeti
+```
+
+Guncel test sonucu:
+
+```text
+125 passed
+```
+
+Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici repository davranislari, testler, karar dokumantasyonu, learning notlari ve NotebookLM podcast notlari ureten bir cekirdek gelistirme alanidir.
+
+## Repo Koku
 
 ```text
 V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer
 ```
 
-## Tamamlanan Adimlar
+## Mimari Ozet
 
-- Adim 001 - Repo ve proje disiplini
-- Adim 002 - Cekirdek veri modeli
-- Adim 003 - Gunluk saha kaydi modeli
-- Adim 004 - Bellek ici basit kayit listeleme
+Proje su ana parcalardan olusur:
 
-## Mevcut Modeller
+- `app/models.py`: Santiye, kalite, uygunsuzluk, NCR, dosya eki ve yardimci domain modelleri.
+- `app/records.py`: Bellek ici kayit listeleme ve `NonconformityRepository` davranislari.
+- `app/main.py`: Basit uygulama baslangic mesaji.
+- `tests/`: Model ve repository davranislarini dogrulayan pytest testleri.
+- `docs/`: Adim bazli karar, kapsam ve kullanim dokumantasyonu.
+- `learning/`: Python ve proje ogrenim notlari.
+- `docs/podcast_notes/`: NotebookLM podcast kaynak notlari.
 
-- `SiteProject`
-- `ChecklistItem`
-- `TrackingRecord`
-- `ArchiveDocument`
-- `DailySiteLog`
+## Mevcut Teknik Kapsam
 
-## Mevcut Yardimci Fonksiyonlar
+Adim 080 itibariyla proje su alanlarda ilerlemistir:
 
-- `list_records`
-- `count_records`
-- `filter_records_by_project_id`
-- `filter_records_by_status`
+- Temel santiye domain modelleri.
+- Gunluk saha, beton dokum, yapi denetim, malzeme, toplanti, RFI/submittal ve ilgili kayit modelleri.
+- Uygunsuzluk adayi sureci.
+- Kesin uygunsuzluk / NCR sureci.
+- `NonconformityRepository` icin bellek ici ekleme, listeleme, filtreleme, sayma, guncelleme, arsivleme ve restore davranislari.
+- `FileAttachmentRecord` ile fotograf, video, PDF, belge, ses ve diger dosya ekleri icin metadata modeli.
+- Dosya eki icin `original_file_name`, `uploaded_by`, `uploaded_at`, `notes`, `file_name`, `file_path`, `file_type`, `mime_type`, `file_size`, `related_record_type` ve `related_record_id` karar hatti.
+- Dosya eki saklama, adlandirma, arsiv guvenligi, silme/tasima karar dokumantasyonu.
+- Adim 001-070 araligi icin NotebookLM podcast notlari.
 
-## Learning Sistemi
+## Henuz Olmayan Ozellikler
 
-Bu proje ayni zamanda Python ve yazilim gelistirme ogrenim arsivi uretir. `learning/` dosyalari kisa not olarak degil, gercek kod bloklari uzerinden aciklanan ders dosyalari olarak yazilir.
+Asagidaki ozellikler henuz eklenmedi:
+
+- Gercek database / SQLite / ORM.
+- JSON persistence.
+- Gercek dosya yukleme servisi.
+- Fiziksel dosya kopyalama, silme veya tasima.
+- API.
+- GUI.
+- CLI.
+- Authentication / authorization.
+- Kullanici, rol veya yetki sistemi.
+- Deployment.
+- CI pipeline.
+- Thumbnail, preview, video oynatma veya streaming.
+- Otomatik audit trail modeli.
+
+Bu sinir bilincli olarak korunuyor. Proje kucuk, testli ve izlenebilir adimlarla buyutuluyor.
 
 ## Kurulum
 
@@ -44,25 +80,48 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 ```
 
-## Calistirma
+## Test
+
+Repo kokunde:
+
+```bash
+python -m pytest
+```
+
+Beklenen guncel sonuc:
+
+```text
+125 passed
+```
+
+## Basit Calistirma
+
+`app/main.py` su anda sadece basit bir baslangic mesaji dondurur:
 
 ```bash
 python -m app.main
 ```
 
-## Test
+Bu komut tam bir CLI veya urun uygulamasi anlamina gelmez.
 
-```bat
-cd /d V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer
-python -m pytest
-```
+## Dokumantasyon
 
-Guncel test sonucu:
+Onemli dokumantasyon dosyalari:
 
-```text
-13 passed
-```
+- `CHANGELOG.md`
+- `ROADMAP.md`
+- `docs/project_decisions.md`
+- `docs/080_file_attachment_metadata_butunluk_ozeti.md`
+- `docs/podcast_notes/`
+
+## Learning Sistemi
+
+Bu proje ayni zamanda Python ve yazilim gelistirme ogrenim arsivi uretir.
+
+`learning/` altindaki dosyalar; dataclass, repository, test, metadata modelleme, karar dokumantasyonu ve proje disiplini gibi konulari adim adim aciklar.
 
 ## Sonraki Adim
 
-Adim 005 - Beton dokum ve numune takip baslangici icin hazirlik veya once Git ilk commit duzeni.
+Adim 081, README dosyasini Adim 080 guvenli noktasindaki gercek repo durumuna gore guncelleme adimidir.
+
+Sonraki teknik calisma, derin analiz sonucuna gore belirlenecektir: mimari, test kapsami, roadmap, learning dosyalari ve sonraki 20 adim stratejisi birlikte degerlendirilecektir.
