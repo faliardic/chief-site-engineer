@@ -688,3 +688,13 @@
 - `notes` alaninin dosya adi, dosya yolu, dosya tipi veya iliskili kayit bilgisi yerine gecmeyecegi kararlastirildi.
 - `notes` verilmezse varsayilan deger `None` olarak kalacak.
 - Bu adimda model alani degistirilmedi; dosya yukleme, fiziksel dosya kopyalama/silme/tasima, not arama/filtreleme, repository, persistence, SQLite, JSON, API, GUI ve CLI eklenmedi.
+
+## 080 FileAttachmentRecord Metadata Butunluk Ozeti
+
+- Adim 072-079 arasindaki `FileAttachmentRecord` / dosya eki hatti derin analiz oncesi kapanis dokumaniyla ozetlendi.
+- Kullanim akisi, ornek kullanim senaryolari, saklama ve adlandirma standardi, arsiv guvenligi kararları ve metadata alanlari tek dokumanda toplandi.
+- Gercek modelde bulunan `file_name`, `file_path`, `file_type`, `mime_type`, `file_size`, `related_record_type`, `related_record_id`, `uploaded_by`, `uploaded_at`, `original_file_name`, `description` ve `notes` alanlarinin anlamlari aciklandi.
+- `storage_reference` gibi gercek modelde bulunmayan kavramlar ileride degerlendirilecek metadata olarak ayrildi.
+- Video dosyalarinin veritabanina gomulmeyecegi; dosya yolu / referans ve metadata ile izlenecegi karar tekrar vurgulandi.
+- Bu adim sadece kapanis dokumantasyonu adimidir.
+- Uygulama kodu, test dosyalari, yeni model alani, repository, persistence, SQLite, JSON, API, GUI, CLI, dosya yukleme/kopyalama/silme/tasima, thumbnail, preview, video oynatma ve streaming degistirilmedi.

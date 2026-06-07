@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 080
+
+- Added a closing metadata summary for the `FileAttachmentRecord` attachment line from Step 072-079.
+- Summarized usage flow, example scenarios, storage/naming standards, archive safety decisions, and metadata fields such as `original_file_name`, `uploaded_by`, `uploaded_at`, and `notes`.
+- No application code, tests, new model field, repository, persistence, SQLite, JSON, API, GUI, CLI, file upload/copy/delete/move, thumbnail, preview, video playback, or streaming behavior was changed in this step.
+
 ## Step 079
 
 - Clarified the `FileAttachmentRecord.notes` field for attachment-specific context, warnings, and short site explanations.

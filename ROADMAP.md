@@ -181,4 +181,6 @@ Adim 078'de `FileAttachmentRecord.uploaded_at` alani dosyanin eklenme zamanini o
 
 Adim 079'da `FileAttachmentRecord.notes` alaninin dosya eki ozelinde saha baglami ve ek aciklama tutma amaci test ve dokumantasyonla netlestirildi.
 
-Sonraki kucuk adim onerisi: Adim 080 - FileAttachmentRecord repository plani
+Adim 080'de Adim 072-079 arasindaki `FileAttachmentRecord` metadata ve dosya eki karar hatti derin analiz oncesi kapanis dokumaniyla ozetlendi.
+
+Sonraki kucuk adim onerisi: Derin analiz - mimari, test kapsami, roadmap, learning dosyalari ve sonraki 20 adim stratejisi
