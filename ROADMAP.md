@@ -1,188 +1,114 @@
 # Roadmap
 
-- [x] Adim 001 - Repo ve proje disiplini
-- [x] Adim 002 - Cekirdek veri modeli
-- [x] Adim 003 - Gunluk saha kaydi modeli
-- [x] Adim 004 - Bellek ici basit kayit listeleme
-- [x] Adim 005 - Beton dokum ve numune takip baslangici
-- [x] Adim 006 - Yapi denetim kontrol cagrilari
-- [x] Adim 007 - Uygunsuzluk kayitlari
-- [x] Adim 008 - Dosya/ek arsivleme
-- [x] Adim 009 - Malzeme giris/kullanim kaydi baslangici
-- [x] Adim 010 - Toplanti tutanagi ve aksiyon kaydi baslangici
-- [x] Adim 011 - RFI/submittal lite kayit modeli baslangici
-- [x] Adim 012 - Gunluk rapor ozet modeli baslangici
-- [x] Adim 013 - Basit proje tarafi / kisi kayit modeli baslangici
-- [x] Adim 014 - Basit santiye lokasyon / mahal kayit modeli baslangici
-- [x] Adim 015 - Basit ekip/iscilik kayit modeli baslangici
-- [x] Adim 016 - Basit ekipman/makine kayit modeli baslangici
-- [x] Adim 017 - Basit tedarikci kayit modeli baslangici
-- [x] Adim 018 - Basit saha notu kayit modeli baslangici
-- [x] Adim 019 - Basit gorev adayi kayit modeli baslangici
-- [x] Adim 020 - Basit kontrol maddesi kayit modeli baslangici
-- [x] Adim 021 - Basit kontrol sonucu kayit modeli baslangici
-- [x] Adim 022 - Basit uygunsuzluk adayi kayit modeli baslangici
-- [x] Adim 023 - Basit uygunsuzluk adayi degerlendirme kayit modeli baslangici
-- [x] Adim 024 - Basit uygunsuzluk adayi aksiyon kayit modeli baslangici
-- [x] Adim 025 - Uygunsuzluk adayi takip durumu ozeti baslangici
-- [x] Adim 026 - AttachmentRecord ile uygunsuzluk adayi ek dosya baglantisi
-- [x] Adim 027 - Uygunsuzluk adayi surec zinciri gorunum modeli baslangici
-- [x] Adim 028 - Uygunsuzluk adayi durum gecmisi modeli baslangici
-- [x] Adim 029 - Uygunsuzluk adayi sorumluluk / atama modeli baslangici
-- [x] Adim 030 - Uygunsuzluk adayi kapanis / sonuc modeli baslangici
-- [x] Adim 031 - NotebookLM podcast notu Adim 026-030
-- [x] Adim 032 - Uygunsuzluk adayindan kesin uygunsuzluga donusum modeli baslangici
-- [x] Adim 033 - NonconformityRecord model degerlendirme raporu
-- [x] Adim 034 - NonconformityRecord alan revizyonu
-- [x] Adim 035 - Kesin uygunsuzluk surec gorunum modeli baslangici
-- [x] Adim 036 - Kesin uygunsuzluk durum gecmisi modeli baslangici
-- [x] Adim 037 - Kesin uygunsuzluk sorumluluk / atama modeli baslangici
-- [x] Adim 038 - Kesin uygunsuzluk duzeltici faaliyet modeli baslangici
-- [x] Adim 039 - Kesin uygunsuzluk duzeltici faaliyet dogrulama modeli baslangici
-- [x] Adim 040 - Kesin uygunsuzluk kapatma / sonuc modeli baslangici
-- [x] Adim 041 - Kesin uygunsuzluk kayit deposu baslangici
-- [x] Adim 042 - NonconformityRepository duplicate id kontrolu
-- [x] Adim 043 - NonconformityRepository durum filtreleme
-- [x] Adim 044 - NonconformityRepository sorumlu filtreleme
-- [x] Adim 045 - NonconformityRepository durum ozeti
-- [x] Adim 046 - NonconformityRepository sorumlu taraf ozeti
-- [x] Adim 047 - NonconformityRepository genel ozet
-- [x] Adim 048 - NonconformityRepository status guncelleme
-- [x] Adim 049 - NonconformityRepository sorumlu taraf guncelleme
-- [x] Adim 050 - NonconformityRepository kayit var mi kontrolu
-- [x] Adim 051 - NonconformityRepository kayit sayisi
-- [x] Adim 052 - NonconformityRecord arsiv alani
-- [x] Adim 053 - NonconformityRepository aktif / arsiv filtreleme
-- [x] Adim 054 - NonconformityRepository arsivleme davranisi
-- [x] Adim 055 - NonconformityRepository restore davranisi
-- [x] Adim 056 - NonconformityRepository arsiv ozeti
-- [x] Adim 057 - NonconformityRepository arsivlenmis kayitlari listeleme
-- [x] Adim 058 - NonconformityRepository aktif kayitlari listeleme
-- [x] Adim 059 - NonconformityRepository tum kayitlari listeleme
-- [x] Adim 060 - NonconformityRepository arsiv / listeleme butunluk kontrolu
-- [x] Adim 061 - NotebookLM podcast notu Adim 056-060
-- [x] Adim 062 - NCR arsiv / listeleme kullanim ozeti
-- [x] Adim 063 - NCR kayit arama plani
-- [x] Adim 064 - NonconformityRepository id ile kayit bulma
-- [x] Adim 065 - NonconformityRepository duruma gore filtreleme
-- [x] Adim 066 - NonconformityRepository konuma gore filtreleme
-- [x] Adim 067 - Dosya ve video eki plani
-- [x] Adim 068 - FileAttachmentRecord veri modeli
-- [x] Adim 069 - FileAttachmentRecord dosya tipi siniflandirmasi
-- [x] Adim 070 - FileAttachmentRecord iliskili kayit baglantisi
+## Guncel Guvenli Nokta
 
-Adim 021-025 araligi tamamlandi. Bu aralik icin final NotebookLM podcast notu hazirlanacak.
+```text
+Adim 080 - FileAttachmentRecord metadata butunluk ozeti
+```
 
-Adim 026'da yeni ek dosya modeli eklenmeden, mevcut `AttachmentRecord` modelinin uygunsuzluk adayi kayitlarina kanit dosyasi baglamak icin kullanilacagi netlestirildi.
+Adim 081'de `README.md`, Adim 080 guvenli noktasindaki gercek repo durumuna gore guncellendi.
 
-Adim 027'de uygunsuzluk adayi surecinin kontrol sonucu, aday kaydi, degerlendirme, aksiyon, takip ozeti ve ek dosya durumunu tek ozet kayitta temsil eden baslangic gorunum modeli eklendi.
+Guncel test durumu:
 
-Adim 028'de uygunsuzluk adayi durum degisikliklerinin eski durum, yeni durum, sebep, kisi, tarih ve kaynak kayit bilgisiyle temsil edilmesi icin baslangic durum gecmisi modeli eklendi.
+```text
+125 passed
+```
 
-Adim 029'da uygunsuzluk adayinin kime atandigini, kim tarafindan atandigini, hedef tarihini, onceligini ve sorumluluk notunu temsil eden baslangic atama modeli eklendi.
+Proje su anda domain model, bellek ici repository, test, dokumantasyon, learning ve NotebookLM podcast notlari cekirdegi seviyesindedir.
 
-Adim 030'da uygunsuzluk adayinin nasil sonuclandigini, kim tarafindan kapatildigini, takip gerektirip gerektirmedigini ve nihai durumunu temsil eden baslangic kapanis modeli eklendi.
+## Henuz Olmayan Uretim Ozellikleri
 
-Adim 031'de Adim 026-030 araliginin final NotebookLM podcast notu hazirlandi.
+Asagidaki ozellikler henuz eklenmedi:
 
-Adim 032'de mevcut `NonconformityRecord` modeli yeniden olusturulmadan, aday kaydin kesin uygunsuzluk / NCR kaydina donusum baglantisini temsil eden baslangic model eklendi.
+- Database yok.
+- Gercek upload servisi yok.
+- API yok.
+- GUI yok.
+- Auth / kullanici / rol / yetki sistemi yok.
+- CI yok.
+- Deployment yok.
+- JSON veya SQLite persistence yok.
+- Gercek dosya kopyalama, silme veya tasima yok.
+- Thumbnail, preview, video oynatma veya streaming yok.
 
-Adim 033'te mevcut `NonconformityRecord` modelinin Adim 021-032 zincirinden sonra yeterliligi degerlendirildi; model degistirilmeden revizyon karar hazirligi raporu hazirlandi.
+Bu sinir bilincli olarak korunuyor. Once model, test, dokumantasyon ve karar hatti netlestiriliyor.
 
-Adim 034'te mevcut `NonconformityRecord` modeli kontrollu sekilde revize edilerek `nonconformity_type`, `detected_by`, `detection_date` ve `final_status` alanlari eklendi.
+## Tamamlanan Ana Fazlar - Adim 001-080
 
-Adim 035'te kesin uygunsuzluk / NCR surecini tek bakista temsil eden baslangic gorunum modeli eklendi.
+### Faz 001-020 - Temel Santiye Model Cekirdegi
 
-Adim 036'da kesin uygunsuzluk / NCR durum degisikliklerinin eski durum, yeni durum, sebep, kisi, tarih ve kaynak kayit bilgisiyle temsil edilmesi icin baslangic durum gecmisi modeli eklendi.
+- [x] Adim 001-004 - Repo disiplini, cekirdek modeller, gunluk saha kaydi ve basit bellek ici listeleme.
+- [x] Adim 005-010 - Beton dokum, yapi denetim, uygunsuzluk, ek dosya, malzeme ve toplanti/aksiyon modelleri.
+- [x] Adim 011-020 - RFI/submittal, gunluk rapor, proje tarafi, lokasyon, ekip, ekipman, tedarikci, saha notu, gorev adayi ve kontrol maddesi modelleri.
 
-Adim 037'de kesin uygunsuzluk / NCR kaydinin kisi, ekip, firma veya sorumlu birime atanmasini temsil eden baslangic sorumluluk modeli eklendi.
+### Faz 021-030 - Uygunsuzluk Adayi Sureci
 
-Adim 038'de kesin uygunsuzluk / NCR kaydi icin planlanan duzeltici faaliyeti temsil eden baslangic veri modeli eklendi.
+- [x] Adim 021-025 - Kontrol sonucu, uygunsuzluk adayi, degerlendirme, aksiyon ve takip ozeti modelleri.
+- [x] Adim 026 - Mevcut `AttachmentRecord` ile uygunsuzluk adayi ek dosya baglantisi.
+- [x] Adim 027-030 - Uygunsuzluk adayi surec gorunumu, durum gecmisi, sorumluluk/atama ve kapanis/sonuc modelleri.
 
-Adim 039'da kesin uygunsuzluk / NCR duzeltici faaliyetinin sahada kontrol edilip sonucunun kayda alinmasini temsil eden baslangic dogrulama modeli eklendi.
+### Faz 031-040 - Kesin Uygunsuzluk / NCR Model Hatti
 
-Adim 040'ta kesin uygunsuzluk / NCR kaydinin kapatilma kararini, kapatan kisiyi, kapanis tarihini ve sonucunu temsil eden baslangic kapanis modeli eklendi.
+- [x] Adim 031 - Adim 026-030 NotebookLM podcast notu.
+- [x] Adim 032 - Aday kayittan kesin uygunsuzluga donusum modeli.
+- [x] Adim 033-034 - `NonconformityRecord` degerlendirme ve alan revizyonu.
+- [x] Adim 035-040 - NCR surec gorunumu, durum gecmisi, sorumluluk, duzeltici faaliyet, dogrulama ve kapatma modelleri.
 
-Adim 041'de `NonconformityRecord` kayitlarini bellek icinde eklemek, listelemek ve kimlige gore bulmak icin baslangic repository sinifi eklendi.
+### Faz 041-055 - NonconformityRepository Bellek Ici Davranislari
 
-Adim 042'de `NonconformityRepository.add` icin ayni `nonconformity_id` degerine sahip ikinci kaydi engelleyen bellek ici duplicate id kontrolu eklendi.
+- [x] Adim 041-045 - NCR repository baslangici, duplicate id kontrolu, status/sorumlu filtreleme ve durum ozeti.
+- [x] Adim 046-050 - Sorumlu ozeti, genel ozet, status/sorumlu guncelleme ve kayit var mi kontrolu.
+- [x] Adim 051-055 - Kayit sayisi, arsiv alani, aktif/arsiv filtreleri, archive ve restore davranislari.
 
-Adim 043'te `NonconformityRepository` icine `status` alanina gore bellek ici filtreleme yapan `list_by_status` davranisi eklendi.
+### Faz 056-060 - NCR Arsiv / Listeleme Tutarliligi
 
-Adim 044'te `NonconformityRepository` icine `responsible_party` alanina gore bellek ici filtreleme yapan `list_by_responsible_party` davranisi eklendi.
+- [x] Adim 056 - NCR arsiv ozeti.
+- [x] Adim 057-059 - Arsivlenmis, aktif ve tum kayit listeleme davranislari.
+- [x] Adim 060 - Arsiv, restore, listeleme ve ozet butunluk kontrolu.
 
-Adim 045'te `NonconformityRepository` icine kayitlari `status` degerlerine gore sayan `get_status_summary` davranisi eklendi.
+### Faz 061-070 - Arama / Filtreleme ve Dosya Eki Temeli
 
-Adim 046'da `NonconformityRepository` icine kayitlari `responsible_party` degerlerine gore sayan `get_responsible_party_summary` davranisi eklendi.
+- [x] Adim 061-063 - Podcast notu, NCR arsiv/listeleme kullanim ozeti ve arama plani.
+- [x] Adim 064-066 - Id, durum ve konuma gore NCR kayit bulma/filtreleme davranislari.
+- [x] Adim 067-070 - Dosya/video eki plani, `FileAttachmentRecord`, dosya tipi siniflandirmasi ve iliskili kayit baglantisi.
 
-Adim 047'de `NonconformityRepository` icine toplam, acik, kapali, atanmis ve atanmamis kayit sayilarini veren `get_overview_summary` davranisi eklendi.
+### Faz 071-080 - FileAttachmentRecord Metadata ve Kapanis
 
-Adim 048'de `NonconformityRepository` icine mevcut kaydin `status` alanini bellek icinde guncelleyen `update_status` davranisi eklendi.
+- [x] Adim 071 - Adim 061-070 NotebookLM podcast notu.
+- [x] Adim 072-075 - Dosya eki kullanim akisi, ornek senaryolar, saklama/adlandirma standardi ve arsiv guvenligi kararları.
+- [x] Adim 076-079 - `original_file_name`, `uploaded_by`, `uploaded_at` ve `notes` metadata netlestirmeleri.
+- [x] Adim 080 - File attachment metadata butunluk ozeti ve derin analiz oncesi kapanis.
 
-Adim 049'da `NonconformityRepository` icine mevcut kaydin `responsible_party` alanini bellek icinde guncelleyen `update_responsible_party` davranisi eklendi.
+## Faz 081-090 - Duzeltme, Standart Kilitleme ve Dokumantasyon Esitleme
 
-Adim 050'de `NonconformityRepository` icine verilen `nonconformity_id` degerine sahip kaydin var olup olmadigini boolean olarak donduren `exists` davranisi eklendi.
+- [x] Adim 081 - README guncellemesi: Adim 080 guvenli noktasi, 125 test, mevcut kapsam ve olmayan ozellikler.
+- [x] Adim 082 - ROADMAP guncellemesi: Adim 080 sonrasi gercek durum ve 081-100 faz plani.
+- [ ] Adim 083 - CHANGELOG derin temizlik ve standart kontrolu.
+- [ ] Adim 084 - `docs/project_decisions.md` karar indeksleme ve okunabilirlik kontrolu.
+- [ ] Adim 085 - Learning dosyalari kapsami ve glossary esitleme kontrolu.
+- [ ] Adim 086 - README / ROADMAP / CHANGELOG tutarlilik testi veya kontrol dokumani.
+- [ ] Adim 087 - NotebookLM podcast notlari 071-080 final dosyasi.
+- [ ] Adim 088 - Paketleme ve derin analiz girdi listesi standardi.
+- [ ] Adim 089 - Derin analiz bulgulari icin karar taslagi.
+- [ ] Adim 090 - Duzeltme fazi kapanis ozeti.
 
-Adim 051'de `NonconformityRepository` icine toplam kayit sayisini veren `count` ve belirli durumdaki kayit sayisini veren `count_by_status` davranislari eklendi.
+Bu fazda hedef yeni urun ozelligi eklemek degil; mevcut dokumantasyon ve proje standartlarini kilitlemektir.
 
-Adim 052'de `NonconformityRecord` icine kaydin arsivlenip arsivlenmedigini temsil eden `is_archived` boolean alani eklendi.
+## Faz 091-100 - Persistence, Upload, Integrity ve Operasyon Omurgasi
 
-Adim 053'te `NonconformityRepository` icine `is_archived` alanina gore aktif ve arsiv kayitlari ayiran `list_active` ve `list_archived` davranislari eklendi.
+- [ ] Adim 091 - Persistence strateji karari: JSON mu SQLite mi, hangi sirayla?
+- [ ] Adim 092 - Repository persistence arayuzu veya plan dokumani.
+- [ ] Adim 093 - FileAttachmentRepository baslangic plani veya bellek ici baslangic.
+- [ ] Adim 094 - Dosya upload servisi tasarim karari.
+- [ ] Adim 095 - Dosya varlik / integrity scanner plan veya baslangic davranisi.
+- [ ] Adim 096 - Attachment audit trail modeli veya karar dokumani.
+- [ ] Adim 097 - NCR + attachment iliskisi icin integrity kontrolu.
+- [ ] Adim 098 - Test kapsami genisletme ve regresyon stratejisi.
+- [ ] Adim 099 - CI stratejisi: pytest otomasyonu ve kalite kapisi.
+- [ ] Adim 100 - Operasyon omurgasi kapanis ozeti ve sonraki faz karari.
 
-Adim 054'te `NonconformityRepository` icine mevcut kaydi silmeden `is_archived=True` yaparak arsivleyen `archive` davranisi eklendi.
+Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistence, upload, integrity, audit ve CI omurgasina gecis icin kucuk ve testli adimlar atmaktir.
 
-Adim 055'te `NonconformityRepository` icine arsivlenmis kaydi silmeden `is_archived=False` yaparak tekrar aktif hale getiren `restore` davranisi eklendi.
+## Sonraki Calisma Onerisi
 
-Adim 056'da `NonconformityRepository` icine aktif, arsivlenmis ve toplam NCR kayit sayilarini veren `get_archive_summary` davranisi eklendi.
-
-Adim 057'de mevcut `NonconformityRepository.list_archived` davranisi arsivlenmis kayitlari listeleme kapsami icin ek test ve dokumantasyonla netlestirildi.
-
-Adim 058'de mevcut `NonconformityRepository.list_active` davranisi aktif kayitlari listeleme kapsami icin ek test ve dokumantasyonla netlestirildi.
-
-Adim 059'da mevcut `NonconformityRepository.list_all` davranisi tum kayitlari listeleme kapsami icin ek test ve dokumantasyonla netlestirildi.
-
-Adim 060'ta `archive`, `restore`, `list_active`, `list_archived`, `list_all` ve `get_archive_summary` davranislarinin birlikte tutarli calistigi butunlesik test ve dokumantasyonla sabitlendi.
-
-Adim 061'de Adim 056-060 araliginin final NotebookLM podcast notu hazirlandi.
-
-Adim 062'de NCR arsivleme ve listeleme davranislari icin kisa kullanim ozeti hazirlandi.
-
-Adim 063'te NCR kayit arama ve filtreleme davranislari icin uygulanabilir plan dokumani hazirlandi.
-
-Adim 064'te mevcut `NonconformityRepository.find_by_id` davranisi id ile kayit bulma kapsami icin ek test ve dokumantasyonla netlestirildi.
-
-Adim 065'te mevcut `NonconformityRepository.list_by_status` davranisi duruma gore filtreleme kapsami icin ek test ve dokumantasyonla netlestirildi.
-
-Adim 066'da `NonconformityRepository.list_by_location` davranisi konuma gore filtreleme icin eklendi.
-
-Adim 067'de fotograf, video, PDF, belge ve ses notu gibi eklerin ortak attachment yaklasimiyla ele alinmasi icin plan dokumani hazirlandi.
-
-Adim 068'de fotograf, video, PDF, belge ve ses notu gibi eklerin metadata ve referans bilgisini temsil eden `FileAttachmentRecord` veri modeli eklendi.
-
-Adim 069'da `FileAttachmentRecord.file_type` alaninda kullanilacak `image`, `video`, `pdf`, `document`, `audio` ve `other` siniflari test ve dokumantasyonla netlestirildi.
-
-Adim 070'te `FileAttachmentRecord.related_record_type` ve `related_record_id` alanlarinin ana kayit baglantisi icin nasil kullanilacagi dokumante edildi.
-
-Adim 071'de Adim 061-070 araliginin final NotebookLM podcast notu hazirlandi.
-
-Adim 072'de `FileAttachmentRecord` icin fotograf, video, PDF, belge ve ses dosyalarinin nasil baglanacagini anlatan kullanim akisi dokumante edildi.
-
-Adim 073'te `FileAttachmentRecord` icin beton dokumu, NCR, malzeme teslimi, gunluk saha kaydi, iscilik, ozel not ve denetim kayitlari uzerinden ornek kullanim senaryolari dokumante edildi.
-
-Adim 074'te `FileAttachmentRecord` ekleri icin saklama klasor yapisi ve dosya adlandirma standardi dokumante edildi.
-
-Adim 075'te `FileAttachmentRecord` ekleri icin silme, tasima, kayip dosya, arsiv guvenligi ve denetim izi karar dokumantasyonu hazirlandi.
-
-Adim 076'da `FileAttachmentRecord` modeline kullanicinin yukledigi dosyanin ilk adini metadata olarak tutan `original_file_name` alani eklendi.
-
-Adim 077'de `FileAttachmentRecord.uploaded_by` alani yukleyen kisi bilgisini opsiyonel string metadata olarak tutacak sekilde netlestirildi.
-
-Adim 078'de `FileAttachmentRecord.uploaded_at` alani dosyanin eklenme zamanini opsiyonel string metadata olarak tutacak sekilde netlestirildi.
-
-Adim 079'da `FileAttachmentRecord.notes` alaninin dosya eki ozelinde saha baglami ve ek aciklama tutma amaci test ve dokumantasyonla netlestirildi.
-
-Adim 080'de Adim 072-079 arasindaki `FileAttachmentRecord` metadata ve dosya eki karar hatti derin analiz oncesi kapanis dokumaniyla ozetlendi.
-
-Adim 081'de `README.md` dosyasi Adim 080 guvenli noktasindaki gercek repo durumuna gore guncellendi.
-
-Sonraki kucuk adim onerisi: Derin analiz - mimari, test kapsami, roadmap, learning dosyalari ve sonraki 20 adim stratejisi
+Adim 083 ile CHANGELOG ve proje dokumantasyonu derin temizlik / standart kontrolu baslatilabilir.

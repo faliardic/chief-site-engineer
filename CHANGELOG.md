@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 082
+
+- Updated `ROADMAP.md` to reflect the real Step 080 safe-point state after the Step 081 README correction.
+- Summarized completed Step 001-080 phases and planned Step 081-090 as documentation/standard locking and Step 091-100 as persistence/upload/integrity/operation backbone work.
+- Explicitly documented that database, real upload service, API, GUI, auth, CI, and deployment are not present yet.
+
 ## Step 081
 
 - Updated `README.md` to reflect the real Step 080 safe-point repository state.
