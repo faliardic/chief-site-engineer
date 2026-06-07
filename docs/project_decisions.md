@@ -542,3 +542,11 @@
 - `is_archived` alaninin gorunurluk/arsiv durumunu, `status` alaninin ise is sureci durumunu temsil ettigi ayrim vurgulandi.
 - Bu adim sadece dokumantasyon / kullanim ozeti adimidir.
 - Uygulama kodu, test dosyalari, JSON, SQLite, API, GUI, CLI ve workflow davranisi degistirilmedi.
+
+## 063 NCR Kayit Arama Plani
+
+- NCR kayit arama ve filtreleme davranislari icin plan dokumani hazirlandi.
+- Bu adimda yeni repository methodu eklenmedi.
+- Mevcut arama/filtreleme davranislari varsa tekrar yazilmadan, sonraki adimlarda test ve dokumantasyonla netlestirilmesi kararlastirildi.
+- Arama davranislarinin read-only kalmasi, kayit silmemesi ve arsiv gorunurlugunu acik method adi veya parametreyle ifade etmesi ilke olarak belirlendi.
+- Uygulama kodu, test dosyalari, JSON, SQLite, API, GUI, CLI, query engine ve workflow davranisi degistirilmedi.

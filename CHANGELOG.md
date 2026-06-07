@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 063
+
+- Added a plan document for future NCR search and filtering behavior in `NonconformityRepository`.
+- Outlined possible small steps for id lookup, status filtering, location filtering, text search, archive filtering, date range filtering, and responsible party filtering.
+- No application code, tests, JSON, SQLite, API, GUI, CLI, query engine, or workflow behavior was changed in this step.
+
 ## Step 062
 
 - Added a concise usage summary for NCR archive and listing behavior from Step 056-060.

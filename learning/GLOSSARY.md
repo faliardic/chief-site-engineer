@@ -1017,3 +1017,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Status degismeme garantisi`: Arsivleme, restore ve listeleme islemlerinin `status` alanini otomatik degistirmemesi.
 
 `Toplam liste korunumu`: Arsivleme veya restore sonrasi kayitlarin `list_all` sonucunda kalmaya devam etmesi.
+
+`Arama plani`: Repository icinde ileride eklenecek arama ve filtreleme davranislarini uygulama oncesinde kucuk adimlara ayiran dokuman.
+
+`Read-only davranis`: Kayitlari okuyan ama mevcut kayitlari degistirmeyen metot veya fonksiyon.
+
+`String arama`: Baslik veya aciklama gibi metin alanlarinda verilen ifadenin aranmasi.
+
+`Filtreleme ilkesi`: Kayit listesinden belirli kosula uyan kayitlari dondururken kayitlari silmeme veya degistirmeme yaklasimi.
