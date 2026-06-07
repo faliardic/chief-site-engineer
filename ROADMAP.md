@@ -89,7 +89,7 @@ Bu sinir bilincli olarak korunuyor. Once model, test, dokumantasyon ve karar hat
 - [x] Adim 086 - `FileType` ve `AttachmentStatus` hafif enum hazirligi.
 - [x] Adim 087 - `FileAttachmentRecord` temel validation testleri ve minimal `ValueError` davranisi.
 - [x] Adim 088 - Canonical attachment path helper fonksiyonu.
-- [ ] Adim 089 - Derin analiz bulgulari icin karar taslagi.
+- [x] Adim 089 - Attachment metadata integrity kurallari ve missing/orphan scanner tasarim zemini.
 - [ ] Adim 090 - Duzeltme fazi kapanis ozeti.
 
 Bu fazda hedef yeni urun ozelligi eklemek degil; mevcut dokumantasyon ve proje standartlarini kilitlemektir.
@@ -111,4 +111,4 @@ Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistenc
 
 ## Sonraki Calisma Onerisi
 
-Adim 089 ile derin analiz bulgulari veya NotebookLM podcast notlari 071-080 final dosyasi ele alinabilir.
+Adim 090 ile duzeltme fazi kapanis ozeti veya NotebookLM podcast notlari 071-080 final dosyasi ele alinabilir.

@@ -772,3 +772,11 @@
 - `file_name` bas/son bosluklardan temizlenir ve klasor ayiricilar guvenli hale getirilir.
 - Helper fiziksel dosya olusturmaz, dosya kopyalamaz, metadata kaydi olusturmaz.
 - Bu adimda upload service, database, API, GUI, auth, CI veya deployment eklenmedi.
+
+## 089 Attachment Metadata Integrity Kurallari
+
+- Ileride gelistirilecek missing/orphan scanner icin attachment metadata butunluk durumlari dokumante edildi.
+- Scanner tasarimi icin `OK`, `MISSING_FILE`, `ORPHAN_FILE`, `INVALID_PATH`, `DUPLICATE_METADATA` ve `UNREADABLE_FILE` durum kodlari belirlendi.
+- Scanner raporunda `status_code`, attachment reference, beklenen path, mevcut path, dosya/metadata varligi, severity, onerilen aksiyon ve kontrol zamani gibi alanlar yer alacak.
+- Backup restore, upload service ve audit event hatlariyla iliski karar duzeyinde aciklandi.
+- Bu adimda uygulama kodu, test dosyalari, scanner implementasyonu, dosya sistemi taramasi, upload service, database, API, GUI, auth, CI veya deployment eklenmedi.

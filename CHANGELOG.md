@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 089
+
+- Documented attachment metadata integrity rules for a future missing/orphan scanner.
+- Defined `OK`, `MISSING_FILE`, `ORPHAN_FILE`, `INVALID_PATH`, `DUPLICATE_METADATA`, and `UNREADABLE_FILE` states with severity and recommended action guidance.
+- No application code, tests, scanner implementation, file system scan, upload service, database, API, GUI, auth, CI, deployment, or push was added.
+
 ## Step 088
 
 - Added `build_attachment_path` to generate canonical attachment metadata paths.

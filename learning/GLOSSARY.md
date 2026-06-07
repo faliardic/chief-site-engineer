@@ -1117,3 +1117,17 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Path helper`: Standart dosya yolu metnini tek yerden ve tutarli sekilde ureten yardimci fonksiyon.
 
 `Safe filename normalization`: Dosya adindaki bas/son bosluklari ve klasor ayirici gibi riskli karakterleri guvenli hale getirme islemi.
+
+`Integrity check`: Metadata ile fiziksel dosyanin birbirini dogru ve tutarli sekilde isaret edip etmedigini kontrol etme islemi.
+
+`Scanner report`: Ileride dosya butunlugu taramasi calistiginda uretilen durum, severity ve onerilen aksiyon bilgisini iceren rapor.
+
+`MISSING_FILE`: Metadata kaydi oldugu halde beklenen fiziksel dosyanin bulunamamasi.
+
+`ORPHAN_FILE`: Fiziksel dosya oldugu halde ona karsilik gelen metadata kaydinin bulunamamasi.
+
+`INVALID_PATH`: Metadata icindeki dosya yolunun canonical attachment path standardina uymamasi.
+
+`DUPLICATE_METADATA`: Birden fazla metadata kaydinin ayni fiziksel dosyayi isaret etmesi.
+
+`UNREADABLE_FILE`: Dosyanin var olmasina ragmen izin, disk veya bozulma gibi nedenlerle okunamamasi.
