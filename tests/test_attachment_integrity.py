@@ -27,6 +27,9 @@ from app.attachment_integrity import (
     build_attachment_integrity_result,
     build_attachment_integrity_report_summary,
     build_attachment_integrity_report,
+    serialize_attachment_integrity_report,
+    serialize_attachment_integrity_report_summary,
+    serialize_attachment_integrity_result,
 )
 
 
@@ -535,3 +538,149 @@ def test_build_attachment_integrity_report_builds_summary() -> None:
     assert report.summary.ok_count == 1
     assert report.summary.warning_count == 1
     assert report.summary.orphan_file_count == 1
+
+
+def test_serialize_attachment_integrity_result_contains_expected_fields() -> None:
+    checked_at = datetime(2026, 6, 7, 14, 32, 10, tzinfo=timezone.utc)
+    result = AttachmentIntegrityResult(
+        status_code=MISSING_FILE,
+        severity=SEVERITY_ERROR,
+        attachment_id="ATT-001",
+        expected_path="attachments/PRJ-001/nonconformity/2026/06/07/NCR-1/photo.jpg",
+        actual_path=None,
+        metadata_exists=True,
+        file_exists=False,
+        recommended_action=ACTION_RESTORE_FROM_BACKUP_OR_REVIEW_AUDIT_TRAIL,
+        checked_at=checked_at,
+        notes=None,
+    )
+
+    serialized = serialize_attachment_integrity_result(result)
+
+    assert serialized == {
+        "status_code": MISSING_FILE,
+        "severity": SEVERITY_ERROR,
+        "attachment_id": "ATT-001",
+        "expected_path": (
+            "attachments/PRJ-001/nonconformity/2026/06/07/NCR-1/photo.jpg"
+        ),
+        "actual_path": None,
+        "metadata_exists": True,
+        "file_exists": False,
+        "recommended_action": ACTION_RESTORE_FROM_BACKUP_OR_REVIEW_AUDIT_TRAIL,
+        "checked_at": "2026-06-07T14:32:10+00:00",
+        "notes": None,
+    }
+
+
+def test_serialize_attachment_integrity_report_summary_contains_expected_fields() -> None:
+    generated_at = datetime(2026, 6, 7, 14, 32, 10, tzinfo=timezone.utc)
+    summary = AttachmentIntegrityReportSummary(
+        total_checked=2,
+        ok_count=1,
+        error_count=1,
+        warning_count=0,
+        missing_file_count=1,
+        orphan_file_count=0,
+        invalid_path_count=0,
+        duplicate_metadata_count=0,
+        unreadable_file_count=0,
+        generated_at=generated_at,
+    )
+
+    serialized = serialize_attachment_integrity_report_summary(summary)
+
+    assert serialized == {
+        "total_checked": 2,
+        "ok_count": 1,
+        "error_count": 1,
+        "warning_count": 0,
+        "missing_file_count": 1,
+        "orphan_file_count": 0,
+        "invalid_path_count": 0,
+        "duplicate_metadata_count": 0,
+        "unreadable_file_count": 0,
+        "generated_at": "2026-06-07T14:32:10+00:00",
+    }
+
+
+def test_serialize_attachment_integrity_report_contains_expected_fields() -> None:
+    generated_at = datetime(2026, 6, 7, 14, 32, 10, tzinfo=timezone.utc)
+    report = build_attachment_integrity_report(
+        [AttachmentIntegrityResult(status_code=OK, severity=SEVERITY_OK)],
+        source="manual-check",
+        notes="Ready for audit.",
+        generated_at=generated_at,
+    )
+
+    serialized = serialize_attachment_integrity_report(report)
+
+    assert set(serialized) == {"results", "summary", "generated_at", "source", "notes"}
+    assert serialized["generated_at"] == "2026-06-07T14:32:10+00:00"
+    assert serialized["source"] == "manual-check"
+    assert serialized["notes"] == "Ready for audit."
+
+
+def test_serialize_attachment_integrity_report_keeps_none_fields() -> None:
+    report = build_attachment_integrity_report(
+        [AttachmentIntegrityResult(status_code=OK, severity=SEVERITY_OK)]
+    )
+
+    serialized = serialize_attachment_integrity_report(report)
+
+    assert "source" in serialized
+    assert "notes" in serialized
+    assert serialized["source"] is None
+    assert serialized["notes"] is None
+    assert "attachment_id" in serialized["results"][0]
+    assert serialized["results"][0]["attachment_id"] is None
+
+
+def test_serialize_attachment_integrity_report_serializes_nested_results() -> None:
+    report = build_attachment_integrity_report(
+        [
+            AttachmentIntegrityResult(status_code=OK, severity=SEVERITY_OK),
+            AttachmentIntegrityResult(
+                status_code=ORPHAN_FILE,
+                severity=SEVERITY_WARNING,
+            ),
+        ]
+    )
+
+    serialized = serialize_attachment_integrity_report(report)
+
+    assert isinstance(serialized["results"], list)
+    assert serialized["results"][0]["status_code"] == OK
+    assert serialized["results"][1]["status_code"] == ORPHAN_FILE
+
+
+def test_serialize_attachment_integrity_report_serializes_nested_summary() -> None:
+    report = build_attachment_integrity_report(
+        [
+            AttachmentIntegrityResult(status_code=OK, severity=SEVERITY_OK),
+            AttachmentIntegrityResult(status_code=MISSING_FILE, severity=SEVERITY_ERROR),
+        ]
+    )
+
+    serialized = serialize_attachment_integrity_report(report)
+
+    assert serialized["summary"]["total_checked"] == 2
+    assert serialized["summary"]["ok_count"] == 1
+    assert serialized["summary"]["error_count"] == 1
+    assert serialized["summary"]["missing_file_count"] == 1
+
+
+def test_serialize_attachment_integrity_helpers_do_not_mutate_models() -> None:
+    result = AttachmentIntegrityResult(status_code=OK, severity=SEVERITY_OK)
+    report = build_attachment_integrity_report([result], source="manual-check")
+    original_results = report.results
+    original_summary_total = report.summary.total_checked
+    original_source = report.source
+
+    serialize_attachment_integrity_result(result)
+    serialize_attachment_integrity_report_summary(report.summary)
+    serialize_attachment_integrity_report(report)
+
+    assert report.results == original_results
+    assert report.summary.total_checked == original_summary_total
+    assert report.source == original_source

@@ -824,3 +824,12 @@
 - `generated_at` verilmezse UTC zaman atanir; report ve summary zamanlari timezone-aware UTC olmak zorundadir.
 - `build_attachment_integrity_report` helper fonksiyonu result listesinden summary uretip report dondurur.
 - Bu adimda toplu scanner, dosya sistemi taramasi, klasor gezme, upload service, backup logic, audit event implementasyonu, database, API, GUI, auth, CI veya deployment eklenmedi.
+
+## 095 Attachment Integrity Report Serializer
+
+- `AttachmentIntegrityResult`, `AttachmentIntegrityReportSummary` ve `AttachmentIntegrityReport` modellerini dictionary formatina cevirmek icin serializer helper fonksiyonlari eklendi.
+- `checked_at` ve `generated_at` gibi datetime alanlari ISO 8601 string olarak serialize edilecek.
+- `None` alanlari dict icinde korunacak; bu adimda bos alanlar ciktidan atilmayacak.
+- Report serializer nested result listesini result dict listesine ve summary bilgisini summary dict yapisina cevirir.
+- Serializer fonksiyonlari orijinal dataclass/model nesnelerini degistirmez.
+- Bu adimda JSON dosyasi yazma, `json.dump`, scanner, dosya sistemi taramasi, klasor gezme, upload service, backup logic, audit event implementasyonu, database, API, GUI, auth, CI veya deployment eklenmedi.

@@ -228,6 +228,55 @@ def build_attachment_integrity_report(
     return AttachmentIntegrityReport(**report_values)
 
 
+def serialize_attachment_integrity_result(
+    result: AttachmentIntegrityResult,
+) -> dict:
+    return {
+        "status_code": result.status_code,
+        "severity": result.severity,
+        "attachment_id": result.attachment_id,
+        "expected_path": result.expected_path,
+        "actual_path": result.actual_path,
+        "metadata_exists": result.metadata_exists,
+        "file_exists": result.file_exists,
+        "recommended_action": result.recommended_action,
+        "checked_at": result.checked_at.isoformat(),
+        "notes": result.notes,
+    }
+
+
+def serialize_attachment_integrity_report_summary(
+    summary: AttachmentIntegrityReportSummary,
+) -> dict:
+    return {
+        "total_checked": summary.total_checked,
+        "ok_count": summary.ok_count,
+        "error_count": summary.error_count,
+        "warning_count": summary.warning_count,
+        "missing_file_count": summary.missing_file_count,
+        "orphan_file_count": summary.orphan_file_count,
+        "invalid_path_count": summary.invalid_path_count,
+        "duplicate_metadata_count": summary.duplicate_metadata_count,
+        "unreadable_file_count": summary.unreadable_file_count,
+        "generated_at": summary.generated_at.isoformat(),
+    }
+
+
+def serialize_attachment_integrity_report(
+    report: AttachmentIntegrityReport,
+) -> dict:
+    return {
+        "results": [
+            serialize_attachment_integrity_result(result)
+            for result in report.results
+        ],
+        "summary": serialize_attachment_integrity_report_summary(report.summary),
+        "generated_at": report.generated_at.isoformat(),
+        "source": report.source,
+        "notes": report.notes,
+    }
+
+
 def _classify_integrity_status(
     metadata_exists: bool,
     file_exists: bool,

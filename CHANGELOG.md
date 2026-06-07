@@ -1,5 +1,11 @@
 # Changelog
 
+## Step 095
+
+- Added serializer helpers for `AttachmentIntegrityResult`, `AttachmentIntegrityReportSummary`, and `AttachmentIntegrityReport`.
+- Serialized datetime fields with ISO 8601 strings and kept `None` fields in the output dictionaries.
+- Added tests for result, summary, report, nested results, nested summary, datetime serialization, `None` preservation, and non-mutating serializer behavior without writing JSON files or adding scanner/file export behavior.
+
 ## Step 094
 
 - Added `AttachmentIntegrityReport` to carry attachment integrity results together with their report summary.

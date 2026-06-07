@@ -1171,3 +1171,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Report source`: Raporun hangi kaynak veya calisma baglamindan uretildigini anlatan opsiyonel alan.
 
 `Report notes`: Rapor hakkinda insan tarafindan okunabilir ek aciklama tutan opsiyonel alan.
+
+`Serializer`: Model nesnesini dictionary gibi daha tasinabilir bir veri yapisina ceviren yardimci fonksiyon.
+
+`Dictionary format`: Verinin anahtar/deger cifti olarak temsil edildigi Python veri yapisi.
+
+`ISO 8601`: Tarih ve saat bilgisini standart metin formatinda gosteren yaygin format.
+
+`Nested serialization`: Bir rapor icindeki alt result ve summary nesnelerinin de dictionary formatina cevrilmesi.
