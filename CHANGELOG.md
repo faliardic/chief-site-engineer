@@ -1,5 +1,12 @@
 # Changelog
 
+## Step 110
+
+- Added edge-case tests and usage clarification for the scanner dry-run helper.
+- Verified extra map paths are ignored, duplicate paths are not treated as duplicate metadata, exact path matching is required, input order is preserved, the path map is not mutated, and map `True` can produce `OK` without creating real files.
+- Confirmed the helper still does not perform real file system scanning, orphan scan, folder traversal, root/path security checks, file delete/move/copy, upload, backup, audit, database, API, GUI, CLI, or AI integration.
+- No commit, push, or ZIP staging was added.
+
 ## Step 109
 
 - Added the attachment integrity dry-run helper start.

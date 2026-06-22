@@ -122,7 +122,7 @@ Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistenc
 - [x] Adim 107 - Scanner scope plani.
 - [x] Adim 108 - Scanner input modeli / plani.
 - [x] Adim 109 - Attachment scanner dry-run helper baslangici.
-- [ ] Adim 110 - Scanner dry-run testleri.
+- [x] Adim 110 - Scanner dry-run testleri / kullanim netlestirmesi.
 - [ ] Adim 111 - Attachment integrity rapor kullanim ozeti.
 - [ ] Adim 112 - Audit event model plani.
 - [ ] Adim 113 - AuditEventRecord baslangic modeli.
@@ -139,4 +139,4 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 
 ## Sonraki Calisma Onerisi
 
-Adim 110 ile scanner dry-run testleri / kullanim netlestirmesi ele alinabilir.
+Adim 111 ile attachment integrity rapor kullanim ozeti ele alinabilir.

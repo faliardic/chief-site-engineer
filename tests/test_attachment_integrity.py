@@ -433,6 +433,130 @@ def test_build_attachment_integrity_results_dry_run_returns_empty_tuple_for_empt
     assert results == ()
 
 
+def test_build_attachment_integrity_results_dry_run_ignores_extra_map_paths() -> None:
+    attachment = _file_attachment_record()
+
+    results = build_attachment_integrity_results_dry_run(
+        [attachment],
+        {
+            attachment.file_path: True,
+            "attachments/ncr/NCR-001/orphan-like-extra.jpg": True,
+        },
+    )
+
+    assert len(results) == 1
+    assert results[0].attachment_id == attachment.attachment_id
+    assert results[0].status_code == OK
+
+
+def test_build_attachment_integrity_results_dry_run_does_not_detect_duplicate_paths() -> None:
+    first_attachment = _file_attachment_record(
+        attachment_id="file-att-001",
+        file_path="attachments/ncr/NCR-001/shared.jpg",
+    )
+    second_attachment = _file_attachment_record(
+        attachment_id="file-att-002",
+        file_path="attachments/ncr/NCR-001/shared.jpg",
+    )
+
+    results = build_attachment_integrity_results_dry_run(
+        [first_attachment, second_attachment],
+        {first_attachment.file_path: True},
+    )
+
+    assert [result.attachment_id for result in results] == [
+        "file-att-001",
+        "file-att-002",
+    ]
+    assert [result.status_code for result in results] == [OK, OK]
+
+
+def test_build_attachment_integrity_results_dry_run_false_map_value_returns_missing_file() -> None:
+    attachment = _file_attachment_record()
+
+    results = build_attachment_integrity_results_dry_run(
+        [attachment],
+        {attachment.file_path: False},
+    )
+
+    assert results[0].status_code == MISSING_FILE
+    assert results[0].file_exists is False
+
+
+def test_build_attachment_integrity_results_dry_run_requires_exact_path_match() -> None:
+    attachment = _file_attachment_record(
+        file_path="attachments/ncr/NCR-001/exact.jpg"
+    )
+
+    results = build_attachment_integrity_results_dry_run(
+        [attachment],
+        {"attachments/ncr/NCR-001/exact.jpg ": True},
+    )
+
+    assert results[0].status_code == MISSING_FILE
+    assert results[0].file_exists is False
+
+
+def test_build_attachment_integrity_results_dry_run_preserves_input_order() -> None:
+    attachments = [
+        _file_attachment_record("file-att-003", "attachments/ncr/NCR-001/c.jpg"),
+        _file_attachment_record("file-att-001", "attachments/ncr/NCR-001/a.jpg"),
+        _file_attachment_record("file-att-002", "attachments/ncr/NCR-001/b.jpg"),
+    ]
+
+    results = build_attachment_integrity_results_dry_run(
+        attachments,
+        {attachment.file_path: True for attachment in attachments},
+    )
+
+    assert [result.attachment_id for result in results] == [
+        "file-att-003",
+        "file-att-001",
+        "file-att-002",
+    ]
+
+
+def test_build_attachment_integrity_results_dry_run_checked_at_none_uses_default_time() -> None:
+    attachment = _file_attachment_record()
+
+    results = build_attachment_integrity_results_dry_run(
+        [attachment],
+        {attachment.file_path: True},
+        checked_at=None,
+    )
+
+    assert results[0].checked_at.tzinfo is not None
+    assert results[0].checked_at.utcoffset() is not None
+    assert results[0].checked_at.utcoffset().total_seconds() == 0
+
+
+def test_build_attachment_integrity_results_dry_run_does_not_mutate_path_map() -> None:
+    attachment = _file_attachment_record()
+    file_existence_by_path = {attachment.file_path: True}
+    original_map = file_existence_by_path.copy()
+
+    build_attachment_integrity_results_dry_run(
+        [attachment],
+        file_existence_by_path,
+    )
+
+    assert file_existence_by_path == original_map
+
+
+def test_build_attachment_integrity_results_dry_run_accepts_map_true_for_uncreated_path() -> None:
+    attachment = _file_attachment_record(
+        file_path="attachments/ncr/NCR-001/uncreated-but-declared.jpg"
+    )
+
+    results = build_attachment_integrity_results_dry_run(
+        [attachment],
+        {attachment.file_path: True},
+    )
+
+    assert results[0].status_code == OK
+    assert results[0].file_exists is True
+
+
 def test_attachment_integrity_report_summary_empty_results() -> None:
     summary = build_attachment_integrity_report_summary([])
 

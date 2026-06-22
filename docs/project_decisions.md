@@ -953,3 +953,13 @@
 - Orphan, duplicate metadata, unreadable file, invalid path ve root disi path kontrolleri bu adimda yapilmayacak.
 - Bu ayrim ileride scanner input modeli, root/path guvenligi ve orphan scan adimlarini daha guvenli ele almak icin korunacak.
 - Bu adimda klasor traversal, dosya silme/tasima/kopyalama, upload service, backup/restore, audit event, database, API, GUI veya CLI eklenmedi.
+
+## 110 Scanner Dry-run Testleri ve Kullanim Netlestirmesi
+
+- Dry-run helper map tabanli ve gercek dosya sistemi kullanmayan yapi olarak kalacak.
+- Duplicate path bu adimda hata sayilmayacak; duplicate metadata tespiti ayri adim konusudur.
+- Map icinde fazla path bulunmasi orphan scan anlamina gelmez ve helper tarafindan yok sayilir.
+- Path eslesmesi birebir map lookup uzerinden yapilir; benzer path degerleri eslesmis sayilmaz.
+- Sonuc sirasi input record sirasi ile ayni kalmalidir.
+- Root/path security ve orphan scan daha sonra ayri kapsamda ele alinacaktir.
+- Bu adimda helper kapsam genisletilmedi; gercek dosya sistemi taramasi, klasor traversal, dosya silme/tasima/kopyalama, upload service, backup/restore, audit event, database, API, GUI veya CLI eklenmedi.
