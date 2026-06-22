@@ -933,3 +933,13 @@
 - Scanner ciktisi mevcut `AttachmentIntegrityResult` ve `AttachmentIntegrityReport` hatti ile uyumlu olmali.
 - Ilk kapsam `OK`, `MISSING_FILE`, `ORPHAN_FILE`, `INVALID_PATH`, `DUPLICATE_METADATA` ve `UNREADABLE_FILE` durumlarini tespit etmeye odaklanir.
 - Bu adimda scanner implementasyonu, dosya sistemi taramasi, upload service, backup/restore, audit event, database, API, GUI veya CLI eklenmedi.
+
+## 108 Attachment Integrity Scanner Input Modeli Plani
+
+- Scanner input modeli, scanner'a verilecek `FileAttachmentRecord` metadata kayitlarini ve attachment root sinirini tarif edecek.
+- Ilk asamada input modeli dosya taramasi, dosya okuma, scanner davranisi veya metadata guncellemesi uretmeyecek.
+- `attachment_records` ve `attachment_root` ilk zorunlu aday alanlar olarak dusunulur.
+- `include_orphan_check`, `allowed_record_types`, `checked_by`, `source`, `notes` ve `created_at` / `requested_at` opsiyonel aday alanlar olarak degerlendirilecek.
+- Orphan check ayri ve riskli bir secenek olarak ele alinacak; acilirsa yalnizca attachment root altinda ve raporlama amaciyla calismalidir.
+- Path traversal ve root disi erisim riski ileride test edilmelidir.
+- Bu adimda dataclass, scanner helper, dosya sistemi taramasi, upload service, backup/restore, audit event, database, API, GUI veya CLI eklenmedi.

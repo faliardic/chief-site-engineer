@@ -1,5 +1,12 @@
 # Changelog
 
+## Step 108
+
+- Documented the attachment integrity scanner input model plan.
+- Clarified that the future input model may carry `attachment_records`, `attachment_root`, orphan-check options, source/notes metadata, and safety boundaries.
+- Defined that the input model is not scanner implementation and does not scan files, read files, delete, move, update metadata, or integrate upload, backup, audit, database, API, GUI, CLI, or AI behavior.
+- No application code, test files, dataclass, scanner helper, commit, push, or ZIP staging was added.
+
 ## Step 107
 
 - Documented the attachment integrity scanner scope plan.
