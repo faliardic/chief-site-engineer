@@ -1,5 +1,12 @@
 # Changelog
 
+## Step 111
+
+- Documented the attachment integrity report usage summary.
+- Explained how the dry-run helper, `AttachmentIntegrityResult`, `AttachmentIntegrityReport`, serializer helpers, and JSON export line fit together.
+- Clarified that the report is not an official record and JSON export is only a report/snapshot output, not a permanent data store.
+- No application code, test files, scanner implementation, file system scan, orphan scan, root/path security helper, audit, backup, database, API, GUI, CLI, AI integration, commit, push, or ZIP staging was added.
+
 ## Step 110
 
 - Added edge-case tests and usage clarification for the scanner dry-run helper.

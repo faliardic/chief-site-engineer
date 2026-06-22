@@ -963,3 +963,12 @@
 - Sonuc sirasi input record sirasi ile ayni kalmalidir.
 - Root/path security ve orphan scan daha sonra ayri kapsamda ele alinacaktir.
 - Bu adimda helper kapsam genisletilmedi; gercek dosya sistemi taramasi, klasor traversal, dosya silme/tasima/kopyalama, upload service, backup/restore, audit event, database, API, GUI veya CLI eklenmedi.
+
+## 111 Attachment Integrity Rapor Kullanim Ozeti
+
+- Attachment integrity hatti metadata -> dry-run result -> report -> serializer -> JSON export akisi olarak okunacak.
+- `AttachmentIntegrityReport` resmi kayit yerine gecmez; mevcut attachment kayitlari icin butunluk kontrol ciktisidir.
+- JSON export kalici veri deposu degil, rapor/snapshot ciktisidir.
+- Dry-run helper dosya sistemi islemi yapmadan guvenli raporlama hatti saglar.
+- Audit, backup, root/path security ve orphan scan ayri adimlarda ele alinacaktir.
+- Bu adimda uygulama kodu, test dosyalari, scanner davranisi, serializer, JSON export kodu, audit event, backup/restore, database, API, GUI veya CLI degistirilmedi.
