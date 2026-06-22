@@ -943,3 +943,13 @@
 - Orphan check ayri ve riskli bir secenek olarak ele alinacak; acilirsa yalnizca attachment root altinda ve raporlama amaciyla calismalidir.
 - Path traversal ve root disi erisim riski ileride test edilmelidir.
 - Bu adimda dataclass, scanner helper, dosya sistemi taramasi, upload service, backup/restore, audit event, database, API, GUI veya CLI eklenmedi.
+
+## 109 Attachment Scanner Dry-run Helper Baslangici
+
+- Ilk dry-run helper gercek dosya sistemi taramasi yapmayacak.
+- File existence bilgisi disaridan kontrollu path -> exists map ile verilecek.
+- Helper mevcut `build_attachment_integrity_result` hattini kullanarak her `FileAttachmentRecord` icin `AttachmentIntegrityResult` uretecek.
+- Map icinde path bulunmazsa kayit guvenli sekilde missing file olarak degerlendirilecek.
+- Orphan, duplicate metadata, unreadable file, invalid path ve root disi path kontrolleri bu adimda yapilmayacak.
+- Bu ayrim ileride scanner input modeli, root/path guvenligi ve orphan scan adimlarini daha guvenli ele almak icin korunacak.
+- Bu adimda klasor traversal, dosya silme/tasima/kopyalama, upload service, backup/restore, audit event, database, API, GUI veya CLI eklenmedi.

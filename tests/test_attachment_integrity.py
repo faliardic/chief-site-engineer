@@ -26,6 +26,7 @@ from app.attachment_integrity import (
     SEVERITY_WARNING,
     UNREADABLE_FILE,
     build_attachment_integrity_result,
+    build_attachment_integrity_results_dry_run,
     build_attachment_integrity_report,
     build_attachment_integrity_report_summary,
     export_attachment_integrity_report_to_json_file,
@@ -34,6 +35,22 @@ from app.attachment_integrity import (
     serialize_attachment_integrity_report_summary,
     serialize_attachment_integrity_result,
 )
+from app.models import FileAttachmentRecord
+
+
+def _file_attachment_record(
+    attachment_id: str = "file-att-001",
+    file_path: str = "attachments/ncr/NCR-001/korkuluk-eksigi.jpg",
+) -> FileAttachmentRecord:
+    return FileAttachmentRecord(
+        attachment_id=attachment_id,
+        related_record_type="nonconformity",
+        related_record_id="NCR-001",
+        file_name=file_path.rsplit("/", 1)[-1],
+        file_path=file_path,
+        file_type="image",
+        mime_type="image/jpeg",
+    )
 
 
 def test_attachment_integrity_status_constants_have_expected_values() -> None:
@@ -309,6 +326,111 @@ def test_build_attachment_integrity_result_keeps_checked_at_and_notes() -> None:
 
     assert result.checked_at == checked_at
     assert result.notes == "Manual recheck completed."
+
+
+def test_build_attachment_integrity_results_dry_run_returns_ok_for_existing_file() -> None:
+    attachment = _file_attachment_record()
+
+    results = build_attachment_integrity_results_dry_run(
+        [attachment],
+        {attachment.file_path: True},
+    )
+
+    assert len(results) == 1
+    assert results[0].status_code == OK
+    assert results[0].severity == SEVERITY_OK
+    assert results[0].attachment_id == attachment.attachment_id
+    assert results[0].expected_path == attachment.file_path
+
+
+def test_build_attachment_integrity_results_dry_run_returns_missing_file() -> None:
+    attachment = _file_attachment_record()
+
+    results = build_attachment_integrity_results_dry_run(
+        [attachment],
+        {attachment.file_path: False},
+    )
+
+    assert results[0].status_code == MISSING_FILE
+    assert results[0].severity == SEVERITY_ERROR
+    assert results[0].metadata_exists is True
+    assert results[0].file_exists is False
+
+
+def test_build_attachment_integrity_results_dry_run_treats_missing_map_path_as_missing_file() -> None:
+    attachment = _file_attachment_record()
+
+    results = build_attachment_integrity_results_dry_run([attachment], {})
+
+    assert results[0].status_code == MISSING_FILE
+    assert results[0].file_exists is False
+
+
+def test_build_attachment_integrity_results_dry_run_returns_multiple_results() -> None:
+    existing_attachment = _file_attachment_record(
+        attachment_id="file-att-001",
+        file_path="attachments/ncr/NCR-001/existing.jpg",
+    )
+    missing_attachment = _file_attachment_record(
+        attachment_id="file-att-002",
+        file_path="attachments/ncr/NCR-001/missing.jpg",
+    )
+
+    results = build_attachment_integrity_results_dry_run(
+        [existing_attachment, missing_attachment],
+        {existing_attachment.file_path: True, missing_attachment.file_path: False},
+    )
+
+    assert isinstance(results, tuple)
+    assert [result.status_code for result in results] == [OK, MISSING_FILE]
+
+
+def test_build_attachment_integrity_results_dry_run_uses_checked_at_for_all_results() -> None:
+    checked_at = datetime(2026, 6, 7, 14, 32, 10, tzinfo=timezone.utc)
+    attachments = [
+        _file_attachment_record("file-att-001", "attachments/ncr/NCR-001/a.jpg"),
+        _file_attachment_record("file-att-002", "attachments/ncr/NCR-001/b.jpg"),
+    ]
+
+    results = build_attachment_integrity_results_dry_run(
+        attachments,
+        {attachment.file_path: True for attachment in attachments},
+        checked_at=checked_at,
+    )
+
+    assert all(result.checked_at == checked_at for result in results)
+
+
+def test_build_attachment_integrity_results_dry_run_uses_path_map_without_real_file() -> None:
+    attachment = _file_attachment_record(
+        file_path="attachments/ncr/NCR-001/not-created-on-disk.jpg"
+    )
+
+    results = build_attachment_integrity_results_dry_run(
+        [attachment],
+        {attachment.file_path: True},
+    )
+
+    assert results[0].status_code == OK
+    assert results[0].file_exists is True
+
+
+def test_build_attachment_integrity_results_dry_run_does_not_mutate_records() -> None:
+    attachment = _file_attachment_record()
+    original_values = vars(attachment).copy()
+
+    build_attachment_integrity_results_dry_run(
+        [attachment],
+        {attachment.file_path: True},
+    )
+
+    assert vars(attachment) == original_values
+
+
+def test_build_attachment_integrity_results_dry_run_returns_empty_tuple_for_empty_records() -> None:
+    results = build_attachment_integrity_results_dry_run([], {})
+
+    assert results == ()
 
 
 def test_attachment_integrity_report_summary_empty_results() -> None:

@@ -181,6 +181,28 @@ def build_attachment_integrity_result(
     return AttachmentIntegrityResult(**result_values)
 
 
+def build_attachment_integrity_results_dry_run(
+    attachment_records,
+    file_existence_by_path,
+    *,
+    checked_at: datetime | None = None,
+) -> tuple[AttachmentIntegrityResult, ...]:
+    results = []
+    for attachment_record in attachment_records:
+        result_values = {
+            "attachment_id": attachment_record.attachment_id,
+            "expected_path": attachment_record.file_path,
+            "metadata_exists": True,
+            "file_exists": bool(
+                file_existence_by_path.get(attachment_record.file_path, False)
+            ),
+        }
+        if checked_at is not None:
+            result_values["checked_at"] = checked_at
+        results.append(build_attachment_integrity_result(**result_values))
+    return tuple(results)
+
+
 def build_attachment_integrity_report_summary(
     results: list[AttachmentIntegrityResult],
 ) -> AttachmentIntegrityReportSummary:

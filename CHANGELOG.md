@@ -1,5 +1,12 @@
 # Changelog
 
+## Step 109
+
+- Added the attachment integrity dry-run helper start.
+- The helper produces `AttachmentIntegrityResult` values from provided `FileAttachmentRecord` metadata records and a path-to-exists map without scanning the real file system.
+- Added tests for existing files, missing files, missing map entries, multiple records, shared `checked_at`, map-only behavior without creating files, non-mutating input behavior, and empty input.
+- No folder traversal, orphan scan, root/path security check, file delete/move/copy, upload, backup, audit, database, API, GUI, CLI, AI integration, commit, push, or ZIP staging was added.
+
 ## Step 108
 
 - Documented the attachment integrity scanner input model plan.
