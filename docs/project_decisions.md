@@ -923,3 +923,13 @@
 - Gercek santiye kullanimi urun kararlarini yonlendirecek; her yeni ozellik gercek problem, kucuk arac, sahada test, duzeltme ve tekrar test dongusunden gecmelidir.
 - Sahada kayit acma suresi 20-30 saniyeyi gecmemelidir.
 - Yeni ozellik filtresi: Bu ozellik santiye sefinin sahada unutmamasini, kanitlamasini, takip etmesini, raporlamasini veya daha sonra geri cagirmasini kolaylastiriyor mu?
+
+## 107 Attachment Integrity Scanner Scope Plani
+
+- Attachment integrity scanner once dry-run ve raporlama mantiginda tasarlanacak.
+- Ilk asamada dosya silme, dosya tasima, otomatik duzeltme, orphan dosya karantinaya alma veya metadata guncelleme yapilmayacak.
+- Scanner yalnizca acikca verilen attachment root siniri icinde calismali; root disina cikan relative path degerleri kabul edilmemelidir.
+- Absolute path davranisi ve path traversal riski ayri tasarlanacak; ilk scanner kontrolsuz proje disi path'lere cikmayacak.
+- Scanner ciktisi mevcut `AttachmentIntegrityResult` ve `AttachmentIntegrityReport` hatti ile uyumlu olmali.
+- Ilk kapsam `OK`, `MISSING_FILE`, `ORPHAN_FILE`, `INVALID_PATH`, `DUPLICATE_METADATA` ve `UNREADABLE_FILE` durumlarini tespit etmeye odaklanir.
+- Bu adimda scanner implementasyonu, dosya sistemi taramasi, upload service, backup/restore, audit event, database, API, GUI veya CLI eklenmedi.

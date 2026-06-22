@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 107
+
+- Documented the attachment integrity scanner scope plan.
+- Clarified that the future scanner will check consistency between `FileAttachmentRecord` metadata and the physical file system in dry-run mode.
+- Defined the first scanner scope as reporting/detection only, without deleting, moving, fixing, upload service integration, backup, audit, database, API, GUI, CLI, or AI integration.
+- Recorded path traversal protection and explicit attachment root boundaries as scanner safety principles.
+- No application code, test files, scanner implementation, file system scan, commit, push, or ZIP staging was added.
+
 ## Step 106
 
 - Documented the CSE product vision and site memory strategy.
