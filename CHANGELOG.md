@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 106
+
+- Documented the CSE product vision and site memory strategy.
+- Clarified that the first real competitors are not large construction management platforms, but scattered field habits such as WhatsApp groups, phone galleries, Excel lists, notebook notes, folder disorder, mail attachments, and "I wrote this somewhere" workflows.
+- Positioned CSE as the site chief's smart agenda, field memory, photo/file evidence archive, and reliable data ground for a future AI-assisted field helper.
+- Clarified that AI is not the first layer; it is a later value-increasing layer built on top of a reliable data backbone and searchable site memory.
+- No application code, test files, database, API, GUI, CLI, scanner, upload service, AI integration, automation, commit, push, or ZIP staging was added.
+
 ## Step 105
 
 - Added `export_attachment_integrity_report_to_json_file` to write an `AttachmentIntegrityReport` JSON string to an explicitly provided file path.

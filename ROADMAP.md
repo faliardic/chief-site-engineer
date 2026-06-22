@@ -13,7 +13,7 @@ Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test
 Guncel test durumu:
 
 ```text
-191 passed
+208 passed
 ```
 
 Proje su anda domain model, bellek ici repository, test, dokumantasyon, learning ve NotebookLM podcast notlari cekirdegi seviyesindedir.
@@ -111,31 +111,32 @@ Bu fazda hedef yeni urun ozelligi eklemek degil; mevcut dokumantasyon ve proje s
 
 Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistence, upload, integrity, audit ve CI omurgasina gecis icin kucuk ve testli adimlar atmaktir.
 
-## Faz 101-120 - Denetim, Attachment Integrity Export, Scanner ve Audit Hazirligi
+## Faz 101-121 - Denetim, Attachment Integrity Export, Scanner ve Audit Hazirligi
 
 - [x] Adim 101 - Genel proje denetimi ve mimari saglik raporu.
 - [x] Adim 102 - README guncellik duzeltmesi: Adim 100 / 191 test ve yeni kapsam bilgisi.
 - [x] Adim 103 - Attachment integrity JSON string export helper.
 - [x] Adim 104 - Attachment integrity JSON file export tasarim dokumani.
 - [x] Adim 105 - Attachment integrity JSON file export helper ve testleri.
-- [ ] Adim 106 - Scanner scope plani.
-- [ ] Adim 107 - Scanner input modeli / plani.
-- [ ] Adim 108 - Attachment scanner dry-run helper baslangici.
-- [ ] Adim 109 - Scanner dry-run testleri.
-- [ ] Adim 110 - Attachment integrity rapor kullanim ozeti.
-- [ ] Adim 111 - Audit event model plani.
-- [ ] Adim 112 - AuditEventRecord baslangic modeli.
-- [ ] Adim 113 - Audit event validation testleri.
-- [ ] Adim 114 - Official record / private workspace model plani.
-- [ ] Adim 115 - PrivateWorkspaceRecord baslangic modeli.
-- [ ] Adim 116 - HandoverPackageRecord plani.
-- [ ] Adim 117 - HandoverPackageRecord baslangic modeli.
-- [ ] Adim 118 - Hard delete prevention model contract dokumantasyonu.
-- [ ] Adim 119 - Test dosyasi bolme plani.
-- [ ] Adim 120 - 101-120 guvenli nokta kalite kontrol ve podcast kapanisi.
+- [x] Adim 106 - CSE urun vizyonu ve saha hafizasi stratejisi.
+- [ ] Adim 107 - Scanner scope plani.
+- [ ] Adim 108 - Scanner input modeli / plani.
+- [ ] Adim 109 - Attachment scanner dry-run helper baslangici.
+- [ ] Adim 110 - Scanner dry-run testleri.
+- [ ] Adim 111 - Attachment integrity rapor kullanim ozeti.
+- [ ] Adim 112 - Audit event model plani.
+- [ ] Adim 113 - AuditEventRecord baslangic modeli.
+- [ ] Adim 114 - Audit event validation testleri.
+- [ ] Adim 115 - Official record / private workspace model plani.
+- [ ] Adim 116 - PrivateWorkspaceRecord baslangic modeli.
+- [ ] Adim 117 - HandoverPackageRecord plani.
+- [ ] Adim 118 - HandoverPackageRecord baslangic modeli.
+- [ ] Adim 119 - Hard delete prevention model contract dokumantasyonu.
+- [ ] Adim 120 - Test dosyasi bolme plani.
+- [ ] Adim 121 - 101-121 guvenli nokta kalite kontrol ve podcast kapanisi.
 
 Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara bolerek once dokumantasyon guncelligini, sonra attachment integrity export/scanner hattini, ardindan audit ve private workspace modelleme zeminini guclendirmektir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 106 ile attachment integrity scanner scope plani ele alinabilir.
+Adim 107 ile attachment integrity scanner scope plani ele alinabilir.

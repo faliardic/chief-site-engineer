@@ -913,3 +913,13 @@
 - Parent klasor yoksa otomatik klasor olusturulmayacak ve `FileNotFoundError` verilecek.
 - Testlerde yalnizca pytest `tmp_path` kullanildi; gercek proje klasorune test dosyasi yazilmadi.
 - Bu adimda scanner, klasor taramasi, backup/restore, audit event, upload service, API, GUI veya CLI eklenmedi.
+
+## 106 CSE Urun Vizyonu ve Saha Hafizasi Stratejisi
+
+- CSE'nin ilk rakibi buyuk insaat yonetim platformlari degil; WhatsApp gruplari, telefon galerisi, Excel listeleri, klasor karmasasi, defter notlari, mail ekleri ve "ben bunu bir yere yazmistim" duzenidir.
+- CSE'nin amaci daha fazla modul eklemek degil; santiye sefinin kayit, takip, kanit, arsiv ve hatirlama problemini sade sekilde cozmektir.
+- CSE once tarih, konum, kategori, fotograf/dosya, sorumlu kisi, durum, kapanis kaniti, audit/gecmis ve iliskilerden olusan guvenilir veri omurgasini kurar.
+- AI ilk katman degildir; dogru kayit, guvenilir arsiv, iliskili veri ve aranabilir saha hafizasi uzerine daha sonra gelecek deger artirici katmandir.
+- Gercek santiye kullanimi urun kararlarini yonlendirecek; her yeni ozellik gercek problem, kucuk arac, sahada test, duzeltme ve tekrar test dongusunden gecmelidir.
+- Sahada kayit acma suresi 20-30 saniyeyi gecmemelidir.
+- Yeni ozellik filtresi: Bu ozellik santiye sefinin sahada unutmamasini, kanitlamasini, takip etmesini, raporlamasini veya daha sonra geri cagirmasini kolaylastiriyor mu?
