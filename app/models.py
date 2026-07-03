@@ -686,3 +686,71 @@ class NonconformityClosureRecord:
     requires_follow_up: bool = False
     follow_up_note: str | None = None
     notes: str | None = None
+
+
+AUDIT_EVENT_TYPES: tuple[str, ...] = (
+    "record.created",
+    "record.updated",
+    "record.archived",
+    "record.restored",
+    "attachment.linked",
+    "attachment.unlinked",
+    "attachment.metadata_updated",
+    "integrity.checked",
+    "integrity.report_generated",
+    "integrity.issue_detected",
+    "json.exported",
+    "json.export_failed",
+    "backup.generated",
+    "backup.validated",
+    "restore.started",
+    "restore.completed",
+    "restore.failed",
+    "handover.package_generated",
+    "handover.package_validated",
+    "audit.event_created",
+    "audit.validation_failed",
+)
+
+AUDIT_EVENT_TYPE_SET: frozenset[str] = frozenset(AUDIT_EVENT_TYPES)
+
+
+@dataclass
+class AuditEventRecord:
+    """Represents a traceable audit event without persistence or automation."""
+
+    event_id: str
+    project_id: str
+    event_type: str
+    actor: str
+    occurred_at: str
+    target_record_type: str | None = None
+    target_record_id: str | None = None
+    reason: str | None = None
+    old_value: str | None = None
+    new_value: str | None = None
+    source: str | None = None
+    notes: str | None = None
+
+    def __post_init__(self) -> None:
+        required_fields = (
+            "event_id",
+            "project_id",
+            "event_type",
+            "actor",
+            "occurred_at",
+        )
+        for field_name in required_fields:
+            value = getattr(self, field_name)
+            if value is None or not value.strip():
+                raise ValueError(f"{field_name} is required")
+
+        if self.event_type not in AUDIT_EVENT_TYPE_SET:
+            raise ValueError("event_type is not supported")
+
+        target_type_is_set = self.target_record_type is not None
+        target_id_is_set = self.target_record_id is not None
+        if target_type_is_set != target_id_is_set:
+            raise ValueError(
+                "target_record_type and target_record_id must be provided together"
+            )

@@ -972,3 +972,68 @@
 - Dry-run helper dosya sistemi islemi yapmadan guvenli raporlama hatti saglar.
 - Audit, backup, root/path security ve orphan scan ayri adimlarda ele alinacaktir.
 - Bu adimda uygulama kodu, test dosyalari, scanner davranisi, serializer, JSON export kodu, audit event, backup/restore, database, API, GUI veya CLI degistirilmedi.
+
+## 112 Audit Event Model Plani
+
+- Audit event, kanit degeri tasiyan olaylarin izini tutmak icin planlanir.
+- Audit event resmi kayit, JSON export, backup dosyasi veya scanner sonucu degildir.
+- Ilk asamada yalnizca model plani yapilir; otomatik audit yazimi, repository veya database yoktur.
+- Attachment integrity raporu ve JSON export ileride audit event uretebilecek olaylar olarak degerlendirilebilir.
+- Audit event modeli ileride veri silme onleme, backup/restore ve handover package hattina zemin hazirlayacaktir.
+- Bu adimda `AuditEventRecord`, audit helper, audit repository, scanner degisikligi, JSON persistence, backup/restore implementasyonu, API, GUI veya CLI eklenmedi.
+
+## 113 AuditEventRecord Baslangic Modeli
+
+- `AuditEventRecord`, izlenebilir audit olaylari icin sade bir dataclass baslangic modeli olarak eklendi.
+- Zorunlu alanlar `event_id`, `project_id`, `event_type`, `actor` ve `occurred_at` olarak belirlendi.
+- Hedef kayit, gerekce, onceki/yeni deger, kaynak ve not bilgileri opsiyonel metadata alanlari olarak tutuldu.
+- Bu model resmi kayit, scanner sonucu, JSON export dosyasi, repository veya otomatik audit mekanizmasi degildir.
+- Bu adimda persistence, audit helper, otomatik audit yazimi, database, API, GUI, CLI, scanner entegrasyonu, backup/restore davranisi, commit, push veya ZIP staging eklenmedi.
+
+## 114 AuditEventRecord Validation Testleri
+
+- `AuditEventRecord` zorunlu alanlari runtime validation ile korunur.
+- Validation su asamada yalnizca bos string, whitespace-only string ve `None` degerleri engeller.
+- Tarih formati, event type enum, target pair tutarliligi ve ozel alan guvenligi sonraki adimlara birakildi.
+- Opsiyonel alanlar bu adimda esnek birakildi; bos string veya `None` degerleri reddedilmez.
+- Audit event hala persistence veya otomatik audit sistemi degildir.
+
+## 115 Audit Event Type Sozlesmesi
+
+- Audit event type degerleri domain/action biciminde planlandi.
+- `event_type` alani serbest aciklama alani degildir.
+- Insan tarafindan okunabilir aciklamalar `reason` veya `notes` alaninda tutulacak.
+- `old_value` ve `new_value` event type yerine kullanilmayacak.
+- Ilk event type listesi dokumantasyon sozlesmesi olarak belirlendi.
+- Event type validation ve kod sabitleri sonraki adima birakildi.
+- Bu adim documentation-only tutuldu.
+
+## 116 Audit Event Type Sabitleri ve Validation
+
+- Event type sozlesmesi ilk asamada `AUDIT_EVENT_TYPES` tuple degeriyle tutuldu.
+- Hizli membership kontrolu icin `AUDIT_EVENT_TYPE_SET` kullanildi.
+- Enum tercih edilmedi; bu asamada sade ve geri alinabilir sabit yapi yeterli goruldu.
+- `AuditEventRecord.event_type` artik yalnizca desteklenen event type degerlerini kabul eder.
+- `event_type is required` ile `event_type is not supported` hata ayrimi korundu.
+- Persistence, repository ve otomatik audit uretimi eklenmedi.
+
+## 117 Audit Event Target Record Iliski Kurallari
+
+- Target record iliskisi `target_record_type` ve `target_record_id` ciftiyle temsil edilecek.
+- Iki alan birlikte doluysa olay belirli bir kayda baglanir.
+- Iki alan birlikte bossa olay genel proje, sistem veya surec olayi olabilir.
+- Tek tarafli doluluk ileride validation riski olarak ele alinacak.
+- Target record alanlari aciklama, gerekce veya snapshot alani degildir.
+- Event type yalnizca olay turunu, target record alanlari ise olayin iliskili oldugu kaydi belirtir.
+- Pair validation ve target type sabitleri sonraki adima birakildi.
+- Bu adim documentation-only tutuldu.
+
+## 118 Audit Event Target Record Pair Validation
+
+- `target_record_type` ve `target_record_id` alanlari pair olarak ele alinir.
+- Iki alan birlikte `None` olabilir.
+- Iki alan birlikte dolu olabilir.
+- Tek tarafli target record referansi runtime validation ile reddedilir.
+- Validation bu adimda yalnizca `None` bazlidir.
+- Bos string / whitespace validation ve target type allowed-list sonraki adimlara birakildi.
+- Persistence, repository ve otomatik audit uretimi eklenmedi.

@@ -1110,6 +1110,14 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 
 `Validation`: Bir model veya is akisi icine gelen verinin temel kurallara uyup uymadigini kontrol etme davranisi.
 
+`__post_init__`: Dataclass nesnesi olustuktan hemen sonra calisan ve ek kontrol veya hazirlik yapmak icin kullanilabilen ozel metot.
+
+`Required Field`: Model olusturulurken bos veya eksik birakilmamasi gereken zorunlu alan.
+
+`Optional Field`: Model olusturulurken verilmesi zorunlu olmayan, `None` veya ileride doldurulacak deger tasiyabilen alan.
+
+`Whitespace`: Bosluk, tab veya satir sonu gibi ekranda anlamli metin gibi gorunmeyen karakterler.
+
 `Metadata integrity`: Dosya ekine ait kimlik, iliski, dosya yolu, dosya turu ve boyut bilgilerinin tutarli ve bozuk olmayan halde kalmasi.
 
 `ValueError`: Python'da bir deger beklenen kurala uymadiginda kullanilabilen hata tipi.
@@ -1201,3 +1209,35 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Data Isolation`: Farkli veri alanlarinin birbirine karismayacak sekilde ayrilmasi.
 
 `Owner User ID`: Bir private workspace veya kisisel kaydin hangi kullaniciya ait oldugunu gosteren sahiplik kimligi.
+
+`Event Type`: Audit event kaydinda olay turunu kisa ve sabit bir metinle anlatan alan degeri.
+
+`Domain/Action Naming`: Olay turunu `domain.action` biciminde, once alan sonra eylem olacak sekilde adlandirma yaklasimi.
+
+`Machine-Readable Value`: Kod, filtreleme veya raporlama tarafindan kolayca okunup karsilastirilabilen sabit deger.
+
+`Human-Readable Note`: Insan tarafindan okunmasi icin yazilan aciklama veya not bilgisi.
+
+`Allowed List`: Sadece onceden izin verilmis degerlerin kabul edildigi kontrol listesi.
+
+`Tuple`: Python'da sirali ve degistirilemeyen deger koleksiyonu.
+
+`Frozenset`: Python'da benzersiz degerlerden olusan ve sonradan degistirilemeyen set koleksiyonu.
+
+`Unsupported Event Type`: Audit event sozlesmesinde yer almayan ve model tarafindan reddedilen event type degeri.
+
+`Target Record`: Bir audit event olayinin iliskili oldugu ana kayit veya sistem ciktisi.
+
+`Target Record Type`: Audit event olayinin hangi tur kayitla iliskili oldugunu anlatan makine-okunabilir kategori degeri.
+
+`Target Record ID`: Audit event olayinin iliskili oldugu kaydin kimligini anlatan alan.
+
+`Pair Validation`: Birbirine bagli iki alanin birlikte dolu veya birlikte bos olmasi gibi iliski kurallarini kontrol etme davranisi.
+
+`Foreign Key`: Bir veritabani kaydinin baska bir tablodaki kaydi kimlik uzerinden isaret etmesini saglayan iliski yapisi.
+
+`None-Based Validation`: Bir alanin yalnizca `None` olup olmamasina bakarak yapilan validation.
+
+`Single-Sided Target Reference`: Target record iliskisinde `target_record_type` veya `target_record_id` alanlarindan sadece birinin dolu olmasi.
+
+`Target Reference`: Audit event olayinin iliskili oldugu kaydi tur ve kimlik bilgisiyle isaret eden referans.

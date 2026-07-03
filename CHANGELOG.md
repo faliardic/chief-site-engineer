@@ -1,5 +1,54 @@
 # Changelog
 
+## Step 118
+
+- Added pair validation for `AuditEventRecord.target_record_type` and `target_record_id`.
+- Single-sided target record references are now rejected with `ValueError`.
+- Kept validation None-based in this step.
+- No target type constants, enum, allowed-list, repository, database, persistence, automatic audit writing, commit, push, or ZIP staging was added.
+
+## Step 117
+
+- Documented relationship rules for `AuditEventRecord.target_record_type` and `target_record_id`.
+- Listed initial target record type candidates.
+- Clarified the separation between event type, target record, reason, notes, old_value, and new_value.
+- No code, tests, validation, enum, constants, repository, persistence, automatic audit writing, commit, push, or ZIP staging was added.
+
+## Step 116
+
+- Added the initial audit event type constants.
+- Added supported-list validation for `AuditEventRecord.event_type`.
+- Unsupported event type values are now rejected with `ValueError`.
+- No database, repository, persistence, JSON audit export, automatic audit writing, scanner integration, commit, push, or ZIP staging was added.
+
+## Step 115
+
+- Documented the first `AuditEventRecord.event_type` contract.
+- Defined the domain/action naming format for audit event type values.
+- Listed initial event type candidates for record, attachment, integrity, JSON export, backup/restore, handover, and audit system events.
+- No code, tests, validation, enum, constants, repository, persistence, automatic audit writing, commit, push, or ZIP staging was added.
+
+## Step 114
+
+- Added required field validation for `AuditEventRecord`.
+- Empty, whitespace-only, and `None` values are rejected for `event_id`, `project_id`, `event_type`, `actor`, and `occurred_at`.
+- Kept optional audit metadata fields flexible; no format, enum, target pair, JSON, or length validation was added.
+- No repository, persistence, JSON audit export, automatic audit writing, database, API, GUI, CLI, scanner integration, backup/restore behavior, commit, push, or ZIP staging was added.
+
+## Step 113
+
+- Added the `AuditEventRecord` dataclass as a plain starting model for traceable audit events.
+- Added focused model tests for required audit event fields, optional defaults, target record references, and change context metadata.
+- Documented that this step adds no persistence, audit helper, automatic audit writing, database, API, GUI, CLI, scanner integration, backup/restore behavior, commit, push, or ZIP staging.
+
+## Step 112
+
+- Documented the audit event model plan.
+- Clarified that an audit event is an event trail, not an official record, JSON export file, backup file, or scanner result.
+- Recorded future field candidates and event type candidates for an eventual audit event model.
+- Explained its relation to attachment integrity reports, JSON export snapshots, backup/restore, and official record separation.
+- No application code, test files, `AuditEventRecord`, audit helper, database, API, GUI, CLI, AI integration, scanner change, backup/restore implementation, commit, push, or ZIP staging was added.
+
 ## Step 111
 
 - Documented the attachment integrity report usage summary.

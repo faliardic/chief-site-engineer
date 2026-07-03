@@ -13,7 +13,7 @@ Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test
 Guncel test durumu:
 
 ```text
-208 passed
+237 passed
 ```
 
 Proje su anda domain model, bellek ici repository, test, dokumantasyon, learning ve NotebookLM podcast notlari cekirdegi seviyesindedir.
@@ -124,14 +124,14 @@ Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistenc
 - [x] Adim 109 - Attachment scanner dry-run helper baslangici.
 - [x] Adim 110 - Scanner dry-run testleri / kullanim netlestirmesi.
 - [x] Adim 111 - Attachment integrity rapor kullanim ozeti.
-- [ ] Adim 112 - Audit event model plani.
-- [ ] Adim 113 - AuditEventRecord baslangic modeli.
-- [ ] Adim 114 - Audit event validation testleri.
-- [ ] Adim 115 - Official record / private workspace model plani.
-- [ ] Adim 116 - PrivateWorkspaceRecord baslangic modeli.
-- [ ] Adim 117 - HandoverPackageRecord plani.
-- [ ] Adim 118 - HandoverPackageRecord baslangic modeli.
-- [ ] Adim 119 - Hard delete prevention model contract dokumantasyonu.
+- [x] Adim 112 - Audit event model plani.
+- [x] Adim 113 - AuditEventRecord baslangic modeli.
+- [x] Adim 114 - Audit event validation testleri.
+- [x] Adim 115 - Audit event type sozlesmesi dokumantasyonu.
+- [x] Adim 116 - Audit event type validation veya sabit sozlesme implementasyonu.
+- [x] Adim 117 - Audit event target record iliski kurallari dokumantasyonu.
+- [x] Adim 118 - Audit event target record pair validation.
+- [ ] Adim 119 - Audit event target record type sabitleri veya target record icerik validation tasarimi.
 - [ ] Adim 120 - Test dosyasi bolme plani.
 - [ ] Adim 121 - 101-121 guvenli nokta kalite kontrol ve podcast kapanisi.
 
@@ -139,4 +139,4 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 
 ## Sonraki Calisma Onerisi
 
-Adim 112 ile audit event model plani ele alinabilir.
+Adim 119 ile audit event target record type sabitleri veya target record icerik validation tasarimi ele alinabilir.
