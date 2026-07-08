@@ -73,6 +73,12 @@ Target type adaylari Adim 117'de dokumante edildi ancak bu adimda koda baglanmad
 
 Allowed-list eklemek daha genis bir sozlesme karari gerektirir. Bu adim sadece pair validation ile sinirlidir.
 
+Adim 119'da `target_record_type` degerleri icin ayri type sozlesmesi dokumante edildi.
+
+Bu nedenle Adim 118 pair validation'i target type allowed-list kontrolu yapmaz. Bu validation yalnizca `target_record_type` ve `target_record_id` alanlarinin birlikte kullanilip kullanilmadigini kontrol eder.
+
+Target type degerinin desteklenen listede olup olmadigi, bos string / whitespace kontrolu ve daha ayrintili icerik validation'i sonraki ayri adimlarin konusudur.
+
 ## Test kapsami
 
 Eklenen testler sunlari dogrular:
@@ -92,6 +98,8 @@ Bu adimda database, repository, migration, foreign key implementasyonu, JSON imp
 
 ## Adim 119'a baglanti
 
-Adim 119 icin uygun sonraki konu, audit event target record type sabitleri veya target record icerik validation tasarimidir.
+Adim 119 icin uygun sonraki konu, audit event target record type sozlesmesi dokumantasyonudur.
 
 Pair validation artik temel tek tarafli referans riskini engelledigi icin sonraki adimda target type sozlugu veya bos string/whitespace icerik validation'i degerlendirilebilir.
+
+Adim 119 bu sozlesmeyi documentation-only olarak ele alir; target type constants ve allowed-list validation implementasyonu Adim 120 veya sonraki adimlara birakilir.

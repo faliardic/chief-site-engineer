@@ -1,5 +1,74 @@
 # Changelog
 
+## Step 127
+
+- Updated README, ROADMAP, changelog, and project decision documentation for the Step 127 safe-point quality-control pass.
+- Added repository hygiene policy for ZIP files and LF line endings through `.gitignore` / `.gitattributes`.
+- Kept this as a documentation / cleanup / quality-control step.
+- No application behavior, model, validation, business logic, or test file behavior was changed.
+- Verified `python -m pytest`: `243 passed`.
+- Verified `git diff --check`: clean.
+- No commit, push, or ZIP staging was added.
+
+## Step 126
+
+- Added Podcast 020 / Step 115-120 NotebookLM podcast note.
+- Kept this as a documentation-only step.
+- No application code or test files were changed.
+- No commit, push, or ZIP staging was added.
+
+## Step 125
+
+- Added Podcast 019 / Step 109-114 NotebookLM podcast note.
+- Kept this as a documentation-only step.
+- No application code or test files were changed.
+- No commit, push, or ZIP staging was added.
+
+## Step 124
+
+- Added Podcast 018 / Step 103-108 NotebookLM podcast note.
+- Kept this as a documentation-only step.
+- No application code or test files were changed.
+- No commit, push, or ZIP staging was added.
+
+## Step 123
+
+- Added Podcast 017 / Step 097-102 NotebookLM podcast note.
+- Kept this as a documentation-only step.
+- No application code or test files were changed.
+- No commit, push, or ZIP staging was added.
+
+## Step 122
+
+- Documented the validation design for `AuditEventRecord.target_record_id`.
+- Defined general format validation and prefix/type matching as two separate stages.
+- Documented the future error message design and validation order.
+- Explained the backward compatibility risk.
+- No code, tests, regex validation, prefix validation, repository, persistence, commit, push, or ZIP staging was added.
+
+## Step 121
+
+- Documented the first format design for `AuditEventRecord.target_record_id`.
+- Added the target type / prefix candidate table.
+- Clarified the separation between target_record_id and event_type, target_record_type, reason, notes, old_value, and new_value.
+- Documented future validation options.
+- No code, tests, validation, regex, repository, persistence, commit, push, or ZIP staging was added.
+
+## Step 120
+
+- Added the initial audit target record type constants.
+- Added supported-list validation for `AuditEventRecord.target_record_type`.
+- Empty or whitespace-only target record reference values are now rejected.
+- No target record id format validation, repository, persistence, automatic audit writing, commit, push, or ZIP staging was added.
+
+## Step 119
+
+- Documented the first type contract for `AuditEventRecord.target_record_type`.
+- Listed the initial target record type candidates.
+- Clarified the separation between target record type and event type, reason, notes, old_value, and new_value.
+- Documented the future allowed-list validation design.
+- No code, tests, validation, enum, repository, persistence, commit, push, or ZIP staging was added.
+
 ## Step 118
 
 - Added pair validation for `AuditEventRecord.target_record_type` and `target_record_id`.

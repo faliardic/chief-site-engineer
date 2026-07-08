@@ -3,6 +3,8 @@ import pytest
 from app.models import (
     AUDIT_EVENT_TYPE_SET,
     AUDIT_EVENT_TYPES,
+    AUDIT_TARGET_RECORD_TYPE_SET,
+    AUDIT_TARGET_RECORD_TYPES,
     ArchiveDocument,
     AttachmentRecord,
     AuditEventRecord,
@@ -94,7 +96,7 @@ def test_audit_event_record_can_reference_target_and_change_context() -> None:
         event_type="record.archived",
         actor="Kalite sorumlusu",
         occurred_at="2026-06-23T11:00:00",
-        target_record_type="NonconformityRecord",
+        target_record_type="project_record",
         target_record_id="NCR-001",
         reason="Kayit kapatma sonrasi arsivlendi.",
         old_value="open",
@@ -103,7 +105,7 @@ def test_audit_event_record_can_reference_target_and_change_context() -> None:
         notes="Sadece olay izi; otomatik arsivleme davranisi yok.",
     )
 
-    assert event.target_record_type == "NonconformityRecord"
+    assert event.target_record_type == "project_record"
     assert event.target_record_id == "NCR-001"
     assert event.reason == "Kayit kapatma sonrasi arsivlendi."
     assert event.old_value == "open"
@@ -179,11 +181,9 @@ def test_audit_event_record_allows_none_optional_fields() -> None:
     assert event.notes is None
 
 
-def test_audit_event_record_does_not_validate_optional_empty_strings_yet() -> None:
+def test_audit_event_record_does_not_validate_optional_metadata_empty_strings_yet() -> None:
     event = AuditEventRecord(
         **_valid_audit_event_kwargs(),
-        target_record_type="",
-        target_record_id="",
         reason="",
         old_value="",
         new_value="",
@@ -191,8 +191,8 @@ def test_audit_event_record_does_not_validate_optional_empty_strings_yet() -> No
         notes="",
     )
 
-    assert event.target_record_type == ""
-    assert event.target_record_id == ""
+    assert event.target_record_type is None
+    assert event.target_record_id is None
     assert event.reason == ""
     assert event.old_value == ""
     assert event.new_value == ""
@@ -261,6 +261,71 @@ def test_audit_event_record_rejects_target_record_id_without_type() -> None:
         match="target_record_type and target_record_id must be provided together",
     ):
         AuditEventRecord(**values)
+
+
+def test_audit_target_record_types_include_initial_contract_values() -> None:
+    expected_values = {
+        "project",
+        "project_record",
+        "attachment",
+        "attachment_metadata",
+        "attachment_integrity_report",
+        "json_export",
+        "backup_package",
+        "restore_operation",
+        "handover_package",
+        "audit_event",
+    }
+
+    assert expected_values.issubset(AUDIT_TARGET_RECORD_TYPES)
+
+
+def test_audit_target_record_type_set_matches_tuple_without_duplicates() -> None:
+    assert AUDIT_TARGET_RECORD_TYPE_SET == frozenset(AUDIT_TARGET_RECORD_TYPES)
+    assert len(AUDIT_TARGET_RECORD_TYPES) == len(AUDIT_TARGET_RECORD_TYPE_SET)
+
+
+def test_audit_event_record_accepts_supported_target_record_type() -> None:
+    values = _valid_audit_event_kwargs()
+    values["event_type"] = "attachment.linked"
+    values["target_record_type"] = "attachment"
+    values["target_record_id"] = "ATT-2026-0001"
+
+    event = AuditEventRecord(
+        **values,
+    )
+
+    assert event.target_record_type == "attachment"
+    assert event.target_record_id == "ATT-2026-0001"
+
+
+def test_audit_event_record_rejects_unsupported_target_record_type() -> None:
+    values = _valid_audit_event_kwargs()
+    values["target_record_type"] = "unknown_record"
+    values["target_record_id"] = "REC-1"
+
+    with pytest.raises(ValueError, match="target_record_type is not supported"):
+        AuditEventRecord(**values)
+
+
+def test_audit_event_record_rejects_empty_target_record_type() -> None:
+    for empty_value in ("", "   "):
+        values = _valid_audit_event_kwargs()
+        values["target_record_type"] = empty_value
+        values["target_record_id"] = "REC-1"
+
+        with pytest.raises(ValueError, match="target_record_type is required"):
+            AuditEventRecord(**values)
+
+
+def test_audit_event_record_rejects_empty_target_record_id() -> None:
+    for empty_value in ("", "   "):
+        values = _valid_audit_event_kwargs()
+        values["target_record_type"] = "project_record"
+        values["target_record_id"] = empty_value
+
+        with pytest.raises(ValueError, match="target_record_id is required"):
+            AuditEventRecord(**values)
 
 
 def _valid_file_attachment_kwargs() -> dict[str, str | int]:

@@ -1037,3 +1037,73 @@
 - Validation bu adimda yalnizca `None` bazlidir.
 - Bos string / whitespace validation ve target type allowed-list sonraki adimlara birakildi.
 - Persistence, repository ve otomatik audit uretimi eklenmedi.
+
+## 119 Audit Event Target Record Type Sozlesmesi
+
+- `target_record_type` icin ilk type sozlesmesi dokumante edildi.
+- Target type degerleri kucuk harfli, makine tarafindan okunabilir ve sabit sozlesmeye uygun olacak sekilde planlandi.
+- Ilk adaylar `project`, `project_record`, `attachment`, `attachment_metadata`, `attachment_integrity_report`, `json_export`, `backup_package`, `restore_operation`, `handover_package`, `audit_event` olarak belirlendi.
+- Target record type aciklama, gerekce, snapshot veya ozel alan verisi tasimayacak.
+- Allowed-list validation ve sabitlerin implementasyonu sonraki adima birakildi.
+- Bu adim documentation-only tutuldu.
+
+## 120 Audit Event Target Record Type Sabitleri ve Validation
+
+- Target record type sozlesmesi `AUDIT_TARGET_RECORD_TYPES` tuple degeriyle koda baglandi.
+- Hizli membership kontrolu icin `AUDIT_TARGET_RECORD_TYPE_SET` kullanildi.
+- Enum tercih edilmedi; sade ve geri alinabilir sabit yapi yeterli goruldu.
+- `AuditEventRecord.target_record_type` artik yalnizca desteklenen degerleri kabul eder.
+- Pair validation ile allowed-list validation ayrimi korundu.
+- `target_record_id` format validation sonraki adimlara birakildi.
+- Persistence, repository ve otomatik audit uretimi eklenmedi.
+
+## 121 Audit Event Target Record ID Format Tasarimi
+
+- `target_record_id` icin ilk format yaklasimi dokumante edildi.
+- Onerilen genel bicim `<TYPE_PREFIX>-<YEAR>-<SEQUENCE>` olarak belirlendi.
+- Prefix adaylari target record type degerlerine gore tasarlandi.
+- Format tasarimi bu adimda koda baglanmadi.
+- Prefix validation, gercek model id alanlariyla uyum kontrolunden sonra ele alinacak.
+- `target_record_id` aciklama, gerekce, snapshot veya ozel alan verisi tasimayacak.
+- Bu adim documentation-only tutuldu.
+
+## 122 Audit Event Target Record ID Validation Tasarimi
+
+- `target_record_id` validation tasarimi iki asamali planlandi.
+- Ilk asama genel format validation olabilir.
+- Ikinci asama prefix / target type uyumu olabilir.
+- Prefix validation gercek model id alanlariyla uyum kontrolunden once kodlanmayacak.
+- Geriye donuk uyumluluk riski nedeniyle bu adim documentation-only tutuldu.
+- Regex validation ve prefix validation sonraki adimlara birakildi.
+
+## 123 Podcast 017 - Adim 097-102 NotebookLM Podcast Notu
+
+- Podcast notlari hattinin Adim 097-102 araligindan itibaren geriden tamamlanmasina karar verildi.
+- Podcast 017, eksik podcast zincirini tamamlamak icin documentation-only olarak olusturuldu.
+- Podcast notlari kod davranisini degistirmez; proje hafizasini ve ogrenme aktarimini guclendirir.
+
+## 124 Podcast 018 - Adim 103-108 NotebookLM Podcast Notu
+
+- Podcast notlari hattinda Podcast 018 ile Adim 103-108 araligi tamamlandi.
+- Podcast 018, eksik podcast zincirini sirali tamamlamak icin documentation-only olarak olusturuldu.
+- Podcast notlari kod davranisini degistirmez; proje hafizasini ve ogrenme aktarimini guclendirir.
+
+## 125 Podcast 019 - Adim 109-114 NotebookLM Podcast Notu
+
+- Podcast notlari hattinda Podcast 019 ile Adim 109-114 araligi tamamlandi.
+- Podcast 019, eksik podcast zincirini sirali tamamlamak icin documentation-only olarak olusturuldu.
+- Podcast notlari kod davranisini degistirmez; proje hafizasini ve ogrenme aktarimini guclendirir.
+
+## 126 Podcast 020 - Adim 115-120 NotebookLM Podcast Notu
+
+- Podcast notlari hattinda Podcast 020 ile Adim 115-120 araligi tamamlandi.
+- Podcast 020, eksik podcast zincirini sirali tamamlamak icin documentation-only olarak olusturuldu.
+- Podcast notlari kod davranisini degistirmez; proje hafizasini ve ogrenme aktarimini guclendirir.
+
+## 127 Guvenli Nokta Kalite Kontrol ve Dokumantasyon Temizligi
+
+- Yeni ozellik eklenmeden once README, ROADMAP, CHANGELOG ve kalite kontrol ciktilari guncel tutulacak.
+- ZIP dosyalari repo kapsami disinda kalacak; guvenli nokta arsivleri commit/stage kapsaminda olmayacak ve `.gitignore` ile dislanacak.
+- Satir sonu ve whitespace gurultusunu azaltmak icin Python, Markdown ve text dosyalarinda LF satir sonu tercih edilecek.
+- Guvenli nokta oncesi `python -m pytest` ve `git diff --check` kontrolleri yapilacak.
+- Bu adim documentation / cleanup / quality-control adimidir; uygulama kodu, test dosyalari, yeni model, validation, business logic, API, GUI, CLI, commit, push veya ZIP staging eklenmedi.

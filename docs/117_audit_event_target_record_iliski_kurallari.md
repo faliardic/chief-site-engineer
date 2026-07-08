@@ -91,6 +91,12 @@ Adim 118'de `target_record_type` ve `target_record_id` icin ilk pair validation 
 
 Bu validation yalnizca `None` bazli tek tarafli dolulugu engeller. Target type allowed-list, bos string validation ve whitespace validation henuz eklenmedi.
 
+Adim 119'da `target_record_type` icin ilk type sozlesmesi ayri bir dokuman olarak kaydedildi.
+
+Bu sozlesme target type degerlerinin hangi aday listeden gelecegini, hangi adlandirma kurallarina uyacagini ve hangi alanlarin yerine kullanilmayacagini aciklar.
+
+Target type allowed-list ve bu listeye bagli validation henuz koda eklenmedi. Adim 118 pair validation'i iki alanin birlikte kullanilip kullanilmadigini korur; Adim 119 type sozlesmesi ise ayri karar hattidir.
+
 ## Ilk target record type adaylari
 
 | Target record type | Ne zaman kullanilir? | Target record id neyi temsil eder? | Ornek event type |
@@ -178,8 +184,10 @@ Bu adimda test eklenmedi veya mevcut test guncellenmedi.
 
 Bu adimda target record enum, constants, repository baglantisi, database iliski modeli, foreign key tasarimi, JSON schema, migration, API veya GUI davranisi eklenmedi.
 
-## Adim 118'e baglanti
+## Adim 118 ve Adim 119'a baglanti
 
 Adim 118 icin uygun sonraki konu, audit event target record validation veya target type sabitleridir.
 
 Bu adimda kurallar yalnizca dokumante edildi. Sonraki adimda pair validation veya target type allowed-list kod seviyesinde ele alinabilir.
+
+Adim 119'da target record type degerleri icin ilk sozlesme dokumante edildi. Bu sozlesme kod davranisi eklemeden Adim 120'de ele alinabilecek target type constants ve allowed-list validation icin zemin hazirlar.

@@ -9,22 +9,22 @@ Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici reposit
 Son guvenli nokta:
 
 ```text
-Adim 100 - Guvenli nokta final kalite kontrol
+Adim 127 - Guvenli nokta kalite kontrol ve dokumantasyon temizligi
 ```
 
 Guncel test sonucu:
 
 ```text
-191 passed
+243 passed
 ```
 
-Son buyuk faz:
+Mevcut calisma durumu:
 
 ```text
-Adim 081-100 - Duzeltme, standart kilitleme, attachment integrity, veri politikasi, podcast notlari ve final kalite kontrol
+Adim 126 sonrasi / Adim 127 kalite kontrol hazirligi
 ```
 
-Adim 101'de genel proje denetimi ve mimari saglik raporu hazirlandi. Bu denetim, projenin attachment integrity hatti, dokumantasyon butunlugu, test kapsami, veri koruma politikasi ve sonraki 20 adim stratejisini degerlendirdi.
+Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, satir sonu politikasi, ZIP repo politikasi, test sonucu ve diff temizligi guvenli nokta oncesi guncellendi. Bu adim yeni urun davranisi eklemez; mevcut audit event ve attachment integrity hattinin dokumantasyonunu guncele ceker.
 
 ## Repo Koku
 
@@ -48,7 +48,7 @@ Proje su ana parcalardan olusur:
 
 ## Mevcut Teknik Kapsam
 
-Adim 100 itibariyla proje su alanlarda ilerlemistir:
+Adim 127 itibariyla proje su alanlarda ilerlemistir:
 
 - Temel santiye domain modelleri.
 - Gunluk saha, beton dokum, yapi denetim, malzeme, toplanti, RFI/submittal ve ilgili kayit modelleri.
@@ -65,11 +65,15 @@ Adim 100 itibariyla proje su alanlarda ilerlemistir:
 - `AttachmentIntegrityReportSummary`.
 - `AttachmentIntegrityReport`.
 - Attachment integrity report serializer fonksiyonlari.
+- Attachment integrity JSON string ve JSON file export helper fonksiyonlari.
+- Attachment scanner dry-run helper baslangici.
+- `AuditEventRecord` modeli, event type validation, target record pair validation ve target record type sozlesmesi.
+- Audit target record id format ve validation tasarimi dokumantasyonu.
 - Dosya eki saklama, adlandirma, arsiv guvenligi, silme/tasima karar dokumantasyonu.
 - CSE ana proje ilkeleri ve veri koruma politikasi.
 - Resmi kayit / Santiye Sefi Ozel Alani izolasyon politikasi.
 - Santiye sefi devir ve ozel alan politikasi.
-- Adim 001-096 araligi icin NotebookLM podcast notlari.
+- Adim 001-120 araligi icin NotebookLM podcast notlari.
 
 ## CSE Politika Dokumanlari
 
@@ -95,21 +99,24 @@ Podcast notlari `docs/podcast_notes/` altindadir.
 
 Son eklenen podcast notlari:
 
-- `docs/podcast_notes/014_adim_071_080_notebooklm_podcast_notu.md`
-- `docs/podcast_notes/015_adim_081_090_notebooklm_podcast_notu.md`
-- `docs/podcast_notes/016_adim_091_096_notebooklm_podcast_notu.md`
+- `docs/podcast_notes/017_adim_097_102_notebooklm_podcast_notu.md`
+- `docs/podcast_notes/018_adim_103_108_notebooklm_podcast_notu.md`
+- `docs/podcast_notes/019_adim_109_114_notebooklm_podcast_notu.md`
+- `docs/podcast_notes/020_adim_115_120_notebooklm_podcast_notu.md`
 
-Bu notlar, dosya eki metadata hatti, attachment integrity hazirliklari ve CSE veri koruma / ozel alan politikalarini podcast anlatimina uygun sekilde ozetler.
+Bu notlar, attachment integrity export/scanner hazirliklari, audit event modeli, audit validation hattini ve CSE veri koruma / ozel alan politikalarini podcast anlatimina uygun sekilde ozetler.
 
-## Adim 101 Denetim Bulgulari
+## Kalite Kontrol Notlari
 
-Adim 101 genel proje denetiminde su takip maddeleri belirlendi:
+Adim 127 guvenli nokta kalite kontrolunde su noktalar sabitlendi:
 
-- README bu adimla Adim 100 / `191 passed` durumuna guncellendi.
+- README, ROADMAP, CHANGELOG ve proje karar kayitlari Adim 126 sonrasi duruma gore guncellendi.
+- Guncel test sonucu `243 passed` olarak dogrulandi.
+- ZIP dosyalari repo kapsamindan dislanacak sekilde politika netlestirildi.
+- `.gitattributes` ile Python, Markdown ve text dosyalari icin LF satir sonu tercih edildi.
 - `app/models.py` buyume riski izleniyor; ileride domain bazli modulleme planlanabilir.
 - `tests/test_models.py` ve `tests/test_records.py` ileride domain bazli bolunebilir.
-- Attachment scanner'a gecmeden once JSON export veya scanner dry-run asamasi daha guvenli goruluyor.
-- Private workspace / resmi kayit ayrimi dokumanda guclu; ileride model ve test seviyesinde sabitlenmeli.
+- Audit event target id validation uygulamasina gecmeden once mevcut sozlesmelerin gercek model id bicimleriyle uyumu kontrol edilmeli.
 
 ## Henuz Olmayan Ozellikler
 
@@ -128,7 +135,7 @@ Asagidaki ozellikler henuz eklenmedi:
 - Deployment.
 - CI pipeline.
 - Thumbnail, preview, video oynatma veya streaming.
-- Otomatik audit trail modeli.
+- Otomatik audit trail uretimi.
 
 Bu sinir bilincli olarak korunuyor. Proje kucuk, testli ve izlenebilir adimlarla buyutuluyor.
 
@@ -153,7 +160,7 @@ python -m pytest
 Beklenen guncel sonuc:
 
 ```text
-191 passed
+243 passed
 ```
 
 ## Basit Calistirma
@@ -175,6 +182,12 @@ Onemli dokumantasyon dosyalari:
 - `docs/project_decisions.md`
 - `docs/100_guvenli_nokta_final_kalite_kontrol.md`
 - `docs/101_genel_proje_denetimi_ve_mimari_saglik_raporu.md`
+- `docs/117_audit_event_target_record_iliski_kurallari.md`
+- `docs/118_audit_event_target_record_pair_validation.md`
+- `docs/119_audit_event_target_record_type_sozlesmesi.md`
+- `docs/120_audit_event_target_record_type_validation.md`
+- `docs/121_audit_event_target_record_id_format_tasarimi.md`
+- `docs/122_audit_event_target_record_id_validation_tasarimi.md`
 - `docs/080_file_attachment_metadata_butunluk_ozeti.md`
 - `docs/089_attachment_metadata_integrity_kurallari.md`
 - `docs/podcast_notes/`
@@ -189,9 +202,6 @@ Bu proje ayni zamanda Python ve yazilim gelistirme ogrenim arsivi uretir.
 
 Sonraki onerilen teknik yonler:
 
-- Attachment integrity JSON export.
-- Scanner dry-run.
-- Audit event hazirligi.
+- Adim 128 icin audit target record id validation uygulama karari.
+- Podcast 021 ile Adim 121-122 NotebookLM podcast notu.
 - Private workspace model baslangici.
-
-Adim 103 icin en uygun devam, attachment integrity JSON-ready export dokumantasyonu veya JSON export helper hazirligi olabilir.

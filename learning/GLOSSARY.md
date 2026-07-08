@@ -1241,3 +1241,35 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Single-Sided Target Reference`: Target record iliskisinde `target_record_type` veya `target_record_id` alanlarindan sadece birinin dolu olmasi.
 
 `Target Reference`: Audit event olayinin iliskili oldugu kaydi tur ve kimlik bilgisiyle isaret eden referans.
+
+`Target Record Type Contract`: Audit event icindeki `target_record_type` degerlerinin nasil adlandirilacagini, hangi anlamda kullanilacagini ve hangi alanlarin yerine gecmeyecegini belirleyen sozlesme.
+
+`Allowed Target Type`: `target_record_type` alaninda kullanilmasina izin verilen makine-okunabilir kayit turu degeri.
+
+`Target Type Validation`: `target_record_type` degerinin bos olmadigini ve desteklenen target type listesinde bulundugunu kontrol eden gelecek validation davranisi.
+
+`Free Text Misuse`: Makine-okunabilir olmasi gereken bir alana aciklama, not veya cumle yazilmasi hatasi.
+
+`Audit Target Record Type`: Audit event kaydinda olayla iliskili hedef kaydin turunu anlatan destekli makine-okunabilir deger.
+
+`Target Type Set`: Target record type degerlerinde hizli membership kontrolu yapmak icin tuple degerlerinden uretilen `frozenset` koleksiyonu.
+
+`Target Reference Validation`: `target_record_type` ve `target_record_id` alanlarinin birlikte, bos olmayan ve desteklenen sekilde kullanildigini kontrol eden validation davranisi.
+
+`ID Prefix`: Bir kayit kimliginin basinda yer alan ve kaydin turunu anlatan kisa kod; ornegin `ATT` veya `BCK`.
+
+`ID Format`: Bir kayit kimliginin hangi parcalardan ve hangi sirayla olusacagini anlatan bicim kurali.
+
+`Prefix Validation`: Kayit kimliginin basindaki prefix degerinin beklenen kayit turuyle uyumlu olup olmadigini kontrol etme davranisi.
+
+`ID Generator`: Yeni kayit kimliklerini belirli bir formata gore otomatik ureten mekanizma.
+
+`Regex Validation`: Bir metin degerinin belirli bir regular expression pattern'ine uyup uymadigini kontrol etme davranisi.
+
+`Format Validation`: Bir alan degerinin beklenen genel bicime uyup uymadigini kontrol etme davranisi.
+
+`Prefix Match`: Bir kimlik degerinin basindaki prefix ile beklenen kayit turu prefix'inin uyumlu olmasi.
+
+`Backward Compatibility`: Yeni kurallar eklendiginde eski veri veya eski kullanimlarin bozulmadan calismaya devam etmesi.
+
+`ID Normalizer`: Farkli yazilmis kimlik degerlerini tek standart bicime donusturmeyi hedefleyen mekanizma.

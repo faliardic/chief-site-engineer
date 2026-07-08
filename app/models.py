@@ -715,6 +715,22 @@ AUDIT_EVENT_TYPES: tuple[str, ...] = (
 AUDIT_EVENT_TYPE_SET: frozenset[str] = frozenset(AUDIT_EVENT_TYPES)
 
 
+AUDIT_TARGET_RECORD_TYPES: tuple[str, ...] = (
+    "project",
+    "project_record",
+    "attachment",
+    "attachment_metadata",
+    "attachment_integrity_report",
+    "json_export",
+    "backup_package",
+    "restore_operation",
+    "handover_package",
+    "audit_event",
+)
+
+AUDIT_TARGET_RECORD_TYPE_SET: frozenset[str] = frozenset(AUDIT_TARGET_RECORD_TYPES)
+
+
 @dataclass
 class AuditEventRecord:
     """Represents a traceable audit event without persistence or automation."""
@@ -754,3 +770,15 @@ class AuditEventRecord:
             raise ValueError(
                 "target_record_type and target_record_id must be provided together"
             )
+
+        if self.target_record_type is None and self.target_record_id is None:
+            return
+
+        if not self.target_record_type.strip():
+            raise ValueError("target_record_type is required")
+
+        if not self.target_record_id.strip():
+            raise ValueError("target_record_id is required")
+
+        if self.target_record_type not in AUDIT_TARGET_RECORD_TYPE_SET:
+            raise ValueError("target_record_type is not supported")
