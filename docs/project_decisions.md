@@ -1138,3 +1138,10 @@
 - Soft validation helper ayri, hard validation helper ayri tasarlanacak; hard validation migration ve test standardizasyonu sonrasi degerlendirilecek.
 - `project_record` gibi genis target type degerleri coklu ID ailesi mapping'i ile desteklenecek.
 - Bu adim documentation-only / helper-design-planning adimidir; uygulama kodu, test dosyalari, constants implementasyonu, helper implementasyonu, regex validation, persistence, repository, API, GUI, CLI, podcast, commit, push veya ZIP staging eklenmedi.
+
+## Podcast 021 - Adim 127-131 NotebookLM Podcast Notu
+
+- Podcast 021, Adim 127-131 araligini guvenli nokta disiplini, attachment validation ve record ID sozlesmesi planlari ekseninde ozetler.
+- Podcast notlari kod davranisini degistirmez; proje hafizasini, karar aktarimini ve NotebookLM hazirligini guclendirir.
+- Bu podcastte `target_record_id` hard validation'in bilincli olarak ertelendigi ve once ID envanteri, central contract, mapping helper plani yaklasiminin secildigi acik tutulur.
+- Podcast 021 documentation-only olarak tutuldu; uygulama kodu, test dosyalari, Adim 132 implementasyonu, audit validation, commit, push veya ZIP staging eklenmedi.

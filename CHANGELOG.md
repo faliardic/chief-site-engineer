@@ -1,5 +1,13 @@
 # Changelog
 
+## Podcast 021
+
+- Added Podcast 021 / Step 127-131 NotebookLM podcast note.
+- Covered the Step 127 safe-point quality-control pass, Step 128 `FileAttachmentRecord` required metadata validation, Step 129 record ID inventory, Step 130 central record ID contract plan, and Step 131 record ID constants and mapping helper plan.
+- Documented that `AuditEventRecord.target_record_id` hard validation remains intentionally deferred until ID inventory, central contract, mapping helper, and test standardization are clear.
+- Kept this as a documentation-only podcast step; no application code, tests, validation behavior, audit hard validation, Step 132 work, commit, push, or ZIP staging was added.
+- Verified `python -m pytest`: `251 passed`.
+
 ## Step 131
 
 - Added a documentation-only record ID constants and target record type mapping helper plan.
