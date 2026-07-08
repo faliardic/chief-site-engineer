@@ -1278,3 +1278,14 @@
 - `AuditEventRecord.__post_init__` degistirilmedigi, `target_record_id` hard validation eklenmedigi, legacy ID orneklerinin korundugu ve `FileAttachmentRecord` davranisina dokunulmadigi yinelendi.
 - Podcast kapsami yalniz Adim 137-141 ile sinirli tutuldu; sonraki adimlar bu podcast kapsaminda anlatilmadi ve Podcast 024 olusturulmadi.
 - Bu adim documentation-only podcast adimidir; uygulama kodu, test dosyalari, hard validation, commit, push veya ZIP staging eklenmedi.
+
+## 144 Soft Validation Report API Boundary and Test Matrix Plan
+
+- Olasi `build_record_id_soft_validation_report(...)` helper'i icin API boundary, input/output sozlesmesi, status/severity yorumlama kurali ve test matrix documentation-only olarak planlandi.
+- Ilk guvenli input sozlesmesi diagnostic report dict olarak belirlendi; helper `build_record_id_diagnostic_report(...)` ciktisini yorumlayabilir, fakat record listesi, repository veya database sorgusu almayacak sekilde planlandi.
+- Olasi output sozlesmesi `status`, `total_count`, `compatible_count`, `warning_count`, `error_count`, `review_required`, `attention_required`, `messages`, `items` ve `summary` alanlarini icerebilir.
+- Status seviyeleri `pass`, `review` ve `attention` olarak planlandi; `blocked` seviyesi hard validation veya engelleme anlami dogurabilecegi icin bu asamada uretilmeyecek.
+- Test matrix bos diagnostic report, info-only pass, warning review, error attention, mixed warning/error attention, status onceligi, required flag mantigi, summary/count korunumu, items korunumu, input immutability, eksik alanlar, uygunsuz input tipi, unknown severity, warning'in kayit reddi olmamasi, error'in otomatik duzeltme olmamasi ve `blocked` uretilmemesini kapsayacak.
+- Soft validation report helper `AuditEventRecord.__post_init__`, constructor validation, hard validation, kayit engelleme, legacy kayit reddi, otomatik data correction, migration uygulamasi, database/repository yazimi, audit event olusturma veya `FileAttachmentRecord` davranisi degistirme icin kullanilmayacak.
+- `target_record_id` hard validation hala eklenmeyecek, `AuditEventRecord.__post_init__` degistirilmeyecek, legacy ID ornekleri korunacak ve `build_record_id_diagnostic_report(...)` davranisi degistirilmeyecek.
+- Bu adim documentation-only API-boundary/test-matrix plan adimidir; uygulama kodu, test dosyalari, soft validation helper implementasyonu, hard validation, Podcast 024, commit, push veya ZIP staging eklenmedi.

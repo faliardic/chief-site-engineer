@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 144
+
+- Added documentation-only API boundary and test matrix planning for a future `build_record_id_soft_validation_report(...)` helper.
+- Planned the first safe input contract as a diagnostic report dict produced by `build_record_id_diagnostic_report(...)`, keeping records, repositories, and database queries out of the initial helper boundary.
+- Planned a possible soft validation report output with `status`, counts, `review_required`, `attention_required`, `messages`, `items`, and `summary`.
+- Documented status rules for `pass`, `review`, and `attention`, and explicitly kept `blocked` out because it can imply hard validation or blocking behavior.
+- Planned tests for empty diagnostic reports, info-only pass, warning review, error attention, mixed warning/error attention, status priority, required flags, summary/count preservation, item preservation, input immutability, missing fields, unsupported input type, unknown severity, warning not rejecting records, error not auto-correcting, and no `blocked` output.
+- Kept this as documentation-only; no application code, tests, soft validation helper implementation, hard validation, `AuditEventRecord.__post_init__` change, `build_record_id_diagnostic_report(...)` behavior change, `FileAttachmentRecord` change, Podcast 024, commit, push, or ZIP staging was added.
+
 ## Podcast 023
 
 - Added Podcast 023 / Step 137-141 NotebookLM podcast note.
