@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 139
+
+- Added documentation-only API boundary and test example matrix planning for a future `build_record_id_diagnostic_report(...)` helper.
+- Planned safe plain Python input options such as dict items with `target_record_type` / `target_record_id` and tuple items such as `("project_record", "PRJ-001")`.
+- Documented the report output contract with `total_count`, `compatible_count`, `warning_count`, `error_count`, `items`, and `summary`, plus item-level diagnostic fields.
+- Planned test categories for empty input, canonical, legacy, unmatched prefix, unknown target type, empty `target_record_id`, mixed severity lists, index preservation, summary counts, input immutability, exception-to-diagnostic behavior, and multi-part prefixes.
+- Clarified that the future helper must remain read-only and must not reject records, mutate data, write to repositories/databases, create audit events, run migrations, auto-correct data, touch file/backup/export systems, connect to `AuditEventRecord.__post_init__`, or become hard validation.
+- Kept this as documentation-only; no application code, tests, helper implementation, hard validation, Podcast 023, commit, push, or ZIP staging was added.
+
 ## Step 138
 
 - Added documentation-only planning for a future read-only record ID diagnostic report helper.

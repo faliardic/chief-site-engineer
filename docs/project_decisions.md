@@ -1217,3 +1217,13 @@
 - Helper `AuditEventRecord.__post_init__`, constructor validation, hard validation, legacy kayit reddi, otomatik duzeltme, migration uygulamasi, `FileAttachmentRecord` davranisi, database/repository yazimi veya audit event olusturma icin kullanilmayacak.
 - `target_record_id` hard validation hala eklenmeyecek; `AuditEventRecord.__post_init__` degistirilmeyecek, legacy ID ornekleri korunacak ve diagnostic report helper ileride bile once read-only kalacak.
 - Bu adim documentation-only plan adimidir; uygulama kodu, test dosyalari, diagnostic report helper implementasyonu, hard validation, Podcast 023, commit, push veya ZIP staging eklenmedi.
+
+## 139 Record ID Diagnostic Report API Boundary and Test Matrix Plan
+
+- Olası `build_record_id_diagnostic_report(...)` helper'i icin API boundary, input/output sozlesmesi ve test example matrix planlandi; implementasyon yapilmadi.
+- Ilk implementasyonun saf Python input listesiyle baslamasi, dict item (`target_record_type` / `target_record_id`) veya tuple item (`target_record_type`, `target_record_id`) bicimlerini destekleyebilmesi ve model/repository/database bagimliligi eklememesi onerildi.
+- Output sozlesmesi `total_count`, `compatible_count`, `warning_count`, `error_count`, `items` ve `summary`; item sozlesmesi `index`, `target_record_type`, `target_record_id`, `expected_family`, `allowed_prefixes`, `observed_prefix`, `is_compatible`, `severity` ve `message` olarak planlandi.
+- Test matrix bos input, canonical, legacy, prefix disi, bilinmeyen target type, bos `target_record_id`, karisik severity listesi, index korunumu, summary count dogrulugu, input degismezligi, exception yerine diagnostic item ve cok parcali prefix orneklerini kapsayacak.
+- Helper read-only kalacak; kayit reddetmeyecek, veri degistirmeyecek, database/repository yazmayacak, audit event olusturmayacak, migration/otomatik duzeltme yapmayacak, dosya sistemi/backup/restore/export uretmeyecek, `AuditEventRecord.__post_init__` icine baglanmayacak, constructor validation veya hard validation olmayacak.
+- `target_record_id` hard validation hala eklenmeyecek; `AuditEventRecord.__post_init__` degistirilmeyecek, legacy ID ornekleri korunacak ve `FileAttachmentRecord` davranisina dokunulmayacak.
+- Bu adim documentation-only API-boundary/test-matrix adimidir; uygulama kodu, test dosyalari, helper implementasyonu, hard validation, Podcast 023, commit, push veya ZIP staging eklenmedi.
