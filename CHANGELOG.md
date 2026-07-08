@@ -1,5 +1,16 @@
 # Changelog
 
+## Podcast 025
+
+- Added Podcast 025 / Step 147-151 NotebookLM podcast note.
+- Covered diagnostic / soft validation format helper planning, API boundary and test matrix planning, read-only JSON-ready dict and Markdown formatter implementation, handover QC usage boundaries, and export/file writing boundary planning.
+- Documented why diagnostic and soft validation report outputs moved through a separate format layer, why format helper planning was documentation-only first, and why API boundary/test matrix work preceded implementation.
+- Clarified what the Step 149 JSON-ready dict and Markdown helpers provide while still avoiding file output, export behavior, backup/restore behavior, diagnostic recomputation, soft validation status recomputation, record rejection, hard validation, and `blocked` status.
+- Reiterated that handover QC summary is a visibility layer for incoming site chiefs and manual review, not record rejection or automatic handover blocking.
+- Clarified why JSON/Markdown file writing remains unimplemented and why export/file writing is a separate risk layer with path, overwrite, encoding, serialization, and package-boundary concerns.
+- Kept the podcast scope limited to Step 147-151; Step 152 was not included and Podcast 026 was not created.
+- Kept this as documentation-only; no application code, tests, JSON/Markdown file output, export/file writing helper, hard validation, `blocked` status, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, commit, push, or ZIP staging was added.
+
 ## Step 151
 
 - Added documentation-only export / file writing boundary planning after the Step 149 JSON-ready dict and Markdown string formatter helpers.

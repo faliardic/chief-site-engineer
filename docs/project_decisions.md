@@ -1396,3 +1396,14 @@
 - Export/file writing layer `AuditEventRecord.__post_init__`, constructor validation, hard validation, kayit olusturmayi engelleme, legacy kayit reddi, otomatik data correction, migration uygulamasi, database/repository yazimi, audit event olusturma, `FileAttachmentRecord` davranisi, API/GUI/CLI entegrasyonu veya backup/restore motoru icin kullanilmayacak.
 - `target_record_id` hard validation hala eklenmeyecek, `AuditEventRecord.__post_init__` degistirilmeyecek, legacy ID ornekleri korunacak, format helper davranislari degistirilmeyecek ve `blocked` status uretilmeyecek.
 - Bu adim documentation-only export/file-writing-boundary plan adimidir; uygulama kodu, test dosyalari, export/file writing helper implementasyonu, JSON/Markdown dosya uretimi, backup/restore davranisi, hard validation, Podcast 025, commit, push veya ZIP staging eklenmedi.
+
+## Podcast 025 - Adim 147-151 NotebookLM Podcast Notu
+
+- Podcast 025, Adim 147-151 araligini diagnostic / soft validation format helper plani, API boundary/test matrix, read-only JSON-ready dict ve Markdown formatter implementasyonu, handover QC usage boundary ve export/file writing boundary ekseninde ozetler.
+- Podcast notu, diagnostic ve soft validation report ciktilarinin neden ayri format katmanina tasindigini, format helper planinin neden once documentation-only yapildigini ve API boundary/test matrix'in neden implementation'dan once belgelendigini acik tutar.
+- Adim 149'da gelen JSON-ready dict ve Markdown helper'larin raporlari okunur hale getirdigi, fakat dosya uretmedigi, export yapmadigi, backup/restore davranisi eklemedigi, diagnostic sonucu veya soft validation status'u yeniden hesaplamadigi vurgulandi.
+- Handover QC summary'nin yeni santiye sefine gorunurluk sagladigi, warning/error veya review/attention kayitlarini manuel inceleme icin gorunur yaptigi, fakat kayit reddi veya otomatik devir bloklama olmadigi anlatildi.
+- Export/file writing boundary'nin ayri risk katmani oldugu; output path, overwrite politikasi, path traversal, UTF-8 encoding, JSON serialize edilebilirlik, Markdown insan-okurlugu ve handover package siniri gibi konular cozulmeden JSON/Markdown dosya uretimine gecilmeyecegi belgelendi.
+- Hard validation ve `blocked` status'un hala kapsam disinda oldugu, `AuditEventRecord.__post_init__` ve `FileAttachmentRecord` davranislarinin degistirilmedigi yinelendi.
+- Podcast kapsami yalniz Adim 147-151 ile sinirli tutuldu; Adim 152 dahil edilmedi ve Podcast 026 olusturulmadi.
+- Bu adim documentation-only podcast adimidir; uygulama kodu, test dosyalari, JSON/Markdown dosya uretimi, export/file writing helper implementasyonu, hard validation, `blocked` status, commit, push veya ZIP staging eklenmedi.

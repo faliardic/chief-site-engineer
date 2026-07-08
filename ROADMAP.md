@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 151 - Export File Writing Boundary Plan
+Podcast 025 - Adim 147-151 NotebookLM Podcast Notu
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -57,6 +57,8 @@ Adim 149'da diagnostic / soft validation format helper katmani read-only olarak 
 Adim 150'de Adim 149 format helper'larinin handover QC icinde nasil okunacagi, Markdown/JSON-ready dict kullanim sinirlari ve devir paketini otomatik bloke etmeyen yorum standardi documentation-only olarak belgelendi.
 
 Adim 151'de Adim 149 format helper ciktilarindan ileride JSON/Markdown dosya yazimi, export ve handover package uretimine gecmeden once export/file writing boundary documentation-only olarak belgelendi; helper davranislari degistirilmedi ve export implementasyonu yapilmadi.
+
+Podcast 025'te Adim 147-151 araligi NotebookLM icin ozetlendi; diagnostic / soft validation format helper plani, API boundary/test matrix, JSON-ready dict ve Markdown formatter implementasyonu, handover QC usage boundary ve export/file writing boundary anlatildi.
 
 Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
 
@@ -222,9 +224,11 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 - [x] Adim 148 - Diagnostic / soft validation format helper API boundary and test matrix plan; Markdown, JSON-ready dict ve handover QC summary icin input/output sozlesmesi ve test kategorileri belgelendi, implementasyon yapilmadi.
 - [x] Adim 149 - Read-only diagnostic / soft validation format helper implementation; JSON-ready dict ve Markdown string format helperlari eklendi, dosya uretimi ve hard validation eklenmedi.
 - [x] Adim 150 - Handover QC summary usage and format helper boundary; format helper ciktilarinin handover QC icinde gorunurluk amacli okunacagi, kayit reddi veya otomatik bloklama olmayacagi belgelendi.
+- [x] Adim 151 - Export file writing boundary plan; JSON/Markdown dosya yazimi, export ve handover package icin ayri risk katmani belgelendi, implementasyon yapilmadi.
+- [x] Podcast 025 - Adim 147-151 NotebookLM podcast notu.
 
 Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokumantasyon ve kullanim standardi ile sabitlemek; sonra rapor format sinirlari, handover QC kullanimi ve soft validation rapor katmanini hard validation'a gecmeden hazirlamaktir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 151 icin Podcast 025 kapsam kontrolu veya Adim 147-151 serisini tamamlayacak son documentation adimi ele alinabilir. Hard validation henuz eklenmemelidir.
+Adim 152 icin export helper API boundary / test matrix plan ele alinabilir. Hard validation henuz eklenmemelidir.
