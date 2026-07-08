@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 131
+
+- Added a documentation-only record ID constants and target record type mapping helper plan.
+- Planned `RECORD_ID_PREFIXES`, `RECORD_ID_FIELD_NAMES`, target type to ID family mappings, information-only helpers, soft validation helpers, hard validation helpers, and future test scenarios.
+- Kept hard validation out of scope; `AuditEventRecord.target_record_id` behavior was not changed.
+- Kept this as helper-design-planning; no application code, tests, constants implementation, helper implementation, audit validation, target id regex, persistence, repository behavior, API, GUI, CLI, podcast, commit, push, or ZIP staging was added.
+- Verified `python -m pytest`: `251 passed`.
+
 ## Step 130
 
 - Added a documentation-only central record ID contract plan based on the Step 129 inventory.

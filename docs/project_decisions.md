@@ -1130,3 +1130,11 @@
 - `project_record` gibi genis target type degerleri tek prefixe zorlanmayacak; coklu ID ailesi mapping'i ile ele alinacak.
 - Explicit ID alani olmayan modeller icin ID stratejisi ayri karar gerektirir.
 - Bu adim architecture planning adimidir; uygulama kodu, test dosyalari, helper implementasyonu, regex validation, persistence, repository, API, GUI, CLI, podcast, commit, push veya ZIP staging eklenmedi.
+
+## 131 Record ID Constants and Mapping Helper Plan
+
+- Record ID constants ve `target_record_type` / ID ailesi mapping helper tasarlanmadan `AuditEventRecord.target_record_id` hard validation uygulanmayacak.
+- Ilk helper katmani sadece bilgi dondurmeli; model davranisini veya mevcut test orneklerini degistirmemeli.
+- Soft validation helper ayri, hard validation helper ayri tasarlanacak; hard validation migration ve test standardizasyonu sonrasi degerlendirilecek.
+- `project_record` gibi genis target type degerleri coklu ID ailesi mapping'i ile desteklenecek.
+- Bu adim documentation-only / helper-design-planning adimidir; uygulama kodu, test dosyalari, constants implementasyonu, helper implementasyonu, regex validation, persistence, repository, API, GUI, CLI, podcast, commit, push veya ZIP staging eklenmedi.
