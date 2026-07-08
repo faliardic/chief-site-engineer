@@ -1172,3 +1172,12 @@
 - Soft validation ciktisi ileride audit raporlama, kalite kontrol ciktisi, CLI/export on kontrolu, handover package on kontrolu veya diagnostic helper icin kullanilabilir.
 - `AuditEventRecord.target_record_id` hard validation, test standardizasyonu ve diagnostic cikti olgunlasmadan uygulanmayacak.
 - Bu adim documentation-only / soft-validation-planning adimidir; uygulama kodu, test dosyalari, soft validation implementasyonu, hard validation, `FileAttachmentRecord` degisikligi, Podcast 022, commit, push veya ZIP staging eklenmedi.
+
+## 135 Record ID Soft Validation Diagnostic Helper Implementation Plan
+
+- Record ID diagnostic helper once dis kalite kontrol / raporlama katmani icin planlanacak.
+- Diagnostic helper veri reddetmeyecek; `info`, `warning` veya helper giris hatasi icin `error` seviyesinde sonuc uretmeyi hedefleyecek.
+- Diagnostic helper `AuditEventRecord.__post_init__` icine baglanmayacak ve hard validation olarak kullanilmayacak.
+- Legacy ID ornekleri korunacak; diagnostic sonuc sadece gorunurluk ve kalite sinyali saglayacak.
+- Diagnostic helper ileride audit report, QC report, CLI/export on kontrolu veya handover package on kontrolu icin kullanilabilir.
+- Bu adim documentation-only / diagnostic-helper-planning adimidir; uygulama kodu, test dosyalari, diagnostic helper implementasyonu, soft validation implementasyonu, hard validation, `FileAttachmentRecord` degisikligi, Podcast 022, commit, push veya ZIP staging eklenmedi.

@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 135
+
+- Added documentation-only record ID soft validation diagnostic helper implementation planning.
+- Planned candidate helpers such as `diagnose_record_id_for_target_type`, `get_record_id_prefix_diagnostic`, and `is_record_id_prefix_compatible`.
+- Documented the planned diagnostic output shape, severity levels, intended external QC/reporting usage, and non-usage inside `AuditEventRecord.__post_init__`.
+- Kept this as diagnostic-helper-planning; no application code, tests, diagnostic helper implementation, soft validation implementation, hard validation, `FileAttachmentRecord` change, Podcast 022, commit, push, or ZIP staging was added.
+- Verified `python -m pytest`: `256 passed`.
+
 ## Step 134
 
 - Added documentation-only record ID soft validation planning.
