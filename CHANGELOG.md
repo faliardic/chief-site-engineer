@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 137
+
+- Added documentation for the usage boundary of `diagnose_record_id_for_target_type`.
+- Documented safe use in handover pre-checks, audit QC reports, migration inventory scans, admin/debug diagnostics, test example standardization checks, and future export/backup/restore warning output.
+- Documented non-use inside `AuditEventRecord.__post_init__`, constructor validation, hard validation, legacy record rejection, `FileAttachmentRecord` behavior changes, and automatic data correction or migration.
+- Clarified that `warning` is a quality-control signal, `error` is helper-level diagnostic failure, and neither should cause automatic deletion, correction, or rejection.
+- Kept this as documentation-only; no application code, tests, hard validation, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, Podcast 023, commit, push, or ZIP staging was added.
+
 ## Podcast 022
 
 - Added Podcast 022 / Step 132-136 NotebookLM podcast note.

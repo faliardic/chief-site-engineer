@@ -1198,3 +1198,12 @@
 - `AuditEventRecord.__post_init__` icine diagnostic helper baglanmadigi ve `AuditEventRecord.target_record_id` hard validation'in hala ertelendigi acik tutulur.
 - Diagnostic helper'in dis kalite kontrol, raporlama ve handover on kontrol katmani icin bilgi urettigi; veri reddetmedigi vurgulanir.
 - Bu adim documentation-only podcast adimidir; uygulama kodu, test dosyalari, hard validation, commit, push veya ZIP staging eklenmedi.
+
+## 137 Record ID Diagnostic Helper Usage Boundary Plan
+
+- `diagnose_record_id_for_target_type` helper'i saf diagnostic fonksiyon olarak kalacak; bilgi uretir, karar verme sorumlulugu cagiran katmandadir.
+- Helper handover on kontrol raporlari, audit kalite kontrol raporlari, migration oncesi envanter taramalari, admin/debug diagnostic ciktilari, test example standardization kontrolleri ve ileride export/backup/restore oncesi uyari uretimi icin kullanilabilir.
+- Helper `AuditEventRecord.__post_init__` icinde, constructor validation katmani olarak, hard validation olarak, legacy kayitlari reddetmek icin, `FileAttachmentRecord` davranisini degistirmek icin veya otomatik data correction/migration icin kullanilmayacak.
+- `warning` veri hatasi degil kalite kontrol uyarisi; `error` otomatik silme veya duzeltme sebebi degil helper seviyesinde diagnostic uretilemeyen giris olarak ele alinacak.
+- `target_record_id` hard validation hala eklenmeyecek; `AuditEventRecord.__post_init__` degistirilmeyecek ve legacy ID ornekleri korunacak.
+- Bu adim documentation-only usage-boundary adimidir; uygulama kodu, test dosyalari, hard validation, Podcast 023, commit, push veya ZIP staging eklenmedi.
