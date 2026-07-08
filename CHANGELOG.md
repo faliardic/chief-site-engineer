@@ -1,5 +1,13 @@
 # Changelog
 
+## Podcast 024
+
+- Added Podcast 024 / Step 142-146 NotebookLM podcast note.
+- Covered diagnostic report export/format boundary planning, soft validation report layer planning, API boundary and test matrix planning, read-only soft validation report implementation, and handover QC interpretation.
+- Documented why diagnostic report output was not directly coupled to export/helper code, why export/format boundaries were planned documentation-only first, and how soft validation differs from hard validation.
+- Clarified the practical meaning of `pass`, `review`, and `attention`, why `blocked` is not produced, and why warning/error signals mean manual review rather than record rejection.
+- Reiterated that `AuditEventRecord.__post_init__` was not changed, hard validation was not added, `FileAttachmentRecord` was not changed, Step 147 was not included, Podcast 025 was not created, and no commit, push, or ZIP staging was added.
+
 ## Step 146
 
 - Added documentation-only usage and handover QC interpretation guidance for `build_record_id_soft_validation_report(...)`.

@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 146 - Soft validation report usage and handover QC interpretation
+Podcast 024 - Adim 142-146 NotebookLM podcast notu
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -45,6 +45,8 @@ Adim 144'te olasi `build_record_id_soft_validation_report(...)` helper'i icin AP
 Adim 145'te `build_record_id_soft_validation_report(diagnostic_report)` helper'i read-only olarak eklendi; diagnostic report dict'i `pass` / `review` / `attention` soft validation report'a cevirir, `blocked` uretmez ve hard validation'a baglanmaz.
 
 Adim 146'da soft validation report helper'inin handover QC, audit QC ve export/backup oncesi yorumlama standardi documentation-only olarak belgelendi; helper davranisi degistirilmedi.
+
+Podcast 024'te Adim 142-146 araligi NotebookLM icin ozetlendi; export/format boundary, soft validation report layer, API boundary/test matrix, read-only helper implementasyonu ve handover QC yorumlama siniri anlatildi.
 
 Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
 
@@ -205,9 +207,10 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 - [x] Adim 144 - Soft validation report API boundary and test matrix plan; diagnostic report dict input, pass/review/attention status kurallari ve blocked disi test matrix planlandi.
 - [x] Adim 145 - Read-only soft validation report implementation; diagnostic report dict'i pass/review/attention soft validation report'a ceviren helper eklendi, blocked ve hard validation kapsam disinda tutuldu.
 - [x] Adim 146 - Soft validation report usage and handover QC interpretation; pass/review/attention anlamlari, handover QC yorumu ve blocked/hard-validation disi kullanim siniri belgelendi.
+- [x] Podcast 024 - Adim 142-146 NotebookLM podcast notu; diagnostic report export/format boundary, soft validation report helper ve handover QC yorumlama hatti ozetlendi.
 
 Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokumantasyon ve kullanim standardi ile sabitlemek; sonra rapor format sinirlari, handover QC kullanimi ve soft validation rapor katmanini hard validation'a gecmeden hazirlamaktir.
 
 ## Sonraki Calisma Onerisi
 
-Podcast 024 icin Adim 142-146 araligi NotebookLM podcast notu ele alinabilir. Hard validation henuz eklenmemelidir.
+Adim 147 icin diagnostic/soft validation format helper plan ele alinabilir. Hard validation henuz eklenmemelidir.
