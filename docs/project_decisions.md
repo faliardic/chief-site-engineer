@@ -1114,3 +1114,11 @@
 - `mime_type` bos birakilamaz; bu alan dosyanin kanonik metadata sozlesmesinin parcasidir.
 - `file_type` once bos/None kontrolunden gecmeli, sonra desteklenen `FileType` degerleriyle karsilastirilmalidir.
 - Bu adim yalnizca `FileAttachmentRecord` validation bosluklarini kapatir; `AuditEventRecord`, audit target id format validation, persistence, repository, API, GUI, CLI, podcast, commit, push veya ZIP staging eklenmedi.
+
+## 129 Record ID Envanteri ve Audit Target ID Risk Analizi
+
+- Audit target_record_id format validation, mevcut record ID envanteri ve merkezi ID sozlesmesi netlesmeden uygulanmayacak.
+- Mevcut modellerde explicit ID alani olan ve olmayan kayit aileleri birlikte bulunuyor.
+- Testlerde lower-case, upper-case, cok parcali prefix, path icine gomulu ID ve opsiyonel `None` baglanti ornekleri birlikte kullaniliyor.
+- `target_record_type` ile `target_record_id` prefix eslestirmesi once merkezi bir karar tablosuna baglanmali.
+- Bu adim documentation-only / architecture-decision-prep adimidir; uygulama kodu, test dosyalari, `AuditEventRecord`, target id regex validation, persistence, repository, API, GUI, CLI, podcast, commit, push veya ZIP staging eklenmedi.

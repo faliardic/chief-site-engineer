@@ -1,5 +1,12 @@
 # Changelog
 
+## Step 129
+
+- Added a documentation-only record ID inventory and audit target id validation risk analysis.
+- Documented model-level ID fields, representative test ID formats, current inconsistency risks, and why `AuditEventRecord.target_record_id` format validation should wait for a central record ID contract.
+- Kept this as architecture-decision-prep; no application code, tests, audit validation, target id regex, persistence, repository behavior, API, GUI, CLI, podcast, commit, push, or ZIP staging was added.
+- Verified `python -m pytest`: `251 passed`.
+
 ## Step 128
 
 - Closed small validation gaps in `FileAttachmentRecord` required metadata fields.
