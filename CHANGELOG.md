@@ -1,5 +1,15 @@
 # Changelog
 
+## Step 146
+
+- Added documentation-only usage and handover QC interpretation guidance for `build_record_id_soft_validation_report(...)`.
+- Clarified how `pass`, `review`, and `attention` should be interpreted in handover QC, audit QC, and export/backup pre-check contexts.
+- Documented that `blocked` remains outside the helper contract because it can imply hard validation or workflow blocking.
+- Clarified that `messages`, `summary`, `warning_count`, `error_count`, `review_required`, and `attention_required` provide visibility only and do not reject records or trigger automatic correction.
+- Documented allowed uses such as handover pre-checks, audit QC, export/backup risk visibility, admin/debug reports, migration pre-review, and test example standardization.
+- Documented non-use inside `AuditEventRecord.__post_init__`, constructor validation, hard validation, record creation blocking, legacy rejection, automatic correction, migration execution, database/repository writes, audit event creation, `FileAttachmentRecord` behavior changes, or API/GUI/CLI integration.
+- Kept this as documentation-only; no application code, tests, helper behavior change, hard validation, `blocked` status, `AuditEventRecord.__post_init__` change, `build_record_id_diagnostic_report(...)` behavior change, `build_record_id_soft_validation_report(...)` behavior change, `FileAttachmentRecord` change, Podcast 024, commit, push, or ZIP staging was added.
+
 ## Step 145
 
 - Added `build_record_id_soft_validation_report(diagnostic_report)` as a read-only soft validation report helper.

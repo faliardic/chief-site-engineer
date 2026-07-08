@@ -1303,3 +1303,18 @@
 - `AuditEventRecord.__post_init__` icine baglanmadi, constructor validation veya hard validation eklenmedi, legacy ID ornekleri korunur.
 - `build_record_id_diagnostic_report(...)` davranisi degistirilmedi ve `FileAttachmentRecord` davranisina dokunulmadi.
 - Database/repository/API/GUI/CLI, audit event olusturma, migration, otomatik duzeltme, Podcast 024, commit, push veya ZIP staging eklenmedi.
+
+## 146 Soft Validation Report Usage and Handover QC Interpretation
+
+- `build_record_id_soft_validation_report(...)` helper'inin usage boundary ve handover QC yorumlama standardi documentation-only olarak belgelendi.
+- Helper diagnostic report dict alir, read-only soft validation report dict dondurur, `pass` / `review` / `attention` status degerlerini uretir ve `blocked` status uretmez.
+- `pass`, warning veya error gorunmedigini anlatir; ek aksiyon gerekmeyen normal gorunum olarak yorumlanir.
+- `review`, warning goruldugunu anlatir; legacy veya prefix disi ama reddedilmeyen kayitlar icin manuel gozden gecirme sinyalidir ve kayit reddi degildir.
+- `attention`, error veya eksik/uygunsuz diagnostic input goruldugunu anlatir; manuel inceleme sinyalidir, otomatik silme, otomatik duzeltme, migration veya kayit reddi sebebi degildir.
+- Handover QC icinde soft validation report yeni santiye sefine veri sagligi gorunurlugu saglar, warning/error kayitlarini gorunur yapar ve checklist icin gozden gecirilecek kayitlar uretir; devir paketini otomatik bloke etmez.
+- Audit QC icinde target record type / id uyum riskini gorunur yapar; legacy kayitlari reddetmez, `AuditEventRecord.__post_init__` icine baglanmaz ve audit event olusturmaz.
+- Export/backup oncesi kullanim veri kalitesi risklerini gorunur yapabilir; exportu durdurmaz, backup/restore davranisini degistirmez ve dosya sistemi islemi yapmaz.
+- `messages`, `summary`, `warning_count`, `error_count`, `review_required` ve `attention_required` alanlari gorunurluk saglar; hard validation, kayit reddi veya otomatik duzeltme tetiklemez.
+- Helper `AuditEventRecord.__post_init__`, constructor validation, hard validation, kayit olusturmayi engelleme, legacy kayit reddi, otomatik data correction, migration uygulamasi, database/repository yazimi, audit event olusturma, `FileAttachmentRecord` davranisi veya API/GUI/CLI entegrasyonu icin kullanilmayacak.
+- `target_record_id` hard validation hala eklenmeyecek, `AuditEventRecord.__post_init__` degistirilmeyecek, legacy ID ornekleri korunacak, `build_record_id_diagnostic_report(...)` ve `build_record_id_soft_validation_report(...)` davranislari degistirilmeyecek.
+- Bu adim documentation-only usage/handover-QC interpretation adimidir; uygulama kodu, test dosyalari, helper davranisi, `blocked` status, hard validation, Podcast 024, commit, push veya ZIP staging eklenmedi.
