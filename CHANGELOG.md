@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 147
+
+- Added documentation-only planning for future diagnostic and soft validation format helpers.
+- Planned Markdown, JSON-ready dict, and handover QC summary presentation boundaries for `build_record_id_diagnostic_report(...)` and `build_record_id_soft_validation_report(...)` outputs.
+- Documented possible future helper names such as `format_record_id_diagnostic_report_as_markdown(...)`, `format_record_id_soft_validation_report_as_markdown(...)`, `format_record_id_diagnostic_report_as_json_ready_dict(...)`, `format_record_id_soft_validation_report_as_json_ready_dict(...)`, and `build_handover_record_id_qc_summary(...)` without implementing them.
+- Clarified that the format layer must not recompute diagnostics, recompute soft validation status, mutate data, reject records, create audit events, write files, write repositories/databases, run backup/export/restore, add API/GUI/CLI behavior, or perform migrations/automatic correction.
+- Standardized presentation meaning for `info`, `warning`, `error`, `pass`, `review`, and `attention`, while keeping `blocked` out of the output.
+- Kept this as documentation-only; no application code, tests, format helper implementation, JSON/Markdown file output, hard validation, `AuditEventRecord.__post_init__` change, `build_record_id_diagnostic_report(...)` behavior change, `build_record_id_soft_validation_report(...)` behavior change, `FileAttachmentRecord` change, Podcast 025, commit, push, or ZIP staging was added.
+
 ## Podcast 024
 
 - Added Podcast 024 / Step 142-146 NotebookLM podcast note.

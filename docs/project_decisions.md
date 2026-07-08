@@ -1329,3 +1329,16 @@
 - `AuditEventRecord.__post_init__` degistirilmedi, hard validation eklenmedi, legacy ID ornekleri korundu ve `FileAttachmentRecord` davranisina dokunulmadi.
 - Podcast kapsami yalniz Adim 142-146 ile sinirli tutuldu; Adim 147 dahil edilmedi ve Podcast 025 olusturulmadi.
 - Bu adim documentation-only podcast adimidir; uygulama kodu, test dosyalari, hard validation, `blocked` status, commit, push veya ZIP staging eklenmedi.
+
+## 147 Diagnostic / Soft Validation Format Helper Plan
+
+- Diagnostic report ve soft validation report ciktilarinin ileride Markdown, JSON-ready dict ve handover QC summary gibi sunum formatlarina nasil donusturulecegi documentation-only olarak planlandi.
+- Format layer mevcut diagnostic report dict veya soft validation report dict alacak; diagnostic sonucu yeniden hesaplamayacak, soft validation status yeniden hesaplamayacak, veriyi degistirmeyecek ve kayit reddetmeyecek.
+- Olası helper adlari `format_record_id_diagnostic_report_as_markdown(...)`, `format_record_id_soft_validation_report_as_markdown(...)`, `format_record_id_diagnostic_report_as_json_ready_dict(...)`, `format_record_id_soft_validation_report_as_json_ready_dict(...)` ve `build_handover_record_id_qc_summary(...)` olarak yalnizca planlandi; implementasyon yapilmadi.
+- Markdown format planinda baslik, summary, status/count alanlari, warning/error item listesi, "kayit reddi degildir" ve "hard validation degildir" notlari yer alabilir.
+- JSON-ready dict Python dict olarak kalacak; dosyaya yazma, export etme, backup/restore islemi veya ozel object/datetime uretimi bu katmanda yapilmayacak.
+- Handover QC summary yeni santiye sefine veri sagligi gorunurlugu saglayacak; warning/error kayitlarini "gozden gecirilecek kayitlar" olarak gosterecek, devir paketini otomatik bloke etmeyecek ve hard validation tetiklemeyecek.
+- Severity/status sunum standardi `info`, `warning`, `error`, `pass`, `review` ve `attention` icin belgelendi; `blocked` status uretilmeyecek ve format layer tarafindan eklenmeyecek.
+- Format layer `AuditEventRecord.__post_init__`, constructor validation, hard validation, kayit engelleme, legacy kayit reddi, otomatik data correction, migration uygulamasi, database/repository yazimi, audit event olusturma, `FileAttachmentRecord` davranisi veya API/GUI/CLI entegrasyonu icin kullanilmayacak.
+- `target_record_id` hard validation hala eklenmeyecek, `AuditEventRecord.__post_init__` degistirilmeyecek, legacy ID ornekleri korunacak, `build_record_id_diagnostic_report(...)` ve `build_record_id_soft_validation_report(...)` davranislari degistirilmeyecek.
+- Bu adim documentation-only format-helper-plan adimidir; uygulama kodu, test dosyalari, format helper implementasyonu, JSON/Markdown dosya uretimi, `blocked` status, hard validation, Podcast 025, commit, push veya ZIP staging eklenmedi.
