@@ -220,10 +220,12 @@ class FileAttachmentRecord:
             "related_record_id",
             "file_name",
             "file_path",
+            "file_type",
+            "mime_type",
         )
         for field_name in required_fields:
             value = getattr(self, field_name)
-            if not value.strip():
+            if value is None or not value.strip():
                 raise ValueError(f"{field_name} cannot be empty")
 
         valid_file_types = {file_type.value for file_type in FileType}

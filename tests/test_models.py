@@ -360,6 +360,8 @@ def test_file_attachment_record_validation_accepts_valid_metadata() -> None:
         "related_record_id",
         "file_name",
         "file_path",
+        "file_type",
+        "mime_type",
     ],
 )
 def test_file_attachment_record_validation_rejects_empty_required_fields(
@@ -367,6 +369,27 @@ def test_file_attachment_record_validation_rejects_empty_required_fields(
 ) -> None:
     values = _valid_file_attachment_kwargs()
     values[field_name] = ""
+
+    with pytest.raises(ValueError, match=f"{field_name} cannot be empty"):
+        FileAttachmentRecord(**values)
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "attachment_id",
+        "related_record_type",
+        "related_record_id",
+        "file_name",
+        "file_path",
+        "file_type",
+    ],
+)
+def test_file_attachment_record_validation_rejects_none_required_fields(
+    field_name: str,
+) -> None:
+    values = _valid_file_attachment_kwargs()
+    values[field_name] = None
 
     with pytest.raises(ValueError, match=f"{field_name} cannot be empty"):
         FileAttachmentRecord(**values)

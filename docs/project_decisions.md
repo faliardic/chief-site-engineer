@@ -1107,3 +1107,10 @@
 - Satir sonu ve whitespace gurultusunu azaltmak icin Python, Markdown ve text dosyalarinda LF satir sonu tercih edilecek.
 - Guvenli nokta oncesi `python -m pytest` ve `git diff --check` kontrolleri yapilacak.
 - Bu adim documentation / cleanup / quality-control adimidir; uygulama kodu, test dosyalari, yeni model, validation, business logic, API, GUI, CLI, commit, push veya ZIP staging eklenmedi.
+
+## 128 FileAttachmentRecord Validation Bosluklari
+
+- `FileAttachmentRecord` icin zorunlu metadata alanlari `None`, bos string ve whitespace durumlarinda kontrollu `ValueError` uretmelidir.
+- `mime_type` bos birakilamaz; bu alan dosyanin kanonik metadata sozlesmesinin parcasidir.
+- `file_type` once bos/None kontrolunden gecmeli, sonra desteklenen `FileType` degerleriyle karsilastirilmalidir.
+- Bu adim yalnizca `FileAttachmentRecord` validation bosluklarini kapatir; `AuditEventRecord`, audit target id format validation, persistence, repository, API, GUI, CLI, podcast, commit, push veya ZIP staging eklenmedi.

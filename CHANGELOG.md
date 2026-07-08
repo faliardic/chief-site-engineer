@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 128
+
+- Closed small validation gaps in `FileAttachmentRecord` required metadata fields.
+- `attachment_id`, `related_record_type`, `related_record_id`, `file_name`, `file_path`, and `file_type` now reject `None` with controlled `ValueError` messages instead of uncontrolled attribute errors.
+- `file_type` and `mime_type` are now part of the same empty-string required field validation path.
+- Added focused model tests for `None` required fields and empty `mime_type`.
+- No audit event model, audit target id validation, persistence, repository behavior, API, GUI, CLI, commit, push, or ZIP staging was added.
+
 ## Step 127
 
 - Updated README, ROADMAP, changelog, and project decision documentation for the Step 127 safe-point quality-control pass.
