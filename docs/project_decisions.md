@@ -1247,3 +1247,14 @@
 - `warning_count` ve `error_count` hard validation tetiklemez; summary/count alanlari karar vermez, rapor gorunurlugu saglar.
 - `target_record_id` hard validation hala eklenmeyecek, `AuditEventRecord.__post_init__` degistirilmeyecek, legacy ID ornekleri korunacak ve diagnostic report helper read-only kalacak.
 - Bu adim documentation-only usage/edge-case standardization adimidir; uygulama kodu, test dosyalari, hard validation, Podcast 023, commit, push veya ZIP staging eklenmedi.
+
+## 142 Diagnostic Report Export / Format Boundary Plan
+
+- `build_record_id_diagnostic_report(...)` ciktisinin ileride JSON-ready dict, Markdown summary, handover QC summary ve admin/debug gorunumu olarak sunulabilmesi icin format/export siniri documentation-only olarak planlandi.
+- Diagnostic helper veri uretir; format layer diagnostic report dict alir ve sunum ciktisi uretir. Format layer diagnostic sonucu yeniden hesaplamaz, veriyi degistirmez, kayit olusturmaz ve audit event uretmez.
+- Olası format helper adlari `format_record_id_diagnostic_report_as_markdown(...)`, `format_record_id_diagnostic_report_as_json_ready_dict(...)` ve `build_handover_record_id_qc_summary(...)` olarak yalnizca planlandi; bu adimda implementasyon yapilmadi.
+- Format layer dosya sistemine yazmayacak, database/repository yazmayacak, backup/export/restore islemini dogrudan yapmayacak, CLI/API/GUI eklemeyecek ve hard validation tetiklemeyecek.
+- Handover QC sunumunda `total_count`, `warning_count`, `error_count` ve warning/error itemlari gorunur olabilir; warning/error degerleri devri otomatik engellemez, "gozden gecirilecek kayit" olarak yorumlanir.
+- `warning` veri reddi degildir; `error` otomatik silme veya duzeltme sebebi degildir. Format layer severity anlamlarini degistirmeyecek.
+- `target_record_id` hard validation hala eklenmeyecek, `AuditEventRecord.__post_init__` degistirilmeyecek, legacy ID ornekleri korunacak ve `build_record_id_diagnostic_report(...)` davranisi degistirilmeyecek.
+- Bu adim documentation-only export/format boundary plan adimidir; uygulama kodu, test dosyalari, export helper, format helper, JSON/Markdown dosya uretimi, hard validation, Podcast 023, commit, push veya ZIP staging eklenmedi.

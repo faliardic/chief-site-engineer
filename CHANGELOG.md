@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 142
+
+- Added documentation-only export/format boundary planning for future `build_record_id_diagnostic_report(...)` presentation layers.
+- Planned possible future formats such as JSON-ready dict, Markdown summary, handover QC summary, and admin/debug view while keeping them separate from the diagnostic helper.
+- Documented candidate future helper names such as `format_record_id_diagnostic_report_as_markdown(...)`, `format_record_id_diagnostic_report_as_json_ready_dict(...)`, and `build_handover_record_id_qc_summary(...)` without implementing them.
+- Clarified that a format layer should accept a diagnostic report dict, produce presentation output, avoid recomputing diagnostics, avoid mutating data, and avoid writing to files, repositories, databases, audit events, backup/export/restore flows, API, GUI, or CLI.
+- Documented severity presentation rules and handover QC interpretation: `warning` is not record rejection, `error` is not automatic deletion/correction, and warning/error counts do not trigger hard validation.
+- Kept this as documentation-only; no application code, tests, export helper, format helper, JSON/Markdown file output, hard validation, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, Podcast 023, commit, push, or ZIP staging was added.
+
 ## Step 141
 
 - Added documentation-only usage boundary and edge case standardization for `build_record_id_diagnostic_report(records)`.

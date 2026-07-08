@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 141 - Record ID diagnostic report usage and edge case standardization
+Adim 142 - Diagnostic report export / format boundary plan
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -33,6 +33,8 @@ Adim 139'da olasi diagnostic report helper icin API boundary, saf Python input y
 Adim 140'da `build_record_id_diagnostic_report(records)` helper'i read-only olarak eklendi; toplu diagnostic summary uretir, kayit reddetmez, veri degistirmez ve hard validation'a baglanmaz.
 
 Adim 141'de `build_record_id_diagnostic_report(records)` helper'inin usage boundary, edge case standartlari, severity yorumlama kurallari ve summary/count okuma sinirlari documentation-only olarak belgelendi.
+
+Adim 142'de diagnostic report ciktisinin ileride JSON-ready dict, Markdown summary, handover QC summary ve admin/debug gorunumlerine nasil ayrik format katmanlariyla sunulabilecegi planlandi; export helper implementasyonu yapilmadi.
 
 Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
 
@@ -187,9 +189,10 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 ## Faz 141-160 - Record ID Diagnostic Usage, Report Sinirlari ve Soft Validation Hazirligi
 
 - [x] Adim 141 - Record ID diagnostic report usage and edge case standardization; `build_record_id_diagnostic_report(records)` helper'inin read-only kullanim siniri, edge case davranislari, severity yorumlama kurallari ve summary/count okuma standardi belgelendi.
+- [x] Adim 142 - Diagnostic report export / format boundary plan; JSON-ready dict, Markdown summary, handover QC summary ve admin/debug gorunumleri icin format/export siniri belgelendi, implementasyon yapilmadi.
 
 Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokumantasyon ve kullanim standardi ile sabitlemek; sonra rapor format sinirlari, handover QC kullanimi ve soft validation rapor katmanini hard validation'a gecmeden hazirlamaktir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 142 icin diagnostic report export/format boundary plan veya handover QC usage plan ele alinabilir. Hard validation henuz eklenmemelidir.
+Adim 143 icin soft validation report layer plan veya handover QC usage plan ele alinabilir. Hard validation henuz eklenmemelidir.
