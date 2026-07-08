@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 148
+
+- Added documentation-only API boundary and test matrix planning for future diagnostic / soft validation format helpers.
+- Planned possible formatter helper names for Markdown, JSON-ready dict, and handover QC summary output without implementing them.
+- Defined the intended input contracts: diagnostic Markdown formatters receive `build_record_id_diagnostic_report(...)` output, soft validation Markdown formatters receive `build_record_id_soft_validation_report(...)` output, JSON-ready formatters receive diagnostic or soft validation report dicts, and handover QC summary uses soft validation report dicts with optional diagnostic report context.
+- Planned output contracts for Markdown string output, JSON-ready dict output, and handover QC summary fields such as `status`, `review_required`, `attention_required`, counts, review/attention items, and message.
+- Documented test categories for Markdown formatter output, JSON-ready dict safety, handover QC summary behavior, unsupported input handling, input immutability, item preservation, no status recomputation, no diagnostic recomputation, and no `blocked` status.
+- Kept this as documentation-only; no application code, tests, format helper implementation, JSON/Markdown file output, hard validation, `AuditEventRecord.__post_init__` change, `build_record_id_diagnostic_report(...)` behavior change, `build_record_id_soft_validation_report(...)` behavior change, `FileAttachmentRecord` change, Podcast 025, commit, push, or ZIP staging was added.
+
 ## Step 147
 
 - Added documentation-only planning for future diagnostic and soft validation format helpers.
