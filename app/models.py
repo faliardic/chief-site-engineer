@@ -828,6 +828,86 @@ def get_allowed_record_id_prefixes_for_target_type(
     return TARGET_RECORD_TYPE_TO_ID_PREFIXES[target_record_type]
 
 
+def diagnose_record_id_for_target_type(
+    target_record_type: str,
+    target_record_id: str,
+) -> dict[str, object]:
+    """Return record ID prefix diagnostics without rejecting the record."""
+
+    if not isinstance(target_record_id, str) or not target_record_id.strip():
+        return {
+            "target_record_type": target_record_type,
+            "target_record_id": target_record_id,
+            "expected_family": (),
+            "allowed_prefixes": (),
+            "observed_prefix": "",
+            "is_compatible": False,
+            "severity": "error",
+            "message": "target_record_id is required for record ID diagnostics",
+        }
+
+    record_id = target_record_id.strip()
+
+    try:
+        expected_family = get_record_id_family_for_target_type(target_record_type)
+        allowed_prefixes = get_allowed_record_id_prefixes_for_target_type(
+            target_record_type
+        )
+    except ValueError:
+        return {
+            "target_record_type": target_record_type,
+            "target_record_id": target_record_id,
+            "expected_family": (),
+            "allowed_prefixes": (),
+            "observed_prefix": record_id.split("-", 1)[0],
+            "is_compatible": False,
+            "severity": "error",
+            "message": "target_record_type is not supported for record ID diagnostics",
+        }
+
+    observed_prefix = ""
+    for prefix in sorted(allowed_prefixes, key=len, reverse=True):
+        if record_id == prefix or record_id.startswith(f"{prefix}-"):
+            observed_prefix = prefix
+            break
+
+    if not observed_prefix:
+        observed_prefix = record_id.split("-", 1)[0]
+        return {
+            "target_record_type": target_record_type,
+            "target_record_id": target_record_id,
+            "expected_family": expected_family,
+            "allowed_prefixes": allowed_prefixes,
+            "observed_prefix": observed_prefix,
+            "is_compatible": False,
+            "severity": "warning",
+            "message": "record ID prefix is outside the allowed diagnostic prefixes",
+        }
+
+    canonical_prefixes = tuple(
+        RECORD_ID_PREFIXES[family]
+        for family in expected_family
+        if family in RECORD_ID_PREFIXES
+    )
+    severity = "info" if observed_prefix in canonical_prefixes else "warning"
+    message = (
+        "record ID prefix matches a canonical diagnostic prefix"
+        if severity == "info"
+        else "record ID prefix matches a legacy diagnostic prefix"
+    )
+
+    return {
+        "target_record_type": target_record_type,
+        "target_record_id": target_record_id,
+        "expected_family": expected_family,
+        "allowed_prefixes": allowed_prefixes,
+        "observed_prefix": observed_prefix,
+        "is_compatible": True,
+        "severity": severity,
+        "message": message,
+    }
+
+
 @dataclass
 class AuditEventRecord:
     """Represents a traceable audit event without persistence or automation."""

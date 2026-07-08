@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 135 - Record ID soft validation diagnostic helper implementation plan
+Adim 136 - Record ID diagnostic helper implementation
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -19,6 +19,8 @@ Adim 133'te bu helper API'sinin validation fonksiyonu gibi kullanilmayacagi ve t
 Adim 134'te record ID soft validation'in yalnizca diagnostic / uyari katmani olarak planlanacagi ve hard validation'a henuz gecilmeyecegi belgelendi.
 
 Adim 135'te record ID diagnostic helper'in dis kalite kontrol / raporlama katmani icin nasil tasarlanacagi planlandi; constructor veya hard validation kapisi olarak kullanilmayacagi netlestirildi.
+
+Adim 136'da `diagnose_record_id_for_target_type` helper'i eklendi; helper canonical, legacy, prefix disi ve helper giris hatasi durumlari icin diagnostic dict dondurur, fakat veri reddetmez.
 
 Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
 
@@ -123,7 +125,7 @@ Bu fazda hedef yeni urun ozelligi eklemek degil; mevcut dokumantasyon ve proje s
 
 Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistence, upload, integrity, audit ve CI omurgasina gecis icin kucuk ve testli adimlar atmaktir.
 
-## Faz 101-135 - Denetim, Attachment Integrity Export, Scanner, Audit Hazirligi ve ID Kararlari
+## Faz 101-136 - Denetim, Attachment Integrity Export, Scanner, Audit Hazirligi ve ID Kararlari
 
 - [x] Adim 101 - Genel proje denetimi ve mimari saglik raporu.
 - [x] Adim 102 - README guncellik duzeltmesi: Adim 100 / 191 test ve yeni kapsam bilgisi.
@@ -161,9 +163,10 @@ Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistenc
 - [x] Adim 133 - Record ID helper API boundary and test example standardization plan; hard validation uygulanmadi.
 - [x] Adim 134 - Record ID soft validation plan; hard validation uygulanmadi.
 - [x] Adim 135 - Record ID soft validation diagnostic helper implementation plan; hard validation uygulanmadi.
+- [x] Adim 136 - Record ID diagnostic helper implementation; veri reddetmeyen diagnostic katmani eklendi, hard validation uygulanmadi.
 
 Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara bolerek once dokumantasyon guncelligini, sonra attachment integrity export/scanner hattini, ardindan audit ve private workspace modelleme zeminini guclendirmektir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 136 icin record ID diagnostic helper implementation veya record ID test example categories dokumantasyonu ele alinabilir. Hard validation henuz eklenmemelidir.
+Adim 137 icin record ID diagnostic helper cikti kullanim ornekleri veya record ID test example categories dokumantasyonu ele alinabilir. Hard validation henuz eklenmemelidir.

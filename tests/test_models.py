@@ -53,6 +53,7 @@ from app.models import (
     TaskCandidateRecord,
     TrackingRecord,
     WorkforceRecord,
+    diagnose_record_id_for_target_type,
     get_allowed_record_id_prefixes_for_target_type,
     get_record_id_family_for_target_type,
 )
@@ -367,6 +368,88 @@ def test_record_id_mapping_helpers_reject_unknown_target_record_type() -> None:
 
     with pytest.raises(ValueError, match="target_record_type is not supported"):
         get_allowed_record_id_prefixes_for_target_type("unknown_record")
+
+
+def test_record_id_diagnostic_returns_info_for_canonical_id() -> None:
+    diagnostic = diagnose_record_id_for_target_type(
+        "attachment",
+        "ATT-2026-0001",
+    )
+
+    assert diagnostic["target_record_type"] == "attachment"
+    assert diagnostic["target_record_id"] == "ATT-2026-0001"
+    assert diagnostic["expected_family"] == ("FILE_ATTACHMENT",)
+    assert diagnostic["allowed_prefixes"] == ("ATT", "file-att", "att")
+    assert diagnostic["observed_prefix"] == "ATT"
+    assert diagnostic["is_compatible"] is True
+    assert diagnostic["severity"] == "info"
+    assert diagnostic["message"]
+
+
+def test_record_id_diagnostic_returns_warning_for_legacy_id() -> None:
+    diagnostic = diagnose_record_id_for_target_type(
+        "attachment",
+        "file-att-001",
+    )
+
+    assert diagnostic["observed_prefix"] == "file-att"
+    assert diagnostic["is_compatible"] is True
+    assert diagnostic["severity"] == "warning"
+
+    event = AuditEventRecord(
+        **_valid_audit_event_kwargs(),
+        target_record_type="attachment",
+        target_record_id="file-att-001",
+    )
+    assert event.target_record_id == "file-att-001"
+
+
+def test_record_id_diagnostic_returns_warning_for_unmatched_prefix() -> None:
+    diagnostic = diagnose_record_id_for_target_type(
+        "project_record",
+        "XYZ-001",
+    )
+
+    assert diagnostic["observed_prefix"] == "XYZ"
+    assert diagnostic["is_compatible"] is False
+    assert diagnostic["severity"] == "warning"
+
+
+def test_record_id_diagnostic_returns_error_for_unknown_target_type() -> None:
+    diagnostic = diagnose_record_id_for_target_type(
+        "unknown_record",
+        "REC-001",
+    )
+
+    assert diagnostic["expected_family"] == ()
+    assert diagnostic["allowed_prefixes"] == ()
+    assert diagnostic["observed_prefix"] == "REC"
+    assert diagnostic["is_compatible"] is False
+    assert diagnostic["severity"] == "error"
+    assert diagnostic["message"]
+
+
+def test_record_id_diagnostic_returns_error_for_empty_target_record_id() -> None:
+    diagnostic = diagnose_record_id_for_target_type(
+        "project_record",
+        "",
+    )
+
+    assert diagnostic["observed_prefix"] == ""
+    assert diagnostic["is_compatible"] is False
+    assert diagnostic["severity"] == "error"
+    assert diagnostic["message"]
+
+
+def test_record_id_diagnostic_does_not_make_audit_event_creation_stricter() -> None:
+    event = AuditEventRecord(
+        **_valid_audit_event_kwargs(),
+        target_record_type="project_record",
+        target_record_id="XYZ-001",
+    )
+
+    assert event.target_record_type == "project_record"
+    assert event.target_record_id == "XYZ-001"
 
 
 def test_record_id_helpers_do_not_make_audit_event_creation_stricter() -> None:

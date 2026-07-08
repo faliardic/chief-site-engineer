@@ -1,5 +1,15 @@
 # Changelog
 
+## Step 136
+
+- Added `diagnose_record_id_for_target_type` as an information-only record ID diagnostic helper.
+- The helper returns `target_record_type`, `target_record_id`, `expected_family`, `allowed_prefixes`, `observed_prefix`, `is_compatible`, `severity`, and `message`.
+- Used the existing record ID mapping layer and safe longest-prefix matching for multi-part prefixes such as `NCR-CAND`, `MAT-DEL`, `CHK-RES`, `JSON-EXP`, and `file-att`.
+- Added focused tests for canonical `info`, legacy `warning`, unmatched-prefix `warning`, unknown-target `error`, empty-ID `error`, and unchanged `AuditEventRecord` constructor behavior.
+- Confirmed the helper does not reject data, was not connected to `AuditEventRecord.__post_init__`, does not add `target_record_id` hard validation, preserves legacy ID examples, and does not change `FileAttachmentRecord`.
+- Podcast 022 was not created; no commit, push, or ZIP staging was added.
+- Verified `python -m pytest`: `262 passed`.
+
 ## Step 135
 
 - Added documentation-only record ID soft validation diagnostic helper implementation planning.

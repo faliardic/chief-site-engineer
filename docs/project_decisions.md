@@ -1181,3 +1181,12 @@
 - Legacy ID ornekleri korunacak; diagnostic sonuc sadece gorunurluk ve kalite sinyali saglayacak.
 - Diagnostic helper ileride audit report, QC report, CLI/export on kontrolu veya handover package on kontrolu icin kullanilabilir.
 - Bu adim documentation-only / diagnostic-helper-planning adimidir; uygulama kodu, test dosyalari, diagnostic helper implementasyonu, soft validation implementasyonu, hard validation, `FileAttachmentRecord` degisikligi, Podcast 022, commit, push veya ZIP staging eklenmedi.
+
+## 136 Record ID Diagnostic Helper Implementation
+
+- `diagnose_record_id_for_target_type` helper'i dis kalite kontrol / raporlama / handover on kontrol katmani icin bilgi ureten kucuk bir fonksiyon olarak eklendi.
+- Helper mevcut record ID mapping katmanini kullanir ve `target_record_type`, `target_record_id`, `expected_family`, `allowed_prefixes`, `observed_prefix`, `is_compatible`, `severity` ve `message` alanlarini dondurur.
+- Prefix okuma uzun prefixleri once dener; `NCR-CAND`, `NCR-CA`, `MAT-DEL`, `CHK-RES`, `JSON-EXP` ve `file-att` gibi cok parcali prefixler yanlis bolunmez.
+- Diagnostic helper veri reddetmez; `AuditEventRecord.__post_init__` icine baglanmadi ve `AuditEventRecord.target_record_id` hard validation eklenmedi.
+- Legacy ID ornekleri korunur; `file-att-001` gibi legacy prefixler warning olarak raporlanir ama constructor tarafinda reddedilmez.
+- `FileAttachmentRecord` davranisina dokunulmadi; Podcast 022 olusturulmadi, commit, push veya ZIP staging yapilmadi.
