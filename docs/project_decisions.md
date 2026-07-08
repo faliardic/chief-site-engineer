@@ -1122,3 +1122,11 @@
 - Testlerde lower-case, upper-case, cok parcali prefix, path icine gomulu ID ve opsiyonel `None` baglanti ornekleri birlikte kullaniliyor.
 - `target_record_type` ile `target_record_id` prefix eslestirmesi once merkezi bir karar tablosuna baglanmali.
 - Bu adim documentation-only / architecture-decision-prep adimidir; uygulama kodu, test dosyalari, `AuditEventRecord`, target id regex validation, persistence, repository, API, GUI, CLI, podcast, commit, push veya ZIP staging eklenmedi.
+
+## 130 Central Record ID Contract Plan
+
+- Merkezi record ID sozlesmesi planlanmadan ve `target_record_type` / ID ailesi mapping'i netlesmeden `AuditEventRecord.target_record_id` hard validation uygulanmayacak.
+- ID sozlesmesi once documentation-only olarak tutulacak; sonra constants/mapping helper, test ornek standardizasyonu, soft validation ve en son hard validation sirasi izlenecek.
+- `project_record` gibi genis target type degerleri tek prefixe zorlanmayacak; coklu ID ailesi mapping'i ile ele alinacak.
+- Explicit ID alani olmayan modeller icin ID stratejisi ayri karar gerektirir.
+- Bu adim architecture planning adimidir; uygulama kodu, test dosyalari, helper implementasyonu, regex validation, persistence, repository, API, GUI, CLI, podcast, commit, push veya ZIP staging eklenmedi.

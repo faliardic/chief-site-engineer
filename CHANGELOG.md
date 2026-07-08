@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 130
+
+- Added a documentation-only central record ID contract plan based on the Step 129 inventory.
+- Planned ID families, prefix candidates, target record type / ID family mapping, backward compatibility risks, and a phased path from documentation to helper mapping, test standardization, soft validation, and eventual hard validation.
+- Documented that `AuditEventRecord.target_record_id` hard format validation will not be added until the central record ID contract and target type / ID family mapping are clear.
+- Kept this as architecture planning; no application code, tests, audit validation, target id regex, helper implementation, persistence, repository behavior, API, GUI, CLI, podcast, commit, push, or ZIP staging was added.
+- Verified `python -m pytest`: `251 passed`.
+
 ## Step 129
 
 - Added a documentation-only record ID inventory and audit target id validation risk analysis.

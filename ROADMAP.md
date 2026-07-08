@@ -111,7 +111,7 @@ Bu fazda hedef yeni urun ozelligi eklemek degil; mevcut dokumantasyon ve proje s
 
 Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistence, upload, integrity, audit ve CI omurgasina gecis icin kucuk ve testli adimlar atmaktir.
 
-## Faz 101-129 - Denetim, Attachment Integrity Export, Scanner, Audit Hazirligi ve ID Kararlari
+## Faz 101-130 - Denetim, Attachment Integrity Export, Scanner, Audit Hazirligi ve ID Kararlari
 
 - [x] Adim 101 - Genel proje denetimi ve mimari saglik raporu.
 - [x] Adim 102 - README guncellik duzeltmesi: Adim 100 / 191 test ve yeni kapsam bilgisi.
@@ -142,10 +142,11 @@ Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistenc
 - [x] Adim 127 - Guvenli nokta kalite kontrol, dokumantasyon temizligi, ZIP repo politikasi ve LF satir sonu tercihi.
 - [x] Adim 128 - FileAttachmentRecord validation bosluklarini kapatma.
 - [x] Adim 129 - Record ID envanteri ve audit target_record_id validation risk analizi; dogrudan validation uygulanmadi.
+- [x] Adim 130 - Central record ID contract plan; dogrudan validation uygulanmadi.
 - [ ] Podcast 021 - Adim 121-122 NotebookLM podcast notu.
 
 Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara bolerek once dokumantasyon guncelligini, sonra attachment integrity export/scanner hattini, ardindan audit ve private workspace modelleme zeminini guclendirmektir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 130 icin central record ID contract plan veya audit target ID validation plan ele alinabilir. Podcast 021, Adim 121-122 NotebookLM podcast notu olarak sonraki olasi dokumantasyon isidir.
+Adim 131 icin record ID constants and mapping helper plan veya target record type to ID family mapping helper ele alinabilir. Podcast 021, Adim 121-122 NotebookLM podcast notu olarak sonraki olasi dokumantasyon isidir.
