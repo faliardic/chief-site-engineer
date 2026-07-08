@@ -1190,3 +1190,11 @@
 - Diagnostic helper veri reddetmez; `AuditEventRecord.__post_init__` icine baglanmadi ve `AuditEventRecord.target_record_id` hard validation eklenmedi.
 - Legacy ID ornekleri korunur; `file-att-001` gibi legacy prefixler warning olarak raporlanir ama constructor tarafinda reddedilmez.
 - `FileAttachmentRecord` davranisina dokunulmadi; Podcast 022 olusturulmadi, commit, push veya ZIP staging yapilmadi.
+
+## Podcast 022 - Adim 132-136 NotebookLM Podcast Notu
+
+- Podcast 022, record ID constants/mapping helper implementation, helper API boundary, soft validation plan, diagnostic helper plan ve diagnostic helper implementation adimlarini ozetler.
+- Podcast notu, hard validation'a dogrudan gecilmeme nedenini merkezi sozlesme, mapping, test standardizasyonu, diagnostic gorunurluk ve legacy ID korunmasi ekseninde anlatir.
+- `AuditEventRecord.__post_init__` icine diagnostic helper baglanmadigi ve `AuditEventRecord.target_record_id` hard validation'in hala ertelendigi acik tutulur.
+- Diagnostic helper'in dis kalite kontrol, raporlama ve handover on kontrol katmani icin bilgi urettigi; veri reddetmedigi vurgulanir.
+- Bu adim documentation-only podcast adimidir; uygulama kodu, test dosyalari, hard validation, commit, push veya ZIP staging eklenmedi.

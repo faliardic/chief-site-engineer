@@ -1,5 +1,12 @@
 # Changelog
 
+## Podcast 022
+
+- Added Podcast 022 / Step 132-136 NotebookLM podcast note.
+- Covered the record ID constants and mapping helper implementation, helper API boundary, soft validation plan, diagnostic helper plan, and diagnostic helper implementation.
+- Documented why `AuditEventRecord.target_record_id` hard validation remains deferred, why `AuditEventRecord.__post_init__` was not connected to the diagnostic helper, and why legacy ID examples remain protected.
+- Kept this as a documentation-only podcast step; no application code, tests, hard validation, `AuditEventRecord.__post_init__` change, commit, push, or ZIP staging was added.
+
 ## Step 136
 
 - Added `diagnose_record_id_for_target_type` as an information-only record ID diagnostic helper.

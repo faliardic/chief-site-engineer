@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 136 - Record ID diagnostic helper implementation
+Podcast 022 - Adim 132-136 NotebookLM podcast notu
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -22,12 +22,14 @@ Adim 135'te record ID diagnostic helper'in dis kalite kontrol / raporlama katman
 
 Adim 136'da `diagnose_record_id_for_target_type` helper'i eklendi; helper canonical, legacy, prefix disi ve helper giris hatasi durumlari icin diagnostic dict dondurur, fakat veri reddetmez.
 
+Podcast 022'de Adim 132-136 araligi NotebookLM icin ozetlendi; record ID mapping, helper API siniri, soft validation, diagnostic helper ve hard validation ertelemesi dokumante edildi.
+
 Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
 
 Guncel test durumu:
 
 ```text
-256 passed
+262 passed
 ```
 
 Proje su anda domain model, bellek ici repository, test, dokumantasyon, learning ve NotebookLM podcast notlari cekirdegi seviyesindedir.
@@ -164,6 +166,7 @@ Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistenc
 - [x] Adim 134 - Record ID soft validation plan; hard validation uygulanmadi.
 - [x] Adim 135 - Record ID soft validation diagnostic helper implementation plan; hard validation uygulanmadi.
 - [x] Adim 136 - Record ID diagnostic helper implementation; veri reddetmeyen diagnostic katmani eklendi, hard validation uygulanmadi.
+- [x] Podcast 022 - Adim 132-136 NotebookLM podcast notu; record ID diagnostic hattinin neden hard validation'a baglanmadigi ozetlendi.
 
 Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara bolerek once dokumantasyon guncelligini, sonra attachment integrity export/scanner hattini, ardindan audit ve private workspace modelleme zeminini guclendirmektir.
 
