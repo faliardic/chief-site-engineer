@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 132 - Record ID constants and mapping helper implementation
+Adim 133 - Record ID helper API boundary and test example standardization plan
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -13,6 +13,8 @@ Adim 128'de `FileAttachmentRecord` required metadata validation guclendirildi.
 Adim 129-131 araliginda audit `target_record_id` hard validation eklenmeden once record ID envanteri, central record ID contract ve mapping helper planlari hazirlandi.
 
 Adim 132'de hard validation eklenmeden record ID constants ve bilgi donen target type mapping helperlari eklendi.
+
+Adim 133'te bu helper API'sinin validation fonksiyonu gibi kullanilmayacagi ve test ornek standardizasyonunun ayri adimlarla ilerleyecegi dokumante edildi.
 
 Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
 
@@ -117,7 +119,7 @@ Bu fazda hedef yeni urun ozelligi eklemek degil; mevcut dokumantasyon ve proje s
 
 Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistence, upload, integrity, audit ve CI omurgasina gecis icin kucuk ve testli adimlar atmaktir.
 
-## Faz 101-132 - Denetim, Attachment Integrity Export, Scanner, Audit Hazirligi ve ID Kararlari
+## Faz 101-133 - Denetim, Attachment Integrity Export, Scanner, Audit Hazirligi ve ID Kararlari
 
 - [x] Adim 101 - Genel proje denetimi ve mimari saglik raporu.
 - [x] Adim 102 - README guncellik duzeltmesi: Adim 100 / 191 test ve yeni kapsam bilgisi.
@@ -152,9 +154,10 @@ Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistenc
 - [x] Adim 131 - Record ID constants and mapping helper plan; hard validation uygulanmadi.
 - [x] Podcast 021 - Adim 127-131 NotebookLM podcast notu.
 - [x] Adim 132 - Record ID constants and mapping helper implementation; hard validation uygulanmadi.
+- [x] Adim 133 - Record ID helper API boundary and test example standardization plan; hard validation uygulanmadi.
 
 Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara bolerek once dokumantasyon guncelligini, sonra attachment integrity export/scanner hattini, ardindan audit ve private workspace modelleme zeminini guclendirmektir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 133 icin record ID helper test ornek standardizasyonu veya soft validation plan dokumantasyonu ele alinabilir. Hard validation henuz eklenmemelidir.
+Adim 134 icin record ID test example standardization planini daha somut test kategorilerine ayirmak veya soft validation plan dokumantasyonu ele alinabilir. Hard validation henuz eklenmemelidir.

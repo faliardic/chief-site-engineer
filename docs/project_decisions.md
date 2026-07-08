@@ -1154,3 +1154,12 @@
 - Bilinmeyen target type degerleri helper seviyesinde temiz `ValueError` alir, fakat mevcut `AuditEventRecord` constructor davranisi daraltilmaz.
 - Legacy ID ornekleri korunur; hard validation ancak ID sozlesmesi, mapping, test standardizasyonu ve migration kararlari netlestikten sonra degerlendirilecek.
 - Bu adimda persistence, repository, API, GUI, CLI, Podcast 022, commit, push veya ZIP staging eklenmedi.
+
+## 133 Record ID Helper API Boundary and Test Standardization Plan
+
+- Record ID helper API'si validation fonksiyonu gibi kullanilmayacak.
+- `get_record_id_family_for_target_type` ve `get_allowed_record_id_prefixes_for_target_type` sadece mapping bilgisi dondurur; `AuditEventRecord.target_record_id` kabul/red karari vermez.
+- Legacy ID ornekleri backward compatibility sinyali olarak korunacak; yeni testlerde canonical prefix ornekleri ayri ve kontrollu bicimde kullanilacak.
+- Helper mapping testleri ile model validation testleri ayri tutulacak.
+- Test ornek standardizasyonu ve soft validation ayri adimlarda ele alinmadan hard validation uygulanmayacak.
+- Bu adim documentation-only / API-boundary-planning adimidir; uygulama kodu, test dosyalari, soft validation implementasyonu, hard validation, Podcast 022, commit, push veya ZIP staging eklenmedi.
