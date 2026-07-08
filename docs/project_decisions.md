@@ -1163,3 +1163,12 @@
 - Helper mapping testleri ile model validation testleri ayri tutulacak.
 - Test ornek standardizasyonu ve soft validation ayri adimlarda ele alinmadan hard validation uygulanmayacak.
 - Bu adim documentation-only / API-boundary-planning adimidir; uygulama kodu, test dosyalari, soft validation implementasyonu, hard validation, Podcast 022, commit, push veya ZIP staging eklenmedi.
+
+## 134 Record ID Soft Validation Plan
+
+- Record ID soft validation once diagnostic / uyari katmani olarak planlanacak.
+- Soft validation bilgi, uyari veya rapor sonucu uretebilir; `AuditEventRecord.target_record_id` degerini reddetmek icin kullanilmayacak.
+- `AuditEventRecord.__post_init__` davranisi daraltilmayacak ve legacy target id ornekleri korunacak.
+- Soft validation ciktisi ileride audit raporlama, kalite kontrol ciktisi, CLI/export on kontrolu, handover package on kontrolu veya diagnostic helper icin kullanilabilir.
+- `AuditEventRecord.target_record_id` hard validation, test standardizasyonu ve diagnostic cikti olgunlasmadan uygulanmayacak.
+- Bu adim documentation-only / soft-validation-planning adimidir; uygulama kodu, test dosyalari, soft validation implementasyonu, hard validation, `FileAttachmentRecord` degisikligi, Podcast 022, commit, push veya ZIP staging eklenmedi.

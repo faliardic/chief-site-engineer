@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 134
+
+- Added documentation-only record ID soft validation planning.
+- Documented how the Step 132 record ID helper API can support future diagnostic / warning output without narrowing `AuditEventRecord` constructor behavior.
+- Planned possible soft validation usage in audit reporting, quality-control output, future CLI/export checks, handover package pre-checks, and diagnostic helpers.
+- Defined a candidate diagnostic output shape with `target_record_type`, `target_record_id`, `expected_family`, `allowed_prefixes`, `observed_prefix`, `severity`, `message`, and `is_compatible`.
+- Kept hard validation out of scope; no application code, tests, soft validation implementation, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, Podcast 022, commit, push, or ZIP staging was added.
+- Verified `python -m pytest`: `256 passed`.
+
 ## Step 133
 
 - Added documentation-only API boundary and test example standardization planning for the Step 132 record ID helper layer.
