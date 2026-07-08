@@ -733,6 +733,101 @@ AUDIT_TARGET_RECORD_TYPES: tuple[str, ...] = (
 AUDIT_TARGET_RECORD_TYPE_SET: frozenset[str] = frozenset(AUDIT_TARGET_RECORD_TYPES)
 
 
+RECORD_ID_PREFIXES: dict[str, str] = {
+    "PROJECT": "PRJ",
+    "FILE_ATTACHMENT": "ATT",
+    "AUDIT_EVENT": "AUD",
+    "NONCONFORMITY": "NCR",
+    "NONCONFORMITY_CANDIDATE": "NCR-CAND",
+    "CORRECTIVE_ACTION": "NCR-CA",
+    "MATERIAL_DELIVERY": "MAT-DEL",
+    "DAILY_LOG": "LOG",
+    "SITE_NOTE": "NOTE",
+    "GENERIC_RECORD": "REC",
+    "CHECK_RESULT": "CHK-RES",
+    "ATTACHMENT_INTEGRITY_REPORT": "AIR",
+    "JSON_EXPORT": "JSON-EXP",
+    "BACKUP_PACKAGE": "BCK",
+    "RESTORE_OPERATION": "RST",
+    "HANDOVER_PACKAGE": "HND",
+}
+
+TARGET_RECORD_TYPE_TO_ID_FAMILY: dict[str, tuple[str, ...]] = {
+    "project": ("PROJECT",),
+    "project_record": (
+        "NONCONFORMITY",
+        "NONCONFORMITY_CANDIDATE",
+        "DAILY_LOG",
+        "SITE_NOTE",
+        "MATERIAL_DELIVERY",
+        "GENERIC_RECORD",
+        "CHECK_RESULT",
+        "CORRECTIVE_ACTION",
+    ),
+    "attachment": ("FILE_ATTACHMENT",),
+    "attachment_metadata": ("FILE_ATTACHMENT", "RELATED_RECORD"),
+    "attachment_integrity_report": ("ATTACHMENT_INTEGRITY_REPORT",),
+    "json_export": ("JSON_EXPORT",),
+    "backup_package": ("BACKUP_PACKAGE",),
+    "restore_operation": ("RESTORE_OPERATION",),
+    "handover_package": ("HANDOVER_PACKAGE",),
+    "audit_event": ("AUDIT_EVENT",),
+}
+
+TARGET_RECORD_TYPE_TO_ID_PREFIXES: dict[str, tuple[str, ...]] = {
+    "project": ("PRJ", "prj"),
+    "project_record": (
+        "NCR",
+        "NCR-CAND",
+        "LOG",
+        "NOTE",
+        "MAT-DEL",
+        "REC",
+        "CHK-RES",
+        "NCR-CA",
+    ),
+    "attachment": ("ATT", "file-att", "att"),
+    "attachment_metadata": (
+        "ATT",
+        "file-att",
+        "att",
+        "NCR",
+        "NCR-CAND",
+        "LOG",
+        "NOTE",
+        "MAT-DEL",
+        "REC",
+        "CHK-RES",
+    ),
+    "attachment_integrity_report": ("AIR", "ATT-INT-RPT"),
+    "json_export": ("JSON-EXP",),
+    "backup_package": ("BCK",),
+    "restore_operation": ("RST",),
+    "handover_package": ("HND",),
+    "audit_event": ("AUD", "EVT", "audit"),
+}
+
+
+def get_record_id_family_for_target_type(target_record_type: str) -> tuple[str, ...]:
+    """Return planned record ID families for a supported audit target type."""
+
+    if target_record_type not in AUDIT_TARGET_RECORD_TYPE_SET:
+        raise ValueError("target_record_type is not supported")
+
+    return TARGET_RECORD_TYPE_TO_ID_FAMILY[target_record_type]
+
+
+def get_allowed_record_id_prefixes_for_target_type(
+    target_record_type: str,
+) -> tuple[str, ...]:
+    """Return planned record ID prefixes without validating target_record_id."""
+
+    if target_record_type not in AUDIT_TARGET_RECORD_TYPE_SET:
+        raise ValueError("target_record_type is not supported")
+
+    return TARGET_RECORD_TYPE_TO_ID_PREFIXES[target_record_type]
+
+
 @dataclass
 class AuditEventRecord:
     """Represents a traceable audit event without persistence or automation."""

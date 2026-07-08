@@ -1145,3 +1145,12 @@
 - Podcast notlari kod davranisini degistirmez; proje hafizasini, karar aktarimini ve NotebookLM hazirligini guclendirir.
 - Bu podcastte `target_record_id` hard validation'in bilincli olarak ertelendigi ve once ID envanteri, central contract, mapping helper plani yaklasiminin secildigi acik tutulur.
 - Podcast 021 documentation-only olarak tutuldu; uygulama kodu, test dosyalari, Adim 132 implementasyonu, audit validation, commit, push veya ZIP staging eklenmedi.
+
+## 132 Record ID Constants and Mapping Helper Implementation
+
+- Record ID constants ve `target_record_type` / ID ailesi mapping helper ilk dar kod katmani olarak eklendi.
+- `RECORD_ID_PREFIXES`, `TARGET_RECORD_TYPE_TO_ID_FAMILY` ve `TARGET_RECORD_TYPE_TO_ID_PREFIXES` sozlesme bilgisini merkezi ve okunur hale getirir.
+- `get_record_id_family_for_target_type` ve `get_allowed_record_id_prefixes_for_target_type` sadece bilgi dondurur; `AuditEventRecord.target_record_id` formatini zorlamaz.
+- Bilinmeyen target type degerleri helper seviyesinde temiz `ValueError` alir, fakat mevcut `AuditEventRecord` constructor davranisi daraltilmaz.
+- Legacy ID ornekleri korunur; hard validation ancak ID sozlesmesi, mapping, test standardizasyonu ve migration kararlari netlestikten sonra degerlendirilecek.
+- Bu adimda persistence, repository, API, GUI, CLI, Podcast 022, commit, push veya ZIP staging eklenmedi.

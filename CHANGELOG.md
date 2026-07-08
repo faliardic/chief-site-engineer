@@ -1,5 +1,15 @@
 # Changelog
 
+## Step 132
+
+- Added the first record ID constants and target record type to ID family mapping helper implementation.
+- Added `RECORD_ID_PREFIXES`, `TARGET_RECORD_TYPE_TO_ID_FAMILY`, and `TARGET_RECORD_TYPE_TO_ID_PREFIXES`.
+- Added information-only helpers: `get_record_id_family_for_target_type` and `get_allowed_record_id_prefixes_for_target_type`.
+- Unknown target record types now receive a clean helper-level `ValueError`, but `AuditEventRecord.target_record_id` hard validation was intentionally not added.
+- Added focused tests for supported mappings, allowed prefixes, unknown target types, unchanged `AuditEventRecord` construction, and legacy target id examples.
+- No persistence, repository behavior, API, GUI, CLI, Podcast 022, commit, push, or ZIP staging was added.
+- Verified `python -m pytest`: `256 passed`.
+
 ## Podcast 021
 
 - Added Podcast 021 / Step 127-131 NotebookLM podcast note.

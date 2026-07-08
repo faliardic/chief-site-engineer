@@ -5,6 +5,9 @@ from app.models import (
     AUDIT_EVENT_TYPES,
     AUDIT_TARGET_RECORD_TYPE_SET,
     AUDIT_TARGET_RECORD_TYPES,
+    RECORD_ID_PREFIXES,
+    TARGET_RECORD_TYPE_TO_ID_FAMILY,
+    TARGET_RECORD_TYPE_TO_ID_PREFIXES,
     ArchiveDocument,
     AttachmentRecord,
     AuditEventRecord,
@@ -50,6 +53,8 @@ from app.models import (
     TaskCandidateRecord,
     TrackingRecord,
     WorkforceRecord,
+    get_allowed_record_id_prefixes_for_target_type,
+    get_record_id_family_for_target_type,
 )
 
 
@@ -326,6 +331,73 @@ def test_audit_event_record_rejects_empty_target_record_id() -> None:
 
         with pytest.raises(ValueError, match="target_record_id is required"):
             AuditEventRecord(**values)
+
+
+def test_record_id_mapping_returns_family_for_supported_target_record_type() -> None:
+    assert RECORD_ID_PREFIXES["PROJECT"] == "PRJ"
+    assert get_record_id_family_for_target_type("project") == ("PROJECT",)
+    assert get_record_id_family_for_target_type("attachment") == (
+        "FILE_ATTACHMENT",
+    )
+    assert "NONCONFORMITY" in TARGET_RECORD_TYPE_TO_ID_FAMILY["project_record"]
+    assert "MATERIAL_DELIVERY" in get_record_id_family_for_target_type(
+        "project_record"
+    )
+
+
+def test_record_id_mapping_returns_allowed_prefixes_for_supported_target_type() -> None:
+    assert get_allowed_record_id_prefixes_for_target_type("project") == (
+        "PRJ",
+        "prj",
+    )
+    assert get_allowed_record_id_prefixes_for_target_type("attachment") == (
+        "ATT",
+        "file-att",
+        "att",
+    )
+    assert "NCR" in TARGET_RECORD_TYPE_TO_ID_PREFIXES["project_record"]
+    assert "REC" in get_allowed_record_id_prefixes_for_target_type(
+        "project_record"
+    )
+
+
+def test_record_id_mapping_helpers_reject_unknown_target_record_type() -> None:
+    with pytest.raises(ValueError, match="target_record_type is not supported"):
+        get_record_id_family_for_target_type("unknown_record")
+
+    with pytest.raises(ValueError, match="target_record_type is not supported"):
+        get_allowed_record_id_prefixes_for_target_type("unknown_record")
+
+
+def test_record_id_helpers_do_not_make_audit_event_creation_stricter() -> None:
+    event = AuditEventRecord(
+        **_valid_audit_event_kwargs(),
+        target_record_type="project_record",
+        target_record_id="REC-1",
+    )
+
+    assert event.target_record_type == "project_record"
+    assert event.target_record_id == "REC-1"
+
+
+def test_audit_event_record_still_accepts_legacy_target_record_id_examples() -> None:
+    examples = (
+        ("project_record", "NCR-001"),
+        ("project_record", "REC-2026-0007"),
+        ("attachment", "file-att-001"),
+        ("attachment", "ATT-2026-0001"),
+        ("audit_event", "audit-001"),
+    )
+
+    for target_record_type, target_record_id in examples:
+        event = AuditEventRecord(
+            **_valid_audit_event_kwargs(),
+            target_record_type=target_record_type,
+            target_record_id=target_record_id,
+        )
+
+        assert event.target_record_type == target_record_type
+        assert event.target_record_id == target_record_id
 
 
 def _valid_file_attachment_kwargs() -> dict[str, str | int]:
