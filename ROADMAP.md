@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 137 - Record ID diagnostic helper usage boundary plan
+Adim 138 - Record ID diagnostic report helper plan
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -25,6 +25,8 @@ Adim 136'da `diagnose_record_id_for_target_type` helper'i eklendi; helper canoni
 Podcast 022'de Adim 132-136 araligi NotebookLM icin ozetlendi; record ID mapping, helper API siniri, soft validation, diagnostic helper ve hard validation ertelemesi dokumante edildi.
 
 Adim 137'de `diagnose_record_id_for_target_type` helper'inin nerede kullanilabilecegi ve nerede kullanilmamasi gerektigi belgelendi; helper'in saf diagnostic fonksiyon olarak kalacagi ve hard validation'a baglanmayacagi netlestirildi.
+
+Adim 138'de tekil diagnostic helper'in ileride read-only toplu `build_record_id_diagnostic_report(...)` benzeri rapor helper'ina nasil donusebilecegi planlandi; kayit reddi, veri degisikligi, migration ve hard validation yine kapsam disinda tutuldu.
 
 Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
 
@@ -129,7 +131,7 @@ Bu fazda hedef yeni urun ozelligi eklemek degil; mevcut dokumantasyon ve proje s
 
 Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistence, upload, integrity, audit ve CI omurgasina gecis icin kucuk ve testli adimlar atmaktir.
 
-## Faz 101-137 - Denetim, Attachment Integrity Export, Scanner, Audit Hazirligi ve ID Kararlari
+## Faz 101-138 - Denetim, Attachment Integrity Export, Scanner, Audit Hazirligi ve ID Kararlari
 
 - [x] Adim 101 - Genel proje denetimi ve mimari saglik raporu.
 - [x] Adim 102 - README guncellik duzeltmesi: Adim 100 / 191 test ve yeni kapsam bilgisi.
@@ -170,9 +172,10 @@ Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistenc
 - [x] Adim 136 - Record ID diagnostic helper implementation; veri reddetmeyen diagnostic katmani eklendi, hard validation uygulanmadi.
 - [x] Podcast 022 - Adim 132-136 NotebookLM podcast notu; record ID diagnostic hattinin neden hard validation'a baglanmadigi ozetlendi.
 - [x] Adim 137 - Record ID diagnostic helper usage boundary plan; helper'in dis QC/raporlama kullanimi ve constructor/hard validation disi siniri belgelendi.
+- [x] Adim 138 - Record ID diagnostic report helper plan; ilerideki read-only toplu diagnostic rapor helper'i planlandi, implementasyon yapilmadi.
 
 Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara bolerek once dokumantasyon guncelligini, sonra attachment integrity export/scanner hattini, ardindan audit ve private workspace modelleme zeminini guclendirmektir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 138 icin diagnostic report helper plan veya read-only diagnostic report scope dokumantasyonu ele alinabilir. Hard validation henuz eklenmemelidir.
+Adim 139 icin diagnostic report helper API boundary dokumantasyonu veya test example matrix plani ele alinabilir. Hard validation henuz eklenmemelidir.

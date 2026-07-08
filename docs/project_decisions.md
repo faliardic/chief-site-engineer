@@ -1207,3 +1207,13 @@
 - `warning` veri hatasi degil kalite kontrol uyarisi; `error` otomatik silme veya duzeltme sebebi degil helper seviyesinde diagnostic uretilemeyen giris olarak ele alinacak.
 - `target_record_id` hard validation hala eklenmeyecek; `AuditEventRecord.__post_init__` degistirilmeyecek ve legacy ID ornekleri korunacak.
 - Bu adim documentation-only usage-boundary adimidir; uygulama kodu, test dosyalari, hard validation, Podcast 023, commit, push veya ZIP staging eklenmedi.
+
+## 138 Record ID Diagnostic Report Helper Plan
+
+- Ilerideki read-only `build_record_id_diagnostic_report(...)` benzeri helper, birden fazla audit/event/record referansini tarayip her item icin `diagnose_record_id_for_target_type(...)` benzeri diagnostic sonuc uretmek uzere planlandi.
+- Olası rapor alanlari `total_count`, `compatible_count`, `warning_count`, `error_count`, `items`, `summary` ve gerekirse ileride `generated_at` olarak belirlendi.
+- Her item icin `index`, `target_record_type`, `target_record_id`, `expected_family`, `allowed_prefixes`, `observed_prefix`, `is_compatible`, `severity` ve `message` alanlari planlandi.
+- Helper handover on kontrol, audit QC, migration oncesi envanter, backup/export oncesi uyari, admin/debug gorunurlugu ve test example standardization kontrolu icin read-only rapor uretebilir.
+- Helper `AuditEventRecord.__post_init__`, constructor validation, hard validation, legacy kayit reddi, otomatik duzeltme, migration uygulamasi, `FileAttachmentRecord` davranisi, database/repository yazimi veya audit event olusturma icin kullanilmayacak.
+- `target_record_id` hard validation hala eklenmeyecek; `AuditEventRecord.__post_init__` degistirilmeyecek, legacy ID ornekleri korunacak ve diagnostic report helper ileride bile once read-only kalacak.
+- Bu adim documentation-only plan adimidir; uygulama kodu, test dosyalari, diagnostic report helper implementasyonu, hard validation, Podcast 023, commit, push veya ZIP staging eklenmedi.

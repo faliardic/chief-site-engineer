@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 138
+
+- Added documentation-only planning for a future read-only record ID diagnostic report helper.
+- Planned a possible `build_record_id_diagnostic_report(...)` helper that would aggregate multiple `diagnose_record_id_for_target_type(...)`-style results without rejecting records, changing data, or running migrations.
+- Documented candidate report fields such as `total_count`, `compatible_count`, `warning_count`, `error_count`, `items`, `summary`, and optional future `generated_at`.
+- Documented item-level diagnostic fields, read-only usage in handover pre-checks, audit QC reports, migration inventory scans, backup/export warning lists, admin/debug views, and test example standardization checks.
+- Clarified non-use inside `AuditEventRecord.__post_init__`, constructor validation, hard validation, legacy rejection, automatic correction, migration implementation, `FileAttachmentRecord` behavior, database/repository writes, or audit event creation.
+- Kept this as documentation-only; no application code, tests, diagnostic report helper implementation, hard validation, Podcast 023, commit, push, or ZIP staging was added.
+
 ## Step 137
 
 - Added documentation for the usage boundary of `diagnose_record_id_for_target_type`.
