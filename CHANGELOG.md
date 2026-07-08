@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 140
+
+- Added `build_record_id_diagnostic_report(records)` as a read-only record ID diagnostic report helper.
+- Supported plain Python dict inputs with `target_record_type` / `target_record_id` and tuple/list inputs with the first two values as type and id.
+- Reused `diagnose_record_id_for_target_type(...)` for each valid item and returned `total_count`, `compatible_count`, `warning_count`, `error_count`, `items`, and `summary`.
+- Added focused tests for empty input, canonical, legacy, unmatched prefix, unknown target type, empty `target_record_id`, mixed severity lists, index preservation, input immutability, tuple input, unsupported item diagnostics, and unchanged `AuditEventRecord` constructor behavior.
+- Kept the helper read-only: no record rejection, data mutation, database/repository dependency, audit event creation, migration, automatic correction, file/backup/restore/export behavior, hard validation, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, Podcast 023, commit, push, or ZIP staging was added.
+
 ## Step 139
 
 - Added documentation-only API boundary and test example matrix planning for a future `build_record_id_diagnostic_report(...)` helper.

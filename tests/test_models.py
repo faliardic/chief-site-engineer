@@ -53,6 +53,7 @@ from app.models import (
     TaskCandidateRecord,
     TrackingRecord,
     WorkforceRecord,
+    build_record_id_diagnostic_report,
     diagnose_record_id_for_target_type,
     get_allowed_record_id_prefixes_for_target_type,
     get_record_id_family_for_target_type,
@@ -442,6 +443,166 @@ def test_record_id_diagnostic_returns_error_for_empty_target_record_id() -> None
 
 
 def test_record_id_diagnostic_does_not_make_audit_event_creation_stricter() -> None:
+    event = AuditEventRecord(
+        **_valid_audit_event_kwargs(),
+        target_record_type="project_record",
+        target_record_id="XYZ-001",
+    )
+
+    assert event.target_record_type == "project_record"
+    assert event.target_record_id == "XYZ-001"
+
+
+def test_record_id_diagnostic_report_returns_empty_summary_for_empty_input() -> None:
+    report = build_record_id_diagnostic_report([])
+
+    assert report["total_count"] == 0
+    assert report["compatible_count"] == 0
+    assert report["warning_count"] == 0
+    assert report["error_count"] == 0
+    assert report["items"] == []
+    assert report["summary"] == {
+        "total": 0,
+        "compatible": 0,
+        "warnings": 0,
+        "errors": 0,
+    }
+
+
+def test_record_id_diagnostic_report_counts_single_canonical_record() -> None:
+    report = build_record_id_diagnostic_report(
+        [{"target_record_type": "attachment", "target_record_id": "ATT-2026-0001"}]
+    )
+
+    assert report["total_count"] == 1
+    assert report["compatible_count"] == 1
+    assert report["warning_count"] == 0
+    assert report["error_count"] == 0
+    assert report["items"][0]["severity"] == "info"
+    assert report["items"][0]["index"] == 0
+
+
+def test_record_id_diagnostic_report_counts_single_legacy_record() -> None:
+    report = build_record_id_diagnostic_report(
+        [{"target_record_type": "attachment", "target_record_id": "file-att-001"}]
+    )
+
+    assert report["compatible_count"] == 1
+    assert report["warning_count"] == 1
+    assert report["error_count"] == 0
+    assert report["items"][0]["severity"] == "warning"
+
+
+def test_record_id_diagnostic_report_counts_unmatched_prefix_without_exception() -> None:
+    report = build_record_id_diagnostic_report(
+        [
+            {
+                "target_record_type": "project_record",
+                "target_record_id": "XYZ-001",
+            }
+        ]
+    )
+
+    assert report["compatible_count"] == 0
+    assert report["warning_count"] == 1
+    assert report["error_count"] == 0
+    assert report["items"][0]["severity"] == "warning"
+
+
+def test_record_id_diagnostic_report_counts_unknown_target_type_as_error() -> None:
+    report = build_record_id_diagnostic_report(
+        [{"target_record_type": "unknown_record", "target_record_id": "REC-001"}]
+    )
+
+    assert report["error_count"] == 1
+    assert report["items"][0]["severity"] == "error"
+
+
+def test_record_id_diagnostic_report_counts_empty_target_record_id_as_error() -> None:
+    report = build_record_id_diagnostic_report(
+        [{"target_record_type": "project_record", "target_record_id": ""}]
+    )
+
+    assert report["error_count"] == 1
+    assert report["items"][0]["severity"] == "error"
+
+
+def test_record_id_diagnostic_report_summarizes_mixed_severity_list() -> None:
+    report = build_record_id_diagnostic_report(
+        [
+            {"target_record_type": "attachment", "target_record_id": "ATT-2026-0001"},
+            {"target_record_type": "attachment", "target_record_id": "file-att-001"},
+            {"target_record_type": "unknown_record", "target_record_id": "REC-001"},
+        ]
+    )
+
+    assert report["total_count"] == 3
+    assert report["compatible_count"] == 2
+    assert report["warning_count"] == 1
+    assert report["error_count"] == 1
+    assert report["summary"] == {
+        "total": 3,
+        "compatible": 2,
+        "warnings": 1,
+        "errors": 1,
+    }
+
+
+def test_record_id_diagnostic_report_preserves_input_order_in_index() -> None:
+    report = build_record_id_diagnostic_report(
+        [
+            {"target_record_type": "attachment", "target_record_id": "ATT-2026-0001"},
+            {"target_record_type": "project_record", "target_record_id": "XYZ-001"},
+            {"target_record_type": "unknown_record", "target_record_id": "REC-001"},
+        ]
+    )
+
+    assert [item["index"] for item in report["items"]] == [0, 1, 2]
+
+
+def test_record_id_diagnostic_report_does_not_mutate_input_records() -> None:
+    records = [
+        {"target_record_type": "attachment", "target_record_id": "ATT-2026-0001"},
+        {"target_record_type": "attachment", "target_record_id": "file-att-001"},
+    ]
+    original_records = [record.copy() for record in records]
+
+    build_record_id_diagnostic_report(records)
+
+    assert records == original_records
+
+
+def test_record_id_diagnostic_report_accepts_tuple_input() -> None:
+    report = build_record_id_diagnostic_report(
+        [("attachment", "ATT-2026-0001")]
+    )
+
+    assert report["total_count"] == 1
+    assert report["compatible_count"] == 1
+    assert report["items"][0]["severity"] == "info"
+
+
+def test_record_id_diagnostic_report_returns_error_items_for_unsupported_items() -> None:
+    report = build_record_id_diagnostic_report(
+        [
+            object(),
+            {},
+            ("project_record",),
+        ]
+    )
+
+    assert report["total_count"] == 3
+    assert report["compatible_count"] == 0
+    assert report["warning_count"] == 0
+    assert report["error_count"] == 3
+    assert [item["severity"] for item in report["items"]] == [
+        "error",
+        "error",
+        "error",
+    ]
+
+
+def test_record_id_diagnostic_report_does_not_make_audit_event_creation_stricter() -> None:
     event = AuditEventRecord(
         **_valid_audit_event_kwargs(),
         target_record_type="project_record",

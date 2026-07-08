@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 139 - Record ID diagnostic report API boundary and test matrix plan
+Adim 140 - Read-only record ID diagnostic report helper implementation
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -29,6 +29,8 @@ Adim 137'de `diagnose_record_id_for_target_type` helper'inin nerede kullanilabil
 Adim 138'de tekil diagnostic helper'in ileride read-only toplu `build_record_id_diagnostic_report(...)` benzeri rapor helper'ina nasil donusebilecegi planlandi; kayit reddi, veri degisikligi, migration ve hard validation yine kapsam disinda tutuldu.
 
 Adim 139'da olasi diagnostic report helper icin API boundary, saf Python input yaklasimi, output sozlesmesi ve test example matrix planlandi; helper'in read-only ve hard validation disi kalacagi yinelendi.
+
+Adim 140'da `build_record_id_diagnostic_report(records)` helper'i read-only olarak eklendi; toplu diagnostic summary uretir, kayit reddetmez, veri degistirmez ve hard validation'a baglanmaz.
 
 Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
 
@@ -133,7 +135,7 @@ Bu fazda hedef yeni urun ozelligi eklemek degil; mevcut dokumantasyon ve proje s
 
 Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistence, upload, integrity, audit ve CI omurgasina gecis icin kucuk ve testli adimlar atmaktir.
 
-## Faz 101-139 - Denetim, Attachment Integrity Export, Scanner, Audit Hazirligi ve ID Kararlari
+## Faz 101-140 - Denetim, Attachment Integrity Export, Scanner, Audit Hazirligi ve ID Kararlari
 
 - [x] Adim 101 - Genel proje denetimi ve mimari saglik raporu.
 - [x] Adim 102 - README guncellik duzeltmesi: Adim 100 / 191 test ve yeni kapsam bilgisi.
@@ -176,9 +178,10 @@ Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistenc
 - [x] Adim 137 - Record ID diagnostic helper usage boundary plan; helper'in dis QC/raporlama kullanimi ve constructor/hard validation disi siniri belgelendi.
 - [x] Adim 138 - Record ID diagnostic report helper plan; ilerideki read-only toplu diagnostic rapor helper'i planlandi, implementasyon yapilmadi.
 - [x] Adim 139 - Record ID diagnostic report API boundary and test matrix plan; input/output sozlesmesi ve test kategorileri belgelendi.
+- [x] Adim 140 - Read-only record ID diagnostic report helper implementation; toplu diagnostic rapor helper'i eklendi, hard validation uygulanmadi.
 
 Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara bolerek once dokumantasyon guncelligini, sonra attachment integrity export/scanner hattini, ardindan audit ve private workspace modelleme zeminini guclendirmektir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 140 icin read-only diagnostic report helper implementation ele alinabilir. Hard validation henuz eklenmemelidir.
+Adim 141 icin record ID diagnostic report edge case standardization veya test example standardization ele alinabilir. Hard validation henuz eklenmemelidir.

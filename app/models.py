@@ -908,6 +908,61 @@ def diagnose_record_id_for_target_type(
     }
 
 
+def build_record_id_diagnostic_report(records: object) -> dict[str, object]:
+    """Return a read-only diagnostic report for record ID references."""
+
+    items: list[dict[str, object]] = []
+
+    for index, record in enumerate(records if isinstance(records, (list, tuple)) else ()):
+        try:
+            if isinstance(record, dict):
+                target_record_type = record["target_record_type"]
+                target_record_id = record["target_record_id"]
+            elif isinstance(record, (list, tuple)) and len(record) >= 2:
+                target_record_type = record[0]
+                target_record_id = record[1]
+            else:
+                raise ValueError("record item is not supported for diagnostics")
+
+            diagnostic = diagnose_record_id_for_target_type(
+                target_record_type,
+                target_record_id,
+            )
+        except (KeyError, ValueError, TypeError, IndexError):
+            diagnostic = {
+                "target_record_type": "",
+                "target_record_id": "",
+                "expected_family": (),
+                "allowed_prefixes": (),
+                "observed_prefix": "",
+                "is_compatible": False,
+                "severity": "error",
+                "message": "record item is not supported for record ID diagnostics",
+            }
+
+        items.append({"index": index, **diagnostic})
+
+    compatible_count = sum(1 for item in items if item["is_compatible"] is True)
+    warning_count = sum(1 for item in items if item["severity"] == "warning")
+    error_count = sum(1 for item in items if item["severity"] == "error")
+    total_count = len(items)
+    summary = {
+        "total": total_count,
+        "compatible": compatible_count,
+        "warnings": warning_count,
+        "errors": error_count,
+    }
+
+    return {
+        "total_count": total_count,
+        "compatible_count": compatible_count,
+        "warning_count": warning_count,
+        "error_count": error_count,
+        "items": items,
+        "summary": summary,
+    }
+
+
 @dataclass
 class AuditEventRecord:
     """Represents a traceable audit event without persistence or automation."""

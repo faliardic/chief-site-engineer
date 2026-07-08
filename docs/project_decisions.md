@@ -1227,3 +1227,13 @@
 - Helper read-only kalacak; kayit reddetmeyecek, veri degistirmeyecek, database/repository yazmayacak, audit event olusturmayacak, migration/otomatik duzeltme yapmayacak, dosya sistemi/backup/restore/export uretmeyecek, `AuditEventRecord.__post_init__` icine baglanmayacak, constructor validation veya hard validation olmayacak.
 - `target_record_id` hard validation hala eklenmeyecek; `AuditEventRecord.__post_init__` degistirilmeyecek, legacy ID ornekleri korunacak ve `FileAttachmentRecord` davranisina dokunulmayacak.
 - Bu adim documentation-only API-boundary/test-matrix adimidir; uygulama kodu, test dosyalari, helper implementasyonu, hard validation, Podcast 023, commit, push veya ZIP staging eklenmedi.
+
+## 140 Read-only Record ID Diagnostic Report Helper Implementation
+
+- `build_record_id_diagnostic_report(records)` helper'i read-only toplu diagnostic rapor helper'i olarak eklendi.
+- Helper saf Python dict itemlari (`target_record_type` / `target_record_id`) ve tuple/list itemlari destekler; her gecerli item icin `diagnose_record_id_for_target_type(...)` sonucunu kullanir.
+- Rapor `total_count`, `compatible_count`, `warning_count`, `error_count`, `items` ve `summary` alanlarini dondurur; itemlar input sirasini `index` ile korur.
+- Eksik veya uygunsuz itemlar exception firlatmak yerine `error` severity diagnostic item uretir; helper input listesini veya dictlerini mutate etmez.
+- Helper kayit reddetmez, veri degistirmez, database/repository yazmaz, audit event olusturmaz, migration/otomatik duzeltme yapmaz, dosya sistemi/backup/restore/export uretmez.
+- `AuditEventRecord.__post_init__` icine baglanmadi, constructor validation veya hard validation eklenmedi, legacy ID ornekleri korunur ve `FileAttachmentRecord` davranisina dokunulmadi.
+- Podcast 023 olusturulmadi; commit, push veya ZIP staging yapilmadi.
