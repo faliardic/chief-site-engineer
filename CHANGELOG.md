@@ -1,5 +1,13 @@
 # Changelog
 
+## Podcast 023
+
+- Added Podcast 023 / Step 137-141 NotebookLM podcast note.
+- Covered the diagnostic helper usage boundary, diagnostic report helper planning, API boundary and test matrix planning, read-only diagnostic report helper implementation, and edge case standardization.
+- Documented why `build_record_id_diagnostic_report(...)` remains read-only, why `warning` and `error` are not record rejection signals, why hard validation remains deferred, and why `AuditEventRecord.__post_init__` was not changed.
+- Kept the podcast scope limited to Step 137-141; later steps were not included and Podcast 024 was not created.
+- Kept this as documentation-only; no application code, tests, hard validation, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, commit, push, or ZIP staging was added.
+
 ## Step 143
 
 - Added documentation-only planning for a future soft validation report layer based on `build_record_id_diagnostic_report(...)` output.
