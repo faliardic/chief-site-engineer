@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Podcast 025 - Adim 147-151 NotebookLM Podcast Notu
+Adim 152 - Export Helper API Boundary and File Writing Safety Plan
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -59,6 +59,8 @@ Adim 150'de Adim 149 format helper'larinin handover QC icinde nasil okunacagi, M
 Adim 151'de Adim 149 format helper ciktilarindan ileride JSON/Markdown dosya yazimi, export ve handover package uretimine gecmeden once export/file writing boundary documentation-only olarak belgelendi; helper davranislari degistirilmedi ve export implementasyonu yapilmadi.
 
 Podcast 025'te Adim 147-151 araligi NotebookLM icin ozetlendi; diagnostic / soft validation format helper plani, API boundary/test matrix, JSON-ready dict ve Markdown formatter implementasyonu, handover QC usage boundary ve export/file writing boundary anlatildi.
+
+Adim 152'de ileride eklenebilecek JSON/Markdown export helper'lari icin API boundary, path safety, overwrite policy, encoding/format beklentileri ve test matrix documentation-only olarak planlandi; export helper implementasyonu yapilmadi ve dosya uretilmedi.
 
 Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
 
@@ -226,9 +228,10 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 - [x] Adim 150 - Handover QC summary usage and format helper boundary; format helper ciktilarinin handover QC icinde gorunurluk amacli okunacagi, kayit reddi veya otomatik bloklama olmayacagi belgelendi.
 - [x] Adim 151 - Export file writing boundary plan; JSON/Markdown dosya yazimi, export ve handover package icin ayri risk katmani belgelendi, implementasyon yapilmadi.
 - [x] Podcast 025 - Adim 147-151 NotebookLM podcast notu.
+- [x] Adim 152 - Export helper API boundary and file writing safety plan; path safety, overwrite policy, encoding ve test matrix planlandi, implementasyon yapilmadi.
 
 Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokumantasyon ve kullanim standardi ile sabitlemek; sonra rapor format sinirlari, handover QC kullanimi ve soft validation rapor katmanini hard validation'a gecmeden hazirlamaktir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 152 icin export helper API boundary / test matrix plan ele alinabilir. Hard validation henuz eklenmemelidir.
+Adim 153 icin path safety / overwrite policy detailed documentation ele alinabilir. Hard validation henuz eklenmemelidir.

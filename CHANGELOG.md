@@ -1,5 +1,16 @@
 # Changelog
 
+## Step 152
+
+- Added documentation-only planning for future export helper API boundaries and file writing safety.
+- Planned possible future helper names such as `write_record_id_diagnostic_report_json(...)`, `write_record_id_soft_validation_report_json(...)`, `write_record_id_diagnostic_report_markdown(...)`, `write_record_id_soft_validation_report_markdown(...)`, and `write_handover_qc_summary_markdown(...)` without implementing them.
+- Defined the intended future API boundary: JSON export helpers should accept JSON-ready Python dict input, Markdown export helpers should accept Markdown string input, and output paths must be explicit and safe.
+- Documented path safety principles for path traversal rejection, project-root or allowed-export-folder containment, relative/absolute path behavior, parent directory handling, deterministic names, Windows path concerns, and excluding ZIP/backup files from export scope.
+- Documented overwrite policy planning with `overwrite=False` as the safe default and `overwrite=True` as an explicit, tested behavior.
+- Planned encoding and format expectations: UTF-8 for Markdown and JSON, deterministic JSON indentation as a possible choice, JSON primitive/list/dict values, human-readable Markdown, and no modification of format-helper output during file writing.
+- Added test matrix categories for JSON/Markdown export path safety, relative/absolute paths, traversal rejection, allowed-folder containment, overwrite behavior, parent directory behavior, UTF-8, JSON serializability, Markdown content preservation, input immutability, no format recomputation, no hard validation, no `blocked` status, and no ZIP/backup stage/export scope.
+- Kept this as documentation-only; no application code, tests, export/file writing helper, JSON/Markdown file output, backup/restore behavior, hard validation, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, Podcast 026, commit, push, or ZIP staging was added.
+
 ## Podcast 025
 
 - Added Podcast 025 / Step 147-151 NotebookLM podcast note.
