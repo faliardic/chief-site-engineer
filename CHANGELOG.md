@@ -1,5 +1,15 @@
 # Changelog
 
+## Step 151
+
+- Added documentation-only export / file writing boundary planning after the Step 149 JSON-ready dict and Markdown string formatter helpers.
+- Documented why file writing is a higher-risk layer than formatting because it creates persistent output and needs explicit path, overwrite, encoding, and serialization boundaries.
+- Kept existing helper behavior unchanged for `build_record_id_diagnostic_report(...)`, `build_record_id_soft_validation_report(...)`, and all four Step 149 format helpers.
+- Planned possible future helper names such as `write_record_id_diagnostic_report_json(...)`, `write_record_id_soft_validation_report_json(...)`, `write_record_id_diagnostic_report_markdown(...)`, `write_record_id_soft_validation_report_markdown(...)`, and `build_handover_qc_export_package(...)` without implementing them.
+- Clarified that any future export/file writing layer should accept already-produced JSON-ready dict or Markdown string output, avoid diagnostic recomputation, avoid soft validation status recomputation, avoid data mutation, avoid record rejection, avoid database/repository writes, avoid audit event creation, avoid backup/restore behavior, avoid hard validation, and avoid `blocked` status.
+- Documented handover package boundaries: it may provide visibility for incoming site chiefs and expose warning/error or review/attention records, but must not automatically block handover, reject records, trigger hard validation, or transfer private outgoing-site-chief space.
+- Kept this as documentation-only; no application code, tests, export/file writing helper, JSON/Markdown file output, backup/restore behavior, hard validation, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, Podcast 025, commit, push, or ZIP staging was added.
+
 ## Step 150
 
 - Added documentation-only usage guidance for handover QC summary interpretation and format helper boundaries.

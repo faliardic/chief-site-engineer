@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 150 - Handover QC Summary Usage and Format Helper Boundary
+Adim 151 - Export File Writing Boundary Plan
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -55,6 +55,8 @@ Adim 148'de diagnostic / soft validation format helper katmani icin API boundary
 Adim 149'da diagnostic / soft validation format helper katmani read-only olarak eklendi; JSON-ready dict ve Markdown string ciktisi uretir, dosya yazmaz, export yapmaz, blocked status uretmez ve hard validation'a baglanmaz.
 
 Adim 150'de Adim 149 format helper'larinin handover QC icinde nasil okunacagi, Markdown/JSON-ready dict kullanim sinirlari ve devir paketini otomatik bloke etmeyen yorum standardi documentation-only olarak belgelendi.
+
+Adim 151'de Adim 149 format helper ciktilarindan ileride JSON/Markdown dosya yazimi, export ve handover package uretimine gecmeden once export/file writing boundary documentation-only olarak belgelendi; helper davranislari degistirilmedi ve export implementasyonu yapilmadi.
 
 Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
 
