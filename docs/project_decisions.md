@@ -1370,3 +1370,16 @@
 - Testler JSON-ready output, Markdown output, input immutability, unsupported input, no recomputation, no blocked output status ve `AuditEventRecord` constructor davranisinin daralmamasini kapsar.
 - `build_record_id_diagnostic_report(...)` ve `build_record_id_soft_validation_report(...)` davranislari degistirilmedi; `AuditEventRecord.__post_init__` degistirilmedi ve `FileAttachmentRecord` davranisina dokunulmadi.
 - Bu adimda JSON/Markdown dosyasi, export helper, backup/restore, database/repository/API/GUI/CLI, migration, otomatik duzeltme, hard validation, Podcast 025, commit, push veya ZIP staging eklenmedi.
+
+## 150 Handover QC Summary Usage and Format Helper Boundary
+
+- Adim 149 format helper'larinin handover QC icinde nasil okunacagi ve nerelerde kullanilmayacagi documentation-only olarak belgelendi.
+- Format helperlar mevcut report dict'lerini sunuma hazirlar; JSON-ready dict veya Markdown string dondurur, dosya uretmez, export yapmaz, veri degistirmez, diagnostic sonucu veya soft validation status yeniden hesaplamaz, kayit reddetmez ve hard validation degildir.
+- Handover QC icinde format helper ciktilari yeni santiye sefine veri sagligi gorunurlugu saglar, warning/error veya review/attention kayitlarini gorunur yapar ve "gozden gecirilecek kayitlar" mantigiyla kullanilir.
+- Handover QC ciktisi devir paketini otomatik bloke etmez, kayit reddetmez, hard validation tetiklemez ve `blocked` status uretmez.
+- Markdown ciktilari handover notu, QC ozeti, admin/debug gorunumu veya proje ici dokumantasyon icin kullanilabilir; "Bu rapor kayit reddi degildir", "Hard validation degildir" ve "`blocked` status uretilmez" notlarini korumalidir.
+- JSON-ready dict ciktilari makine tarafindan okunabilir ara temsil olabilir; bu adimda dosyaya yazilmaz, export helper degildir, backup/restore davranisi degildir, database/repository yazmaz ve input report davranisini degistirmez.
+- Handover QC status yorumlari `pass` icin gorunur risk yok, `review` icin manuel gozden gecirme, `attention` icin manuel inceleme ve `blocked` icin kullanilmaz/uretilmez seklinde sabitlendi.
+- Format helperlar `AuditEventRecord.__post_init__`, constructor validation, hard validation, kayit engelleme, legacy kayit reddi, otomatik data correction, migration uygulamasi, database/repository yazimi, audit event olusturma, `FileAttachmentRecord` davranisi, API/GUI/CLI entegrasyonu veya JSON/Markdown dosya exportu icin kullanilmayacak.
+- `build_record_id_diagnostic_report(...)`, `build_record_id_soft_validation_report(...)` ve tum format helper davranislari degistirilmedi.
+- Bu adim documentation-only usage-boundary adimidir; uygulama kodu, test dosyalari, format helper davranisi, JSON/Markdown dosya uretimi, export helper, `blocked` status, hard validation, Podcast 025, commit, push veya ZIP staging eklenmedi.

@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 150
+
+- Added documentation-only usage guidance for handover QC summary interpretation and format helper boundaries.
+- Documented that the Step 149 format helpers prepare existing report dicts for JSON-ready dict or Markdown string presentation without file output, export behavior, data mutation, diagnostic recomputation, soft validation status recomputation, record rejection, or hard validation.
+- Clarified handover QC use: format helper outputs provide visibility for the incoming site chief, expose warning/error or review/attention records, and support "records to review" workflows without automatically blocking the handover package.
+- Standardized status interpretation for handover QC: `pass` means no visible risk, `review` means manual review, `attention` means manual inspection, and `blocked` is not used or produced.
+- Documented Markdown and JSON-ready dict usage boundaries, including no JSON/Markdown file export, no backup/restore behavior, no repository/database writes, and no API/GUI/CLI integration.
+- Kept this as documentation-only; no application code, tests, format helper behavior change, JSON/Markdown file output, export helper, hard validation, `AuditEventRecord.__post_init__` change, `build_record_id_diagnostic_report(...)` behavior change, `build_record_id_soft_validation_report(...)` behavior change, `FileAttachmentRecord` change, Podcast 025, commit, push, or ZIP staging was added.
+
 ## Step 149
 
 - Added read-only diagnostic / soft validation format helpers for JSON-ready dict and Markdown string presentation.

@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 149 - Read-only Diagnostic / Soft Validation Format Helper Implementation
+Adim 150 - Handover QC Summary Usage and Format Helper Boundary
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -53,6 +53,8 @@ Adim 147'de diagnostic report ve soft validation report ciktilarinin ileride Mar
 Adim 148'de diagnostic / soft validation format helper katmani icin API boundary, input/output sozlesmesi ve Markdown, JSON-ready dict, handover QC summary test matrix'i documentation-only olarak planlandi; format helper implementasyonu yapilmadi.
 
 Adim 149'da diagnostic / soft validation format helper katmani read-only olarak eklendi; JSON-ready dict ve Markdown string ciktisi uretir, dosya yazmaz, export yapmaz, blocked status uretmez ve hard validation'a baglanmaz.
+
+Adim 150'de Adim 149 format helper'larinin handover QC icinde nasil okunacagi, Markdown/JSON-ready dict kullanim sinirlari ve devir paketini otomatik bloke etmeyen yorum standardi documentation-only olarak belgelendi.
 
 Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
 
@@ -217,9 +219,10 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 - [x] Adim 147 - Diagnostic / soft validation format helper plan; Markdown, JSON-ready dict ve handover QC summary icin read-only sunum katmani siniri belgelendi, implementasyon yapilmadi.
 - [x] Adim 148 - Diagnostic / soft validation format helper API boundary and test matrix plan; Markdown, JSON-ready dict ve handover QC summary icin input/output sozlesmesi ve test kategorileri belgelendi, implementasyon yapilmadi.
 - [x] Adim 149 - Read-only diagnostic / soft validation format helper implementation; JSON-ready dict ve Markdown string format helperlari eklendi, dosya uretimi ve hard validation eklenmedi.
+- [x] Adim 150 - Handover QC summary usage and format helper boundary; format helper ciktilarinin handover QC icinde gorunurluk amacli okunacagi, kayit reddi veya otomatik bloklama olmayacagi belgelendi.
 
 Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokumantasyon ve kullanim standardi ile sabitlemek; sonra rapor format sinirlari, handover QC kullanimi ve soft validation rapor katmanini hard validation'a gecmeden hazirlamaktir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 150 icin handover QC summary usage documentation ele alinabilir. Hard validation henuz eklenmemelidir.
+Adim 151 icin Podcast 025 kapsam kontrolu veya Adim 147-151 serisini tamamlayacak son documentation adimi ele alinabilir. Hard validation henuz eklenmemelidir.
