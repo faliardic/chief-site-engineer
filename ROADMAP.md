@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 148 - Diagnostic / Soft Validation Format Helper API Boundary and Test Matrix Plan
+Adim 149 - Read-only Diagnostic / Soft Validation Format Helper Implementation
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -52,12 +52,14 @@ Adim 147'de diagnostic report ve soft validation report ciktilarinin ileride Mar
 
 Adim 148'de diagnostic / soft validation format helper katmani icin API boundary, input/output sozlesmesi ve Markdown, JSON-ready dict, handover QC summary test matrix'i documentation-only olarak planlandi; format helper implementasyonu yapilmadi.
 
+Adim 149'da diagnostic / soft validation format helper katmani read-only olarak eklendi; JSON-ready dict ve Markdown string ciktisi uretir, dosya yazmaz, export yapmaz, blocked status uretmez ve hard validation'a baglanmaz.
+
 Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
 
 Guncel test durumu:
 
 ```text
-287 passed
+294 passed
 ```
 
 Proje su anda domain model, bellek ici repository, test, dokumantasyon, learning ve NotebookLM podcast notlari cekirdegi seviyesindedir.
@@ -214,9 +216,10 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 - [x] Podcast 024 - Adim 142-146 NotebookLM podcast notu; diagnostic report export/format boundary, soft validation report helper ve handover QC yorumlama hatti ozetlendi.
 - [x] Adim 147 - Diagnostic / soft validation format helper plan; Markdown, JSON-ready dict ve handover QC summary icin read-only sunum katmani siniri belgelendi, implementasyon yapilmadi.
 - [x] Adim 148 - Diagnostic / soft validation format helper API boundary and test matrix plan; Markdown, JSON-ready dict ve handover QC summary icin input/output sozlesmesi ve test kategorileri belgelendi, implementasyon yapilmadi.
+- [x] Adim 149 - Read-only diagnostic / soft validation format helper implementation; JSON-ready dict ve Markdown string format helperlari eklendi, dosya uretimi ve hard validation eklenmedi.
 
 Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokumantasyon ve kullanim standardi ile sabitlemek; sonra rapor format sinirlari, handover QC kullanimi ve soft validation rapor katmanini hard validation'a gecmeden hazirlamaktir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 149 icin read-only format helper implementation ele alinabilir. Hard validation henuz eklenmemelidir.
+Adim 150 icin handover QC summary usage documentation ele alinabilir. Hard validation henuz eklenmemelidir.

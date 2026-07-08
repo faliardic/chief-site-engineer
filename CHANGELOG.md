@@ -1,5 +1,15 @@
 # Changelog
 
+## Step 149
+
+- Added read-only diagnostic / soft validation format helpers for JSON-ready dict and Markdown string presentation.
+- Added `format_record_id_diagnostic_report_as_json_ready_dict(...)`, `format_record_id_soft_validation_report_as_json_ready_dict(...)`, `format_record_id_diagnostic_report_as_markdown(...)`, and `format_record_id_soft_validation_report_as_markdown(...)`.
+- The JSON-ready helpers return Python dict output, copy input report data without mutating it, preserve count/status/items/messages/summary content, and avoid adding non-serializable objects.
+- The Markdown helpers return strings with report headings, count/status fields, visible warning/error or review/attention items, and explicit notes that the report is not record rejection and is not hard validation.
+- Unsupported input returns readable minimal dict or Markdown output instead of raising an exception.
+- Added focused tests for JSON-ready output, Markdown output, input immutability, unsupported input, no diagnostic/status recomputation, no `blocked` output status, and unchanged `AuditEventRecord` constructor behavior.
+- Kept `build_record_id_diagnostic_report(...)` and `build_record_id_soft_validation_report(...)` behavior unchanged; no JSON/Markdown file output, export helper, hard validation, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, database/repository/API/GUI/CLI behavior, migration, automatic correction, Podcast 025, commit, push, or ZIP staging was added.
+
 ## Step 148
 
 - Added documentation-only API boundary and test matrix planning for future diagnostic / soft validation format helpers.

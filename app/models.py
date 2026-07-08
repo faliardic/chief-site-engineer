@@ -1064,6 +1064,190 @@ def build_record_id_soft_validation_report(
     }
 
 
+def _record_id_format_json_ready_value(value: object) -> object:
+    """Return a simple JSON-ready copy without mutating the input."""
+
+    if isinstance(value, dict):
+        return {
+            str(key): _record_id_format_json_ready_value(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_record_id_format_json_ready_value(item) for item in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
+
+
+def _unsupported_record_id_format_report(report_type: str) -> dict[str, object]:
+    """Return a non-blocking formatter response for unsupported input."""
+
+    return {
+        "report_type": report_type,
+        "is_supported_input": False,
+        "message": "report must be a dict for record ID formatting",
+        "items": [],
+        "summary": {},
+        "notes": [
+            "Bu rapor kayit reddi degildir.",
+            "Hard validation degildir.",
+            "`blocked` status uretilmez.",
+        ],
+    }
+
+
+def format_record_id_diagnostic_report_as_json_ready_dict(
+    report: object,
+) -> dict[str, object]:
+    """Return a read-only JSON-ready diagnostic report presentation dict."""
+
+    if not isinstance(report, dict):
+        return _unsupported_record_id_format_report("record_id_diagnostic")
+
+    formatted = _record_id_format_json_ready_value(report)
+    assert isinstance(formatted, dict)
+    return {
+        "report_type": "record_id_diagnostic",
+        "is_supported_input": True,
+        **formatted,
+    }
+
+
+def format_record_id_soft_validation_report_as_json_ready_dict(
+    report: object,
+) -> dict[str, object]:
+    """Return a read-only JSON-ready soft validation presentation dict."""
+
+    if not isinstance(report, dict):
+        return _unsupported_record_id_format_report("record_id_soft_validation")
+
+    formatted = _record_id_format_json_ready_value(report)
+    assert isinstance(formatted, dict)
+    if formatted.get("status") == "blocked":
+        formatted["status"] = "unsupported"
+        messages = formatted.get("messages", [])
+        if not isinstance(messages, list):
+            messages = [str(messages)]
+        messages.append("`blocked` status uretilmez.")
+        formatted["messages"] = messages
+
+    return {
+        "report_type": "record_id_soft_validation",
+        "is_supported_input": True,
+        **formatted,
+    }
+
+
+def _record_id_format_count_lines(report: dict[str, object]) -> list[str]:
+    count_fields = (
+        "total_count",
+        "compatible_count",
+        "warning_count",
+        "error_count",
+    )
+    return [f"- {field}: {report.get(field, 0)}" for field in count_fields]
+
+
+def _record_id_format_item_line(item: dict[str, object]) -> str:
+    index = item.get("index", "")
+    target_type = item.get("target_record_type", "")
+    target_id = item.get("target_record_id", "")
+    severity = item.get("severity", "")
+    message = item.get("message", "")
+    return f"- [{index}] {severity} {target_type} {target_id}: {message}".strip()
+
+
+def _record_id_format_warning_error_items(report: dict[str, object]) -> list[str]:
+    items = report.get("items", [])
+    if not isinstance(items, list):
+        return ["- Items are not available in a readable list."]
+
+    visible_items = [
+        item
+        for item in items
+        if isinstance(item, dict)
+        and item.get("severity") in {"warning", "error"}
+    ]
+    if not visible_items:
+        return ["- No warning/error items."]
+
+    return [_record_id_format_item_line(item) for item in visible_items]
+
+
+def _unsupported_record_id_markdown(title: str) -> str:
+    return "\n".join(
+        [
+            f"# {title}",
+            "",
+            "Unsupported report input.",
+            "",
+            "Bu rapor kayit reddi degildir.",
+            "Hard validation degildir.",
+            "`blocked` status uretilmez.",
+        ]
+    )
+
+
+def format_record_id_diagnostic_report_as_markdown(report: object) -> str:
+    """Return a read-only Markdown diagnostic report presentation."""
+
+    title = "Record ID Diagnostic Report"
+    if not isinstance(report, dict):
+        return _unsupported_record_id_markdown(title)
+
+    lines = [
+        f"# {title}",
+        "",
+        "## Summary",
+        *_record_id_format_count_lines(report),
+        "",
+        "## Warning/Error Items",
+        *_record_id_format_warning_error_items(report),
+        "",
+        "Bu rapor kayit reddi degildir.",
+        "Hard validation degildir.",
+    ]
+    return "\n".join(lines)
+
+
+def format_record_id_soft_validation_report_as_markdown(report: object) -> str:
+    """Return a read-only Markdown soft validation report presentation."""
+
+    title = "Record ID Soft Validation Report"
+    if not isinstance(report, dict):
+        return _unsupported_record_id_markdown(title)
+
+    status = report.get("status", "unknown")
+    if status == "blocked":
+        status = "unsupported"
+
+    messages = report.get("messages", [])
+    if not isinstance(messages, list):
+        messages = [messages]
+    message_lines = [f"- {message}" for message in messages] or ["- No messages."]
+
+    lines = [
+        f"# {title}",
+        "",
+        "## Summary",
+        f"- status: {status}",
+        *_record_id_format_count_lines(report),
+        f"- review_required: {report.get('review_required', False)}",
+        f"- attention_required: {report.get('attention_required', False)}",
+        "",
+        "## Messages",
+        *message_lines,
+        "",
+        "## Review/Attention Items",
+        *_record_id_format_warning_error_items(report),
+        "",
+        "Bu rapor kayit reddi degildir.",
+        "Hard validation degildir.",
+        "`blocked` status uretilmez.",
+    ]
+    return "\n".join(lines)
+
+
 @dataclass
 class AuditEventRecord:
     """Represents a traceable audit event without persistence or automation."""

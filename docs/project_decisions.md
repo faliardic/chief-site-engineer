@@ -1357,3 +1357,16 @@
 - Format layer `AuditEventRecord.__post_init__`, constructor validation, hard validation, kayit engelleme, legacy kayit reddi, otomatik data correction, migration uygulamasi, database/repository yazimi, audit event olusturma, `FileAttachmentRecord` davranisi veya API/GUI/CLI entegrasyonu icin kullanilmayacak.
 - `target_record_id` hard validation hala eklenmeyecek, `AuditEventRecord.__post_init__` degistirilmeyecek, legacy ID ornekleri korunacak, `build_record_id_diagnostic_report(...)` ve `build_record_id_soft_validation_report(...)` davranislari degistirilmeyecek.
 - Bu adim documentation-only API-boundary/test-matrix plan adimidir; uygulama kodu, test dosyalari, format helper implementasyonu, JSON/Markdown dosya uretimi, `blocked` status, hard validation, Podcast 025, commit, push veya ZIP staging eklenmedi.
+
+## 149 Read-only Diagnostic / Soft Validation Format Helper Implementation
+
+- Diagnostic / soft validation format helper katmani read-only olarak implemente edildi.
+- `format_record_id_diagnostic_report_as_json_ready_dict(...)`, `format_record_id_soft_validation_report_as_json_ready_dict(...)`, `format_record_id_diagnostic_report_as_markdown(...)` ve `format_record_id_soft_validation_report_as_markdown(...)` helperlari eklendi.
+- JSON-ready helperlar Python dict dondurur, input report verisini mutate etmeden kopyalar, count/status/items/messages/summary icerigini sunar ve yeni serialize edilemeyen object eklemez.
+- Markdown helperlar string dondurur; baslik, count/status alanlari, warning/error veya review/attention itemlari ve "kayit reddi degildir" / "Hard validation degildir" notlarini icerir.
+- Unsupported inputlarda exception yerine okunur minimal dict veya Markdown string dondurulur; bu kayit reddi anlami tasimaz.
+- Formatterlar diagnostic sonucu veya soft validation status'u yeniden hesaplamaz; inputta gelen count/status degerlerini sunar.
+- `blocked` output status olarak uretilmez; soft validation Markdown ciktisi `blocked` status uretilmedigini acikca belirtir.
+- Testler JSON-ready output, Markdown output, input immutability, unsupported input, no recomputation, no blocked output status ve `AuditEventRecord` constructor davranisinin daralmamasini kapsar.
+- `build_record_id_diagnostic_report(...)` ve `build_record_id_soft_validation_report(...)` davranislari degistirilmedi; `AuditEventRecord.__post_init__` degistirilmedi ve `FileAttachmentRecord` davranisina dokunulmadi.
+- Bu adimda JSON/Markdown dosyasi, export helper, backup/restore, database/repository/API/GUI/CLI, migration, otomatik duzeltme, hard validation, Podcast 025, commit, push veya ZIP staging eklenmedi.

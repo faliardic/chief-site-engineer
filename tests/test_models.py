@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import pytest
 
 from app.models import (
@@ -56,6 +58,10 @@ from app.models import (
     build_record_id_diagnostic_report,
     build_record_id_soft_validation_report,
     diagnose_record_id_for_target_type,
+    format_record_id_diagnostic_report_as_json_ready_dict,
+    format_record_id_diagnostic_report_as_markdown,
+    format_record_id_soft_validation_report_as_json_ready_dict,
+    format_record_id_soft_validation_report_as_markdown,
     get_allowed_record_id_prefixes_for_target_type,
     get_record_id_family_for_target_type,
 )
@@ -791,6 +797,182 @@ def test_record_id_soft_validation_report_does_not_make_audit_event_creation_str
 
     assert event.target_record_type == "project_record"
     assert event.target_record_id == "XYZ-001"
+
+
+def test_record_id_diagnostic_json_ready_formatter_preserves_counts_and_items() -> None:
+    report = build_record_id_diagnostic_report(
+        [
+            {"target_record_type": "attachment", "target_record_id": "ATT-2026-0001"},
+            {"target_record_type": "attachment", "target_record_id": "file-att-001"},
+        ]
+    )
+    original_report = deepcopy(report)
+
+    formatted = format_record_id_diagnostic_report_as_json_ready_dict(report)
+
+    assert isinstance(formatted, dict)
+    assert formatted["report_type"] == "record_id_diagnostic"
+    assert formatted["total_count"] == report["total_count"]
+    assert formatted["compatible_count"] == report["compatible_count"]
+    assert formatted["warning_count"] == report["warning_count"]
+    assert formatted["error_count"] == report["error_count"]
+    assert formatted["items"][0]["target_record_id"] == "ATT-2026-0001"
+    assert formatted["items"][1]["target_record_id"] == "file-att-001"
+    assert report == original_report
+
+
+def test_record_id_soft_validation_json_ready_formatter_preserves_report_fields() -> None:
+    diagnostic_report = build_record_id_diagnostic_report(
+        [{"target_record_type": "attachment", "target_record_id": "file-att-001"}]
+    )
+    report = build_record_id_soft_validation_report(diagnostic_report)
+    original_report = deepcopy(report)
+
+    formatted = format_record_id_soft_validation_report_as_json_ready_dict(report)
+
+    assert isinstance(formatted, dict)
+    assert formatted["report_type"] == "record_id_soft_validation"
+    assert formatted["status"] == report["status"]
+    assert formatted["total_count"] == report["total_count"]
+    assert formatted["warning_count"] == report["warning_count"]
+    assert formatted["error_count"] == report["error_count"]
+    assert formatted["items"][0]["target_record_id"] == "file-att-001"
+    assert formatted["items"][0]["allowed_prefixes"] == ["ATT", "file-att", "att"]
+    assert formatted["messages"] == report["messages"]
+    assert formatted["summary"] == report["summary"]
+    assert report == original_report
+
+
+def test_record_id_diagnostic_markdown_formatter_shows_counts_and_items() -> None:
+    report = build_record_id_diagnostic_report(
+        [
+            {"target_record_type": "attachment", "target_record_id": "file-att-001"},
+            {"target_record_type": "unknown_record", "target_record_id": "REC-001"},
+        ]
+    )
+    original_report = deepcopy(report)
+
+    markdown = format_record_id_diagnostic_report_as_markdown(report)
+
+    assert isinstance(markdown, str)
+    assert "# Record ID Diagnostic Report" in markdown
+    assert "total_count: 2" in markdown
+    assert "warning_count: 1" in markdown
+    assert "error_count: 1" in markdown
+    assert "file-att-001" in markdown
+    assert "REC-001" in markdown
+    assert "Bu rapor kayit reddi degildir." in markdown
+    assert "Hard validation degildir." in markdown
+    assert report == original_report
+
+
+def test_record_id_soft_validation_markdown_formatter_shows_status_messages_and_items() -> None:
+    diagnostic_report = build_record_id_diagnostic_report(
+        [
+            {"target_record_type": "attachment", "target_record_id": "file-att-001"},
+            {"target_record_type": "unknown_record", "target_record_id": "REC-001"},
+        ]
+    )
+    report = build_record_id_soft_validation_report(diagnostic_report)
+    original_report = deepcopy(report)
+
+    markdown = format_record_id_soft_validation_report_as_markdown(report)
+
+    assert isinstance(markdown, str)
+    assert "# Record ID Soft Validation Report" in markdown
+    assert "status: attention" in markdown
+    assert "review_required: True" in markdown
+    assert "attention_required: True" in markdown
+    assert report["messages"][0] in markdown
+    assert "file-att-001" in markdown
+    assert "REC-001" in markdown
+    assert "`blocked` status uretilmez." in markdown
+    assert report == original_report
+
+
+def test_record_id_formatters_return_readable_outputs_for_unsupported_input() -> None:
+    unsupported_inputs = (None, [], "not-a-report")
+
+    for value in unsupported_inputs:
+        diagnostic_json = format_record_id_diagnostic_report_as_json_ready_dict(value)
+        soft_json = format_record_id_soft_validation_report_as_json_ready_dict(value)
+        diagnostic_markdown = format_record_id_diagnostic_report_as_markdown(value)
+        soft_markdown = format_record_id_soft_validation_report_as_markdown(value)
+
+        assert isinstance(diagnostic_json, dict)
+        assert isinstance(soft_json, dict)
+        assert diagnostic_json["is_supported_input"] is False
+        assert soft_json["is_supported_input"] is False
+        assert isinstance(diagnostic_markdown, str)
+        assert isinstance(soft_markdown, str)
+        assert "Unsupported report input." in diagnostic_markdown
+        assert "Unsupported report input." in soft_markdown
+
+
+def test_record_id_formatters_do_not_recompute_counts_or_status() -> None:
+    diagnostic_report = {
+        "total_count": 99,
+        "compatible_count": 88,
+        "warning_count": 7,
+        "error_count": 4,
+        "items": [{"index": 0, "severity": "info", "target_record_id": "ATT-1"}],
+        "summary": {"total": 99, "compatible": 88, "warnings": 7, "errors": 4},
+    }
+    soft_report = {
+        "status": "review",
+        "total_count": 99,
+        "compatible_count": 88,
+        "warning_count": 7,
+        "error_count": 4,
+        "review_required": False,
+        "attention_required": False,
+        "messages": ["precomputed status must be displayed as-is"],
+        "items": [],
+        "summary": {"total": 99, "compatible": 88, "warnings": 7, "errors": 4},
+    }
+
+    diagnostic_json = format_record_id_diagnostic_report_as_json_ready_dict(
+        diagnostic_report
+    )
+    soft_json = format_record_id_soft_validation_report_as_json_ready_dict(
+        soft_report
+    )
+    diagnostic_markdown = format_record_id_diagnostic_report_as_markdown(
+        diagnostic_report
+    )
+    soft_markdown = format_record_id_soft_validation_report_as_markdown(soft_report)
+
+    assert diagnostic_json["total_count"] == 99
+    assert diagnostic_json["warning_count"] == 7
+    assert diagnostic_json["error_count"] == 4
+    assert soft_json["status"] == "review"
+    assert soft_json["review_required"] is False
+    assert "total_count: 99" in diagnostic_markdown
+    assert "warning_count: 7" in diagnostic_markdown
+    assert "status: review" in soft_markdown
+    assert "review_required: False" in soft_markdown
+
+
+def test_record_id_formatters_do_not_emit_blocked_as_output_status() -> None:
+    report = {
+        "status": "blocked",
+        "total_count": 1,
+        "compatible_count": 0,
+        "warning_count": 0,
+        "error_count": 1,
+        "review_required": True,
+        "attention_required": True,
+        "messages": ["upstream input used unsupported status"],
+        "items": [],
+        "summary": {"total": 1, "compatible": 0, "warnings": 0, "errors": 1},
+    }
+
+    formatted = format_record_id_soft_validation_report_as_json_ready_dict(report)
+    markdown = format_record_id_soft_validation_report_as_markdown(report)
+
+    assert formatted["status"] != "blocked"
+    assert "status: blocked" not in markdown
+    assert "`blocked` status uretilmez." in markdown
 
 
 def test_record_id_helpers_do_not_make_audit_event_creation_stricter() -> None:
