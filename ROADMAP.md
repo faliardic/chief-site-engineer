@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 144 - Soft validation report API boundary and test matrix plan
+Adim 145 - Read-only soft validation report implementation
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -42,12 +42,14 @@ Podcast 023'te Adim 137-141 araligi NotebookLM icin ozetlendi; diagnostic helper
 
 Adim 144'te olasi `build_record_id_soft_validation_report(...)` helper'i icin API boundary, diagnostic report dict input sozlesmesi, status seviyeleri ve test matrix documentation-only olarak planlandi.
 
+Adim 145'te `build_record_id_soft_validation_report(diagnostic_report)` helper'i read-only olarak eklendi; diagnostic report dict'i `pass` / `review` / `attention` soft validation report'a cevirir, `blocked` uretmez ve hard validation'a baglanmaz.
+
 Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
 
 Guncel test durumu:
 
 ```text
-274 passed
+287 passed
 ```
 
 Proje su anda domain model, bellek ici repository, test, dokumantasyon, learning ve NotebookLM podcast notlari cekirdegi seviyesindedir.
@@ -199,9 +201,10 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 - [x] Adim 143 - Soft validation report layer plan; diagnostic report ciktisinin pass/review/attention gibi kayit reddetmeyen yorum seviyeleriyle nasil kullanilabilecegi belgelendi, implementasyon yapilmadi.
 - [x] Podcast 023 - Adim 137-141 NotebookLM podcast notu; record ID diagnostic report hattinin read-only, edge-case-aware ve hard-validation-disinda kalma kararlarini ozetledi.
 - [x] Adim 144 - Soft validation report API boundary and test matrix plan; diagnostic report dict input, pass/review/attention status kurallari ve blocked disi test matrix planlandi.
+- [x] Adim 145 - Read-only soft validation report implementation; diagnostic report dict'i pass/review/attention soft validation report'a ceviren helper eklendi, blocked ve hard validation kapsam disinda tutuldu.
 
 Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokumantasyon ve kullanim standardi ile sabitlemek; sonra rapor format sinirlari, handover QC kullanimi ve soft validation rapor katmanini hard validation'a gecmeden hazirlamaktir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 145 icin read-only soft validation report implementation ele alinabilir. Hard validation henuz eklenmemelidir.
+Adim 146 icin soft validation usage documentation / handover QC interpretation ele alinabilir. Hard validation henuz eklenmemelidir.

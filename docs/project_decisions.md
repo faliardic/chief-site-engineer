@@ -1289,3 +1289,17 @@
 - Soft validation report helper `AuditEventRecord.__post_init__`, constructor validation, hard validation, kayit engelleme, legacy kayit reddi, otomatik data correction, migration uygulamasi, database/repository yazimi, audit event olusturma veya `FileAttachmentRecord` davranisi degistirme icin kullanilmayacak.
 - `target_record_id` hard validation hala eklenmeyecek, `AuditEventRecord.__post_init__` degistirilmeyecek, legacy ID ornekleri korunacak ve `build_record_id_diagnostic_report(...)` davranisi degistirilmeyecek.
 - Bu adim documentation-only API-boundary/test-matrix plan adimidir; uygulama kodu, test dosyalari, soft validation helper implementasyonu, hard validation, Podcast 024, commit, push veya ZIP staging eklenmedi.
+
+## 145 Read-only Soft Validation Report Implementation
+
+- `build_record_id_soft_validation_report(diagnostic_report)` helper'i read-only soft validation report katmani olarak eklendi.
+- Helper input olarak `build_record_id_diagnostic_report(...)` ciktisi olan diagnostic report dict alir; record listesi, repository veya database sorgusu almaz.
+- Output sozlesmesi `status`, `total_count`, `compatible_count`, `warning_count`, `error_count`, `review_required`, `attention_required`, `messages`, `items` ve `summary` alanlarini icerir.
+- Status kurallari `pass`, `review` ve `attention` olarak uygulandi; `blocked` status'u uretilmez.
+- `pass` warning/error olmadigini, `review` warning goruldugunu, `attention` error veya helper input sorunu goruldugunu anlatir. Bu seviyeler kayit reddi, otomatik silme, otomatik duzeltme veya migration sebebi degildir.
+- Helper diagnostic report dict'ini mutate etmez; count degerlerini diagnostic report'tan okur, item ve summary bilgisini korur.
+- Unknown severity exception firlatmaz; messages alaninda gorunur olur ve kayit reddi yaratmaz.
+- Uygunsuz input veya eksik alanlar exception yerine `attention` seviyesinde okunur soft validation report dondurur.
+- `AuditEventRecord.__post_init__` icine baglanmadi, constructor validation veya hard validation eklenmedi, legacy ID ornekleri korunur.
+- `build_record_id_diagnostic_report(...)` davranisi degistirilmedi ve `FileAttachmentRecord` davranisina dokunulmadi.
+- Database/repository/API/GUI/CLI, audit event olusturma, migration, otomatik duzeltme, Podcast 024, commit, push veya ZIP staging eklenmedi.

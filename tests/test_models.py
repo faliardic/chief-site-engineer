@@ -54,6 +54,7 @@ from app.models import (
     TrackingRecord,
     WorkforceRecord,
     build_record_id_diagnostic_report,
+    build_record_id_soft_validation_report,
     diagnose_record_id_for_target_type,
     get_allowed_record_id_prefixes_for_target_type,
     get_record_id_family_for_target_type,
@@ -603,6 +604,185 @@ def test_record_id_diagnostic_report_returns_error_items_for_unsupported_items()
 
 
 def test_record_id_diagnostic_report_does_not_make_audit_event_creation_stricter() -> None:
+    event = AuditEventRecord(
+        **_valid_audit_event_kwargs(),
+        target_record_type="project_record",
+        target_record_id="XYZ-001",
+    )
+
+    assert event.target_record_type == "project_record"
+    assert event.target_record_id == "XYZ-001"
+
+
+def test_record_id_soft_validation_report_returns_pass_for_empty_diagnostics() -> None:
+    diagnostic_report = build_record_id_diagnostic_report([])
+
+    report = build_record_id_soft_validation_report(diagnostic_report)
+
+    assert report["status"] == "pass"
+    assert report["review_required"] is False
+    assert report["attention_required"] is False
+    assert report["total_count"] == 0
+    assert report["items"] == []
+
+
+def test_record_id_soft_validation_report_returns_pass_for_info_only_items() -> None:
+    diagnostic_report = build_record_id_diagnostic_report(
+        [{"target_record_type": "attachment", "target_record_id": "ATT-2026-0001"}]
+    )
+
+    report = build_record_id_soft_validation_report(diagnostic_report)
+
+    assert report["status"] == "pass"
+    assert report["compatible_count"] == 1
+    assert report["warning_count"] == 0
+    assert report["error_count"] == 0
+
+
+def test_record_id_soft_validation_report_returns_review_for_warnings_only() -> None:
+    diagnostic_report = build_record_id_diagnostic_report(
+        [{"target_record_type": "attachment", "target_record_id": "file-att-001"}]
+    )
+
+    report = build_record_id_soft_validation_report(diagnostic_report)
+
+    assert report["status"] == "review"
+    assert report["review_required"] is True
+    assert report["attention_required"] is False
+
+
+def test_record_id_soft_validation_report_returns_attention_for_errors() -> None:
+    diagnostic_report = build_record_id_diagnostic_report(
+        [{"target_record_type": "unknown_record", "target_record_id": "REC-001"}]
+    )
+
+    report = build_record_id_soft_validation_report(diagnostic_report)
+
+    assert report["status"] == "attention"
+    assert report["review_required"] is True
+    assert report["attention_required"] is True
+
+
+def test_record_id_soft_validation_report_prioritizes_attention_over_review() -> None:
+    diagnostic_report = build_record_id_diagnostic_report(
+        [
+            {"target_record_type": "attachment", "target_record_id": "file-att-001"},
+            {"target_record_type": "unknown_record", "target_record_id": "REC-001"},
+        ]
+    )
+
+    report = build_record_id_soft_validation_report(diagnostic_report)
+
+    assert report["status"] == "attention"
+    assert report["warning_count"] == 1
+    assert report["error_count"] == 1
+
+
+def test_record_id_soft_validation_report_preserves_counts_from_diagnostics() -> None:
+    diagnostic_report = build_record_id_diagnostic_report(
+        [
+            {"target_record_type": "attachment", "target_record_id": "ATT-2026-0001"},
+            {"target_record_type": "attachment", "target_record_id": "file-att-001"},
+            {"target_record_type": "unknown_record", "target_record_id": "REC-001"},
+        ]
+    )
+
+    report = build_record_id_soft_validation_report(diagnostic_report)
+
+    assert report["total_count"] == diagnostic_report["total_count"]
+    assert report["compatible_count"] == diagnostic_report["compatible_count"]
+    assert report["warning_count"] == diagnostic_report["warning_count"]
+    assert report["error_count"] == diagnostic_report["error_count"]
+    assert report["summary"] == diagnostic_report["summary"]
+
+
+def test_record_id_soft_validation_report_preserves_items_content() -> None:
+    diagnostic_report = build_record_id_diagnostic_report(
+        [
+            {"target_record_type": "attachment", "target_record_id": "ATT-2026-0001"},
+            {"target_record_type": "project_record", "target_record_id": "XYZ-001"},
+        ]
+    )
+
+    report = build_record_id_soft_validation_report(diagnostic_report)
+
+    assert report["items"] == diagnostic_report["items"]
+
+
+def test_record_id_soft_validation_report_does_not_mutate_input_report() -> None:
+    diagnostic_report = build_record_id_diagnostic_report(
+        [{"target_record_type": "attachment", "target_record_id": "file-att-001"}]
+    )
+    original_report = {
+        key: (value.copy() if isinstance(value, dict) else list(value))
+        if isinstance(value, (dict, list))
+        else value
+        for key, value in diagnostic_report.items()
+    }
+
+    build_record_id_soft_validation_report(diagnostic_report)
+
+    assert diagnostic_report == original_report
+
+
+def test_record_id_soft_validation_report_handles_unknown_severity_without_exception() -> None:
+    diagnostic_report = {
+        "total_count": 1,
+        "compatible_count": 0,
+        "warning_count": 0,
+        "error_count": 0,
+        "items": [{"index": 0, "severity": "notice", "is_compatible": False}],
+        "summary": {"total": 1, "compatible": 0, "warnings": 0, "errors": 0},
+    }
+
+    report = build_record_id_soft_validation_report(diagnostic_report)
+
+    assert report["status"] == "pass"
+    assert report["items"] == diagnostic_report["items"]
+    assert report["messages"]
+
+
+def test_record_id_soft_validation_report_returns_attention_for_unsupported_input() -> None:
+    report = build_record_id_soft_validation_report(object())
+
+    assert report["status"] == "attention"
+    assert report["error_count"] == 1
+    assert report["review_required"] is True
+    assert report["attention_required"] is True
+
+
+def test_record_id_soft_validation_report_returns_attention_for_missing_fields() -> None:
+    report = build_record_id_soft_validation_report({"items": []})
+
+    assert report["status"] == "attention"
+    assert report["messages"]
+
+
+def test_record_id_soft_validation_report_never_returns_blocked_status() -> None:
+    reports = [
+        build_record_id_soft_validation_report(build_record_id_diagnostic_report([])),
+        build_record_id_soft_validation_report(
+            build_record_id_diagnostic_report(
+                [
+                    {
+                        "target_record_type": "attachment",
+                        "target_record_id": "file-att-001",
+                    }
+                ]
+            )
+        ),
+        build_record_id_soft_validation_report(
+            build_record_id_diagnostic_report(
+                [{"target_record_type": "unknown_record", "target_record_id": ""}]
+            )
+        ),
+        build_record_id_soft_validation_report(object()),
+    ]
+
+    assert {report["status"] for report in reports}.isdisjoint({"blocked"})
+
+
+def test_record_id_soft_validation_report_does_not_make_audit_event_creation_stricter() -> None:
     event = AuditEventRecord(
         **_valid_audit_event_kwargs(),
         target_record_type="project_record",

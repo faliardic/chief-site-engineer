@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 145
+
+- Added `build_record_id_soft_validation_report(diagnostic_report)` as a read-only soft validation report helper.
+- The helper accepts the diagnostic report dict produced by `build_record_id_diagnostic_report(...)` and returns `status`, counts, `review_required`, `attention_required`, `messages`, `items`, and `summary`.
+- Implemented non-blocking status interpretation: `pass` for no warnings/errors, `review` for warnings without errors, and `attention` for errors or unsupported helper input.
+- Explicitly kept `blocked` out of the helper output.
+- Added focused tests for empty diagnostics, info-only pass, warning review, error attention, attention priority, count preservation, item preservation, input immutability, unknown severity, unsupported input, missing fields, no blocked output, and unchanged `AuditEventRecord` constructor behavior.
+- Kept the helper read-only; no record rejection, data mutation, hard validation, constructor validation, `AuditEventRecord.__post_init__` change, `build_record_id_diagnostic_report(...)` behavior change, `FileAttachmentRecord` change, database/repository/API/GUI/CLI behavior, migration, automatic correction, Podcast 024, commit, push, or ZIP staging was added.
+
 ## Step 144
 
 - Added documentation-only API boundary and test matrix planning for a future `build_record_id_soft_validation_report(...)` helper.

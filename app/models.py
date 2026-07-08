@@ -963,6 +963,107 @@ def build_record_id_diagnostic_report(records: object) -> dict[str, object]:
     }
 
 
+def build_record_id_soft_validation_report(
+    diagnostic_report: object,
+) -> dict[str, object]:
+    """Return a read-only soft validation report for record ID diagnostics."""
+
+    def attention_report(message: str) -> dict[str, object]:
+        return {
+            "status": "attention",
+            "total_count": 0,
+            "compatible_count": 0,
+            "warning_count": 0,
+            "error_count": 1,
+            "review_required": True,
+            "attention_required": True,
+            "messages": [message],
+            "items": [],
+            "summary": {
+                "total": 0,
+                "compatible": 0,
+                "warnings": 0,
+                "errors": 1,
+            },
+        }
+
+    if not isinstance(diagnostic_report, dict):
+        return attention_report(
+            "diagnostic_report must be a dict for soft validation"
+        )
+
+    required_count_fields = (
+        "total_count",
+        "compatible_count",
+        "warning_count",
+        "error_count",
+    )
+    counts: dict[str, int] = {}
+    for field_name in required_count_fields:
+        value = diagnostic_report.get(field_name)
+        if not isinstance(value, int) or value < 0:
+            return attention_report(
+                "diagnostic_report is missing required count fields"
+            )
+        counts[field_name] = value
+
+    items = diagnostic_report.get("items", [])
+    if not isinstance(items, list):
+        return attention_report("diagnostic_report items must be a list")
+
+    summary = diagnostic_report.get(
+        "summary",
+        {
+            "total": counts["total_count"],
+            "compatible": counts["compatible_count"],
+            "warnings": counts["warning_count"],
+            "errors": counts["error_count"],
+        },
+    )
+    if not isinstance(summary, dict):
+        return attention_report("diagnostic_report summary must be a dict")
+
+    error_count = counts["error_count"]
+    warning_count = counts["warning_count"]
+    if error_count > 0:
+        status = "attention"
+        messages = [
+            "record ID diagnostics include errors requiring manual attention"
+        ]
+    elif warning_count > 0:
+        status = "review"
+        messages = ["record ID diagnostics include warnings for review"]
+    else:
+        status = "pass"
+        messages = ["record ID diagnostics passed without warnings or errors"]
+
+    has_unknown_severity = any(
+        isinstance(item, dict)
+        and item.get("severity") not in {"info", "warning", "error"}
+        for item in items
+    )
+    if has_unknown_severity:
+        messages.append(
+            "record ID diagnostics include unknown severity values for review"
+        )
+
+    review_required = status in {"review", "attention"}
+    attention_required = status == "attention"
+
+    return {
+        "status": status,
+        "total_count": counts["total_count"],
+        "compatible_count": counts["compatible_count"],
+        "warning_count": warning_count,
+        "error_count": error_count,
+        "review_required": review_required,
+        "attention_required": attention_required,
+        "messages": messages,
+        "items": list(items),
+        "summary": dict(summary),
+    }
+
+
 @dataclass
 class AuditEventRecord:
     """Represents a traceable audit event without persistence or automation."""
