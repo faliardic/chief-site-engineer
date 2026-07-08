@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 143
+
+- Added documentation-only planning for a future soft validation report layer based on `build_record_id_diagnostic_report(...)` output.
+- Clarified the distinction between raw diagnostic output and a soft validation report: diagnostics provide `info` / `warning` / `error` items, while soft validation interprets them as review or attention signals without rejecting records.
+- Planned safe usage in handover pre-checks, audit QC reports, export/backup risk visibility, admin/debug quality reports, pre-migration data health review, and test example standardization review.
+- Documented non-use inside `AuditEventRecord.__post_init__`, constructor validation, hard validation, record creation blocking, legacy rejection, automatic correction, migration execution, database/repository writes, audit event creation, or `FileAttachmentRecord` behavior changes.
+- Planned possible future output levels `pass`, `review`, and `attention`, while explicitly leaving `blocked` out because it may imply hard validation or blocking behavior.
+- Kept this as documentation-only; no application code, tests, soft validation helper, `build_record_id_soft_validation_report(...)` implementation, hard validation, `AuditEventRecord.__post_init__` change, `build_record_id_diagnostic_report(...)` behavior change, Podcast 023, commit, push, or ZIP staging was added.
+
 ## Step 142
 
 - Added documentation-only export/format boundary planning for future `build_record_id_diagnostic_report(...)` presentation layers.

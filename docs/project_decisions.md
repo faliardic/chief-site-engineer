@@ -1258,3 +1258,15 @@
 - `warning` veri reddi degildir; `error` otomatik silme veya duzeltme sebebi degildir. Format layer severity anlamlarini degistirmeyecek.
 - `target_record_id` hard validation hala eklenmeyecek, `AuditEventRecord.__post_init__` degistirilmeyecek, legacy ID ornekleri korunacak ve `build_record_id_diagnostic_report(...)` davranisi degistirilmeyecek.
 - Bu adim documentation-only export/format boundary plan adimidir; uygulama kodu, test dosyalari, export helper, format helper, JSON/Markdown dosya uretimi, hard validation, Podcast 023, commit, push veya ZIP staging eklenmedi.
+
+## 143 Soft Validation Report Layer Plan
+
+- `build_record_id_diagnostic_report(...)` ciktisinin ileride kayit reddetmeyen soft validation report layer icin nasil yorumlanabilecegi documentation-only olarak planlandi.
+- Diagnostic katman ham `info` / `warning` / `error` bilgisi uretir; soft validation report bu sonuclari "gozden gecir", "devir oncesi kontrol et" veya "legacy uyumlu ama izlenmeli" gibi kalite kontrol yorumlarina cevirir.
+- Soft validation report layer handover on kontrol, audit QC raporu, export/backup oncesi risk gorunurlugu, admin/debug kalite raporu, migration oncesi veri sagligi incelemesi ve test example standardization gozden gecirme icin kullanilabilir.
+- Soft validation report `AuditEventRecord.__post_init__`, constructor validation, hard validation, kayit olusturmayi engelleme, legacy kayit reddi, otomatik data correction, migration uygulamasi, database/repository yazimi, audit event olusturma veya `FileAttachmentRecord` davranisi degistirme icin kullanilmayacak.
+- Olası `build_record_id_soft_validation_report(...)` helper adi yalnizca planlandi; bu adimda implementasyon yapilmadi.
+- Olası soft validation seviyeleri `pass`, `review` ve `attention` olarak planlandi; `blocked` seviyesi hard validation veya engelleme anlami dogurabilecegi icin bu asamada kullanilmayacak.
+- Handover ve export/backup yorumlari warning/error kayitlarini gorunur yapar, fakat devir paketini veya exportu otomatik bloke etmez ve backup/restore davranisini degistirmez.
+- `target_record_id` hard validation hala eklenmeyecek, `AuditEventRecord.__post_init__` degistirilmeyecek, legacy ID ornekleri korunacak ve `build_record_id_diagnostic_report(...)` davranisi degistirilmeyecek.
+- Bu adim documentation-only soft-validation-report-layer plan adimidir; uygulama kodu, test dosyalari, soft validation helper, hard validation, Podcast 023, commit, push veya ZIP staging eklenmedi.
