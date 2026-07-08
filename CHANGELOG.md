@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 141
+
+- Added documentation-only usage boundary and edge case standardization for `build_record_id_diagnostic_report(records)`.
+- Documented safe usage in handover pre-check reports, audit QC reports, pre-migration inventory, backup/export warning lists, admin/debug visibility, test example standardization, and data quality review documentation.
+- Clarified non-use inside `AuditEventRecord.__post_init__`, constructor validation, hard validation, legacy rejection, automatic data correction, migration execution, database/repository writes, audit event creation, or `FileAttachmentRecord` behavior changes.
+- Standardized diagnostic interpretation for empty input, canonical IDs, legacy IDs, unmatched prefixes, unknown target types, empty `target_record_id`, unsupported input items, tuple/list input, and dict input.
+- Documented severity and summary interpretation: `info` is normal canonical compatibility, `warning` is a quality-control signal, `error` is helper-level diagnostic difficulty, and counts do not trigger hard validation.
+- Kept this as documentation-only; no application code, tests, hard validation, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, Podcast 023, commit, push, or ZIP staging was added.
+
 ## Step 140
 
 - Added `build_record_id_diagnostic_report(records)` as a read-only record ID diagnostic report helper.

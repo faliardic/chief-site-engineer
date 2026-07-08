@@ -1237,3 +1237,13 @@
 - Helper kayit reddetmez, veri degistirmez, database/repository yazmaz, audit event olusturmaz, migration/otomatik duzeltme yapmaz, dosya sistemi/backup/restore/export uretmez.
 - `AuditEventRecord.__post_init__` icine baglanmadi, constructor validation veya hard validation eklenmedi, legacy ID ornekleri korunur ve `FileAttachmentRecord` davranisina dokunulmadi.
 - Podcast 023 olusturulmadi; commit, push veya ZIP staging yapilmadi.
+
+## 141 Record ID Diagnostic Report Usage and Edge Case Standardization
+
+- `build_record_id_diagnostic_report(records)` helper'i handover on kontrol, audit QC, migration oncesi envanter, backup/export oncesi uyari listesi, admin/debug gorunurlugu, test example standardization ve veri kalitesi gozden gecirme dokumantasyonu icin read-only gorunurluk saglar.
+- Helper `AuditEventRecord.__post_init__` icinde, constructor validation olarak, hard validation olarak, legacy kayitlari reddetmek icin, otomatik data correction icin, migration uygulama adimi olarak, database/repository yazmak icin, audit event olusturmak icin veya `FileAttachmentRecord` davranisini degistirmek icin kullanilmayacak.
+- Bos input hata degildir; canonical ID `info` ve compatible, legacy ID `warning` ve compatible, prefix disi ID `warning` ve incompatible, bilinmeyen target type veya bos `target_record_id` ise helper seviyesinde `error` diagnostic item olarak yorumlanir.
+- Uygunsuz input item raporu kesmez; exception yerine `error` diagnostic item uretir. Tuple/list inputta ilk iki eleman, dict inputta `target_record_type` ve `target_record_id` anahtarlari okunur.
+- `warning_count` ve `error_count` hard validation tetiklemez; summary/count alanlari karar vermez, rapor gorunurlugu saglar.
+- `target_record_id` hard validation hala eklenmeyecek, `AuditEventRecord.__post_init__` degistirilmeyecek, legacy ID ornekleri korunacak ve diagnostic report helper read-only kalacak.
+- Bu adim documentation-only usage/edge-case standardization adimidir; uygulama kodu, test dosyalari, hard validation, Podcast 023, commit, push veya ZIP staging eklenmedi.
