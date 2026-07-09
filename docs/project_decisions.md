@@ -1620,3 +1620,15 @@
 - Handover QC yorumunda `success=True` export dosyasinin yazildigini, `success=False` export yaziminin basarisiz veya skipped oldugunu, fakat devir paketini otomatik bloke etmedigini ve `blocked` status uretmedigini netlestirdi.
 - Wrapperlarin diagnostic/soft validation sonucunu yeniden hesaplamayacagi, format helper ciktisini degistirmeyecegi, input mutate etmeyecegi, database/repository yazmayacagi, audit event uretmeyecegi, backup/restore baslatmayacagi, API/GUI/CLI eklemeyecegi, hard validation tetiklemeyecegi ve `blocked` status uretmeyecegi yinelendi.
 - Bu adim documentation-only adimidir; `app/models.py`, `tests/test_models.py`, helper davranisi, yeni test, JSON/Markdown export cikti dosyasi, Podcast 027, commit veya push eklenmedi.
+
+## Podcast 027 Adim 157-161 NotebookLM Podcast Notu
+
+- Podcast 027, Adim 157-161 araligini NotebookLM podcast uretimine uygun documentation-only not olarak ozetledi.
+- Kapsam yalniz Adim 157 Export Helper Error / Result Contract Plan, Adim 158 Export Helper Result Contract Implementation Plan, Adim 159 Export Helper Result Contract Test Matrix Plan, Adim 160 Export Helper Result Contract API Boundary / Wrapper Plan ve Adim 161 Export Helper Result Contract Wrapper Implementation Plan olarak belirlendi.
+- Adim 162, Adim 163, Adim 164 ve sonrasi podcast kapsam disinda tutuldu.
+- Ana tema export helper error/result contract yapisinin planlanmasi, sinirlandirilmasi ve future wrapper implementasyonuna hazirlanmasi olarak kaydedildi.
+- Result contract yaklasimi basari/basarisizlik durumunun standart raporlanmasi, `error_code`, `error_message`, `skipped_reason`, `attempted_path`, `output_path`, `allowed_root`, `file_type` ve `overwritten` alanlariyla okunabilir hale gelmesi olarak aciklandi.
+- Exception firlatan dusuk seviyeli `write_json_ready_dict_to_file(...)` ve `write_markdown_text_to_file(...)` helperlari ile future result contract dondurebilecek `try_write_json_ready_dict_to_file(...)` ve `try_write_markdown_text_to_file(...)` wrapper katmani ayrimi anlatildi.
+- CSE veri omurgasi acisindan export davranisinin daha kontrollu hale gelmesi, hata raporlamasinin standartlasmasi ve dosya yazma sonucunun ust katmana okunabilir bicimde tasinmasi vurgulandi.
+- Bu gorunurlugun backup/restore, API, GUI, CLI, otomasyon, audit event uretimi, hard validation veya `blocked` status olmadigi tekrarlandi.
+- Bu adim documentation-only podcast adimidir; uygulama kodu, test dosyalari, export helper davranisi, validasyon mantigi, JSON/Markdown export cikti dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event uretimi, ZIP staging, commit veya push eklenmedi.

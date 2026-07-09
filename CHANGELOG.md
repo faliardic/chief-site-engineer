@@ -1,5 +1,14 @@
 # Changelog
 
+## Podcast 027
+
+- Added a documentation-only NotebookLM podcast note for Step 157-161.
+- Summarized the export helper error/result contract planning arc from preserving exception-based `write_*` helper behavior to preparing a future `try_*` wrapper layer.
+- Explained the result contract idea for standardized success/failure reporting, readable `error_code` / `error_message` / `skipped_reason` fields, attempted/output path visibility, and overwrite reporting.
+- Clarified the distinction between low-level exception-based helpers and a future safe wrapper layer for handover QC or admin/debug visibility.
+- Reiterated that Step 162-164 are outside this podcast scope.
+- Kept this as documentation-only; no application code, tests, helper behavior changes, JSON/Markdown export output, backup/restore behavior, database/repository/API/GUI/CLI, audit event creation, hard validation, `blocked` status, commit, push, or ZIP/cache staging was added.
+
 ## Step 164
 
 - Added documentation-only usage guidance for the Step 163 result contract wrapper helpers.

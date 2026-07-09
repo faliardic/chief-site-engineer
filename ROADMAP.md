@@ -88,6 +88,8 @@ Adim 163'te mevcut exception tabanli `write_json_ready_dict_to_file(...)` ve `wr
 
 Adim 164'te Adim 163 wrapperlarinin usage boundary'si documentation-only olarak belgelendi; `write_*` exception helperlari ile `try_*` result wrapperlari arasindaki fark, result contract alanlari, error code yorumlari, overwrite/allowed_root kullanimi ve handover QC yorumu netlestirildi. Kod/test degisikligi, export cikti dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 
+Podcast 027'de Adim 157-161 araligi NotebookLM icin ozetlendi; export helper error/result contract planlari, result dict yaklasimi, exception tabanli `write_*` helperlar ile future `try_*` wrapper katmani ayrimi, test matrix/API boundary/implementation plan hazirligi ve handover QC gorunurlugu anlatildi. Adim 162-164 kapsam disinda tutuldu; kod/test/export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event, commit veya push eklenmedi.
+
 Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
 
 Guncel test durumu:
@@ -268,9 +270,10 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 - [x] Adim 162 - Export helper result contract wrapper test matrix finalization; future `try_write_*` wrapper testleri icin basari, input, path, overwrite, schema, regression ve handover QC beklentileri kesinlestirildi, implementasyon yapilmadi.
 - [x] Adim 163 - Export helper result contract wrapper implementation; `try_write_json_ready_dict_to_file(...)` ve `try_write_markdown_text_to_file(...)` wrapperlari, result schema, error mapping, overwrite/path safety testleri ve dokumantasyonu eklendi.
 - [x] Adim 164 - Export helper result contract wrapper usage documentation; `write_*` ve `try_*` kullanim ayrimi, result contract yorumlari, overwrite/allowed-root sinirlari ve handover QC gorunurlugu belgelendi, kod/test/export dosyasi eklenmedi.
+- [x] Podcast 027 - Adim 157-161 NotebookLM podcast notu; export helper error/result contract planlama hattini, future wrapper ayrimini ve handover QC gorunurlugunu ozetledi.
 
 Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokumantasyon ve kullanim standardi ile sabitlemek; sonra rapor format sinirlari, handover QC kullanimi ve soft validation rapor katmanini hard validation'a gecmeden hazirlamaktir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 165 icin Podcast 027 hazirlik kapsami veya result contract wrapper edge-case documentation ele alinabilir. Hard validation ve `blocked` status henuz eklenmemelidir.
+Adim 165 icin result contract wrapper edge-case documentation ele alinabilir. Hard validation ve `blocked` status henuz eklenmemelidir.
