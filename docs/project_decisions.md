@@ -1422,3 +1422,21 @@
 - Handover export ileride yalniz explicit handover icerigi uretebilir; warning/error veya review/attention kayitlarini gorunur yapabilir, fakat eski santiye sefinin ozel alanini devretmeyecek, devir paketini otomatik bloke etmeyecek, kayit reddetmeyecek ve hard validation tetiklemeyecek.
 - `target_record_id` hard validation hala eklenmeyecek, `AuditEventRecord.__post_init__` degistirilmeyecek, legacy ID ornekleri korunacak, `build_record_id_diagnostic_report(...)`, `build_record_id_soft_validation_report(...)` ve format helper davranislari degistirilmeyecek.
 - Bu adim documentation-only export-helper-boundary/file-writing-safety plan adimidir; uygulama kodu, test dosyalari, export/file writing helper implementasyonu, JSON/Markdown dosya uretimi, backup/restore davranisi, hard validation, `blocked` status, Podcast 026, commit, push veya ZIP staging eklenmedi.
+
+## 153 Path Safety and Overwrite Policy Detailed Documentation
+
+- Adim 153 path safety ve overwrite policy konusunu documentation-only olarak detaylandirdi.
+- Gelecekteki export helper'in output path'i implicit secmemesi, explicit output path istemesi ve yazma hedefini izinli export kokunun icinde tutmasi kararlastirildi.
+- Relative path davranisi izinli export kokune gore cozumlenmeli; cozumlenmis hedef allowed output root disina cikiyorsa yazma yapilmamalidir.
+- Absolute path davranisi ya tamamen reddedilmeli ya da cozumlenmis hedef allowed output root altinda kalacak sekilde sinirlanmalidir; Windows drive/UNC varyasyonlari test matrix'te dikkate alinmalidir.
+- Parent directory davranisi belirsiz birakilmayacak; guvenli varsayilan eksik parent icin hata olabilir, otomatik olusturma ancak explicit ve allowed output root altinda planlanabilir.
+- Path traversal riskleri `..`, mixed separator, encoded traversal benzeri inputlar ve dosya adi icinde separator kullanimi icin prensip duzeyinde belgelendi; yalniz string prefix kontrolu yeterli karar sayilmadi.
+- `.git`, `.env`, cache, pycache, database, backup, ZIP/yedek ve source-code alanlari future export yazim kapsamindan disarida tutulacak.
+- Dosya uzantisi siniri JSON export icin `.json`, Markdown export icin `.md` olarak planlandi; bos dosya adi, separator iceren ad, cok uzun ad, ozel karakterler ve Windows reserved names riski ayri ele alinacak.
+- Overwrite policy icin guvenli varsayilan `overwrite=False` olarak netlestirildi; mevcut dosya explicit `overwrite=True` olmadikca ezilmeyecek ve overwrite davranisi ileride audit/log gorunurluguyle ele alinabilir.
+- Atomic write icin temporary file + replace prensibi ileride degerlendirilebilir; bu adimda temporary file, replace veya file-writing kodu eklenmedi.
+- Hata davranisi exception veya diagnostic result olarak ileride tasarlanabilir; hangi model secilirse secilsin kayit reddi, hard validation veya `blocked` status anlami tasimayacak.
+- Read-only format helper ile file-writing export helper ayrimi korundu; format helper Python dict/Markdown string dondurur, file-writing helper ise ileride yalniz hazir ciktinin guvenli dosyaya yazilmasindan sorumlu olabilir.
+- Handover QC export yalniz gorunurluk ve manuel inceleme amacli kullanilabilir; devir paketini otomatik bloke etmeyecek, kayit reddetmeyecek, eski santiye sefinin ozel alanini devretmeyecek ve backup/restore motoru olmayacak.
+- `target_record_id` hard validation hala eklenmeyecek, `AuditEventRecord.__post_init__` degistirilmeyecek, legacy ID ornekleri korunacak, `FileAttachmentRecord` davranisi degistirilmeyecek ve `blocked` status uretilmeyecek.
+- Bu adim documentation-only detailed-policy adimidir; uygulama kodu, test dosyalari, export/file writing helper implementasyonu, JSON/Markdown export dosyasi, backup/restore davranisi, database/repository/API/GUI/CLI, hard validation, Podcast 026, commit, push veya ZIP staging eklenmedi.

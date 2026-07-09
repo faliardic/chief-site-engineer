@@ -1,5 +1,17 @@
 # Changelog
 
+## Step 153
+
+- Added documentation-only detailed guidance for path safety and overwrite policy before any future export/file writing helper implementation.
+- Detailed why future export helpers should require an explicit output path, keep relative paths contained under an allowed output root, and either reject or strictly contain absolute paths.
+- Documented parent directory behavior options, including the safer default of not creating missing parents unless an explicit future option is designed and limited to the allowed output root.
+- Expanded path traversal risk guidance for `..`, mixed separators, encoded traversal-like input, path separator use in file names, and why resolved-path containment is stronger than string prefix checks.
+- Clarified allowed output root principles and excluded `.git`, `.env`, cache, pycache, database, backup, ZIP, source-code, and other non-export areas from future export writes.
+- Documented file extension and file name safety expectations: `.json` for JSON export, `.md` for Markdown export, no empty names, no separator-bearing names, length limits, special-character handling, and Windows reserved-name risk.
+- Detailed overwrite policy with `overwrite=False` as the safe default, existing-file protection unless `overwrite=True` is explicit, and possible future audit/log visibility for overwrite operations.
+- Documented future atomic write principles, safe error-reporting choices, read-only format helper versus file-writing export helper separation, and handover QC export usage boundaries.
+- Kept this as documentation-only; no application code, tests, export/file writing helper, JSON/Markdown export output, backup/restore behavior, hard validation, `blocked` status, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, Podcast 026, commit, push, or ZIP staging was added.
+
 ## Step 152
 
 - Added documentation-only planning for future export helper API boundaries and file writing safety.
