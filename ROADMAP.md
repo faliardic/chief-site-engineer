@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 156 - Export Helper Usage Documentation
+Adim 157 - Export Helper Error / Result Contract Plan
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -71,6 +71,8 @@ Adim 155'te hazir JSON-ready dict ve Markdown string ciktilarini explicit output
 Adim 156'da Adim 155 file writing helper'larinin kullanim siniri documentation-only olarak belgelendi; JSON-ready dict ve Markdown akislarinda report -> formatter -> file writer ayrimi, `allowed_root`, explicit output path, `overwrite=False`, parent directory olusturmama, path traversal reddi, `exports/` kullanimi ve handover QC export senaryosu anlatildi. Yeni kod/test/export dosyasi, hard validation, `blocked` status ve Podcast 026 eklenmedi.
 
 Podcast 026'da Adim 152-156 araligi NotebookLM icin ozetlendi; export helper boundary, path safety, overwrite policy, test matrix, read-only file writing helper implementasyonu ve usage documentation anlatildi. Podcast 027 olusturulmadi.
+
+Adim 157'de Adim 155 read-only file writing helper'larinin error/result contract siniri documentation-only olarak planlandi; basarida mevcut `Path` donusunun ve hatada standart Python exception davranisinin korunacagi, gelecekte gerekiyorsa ayri result dict wrapper/helper dusunulebilecegi belgelendi. Result contract implementasyonu, yeni kod/test, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 
 Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
 
@@ -244,9 +246,10 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 - [x] Adim 155 - Read-only file writing helper implementation; JSON-ready dict ve Markdown string ciktisini guvenli explicit path'e yazan helperlar eklendi, path/overwrite/allowed-root testleriyle sinirlandi.
 - [x] Adim 156 - Export helper usage documentation; read-only file writing helper kullanim sinirlari, JSON/Markdown akis ornekleri, `allowed_root`, overwrite ve handover QC export siniri belgelendi, yeni kod/test/export dosyasi eklenmedi.
 - [x] Podcast 026 - Adim 152-156 NotebookLM podcast notu; export/file writing boundary'den usage documentation'a kadar guvenli dosya yazma hattini ozetledi.
+- [x] Adim 157 - Export helper error/result contract plan; mevcut `Path` donusu ve standart Python exception davranisi belgelendi, olasi future result dict alanlari planlandi, yeni kod/test/export dosyasi eklenmedi.
 
 Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokumantasyon ve kullanim standardi ile sabitlemek; sonra rapor format sinirlari, handover QC kullanimi ve soft validation rapor katmanini hard validation'a gecmeden hazirlamaktir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 157 icin read-only export helper usage edge case standardization ele alinabilir. Hard validation ve `blocked` status henuz eklenmemelidir.
+Adim 158 icin export helper error/result contract test matrix veya future wrapper boundary documentation ele alinabilir. Hard validation ve `blocked` status henuz eklenmemelidir.

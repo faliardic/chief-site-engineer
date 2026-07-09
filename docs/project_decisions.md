@@ -1492,3 +1492,18 @@
 - Podcast kapsami yalniz Adim 152-156 ile sinirli tutuldu; Adim 157 veya sonrasi dahil edilmedi ve Podcast 027 olusturulmadi.
 - `target_record_id` hard validation hala eklenmeyecek, `AuditEventRecord.__post_init__` daraltilmayacak, legacy ID ornekleri korunacak, `FileAttachmentRecord` davranisi degistirilmeyecek ve `blocked` status uretilmeyecek.
 - Bu adim documentation-only podcast adimidir; uygulama kodu, test dosyalari, yeni helper implementasyonu, JSON/Markdown export dosyasi, backup/restore davranisi, database/repository/API/GUI/CLI, audit event uretimi, hard validation, Podcast 027, commit, push veya ZIP staging eklenmedi.
+
+## 157 Export Helper Error / Result Contract Plan
+
+- Adim 157, Adim 155'te eklenen `write_json_ready_dict_to_file(...)` ve `write_markdown_text_to_file(...)` helper'larinin hata ve basari sozlesmesini documentation-only olarak netlestirdi.
+- Mevcut dusuk seviyeli helper davranisinin korunmasina karar verildi: basarili yazim `Path` nesnesi dondurur, basarisiz yazim standart Python exception ile gorunur olur.
+- String path donusu ve result dict donusu degerlendirildi; string path'in Python path islemleri icin daha zayif oldugu, result dict'in ise kullaniciya donuk katmanlarda faydali ama mevcut helper icin daha karmasik oldugu kaydedildi.
+- Gelecekte result contract gerekiyorsa bunun mevcut helper return type'ini degistirmek yerine ayri wrapper/helper olarak planlanmasi daha guvenli karar olarak not edildi.
+- Olasil future result contract alanlari `success`, `output_path`, `error_code`, `error_message`, `skipped_reason` ve `overwritten` olarak belgelendi; bu adimda result object implementasyonu yapilmadi.
+- Path safety hata kategorileri bos path, klasor path, yanlis uzanti, traversal, `allowed_root` disina cikma ve missing parent olarak ayrildi; bu durumlarin sessizce yutulmamasi gerektigi kararlastirildi.
+- Input hata kategorileri non-dict JSON input, serialize edilemeyen JSON input, non-string Markdown input ve bos icerik politikasi olarak belgelendi.
+- Overwrite hata davranisi `overwrite=False` ile hedef dosya varken yazmama ve gorunur hata, `overwrite=True` ile explicit basarili yazim olarak aciklandi.
+- File system hata kategorileri izin hatasi, kilitli dosya ve disk/IO hatalari olarak belgelendi; mevcut asamada bu hatalar standart Python exception olarak yukari tasinabilir.
+- Handover QC veya kullaniciya donuk gelecek katmanlar exception'lari okunur mesajlara cevirebilir; bu gorunurluk manuel inceleme icindir, devir paketini otomatik bloke etmez ve kayit reddi anlami tasimaz.
+- File-writing helperlar diagnostic/soft validation sonucunu yeniden hesaplamayacak, format helper davranisini degistirmeyecek ve format helper ile file-writing helper ayrimi korunacak.
+- Bu adim documentation-only error/result-contract plan adimidir; uygulama kodu, test dosyalari, helper davranisi, result contract implementasyonu, JSON/Markdown export dosyasi, audit event uretimi, backup/restore davranisi, database/repository/API/GUI/CLI, hard validation, `AuditEventRecord.__post_init__`, `FileAttachmentRecord`, `blocked` status, Podcast 027, commit, push veya ZIP staging eklenmedi.

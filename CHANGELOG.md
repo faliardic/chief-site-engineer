@@ -1,5 +1,15 @@
 # Changelog
 
+## Step 157
+
+- Added documentation-only planning for the export helper error/result contract after the Step 155 read-only file writing helpers and Step 156 usage documentation.
+- Clarified that `write_json_ready_dict_to_file(...)` and `write_markdown_text_to_file(...)` currently keep their success behavior as returning a `Path` object, while failures remain visible through standard Python exceptions.
+- Compared `Path`, string path, and future result dict return approaches, and documented that any richer result contract should be handled by a future wrapper/helper rather than changing the current low-level file-writing helper in this step.
+- Planned possible future result fields such as `success`, `output_path`, `error_code`, `error_message`, `skipped_reason`, and `overwritten` without implementing a result object.
+- Documented expected visibility for path safety errors, input errors, overwrite errors, and filesystem errors, including empty paths, directory targets, wrong extensions, traversal, `allowed_root` escape, missing parents, non-dict JSON, unserializable JSON, non-string Markdown, file exists with `overwrite=False`, permission errors, locked files, and disk/IO failures.
+- Clarified that future handover QC surfacing may translate exceptions into user-readable messages, but must remain visibility/manual-review oriented and must not block handover, reject records, create audit events, or trigger hard validation.
+- Kept this as documentation-only; no application code, tests, helper behavior changes, result contract implementation, JSON/Markdown export output, backup/restore behavior, database/repository/API/GUI/CLI, audit event creation, hard validation, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, `blocked` status, Podcast 027, commit, push, or ZIP/cache staging was added.
+
 ## Podcast 026
 
 - Added Podcast 026 / Step 152-156 NotebookLM podcast note.
