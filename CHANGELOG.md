@@ -1,5 +1,16 @@
 # Changelog
 
+## Podcast 026
+
+- Added Podcast 026 / Step 152-156 NotebookLM podcast note.
+- Covered export helper API boundary and file writing safety planning, detailed path safety and overwrite policy documentation, export helper test matrix finalization, read-only file writing helper implementation, and export helper usage documentation.
+- Documented why file writing is separate from formatting, why explicit output paths and `allowed_root` matter, why path traversal is rejected, why parent directories are not auto-created, and why `overwrite=False` is the safe default.
+- Summarized the Step 155 helpers `write_json_ready_dict_to_file(...)` and `write_markdown_text_to_file(...)`, including the JSON-ready dict and Markdown string flows.
+- Noted that test coverage rose from 294 passed to 319 passed after the read-only file writing helper implementation.
+- Clarified that no JSON/Markdown export output files were committed into `exports/`, which remains free of generated export outputs.
+- Reiterated that hard validation remains deferred, `blocked` status was not produced, backup/restore/API/GUI/CLI behavior was not added, and this podcast covers only Steps 152-156.
+- Kept this as documentation-only; no application code, tests, export output files, hard validation, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, `blocked` status, Podcast 027, commit, push, or ZIP/cache staging was added.
+
 ## Step 156
 
 - Added documentation-only usage guidance for the Step 155 read-only file writing helpers.

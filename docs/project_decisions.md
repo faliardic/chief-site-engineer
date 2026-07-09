@@ -1481,3 +1481,14 @@
 - Handover QC export senaryosu yalniz yeni santiye sefine gorunurluk ve manuel inceleme destegi olarak belgelendi; devir paketini otomatik bloke etmeyecek, kayit reddetmeyecek, audit event uretmeyecek ve backup/restore motoru olmayacak.
 - Export helper usage hard validation degildir; `AuditEventRecord.__post_init__` daraltilmayacak, legacy ID ornekleri korunacak, `FileAttachmentRecord` davranisi degistirilmeyecek ve `blocked` status uretilmeyecek.
 - Bu adim documentation-only usage adimidir; uygulama kodu, test dosyalari, yeni helper implementasyonu, JSON/Markdown export dosyasi, backup/restore davranisi, database/repository/API/GUI/CLI, audit event uretimi, hard validation, Podcast 026, commit, push veya ZIP staging eklenmedi.
+
+## Podcast 026 - Adim 152-156 NotebookLM Podcast Notu
+
+- Podcast 026, Adim 152-156 araligini export helper API boundary, path safety / overwrite policy, test matrix finalization, read-only file writing helper implementation ve usage documentation ekseninde ozetler.
+- Podcast notu, formatter helper ile file-writing helper ayrimini, JSON-ready dict ve Markdown string akislarini, explicit output path yaklasimini, `allowed_root` guvenlik sinirini, path traversal reddini ve `overwrite=False` varsayilanini sade anlatimla aciklar.
+- Podcast 026, Adim 155'te eklenen `write_json_ready_dict_to_file(...)` ve `write_markdown_text_to_file(...)` helper'larini tanitir; helperlarin diagnostic/soft validation sonucunu yeniden hesaplamadigini ve input mutate etmedigini vurgular.
+- Test sayisinin 294 passed seviyesinden 319 passed seviyesine ciktigi, fakat `exports/` icinde repo'ya kalici JSON/Markdown export cikti dosyasi eklenmedigi not edildi.
+- Handover QC export senaryosu gorunurluk ve manuel inceleme destegi olarak anlatildi; devir paketini otomatik bloke etme, kayit reddi, hard validation, `blocked` status veya backup/restore davranisi olarak sunulmadi.
+- Podcast kapsami yalniz Adim 152-156 ile sinirli tutuldu; Adim 157 veya sonrasi dahil edilmedi ve Podcast 027 olusturulmadi.
+- `target_record_id` hard validation hala eklenmeyecek, `AuditEventRecord.__post_init__` daraltilmayacak, legacy ID ornekleri korunacak, `FileAttachmentRecord` davranisi degistirilmeyecek ve `blocked` status uretilmeyecek.
+- Bu adim documentation-only podcast adimidir; uygulama kodu, test dosyalari, yeni helper implementasyonu, JSON/Markdown export dosyasi, backup/restore davranisi, database/repository/API/GUI/CLI, audit event uretimi, hard validation, Podcast 027, commit, push veya ZIP staging eklenmedi.
