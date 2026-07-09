@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 153 - Path Safety and Overwrite Policy Detailed Documentation
+Adim 154 - Export Helper Test Matrix Finalization
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -63,6 +63,8 @@ Podcast 025'te Adim 147-151 araligi NotebookLM icin ozetlendi; diagnostic / soft
 Adim 152'de ileride eklenebilecek JSON/Markdown export helper'lari icin API boundary, path safety, overwrite policy, encoding/format beklentileri ve test matrix documentation-only olarak planlandi; export helper implementasyonu yapilmadi ve dosya uretilmedi.
 
 Adim 153'te path safety ve overwrite policy detayli olarak belgelendi; explicit output path, relative/absolute path davranisi, allowed output root, parent directory, path traversal, dosya adi/uzantisi, overwrite=False varsayilani, atomic write prensibi ve handover QC export sinirlari documentation-only olarak netlestirildi. Export helper implementasyonu, hard validation, `blocked` status ve Podcast 026 eklenmedi.
+
+Adim 154'te Adim 155 oncesi export helper test matrix finalization documentation-only olarak tamamlandi; JSON/Markdown export helper beklentileri, path safety, overwrite policy, parent directory, unsupported input, hata davranisi, ZIP/yedek/cache dislama, atomic write prensibi ve handover QC export senaryolari test basliklari netlestirildi. Export helper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status ve Podcast 026 eklenmedi.
 
 Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
 
@@ -232,9 +234,10 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 - [x] Podcast 025 - Adim 147-151 NotebookLM podcast notu.
 - [x] Adim 152 - Export helper API boundary and file writing safety plan; path safety, overwrite policy, encoding ve test matrix planlandi, implementasyon yapilmadi.
 - [x] Adim 153 - Path safety and overwrite policy detailed documentation; allowed output root, traversal riskleri, file name/extension sinirlari, parent directory, overwrite=False varsayilani, atomic write prensibi ve handover QC export sinirlari belgelendi, implementasyon yapilmadi.
+- [x] Adim 154 - Export helper test matrix finalization; JSON/Markdown export, path safety, overwrite, parent directory, unsupported input, hata davranisi, ZIP/cache dislama ve handover QC export test sinirlari belgelendi, implementasyon yapilmadi.
 
 Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokumantasyon ve kullanim standardi ile sabitlemek; sonra rapor format sinirlari, handover QC kullanimi ve soft validation rapor katmanini hard validation'a gecmeden hazirlamaktir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 154 icin export helper test matrix finalization ele alinabilir. Hard validation ve export helper implementasyonu henuz eklenmemelidir.
+Adim 155 icin read-only file writing helper implementation ele alinabilir. Hard validation, `blocked` status ve Podcast 026 henuz eklenmemelidir.

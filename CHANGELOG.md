@@ -1,5 +1,15 @@
 # Changelog
 
+## Step 154
+
+- Added documentation-only finalization for the future export helper test matrix before any read-only file writing helper implementation.
+- Defined separate JSON export helper test expectations for JSON-ready dict input, `.json` targets, UTF-8 output, deterministic pretty/indent behavior, readable JSON verification, no input mutation, no report recomputation, and rejection or safe reporting for dataclass/object/unserializable input.
+- Defined separate Markdown export helper test expectations for Markdown string input, `.md` targets, UTF-8 output, no Markdown reformatting, no formatter-output mutation, and safe handling of non-string input.
+- Finalized path safety test categories for explicit output paths, traversal rejection, `..`, allowed output root containment, relative and absolute path behavior, mixed separators, Windows reserved-name risk, and exclusion of `.git`, `.env`, cache, pycache, database, backup, ZIP, and other non-export areas.
+- Finalized overwrite, parent directory, unsupported input, and error-behavior test categories, including `overwrite=False` as the safe default, existing-file preservation, explicit `overwrite=True`, parent creation only under an allowed root, empty/invalid path cases, permission errors, and locked/unavailable target principles.
+- Documented ZIP/backup/cache exclusion tests, future atomic write considerations, and handover QC export scenarios where file output provides visibility but must not block handover, reject records, trigger hard validation, or produce `blocked` status.
+- Kept this as documentation-only; no application code, tests, export/file writing helper, JSON/Markdown export output, backup/restore behavior, hard validation, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, `blocked` status, Podcast 026, commit, push, or ZIP staging was added.
+
 ## Step 153
 
 - Added documentation-only detailed guidance for path safety and overwrite policy before any future export/file writing helper implementation.

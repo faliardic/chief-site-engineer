@@ -1440,3 +1440,19 @@
 - Handover QC export yalniz gorunurluk ve manuel inceleme amacli kullanilabilir; devir paketini otomatik bloke etmeyecek, kayit reddetmeyecek, eski santiye sefinin ozel alanini devretmeyecek ve backup/restore motoru olmayacak.
 - `target_record_id` hard validation hala eklenmeyecek, `AuditEventRecord.__post_init__` degistirilmeyecek, legacy ID ornekleri korunacak, `FileAttachmentRecord` davranisi degistirilmeyecek ve `blocked` status uretilmeyecek.
 - Bu adim documentation-only detailed-policy adimidir; uygulama kodu, test dosyalari, export/file writing helper implementasyonu, JSON/Markdown export dosyasi, backup/restore davranisi, database/repository/API/GUI/CLI, hard validation, Podcast 026, commit, push veya ZIP staging eklenmedi.
+
+## 154 Export Helper Test Matrix Finalization
+
+- Adim 154, Adim 155'te ele alinabilecek read-only file writing helper implementation oncesinde export helper test matrix'ini documentation-only olarak netlestirdi.
+- Format helper ile file-writing export helper ayri test edilecek; format helper JSON-ready dict veya Markdown string uretir, export helper ise ileride yalniz hazir ciktinin guvenli dosya yazimindan sorumlu olabilir.
+- JSON export helper testleri JSON-ready dict input, `.json` uzantisi, UTF-8 output, pretty/indent davranisi, dosya iceriginin tekrar okunup dogrulanmasi, input immutability, diagnostic/soft validation recomputation olmamasi ve dataclass/object/unserializable input icin guvenli hata davranisini kapsayacak.
+- Markdown export helper testleri Markdown string input, `.md` uzantisi, UTF-8 output, Markdown iceriginin yeniden formatlanmamasi, formatter ciktisinin degistirilmemesi ve non-string input icin guvenli hata davranisini kapsayacak.
+- Path safety testleri explicit output path zorunlulugu, bos path, traversal reddi, `..`, allowed output root disina cikmama, absolute/relative path davranisi, mixed separator, Windows reserved names riski ve `.git`, `.env`, cache, pycache, database, backup, ZIP/yedek alanlarina yazmama senaryolarini kapsayacak.
+- Overwrite policy testleri `overwrite=False` varsayilanini, hedef dosya varken yazmama davranisini, icerigin korunmasini, explicit `overwrite=True` ile uzerine yazmayi ve yalniz hedef dosyanin degistigini dogrulamayi kapsayacak.
+- Parent directory testleri parent mevcutken yazmayi, parent yokken net hata/olusturma davranisini, otomatik klasor olusturma varsa bunun yalniz allowed output root altinda olmasini ve root disinda parent olusturulmamasi kararini kapsayacak.
+- Unsupported input ve hata davranisi testleri bos filename, klasor path'i, yanlis uzanti, cok uzun filename, separator iceren filename, `None` input, bos dict/string, izin hatasi, kilitli/erisilemez hedef dosya, yarim dosya birakmama ve input mutate etmeme beklentilerini kapsayacak.
+- ZIP/yedek/cache dislama testleri ignored ZIP'in export girdisi/hedefi gibi kullanilmamasini, ZIP/yedek/cache dosyalarinin stage edilmemesini ve `.pytest_cache` / `__pycache__` alanlarinin export hedefi olmamasini kapsayacak.
+- Atomic write temporary file + replace prensibi ileride degerlendirilebilir; bu adimda atomic write, temporary file veya replace implementasyonu yapilmadi.
+- Handover QC export testleri explicit path, allowed output root, overwrite=False ile mevcut dosya koruma, warning/error veya review/attention bilgisinin yalniz gorunurluk olarak tasinmasi ve devir paketinin otomatik bloke edilmemesini kapsayacak.
+- `target_record_id` hard validation hala eklenmeyecek, `AuditEventRecord.__post_init__` degistirilmeyecek, legacy ID ornekleri korunacak, `FileAttachmentRecord` davranisi degistirilmeyecek ve `blocked` status uretilmeyecek.
+- Bu adim documentation-only test-matrix-finalization adimidir; uygulama kodu, test dosyalari, export/file writing helper implementasyonu, JSON/Markdown export dosyasi, backup/restore davranisi, database/repository/API/GUI/CLI, hard validation, Podcast 026, commit, push veya ZIP staging eklenmedi.
