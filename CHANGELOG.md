@@ -1,5 +1,15 @@
 # Changelog
 
+## Step 156
+
+- Added documentation-only usage guidance for the Step 155 read-only file writing helpers.
+- Documented the intended usage boundaries for `write_json_ready_dict_to_file(...)` and `write_markdown_text_to_file(...)`, including explicit output paths, `.json` / `.md` extension limits, UTF-8 output, input immutability, `allowed_root`, `overwrite=False` by default, and explicit `overwrite=True`.
+- Clarified the safe JSON-ready dict flow: build diagnostic/soft validation report, format it as JSON-ready dict, then write the already-prepared dict to a file.
+- Clarified the safe Markdown flow: build the report, format it as Markdown string, then write the already-prepared Markdown text to a file without reformatting it.
+- Documented `allowed_root` as a path safety barrier, parent-directory non-creation, path traversal rejection, wrong-extension rejection, non-export areas such as `.git`, `.env`, cache, pycache, ZIP/yedek paths, and safe `exports/` usage.
+- Documented the handover QC export scenario as a visibility and manual-review aid, not a handover blocker, record rejection mechanism, audit event creator, backup/restore flow, or hard validation layer.
+- Kept this as documentation-only; no application code, tests, JSON/Markdown export output, backup/restore behavior, database/repository/API/GUI/CLI, audit event creation, hard validation, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, `blocked` status, Podcast 026, commit, push, or ZIP/cache staging was added.
+
 ## Step 155
 
 - Added two read-only file writing helpers: `write_json_ready_dict_to_file(...)` and `write_markdown_text_to_file(...)`.

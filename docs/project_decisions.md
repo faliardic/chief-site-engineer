@@ -1470,3 +1470,14 @@
 - Test sonucu bu adimda `319 passed` seviyesine cikti.
 - `target_record_id` hard validation hala eklenmeyecek, `AuditEventRecord.__post_init__` daraltilmayacak, legacy ID ornekleri korunacak, `FileAttachmentRecord` davranisi degistirilmeyecek ve `blocked` status uretilmeyecek.
 - Bu adim sinirli implementation adimidir; JSON/Markdown ornek export dosyasi repo icinde uretilmedi, backup/restore davranisi, database/repository/API/GUI/CLI, audit event uretimi, hard validation, Podcast 026, commit, push veya ZIP staging eklenmedi.
+
+## 156 Export Helper Usage Documentation
+
+- Adim 156, Adim 155'te eklenen `write_json_ready_dict_to_file(...)` ve `write_markdown_text_to_file(...)` helper'larinin kullanim sinirini documentation-only olarak belgelendi.
+- JSON-ready dict akisi report helper -> JSON-ready formatter -> file writing helper olarak sabitlendi; file-writing helper diagnostic veya soft validation sonucunu yeniden hesaplamayacak ve input dict'i mutate etmeyecek.
+- Markdown akisi report helper -> Markdown formatter -> file writing helper olarak sabitlendi; file-writing helper Markdown icerigini yeniden formatlamayacak ve input string'i degistirmeyecek.
+- `allowed_root`, explicit output path, `overwrite=False` varsayilani, explicit `overwrite=True`, parent directory otomatik olusturmama, yanlis uzanti reddi, path traversal reddi ve non-export alanlara yazmama prensipleri usage dokumantasyonunda aciklandi.
+- `.git`, `.env`, cache, pycache, ZIP/yedek, database, backup ve restore alanlari export hedefi olarak kullanilmayacak; `exports/` klasoru ancak explicit path ve allowed-root siniriyle guvenli aday olarak ele alinacak.
+- Handover QC export senaryosu yalniz yeni santiye sefine gorunurluk ve manuel inceleme destegi olarak belgelendi; devir paketini otomatik bloke etmeyecek, kayit reddetmeyecek, audit event uretmeyecek ve backup/restore motoru olmayacak.
+- Export helper usage hard validation degildir; `AuditEventRecord.__post_init__` daraltilmayacak, legacy ID ornekleri korunacak, `FileAttachmentRecord` davranisi degistirilmeyecek ve `blocked` status uretilmeyecek.
+- Bu adim documentation-only usage adimidir; uygulama kodu, test dosyalari, yeni helper implementasyonu, JSON/Markdown export dosyasi, backup/restore davranisi, database/repository/API/GUI/CLI, audit event uretimi, hard validation, Podcast 026, commit, push veya ZIP staging eklenmedi.
