@@ -1,5 +1,15 @@
 # Changelog
 
+## Step 155
+
+- Added two read-only file writing helpers: `write_json_ready_dict_to_file(...)` and `write_markdown_text_to_file(...)`.
+- Implemented JSON file writing for JSON-ready dict input only, with required explicit output paths, `.json` extension enforcement, UTF-8 output, deterministic `indent=2`, `ensure_ascii=False`, and `sort_keys=True` JSON formatting, input immutability, `overwrite=False` by default, and explicit `overwrite=True` support.
+- Implemented Markdown file writing for Markdown string input only, with required explicit output paths, `.md` extension enforcement, UTF-8 output, no Markdown reformatting, `overwrite=False` by default, and explicit `overwrite=True` support.
+- Added minimum path safety policy for empty paths, `..` traversal, existing directory targets, missing parent directories, optional `allowed_root` containment, wrong extensions, and non-export areas such as `.git`, `.env`, cache, pycache, database, backup, restore, ZIP, and yedek paths.
+- Added focused tests for JSON/Markdown writing, UTF-8 preservation, deterministic JSON, input immutability, unsupported input, unserializable JSON input, overwrite behavior, allowed-root containment, traversal rejection, missing parent directories, non-export areas, unchanged diagnostic/soft validation/formatter behavior, unchanged audit event construction, and no `blocked` status.
+- Added implementation documentation and learning notes for the read-only file writing helper boundary.
+- Kept database/repository/API/GUI/CLI, backup/restore behavior, audit event creation, hard validation, `AuditEventRecord.__post_init__` tightening, `FileAttachmentRecord` behavior changes, `blocked` status, Podcast 026, commit, push, and ZIP/cache staging out of scope.
+
 ## Step 154
 
 - Added documentation-only finalization for the future export helper test matrix before any read-only file writing helper implementation.

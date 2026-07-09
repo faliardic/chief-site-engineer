@@ -1,5 +1,7 @@
+import json
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 
 class FileType(str, Enum):
@@ -1246,6 +1248,105 @@ def format_record_id_soft_validation_report_as_markdown(report: object) -> str:
         "`blocked` status uretilmez.",
     ]
     return "\n".join(lines)
+
+
+_EXPORT_FORBIDDEN_PATH_PARTS: frozenset[str] = frozenset(
+    {
+        ".git",
+        ".env",
+        ".pytest_cache",
+        "__pycache__",
+        "cache",
+        "database",
+        "backup",
+        "backups",
+        "restore",
+        "zip",
+        "yedek",
+    }
+)
+
+
+def _prepare_export_output_path(
+    output_path: str | Path,
+    expected_suffix: str,
+    allowed_root: str | Path | None,
+) -> Path:
+    if isinstance(output_path, str) and not output_path.strip():
+        raise ValueError("output_path cannot be empty")
+
+    path = Path(output_path)
+    if path == Path():
+        raise ValueError("output_path cannot be empty")
+
+    if ".." in path.parts:
+        raise ValueError("output_path cannot include path traversal")
+
+    lowered_parts = {part.lower() for part in path.parts}
+    if lowered_parts.intersection(_EXPORT_FORBIDDEN_PATH_PARTS):
+        raise ValueError("output_path points to a non-export area")
+
+    if path.suffix.lower() != expected_suffix:
+        raise ValueError(f"output_path must use the {expected_suffix} extension")
+
+    if path.exists() and path.is_dir():
+        raise ValueError("output_path must be a file path")
+
+    if allowed_root is not None:
+        if isinstance(allowed_root, str) and not allowed_root.strip():
+            raise ValueError("allowed_root cannot be empty")
+        root = Path(allowed_root).resolve(strict=False)
+        resolved_path = path.resolve(strict=False)
+        try:
+            resolved_path.relative_to(root)
+        except ValueError as exc:
+            raise ValueError("output_path must stay inside allowed_root") from exc
+
+    if not path.parent.exists():
+        raise FileNotFoundError("output_path parent directory does not exist")
+
+    return path
+
+
+def write_json_ready_dict_to_file(
+    data: dict[str, object],
+    output_path: str | Path,
+    *,
+    overwrite: bool = False,
+    allowed_root: str | Path | None = None,
+) -> Path:
+    """Write a JSON-ready dict to an explicit safe .json path."""
+
+    if not isinstance(data, dict):
+        raise TypeError("data must be a JSON-ready dict")
+
+    path = _prepare_export_output_path(output_path, ".json", allowed_root)
+    if path.exists() and not overwrite:
+        raise FileExistsError("output_path already exists")
+
+    json_text = json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True)
+    path.write_text(f"{json_text}\n", encoding="utf-8")
+    return path
+
+
+def write_markdown_text_to_file(
+    markdown_text: str,
+    output_path: str | Path,
+    *,
+    overwrite: bool = False,
+    allowed_root: str | Path | None = None,
+) -> Path:
+    """Write Markdown text to an explicit safe .md path without reformatting."""
+
+    if not isinstance(markdown_text, str):
+        raise TypeError("markdown_text must be a string")
+
+    path = _prepare_export_output_path(output_path, ".md", allowed_root)
+    if path.exists() and not overwrite:
+        raise FileExistsError("output_path already exists")
+
+    path.write_text(markdown_text, encoding="utf-8")
+    return path
 
 
 @dataclass

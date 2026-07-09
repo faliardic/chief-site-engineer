@@ -1,3 +1,4 @@
+import json
 from copy import deepcopy
 
 import pytest
@@ -64,6 +65,8 @@ from app.models import (
     format_record_id_soft_validation_report_as_markdown,
     get_allowed_record_id_prefixes_for_target_type,
     get_record_id_family_for_target_type,
+    write_json_ready_dict_to_file,
+    write_markdown_text_to_file,
 )
 
 
@@ -984,6 +987,268 @@ def test_record_id_helpers_do_not_make_audit_event_creation_stricter() -> None:
 
     assert event.target_record_type == "project_record"
     assert event.target_record_id == "REC-1"
+
+
+def test_write_json_ready_dict_to_file_writes_readable_utf8_json(tmp_path) -> None:
+    output_path = tmp_path / "diagnostic.json"
+    data = {"title": "Şantiye raporu", "count": 2, "items": ["A", "B"]}
+
+    written_path = write_json_ready_dict_to_file(data, output_path)
+
+    assert written_path == output_path
+    assert json.loads(output_path.read_text(encoding="utf-8")) == data
+    assert "Şantiye raporu" in output_path.read_text(encoding="utf-8")
+
+
+def test_write_json_ready_dict_to_file_uses_deterministic_format(tmp_path) -> None:
+    output_path = tmp_path / "diagnostic.json"
+
+    write_json_ready_dict_to_file({"b": 2, "a": 1}, output_path)
+
+    assert output_path.read_text(encoding="utf-8") == '{\n  "a": 1,\n  "b": 2\n}\n'
+
+
+def test_write_json_ready_dict_to_file_does_not_mutate_input(tmp_path) -> None:
+    output_path = tmp_path / "diagnostic.json"
+    data = {"items": [{"id": "ATT-1"}], "summary": {"total": 1}}
+    original_data = deepcopy(data)
+
+    write_json_ready_dict_to_file(data, output_path)
+
+    assert data == original_data
+
+
+def test_write_json_ready_dict_to_file_rejects_wrong_extension(tmp_path) -> None:
+    with pytest.raises(ValueError, match=".json"):
+        write_json_ready_dict_to_file({"ok": True}, tmp_path / "diagnostic.md")
+
+
+def test_write_json_ready_dict_to_file_rejects_non_dict_input(tmp_path) -> None:
+    with pytest.raises(TypeError, match="JSON-ready dict"):
+        write_json_ready_dict_to_file(["not", "a", "dict"], tmp_path / "out.json")
+
+
+def test_write_json_ready_dict_to_file_rejects_unserializable_object(tmp_path) -> None:
+    output_path = tmp_path / "diagnostic.json"
+
+    with pytest.raises(TypeError):
+        write_json_ready_dict_to_file({"bad": object()}, output_path)
+
+    assert not output_path.exists()
+
+
+def test_write_json_ready_dict_to_file_preserves_existing_file_without_overwrite(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "diagnostic.json"
+    output_path.write_text('{"old": true}', encoding="utf-8")
+
+    with pytest.raises(FileExistsError):
+        write_json_ready_dict_to_file({"old": False}, output_path)
+
+    assert output_path.read_text(encoding="utf-8") == '{"old": true}'
+
+
+def test_write_json_ready_dict_to_file_overwrites_explicit_target_only(tmp_path) -> None:
+    output_path = tmp_path / "diagnostic.json"
+    sibling_path = tmp_path / "sibling.json"
+    output_path.write_text('{"old": true}', encoding="utf-8")
+    sibling_path.write_text('{"keep": true}', encoding="utf-8")
+
+    write_json_ready_dict_to_file({"new": True}, output_path, overwrite=True)
+
+    assert json.loads(output_path.read_text(encoding="utf-8")) == {"new": True}
+    assert sibling_path.read_text(encoding="utf-8") == '{"keep": true}'
+
+
+def test_write_json_ready_dict_to_file_allows_path_inside_allowed_root(tmp_path) -> None:
+    allowed_root = tmp_path / "exports"
+    allowed_root.mkdir()
+    output_path = allowed_root / "diagnostic.json"
+
+    written_path = write_json_ready_dict_to_file(
+        {"ok": True},
+        output_path,
+        allowed_root=allowed_root,
+    )
+
+    assert written_path == output_path
+    assert json.loads(output_path.read_text(encoding="utf-8")) == {"ok": True}
+
+
+def test_write_json_ready_dict_to_file_rejects_path_outside_allowed_root(
+    tmp_path,
+) -> None:
+    allowed_root = tmp_path / "exports"
+    outside_root = tmp_path / "outside"
+    allowed_root.mkdir()
+    outside_root.mkdir()
+
+    with pytest.raises(ValueError, match="allowed_root"):
+        write_json_ready_dict_to_file(
+            {"ok": True},
+            outside_root / "diagnostic.json",
+            allowed_root=allowed_root,
+        )
+
+
+def test_write_json_ready_dict_to_file_rejects_path_traversal(tmp_path) -> None:
+    with pytest.raises(ValueError, match="path traversal"):
+        write_json_ready_dict_to_file(
+            {"ok": True},
+            tmp_path / "exports" / ".." / "diagnostic.json",
+        )
+
+
+def test_write_json_ready_dict_to_file_rejects_missing_parent(tmp_path) -> None:
+    with pytest.raises(FileNotFoundError, match="parent directory"):
+        write_json_ready_dict_to_file(
+            {"ok": True},
+            tmp_path / "missing" / "diagnostic.json",
+        )
+
+
+def test_write_json_ready_dict_to_file_rejects_non_export_area(tmp_path) -> None:
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+
+    with pytest.raises(ValueError, match="non-export area"):
+        write_json_ready_dict_to_file({"ok": True}, git_dir / "diagnostic.json")
+
+
+def test_write_markdown_text_to_file_writes_utf8_without_reformatting(tmp_path) -> None:
+    output_path = tmp_path / "summary.md"
+    markdown = "# Başlık\n\n- item\n```text\nraw\n```\n"
+
+    written_path = write_markdown_text_to_file(markdown, output_path)
+
+    assert written_path == output_path
+    assert output_path.read_text(encoding="utf-8") == markdown
+
+
+def test_write_markdown_text_to_file_rejects_non_string_input(tmp_path) -> None:
+    with pytest.raises(TypeError, match="string"):
+        write_markdown_text_to_file({"not": "markdown"}, tmp_path / "summary.md")
+
+
+def test_write_markdown_text_to_file_rejects_wrong_extension(tmp_path) -> None:
+    with pytest.raises(ValueError, match=".md"):
+        write_markdown_text_to_file("# Summary", tmp_path / "summary.json")
+
+
+def test_write_markdown_text_to_file_preserves_existing_file_without_overwrite(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "summary.md"
+    output_path.write_text("old content", encoding="utf-8")
+
+    with pytest.raises(FileExistsError):
+        write_markdown_text_to_file("new content", output_path)
+
+    assert output_path.read_text(encoding="utf-8") == "old content"
+
+
+def test_write_markdown_text_to_file_overwrites_explicit_target_only(tmp_path) -> None:
+    output_path = tmp_path / "summary.md"
+    sibling_path = tmp_path / "sibling.md"
+    output_path.write_text("old content", encoding="utf-8")
+    sibling_path.write_text("keep content", encoding="utf-8")
+
+    write_markdown_text_to_file("new content", output_path, overwrite=True)
+
+    assert output_path.read_text(encoding="utf-8") == "new content"
+    assert sibling_path.read_text(encoding="utf-8") == "keep content"
+
+
+def test_write_markdown_text_to_file_allows_path_inside_allowed_root(tmp_path) -> None:
+    allowed_root = tmp_path / "exports"
+    allowed_root.mkdir()
+    output_path = allowed_root / "summary.md"
+
+    written_path = write_markdown_text_to_file(
+        "# Summary",
+        output_path,
+        allowed_root=allowed_root,
+    )
+
+    assert written_path == output_path
+    assert output_path.read_text(encoding="utf-8") == "# Summary"
+
+
+def test_write_markdown_text_to_file_rejects_path_outside_allowed_root(
+    tmp_path,
+) -> None:
+    allowed_root = tmp_path / "exports"
+    outside_root = tmp_path / "outside"
+    allowed_root.mkdir()
+    outside_root.mkdir()
+
+    with pytest.raises(ValueError, match="allowed_root"):
+        write_markdown_text_to_file(
+            "# Summary",
+            outside_root / "summary.md",
+            allowed_root=allowed_root,
+        )
+
+
+def test_write_markdown_text_to_file_rejects_path_traversal(tmp_path) -> None:
+    with pytest.raises(ValueError, match="path traversal"):
+        write_markdown_text_to_file(
+            "# Summary",
+            tmp_path / "exports" / ".." / "summary.md",
+        )
+
+
+def test_write_markdown_text_to_file_rejects_missing_parent(tmp_path) -> None:
+    with pytest.raises(FileNotFoundError, match="parent directory"):
+        write_markdown_text_to_file(
+            "# Summary",
+            tmp_path / "missing" / "summary.md",
+        )
+
+
+def test_write_markdown_text_to_file_rejects_non_export_area(tmp_path) -> None:
+    cache_dir = tmp_path / "__pycache__"
+    cache_dir.mkdir()
+
+    with pytest.raises(ValueError, match="non-export area"):
+        write_markdown_text_to_file("# Summary", cache_dir / "summary.md")
+
+
+def test_file_writing_helpers_do_not_recompute_reports_or_formatters(tmp_path) -> None:
+    diagnostic_report = build_record_id_diagnostic_report(
+        [{"target_record_type": "attachment", "target_record_id": "ATT-2026-0001"}]
+    )
+    soft_report = build_record_id_soft_validation_report(diagnostic_report)
+    json_ready = format_record_id_soft_validation_report_as_json_ready_dict(
+        soft_report
+    )
+    markdown = format_record_id_soft_validation_report_as_markdown(soft_report)
+
+    write_json_ready_dict_to_file(json_ready, tmp_path / "soft.json")
+    write_markdown_text_to_file(markdown, tmp_path / "soft.md")
+
+    assert json_ready["status"] == "pass"
+    assert "status: pass" in markdown
+    assert build_record_id_diagnostic_report(
+        [{"target_record_type": "attachment", "target_record_id": "ATT-2026-0001"}]
+    ) == diagnostic_report
+    assert build_record_id_soft_validation_report(diagnostic_report) == soft_report
+
+
+def test_file_writing_helpers_do_not_emit_blocked_status(tmp_path) -> None:
+    report = {"status": "attention", "messages": ["manual review"]}
+    markdown = "status: attention\n`blocked` status uretilmez."
+
+    write_json_ready_dict_to_file(report, tmp_path / "report.json")
+    write_markdown_text_to_file(markdown, tmp_path / "report.md")
+
+    assert json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))[
+        "status"
+    ] == "attention"
+    assert "status: blocked" not in (tmp_path / "report.md").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_audit_event_record_still_accepts_legacy_target_record_id_examples() -> None:

@@ -1456,3 +1456,17 @@
 - Handover QC export testleri explicit path, allowed output root, overwrite=False ile mevcut dosya koruma, warning/error veya review/attention bilgisinin yalniz gorunurluk olarak tasinmasi ve devir paketinin otomatik bloke edilmemesini kapsayacak.
 - `target_record_id` hard validation hala eklenmeyecek, `AuditEventRecord.__post_init__` degistirilmeyecek, legacy ID ornekleri korunacak, `FileAttachmentRecord` davranisi degistirilmeyecek ve `blocked` status uretilmeyecek.
 - Bu adim documentation-only test-matrix-finalization adimidir; uygulama kodu, test dosyalari, export/file writing helper implementasyonu, JSON/Markdown export dosyasi, backup/restore davranisi, database/repository/API/GUI/CLI, hard validation, Podcast 026, commit, push veya ZIP staging eklenmedi.
+
+## 155 Read-only File Writing Helper Implementation
+
+- Adim 155'te hazir JSON-ready dict ve Markdown string ciktilarini explicit output path'e yazan iki kucuk helper eklendi: `write_json_ready_dict_to_file(...)` ve `write_markdown_text_to_file(...)`.
+- Helperlar read-only boundary icinde tutuldu; database/repository yazmaz, audit event uretmez, backup/restore baslatmaz, kayit degistirmez, diagnostic/soft validation sonucunu yeniden hesaplamaz ve format helper davranisini degistirmez.
+- JSON helper yalniz dict input kabul eder, `.json` uzantili dosyaya UTF-8 yazar, `indent=2`, `ensure_ascii=False`, `sort_keys=True` ile deterministic cikti uretir, input dict'i mutate etmez ve unserializable object icin standart `TypeError` verir.
+- Markdown helper yalniz string input kabul eder, `.md` uzantili dosyaya UTF-8 yazar, Markdown icerigini yeniden formatlamaz ve non-string input icin `TypeError` verir.
+- Her iki helper icin `output_path` zorunludur, varsayilan `overwrite=False` olarak uygulandi; hedef dosya varsa explicit `overwrite=True` olmadikca yazma yapilmaz ve `FileExistsError` verilir.
+- Minimum path safety policy uygulandi: bos path, `..` traversal, yanlis uzanti, existing directory target, missing parent directory, optional `allowed_root` disina cikma ve `.git`, `.env`, cache, pycache, database, backup, restore, ZIP/yedek gibi non-export alanlara yazma reddedilir.
+- Parent directory otomatik olusturulmadi; parent yoksa `FileNotFoundError` verilir. Gelecekte parent olusturma istenirse explicit parametre ve ayri testlerle ele alinmalidir.
+- Testler JSON/Markdown yazimi, UTF-8 korunumu, deterministic JSON, input immutability, unsupported input, overwrite davranisi, allowed_root ic/dis senaryolari, traversal reddi, missing parent, non-export area reddi, helper boundary korunumu ve `blocked` status uretilmemesini kapsar.
+- Test sonucu bu adimda `319 passed` seviyesine cikti.
+- `target_record_id` hard validation hala eklenmeyecek, `AuditEventRecord.__post_init__` daraltilmayacak, legacy ID ornekleri korunacak, `FileAttachmentRecord` davranisi degistirilmeyecek ve `blocked` status uretilmeyecek.
+- Bu adim sinirli implementation adimidir; JSON/Markdown ornek export dosyasi repo icinde uretilmedi, backup/restore davranisi, database/repository/API/GUI/CLI, audit event uretimi, hard validation, Podcast 026, commit, push veya ZIP staging eklenmedi.
