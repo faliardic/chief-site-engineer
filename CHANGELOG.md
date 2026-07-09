@@ -1,5 +1,16 @@
 # Changelog
 
+## Step 159
+
+- Added documentation-only planning for the future export helper result contract test matrix before any result contract implementation.
+- Defined success-result expectations for future JSON and Markdown result wrappers, including `success=True`, `output_path`, `file_type`, `overwritten`, `attempted_path`, `allowed_root`, and empty error fields.
+- Planned JSON and Markdown input test categories for JSON-ready dicts, empty-content policy, non-dict JSON input, unserializable JSON input, Markdown string input, non-string Markdown input, input immutability, no content reformatting, and no diagnostic/soft validation recomputation.
+- Planned path safety result-contract tests for empty paths, directory targets, wrong extensions, `.json` / `.md` enforcement, traversal, outside-allowed-root paths, allowed-root success paths, mixed separators, missing parents, and `.git` / `.env` / cache / pycache / ZIP / yedek exclusions.
+- Planned overwrite-policy tests for `overwrite=False` success on new files, `overwrite=False` skip behavior on existing files, `success=False`, `skipped_reason`, content preservation, explicit `overwrite=True`, and target-only mutation.
+- Planned IO/permission, boundary regression, and handover QC tests to ensure errors become visible without changing existing helper exception behavior, format helper behavior, diagnostic/soft validation helpers, `AuditEventRecord.__post_init__`, `FileAttachmentRecord`, hard validation, audit event creation, or `blocked` status.
+- Documented expected test meaning for result fields: `success`, `output_path`, `attempted_path`, `allowed_root`, `file_type`, `error_code`, `error_message`, `skipped_reason`, and `overwritten`.
+- Kept this as documentation-only; no application code, tests, helper behavior changes, result contract implementation, JSON/Markdown export output, backup/restore behavior, database/repository/API/GUI/CLI, audit event creation, hard validation, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, `blocked` status, Podcast 027, commit, push, or ZIP/cache staging was added.
+
 ## Step 158
 
 - Added documentation-only planning for how the Step 157 export helper error/result contract could be implemented in the future without changing the current low-level helper behavior.
