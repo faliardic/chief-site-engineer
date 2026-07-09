@@ -1538,3 +1538,18 @@
 - Handover QC testleri hata contract'inin kullaniciya gosterilebilir veri tasimasini, `output_path` / `attempted_path` ayrimini, outside-allowed-root hatasini, `overwrite=False` skipped sonucunu, export basarisizliginin devir paketini otomatik bloke etmemesini ve audit event uretmemesini kapsayacak.
 - Result contract alanlari icin `success`, `output_path`, `attempted_path`, `allowed_root`, `file_type`, `error_code`, `error_message`, `skipped_reason` ve `overwritten` alanlarinin basari/hata durumlarindaki test anlamlari belgelendi.
 - Bu adim documentation-only test-matrix-plan adimidir; uygulama kodu, test dosyalari, helper davranisi, result contract implementasyonu, JSON/Markdown export dosyasi, audit event uretimi, backup/restore davranisi, database/repository/API/GUI/CLI, hard validation, `AuditEventRecord.__post_init__`, `FileAttachmentRecord`, `blocked` status, Podcast 027, commit, push veya ZIP staging eklenmedi.
+
+## 160 Export Helper Result Contract API Boundary / Wrapper Plan
+
+- Adim 160, mevcut exception tabanli file-writing helper davranisini bozmadan future result contract wrapper katmaninin nasil eklenebilecegini documentation-only olarak planladi.
+- Mevcut `write_json_ready_dict_to_file(...)` ve `write_markdown_text_to_file(...)` helperlarinin dusuk seviyeli, exception tabanli ve basarida `Path` donduren davranisinin korunmasina karar verildi.
+- Result contract icin mevcut helper return type'ini dogrudan degistirmek yerine ayri wrapper fonksiyonlar eklemek daha guvenli API boundary olarak belgelendi.
+- Olasil future wrapper isimleri `try_write_json_ready_dict_to_file(...)` ve `try_write_markdown_text_to_file(...)` olarak planlandi; bu adimda implementasyon yapilmadi.
+- Wrapper result contract alanlari `success`, `output_path`, `attempted_path`, `allowed_root`, `file_type`, `error_code`, `error_message`, `skipped_reason` ve `overwritten` olarak belirlendi.
+- Wrapper inputlarinin mevcut helper inputlariyla uyumlu olmasi, diagnostic/soft validation sonucunu yeniden hesaplamamasi, format helper ciktisini degistirmemesi ve yalniz dosya yazma sonucunu raporlamasi kararlastirildi.
+- Wrapper database/repository/API/GUI/CLI katmanina baglanmayacak, audit event uretmeyecek, backup/restore baslatmayacak, hard validation tetiklemeyecek ve `blocked` status uretmeyecek.
+- Error mapping plani `TypeError -> input_type_error`, `ValueError -> path_or_extension_error`, `FileExistsError -> file_exists`, `PermissionError -> permission_error`, `OSError -> io_error` ve beklenmeyen exception icin `unexpected_error` olarak belgelendi.
+- Ozel durumlar icin `overwrite=False` ve dosya mevcutken `success=False`, file-exists/skipped sonucu ve mevcut dosyanin korunmasi; `overwrite=True` basariliysa `success=True` ve `overwritten=True`; outside allowed root, path traversal, wrong extension ve parent missing icin net `error_code` beklentileri planlandi.
+- Geriye uyumluluk icin mevcut `write_*` helperlar exception davranisini koruyacak, yeni `try_write_*` wrapperlar result contract dondurecek, eski testler kirilmayacak ve wrapper testleri ileride ayri eklenecek.
+- Handover QC kullanimi wrapper sonucunu devir raporunda gorunur kilabilir; export basarisizligi otomatik blokaj, audit event, backup/restore veya hard validation anlami tasimayacak ve `blocked` status uretilmeyecek.
+- Bu adim documentation-only API-boundary/wrapper-plan adimidir; uygulama kodu, test dosyalari, helper davranisi, result contract wrapper implementasyonu, JSON/Markdown export dosyasi, audit event uretimi, backup/restore davranisi, database/repository/API/GUI/CLI, hard validation, `AuditEventRecord.__post_init__`, `FileAttachmentRecord`, `blocked` status, Podcast 027, commit, push veya ZIP staging eklenmedi.

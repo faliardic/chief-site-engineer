@@ -1,5 +1,16 @@
 # Changelog
 
+## Step 160
+
+- Added documentation-only planning for the export helper result contract API boundary and future wrapper approach.
+- Clarified that the existing `write_json_ready_dict_to_file(...)` and `write_markdown_text_to_file(...)` helpers should remain exception-based low-level helpers that return `Path` on success.
+- Planned future wrapper helpers such as `try_write_json_ready_dict_to_file(...)` and `try_write_markdown_text_to_file(...)` as a non-breaking way to return result contract dictionaries.
+- Defined wrapper result fields: `success`, `output_path`, `attempted_path`, `allowed_root`, `file_type`, `error_code`, `error_message`, `skipped_reason`, and `overwritten`.
+- Documented the wrapper API boundary: inputs should align with existing helpers, diagnostic/soft validation reports must not be recomputed, formatter output must not be changed, and wrappers should only report file-writing results.
+- Planned exception-to-result error mapping for `TypeError`, `ValueError`, `FileExistsError`, `PermissionError`, `OSError`, and unexpected exceptions, with special cases for file exists, overwrite, outside-allowed-root paths, traversal, wrong extensions, and missing parents.
+- Clarified that future wrapper results may support handover QC visibility and manual review without automatic blocking, audit event creation, backup/restore behavior, hard validation, or `blocked` status.
+- Kept this as documentation-only; no application code, tests, helper behavior changes, result contract wrapper implementation, JSON/Markdown export output, backup/restore behavior, database/repository/API/GUI/CLI, audit event creation, hard validation, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, `blocked` status, Podcast 027, commit, push, or ZIP/cache staging was added.
+
 ## Step 159
 
 - Added documentation-only planning for the future export helper result contract test matrix before any result contract implementation.
