@@ -65,6 +65,8 @@ from app.models import (
     format_record_id_soft_validation_report_as_markdown,
     get_allowed_record_id_prefixes_for_target_type,
     get_record_id_family_for_target_type,
+    try_write_json_ready_dict_to_file,
+    try_write_markdown_text_to_file,
     write_json_ready_dict_to_file,
     write_markdown_text_to_file,
 )
@@ -1213,6 +1215,340 @@ def test_write_markdown_text_to_file_rejects_non_export_area(tmp_path) -> None:
 
     with pytest.raises(ValueError, match="non-export area"):
         write_markdown_text_to_file("# Summary", cache_dir / "summary.md")
+
+
+EXPORT_WRITE_RESULT_KEYS = {
+    "success",
+    "output_path",
+    "attempted_path",
+    "allowed_root",
+    "file_type",
+    "error_code",
+    "error_message",
+    "skipped_reason",
+    "overwritten",
+}
+
+
+def test_try_write_json_ready_dict_to_file_returns_success_result(tmp_path) -> None:
+    output_path = tmp_path / "diagnostic.json"
+    data = {"title": "Şantiye raporu", "items": [{"id": "ATT-1"}]}
+    original_data = deepcopy(data)
+
+    result = try_write_json_ready_dict_to_file(data, output_path)
+
+    assert set(result) == EXPORT_WRITE_RESULT_KEYS
+    assert result["success"] is True
+    assert result["output_path"] == output_path
+    assert result["attempted_path"] == output_path
+    assert result["allowed_root"] is None
+    assert result["file_type"] == "json"
+    assert result["error_code"] is None
+    assert result["error_message"] is None
+    assert result["skipped_reason"] is None
+    assert result["overwritten"] is False
+    assert json.loads(output_path.read_text(encoding="utf-8")) == data
+    assert data == original_data
+
+
+def test_try_write_json_ready_dict_to_file_reports_non_dict_input(tmp_path) -> None:
+    output_path = tmp_path / "diagnostic.json"
+
+    result = try_write_json_ready_dict_to_file(["not", "dict"], output_path)
+
+    assert result["success"] is False
+    assert result["output_path"] is None
+    assert result["attempted_path"] == output_path
+    assert result["file_type"] == "json"
+    assert result["error_code"] == "input_type_error"
+    assert result["error_message"]
+    assert result["overwritten"] is False
+    assert not output_path.exists()
+
+
+def test_try_write_json_ready_dict_to_file_reports_serialization_error(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "diagnostic.json"
+
+    result = try_write_json_ready_dict_to_file({"bad": object()}, output_path)
+
+    assert result["success"] is False
+    assert result["output_path"] is None
+    assert result["attempted_path"] == output_path
+    assert result["file_type"] == "json"
+    assert result["error_code"] == "serialization_error"
+    assert result["error_message"]
+    assert result["overwritten"] is False
+    assert not output_path.exists()
+
+
+def test_try_write_json_ready_dict_to_file_reports_wrong_extension(tmp_path) -> None:
+    output_path = tmp_path / "diagnostic.md"
+
+    result = try_write_json_ready_dict_to_file({"ok": True}, output_path)
+
+    assert result["success"] is False
+    assert result["output_path"] is None
+    assert result["attempted_path"] == output_path
+    assert result["file_type"] == "json"
+    assert result["error_code"] == "wrong_extension"
+    assert result["overwritten"] is False
+    assert not output_path.exists()
+
+
+def test_try_write_json_ready_dict_to_file_reports_outside_allowed_root(
+    tmp_path,
+) -> None:
+    allowed_root = tmp_path / "exports"
+    outside_root = tmp_path / "outside"
+    allowed_root.mkdir()
+    outside_root.mkdir()
+    output_path = outside_root / "diagnostic.json"
+
+    result = try_write_json_ready_dict_to_file(
+        {"ok": True},
+        output_path,
+        allowed_root=allowed_root,
+    )
+
+    assert result["success"] is False
+    assert result["output_path"] is None
+    assert result["attempted_path"] == output_path
+    assert result["allowed_root"] == allowed_root
+    assert result["file_type"] == "json"
+    assert result["error_code"] == "outside_allowed_root"
+    assert result["overwritten"] is False
+    assert not output_path.exists()
+
+
+def test_try_write_json_ready_dict_to_file_reports_path_traversal(tmp_path) -> None:
+    output_path = tmp_path / "exports" / ".." / "diagnostic.json"
+
+    result = try_write_json_ready_dict_to_file({"ok": True}, output_path)
+
+    assert result["success"] is False
+    assert result["output_path"] is None
+    assert result["attempted_path"] == output_path
+    assert result["file_type"] == "json"
+    assert result["error_code"] == "path_traversal"
+    assert result["overwritten"] is False
+
+
+def test_try_write_json_ready_dict_to_file_reports_missing_parent(tmp_path) -> None:
+    output_path = tmp_path / "missing" / "diagnostic.json"
+
+    result = try_write_json_ready_dict_to_file({"ok": True}, output_path)
+
+    assert result["success"] is False
+    assert result["output_path"] is None
+    assert result["attempted_path"] == output_path
+    assert result["file_type"] == "json"
+    assert result["error_code"] == "parent_missing"
+    assert result["overwritten"] is False
+    assert not output_path.exists()
+
+
+def test_try_write_json_ready_dict_to_file_reports_existing_file_without_overwrite(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "diagnostic.json"
+    output_path.write_text('{"old": true}', encoding="utf-8")
+
+    result = try_write_json_ready_dict_to_file({"old": False}, output_path)
+
+    assert result["success"] is False
+    assert result["output_path"] is None
+    assert result["attempted_path"] == output_path
+    assert result["file_type"] == "json"
+    assert result["error_code"] == "file_exists"
+    assert result["skipped_reason"] == "file_exists"
+    assert result["overwritten"] is False
+    assert output_path.read_text(encoding="utf-8") == '{"old": true}'
+
+
+def test_try_write_json_ready_dict_to_file_reports_explicit_overwrite(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "diagnostic.json"
+    sibling_path = tmp_path / "sibling.json"
+    output_path.write_text('{"old": true}', encoding="utf-8")
+    sibling_path.write_text('{"keep": true}', encoding="utf-8")
+
+    result = try_write_json_ready_dict_to_file(
+        {"new": True},
+        output_path,
+        overwrite=True,
+    )
+
+    assert result["success"] is True
+    assert result["output_path"] == output_path
+    assert result["attempted_path"] == output_path
+    assert result["file_type"] == "json"
+    assert result["error_code"] is None
+    assert result["skipped_reason"] is None
+    assert result["overwritten"] is True
+    assert json.loads(output_path.read_text(encoding="utf-8")) == {"new": True}
+    assert sibling_path.read_text(encoding="utf-8") == '{"keep": true}'
+
+
+def test_try_write_markdown_text_to_file_returns_success_result(tmp_path) -> None:
+    output_path = tmp_path / "summary.md"
+    markdown = "# Başlık\n\n- item\n```text\nraw\n```\n"
+
+    result = try_write_markdown_text_to_file(markdown, output_path)
+
+    assert set(result) == EXPORT_WRITE_RESULT_KEYS
+    assert result["success"] is True
+    assert result["output_path"] == output_path
+    assert result["attempted_path"] == output_path
+    assert result["allowed_root"] is None
+    assert result["file_type"] == "markdown"
+    assert result["error_code"] is None
+    assert result["error_message"] is None
+    assert result["skipped_reason"] is None
+    assert result["overwritten"] is False
+    assert output_path.read_text(encoding="utf-8") == markdown
+
+
+def test_try_write_markdown_text_to_file_reports_non_string_input(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "summary.md"
+
+    result = try_write_markdown_text_to_file({"not": "markdown"}, output_path)
+
+    assert result["success"] is False
+    assert result["output_path"] is None
+    assert result["attempted_path"] == output_path
+    assert result["file_type"] == "markdown"
+    assert result["error_code"] == "input_type_error"
+    assert result["error_message"]
+    assert result["overwritten"] is False
+    assert not output_path.exists()
+
+
+def test_try_write_markdown_text_to_file_reports_wrong_extension(tmp_path) -> None:
+    output_path = tmp_path / "summary.json"
+
+    result = try_write_markdown_text_to_file("# Summary", output_path)
+
+    assert result["success"] is False
+    assert result["output_path"] is None
+    assert result["attempted_path"] == output_path
+    assert result["file_type"] == "markdown"
+    assert result["error_code"] == "wrong_extension"
+    assert result["overwritten"] is False
+    assert not output_path.exists()
+
+
+def test_try_write_markdown_text_to_file_reports_outside_allowed_root(
+    tmp_path,
+) -> None:
+    allowed_root = tmp_path / "exports"
+    outside_root = tmp_path / "outside"
+    allowed_root.mkdir()
+    outside_root.mkdir()
+    output_path = outside_root / "summary.md"
+
+    result = try_write_markdown_text_to_file(
+        "# Summary",
+        output_path,
+        allowed_root=allowed_root,
+    )
+
+    assert result["success"] is False
+    assert result["output_path"] is None
+    assert result["attempted_path"] == output_path
+    assert result["allowed_root"] == allowed_root
+    assert result["file_type"] == "markdown"
+    assert result["error_code"] == "outside_allowed_root"
+    assert result["overwritten"] is False
+    assert not output_path.exists()
+
+
+def test_try_write_markdown_text_to_file_reports_path_traversal(tmp_path) -> None:
+    output_path = tmp_path / "exports" / ".." / "summary.md"
+
+    result = try_write_markdown_text_to_file("# Summary", output_path)
+
+    assert result["success"] is False
+    assert result["output_path"] is None
+    assert result["attempted_path"] == output_path
+    assert result["file_type"] == "markdown"
+    assert result["error_code"] == "path_traversal"
+    assert result["overwritten"] is False
+
+
+def test_try_write_markdown_text_to_file_reports_missing_parent(tmp_path) -> None:
+    output_path = tmp_path / "missing" / "summary.md"
+
+    result = try_write_markdown_text_to_file("# Summary", output_path)
+
+    assert result["success"] is False
+    assert result["output_path"] is None
+    assert result["attempted_path"] == output_path
+    assert result["file_type"] == "markdown"
+    assert result["error_code"] == "parent_missing"
+    assert result["overwritten"] is False
+    assert not output_path.exists()
+
+
+def test_try_write_markdown_text_to_file_reports_existing_file_without_overwrite(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "summary.md"
+    output_path.write_text("old content", encoding="utf-8")
+
+    result = try_write_markdown_text_to_file("new content", output_path)
+
+    assert result["success"] is False
+    assert result["output_path"] is None
+    assert result["attempted_path"] == output_path
+    assert result["file_type"] == "markdown"
+    assert result["error_code"] == "file_exists"
+    assert result["skipped_reason"] == "file_exists"
+    assert result["overwritten"] is False
+    assert output_path.read_text(encoding="utf-8") == "old content"
+
+
+def test_try_write_markdown_text_to_file_reports_explicit_overwrite(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "summary.md"
+    sibling_path = tmp_path / "sibling.md"
+    output_path.write_text("old content", encoding="utf-8")
+    sibling_path.write_text("keep content", encoding="utf-8")
+
+    result = try_write_markdown_text_to_file(
+        "new content",
+        output_path,
+        overwrite=True,
+    )
+
+    assert result["success"] is True
+    assert result["output_path"] == output_path
+    assert result["attempted_path"] == output_path
+    assert result["file_type"] == "markdown"
+    assert result["error_code"] is None
+    assert result["skipped_reason"] is None
+    assert result["overwritten"] is True
+    assert output_path.read_text(encoding="utf-8") == "new content"
+    assert sibling_path.read_text(encoding="utf-8") == "keep content"
+
+
+def test_try_write_helpers_keep_existing_exception_helpers_unchanged(tmp_path) -> None:
+    with pytest.raises(TypeError, match="JSON-ready dict"):
+        write_json_ready_dict_to_file(["not", "dict"], tmp_path / "out.json")
+
+    with pytest.raises(TypeError, match="string"):
+        write_markdown_text_to_file({"not": "markdown"}, tmp_path / "out.md")
+
+    with pytest.raises(ValueError, match=".json"):
+        write_json_ready_dict_to_file({"ok": True}, tmp_path / "out.md")
+
+    with pytest.raises(ValueError, match=".md"):
+        write_markdown_text_to_file("# Summary", tmp_path / "out.json")
 
 
 def test_file_writing_helpers_do_not_recompute_reports_or_formatters(tmp_path) -> None:

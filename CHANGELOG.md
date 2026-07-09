@@ -1,5 +1,17 @@
 # Changelog
 
+## Step 163
+
+- Added result contract wrapper helpers `try_write_json_ready_dict_to_file(...)` and `try_write_markdown_text_to_file(...)`.
+- Kept existing low-level `write_json_ready_dict_to_file(...)` and `write_markdown_text_to_file(...)` behavior unchanged: they still return `Path` on success and raise standard Python exceptions on failure.
+- Implemented a stable result dict schema with `success`, `output_path`, `attempted_path`, `allowed_root`, `file_type`, `error_code`, `error_message`, `skipped_reason`, and `overwritten`.
+- Mapped file-writing exceptions into visible wrapper result codes including `input_type_error`, `serialization_error`, `file_exists`, `wrong_extension`, `path_traversal`, `outside_allowed_root`, `parent_missing`, `directory_path`, `empty_output_path`, `permission_error`, `io_error`, and `unexpected_error`.
+- Added JSON wrapper tests for success, input immutability, non-dict input, unserializable input, wrong extension, outside-allowed-root path, path traversal, missing parent, existing file with `overwrite=False`, and explicit `overwrite=True`.
+- Added Markdown wrapper tests for success, non-string input, wrong extension, outside-allowed-root path, path traversal, missing parent, existing file with `overwrite=False`, and explicit `overwrite=True`.
+- Added regression coverage confirming the existing exception-based `write_*` helper behavior remains intact.
+- Added Step 163 implementation documentation and learning notes.
+- Kept JSON/Markdown export output files, audit event creation, backup/restore behavior, database/repository/API/GUI/CLI, hard validation, `AuditEventRecord.__post_init__` changes, `FileAttachmentRecord` changes, `blocked` status, Podcast 027, commit, push, and ZIP/cache staging out of scope.
+
 ## Step 162
 
 - Added documentation-only finalization for the future export helper result contract wrapper test matrix.

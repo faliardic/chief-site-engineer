@@ -1586,3 +1586,21 @@
 - Regression boundary testleri mevcut `write_*` helper exception davranisinin, formatter helperlarin, diagnostic/soft validation report helperlarin, `AuditEventRecord.__post_init__`, `FileAttachmentRecord`, hard validation disi davranisin, `blocked` status uretilmemesinin, backup/restore/API/GUI/CLI eklenmemesinin ve audit event uretilmemesinin korunmasini kapsayacak.
 - Handover QC testleri `success=False` sonucunun otomatik blokaj olmamasini, `blocked` status uretilmemesini, hata bilgisinin insan incelemesine uygun tasinmasini, `output_path` / `attempted_path` ayrimini, outside allowed-root denemesinin raporlanmasini, overwrite skip sonucunun gorunur olmasini ve export basarisizliginin database/repository kaydi degistirmemesini kapsayacak.
 - Bu adim documentation-only test-matrix-finalization adimidir; uygulama kodu, test dosyalari, helper davranisi, result contract wrapper implementasyonu, JSON/Markdown export dosyasi, audit event uretimi, backup/restore davranisi, database/repository/API/GUI/CLI, hard validation, `AuditEventRecord.__post_init__`, `FileAttachmentRecord`, `blocked` status, Podcast 027, commit, push veya ZIP staging eklenmedi.
+
+## 163 Export Helper Result Contract Wrapper Implementation
+
+- Adim 163, Adim 160-162'de planlanan result contract wrapper katmanini uyguladi.
+- Mevcut `write_json_ready_dict_to_file(...)` ve `write_markdown_text_to_file(...)` helperlari dusuk seviyeli, exception tabanli helperlar olarak korundu; basarida `Path` dondurmeye ve hatada standart Python exception firlatmaya devam eder.
+- Yeni `try_write_json_ready_dict_to_file(...)` ve `try_write_markdown_text_to_file(...)` wrapperlari eklendi; bu wrapperlar mevcut `write_*` helperlari cagirir, exception yakalar ve her durumda result dict dondurur.
+- Wrapper result contract alanlari `success`, `output_path`, `attempted_path`, `allowed_root`, `file_type`, `error_code`, `error_message`, `skipped_reason` ve `overwritten` olarak sabitlendi.
+- Basarili JSON ve Markdown yazimlari `success=True`, dogru `file_type`, dolu `output_path`, dolu `attempted_path`, bos hata alanlari ve yeni dosyada `overwritten=False` sonucu dondurur.
+- Explicit `overwrite=True` ile mevcut hedef dosya basarili yazilirsa `overwritten=True` raporlanir; `overwrite=False` ve hedef dosya mevcutsa `success=False`, `error_code="file_exists"`, `skipped_reason="file_exists"` ve `overwritten=False` dondurulur.
+- Error mapping basit ve test edilebilir tutuldu: non-dict/non-string input icin `input_type_error`, JSON serialization hatasi icin `serialization_error`, yanlis uzanti icin `wrong_extension`, path traversal icin `path_traversal`, allowed-root disi path icin `outside_allowed_root`, missing parent icin `parent_missing`, mevcut dosya icin `file_exists`, permission/IO hatalari icin `permission_error` / `io_error` ve beklenmeyen hata icin `unexpected_error`.
+- Path safety, extension, traversal, non-export area, missing parent ve `allowed_root` kararlarinin mevcut `write_*` helperlarinda kalmasina karar verildi; wrapper bu kararlari yeniden hesaplamaz, yalniz result contract'a cevirir.
+- JSON wrapper testleri basari, input immutability, non-dict input, serialize edilemeyen object, wrong extension, outside allowed root, path traversal, missing parent, `overwrite=False` mevcut dosya korumasi ve explicit overwrite senaryolarini kapsar.
+- Markdown wrapper testleri basari, non-string input, wrong extension, outside allowed root, path traversal, missing parent, `overwrite=False` mevcut dosya korumasi ve explicit overwrite senaryolarini kapsar.
+- Regression testi mevcut exception tabanli `write_*` helper davranisinin degismedigini kanitlar.
+- Wrapperlar database/repository yazmaz, audit event uretmez, backup/restore baslatmaz, API/GUI/CLI eklemez, hard validation tetiklemez, `blocked` status uretmez ve export basarisizligini otomatik blokaj anlamina getirmez.
+- JSON/Markdown export cikti dosyasi repo icine uretilmedi; `exports/` temiz tutuldu.
+- Podcast 027 olusturulmadi; ZIP/yedek/cache dosyalari stage edilmedi.
+- Bu adim kod + test + dokumantasyon adimidir; commit veya push yapilmadi.

@@ -1349,6 +1349,186 @@ def write_markdown_text_to_file(
     return path
 
 
+_EXPORT_WRITE_RESULT_KEYS: tuple[str, ...] = (
+    "success",
+    "output_path",
+    "attempted_path",
+    "allowed_root",
+    "file_type",
+    "error_code",
+    "error_message",
+    "skipped_reason",
+    "overwritten",
+)
+
+
+def _safe_export_attempted_path(output_path: object) -> Path | None:
+    try:
+        if isinstance(output_path, str) and not output_path.strip():
+            return None
+        return Path(output_path)  # type: ignore[arg-type]
+    except TypeError:
+        return None
+
+
+def _export_path_existed_before(output_path: object) -> bool:
+    attempted_path = _safe_export_attempted_path(output_path)
+    return attempted_path.exists() if attempted_path is not None else False
+
+
+def _export_result(
+    *,
+    success: bool,
+    output_path: Path | None,
+    attempted_path: Path | None,
+    allowed_root: str | Path | None,
+    file_type: str,
+    error_code: str | None,
+    error_message: str | None,
+    skipped_reason: str | None,
+    overwritten: bool,
+) -> dict[str, object]:
+    return {
+        "success": success,
+        "output_path": output_path,
+        "attempted_path": attempted_path,
+        "allowed_root": allowed_root,
+        "file_type": file_type,
+        "error_code": error_code,
+        "error_message": error_message,
+        "skipped_reason": skipped_reason,
+        "overwritten": overwritten,
+    }
+
+
+def _export_error_code(exc: Exception) -> str:
+    message = str(exc).lower()
+
+    if isinstance(exc, FileExistsError):
+        return "file_exists"
+    if isinstance(exc, PermissionError):
+        return "permission_error"
+    if isinstance(exc, TypeError):
+        if "json-ready dict" in message or "string" in message:
+            return "input_type_error"
+        return "serialization_error"
+    if isinstance(exc, ValueError):
+        if "extension" in message:
+            return "wrong_extension"
+        if "path traversal" in message:
+            return "path_traversal"
+        if "allowed_root" in message:
+            return "outside_allowed_root"
+        if "file path" in message:
+            return "directory_path"
+        if "cannot be empty" in message:
+            return "empty_output_path"
+        if "non-export area" in message:
+            return "path_or_extension_error"
+        return "path_or_extension_error"
+    if isinstance(exc, FileNotFoundError):
+        return "parent_missing"
+    if isinstance(exc, OSError):
+        return "io_error"
+    return "unexpected_error"
+
+
+def _export_skipped_reason(error_code: str) -> str | None:
+    if error_code == "file_exists":
+        return "file_exists"
+    return None
+
+
+def try_write_json_ready_dict_to_file(
+    data: object,
+    output_path: str | Path,
+    *,
+    overwrite: bool = False,
+    allowed_root: str | Path | None = None,
+) -> dict[str, object]:
+    """Return a result contract for JSON file writing without raising."""
+
+    attempted_path = _safe_export_attempted_path(output_path)
+    existed_before = _export_path_existed_before(output_path)
+    try:
+        written_path = write_json_ready_dict_to_file(
+            data,  # type: ignore[arg-type]
+            output_path,
+            overwrite=overwrite,
+            allowed_root=allowed_root,
+        )
+    except Exception as exc:  # noqa: BLE001 - wrapper intentionally converts errors.
+        error_code = _export_error_code(exc)
+        return _export_result(
+            success=False,
+            output_path=None,
+            attempted_path=attempted_path,
+            allowed_root=allowed_root,
+            file_type="json",
+            error_code=error_code,
+            error_message=str(exc),
+            skipped_reason=_export_skipped_reason(error_code),
+            overwritten=False,
+        )
+
+    return _export_result(
+        success=True,
+        output_path=written_path,
+        attempted_path=attempted_path,
+        allowed_root=allowed_root,
+        file_type="json",
+        error_code=None,
+        error_message=None,
+        skipped_reason=None,
+        overwritten=bool(overwrite and existed_before),
+    )
+
+
+def try_write_markdown_text_to_file(
+    markdown_text: object,
+    output_path: str | Path,
+    *,
+    overwrite: bool = False,
+    allowed_root: str | Path | None = None,
+) -> dict[str, object]:
+    """Return a result contract for Markdown file writing without raising."""
+
+    attempted_path = _safe_export_attempted_path(output_path)
+    existed_before = _export_path_existed_before(output_path)
+    try:
+        written_path = write_markdown_text_to_file(
+            markdown_text,  # type: ignore[arg-type]
+            output_path,
+            overwrite=overwrite,
+            allowed_root=allowed_root,
+        )
+    except Exception as exc:  # noqa: BLE001 - wrapper intentionally converts errors.
+        error_code = _export_error_code(exc)
+        return _export_result(
+            success=False,
+            output_path=None,
+            attempted_path=attempted_path,
+            allowed_root=allowed_root,
+            file_type="markdown",
+            error_code=error_code,
+            error_message=str(exc),
+            skipped_reason=_export_skipped_reason(error_code),
+            overwritten=False,
+        )
+
+    return _export_result(
+        success=True,
+        output_path=written_path,
+        attempted_path=attempted_path,
+        allowed_root=allowed_root,
+        file_type="markdown",
+        error_code=None,
+        error_message=None,
+        skipped_reason=None,
+        overwritten=bool(overwrite and existed_before),
+    )
+
+
 @dataclass
 class AuditEventRecord:
     """Represents a traceable audit event without persistence or automation."""
