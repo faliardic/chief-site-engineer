@@ -1,5 +1,15 @@
 # Changelog
 
+## Step 162
+
+- Added documentation-only finalization for the future export helper result contract wrapper test matrix.
+- Confirmed that planned wrapper tests for `try_write_json_ready_dict_to_file(...)` and `try_write_markdown_text_to_file(...)` must remain separate from the existing exception-based `write_*` helper tests.
+- Finalized wrapper success test expectations for `success=True`, `output_path`, `attempted_path`, `allowed_root`, `file_type`, empty error fields, `overwritten=False` for new files, and `overwritten=True` for explicit overwrite.
+- Finalized JSON and Markdown wrapper input test categories for JSON-ready dicts, Markdown strings, empty-content policy, non-dict/non-string inputs, unserializable JSON, input immutability, no diagnostic/soft validation recomputation, and no formatter output changes.
+- Finalized path safety and overwrite wrapper tests for empty paths, directory targets, wrong extensions, `.json` / `.md` enforcement, traversal, outside-allowed-root paths, missing parents, non-export areas, mixed separators, `overwrite=False` skip behavior, content preservation, and explicit `overwrite=True`.
+- Finalized error mapping, result schema, regression boundary, and handover QC test categories, including stable result keys, bool `success` / `overwritten`, clear `error_code` / `skipped_reason`, unchanged existing helper behavior, no audit event creation, no hard validation, and no `blocked` status.
+- Kept this as documentation-only; no application code, tests, helper behavior changes, result contract wrapper implementation, JSON/Markdown export output, backup/restore behavior, database/repository/API/GUI/CLI, audit event creation, hard validation, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, `blocked` status, Podcast 027, commit, push, or ZIP/cache staging was added.
+
 ## Step 161
 
 - Added documentation-only planning for the future export helper result contract wrapper implementation, following the Step 160 API boundary.
