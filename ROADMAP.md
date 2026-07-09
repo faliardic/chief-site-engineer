@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 160 - Export Helper Result Contract API Boundary / Wrapper Plan
+Adim 161 - Export Helper Result Contract Wrapper Implementation Plan
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -79,6 +79,8 @@ Adim 158'de Adim 157 result contract planinin ileride nasil uygulanabilecegi doc
 Adim 159'da future export helper result contract implementasyonu oncesi test matrix documentation-only olarak planlandi; basari result alanlari, JSON/Markdown input testleri, path safety, overwrite policy, IO/permission, boundary regression ve handover QC test beklentileri netlestirildi. Yeni kod/test, result contract implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 
 Adim 160'da mevcut exception tabanli file-writing helper davranisini bozmadan future result contract wrapper API boundary documentation-only olarak planlandi; `write_*` helperlarin korunmasi, olasi `try_write_*` wrapper isimleri, result alanlari, error mapping, geriye uyumluluk ve handover QC gorunurlugu netlestirildi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
+
+Adim 161'de Adim 160 API boundary'sine bagli future result contract wrapper implementation plan documentation-only olarak netlestirildi; `try_write_json_ready_dict_to_file(...)` ve `try_write_markdown_text_to_file(...)` wrapper davranisi, basari/hata result sozlesmesi, error mapping, overwrite/path safety davranisi, geriye uyumluluk ve handover QC gorunurlugu belgelendi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 
 Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
 
@@ -256,9 +258,10 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 - [x] Adim 158 - Export helper result contract implementation plan; future wrapper/helper katmani, ortak result alanlari, hata kodlari ve handover QC gorunurlugu documentation-only olarak planlandi, implementasyon yapilmadi.
 - [x] Adim 159 - Export helper result contract test matrix plan; basari, input, path safety, overwrite, IO, regression ve handover QC test beklentileri belgelendi, yeni kod/test/export dosyasi eklenmedi.
 - [x] Adim 160 - Export helper result contract API boundary / wrapper plan; mevcut `write_*` helperlari koruyan future `try_write_*` wrapper siniri ve error mapping belgelendi, implementasyon yapilmadi.
+- [x] Adim 161 - Export helper result contract wrapper implementation plan; future `try_write_*` wrapper davranisi, result sozlesmesi, error mapping, overwrite/path safety ve handover QC siniri belgelendi, implementasyon yapilmadi.
 
 Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokumantasyon ve kullanim standardi ile sabitlemek; sonra rapor format sinirlari, handover QC kullanimi ve soft validation rapor katmanini hard validation'a gecmeden hazirlamaktir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 161 icin export helper result contract wrapper implementation readiness review veya podcast hazirlik dokumantasyonu ele alinabilir. Hard validation ve `blocked` status henuz eklenmemelidir.
+Adim 162 icin export helper result contract wrapper implementation readiness review veya podcast hazirlik dokumantasyonu ele alinabilir. Hard validation ve `blocked` status henuz eklenmemelidir.

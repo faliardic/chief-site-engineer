@@ -1,5 +1,16 @@
 # Changelog
 
+## Step 161
+
+- Added documentation-only planning for the future export helper result contract wrapper implementation, following the Step 160 API boundary.
+- Clarified that existing `write_json_ready_dict_to_file(...)` and `write_markdown_text_to_file(...)` behavior must remain unchanged, with future wrappers added as a separate layer.
+- Planned future wrapper names `try_write_json_ready_dict_to_file(...)` and `try_write_markdown_text_to_file(...)`, which would call the existing helpers, catch exceptions, and return result contract dictionaries.
+- Documented wrapper behavior for matching existing inputs, returning success results, returning safe failure results instead of raising, avoiding silent failures, avoiding diagnostic/soft validation recomputation, preserving formatter output, and avoiding input mutation.
+- Defined success and failure result expectations for `success`, `output_path`, `attempted_path`, `allowed_root`, `file_type`, `error_code`, `error_message`, `skipped_reason`, and `overwritten`.
+- Planned error mapping for general Python exceptions plus more specific future `error_code` values such as `wrong_extension`, `path_traversal`, `outside_allowed_root`, `parent_missing`, `directory_path`, `empty_output_path`, and `serialization_error`.
+- Clarified overwrite, path safety, boundary, backward compatibility, and handover QC behavior while keeping the wrapper as visibility/manual-review support rather than automatic blocking, audit event creation, backup/restore, hard validation, or `blocked` status.
+- Kept this as documentation-only; no application code, tests, helper behavior changes, result contract wrapper implementation, JSON/Markdown export output, backup/restore behavior, database/repository/API/GUI/CLI, audit event creation, hard validation, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, `blocked` status, Podcast 027, commit, push, or ZIP/cache staging was added.
+
 ## Step 160
 
 - Added documentation-only planning for the export helper result contract API boundary and future wrapper approach.
