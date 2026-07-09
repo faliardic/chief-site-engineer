@@ -1,5 +1,16 @@
 # Changelog
 
+## Step 158
+
+- Added documentation-only planning for how the Step 157 export helper error/result contract could be implemented in the future without changing the current low-level helper behavior.
+- Clarified that the existing `write_json_ready_dict_to_file(...)` and `write_markdown_text_to_file(...)` helpers should keep returning `Path` on success and standard Python exceptions on failure for backward compatibility.
+- Planned a future wrapper/helper layer as the preferred result-contract approach, instead of changing the current helper return type directly.
+- Expanded the proposed result fields to include `success`, `output_path`, `error_code`, `error_message`, `skipped_reason`, `overwritten`, `attempted_path`, `allowed_root`, and `file_type`.
+- Documented that JSON and Markdown export writing can share a common result contract while representing JSON-specific, Markdown-specific, path safety, input validation, overwrite, parent-directory, allowed-root, extension, permission, and IO errors through `error_code` / `skipped_reason`.
+- Clarified possible future behavior for `overwrite=False` with existing files, explicit `overwrite=True`, missing parents, outside-allowed-root paths, wrong extensions, unserializable JSON input, non-string Markdown input, and IO/permission errors.
+- Reiterated that the result contract must not create silent failures, and that future handover QC usage would be visibility/manual-review oriented rather than audit event creation, backup/restore, hard validation, record rejection, or `blocked` status.
+- Kept this as documentation-only; no application code, tests, helper behavior changes, result contract implementation, JSON/Markdown export output, backup/restore behavior, database/repository/API/GUI/CLI, audit event creation, hard validation, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, `blocked` status, Podcast 027, commit, push, or ZIP/cache staging was added.
+
 ## Step 157
 
 - Added documentation-only planning for the export helper error/result contract after the Step 155 read-only file writing helpers and Step 156 usage documentation.
