@@ -1604,3 +1604,19 @@
 - JSON/Markdown export cikti dosyasi repo icine uretilmedi; `exports/` temiz tutuldu.
 - Podcast 027 olusturulmadi; ZIP/yedek/cache dosyalari stage edilmedi.
 - Bu adim kod + test + dokumantasyon adimidir; commit veya push yapilmadi.
+
+## 164 Export Helper Result Contract Wrapper Usage Documentation
+
+- Adim 164, Adim 163'te eklenen `try_write_json_ready_dict_to_file(...)` ve `try_write_markdown_text_to_file(...)` wrapperlarinin kullanim sinirini documentation-only olarak belgelendirdi.
+- `write_json_ready_dict_to_file(...)` ve `write_markdown_text_to_file(...)` helperlarinin dusuk seviyeli, exception tabanli helperlar olarak kalacagi; `try_*` wrapperlarin ise result contract dondurecegi kullanim ayrimi netlestirildi.
+- Diagnostic/soft validation report uretimi, format helper ile JSON-ready dict veya Markdown string uretilmesi, sonrasinda `write_*` veya `try_*` dosya yazma katmaninin secilmesi akisi belgelendi.
+- JSON wrapper kullaniminda JSON-ready dict input, `.json` uzantili explicit output path, optional `allowed_root`, `overwrite=False` varsayilani, `success=True` ve `success=False` yorumlari aciklandi.
+- Markdown wrapper kullaniminda Markdown string input, `.md` uzantili explicit output path, optional `allowed_root`, Markdown iceriginin yeniden formatlanmamasi ve `success=False` sonucunun otomatik blokaj olmamasi aciklandi.
+- Result contract alanlari `success`, `output_path`, `attempted_path`, `allowed_root`, `file_type`, `error_code`, `error_message`, `skipped_reason` ve `overwritten` icin basari/hata/handover QC yorumlari belgelendi.
+- Error code yorumlari `input_type_error`, `path_or_extension_error`, `file_exists`, `permission_error`, `io_error`, `unexpected_error`, `wrong_extension`, `path_traversal`, `outside_allowed_root`, `parent_missing`, `directory_path`, `empty_output_path` ve `serialization_error` icin aciklandi.
+- `overwrite=False` guvenli varsayilan olarak korundu; mevcut dosya varsa `success=False`, `file_exists`, `skipped_reason` ve mevcut icerik korunumu yorumlari belgelendi.
+- `overwrite=True` bilincli ve explicit tercih olarak anlatildi; basarili overwrite sonucunda `overwritten=True` alaninin handover QC tarafindan nasil okunacagi netlestirildi.
+- Path safety kullaniminda explicit output path, mumkunse `allowed_root`, allowed-root disi yazim, path traversal, missing parent ve `.git`, `.env`, cache, pycache, ZIP/yedek alanlarinin kapsam disi kalmasi belgelendi.
+- Handover QC yorumunda `success=True` export dosyasinin yazildigini, `success=False` export yaziminin basarisiz veya skipped oldugunu, fakat devir paketini otomatik bloke etmedigini ve `blocked` status uretmedigini netlestirdi.
+- Wrapperlarin diagnostic/soft validation sonucunu yeniden hesaplamayacagi, format helper ciktisini degistirmeyecegi, input mutate etmeyecegi, database/repository yazmayacagi, audit event uretmeyecegi, backup/restore baslatmayacagi, API/GUI/CLI eklemeyecegi, hard validation tetiklemeyecegi ve `blocked` status uretmeyecegi yinelendi.
+- Bu adim documentation-only adimidir; `app/models.py`, `tests/test_models.py`, helper davranisi, yeni test, JSON/Markdown export cikti dosyasi, Podcast 027, commit veya push eklenmedi.

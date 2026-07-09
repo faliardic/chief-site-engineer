@@ -1,5 +1,15 @@
 # Changelog
 
+## Step 164
+
+- Added documentation-only usage guidance for the Step 163 result contract wrapper helpers.
+- Documented when to use `write_json_ready_dict_to_file(...)` / `write_markdown_text_to_file(...)` as exception-based low-level helpers and when to use `try_write_json_ready_dict_to_file(...)` / `try_write_markdown_text_to_file(...)` for result contracts.
+- Clarified the recommended flow from diagnostic/soft validation report creation to JSON-ready dict or Markdown formatting, then optional `write_*` or `try_write_*` file writing.
+- Documented JSON and Markdown wrapper usage expectations for explicit output paths, `.json` / `.md` extension boundaries, `allowed_root`, `overwrite=False`, `success=True`, `success=False`, `error_code`, `error_message`, `skipped_reason`, and `overwritten`.
+- Explained result contract fields and error code interpretation for handover QC and admin/debug review.
+- Reiterated that `success=False` is not automatic blocking, does not create a `blocked` status, and does not change database/repository records or emit audit events.
+- Kept this as documentation-only; no application code, tests, helper behavior changes, JSON/Markdown export output, backup/restore behavior, database/repository/API/GUI/CLI, audit event creation, hard validation, `AuditEventRecord.__post_init__` change, `FileAttachmentRecord` change, `blocked` status, Podcast 027, commit, push, or ZIP/cache staging was added.
+
 ## Step 163
 
 - Added result contract wrapper helpers `try_write_json_ready_dict_to_file(...)` and `try_write_markdown_text_to_file(...)`.
