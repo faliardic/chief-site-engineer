@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 168 - Export Helper Result Contract Summary Report Layer Plan
+Adim 169 - Export Result Summary Report API Boundary and Test Matrix Plan
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -97,6 +97,8 @@ Adim 166'da mevcut export helper result contract wrapper davranisi testlerle gor
 Adim 167'de Adim 166 testleri sonrasi wrapper result contract davranisinin kullanim ve entegrasyon siniri documentation-only olarak belgelendi; handover QC, admin/debug, guvenli export ozeti ve kullanici mesajlari icin yorumlama siniri aciklandi. Kod/test degisikligi, GUI/API/CLI entegrasyonu, backup/restore, audit event, database/repository davranisi, hard validation, `blocked` status ve repo icinde export cikti dosyasi eklenmedi.
 
 Adim 168'de export helper wrapper result contract ciktisindan ileride okunabilir summary/report layer uretilmesi documentation-only olarak planlandi; olasi helper fikirleri, tartisma seviyesindeki summary alanlari, handover QC/admin-debug yorumlari ve future test matrix basliklari belgelendi. Kod/test degisikligi, helper davranisi degisikligi, export cikti dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event ve database/repository davranisi eklenmedi.
+
+Adim 169'da future export result summary/report layer icin API boundary ve test matrix documentation-only olarak netlestirildi; input'un yalniz wrapper result contract veya contract listesi olmasi, output'un JSON-ready dict/Markdown/Handover QC summary gibi raporlama amacli kalmasi ve no file writing/no hard validation/no blocked status sinirlari belgelendi. Kod/test degisikligi, helper davranisi degisikligi, export cikti dosyasi, backup/restore/API/GUI/CLI, audit event ve database/repository davranisi eklenmedi.
 
 Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
 
@@ -283,9 +285,10 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 - [x] Adim 166 - Export helper result contract wrapper test implementation; mevcut wrapper success/failure contract davranisi ve dusuk seviye helper exception regression testleri eklendi.
 - [x] Adim 167 - Export helper result contract wrapper integration boundary; testlerle sabitlenen wrapper sonucunun handover QC/admin-debug/kullanici mesaji yorum siniri belgelendi.
 - [x] Adim 168 - Export helper result contract summary/report layer plan; wrapper result contract'tan ileride okunabilir ozet/rapor uretme siniri documentation-only olarak planlandi.
+- [x] Adim 169 - Export result summary/report layer API boundary and test matrix plan; input/output siniri ve future test matrix basliklari documentation-only olarak netlestirildi.
 
 Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokumantasyon ve kullanim standardi ile sabitlemek; sonra rapor format sinirlari, handover QC kullanimi ve soft validation rapor katmanini hard validation'a gecmeden hazirlamaktir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 169 icin handover QC export result interpretation plan veya export result summary test matrix plan ele alinabilir. Hard validation ve `blocked` status henuz eklenmemelidir.
+Adim 170 icin handover QC export result interpretation plan veya export result summary implementation boundary ele alinabilir. Hard validation ve `blocked` status henuz eklenmemelidir.

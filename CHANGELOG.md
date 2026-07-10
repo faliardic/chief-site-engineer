@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 169
+
+- Added a documentation-only API boundary and future test matrix plan for the export result summary/report layer.
+- Clarified that a future summary/report helper should accept only wrapper result contracts or lists of wrapper result contracts and should not call export helpers, write files, recompute path safety, or replace low-level `write_*` helpers.
+- Documented possible future helper names `build_export_result_summary(...)`, `build_export_result_report(...)`, and `format_export_result_summary_as_markdown(...)` as planning examples only.
+- Defined output boundaries for possible JSON-ready dict, Markdown text, or handover QC summary outputs while keeping them reporting-only and not hard validation, package blocking, database/repository updates, or audit event creation.
+- Planned future test categories including success/failure summaries, mixed result lists, missing optional fields, unknown status, unsupported input, immutability, no file writing, no `blocked` status, no hard validation, no recomputation, safe Markdown user messages, and preserving technical detail without overusing it.
+- Kept this as documentation-only; no application code, tests, helper behavior changes, JSON/Markdown export output, backup/restore behavior, database/repository/API/GUI/CLI, audit event creation, hard validation, `blocked` status, commit, push, or ZIP/cache staging was added.
+
 ## Step 168
 
 - Added a documentation-only plan for a future export helper result contract summary/report layer.
