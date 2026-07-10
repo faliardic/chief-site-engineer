@@ -1,5 +1,15 @@
 # Proje Kararlari
 
+## 188 Export / Handover QC Checklist Downstream Formatter Plan Karari
+
+- Adim 188, `build_export_handover_qc_review_checklist(summary, report)` helper ciktisinin ileride Markdown veya presentation formatter ile nasil okunabilecegini documentation-only olarak planlar.
+- Future formatter checklist JSON-ready dict input alabilir ve yalniz presentation-safe Markdown/string output dondurebilir.
+- Formatter dosya yazmaz, export uretmez, `exports/` altina cikti birakmaz, input checklist dict'i mutate etmez, checklist sonucunu yeniden hesaplamaz ve `build_export_handover_qc_review_checklist(...)` davranisini degistirmez.
+- Markdown gorunumunde `is_read_only=True`, `is_blocking=False`, `requires_human_review` ve `review_notes` karar verici olmayan QC visibility bilgisi olarak korunmalidir.
+- Success-only gorunurluk resmi kabul, failure-only veya mixed gorunurluk otomatik ret ya da bloklama anlamina gelmez; empty, missing optional field ve unknown/additional field durumlari safe presentation fallback ile okunmalidir.
+- Future formatter implementasyonu gerekiyorsa ayri adim, ayri test ve ayri dokumantasyonla ele alinacaktir.
+- Hard validation, generated `blocked` status, API/GUI/CLI, database/repository erisimi, audit event, backup/restore ve export ciktisi kapsam disidir.
+
 ## 187 Export / Handover QC Checklist Downstream Boundary Karari
 
 - Adim 187, `build_export_handover_qc_review_checklist(summary, report)` helper ciktisinin downstream formatter ve consumer sinirini documentation-only olarak planlar.

@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 187 - Export / Handover QC Review Checklist Downstream Formatter Boundary Plan
+Adim 188 - Export / Handover QC Review Checklist Downstream Formatter Plan
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -115,6 +115,8 @@ Adim 185'te `build_export_handover_qc_review_checklist(summary, report)` helper'
 Adim 186'da `build_export_handover_qc_review_checklist(summary, report)` helper'i icin test/example standardi guclendirildi. Top-level checklist contract, summary alan seti, item alan seti, `review_notes` aciklayici siniri, `requires_human_review` alaninin bloklama anlamina gelmemesi, `is_read_only=True`, `is_blocking=False`, generated `blocked` status uretilmemesi ve `format_export_result_summary_as_markdown(...)` regression davranisi testlerle sabitlendi. Helper davranisi genisletilmedi, `app/models.py` degistirilmedi, dosya yazma/export ciktisi/hard validation/`blocked` status/API/GUI/CLI/database-repository/audit/backup-restore eklenmedi.
 
 Adim 187'de `build_export_handover_qc_review_checklist(summary, report)` ciktisinin downstream formatter ve consumer siniri documentation-only olarak planlandi. Checklist output'unun JSON-ready dict olarak kalacagi, ileride Markdown formatter, handover QC ekrani, export review akisi veya GUI/API/CLI consumer tarafindan yalniz presentation/QC visibility icin okunabilecegi belgelendi. Downstream consumer'lar `is_read_only=True`, `is_blocking=False` ve `requires_human_review` alanlarinin non-blocking anlamini korumali; success gorunurlugunu resmi kabul, failure/mixed gorunurlugu otomatik ret veya bloklama olarak yorumlamamalidir. Formatter/API/GUI/CLI implementation, database/repository, audit, backup/restore, export ciktisi, hard validation, `blocked` status, kod/test/helper davranisi, commit ve push eklenmedi.
+
+Adim 188'de `build_export_handover_qc_review_checklist(summary, report)` ciktisinin ileride Markdown veya presentation formatter ile nasil okunabilir rapora donusturulebilecegi documentation-only olarak planlandi. Future formatter'in checklist JSON-ready dict input alip presentation-safe Markdown/string output dondurebilecegi; dosya yazmayacagi, export uretmeyecegi, input'u mutate etmeyecegi, checklist sonucunu yeniden hesaplamayacagi ve helper davranislarini degistirmeyecegi belgelendi. Success-only, failure-only, mixed, empty/zero-count, missing optional field, unknown/additional field, `review_notes`, `is_read_only=True`, `is_blocking=False` ve `requires_human_review` gorunum sinirlari standardize edildi. Formatter implementation, yeni test, API/GUI/CLI, database/repository, audit, backup/restore, export ciktisi, hard validation, `blocked` status, kod/helper davranisi, commit ve push eklenmedi.
 
 Adim 160'da mevcut exception tabanli file-writing helper davranisini bozmadan future result contract wrapper API boundary documentation-only olarak planlandi; `write_*` helperlarin korunmasi, olasi `try_write_*` wrapper isimleri, result alanlari, error mapping, geriye uyumluluk ve handover QC gorunurlugu netlestirildi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 

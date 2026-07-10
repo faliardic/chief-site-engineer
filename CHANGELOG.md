@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 188
+
+- Added documentation-only downstream formatter planning for `build_export_handover_qc_review_checklist(summary, report)` output.
+- Documented that a future formatter may accept the checklist JSON-ready dict and return presentation-safe Markdown/string output without writing files, creating exports, mutating input, recomputing checklist results, or changing helper behavior.
+- Planned success-only, failure-only, mixed, empty/zero-count, missing optional field, unknown/additional field, `review_notes`, `is_read_only=True`, `is_blocking=False`, and `requires_human_review` presentation boundaries.
+- Reiterated that any future formatter must not approve, reject, block, perform hard validation, generate `blocked` status, access database/repository state, create audit events, run backup/restore, or add API/GUI/CLI behavior.
+- Kept this as documentation-only; no code, tests, formatter, export output, commit, push, or ZIP/cache staging was added.
+
 ## Step 187
 
 - Added documentation-only downstream formatter and consumer boundary planning for `build_export_handover_qc_review_checklist(summary, report)` output.
