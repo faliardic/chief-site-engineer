@@ -1,5 +1,14 @@
 # Proje Kararlari
 
+## 177 Export Result Report Formatter Test Example Standardization Karari
+
+- Adim 177, `format_export_result_report_as_markdown(report)` helper'i icin test/example standardini guclendirir.
+- Success-only, failure-only ve empty zero-count Markdown ornekleri stable presentation contract olarak test edilir.
+- Missing optional field fallback ve additional/raw field sinirlari formatter'in presentation layer olarak kaldigini gostermek icin test edilir.
+- `build_export_result_report(...)` contract regression testi, formatter test standardizasyonunun report builder davranisini degistirmedigini sabitler.
+- Formatter davranisi genisletilmez; `app/models.py` degistirilmez.
+- Dosya yazma, export ciktisi, hard validation, generated `blocked` status, API/GUI/CLI, database/repository erisimi, audit event ve backup/restore kapsam disidir.
+
 ## 176 Export Result Report Markdown Formatter Usage Karari
 
 - Adim 176, `format_export_result_report_as_markdown(report)` helper'i icin usage boundary ve edge case standardini documentation-only olarak belirler.

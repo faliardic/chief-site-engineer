@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 177
+
+- Added test/example standardization for `format_export_result_report_as_markdown(report)` without changing formatter behavior.
+- Added stable Markdown examples for success-only, failure-only, and empty zero-count report outputs.
+- Added tests for missing optional field fallback, additional/raw field presentation boundaries, and `build_export_result_report(...)` contract regression.
+- Documented that `app/models.py` was not changed and the formatter remains read-only, non-validating, no-file-writing, no-export-output, and no-recomputation.
+- Kept hard validation, generated `blocked` status, API/GUI/CLI, database/repository access, audit events, backup/restore, commit, push, and ZIP/cache staging out of scope.
+
 ## Step 176
 
 - Added documentation-only usage and edge case standardization for `format_export_result_report_as_markdown(report)`.

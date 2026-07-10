@@ -1936,6 +1936,194 @@ def test_format_export_result_report_as_markdown_keeps_mixed_visibility(
     assert "Export was not written because the target file exists." in markdown
 
 
+def test_format_export_result_report_as_markdown_success_example_is_stable() -> None:
+    report = {
+        "operation": "export_result_report",
+        "status": "success",
+        "total_count": 1,
+        "success_count": 1,
+        "review_count": 0,
+        "unknown_count": 0,
+        "safe_for_user_message": "All export results completed.",
+        "items": [
+            {
+                "status": "success",
+                "safe_for_user_message": "json export completed.",
+                "file_type": "json",
+                "path": "exports/report.json",
+                "output_path": "exports/report.json",
+                "attempted_path": "exports/report.json",
+                "overwritten": False,
+            }
+        ],
+    }
+
+    markdown = format_export_result_report_as_markdown(report)
+
+    assert markdown == (
+        "# Export Result Report\n"
+        "\n"
+        "## Summary\n"
+        "- Status: success\n"
+        "- Total: 1\n"
+        "- Success: 1\n"
+        "- Failure/review: 0\n"
+        "- Unknown: 0\n"
+        "- Message: All export results completed.\n"
+        "\n"
+        "## Items\n"
+        "1. success - json export completed.\n"
+        "   - File type: json\n"
+        "   - Path: exports/report.json\n"
+        "   - Output path: exports/report.json\n"
+        "   - Attempted path: exports/report.json\n"
+        "   - Overwritten: no\n"
+        "\n"
+        "## Notes\n"
+        "- Read-only presentation formatter.\n"
+        "- No files are written and no export output is created.\n"
+        "- Report data is not recalculated and hard validation is not performed.\n"
+    )
+
+
+def test_format_export_result_report_as_markdown_failure_example_is_stable() -> None:
+    report = {
+        "operation": "export_result_report",
+        "status": "review",
+        "total_count": 1,
+        "success_count": 0,
+        "review_count": 1,
+        "unknown_count": 0,
+        "safe_for_user_message": "One or more export results need review.",
+        "items": [
+            {
+                "status": "review",
+                "safe_for_user_message": (
+                    "Export was not written because the parent folder is missing."
+                ),
+                "file_type": "markdown",
+                "path": "exports/missing/report.md",
+                "attempted_path": "exports/missing/report.md",
+                "error_type": "parent_missing",
+                "technical_detail": "output_path parent directory does not exist",
+                "next_action_hint": "Review the export result before using the output.",
+                "overwritten": False,
+            }
+        ],
+    }
+
+    markdown = format_export_result_report_as_markdown(report)
+
+    assert markdown == (
+        "# Export Result Report\n"
+        "\n"
+        "## Summary\n"
+        "- Status: review\n"
+        "- Total: 1\n"
+        "- Success: 0\n"
+        "- Failure/review: 1\n"
+        "- Unknown: 0\n"
+        "- Message: One or more export results need review.\n"
+        "\n"
+        "## Items\n"
+        "1. review - Export was not written because the parent folder is missing.\n"
+        "   - File type: markdown\n"
+        "   - Path: exports/missing/report.md\n"
+        "   - Attempted path: exports/missing/report.md\n"
+        "   - Error type: parent_missing\n"
+        "   - Technical detail: output_path parent directory does not exist\n"
+        "   - Next action: Review the export result before using the output.\n"
+        "   - Overwritten: no\n"
+        "\n"
+        "## Notes\n"
+        "- Read-only presentation formatter.\n"
+        "- No files are written and no export output is created.\n"
+        "- Report data is not recalculated and hard validation is not performed.\n"
+    )
+
+
+def test_format_export_result_report_as_markdown_empty_report_example_is_stable() -> None:
+    report = {
+        "operation": "export_result_report",
+        "status": "unknown",
+        "total_count": 0,
+        "success_count": 0,
+        "review_count": 0,
+        "unknown_count": 0,
+        "safe_for_user_message": "No export results were provided.",
+        "items": [],
+    }
+
+    markdown = format_export_result_report_as_markdown(report)
+
+    assert markdown == (
+        "# Export Result Report\n"
+        "\n"
+        "## Summary\n"
+        "- Status: unknown\n"
+        "- Total: 0\n"
+        "- Success: 0\n"
+        "- Failure/review: 0\n"
+        "- Unknown: 0\n"
+        "- Message: No export results were provided.\n"
+        "\n"
+        "## Items\n"
+        "- No export result items.\n"
+        "\n"
+        "## Notes\n"
+        "- Read-only presentation formatter.\n"
+        "- No files are written and no export output is created.\n"
+        "- Report data is not recalculated and hard validation is not performed.\n"
+    )
+
+
+def test_format_export_result_report_as_markdown_missing_optional_fields_fallback() -> None:
+    report = {
+        "operation": "export_result_report",
+        "status": "review",
+        "items": [{"status": "review"}],
+    }
+
+    markdown = format_export_result_report_as_markdown(report)
+
+    assert "- Total: not available" in markdown
+    assert "- Success: not available" in markdown
+    assert "- Failure/review: not available" in markdown
+    assert "- Message: not available" in markdown
+    assert "1. review - Export result item has no message." in markdown
+    assert "   - File type: not available" in markdown
+    assert "   - Path: not available" in markdown
+
+
+def test_format_export_result_report_as_markdown_ignores_additional_fields() -> None:
+    report = {
+        "operation": "export_result_report",
+        "status": "review",
+        "total_count": 1,
+        "success_count": 0,
+        "review_count": 1,
+        "unknown_count": 0,
+        "safe_for_user_message": "Existing report message.",
+        "unexpected_report_field": "do not render",
+        "items": [
+            {
+                "status": "review",
+                "safe_for_user_message": "Prebuilt review message.",
+                "path": "exports/review.md",
+                "unexpected_item_field": "do not render",
+                "error_code": "raw_contract_field_not_rendered",
+            }
+        ],
+    }
+
+    markdown = format_export_result_report_as_markdown(report)
+
+    assert "Prebuilt review message." in markdown
+    assert "exports/review.md" in markdown
+    assert "do not render" not in markdown
+    assert "raw_contract_field_not_rendered" not in markdown
+
+
 def test_format_export_result_report_as_markdown_does_not_mutate_input(
     tmp_path,
 ) -> None:
@@ -2066,6 +2254,33 @@ def test_format_export_result_summary_as_markdown_report_regression(
     assert markdown.startswith("# Export Result Report\n")
     assert "- Status: success" in markdown
     assert "1. success - json export completed." in markdown
+
+
+def test_build_export_result_report_contract_regression(tmp_path) -> None:
+    output_path = tmp_path / "regression.json"
+
+    report = build_export_result_report(
+        [
+            {
+                "success": True,
+                "output_path": output_path,
+                "attempted_path": output_path,
+                "file_type": "json",
+                "overwritten": False,
+            }
+        ]
+    )
+
+    assert report["operation"] == "export_result_report"
+    assert report["status"] == "success"
+    assert report["total_count"] == 1
+    assert report["success_count"] == 1
+    assert report["review_count"] == 0
+    assert report["unknown_count"] == 0
+    assert report["safe_for_user_message"] == "All export results completed."
+    assert report["items"][0]["operation"] == "export_result_summary"
+    assert report["items"][0]["status"] == "success"
+    assert report["items"][0]["path"] == str(output_path)
 
 
 def test_export_result_summary_helpers_do_not_write_files(tmp_path) -> None:
