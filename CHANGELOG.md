@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 186
+
+- Added test/example standardization for `build_export_handover_qc_review_checklist(summary, report)` without expanding helper behavior.
+- Added regression examples for the top-level checklist contract, summary block fields, item block fields, explanatory `review_notes`, `requires_human_review` not implying blocking, stable `is_read_only=True`, stable `is_blocking=False`, no generated `blocked` status, and summary Markdown formatter preservation.
+- Confirmed existing success-only, failure-only, mixed, empty/zero-count, missing optional field, unknown/additional field, JSON-ready output, item visibility, input immutability, no file writing, no export output, no hard validation, and existing helper regression coverage remains aligned with the Step 184 contract.
+- Documented that the checklist helper remains read-only, JSON-ready, non-blocking, non-validating, and presentation/QC visibility only.
+- Kept `app/models.py` unchanged; no helper behavior changes, API/GUI/CLI, database/repository access, audit event, backup/restore, export output, hard validation, `blocked` status, commit, push, or ZIP/cache staging was added.
+
 ## Step 185
 
 - Added documentation-only usage and edge case standardization for `build_export_handover_qc_review_checklist(summary, report)`.

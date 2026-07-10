@@ -1,5 +1,14 @@
 # Proje Kararlari
 
+## 186 Export / Handover QC Checklist Helper Test Example Karari
+
+- Adim 186, `build_export_handover_qc_review_checklist(summary, report)` helper'i icin test/example standardini guclendirir.
+- Helper davranisi genisletilmez; `app/models.py` degistirilmez.
+- Testler top-level checklist contract, summary alan seti, item alan seti, `review_notes` aciklayici siniri, `requires_human_review` alaninin bloklama anlamina gelmemesi, `is_read_only=True`, `is_blocking=False` ve generated `blocked` status uretilmemesi konularini sabitler.
+- `format_export_result_summary_as_markdown(...)` davranisi regression testiyle korunur; mevcut summary/report/formatter/write/try_write helper zinciri degistirilmez.
+- Checklist output JSON-ready, read-only ve presentation/QC visibility katmani olarak kalir; resmi kabul, resmi ret, otomatik bloklama, hard validation veya audit event degildir.
+- API/GUI/CLI, database/repository erisimi, backup/restore, export ciktisi, hard validation ve `blocked` status kapsam disidir.
+
 ## 185 Export / Handover QC Checklist Helper Usage Karari
 
 - Adim 185, `build_export_handover_qc_review_checklist(summary, report)` helper'inin usage boundary ve edge case okuma standardini documentation-only olarak netlestirir.
