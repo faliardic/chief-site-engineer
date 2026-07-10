@@ -1,5 +1,15 @@
 # Proje Kararlari
 
+## 185 Export / Handover QC Checklist Helper Usage Karari
+
+- Adim 185, `build_export_handover_qc_review_checklist(summary, report)` helper'inin usage boundary ve edge case okuma standardini documentation-only olarak netlestirir.
+- Helper input olarak `build_export_result_summary(...)` ve `build_export_result_report(...)` ciktilari olan structured dict'leri bekler; formatter Markdown source of truth olarak parse edilmez.
+- Output `checklist_type`, `status`, `summary`, `items`, `review_notes`, `is_read_only`, `is_blocking` ve `requires_human_review` alanlariyla JSON-ready checklist dict olarak okunur.
+- `is_read_only=True`, `is_blocking=False` ve `requires_human_review` alanlari QC gorunurluk sinyalidir; resmi kabul, resmi ret, otomatik bloklama, hard validation veya generated `blocked` status degildir.
+- Success-only, failure-only, mixed, empty/zero-count, missing optional field ve unknown/additional field durumlari insan incelemesini destekleyen gorunurluk olarak standardize edilir; yeni business rule veya karar otoritesi turetilmez.
+- Helper dosya yazmaz, export uretmez, `exports/` altina cikti birakmaz, database/repository erisimi yapmaz, audit event uretmez, API/GUI/CLI veya backup/restore eklemez.
+- Existing `build_export_result_summary(...)`, `build_export_result_report(...)`, `format_export_result_report_as_markdown(...)`, `format_export_result_summary_as_markdown(...)`, `write_*` ve `try_write_*` davranislari korunur.
+
 ## 184 Export / Handover QC Checklist Helper Implementation Karari
 
 - Adim 184, `build_export_handover_qc_review_checklist(summary, report)` helper'ini read-only QC helper olarak ekler.

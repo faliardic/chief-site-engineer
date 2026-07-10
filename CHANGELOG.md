@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 185
+
+- Added documentation-only usage and edge case standardization for `build_export_handover_qc_review_checklist(summary, report)`.
+- Documented that the helper expects `build_export_result_summary(...)` and `build_export_result_report(...)` dict outputs and returns a JSON-ready checklist dict with `checklist_type`, `status`, `summary`, `items`, `review_notes`, `is_read_only`, `is_blocking`, and `requires_human_review`.
+- Clarified that `is_read_only=True`, `is_blocking=False`, and `requires_human_review` are QC visibility signals, not automatic approval, rejection, blocking, hard validation, or `blocked` status.
+- Standardized success-only, failure-only, mixed, empty/zero-count, missing optional field, and unknown/additional field reading for handover QC review.
+- Reiterated that the helper does not write files, create exports, access database/repository state, create audit events, add API/GUI/CLI behavior, run backup/restore, or change existing summary/report/formatter/write/try-write helper behavior.
+- Kept this as documentation-only; no code, tests, helper behavior changes, export output, commit, push, or ZIP/cache staging was added.
+
 ## Step 184
 
 - Added the read-only `build_export_handover_qc_review_checklist(summary, report)` helper.
