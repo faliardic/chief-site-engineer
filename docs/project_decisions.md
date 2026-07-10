@@ -1,5 +1,15 @@
 # Proje Kararlari
 
+## 171 Export Result Summary/Report Usage Karari
+
+- Adim 170 helperlari read-only yorumlama katmani olarak kullanilacak.
+- `build_export_result_summary(...)` tek export result contract icin okunabilir summary uretir.
+- `build_export_result_report(...)` birden fazla result contract icin toplu rapor uretir.
+- `format_export_result_summary_as_markdown(...)` summary/report dict'ini okunabilir Markdown metnine cevirir.
+- Bu helperlar dosya yazmaz, export helper cagirmaya baslamaz, path safety kararini yeniden hesaplamaz ve wrapper result contract'i degistirmez.
+- Bu helperlar dusuk seviye `write_*` helperlarin yerine gecmez; sadece wrapper sonucunu handover QC, rapor veya admin/debug gorunurlugu icin yorumlar.
+- Failure sonucu review/attention bilgisi olarak okunur; otomatik devir paketi bloklama, kayit gecersiz kilma, hard validation, `blocked` status, audit event, backup/restore, API, GUI, CLI veya database/repository davranisi uretilmez.
+
 ## 170 Export Result Summary/Report Helper Karari
 
 - Export result summary/report katmani mevcut wrapper result contract dict'lerini okuyan read-only bir yorumlama katmani olarak eklendi.

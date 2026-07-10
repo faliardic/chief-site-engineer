@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 170 - Export Result Summary Report Helper Implementation
+Adim 171 - Export Result Summary Report Helper Usage Documentation
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -79,6 +79,8 @@ Adim 158'de Adim 157 result contract planinin ileride nasil uygulanabilecegi doc
 Adim 159'da future export helper result contract implementasyonu oncesi test matrix documentation-only olarak planlandi; basari result alanlari, JSON/Markdown input testleri, path safety, overwrite policy, IO/permission, boundary regression ve handover QC test beklentileri netlestirildi. Yeni kod/test, result contract implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 
 Adim 170'te export wrapper result contract verisini okuyan summary/report helper katmani eklendi. `build_export_result_summary(...)`, `build_export_result_report(...)` ve `format_export_result_summary_as_markdown(...)` helperlari dosya yazmadan, export helper cagirmadan ve path safety tekrar hesaplamadan mevcut result contract'lari okunabilir ozet ve rapora cevirir. Test kapsami 342'den 352'ye yukseldi; hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event ve export ciktisi eklenmedi.
+
+Adim 171'de Adim 170 helperlarinin kullanim siniri documentation-only olarak belgelendi. Tekil success/failure result contract yorumlama, coklu report toplama, Markdown metin uretimi, handover QC review yorumu ve admin/debug teknik detay ayrimi anlatildi. Kod/test degistirilmedi; export ciktisi, hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event, commit ve push eklenmedi.
 
 Adim 160'da mevcut exception tabanli file-writing helper davranisini bozmadan future result contract wrapper API boundary documentation-only olarak planlandi; `write_*` helperlarin korunmasi, olasi `try_write_*` wrapper isimleri, result alanlari, error mapping, geriye uyumluluk ve handover QC gorunurlugu netlestirildi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 

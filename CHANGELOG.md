@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 171
+
+- Added documentation-only usage guidance for the Step 170 read-only export result summary/report helper layer.
+- Documented the intended use of `build_export_result_summary(...)`, `build_export_result_report(...)`, and `format_export_result_summary_as_markdown(...)`.
+- Clarified that these helpers interpret existing wrapper result contracts, do not write files, do not call export helpers, do not recompute path safety, and do not replace low-level `write_*` helpers.
+- Added usage scenarios for single success summaries, failure user messages, multi-result reports, handover QC review visibility, admin/debug technical detail, and Markdown use in upper-layer notes.
+- Reiterated that failure summaries mean review/attention, not automatic package blocking, invalid records, hard validation, audit events, backup/restore, API/GUI/CLI integration, database/repository writes, export output files, or `blocked` status.
+- Kept this as documentation-only; no code, tests, helper behavior changes, export output, commit, push, or ZIP/cache staging was added.
+
 ## Step 170
 
 - Added read-only export result summary/report helper foundations for the existing wrapper result contracts.
