@@ -1,5 +1,15 @@
 # Proje Kararlari
 
+## 187 Export / Handover QC Checklist Downstream Boundary Karari
+
+- Adim 187, `build_export_handover_qc_review_checklist(summary, report)` helper ciktisinin downstream formatter ve consumer sinirini documentation-only olarak planlar.
+- Checklist output JSON-ready dict olarak kalir; future Markdown formatter, handover QC ekrani, export review akisi veya GUI/API/CLI consumer tarafindan yalniz presentation/QC visibility icin okunabilir.
+- Downstream consumer'lar `is_read_only=True`, `is_blocking=False` ve `requires_human_review` alanlarinin non-blocking anlamini korumalidir.
+- Checklist item'lari insan incelemesi icindir; success gorunurlugu resmi kabul/onay, failure veya mixed gorunurluk otomatik ret ya da bloklama degildir.
+- Future Markdown formatter veya GUI/API/CLI entegrasyonu gerekiyorsa ayri adim, ayri test ve ayri dokumantasyonla ele alinacaktir.
+- Database/repository erisimi, audit event, backup/restore, export ciktisi, hard validation ve generated `blocked` status kapsam disidir.
+- Existing `build_export_handover_qc_review_checklist(...)`, `build_export_result_summary(...)`, `build_export_result_report(...)`, `format_export_result_report_as_markdown(...)`, `format_export_result_summary_as_markdown(...)`, `write_*` ve `try_write_*` davranislari korunur; downstream consumer'lar checklist output'unu mutate etmemelidir.
+
 ## 186 Export / Handover QC Checklist Helper Test Example Karari
 
 - Adim 186, `build_export_handover_qc_review_checklist(summary, report)` helper'i icin test/example standardini guclendirir.

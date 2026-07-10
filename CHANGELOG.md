@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 187
+
+- Added documentation-only downstream formatter and consumer boundary planning for `build_export_handover_qc_review_checklist(summary, report)` output.
+- Documented that the checklist output remains a JSON-ready dict that future Markdown formatter, handover QC screen, export review workflow, GUI, API, or CLI consumers may read only for presentation/QC visibility.
+- Clarified that downstream consumers must preserve `is_read_only=True`, `is_blocking=False`, and the non-blocking meaning of `requires_human_review`.
+- Reiterated that success visibility is not official acceptance, failure/mixed visibility is not automatic rejection or blocking, and checklist items are for human review.
+- Kept this as documentation-only; no code, tests, formatter, API/GUI/CLI, database/repository access, audit event, backup/restore, export output, hard validation, `blocked` status, commit, push, or ZIP/cache staging was added.
+
 ## Step 186
 
 - Added test/example standardization for `build_export_handover_qc_review_checklist(summary, report)` without expanding helper behavior.
