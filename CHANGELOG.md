@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 174
+
+- Added a documentation-only API boundary and test matrix plan for a future export result report Markdown formatter.
+- Planned the possible future helper `format_export_result_report_as_markdown(report)` as a presentation-safe Markdown string formatter for `build_export_result_report(...)` output.
+- Clarified that the planned formatter should not write files, create exports, access database/repository state, recompute summary/report data, mutate input, trigger hard validation, produce `blocked` status, or change `write_*` / `try_write_*` behavior.
+- Documented future test categories for empty reports, all-success reports, mixed success/failure reports, missing optional fields, unknown status, path visibility, error message visibility, input immutability, no recomputation, Markdown string output, no file writing, and no `blocked` status.
+- Recommended Step 175 as read-only export result report Markdown formatter implementation without starting it.
+- Kept this as documentation-only; no code, tests, helper behavior changes, export output, Podcast 029, backup/restore/API/GUI/CLI, database/repository behavior, commit, push, or ZIP/cache staging was added.
+
 ## Step 173
 
 - Added a documentation-only follow-up plan for the export result summary/report helper line after Step 168-172.

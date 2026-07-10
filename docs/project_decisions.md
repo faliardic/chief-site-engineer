@@ -1,5 +1,15 @@
 # Proje Kararlari
 
+## 174 Export Result Report Formatter API Boundary Karari
+
+- Adim 174, future `format_export_result_report_as_markdown(report)` helper'i icin API boundary ve test matrix'i documentation-only olarak planlar.
+- Planlanan helper yalniz `build_export_result_report(...)` ciktisi olan dict'i input olarak alip presentation-safe Markdown string dondurebilir; bu adimda implementasyon yapilmaz.
+- Helper dosya yazmayacak, export uretmeyecek, database/repository erisimi yapmayacak, diagnostic veya soft validation sonucu uretmeyecek, summary/report sonucunu yeniden hesaplamayacak ve input dict'i mutate etmeyecek.
+- Markdown cikti baslik, overall status, success/failure count, path gorunurlugu, error message gorunurlugu, result contract item listesi, human review note ve hard validation olmadigi bilgisini gosterebilir.
+- Future test matrix empty report, all success, mixed success/failure, missing optional fields, unknown status, path visibility, error message visibility, input immutability, no recomputation, Markdown string output, no `blocked` status, no file writing, low-level `write_*` davranisini koruma ve `try_write_*` wrapper davranisini koruma basliklarini kapsayabilir.
+- Hard validation, `blocked` status, backup/restore, database/repository, API/GUI/CLI, export cikti dosyasi, helper davranisi degisikligi, Podcast 029 ve ZIP/cache/export staging kapsam disidir.
+- Onerilen sonraki adim Adim 175 - Read-only export result report markdown formatter implementation olarak kaydedildi; Adim 175 bu adimda baslatilmaz.
+
 ## 173 Export Result Summary/Report Follow-up Karari
 
 - Adim 173, Adim 168-172 araliginda kurulan export result summary/report helper hatti sonrasi follow-up yonunu documentation-only olarak planlar.
