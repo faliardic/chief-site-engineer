@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 165
+
+- Added documentation-only usage examples and boundary/example standards for the result contract wrapper helpers.
+- Documented when to prefer `try_write_json_ready_dict_to_file(...)` / `try_write_markdown_text_to_file(...)` for readable result contracts and when low-level `write_json_ready_dict_to_file(...)` / `write_markdown_text_to_file(...)` exception behavior may still be appropriate.
+- Added example interpretations for successful JSON export, successful Markdown export, invalid/unsafe paths, overwrite policy, missing parent directories, JSON serialization errors, invalid Markdown input, user-facing summary messages, and handover QC summary usage.
+- Documented future test example names for wrapper success/error contracts, mutation boundaries, and low-level helper exception behavior without adding or changing tests.
+- Kept this as documentation-only; no application code, tests, helper behavior changes, existing test matrix changes, JSON/Markdown export output, backup/restore behavior, database/repository/API/GUI/CLI, audit event creation, hard validation, `blocked` status, commit, push, or ZIP/cache staging was added.
+
 ## Podcast 027
 
 - Added a documentation-only NotebookLM podcast note for Step 157-161.
