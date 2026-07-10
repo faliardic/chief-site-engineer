@@ -56,9 +56,12 @@ from app.models import (
     TaskCandidateRecord,
     TrackingRecord,
     WorkforceRecord,
+    build_export_result_report,
+    build_export_result_summary,
     build_record_id_diagnostic_report,
     build_record_id_soft_validation_report,
     diagnose_record_id_for_target_type,
+    format_export_result_summary_as_markdown,
     format_record_id_diagnostic_report_as_json_ready_dict,
     format_record_id_diagnostic_report_as_markdown,
     format_record_id_soft_validation_report_as_json_ready_dict,
@@ -1655,6 +1658,225 @@ def test_try_write_helpers_keep_existing_exception_helpers_unchanged(tmp_path) -
 
     with pytest.raises(ValueError, match=".md"):
         write_markdown_text_to_file("# Summary", tmp_path / "out.json")
+
+
+def test_build_export_result_summary_returns_success_summary(tmp_path) -> None:
+    output_path = tmp_path / "summary.json"
+    contract = {
+        "success": True,
+        "output_path": output_path,
+        "attempted_path": output_path,
+        "allowed_root": tmp_path,
+        "file_type": "json",
+        "error_code": None,
+        "error_message": None,
+        "skipped_reason": None,
+        "overwritten": False,
+    }
+
+    summary = build_export_result_summary(contract)
+
+    assert summary["operation"] == "export_result_summary"
+    assert summary["status"] == "success"
+    assert summary["success"] is True
+    assert summary["file_type"] == "json"
+    assert summary["path"] == str(output_path)
+    assert summary["allowed_root"] == str(tmp_path)
+    assert summary["error_type"] is None
+    assert summary["safe_for_user_message"] == "json export completed."
+    assert summary["technical_detail"] is None
+    assert summary["next_action_hint"] is None
+
+
+def test_build_export_result_summary_returns_failure_summary(tmp_path) -> None:
+    output_path = tmp_path / "summary.md"
+    contract = {
+        "success": False,
+        "output_path": None,
+        "attempted_path": output_path,
+        "allowed_root": None,
+        "file_type": "markdown",
+        "error_code": "file_exists",
+        "error_message": "output_path already exists",
+        "skipped_reason": "file_exists",
+        "overwritten": False,
+    }
+
+    summary = build_export_result_summary(contract)
+
+    assert summary["status"] == "review"
+    assert summary["success"] is False
+    assert summary["path"] == str(output_path)
+    assert summary["error_type"] == "file_exists"
+    assert (
+        summary["safe_for_user_message"]
+        == "Export was not written because the target file exists."
+    )
+    assert summary["technical_detail"] == "output_path already exists"
+    assert summary["next_action_hint"] == (
+        "Review the export result before using the output."
+    )
+
+
+def test_build_export_result_summary_handles_unknown_status(tmp_path) -> None:
+    contract = {
+        "output_path": None,
+        "attempted_path": tmp_path / "maybe.json",
+        "file_type": "json",
+    }
+
+    summary = build_export_result_summary(contract)
+
+    assert summary["status"] == "unknown"
+    assert summary["success"] is None
+    assert summary["path"] == str(tmp_path / "maybe.json")
+    assert summary["error_type"] == "unknown_status"
+    assert summary["safe_for_user_message"] == "Export result could not be interpreted."
+    assert summary["next_action_hint"] == "Review the raw export result contract."
+
+
+def test_build_export_result_summary_handles_missing_optional_fields() -> None:
+    summary = build_export_result_summary({"success": True})
+
+    assert summary["status"] == "success"
+    assert summary["success"] is True
+    assert summary["file_type"] is None
+    assert summary["path"] is None
+    assert summary["output_path"] is None
+    assert summary["attempted_path"] is None
+    assert summary["allowed_root"] is None
+    assert summary["overwritten"] is False
+
+
+def test_build_export_result_report_counts_mixed_result_list_in_order(tmp_path) -> None:
+    success_contract = {
+        "success": True,
+        "output_path": tmp_path / "ok.json",
+        "attempted_path": tmp_path / "ok.json",
+        "file_type": "json",
+        "overwritten": False,
+    }
+    failure_contract = {
+        "success": False,
+        "output_path": None,
+        "attempted_path": tmp_path / "missing.md",
+        "file_type": "markdown",
+        "error_code": "parent_missing",
+        "error_message": "output_path parent directory does not exist",
+        "overwritten": False,
+    }
+    unknown_contract = {"file_type": "json"}
+
+    report = build_export_result_report(
+        [success_contract, failure_contract, unknown_contract]
+    )
+
+    assert report["operation"] == "export_result_report"
+    assert report["status"] == "review"
+    assert report["total_count"] == 3
+    assert report["success_count"] == 1
+    assert report["review_count"] == 1
+    assert report["unknown_count"] == 1
+    assert [item["status"] for item in report["items"]] == [
+        "success",
+        "review",
+        "unknown",
+    ]
+    assert report["safe_for_user_message"] == "One or more export results need review."
+
+
+def test_build_export_result_report_handles_unsupported_input() -> None:
+    report = build_export_result_report("not a result contract")
+
+    assert report["status"] == "review"
+    assert report["total_count"] == 1
+    assert report["success_count"] == 0
+    assert report["review_count"] == 0
+    assert report["unknown_count"] == 1
+    assert report["items"][0]["error_type"] == "unsupported_input"
+
+
+def test_export_result_summary_helpers_do_not_mutate_input(tmp_path) -> None:
+    contract = {
+        "success": False,
+        "output_path": None,
+        "attempted_path": tmp_path / "summary.json",
+        "file_type": "json",
+        "error_code": "wrong_extension",
+        "error_message": "output_path must use .json extension",
+        "details": {"keep": ["same"]},
+    }
+    original_contract = deepcopy(contract)
+
+    build_export_result_summary(contract)
+    build_export_result_report([contract])
+
+    assert contract == original_contract
+
+
+def test_format_export_result_summary_as_markdown_contains_safe_message(
+    tmp_path,
+) -> None:
+    summary = build_export_result_summary(
+        {
+            "success": False,
+            "output_path": None,
+            "attempted_path": tmp_path / "summary.md",
+            "file_type": "markdown",
+            "error_code": "parent_missing",
+            "error_message": "output_path parent directory does not exist",
+            "overwritten": False,
+        }
+    )
+
+    markdown = format_export_result_summary_as_markdown(summary)
+
+    assert markdown.startswith("# Export Result Summary\n")
+    assert "- Status: review" in markdown
+    assert "Export was not written because the parent folder is missing." in markdown
+    assert "- Error type: parent_missing" in markdown
+    assert "- Technical detail: output_path parent directory does not exist" in markdown
+
+
+def test_export_result_summary_helpers_do_not_write_files(tmp_path) -> None:
+    output_path = tmp_path / "summary.json"
+
+    summary = build_export_result_summary(
+        {
+            "success": True,
+            "output_path": output_path,
+            "attempted_path": output_path,
+            "file_type": "json",
+            "overwritten": False,
+        }
+    )
+    markdown = format_export_result_summary_as_markdown(summary)
+
+    assert summary["path"] == str(output_path)
+    assert markdown
+    assert not output_path.exists()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_export_result_summary_helpers_do_not_emit_blocked_status(tmp_path) -> None:
+    report = build_export_result_report(
+        [
+            {
+                "success": False,
+                "output_path": None,
+                "attempted_path": tmp_path / "summary.md",
+                "file_type": "markdown",
+                "error_code": "outside_allowed_root",
+                "error_message": "output_path must stay inside allowed_root",
+                "overwritten": False,
+            }
+        ]
+    )
+    markdown = format_export_result_summary_as_markdown(report)
+
+    assert report["status"] == "review"
+    assert "blocked" not in {item["status"] for item in report["items"]}
+    assert "blocked" not in markdown.lower()
 
 
 def test_file_writing_helpers_do_not_recompute_reports_or_formatters(tmp_path) -> None:

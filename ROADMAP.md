@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 169 - Export Result Summary Report API Boundary and Test Matrix Plan
+Adim 170 - Export Result Summary Report Helper Implementation
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -77,6 +77,8 @@ Adim 157'de Adim 155 read-only file writing helper'larinin error/result contract
 Adim 158'de Adim 157 result contract planinin ileride nasil uygulanabilecegi documentation-only olarak netlestirildi; mevcut exception tabanli helper davranisinin geriye uyumluluk icin korunmasi, result contract icin ayri wrapper/helper katmani, ortak JSON/Markdown result alanlari, path/input/overwrite/IO hata kodlari ve handover QC gorunurlugu belgelendi. Yeni kod/test, result contract implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 
 Adim 159'da future export helper result contract implementasyonu oncesi test matrix documentation-only olarak planlandi; basari result alanlari, JSON/Markdown input testleri, path safety, overwrite policy, IO/permission, boundary regression ve handover QC test beklentileri netlestirildi. Yeni kod/test, result contract implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
+
+Adim 170'te export wrapper result contract verisini okuyan summary/report helper katmani eklendi. `build_export_result_summary(...)`, `build_export_result_report(...)` ve `format_export_result_summary_as_markdown(...)` helperlari dosya yazmadan, export helper cagirmadan ve path safety tekrar hesaplamadan mevcut result contract'lari okunabilir ozet ve rapora cevirir. Test kapsami 342'den 352'ye yukseldi; hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event ve export ciktisi eklenmedi.
 
 Adim 160'da mevcut exception tabanli file-writing helper davranisini bozmadan future result contract wrapper API boundary documentation-only olarak planlandi; `write_*` helperlarin korunmasi, olasi `try_write_*` wrapper isimleri, result alanlari, error mapping, geriye uyumluluk ve handover QC gorunurlugu netlestirildi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 

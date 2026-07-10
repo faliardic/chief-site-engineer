@@ -1,5 +1,15 @@
 # Changelog
 
+## Step 170
+
+- Added read-only export result summary/report helper foundations for the existing wrapper result contracts.
+- Added `build_export_result_summary(...)` to translate a single wrapper result contract into a JSON-ready, user-facing summary with `success`, `review`, or `unknown` status.
+- Added `build_export_result_report(...)` to aggregate multiple wrapper result contracts without calling export helpers, writing files, or recomputing path safety.
+- Added `format_export_result_summary_as_markdown(...)` to render a summary or report as Markdown text without creating export output files.
+- Added tests for success summaries, failure summaries, unknown status, missing optional fields, mixed report lists, unsupported input, input immutability, safe Markdown messages, no file writing, and no `blocked` status.
+- Added Step 170 implementation documentation and learning notes.
+- Kept low-level write helper behavior, wrapper result contract behavior, backup/restore behavior, database/repository/API/GUI/CLI, audit event creation, hard validation, export output files, commit, push, and ZIP/cache staging out of scope.
+
 ## Step 169
 
 - Added a documentation-only API boundary and future test matrix plan for the export result summary/report layer.

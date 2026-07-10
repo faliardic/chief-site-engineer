@@ -1529,6 +1529,195 @@ def try_write_markdown_text_to_file(
     )
 
 
+def _export_summary_string(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)
+
+
+def _export_summary_status(success: object) -> str:
+    if success is True:
+        return "success"
+    if success is False:
+        return "review"
+    return "unknown"
+
+
+def _export_summary_user_message(
+    *,
+    status: str,
+    error_type: str | None,
+    file_type: str | None,
+) -> str:
+    file_label = file_type or "export"
+    if status == "success":
+        return f"{file_label} export completed."
+
+    messages = {
+        "file_exists": "Export was not written because the target file exists.",
+        "parent_missing": "Export was not written because the parent folder is missing.",
+        "outside_allowed_root": "Export was not written outside the allowed root.",
+        "path_traversal": "Export was not written because the path is unsafe.",
+        "wrong_extension": "Export was not written because the extension is not valid.",
+        "input_type_error": "Export was not written because the input type is not valid.",
+        "serialization_error": "Export was not written because the data is not JSON-ready.",
+    }
+    if error_type in messages:
+        return messages[error_type]
+    if status == "review":
+        return "Export result needs review."
+    return "Export result could not be interpreted."
+
+
+def build_export_result_summary(result_contract: object) -> dict[str, object]:
+    """Build a read-only user-facing summary from one export result contract."""
+
+    if not isinstance(result_contract, dict):
+        return {
+            "operation": "export_result_summary",
+            "status": "unknown",
+            "success": None,
+            "file_type": None,
+            "path": None,
+            "output_path": None,
+            "attempted_path": None,
+            "allowed_root": None,
+            "error_type": "unsupported_input",
+            "safe_for_user_message": "Export result could not be interpreted.",
+            "technical_detail": "Expected an export result contract dict.",
+            "next_action_hint": "Review the caller input before showing this summary.",
+            "overwritten": False,
+        }
+
+    success = result_contract.get("success")
+    status = _export_summary_status(success)
+    file_type = _export_summary_string(result_contract.get("file_type"))
+    output_path = _export_summary_string(result_contract.get("output_path"))
+    attempted_path = _export_summary_string(result_contract.get("attempted_path"))
+    allowed_root = _export_summary_string(result_contract.get("allowed_root"))
+    error_type = _export_summary_string(result_contract.get("error_code"))
+    error_message = _export_summary_string(result_contract.get("error_message"))
+    skipped_reason = _export_summary_string(result_contract.get("skipped_reason"))
+    path = output_path or attempted_path
+
+    if status == "success":
+        technical_detail = None
+        next_action_hint = None
+    elif status == "review":
+        technical_detail = error_message or skipped_reason
+        next_action_hint = "Review the export result before using the output."
+    else:
+        technical_detail = error_message or skipped_reason
+        error_type = error_type or "unknown_status"
+        next_action_hint = "Review the raw export result contract."
+
+    return {
+        "operation": "export_result_summary",
+        "status": status,
+        "success": success if isinstance(success, bool) else None,
+        "file_type": file_type,
+        "path": path,
+        "output_path": output_path,
+        "attempted_path": attempted_path,
+        "allowed_root": allowed_root,
+        "error_type": error_type,
+        "safe_for_user_message": _export_summary_user_message(
+            status=status,
+            error_type=error_type,
+            file_type=file_type,
+        ),
+        "technical_detail": technical_detail,
+        "next_action_hint": next_action_hint,
+        "overwritten": bool(result_contract.get("overwritten", False)),
+    }
+
+
+def build_export_result_report(result_contracts: object) -> dict[str, object]:
+    """Build a read-only aggregate report from export result contracts."""
+
+    if not isinstance(result_contracts, (list, tuple)):
+        items = [build_export_result_summary(result_contracts)]
+    else:
+        items = [
+            build_export_result_summary(result_contract)
+            for result_contract in result_contracts
+        ]
+
+    success_count = sum(1 for item in items if item["status"] == "success")
+    review_count = sum(1 for item in items if item["status"] == "review")
+    unknown_count = sum(1 for item in items if item["status"] == "unknown")
+    total_count = len(items)
+
+    if total_count == 0:
+        status = "unknown"
+        message = "No export results were provided."
+    elif review_count or unknown_count:
+        status = "review"
+        message = "One or more export results need review."
+    else:
+        status = "success"
+        message = "All export results completed."
+
+    return {
+        "operation": "export_result_report",
+        "status": status,
+        "total_count": total_count,
+        "success_count": success_count,
+        "review_count": review_count,
+        "unknown_count": unknown_count,
+        "items": items,
+        "safe_for_user_message": message,
+    }
+
+
+def format_export_result_summary_as_markdown(summary: object) -> str:
+    """Format a summary or report dict as Markdown without writing a file."""
+
+    if not isinstance(summary, dict):
+        summary = build_export_result_summary(summary)
+
+    if summary.get("operation") == "export_result_report":
+        lines = [
+            "# Export Result Report",
+            "",
+            f"- Status: {summary.get('status')}",
+            f"- Total: {summary.get('total_count')}",
+            f"- Success: {summary.get('success_count')}",
+            f"- Review: {summary.get('review_count')}",
+            f"- Unknown: {summary.get('unknown_count')}",
+            f"- Message: {summary.get('safe_for_user_message')}",
+        ]
+        items = summary.get("items", [])
+        if isinstance(items, list) and items:
+            lines.extend(["", "## Items"])
+            for index, item in enumerate(items, start=1):
+                if not isinstance(item, dict):
+                    item = build_export_result_summary(item)
+                item_message = item.get("safe_for_user_message")
+                item_path = item.get("path") or "not available"
+                lines.append(
+                    f"{index}. {item.get('status')} - {item_message} "
+                    f"(path: {item_path})"
+                )
+        return "\n".join(lines) + "\n"
+
+    lines = [
+        "# Export Result Summary",
+        "",
+        f"- Status: {summary.get('status')}",
+        f"- File type: {summary.get('file_type') or 'not available'}",
+        f"- Path: {summary.get('path') or 'not available'}",
+        f"- Message: {summary.get('safe_for_user_message')}",
+    ]
+    if summary.get("error_type"):
+        lines.append(f"- Error type: {summary.get('error_type')}")
+    if summary.get("technical_detail"):
+        lines.append(f"- Technical detail: {summary.get('technical_detail')}")
+    if summary.get("next_action_hint"):
+        lines.append(f"- Next action: {summary.get('next_action_hint')}")
+    return "\n".join(lines) + "\n"
+
+
 @dataclass
 class AuditEventRecord:
     """Represents a traceable audit event without persistence or automation."""

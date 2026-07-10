@@ -1,5 +1,14 @@
 # Proje Kararlari
 
+## 170 Export Result Summary/Report Helper Karari
+
+- Export result summary/report katmani mevcut wrapper result contract dict'lerini okuyan read-only bir yorumlama katmani olarak eklendi.
+- `build_export_result_summary(...)` tekil result contract'i `success`, `review` veya `unknown` durumlu JSON-ready ozet dict'e cevirir.
+- `build_export_result_report(...)` result contract listesini toplu rapora cevirir ve sirayi korur.
+- `format_export_result_summary_as_markdown(...)` summary veya report dict'ini Markdown metnine cevirir, fakat dosya yazmaz.
+- Bu katman export helper cagirmayacak, path safety hesaplamasini tekrarlamayacak, low-level `write_*` helper davranisini degistirmeyecek ve wrapper result contract davranisini replace etmeyecek.
+- Hata/uyari durumlari kullaniciya okunabilir mesaj olarak aktarilir; buna ragmen hard validation, `blocked` status, audit event, backup/restore, API, GUI, CLI veya otomasyon uretilmez.
+
 ## 001 Repo ve Calisma Anlasmalari
 
 - Ilk adimda framework eklenmeyecek.
