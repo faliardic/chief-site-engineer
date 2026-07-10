@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 181
+
+- Added documentation-only planning for an export / handover QC review checklist.
+- Documented how `build_export_result_summary(...)`, `build_export_result_report(...)`, and `format_export_result_report_as_markdown(report)` outputs can support a human-readable review checklist.
+- Clarified success, failure, mixed, empty, missing, and unknown field reading for handover QC without turning the checklist into official approval, rejection, automatic blocking, audit logging, export generation, or hard validation.
+- Reiterated the private workspace versus official handover/export package boundary and noted that future checklist helpers or formatter implementations must be separate tested/documented steps.
+- Kept this as documentation-only; no code, tests, helper behavior changes, GUI/API/CLI, database/repository access, audit event, backup/restore, export output, commit, push, or ZIP/cache staging was added.
+
 ## Podcast 029
 
 - Added a documentation-only NotebookLM podcast note for Step 167-180.

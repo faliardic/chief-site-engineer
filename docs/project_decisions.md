@@ -1,5 +1,14 @@
 # Proje Kararlari
 
+## 181 Export / Handover QC Review Checklist Karari
+
+- Adim 181, export result summary/report/formatter hattinin handover QC review checklist'e nasil baglanabilecegini documentation-only olarak planlar.
+- Checklist mevcut `build_export_result_summary(...)`, `build_export_result_report(...)` ve `format_export_result_report_as_markdown(report)` ciktilarini insan incelemesine tasiyan read-only QC katmani olarak konumlandirilir.
+- Checklist resmi kabul, resmi ret, otomatik bloklama, hard validation, `blocked` status, audit event, export generation, database/repository mutation veya backup/restore davranisi degildir.
+- Success itemlar olumlu gorunurluk, failure/review itemlar insan incelemesi, mixed reportlar oncelikli review siralamasi, empty/missing/unknown field durumlari eksik gorunurluk sinyali olarak okunur.
+- Yeni santiye sefi icin export-related success/review/path/error/next-action gorunurlugu planlanir; eski santiye sefinin ozel alani resmi handover/export paketinden ayridir.
+- Future checklist helper, formatter, GUI/API/CLI veya exportable checklist dosyasi gerekiyorsa ayri adim, ayri test ve ayri dokumantasyonla ele alinmalidir.
+
 ## Podcast 029 Kapsam Karari
 
 - Podcast 029, documentation-only NotebookLM podcast notu olarak yalniz Adim 167-180 araligini kapsar.

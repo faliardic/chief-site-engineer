@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Podcast 029 - Adim 167-180 NotebookLM Podcast Notu
+Adim 181 - Export / Handover QC Review Checklist Plan
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -101,6 +101,8 @@ Adim 179'da `format_export_result_report_as_markdown(report)` helper'i icin down
 Adim 180'de Adim 175-179 export result report formatter fazi documentation-only olarak kapatildi. `format_export_result_report_as_markdown(report)` helper'inin `build_export_result_report(...)` ciktisini read-only presentation-safe Markdown'a cevirdigi; dosya yazmadigi, export uretmedigi, input'u mutate etmedigi, report sonucunu yeniden hesaplamadigi ve build/summary/write/try_write helper davranislarini korudugu ozetlendi. Handover QC usage boundary, downstream integration boundary, success/failure/mixed/empty/missing/unknown field okuma standardi ve ara sonrasi guvenli baslangic kosullari belgelendi. Hard validation, `blocked` status, API/GUI/CLI, database/repository, audit, backup/restore, export ciktisi, kod/test/helper degisikligi, commit ve push eklenmedi. Adim 180 sonrasi yeni teknik adima baslanmamalidir.
 
 Podcast 029'da Adim 167-180 araligi NotebookLM icin ozetlendi; wrapper result contract integration boundary'den export result summary/report helper hattina, report formatter API boundary/implementation/usage/test example standardization'a, handover QC ve downstream integration boundary kararlarina ve Adim 180 faz kapanisina kadar olan hat anlatildi. Adim 181, yeni teknik faz, hard validation, `blocked` status, API/GUI/CLI implementation, database/repository erisimi, audit event, backup/restore ve export ciktisi kapsam disinda tutuldu.
+
+Adim 181'de export result summary/report/formatter hattinin handover QC surecinde read-only review checklist'e nasil donusebilecegi documentation-only olarak planlandi. `build_export_result_summary(...)`, `build_export_result_report(...)` ve `format_export_result_report_as_markdown(report)` ciktilarinin insan incelemesine nasil tasinabilecegi; success/failure/mixed/empty/missing/unknown field okumasi; yeni santiye sefi gorunurlugu; eski santiye sefinin ozel alani ile resmi handover/export paketi ayrimi ve checklist'in resmi kabul, otomatik bloklama, audit event, export generation veya hard validation olmadigi belgelendi. Kod/test/helper davranisi, API/GUI/CLI, database/repository, audit, backup/restore, export ciktisi, commit ve push eklenmedi.
 
 Adim 160'da mevcut exception tabanli file-writing helper davranisini bozmadan future result contract wrapper API boundary documentation-only olarak planlandi; `write_*` helperlarin korunmasi, olasi `try_write_*` wrapper isimleri, result alanlari, error mapping, geriye uyumluluk ve handover QC gorunurlugu netlestirildi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 
@@ -325,9 +327,10 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 - [x] Adim 179 - Export result report formatter downstream integration boundary plan; GUI/API/CLI ve review akislari icin presentation-layer entegrasyon siniri belgelendi.
 - [x] Adim 180 - Export result report formatter phase closure and next-step boundary; Adim 175-179 fazi documentation-only olarak kapatildi.
 - [x] Podcast 029 - Adim 167-180 NotebookLM podcast notu; wrapper result contract integration boundary'den report formatter phase closure'a kadar olan hat ozetlendi.
+- [x] Adim 181 - Export / handover QC review checklist plan; summary/report/formatter ciktilarinin read-only insan inceleme checklist'ine nasil tasinabilecegi belgelendi.
 
 Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokumantasyon ve kullanim standardi ile sabitlemek; sonra rapor format sinirlari, handover QC kullanimi ve soft validation rapor katmanini hard validation'a gecmeden hazirlamaktir.
 
 ## Sonraki Calisma Onerisi
 
-Podcast 029 commit/push sureci ayrica istenirse once mevcut Git/test durumu yeniden dogrulanmalidir. Yeni teknik adima baslamadan once yine mevcut Git/test durumu kontrol edilmelidir. Olası adaylar yalniz plan seviyesindedir: export/handover QC review checklist plan, formatter downstream consumer test plan veya hard validation oncesi soft/diagnostic sinir kontrolu.
+Adim 181 commit/push sureci ayrica istenirse once mevcut Git/test durumu yeniden dogrulanmalidir. Yeni teknik adima baslamadan once yine mevcut Git/test durumu kontrol edilmelidir. Olası adaylar yalniz plan seviyesindedir: checklist helper API boundary plan, formatter downstream consumer test plan veya hard validation oncesi soft/diagnostic sinir kontrolu.
