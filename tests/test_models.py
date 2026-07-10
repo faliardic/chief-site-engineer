@@ -1537,6 +1537,112 @@ def test_try_write_markdown_text_to_file_reports_explicit_overwrite(
     assert sibling_path.read_text(encoding="utf-8") == "keep content"
 
 
+def test_try_write_json_ready_dict_to_file_returns_success_contract(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "handover_summary.json"
+
+    result = try_write_json_ready_dict_to_file(
+        {"status": "review", "warnings": ["manual check"]},
+        output_path,
+    )
+
+    assert set(result) == EXPORT_WRITE_RESULT_KEYS
+    assert result == {
+        "success": True,
+        "output_path": output_path,
+        "attempted_path": output_path,
+        "allowed_root": None,
+        "file_type": "json",
+        "error_code": None,
+        "error_message": None,
+        "skipped_reason": None,
+        "overwritten": False,
+    }
+
+
+def test_try_write_markdown_text_to_file_returns_success_contract(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "handover_summary.md"
+
+    result = try_write_markdown_text_to_file(
+        "# Handover QC\n\nExport yazimi hazir.",
+        output_path,
+    )
+
+    assert set(result) == EXPORT_WRITE_RESULT_KEYS
+    assert result == {
+        "success": True,
+        "output_path": output_path,
+        "attempted_path": output_path,
+        "allowed_root": None,
+        "file_type": "markdown",
+        "error_code": None,
+        "error_message": None,
+        "skipped_reason": None,
+        "overwritten": False,
+    }
+
+
+def test_try_write_json_ready_dict_to_file_returns_error_contract_for_invalid_path(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "missing" / "handover_summary.json"
+
+    result = try_write_json_ready_dict_to_file({"status": "review"}, output_path)
+
+    assert result["success"] is False
+    assert result["output_path"] is None
+    assert result["attempted_path"] == output_path
+    assert result["file_type"] == "json"
+    assert result["error_code"] == "parent_missing"
+    assert result["error_message"]
+    assert result["overwritten"] is False
+    assert not output_path.exists()
+
+
+def test_try_write_helpers_do_not_mutate_inputs(tmp_path) -> None:
+    json_ready = {"status": "review", "items": [{"id": "NCR-001"}]}
+    original_json_ready = deepcopy(json_ready)
+    markdown = "# Handover QC\n\n- NCR-001 review"
+
+    json_result = try_write_json_ready_dict_to_file(
+        json_ready,
+        tmp_path / "handover_summary.json",
+    )
+    markdown_result = try_write_markdown_text_to_file(
+        markdown,
+        tmp_path / "handover_summary.md",
+    )
+
+    assert json_result["success"] is True
+    assert markdown_result["success"] is True
+    assert json_ready == original_json_ready
+    assert markdown == "# Handover QC\n\n- NCR-001 review"
+
+
+def test_low_level_write_helpers_keep_exception_behavior(tmp_path) -> None:
+    json_path = tmp_path / "handover_summary.json"
+    markdown_path = tmp_path / "handover_summary.md"
+    json_path.write_text('{"old": true}', encoding="utf-8")
+    markdown_path.write_text("old content", encoding="utf-8")
+
+    json_result = try_write_json_ready_dict_to_file({"new": True}, json_path)
+    markdown_result = try_write_markdown_text_to_file("new content", markdown_path)
+
+    assert json_result["success"] is False
+    assert json_result["error_code"] == "file_exists"
+    assert markdown_result["success"] is False
+    assert markdown_result["error_code"] == "file_exists"
+
+    with pytest.raises(FileExistsError):
+        write_json_ready_dict_to_file({"new": True}, json_path)
+
+    with pytest.raises(FileExistsError):
+        write_markdown_text_to_file("new content", markdown_path)
+
+
 def test_try_write_helpers_keep_existing_exception_helpers_unchanged(tmp_path) -> None:
     with pytest.raises(TypeError, match="JSON-ready dict"):
         write_json_ready_dict_to_file(["not", "dict"], tmp_path / "out.json")

@@ -1,5 +1,15 @@
 # Changelog
 
+## Step 166
+
+- Added focused tests that make the existing export helper result contract wrapper behavior more visible.
+- Covered JSON and Markdown wrapper success contracts using the existing result fields: `success`, `output_path`, `attempted_path`, `allowed_root`, `file_type`, `error_code`, `error_message`, `skipped_reason`, and `overwritten`.
+- Added a stable invalid-path failure contract example proving the JSON wrapper returns `success=False` instead of raising for a missing parent path.
+- Added input immutability coverage for JSON-ready dict and Markdown text wrapper calls.
+- Added regression coverage showing low-level `write_*` helpers still raise exceptions for file-exists scenarios while wrapper helpers report the same scenario as failure contracts.
+- Added Step 166 documentation and learning notes explaining the test scope, `tmp_path` boundary, low-level helper / wrapper distinction, and repo `exports/` cleanliness.
+- Kept production code, helper signatures, helper behavior, JSON/Markdown export outputs in the repo, backup/restore behavior, database/repository/API/GUI/CLI, audit event creation, hard validation, `blocked` status, commit, push, and ZIP/cache staging out of scope.
+
 ## Step 165
 
 - Added documentation-only usage examples and boundary/example standards for the result contract wrapper helpers.

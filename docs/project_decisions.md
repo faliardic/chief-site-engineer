@@ -1643,3 +1643,15 @@
 - `success=False` sonucunun export yaziminin basarisiz veya skipped oldugunu gosterdigi; devir paketini otomatik bloke etmedigi, hard validation veya `blocked` status anlamina gelmedigi tekrarlandi.
 - Future test example standardization icin `test_try_write_json_ready_dict_to_file_returns_success_contract`, `test_try_write_markdown_text_to_file_returns_success_contract`, `test_try_write_json_ready_dict_to_file_returns_error_contract_for_invalid_path`, `test_try_write_markdown_text_to_file_does_not_mutate_input` ve `test_low_level_write_helpers_keep_exception_behavior` gibi ornek isimler belgelendi; test dosyasi olusturulmadi veya degistirilmedi.
 - Bu adim documentation-only adimidir; uygulama kodu, test dosyalari, existing test matrix, export helper davranisi, JSON/Markdown export cikti dosyasi, `exports/` icerigi, hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event uretimi, database/repository davranisi, ZIP staging, commit veya push eklenmedi.
+
+## 166 Export Helper Result Contract Wrapper Test Implementation
+
+- Adim 166, Adim 163'te eklenen `try_write_json_ready_dict_to_file(...)` ve `try_write_markdown_text_to_file(...)` wrapper helperlarinin mevcut result contract davranisini testlerle daha gorunur hale getirdi.
+- Yeni result contract semasi icat edilmedi; mevcut implementation ve mevcut testlerde kullanilan `success`, `output_path`, `attempted_path`, `allowed_root`, `file_type`, `error_code`, `error_message`, `skipped_reason` ve `overwritten` alanlari esas alindi.
+- JSON wrapper icin basarili yazma sonucunda sabit success contract dondurdugu test edildi.
+- Markdown wrapper icin basarili yazma sonucunda sabit success contract dondurdugu test edildi.
+- Invalid path / missing parent senaryosunda JSON wrapper'in exception firlatmak yerine `success=False`, `error_code="parent_missing"` ve okunabilir hata alaniyla failure contract dondurdugu test edildi.
+- Wrapper helperlarin JSON-ready dict ve Markdown text inputlarini mutate etmedigi test edildi.
+- Dusuk seviye `write_json_ready_dict_to_file(...)` ve `write_markdown_text_to_file(...)` helperlarinin file-exists senaryosunda `FileExistsError` firlatan exception tabanli davranisini korudugu; wrapperlarin ayni senaryoyu failure contract olarak raporladigi regression testiyle sabitlendi.
+- Testler file-writing davranisini yalniz pytest `tmp_path` altinda dogrular; repo icindeki `exports/` dizinine cikti birakilmaz.
+- Bu adim test + dokumantasyon adimidir; `app/models.py`, production helper davranisi, helper imzalari, repo icinde JSON/Markdown export cikti dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event uretimi, database/repository davranisi, ZIP staging, commit veya push eklenmedi.
