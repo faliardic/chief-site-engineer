@@ -1,5 +1,13 @@
 # Proje Kararlari
 
+## Podcast 028 Kapsam Karari
+
+- Podcast 028, documentation-only NotebookLM podcast notu olarak yalniz Adim 162-166 araligini kapsar.
+- Kapsam; wrapper test matrix finalization, `try_write_*` result contract wrapper implementation, wrapper usage documentation, wrapper usage examples ve wrapper contract test implementation hattidir.
+- Adim 167-172 bu podcast kapsaminda degildir; Adim 167 wrapper integration boundary, Adim 168-172 ise export result summary/report layer hattina ayrilir.
+- Bu podcast yeni teknik karar, helper davranisi, kod, test, export cikti dosyasi, hard validation, `blocked` status, backup/restore, API, GUI, CLI, audit event, commit veya push uretmez.
+- ZIP, backup ve cache dosyalari repo kapsamina alinmaz.
+
 ## 172 Export Result Summary/Report Edge Case Karari
 
 - Export result summary/report helperlari edge case durumlarini hard validation'a cevirmeyecek.

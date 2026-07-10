@@ -1,5 +1,13 @@
 # Changelog
 
+## Podcast 028
+
+- Added a documentation-only NotebookLM podcast note for Step 162-166.
+- Summarized the export helper result contract wrapper arc from test matrix finalization through wrapper implementation, usage documentation, usage examples, and contract test visibility.
+- Reiterated that low-level `write_*` helper behavior remains unchanged while `try_write_*` wrappers provide readable success/failure result contracts.
+- Clarified that Step 167-172 are outside this podcast scope and should remain separate from this Step 162-166 wrapper-focused episode.
+- Kept this as documentation-only; no application code, tests, helper behavior changes, JSON/Markdown export output, backup/restore behavior, database/repository/API/GUI/CLI, audit event creation, hard validation, `blocked` status, commit, push, or ZIP/cache staging was added.
+
 ## Step 172
 
 - Added documentation-only edge case standardization for the export result summary/report helper layer.
