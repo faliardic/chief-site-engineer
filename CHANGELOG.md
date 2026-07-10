@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 183
+
+- Added documentation-only implementation planning for a future export / handover QC review checklist helper.
+- Proposed `build_export_handover_qc_review_checklist(...)` as a possible future helper name while keeping this step implementation-free.
+- Documented possible structured input contracts from `build_export_result_summary(...)` and `build_export_result_report(...)`, with formatter Markdown remaining presentation text rather than source of truth.
+- Planned a JSON-ready output shape with checklist items, visibility status/priority labels, and review notes while excluding decision/blocking fields.
+- Reiterated future test expectations for success-only, failure-only, mixed, empty/zero-count, missing optional field, unknown/additional field, input immutability, no side effects, and preserving existing helper behavior.
+- Kept this as documentation-only; no code, tests, helper behavior changes, API/GUI/CLI, database/repository access, audit event, backup/restore, export output, hard validation, `blocked` status, commit, push, or ZIP/cache staging was added.
+
 ## Step 182
 
 - Added documentation-only API boundary and future test matrix planning for an export / handover QC review checklist.

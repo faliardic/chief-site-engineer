@@ -1,5 +1,14 @@
 # Proje Kararlari
 
+## 183 Export / Handover QC Checklist Helper Implementation Plan Karari
+
+- Adim 183, gelecekte yazilabilecek export / handover QC review checklist helper'i icin implementation planini documentation-only olarak hazirlar.
+- Olasil helper adi `build_export_handover_qc_review_checklist(...)` olarak kaydedilir; bu adimda helper implementasyonu yapilmaz.
+- Future helper structured input kullanmalidir: tercihen `build_export_result_report(...)` report dict'i veya `build_export_result_summary(...)` summary dict'i; formatter Markdown'u source of truth degil presentation text olarak kalmalidir.
+- Output JSON-ready checklist dict, item listesi, gorunurluk status/priority etiketleri ve review note icerebilir; `approved`, `rejected`, `blocked`, `official_decision` veya `audit_event_id` gibi karar/bloklama alanlari olmamalidir.
+- Future helper success-only, failure-only, mixed, empty/zero-count, missing optional field, unknown/additional field, input immutability, no side effect, no file write/export output, no database/repository, no audit event, no API/GUI/CLI ve no hard validation/no blocked regression testleriyle ayri adimda ele alinmalidir.
+- Existing `build_export_result_summary(...)`, `build_export_result_report(...)`, `format_export_result_report_as_markdown(...)`, `write_*` ve `try_write_*` davranislari korunacaktir; hard validation sonraki ayri faza birakilir.
+
 ## 182 Export / Handover QC Checklist Boundary and Test Matrix Karari
 
 - Adim 182, export / handover QC review checklist icin API boundary ve future test matrix'i documentation-only olarak netlestirir.
