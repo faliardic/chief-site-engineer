@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 180
+
+- Added documentation-only phase closure for the Step 175-179 export result report formatter work.
+- Summarized the current safe contract of `format_export_result_report_as_markdown(report)` as a read-only presentation-layer formatter for `build_export_result_report(...)` output.
+- Reiterated that the formatter does not write files, create export output, mutate input, recompute report results, perform hard validation, produce `blocked` status, or change summary/report/write/try-write helper behavior.
+- Recorded handover QC usage, downstream integration boundaries, standardized success/failure/mixed/empty/missing/unknown field readings, and safe restart conditions after a pause.
+- Listed only future work candidates: Podcast 029 scope review, export/handover QC checklist planning, downstream consumer test planning, and soft/diagnostic boundary review before hard validation.
+- Kept this as a closure note; no code, tests, helper behavior changes, API/GUI/CLI, database/repository access, audit event, backup/restore, export output, commit, push, or ZIP/cache staging was added.
+
 ## Step 179
 
 - Added documentation-only downstream integration boundary planning for `format_export_result_report_as_markdown(report)`.

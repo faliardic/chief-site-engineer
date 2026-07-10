@@ -1,5 +1,15 @@
 # Proje Kararlari
 
+## 180 Export Result Report Formatter Phase Closure Karari
+
+- Adim 180, Adim 175-179 export result report formatter fazini documentation-only olarak kapatir.
+- `format_export_result_report_as_markdown(report)` helper'i `build_export_result_report(...)` ciktisini read-only presentation-safe Markdown'a ceviren yardimci olarak kalir.
+- Helper dosya yazmaz, export uretmez, input'u mutate etmez, report sonucunu yeniden hesaplamaz, hard validation yapmaz ve `blocked` status uretmez.
+- `build_export_result_summary(...)`, `build_export_result_report(...)`, `format_export_result_summary_as_markdown(...)`, `write_*` ve `try_write_*` helper davranislari korunur.
+- Handover QC ve downstream entegrasyonlar formatter'i karar, validation, audit, persistence, backup/restore veya export writing katmani olarak kullanmamalidir.
+- Adim 180 sonrasi yeni teknik adima baslanmayacak; ara sonrasi once mevcut Git/test durumu dogrulanacaktir.
+- Olası sonraki isler yalniz aday olarak kaydedilir: Podcast 029 kapsam kontrolu, export/handover QC checklist plan, downstream consumer test plan ve hard validation oncesi soft/diagnostic sinir kontrolu.
+
 ## 179 Export Result Report Formatter Downstream Integration Boundary Karari
 
 - Adim 179, `format_export_result_report_as_markdown(report)` helper'i icin downstream integration boundary'yi documentation-only olarak planlar.
