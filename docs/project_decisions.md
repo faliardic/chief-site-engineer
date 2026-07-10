@@ -1,5 +1,13 @@
 # Proje Kararlari
 
+## 182 Export / Handover QC Checklist Boundary and Test Matrix Karari
+
+- Adim 182, export / handover QC review checklist icin API boundary ve future test matrix'i documentation-only olarak netlestirir.
+- Checklist read-only QC katmani olarak kalir; mevcut `build_export_result_summary(...)`, `build_export_result_report(...)` ve `format_export_result_report_as_markdown(report)` ciktilarini insan incelemesine tasiyabilir fakat bu helper davranislarini degistirmez.
+- Checklist karar verici, otomatik onaylayici, otomatik bloklayici, hard validation, `blocked` status uretici, audit logger, database/repository mutator, backup/restore runner veya export writer degildir.
+- Future helper yazilirsa input/output contract dar ve acik olacak; success-only, failure-only, mixed, empty/zero-count, missing optional field, unknown/additional field, input immutability, no file write/export output ve no hard validation/no blocked regression testleri ayri adimda ele alinacaktir.
+- API/GUI/CLI entegrasyonlari, database/repository erisimi, audit event, backup/restore, export cikti dosyasi, helper implementation ve test ekleme bu adimda kapsam disidir.
+
 ## 181 Export / Handover QC Review Checklist Karari
 
 - Adim 181, export result summary/report/formatter hattinin handover QC review checklist'e nasil baglanabilecegini documentation-only olarak planlar.

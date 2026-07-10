@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 182
+
+- Added documentation-only API boundary and future test matrix planning for an export / handover QC review checklist.
+- Defined the checklist as a read-only QC layer that may consume `build_export_result_summary(...)`, `build_export_result_report(...)`, and `format_export_result_report_as_markdown(report)` outputs without changing their behavior.
+- Planned future test scenarios for success-only, failure-only, mixed, empty/zero-count, missing optional field, unknown/additional field, input immutability, no file writing/export output, and no hard validation/`blocked` regression.
+- Clarified that API/GUI/CLI integration, database/repository access, audit events, backup/restore, export output generation, helper implementation, and tests remain out of scope for this step.
+- Kept this as documentation-only; no code, tests, helper behavior changes, export output, commit, push, or ZIP/cache staging was added.
+
 ## Step 181
 
 - Added documentation-only planning for an export / handover QC review checklist.
