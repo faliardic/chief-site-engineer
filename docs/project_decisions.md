@@ -1,5 +1,14 @@
 # Proje Kararlari
 
+## 184 Export / Handover QC Checklist Helper Implementation Karari
+
+- Adim 184, `build_export_handover_qc_review_checklist(summary, report)` helper'ini read-only QC helper olarak ekler.
+- Helper mevcut `build_export_result_summary(...)` ve `build_export_result_report(...)` ciktilarini JSON-ready checklist dict yapisina cevirir; formatter Markdown'u source of truth olarak parse etmez.
+- Output `checklist_type`, gorunurluk `status`, `summary`, `items`, `review_notes`, `is_read_only=True`, `is_blocking=False` ve `requires_human_review` alanlarini icerir.
+- Helper success-only, failure-only, mixed, empty/zero-count, missing optional field ve unknown/additional field durumlarini insan incelemesi icin gorunur kilar; resmi kabul, ret, otomatik bloklama, hard validation veya `blocked` status uretmez.
+- Helper input mutate etmez, dosya yazmaz, export uretmez, `exports/` altina cikti birakmaz, database/repository erisimi yapmaz, audit event uretmez, API/GUI/CLI veya backup/restore eklemez.
+- Existing `build_export_result_summary(...)`, `build_export_result_report(...)`, `format_export_result_report_as_markdown(...)`, `format_export_result_summary_as_markdown(...)`, `write_*` ve `try_write_*` davranislari regression testleriyle korunur.
+
 ## 183 Export / Handover QC Checklist Helper Implementation Plan Karari
 
 - Adim 183, gelecekte yazilabilecek export / handover QC review checklist helper'i icin implementation planini documentation-only olarak hazirlar.

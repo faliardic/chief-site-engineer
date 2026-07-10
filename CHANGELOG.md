@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 184
+
+- Added the read-only `build_export_handover_qc_review_checklist(summary, report)` helper.
+- Converts existing export result summary/report outputs into a JSON-ready handover QC review checklist dict with `checklist_type`, visibility `status`, `summary`, `items`, `review_notes`, `is_read_only`, `is_blocking`, and `requires_human_review`.
+- Added tests for success-only, failure-only, mixed, empty/zero-count, missing optional field, unknown/additional field, JSON-ready output, item list visibility, input immutability, no file writing, no `exports/` output, no generated `blocked` status, no hard validation behavior, and existing helper regressions.
+- Confirmed the helper does not mutate input, write files, create exports, access database/repository state, create audit events, add API/GUI/CLI behavior, run backup/restore, approve/reject/block handover packages, or change existing summary/report/formatter/write/try-write helper behavior.
+- Kept commit, push, ZIP/cache staging, hard validation, and `blocked` status out of scope.
+
 ## Step 183
 
 - Added documentation-only implementation planning for a future export / handover QC review checklist helper.

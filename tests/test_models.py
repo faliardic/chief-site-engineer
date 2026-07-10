@@ -56,6 +56,7 @@ from app.models import (
     TaskCandidateRecord,
     TrackingRecord,
     WorkforceRecord,
+    build_export_handover_qc_review_checklist,
     build_export_result_report,
     build_export_result_summary,
     build_record_id_diagnostic_report,
@@ -2322,6 +2323,404 @@ def test_export_result_summary_helpers_do_not_emit_blocked_status(tmp_path) -> N
     assert report["status"] == "review"
     assert "blocked" not in {item["status"] for item in report["items"]}
     assert "blocked" not in markdown.lower()
+
+
+def test_build_export_handover_qc_review_checklist_success_only(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "handover.json"
+    summary = build_export_result_summary(
+        {
+            "success": True,
+            "output_path": output_path,
+            "attempted_path": output_path,
+            "file_type": "json",
+            "overwritten": False,
+        }
+    )
+    report = build_export_result_report(
+        [
+            {
+                "success": True,
+                "output_path": output_path,
+                "attempted_path": output_path,
+                "file_type": "json",
+                "overwritten": False,
+            }
+        ]
+    )
+
+    checklist = build_export_handover_qc_review_checklist(summary, report)
+
+    assert checklist["checklist_type"] == "export_handover_qc_review"
+    assert checklist["status"] == "success"
+    assert checklist["summary"]["success_count"] == 1
+    assert checklist["items"][0]["status"] == "success"
+    assert checklist["items"][0]["priority"] == "info"
+    assert checklist["items"][0]["path"] == str(output_path)
+    assert checklist["is_read_only"] is True
+    assert checklist["is_blocking"] is False
+    assert checklist["requires_human_review"] is False
+
+
+def test_build_export_handover_qc_review_checklist_failure_only(
+    tmp_path,
+) -> None:
+    attempted_path = tmp_path / "missing" / "handover.md"
+    summary = build_export_result_summary(
+        {
+            "success": False,
+            "output_path": None,
+            "attempted_path": attempted_path,
+            "file_type": "markdown",
+            "error_code": "parent_missing",
+            "error_message": "output_path parent directory does not exist",
+            "overwritten": False,
+        }
+    )
+    report = build_export_result_report(
+        [
+            {
+                "success": False,
+                "output_path": None,
+                "attempted_path": attempted_path,
+                "file_type": "markdown",
+                "error_code": "parent_missing",
+                "error_message": "output_path parent directory does not exist",
+                "overwritten": False,
+            }
+        ]
+    )
+
+    checklist = build_export_handover_qc_review_checklist(summary, report)
+
+    assert checklist["status"] == "review"
+    assert checklist["summary"]["review_count"] == 1
+    assert checklist["items"][0]["status"] == "review"
+    assert checklist["items"][0]["priority"] == "review"
+    assert checklist["items"][0]["path"] == str(attempted_path)
+    assert checklist["items"][0]["error_type"] == "parent_missing"
+    assert (
+        checklist["items"][0]["technical_detail"]
+        == "output_path parent directory does not exist"
+    )
+    assert checklist["is_blocking"] is False
+    assert checklist["requires_human_review"] is True
+
+
+def test_build_export_handover_qc_review_checklist_mixed_report(
+    tmp_path,
+) -> None:
+    success_path = tmp_path / "ok.json"
+    failure_path = tmp_path / "exists.md"
+    report = build_export_result_report(
+        [
+            {
+                "success": True,
+                "output_path": success_path,
+                "attempted_path": success_path,
+                "file_type": "json",
+                "overwritten": False,
+            },
+            {
+                "success": False,
+                "output_path": None,
+                "attempted_path": failure_path,
+                "file_type": "markdown",
+                "error_code": "file_exists",
+                "error_message": "output_path already exists",
+                "overwritten": False,
+            },
+        ]
+    )
+
+    checklist = build_export_handover_qc_review_checklist(
+        report["items"][0],
+        report,
+    )
+
+    assert checklist["status"] == "review"
+    assert checklist["summary"]["total_count"] == 2
+    assert checklist["summary"]["success_count"] == 1
+    assert checklist["summary"]["review_count"] == 1
+    assert [item["status"] for item in checklist["items"]] == ["success", "review"]
+    assert checklist["items"][0]["path"] == str(success_path)
+    assert checklist["items"][1]["path"] == str(failure_path)
+    assert checklist["is_blocking"] is False
+
+
+def test_build_export_handover_qc_review_checklist_empty_report() -> None:
+    report = build_export_result_report([])
+
+    checklist = build_export_handover_qc_review_checklist({}, report)
+
+    assert checklist["status"] == "unknown"
+    assert checklist["summary"]["total_count"] == 0
+    assert checklist["summary"]["success_count"] == 0
+    assert checklist["summary"]["review_count"] == 0
+    assert checklist["summary"]["unknown_count"] == 0
+    assert checklist["items"] == []
+    assert checklist["requires_human_review"] is True
+    assert checklist["is_blocking"] is False
+
+
+def test_build_export_handover_qc_review_checklist_missing_optional_fields() -> None:
+    summary = {"operation": "export_result_summary", "status": "review"}
+    report = {
+        "operation": "export_result_report",
+        "status": "review",
+        "total_count": 1,
+        "success_count": 0,
+        "review_count": 1,
+        "unknown_count": 0,
+        "items": [{"status": "review"}],
+    }
+
+    checklist = build_export_handover_qc_review_checklist(summary, report)
+
+    assert checklist["status"] == "review"
+    assert checklist["summary"]["message"] == (
+        "Export handover QC checklist needs review."
+    )
+    assert checklist["items"][0]["message"] == "Export checklist item has no message."
+    assert checklist["items"][0]["file_type"] is None
+    assert checklist["items"][0]["path"] is None
+
+
+def test_build_export_handover_qc_review_checklist_unknown_additional_fields() -> None:
+    summary = {
+        "operation": "export_result_summary",
+        "status": "blocked",
+        "safe_for_user_message": "Manual review required.",
+        "unexpected_summary_field": "do not copy",
+    }
+    report = {
+        "operation": "export_result_report",
+        "status": "blocked",
+        "total_count": 1,
+        "success_count": 0,
+        "review_count": 1,
+        "unknown_count": 0,
+        "safe_for_user_message": "Manual review required.",
+        "unexpected_report_field": "do not copy",
+        "items": [
+            {
+                "status": "blocked",
+                "safe_for_user_message": "Manual review item.",
+                "path": "exports/review.md",
+                "unexpected_item_field": "do not copy",
+            }
+        ],
+    }
+
+    checklist = build_export_handover_qc_review_checklist(summary, report)
+
+    assert checklist["status"] == "review"
+    assert checklist["summary"]["source_summary_status"] == "review"
+    assert checklist["items"][0]["status"] == "review"
+    assert "unexpected_summary_field" not in checklist["summary"]
+    assert "unexpected_item_field" not in checklist["items"][0]
+    assert "blocked" not in json.dumps(checklist).lower()
+
+
+def test_build_export_handover_qc_review_checklist_output_is_json_ready(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "json-ready.json"
+    summary = build_export_result_summary(
+        {
+            "success": True,
+            "output_path": output_path,
+            "attempted_path": output_path,
+            "file_type": "json",
+            "overwritten": False,
+        }
+    )
+    report = build_export_result_report(
+        [
+            {
+                "success": True,
+                "output_path": output_path,
+                "attempted_path": output_path,
+                "file_type": "json",
+                "overwritten": False,
+            }
+        ]
+    )
+
+    checklist = build_export_handover_qc_review_checklist(summary, report)
+
+    assert isinstance(checklist, dict)
+    assert isinstance(checklist["items"], list)
+    assert json.loads(json.dumps(checklist)) == checklist
+
+
+def test_build_export_handover_qc_review_checklist_does_not_mutate_input(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "immutable.json"
+    summary = build_export_result_summary(
+        {
+            "success": True,
+            "output_path": output_path,
+            "attempted_path": output_path,
+            "file_type": "json",
+            "overwritten": False,
+        }
+    )
+    report = build_export_result_report(
+        [
+            {
+                "success": False,
+                "output_path": None,
+                "attempted_path": tmp_path / "review.md",
+                "file_type": "markdown",
+                "error_code": "wrong_extension",
+                "error_message": "output_path must use the .md extension",
+                "overwritten": False,
+            }
+        ]
+    )
+    original_summary = deepcopy(summary)
+    original_report = deepcopy(report)
+
+    build_export_handover_qc_review_checklist(summary, report)
+
+    assert summary == original_summary
+    assert report == original_report
+
+
+def test_build_export_handover_qc_review_checklist_does_not_write_files(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "exports" / "handover.json"
+    summary = build_export_result_summary(
+        {
+            "success": True,
+            "output_path": output_path,
+            "attempted_path": output_path,
+            "file_type": "json",
+            "overwritten": False,
+        }
+    )
+    report = build_export_result_report(
+        [
+            {
+                "success": True,
+                "output_path": output_path,
+                "attempted_path": output_path,
+                "file_type": "json",
+                "overwritten": False,
+            }
+        ]
+    )
+
+    checklist = build_export_handover_qc_review_checklist(summary, report)
+
+    assert checklist["items"][0]["path"] == str(output_path)
+    assert not output_path.exists()
+    assert not (tmp_path / "exports").exists()
+
+
+def test_build_export_handover_qc_review_checklist_no_hard_validation() -> None:
+    checklist = build_export_handover_qc_review_checklist(
+        "not a summary",
+        "not a report",
+    )
+
+    assert checklist["status"] == "unknown"
+    assert checklist["summary"]["total_count"] == 0
+    assert checklist["items"] == []
+    assert checklist["is_read_only"] is True
+    assert checklist["is_blocking"] is False
+    assert checklist["requires_human_review"] is True
+
+
+def test_build_export_handover_qc_review_checklist_preserves_summary_behavior(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "summary-regression.json"
+    contract = {
+        "success": True,
+        "output_path": output_path,
+        "attempted_path": output_path,
+        "file_type": "json",
+        "overwritten": False,
+    }
+    expected_summary = build_export_result_summary(contract)
+    report = build_export_result_report([contract])
+
+    build_export_handover_qc_review_checklist(expected_summary, report)
+
+    assert build_export_result_summary(contract) == expected_summary
+
+
+def test_build_export_handover_qc_review_checklist_preserves_report_behavior(
+    tmp_path,
+) -> None:
+    contract = {
+        "success": False,
+        "output_path": None,
+        "attempted_path": tmp_path / "report-regression.md",
+        "file_type": "markdown",
+        "error_code": "parent_missing",
+        "error_message": "output_path parent directory does not exist",
+        "overwritten": False,
+    }
+    expected_report = build_export_result_report([contract])
+    summary = expected_report["items"][0]
+
+    build_export_handover_qc_review_checklist(summary, expected_report)
+
+    assert build_export_result_report([contract]) == expected_report
+
+
+def test_build_export_handover_qc_review_checklist_preserves_formatter_behavior(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "formatter-regression.json"
+    report = build_export_result_report(
+        [
+            {
+                "success": True,
+                "output_path": output_path,
+                "attempted_path": output_path,
+                "file_type": "json",
+                "overwritten": False,
+            }
+        ]
+    )
+    expected_markdown = format_export_result_report_as_markdown(report)
+
+    build_export_handover_qc_review_checklist(report["items"][0], report)
+
+    assert format_export_result_report_as_markdown(report) == expected_markdown
+
+
+def test_build_export_handover_qc_review_checklist_preserves_write_helpers(
+    tmp_path,
+) -> None:
+    existing_json = tmp_path / "existing.json"
+    existing_markdown = tmp_path / "existing.md"
+    existing_json.write_text('{"old": true}', encoding="utf-8")
+    existing_markdown.write_text("old", encoding="utf-8")
+    report = build_export_result_report([])
+
+    build_export_handover_qc_review_checklist({}, report)
+
+    with pytest.raises(FileExistsError):
+        write_json_ready_dict_to_file({"new": True}, existing_json)
+
+    with pytest.raises(FileExistsError):
+        write_markdown_text_to_file("new", existing_markdown)
+
+    json_result = try_write_json_ready_dict_to_file({"new": True}, existing_json)
+    markdown_result = try_write_markdown_text_to_file("new", existing_markdown)
+
+    assert json_result["success"] is False
+    assert json_result["error_code"] == "file_exists"
+    assert markdown_result["success"] is False
+    assert markdown_result["error_code"] == "file_exists"
 
 
 def test_file_writing_helpers_do_not_recompute_reports_or_formatters(tmp_path) -> None:

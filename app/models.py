@@ -1799,6 +1799,141 @@ def format_export_result_report_as_markdown(report: object) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _export_checklist_text(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value).replace("\r", " ").replace("\n", " ").strip()
+    return text or None
+
+
+def _export_checklist_int(value: object, fallback: int = 0) -> int:
+    if isinstance(value, bool):
+        return fallback
+    if isinstance(value, int):
+        return value
+    return fallback
+
+
+def _export_checklist_status(value: object) -> str:
+    status = (_export_checklist_text(value) or "unknown").lower()
+    if status == "success":
+        return "success"
+    if status in {"review", "blocked"}:
+        return "review"
+    return "unknown"
+
+
+def _export_checklist_priority(status: str) -> str:
+    if status == "success":
+        return "info"
+    if status == "review":
+        return "review"
+    return "attention"
+
+
+def _export_checklist_item(item: object) -> dict[str, object]:
+    if not isinstance(item, dict):
+        return {
+            "status": "unknown",
+            "priority": "attention",
+            "file_type": None,
+            "path": None,
+            "message": "Export checklist item could not be interpreted.",
+            "error_type": "unsupported_item",
+            "technical_detail": "Expected an export result summary dict.",
+            "next_action_hint": "Review the export checklist source data.",
+            "overwritten": False,
+        }
+
+    status = _export_checklist_status(item.get("status"))
+    return {
+        "status": status,
+        "priority": _export_checklist_priority(status),
+        "file_type": _export_checklist_text(item.get("file_type")),
+        "path": _export_checklist_text(item.get("path")),
+        "message": (
+            _export_checklist_text(item.get("safe_for_user_message"))
+            or "Export checklist item has no message."
+        ),
+        "error_type": _export_checklist_text(item.get("error_type")),
+        "technical_detail": _export_checklist_text(item.get("technical_detail")),
+        "next_action_hint": _export_checklist_text(item.get("next_action_hint")),
+        "overwritten": bool(item.get("overwritten", False)),
+    }
+
+
+def build_export_handover_qc_review_checklist(
+    summary: object,
+    report: object,
+) -> dict[str, object]:
+    """Build a read-only JSON-ready handover QC checklist from export summaries."""
+
+    summary_dict = summary if isinstance(summary, dict) else {}
+    report_dict = report if isinstance(report, dict) else {}
+    raw_items = report_dict.get("items", [])
+    if not isinstance(raw_items, list):
+        raw_items = []
+    if not raw_items and summary_dict:
+        raw_items = [summary_dict]
+
+    items = [_export_checklist_item(item) for item in raw_items]
+    total_count = _export_checklist_int(report_dict.get("total_count"), len(items))
+    success_count = _export_checklist_int(
+        report_dict.get("success_count"),
+        sum(1 for item in items if item["status"] == "success"),
+    )
+    review_count = _export_checklist_int(
+        report_dict.get("review_count"),
+        sum(1 for item in items if item["status"] == "review"),
+    )
+    unknown_count = _export_checklist_int(
+        report_dict.get("unknown_count"),
+        sum(1 for item in items if item["status"] == "unknown"),
+    )
+
+    if total_count == 0:
+        status = "unknown"
+    elif review_count:
+        status = "review"
+    elif unknown_count:
+        status = "unknown"
+    elif success_count == total_count:
+        status = "success"
+    else:
+        status = _export_checklist_status(
+            report_dict.get("status", summary_dict.get("status"))
+        )
+
+    return {
+        "checklist_type": "export_handover_qc_review",
+        "status": status,
+        "summary": {
+            "status": status,
+            "total_count": total_count,
+            "success_count": success_count,
+            "review_count": review_count,
+            "unknown_count": unknown_count,
+            "source_summary_status": _export_checklist_status(
+                summary_dict.get("status")
+            ),
+            "message": (
+                _export_checklist_text(report_dict.get("safe_for_user_message"))
+                or _export_checklist_text(summary_dict.get("safe_for_user_message"))
+                or "Export handover QC checklist needs review."
+            ),
+        },
+        "items": items,
+        "review_notes": [
+            "Read-only QC checklist for human review.",
+            "This checklist does not approve or reject a handover package.",
+            "Hard validation is not performed and no audit event is created.",
+        ],
+        "is_read_only": True,
+        "is_blocking": False,
+        "requires_human_review": status != "success",
+    }
+
+
 def format_export_result_summary_as_markdown(summary: object) -> str:
     """Format a summary or report dict as Markdown without writing a file."""
 
