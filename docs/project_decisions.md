@@ -1,5 +1,16 @@
 # Proje Kararlari
 
+## 190 Export / Handover QC Checklist Formatter Implementation Karari
+
+- Adim 190, `format_export_handover_qc_review_checklist_as_markdown(checklist)` helper'ini read-only presentation formatter olarak ekler.
+- Helper input olarak `build_export_handover_qc_review_checklist(summary, report)` ciktisi olan JSON-ready checklist dict'i bekler ve output olarak Markdown/string dondurur.
+- Output checklist type, status, summary count'lari, `is_read_only`, `is_blocking`, `requires_human_review`, review notes ve checklist item listesini insan incelemesi icin gorunur kilar.
+- Formatter dosya yazmaz, export uretmez, `exports/` altina cikti birakmaz, input'u mutate etmez, checklist/summary/report sonucunu yeniden hesaplamaz ve existing helper davranislarini degistirmez.
+- `requires_human_review` insan incelemesi ihtiyaci olarak sunulur; formatter resmi kabul, resmi ret, otomatik bloklama, hard validation veya generated `blocked` status uretmez.
+- Unsupported/missing alanlarda formatter guvenli ve okunabilir fallback Markdown uretir; tum review akisimi exception ile kirmaz.
+- Existing `build_export_handover_qc_review_checklist(...)`, `build_export_result_summary(...)`, `build_export_result_report(...)`, `format_export_result_report_as_markdown(...)`, `format_export_result_summary_as_markdown(...)`, `write_*` ve `try_write_*` davranislari regression testleriyle korunur.
+- API/GUI/CLI, database/repository erisimi, audit event, backup/restore, export ciktisi, hard validation ve `blocked` status kapsam disidir.
+
 ## 189 Export / Handover QC Checklist Formatter API Boundary Karari
 
 - Adim 189, future downstream checklist formatter icin API boundary ve test matrix'i documentation-only olarak netlestirir.

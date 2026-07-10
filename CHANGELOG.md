@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 190
+
+- Added the read-only `format_export_handover_qc_review_checklist_as_markdown(checklist)` formatter.
+- Formats `build_export_handover_qc_review_checklist(summary, report)` JSON-ready checklist output as presentation-safe Markdown text.
+- Shows checklist type, status, summary counts, `is_read_only`, `is_blocking`, `requires_human_review`, review notes, and checklist items while keeping human-review visibility separate from package decisions.
+- Added tests for success-only, failure-only, mixed, empty/zero-count, missing optional field, unknown/additional field, explanatory review notes, readable item lists, input immutability, unsupported input fallback, no file writing/export output, no generated `blocked` status, no hard validation, and existing helper regressions.
+- Confirmed the formatter does not write files, create exports, mutate input, recompute checklist/summary/report results, approve/reject/block handover packages, access database/repository state, create audit events, add API/GUI/CLI behavior, or run backup/restore.
+- Kept commit, push, ZIP/cache staging, hard validation, and `blocked` status out of scope.
+
 ## Step 189
 
 - Added documentation-only API boundary and future test matrix planning for a possible `format_export_handover_qc_review_checklist_as_markdown(checklist)` formatter.

@@ -1934,6 +1934,118 @@ def build_export_handover_qc_review_checklist(
     }
 
 
+def _export_checklist_markdown_value(value: object) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    return _export_checklist_text(value) or "not available"
+
+
+def format_export_handover_qc_review_checklist_as_markdown(
+    checklist: object,
+) -> str:
+    """Format a handover QC checklist dict as Markdown without writing files."""
+
+    checklist_dict = checklist if isinstance(checklist, dict) else {}
+    summary = checklist_dict.get("summary", {})
+    if not isinstance(summary, dict):
+        summary = {}
+    raw_items = checklist_dict.get("items", [])
+    if not isinstance(raw_items, list):
+        raw_items = []
+    raw_notes = checklist_dict.get("review_notes", [])
+    if not isinstance(raw_notes, list):
+        raw_notes = []
+
+    status = _export_checklist_status(checklist_dict.get("status"))
+    is_read_only = (
+        checklist_dict.get("is_read_only")
+        if isinstance(checklist_dict.get("is_read_only"), bool)
+        else True
+    )
+    is_blocking = (
+        checklist_dict.get("is_blocking")
+        if isinstance(checklist_dict.get("is_blocking"), bool)
+        else False
+    )
+    requires_human_review = (
+        checklist_dict.get("requires_human_review")
+        if isinstance(checklist_dict.get("requires_human_review"), bool)
+        else status != "success"
+    )
+
+    lines = [
+        "# Export Handover QC Review Checklist",
+        "",
+        "- checklist_type: "
+        f"{_export_checklist_markdown_value(checklist_dict.get('checklist_type'))}",
+        f"- status: {status}",
+        f"- is_read_only: {_export_checklist_markdown_value(is_read_only)}",
+        f"- is_blocking: {_export_checklist_markdown_value(is_blocking)}",
+        "- requires_human_review: "
+        f"{_export_checklist_markdown_value(requires_human_review)} "
+        "(human review visibility only; not a package block)",
+        "",
+        "## Summary",
+        f"- status: {_export_checklist_status(summary.get('status'))}",
+        f"- total_count: {_export_checklist_markdown_value(summary.get('total_count'))}",
+        f"- success_count: {_export_checklist_markdown_value(summary.get('success_count'))}",
+        f"- review_count: {_export_checklist_markdown_value(summary.get('review_count'))}",
+        f"- unknown_count: {_export_checklist_markdown_value(summary.get('unknown_count'))}",
+        "- source_summary_status: "
+        f"{_export_checklist_status(summary.get('source_summary_status'))}",
+        f"- message: {_export_checklist_markdown_value(summary.get('message'))}",
+        "",
+        "## Items",
+    ]
+
+    if raw_items:
+        for index, raw_item in enumerate(raw_items, start=1):
+            item = (
+                raw_item
+                if isinstance(raw_item, dict)
+                else _export_checklist_item(raw_item)
+            )
+            item_status = _export_checklist_status(item.get("status"))
+            lines.extend(
+                [
+                    f"{index}. status: {item_status}",
+                    f"   - priority: {_export_checklist_markdown_value(item.get('priority'))}",
+                    f"   - file_type: {_export_checklist_markdown_value(item.get('file_type'))}",
+                    f"   - path: {_export_checklist_markdown_value(item.get('path'))}",
+                    f"   - message: {_export_checklist_markdown_value(item.get('message'))}",
+                    f"   - error_type: {_export_checklist_markdown_value(item.get('error_type'))}",
+                    "   - technical_detail: "
+                    f"{_export_checklist_markdown_value(item.get('technical_detail'))}",
+                    "   - next_action_hint: "
+                    f"{_export_checklist_markdown_value(item.get('next_action_hint'))}",
+                    f"   - overwritten: {_export_checklist_markdown_value(item.get('overwritten'))}",
+                ]
+            )
+    else:
+        lines.append("- No checklist items.")
+
+    lines.extend(["", "## Review Notes"])
+    notes = [_export_checklist_text(note) for note in raw_notes]
+    notes = [note for note in notes if note]
+    if notes:
+        lines.extend(f"- {note}" for note in notes)
+    else:
+        lines.append("- No review notes.")
+
+    lines.extend(
+        [
+            "",
+            "## Boundary",
+            "- Read-only presentation formatter.",
+            "- Human review visibility only; no automatic approval, rejection, or package block.",
+            "- Hard validation is not performed and no audit event is created.",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
 def format_export_result_summary_as_markdown(summary: object) -> str:
     """Format a summary or report dict as Markdown without writing a file."""
 
