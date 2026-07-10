@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 189
+
+- Added documentation-only API boundary and future test matrix planning for a possible `format_export_handover_qc_review_checklist_as_markdown(checklist)` formatter.
+- Documented that a future formatter should accept the JSON-ready checklist dict from `build_export_handover_qc_review_checklist(summary, report)` and return a presentation-safe Markdown/string without writing files, creating exports, mutating input, or recomputing checklist/summary/report results.
+- Planned required visibility for `checklist_type`, `is_read_only=True`, `is_blocking=False`, `requires_human_review`, `review_notes`, and checklist items.
+- Planned future tests for success-only, failure-only, mixed, empty/zero-count, missing optional field, unknown/additional field, unsupported input, string output, input immutability, no file writing/export output, no generated `blocked` status, no hard validation, and existing helper regressions.
+- Kept this as documentation-only; no code, tests, formatter, API/GUI/CLI, database/repository access, audit event, backup/restore, export output, hard validation, `blocked` status, commit, push, or ZIP/cache staging was added.
+
 ## Step 188
 
 - Added documentation-only downstream formatter planning for `build_export_handover_qc_review_checklist(summary, report)` output.
