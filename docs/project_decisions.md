@@ -1,5 +1,15 @@
 # Proje Kararlari
 
+## 173 Export Result Summary/Report Follow-up Karari
+
+- Adim 173, Adim 168-172 araliginda kurulan export result summary/report helper hatti sonrasi follow-up yonunu documentation-only olarak planlar.
+- Mevcut `build_export_result_summary(...)`, `build_export_result_report(...)` ve `format_export_result_summary_as_markdown(...)` helper davranislari korunacak; bu adimda yeni helper, formatter, writer, API, GUI veya CLI eklenmeyecek.
+- Olasil takip basliklari export result report Markdown formatter plani, JSON-ready formatter boundary, combined handover QC gorunumu, report test example standardization, unsupported input handling documentation ve result contract wrapper ile summary/report helper iliskisinin dokumantasyonudur.
+- Summary/report helper katmani diagnostic engine veya validation gate degildir; export result gorunurluk ve ozet katmani olarak kalir.
+- Low-level `write_*` helper davranisi ve `try_write_*` wrapper davranisi degistirilmeyecek.
+- Hard validation, `blocked` status, backup/restore, database/repository, API/GUI/CLI, export cikti dosyasi, Podcast 029 ve ZIP/cache/export staging kapsam disidir.
+- Onerilen sonraki adim Adim 174 - Export result report formatter API boundary / test matrix plan olarak kaydedildi; Adim 174 bu adimda baslatilmaz.
+
 ## Podcast 028 Kapsam Karari
 
 - Podcast 028, documentation-only NotebookLM podcast notu olarak yalniz Adim 162-166 araligini kapsar.

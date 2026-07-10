@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 173
+
+- Added a documentation-only follow-up plan for the export result summary/report helper line after Step 168-172.
+- Documented that `build_export_result_summary(...)`, `build_export_result_report(...)`, and `format_export_result_summary_as_markdown(...)` should keep their current behavior while future work is planned in smaller presentation-safe steps.
+- Planned possible future topics including an export result report Markdown formatter plan, JSON-ready formatter boundary, combined handover QC view, report test example standardization, unsupported input documentation, and wrapper-to-summary/report relationship documentation.
+- Recommended Step 174 as an export result report formatter API boundary / test matrix plan without starting it.
+- Kept this as documentation-only; no code, tests, helper behavior changes, export output, Podcast 029, backup/restore/API/GUI/CLI, database/repository behavior, commit, push, or ZIP/cache staging was added.
+
 ## Podcast 028
 
 - Added a documentation-only NotebookLM podcast note for Step 162-166.

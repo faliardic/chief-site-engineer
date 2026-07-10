@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 172 - Export Result Summary Report Helper Edge Case Standardization
+Adim 173 - Export Result Summary Report Follow-up Plan
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -83,6 +83,8 @@ Adim 170'te export wrapper result contract verisini okuyan summary/report helper
 Adim 171'de Adim 170 helperlarinin kullanim siniri documentation-only olarak belgelendi. Tekil success/failure result contract yorumlama, coklu report toplama, Markdown metin uretimi, handover QC review yorumu ve admin/debug teknik detay ayrimi anlatildi. Kod/test degistirilmedi; export ciktisi, hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event, commit ve push eklenmedi.
 
 Adim 172'de export result summary/report helperlari icin edge case standardi documentation-only olarak belgelendi. Empty contract, missing/unknown status, missing path/message/detail, unsupported input, empty report list, mixed result list, duplicate path, non-string field ve Markdown fallback davranislari guvenli diagnostic/review yaklasimiyla standardize edildi. Kod/test degistirilmedi; export ciktisi, hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event, database/repository davranisi, commit ve push eklenmedi.
+
+Adim 173'te Adim 168-172 export result summary/report helper hatti sonrasi follow-up yonu documentation-only olarak planlandi. Mevcut `build_export_result_summary(...)`, `build_export_result_report(...)` ve `format_export_result_summary_as_markdown(...)` helper davranislari korunarak export result report Markdown formatter plani, JSON-ready formatter boundary, combined handover QC gorunumu, test example standardization, unsupported input handling documentation ve wrapper-summary/report iliskisi olasi takip basliklari olarak belgelendi. Adim 174 icin export result report formatter API boundary / test matrix plan onerildi; Adim 174 baslatilmadi. Kod/test/helper davranisi degisikligi, export ciktisi, hard validation, `blocked` status, backup/restore/API/GUI/CLI, Podcast 029, commit ve push eklenmedi.
 
 Adim 160'da mevcut exception tabanli file-writing helper davranisini bozmadan future result contract wrapper API boundary documentation-only olarak planlandi; `write_*` helperlarin korunmasi, olasi `try_write_*` wrapper isimleri, result alanlari, error mapping, geriye uyumluluk ve handover QC gorunurlugu netlestirildi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 
@@ -294,9 +296,14 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 - [x] Adim 167 - Export helper result contract wrapper integration boundary; testlerle sabitlenen wrapper sonucunun handover QC/admin-debug/kullanici mesaji yorum siniri belgelendi.
 - [x] Adim 168 - Export helper result contract summary/report layer plan; wrapper result contract'tan ileride okunabilir ozet/rapor uretme siniri documentation-only olarak planlandi.
 - [x] Adim 169 - Export result summary/report layer API boundary and test matrix plan; input/output siniri ve future test matrix basliklari documentation-only olarak netlestirildi.
+- [x] Adim 170 - Export result summary/report helper implementation; wrapper result contract verisini okuyan read-only summary/report helperlari eklendi.
+- [x] Adim 171 - Export result summary/report helper usage documentation; helper kullanim siniri ve handover QC review yorumu documentation-only olarak belgelendi.
+- [x] Adim 172 - Export result summary/report helper edge case standardization; eksik/unknown/unsupported/mixed input durumlari icin safe review/summary standardi belgelendi.
+- [x] Podcast 028 - Adim 162-166 NotebookLM podcast notu; wrapper test matrix, implementation, usage, examples ve test gorunurlugu ozetlendi.
+- [x] Adim 173 - Export result summary/report follow-up plan; presentation-safe report formatter ve handover QC takip basliklari documentation-only olarak planlandi.
 
 Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokumantasyon ve kullanim standardi ile sabitlemek; sonra rapor format sinirlari, handover QC kullanimi ve soft validation rapor katmanini hard validation'a gecmeden hazirlamaktir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 170 icin handover QC export result interpretation plan veya export result summary implementation boundary ele alinabilir. Hard validation ve `blocked` status henuz eklenmemelidir.
+Adim 174 icin export result report formatter API boundary / test matrix plan ele alinabilir. Hard validation ve `blocked` status henuz eklenmemelidir.
