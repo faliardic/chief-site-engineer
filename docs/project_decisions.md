@@ -1,5 +1,14 @@
 # Proje Kararlari
 
+## 178 Export Result Report Formatter Handover QC Usage Karari
+
+- Adim 178, `format_export_result_report_as_markdown(report)` helper'inin handover QC surecindeki rolunu documentation-only olarak planlar.
+- Formatter ciktisi gorunurluk ve okunabilirlik saglar; devir paketini otomatik onaylamaz veya otomatik bloke etmez.
+- Success-only rapor resmi kabul yerine gecmez; failure-only rapor insan incelemesine tasinir ama otomatik bloklama uretmez; mixed rapor hem basarili hem review gereken itemlari gorunur tutar.
+- Empty, unknown ve missing field durumlari eksik gorunurluk olarak yorumlanir; hard validation veya `blocked` status'a donusturulmez.
+- Eski santiye sefinin ozel alani resmi export/handover paketinden ayridir; formatter yalniz kendisine verilen report dict'ini sunuma cevirir.
+- Future GUI/API/CLI entegrasyonlari bu formatter'i yalniz presentation layer olarak kullanmalidir; audit, database/repository, backup/restore, hard validation ve export uretimi kapsam disidir.
+
 ## 177 Export Result Report Formatter Test Example Standardization Karari
 
 - Adim 177, `format_export_result_report_as_markdown(report)` helper'i icin test/example standardini guclendirir.

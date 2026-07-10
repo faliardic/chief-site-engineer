@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 178
+
+- Added documentation-only handover QC usage planning for `format_export_result_report_as_markdown(report)`.
+- Documented that formatter Markdown provides visibility/readability in handover QC but does not approve or block a handover package.
+- Clarified how success-only, failure-only, mixed, empty, unknown, and missing-field reports should be read by human reviewers.
+- Documented the formatter's place in an export review checklist, incoming site chief visibility, and the separation between the outgoing site chief's private area and the official export/handover package.
+- Reiterated that future GUI/API/CLI integrations should treat the formatter only as a presentation layer; no code, tests, export output, hard validation, `blocked` status, database/repository access, audit event, backup/restore, commit, push, or ZIP/cache staging was added.
+
 ## Step 177
 
 - Added test/example standardization for `format_export_result_report_as_markdown(report)` without changing formatter behavior.
