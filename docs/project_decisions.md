@@ -1,5 +1,14 @@
 # Proje Kararlari
 
+## 172 Export Result Summary/Report Edge Case Karari
+
+- Export result summary/report helperlari edge case durumlarini hard validation'a cevirmeyecek.
+- Empty contract, missing/unknown status, missing path/message/error/detail, unsupported input, empty report list, mixed report list, duplicate path ve non-string alanlar guvenli diagnostic veya review/attention ozetleri olarak yorumlanacak.
+- Helperlar input'u mutate etmeyecek, dosya yazmayacak, export helper cagirmayacak ve low-level `write_*` helper davranisini degistirmeyecek.
+- Missing field durumunda Markdown formatter kirik veya bos metin yerine guvenli fallback mesaj kullanacak sekilde yorumlanmalidir.
+- Handover QC yorumunda unknown veya incomplete result contract attention gerektirebilir; fakat devir paketini otomatik bloke etmez, kayitlari gecersiz saymaz, migration veya otomatik duzeltme baslatmaz ve hard validation anlamina gelmez.
+- Edge case standardi gelecekte test basliklarina kaynak olabilir; bu adimda test veya helper davranisi degistirilmez.
+
 ## 171 Export Result Summary/Report Usage Karari
 
 - Adim 170 helperlari read-only yorumlama katmani olarak kullanilacak.

@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 172
+
+- Added documentation-only edge case standardization for the export result summary/report helper layer.
+- Documented how empty contracts, missing or unknown status, missing path/message/error/detail fields, unsupported input, empty result lists, mixed reports, duplicate paths, non-string values, and incomplete Markdown fields should be interpreted.
+- Clarified that edge cases should remain safe diagnostic or review/attention summaries, not hard validation, automatic package blocking, record invalidation, migration, automatic correction, audit event creation, or `blocked` status.
+- Documented future test topic names for empty contracts, missing status, unknown status, fallback messages, unsupported input, empty reports, mixed counts, duplicate path visibility, non-string handling, Markdown fallback, no file writing, no `blocked` status, and input immutability.
+- Kept this as documentation-only; no code, tests, helper behavior changes, export output, backup/restore/API/GUI/CLI, database/repository behavior, commit, push, or ZIP/cache staging was added.
+
 ## Step 171
 
 - Added documentation-only usage guidance for the Step 170 read-only export result summary/report helper layer.
