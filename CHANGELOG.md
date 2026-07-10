@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 167
+
+- Added documentation-only integration boundary guidance after the Step 166 wrapper result contract tests.
+- Documented the tested behavior now treated as stable: JSON success contract, Markdown success contract, invalid-path failure contract, input immutability, and preserved low-level `write_*` exception behavior.
+- Clarified that wrapper failure/error contracts can support handover QC, admin/debug views, safe export summaries, and short user-facing messages without adding GUI/API/CLI integration.
+- Explained that failure contracts support safe explanation and review, not automatic correction, hard validation, package blocking, `blocked` status, audit event creation, backup/restore, or database/repository writes.
+- Added a next-step suggestion for Step 168 as either an export helper result contract summary/report layer plan or a handover QC export result interpretation plan, without starting that step.
+- Kept this as documentation-only; no application code, tests, helper behavior changes, JSON/Markdown export output, backup/restore behavior, database/repository/API/GUI/CLI, audit event creation, hard validation, `blocked` status, commit, push, or ZIP/cache staging was added.
+
 ## Step 166
 
 - Added focused tests that make the existing export helper result contract wrapper behavior more visible.

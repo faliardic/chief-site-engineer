@@ -1655,3 +1655,14 @@
 - Dusuk seviye `write_json_ready_dict_to_file(...)` ve `write_markdown_text_to_file(...)` helperlarinin file-exists senaryosunda `FileExistsError` firlatan exception tabanli davranisini korudugu; wrapperlarin ayni senaryoyu failure contract olarak raporladigi regression testiyle sabitlendi.
 - Testler file-writing davranisini yalniz pytest `tmp_path` altinda dogrular; repo icindeki `exports/` dizinine cikti birakilmaz.
 - Bu adim test + dokumantasyon adimidir; `app/models.py`, production helper davranisi, helper imzalari, repo icinde JSON/Markdown export cikti dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event uretimi, database/repository davranisi, ZIP staging, commit veya push eklenmedi.
+
+## 167 Export Helper Result Contract Wrapper Integration Boundary
+
+- Adim 167, Adim 166'da testlerle gorunur hale gelen wrapper result contract davranisinin kullanim ve entegrasyon sinirini documentation-only olarak belgelendirdi.
+- Testlerden sonra sabitlenen davranislar JSON success contract, Markdown success contract, invalid path failure contract, input immutability ve dusuk seviye `write_*` helperlarin exception tabanli davranisinin korunmasi olarak kaydedildi.
+- Basarisiz dosya yazma/path senaryolarinin wrapper seviyesinde exception olarak ust katmana firlatilmayacagi; okunabilir `success=False`, `error_code`, `error_message`, `attempted_path`, `skipped_reason` ve `overwritten` alanlariyla yorumlanacagi aciklandi.
+- Wrapper result contract'in ileride handover QC, admin/debug gorunumu, guvenli export ozeti veya kullaniciya gosterilecek kisa sonuc mesajlari icin kullanilabilecegi belgelendi.
+- Bu adimda GUI/API/CLI entegrasyonu yapilmadi; result contract yorumlama isinin ayri katman olarak kalacagi ve wrapper helper'in dogrudan backup/restore veya audit event sistemi olmadigi netlestirildi.
+- Basarili contract'in export yazma isleminin kontrollu tamamlandigini; failure/error contract'in ise ust katmana guvenli aciklama sunmak icin kullanilacagini, fakat otomatik duzeltme, hard validation veya devir paketini otomatik bloke etme anlami tasimayacagini belirtti.
+- Hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event uretimi, database/repository davranisi, repo icinde export cikti dosyasi, ZIP/cache staging ve dusuk seviye helper davranisi degisikligi kapsam disi tutuldu.
+- Sonraki olasi adim olarak Adim 168 icin export helper result contract summary/report layer plan veya handover QC export result interpretation plan onerildi; Adim 168 bu adimda baslatilmadi.
