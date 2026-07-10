@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 174 - Export Result Report Formatter API Boundary and Test Matrix Plan
+Adim 175 - Read-only Export Result Report Markdown Formatter Implementation
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -88,6 +88,8 @@ Adim 173'te Adim 168-172 export result summary/report helper hatti sonrasi follo
 
 Adim 174'te future `format_export_result_report_as_markdown(report)` helper'i icin API boundary ve test matrix documentation-only olarak planlandi. Helper'in `build_export_result_report(...)` ciktisi olan dict'i input olarak alip presentation-safe Markdown string dondurmesi; dosya yazmamasi, export uretmemesi, database/repository erisimi yapmamasi, summary/report sonucunu yeniden hesaplamamasi, input mutate etmemesi ve hard validation veya `blocked` status uretmemesi belgelendi. Empty report, all-success, mixed success/failure, missing optional fields, unknown status, path visibility, error message visibility, input immutability, no recomputation, string output, no file writing, low-level `write_*` ve `try_write_*` davranisini koruma test basliklari planlandi. Adim 175 read-only export result report Markdown formatter implementation olarak onerildi; Adim 175 baslatilmadi. Kod/test/helper davranisi degisikligi, export ciktisi, backup/restore/API/GUI/CLI, Podcast 029, commit ve push eklenmedi.
 
+Adim 175'te `format_export_result_report_as_markdown(report)` helper'i read-only olarak eklendi. Helper `build_export_result_report(...)` ciktisi olan dict'i Markdown string'e cevirir; status, count, success/review gorunurlugu, path, error type, technical detail, next action ve overwrite bilgisini sunar. Summary/report sonucunu yeniden hesaplamaz, input'u mutate etmez, dosya yazmaz, export uretmez, hard validation veya `blocked` status uretmez. Existing `build_export_result_report(...)`, `build_export_result_summary(...)`, `format_export_result_summary_as_markdown(...)`, low-level `write_*` ve `try_write_*` wrapper davranislari korunur. Backup/restore/API/GUI/CLI, audit event, database/repository davranisi, export ciktisi, commit ve push eklenmedi.
+
 Adim 160'da mevcut exception tabanli file-writing helper davranisini bozmadan future result contract wrapper API boundary documentation-only olarak planlandi; `write_*` helperlarin korunmasi, olasi `try_write_*` wrapper isimleri, result alanlari, error mapping, geriye uyumluluk ve handover QC gorunurlugu netlestirildi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 
 Adim 161'de Adim 160 API boundary'sine bagli future result contract wrapper implementation plan documentation-only olarak netlestirildi; `try_write_json_ready_dict_to_file(...)` ve `try_write_markdown_text_to_file(...)` wrapper davranisi, basari/hata result sozlesmesi, error mapping, overwrite/path safety davranisi, geriye uyumluluk ve handover QC gorunurlugu belgelendi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
@@ -117,7 +119,7 @@ Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test
 Guncel test durumu:
 
 ```text
-342 passed
+361 passed
 ```
 
 Proje su anda domain model, bellek ici repository, test, dokumantasyon, learning ve NotebookLM podcast notlari cekirdegi seviyesindedir.
@@ -304,9 +306,10 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 - [x] Podcast 028 - Adim 162-166 NotebookLM podcast notu; wrapper test matrix, implementation, usage, examples ve test gorunurlugu ozetlendi.
 - [x] Adim 173 - Export result summary/report follow-up plan; presentation-safe report formatter ve handover QC takip basliklari documentation-only olarak planlandi.
 - [x] Adim 174 - Export result report formatter API boundary and test matrix plan; future report Markdown formatter siniri ve test kategorileri documentation-only olarak planlandi.
+- [x] Adim 175 - Read-only export result report markdown formatter implementation; report dict ciktisini Markdown string'e ceviren read-only helper ve testleri eklendi.
 
 Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokumantasyon ve kullanim standardi ile sabitlemek; sonra rapor format sinirlari, handover QC kullanimi ve soft validation rapor katmanini hard validation'a gecmeden hazirlamaktir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 175 icin read-only export result report markdown formatter implementation ele alinabilir. Hard validation ve `blocked` status henuz eklenmemelidir.
+Adim 176 icin export result report formatter usage documentation ele alinabilir. Hard validation ve `blocked` status henuz eklenmemelidir.

@@ -1,5 +1,14 @@
 # Proje Kararlari
 
+## 175 Export Result Report Markdown Formatter Implementation Karari
+
+- Adim 175, `format_export_result_report_as_markdown(report)` helper'ini read-only presentation formatter olarak implemente eder.
+- Helper yalniz `build_export_result_report(...)` ciktisi olan dict'i Markdown string'e cevirir; dosya yazmaz, export uretmez, database/repository erisimi yapmaz ve audit event uretmez.
+- Helper summary/report sonucunu yeniden hesaplamaz, export wrapper veya builder helper cagirmadan mevcut report alanlarini okur ve input dict'i mutate etmez.
+- Markdown cikti status, total/success/review/unknown count, success/failure gorunurlugu, path, error type, technical detail, next action ve overwrite bilgisini gorunur kilar.
+- Hard validation, diagnostic/soft validation sonucu, `blocked` status, backup/restore, API/GUI/CLI ve export ciktisi kapsam disidir.
+- Existing `build_export_result_report(...)`, `build_export_result_summary(...)`, `format_export_result_summary_as_markdown(...)`, low-level `write_*` helperlari ve `try_write_*` wrapper davranislari korunur.
+
 ## 174 Export Result Report Formatter API Boundary Karari
 
 - Adim 174, future `format_export_result_report_as_markdown(report)` helper'i icin API boundary ve test matrix'i documentation-only olarak planlar.

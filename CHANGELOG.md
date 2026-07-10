@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 175
+
+- Added the read-only `format_export_result_report_as_markdown(report)` helper for `build_export_result_report(...)` output.
+- Rendered export report status, counts, success/review visibility, paths, error types, technical details, next actions, and overwrite visibility as presentation-safe Markdown text.
+- Added tests for success, failure, mixed success/failure, count visibility, error message visibility, string output, input immutability, no file writing, no report recomputation, unsupported input, no generated `blocked` status, and existing summary formatter regression.
+- Confirmed the formatter does not write files, create export output, access database/repository state, recompute summary/report data, mutate input, trigger hard validation, create audit events, or change `write_*` / `try_write_*` behavior.
+- Kept backup/restore/API/GUI/CLI out of scope; no commit, push, ZIP/cache staging, or export output was added.
+
 ## Step 174
 
 - Added a documentation-only API boundary and test matrix plan for a future export result report Markdown formatter.

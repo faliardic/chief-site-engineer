@@ -1670,6 +1670,135 @@ def build_export_result_report(result_contracts: object) -> dict[str, object]:
     }
 
 
+def _export_report_markdown_value(value: object, fallback: str = "not available") -> str:
+    if value is None:
+        return fallback
+    text = str(value).replace("\r", " ").replace("\n", " ").strip()
+    return text or fallback
+
+
+def _export_report_markdown_status(value: object) -> str:
+    status = _export_report_markdown_value(value, "unknown")
+    if status == "blocked":
+        return "review"
+    return status
+
+
+def format_export_result_report_as_markdown(report: object) -> str:
+    """Format an export result report dict as Markdown without writing a file."""
+
+    if not isinstance(report, dict):
+        return "\n".join(
+            [
+                "# Export Result Report",
+                "",
+                "## Summary",
+                "- Status: unknown",
+                "- Total: not available",
+                "- Success: not available",
+                "- Failure/review: not available",
+                "- Unknown: not available",
+                "- Message: Export result report could not be interpreted.",
+                "",
+                "## Notes",
+                "- Read-only presentation formatter.",
+                "- No files are written and no export output is created.",
+                "- Report data is not recalculated and hard validation is not performed.",
+            ]
+        ) + "\n"
+
+    lines = [
+        "# Export Result Report",
+        "",
+        "## Summary",
+        f"- Status: {_export_report_markdown_status(report.get('status'))}",
+        f"- Total: {_export_report_markdown_value(report.get('total_count'))}",
+        f"- Success: {_export_report_markdown_value(report.get('success_count'))}",
+        f"- Failure/review: {_export_report_markdown_value(report.get('review_count'))}",
+        f"- Unknown: {_export_report_markdown_value(report.get('unknown_count'))}",
+        (
+            "- Message: "
+            f"{_export_report_markdown_value(report.get('safe_for_user_message'))}"
+        ),
+    ]
+
+    items = report.get("items", [])
+    if isinstance(items, list) and items:
+        lines.extend(["", "## Items"])
+        for index, item in enumerate(items, start=1):
+            if not isinstance(item, dict):
+                lines.extend(
+                    [
+                        f"{index}. unknown - Export result item could not be interpreted.",
+                        "   - Path: not available",
+                    ]
+                )
+                continue
+
+            item_status = _export_report_markdown_status(item.get("status"))
+            item_message = _export_report_markdown_value(
+                item.get("safe_for_user_message"),
+                "Export result item has no message.",
+            )
+            item_path = _export_report_markdown_value(item.get("path"))
+
+            lines.extend(
+                [
+                    f"{index}. {item_status} - {item_message}",
+                    (
+                        "   - File type: "
+                        f"{_export_report_markdown_value(item.get('file_type'))}"
+                    ),
+                    f"   - Path: {item_path}",
+                ]
+            )
+            if item.get("output_path") is not None:
+                lines.append(
+                    "   - Output path: "
+                    f"{_export_report_markdown_value(item.get('output_path'))}"
+                )
+            if item.get("attempted_path") is not None:
+                lines.append(
+                    "   - Attempted path: "
+                    f"{_export_report_markdown_value(item.get('attempted_path'))}"
+                )
+            if item.get("allowed_root") is not None:
+                lines.append(
+                    "   - Allowed root: "
+                    f"{_export_report_markdown_value(item.get('allowed_root'))}"
+                )
+            if item.get("error_type") is not None:
+                lines.append(
+                    f"   - Error type: {_export_report_markdown_value(item.get('error_type'))}"
+                )
+            if item.get("technical_detail") is not None:
+                lines.append(
+                    "   - Technical detail: "
+                    f"{_export_report_markdown_value(item.get('technical_detail'))}"
+                )
+            if item.get("next_action_hint") is not None:
+                lines.append(
+                    "   - Next action: "
+                    f"{_export_report_markdown_value(item.get('next_action_hint'))}"
+                )
+            if item.get("overwritten") is not None:
+                overwritten = "yes" if item.get("overwritten") is True else "no"
+                lines.append(f"   - Overwritten: {overwritten}")
+    else:
+        lines.extend(["", "## Items", "- No export result items."])
+
+    lines.extend(
+        [
+            "",
+            "## Notes",
+            "- Read-only presentation formatter.",
+            "- No files are written and no export output is created.",
+            "- Report data is not recalculated and hard validation is not performed.",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
 def format_export_result_summary_as_markdown(summary: object) -> str:
     """Format a summary or report dict as Markdown without writing a file."""
 

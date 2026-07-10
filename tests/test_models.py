@@ -61,6 +61,7 @@ from app.models import (
     build_record_id_diagnostic_report,
     build_record_id_soft_validation_report,
     diagnose_record_id_for_target_type,
+    format_export_result_report_as_markdown,
     format_export_result_summary_as_markdown,
     format_record_id_diagnostic_report_as_json_ready_dict,
     format_record_id_diagnostic_report_as_markdown,
@@ -1836,6 +1837,235 @@ def test_format_export_result_summary_as_markdown_contains_safe_message(
     assert "Export was not written because the parent folder is missing." in markdown
     assert "- Error type: parent_missing" in markdown
     assert "- Technical detail: output_path parent directory does not exist" in markdown
+
+
+def test_format_export_result_report_as_markdown_formats_success_report(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "report.json"
+    report = build_export_result_report(
+        [
+            {
+                "success": True,
+                "output_path": output_path,
+                "attempted_path": output_path,
+                "allowed_root": tmp_path,
+                "file_type": "json",
+                "overwritten": False,
+            }
+        ]
+    )
+
+    markdown = format_export_result_report_as_markdown(report)
+
+    assert isinstance(markdown, str)
+    assert markdown.startswith("# Export Result Report\n")
+    assert "- Status: success" in markdown
+    assert "- Total: 1" in markdown
+    assert "- Success: 1" in markdown
+    assert "- Failure/review: 0" in markdown
+    assert "1. success - json export completed." in markdown
+    assert f"   - Path: {output_path}" in markdown
+    assert "Read-only presentation formatter." in markdown
+
+
+def test_format_export_result_report_as_markdown_formats_failure_report(
+    tmp_path,
+) -> None:
+    attempted_path = tmp_path / "missing" / "report.md"
+    report = build_export_result_report(
+        [
+            {
+                "success": False,
+                "output_path": None,
+                "attempted_path": attempted_path,
+                "file_type": "markdown",
+                "error_code": "parent_missing",
+                "error_message": "output_path parent directory does not exist",
+                "overwritten": False,
+            }
+        ]
+    )
+
+    markdown = format_export_result_report_as_markdown(report)
+
+    assert "- Status: review" in markdown
+    assert "- Success: 0" in markdown
+    assert "- Failure/review: 1" in markdown
+    assert "1. review - Export was not written because the parent folder is missing." in markdown
+    assert f"   - Path: {attempted_path}" in markdown
+    assert "   - Error type: parent_missing" in markdown
+    assert "   - Technical detail: output_path parent directory does not exist" in markdown
+
+
+def test_format_export_result_report_as_markdown_keeps_mixed_visibility(
+    tmp_path,
+) -> None:
+    success_path = tmp_path / "ok.json"
+    failure_path = tmp_path / "exists.md"
+    report = build_export_result_report(
+        [
+            {
+                "success": True,
+                "output_path": success_path,
+                "attempted_path": success_path,
+                "file_type": "json",
+                "overwritten": False,
+            },
+            {
+                "success": False,
+                "output_path": None,
+                "attempted_path": failure_path,
+                "file_type": "markdown",
+                "error_code": "file_exists",
+                "error_message": "output_path already exists",
+                "overwritten": False,
+            },
+        ]
+    )
+
+    markdown = format_export_result_report_as_markdown(report)
+
+    assert "- Status: review" in markdown
+    assert "- Total: 2" in markdown
+    assert "- Success: 1" in markdown
+    assert "- Failure/review: 1" in markdown
+    assert f"   - Path: {success_path}" in markdown
+    assert f"   - Path: {failure_path}" in markdown
+    assert "json export completed." in markdown
+    assert "Export was not written because the target file exists." in markdown
+
+
+def test_format_export_result_report_as_markdown_does_not_mutate_input(
+    tmp_path,
+) -> None:
+    report = build_export_result_report(
+        [
+            {
+                "success": False,
+                "output_path": None,
+                "attempted_path": tmp_path / "wrong.txt",
+                "file_type": "markdown",
+                "error_code": "wrong_extension",
+                "error_message": "output_path must use the .md extension",
+                "overwritten": False,
+            }
+        ]
+    )
+    original_report = deepcopy(report)
+
+    format_export_result_report_as_markdown(report)
+
+    assert report == original_report
+
+
+def test_format_export_result_report_as_markdown_does_not_write_files(
+    tmp_path,
+) -> None:
+    output_path = tmp_path / "export.json"
+    report = build_export_result_report(
+        [
+            {
+                "success": True,
+                "output_path": output_path,
+                "attempted_path": output_path,
+                "file_type": "json",
+                "overwritten": False,
+            }
+        ]
+    )
+
+    markdown = format_export_result_report_as_markdown(report)
+
+    assert markdown
+    assert not output_path.exists()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_format_export_result_report_as_markdown_does_not_recompute_report() -> None:
+    report = {
+        "operation": "export_result_report",
+        "status": "review",
+        "total_count": 1,
+        "success_count": 0,
+        "review_count": 1,
+        "unknown_count": 0,
+        "safe_for_user_message": "Existing report message.",
+        "items": [
+            {
+                "status": "review",
+                "safe_for_user_message": "Prebuilt item message.",
+                "path": "exports/prebuilt.md",
+                "technical_detail": "Prebuilt technical detail.",
+                "overwritten": False,
+                "success": True,
+                "error_code": "would_be_recomputed_if_treated_as_contract",
+            }
+        ],
+    }
+
+    markdown = format_export_result_report_as_markdown(report)
+
+    assert "Prebuilt item message." in markdown
+    assert "Prebuilt technical detail." in markdown
+    assert "would_be_recomputed_if_treated_as_contract" not in markdown
+    assert "json export completed." not in markdown
+
+
+def test_format_export_result_report_as_markdown_handles_unsupported_input() -> None:
+    markdown = format_export_result_report_as_markdown("not a report")
+
+    assert isinstance(markdown, str)
+    assert markdown.startswith("# Export Result Report\n")
+    assert "- Status: unknown" in markdown
+    assert "Export result report could not be interpreted." in markdown
+
+
+def test_format_export_result_report_as_markdown_does_not_emit_blocked_status() -> None:
+    report = {
+        "operation": "export_result_report",
+        "status": "blocked",
+        "total_count": 1,
+        "success_count": 0,
+        "review_count": 1,
+        "unknown_count": 0,
+        "safe_for_user_message": "Manual review required.",
+        "items": [
+            {
+                "status": "blocked",
+                "safe_for_user_message": "Manual review item.",
+                "path": "exports/review.md",
+            }
+        ],
+    }
+
+    markdown = format_export_result_report_as_markdown(report)
+
+    assert "- Status: review" in markdown
+    assert "1. review - Manual review item." in markdown
+    assert "blocked" not in markdown.lower()
+
+
+def test_format_export_result_summary_as_markdown_report_regression(
+    tmp_path,
+) -> None:
+    report = build_export_result_report(
+        [
+            {
+                "success": True,
+                "output_path": tmp_path / "summary.json",
+                "attempted_path": tmp_path / "summary.json",
+                "file_type": "json",
+                "overwritten": False,
+            }
+        ]
+    )
+
+    markdown = format_export_result_summary_as_markdown(report)
+
+    assert markdown.startswith("# Export Result Report\n")
+    assert "- Status: success" in markdown
+    assert "1. success - json export completed." in markdown
 
 
 def test_export_result_summary_helpers_do_not_write_files(tmp_path) -> None:
