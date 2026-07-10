@@ -1,5 +1,13 @@
 # Changelog
 
+## Podcast 029
+
+- Added a documentation-only NotebookLM podcast note for Step 167-180.
+- Summarized the arc from export helper result contract wrapper integration boundary through summary/report helper planning, implementation, usage, edge case standardization, report formatter planning, formatter implementation, handover QC usage, downstream integration boundary, and Step 180 phase closure.
+- Clarified that `format_export_result_report_as_markdown(report)` is a read-only presentation-layer formatter for `build_export_result_report(...)` output and does not write files, create exports, mutate input, recompute report results, or decide handover acceptance.
+- Reiterated that hard validation, `blocked` status, API/GUI/CLI implementation, database/repository access, audit event creation, backup/restore implementation, export output files, Step 181, and a new technical phase remain out of scope.
+- Kept this as documentation-only; no application code, tests, helper behavior changes, export output, commit, push, or ZIP/cache staging was added.
+
 ## Step 180
 
 - Added documentation-only phase closure for the Step 175-179 export result report formatter work.

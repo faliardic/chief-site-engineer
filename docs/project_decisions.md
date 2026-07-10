@@ -1,5 +1,13 @@
 # Proje Kararlari
 
+## Podcast 029 Kapsam Karari
+
+- Podcast 029, documentation-only NotebookLM podcast notu olarak yalniz Adim 167-180 araligini kapsar.
+- Kapsam; export helper result contract wrapper integration boundary, summary/report layer plan ve implementation, usage ve edge case standardization, report formatter API boundary, read-only formatter implementation, formatter usage/test-example standardization, handover QC usage, downstream integration boundary ve Adim 180 phase closure hattidir.
+- `format_export_result_report_as_markdown(report)` helper'i read-only presentation layer olarak anlatilir; dosya yazmaz, export uretmez, input mutate etmez, report sonucunu yeniden hesaplamaz ve handover karar otoritesi degildir.
+- Adim 181, yeni teknik faz, hard validation, `blocked` status, API/GUI/CLI implementation, database/repository erisimi, audit event uretimi, backup/restore implementation ve export cikti dosyasi kapsam disidir.
+- Bu podcast yeni helper, test, kod davranisi, commit, push veya ZIP/cache/export staging uretmez.
+
 ## 180 Export Result Report Formatter Phase Closure Karari
 
 - Adim 180, Adim 175-179 export result report formatter fazini documentation-only olarak kapatir.
