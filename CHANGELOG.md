@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 176
+
+- Added documentation-only usage and edge case standardization for `format_export_result_report_as_markdown(report)`.
+- Documented that the formatter expects `build_export_result_report(...)` dict output and returns a presentation-safe Markdown string.
+- Clarified success-only, failure-only, mixed, empty item/count, missing field, and unknown field interpretation for handover/export QC review.
+- Reiterated that the formatter only presents the existing report dict; it does not write files, create exports, mutate input, recompute report results, reject records, trigger hard validation, produce `blocked` status, or change summary/report/write helper behavior.
+- Kept this step documentation-only; no code, tests, helper behavior changes, export output, API/GUI/CLI, database/repository behavior, audit event, backup/restore behavior, commit, push, or ZIP/cache staging was added.
+
 ## Step 175
 
 - Added the read-only `format_export_result_report_as_markdown(report)` helper for `build_export_result_report(...)` output.

@@ -1,5 +1,14 @@
 # Proje Kararlari
 
+## 176 Export Result Report Markdown Formatter Usage Karari
+
+- Adim 176, `format_export_result_report_as_markdown(report)` helper'i icin usage boundary ve edge case standardini documentation-only olarak belirler.
+- Helper'in input'u `build_export_result_report(...)` ciktisi olan dict, output'u presentation-safe Markdown string olarak okunur.
+- Formatter yalnizca mevcut report dict'ini sunuma cevirir; kayit reddetmez, export basarisi/basarisizligini yeniden hesaplamaz, dosya sistemi yan etkisi olusturmaz ve input'u mutate etmez.
+- Success-only, failure-only ve mixed report ciktilari handover/export QC icin gorunurluk saglar; karar verdiren otorite degildir.
+- Empty item/count, missing field ve unknown field durumlari hard validation'a veya otomatik bloklamaya donusturulmez; formatter presentation layer sinirinda kalir.
+- Summary/report/write helper davranislari, `try_write_*` wrapper davranisi, API/GUI/CLI, database/repository erisimi, audit event, backup/restore, hard validation ve `blocked` status kapsam disidir.
+
 ## 175 Export Result Report Markdown Formatter Implementation Karari
 
 - Adim 175, `format_export_result_report_as_markdown(report)` helper'ini read-only presentation formatter olarak implemente eder.
