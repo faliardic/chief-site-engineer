@@ -1,5 +1,14 @@
 # Proje Kararlari
 
+## 179 Export Result Report Formatter Downstream Integration Boundary Karari
+
+- Adim 179, `format_export_result_report_as_markdown(report)` helper'i icin downstream integration boundary'yi documentation-only olarak planlar.
+- Future GUI/API/CLI, handover QC ekrani ve export review akislari formatter ciktisini yalniz read-only presentation layer olarak kullanabilir; bu adim entegrasyon eklemez.
+- Downstream consumer'lar mevcut `build_export_result_report(...)` report dict contract'ina bagli kalmali ve formatter'a ham export writer veya validation gate gibi davranmamalidir.
+- Presentation layer; business decision, hard validation, audit, persistence, export writing ve backup/restore katmanlarindan ayridir.
+- Success gorunurlugu otomatik resmi kabul/onay anlamina gelmez; failure gorunurlugu otomatik bloklama anlamina gelmez.
+- GUI/API/CLI eklenirse bu ayri adim, ayri test ve ayri dokumantasyonla yapilmalidir; hard validation ve `blocked` status kapsam disidir.
+
 ## 178 Export Result Report Formatter Handover QC Usage Karari
 
 - Adim 178, `format_export_result_report_as_markdown(report)` helper'inin handover QC surecindeki rolunu documentation-only olarak planlar.

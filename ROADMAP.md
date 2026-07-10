@@ -3,7 +3,7 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 178 - Export Result Report Formatter Handover QC Usage Plan
+Adim 179 - Export Result Report Formatter Downstream Integration Boundary Plan
 ```
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
@@ -95,6 +95,8 @@ Adim 176'da `format_export_result_report_as_markdown(report)` helper'inin usage 
 Adim 177'de `format_export_result_report_as_markdown(report)` helper'i icin test/example standardi guclendirildi. Success-only, failure-only ve empty zero-count Markdown ornekleri; missing optional field fallback davranisi; additional/raw field presentation boundary ve `build_export_result_report(...)` contract regression testleri eklendi. Formatter davranisi genisletilmedi, `app/models.py` degistirilmedi, dosya yazma/export ciktisi/hard validation/`blocked` status/API/GUI/CLI/database-repository/audit/backup-restore eklenmedi.
 
 Adim 178'de `format_export_result_report_as_markdown(report)` helper'inin handover QC surecinde nasil okunacagi documentation-only olarak planlandi. Formatter ciktisinin devir kalite kontrolunde gorunurluk ve okunabilirlik sagladigi, fakat devir paketini otomatik onaylamadigi veya bloke etmedigi netlestirildi. Success-only, failure-only, mixed, empty/unknown/missing field raporlarin insan incelemesine nasil tasinacagi; export review checklist icindeki yeri; yeni santiye sefi gorunurlugu; eski santiye sefinin ozel alani ile resmi export/handover paketinin ayrimi ve future GUI/API/CLI entegrasyonlarinda formatter'in yalniz presentation layer olarak kalmasi belgelendi. Kod/test/helper davranisi, hard validation, `blocked` status, database/repository, audit, backup/restore, export ciktisi, commit ve push eklenmedi.
+
+Adim 179'da `format_export_result_report_as_markdown(report)` helper'i icin downstream integration boundary documentation-only olarak planlandi. Future GUI/API/CLI, handover QC ekrani ve export review akislari bu formatter'i yalniz read-only presentation layer olarak kullanabilir; ancak entegrasyon bu adimda eklenmedi. Downstream consumer'larin mevcut `build_export_result_report(...)` report dict contract'ina bagli kalmasi, formatter'a raw export writer gibi davranmamasi, report building/presentation/human review/validation/export writing/audit/persistence katmanlarini ayri tutmasi belgelendi. Success gorunurlugu otomatik resmi kabul, failure gorunurlugu otomatik bloklama degildir. Kod/test/helper davranisi, GUI/API/CLI, database/repository, audit, backup/restore, export ciktisi, hard validation, `blocked` status, commit ve push eklenmedi.
 
 Adim 160'da mevcut exception tabanli file-writing helper davranisini bozmadan future result contract wrapper API boundary documentation-only olarak planlandi; `write_*` helperlarin korunmasi, olasi `try_write_*` wrapper isimleri, result alanlari, error mapping, geriye uyumluluk ve handover QC gorunurlugu netlestirildi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 
@@ -316,9 +318,10 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 - [x] Adim 176 - Export result report markdown formatter usage and edge case standardization; formatter kullanim siniri ve QC okuma standardi documentation-only olarak belgelendi.
 - [x] Adim 177 - Export result report formatter test/example standardization; Markdown ornekleri ve formatter boundary regression testleri guclendirildi.
 - [x] Adim 178 - Export result report formatter handover QC usage plan; formatter ciktisinin handover review icindeki presentation-layer rolu belgelendi.
+- [x] Adim 179 - Export result report formatter downstream integration boundary plan; GUI/API/CLI ve review akislari icin presentation-layer entegrasyon siniri belgelendi.
 
 Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokumantasyon ve kullanim standardi ile sabitlemek; sonra rapor format sinirlari, handover QC kullanimi ve soft validation rapor katmanini hard validation'a gecmeden hazirlamaktir.
 
 ## Sonraki Calisma Onerisi
 
-Adim 179 icin export result report JSON-ready presentation formatter boundary plan ele alinabilir. Hard validation ve `blocked` status henuz eklenmemelidir.
+Adim 180 icin export result report JSON-ready presentation formatter boundary plan ele alinabilir. Hard validation ve `blocked` status henuz eklenmemelidir.

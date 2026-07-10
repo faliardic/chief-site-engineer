@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 179
+
+- Added documentation-only downstream integration boundary planning for `format_export_result_report_as_markdown(report)`.
+- Documented that future GUI/API/CLI, handover QC screens, and export review flows may use formatter output only as a read-only presentation layer.
+- Clarified that downstream consumers must keep report building, presentation, human review decisions, validation, export writing, audit, and persistence responsibilities separate.
+- Reiterated that formatter success visibility is not automatic official acceptance and failure visibility is not automatic blocking.
+- Kept this step integration-free; no code, tests, GUI/API/CLI, database/repository access, audit event, backup/restore, export output, hard validation, `blocked` status, commit, push, or ZIP/cache staging was added.
+
 ## Step 178
 
 - Added documentation-only handover QC usage planning for `format_export_result_report_as_markdown(report)`.
