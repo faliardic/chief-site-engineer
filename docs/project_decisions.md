@@ -1666,3 +1666,14 @@
 - Basarili contract'in export yazma isleminin kontrollu tamamlandigini; failure/error contract'in ise ust katmana guvenli aciklama sunmak icin kullanilacagini, fakat otomatik duzeltme, hard validation veya devir paketini otomatik bloke etme anlami tasimayacagini belirtti.
 - Hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event uretimi, database/repository davranisi, repo icinde export cikti dosyasi, ZIP/cache staging ve dusuk seviye helper davranisi degisikligi kapsam disi tutuldu.
 - Sonraki olasi adim olarak Adim 168 icin export helper result contract summary/report layer plan veya handover QC export result interpretation plan onerildi; Adim 168 bu adimda baslatilmadi.
+
+## 168 Export Helper Result Contract Summary Report Layer Plan
+
+- Adim 168, Adim 163-167 araliginda olusturulan ve testlerle sabitlenen export helper result contract wrapper davranisinin ileride nasil ozetlenebilecegini ve raporlanabilecegini documentation-only olarak planladi.
+- Planlanan summary/report layer amaci wrapper result contract ciktilarindan okunabilir ozet uretmek, basari ve hata durumlarini ust katmana kisa, standart ve yorumlanabilir sekilde tasimak, handover QC/admin-debug/kullanici mesaji icin zemin hazirlamak olarak belirlendi.
+- Bu katmanin `write_*` file-writing helperlarinin veya `try_*` wrapper helperlarinin yerine gecmeyecegi; yalniz mevcut result contract'i yorumlayan ayri bir katman olabilecegi kaydedildi.
+- Olasil ilerideki helper fikirleri `build_export_result_summary(...)`, `build_export_result_report(...)` ve `format_export_result_summary_as_markdown(...)` olarak yalniz plan seviyesinde tartisildi; implementasyon yapilmadi ve helper imzasi kilitlenmedi.
+- Plan duzeyinde `operation`, `status`, `path`, `message`, `error_type`, `safe_for_user_message`, `technical_detail` ve `next_action_hint` alanlari tartisildi; bu alanlar zorunlu sema olarak kilitlenmedi.
+- Handover QC yorumunda basarili export icin "export uretildi", basarisiz export icin "gozden gecirilecek export sonucu" dilinin kullanilabilecegi; failure contract'in kayitlari gecersiz yapmayacagi, devir paketini otomatik bloke etmeyecegi ve hard validation anlami tasimayacagi yinelendi.
+- Future test matrix planinda success contract summary, failure contract summary, mixed result list summary, missing optional fields, unsupported input, input immutability, no blocked status ve no recomputation of low-level result basliklari belgelendi; test yazilmadi.
+- Bu adim documentation-only plan adimidir; uygulama kodu, test dosyalari, existing helper davranisi, JSON/Markdown export cikti dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event uretimi, database/repository davranisi, ZIP/cache staging, commit veya push eklenmedi.

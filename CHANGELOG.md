@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 168
+
+- Added a documentation-only plan for a future export helper result contract summary/report layer.
+- Explained that a future summary/report layer could translate wrapper result contracts into readable handover QC, admin/debug, safe export summary, or user-facing messages without replacing file-writing helpers.
+- Documented possible future helper ideas such as `build_export_result_summary(...)`, `build_export_result_report(...)`, and `format_export_result_summary_as_markdown(...)` as planning examples only.
+- Listed possible summary fields including `operation`, `status`, `path`, `message`, `error_type`, `safe_for_user_message`, `technical_detail`, and `next_action_hint` without locking them as a required schema.
+- Planned future test categories for success summaries, failure summaries, mixed result lists, missing optional fields, unsupported input, immutability, no `blocked` status, and no recomputation of low-level results.
+- Kept this as documentation-only; no application code, tests, helper behavior changes, JSON/Markdown export output, backup/restore behavior, database/repository/API/GUI/CLI, audit event creation, hard validation, `blocked` status, commit, push, or ZIP/cache staging was added.
+
 ## Step 167
 
 - Added documentation-only integration boundary guidance after the Step 166 wrapper result contract tests.
