@@ -1,5 +1,19 @@
 # Changelog
 
+## Step 204
+
+- Added a documentation/state-only fixture naming, ownership/location, and assertion checklist plan for a future handover QC presentation view-model implementation.
+- Added `.cse/tasks/204_task.md`.
+- Added `docs/204_handover_qc_fixture_naming_and_assertion_checklist_plan.md`.
+- Added `learning/204_handover_qc_fixture_naming_and_assertion_checklist_plan.md`.
+- Added `.cse/results/204_result.md`.
+- Updated `.cse/state/project_state.json`, `ROADMAP.md`, `CHANGELOG.md`, and `docs/project_decisions.md`.
+- Reserved four deterministic future artifact families for all seven canonical cases: source checklist, expected view-model, optional expected Markdown, and expected review visibility.
+- Documented future test-layer ownership under `tests/fixtures/handover_qc/` and the future fixture-contract test location without creating any fixture directory, fixture, or test.
+- Defined assertions for structured checklist source truth, Markdown display-only handling, canonical wording, read-only/non-blocking semantics, fallback safety, official/private separation, forbidden decision fields, no side effects, immutability, no recomputation, no generated `blocked`, and no automatic package decision.
+- Restricted the single future proposal to canonical fixture data and fixture-contract tests for the seven documented cases under a separate explicitly authorized task.
+- Kept this as documentation/state-only; no production code, tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, export output, ZIP mutation, PR creation, or merge behavior was added.
+
 ## Step 203
 
 - Added documentation-only official local sync protocol required by Issue #21.

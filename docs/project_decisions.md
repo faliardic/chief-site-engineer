@@ -1,5 +1,20 @@
 # Proje Kararlari
 
+## 204 Handover QC Fixture Naming and Assertion Checklist Plan Karari
+
+- Adim 204, Issue #23 talimatina gore future handover QC presentation view-model icin fixture naming, ownership/location ve assertion checklist planini documentation/state-only olarak sabitler.
+- Structured source of truth yalniz `build_export_handover_qc_review_checklist(summary, report)` ciktisidir.
+- `format_export_handover_qc_review_checklist_as_markdown(checklist)` optional display-only Markdown olarak kalir; Markdown structured truth olarak parse edilmez ve source checklist yerine gecmez.
+- Yedi canonical case icin dort ayri artifact family kullanilir: `handover_qc_source_checklist_<case>`, `handover_qc_expected_view_model_<case>`, `handover_qc_expected_markdown_<case>` ve `handover_qc_expected_review_visibility_<case>`.
+- Future fixture data ownership test layer'a aittir ve yalniz `tests/fixtures/handover_qc/` altinda planlanir; production code `tests/fixtures/` altindan import yapamaz ve dokumantasyon runtime dependency degildir.
+- Expected Markdown optional display regression artifact'i, expected review visibility ise yalniz human-review visibility contract'idir; fixture'lar persistence, audit, export writing veya package decision mekanizmasi degildir.
+- Official-transferable fixture data ile private/non-transferable bilgi ayrilir; credentials, secrets, private field notes, local cache ve user-specific non-transferable data fixture'lara giremez.
+- Assertion checklist canonical wording, empty/unsupported fallback, source truth, immutability, no recomputation, no side effects, read-only/non-blocking semantics ve official/private transfer boundary'sini kapsar.
+- `approved`, `rejected`, `blocked`, `official_decision`, `package_blocked`, `audit_event_id`, `persisted_at` ve `export_written` future view-model contract disinda tutulur.
+- Success official approval, review/failure automatic rejection, mixed package decision ve unknown hard validation degildir; generated `blocked` veya automatic decision eklenmez.
+- Tek dar future proposal, ayri acik yetkili task icinde yedi canonical case icin fixture data ve fixture-contract testleri olusturulmasidir; presentation consumer veya production feature expansion eklenemez.
+- Production code, executable fixtures/tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked`, file/export output, ZIP mutasyonu, PR creation ve merge behavior eklenmez.
+
 ## 203 Official Local Sync Protocol Karari
 
 - Adim 203, Issue #21 talimatina gore official local working copy protokolunu documentation-only olarak sabitler.

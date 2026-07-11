@@ -3,11 +3,11 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 202 - Canonical Handover QC View-Model Examples and Wording Standardization
-Merge commit: a5fcadf1108dce409d7a1ddd9928b6a9cbb730c9
+Adim 203 - Official Local Sync Protocol
+Merge commit: 583f8539d9522027f1578a91b0298a8bdf21a1c9
 ```
 
-Adim 202, master uzerindeki guncel guvenli noktadir. Step 203 acik branch official local sync protocol calismasidir ve merge edilene kadar yeni guvenli nokta olarak sayilmaz.
+Adim 203, master uzerindeki guncel guvenli noktadir. Step 204, `docs/204_handover_qc_fixture_naming_and_assertion_checklist_plan.md` ve `learning/204_handover_qc_fixture_naming_and_assertion_checklist_plan.md` ile future handover QC fixture adlandirma, sahiplik/konum ve assertion checklist sinirlarini documentation/state-only olarak kaydeden acik branch calismasidir. Step 204 merge edilene kadar yeni guvenli nokta sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -436,8 +436,15 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 - [x] Adim 203 - `.cse/README.md`, `.cse/templates/task_template.md` ve `.cse/templates/result_template.md` local-first protocol'u future steps icin canonical hale getirecek sekilde guncellendi.
 - [x] Adim 203 - Issue #21 kapsaminda Codex'in draft PR acmayacagi ve ChatGPT review/PR acma surecinin ayri kalacagi kaydedildi.
 
+## Handover QC Fixture Assertion Plan - Adim 204
+
+- [x] Adim 204 - Future handover QC presentation view-model icin fixture naming and assertion checklist plan documentation-only olarak hazirlandi.
+- [x] Adim 204 - Future fixture names success-only, failure-only, mixed, empty/zero-count, missing optional fields, unknown status/additional fields ve unsupported input fallback case'leri icin ayrildi.
+- [x] Adim 204 - Assertion checklist structured source of truth, optional Markdown display-only handling, status label, human-review indicator, read-only/non-blocking notice, fallback wording, transfer boundary, forbidden decision fields, no side effects, input immutability, no recomputation, no generated `blocked` status ve no automatic package decision behavior basliklarini kapsiyor.
+- [x] Adim 204 - Executable fixtures, executable tests, production code ve workflow degisikligi bu adimda eklenmedi; future conversion ayri explicit task gerektiriyor.
+
 ## Sonraki Calisma Onerisi
 
-Adim 203 sonrasi tek dar teknik onerim, future handover QC presentation view-model icin documentation-only fixture naming and assertion checklist hazirlamaktir. Her yeni adim once official local sync protocol'u uygulamali; API/GUI/CLI implementation, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, file/export output veya official package decision behavior baslatmamalidir.
+Adim 204 sonrasi tek dar teknik onerim, fixture naming and assertion checklist planinin ChatGPT tarafindan incelenmesi ve gerekiyorsa ayri bir future task ile executable fixture/test conversion kapsam kararinin verilmesidir. Her yeni adim once official local sync protocol'u uygulamali; API/GUI/CLI implementation, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, file/export output veya official package decision behavior baslatmamalidir.
 
 Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Son mevcut podcast notu Podcast 030'dur ve Adim 196-200 araligini kapsar. Adim 201 kapsaminda Podcast 030 olusturuldu.
