@@ -8,7 +8,7 @@
   "base_branch": "master",
   "base_commit": "e98ba58554857e2719b1c4e1315e8edd31f2f919",
   "result_commit": "d2a9fff2f86200995c3ce2fa98647aeec2eee2a4",
-  "workflow_status": "local_verification_passed_pending_push",
+  "workflow_status": "pushed_to_open_draft_pr",
   "implemented_command": {
     "path": ".github/workflows/pytest.yml",
     "workflow_name": "CI",
@@ -54,7 +54,7 @@
     "workflow_structural_validation": "passed"
   },
   "working_tree": {
-    "result": "pending_commit",
+    "result": "clean_after_push",
     "changes": [
       "A .github/workflows/pytest.yml",
       "A .cse/results/196_result.md",
