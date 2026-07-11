@@ -1,0 +1,47 @@
+{
+  "protocol_version": 1,
+  "step": 193,
+  "issue": 1,
+  "pull_request": 2,
+  "pull_request_state": "open_draft",
+  "branch": "step-193-github-handoff-protocol",
+  "base_branch": "master",
+  "base_commit": "12e042850515005ed7baa55d9eb273dad8d201e3",
+  "result_commit": "a48d2ae2087b764f1f15f49e5295c64c1679de46",
+  "workflow_status": "pushed_to_open_draft_pr",
+  "tests": {
+    "command": "python -m pytest",
+    "result": "passed",
+    "summary": "398 passed in 1.29s"
+  },
+  "diff_check": {
+    "command": "git diff --check",
+    "result": "passed"
+  },
+  "exports": {
+    "result": "clean",
+    "contents": [
+      ".gitkeep"
+    ]
+  },
+  "zip": {
+    "ignored_zip_touched": false,
+    "zip_files_found": 0
+  },
+  "working_tree": {
+    "result": "clean_after_push",
+    "changes": [
+      "M .cse/README.md",
+      "M .cse/results/193_result.md",
+      "M .cse/state/project_state.json",
+      "D .cse/results/RESULT_TEMPLATE.md",
+      "D .cse/tasks/TASK_TEMPLATE.md"
+    ],
+    "ignored_files_remaining": 0
+  },
+  "production_code_changed": false,
+  "tests_changed": false,
+  "forbidden_scope_added": false,
+  "merge_authorized": false,
+  "next_action": "Review PR #2 and merge only after explicit user approval"
+}
