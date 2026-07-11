@@ -23,7 +23,7 @@ Bu kaynak hazırlanırken aşağıdaki proje kaynakları birlikte incelenmiştir
 5. `CSE_STRATEGIC_PRODUCT_DIRECTION.md`
 6. `CSE_GUNCEL_PROJE_TALIMATLARI.md`
 7. `STEP_204_CODEX_DUZELTME_TALIMATI.md`
-8. Bu sohbet içinde kesinleştirilen Step 206, Step 207, Step 208, Step 209 ve Step 210 kararları
+8. Bu sohbet içinde kesinleştirilen Step 206, Step 207, Step 208, Step 209, Step 210 ve Step 211 kararları
 9. Güncel GitHub Issue/PR/merge gerçekliği
 
 ### Kaynakların kullanım biçimi
@@ -940,38 +940,40 @@ Gerçek şantiye
 
 ### Son doğrulanmış merged GitHub noktası
 
-- Step: **209**
-- PR: **#35**
-- Issue: **#34**
+- Step: **210**
+- PR: **#37**
+- Issue: **#36**
 - Merge commit:
 
 ```text
-f1fd7b8e6add21369b3d5f4c44d014994538fc1c
+c7dbd94076f9e23c928f27ea377a97debad6636b
 ```
 
-- Son doğrulanan test seviyesi: **416 passed**
+- Son doğrulanan test seviyesi: **420 passed**
 - GitHub Actions: manuel olarak devre dışı
 - Podcast 031: Steps 201-205 tamamlandı
+- Podcast 032: Step 211 aktif artifact; merge sonrasinda Steps 206-210 icin latest completed podcast olur
 
 ### Yerel senkronizasyon durumu
 
-Step 210 baslangicinda resmî `V:` yerel master `f1fd7b8e6add21369b3d5f4c44d014994538fc1c` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
+Step 211 baslangicinda resmî `V:` yerel master `c7dbd94076f9e23c928f27ea377a97debad6636b` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
 
 ### Aktif iş
 
-- Step: **210**
-- Issue: **#36**
-- Amaç: merge edilmis `FieldObservationRecord` icin minimal bellek ici `FieldObservationRepository` baseline'i ve focused repository testlerini eklemek
+- Step: **211**
+- Issue: **#38**
+- Amaç: Steps 206-210 icin Podcast 032 NotebookLM kaynak notunu eklemek ve Step 210 merge gercegini repository truth kayitlarina islemek
 - Branch:
 
 ```text
-step-210-field-observation-repository-baseline
+step-211-podcast-032-steps-206-210
 ```
 
-- Bu adim narrow repository/test isidir.
+- Bu adim documentation/state/podcast-only isidir.
 - `FieldObservationRecord` halen tek Field-MVP model implementasyonudur.
 - `FieldObservationRepository` yalniz baseline-level bellek ici repository'dir.
 - Persistence, attachment integration, filters, lifecycle updates, export/reporting, API/GUI/CLI, audit ve validation henuz uygulanmamistir.
+- Step 212 baslatilmamistir.
 
 ---
 
@@ -1009,7 +1011,7 @@ step-210-field-observation-repository-baseline
 
 ### 29.7 Eski aktif Step bilgileri
 
-Step 203, 204, 205, 206, 207, 208 ve aktif Step 209 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 209’dur; Step 210 aktif unmerged repository-baseline aşamasındadır.
+Step 203, 204, 205, 206, 207, 208, 209 ve aktif Step 210 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 210’dur; Step 211 aktif unmerged documentation/podcast aşamasındadır.
 
 ### 29.8 Eski modül sırasının bağlayıcı olması
 

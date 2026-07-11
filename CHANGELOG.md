@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 211
+
+- Added Podcast 032 source note at `docs/podcast_notes/032_adim_206_210_notebooklm_podcast_notu.md`, covering only Steps 206-210.
+- Framed the central story as source authority and execution discipline -> reviewed observation contract -> minimal observation model -> minimal in-memory repository.
+- Updated repository truth so Step 210 / PR #37 / Issue #36 / merge commit `c7dbd94076f9e23c928f27ea377a97debad6636b` is the latest merged/finalized safe point and Step 211 remains active unmerged documentation/podcast work.
+- Recorded Podcast 032 as the active artifact until Step 211 merges; after merge it becomes the latest completed podcast and the next five-step podcast range becomes Steps 211-215.
+- Preserved the current local verification baseline as `420 passed`.
+- Kept this as documentation/state/podcast-only; no production code, executable tests, workflow behavior, Actions setting, persistence, attachment handling, filters, lifecycle behavior, export/reporting, API/GUI/CLI, audit, backup/restore, migration, validation, generated `blocked`, ZIP mutation, Desktop archive mutation, Step 212, or product behavior was added.
+
 ## Step 210
 
 - Added minimal in-memory `FieldObservationRepository` to `app/records.py` for the merged `FieldObservationRecord` model.

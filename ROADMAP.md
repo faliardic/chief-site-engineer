@@ -3,11 +3,11 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 209 - Minimal FieldObservationRecord Model
-PR #35 merge commit: f1fd7b8e6add21369b3d5f4c44d014994538fc1c
+Adim 210 - FieldObservationRepository Baseline
+PR #37 merge commit: c7dbd94076f9e23c928f27ea377a97debad6636b
 ```
 
-Adim 209, PR #35 squash merge commit `f1fd7b8e6add21369b3d5f4c44d014994538fc1c` ile master uzerindeki guncel guvenli noktadir. Step 210, Issue #36 kapsaminda minimal bellek ici `FieldObservationRepository` baseline'i ve focused repository testleri ekleyen aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Adim 210, PR #37 squash merge commit `c7dbd94076f9e23c928f27ea377a97debad6636b` ile master uzerindeki guncel guvenli noktadir. Step 211, Issue #38 kapsaminda Steps 206-210 icin Podcast 032 kaynak notunu ekleyen aktif documentation/podcast branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -490,14 +490,21 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 
 ## Step 210 - FieldObservationRepository Baseline
 
-- [ ] Adim 210 - Minimal bellek ici `FieldObservationRepository` baseline'i mevcut repository stiline uygun olarak eklenecek.
-- [ ] Adim 210 - `add`, `list_all`, `count` ve `find_by_id` davranislari eklenecek.
-- [ ] Adim 210 - Duplicate `observation_id` `ValueError` ile reddedilecek; farkli `observation_id` kabul edilecek.
-- [ ] Adim 210 - `list_all()` ic koleksiyonu degistirmeyen liste kopyasi dondurecek.
-- [ ] Adim 210 - Filters, lifecycle updates, archive/restore/delete/bulk ops, persistence, attachment linking, export/reporting, API/GUI/CLI, audit, validation ve Podcast 032 eklenmeyecek.
+- [x] Adim 210 - Minimal bellek ici `FieldObservationRepository` baseline'i mevcut repository stiline uygun olarak eklendi.
+- [x] Adim 210 - `add`, `list_all`, `count` ve `find_by_id` davranislari eklendi.
+- [x] Adim 210 - Duplicate `observation_id` `ValueError` ile reddedildi; farkli `observation_id` kabul edildi.
+- [x] Adim 210 - `list_all()` ic koleksiyonu degistirmeyen liste kopyasi dondurur.
+- [x] Adim 210 - Filters, lifecycle updates, archive/restore/delete/bulk ops, persistence, attachment linking, export/reporting, API/GUI/CLI, audit, validation ve Podcast 032 eklenmedi.
+
+## Step 211 - Podcast 032 for Steps 206-210
+
+- [ ] Adim 211 - `docs/podcast_notes/032_adim_206_210_notebooklm_podcast_notu.md` dosyasi Steps 206-210 icin hazirlanacak.
+- [ ] Adim 211 - Podcast 032, protocol/source/workflow consolidation'dan ilk Field MVP contract/model/repository cekirdegine gecisi anlatacak.
+- [ ] Adim 211 - Repository truth Step 210 / PR #37 / Issue #36 / merge `c7dbd94076f9e23c928f27ea377a97debad6636b` safe point olacak sekilde guncellenecek.
+- [ ] Adim 211 - Production code, tests, workflow, persistence, attachment, filters, lifecycle, export/reporting, API/GUI/CLI, audit ve Step 212 baslatilmayacak.
 
 ## Sonraki Calisma Onerisi
 
-Adim 210 merge edildikten sonra onerilen sonraki adim Step 211 - Podcast 032'dir. Podcast 032 yalniz Step 206-210 araligini kapsayacak sekilde Step 210 merge sonrasi hazirlanmalidir. Ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur; persistence, attachment integration, filters, updates, export/API/audit/validation henuz uygulanmamistir.
+Adim 211 merge edildikten sonra Podcast 032 latest completed podcast olur ve Steps 206-210 araligini kapsar. Sonraki besli podcast araligi Steps 211-215 olur. Ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur; persistence, attachment integration, filters, updates, export/API/audit/validation henuz uygulanmamistir.
 
-Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Podcast 030 Adim 196-200 araligini, Podcast 031 Adim 201-205 araligini kapsar.
+Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Podcast 030 Adim 196-200 araligini, Podcast 031 Adim 201-205 araligini kapsar; Podcast 032 Step 211 branch'i uzerinde aktif artifact olarak Steps 206-210 icin hazirlanir.

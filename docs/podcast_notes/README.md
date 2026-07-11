@@ -59,7 +59,10 @@ Ornekler:
 - Podcast 030 kapsami: Steps 196-200
 - Podcast 031: `docs/podcast_notes/031_adim_201_205_notebooklm_podcast_notu.md`
 - Podcast 031 kapsami: Steps 201-205
-- Sonraki besli aralik: Step 206 ile baslar
+- Podcast 032 active artifact: `docs/podcast_notes/032_adim_206_210_notebooklm_podcast_notu.md`
+- Podcast 032 kapsami: Steps 206-210
+- Podcast 032 latest completed sayilmasi: Step 211 merge edildikten sonra
+- Sonraki besli aralik: Steps 211-215
 
 Bu factual state yeni podcastler eklendikce guncellenir, ancak burada eski proje asamasi ornekleri veya cabuk bayatlayan "aktif adim" metinleri tutulmaz.
 
