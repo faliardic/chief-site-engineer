@@ -3,11 +3,11 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 206 - Step 205 Merged Truth, Podcast 031, and Instruction Authority Closure
-PR #29 merge commit: 3b05fae76766cedc8840eea6c0fc2f51440354e4
+Adim 207 - Unified Source and Codex Invocation Policy
+PR #31 merge commit: 23baddf413e1cdf5a5e5564fe4a559954572e45f
 ```
 
-Adim 206, PR #29 squash merge commit `3b05fae76766cedc8840eea6c0fc2f51440354e4` ile master uzerindeki guncel guvenli noktadir. Step 207, Issue #30 kapsaminda unified project source, source register, GitHub-native new-chat bootstrap ve Codex invocation / batched execution policy ekleyen aktif documentation/state/protocol branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Adim 207, PR #31 squash merge commit `23baddf413e1cdf5a5e5564fe4a559954572e45f` ile master uzerindeki guncel guvenli noktadir. Step 208, Issue #32 kapsaminda ilk Field MVP icin `FieldObservationRecord` contract'ini tanimlayan aktif documentation/contract branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -464,16 +464,25 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 
 ## Step 207 - Unified Source and Codex Invocation Policy
 
-- [ ] Adim 207 - `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md` approved merged source'tan tracked ust proje kaynagi olarak eklenecek.
-- [ ] Adim 207 - `docs/protocols/CSE_PROJECT_SOURCE_REGISTER.md` source set, erisim durumu, unavailable sources ve copied reference files icin kayit olacak.
-- [ ] Adim 207 - `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md` yeni chat'in GitHub'dan ZIP/handoff yuklemeden devam etme kuralini kalici hale getirecek.
-- [ ] Adim 207 - ChatGPT'nin Codex gerekip gerekmedigine karar vermesi, gerekirse `Codex çalışmalı` demesi ve nedenini aciklamasi protokole eklenecek.
-- [ ] Adim 207 - Codex-required / Codex-not-required kategorileri, batched execution, post-merge sync batching ve metadata churn avoidance kalici operasyon kuralina donusecek.
-- [ ] Adim 207 - Her Codex execution icin required source pre-read sirası instructions, `.cse/README.md`, task template ve result template icinde kalici hale gelecek.
-- [ ] Adim 207 - Step 206 / PR #29 / Issue #28 / merge commit `3b05fae76766cedc8840eea6c0fc2f51440354e4` latest safe point olarak state ve ana dokumanlarda kaydedilecek.
+- [x] Adim 207 - `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md` approved merged source'tan tracked ust proje kaynagi olarak eklendi.
+- [x] Adim 207 - `docs/protocols/CSE_PROJECT_SOURCE_REGISTER.md` source set, erisim durumu, unavailable sources ve copied reference files icin kayit oldu.
+- [x] Adim 207 - `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md` yeni chat'in GitHub'dan ZIP/handoff yuklemeden devam etme kuralini kalici hale getirdi.
+- [x] Adim 207 - ChatGPT'nin Codex gerekip gerekmedigine karar vermesi, gerekirse `Codex çalışmalı` demesi ve nedenini aciklamasi protokole eklendi.
+- [x] Adim 207 - Codex-required / Codex-not-required kategorileri, batched execution, post-merge sync batching ve metadata churn avoidance kalici operasyon kuralina donustu.
+- [x] Adim 207 - Her Codex execution icin required source pre-read sirasi instructions, `.cse/README.md`, task template ve result template icinde kalici hale geldi.
+- [x] Adim 207 - Step 206 / PR #29 / Issue #28 / merge commit `3b05fae76766cedc8840eea6c0fc2f51440354e4` latest safe point olarak state ve ana dokumanlarda kaydedildi.
+
+## Step 208 - First Field MVP Observation Record Contract
+
+- [ ] Adim 208 - `FieldObservationRecord` documentation-level future model contract'i tanimlanacak.
+- [ ] Adim 208 - Required future fields `observation_id`, `project_id`, `observed_at`, `location`, `category`, `description` olarak belirlenecek.
+- [ ] Adim 208 - `status` default `open` ve ilk vocabulary `open`, `tracking`, `closed` olarak kaydedilecek.
+- [ ] Adim 208 - Optional/deferred fields `reported_to`, `reported_at`, `created_by`, `closed_at`, `notes`, `is_archived` olarak belirlenecek.
+- [ ] Adim 208 - Existing model mapping ve gap analysis `SiteProject`, `SiteLocationRecord`, `ContactPersonRecord`, `SiteNoteRecord`, `TrackingRecord`, `FileAttachmentRecord`, `DailySiteLog`, `DailyReportRecord` icin yazilacak.
+- [ ] Adim 208 - Field-MVP implementation baslatilmadan Step 209'un review/merge sonrasi onerilen implementation adimi oldugu kaydedilecek.
 
 ## Sonraki Calisma Onerisi
 
-Adim 207 merge edilmeden Step 208 veya field-MVP implementation baslatilmaz. Adim 207 sonrasi dogal besli podcast araligi halen Steps 206-210'dur; ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur.
+Adim 208 merge edilmeden Step 209 veya field-MVP implementation baslatilmaz. Adim 208 sonrasi dogal besli podcast araligi halen Steps 206-210'dur; ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur.
 
 Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Podcast 030 Adim 196-200 araligini, Podcast 031 Adim 201-205 araligini kapsar.

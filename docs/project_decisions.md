@@ -1,5 +1,22 @@
 # Proje Kararlari
 
+## 208 First Field MVP Observation Record Contract Karari
+
+- `FieldObservationRecord`, ilk Field MVP hizli saha gozlem kaydi icin gelecekte eklenecek resmi/proje kaydi contract'i olarak tanimlanir.
+- Required future fields: `observation_id`, `project_id`, `observed_at`, `location`, `category`, `description`.
+- `status` default degeri `open`; ilk vocabulary `open`, `tracking`, `closed`.
+- Optional/deferred-at-capture fields: `reported_to`, `reported_at`, `created_by`, `closed_at`, `notes`, `is_archived`.
+- `location` V1'de fast-capture text/snapshot alanidir; future structured normalization ayri adimda `SiteLocationRecord` kullanabilir.
+- `reported_to` V1'de optional fast-capture text/snapshot alanidir; future identity/contact normalization ayri adimda `ContactPersonRecord` kullanabilir.
+- Attachments observation record icine gomulmez; ayri `FileAttachmentRecord` satirlari `related_record_type = "field_observation"` ve `related_record_id = observation_id` ile baglanir.
+- Initial record creation attachment veya `reported_to` gerektirmez; bu bilgiler sonradan eklenebilir.
+- `closed` lifecycle state'tir, fiziksel silme degildir; archive closed'dan ayridir.
+- Private notes resmi observation record'a sessizce kopyalanmaz; future conversion acik kullanici islemi gerektirir.
+- Step 208 documentation/state/contract-only'dir; production code, executable test/fixture, workflow behavior, persistence, API/GUI/CLI, audit, migration, backup/restore, hard validation, generated `blocked`, task creation, NCR conversion, automatic official decision, export output, ZIP mutation, Step 209 veya field-MVP implementation eklenmez.
+- Step 207, PR #31 squash merge commit `23baddf413e1cdf5a5e5564fe4a559954572e45f` ile latest merged/finalized safe point'tir; Issue #30 completed olarak kaydedilir.
+- Step 208, Issue #32 ve `step-208-first-field-mvp-observation-contract` branch'i uzerinde aktif unmerged documentation/contract isidir.
+- Step 209, bu contract review edilip merge edildikten sonra onerilen implementation adimidir.
+
 ## 207 Unified Project Source, GitHub Bootstrap ve Codex Invocation Policy Karari
 
 - `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`, product purpose, strategy, data principles, product layers, roadmap, source-conflict resolutions ve long-term architecture icin ust tracked proje kaynagidir.
