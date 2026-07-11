@@ -80,17 +80,14 @@ Bu çekirdek değer kanıtlanmadan karmaşık dashboard, çok kullanıcı, bulut
 
 Bir çelişki olduğunda aşağıdaki sıra uygulanır:
 
-1. Bu belge: `CSE_GUNCEL_PROJE_TALIMATLARI.md`
-2. Güncel GitHub Issue ve yerelde oluşturulan `.cse/tasks/<step>_task.md`
-3. `.cse/state/project_state.json`
-4. İlgili `.cse/results/<step>_result.md`
-5. `ROADMAP.md`
-6. `docs/project_decisions.md`
-7. `CHANGELOG.md`
-8. `CSE_STRATEGIC_PRODUCT_DIRECTION.md`
-9. Güvenilir veri omurgası ilkeleri
-10. `chat_handoff/` özet dosyaları
-11. Eski ZIP ve arşiv paketleri
+1. Resmî yerel ortamda `CSE_GUNCEL_PROJE_TALIMATLARI.md` yalnız dosya mevcutsa ve beklenen SHA-256 değeri doğrulanmışsa kullanılır.
+2. Doğrulanmış local-only kaynak yoksa ve bütün fresh clone/handoff ortamlarında tracked `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` canonical repository instruction source olarak kullanılır.
+3. Güncel GitHub Issue ve yerelde oluşturulan `.cse/tasks/<step>_task.md` birlikte uygulanır.
+4. `.cse/state/project_state.json`
+5. İlgili `.cse/results/<step>_result.md`
+6. Sırasıyla `ROADMAP.md`, `docs/project_decisions.md`, `CHANGELOG.md`, `CSE_STRATEGIC_PRODUCT_DIRECTION.md`, güvenilir veri omurgası ilkeleri, `chat_handoff/` özetleri ve eski ZIP/arşiv paketleri.
+
+Tracked canonical dosya, doğrulanmış local-only kaynak kullanılamadığında yetkili repository instruction source’tur. Bu fallback, fresh clone ve handoff’ların root local-only dosyaya bağımlı kalmasını önler.
 
 `chat_handoff/` dosyaları sohbet aktarımı içindir; Git durumu, yerel çalışma ağacı veya güncel Issue/PR kayıtlarının yerine geçmez.
 
@@ -166,28 +163,30 @@ Merge sonrasında yeni adıma geçmeden önce aynı senkronizasyon tekrar yapıl
 
 ## 8. Issue → Branch → Task → PR Akışı
 
+Kullanıcı normalde yalnız `devam` veya eşdeğer bir devam komutu yazar. ChatGPT her sonraki işlemden önce GitHub Issue, PR, branch, diff, comments, checks ve merge state’i kontrol eder. Uzun talimat veya sonuç bloklarının kullanıcı tarafından ChatGPT ile Codex arasında kopyalanması beklenmez; Codex instruction ve completion evidence güncel GitHub Issue üzerinden paylaşılır.
+
 Her adım aşağıdaki sırayla yürütülür:
 
-1. ChatGPT küçük ve sınırları net bir GitHub Issue açar.
-2. Issue, resmî yerel repo yolunu ve beklenen base commit’i içerir.
-3. Codex yerel `master`ı senkronlar.
-4. Codex step branch’ini yerelde oluşturur:
+1. ChatGPT GitHub durumunu doğrular ve küçük, sınırları net bir GitHub Issue açar veya günceller.
+2. Issue, resmî yerel repo yolunu, beklenen base commit’i ve Codex execution instruction’ını içerir.
+3. Codex yalnız local project-file edit, local test, commit/push veya post-merge local synchronization gerektiğinde devreye girer.
+4. Codex yerel `master`ı senkronlar ve step branch’ini yerelde oluşturur:
 
    ```text
    step-NNN-kisa-amac
    ```
 
-5. Codex `.cse/tasks/NNN_task.md` dosyasını yerelde oluşturur.
-6. Bütün yetkili dosyalar fiziksel olarak yerel çalışma ağacında oluşturulur.
-7. Codex test ve kalite kontrollerini yerelde çalıştırır.
-8. Görev izin veriyorsa Codex yerelden commit ve push yapar.
-9. Codex branch/remote farkını `0 0` olarak doğrular.
-10. ChatGPT pushlanmış branch’i GitHub’dan inceler ve Draft PR açar.
-11. Eksik veya çelişkili kayıt varsa merge edilmez; düzeltme yerelde yapılır.
-12. İnceleme geçerse PR ready yapılır ve kullanıcı onayıyla squash merge edilir.
-13. Merge sonrası yerel `master` yeni merge commit’ine fast-forward edilir.
+5. Codex `.cse/tasks/NNN_task.md` ve bütün yetkili project files’ı fiziksel yerel çalışma ağacında oluşturur veya düzenler.
+6. Codex test ve kalite kontrollerini yerelde çalıştırır.
+7. Görev izin veriyorsa Codex yerelden commit/push yapar ve branch/remote farkını `0 0` doğrular.
+8. Codex factual completion evidence’i güncel GitHub Issue’a ekler.
+9. ChatGPT GitHub branch diff’ini, comment/evidence’i ve review state’i inceler; güvenliyse Draft PR’ı doğrudan oluşturur.
+10. Eksik veya çelişkili kayıt varsa ChatGPT Issue üzerinden local correction instruction verir; merge yapılmaz.
+11. İnceleme geçerse ChatGPT PR’ı ready yapar ve kullanıcı onayıyla squash merge eder.
+12. ChatGPT gerektiğinde sonraki Issue’yu doğrudan oluşturur.
+13. Merge sonrası Codex yalnız gerektiğinde yerel `master`ı yeni merge commit’ine fast-forward eder.
 
-Branch ve task dosyası GitHub connector üzerinden önceden oluşturulmaz.
+ChatGPT GitHub-native Issue creation/update, review comment, Draft PR creation, ready transition, merge ve next Issue creation işlemlerini doğrudan yapar. Branch/task/project files GitHub connector üzerinden üretilmez; GitHub-only project-file creation completion değildir.
 
 ---
 
@@ -309,15 +308,18 @@ State/result dosyalarına henüz gerçekleşmemiş “push tamamlandı”, “ç
 
 - Resmî yerel repoda çalışır.
 - Yerel değişiklikleri korur; beklenmeyen durumda durur.
-- Branch/task/dosya/test/commit/push işlemlerini yerelden yapar.
+- Yalnız local project-file edit, local test, commit/push veya post-merge local synchronization gerektiğinde çağrılır.
+- Branch/task/dosya/test/commit/push işlemlerini yerelden yapar ve completion evidence’i güncel GitHub Issue’a ekler.
 - Görev kapsamını genişletmez.
 - Kanıtlanmamış durum yazmaz.
 - PR veya merge işlemi yalnız görev açıkça yetki verirse yapılır; varsayılan olarak PR’ı ChatGPT açar.
 
 ### ChatGPT
 
+- Kullanıcının `devam` veya eşdeğer komutundan sonra her işlem öncesinde GitHub Issue, PR, branch, diff, comments, checks ve merge state’i doğrular.
 - Son güvenli commit’i ve aktif adımı takip eder.
-- Küçük ve açık Issue tanımlar.
+- GitHub-native Issue creation/update, review comments, Draft PR creation, ready transition, merge ve next Issue creation işlemlerini doğrudan yapar.
+- Küçük ve açık Issue tanımlar; Codex instruction ve completion evidence’in güncel Issue üzerinden paylaşılmasını sağlar.
 - Codex reasoning seviyesini belirtir.
 - GitHub branch diff’ini, dosya kapsamını, result/state kayıtlarını ve test kanıtını inceler.
 - Proje dosyalarını GitHub üzerinden üretmez.
@@ -327,8 +329,11 @@ State/result dosyalarına henüz gerçekleşmemiş “push tamamlandı”, “ç
 
 ### Kullanıcı
 
+- Normalde yalnız `devam` veya eşdeğer bir continuation command yazar; büyük instruction/result bloklarını ChatGPT ve Codex arasında kopyalamak zorunda değildir.
 - Ürün kapsamı ve merge için nihai karar sahibidir.
 - Yerel çalışma kopyasının ve özel verilerin sahibidir.
+
+Resmî yerel repository project-file changes için execution source, GitHub ise synchronized coordination/review surface olarak kalır. ChatGPT her sonraki action öncesinde GitHub state’i doğrular.
 
 ---
 
@@ -381,31 +386,31 @@ Güncel kural:
 
 ### Son güvenli GitHub noktası
 
-- Tamamlanan adım: **Step 203**
-- Merge edilen PR: **#22**
+- Tamamlanan adım: **Step 204**
+- Merge edilen PR: **#24**
 - `master` commit:
 
 ```text
-583f8539d9522027f1578a91b0298a8bdf21a1c9
+7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3
 ```
 
-- Son bilinen yerel test sonucu: **413 passed**
-- GitHub Actions: **devre dışı**
+- Son doğrulanan yerel test sonucu: **413 passed**
+- GitHub Actions: workflow mevcut, otomatik execution manuel olarak devre dışı
 
 ### Aktif iş
 
-- Issue: **#23**
-- Adım: **Step 204 — Handover QC view-model için kanonik fixture adları ve assertion checklist planı**
-- Beklenen branch:
+- Issue: **#25**
+- Adım: **Step 205 — Canonical project instructions and repository truth synchronization**
+- Branch:
 
 ```text
-step-204-handover-qc-fixture-assertion-plan
+step-205-project-instructions-truth-sync
 ```
 
-- İlk işlem: yerel `master`ı `583f8539d9522027f1578a91b0298a8bdf21a1c9` commit’ine fast-forward etmek.
-- Bu adım documentation/state-only olmalıdır.
-- Executable fixture, üretim kodu veya test eklenmemelidir.
-- Reasoning: **Extra High**
+- Kapsam: **documentation/state-only**
+- Reasoning: **High**
+- Merge sonrası doğal documentation task: **Podcast 031 — Steps 201–205**
+- Step 206 ve product implementation başlamadı.
 
 Bu bölüm proje ilerledikçe güncellenir; yukarıdaki kalıcı kurallar değişmez.
 

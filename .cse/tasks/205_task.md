@@ -2,7 +2,7 @@
 
 ## Objective
 
-Canonicalize the current project instructions inside the repository and resynchronize the principal truth-bearing documentation/state records with the merged Step 204 safe point, without changing production, test, workflow, or product behavior.
+Canonicalize the current project instructions, correct repository authority/current-state sections, permanently record the GitHub-centered operating workflow, and resynchronize truth-bearing documentation/state records without changing production, test, workflow, or product behavior.
 
 ## Repository Context
 
@@ -12,7 +12,8 @@ Canonicalize the current project instructions inside the repository and resynchr
 - Expected base commit: `7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3`
 - Working branch: `step-205-project-instructions-truth-sync`
 - Official local working directory: `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer`
-- Highest-priority execution source: local-only `CSE_GUNCEL_PROJE_TALIMATLARI.md`
+- Highest-priority source in the official local environment: verified local-only `CSE_GUNCEL_PROJE_TALIMATLARI.md`
+- Fresh clone/handoff fallback authority: tracked `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
 - Expected source SHA-256: `A03C207BE84425F793C962DFA2C9A1E09EDCF739761465FFE5C57D3BFA0E123F`
 
 ## Local-First Preconditions
@@ -71,12 +72,12 @@ No other project file is authorized.
 
 ## Required Work
 
-1. Copy the complete local instruction source to `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` while preserving source meaning/order and proving text equivalence.
+1. Preserve the canonical file as initially derived from the local-only source while intentionally adapting Section 4 authority, Section 17 current state, and the ChatGPT/GitHub/Codex operating workflow.
 2. Keep the root source unchanged, local-only, ignored, unstaged, and uncommitted.
-3. Correct README current state, test count, CI/Actions truth, product maturity, missing production capabilities, canonical instruction path, and first field-MVP direction.
-4. Update machine-readable state so Step 204 and PR #24 are the latest merged/finalized safe point, Issue #23 is complete, Actions is manually disabled, required checks are disabled, and Step 205 remains documentation/state-only.
-5. Update roadmap, changelog, and project decisions with the canonical instruction decision, truth correction, reliable-data-backbone-first rule, first field MVP, and Podcast 031 follow-up.
-6. Create the Step 205 documentation and learning records.
+3. Make the tracked canonical file authoritative whenever the verified local-only source is unavailable, including fresh clones and handoffs.
+4. Record that users normally issue a short continuation command, ChatGPT verifies and operates GitHub-native state, and Codex is invoked only for required local execution.
+5. Keep Section 17 factual for Step 204/PR #24 and active Issue #25/Step 205; Step 206 and product implementation remain unstarted.
+6. Correct README/state/roadmap/changelog/decision/learning/result derivation claims so they do not claim equal SHA, equal line count, or complete text equivalence after intentional adaptation.
 7. Record only factual command evidence in result/state.
 
 ## Two-Phase Evidence Finalization
@@ -95,7 +96,9 @@ No other project file is authorized.
 - `git status --short --branch`
 - `git status --ignored --short --untracked-files=all`
 - Verify all required Step 205 files physically exist.
-- Verify canonical/source SHA-256 and text equivalence.
+- Verify the source SHA-256 is unchanged and record the corrected canonical SHA-256 separately.
+- Verify canonical Section 4 fallback authority, Section 17 current state, and the GitHub-centered workflow.
+- Verify stale full-equivalence/equal-line-count claims are removed or explicitly qualified as historical pre-adaptation evidence.
 - Verify README no longer presents Step 127 or `243 passed` as current.
 - Verify state no longer presents Step 202/203 or PR #22 as the current active merged state.
 - Verify `exports/` contains only `.gitkeep`.
@@ -123,7 +126,7 @@ After merge, local `master` must be fast-forwarded from `origin/master` before a
 
 ## Completion Criteria
 
-- Canonical instructions are tracked at the required path and equivalent to the local-only source.
+- Canonical instructions are tracked at the required path, initially derived from the local-only source, and intentionally adapted in documented authority/current-state/workflow sections.
 - README, state, roadmap, changelog, and decisions agree on Step 204 safe point and current maturity/CI truth.
 - Required checks pass and changed files remain authorized.
 - Content and final branch push evidence is factual with divergence `0 0`.

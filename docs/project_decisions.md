@@ -2,9 +2,10 @@
 
 ## 205 Canonical Project Instructions and Repository Truth Resynchronization Karari
 
-- `CSE_GUNCEL_PROJE_TALIMATLARI.md`, resmi local execution source olarak highest-priority kalir; dosya `.git/info/exclude` uzerinden ignored, unchanged, unstaged ve uncommitted korunur.
-- Complete instruction content, future clone ve handoff'lar icin `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` yolunda tracked canonical repository source olarak kaydedilir; source/canonical SHA-256 ve text equivalence dogrulanir.
-- Official local repository branch/file/test/commit/push execution surface, GitHub ise synchronized review ve evidence surface olarak kalir.
+- `CSE_GUNCEL_PROJE_TALIMATLARI.md`, resmi local environment'ta yalniz mevcut ve expected SHA-256 ile verified oldugunda highest-priority source'tur; dosya `.git/info/exclude` uzerinden ignored, unchanged, unstaged ve uncommitted korunur.
+- Verified local-only source yoksa, ozellikle fresh clone ve handoff'larda `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` tracked canonical repository instruction authority'dir.
+- Canonical dosya local-only source'tan initially derived edilmistir; persistent product/protocol meaning ve section order korunurken Section 4, Section 17 ve ChatGPT/GitHub/Codex workflow'u intentionally adapted edilmistir. Adaptation sonrasi equal SHA, equal line count veya full text equivalence iddiasi yapilmaz.
+- Official local repository branch/file/test/commit/push execution surface, GitHub synchronized coordination/review surface olarak kalir. Kullanici normalde `devam` der; ChatGPT GitHub state/actions'i dogrudan yonetir, Codex yalniz gerekli local execution icin kullanilir ve evidence current Issue uzerinden tasinir.
 - Step 204, PR #24 squash merge commit `7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3` ile latest merged/finalized safe point'tir; Issue #23 completed olarak kaydedilir.
 - Step 205, merge edilene kadar documentation/state-only active branch'tir ve Step 204 guvenli noktasini degistirmez.
 - `.github/workflows/pytest.yml` repoda vardir; automatic Actions execution account billing/runner-start constraint nedeniyle manually disabled kalir ve required status checks etkinlestirilmez.

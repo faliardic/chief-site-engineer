@@ -445,7 +445,9 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 
 ## Canonical Project Instructions and Repository Truth Sync - Adim 205
 
-- [ ] Adim 205 - `CSE_GUNCEL_PROJE_TALIMATLARI.md` local-only source'u degistirilmeden `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` yolunda canonical tracked talimat olarak kaydedilecek.
+- [ ] Adim 205 - `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`, local-only source'tan initially derived canonical dosya olarak korunacak; Section 4 tracked fallback authority, Section 17 Step 204/205 truth ve GitHub-centered workflow icin intentionally adapted edilecek.
+- [ ] Adim 205 - Adaptation sonrasi equal SHA, equal line count veya full text equivalence iddiasi yapilmayacak; local-only source byte/hash unchanged kalacak.
+- [ ] Adim 205 - Kullanici `devam` dediginde ChatGPT GitHub state ve native actions'i yonetecek, Codex yalniz gerekli local project-file/test/commit-push/sync execution icin kullanilacak.
 - [ ] Adim 205 - README, machine-readable state, roadmap, changelog ve proje kararlari Step 204 merge commit `7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3` ile yeniden eslenecek.
 - [ ] Adim 205 - Workflow varligi, manuel disabled Actions durumu ve disabled required status checks ayri factual alanlar olarak kaydedilecek.
 - [ ] Adim 205 - CSE'nin tested domain/data/documentation core oldugu, field-ready application olmadigi ve eksik production capabilities acik tutulacak.

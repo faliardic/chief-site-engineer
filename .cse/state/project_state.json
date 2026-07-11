@@ -9,15 +9,31 @@
   "base_commit": "7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3",
   "canonical_project_instructions": {
     "canonical_path": "docs/protocols/CSE_PROJECT_INSTRUCTIONS.md",
-    "canonical_sha256": "7716FFDDFCD67CA26B1369AF837FBAC6FC970C83F50818DDC5F8D135D39A71A7",
+    "canonical_sha256_after_authority_workflow_correction": "54484B6DBE0262CBF815B7F56835750F29DD345FB85E5D2717664C510701B086",
+    "derivation": "initially_derived_from_local_only_source_then_intentionally_adapted",
+    "intentionally_adapted_sections": [
+      "section_4_repository_authority_fallback",
+      "section_8_github_centered_workflow",
+      "section_13_chatgpt_codex_user_responsibilities",
+      "section_17_current_safe_point_and_active_work"
+    ],
+    "persistent_product_protocol_meaning_preserved": true,
+    "section_order_preserved": true,
     "source_ignored_via": ".git/info/exclude",
     "source_path": "CSE_GUNCEL_PROJE_TALIMATLARI.md",
     "source_sha256": "A03C207BE84425F793C962DFA2C9A1E09EDCF739761465FFE5C57D3BFA0E123F",
     "source_staged": false,
     "source_committed": false,
     "source_unchanged": true,
-    "equivalence_normalization": "line_endings_and_trailing_line_whitespace",
-    "text_equivalent": true
+    "full_text_equivalence_claimed_after_adaptation": false
+  },
+  "github_centered_workflow": {
+    "chatgpt_verifies_github_before_next_action": true,
+    "chatgpt_handles_github_native_actions": true,
+    "codex_handles_required_local_execution": true,
+    "evidence_exchange_surface": "current_github_issue",
+    "github_only_project_file_creation_is_completion": false,
+    "user_default_command": "devam_or_equivalent"
   },
   "ci": {
     "automatic_actions_execution": "manually_disabled",
@@ -97,9 +113,9 @@
     "merge_authorized": false,
     "pull_request": null,
     "pull_request_creation_by_codex": false,
-    "verified_content_commit_divergence": "0 0",
-    "verified_content_commit_local_sha": "7df6451e0c6e7332a8293cf326ce25e15b548598",
-    "verified_content_commit_remote_sha": "7df6451e0c6e7332a8293cf326ce25e15b548598"
+    "initial_step_205_content_commit_divergence": "0 0",
+    "initial_step_205_content_commit_local_sha": "7df6451e0c6e7332a8293cf326ce25e15b548598",
+    "initial_step_205_content_commit_remote_sha": "7df6451e0c6e7332a8293cf326ce25e15b548598"
   },
   "required_files": [
     "docs/protocols/CSE_PROJECT_INSTRUCTIONS.md",
@@ -118,13 +134,14 @@
     "command": "python -m pytest",
     "result": "passed",
     "content_verification_summary": "413 passed in 1.18s",
-    "metadata_finalization_summary": "413 passed in 1.17s"
+    "metadata_finalization_summary": "413 passed in 1.17s",
+    "correction_content_verification_summary": "413 passed in 1.21s"
   },
-  "workflow_status": "step_205_documentation_state_content_push_verified_before_metadata_finalization",
+  "workflow_status": "step_205_canonical_authority_and_github_workflow_content_verified_before_correction_push",
   "working_tree": {
     "authorized_scope_only": true,
     "required_files_physically_present": true,
-    "result": "result_and_state_metadata_finalization_only_after_verified_content_push"
+    "result": "authorized_correction_content_verified_before_commit"
   },
   "zip": {
     "ignored_zip_touched": false,

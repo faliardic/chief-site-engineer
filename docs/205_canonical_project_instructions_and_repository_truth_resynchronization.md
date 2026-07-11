@@ -8,11 +8,11 @@ Step 205 makes the current CSE operating instructions available as a tracked rep
 
 The official local working copy may contain a high-priority local-only execution source needed to coordinate safe work. That source is intentionally excluded from commits, so a fresh clone or handoff cannot rely on its presence. A tracked canonical copy at `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` preserves the current operating contract for future clones, reviewers, and handoffs while the root source remains private to the official local environment.
 
-The canonical file is copied from `CSE_GUNCEL_PROJE_TALIMATLARI.md`. Step 205 verifies source/canonical SHA-256, equal line count, normalized-text equivalence, and source preservation. Line endings and trailing line whitespace may be normalized so the tracked copy passes repository diff checks. The local-only source remains ignored through `.git/info/exclude`, unstaged, and uncommitted.
+The canonical file was initially derived from `CSE_GUNCEL_PROJE_TALIMATLARI.md`, with persistent product/protocol meaning and section order preserved. It is now intentionally adapted so Section 4 provides tracked fallback authority for fresh clones/handoffs, Section 17 records the current Step 204/Step 205 state, and the ChatGPT/GitHub/Codex operating rule is explicit. Because of those reviewable adaptations, the repository does not claim equal SHA, equal line count, or complete normalized-text equivalence. The local-only source remains byte/hash unchanged, ignored through `.git/info/exclude`, unstaged, and uncommitted.
 
 ## Local Execution Source and GitHub Review Surface
 
-Execution happens in `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer`. Branch creation, project-file edits, verification, commit, and push occur in that official local repository. GitHub Issue #25 defines scope and accepts completion evidence; GitHub remains the synchronized review surface. GitHub-only project-file creation is not completion.
+Execution happens in `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer`. Branch creation, project-file edits, verification, commit, and push occur in that official local repository. GitHub Issue #25 defines scope and accepts completion evidence; GitHub remains the synchronized coordination/review surface. The user normally sends a short continuation command, ChatGPT verifies GitHub state and performs GitHub-native actions, and Codex is invoked only for required local execution. GitHub-only project-file creation is not completion.
 
 ## Corrected Repository Truth
 
