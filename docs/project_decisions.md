@@ -1,5 +1,22 @@
 # Proje Kararlari
 
+## 215 FieldObservationRepository Location ve Category Filter Karari
+
+- `FieldObservationRepository`, `list_by_location(location)` ve `list_by_category(category)` read-only filtrelerini saglar.
+- `list_by_location(location)`, yalniz `record.location == location` exact match sonucunu dondurur.
+- `list_by_category(category)`, yalniz `record.category == category` exact match sonucunu dondurur.
+- Filtreler case-sensitive calisir; trim, normalize, parse, map, tokenize, validation, enum veya fallback yapmaz.
+- Eslesmeyen, bilinmeyen, case-different veya whitespace-different degerler icin `[]` dondurulur.
+- Sonuclar repository ekleme sirasini korur.
+- Her filtre cagrisi yeni bir liste dondurur; disarida donen liste mutate edilirse repository storage degismez.
+- Record nesneleri kopyalanmaz ve mutate edilmez; mevcut in-memory repository sozlesmesi korunur.
+- Archived matching record'lar filtre sonucundan dislanmaz; active/archive-only filtre bu adimin kapsami degildir.
+- Location, category, project ve status filtreleri birbirinden bagimsiz kalir; combined query/filter object eklenmez.
+- Step 214, PR #45 squash merge commit `768178a85844aae10c46008e28eafa23822fd631` ile latest merged/finalized safe point'tir; Issue #44 completed olarak kaydedilir.
+- Step 215, Issue #46 ve `step-215-field-observation-location-category-filters` branch'i uzerinde aktif unmerged location/category filter isidir.
+- Podcast 032 latest completed podcast olarak Steps 206-210 araligini kapsar; Podcast 033, Steps 211-215 icin yalniz Step 215 merge edildikten sonra ayri Step 216 ile olusturulmalidir.
+- Structured location lookup, category constants/enums/vocabulary, normalization, validation, partial/fuzzy/text search, broader filters/mutations, persistence, attachment integration, API/GUI/CLI, audit/history/task/NCR/decision generation, generated `blocked`, daily export, weekly summary, Podcast 033 ve Step 216 uygulanmamistir.
+
 ## 214 FieldObservationRepository Reporting Update Karari
 
 - `FieldObservationRepository`, `update_reporting(observation_id, reported_to, reported_at)` explicit reporting-context enrichment method'unu saglar.

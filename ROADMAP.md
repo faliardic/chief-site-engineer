@@ -3,11 +3,11 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 213 - FieldObservationRepository Status Update
-PR #43 merge commit: 45c2b2e2828dfea74121033bf01a868e6821b544
+Adim 214 - FieldObservationRepository Reporting Update
+PR #45 merge commit: 768178a85844aae10c46008e28eafa23822fd631
 ```
 
-Adim 213, PR #43 squash merge commit `45c2b2e2828dfea74121033bf01a868e6821b544` ile master uzerindeki guncel guvenli noktadir. Step 214, Issue #44 kapsaminda `FieldObservationRepository` icin explicit reporting-context update davranisini ekleyen aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Adim 214, PR #45 squash merge commit `768178a85844aae10c46008e28eafa23822fd631` ile master uzerindeki guncel guvenli noktadir. Step 215, Issue #46 kapsaminda `FieldObservationRepository` icin exact read-only location/category filtrelerini ekleyen aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -159,6 +159,8 @@ Adim 213'te `FieldObservationRepository.update_status(observation_id, new_status
 
 Adim 214'te `FieldObservationRepository.update_reporting(observation_id, reported_to, reported_at)` explicit reporting-context enrichment davranisi eklendi. Method existing `find_by_id(...)` lookup'ini kullanir, missing id icin `None` dondurur, bulunan stored record'un yalniz `reported_to` ve `reported_at` alanlarini degistirir ve ayni record nesnesini dondurur. Status otomatik `tracking` yapilmaz; current-time generation, contact lookup/normalization, other field updates, reporting history, audit/task/NCR/notification/decision generation, persistence, attachment integration, API/GUI/CLI ve Step 215 eklenmedi.
 
+Adim 215'te `FieldObservationRepository.list_by_location(location)` ve `FieldObservationRepository.list_by_category(category)` exact read-only filtreleri eklendi. Filtreler case-sensitive string equality kullanir, trim/normalize/parse/map/tokenize/validate yapmaz, insertion order'i korur, her cagri yeni liste dondurur, ayni stored record nesnelerini referansla verir ve archived matching kayitlari dislamaz. Structured location lookup, category constants/enums/vocabulary, combined query/filter object, broader filters, field updates, persistence, attachment integration, export/reporting, API/GUI/CLI, Podcast 033 ve Step 216 eklenmedi.
+
 Adim 160'da mevcut exception tabanli file-writing helper davranisini bozmadan future result contract wrapper API boundary documentation-only olarak planlandi; `write_*` helperlarin korunmasi, olasi `try_write_*` wrapper isimleri, result alanlari, error mapping, geriye uyumluluk ve handover QC gorunurlugu netlestirildi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 
 Adim 161'de Adim 160 API boundary'sine bagli future result contract wrapper implementation plan documentation-only olarak netlestirildi; `try_write_json_ready_dict_to_file(...)` ve `try_write_markdown_text_to_file(...)` wrapper davranisi, basari/hata result sozlesmesi, error mapping, overwrite/path safety davranisi, geriye uyumluluk ve handover QC gorunurlugu belgelendi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
@@ -188,7 +190,7 @@ Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test
 Guncel test durumu:
 
 ```text
-438 passed
+445 passed
 ```
 
 Proje su anda domain model, bellek ici repository, test, dokumantasyon, learning ve NotebookLM podcast notlari cekirdegi seviyesindedir.
@@ -533,8 +535,17 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 - [x] Adim 214 - Exact string preservation, archived record allowance ve stable count davranislari test edildi.
 - [x] Adim 214 - Automatic status change, timestamp generation, contact lookup/normalization, other field updates, persistence, attachment integration, API/GUI/CLI, audit ve Step 215 baslatilmadi.
 
+## Step 215 - FieldObservationRepository Location/Category Filters
+
+- [x] Adim 215 - `list_by_location(location)` exact, case-sensitive location filtresi eklendi.
+- [x] Adim 215 - `list_by_category(category)` exact, case-sensitive category filtresi eklendi.
+- [x] Adim 215 - Unknown, case-different ve whitespace-different degerlerin farkli sonuc verdigi test edildi.
+- [x] Adim 215 - Location, category, project ve status filtrelerinin birbirinden bagimsiz kaldigi test edildi.
+- [x] Adim 215 - Donen listelerin yeni liste oldugu, stored record nesnelerinin kopyalanmadigi/mutate edilmedigi ve archived matching kayitlarin dahil edildigi test edildi.
+- [x] Adim 215 - Structured location lookup, category normalization/constants/enums, combined query, broader filters/mutations, persistence, attachment integration, API/GUI/CLI, audit, Podcast 033 ve Step 216 baslatilmadi.
+
 ## Sonraki Calisma Onerisi
 
-Adim 214 merge edildikten sonra Field MVP icin sonraki dar adimlar attachment, location, explicit close/reopen policy veya export/reporting consumers alanlarindan biri olabilir; bunlar ayri issue ile netlestirilmelidir. Ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur; persistence, attachment integration, broader filters/mutations, automatic lifecycle rules, contact normalization, export/API/audit/validation henuz uygulanmamistir.
+Adim 215 merge edildikten sonra Steps 211-215 podcast kapanisi ayri Step 216 olarak ele alinabilir. Field MVP icin sonraki dar teknik adimlar attachment, explicit close/reopen policy veya export/reporting consumers alanlarindan biri olabilir; bunlar ayri issue ile netlestirilmelidir. Ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur; persistence, attachment integration, broader filters/mutations, automatic lifecycle rules, structured location/contact normalization, export/API/audit/validation henuz uygulanmamistir.
 
 Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Podcast 030 Adim 196-200 araligini, Podcast 031 Adim 201-205 araligini ve Podcast 032 Adim 206-210 araligini kapsar; sonraki dogal podcast araligi Steps 211-215'tir.

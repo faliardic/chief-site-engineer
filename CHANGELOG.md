@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 215
+
+- Added `FieldObservationRepository.list_by_location(location)` and `FieldObservationRepository.list_by_category(category)` for exact read-only in-memory visibility.
+- Added focused tests for exact/case-sensitive/whitespace-sensitive matching, filter independence, new-list behavior, archived record inclusion, empty repository results, and no record copy/mutation.
+- Updated repository truth so Step 214 / PR #45 / Issue #44 / merge commit `768178a85844aae10c46008e28eafa23822fd631` is the latest merged/finalized safe point and Step 215 remains active unmerged location/category filter work.
+- Recorded that Field MVP now has a minimal observation model, in-memory repository, project/status/location/category filters, explicit status update, and explicit reporting-context update.
+- Kept this scope narrow; no structured location lookup, category constants/enums/vocabulary, normalization, validation, partial/fuzzy/text search, combined query/filter object, broader filters, field updates, lifecycle rules, persistence, attachment integration, daily export, weekly summary, API/GUI/CLI, generated `blocked`, Podcast 033, Step 216, workflow changes, Actions enablement, ZIP mutation, or Desktop archive mutation was added.
+
 ## Step 214
 
 - Added `FieldObservationRepository.update_reporting(observation_id, reported_to, reported_at)` for explicit in-memory reporting-context enrichment.

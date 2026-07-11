@@ -940,41 +940,41 @@ Gerçek şantiye
 
 ### Son doğrulanmış merged GitHub noktası
 
-- Step: **213**
-- PR: **#43**
-- Issue: **#42**
+- Step: **214**
+- PR: **#45**
+- Issue: **#44**
 - Merge commit:
 
 ```text
-45c2b2e2828dfea74121033bf01a868e6821b544
+768178a85844aae10c46008e28eafa23822fd631
 ```
 
-- Latest merged safe point test seviyesi: **431 passed**
-- Aktif Step 214 yerel test seviyesi: **438 passed**
+- Latest merged safe point test seviyesi: **438 passed**
+- Aktif Step 215 yerel test seviyesi: **445 passed**
 - GitHub Actions: manuel olarak devre dışı
 - Podcast 032: Steps 206-210 latest completed podcast
 - Sonraki doğal podcast aralığı: Steps 211-215
 
 ### Yerel senkronizasyon durumu
 
-Step 214 baslangicinda resmî `V:` yerel master `45c2b2e2828dfea74121033bf01a868e6821b544` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
+Step 215 baslangicinda resmî `V:` yerel master `768178a85844aae10c46008e28eafa23822fd631` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
 
 ### Aktif iş
 
-- Step: **214**
-- Issue: **#44**
-- Amaç: `FieldObservationRepository` icin explicit `reported_to` / `reported_at` update davranisini eklemek
+- Step: **215**
+- Issue: **#46**
+- Amaç: `FieldObservationRepository` icin exact read-only `location` / `category` filtrelerini eklemek
 - Branch:
 
 ```text
-step-214-field-observation-reporting-update
+step-215-field-observation-location-category-filters
 ```
 
-- Bu adim dar repository explicit reporting-context enrichment isidir.
+- Bu adim dar repository read-only location/category visibility isidir.
 - `FieldObservationRecord` halen tek Field-MVP model implementasyonudur.
-- `FieldObservationRepository` baseline-level bellek ici repository'dir; project/status exact filtreleri, explicit status update ve Step 214 kapsaminda tek explicit reporting-context update davranisi vardir.
-- Persistence, attachment integration, broader filters/mutations, automatic lifecycle rules, contact normalization, export/reporting consumers, API/GUI/CLI, audit ve validation henuz uygulanmamistir.
-- Step 215 baslatilmamistir.
+- `FieldObservationRepository` baseline-level bellek ici repository'dir; project/status/location/category exact filtreleri, explicit status update ve explicit reporting-context update davranisi vardir.
+- Persistence, attachment integration, broader filters/mutations, automatic lifecycle rules, structured location/contact normalization, export/reporting consumers, API/GUI/CLI, audit ve validation henuz uygulanmamistir.
+- Podcast 033 ve Step 216 baslatilmamistir.
 
 ---
 
@@ -1012,7 +1012,7 @@ step-214-field-observation-reporting-update
 
 ### 29.7 Eski aktif Step bilgileri
 
-Step 203, 204, 205, 206, 207, 208, 209, 210, 211, 212 ve aktif Step 213 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 213’tür; Step 214 aktif unmerged explicit reporting-update aşamasındadır.
+Step 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213 ve aktif Step 214 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 214’tür; Step 215 aktif unmerged location/category filter aşamasındadır.
 
 ### 29.8 Eski modül sırasının bağlayıcı olması
 
