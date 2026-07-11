@@ -9,8 +9,8 @@ Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici reposit
 Son guvenli nokta:
 
 ```text
-Adim 205 - Canonical project instructions and repository truth synchronization
-PR #26 merge commit: 92a15f2a55e6bfda42d50b8ef7dea651ff496f62
+Adim 206 - Step 205 merged truth, Podcast 031, and instruction authority closure
+PR #29 merge commit: 3b05fae76766cedc8840eea6c0fc2f51440354e4
 ```
 
 Guncel test sonucu:
@@ -22,10 +22,10 @@ Guncel test sonucu:
 Mevcut calisma durumu:
 
 ```text
-Adim 206 - Step 205 merged truth, Podcast 031, and instruction authority closure
+Adim 207 - Unified project source and Codex invocation policy
 ```
 
-Adim 205, PR #26 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 206, Step 205 merge gercegini README/state/roadmap/changelog/karar/protokol kayitlarinda final hale getirir, Podcast 031'i olusturur ve talimat yetkisini tracked canonical dosyada birlestirir.
+Adim 206, PR #29 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 207, unified project source, source register, GitHub-native new-chat bootstrap ve Codex invocation / batched execution policy calismasidir; henuz merge edilmemis aktif documentation/state/protocol isidir.
 
 ## Repo Koku
 
@@ -46,6 +46,9 @@ Proje su ana parcalardan olusur:
 - `docs/`: Adim bazli karar, kapsam, politika, denetim ve kullanim dokumantasyonu.
 - `learning/`: Python ve proje ogrenim notlari.
 - `docs/podcast_notes/`: NotebookLM podcast kaynak notlari.
+- `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`: Urun amaci, strateji, veri ilkeleri, urun katmanlari, roadmap ve uzun vadeli mimari icin birlesik ust kaynak.
+- `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`: Git/GitHub/Codex operasyon, safety, verification ve execution protocol kaynagi.
+- `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md`: Yeni chat'in GitHub'dan ZIP/handoff yuklemeden nasil devam edecegini anlatan bootstrap kaynagi.
 
 ## Mevcut Teknik Kapsam
 
@@ -182,7 +185,10 @@ Onemli dokumantasyon dosyalari:
 - `CHANGELOG.md`
 - `ROADMAP.md`
 - `docs/project_decisions.md`
+- `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
 - `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
+- `docs/protocols/CSE_PROJECT_SOURCE_REGISTER.md`
+- `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md`
 - `docs/100_guvenli_nokta_final_kalite_kontrol.md`
 - `docs/101_genel_proje_denetimi_ve_mimari_saglik_raporu.md`
 - `docs/117_audit_event_target_record_iliski_kurallari.md`
@@ -213,4 +219,4 @@ Adim 205 repository truth synchronization merge edildikten sonra ilk urun yonu, 
 - daily export,
 - weekly summary.
 
-CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. Adim 206, bu urun implementation'ini baslatmaz; yalniz Step 205 truth, Podcast 031 ve instruction authority closure kayitlarini tamamlar.
+CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. Adim 207, field-MVP implementation baslatmaz; yalniz unified source, GitHub bootstrap ve Codex invocation/batched execution policy kayitlarini tamamlar.

@@ -1,0 +1,29 @@
+1. CSE önce güvenilir veri omurgası kurar; otomasyon ve AI daha sonra gelir.
+
+2. Proje ilk günden dev platforma dönüştürülmez; küçük, test edilebilir ve geri alınabilir adımlarla büyür.
+
+3. Resmi kayıtlar ile kişisel özel alan kesin olarak ayrıdır.
+
+4. Resmi kayıtlar fiziksel olarak silinmez; arşivlenir, pasifleştirilir, hükümsüz kılınır veya yeni revizyonla değiştirilir.
+
+5. Kanıt niteliği taşıyan her işlem audit izi bırakır.
+
+6. Medya dosyaları veritabanına gömülmez; dosya yolu, metadata ve bütünlük kontrolleriyle yönetilir.
+
+7. Her attachment metadata kaydı fiziksel dosya ile bütünlük içinde olmalıdır.
+
+8. Özel alan verileri kullanıcıya aittir; proje devrinde yeni şantiye şefine aktarılmaz.
+
+9. Yeni şantiye şefi projeyi devraldığında kendi özel alanı sıfırdan açılır.
+
+10. Eski şantiye şefinin özel alanına erişim, rol değişikliği veya proje devriyle devredilemez.
+
+11. Devir için gerekli bilgiler özel alanda bırakılmaz; resmi kayıt veya explicit handover package olarak oluşturulur.
+
+12. Codex görevleri küçük, sınırları net, test edilebilir ve commitlenebilir parçalar halinde verilir.
+
+13. Her geliştirme test, dokümantasyon, kalite kontrol ve commit disipliniyle kapatılır.
+
+14. Offline, backup, restore, audit ve encryption gibi yüksek riskli konular erken belgelenir; aceleyle karmaşık kod yazılmaz.
+
+15. CSE’nin amacı sahada kullanılmayan ağır formlar üretmek değil; hızlı kayıt, güvenilir arşiv ve kanıt zinciri oluşturmaktır.
