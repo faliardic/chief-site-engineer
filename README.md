@@ -9,8 +9,8 @@ Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici reposit
 Son guvenli nokta:
 
 ```text
-Adim 209 - Minimal FieldObservationRecord model
-PR #35 merge commit: f1fd7b8e6add21369b3d5f4c44d014994538fc1c
+Adim 210 - FieldObservationRepository baseline
+PR #37 merge commit: c7dbd94076f9e23c928f27ea377a97debad6636b
 ```
 
 Guncel test sonucu:
@@ -22,10 +22,10 @@ Guncel test sonucu:
 Mevcut calisma durumu:
 
 ```text
-Adim 210 - FieldObservationRepository baseline
+Adim 211 - Podcast 032 for Steps 206-210
 ```
 
-Adim 209, PR #35 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 210, ilk Field MVP icin minimal bellek ici `FieldObservationRepository` baseline'ini ekleyen aktif repository/test isidir; henuz merge edilmemistir.
+Adim 210, PR #37 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 211, Steps 206-210 icin Podcast 032 kaynak notunu ekleyen aktif documentation/podcast isidir; henuz merge edilmemistir.
 
 ## Repo Koku
 
@@ -112,8 +112,9 @@ Son eklenen podcast notlari:
 - `docs/podcast_notes/029_adim_167_180_notebooklm_podcast_notu.md`
 - `docs/podcast_notes/030_adim_196_200_notebooklm_podcast_notu.md`
 - `docs/podcast_notes/031_adim_201_205_notebooklm_podcast_notu.md`
+- `docs/podcast_notes/032_adim_206_210_notebooklm_podcast_notu.md`
 
-Bu notlar, export/result/handover QC hattini, official local sync protokolunu, canonical instruction workflow'unu ve CSE veri koruma / ozel alan politikalarini podcast anlatimina uygun sekilde ozetler.
+Podcast 032, Step 211 branch'i uzerinde aktif artifact'tir; merge sonrasinda latest completed podcast olur ve Steps 206-210 araligini kapsar. Bu notlar, export/result/handover QC hattini, official local sync protokolunu, canonical instruction workflow'unu, Field MVP observation contract/model/repository baslangicini ve CSE veri koruma / ozel alan politikalarini podcast anlatimina uygun sekilde ozetler.
 
 ## Kalite Kontrol ve CI Durumu
 
@@ -211,7 +212,7 @@ Bu proje ayni zamanda Python ve yazilim gelistirme ogrenim arsivi uretir.
 
 ## Sonraki Urun Yonu
 
-Adim 209 merge edildikten sonra ilk urun yonu, veri omurgasini guvenilir tutan dar bir saha MVP'sidir:
+Adim 210 merge edildikten sonra ilk urun yonu, veri omurgasini guvenilir tutan dar bir saha MVP'sidir:
 
 - hizli observation kaydi,
 - attachment,
@@ -221,4 +222,4 @@ Adim 209 merge edildikten sonra ilk urun yonu, veri omurgasini guvenilir tutan d
 - daily export,
 - weekly summary.
 
-CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. Adim 210, Field MVP implementasyonunu yalniz minimal bellek ici `FieldObservationRepository` baseline'i kadar ilerletir; persistence, filters, lifecycle updates, attachment linking, export/reporting, API/GUI/CLI, audit ve validation henuz eklenmemistir.
+CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. `FieldObservationRecord` ve minimal bellek ici `FieldObservationRepository` baseline'i implement edilmis durumdadir; persistence, filters, lifecycle updates, attachment linking, export/reporting, API/GUI/CLI, audit ve validation henuz eklenmemistir.

@@ -1,5 +1,18 @@
 # Proje Kararlari
 
+## 211 Podcast 032 for Steps 206-210 Karari
+
+- Podcast 032, yalniz Steps 206-210 araligini kapsayan NotebookLM kaynak notu olarak `docs/podcast_notes/032_adim_206_210_notebooklm_podcast_notu.md` dosyasinda hazirlanir.
+- Podcast 032'nin ana anlatimi: source authority and execution discipline -> reviewed observation contract -> minimal observation model -> minimal in-memory repository.
+- Step 210, PR #37 squash merge commit `c7dbd94076f9e23c928f27ea377a97debad6636b` ile latest merged/finalized safe point'tir; Issue #36 completed olarak kaydedilir.
+- Step 211, Issue #38 ve `step-211-podcast-032-steps-206-210` branch'i uzerinde aktif unmerged documentation/podcast isidir.
+- Podcast 032, Step 211 merge edilene kadar active artifact'tir; merge sonrasinda latest completed podcast olur ve Steps 206-210 araligini kapsar.
+- Sonraki besli podcast araligi Steps 211-215 olarak kaydedilir.
+- Current local verification baseline `420 passed` olarak korunur.
+- `FieldObservationRecord` ve minimal bellek ici `FieldObservationRepository` baseline'i implement edilmistir.
+- Persistence, filters, lifecycle updates, attachment integration, reporting/export, API/GUI/CLI, audit, validation, generated `blocked`, daily export ve weekly summary henuz uygulanmamistir.
+- Step 211 product behavior, production code, executable test, workflow behavior, Actions setting, ZIP mutation, Desktop archive mutation veya Step 212 baslatmaz.
+
 ## 210 FieldObservationRepository Baseline Karari
 
 - `FieldObservationRepository`, merge edilmis `FieldObservationRecord` modeli icin minimal bellek ici repository baseline'i olarak `app/records.py` icine eklendi.
