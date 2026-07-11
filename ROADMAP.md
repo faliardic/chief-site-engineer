@@ -3,11 +3,11 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 204 - Handover QC Fixture Naming and Assertion Checklist Plan
-Merge commit: 7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3
+Adim 205 - Canonical Project Instructions and Repository Truth Synchronization
+PR #26 merge commit: 92a15f2a55e6bfda42d50b8ef7dea651ff496f62
 ```
 
-Adim 204, PR #24 squash merge commit `7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3` ile master uzerindeki guncel guvenli noktadir. Step 205, canonical proje talimatlarini tracked hale getiren ve README/state/roadmap/changelog/karar gercegini bu merge ile esleyen aktif documentation/state-only branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Adim 205, PR #26 squash merge commit `92a15f2a55e6bfda42d50b8ef7dea651ff496f62` ile master uzerindeki guncel guvenli noktadir. Step 206, Issue #28 kapsaminda Step 205 merged truth kayitlarini finalize eden, Podcast 031'i ekleyen, podcast protocol'unu tazeleyen ve instruction authority'yi tracked canonical dosyada birlestiren aktif documentation/state-only branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -445,16 +445,25 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 
 ## Canonical Project Instructions and Repository Truth Sync - Adim 205
 
-- [ ] Adim 205 - `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`, local-only source'tan initially derived canonical dosya olarak korunacak; Section 4 tracked fallback authority, Section 17 Step 204/205 truth ve GitHub-centered workflow icin intentionally adapted edilecek.
-- [ ] Adim 205 - Adaptation sonrasi equal SHA, equal line count veya full text equivalence iddiasi yapilmayacak; local-only source byte/hash unchanged kalacak.
-- [ ] Adim 205 - Kullanici `devam` dediginde ChatGPT GitHub state ve native actions'i yonetecek, Codex yalniz gerekli local project-file/test/commit-push/sync execution icin kullanilacak.
-- [ ] Adim 205 - README, machine-readable state, roadmap, changelog ve proje kararlari Step 204 merge commit `7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3` ile yeniden eslenecek.
-- [ ] Adim 205 - Workflow varligi, manuel disabled Actions durumu ve disabled required status checks ayri factual alanlar olarak kaydedilecek.
-- [ ] Adim 205 - CSE'nin tested domain/data/documentation core oldugu, field-ready application olmadigi ve eksik production capabilities acik tutulacak.
-- [ ] Adim 205 - Reliable data backbone first, automation later, AI last ilkesi ve ilk field-MVP yonu korunacak.
+- [x] Adim 205 - `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`, local-only source'tan initially derived canonical dosya olarak tracked hale getirildi; Section 4 authority, Section 17 Step 204/205 truth ve GitHub-centered workflow intentionally adapted edildi.
+- [x] Adim 205 - Adaptation sonrasi equal SHA, equal line count veya full text equivalence iddiasi yapilmadi; local-only source byte/hash unchanged kaldi.
+- [x] Adim 205 - Kullanici `devam` dediginde ChatGPT GitHub state ve native actions'i yonetecek, Codex yalniz gerekli local project-file/test/commit-push/sync execution icin kullanilacak workflow kaydedildi.
+- [x] Adim 205 - README, machine-readable state, roadmap, changelog ve proje kararlari Step 204 merge commit `7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3` ile yeniden eslendi; PR #26 merge sonrasinda Step 205 guncel guvenli nokta oldu.
+- [x] Adim 205 - Workflow varligi, manuel disabled Actions durumu ve disabled required status checks ayri factual alanlar olarak kaydedildi.
+- [x] Adim 205 - CSE'nin tested domain/data/documentation core oldugu, field-ready application olmadigi ve eksik production capabilities acik tutuldu.
+- [x] Adim 205 - Reliable data backbone first, automation later, AI last ilkesi ve ilk field-MVP yonu korundu.
+
+## Step 206 - Podcast 031 and Instruction Authority Closure
+
+- [ ] Adim 206 - Step 205 / PR #26 / Issue #25 / merge commit `92a15f2a55e6bfda42d50b8ef7dea651ff496f62` latest merged/finalized safe point olarak README, state, roadmap, changelog, decisions ve canonical Section 17 icinde eslenecek.
+- [ ] Adim 206 - `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` tek yetkili proje talimat kaynagi olacak; `CSE_GUNCEL_PROJE_TALIMATLARI.md` sadece ignored local mirror olarak tutulacak ve canonical metinle birebir eslenecek.
+- [ ] Adim 206 - Official workspace rule `Set-Location`, exact `git rev-parse --show-toplevel` check, wrong-root stop rule, no automatic `C:` clone/workspace ve GitHub Issue evidence exchange maddeleriyle sertlestirilecek.
+- [ ] Adim 206 - Podcast 031, yalniz Steps 201-205 araligini kapsayacak sekilde eklenecek.
+- [ ] Adim 206 - `docs/podcast_notes/README.md` stale Step 022 current-state metninden arindirilarak durable cadence ve factual Podcast 030/031 state ile guncellenecek.
+- [ ] Adim 206 - Desktop archive repository risk kaydi non-blocking unresolved local archive item olarak belgelenecek; Desktop repository'ye dokunulmayacak.
 
 ## Sonraki Calisma Onerisi
 
-Adim 205 merge edildikten sonraki urun yonu ilk field MVP'dir: hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary. Bu yon bu adimda implementation baslatmaz; her teknik parca ayri explicit task, test ve local-first verification ister.
+Adim 206 merge edilmeden Step 207 veya field-MVP implementation baslatilmaz. Adim 206 sonrasi dogal besli podcast araligi Step 206 ile baslar; ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur.
 
-Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Son mevcut podcast notu Podcast 030'dur ve Adim 196-200 araligini kapsar. Podcast 031, Adim 201-205 araligini Adim 205 merge edildikten sonra ozetleyecek dogal documentation follow-up'tur.
+Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Podcast 030 Adim 196-200 araligini, Podcast 031 Adim 201-205 araligini kapsar.

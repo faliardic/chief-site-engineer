@@ -14,29 +14,20 @@ Bu notlarin amaci:
 
 ## Podcast Notu Uretim Araligi
 
-Her 5 adimda bir podcast notu hazirlanir.
+Her bes adimlik teknik blok tamamlandiginda bir podcast notu hazirlanir.
 
-Araliklar:
+Genel aralik mantigi:
 
 ```text
 Adim 001-005
 Adim 006-010
 Adim 011-015
-Adim 016-020
-Adim 021-025
-Adim 026-030
-Adim 031-035
-Adim 036-040
+...
 ```
 
-Podcast notu, ilgili araliktaki son adim commitlendikten sonra hazirlanir.
+Podcast notu, ilgili araliktaki son adim tamamlandiktan ve o aralik icin factual state netlestikten sonra hazirlanir.
 
-Ornek:
-
-```text
-Adim 025 commitlendikten sonra:
-docs/podcast_notes/005_adim_021_025_notebooklm_podcast_notu.md
-```
+Bu belge obsolete proje-stage metni tutmaz. Guncel proje durumu icin `README.md`, `.cse/state/project_state.json`, `ROADMAP.md` ve current GitHub Issue birlikte okunur.
 
 ## Dosya Konumu
 
@@ -61,6 +52,16 @@ Ornekler:
 004_adim_016_020_notebooklm_podcast_notu.md
 005_adim_021_025_notebooklm_podcast_notu.md
 ```
+
+## Factual Current Podcast State
+
+- Podcast 030: `docs/podcast_notes/030_adim_196_200_notebooklm_podcast_notu.md`
+- Podcast 030 kapsami: Steps 196-200
+- Podcast 031: `docs/podcast_notes/031_adim_201_205_notebooklm_podcast_notu.md`
+- Podcast 031 kapsami: Steps 201-205
+- Sonraki besli aralik: Step 206 ile baslar
+
+Bu factual state yeni podcastler eklendikce guncellenir, ancak burada eski proje asamasi ornekleri veya cabuk bayatlayan "aktif adim" metinleri tutulmaz.
 
 ## Podcast Notu Icerigi
 
@@ -145,43 +146,10 @@ Bolum sonunda su soruya cevap ver:
 
 ## Commit Kurali
 
-Podcast notu, ilgili 5 adimlik araligin son adimi tamamlandiktan sonra ayri bir kucuk adim olarak degil, ilgili adimin dokumantasyon ciktisi olarak hazirlanabilir.
+Podcast notu, ilgili 5 adimlik araligin son adimi tamamlandiktan sonra ilgili adimin dokumantasyon ciktisi olarak hazirlanabilir.
 
-Ornek:
-
-```text
-Adim 025 tamamlandiktan sonra:
-- Adim 025 kalite kontrol yapilir.
-- Adim 025 commitlenir.
-- Ardindan Adim 021-025 podcast notu hazirlanir.
-- Podcast notu icin ayri kalite kontrol yapilir.
-- Podcast notu ayri commitlenebilir.
-```
-
-Onerilen commit mesaji:
+Onerilen commit mesaji ornegi:
 
 ```text
-Add NotebookLM podcast notes for steps 021-025
-```
-
-## Mevcut Duruma Uygulama
-
-Proje su anda Adim 022 asamasindadir.
-
-Son tamamlanan 5'li aralik:
-
-```text
-Adim 016-020
-```
-
-Aktif devam eden 5'li aralik:
-
-```text
-Adim 021-025
-```
-
-Bu nedenle sonraki podcast notu Adim 025 tamamlandiktan sonra hazirlanacaktir:
-
-```text
-docs/podcast_notes/005_adim_021_025_notebooklm_podcast_notu.md
+Add NotebookLM podcast notes for steps AAA-BBB
 ```

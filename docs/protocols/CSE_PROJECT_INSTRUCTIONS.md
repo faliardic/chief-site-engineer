@@ -2,8 +2,8 @@
 
 **Belge türü:** Ana proje talimatı / proje kaynağı
 **Geçerlilik tarihi:** 2026-07-11
-**Önerilen proje yolu:** `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
-**Durum:** Önceki proje talimatlarıyla çelişen maddelerde bu belge geçerlidir.
+**Canonical proje yolu:** `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
+**Durum:** Bu tracked belge, proje talimatlari icin tek yetkili kaynaktir.
 
 ---
 
@@ -80,14 +80,15 @@ Bu çekirdek değer kanıtlanmadan karmaşık dashboard, çok kullanıcı, bulut
 
 Bir çelişki olduğunda aşağıdaki sıra uygulanır:
 
-1. Resmî yerel ortamda `CSE_GUNCEL_PROJE_TALIMATLARI.md` yalnız dosya mevcutsa ve beklenen SHA-256 değeri doğrulanmışsa kullanılır.
-2. Doğrulanmış local-only kaynak yoksa ve bütün fresh clone/handoff ortamlarında tracked `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` canonical repository instruction source olarak kullanılır.
-3. Güncel GitHub Issue ve yerelde oluşturulan `.cse/tasks/<step>_task.md` birlikte uygulanır.
-4. `.cse/state/project_state.json`
-5. İlgili `.cse/results/<step>_result.md`
-6. Sırasıyla `ROADMAP.md`, `docs/project_decisions.md`, `CHANGELOG.md`, `CSE_STRATEGIC_PRODUCT_DIRECTION.md`, güvenilir veri omurgası ilkeleri, `chat_handoff/` özetleri ve eski ZIP/arşiv paketleri.
+1. Tracked canonical proje talimatlari: `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
+2. Güncel GitHub Issue ve yerelde oluşturulan `.cse/tasks/<step>_task.md`
+3. `.cse/state/project_state.json`
+4. İlgili `.cse/results/<step>_result.md`
+5. Sırasıyla `ROADMAP.md`, `docs/project_decisions.md`, `CHANGELOG.md`, güvenilir veri omurgası ilkeleri, `chat_handoff/` özetleri ve eski ZIP/arşiv paketleri.
 
-Tracked canonical dosya, doğrulanmış local-only kaynak kullanılamadığında yetkili repository instruction source’tur. Bu fallback, fresh clone ve handoff’ların root local-only dosyaya bağımlı kalmasını önler.
+Kök dizindeki `CSE_GUNCEL_PROJE_TALIMATLARI.md` dosyasi artik higher-priority override degildir. Bu dosya, yalniz resmi yerel çalışma kopyasinda kolay okuma icin tutulabilecek optional local mirror'dir.
+
+Local mirror mevcutsa tracked canonical dosya ile byte-for-byte ayni metni tasimalidir. Mirror `.git/info/exclude` uzerinden ignored kalir, stage edilmez ve commitlenmez. Mirror ile canonical arasinda fark varsa yetkili kaynak yine tracked canonical dosyadir ve mirror duzeltilmelidir.
 
 `chat_handoff/` dosyaları sohbet aktarımı içindir; Git durumu, yerel çalışma ağacı veya güncel Issue/PR kayıtlarının yerine geçmez.
 
@@ -103,6 +104,16 @@ V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer
 
 ### Zorunlu kural
 
+- Her Codex execution once resmi `V:` yoluna gecmelidir:
+
+  ```powershell
+  Set-Location 'V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer'
+  ```
+
+- `git rev-parse --show-toplevel` sonucu tam olarak resmi `V:` yolu ile ayni root'a cozumlenmelidir.
+- Yol farkliysa herhangi bir Git islemi veya file write yapmadan durulur.
+- CSE icin otomatik `C:` clone/workspace olusturulmaz ve kullanilmaz.
+- Instruction ve evidence alisverisi guncel GitHub Issue uzerinden yapilir; local execution resmi `V:` reposunda kalir.
 - Proje dosyalarını yalnız GitHub web arayüzü, connector veya API üzerinden oluşturmak tamamlanmış iş sayılmaz.
 - GitHub senkronize remote ve inceleme yüzeyidir.
 - Yerel repo; dosya oluşturma, düzenleme, test, kalite kontrol, commit ve push için yürütme kaynağıdır.
@@ -117,6 +128,13 @@ Codex herhangi bir branch değişikliği, pull, düzenleme, commit veya push ön
 
 ```powershell
 Set-Location 'V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer'
+
+$expected = (Resolve-Path 'V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer').Path
+$actual = (git rev-parse --show-toplevel)
+
+if ((Resolve-Path $actual).Path -ne $expected) {
+    throw 'Wrong repository root. Stop without changing anything.'
+}
 
 git status --short --branch
 git status --ignored --short --untracked-files=all
@@ -364,7 +382,7 @@ Dokümantasyon üretmek, gerçek kod/test/yerel dosya kanıtının yerine geçme
 
 ### Podcast kuralı
 
-Her beş adımlık teknik blok tamamlandığında NotebookLM podcast notu oluşturulur. Son tamamlanan podcast, Steps 196–200 kapsamındaki Podcast 030’dur. Doğal sonraki podcast aralığı Steps 201–205’tir ve Step 205 tamamlandıktan sonra oluşturulmalıdır.
+Her beş adımlık teknik blok tamamlandığında NotebookLM podcast notu oluşturulur. Podcast 030, Steps 196-200 araligini kapsar. Podcast 031, Steps 201-205 araligini kapsar. Dogal sonraki besli aralik Step 206 ile baslar.
 
 ---
 
@@ -386,12 +404,13 @@ Güncel kural:
 
 ### Son güvenli GitHub noktası
 
-- Tamamlanan adım: **Step 204**
-- Merge edilen PR: **#24**
+- Tamamlanan adım: **Step 205**
+- Merge edilen PR: **#26**
+- Tamamlanan Issue: **#25**
 - `master` commit:
 
 ```text
-7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3
+92a15f2a55e6bfda42d50b8ef7dea651ff496f62
 ```
 
 - Son doğrulanan yerel test sonucu: **413 passed**
@@ -399,18 +418,18 @@ Güncel kural:
 
 ### Aktif iş
 
-- Issue: **#25**
-- Adım: **Step 205 — Canonical project instructions and repository truth synchronization**
+- Issue: **#28**
+- Adım: **Step 206 — Step 205 merged truth, Podcast 031, and instruction authority closure**
 - Branch:
 
 ```text
-step-205-project-instructions-truth-sync
+step-206-podcast-031-and-authority-closure
 ```
 
 - Kapsam: **documentation/state-only**
 - Reasoning: **High**
-- Merge sonrası doğal documentation task: **Podcast 031 — Steps 201–205**
-- Step 206 ve product implementation başlamadı.
+- Bu adim Step 205 merge gercegini final hale getirir, Podcast 031'i olusturur, podcast protocol'unu tazeler ve instruction authority'yi tracked canonical dosyada birlestirir.
+- Step 206 merge iddiasi, PR creation, merge veya product implementation bu aktif is kapsaminda yazilmaz.
 
 Bu bölüm proje ilerledikçe güncellenir; yukarıdaki kalıcı kurallar değişmez.
 

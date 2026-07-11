@@ -1,91 +1,81 @@
 {
-  "active_work": {
-    "branch": "step-205-project-instructions-truth-sync",
-    "documentation_state_only": true,
-    "issue": 25,
-    "step": 205
-  },
+  "step": 206,
   "base_branch": "master",
-  "base_commit": "7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3",
+  "base_commit": "92a15f2a55e6bfda42d50b8ef7dea651ff496f62",
+  "active_work": {
+    "issue": 28,
+    "step": 206,
+    "branch": "step-206-podcast-031-and-authority-closure",
+    "documentation_state_protocol_only": true,
+    "merge_claim_for_step_206": false
+  },
+  "current_safe_point": {
+    "semantics": "latest_merged_finalized_checkpoint",
+    "step": 205,
+    "issue": 25,
+    "issue_state": "completed",
+    "pull_request": 26,
+    "pull_request_state": "merged",
+    "merge_commit": "92a15f2a55e6bfda42d50b8ef7dea651ff496f62",
+    "local_test_summary": "413 passed"
+  },
+  "official_local_sync": {
+    "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
+    "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
+    "local_master_sha": "92a15f2a55e6bfda42d50b8ef7dea651ff496f62",
+    "origin_master_sha": "92a15f2a55e6bfda42d50b8ef7dea651ff496f62",
+    "divergence": "0 0",
+    "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
+    "misspelled_workspace_present": false,
+    "automatic_c_workspace_allowed": false
+  },
   "canonical_project_instructions": {
     "canonical_path": "docs/protocols/CSE_PROJECT_INSTRUCTIONS.md",
-    "canonical_sha256_after_authority_workflow_correction": "54484B6DBE0262CBF815B7F56835750F29DD345FB85E5D2717664C510701B086",
-    "derivation": "initially_derived_from_local_only_source_then_intentionally_adapted",
-    "intentionally_adapted_sections": [
-      "section_4_repository_authority_fallback",
-      "section_8_github_centered_workflow",
-      "section_13_chatgpt_codex_user_responsibilities",
-      "section_17_current_safe_point_and_active_work"
-    ],
-    "persistent_product_protocol_meaning_preserved": true,
-    "section_order_preserved": true,
-    "source_ignored_via": ".git/info/exclude",
-    "source_path": "CSE_GUNCEL_PROJE_TALIMATLARI.md",
-    "source_sha256": "A03C207BE84425F793C962DFA2C9A1E09EDCF739761465FFE5C57D3BFA0E123F",
-    "source_staged": false,
-    "source_committed": false,
-    "source_unchanged": true,
-    "full_text_equivalence_claimed_after_adaptation": false
+    "canonical_is_single_authority": true,
+    "root_mirror_path": "CSE_GUNCEL_PROJE_TALIMATLARI.md",
+    "root_mirror_role": "optional_local_convenience_mirror_only",
+    "root_mirror_higher_priority_override": false,
+    "root_mirror_ignored_via": ".git/info/exclude",
+    "root_mirror_staged": false,
+    "root_mirror_committed": false,
+    "required_text_equivalence": "byte_for_byte_match_when_present",
+    "sha256_evidence_location": ".cse/results/206_result.md"
   },
   "github_centered_workflow": {
     "chatgpt_verifies_github_before_next_action": true,
     "chatgpt_handles_github_native_actions": true,
     "codex_handles_required_local_execution": true,
     "evidence_exchange_surface": "current_github_issue",
+    "local_execution_surface": "official_v_drive_repository",
     "github_only_project_file_creation_is_completion": false,
     "user_default_command": "devam_or_equivalent"
   },
+  "podcast": {
+    "latest_completed_before_step_206": {
+      "podcast": 30,
+      "range": "196-200",
+      "path": "docs/podcast_notes/030_adim_196_200_notebooklm_podcast_notu.md"
+    },
+    "created_in_step_206": {
+      "podcast": 31,
+      "range": "201-205",
+      "path": "docs/podcast_notes/031_adim_201_205_notebooklm_podcast_notu.md",
+      "covers_only_steps_201_205": true
+    },
+    "next_five_step_range_begins_with": 206
+  },
   "ci": {
+    "workflow_exists": true,
+    "workflow_path": ".github/workflows/pytest.yml",
     "automatic_actions_execution": "manually_disabled",
     "constraint": "account_billing_and_runner_start",
     "required_status_checks_enabled": false,
-    "workflow_changed": false,
-    "workflow_exists": true,
-    "workflow_path": ".github/workflows/pytest.yml"
-  },
-  "current_safe_point": {
-    "issue": 23,
-    "issue_state": "completed",
-    "merge_commit": "7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3",
-    "pull_request": 24,
-    "pull_request_state": "merged",
-    "semantics": "latest_merged_finalized_checkpoint",
-    "step": 204
-  },
-  "diff_check": {
-    "command": "git diff --check",
-    "result": "passed"
-  },
-  "exports": {
-    "contents": [
-      ".gitkeep"
-    ],
-    "result": "clean"
-  },
-  "forbidden_scope_added": false,
-  "merged_state": {
-    "active_merged_state_ambiguity": false,
-    "obsolete_active_pull_request": null,
-    "step_203_or_pr_22_presented_as_current": false
-  },
-  "next_action": "ChatGPT inspection and Draft PR creation after the Step 205 branch is pushed; do not merge automatically.",
-  "official_local_sync": {
-    "divergence": "0 0",
-    "local_master_sha": "7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3",
-    "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
-    "origin_master_sha": "7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3"
+    "workflow_changed": false
   },
   "product_maturity": {
+    "state": "tested_domain_data_documentation_core",
     "field_ready_application": false,
-    "missing_production_capabilities": [
-      "persistence_database",
-      "real_file_upload",
-      "api",
-      "gui",
-      "authentication_authorization",
-      "deployment",
-      "complete_backup_restore"
-    ],
+    "product_rule": "reliable_data_backbone_first_automation_later_ai_last",
     "next_product_direction": {
       "name": "first_field_mvp",
       "scope": [
@@ -96,62 +86,75 @@
         "reported_to",
         "daily_export",
         "weekly_summary"
-      ]
+      ],
+      "implementation_started_in_step_206": false
     },
-    "product_rule": "reliable_data_backbone_first_automation_later_ai_last",
-    "state": "tested_domain_data_documentation_core"
+    "missing_production_capabilities": [
+      "persistence_database",
+      "real_file_upload",
+      "api",
+      "gui",
+      "authentication_authorization",
+      "deployment",
+      "complete_backup_restore"
+    ]
+  },
+  "local_archive_risk": {
+    "path": "C:\\Users\\Fatih\\Desktop\\fatih\\chief-site-engineer",
+    "status": "unresolved_non_blocking_local_archive_item",
+    "known_prior_state": [
+      "no_canonical_origin_remote",
+      "deleted_interim_podcast_note_path",
+      "untracked_final_005_adim_021_025_notebooklm_podcast_notu.md"
+    ],
+    "canonical_repository_contains_docs_podcast_notes_005": true,
+    "exact_local_content_identity_proven": false,
+    "touched_in_step_206": false
   },
   "protected_paths": {
-    ".github/workflows/pytest.yml": "unchanged",
     "app/models.py": "unchanged",
-    "tests/test_models.py": "unchanged"
+    "tests/test_models.py": "unchanged",
+    ".github/workflows/pytest.yml": "unchanged"
   },
-  "protocol_version": 1,
+  "exports": {
+    "expected_contents": [
+      ".gitkeep"
+    ]
+  },
   "publication": {
-    "branch_deletion_authorized": false,
+    "commit_authorized": true,
+    "ordinary_push_authorized": true,
     "force_push_authorized": false,
-    "merge_authorized": false,
-    "pull_request": null,
     "pull_request_creation_by_codex": false,
-    "initial_step_205_content_commit_divergence": "0 0",
-    "initial_step_205_content_commit_local_sha": "7df6451e0c6e7332a8293cf326ce25e15b548598",
-    "initial_step_205_content_commit_remote_sha": "7df6451e0c6e7332a8293cf326ce25e15b548598",
-    "verified_correction_content_commit_divergence": "0 0",
-    "verified_correction_content_commit_local_sha": "ea54e7dd257f8987f412314862da2e54ed86f01d",
-    "verified_correction_content_commit_remote_sha": "ea54e7dd257f8987f412314862da2e54ed86f01d"
+    "pull_request_status": "not_created_by_codex_pending_chatgpt_inspection",
+    "merge_authorized": false,
+    "merge_performed": false,
+    "branch_deletion_authorized": false,
+    "verified_content_push": {
+      "successful": true,
+      "local_sha": "9c8a2db33abb4c20ac502b9efb865f68f927d45f",
+      "remote_sha": "9c8a2db33abb4c20ac502b9efb865f68f927d45f",
+      "divergence": "0 0"
+    },
+    "metadata_finalization": {
+      "final_branch_sha_evidence_in_issue_comment_after_push": true
+    },
+    "final_remote_sha_evidence_location": "GitHub Issue #28 completion comment after push"
   },
   "required_files": [
     "docs/protocols/CSE_PROJECT_INSTRUCTIONS.md",
     "README.md",
-    ".cse/tasks/205_task.md",
-    ".cse/results/205_result.md",
+    ".cse/tasks/206_task.md",
+    ".cse/results/206_result.md",
     ".cse/state/project_state.json",
-    "docs/205_canonical_project_instructions_and_repository_truth_resynchronization.md",
-    "learning/205_canonical_project_instructions_and_repository_truth_resynchronization.md",
     "ROADMAP.md",
     "CHANGELOG.md",
-    "docs/project_decisions.md"
+    "docs/project_decisions.md",
+    "docs/podcast_notes/031_adim_201_205_notebooklm_podcast_notu.md",
+    "docs/podcast_notes/README.md",
+    "docs/206_step_205_merged_truth_podcast_031_and_instruction_authority_closure.md",
+    "learning/206_step_205_merged_truth_podcast_031_and_instruction_authority_closure.md"
   ],
-  "step": 205,
-  "tests": {
-    "command": "python -m pytest",
-    "result": "passed",
-    "content_verification_summary": "413 passed in 1.18s",
-    "metadata_finalization_summary": "413 passed in 1.17s",
-    "correction_content_verification_summary": "413 passed in 1.21s",
-    "correction_metadata_finalization_summary": "413 passed in 1.17s"
-  },
-  "workflow_status": "step_205_canonical_authority_and_github_workflow_correction_push_verified_before_metadata_finalization",
-  "working_tree": {
-    "authorized_scope_only": true,
-    "required_files_physically_present": true,
-    "result": "result_and_state_metadata_finalization_only_after_verified_correction_push"
-  },
-  "zip": {
-    "ignored_zip_touched": false,
-    "last_write_time_utc": "2026-06-07T11:30:04.4671945Z",
-    "length": 326209,
-    "path": "chief-site-engineer_adim_080_guvenli_nokta.zip",
-    "sha256": "E96CAA2115B98C54A5B030DAB265DC62AFD509BB4F6E59E2694AF0C89165C653"
-  }
+  "workflow_status": "step_206_content_push_verified_before_metadata_finalization",
+  "forbidden_scope_added": false
 }
