@@ -106,7 +106,7 @@
   "tests": {
     "command": "python -m pytest",
     "result": "passed",
-    "summary": "413 passed in 1.84s"
+    "summary": "413 passed in 2.06s"
   },
   "tests_changed": false,
   "workflow_changed": false,
@@ -124,8 +124,24 @@
     "ignored_files_remaining": 0,
     "result": "clean_after_push"
   },
+  "official_local_sync": {
+    "local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
+    "source_of_truth": "official_local_working_copy",
+    "branch": "step-202-canonical-view-model-wording",
+    "divergence_after_sync": "0 0",
+    "state_fields_verified": {
+      "workflow_status": "pushed_to_open_draft_pr",
+      "working_tree_result": "clean_after_push"
+    },
+    "tests": "413 passed in 2.06s",
+    "diff_check": "passed",
+    "exports": "clean_only_gitkeep",
+    "zip_files_existing_untouched": [
+      "chief-site-engineer_adim_080_guvenli_nokta.zip"
+    ]
+  },
   "zip": {
     "ignored_zip_touched": false,
-    "zip_files_found": 0
+    "zip_files_found": 1
   }
 }
