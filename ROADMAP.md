@@ -3,8 +3,11 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 192 - Formatter Test Examples / Regression Boundary Standardization
+Adim 197 - Merged CI Checkpoint Finalization / Billing Constraint Record
+Merge commit: 947350ff9348f79965fec282c28e2fa858d7356a
 ```
+
+Adim 197, master uzerindeki guncel guvenli noktadir. Step 198 acik draft dokumantasyon/state resynchronization calismasidir ve merge edilene kadar yeni guvenli nokta olarak sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -126,6 +129,16 @@ Adim 191'de `format_export_handover_qc_review_checklist_as_markdown(checklist)` 
 
 Adim 192'de `format_export_handover_qc_review_checklist_as_markdown(checklist)` helper'i icin test examples ve regression boundary standardi documentation-only olarak belgelendi. Success, failure, mixed, empty, missing field, unknown status, unsupported input, no mutation, no file/export output, no hard validation, no generated `blocked` status ve existing helper regression orneklerinin hangi davranislari kilitledigi netlestirildi. Formatter'in checklist/summary/report'u yeniden hesaplamamasi, input dict'i mutate etmemesi, dosya yazmamasi, `exports/` altina cikti uretmemesi, `is_blocking` degerini otomatik karara donusturmemesi ve `requires_human_review` alanini yalniz insan inceleme sinyali olarak tutmasi regression boundary olarak kaydedildi. Bu adim yeni test eklemez; future kod/test adimi gerekirse ayri adim olmali ve Extra High reasoning onerilmelidir. Kod/test/helper davranisi, export ciktisi, API/GUI/CLI, database/repository, audit, backup/restore, migration, commit ve push eklenmedi.
 
+Adim 193'te GitHub-native ChatGPT/Codex handoff protokolu eklendi; `.cse/tasks/`, `.cse/results/`, `.cse/templates/`, `.cse/state/project_state.json` ve emergency/offline ZIP siniri repo-native olarak belgelendi.
+
+Adim 194'te read-only repository status komutu eklendi; branch, HEAD, diff check, exports, ZIP ve opsiyonel pytest durumunu raporlar, varsayilan davranista repo mutasyonu yapmaz.
+
+Adim 195'te explicit post-merge state finalization yolu eklendi; merged PR/issue state'i yalniz acik CLI metadata ile `.cse/state/project_state.json` icine yazilir, GitHub state otomatik tahmin edilmez.
+
+Adim 196'da `.github/workflows/pytest.yml` GitHub Actions workflow'u eklendi; PR-to-master ve push-to-master icin `git diff --check` ve `python -m pytest` kosacak sekilde tasarlandi.
+
+Adim 197'de Step 196 merge sonrasi state semantigi latest merged/finalized checkpoint olarak sabitlendi; GitHub runner'in account billing lock nedeniyle startup oncesinde calismamasi dissal CI execution constraint olarak kaydedildi.
+
 Adim 160'da mevcut exception tabanli file-writing helper davranisini bozmadan future result contract wrapper API boundary documentation-only olarak planlandi; `write_*` helperlarin korunmasi, olasi `try_write_*` wrapper isimleri, result alanlari, error mapping, geriye uyumluluk ve handover QC gorunurlugu netlestirildi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 
 Adim 161'de Adim 160 API boundary'sine bagli future result contract wrapper implementation plan documentation-only olarak netlestirildi; `try_write_json_ready_dict_to_file(...)` ve `try_write_markdown_text_to_file(...)` wrapper davranisi, basari/hata result sozlesmesi, error mapping, overwrite/path safety davranisi, geriye uyumluluk ve handover QC gorunurlugu belgelendi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
@@ -155,10 +168,18 @@ Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test
 Guncel test durumu:
 
 ```text
-381 passed
+413 passed
 ```
 
 Proje su anda domain model, bellek ici repository, test, dokumantasyon, learning ve NotebookLM podcast notlari cekirdegi seviyesindedir.
+
+Guncel CI durumu:
+
+- CI workflow var: `.github/workflows/pytest.yml`.
+- Workflow kodu `git diff --check` ve `python -m pytest` kosacak sekilde tanimli.
+- GitHub-hosted runner calismasi su anda account billing lock nedeniyle runner startup oncesinde dissal olarak engelleniyor.
+- Bu durum pytest failure veya workflow kodu hatasi olarak yorumlanmiyor.
+- Required status checks, basarili bir GitHub Actions `pytest` kosusu olana kadar devre disi tutuluyor.
 
 ## Henuz Olmayan Uretim Ozellikleri
 
@@ -169,7 +190,6 @@ Asagidaki ozellikler henuz eklenmedi:
 - API yok.
 - GUI yok.
 - Auth / kullanici / rol / yetki sistemi yok.
-- CI yok.
 - Deployment yok.
 - JSON veya SQLite persistence yok.
 - Gercek dosya kopyalama, silme veya tasima yok.
@@ -356,6 +376,16 @@ Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara 
 
 Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokumantasyon ve kullanim standardi ile sabitlemek; sonra rapor format sinirlari, handover QC kullanimi ve soft validation rapor katmanini hard validation'a gecmeden hazirlamaktir.
 
+## CSE Handoff / CI Checkpoint - Adim 193-197
+
+- [x] Adim 193 - GitHub-native ChatGPT/Codex handoff protocol; canonical `.cse/templates/`, task/result/state dosyalari ve ZIP dislama sinirlari netlesti.
+- [x] Adim 194 - Read-only CSE status command; git, diff, exports, ZIP ve opsiyonel pytest raporlama komutu eklendi.
+- [x] Adim 195 - Explicit post-merge state finalization; merged state yalniz acik CLI metadata ile final hale getiriliyor.
+- [x] Adim 196 - GitHub Actions `pytest` workflow; CI workflow var, fakat hosted runner billing lock nedeniyle henuz basarili GitHub `pytest` kosusu uretmedi.
+- [x] Adim 197 - Latest merged/finalized checkpoint semantics; Step 196 merge commit `947350ff9348f79965fec282c28e2fa858d7356a` guvenli nokta olarak kaydedildi ve billing lock dissal constraint olarak belgelendi.
+
 ## Sonraki Calisma Onerisi
 
-Adim 184 commit/push sureci ayrica istenirse once mevcut Git/test durumu yeniden dogrulanmalidir. Yeni teknik adima baslamadan once yine mevcut Git/test durumu kontrol edilmelidir. Olası adaylar yalniz plan seviyesindedir: checklist helper usage documentation, formatter downstream consumer test plan veya hard validation oncesi soft/diagnostic sinir kontrolu.
+Adim 197 sonrasi onerilen teknik yon, handover QC/checklist phase closure ve downstream consumer boundary review calismasidir. API/GUI/CLI implementation henuz baslatilmamalidir. Hard validation ve generated `blocked` status ayri, ilerideki explicit scope olmadan eklenmemelidir.
+
+Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Son mevcut podcast notu Podcast 029'dur ve Adim 167-180 araligini kapsar. Bu nedenle Adim 181-185, 186-190 ve 191-195 icin podcast catch-up maddeleri beklemededir; Adim 196-200 podcast notu ise Adim 200 tamamlanmadan dogrudan gerekli degildir. Step 198 kapsaminda podcast notu olusturulmadi.

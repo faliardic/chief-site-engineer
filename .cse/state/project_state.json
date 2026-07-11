@@ -1,151 +1,88 @@
 {
   "base_branch": "master",
+  "base_commit": "947350ff9348f79965fec282c28e2fa858d7356a",
+  "branch": "step-198-roadmap-resynchronization",
+  "current_safe_point": {
+    "merge_commit": "947350ff9348f79965fec282c28e2fa858d7356a",
+    "semantics": "latest_merged_finalized_checkpoint",
+    "step": 197
+  },
+  "diff_check": {
+    "command": "git diff --check",
+    "result": "passed"
+  },
+  "documentation_resynchronization": {
+    "ci_status": {
+      "billing_lock_classification": "external_ci_execution_constraint",
+      "github_runner_execution": "blocked_before_runner_start_by_account_billing_lock",
+      "required_status_checks": "disabled_until_successful_github_actions_pytest_run_exists",
+      "workflow_path": ".github/workflows/pytest.yml"
+    },
+    "current_test_count": "413 passed",
+    "files": [
+      "ROADMAP.md",
+      "CHANGELOG.md",
+      "docs/project_decisions.md"
+    ],
+    "podcast_cadence": {
+      "catch_up_pending": true,
+      "notes_created_in_step_198": false,
+      "pending_ranges": [
+        "181-185",
+        "186-190",
+        "191-195"
+      ],
+      "range_196_200_due_after_step_200": true
+    },
+    "recorded_steps": [
+      193,
+      194,
+      195,
+      196,
+      197
+    ]
+  },
   "exports": {
-    "clean": true,
     "contents": [
       ".gitkeep"
     ],
-    "exists": true,
-    "expected_only": [
-      ".gitkeep"
-    ]
+    "result": "clean"
   },
-  "finalized_step": 196,
-  "issue": 7,
-  "issue_state": "closed",
-  "local_git_evidence": {
-    "divergence": {
-      "ahead": 1,
-      "available": true,
-      "behind": 0,
-      "commands": {
-        "count": {
-          "command": [
-            "git",
-            "rev-list",
-            "--left-right",
-            "--count",
-            "origin/master...HEAD"
-          ],
-          "ok": true,
-          "returncode": 0,
-          "stderr": [],
-          "stdout": [
-            "0\t1"
-          ]
-        },
-        "verify": {
-          "command": [
-            "git",
-            "rev-parse",
-            "--verify",
-            "origin/master"
-          ],
-          "ok": true,
-          "returncode": 0,
-          "stderr": [],
-          "stdout": [
-            "df9c04fa033b9c2d42e1690e9263a91856c5e512"
-          ]
-        }
-      },
-      "upstream": "origin/master"
-    },
-    "git": {
-      "commands": {
-        "ignored": {
-          "command": [
-            "git",
-            "status",
-            "--ignored",
-            "--short",
-            "--untracked-files=all"
-          ],
-          "ok": true,
-          "returncode": 0,
-          "stderr": [],
-          "stdout": []
-        },
-        "staged": {
-          "command": [
-            "git",
-            "diff",
-            "--name-status",
-            "--cached"
-          ],
-          "ok": true,
-          "returncode": 0,
-          "stderr": [],
-          "stdout": []
-        },
-        "tracked": {
-          "command": [
-            "git",
-            "diff",
-            "--name-status"
-          ],
-          "ok": true,
-          "returncode": 0,
-          "stderr": [],
-          "stdout": []
-        }
-      },
-      "ignored_files": [],
-      "staged_files": [],
-      "tracked_worktree_changes": [],
-      "untracked_files": []
-    },
-    "head": {
-      "branch": "step-197-finalize-ci-state",
-      "commands": {
-        "branch": {
-          "command": [
-            "git",
-            "branch",
-            "--show-current"
-          ],
-          "ok": true,
-          "returncode": 0,
-          "stderr": [],
-          "stdout": [
-            "step-197-finalize-ci-state"
-          ]
-        },
-        "head": {
-          "command": [
-            "git",
-            "log",
-            "-1",
-            "--format=%H%x00%s"
-          ],
-          "ok": true,
-          "returncode": 0,
-          "stderr": [],
-          "stdout": [
-            "2745ad5b7baa2bfb0c77d5d74311d3bddaf49c9b\u0000Add Step 197 finalized CI state task"
-          ]
-        }
-      },
-      "commit": "2745ad5b7baa2bfb0c77d5d74311d3bddaf49c9b",
-      "message": "Add Step 197 finalized CI state task"
-    },
-    "note": "Local evidence only; remote PR and issue state came from explicit CLI metadata."
+  "forbidden_scope_added": false,
+  "issue": 11,
+  "merge_authorized": false,
+  "next_action": "Review draft PR #12; next technical direction is handover QC/checklist phase closure and downstream consumer boundary review without API/GUI/CLI, hard validation, or generated blocked status.",
+  "production_code_changed": false,
+  "protected_paths": {
+    ".github/workflows/pytest.yml": "unchanged",
+    "app/models.py": "unchanged",
+    "tests/test_models.py": "unchanged"
   },
-  "merge_authorized": true,
-  "merge_commit": "df9c04fa033b9c2d42e1690e9263a91856c5e512",
-  "next_action": "Continue with local verification and PR review; keep required status checks disabled until billing is resolved and pytest succeeds on GitHub Actions",
   "protocol_version": 1,
-  "pull_request": 8,
-  "pull_request_state": "merged",
-  "remote_state_source": "explicit_cli_metadata",
-  "source_branch": "step-196-github-actions-pytest",
-  "step": 196,
-  "verification": {
-    "summary": "Local pytest: 413 passed in 1.91s; workflow YAML/structure passed; GitHub runner did not start because the account is billing-locked"
+  "pull_request": 12,
+  "pull_request_state": "open_draft",
+  "step": 198,
+  "tests": {
+    "command": "python -m pytest",
+    "result": "passed",
+    "summary": "413 passed in 1.83s"
   },
-  "workflow_status": "merged_finalized",
-  "zip_files": {
-    "count": 0,
-    "files": []
+  "tests_changed": false,
+  "workflow_changed": false,
+  "workflow_status": "pushed_to_open_draft_pr",
+  "working_tree": {
+    "changes": [
+      "M ROADMAP.md",
+      "M CHANGELOG.md",
+      "M docs/project_decisions.md",
+      "A .cse/results/198_result.md",
+      "M .cse/state/project_state.json"
+    ],
+    "ignored_files_remaining": 0,
+    "result": "clean_after_push"
+  },
+  "zip": {
+    "ignored_zip_touched": false,
+    "zip_files_found": 0
   }
 }
