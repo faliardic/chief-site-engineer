@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 213
+
+- Added `FieldObservationRepository.update_status(observation_id, new_status)` for explicit in-memory status mutation.
+- Added focused tests for missing id behavior, `open -> tracking`, `tracking -> closed` without automatic side effects, targeted record mutation, status filter reflection, and archived record update allowance.
+- Updated repository truth so Step 212 / PR #41 / Issue #40 / merge commit `e5842131882034eaf0cf5c8ec198f17c0f063dbe` is the latest merged/finalized safe point and Step 213 remains active unmerged explicit status-update work.
+- Recorded that Field MVP now has a minimal observation model, in-memory repository, read-only project/status filters, and one explicit status mutation operation.
+- Kept this scope narrow; no `close(...)`, `reopen(...)`, transition rules, automatic timestamps, validation/enums/constants, other field updates, archive/restore/delete/bulk operations, persistence/database/JSON/SQLite, attachment linking/file operations, daily export, weekly summary, API/GUI/CLI, audit/history/task/NCR/decision generation, generated `blocked`, Step 214, workflow changes, Actions enablement, ZIP mutation, or Desktop archive mutation was added.
+
 ## Step 212
 
 - Added `FieldObservationRepository.list_by_project_id(project_id)` for exact, case-sensitive project filtering.

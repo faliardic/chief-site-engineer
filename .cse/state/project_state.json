@@ -1,32 +1,32 @@
 {
-  "step": 212,
+  "step": 213,
   "base_branch": "master",
-  "base_commit": "26509f35abb0cb706d2a085715310358cf5d2421",
+  "base_commit": "e5842131882034eaf0cf5c8ec198f17c0f063dbe",
   "active_work": {
-    "issue": 40,
-    "step": 212,
-    "branch": "step-212-field-observation-project-status-filters",
-    "field_observation_project_status_filters": true,
-    "read_only_repository_visibility_work": true,
-    "merge_claim_for_step_212": false,
-    "step_213_started": false,
-    "local_test_summary": "425 passed"
+    "issue": 42,
+    "step": 213,
+    "branch": "step-213-field-observation-status-update",
+    "field_observation_status_update": true,
+    "explicit_repository_mutation_work": true,
+    "merge_claim_for_step_213": false,
+    "step_214_started": false,
+    "local_test_summary": "431 passed"
   },
   "current_safe_point": {
     "semantics": "latest_merged_finalized_checkpoint",
-    "step": 211,
-    "issue": 38,
+    "step": 212,
+    "issue": 40,
     "issue_state": "completed",
-    "pull_request": 39,
+    "pull_request": 41,
     "pull_request_state": "merged",
-    "merge_commit": "26509f35abb0cb706d2a085715310358cf5d2421",
-    "local_test_summary": "420 passed"
+    "merge_commit": "e5842131882034eaf0cf5c8ec198f17c0f063dbe",
+    "local_test_summary": "425 passed"
   },
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
-    "local_master_sha": "26509f35abb0cb706d2a085715310358cf5d2421",
-    "origin_master_sha": "26509f35abb0cb706d2a085715310358cf5d2421",
+    "local_master_sha": "e5842131882034eaf0cf5c8ec198f17c0f063dbe",
+    "origin_master_sha": "e5842131882034eaf0cf5c8ec198f17c0f063dbe",
     "divergence": "0 0",
     "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
     "misspelled_workspace_present": false,
@@ -169,6 +169,21 @@
       "nonconformity_repository_project_status_patterns": true,
       "new_chat_bootstrap": false
     },
+    "step_213_sources_read": {
+      "unified_project_source": true,
+      "project_instructions": true,
+      "github_issue_42_with_scope_comments": true,
+      "task_213": true,
+      "step_208_contract": true,
+      "step_209_model_documentation": true,
+      "step_210_repository_documentation": true,
+      "step_212_filter_documentation": true,
+      "app_models": true,
+      "app_records": true,
+      "tests_test_records": true,
+      "nonconformity_repository_update_status_pattern": true,
+      "new_chat_bootstrap": false
+    },
     "unresolved_conflict_found": false
   },
   "canonical_project_instructions": {
@@ -217,6 +232,7 @@
     "field_mvp_implementation_started_in_step_210": true,
     "field_mvp_product_behavior_added_in_step_211": false,
     "field_mvp_read_only_visibility_added_in_step_212": true,
+    "field_mvp_explicit_status_mutation_added_in_step_213": true,
     "next_product_direction": {
       "name": "first_field_mvp",
       "scope": [
@@ -289,7 +305,7 @@
       ]
     },
     "field_observation_repository": {
-      "status": "implemented_in_memory_baseline_with_project_status_filters",
+      "status": "implemented_in_memory_baseline_with_project_status_filters_and_explicit_status_update",
       "path": "app/records.py",
       "tests_path": "tests/test_records.py",
       "methods": [
@@ -298,7 +314,8 @@
         "list_by_project_id",
         "list_by_status",
         "count",
-        "find_by_id"
+        "find_by_id",
+        "update_status"
       ],
       "identity_field": "observation_id",
       "duplicate_rejection": true,
@@ -307,11 +324,16 @@
       "project_status_filters_return_new_lists": true,
       "project_status_filters_exact_case_sensitive": true,
       "project_status_filters_include_archived_matches": true,
+      "explicit_status_update_returns_same_record": true,
+      "explicit_status_update_missing_id_returns_none": true,
+      "explicit_status_update_has_no_automatic_side_effects": true,
+      "explicit_status_update_allows_archived_records": true,
       "record_objects_not_copied": true,
       "record_objects_not_mutated": true,
       "not_implemented": [
         "category_location_reported_to_date_time_text_search_active_archive_combined_filters",
-        "lifecycle_updates",
+        "automatic_lifecycle_rules",
+        "close_reopen_transition_workflow_helpers",
         "archive_restore_delete_bulk",
         "summaries_reporting",
         "persistence_database_json_sqlite",
@@ -326,10 +348,10 @@
     }
   },
   "protected_paths": {
-    "app/models.py": "unchanged_in_step_212",
-    "app/records.py": "changed_only_for_step_212_field_observation_project_status_filters",
-    "tests/test_models.py": "unchanged_in_step_212",
-    "tests/test_records.py": "changed_only_for_step_212_field_observation_project_status_tests",
+    "app/models.py": "unchanged_in_step_213",
+    "app/records.py": "changed_only_for_step_213_field_observation_status_update",
+    "tests/test_models.py": "unchanged_in_step_213",
+    "tests/test_records.py": "changed_only_for_step_213_field_observation_status_update_tests",
     ".github/workflows/pytest.yml": "unchanged"
   },
   "exports": {
@@ -344,14 +366,14 @@
     "pull_request_creation_by_codex": false,
     "merge_authorized": false,
     "branch_deletion_authorized": false,
-    "final_remote_sha_evidence_location": "GitHub Issue #40 completion comment after push"
+    "final_remote_sha_evidence_location": "GitHub Issue #42 completion comment after push"
   },
   "required_files": [
-    ".cse/tasks/212_task.md",
-    ".cse/results/212_result.md",
+    ".cse/tasks/213_task.md",
+    ".cse/results/213_result.md",
     ".cse/state/project_state.json",
-    "docs/212_field_observation_repository_project_status_filters.md",
-    "learning/212_field_observation_repository_project_status_filters.md",
+    "docs/213_field_observation_repository_status_update.md",
+    "learning/213_field_observation_repository_status_update.md",
     "app/records.py",
     "tests/test_records.py",
     "docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md",
@@ -360,6 +382,6 @@
     "CHANGELOG.md",
     "docs/project_decisions.md"
   ],
-  "workflow_status": "step_212_field_observation_project_status_filters_completed_before_commit_push",
+  "workflow_status": "step_213_field_observation_status_update_completed_before_commit_push",
   "forbidden_scope_added": false
 }

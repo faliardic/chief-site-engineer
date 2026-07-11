@@ -309,6 +309,96 @@ def test_field_observation_repository_filters_include_archived_matching_records(
     assert archived_record.is_archived is True
 
 
+def test_field_observation_repository_update_status_returns_none_for_missing_id() -> None:
+    repository = FieldObservationRepository()
+    record = _field_observation("obs-001", status="open")
+    repository.add(record)
+
+    result = repository.update_status("obs-999", "tracking")
+
+    assert result is None
+    assert repository.list_all() == [record]
+    assert record.status == "open"
+
+
+def test_field_observation_repository_update_status_from_open_to_tracking() -> None:
+    repository = FieldObservationRepository()
+    record = _field_observation("obs-001", status="open")
+    repository.add(record)
+
+    result = repository.update_status("obs-001", "tracking")
+
+    assert result is record
+    assert record.status == "tracking"
+    assert repository.find_by_id("obs-001") is record
+
+
+def test_field_observation_repository_update_status_to_closed_has_no_side_effects() -> None:
+    repository = FieldObservationRepository()
+    record = _field_observation("obs-001", status="tracking")
+    record.reported_at = "2026-07-11T19:00:00"
+    record.notes = "Reported to site team."
+    repository.add(record)
+
+    result = repository.update_status("obs-001", "closed")
+
+    assert result is record
+    assert record.status == "closed"
+    assert record.closed_at is None
+    assert record.reported_at == "2026-07-11T19:00:00"
+    assert record.notes == "Reported to site team."
+    assert record.is_archived is False
+
+
+def test_field_observation_repository_update_status_changes_only_target_record() -> None:
+    repository = FieldObservationRepository()
+    target_record = _field_observation("obs-001", status="open")
+    other_record = _field_observation("obs-002", status="open")
+
+    repository.add(target_record)
+    repository.add(other_record)
+
+    result = repository.update_status("obs-001", "tracking")
+
+    assert result is target_record
+    assert target_record.status == "tracking"
+    assert other_record.status == "open"
+    assert repository.list_all() == [target_record, other_record]
+
+
+def test_field_observation_repository_update_status_is_reflected_in_status_filter() -> None:
+    repository = FieldObservationRepository()
+    record = _field_observation("obs-001", status="open")
+    existing_tracking_record = _field_observation("obs-002", status="tracking")
+
+    repository.add(record)
+    repository.add(existing_tracking_record)
+
+    repository.update_status("obs-001", "tracking")
+
+    assert repository.list_by_status("open") == []
+    assert repository.list_by_status("tracking") == [record, existing_tracking_record]
+    assert repository.count() == 2
+    assert repository.list_all() == [record, existing_tracking_record]
+
+
+def test_field_observation_repository_update_status_allows_archived_record() -> None:
+    repository = FieldObservationRepository()
+    archived_record = _field_observation(
+        "obs-001",
+        status="open",
+        is_archived=True,
+    )
+    repository.add(archived_record)
+
+    result = repository.update_status("obs-001", "closed")
+
+    assert result is archived_record
+    assert archived_record.status == "closed"
+    assert archived_record.is_archived is True
+    assert repository.list_by_status("closed") == [archived_record]
+
+
 def test_nonconformity_repository_adds_and_lists_records() -> None:
     repository = NonconformityRepository()
     record = NonconformityRecord(

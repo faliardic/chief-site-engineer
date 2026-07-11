@@ -940,41 +940,41 @@ Gerçek şantiye
 
 ### Son doğrulanmış merged GitHub noktası
 
-- Step: **211**
-- PR: **#39**
-- Issue: **#38**
+- Step: **212**
+- PR: **#41**
+- Issue: **#40**
 - Merge commit:
 
 ```text
-26509f35abb0cb706d2a085715310358cf5d2421
+e5842131882034eaf0cf5c8ec198f17c0f063dbe
 ```
 
-- Latest merged safe point test seviyesi: **420 passed**
-- Aktif Step 212 yerel test seviyesi: **425 passed**
+- Latest merged safe point test seviyesi: **425 passed**
+- Aktif Step 213 yerel test seviyesi: **431 passed**
 - GitHub Actions: manuel olarak devre dışı
 - Podcast 032: Steps 206-210 latest completed podcast
 - Sonraki doğal podcast aralığı: Steps 211-215
 
 ### Yerel senkronizasyon durumu
 
-Step 212 baslangicinda resmî `V:` yerel master `26509f35abb0cb706d2a085715310358cf5d2421` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
+Step 213 baslangicinda resmî `V:` yerel master `e5842131882034eaf0cf5c8ec198f17c0f063dbe` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
 
 ### Aktif iş
 
-- Step: **212**
-- Issue: **#40**
-- Amaç: `FieldObservationRepository` icin exact `project_id` ve `status` filtrelerini eklemek
+- Step: **213**
+- Issue: **#42**
+- Amaç: `FieldObservationRepository` icin explicit `status` update davranisini eklemek
 - Branch:
 
 ```text
-step-212-field-observation-project-status-filters
+step-213-field-observation-status-update
 ```
 
-- Bu adim dar repository read-only visibility isidir.
+- Bu adim dar repository explicit mutation isidir.
 - `FieldObservationRecord` halen tek Field-MVP model implementasyonudur.
-- `FieldObservationRepository` baseline-level bellek ici repository'dir ve Step 212 kapsaminda yalniz project/status exact filtreleri eklenir.
-- Persistence, attachment integration, broader filters, lifecycle updates, export/reporting, API/GUI/CLI, audit ve validation henuz uygulanmamistir.
-- Step 213 baslatilmamistir.
+- `FieldObservationRepository` baseline-level bellek ici repository'dir; project/status exact filtreleri ve Step 213 kapsaminda tek explicit status update davranisi vardir.
+- Persistence, attachment integration, broader filters, automatic lifecycle rules, export/reporting, API/GUI/CLI, audit ve validation henuz uygulanmamistir.
+- Step 214 baslatilmamistir.
 
 ---
 
@@ -1012,7 +1012,7 @@ step-212-field-observation-project-status-filters
 
 ### 29.7 Eski aktif Step bilgileri
 
-Step 203, 204, 205, 206, 207, 208, 209 ve aktif Step 210 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 210’dur; Step 211 aktif unmerged documentation/podcast aşamasındadır.
+Step 203, 204, 205, 206, 207, 208, 209, 210, 211 ve aktif Step 212 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 212’dir; Step 213 aktif unmerged explicit status-update aşamasındadır.
 
 ### 29.8 Eski modül sırasının bağlayıcı olması
 
