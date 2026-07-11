@@ -9,8 +9,8 @@ Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici reposit
 Son guvenli nokta:
 
 ```text
-Adim 204 - Handover QC fixture naming and assertion checklist plan
-Merge commit: 7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3
+Adim 205 - Canonical project instructions and repository truth synchronization
+PR #26 merge commit: 92a15f2a55e6bfda42d50b8ef7dea651ff496f62
 ```
 
 Guncel test sonucu:
@@ -22,10 +22,10 @@ Guncel test sonucu:
 Mevcut calisma durumu:
 
 ```text
-Adim 205 - Canonical project instructions and repository truth synchronization
+Adim 206 - Step 205 merged truth, Podcast 031, and instruction authority closure
 ```
 
-Adim 204, PR #24 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 205, canonical proje talimatlarini `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` yolunda izlenebilir hale getirir ve README/state/roadmap karar gercegini bu guvenli noktayla documentation/state-only olarak esler.
+Adim 205, PR #26 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 206, Step 205 merge gercegini README/state/roadmap/changelog/karar/protokol kayitlarinda final hale getirir, Podcast 031'i olusturur ve talimat yetkisini tracked canonical dosyada birlestirir.
 
 ## Repo Koku
 
@@ -49,7 +49,7 @@ Proje su ana parcalardan olusur:
 
 ## Mevcut Teknik Kapsam
 
-Adim 204 itibariyla proje su alanlarda ilerlemistir:
+Adim 205 itibariyla proje su alanlarda ilerlemistir:
 
 - Temel santiye domain modelleri.
 - Gunluk saha, beton dokum, yapi denetim, malzeme, toplanti, RFI/submittal ve ilgili kayit modelleri.
@@ -75,6 +75,8 @@ Adim 204 itibariyla proje su alanlarda ilerlemistir:
 - Resmi kayit / Santiye Sefi Ozel Alani izolasyon politikasi.
 - Santiye sefi devir ve ozel alan politikasi.
 - Adim 001-120 araligi icin NotebookLM podcast notlari.
+- GitHub-centered Issue/Branch/Task/Result workflow ve resmi `V:` local repository execution protokolu.
+- Tracked canonical proje talimatlari: `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`.
 
 ## CSE Politika Dokumanlari
 
@@ -100,12 +102,13 @@ Podcast notlari `docs/podcast_notes/` altindadir.
 
 Son eklenen podcast notlari:
 
-- `docs/podcast_notes/017_adim_097_102_notebooklm_podcast_notu.md`
-- `docs/podcast_notes/018_adim_103_108_notebooklm_podcast_notu.md`
-- `docs/podcast_notes/019_adim_109_114_notebooklm_podcast_notu.md`
-- `docs/podcast_notes/020_adim_115_120_notebooklm_podcast_notu.md`
+- `docs/podcast_notes/027_adim_157_161_notebooklm_podcast_notu.md`
+- `docs/podcast_notes/028_adim_162_166_notebooklm_podcast_notu.md`
+- `docs/podcast_notes/029_adim_167_180_notebooklm_podcast_notu.md`
+- `docs/podcast_notes/030_adim_196_200_notebooklm_podcast_notu.md`
+- `docs/podcast_notes/031_adim_201_205_notebooklm_podcast_notu.md`
 
-Bu notlar, attachment integrity export/scanner hazirliklari, audit event modeli, audit validation hattini ve CSE veri koruma / ozel alan politikalarini podcast anlatimina uygun sekilde ozetler.
+Bu notlar, export/result/handover QC hattini, official local sync protokolunu, canonical instruction workflow'unu ve CSE veri koruma / ozel alan politikalarini podcast anlatimina uygun sekilde ozetler.
 
 ## Kalite Kontrol ve CI Durumu
 
@@ -210,4 +213,4 @@ Adim 205 repository truth synchronization merge edildikten sonra ilk urun yonu, 
 - daily export,
 - weekly summary.
 
-CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. Adim 201-205 araligini ozetleyen Podcast 031, Adim 205 merge sonrasi dogal documentation follow-up'tur.
+CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. Adim 206, bu urun implementation'ini baslatmaz; yalniz Step 205 truth, Podcast 031 ve instruction authority closure kayitlarini tamamlar.

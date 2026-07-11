@@ -1,13 +1,28 @@
 # Proje Kararlari
 
+## 206 Step 205 Merged Truth, Podcast 031 ve Instruction Authority Closure Karari
+
+- Tracked canonical proje talimat kaynagi `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` dosyasidir; current instruction authority icin tek yetkili kaynak budur.
+- `CSE_GUNCEL_PROJE_TALIMATLARI.md` artik higher-priority override degildir; yalniz resmi yerel repoda kolay okuma icin tutulabilecek optional local mirror'dir.
+- Local mirror mevcutsa canonical metinle byte-for-byte ayni icerikte tutulur, `.git/info/exclude` uzerinden ignored kalir, stage edilmez ve commitlenmez.
+- Codex execution resmi local repo olan `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer` yolunda baslar; `git rev-parse --show-toplevel` sonucu bu root'a esit degilse Git veya file write yapmadan durulur.
+- CSE icin otomatik `C:` clone/workspace olusturulmaz ve kullanilmaz; instruction ve completion evidence current GitHub Issue uzerinden paylasilirken local execution resmi `V:` reposunda kalir.
+- Step 205, PR #26 squash merge commit `92a15f2a55e6bfda42d50b8ef7dea651ff496f62` ile latest merged/finalized safe point'tir; Issue #25 completed olarak kaydedilir.
+- Step 206, Issue #28 ve `step-206-podcast-031-and-authority-closure` branch'i uzerinde documentation/state/protocol aktif isidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+- Podcast 031, yalniz Step 201-205 araligini kapsar; sonraki besli podcast araligi Step 206 ile baslar.
+- `docs/podcast_notes/README.md` stale Step 022 current-state orneginden arindirildi; durable cadence ve factual Podcast 030/031 state ile tutulur.
+- `C:\Users\Fatih\Documents\chieh-site-engineer` misspelled workspace kullanici tarafindan kaldirilmis kabul edilir ve Step 206 preflight'ta local `Test-Path` ile absent dogrulanir; bu Git history iddiasi degildir.
+- `C:\Users\Fatih\Desktop\fatih\chief-site-engineer` ayri local archive riskidir; canonical origin remote bulunmadigi, silinmis interim podcast note path'i ve untracked final `005_adim_021_025_notebooklm_podcast_notu.md` onceki bilinen durum olarak kaydedilir. Bu repo Step 206'da silinmez, uzerine yazilmaz, tasinmaz veya commitlenmez.
+- Production code, executable test/fixture, workflow behavior, Actions enablement, required checks, API/GUI/CLI, persistence/database/repository, audit, backup/restore, migration, hard validation, generated `blocked`, export output, ZIP mutation, Desktop archive mutation, Step 207 ve field-MVP implementation eklenmez.
+
 ## 205 Canonical Project Instructions and Repository Truth Resynchronization Karari
 
-- `CSE_GUNCEL_PROJE_TALIMATLARI.md`, resmi local environment'ta yalniz mevcut ve expected SHA-256 ile verified oldugunda highest-priority source'tur; dosya `.git/info/exclude` uzerinden ignored, unchanged, unstaged ve uncommitted korunur.
-- Verified local-only source yoksa, ozellikle fresh clone ve handoff'larda `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` tracked canonical repository instruction authority'dir.
-- Canonical dosya local-only source'tan initially derived edilmistir; persistent product/protocol meaning ve section order korunurken Section 4, Section 17 ve ChatGPT/GitHub/Codex workflow'u intentionally adapted edilmistir. Adaptation sonrasi equal SHA, equal line count veya full text equivalence iddiasi yapilmaz.
+- Step 205 sirasinda `CSE_GUNCEL_PROJE_TALIMATLARI.md` verified local-only source olarak korunmus, tracked `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` fresh clone/handoff fallback authority olarak eklenmisti; bu authority modeli Step 206 ile superseded edilmistir.
+- Step 206 sonrasinda current instruction authority tracked `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` dosyasidir; root dosya yalniz ignored optional mirror olarak ele alinir.
+- Canonical dosya local-only source'tan initially derived edilmisti; persistent product/protocol meaning ve section order korunurken Section 4, Section 17 ve ChatGPT/GitHub/Codex workflow'u intentionally adapted edilmisti. Adaptation sonrasi equal SHA, equal line count veya full text equivalence iddiasi yapilmaz.
 - Official local repository branch/file/test/commit/push execution surface, GitHub synchronized coordination/review surface olarak kalir. Kullanici normalde `devam` der; ChatGPT GitHub state/actions'i dogrudan yonetir, Codex yalniz gerekli local execution icin kullanilir ve evidence current Issue uzerinden tasinir.
-- Step 204, PR #24 squash merge commit `7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3` ile latest merged/finalized safe point'tir; Issue #23 completed olarak kaydedilir.
-- Step 205, merge edilene kadar documentation/state-only active branch'tir ve Step 204 guvenli noktasini degistirmez.
+- Step 205 kaydi yazildigi sirada Step 204, PR #24 squash merge commit `7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3` ile latest merged/finalized safe point olarak kaydedilmisti; bu current safe point Step 206 ile Step 205 / PR #26 gercegine guncellenmistir.
+- Step 205 kaydi yazildigi sirada Step 205, merge edilene kadar documentation/state-only active branch olarak kaydedilmisti; Step 206 sirasinda Step 205 artik merged/finalized safe point'tir.
 - `.github/workflows/pytest.yml` repoda vardir; automatic Actions execution account billing/runner-start constraint nedeniyle manually disabled kalir ve required status checks etkinlestirilmez.
 - CSE tested domain/data/documentation core'dur, field-ready application degildir; persistence/database, real file upload, API, GUI, authentication/authorization, deployment ve complete backup/restore production capabilities henuz yoktur.
 - Urun kurali reliable data backbone first, automation later, AI last olarak korunur.

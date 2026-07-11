@@ -1,5 +1,18 @@
 # Changelog
 
+## Step 206
+
+- Updated tracked canonical project instructions so `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` is the single authoritative project instruction source.
+- Reframed `CSE_GUNCEL_PROJE_TALIMATLARI.md` as an optional ignored local mirror only, not a higher-priority override; the local mirror is kept unstaged and uncommitted.
+- Hardened the official workspace rule with mandatory `Set-Location`, exact `git rev-parse --show-toplevel` verification, wrong-root stop behavior, no automatic `C:` clone/workspace, and GitHub Issue evidence exchange while execution stays in the official `V:` repository.
+- Resynchronized README, state, roadmap, changelog, decisions, and canonical Section 17 with Step 205 as the latest merged/finalized safe point: PR #26, Issue #25 completed, merge commit `92a15f2a55e6bfda42d50b8ef7dea651ff496f62`, and `413 passed`.
+- Added Podcast 031 at `docs/podcast_notes/031_adim_201_205_notebooklm_podcast_notu.md`, covering only Steps 201-205.
+- Refreshed `docs/podcast_notes/README.md` by removing obsolete Step 022 current-state text and replacing it with durable cadence plus factual Podcast 030/031 status.
+- Added `.cse/tasks/206_task.md`, `.cse/results/206_result.md`, the Step 206 documentation record, and the Step 206 learning record.
+- Recorded the removed misspelled `C:\Users\Fatih\Documents\chieh-site-engineer` workspace as absent during local preflight.
+- Recorded the separate Desktop archive repository risk as unresolved and non-blocking without touching that repository.
+- Kept this as documentation/state/protocol work; no production code, executable tests/fixtures, workflow behavior, Actions enablement, required checks, API/GUI/CLI, persistence/database/repository behavior, audit, backup/restore, migration, hard validation, generated `blocked`, export output, ZIP mutation, Desktop archive mutation, Step 207, field-MVP implementation, PR creation, merge, or branch deletion was added.
+
 ## Step 205
 
 - Added tracked canonical project instructions at `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`, initially derived from the unchanged local-only source and intentionally adapted for repository authority, current state, and GitHub-centered workflow; no equal-SHA, equal-line-count, or full-text-equivalence claim remains after adaptation.
