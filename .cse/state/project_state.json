@@ -8,7 +8,7 @@
   "base_branch": "master",
   "base_commit": "de95bc0ed7f3115bba80d4410dfa2f518fb6bfe1",
   "result_commit": "1cb660b8907f9f15279a462da50b7623efbbc6a6",
-  "workflow_status": "local_verification_passed_pending_push",
+  "workflow_status": "pushed_to_open_draft_pr",
   "implemented_command": {
     "path": "scripts/cse_status.py",
     "default_command": "python scripts/cse_status.py",
@@ -46,7 +46,7 @@
     "finalize_temp_json_parse": "passed"
   },
   "working_tree": {
-    "result": "pending_commit",
+    "result": "clean_after_push",
     "changes": [
       "M scripts/cse_status.py",
       "M tests/test_cse_status.py",
