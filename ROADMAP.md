@@ -3,11 +3,11 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 207 - Unified Source and Codex Invocation Policy
-PR #31 merge commit: 23baddf413e1cdf5a5e5564fe4a559954572e45f
+Adim 208 - First Field MVP Observation Record Contract
+PR #33 merge commit: 335fb83c989f3fbf1057d88ebe02045174efcdc9
 ```
 
-Adim 207, PR #31 squash merge commit `23baddf413e1cdf5a5e5564fe4a559954572e45f` ile master uzerindeki guncel guvenli noktadir. Step 208, Issue #32 kapsaminda ilk Field MVP icin `FieldObservationRecord` contract'ini tanimlayan aktif documentation/contract branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Adim 208, PR #33 squash merge commit `335fb83c989f3fbf1057d88ebe02045174efcdc9` ile master uzerindeki guncel guvenli noktadir. Step 209, Issue #34 kapsaminda minimal `FieldObservationRecord` dataclass ve focused value/default testleri ekleyen aktif model/test branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -474,15 +474,22 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 
 ## Step 208 - First Field MVP Observation Record Contract
 
-- [ ] Adim 208 - `FieldObservationRecord` documentation-level future model contract'i tanimlanacak.
-- [ ] Adim 208 - Required future fields `observation_id`, `project_id`, `observed_at`, `location`, `category`, `description` olarak belirlenecek.
-- [ ] Adim 208 - `status` default `open` ve ilk vocabulary `open`, `tracking`, `closed` olarak kaydedilecek.
-- [ ] Adim 208 - Optional/deferred fields `reported_to`, `reported_at`, `created_by`, `closed_at`, `notes`, `is_archived` olarak belirlenecek.
-- [ ] Adim 208 - Existing model mapping ve gap analysis `SiteProject`, `SiteLocationRecord`, `ContactPersonRecord`, `SiteNoteRecord`, `TrackingRecord`, `FileAttachmentRecord`, `DailySiteLog`, `DailyReportRecord` icin yazilacak.
-- [ ] Adim 208 - Field-MVP implementation baslatilmadan Step 209'un review/merge sonrasi onerilen implementation adimi oldugu kaydedilecek.
+- [x] Adim 208 - `FieldObservationRecord` documentation-level future model contract'i tanimlandi.
+- [x] Adim 208 - Required future fields `observation_id`, `project_id`, `observed_at`, `location`, `category`, `description` olarak belirlendi.
+- [x] Adim 208 - `status` default `open` ve ilk vocabulary `open`, `tracking`, `closed` olarak kaydedildi.
+- [x] Adim 208 - Optional/deferred fields `reported_to`, `reported_at`, `created_by`, `closed_at`, `notes`, `is_archived` olarak belirlendi.
+- [x] Adim 208 - Existing model mapping ve gap analysis `SiteProject`, `SiteLocationRecord`, `ContactPersonRecord`, `SiteNoteRecord`, `TrackingRecord`, `FileAttachmentRecord`, `DailySiteLog`, `DailyReportRecord` icin yazildi.
+- [x] Adim 208 - Field-MVP implementation baslatilmadan Step 209'un review/merge sonrasi onerilen implementation adimi oldugu kaydedildi.
+
+## Step 209 - Minimal FieldObservationRecord Model
+
+- [ ] Adim 209 - Minimal `FieldObservationRecord` dataclass'i mevcut model stiline uygun olarak eklenecek.
+- [ ] Adim 209 - Required fields ve default values Step 208 contract'iyle eslenecek.
+- [ ] Adim 209 - Focused tests minimal construction/default, optional/lifecycle field value holding ve documented status value holding davranisini dogrulayacak.
+- [ ] Adim 209 - Validation, repository/persistence, attachment integration, export/reporting, API/GUI/CLI, audit ve additional Field-MVP model eklenmeyecek.
 
 ## Sonraki Calisma Onerisi
 
-Adim 208 merge edilmeden Step 209 veya field-MVP implementation baslatilmaz. Adim 208 sonrasi dogal besli podcast araligi halen Steps 206-210'dur; ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur.
+Adim 209 merge edilmeden Step 210 baslatilmaz. Adim 209 sonrasi dogal besli podcast araligi halen Steps 206-210'dur; ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur, fakat attachment/repository/export/API/audit/validation henuz uygulanmamistir.
 
 Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Podcast 030 Adim 196-200 araligini, Podcast 031 Adim 201-205 araligini kapsar.

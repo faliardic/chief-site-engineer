@@ -9,23 +9,23 @@ Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici reposit
 Son guvenli nokta:
 
 ```text
-Adim 207 - Unified project source and Codex invocation policy
-PR #31 merge commit: 23baddf413e1cdf5a5e5564fe4a559954572e45f
+Adim 208 - First Field MVP observation record contract
+PR #33 merge commit: 335fb83c989f3fbf1057d88ebe02045174efcdc9
 ```
 
 Guncel test sonucu:
 
 ```text
-413 passed
+416 passed
 ```
 
 Mevcut calisma durumu:
 
 ```text
-Adim 208 - First Field MVP observation record contract
+Adim 209 - Minimal FieldObservationRecord model
 ```
 
-Adim 207, PR #31 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 208, ilk Field MVP icin `FieldObservationRecord` veri sozlesmesini tanimlayan aktif documentation/contract isidir; henuz merge edilmemistir ve field-MVP implementation baslamamistir.
+Adim 208, PR #33 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 209, ilk Field MVP icin minimal `FieldObservationRecord` dataclass ve focused value/default testlerini ekleyen aktif model/test isidir; henuz merge edilmemistir.
 
 ## Repo Koku
 
@@ -74,6 +74,7 @@ Adim 205 itibariyla proje su alanlarda ilerlemistir:
 - `AuditEventRecord` modeli, event type validation, target record pair validation ve target record type sozlesmesi.
 - Audit target record id format ve validation tasarimi dokumantasyonu.
 - Dosya eki saklama, adlandirma, arsiv guvenligi, silme/tasima karar dokumantasyonu.
+- Minimal `FieldObservationRecord` dataclass ve focused value/default testleri.
 - CSE ana proje ilkeleri ve veri koruma politikasi.
 - Resmi kayit / Santiye Sefi Ozel Alani izolasyon politikasi.
 - Santiye sefi devir ve ozel alan politikasi.
@@ -219,4 +220,4 @@ Adim 205 repository truth synchronization merge edildikten sonra ilk urun yonu, 
 - daily export,
 - weekly summary.
 
-CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. Adim 208, field-MVP implementation baslatmaz; yalniz ilk Field MVP hizli gozlem kaydi icin `FieldObservationRecord` contract'ini tanimlar. Step 209, bu contract review edilip merge edildikten sonra onerilen dar implementation adimidir.
+CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. Adim 209, Field MVP implementasyonunu yalniz minimal `FieldObservationRecord` dataclass ve focused test kapsaminda baslatir; attachment linking, repository/persistence, export/reporting, API/GUI/CLI, audit ve validation henuz eklenmemistir.
