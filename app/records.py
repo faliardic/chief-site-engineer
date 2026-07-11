@@ -79,6 +79,19 @@ class FieldObservationRepository:
         record.status = new_status
         return record
 
+    def update_reporting(
+        self,
+        observation_id: str,
+        reported_to: str,
+        reported_at: str,
+    ) -> FieldObservationRecord | None:
+        record = self.find_by_id(observation_id)
+        if record is None:
+            return None
+        record.reported_to = reported_to
+        record.reported_at = reported_at
+        return record
+
 
 class NonconformityRepository:
     """Stores nonconformity records in memory."""

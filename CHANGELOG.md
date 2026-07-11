@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 214
+
+- Added `FieldObservationRepository.update_reporting(observation_id, reported_to, reported_at)` for explicit in-memory reporting-context enrichment.
+- Added focused tests for missing id behavior, reporting field assignment, no automatic side effects, targeted record mutation, exact string preservation, archived record update allowance, and stable repository count.
+- Updated repository truth so Step 213 / PR #43 / Issue #42 / merge commit `45c2b2e2828dfea74121033bf01a868e6821b544` is the latest merged/finalized safe point and Step 214 remains active unmerged explicit reporting-update work.
+- Recorded that Field MVP now has a minimal observation model, in-memory repository, project/status filters, explicit status update, and explicit reporting-context update.
+- Kept this scope narrow; no automatic status change, automatic/current-time generation, contact lookup/contact IDs/normalization/validation/constants/enums, other field updates, reporting history, audit/task/NCR/notification/decision generation, persistence/database/JSON/SQLite, attachment linking/file operations, daily export, weekly summary, API/GUI/CLI, generated `blocked`, Step 215, workflow changes, Actions enablement, ZIP mutation, or Desktop archive mutation was added.
+
 ## Step 213
 
 - Added `FieldObservationRepository.update_status(observation_id, new_status)` for explicit in-memory status mutation.
