@@ -1,5 +1,18 @@
 # Proje Kararlari
 
+## 191 Export / Handover QC Checklist Formatter Usage Karari
+
+- Adim 191, `format_export_handover_qc_review_checklist_as_markdown(checklist)` helper'i icin usage documentation, example standardization ve edge case yorumlama standardini documentation-only olarak netlestirir.
+- Formatter input olarak `build_export_handover_qc_review_checklist(...)` ciktisi olan JSON-ready checklist dict'i bekler ve output olarak insan incelemesine uygun Markdown/string dondurur.
+- Formatter helper zincirinde `build_export_result_summary(...)`, `build_export_result_report(...)`, `build_export_handover_qc_review_checklist(...)` sonrasi presentation katmanidir.
+- Formatter dosya yazmaz, export uretmez, `exports/` altina cikti birakmaz, database/repository erisimi yapmaz, audit event uretmez, backup/restore veya migration baslatmaz.
+- Formatter checklist, summary veya report sonucunu yeniden hesaplamaz ve input dict'i mutate etmez.
+- `is_blocking` karar mekanizmasi olarak kullanilmaz; `requires_human_review` yalniz insan inceleme sinyalidir ve otomatik kabul, ret, bloklama, hard validation veya generated `blocked` status degildir.
+- Success, failure, mixed, empty, missing field, unknown status ve unsupported input durumlari presentation/QC visibility olarak okunur; yeni business rule veya resmi handover karari turetilmez.
+- Uygun kullanimlar handover QC review notu, future export review presentation layer, NotebookLM/insan ozetleri ve debug/admin metinsel incelemedir.
+- Hard validation, otomatik kayit reddi, migration, backup/restore, API/GUI/CLI davranisi, audit event uretimi veya dosya export helper yerine dogrudan export yazimi kapsam disidir.
+- Kod/test/helper davranisi, export ciktisi, commit ve push eklenmez.
+
 ## 190 Export / Handover QC Checklist Formatter Implementation Karari
 
 - Adim 190, `format_export_handover_qc_review_checklist_as_markdown(checklist)` helper'ini read-only presentation formatter olarak ekler.

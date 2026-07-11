@@ -1,5 +1,15 @@
 # Changelog
 
+## Step 191
+
+- Added documentation-only usage, example, and edge case standardization for `format_export_handover_qc_review_checklist_as_markdown(checklist)`.
+- Documented that the formatter accepts the JSON-ready checklist dict from `build_export_handover_qc_review_checklist(...)` and returns presentation-safe Markdown for human review.
+- Clarified read-only, no-recompute, no-mutation, and non-blocking boundaries: the formatter does not write files, create exports, access database/repository state, create audit events, recompute checklist/summary/report results, mutate input, perform hard validation, or generate `blocked` status.
+- Standardized success, failure, mixed, empty, missing field, unknown status, and unsupported input interpretation for handover QC review visibility.
+- Documented appropriate usage in handover QC notes, future export review presentation, NotebookLM/human summaries, and debug/admin textual inspection.
+- Documented non-usage for hard validation, automatic rejection, migration, backup/restore, API/GUI/CLI behavior, audit event creation, direct export writing, or replacing file export helpers.
+- Kept this as documentation-only; no code, tests, export output, staged files, commit, push, hard validation, `blocked` status, API/GUI/CLI, database/repository access, audit event, backup/restore, or migration behavior was added.
+
 ## Step 190
 
 - Added the read-only `format_export_handover_qc_review_checklist_as_markdown(checklist)` formatter.
