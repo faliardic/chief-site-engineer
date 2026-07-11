@@ -1,27 +1,28 @@
 {
   "protocol_version": 1,
-  "step": 194,
-  "issue": 3,
-  "pull_request": 4,
+  "step": 195,
+  "issue": 5,
+  "pull_request": 6,
   "pull_request_state": "open_draft",
-  "branch": "step-194-cse-status-report",
+  "branch": "step-195-post-merge-state-finalization",
   "base_branch": "master",
-  "base_commit": "51d6bc9283fab92bc303d0d96b6a17768d28979e",
-  "result_commit": "9d98a898461722ba8871a38b7599bb328c11d78a",
-  "workflow_status": "pushed_to_open_draft_pr",
+  "base_commit": "de95bc0ed7f3115bba80d4410dfa2f518fb6bfe1",
+  "result_commit": null,
+  "workflow_status": "local_verification_passed_pending_commit_push",
   "implemented_command": {
     "path": "scripts/cse_status.py",
     "default_command": "python scripts/cse_status.py",
     "test_command": "python scripts/cse_status.py --run-tests",
     "json_command": "python scripts/cse_status.py --format json",
+    "finalize_command": "python scripts/cse_status.py --finalize-state --step <step> --issue <issue> --pull-request <pr> --issue-state closed --pull-request-state merged --source-branch <branch> --base-branch master --merge-commit <sha> --verification-summary <summary> --next-action <action> --state-output .cse/state/project_state.json --overwrite",
     "read_only_by_default": true
   },
   "tests": {
     "command": "python -m pytest",
     "result": "passed",
-    "summary": "406 passed in 1.44s",
+    "summary": "413 passed in 1.73s",
     "focused_command": "python -m pytest tests/test_cse_status.py",
-    "focused_summary": "8 passed in 0.07s"
+    "focused_summary": "15 passed in 0.43s"
   },
   "diff_check": {
     "command": "git diff --check",
@@ -39,18 +40,19 @@
   },
   "command_verification": {
     "without_tests": "passed",
-    "with_tests": "passed",
+    "with_tests": "not_run_for_step_195",
     "json_parse": "passed",
-    "with_tests_summary": "406 passed in 0.66s"
+    "finalize_temp_output": "passed",
+    "finalize_temp_json_parse": "passed"
   },
   "working_tree": {
-    "result": "clean_after_push",
+    "result": "pending_commit",
     "changes": [
-      "A scripts/cse_status.py",
-      "A tests/test_cse_status.py",
-      "A .cse/results/194_result.md",
+      "M scripts/cse_status.py",
+      "M tests/test_cse_status.py",
+      "A .cse/results/195_result.md",
       "M .cse/state/project_state.json",
-      "A .cse/tasks/194_task.md"
+      "A .cse/tasks/195_task.md"
     ],
     "ignored_files_remaining": 0
   },
@@ -58,5 +60,5 @@
   "tests_changed": true,
   "forbidden_scope_added": false,
   "merge_authorized": false,
-  "next_action": "Review draft PR #4 and merge only after explicit user approval"
+  "next_action": "Review draft PR #6 and merge only after explicit user approval"
 }
