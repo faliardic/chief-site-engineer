@@ -68,6 +68,17 @@ class FieldObservationRepository:
                 return record
         return None
 
+    def update_status(
+        self,
+        observation_id: str,
+        new_status: str,
+    ) -> FieldObservationRecord | None:
+        record = self.find_by_id(observation_id)
+        if record is None:
+            return None
+        record.status = new_status
+        return record
+
 
 class NonconformityRepository:
     """Stores nonconformity records in memory."""

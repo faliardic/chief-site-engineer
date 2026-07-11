@@ -1,5 +1,20 @@
 # Proje Kararlari
 
+## 213 FieldObservationRepository Status Update Karari
+
+- `FieldObservationRepository`, `update_status(observation_id, new_status)` explicit status mutation method'unu saglar.
+- Method existing `find_by_id(...)` lookup davranisini kullanir.
+- Missing `observation_id` icin `None` dondurur ve repository contents degismez.
+- Found record icin yalniz `record.status = new_status` assignment'i yapilir ve ayni stored record nesnesi dondurulur.
+- `new_status` trim, normalize, validate, map veya convert edilmez; status constants veya enum eklenmez.
+- `closed_at`, `reported_at`, notes, `is_archived` veya baska alan otomatik set/clear edilmez.
+- Existing `list_by_status(...)` filtreleri ayni stored record nesnesini okudugu icin update'i hemen yansitir.
+- Archived observation kayitlari explicit status update'ten engellenmez; archive gating bu adimin kapsami degildir.
+- Step 212, PR #41 squash merge commit `e5842131882034eaf0cf5c8ec198f17c0f063dbe` ile latest merged/finalized safe point'tir; Issue #40 completed olarak kaydedilir.
+- Step 213, Issue #42 ve `step-213-field-observation-status-update` branch'i uzerinde aktif unmerged explicit status-update isidir.
+- Podcast 032 latest completed podcast olarak Steps 206-210 araligini kapsar; sonraki besli podcast araligi Steps 211-215'tir.
+- `close(...)`, `reopen(...)`, transition rules, automatic timestamps, validation/enums/constants, other field updates, archive/restore/delete/bulk operations, persistence, attachment integration, API/GUI/CLI, audit/history/task/NCR/decision generation, generated `blocked`, daily export, weekly summary ve Step 214 uygulanmamistir.
+
 ## 212 FieldObservationRepository Project ve Status Filter Karari
 
 - `FieldObservationRepository`, `list_by_project_id(project_id)` ve `list_by_status(status)` read-only filtrelerini saglar.

@@ -9,23 +9,23 @@ Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici reposit
 Son guvenli nokta:
 
 ```text
-Adim 211 - Podcast 032 for Steps 206-210
-PR #39 merge commit: 26509f35abb0cb706d2a085715310358cf5d2421
+Adim 212 - FieldObservationRepository project and status filters
+PR #41 merge commit: e5842131882034eaf0cf5c8ec198f17c0f063dbe
 ```
 
 Guncel test sonucu:
 
 ```text
-425 passed
+431 passed
 ```
 
 Mevcut calisma durumu:
 
 ```text
-Adim 212 - FieldObservationRepository project and status filters
+Adim 213 - FieldObservationRepository status update
 ```
 
-Adim 211, PR #39 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 212, `FieldObservationRepository` icin exact project/status filtrelerini ekleyen aktif branch isidir; henuz merge edilmemistir.
+Adim 212, PR #41 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 213, `FieldObservationRepository` icin explicit status update davranisini ekleyen aktif branch isidir; henuz merge edilmemistir.
 
 ## Repo Koku
 
@@ -77,6 +77,7 @@ Adim 205 itibariyla proje su alanlarda ilerlemistir:
 - Minimal `FieldObservationRecord` dataclass ve focused value/default testleri.
 - Minimal bellek ici `FieldObservationRepository` baseline'i; add/list/count/find ve duplicate `observation_id` reddi.
 - `FieldObservationRepository` icin read-only exact `project_id` ve `status` filtreleri.
+- `FieldObservationRepository` icin explicit `update_status(observation_id, new_status)` davranisi.
 - CSE ana proje ilkeleri ve veri koruma politikasi.
 - Resmi kayit / Santiye Sefi Ozel Alani izolasyon politikasi.
 - Santiye sefi devir ve ozel alan politikasi.
@@ -119,7 +120,7 @@ Podcast 032, latest completed podcast olarak Steps 206-210 araligini kapsar. Bu 
 
 ## Kalite Kontrol ve CI Durumu
 
-- Guncel yerel test tabani `425 passed` olarak dogrulanir.
+- Guncel yerel test tabani `431 passed` olarak dogrulanir.
 - `.github/workflows/pytest.yml` GitHub Actions workflow'u repoda bulunur.
 - Otomatik Actions calismasi account billing/runner-start kisiti nedeniyle manuel olarak devre disidir.
 - Required status checks etkin degildir.
@@ -169,7 +170,7 @@ python -m pytest
 Beklenen guncel sonuc:
 
 ```text
-425 passed
+431 passed
 ```
 
 ## Basit Calistirma
@@ -223,4 +224,4 @@ Adim 212 branch calismasi boyunca ilk urun yonu, veri omurgasini guvenilir tutan
 - daily export,
 - weekly summary.
 
-CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. `FieldObservationRecord`, minimal bellek ici `FieldObservationRepository` baseline'i ve repository icinde read-only exact `project_id` / `status` filtreleri implement edilmis durumdadir; persistence, broader filters, lifecycle updates, attachment linking, export/reporting, API/GUI/CLI, audit ve validation henuz eklenmemistir.
+CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. `FieldObservationRecord`, minimal bellek ici `FieldObservationRepository` baseline'i, repository icinde read-only exact `project_id` / `status` filtreleri ve explicit status update davranisi implement edilmis durumdadir; persistence, broader filters, automatic lifecycle rules, attachment linking, export/reporting, API/GUI/CLI, audit ve validation henuz eklenmemistir.
