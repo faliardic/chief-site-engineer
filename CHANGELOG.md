@@ -1,5 +1,17 @@
 # Changelog
 
+## Step 205
+
+- Added tracked canonical project instructions at `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`, copied completely from the unchanged local-only source and verified by source/canonical SHA-256, equal line count, and normalized-text equivalence.
+- Added `.cse/tasks/205_task.md`, `.cse/results/205_result.md`, the Step 205 documentation record, and the Step 205 learning record.
+- Resynchronized `README.md`, `.cse/state/project_state.json`, `ROADMAP.md`, `CHANGELOG.md`, and `docs/project_decisions.md` with Step 204 squash-merge commit `7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3`, merged PR #24, and completed Issue #23.
+- Corrected stale current-state references to Step 127 and `243 passed`; recorded the factual Step 205 local test result.
+- Recorded that `.github/workflows/pytest.yml` exists while automatic GitHub Actions execution is manually disabled for the account billing/runner-start constraint and required status checks remain disabled.
+- Recorded CSE as a tested domain/data/documentation core rather than a field-ready application, including its missing production capabilities.
+- Preserved the product rule `reliable data backbone first, automation later, AI last` and recorded the first field MVP direction: fast observation record, attachment, location, status tracking, reported-to, daily export, and weekly summary.
+- Recorded Podcast 031 as the natural documentation follow-up for Steps 201-205 after Step 205 merges.
+- Kept Step 205 documentation/state-only; no production code, executable test/fixture, workflow behavior, Actions enablement, required checks, API/GUI/CLI, persistence/database, audit, backup/restore, migration, hard validation, generated `blocked`, export output, ZIP mutation, PR creation, or merge behavior was added.
+
 ## Step 204
 
 - Added a documentation/state-only fixture naming, ownership/location, and assertion checklist plan for a future handover QC presentation view-model implementation.

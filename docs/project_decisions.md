@@ -1,5 +1,19 @@
 # Proje Kararlari
 
+## 205 Canonical Project Instructions and Repository Truth Resynchronization Karari
+
+- `CSE_GUNCEL_PROJE_TALIMATLARI.md`, resmi local execution source olarak highest-priority kalir; dosya `.git/info/exclude` uzerinden ignored, unchanged, unstaged ve uncommitted korunur.
+- Complete instruction content, future clone ve handoff'lar icin `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` yolunda tracked canonical repository source olarak kaydedilir; source/canonical SHA-256 ve text equivalence dogrulanir.
+- Official local repository branch/file/test/commit/push execution surface, GitHub ise synchronized review ve evidence surface olarak kalir.
+- Step 204, PR #24 squash merge commit `7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3` ile latest merged/finalized safe point'tir; Issue #23 completed olarak kaydedilir.
+- Step 205, merge edilene kadar documentation/state-only active branch'tir ve Step 204 guvenli noktasini degistirmez.
+- `.github/workflows/pytest.yml` repoda vardir; automatic Actions execution account billing/runner-start constraint nedeniyle manually disabled kalir ve required status checks etkinlestirilmez.
+- CSE tested domain/data/documentation core'dur, field-ready application degildir; persistence/database, real file upload, API, GUI, authentication/authorization, deployment ve complete backup/restore production capabilities henuz yoktur.
+- Urun kurali reliable data backbone first, automation later, AI last olarak korunur.
+- Step 205 sonrasi ilk product direction; fast observation record, attachment, location, status tracking, reported-to, daily export ve weekly summary iceren dar field MVP'dir; implementation bu adimda baslatilmaz.
+- Podcast 031, Step 201-205 araligini Step 205 merge sonrasi ozetleyecek dogal documentation follow-up'tur.
+- Production code, executable test/fixture, workflow behavior, Actions enablement, required checks, API/GUI/CLI, persistence/database/repository, audit, backup/restore, migration, hard validation, generated `blocked`, export output, ZIP mutasyonu, automatic decision, PR creation ve merge behavior eklenmez.
+
 ## 204 Handover QC Fixture Naming and Assertion Checklist Plan Karari
 
 - Adim 204, Issue #23 talimatina gore future handover QC presentation view-model icin fixture naming, ownership/location ve assertion checklist planini documentation/state-only olarak sabitler.
