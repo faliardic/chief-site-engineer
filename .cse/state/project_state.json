@@ -8,7 +8,7 @@
   "base_branch": "master",
   "base_commit": "12e042850515005ed7baa55d9eb273dad8d201e3",
   "result_commit": "a48d2ae2087b764f1f15f49e5295c64c1679de46",
-  "workflow_status": "local_verification_passed_pending_push",
+  "workflow_status": "pushed_to_open_draft_pr",
   "tests": {
     "command": "python -m pytest",
     "result": "passed",
@@ -29,7 +29,7 @@
     "zip_files_found": 0
   },
   "working_tree": {
-    "result": "pending_commit",
+    "result": "clean_after_push",
     "changes": [
       "M .cse/README.md",
       "M .cse/results/193_result.md",
