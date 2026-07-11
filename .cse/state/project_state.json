@@ -9,7 +9,7 @@
   },
   "diff_check": {
     "command": "git diff --check",
-    "result": "passed_exit_0_with_autocrlf_warning_for_project_state_json"
+    "result": "passed"
   },
   "exports": {
     "contents": [
@@ -17,49 +17,37 @@
     ],
     "result": "clean"
   },
+  "final_branch_head_evidence_location": "GitHub Issue #23 completion comment after metadata-finalization push",
   "fixture_assertion_plan": {
+    "canonical_cases": [
+      "success_only",
+      "failure_only",
+      "mixed",
+      "empty_zero_count",
+      "missing_optional_fields",
+      "unknown_status_additional_fields",
+      "unsupported_input_fallback"
+    ],
     "documentation_only": true,
     "executable_fixtures_created": false,
-    "tests_changed": false,
-    "production_code_changed": false,
-    "workflow_changed": false,
-    "source_of_truth": "build_export_handover_qc_review_checklist(summary, report)",
+    "fixture_artifact_families": [
+      "handover_qc_source_checklist_<case>",
+      "handover_qc_expected_view_model_<case>",
+      "handover_qc_expected_markdown_<case>",
+      "handover_qc_expected_review_visibility_<case>"
+    ],
+    "future_fixture_locations": [
+      "tests/fixtures/handover_qc/source_checklists/<case>.json",
+      "tests/fixtures/handover_qc/expected_view_models/<case>.json",
+      "tests/fixtures/handover_qc/expected_markdown/<case>.md",
+      "tests/fixtures/handover_qc/expected_review_visibility/<case>.json"
+    ],
+    "future_test_file": "tests/test_handover_qc_view_model_fixtures.py",
     "optional_markdown_display_only": "format_export_handover_qc_review_checklist_as_markdown(checklist)",
-    "future_fixture_names": [
-      "handover_qc_view_model_success_only",
-      "handover_qc_view_model_failure_only",
-      "handover_qc_view_model_mixed",
-      "handover_qc_view_model_empty_zero_count",
-      "handover_qc_view_model_missing_optional_fields",
-      "handover_qc_view_model_unknown_status_additional_fields",
-      "handover_qc_view_model_unsupported_input_fallback"
-    ],
-    "assertion_categories": [
-      "structured_source_contract",
-      "optional_markdown_display_only",
-      "status_label_wording",
-      "human_review_indicator_wording",
-      "read_only_notice",
-      "non_blocking_notice",
-      "item_row_fallbacks",
-      "empty_state_wording",
-      "unknown_status_visibility_only",
-      "official_private_transfer_boundary",
-      "forbidden_decision_fields",
-      "no_side_effects",
-      "input_immutability",
-      "no_recomputation",
-      "no_generated_blocked_status",
-      "no_automatic_acceptance_rejection_or_package_blocking"
-    ],
-    "future_metadata_fields": [
-      "source_checklist_case",
-      "expected_view_model_case",
-      "required_assertions",
-      "forbidden_fields",
-      "transfer_boundary_assertions",
-      "side_effect_assertions"
-    ],
+    "production_code_changed": false,
+    "source_of_truth": "build_export_handover_qc_review_checklist(summary, report)",
+    "tests_changed": false,
+    "workflow_changed": false,
     "forbidden_fields": [
       "approved",
       "rejected",
@@ -70,32 +58,27 @@
       "persisted_at",
       "export_written"
     ],
-    "future_test_conversion_boundary": "A future step may convert this plan into executable fixtures and tests only with explicit authorization."
+    "future_test_conversion_boundary": "A separate explicitly authorized future task may create canonical fixture data and fixture-contract tests for the seven documented handover QC cases."
   },
   "forbidden_scope_added": false,
   "issue": 23,
+  "local_only_instruction_file": {
+    "ignored_via": ".git/info/exclude",
+    "path": "CSE_GUNCEL_PROJE_TALIMATLARI.md",
+    "sha256": "A03C207BE84425F793C962DFA2C9A1E09EDCF739761465FFE5C57D3BFA0E123F",
+    "staged": false,
+    "committed": false,
+    "unchanged": true
+  },
   "merge_authorized": false,
-  "next_action": "Push branch step-204-handover-qc-fixture-assertion-plan for ChatGPT inspection and draft PR creation; do not open or merge a PR from Codex.",
+  "next_action": "ChatGPT re-inspection and Draft PR creation after final remote evidence is posted to Issue #23; do not merge.",
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
-    "github_only_changes_count_as_completion": false,
     "master_sync": {
-      "expected_master_sha": "583f8539d9522027f1578a91b0298a8bdf21a1c9",
-      "local_master_sha_after_pull": "583f8539d9522027f1578a91b0298a8bdf21a1c9",
-      "origin_master_sha_after_fetch": "583f8539d9522027f1578a91b0298a8bdf21a1c9",
-      "divergence_after_sync": "0 0"
-    },
-    "branch": {
-      "name": "step-204-handover-qc-fixture-assertion-plan",
-      "created_from": "synchronized_master",
-      "initial_sha": "583f8539d9522027f1578a91b0298a8bdf21a1c9"
-    },
-    "pre_change_status": {
-      "git_status_short_branch": "## step-204-handover-qc-fixture-assertion-plan",
-      "git_status_ignored_short_untracked_all": "!! chief-site-engineer_adim_080_guvenli_nokta.zip"
-    },
-    "existing_ignored_zip": "chief-site-engineer_adim_080_guvenli_nokta.zip",
-    "codex_opens_draft_pr": false
+      "local_master_sha": "583f8539d9522027f1578a91b0298a8bdf21a1c9",
+      "origin_master_sha": "583f8539d9522027f1578a91b0298a8bdf21a1c9",
+      "divergence": "0 0"
+    }
   },
   "production_code_changed": false,
   "protected_paths": {
@@ -105,13 +88,13 @@
   },
   "protocol_version": 1,
   "pull_request": null,
-  "pull_request_state": "not_created_by_codex_issue_23_instruction",
+  "pull_request_state": "not_created_by_codex",
   "required_files": [
     ".cse/tasks/204_task.md",
-    "docs/204_handover_qc_fixture_assertion_plan.md",
-    "learning/204_handover_qc_fixture_assertion_plan.md",
     ".cse/results/204_result.md",
     ".cse/state/project_state.json",
+    "docs/204_handover_qc_fixture_naming_and_assertion_checklist_plan.md",
+    "learning/204_handover_qc_fixture_naming_and_assertion_checklist_plan.md",
     "ROADMAP.md",
     "CHANGELOG.md",
     "docs/project_decisions.md"
@@ -119,29 +102,35 @@
   "step": 204,
   "tests": {
     "command": "python -m pytest",
-    "result": "pending",
-    "summary": "pending"
+    "result": "passed",
+    "content_correction_summary": "413 passed in 1.90s",
+    "metadata_finalization_summary": "413 passed in 1.26s"
   },
   "tests_changed": false,
+  "verified_content_commit_divergence": "0 0",
+  "verified_content_commit_remote_sha": "fa336b973f9d476e12ffbde0751b729a06565a91",
+  "verified_content_commit_sha_before_metadata_finalization": "fa336b973f9d476e12ffbde0751b729a06565a91",
   "workflow_changed": false,
-  "workflow_status": "documentation_state_only_verified_pending_commit_and_push",
+  "workflow_status": "step_204_documentation_state_correction_verified",
   "working_tree": {
-    "changes": [
-      "A .cse/tasks/204_task.md",
-      "A docs/204_handover_qc_fixture_assertion_plan.md",
-      "A learning/204_handover_qc_fixture_assertion_plan.md",
-      "A .cse/results/204_result.md",
-      "M .cse/state/project_state.json",
-      "M ROADMAP.md",
-      "M CHANGELOG.md",
-      "M docs/project_decisions.md"
+    "authorized_changed_files": [
+      ".cse/tasks/204_task.md",
+      ".cse/results/204_result.md",
+      ".cse/state/project_state.json",
+      "docs/204_handover_qc_fixture_naming_and_assertion_checklist_plan.md",
+      "learning/204_handover_qc_fixture_naming_and_assertion_checklist_plan.md",
+      "ROADMAP.md",
+      "CHANGELOG.md",
+      "docs/project_decisions.md"
     ],
-    "ignored_files_remaining": 1,
     "required_files_physically_present": true,
-    "result": "authorized_step_204_documentation_state_changes_before_commit"
+    "result": "tracked_project_working_tree_clean_after_metadata_finalization_push"
   },
   "zip": {
     "ignored_zip_touched": false,
-    "zip_files_found": 1
+    "last_write_time_utc": "2026-06-07T11:30:04.4671945Z",
+    "length": 326209,
+    "path": "chief-site-engineer_adim_080_guvenli_nokta.zip",
+    "sha256": "E96CAA2115B98C54A5B030DAB265DC62AFD509BB4F6E59E2694AF0C89165C653"
   }
 }
