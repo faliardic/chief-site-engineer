@@ -1,5 +1,20 @@
 # Changelog
 
+## Step 200
+
+- Added documentation-only downstream presentation consumer contract and future regression/test matrix planning for handover QC screen and export review flow consumers.
+- Added `docs/200_handover_qc_downstream_presentation_consumer_contract_test_matrix_plan.md`.
+- Added `learning/200_handover_qc_downstream_presentation_consumer_contract_test_matrix_plan.md`.
+- Defined the future consumer input boundary around `build_export_handover_qc_review_checklist(summary, report)` structured checklist output and optional `format_export_handover_qc_review_checklist_as_markdown(checklist)` presentation Markdown.
+- Specified a future view-model contract without implementing a consumer, API, GUI, CLI, persistence, or decision layer.
+- Separated required fields, optional fields, fallback display behavior, status visibility, item visibility, review notes, and human-review indicators.
+- Preserved existing read-only, non-blocking semantics: `is_read_only=True`, `is_blocking=False`, `requires_human_review` as a human-review signal only, no generated `blocked` status, and no automatic acceptance, rejection, approval, or package blocking.
+- Preserved official transferable handover data versus private/non-transferable information separation.
+- Kept report building, checklist building, Markdown formatting, presentation consumption, human review, validation, persistence, audit, and export writing as separate layers.
+- Planned future regression coverage for success-only, failure-only, mixed, empty/zero-count, missing required/optional fields, unknown/additional fields and statuses, unsupported input, input immutability, no report/checklist recomputation, no file/export output, no persistence/audit side effect, no hard validation, no generated `blocked`, no automatic acceptance/rejection/blocking, and private/non-transferable exclusion.
+- Recorded the Step 196-200 NotebookLM podcast note as the next documentation follow-up after Step 200 is merged; no podcast note was created in this step.
+- Kept this as documentation/state-only; no production code, tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, file/export output, ZIP mutation, or merge behavior was added.
+
 ## Step 199
 
 - Added documentation-only phase closure for the Step 181-192 export/handover QC checklist and Markdown formatter work.

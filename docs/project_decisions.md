@@ -1,5 +1,23 @@
 # Proje Kararlari
 
+## 200 Downstream Presentation Consumer Contract and Test Matrix Plan Karari
+
+- Adim 200, future handover QC screen ve export review flow presentation consumer sozlesmesini documentation-only olarak planlar.
+- Consumer input boundary structured source of truth olarak `build_export_handover_qc_review_checklist(summary, report)` ciktisidir.
+- `format_export_handover_qc_review_checklist_as_markdown(checklist)` ciktisi optional presentation Markdown olarak okunabilir; future consumer Markdown'u structured source of truth olarak parse etmemelidir.
+- Future view-model contract implementation-free kalir ve API/GUI/CLI consumer baslatmaz.
+- Required field set `checklist_type`, `status`, `summary`, `items`, `review_notes`, `is_read_only`, `is_blocking` ve `requires_human_review` alanlarina dayanir.
+- Summary ve item visibility alanlari insan incelemesi icin gorunur tutulur; missing/unknown alanlar hard validation veya automatic rejection yerine fallback display ile ele alinmalidir.
+- `is_read_only=True`, `is_blocking=False` ve `requires_human_review` yalniz human-review signal semantics olarak korunur.
+- Future consumer success visibility'yi official acceptance, failure/review visibility'yi automatic rejection, mixed visibility'yi package decision veya unknown visibility'yi hard validation olarak yorumlamamalidir.
+- Generated `blocked` status, automatic acceptance/rejection/approval/package blocking, persistence, audit, backup/restore, migration ve hard validation eklenmez.
+- Report building, checklist building, Markdown formatting, presentation consumption, human review, validation, persistence, audit ve export writing katmanlari ayri kalir.
+- Official transferable handover data approved documentation, structured summary/report/checklist ve explicitly selected review Markdown/export package ile sinirlidir; private workspace notes, user-specific context, credentials/secrets, local cache ve non-transferable personal data disarida kalir.
+- Future regression/test matrix success-only, failure-only, mixed, empty/zero-count, missing required/optional fields, unknown/additional fields/statuses, unsupported input, immutability, no recomputation, no file/export output, no persistence/audit side effect, no hard validation, no generated `blocked`, no automatic acceptance/rejection/blocking ve private/non-transferable exclusion basliklarini kapsamalidir.
+- Sonraki dar teknik onerim future handover QC presentation view-model icin documentation-only canonical examples and wording standardization hazirlamaktir.
+- Step 196-200 NotebookLM podcast note, Step 200 merge edildikten sonraki documentation follow-up olarak kaydedilir; bu adimda podcast notu olusturulmaz.
+- Production code, tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, file/export output ve ZIP mutasyonu eklenmez.
+
 ## 199 Handover QC Checklist Phase Closure and Downstream Boundary Karari
 
 - Adim 199, Adim 181-192 export/handover QC checklist ve Markdown formatter fazini documentation-only olarak kapatir.
