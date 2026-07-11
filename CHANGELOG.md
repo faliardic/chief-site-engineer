@@ -1,5 +1,19 @@
 # Changelog
 
+## Step 201
+
+- Added Podcast 030 NotebookLM note for Steps 196-200 only.
+- Added `docs/podcast_notes/030_adim_196_200_notebooklm_podcast_notu.md`.
+- Summarized Step 196 minimal GitHub Actions `pytest` workflow and stable `pytest` check name.
+- Summarized Step 197 explicit merged-state finalization and billing lock classification as an external CI execution constraint.
+- Summarized Step 198 roadmap/current checkpoint resynchronization.
+- Summarized Step 199 handover QC checklist phase closure and downstream boundary review.
+- Summarized Step 200 downstream presentation consumer contract and future regression/test matrix plan.
+- Recorded that local verification remained `413 passed` and that GitHub-hosted runner execution did not start because of the account billing lock; this is not classified as a pytest failure or workflow-code defect.
+- Reiterated read-only/non-blocking semantics: `is_read_only=True`, `is_blocking=False`, `requires_human_review` as a human-review signal only, no generated `blocked` status, and no automatic acceptance, rejection, approval, or package blocking.
+- Preserved official transferable handover data versus private/non-transferable information separation.
+- Kept this as documentation/state-only; no production code, tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, file/export output, ZIP mutation, or merge behavior was added.
+
 ## Step 200
 
 - Added documentation-only downstream presentation consumer contract and future regression/test matrix planning for handover QC screen and export review flow consumers.

@@ -1,5 +1,21 @@
 # Proje Kararlari
 
+## 201 Podcast 030 - Adim 196-200 NotebookLM Podcast Notu Karari
+
+- Adim 201, Podcast 030'u documentation-only olarak hazirlar.
+- Podcast 030 yalniz Adim 196-200 araligini kapsar.
+- Podcast notu Step 196 minimal GitHub Actions `pytest` workflow'unu ve stabil `pytest` check adini ozetler.
+- Podcast notu Step 197 explicit merged-state finalization semantigini ve billing lock'un external CI execution constraint oldugunu anlatir.
+- Billing lock pytest failure, workflow-code defect veya required status check basarisi olarak siniflandirilmaz.
+- Podcast notu Step 198 roadmap/current checkpoint resynchronization calismasini ozetler.
+- Podcast notu Step 199 handover QC checklist phase closure ve downstream boundary review kararlarini ozetler.
+- Podcast notu Step 200 downstream presentation consumer contract ve future test matrix planini ozetler.
+- Local verification `413 passed` olarak factual kalir; GitHub-hosted runner execution account billing lock nedeniyle baslamamistir.
+- `is_read_only=True`, `is_blocking=False` ve `requires_human_review` yalniz human-review signal semantics olarak korunur.
+- Generated `blocked` status, automatic acceptance/rejection/approval/package blocking, persistence, audit, backup/restore, migration ve hard validation eklenmez.
+- Official transferable handover data ile private/non-transferable information ayrimi podcast notunda acik tutulur.
+- Production code, tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, file/export output ve ZIP mutasyonu eklenmez.
+
 ## 200 Downstream Presentation Consumer Contract and Test Matrix Plan Karari
 
 - Adim 200, future handover QC screen ve export review flow presentation consumer sozlesmesini documentation-only olarak planlar.
