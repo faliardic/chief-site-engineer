@@ -9,23 +9,23 @@ Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici reposit
 Son guvenli nokta:
 
 ```text
-Adim 213 - FieldObservationRepository status update
-PR #43 merge commit: 45c2b2e2828dfea74121033bf01a868e6821b544
+Adim 214 - FieldObservationRepository reporting update
+PR #45 merge commit: 768178a85844aae10c46008e28eafa23822fd631
 ```
 
 Guncel test sonucu:
 
 ```text
-438 passed
+445 passed
 ```
 
 Mevcut calisma durumu:
 
 ```text
-Adim 214 - FieldObservationRepository reporting update
+Adim 215 - FieldObservationRepository location/category filters
 ```
 
-Adim 213, PR #43 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 214, `FieldObservationRepository` icin explicit reporting-context update davranisini ekleyen aktif branch isidir; henuz merge edilmemistir.
+Adim 214, PR #45 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 215, `FieldObservationRepository` icin exact read-only location/category filtrelerini ekleyen aktif branch isidir; henuz merge edilmemistir.
 
 ## Repo Koku
 
@@ -77,6 +77,7 @@ Adim 205 itibariyla proje su alanlarda ilerlemistir:
 - Minimal `FieldObservationRecord` dataclass ve focused value/default testleri.
 - Minimal bellek ici `FieldObservationRepository` baseline'i; add/list/count/find ve duplicate `observation_id` reddi.
 - `FieldObservationRepository` icin read-only exact `project_id` ve `status` filtreleri.
+- `FieldObservationRepository` icin read-only exact `location` ve `category` filtreleri.
 - `FieldObservationRepository` icin explicit `update_status(observation_id, new_status)` davranisi.
 - `FieldObservationRepository` icin explicit `update_reporting(observation_id, reported_to, reported_at)` davranisi.
 - CSE ana proje ilkeleri ve veri koruma politikasi.
@@ -121,7 +122,7 @@ Podcast 032, latest completed podcast olarak Steps 206-210 araligini kapsar. Bu 
 
 ## Kalite Kontrol ve CI Durumu
 
-- Guncel yerel Step 214 branch test sonucu `438 passed` olarak dogrulanir.
+- Guncel yerel Step 215 branch test sonucu `445 passed` olarak dogrulanir.
 - `.github/workflows/pytest.yml` GitHub Actions workflow'u repoda bulunur.
 - Otomatik Actions calismasi account billing/runner-start kisiti nedeniyle manuel olarak devre disidir.
 - Required status checks etkin degildir.
@@ -171,7 +172,7 @@ python -m pytest
 Beklenen guncel sonuc:
 
 ```text
-438 passed
+445 passed
 ```
 
 ## Basit Calistirma

@@ -24,6 +24,8 @@ def _field_observation(
     observation_id: str,
     *,
     project_id: str = "prj-001",
+    location: str = "A Blok 2. Kat",
+    category: str = "quality",
     status: str = "open",
     is_archived: bool = False,
 ) -> FieldObservationRecord:
@@ -31,8 +33,8 @@ def _field_observation(
         observation_id=observation_id,
         project_id=project_id,
         observed_at="2026-07-11T18:30:00",
-        location="A Blok 2. Kat",
-        category="quality",
+        location=location,
+        category=category,
         description=f"Field observation {observation_id}",
         status=status,
         is_archived=is_archived,
@@ -307,6 +309,215 @@ def test_field_observation_repository_filters_include_archived_matching_records(
     assert repository.list_by_project_id("prj-001") == [active_record, archived_record]
     assert repository.list_by_status("tracking") == [active_record, archived_record]
     assert archived_record.is_archived is True
+
+
+def test_field_observation_repository_filters_by_location_exact_matches_in_order() -> None:
+    repository = FieldObservationRepository()
+
+    assert repository.list_by_location("A Blok 2. Kat") == []
+
+    first_record = _field_observation("obs-001", location="A Blok 2. Kat")
+    other_location_record = _field_observation("obs-002", location="B Blok Zemin")
+    second_record = _field_observation("obs-003", location="A Blok 2. Kat")
+    case_variant_record = _field_observation("obs-004", location="a blok 2. kat")
+    whitespace_variant_record = _field_observation(
+        "obs-005",
+        location=" A Blok 2. Kat ",
+    )
+
+    repository.add(first_record)
+    repository.add(other_location_record)
+    repository.add(second_record)
+    repository.add(case_variant_record)
+    repository.add(whitespace_variant_record)
+
+    assert repository.list_by_location("A Blok 2. Kat") == [
+        first_record,
+        second_record,
+    ]
+    assert repository.list_by_location("B Blok Zemin") == [other_location_record]
+    assert repository.list_by_location("a blok 2. kat") == [case_variant_record]
+    assert repository.list_by_location(" A Blok 2. Kat ") == [
+        whitespace_variant_record,
+    ]
+    assert repository.list_by_location("C Blok 1. Kat") == []
+    assert repository.list_by_location("A BLOK 2. KAT") == []
+    assert repository.list_by_location("A Blok 2. Kat ") == []
+
+
+def test_field_observation_repository_filters_by_category_exact_matches_in_order() -> None:
+    repository = FieldObservationRepository()
+
+    assert repository.list_by_category("quality") == []
+
+    first_record = _field_observation("obs-001", category="quality")
+    other_category_record = _field_observation("obs-002", category="safety")
+    second_record = _field_observation("obs-003", category="quality")
+    case_variant_record = _field_observation("obs-004", category="Quality")
+    whitespace_variant_record = _field_observation(
+        "obs-005",
+        category=" quality ",
+    )
+
+    repository.add(first_record)
+    repository.add(other_category_record)
+    repository.add(second_record)
+    repository.add(case_variant_record)
+    repository.add(whitespace_variant_record)
+
+    assert repository.list_by_category("quality") == [first_record, second_record]
+    assert repository.list_by_category("safety") == [other_category_record]
+    assert repository.list_by_category("Quality") == [case_variant_record]
+    assert repository.list_by_category(" quality ") == [whitespace_variant_record]
+    assert repository.list_by_category("coordination") == []
+    assert repository.list_by_category("QUALITY") == []
+    assert repository.list_by_category("quality ") == []
+
+
+def test_field_observation_repository_location_category_project_status_filters_are_independent() -> None:
+    repository = FieldObservationRepository()
+    first_record = _field_observation(
+        "obs-001",
+        project_id="prj-001",
+        location="A Blok 2. Kat",
+        category="quality",
+        status="open",
+    )
+    second_record = _field_observation(
+        "obs-002",
+        project_id="prj-001",
+        location="B Blok Zemin",
+        category="safety",
+        status="tracking",
+    )
+    third_record = _field_observation(
+        "obs-003",
+        project_id="prj-002",
+        location="A Blok 2. Kat",
+        category="safety",
+        status="open",
+    )
+
+    repository.add(first_record)
+    repository.add(second_record)
+    repository.add(third_record)
+
+    assert repository.list_by_location("A Blok 2. Kat") == [
+        first_record,
+        third_record,
+    ]
+    assert repository.list_by_category("safety") == [second_record, third_record]
+    assert repository.list_by_project_id("prj-001") == [first_record, second_record]
+    assert repository.list_by_status("open") == [first_record, third_record]
+
+
+def test_field_observation_repository_location_category_filtered_lists_are_copies() -> None:
+    repository = FieldObservationRepository()
+    first_record = _field_observation(
+        "obs-001",
+        location="A Blok 2. Kat",
+        category="quality",
+    )
+    second_record = _field_observation(
+        "obs-002",
+        location="A Blok 2. Kat",
+        category="quality",
+    )
+    other_record = _field_observation(
+        "obs-003",
+        location="B Blok Zemin",
+        category="safety",
+    )
+
+    repository.add(first_record)
+    repository.add(second_record)
+    repository.add(other_record)
+
+    location_records = repository.list_by_location("A Blok 2. Kat")
+    category_records = repository.list_by_category("quality")
+    second_location_records = repository.list_by_location("A Blok 2. Kat")
+    location_records.clear()
+    category_records.append(other_record)
+
+    assert second_location_records is not repository.list_by_location("A Blok 2. Kat")
+    assert repository.list_by_location("A Blok 2. Kat") == [
+        first_record,
+        second_record,
+    ]
+    assert repository.list_by_category("quality") == [first_record, second_record]
+    assert repository.count() == 3
+
+
+def test_field_observation_repository_location_category_filters_include_archived_records() -> None:
+    repository = FieldObservationRepository()
+    active_record = _field_observation(
+        "obs-001",
+        location="A Blok 2. Kat",
+        category="quality",
+    )
+    archived_record = _field_observation(
+        "obs-002",
+        location="A Blok 2. Kat",
+        category="quality",
+        is_archived=True,
+    )
+
+    repository.add(active_record)
+    repository.add(archived_record)
+
+    assert repository.list_by_location("A Blok 2. Kat") == [
+        active_record,
+        archived_record,
+    ]
+    assert repository.list_by_category("quality") == [active_record, archived_record]
+    assert archived_record.is_archived is True
+
+
+def test_field_observation_repository_location_category_filters_return_empty_for_empty_repository() -> None:
+    repository = FieldObservationRepository()
+
+    assert repository.list_by_location("A Blok 2. Kat") == []
+    assert repository.list_by_category("quality") == []
+
+
+def test_field_observation_repository_location_category_filters_do_not_copy_or_mutate_records() -> None:
+    repository = FieldObservationRepository()
+    first_record = _field_observation(
+        "obs-001",
+        location="A Blok 2. Kat",
+        category="quality",
+        status="tracking",
+    )
+    second_record = _field_observation(
+        "obs-002",
+        location="B Blok Zemin",
+        category="safety",
+        status="closed",
+        is_archived=True,
+    )
+    first_record.reported_to = "Saha ekibi"
+    first_record.notes = "Existing note."
+
+    repository.add(first_record)
+    repository.add(second_record)
+
+    location_result = repository.list_by_location("A Blok 2. Kat")
+    category_result = repository.list_by_category("quality")
+
+    assert location_result == [first_record]
+    assert category_result == [first_record]
+    assert location_result[0] is first_record
+    assert category_result[0] is first_record
+    assert repository.count() == 2
+    assert repository.list_all() == [first_record, second_record]
+    assert first_record.location == "A Blok 2. Kat"
+    assert first_record.category == "quality"
+    assert first_record.status == "tracking"
+    assert first_record.is_archived is False
+    assert first_record.reported_to == "Saha ekibi"
+    assert first_record.notes == "Existing note."
+    assert second_record.status == "closed"
+    assert second_record.is_archived is True
 
 
 def test_field_observation_repository_update_status_returns_none_for_missing_id() -> None:

@@ -59,6 +59,12 @@ class FieldObservationRepository:
     def list_by_status(self, status: str) -> list[FieldObservationRecord]:
         return [record for record in self._records if record.status == status]
 
+    def list_by_location(self, location: str) -> list[FieldObservationRecord]:
+        return [record for record in self._records if record.location == location]
+
+    def list_by_category(self, category: str) -> list[FieldObservationRecord]:
+        return [record for record in self._records if record.category == category]
+
     def count(self) -> int:
         return len(self._records)
 
