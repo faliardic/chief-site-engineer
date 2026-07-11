@@ -3,11 +3,11 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 210 - FieldObservationRepository Baseline
-PR #37 merge commit: c7dbd94076f9e23c928f27ea377a97debad6636b
+Adim 211 - Podcast 032 for Steps 206-210
+PR #39 merge commit: 26509f35abb0cb706d2a085715310358cf5d2421
 ```
 
-Adim 210, PR #37 squash merge commit `c7dbd94076f9e23c928f27ea377a97debad6636b` ile master uzerindeki guncel guvenli noktadir. Step 211, Issue #38 kapsaminda Steps 206-210 icin Podcast 032 kaynak notunu ekleyen aktif documentation/podcast branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Adim 211, PR #39 squash merge commit `26509f35abb0cb706d2a085715310358cf5d2421` ile master uzerindeki guncel guvenli noktadir. Step 212, Issue #40 kapsaminda `FieldObservationRepository` icin exact project/status filtrelerini ekleyen aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -151,6 +151,10 @@ Adim 202'de future handover QC presentation view-model consumer'lari icin canoni
 
 Adim 203'te Issue #21 uyarinca official local working copy protocol documentation-only olarak sabitlendi. `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer` proje dosyasi olusturma, duzenleme, verification, commit ve push icin primary working copy olarak kaydedilir; GitHub synchronized remote ve review surface olarak kalir. `.cse/README.md`, `.cse/templates/task_template.md` ve `.cse/templates/result_template.md` local-first flow, master sync evidence, local branch creation, physical local file existence, local/remote divergence, result reporting ve post-merge sync boundary icin guncellenir. Branch/pull oncesi local status inspection, fast-forward-only master sync, expected master SHA dogrulama, branch divergence, required local verification, exports cleanliness ve ignored ZIP untouched status raporlamasi standardize edilir. Production code, tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, export output, ZIP mutasyonu, PR creation ve merge behavior eklenmez.
 
+Adim 211'de Podcast 032 documentation-only olarak hazirlandi ve yalniz Adim 206-210 araligini kapsadi. Not; canonical instruction authority, unified project source, FieldObservationRecord contract/model ve FieldObservationRepository baseline baslangicini NotebookLM-friendly sekilde ozetler. Step 211 PR #39 merge commit `26509f35abb0cb706d2a085715310358cf5d2421` ile latest merged/finalized safe point oldu; Podcast 032 latest completed podcast'e donustu ve sonraki dogal podcast araligi Steps 211-215 olarak kaydedildi.
+
+Adim 212'de `FieldObservationRepository` icin `list_by_project_id(project_id)` ve `list_by_status(status)` read-only filtreleri eklendi. Filtreler exact, case-sensitive, trim/normalize/validate etmeyen string karsilastirmasi yapar; insertion order korunur, eslesmeyen degerler `[]` dondurur, her cagri yeni liste uretir ve archived eslesen kayitlar da dahil edilir. Category/location/reported_to/date-time/text-search/active/archive-only/combined filtreler, lifecycle mutation, persistence, attachment integration, reporting/export, API/GUI/CLI, validation ve Step 213 kapsam disinda tutuldu.
+
 Adim 160'da mevcut exception tabanli file-writing helper davranisini bozmadan future result contract wrapper API boundary documentation-only olarak planlandi; `write_*` helperlarin korunmasi, olasi `try_write_*` wrapper isimleri, result alanlari, error mapping, geriye uyumluluk ve handover QC gorunurlugu netlestirildi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 
 Adim 161'de Adim 160 API boundary'sine bagli future result contract wrapper implementation plan documentation-only olarak netlestirildi; `try_write_json_ready_dict_to_file(...)` ve `try_write_markdown_text_to_file(...)` wrapper davranisi, basari/hata result sozlesmesi, error mapping, overwrite/path safety davranisi, geriye uyumluluk ve handover QC gorunurlugu belgelendi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
@@ -180,7 +184,7 @@ Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test
 Guncel test durumu:
 
 ```text
-420 passed
+425 passed
 ```
 
 Proje su anda domain model, bellek ici repository, test, dokumantasyon, learning ve NotebookLM podcast notlari cekirdegi seviyesindedir.
@@ -498,13 +502,20 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 
 ## Step 211 - Podcast 032 for Steps 206-210
 
-- [ ] Adim 211 - `docs/podcast_notes/032_adim_206_210_notebooklm_podcast_notu.md` dosyasi Steps 206-210 icin hazirlanacak.
-- [ ] Adim 211 - Podcast 032, protocol/source/workflow consolidation'dan ilk Field MVP contract/model/repository cekirdegine gecisi anlatacak.
-- [ ] Adim 211 - Repository truth Step 210 / PR #37 / Issue #36 / merge `c7dbd94076f9e23c928f27ea377a97debad6636b` safe point olacak sekilde guncellenecek.
-- [ ] Adim 211 - Production code, tests, workflow, persistence, attachment, filters, lifecycle, export/reporting, API/GUI/CLI, audit ve Step 212 baslatilmayacak.
+- [x] Adim 211 - `docs/podcast_notes/032_adim_206_210_notebooklm_podcast_notu.md` dosyasi Steps 206-210 icin hazirlandi.
+- [x] Adim 211 - Podcast 032, protocol/source/workflow consolidation'dan ilk Field MVP contract/model/repository cekirdegine gecisi anlatti.
+- [x] Adim 211 - Repository truth Step 210 / PR #37 / Issue #36 / merge `c7dbd94076f9e23c928f27ea377a97debad6636b` safe point olacak sekilde guncellendi.
+- [x] Adim 211 - Production code, tests, workflow, persistence, attachment, filters, lifecycle, export/reporting, API/GUI/CLI, audit ve Step 212 baslatilmadi.
+
+## Step 212 - FieldObservationRepository Project/Status Filters
+
+- [x] Adim 212 - `list_by_project_id(project_id)` exact, case-sensitive project filtresi eklendi.
+- [x] Adim 212 - `list_by_status(status)` exact, case-sensitive status filtresi eklendi.
+- [x] Adim 212 - Donen filtered listelerin yeni liste oldugu, insertion order'in korundugu ve archived matching kayitlarin dahil edildigi test edildi.
+- [x] Adim 212 - Category/location/reported_to/date-time/text-search/active/archive-only/combined filters, lifecycle mutation, persistence, attachment integration, export/reporting, API/GUI/CLI, audit, validation ve Step 213 baslatilmadi.
 
 ## Sonraki Calisma Onerisi
 
-Adim 211 merge edildikten sonra Podcast 032 latest completed podcast olur ve Steps 206-210 araligini kapsar. Sonraki besli podcast araligi Steps 211-215 olur. Ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur; persistence, attachment integration, filters, updates, export/API/audit/validation henuz uygulanmamistir.
+Adim 212 merge edildikten sonra Field MVP icin sonraki dar adimlar attachment, location, reported-to, lifecycle veya export/reporting alanlarindan biri olabilir; bunlar ayri issue ile netlestirilmelidir. Ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur; persistence, attachment integration, broader filters, updates, export/API/audit/validation henuz uygulanmamistir.
 
-Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Podcast 030 Adim 196-200 araligini, Podcast 031 Adim 201-205 araligini kapsar; Podcast 032 Step 211 branch'i uzerinde aktif artifact olarak Steps 206-210 icin hazirlanir.
+Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Podcast 030 Adim 196-200 araligini, Podcast 031 Adim 201-205 araligini ve Podcast 032 Adim 206-210 araligini kapsar; sonraki dogal podcast araligi Steps 211-215'tir.

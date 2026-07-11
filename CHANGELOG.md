@@ -1,5 +1,15 @@
 # Changelog
 
+## Step 212
+
+- Added `FieldObservationRepository.list_by_project_id(project_id)` for exact, case-sensitive project filtering.
+- Added `FieldObservationRepository.list_by_status(status)` for exact, case-sensitive status filtering.
+- Added focused tests for project filtering, status filtering, independent project/status visibility, filtered-list copy behavior, and archived matching record inclusion.
+- Updated the field observation test helper with optional `project_id`, `status`, and `is_archived` keyword arguments.
+- Updated repository truth so Step 211 / PR #39 / Issue #38 / merge commit `26509f35abb0cb706d2a085715310358cf5d2421` is the latest merged/finalized safe point and Step 212 remains active unmerged project/status filter work.
+- Recorded Podcast 032 as latest completed for Steps 206-210 and the next podcast range as Steps 211-215.
+- Kept this scope narrow; no category/location/reported_to/date-time/text-search/active/archive-only/combined filters, lifecycle mutation, summaries/reporting, persistence/database/JSON/SQLite, attachment linking/file operations, validation/normalization/enums/constants, API/GUI/CLI, audit/task/NCR conversion, generated `blocked`, daily export, weekly summary, Step 213, workflow changes, Actions enablement, ZIP mutation, or Desktop archive mutation was added.
+
 ## Step 211
 
 - Added Podcast 032 source note at `docs/podcast_notes/032_adim_206_210_notebooklm_podcast_notu.md`, covering only Steps 206-210.
