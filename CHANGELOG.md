@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 208
+
+- Added documentation-level `FieldObservationRecord` future model contract for the first Field MVP fast observation record.
+- Documented required future fields, optional/deferred-at-capture fields, status default/vocabulary, relationship boundaries, behavioral boundaries, and existing-model mapping/gap analysis.
+- Recorded Step 209 as the recommended implementation step only after Step 208 contract review and merge.
+- Updated repository truth so Step 207 / PR #31 / Issue #30 / merge commit `23baddf413e1cdf5a5e5564fe4a559954572e45f` is the latest merged/finalized safe point and Step 208 remains active unmerged documentation/contract work.
+- Kept Podcast 031 as latest and the next podcast range as Steps 206-210.
+- Kept this as documentation/state/contract-only; no production code, executable tests/fixtures, workflow behavior, Actions enablement, required checks, API/GUI/CLI implementation, persistence, audit, backup/restore, migration, hard validation, generated `blocked`, export output, ZIP mutation, Desktop archive mutation, Step 209, or field-MVP implementation was added.
+
 ## Step 207
 
 - Added tracked unified project source at `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md` from the approved `CHIEF_SITE_ENGINEER_EXE_BIRLESTIRILMIS_PROJE_KAYNAGI.md` source without reconstruction or shortening.

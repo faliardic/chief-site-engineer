@@ -9,8 +9,8 @@ Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici reposit
 Son guvenli nokta:
 
 ```text
-Adim 206 - Step 205 merged truth, Podcast 031, and instruction authority closure
-PR #29 merge commit: 3b05fae76766cedc8840eea6c0fc2f51440354e4
+Adim 207 - Unified project source and Codex invocation policy
+PR #31 merge commit: 23baddf413e1cdf5a5e5564fe4a559954572e45f
 ```
 
 Guncel test sonucu:
@@ -22,10 +22,10 @@ Guncel test sonucu:
 Mevcut calisma durumu:
 
 ```text
-Adim 207 - Unified project source and Codex invocation policy
+Adim 208 - First Field MVP observation record contract
 ```
 
-Adim 206, PR #29 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 207, unified project source, source register, GitHub-native new-chat bootstrap ve Codex invocation / batched execution policy calismasidir; henuz merge edilmemis aktif documentation/state/protocol isidir.
+Adim 207, PR #31 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 208, ilk Field MVP icin `FieldObservationRecord` veri sozlesmesini tanimlayan aktif documentation/contract isidir; henuz merge edilmemistir ve field-MVP implementation baslamamistir.
 
 ## Repo Koku
 
@@ -219,4 +219,4 @@ Adim 205 repository truth synchronization merge edildikten sonra ilk urun yonu, 
 - daily export,
 - weekly summary.
 
-CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. Adim 207, field-MVP implementation baslatmaz; yalniz unified source, GitHub bootstrap ve Codex invocation/batched execution policy kayitlarini tamamlar.
+CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. Adim 208, field-MVP implementation baslatmaz; yalniz ilk Field MVP hizli gozlem kaydi icin `FieldObservationRecord` contract'ini tanimlar. Step 209, bu contract review edilip merge edildikten sonra onerilen dar implementation adimidir.

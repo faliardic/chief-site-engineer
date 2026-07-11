@@ -23,7 +23,7 @@ Bu kaynak hazırlanırken aşağıdaki proje kaynakları birlikte incelenmiştir
 5. `CSE_STRATEGIC_PRODUCT_DIRECTION.md`
 6. `CSE_GUNCEL_PROJE_TALIMATLARI.md`
 7. `STEP_204_CODEX_DUZELTME_TALIMATI.md`
-8. Bu sohbet içinde kesinleştirilen Step 206 ve Step 207 kararları
+8. Bu sohbet içinde kesinleştirilen Step 206, Step 207 ve Step 208 kararları
 9. Güncel GitHub Issue/PR/merge gerçekliği
 
 ### Kaynakların kullanım biçimi
@@ -940,13 +940,13 @@ Gerçek şantiye
 
 ### Son doğrulanmış merged GitHub noktası
 
-- Step: **206**
-- PR: **#29**
-- Issue: **#28**
+- Step: **207**
+- PR: **#31**
+- Issue: **#30**
 - Merge commit:
 
 ```text
-3b05fae76766cedc8840eea6c0fc2f51440354e4
+23baddf413e1cdf5a5e5564fe4a559954572e45f
 ```
 
 - Son doğrulanan test seviyesi: **413 passed**
@@ -955,24 +955,22 @@ Gerçek şantiye
 
 ### Yerel senkronizasyon durumu
 
-Step 206 merge commit’inin resmî `V:` yerel master’a senkronlandığına dair bu sohbet içinde henüz nihai yerel kanıt bulunmamaktadır.
+Step 208 baslangicinda resmî `V:` yerel master `23baddf413e1cdf5a5e5564fe4a559954572e45f` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
 
-Bu nedenle yerel master’ın senkron olduğu iddia edilmez.
+### Aktif iş
 
-### Aktif planlanan iş
-
-- Step: **207**
-- Issue: **#30**
-- Amaç: Codex çağırma ve toplu yürütme politikasını kalıcı hâle getirmek
-- Beklenen branch:
+- Step: **208**
+- Issue: **#32**
+- Amaç: ilk Field MVP icin `FieldObservationRecord` documentation-level contract'ini tanimlamak
+- Branch:
 
 ```text
-step-207-codex-invocation-policy
+step-208-first-field-mvp-observation-contract
 ```
 
-- Branch henüz GitHub’da doğrulanmamıştır.
-- Codex completion evidence henüz bulunmamaktadır.
-- Step 208 veya field-MVP implementation başlamamıştır.
+- Bu adim documentation/state/contract-only isidir.
+- Field-MVP implementation baslamamistir.
+- Step 209, bu contract review edilip merge edildikten sonra onerilen implementation adimidir.
 
 ---
 
@@ -1010,7 +1008,7 @@ step-207-codex-invocation-policy
 
 ### 29.7 Eski aktif Step bilgileri
 
-Step 203, 204, 205 ve aktif Step 206 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 206’dır; Step 207 plan aşamasındadır.
+Step 203, 204, 205, 206 ve aktif Step 207 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 207’dir; Step 208 aktif unmerged contract aşamasındadır.
 
 ### 29.8 Eski modül sırasının bağlayıcı olması
 
