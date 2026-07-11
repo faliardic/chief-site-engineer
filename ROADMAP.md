@@ -3,11 +3,11 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 197 - Merged CI Checkpoint Finalization / Billing Constraint Record
-Merge commit: 947350ff9348f79965fec282c28e2fa858d7356a
+Adim 198 - Roadmap and Current Project Checkpoint Resynchronization
+Merge commit: 90b5a17894241c0fd0f773af4943a0cdaf69f413
 ```
 
-Adim 197, master uzerindeki guncel guvenli noktadir. Step 198 acik draft dokumantasyon/state resynchronization calismasidir ve merge edilene kadar yeni guvenli nokta olarak sayilmaz.
+Adim 198, master uzerindeki guncel guvenli noktadir. Step 199 acik draft handover QC/checklist phase closure calismasidir ve merge edilene kadar yeni guvenli nokta olarak sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -138,6 +138,10 @@ Adim 195'te explicit post-merge state finalization yolu eklendi; merged PR/issue
 Adim 196'da `.github/workflows/pytest.yml` GitHub Actions workflow'u eklendi; PR-to-master ve push-to-master icin `git diff --check` ve `python -m pytest` kosacak sekilde tasarlandi.
 
 Adim 197'de Step 196 merge sonrasi state semantigi latest merged/finalized checkpoint olarak sabitlendi; GitHub runner'in account billing lock nedeniyle startup oncesinde calismamasi dissal CI execution constraint olarak kaydedildi.
+
+Adim 198'de ana proje dokumantasyonu Adim 197 guvenli noktasina gore yeniden senkronize edildi; CI workflow varligi, billing-lock runner siniri, required status checks durumu, 413 test sayisi ve podcast catch-up maddeleri factually kaydedildi.
+
+Adim 199'da Step 181-192 export/handover QC checklist ve Markdown formatter fazi documentation-only olarak kapatildi. `build_export_handover_qc_review_checklist(summary, report)` ve `format_export_handover_qc_review_checklist_as_markdown(checklist)` stable contract'lari, non-blocking semantics ve downstream consumer boundary'leri belgelendi; helper davranisi, test, workflow, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, ZIP ve export ciktisi eklenmedi.
 
 Adim 160'da mevcut exception tabanli file-writing helper davranisini bozmadan future result contract wrapper API boundary documentation-only olarak planlandi; `write_*` helperlarin korunmasi, olasi `try_write_*` wrapper isimleri, result alanlari, error mapping, geriye uyumluluk ve handover QC gorunurlugu netlestirildi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 
@@ -384,8 +388,17 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 - [x] Adim 196 - GitHub Actions `pytest` workflow; CI workflow var, fakat hosted runner billing lock nedeniyle henuz basarili GitHub `pytest` kosusu uretmedi.
 - [x] Adim 197 - Latest merged/finalized checkpoint semantics; Step 196 merge commit `947350ff9348f79965fec282c28e2fa858d7356a` guvenli nokta olarak kaydedildi ve billing lock dissal constraint olarak belgelendi.
 
+## Handover QC Checklist Phase Closure - Adim 181-192 / 199
+
+- [x] Adim 181-183 - Export / handover QC review checklist plan, boundary, test matrix ve implementation plan documentation-only olarak hazirlandi.
+- [x] Adim 184 - `build_export_handover_qc_review_checklist(summary, report)` read-only JSON-ready checklist helper olarak eklendi.
+- [x] Adim 185-189 - Checklist helper usage, test/example, downstream formatter/consumer boundary ve Markdown formatter API boundary documentation-only olarak netlestirildi.
+- [x] Adim 190 - `format_export_handover_qc_review_checklist_as_markdown(checklist)` read-only presentation formatter olarak eklendi.
+- [x] Adim 191-192 - Markdown formatter usage, edge case standardization, test example intent ve regression boundary documentation-only olarak sabitlendi.
+- [x] Adim 199 - Faz kapatildi; `is_read_only=True`, `is_blocking=False`, `requires_human_review` insan inceleme sinyali, no generated `blocked` status ve no automatic official acceptance/rejection/blocking semantics downstream boundary olarak kaydedildi.
+
 ## Sonraki Calisma Onerisi
 
-Adim 197 sonrasi onerilen teknik yon, handover QC/checklist phase closure ve downstream consumer boundary review calismasidir. API/GUI/CLI implementation henuz baslatilmamalidir. Hard validation ve generated `blocked` status ayri, ilerideki explicit scope olmadan eklenmemelidir.
+Adim 199 sonrasi tek dar teknik onerim, future handover QC screen / export review presentation consumer icin documentation-only contract and test matrix plan hazirlamaktir. Bu adim API/GUI/CLI implementation, persistence, audit, backup/restore, migration, hard validation veya generated `blocked` status baslatmamalidir.
 
 Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Son mevcut podcast notu Podcast 029'dur ve Adim 167-180 araligini kapsar. Bu nedenle Adim 181-185, 186-190 ve 191-195 icin podcast catch-up maddeleri beklemededir; Adim 196-200 podcast notu ise Adim 200 tamamlanmadan dogrudan gerekli degildir. Step 198 kapsaminda podcast notu olusturulmadi.

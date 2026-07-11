@@ -1,5 +1,19 @@
 # Changelog
 
+## Step 199
+
+- Added documentation-only phase closure for the Step 181-192 export/handover QC checklist and Markdown formatter work.
+- Added `docs/199_handover_qc_checklist_phase_closure_and_downstream_boundary.md`.
+- Added `learning/199_handover_qc_checklist_phase_closure_and_downstream_boundary.md`.
+- Summarized the stable contract of `build_export_handover_qc_review_checklist(summary, report)` as a read-only JSON-ready checklist layer over existing summary/report outputs.
+- Summarized the stable contract of `format_export_handover_qc_review_checklist_as_markdown(checklist)` as a read-only presentation layer over checklist dict output.
+- Reiterated stable non-blocking semantics: `is_read_only=True`, `is_blocking=False`, `requires_human_review` as a human-review signal only, no generated `blocked` status, and no automatic official acceptance, rejection, or package blocking.
+- Defined downstream boundaries for future handover QC screens, export review flows, API/GUI/CLI presentation consumers, and admin/debug visibility without implementing those consumers.
+- Kept report building, checklist building, Markdown presentation, human review, validation, persistence, audit, and export writing as separate layers.
+- Preserved the separation between official transferable handover data and private/non-transferable user information.
+- Defined the next technical recommendation as a documentation-only downstream presentation consumer contract/test matrix plan.
+- Kept this as documentation/state-only; no production code, test behavior, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, file/export output, ZIP mutation, or merge behavior was added.
+
 ## Step 198
 
 - Resynchronized `ROADMAP.md`, `CHANGELOG.md`, and `docs/project_decisions.md` with Step 197 as the current safe point.

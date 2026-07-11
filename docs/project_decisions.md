@@ -1,5 +1,22 @@
 # Proje Kararlari
 
+## 199 Handover QC Checklist Phase Closure and Downstream Boundary Karari
+
+- Adim 199, Adim 181-192 export/handover QC checklist ve Markdown formatter fazini documentation-only olarak kapatir.
+- `build_export_handover_qc_review_checklist(summary, report)` stable contract'i read-only JSON-ready checklist dict uretimidir; input olarak existing `build_export_result_summary(...)` ve `build_export_result_report(...)` output'lari okunur.
+- `format_export_handover_qc_review_checklist_as_markdown(checklist)` stable contract'i checklist dict'i presentation-safe Markdown/string olarak sunmaktir.
+- `is_read_only=True` helper zincirinin okuma/gorunurluk katmani oldugunu gosterir.
+- `is_blocking=False` checklist veya formatter ciktisinin resmi paket bloklama mekanizmasi olmadigini gosterir.
+- `requires_human_review` yalniz insan inceleme sinyalidir; automatic official acceptance, rejection, package blocking, hard validation veya generated `blocked` status degildir.
+- Downstream consumer'lar report building, checklist building, Markdown presentation, human review, validation, persistence, audit ve export writing katmanlarini ayri tutmalidir.
+- Future handover QC screen checklist/Markdown ciktisini yalniz read-only presentation icin kullanabilir; official decision veya blocking state uretmemelidir.
+- Future export review flow export result summary/report/checklist zincirini gorunurluk icin okuyabilir; export file writing, overwrite, backup/restore veya audit davranisi ayri explicit scope ister.
+- Future API/GUI/CLI presentation consumer bu adimda baslatilmaz; gerekiyorsa ayri task, ayri test matrix ve explicit non-blocking contract ile ele alinmalidir.
+- Admin/debug visibility teknik detail, path, next action hint ve review notes bilgilerini insan incelemesine sunabilir; private/non-transferable user information'i official transferable handover data ile karistirmamalidir.
+- Official transferable handover data yalniz structured report/checklist, approved documentation ve explicit export package kapsaminda ele alinmalidir; private workspace notes, user-specific context, credentials, secrets, local caches ve non-transferable personal data resmi devir paketine katilmaz.
+- Sonraki dar teknik onerim future handover QC screen / export review presentation consumer icin documentation-only contract and test matrix plan hazirlanmasidir; implementation baslatilmaz.
+- Production code, tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, file/export output ve ZIP mutasyonu eklenmez.
+
 ## 198 Roadmap and Current Checkpoint Resynchronization Karari
 
 - Adim 198, ana proje dokumantasyonunu Adim 197 guvenli noktasina gore senkronize eder.
