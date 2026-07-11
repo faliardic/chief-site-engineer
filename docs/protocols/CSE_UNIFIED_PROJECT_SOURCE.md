@@ -940,41 +940,42 @@ Gerçek şantiye
 
 ### Son doğrulanmış merged GitHub noktası
 
-- Step: **214**
-- PR: **#45**
-- Issue: **#44**
+- Step: **215**
+- PR: **#47**
+- Issue: **#46**
 - Merge commit:
 
 ```text
-768178a85844aae10c46008e28eafa23822fd631
+7b3361087cdb51fe1e76caa6f2cd91ff005cdfe2
 ```
 
-- Latest merged safe point test seviyesi: **438 passed**
-- Aktif Step 215 yerel test seviyesi: **445 passed**
+- Latest merged safe point test seviyesi: **445 passed**
+- Aktif Step 216 yerel test seviyesi: **445 passed**
 - GitHub Actions: manuel olarak devre dışı
-- Podcast 032: Steps 206-210 latest completed podcast
-- Sonraki doğal podcast aralığı: Steps 211-215
+- Podcast 032: Steps 206-210 latest completed podcast before Step 216 merges
+- Podcast 033: Steps 211-215 active unmerged podcast artifact
+- Sonraki doğal podcast aralığı: Steps 216-220 after Step 216 merges
 
 ### Yerel senkronizasyon durumu
 
-Step 215 baslangicinda resmî `V:` yerel master `768178a85844aae10c46008e28eafa23822fd631` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
+Step 216 baslangicinda resmî `V:` yerel master `7b3361087cdb51fe1e76caa6f2cd91ff005cdfe2` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
 
 ### Aktif iş
 
-- Step: **215**
-- Issue: **#46**
-- Amaç: `FieldObservationRepository` icin exact read-only `location` / `category` filtrelerini eklemek
+- Step: **216**
+- Issue: **#48**
+- Amaç: Steps 211-215 icin Podcast 033 NotebookLM kaynak notunu hazirlamak
 - Branch:
 
 ```text
-step-215-field-observation-location-category-filters
+step-216-podcast-033-steps-211-215
 ```
 
-- Bu adim dar repository read-only location/category visibility isidir.
+- Bu adim documentation/state/podcast-only istir.
 - `FieldObservationRecord` halen tek Field-MVP model implementasyonudur.
 - `FieldObservationRepository` baseline-level bellek ici repository'dir; project/status/location/category exact filtreleri, explicit status update ve explicit reporting-context update davranisi vardir.
 - Persistence, attachment integration, broader filters/mutations, automatic lifecycle rules, structured location/contact normalization, export/reporting consumers, API/GUI/CLI, audit ve validation henuz uygulanmamistir.
-- Podcast 033 ve Step 216 baslatilmamistir.
+- Product behavior, Podcast 034 ve Step 217 baslatilmamistir.
 
 ---
 
@@ -1012,7 +1013,7 @@ step-215-field-observation-location-category-filters
 
 ### 29.7 Eski aktif Step bilgileri
 
-Step 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213 ve aktif Step 214 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 214’tür; Step 215 aktif unmerged location/category filter aşamasındadır.
+Step 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214 ve aktif Step 215 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 215’tir; Step 216 aktif unmerged Podcast 033 aşamasındadır.
 
 ### 29.8 Eski modül sırasının bağlayıcı olması
 
