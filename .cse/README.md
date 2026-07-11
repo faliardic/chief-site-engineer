@@ -9,18 +9,36 @@ Remove routine copy/paste between ChatGPT and Codex while keeping every task sma
 ## Standard Flow
 
 1. A GitHub issue defines the business purpose and acceptance boundary.
-2. ChatGPT creates a dedicated task branch from the current safe `master` commit.
-3. ChatGPT writes the exact task into `.cse/tasks/<step>_task.md`.
-4. Codex reads that task file from the repository and performs only the authorized work.
-5. Codex writes `.cse/results/<step>_result.md` and updates `.cse/state/project_state.json`.
-6. Codex commits and pushes only when the task explicitly authorizes it.
-7. A draft pull request is opened against `master`.
-8. ChatGPT reviews the PR diff, scope, result report, checks, and review boundaries directly from GitHub.
-9. Merge requires explicit user approval.
+2. Codex works from the official local repository first:
+
+   ```text
+   V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer
+   ```
+
+3. Before branch changes, pulls, edits, commits, or pushes, Codex inspects the local working tree. If unexpected tracked, staged, or untracked project changes exist, Codex stops and reports them instead of resetting, cleaning, stashing, deleting, or overwriting.
+4. Codex fetches and fast-forwards local `master` before branch work:
+
+   ```powershell
+   git fetch origin --prune
+   git checkout master
+   git pull --ff-only origin master
+   ```
+
+5. Codex verifies local `master`, `origin/master`, and divergence evidence before creating or checking out the step branch locally.
+6. Codex creates the task file and all authorized project files physically in the official local working tree. GitHub-only file creation is incomplete.
+7. Codex performs only the authorized work, writes `.cse/results/<step>_result.md`, and updates `.cse/state/project_state.json` locally.
+8. Codex runs tests and all safety checks locally, including protected path diff, `exports/`, ignored ZIP, and branch divergence checks.
+9. Codex commits and pushes from the official local repository only when the task explicitly authorizes it.
+10. A draft pull request is opened against `master` only when the task/issue authorizes that actor to do so.
+11. ChatGPT reviews the PR diff, scope, result report, checks, and review boundaries directly from GitHub.
+12. Merge requires explicit user approval.
+13. After a merge, Codex must fast-forward local `master` before starting the next step.
 
 ## Source of Truth
 
 - Git history and the current pull request are the change source of truth.
+- The official local repository is the execution source of truth for project file creation, edits, verification, commit, and push.
+- GitHub is the synchronized remote and review surface; GitHub-only project file changes do not count as completion.
 - `.cse/tasks/` contains authorized work definitions.
 - `.cse/results/` contains execution reports.
 - `.cse/templates/` contains canonical reusable task and result templates.
@@ -30,12 +48,18 @@ Remove routine copy/paste between ChatGPT and Codex while keeping every task sma
 ## Safety Rules
 
 - Never work directly on `master` for a new technical step.
+- Before branch changes, pulls, edits, commits, or pushes, inspect tracked, staged, untracked, and ignored local status.
+- Stop and report unexpected tracked, staged, or untracked project changes. Do not automatically reset, clean, stash, delete, or overwrite user work.
+- Fast-forward local `master` from `origin/master` before creating or checking out a new step branch.
+- Create/check out step branches locally and verify local/remote divergence evidence.
+- Create all task, result, state, documentation, and project files physically in the official local working tree.
 - Never expand scope beyond the task file.
 - Never commit or push unless the task grants that permission.
 - Production code changes require corresponding tests.
 - Tests and `git diff --check` must pass before a change is proposed as safe.
 - `exports/` must not receive unintended output.
 - Ignored ZIP files must not be staged, deleted, renamed, or committed.
+- After a merge, fast-forward local `master` before starting the next step.
 - Hard validation, blocking behavior, migration, database/repository access, audit behavior, backup/restore, API, GUI, or CLI work requires explicit task scope.
 
 ## Naming

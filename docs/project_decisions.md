@@ -1,5 +1,22 @@
 # Proje Kararlari
 
+## 203 Official Local Sync Protocol Karari
+
+- Adim 203, Issue #21 talimatina gore official local working copy protokolunu documentation-only olarak sabitler.
+- Official local repository path `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer` proje dosyasi olusturma, duzenleme, verification, commit ve push icin primary working copy olarak kaydedilir.
+- GitHub connector veya web/API uzerinden olusturulan dosyalar tek basina completion sayilmaz; GitHub synchronized remote ve review surface olarak kalir.
+- `.cse/README.md` standard flow'u local-first hale getirir; ChatGPT/GitHub-only branch veya task creation completion olarak kabul edilmez.
+- `.cse/templates/task_template.md` future task'lar icin local-first precondition, master sync evidence, local branch creation, local file presence, divergence ve post-merge sync boundary alanlarini zorunlu hale getirir.
+- `.cse/templates/result_template.md` future result report'lari icin official local path, synchronized master SHA, branch SHA, divergence, local file presence, verification, protected paths, exports, ZIP, final working tree ve push result raporlamasini zorunlu hale getirir.
+- Branch degistirme veya pull oncesinde `git status --short --branch` ve ignored/untracked gorunurluk ile local working tree incelenmelidir.
+- Unexpected tracked, staged veya untracked project changes varsa Codex durup raporlamalidir; otomatik reset, clean, stash, delete veya overwrite yapmamalidir.
+- Existing ignored ZIP emergency/offline artifact olarak kalir ve normal step calismasinda dokunulmaz.
+- Local `master` sadece fast-forward-only sync ile `origin/master` durumuna getirilir; Adim 203 icin beklenen synchronized master commit `a5fcadf1108dce409d7a1ddd9928b6a9cbb730c9` olarak kaydedilir.
+- Work branch `step-203-official-local-sync-protocol`, synchronized `master` uzerinden localde olusturulur.
+- Required local verification `python -m pytest`, `git diff --check`, protected-path diff, changed-file scope, exports cleanliness, ZIP untouched status, divergence ve final working-tree status raporlamasini kapsar.
+- Issue #21 kapsaminda Codex draft PR acmaz; branch push edilir ve ChatGPT review / PR acma sureci ayri kalir.
+- Production code, tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, export output, ZIP mutasyonu ve merge behavior eklenmez.
+
 ## 202 Canonical Handover QC View-Model Examples and Wording Karari
 
 - Adim 202, future handover QC presentation view-model consumer'lari icin canonical example ve wording standardizasyonunu documentation-only olarak hazirlar.

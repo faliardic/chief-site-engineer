@@ -10,7 +10,56 @@ Describe one small, testable, reversible outcome.
 - Base branch: `master`
 - Expected base commit: `<sha>`
 - Working branch: `step-NNN-<purpose>`
-- Local working directory: `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer`
+- Official local working directory: `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer`
+
+## Local-First Preconditions
+
+- Work must start from the official local repository.
+- GitHub-only project file creation or editing is incomplete.
+- Before branch changes, pulls, edits, commits, or pushes, inspect:
+
+```powershell
+git status --short --branch
+git status --ignored --short --untracked-files=all
+```
+
+- If unexpected tracked, staged, or untracked project changes exist, stop and report them. Do not reset, clean, stash, delete, or overwrite.
+- Existing ignored ZIP files must remain untouched.
+
+## Required Master Synchronization
+
+Run from the official local repository before branch work:
+
+```powershell
+git fetch origin --prune
+git checkout master
+git pull --ff-only origin master
+git rev-parse master
+git rev-parse origin/master
+git rev-list --left-right --count origin/master...master
+```
+
+Required evidence:
+
+- Local `master` SHA: `<sha>`
+- `origin/master` SHA: `<sha>`
+- Master divergence: `0 0`
+
+## Local Branch Requirement
+
+- Create or check out the step branch locally after synchronized `master`.
+- Record branch creation source and branch SHA.
+- Verify local/remote divergence after push:
+
+```powershell
+git rev-parse HEAD
+git rev-parse origin/step-NNN-<purpose>
+git rev-list --left-right --count origin/step-NNN-<purpose>...HEAD
+```
+
+## Physical Local File Requirement
+
+All task, result, state, documentation, and project files for this step must physically exist in the official local working tree before completion.
 
 ## Reasoning Level
 
@@ -19,6 +68,9 @@ Describe one small, testable, reversible outcome.
 
 ## Authorized Changes
 
+- `.cse/tasks/NNN_task.md`
+- `.cse/results/NNN_result.md`
+- `.cse/state/project_state.json`
 - `<path or file group>`
 
 ## Required Work
@@ -30,10 +82,13 @@ Describe one small, testable, reversible outcome.
 
 - `python -m pytest`
 - `git diff --check`
-- Confirm staged files match scope.
+- `git diff -- app/models.py tests/test_models.py .github/workflows/pytest.yml` must be empty unless explicitly authorized.
+- Confirm changed/staged files match scope.
 - Confirm `exports/` is clean unless explicitly authorized.
 - Confirm ignored ZIP files remain untouched.
-- Confirm unrelated production code and tests are unchanged.
+- Confirm required files physically exist in the official local working tree.
+- Confirm local/remote branch divergence is reported.
+- Confirm final working tree status is reported.
 
 ## Forbidden Scope
 
@@ -53,6 +108,11 @@ Unless explicitly authorized, do not add or modify:
 - Commit: `<allowed|not allowed>`
 - Push: `<allowed|not allowed>`
 - Pull request: `<draft|required|not allowed>`
+- Merge: `<allowed|not allowed>`
+
+## Post-Merge Sync Boundary
+
+After merge, local `master` must be fast-forwarded from `origin/master` before any next step begins. Do not start future work from stale local `master`.
 
 ## Required Result Files
 
@@ -63,6 +123,9 @@ Unless explicitly authorized, do not add or modify:
 
 - Work stays inside scope.
 - Required checks pass.
+- Local `master` sync evidence is recorded.
+- Branch divergence evidence is recorded.
+- Required files exist physically in the official local working tree.
 - Result report is complete and factual.
 - No unrelated files change.
 - The branch is ready for ChatGPT review.
