@@ -64,6 +64,25 @@ class TrackingRecord:
 
 
 @dataclass
+class FieldObservationRecord:
+    """Represents a fast official field observation for the first Field MVP."""
+
+    observation_id: str
+    project_id: str
+    observed_at: str
+    location: str
+    category: str
+    description: str
+    status: str = "open"
+    reported_to: str | None = None
+    reported_at: str | None = None
+    created_by: str | None = None
+    closed_at: str | None = None
+    notes: str | None = None
+    is_archived: bool = False
+
+
+@dataclass
 class ArchiveDocument:
     """Represents an archived project document."""
 

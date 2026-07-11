@@ -23,7 +23,7 @@ Bu kaynak hazırlanırken aşağıdaki proje kaynakları birlikte incelenmiştir
 5. `CSE_STRATEGIC_PRODUCT_DIRECTION.md`
 6. `CSE_GUNCEL_PROJE_TALIMATLARI.md`
 7. `STEP_204_CODEX_DUZELTME_TALIMATI.md`
-8. Bu sohbet içinde kesinleştirilen Step 206, Step 207 ve Step 208 kararları
+8. Bu sohbet içinde kesinleştirilen Step 206, Step 207, Step 208 ve Step 209 kararları
 9. Güncel GitHub Issue/PR/merge gerçekliği
 
 ### Kaynakların kullanım biçimi
@@ -940,13 +940,13 @@ Gerçek şantiye
 
 ### Son doğrulanmış merged GitHub noktası
 
-- Step: **207**
-- PR: **#31**
-- Issue: **#30**
+- Step: **208**
+- PR: **#33**
+- Issue: **#32**
 - Merge commit:
 
 ```text
-23baddf413e1cdf5a5e5564fe4a559954572e45f
+335fb83c989f3fbf1057d88ebe02045174efcdc9
 ```
 
 - Son doğrulanan test seviyesi: **413 passed**
@@ -955,22 +955,22 @@ Gerçek şantiye
 
 ### Yerel senkronizasyon durumu
 
-Step 208 baslangicinda resmî `V:` yerel master `23baddf413e1cdf5a5e5564fe4a559954572e45f` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
+Step 209 baslangicinda resmî `V:` yerel master `335fb83c989f3fbf1057d88ebe02045174efcdc9` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
 
 ### Aktif iş
 
-- Step: **208**
-- Issue: **#32**
-- Amaç: ilk Field MVP icin `FieldObservationRecord` documentation-level contract'ini tanimlamak
+- Step: **209**
+- Issue: **#34**
+- Amaç: ilk Field MVP icin minimal `FieldObservationRecord` dataclass ve focused value/default testlerini eklemek
 - Branch:
 
 ```text
-step-208-first-field-mvp-observation-contract
+step-209-field-observation-record-model
 ```
 
-- Bu adim documentation/state/contract-only isidir.
-- Field-MVP implementation baslamamistir.
-- Step 209, bu contract review edilip merge edildikten sonra onerilen implementation adimidir.
+- Bu adim narrow model/test isidir.
+- Field-MVP implementation yalniz minimal `FieldObservationRecord` dataclass ve focused test kapsaminda baslamistir.
+- Attachment linking, repository/persistence, export/reporting, API/GUI/CLI, audit ve validation henuz uygulanmamistir.
 
 ---
 
@@ -1008,7 +1008,7 @@ step-208-first-field-mvp-observation-contract
 
 ### 29.7 Eski aktif Step bilgileri
 
-Step 203, 204, 205, 206 ve aktif Step 207 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 207’dir; Step 208 aktif unmerged contract aşamasındadır.
+Step 203, 204, 205, 206, 207 ve aktif Step 208 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 208’dir; Step 209 aktif unmerged model/test aşamasındadır.
 
 ### 29.8 Eski modül sırasının bağlayıcı olması
 

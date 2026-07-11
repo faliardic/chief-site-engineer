@@ -1,30 +1,30 @@
 {
-  "step": 208,
+  "step": 209,
   "base_branch": "master",
-  "base_commit": "23baddf413e1cdf5a5e5564fe4a559954572e45f",
+  "base_commit": "335fb83c989f3fbf1057d88ebe02045174efcdc9",
   "active_work": {
-    "issue": 32,
-    "step": 208,
-    "branch": "step-208-first-field-mvp-observation-contract",
-    "documentation_state_contract_only": true,
-    "field_mvp_implementation_started": false,
-    "merge_claim_for_step_208": false
+    "issue": 34,
+    "step": 209,
+    "branch": "step-209-field-observation-record-model",
+    "model_test_work": true,
+    "field_mvp_implementation_scope": "minimal_field_observation_record_dataclass_only",
+    "merge_claim_for_step_209": false
   },
   "current_safe_point": {
     "semantics": "latest_merged_finalized_checkpoint",
-    "step": 207,
-    "issue": 30,
+    "step": 208,
+    "issue": 32,
     "issue_state": "completed",
-    "pull_request": 31,
+    "pull_request": 33,
     "pull_request_state": "merged",
-    "merge_commit": "23baddf413e1cdf5a5e5564fe4a559954572e45f",
+    "merge_commit": "335fb83c989f3fbf1057d88ebe02045174efcdc9",
     "local_test_summary": "413 passed"
   },
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
-    "local_master_sha": "23baddf413e1cdf5a5e5564fe4a559954572e45f",
-    "origin_master_sha": "23baddf413e1cdf5a5e5564fe4a559954572e45f",
+    "local_master_sha": "335fb83c989f3fbf1057d88ebe02045174efcdc9",
+    "origin_master_sha": "335fb83c989f3fbf1057d88ebe02045174efcdc9",
     "divergence": "0 0",
     "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
     "misspelled_workspace_present": false,
@@ -113,6 +113,14 @@
       "task_208": true,
       "new_chat_bootstrap": false
     },
+    "step_209_sources_read": {
+      "unified_project_source": true,
+      "project_instructions": true,
+      "github_issue_34_with_scope_comments": true,
+      "task_209": true,
+      "step_208_contract": true,
+      "new_chat_bootstrap": false
+    },
     "unresolved_conflict_found": false
   },
   "canonical_project_instructions": {
@@ -156,6 +164,7 @@
     "product_rule": "reliable_data_backbone_first_automation_later_ai_last",
     "field_mvp_implementation_started_in_step_207": false,
     "field_mvp_implementation_started_in_step_208": false,
+    "field_mvp_implementation_started_in_step_209": true,
     "next_product_direction": {
       "name": "first_field_mvp",
       "scope": [
@@ -198,11 +207,41 @@
       "private_area_record": false,
       "implementation_started": false,
       "recommended_next_step": 209
+    },
+    "field_observation_record_model": {
+      "status": "implemented_minimal_dataclass",
+      "path": "app/models.py",
+      "future_model_name": "FieldObservationRecord",
+      "tests_path": "tests/test_models.py",
+      "implementation_scope": [
+        "minimal_dataclass",
+        "required_value_holding",
+        "default_value_holding",
+        "optional_lifecycle_value_holding",
+        "documented_status_value_holding"
+      ],
+      "not_implemented": [
+        "post_init_validation",
+        "enum_or_constants",
+        "hard_validation",
+        "whitespace_validation",
+        "date_parsing",
+        "project_lookup",
+        "contact_lookup",
+        "automatic_normalization",
+        "attachment_creation",
+        "embedded_attachment_fields",
+        "repository_persistence",
+        "export_reporting",
+        "api_gui_cli",
+        "audit",
+        "generated_blocked"
+      ]
     }
   },
   "protected_paths": {
-    "app/models.py": "unchanged",
-    "tests/test_models.py": "unchanged",
+    "app/models.py": "authorized_step_209_change",
+    "tests/test_models.py": "authorized_step_209_change",
     ".github/workflows/pytest.yml": "unchanged"
   },
   "exports": {
@@ -217,20 +256,22 @@
     "pull_request_creation_by_codex": false,
     "merge_authorized": false,
     "branch_deletion_authorized": false,
-    "final_remote_sha_evidence_location": "GitHub Issue #32 completion comment after push"
+    "final_remote_sha_evidence_location": "GitHub Issue #34 completion comment after push"
   },
   "required_files": [
-    ".cse/tasks/208_task.md",
-    ".cse/results/208_result.md",
+    ".cse/tasks/209_task.md",
+    ".cse/results/209_result.md",
     ".cse/state/project_state.json",
+    "app/models.py",
+    "tests/test_models.py",
     "docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md",
     "README.md",
     "ROADMAP.md",
     "CHANGELOG.md",
     "docs/project_decisions.md",
-    "docs/208_first_field_mvp_observation_record_contract.md",
-    "learning/208_first_field_mvp_observation_record_contract.md"
+    "docs/209_field_observation_record_model_implementation.md",
+    "learning/209_field_observation_record_model_implementation.md"
   ],
-  "workflow_status": "step_208_contract_work_in_progress_before_final_verification",
+  "workflow_status": "step_209_model_test_work_in_progress_before_final_verification",
   "forbidden_scope_added": false
 }

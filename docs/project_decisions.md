@@ -1,5 +1,18 @@
 # Proje Kararlari
 
+## 209 Minimal FieldObservationRecord Model Karari
+
+- `FieldObservationRecord`, ilk Field MVP resmi hizli saha gozlem kaydi icin minimal dataclass olarak `app/models.py` icine eklendi.
+- Required constructor fields: `observation_id`, `project_id`, `observed_at`, `location`, `category`, `description`.
+- Defaults: `status = "open"`, optional context/lifecycle fields `None`, `is_archived = False`.
+- `open`, `tracking` ve `closed` lifecycle degerleri validation yan etkisi olmadan oldugu gibi tutulur.
+- Focused testler minimal construction/default, optional/lifecycle field value holding ve documented status value holding davranisini dogrular.
+- Step 209, Field MVP implementasyonunu yalniz bu dar dataclass/test kapsaminda baslatir.
+- Attachment linking, repository/persistence, export/reporting, API/GUI/CLI, audit, structured location/contact normalization ve validation henuz uygulanmamistir.
+- Step 208, PR #33 squash merge commit `335fb83c989f3fbf1057d88ebe02045174efcdc9` ile latest merged/finalized safe point'tir; Issue #32 completed olarak kaydedilir.
+- Step 209, Issue #34 ve `step-209-field-observation-record-model` branch'i uzerinde aktif unmerged model/test isidir.
+- Step 210 baslatilmaz; ek Field-MVP model, repository, persistence, attachment integration veya validation eklenmez.
+
 ## 208 First Field MVP Observation Record Contract Karari
 
 - `FieldObservationRecord`, ilk Field MVP hizli saha gozlem kaydi icin gelecekte eklenecek resmi/proje kaydi contract'i olarak tanimlanir.

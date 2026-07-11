@@ -24,6 +24,7 @@ from app.models import (
     DailySiteLog,
     EquipmentRecord,
     AttachmentStatus,
+    FieldObservationRecord,
     FileAttachmentRecord,
     FileType,
     InspectionRequest,
@@ -3427,6 +3428,72 @@ def test_tracking_record_holds_values_and_defaults() -> None:
     assert record.date == "2026-06-05"
     assert record.responsible_party is None
     assert record.status == "open"
+
+
+def test_field_observation_record_holds_required_values_and_defaults() -> None:
+    observation = FieldObservationRecord(
+        observation_id="obs-001",
+        project_id="prj-001",
+        observed_at="2026-07-11T18:30:00",
+        location="A Blok 2. Kat",
+        category="quality",
+        description="Kalip birlesiminde aciklik goruldu.",
+    )
+
+    assert observation.observation_id == "obs-001"
+    assert observation.project_id == "prj-001"
+    assert observation.observed_at == "2026-07-11T18:30:00"
+    assert observation.location == "A Blok 2. Kat"
+    assert observation.category == "quality"
+    assert observation.description == "Kalip birlesiminde aciklik goruldu."
+    assert observation.status == "open"
+    assert observation.reported_to is None
+    assert observation.reported_at is None
+    assert observation.created_by is None
+    assert observation.closed_at is None
+    assert observation.notes is None
+    assert observation.is_archived is False
+
+
+def test_field_observation_record_holds_optional_lifecycle_values() -> None:
+    observation = FieldObservationRecord(
+        observation_id="obs-002",
+        project_id="prj-001",
+        observed_at="2026-07-11T18:45:00",
+        location="B Blok Saha Girisi",
+        category="coordination",
+        description="Malzeme istif alani icin koordinasyon notu.",
+        status="tracking",
+        reported_to="Saha formeni",
+        reported_at="2026-07-11T18:50:00",
+        created_by="Santiye sefi",
+        closed_at="2026-07-12T09:00:00",
+        notes="Sabah toplantisinda tekrar kontrol edilecek.",
+        is_archived=True,
+    )
+
+    assert observation.status == "tracking"
+    assert observation.reported_to == "Saha formeni"
+    assert observation.reported_at == "2026-07-11T18:50:00"
+    assert observation.created_by == "Santiye sefi"
+    assert observation.closed_at == "2026-07-12T09:00:00"
+    assert observation.notes == "Sabah toplantisinda tekrar kontrol edilecek."
+    assert observation.is_archived is True
+
+
+def test_field_observation_record_holds_documented_status_values() -> None:
+    for status in ("open", "tracking", "closed"):
+        observation = FieldObservationRecord(
+            observation_id=f"obs-{status}",
+            project_id="prj-001",
+            observed_at="2026-07-11T19:00:00",
+            location="C Blok",
+            category="progress",
+            description="Gunluk saha gozlem kaydi.",
+            status=status,
+        )
+
+        assert observation.status == status
 
 
 def test_archive_document_holds_values_and_defaults() -> None:

@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 209
+
+- Added minimal `FieldObservationRecord` dataclass to `app/models.py` for the first Field MVP official fast observation record.
+- Added focused value/default tests proving minimal construction defaults, optional/lifecycle field storage, and documented `open` / `tracking` / `closed` status value holding without validation side effects.
+- Updated repository truth so Step 208 / PR #33 / Issue #32 / merge commit `335fb83c989f3fbf1057d88ebe02045174efcdc9` is the latest merged/finalized safe point and Step 209 remains active unmerged model/test work.
+- Recorded that `FieldObservationRecord` implementation has started only in this narrow dataclass/test scope.
+- Kept Podcast 031 as latest and the next podcast range as Steps 206-210.
+- Kept this scope narrow; no repository/persistence, attachment service or embedded attachment fields, structured location/contact relationships, export/report generation, API/GUI/CLI, audit, backup/restore, migration, hard validation, generated `blocked`, workflow changes, Actions enablement, ZIP mutation, Desktop archive mutation, Step 210, or additional Field-MVP model was added.
+
 ## Step 208
 
 - Added documentation-level `FieldObservationRecord` future model contract for the first Field MVP fast observation record.
