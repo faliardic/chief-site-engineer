@@ -23,6 +23,7 @@ Remove routine copy/paste between ChatGPT and Codex while keeping every task sma
 - Git history and the current pull request are the change source of truth.
 - `.cse/tasks/` contains authorized work definitions.
 - `.cse/results/` contains execution reports.
+- `.cse/templates/` contains canonical reusable task and result templates.
 - `.cse/state/project_state.json` contains the latest machine-readable handoff state.
 - ZIP files are emergency/offline backups only and must remain outside tracked repository scope.
 
