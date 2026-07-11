@@ -22,7 +22,7 @@
 - Defined one narrow next technical recommendation without implementation.
 
 ## Verification
-- Full tests: `python -m pytest` -> `413 passed in 1.95s`
+- Full tests: `python -m pytest` -> `413 passed in 1.84s`
 - `git diff --check`: passed
 - Protected path diff (`app/models.py`, `tests/test_models.py`, `.github/workflows/pytest.yml`): empty
 - Changed-file scope: authorized documentation/state files only

@@ -71,7 +71,7 @@
   "tests": {
     "command": "python -m pytest",
     "result": "passed",
-    "summary": "413 passed in 1.95s"
+    "summary": "413 passed in 1.84s"
   },
   "tests_changed": false,
   "workflow_changed": false,
