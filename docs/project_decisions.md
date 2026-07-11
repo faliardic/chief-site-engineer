@@ -1,5 +1,17 @@
 # Proje Kararlari
 
+## 204 Handover QC Fixture Assertion Plan Karari
+
+- Adim 204, Issue #23 talimatina gore future handover QC presentation view-model icin fixture naming and assertion checklist planini documentation-only olarak sabitler.
+- Structured source of truth `build_export_handover_qc_review_checklist(summary, report)` ciktisi olarak kalir.
+- `format_export_handover_qc_review_checklist_as_markdown(checklist)` optional display-only Markdown olarak kalir; future consumer Markdown'u structured truth olarak parse etmemelidir.
+- Future fixture isimleri `handover_qc_view_model_success_only`, `handover_qc_view_model_failure_only`, `handover_qc_view_model_mixed`, `handover_qc_view_model_empty_zero_count`, `handover_qc_view_model_missing_optional_fields`, `handover_qc_view_model_unknown_status_additional_fields` ve `handover_qc_view_model_unsupported_input_fallback` olarak ayrilir.
+- Assertion checklist source contract, status label, human-review indicator, read-only/non-blocking notice, item row fallback, empty state, unknown status visibility, official/private transfer boundary, forbidden decision fields, no side effects, input immutability, no recomputation, no generated `blocked` status ve no automatic package decision logic basliklarini kapsar.
+- Future fixture metadata alanlari `source_checklist_case`, `expected_view_model_case`, `required_assertions`, `forbidden_fields`, `transfer_boundary_assertions` ve `side_effect_assertions` olarak planlanir.
+- `approved`, `rejected`, `blocked`, `official_decision`, `package_blocked`, `audit_event_id`, `persisted_at` ve `export_written` gibi decision veya side-effect field'lari future view-model contract disinda tutulur.
+- Executable fixtures, executable tests, production implementation veya workflow degisikligi yalniz ayri ve acik yetkilendirilmis future task ile eklenebilir.
+- Production code, tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, file/export output, ZIP mutasyonu, PR creation ve merge behavior eklenmez.
+
 ## 203 Official Local Sync Protocol Karari
 
 - Adim 203, Issue #21 talimatina gore official local working copy protokolunu documentation-only olarak sabitler.

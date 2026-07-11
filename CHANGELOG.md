@@ -1,5 +1,18 @@
 # Changelog
 
+## Step 204
+
+- Added documentation-only fixture naming and assertion checklist plan for a future handover QC presentation view-model implementation.
+- Added `.cse/tasks/204_task.md`.
+- Added `docs/204_handover_qc_fixture_assertion_plan.md`.
+- Added `learning/204_handover_qc_fixture_assertion_plan.md`.
+- Added `.cse/results/204_result.md`.
+- Updated `.cse/state/project_state.json`, `ROADMAP.md`, `CHANGELOG.md`, and `docs/project_decisions.md`.
+- Reserved future fixture names for success-only, failure-only, mixed, empty/zero-count, missing optional fields, unknown status/additional fields, and unsupported input fallback cases.
+- Defined assertion categories for structured checklist source of truth, optional Markdown display-only handling, status labels, human-review indicators, read-only/non-blocking notices, fallback wording, transfer boundary, forbidden decision fields, side-effect absence, input immutability, no recomputation, no generated `blocked` status, and no automatic package decision logic.
+- Recorded that executable fixtures/tests may only be added by a future explicitly authorized task.
+- Kept this as documentation/state-only; no production code, tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, export output, ZIP mutation, PR creation, or merge behavior was added.
+
 ## Step 203
 
 - Added documentation-only official local sync protocol required by Issue #21.

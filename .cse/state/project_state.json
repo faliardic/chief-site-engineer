@@ -1,15 +1,15 @@
 {
   "base_branch": "master",
-  "base_commit": "a5fcadf1108dce409d7a1ddd9928b6a9cbb730c9",
-  "branch": "step-203-official-local-sync-protocol",
+  "base_commit": "583f8539d9522027f1578a91b0298a8bdf21a1c9",
+  "branch": "step-204-handover-qc-fixture-assertion-plan",
   "current_safe_point": {
-    "merge_commit": "a5fcadf1108dce409d7a1ddd9928b6a9cbb730c9",
+    "merge_commit": "583f8539d9522027f1578a91b0298a8bdf21a1c9",
     "semantics": "latest_merged_master_checkpoint",
-    "step": 202
+    "step": 203
   },
   "diff_check": {
     "command": "git diff --check",
-    "result": "passed"
+    "result": "passed_exit_0_with_autocrlf_warning_for_project_state_json"
   },
   "exports": {
     "contents": [
@@ -17,49 +17,83 @@
     ],
     "result": "clean"
   },
-  "forbidden_scope_added": false,
-  "issue": 21,
-  "merge_authorized": false,
-  "next_action": "Push branch step-203-official-local-sync-protocol for ChatGPT inspection and draft PR creation; do not merge.",
-  "official_local_sync_protocol": {
+  "fixture_assertion_plan": {
     "documentation_only": true,
+    "executable_fixtures_created": false,
+    "tests_changed": false,
+    "production_code_changed": false,
+    "workflow_changed": false,
+    "source_of_truth": "build_export_handover_qc_review_checklist(summary, report)",
+    "optional_markdown_display_only": "format_export_handover_qc_review_checklist_as_markdown(checklist)",
+    "future_fixture_names": [
+      "handover_qc_view_model_success_only",
+      "handover_qc_view_model_failure_only",
+      "handover_qc_view_model_mixed",
+      "handover_qc_view_model_empty_zero_count",
+      "handover_qc_view_model_missing_optional_fields",
+      "handover_qc_view_model_unknown_status_additional_fields",
+      "handover_qc_view_model_unsupported_input_fallback"
+    ],
+    "assertion_categories": [
+      "structured_source_contract",
+      "optional_markdown_display_only",
+      "status_label_wording",
+      "human_review_indicator_wording",
+      "read_only_notice",
+      "non_blocking_notice",
+      "item_row_fallbacks",
+      "empty_state_wording",
+      "unknown_status_visibility_only",
+      "official_private_transfer_boundary",
+      "forbidden_decision_fields",
+      "no_side_effects",
+      "input_immutability",
+      "no_recomputation",
+      "no_generated_blocked_status",
+      "no_automatic_acceptance_rejection_or_package_blocking"
+    ],
+    "future_metadata_fields": [
+      "source_checklist_case",
+      "expected_view_model_case",
+      "required_assertions",
+      "forbidden_fields",
+      "transfer_boundary_assertions",
+      "side_effect_assertions"
+    ],
+    "forbidden_fields": [
+      "approved",
+      "rejected",
+      "blocked",
+      "official_decision",
+      "package_blocked",
+      "audit_event_id",
+      "persisted_at",
+      "export_written"
+    ],
+    "future_test_conversion_boundary": "A future step may convert this plan into executable fixtures and tests only with explicit authorization."
+  },
+  "forbidden_scope_added": false,
+  "issue": 23,
+  "merge_authorized": false,
+  "next_action": "Push branch step-204-handover-qc-fixture-assertion-plan for ChatGPT inspection and draft PR creation; do not open or merge a PR from Codex.",
+  "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "github_only_changes_count_as_completion": false,
-    "github_role": "synchronized_remote_and_review_surface",
-    "local_role": "primary_working_copy_for_files_verification_commit_and_push",
-    "pre_change_safety_rule": "inspect tracked staged untracked and ignored status before branch changes pulls edits or commits; stop and report unexpected project changes",
-    "automatic_reset_clean_stash_delete_or_overwrite_allowed": false,
     "master_sync": {
-      "command_sequence": [
-        "git fetch origin --prune",
-        "git checkout master",
-        "git pull --ff-only origin master"
-      ],
-      "expected_master_sha": "a5fcadf1108dce409d7a1ddd9928b6a9cbb730c9",
-      "local_master_sha_after_pull": "a5fcadf1108dce409d7a1ddd9928b6a9cbb730c9",
-      "origin_master_sha_after_fetch": "a5fcadf1108dce409d7a1ddd9928b6a9cbb730c9",
+      "expected_master_sha": "583f8539d9522027f1578a91b0298a8bdf21a1c9",
+      "local_master_sha_after_pull": "583f8539d9522027f1578a91b0298a8bdf21a1c9",
+      "origin_master_sha_after_fetch": "583f8539d9522027f1578a91b0298a8bdf21a1c9",
       "divergence_after_sync": "0 0"
     },
     "branch": {
-      "name": "step-203-official-local-sync-protocol",
+      "name": "step-204-handover-qc-fixture-assertion-plan",
       "created_from": "synchronized_master",
-      "initial_sha": "a5fcadf1108dce409d7a1ddd9928b6a9cbb730c9"
+      "initial_sha": "583f8539d9522027f1578a91b0298a8bdf21a1c9"
     },
-    "required_verification": [
-      "python -m pytest",
-      "git diff --check",
-      "git diff -- app/models.py tests/test_models.py .github/workflows/pytest.yml",
-      "changed_file_scope",
-      "exports_clean",
-      "ignored_zip_untouched",
-      "branch_divergence",
-      "final_working_tree_status"
-    ],
-    "protocol_files_updated": [
-      ".cse/README.md",
-      ".cse/templates/task_template.md",
-      ".cse/templates/result_template.md"
-    ],
+    "pre_change_status": {
+      "git_status_short_branch": "## step-204-handover-qc-fixture-assertion-plan",
+      "git_status_ignored_short_untracked_all": "!! chief-site-engineer_adim_080_guvenli_nokta.zip"
+    },
     "existing_ignored_zip": "chief-site-engineer_adim_080_guvenli_nokta.zip",
     "codex_opens_draft_pr": false
   },
@@ -70,61 +104,41 @@
     "tests/test_models.py": "unchanged"
   },
   "protocol_version": 1,
-  "pull_request": 22,
-  "pull_request_state": "open_draft",
-  "step": 203,
+  "pull_request": null,
+  "pull_request_state": "not_created_by_codex_issue_23_instruction",
+  "required_files": [
+    ".cse/tasks/204_task.md",
+    "docs/204_handover_qc_fixture_assertion_plan.md",
+    "learning/204_handover_qc_fixture_assertion_plan.md",
+    ".cse/results/204_result.md",
+    ".cse/state/project_state.json",
+    "ROADMAP.md",
+    "CHANGELOG.md",
+    "docs/project_decisions.md"
+  ],
+  "step": 204,
   "tests": {
     "command": "python -m pytest",
-    "result": "passed",
-    "summary": "413 passed in 2.04s"
+    "result": "pending",
+    "summary": "pending"
   },
   "tests_changed": false,
   "workflow_changed": false,
-  "workflow_status": "pushed_branch_for_chatgpt_pr_creation",
-  "final_post_push_evidence": {
-    "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
-    "synchronized_local_master_sha": "a5fcadf1108dce409d7a1ddd9928b6a9cbb730c9",
-    "origin_master_sha": "a5fcadf1108dce409d7a1ddd9928b6a9cbb730c9",
-    "master_divergence": "0 0",
-    "local_result_branch_sha_verified_before_finalization": "e5030c0bef6eda1e6c5dc2230964a8eb7d3111ce",
-    "remote_result_branch_sha_verified_before_finalization": "e5030c0bef6eda1e6c5dc2230964a8eb7d3111ce",
-    "branch_divergence_after_push_verified_before_finalization": "0 0",
-    "push_result": "pushed_to_origin_step-203-official-local-sync-protocol",
-    "pull_request": 22,
-    "pull_request_state": "open_draft",
-    "required_files_physically_present_locally": [
-      ".cse/README.md",
-      ".cse/templates/task_template.md",
-      ".cse/templates/result_template.md",
-      ".cse/tasks/203_task.md",
-      "docs/203_official_local_sync_protocol.md",
-      "learning/203_official_local_sync_protocol.md",
-      ".cse/results/203_result.md",
-      ".cse/state/project_state.json",
-      "ROADMAP.md",
-      "CHANGELOG.md",
-      "docs/project_decisions.md"
-    ],
-    "exact_final_git_status_short_branch_before_finalization": "## step-203-official-local-sync-protocol...origin/step-203-official-local-sync-protocol",
-    "final_post_push_clean_status_before_finalization": "tracked_working_tree_clean_only_existing_ignored_zip_present",
-    "existing_ignored_zip": "chief-site-engineer_adim_080_guvenli_nokta.zip"
-  },
+  "workflow_status": "documentation_state_only_verified_pending_commit_and_push",
   "working_tree": {
     "changes": [
-      "M .cse/README.md",
-      "M .cse/templates/task_template.md",
-      "M .cse/templates/result_template.md",
-      "A .cse/tasks/203_task.md",
-      "A docs/203_official_local_sync_protocol.md",
-      "A learning/203_official_local_sync_protocol.md",
-      "A .cse/results/203_result.md",
+      "A .cse/tasks/204_task.md",
+      "A docs/204_handover_qc_fixture_assertion_plan.md",
+      "A learning/204_handover_qc_fixture_assertion_plan.md",
+      "A .cse/results/204_result.md",
       "M .cse/state/project_state.json",
       "M ROADMAP.md",
       "M CHANGELOG.md",
       "M docs/project_decisions.md"
     ],
     "ignored_files_remaining": 1,
-    "result": "clean_after_push"
+    "required_files_physically_present": true,
+    "result": "authorized_step_204_documentation_state_changes_before_commit"
   },
   "zip": {
     "ignored_zip_touched": false,
