@@ -24,7 +24,7 @@ Remove routine copy/paste between ChatGPT and Codex while keeping every task sma
 - `.cse/tasks/` contains authorized work definitions.
 - `.cse/results/` contains execution reports.
 - `.cse/templates/` contains canonical reusable task and result templates.
-- `.cse/state/project_state.json` contains the latest machine-readable handoff state.
+- `.cse/state/project_state.json` contains the latest merged/finalized machine-readable checkpoint. Open draft work remains represented by its task file, result report, branch, issue, and pull request until it is merged and finalized.
 - ZIP files are emergency/offline backups only and must remain outside tracked repository scope.
 
 ## Safety Rules
