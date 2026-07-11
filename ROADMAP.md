@@ -3,11 +3,11 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 203 - Official Local Sync Protocol
-Merge commit: 583f8539d9522027f1578a91b0298a8bdf21a1c9
+Adim 204 - Handover QC Fixture Naming and Assertion Checklist Plan
+Merge commit: 7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3
 ```
 
-Adim 203, master uzerindeki guncel guvenli noktadir. Step 204, `docs/204_handover_qc_fixture_naming_and_assertion_checklist_plan.md` ve `learning/204_handover_qc_fixture_naming_and_assertion_checklist_plan.md` ile future handover QC fixture adlandirma, sahiplik/konum ve assertion checklist sinirlarini documentation/state-only olarak kaydeden acik branch calismasidir. Step 204 merge edilene kadar yeni guvenli nokta sayilmaz.
+Adim 204, PR #24 squash merge commit `7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3` ile master uzerindeki guncel guvenli noktadir. Step 205, canonical proje talimatlarini tracked hale getiren ve README/state/roadmap/changelog/karar gercegini bu merge ile esleyen aktif documentation/state-only branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -189,9 +189,9 @@ Guncel CI durumu:
 
 - CI workflow var: `.github/workflows/pytest.yml`.
 - Workflow kodu `git diff --check` ve `python -m pytest` kosacak sekilde tanimli.
-- GitHub-hosted runner calismasi su anda account billing lock nedeniyle runner startup oncesinde dissal olarak engelleniyor.
-- Bu durum pytest failure veya workflow kodu hatasi olarak yorumlanmiyor.
-- Required status checks, basarili bir GitHub Actions `pytest` kosusu olana kadar devre disi tutuluyor.
+- Otomatik GitHub Actions execution, account billing/runner-start kisiti nedeniyle manuel olarak devre disidir.
+- Yeni push sonrasinda Actions run olusmamasi beklenen davranistir; bu durum pytest failure veya workflow kodu hatasi olarak yorumlanmaz.
+- Required status checks devre disidir ve Step 205 bunlari etkinlestirmez.
 
 ## Henuz Olmayan Uretim Ozellikleri
 
@@ -443,8 +443,18 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 - [x] Adim 204 - Assertion checklist structured source of truth, optional Markdown display-only handling, status label, human-review indicator, read-only/non-blocking notice, fallback wording, transfer boundary, forbidden decision fields, no side effects, input immutability, no recomputation, no generated `blocked` status ve no automatic package decision behavior basliklarini kapsiyor.
 - [x] Adim 204 - Executable fixtures, executable tests, production code ve workflow degisikligi bu adimda eklenmedi; future conversion ayri explicit task gerektiriyor.
 
+## Canonical Project Instructions and Repository Truth Sync - Adim 205
+
+- [ ] Adim 205 - `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`, local-only source'tan initially derived canonical dosya olarak korunacak; Section 4 tracked fallback authority, Section 17 Step 204/205 truth ve GitHub-centered workflow icin intentionally adapted edilecek.
+- [ ] Adim 205 - Adaptation sonrasi equal SHA, equal line count veya full text equivalence iddiasi yapilmayacak; local-only source byte/hash unchanged kalacak.
+- [ ] Adim 205 - Kullanici `devam` dediginde ChatGPT GitHub state ve native actions'i yonetecek, Codex yalniz gerekli local project-file/test/commit-push/sync execution icin kullanilacak.
+- [ ] Adim 205 - README, machine-readable state, roadmap, changelog ve proje kararlari Step 204 merge commit `7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3` ile yeniden eslenecek.
+- [ ] Adim 205 - Workflow varligi, manuel disabled Actions durumu ve disabled required status checks ayri factual alanlar olarak kaydedilecek.
+- [ ] Adim 205 - CSE'nin tested domain/data/documentation core oldugu, field-ready application olmadigi ve eksik production capabilities acik tutulacak.
+- [ ] Adim 205 - Reliable data backbone first, automation later, AI last ilkesi ve ilk field-MVP yonu korunacak.
+
 ## Sonraki Calisma Onerisi
 
-Adim 204 sonrasi tek dar teknik onerim, fixture naming and assertion checklist planinin ChatGPT tarafindan incelenmesi ve gerekiyorsa ayri bir future task ile executable fixture/test conversion kapsam kararinin verilmesidir. Her yeni adim once official local sync protocol'u uygulamali; API/GUI/CLI implementation, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, file/export output veya official package decision behavior baslatmamalidir.
+Adim 205 merge edildikten sonraki urun yonu ilk field MVP'dir: hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary. Bu yon bu adimda implementation baslatmaz; her teknik parca ayri explicit task, test ve local-first verification ister.
 
-Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Son mevcut podcast notu Podcast 030'dur ve Adim 196-200 araligini kapsar. Adim 201 kapsaminda Podcast 030 olusturuldu.
+Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Son mevcut podcast notu Podcast 030'dur ve Adim 196-200 araligini kapsar. Podcast 031, Adim 201-205 araligini Adim 205 merge edildikten sonra ozetleyecek dogal documentation follow-up'tur.

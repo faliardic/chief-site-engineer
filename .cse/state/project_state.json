@@ -1,11 +1,56 @@
 {
+  "active_work": {
+    "branch": "step-205-project-instructions-truth-sync",
+    "documentation_state_only": true,
+    "issue": 25,
+    "step": 205
+  },
   "base_branch": "master",
-  "base_commit": "583f8539d9522027f1578a91b0298a8bdf21a1c9",
-  "branch": "step-204-handover-qc-fixture-assertion-plan",
+  "base_commit": "7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3",
+  "canonical_project_instructions": {
+    "canonical_path": "docs/protocols/CSE_PROJECT_INSTRUCTIONS.md",
+    "canonical_sha256_after_authority_workflow_correction": "54484B6DBE0262CBF815B7F56835750F29DD345FB85E5D2717664C510701B086",
+    "derivation": "initially_derived_from_local_only_source_then_intentionally_adapted",
+    "intentionally_adapted_sections": [
+      "section_4_repository_authority_fallback",
+      "section_8_github_centered_workflow",
+      "section_13_chatgpt_codex_user_responsibilities",
+      "section_17_current_safe_point_and_active_work"
+    ],
+    "persistent_product_protocol_meaning_preserved": true,
+    "section_order_preserved": true,
+    "source_ignored_via": ".git/info/exclude",
+    "source_path": "CSE_GUNCEL_PROJE_TALIMATLARI.md",
+    "source_sha256": "A03C207BE84425F793C962DFA2C9A1E09EDCF739761465FFE5C57D3BFA0E123F",
+    "source_staged": false,
+    "source_committed": false,
+    "source_unchanged": true,
+    "full_text_equivalence_claimed_after_adaptation": false
+  },
+  "github_centered_workflow": {
+    "chatgpt_verifies_github_before_next_action": true,
+    "chatgpt_handles_github_native_actions": true,
+    "codex_handles_required_local_execution": true,
+    "evidence_exchange_surface": "current_github_issue",
+    "github_only_project_file_creation_is_completion": false,
+    "user_default_command": "devam_or_equivalent"
+  },
+  "ci": {
+    "automatic_actions_execution": "manually_disabled",
+    "constraint": "account_billing_and_runner_start",
+    "required_status_checks_enabled": false,
+    "workflow_changed": false,
+    "workflow_exists": true,
+    "workflow_path": ".github/workflows/pytest.yml"
+  },
   "current_safe_point": {
-    "merge_commit": "583f8539d9522027f1578a91b0298a8bdf21a1c9",
-    "semantics": "latest_merged_master_checkpoint",
-    "step": 203
+    "issue": 23,
+    "issue_state": "completed",
+    "merge_commit": "7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3",
+    "pull_request": 24,
+    "pull_request_state": "merged",
+    "semantics": "latest_merged_finalized_checkpoint",
+    "step": 204
   },
   "diff_check": {
     "command": "git diff --check",
@@ -17,114 +62,90 @@
     ],
     "result": "clean"
   },
-  "final_branch_head_evidence_location": "GitHub Issue #23 completion comment after metadata-finalization push",
-  "fixture_assertion_plan": {
-    "canonical_cases": [
-      "success_only",
-      "failure_only",
-      "mixed",
-      "empty_zero_count",
-      "missing_optional_fields",
-      "unknown_status_additional_fields",
-      "unsupported_input_fallback"
-    ],
-    "documentation_only": true,
-    "executable_fixtures_created": false,
-    "fixture_artifact_families": [
-      "handover_qc_source_checklist_<case>",
-      "handover_qc_expected_view_model_<case>",
-      "handover_qc_expected_markdown_<case>",
-      "handover_qc_expected_review_visibility_<case>"
-    ],
-    "future_fixture_locations": [
-      "tests/fixtures/handover_qc/source_checklists/<case>.json",
-      "tests/fixtures/handover_qc/expected_view_models/<case>.json",
-      "tests/fixtures/handover_qc/expected_markdown/<case>.md",
-      "tests/fixtures/handover_qc/expected_review_visibility/<case>.json"
-    ],
-    "future_test_file": "tests/test_handover_qc_view_model_fixtures.py",
-    "optional_markdown_display_only": "format_export_handover_qc_review_checklist_as_markdown(checklist)",
-    "production_code_changed": false,
-    "source_of_truth": "build_export_handover_qc_review_checklist(summary, report)",
-    "tests_changed": false,
-    "workflow_changed": false,
-    "forbidden_fields": [
-      "approved",
-      "rejected",
-      "blocked",
-      "official_decision",
-      "package_blocked",
-      "audit_event_id",
-      "persisted_at",
-      "export_written"
-    ],
-    "future_test_conversion_boundary": "A separate explicitly authorized future task may create canonical fixture data and fixture-contract tests for the seven documented handover QC cases."
-  },
   "forbidden_scope_added": false,
-  "issue": 23,
-  "local_only_instruction_file": {
-    "ignored_via": ".git/info/exclude",
-    "path": "CSE_GUNCEL_PROJE_TALIMATLARI.md",
-    "sha256": "A03C207BE84425F793C962DFA2C9A1E09EDCF739761465FFE5C57D3BFA0E123F",
-    "staged": false,
-    "committed": false,
-    "unchanged": true
+  "merged_state": {
+    "active_merged_state_ambiguity": false,
+    "obsolete_active_pull_request": null,
+    "step_203_or_pr_22_presented_as_current": false
   },
-  "merge_authorized": false,
-  "next_action": "ChatGPT re-inspection and Draft PR creation after final remote evidence is posted to Issue #23; do not merge.",
+  "next_action": "ChatGPT inspection and Draft PR creation after the Step 205 branch is pushed; do not merge automatically.",
   "official_local_sync": {
+    "divergence": "0 0",
+    "local_master_sha": "7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3",
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
-    "master_sync": {
-      "local_master_sha": "583f8539d9522027f1578a91b0298a8bdf21a1c9",
-      "origin_master_sha": "583f8539d9522027f1578a91b0298a8bdf21a1c9",
-      "divergence": "0 0"
-    }
+    "origin_master_sha": "7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3"
   },
-  "production_code_changed": false,
+  "product_maturity": {
+    "field_ready_application": false,
+    "missing_production_capabilities": [
+      "persistence_database",
+      "real_file_upload",
+      "api",
+      "gui",
+      "authentication_authorization",
+      "deployment",
+      "complete_backup_restore"
+    ],
+    "next_product_direction": {
+      "name": "first_field_mvp",
+      "scope": [
+        "fast_observation_record",
+        "attachment",
+        "location",
+        "status_tracking",
+        "reported_to",
+        "daily_export",
+        "weekly_summary"
+      ]
+    },
+    "product_rule": "reliable_data_backbone_first_automation_later_ai_last",
+    "state": "tested_domain_data_documentation_core"
+  },
   "protected_paths": {
     ".github/workflows/pytest.yml": "unchanged",
     "app/models.py": "unchanged",
     "tests/test_models.py": "unchanged"
   },
   "protocol_version": 1,
-  "pull_request": null,
-  "pull_request_state": "not_created_by_codex",
+  "publication": {
+    "branch_deletion_authorized": false,
+    "force_push_authorized": false,
+    "merge_authorized": false,
+    "pull_request": null,
+    "pull_request_creation_by_codex": false,
+    "initial_step_205_content_commit_divergence": "0 0",
+    "initial_step_205_content_commit_local_sha": "7df6451e0c6e7332a8293cf326ce25e15b548598",
+    "initial_step_205_content_commit_remote_sha": "7df6451e0c6e7332a8293cf326ce25e15b548598",
+    "verified_correction_content_commit_divergence": "0 0",
+    "verified_correction_content_commit_local_sha": "ea54e7dd257f8987f412314862da2e54ed86f01d",
+    "verified_correction_content_commit_remote_sha": "ea54e7dd257f8987f412314862da2e54ed86f01d"
+  },
   "required_files": [
-    ".cse/tasks/204_task.md",
-    ".cse/results/204_result.md",
+    "docs/protocols/CSE_PROJECT_INSTRUCTIONS.md",
+    "README.md",
+    ".cse/tasks/205_task.md",
+    ".cse/results/205_result.md",
     ".cse/state/project_state.json",
-    "docs/204_handover_qc_fixture_naming_and_assertion_checklist_plan.md",
-    "learning/204_handover_qc_fixture_naming_and_assertion_checklist_plan.md",
+    "docs/205_canonical_project_instructions_and_repository_truth_resynchronization.md",
+    "learning/205_canonical_project_instructions_and_repository_truth_resynchronization.md",
     "ROADMAP.md",
     "CHANGELOG.md",
     "docs/project_decisions.md"
   ],
-  "step": 204,
+  "step": 205,
   "tests": {
     "command": "python -m pytest",
     "result": "passed",
-    "content_correction_summary": "413 passed in 1.90s",
-    "metadata_finalization_summary": "413 passed in 1.26s"
+    "content_verification_summary": "413 passed in 1.18s",
+    "metadata_finalization_summary": "413 passed in 1.17s",
+    "correction_content_verification_summary": "413 passed in 1.21s",
+    "correction_metadata_finalization_summary": "413 passed in 1.17s"
   },
-  "tests_changed": false,
-  "verified_content_commit_divergence": "0 0",
-  "verified_content_commit_remote_sha": "fa336b973f9d476e12ffbde0751b729a06565a91",
-  "verified_content_commit_sha_before_metadata_finalization": "fa336b973f9d476e12ffbde0751b729a06565a91",
-  "workflow_changed": false,
-  "workflow_status": "step_204_documentation_state_correction_verified",
+  "workflow_status": "step_205_canonical_authority_and_github_workflow_correction_push_verified_before_metadata_finalization",
   "working_tree": {
-    "authorized_changed_files": [
-      ".cse/tasks/204_task.md",
-      ".cse/results/204_result.md",
-      ".cse/state/project_state.json",
-      "docs/204_handover_qc_fixture_naming_and_assertion_checklist_plan.md",
-      "learning/204_handover_qc_fixture_naming_and_assertion_checklist_plan.md",
-      "ROADMAP.md",
-      "CHANGELOG.md",
-      "docs/project_decisions.md"
-    ],
+    "authorized_scope_only": true,
     "required_files_physically_present": true,
-    "result": "tracked_project_working_tree_clean_after_metadata_finalization_push"
+    "result": "result_and_state_metadata_finalization_only_after_verified_correction_push"
   },
   "zip": {
     "ignored_zip_touched": false,

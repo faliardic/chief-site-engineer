@@ -9,22 +9,23 @@ Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici reposit
 Son guvenli nokta:
 
 ```text
-Adim 127 - Guvenli nokta kalite kontrol ve dokumantasyon temizligi
+Adim 204 - Handover QC fixture naming and assertion checklist plan
+Merge commit: 7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3
 ```
 
 Guncel test sonucu:
 
 ```text
-243 passed
+413 passed
 ```
 
 Mevcut calisma durumu:
 
 ```text
-Adim 126 sonrasi / Adim 127 kalite kontrol hazirligi
+Adim 205 - Canonical project instructions and repository truth synchronization
 ```
 
-Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, satir sonu politikasi, ZIP repo politikasi, test sonucu ve diff temizligi guvenli nokta oncesi guncellendi. Bu adim yeni urun davranisi eklemez; mevcut audit event ve attachment integrity hattinin dokumantasyonunu guncele ceker.
+Adim 204, PR #24 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 205, canonical proje talimatlarini `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` yolunda izlenebilir hale getirir ve README/state/roadmap karar gercegini bu guvenli noktayla documentation/state-only olarak esler.
 
 ## Repo Koku
 
@@ -48,7 +49,7 @@ Proje su ana parcalardan olusur:
 
 ## Mevcut Teknik Kapsam
 
-Adim 127 itibariyla proje su alanlarda ilerlemistir:
+Adim 204 itibariyla proje su alanlarda ilerlemistir:
 
 - Temel santiye domain modelleri.
 - Gunluk saha, beton dokum, yapi denetim, malzeme, toplanti, RFI/submittal ve ilgili kayit modelleri.
@@ -106,17 +107,15 @@ Son eklenen podcast notlari:
 
 Bu notlar, attachment integrity export/scanner hazirliklari, audit event modeli, audit validation hattini ve CSE veri koruma / ozel alan politikalarini podcast anlatimina uygun sekilde ozetler.
 
-## Kalite Kontrol Notlari
+## Kalite Kontrol ve CI Durumu
 
-Adim 127 guvenli nokta kalite kontrolunde su noktalar sabitlendi:
-
-- README, ROADMAP, CHANGELOG ve proje karar kayitlari Adim 126 sonrasi duruma gore guncellendi.
-- Guncel test sonucu `243 passed` olarak dogrulandi.
-- ZIP dosyalari repo kapsamindan dislanacak sekilde politika netlestirildi.
-- `.gitattributes` ile Python, Markdown ve text dosyalari icin LF satir sonu tercih edildi.
-- `app/models.py` buyume riski izleniyor; ileride domain bazli modulleme planlanabilir.
-- `tests/test_models.py` ve `tests/test_records.py` ileride domain bazli bolunebilir.
-- Audit event target id validation uygulamasina gecmeden once mevcut sozlesmelerin gercek model id bicimleriyle uyumu kontrol edilmeli.
+- Guncel yerel test tabani `413 passed` olarak dogrulanir.
+- `.github/workflows/pytest.yml` GitHub Actions workflow'u repoda bulunur.
+- Otomatik Actions calismasi account billing/runner-start kisiti nedeniyle manuel olarak devre disidir.
+- Required status checks etkin degildir.
+- Guvenlik kaniti yerel pytest, `git diff --check`, protected-path diff ve Git divergence kontrolleriyle uretilir.
+- ZIP dosyalari repo kapsamindan dislanir ve local emergency/offline artifact olarak dokunulmadan korunur.
+- `.gitattributes` Python, Markdown ve text dosyalari icin LF satir sonu tercihini korur.
 
 ## Henuz Olmayan Ozellikler
 
@@ -133,7 +132,7 @@ Asagidaki ozellikler henuz eklenmedi:
 - Authentication / authorization.
 - Kullanici, rol veya yetki sistemi.
 - Deployment.
-- CI pipeline.
+- Tam backup/restore akisi.
 - Thumbnail, preview, video oynatma veya streaming.
 - Otomatik audit trail uretimi.
 
@@ -160,7 +159,7 @@ python -m pytest
 Beklenen guncel sonuc:
 
 ```text
-243 passed
+413 passed
 ```
 
 ## Basit Calistirma
@@ -180,6 +179,7 @@ Onemli dokumantasyon dosyalari:
 - `CHANGELOG.md`
 - `ROADMAP.md`
 - `docs/project_decisions.md`
+- `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
 - `docs/100_guvenli_nokta_final_kalite_kontrol.md`
 - `docs/101_genel_proje_denetimi_ve_mimari_saglik_raporu.md`
 - `docs/117_audit_event_target_record_iliski_kurallari.md`
@@ -198,10 +198,16 @@ Bu proje ayni zamanda Python ve yazilim gelistirme ogrenim arsivi uretir.
 
 `learning/` altindaki dosyalar; dataclass, repository, test, metadata modelleme, attachment integrity, karar dokumantasyonu ve proje disiplini gibi konulari adim adim aciklar.
 
-## Sonraki Adim
+## Sonraki Urun Yonu
 
-Sonraki onerilen teknik yonler:
+Adim 205 repository truth synchronization merge edildikten sonra ilk urun yonu, veri omurgasini guvenilir tutan dar bir saha MVP'sidir:
 
-- Adim 128 icin audit target record id validation uygulama karari.
-- Podcast 021 ile Adim 121-122 NotebookLM podcast notu.
-- Private workspace model baslangici.
+- hizli observation kaydi,
+- attachment,
+- location,
+- status tracking,
+- reported-to,
+- daily export,
+- weekly summary.
+
+CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. Adim 201-205 araligini ozetleyen Podcast 031, Adim 205 merge sonrasi dogal documentation follow-up'tur.
