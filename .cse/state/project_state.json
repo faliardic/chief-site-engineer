@@ -115,7 +115,10 @@
     "pull_request_creation_by_codex": false,
     "initial_step_205_content_commit_divergence": "0 0",
     "initial_step_205_content_commit_local_sha": "7df6451e0c6e7332a8293cf326ce25e15b548598",
-    "initial_step_205_content_commit_remote_sha": "7df6451e0c6e7332a8293cf326ce25e15b548598"
+    "initial_step_205_content_commit_remote_sha": "7df6451e0c6e7332a8293cf326ce25e15b548598",
+    "verified_correction_content_commit_divergence": "0 0",
+    "verified_correction_content_commit_local_sha": "ea54e7dd257f8987f412314862da2e54ed86f01d",
+    "verified_correction_content_commit_remote_sha": "ea54e7dd257f8987f412314862da2e54ed86f01d"
   },
   "required_files": [
     "docs/protocols/CSE_PROJECT_INSTRUCTIONS.md",
@@ -135,13 +138,14 @@
     "result": "passed",
     "content_verification_summary": "413 passed in 1.18s",
     "metadata_finalization_summary": "413 passed in 1.17s",
-    "correction_content_verification_summary": "413 passed in 1.21s"
+    "correction_content_verification_summary": "413 passed in 1.21s",
+    "correction_metadata_finalization_summary": "413 passed in 1.17s"
   },
-  "workflow_status": "step_205_canonical_authority_and_github_workflow_content_verified_before_correction_push",
+  "workflow_status": "step_205_canonical_authority_and_github_workflow_correction_push_verified_before_metadata_finalization",
   "working_tree": {
     "authorized_scope_only": true,
     "required_files_physically_present": true,
-    "result": "authorized_correction_content_verified_before_commit"
+    "result": "result_and_state_metadata_finalization_only_after_verified_correction_push"
   },
   "zip": {
     "ignored_zip_touched": false,
