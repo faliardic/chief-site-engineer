@@ -1,5 +1,50 @@
 # Changelog
 
+## Step 198
+
+- Resynchronized `ROADMAP.md`, `CHANGELOG.md`, and `docs/project_decisions.md` with Step 197 as the current safe point.
+- Recorded merge commit `947350ff9348f79965fec282c28e2fa858d7356a` as the latest merged checkpoint.
+- Added concise factual summaries for Steps 193-197 covering the CSE handoff protocol, read-only status command, explicit post-merge finalization, GitHub Actions `pytest` workflow, and finalized checkpoint/billing constraint record.
+- Updated current local test count to `413 passed`.
+- Replaced stale no-CI wording with the factual state: `.github/workflows/pytest.yml` exists, GitHub-hosted runner startup is externally blocked by the account billing lock, and required status checks remain disabled until a successful GitHub Actions `pytest` run exists.
+- Recorded podcast cadence status: catch-up items are pending for Steps 181-185, 186-190, and 191-195; no podcast note was created in this step.
+- Defined the next technical direction as handover QC/checklist phase closure and downstream consumer boundary review without implementing API, GUI, CLI, hard validation, or generated `blocked` status.
+- Kept this as documentation/state-only; no production code, tests, workflow behavior, exports, ZIP files, persistence, audit, backup/restore, migration, deployment, release, publishing, or secrets were changed.
+
+## Step 197
+
+- Finalized Step 196 as the latest merged/finalized checkpoint after PR #8 merged into `master`.
+- Recorded merge commit `947350ff9348f79965fec282c28e2fa858d7356a` as the current safe point.
+- Documented `.cse/state/project_state.json` semantics as the latest merged/finalized machine-readable checkpoint.
+- Recorded the GitHub billing lock as an external CI execution constraint, not a pytest failure and not evidence of defective workflow code.
+- Kept required status checks disabled until billing is resolved and a successful GitHub Actions `pytest` run exists.
+
+## Step 196
+
+- Added `.github/workflows/pytest.yml` as the GitHub Actions CI workflow.
+- Configured pull requests targeting `master` and pushes to `master` to run `git diff --check` and `python -m pytest`.
+- Used minimal read-only repository permissions and Python 3.12 setup.
+- Kept deployment, release, publishing, secrets, automatic merge, and branch mutation out of scope.
+
+## Step 195
+
+- Added explicit post-merge CSE state finalization through `scripts/cse_status.py --finalize-state`.
+- Required explicit step, issue, PR, branch, merge commit, verification summary, and next-action metadata.
+- Kept default `python scripts/cse_status.py` diagnostic and read-only.
+- Avoided automatic GitHub remote-state inference, staging, cleaning, committing, pushing, or branch changes from the script.
+
+## Step 194
+
+- Added a read-only CSE repository status command.
+- Reported branch, HEAD, origin/master divergence, staged/tracked/untracked/ignored files, `git diff --check`, `exports/`, ZIP files, and optional pytest execution.
+- Preserved read-only default behavior and avoided export/ZIP mutation.
+
+## Step 193
+
+- Established the GitHub-native ChatGPT/Codex handoff protocol under `.cse/`.
+- Kept canonical reusable templates in `.cse/templates/` and removed duplicate task/result templates from `.cse/tasks/` and `.cse/results/`.
+- Added machine-readable project state and result reporting conventions for small, reviewable, branch-based work.
+
 ## Step 192
 
 - Added documentation-only test example and regression boundary standardization for `format_export_handover_qc_review_checklist_as_markdown(checklist)`.

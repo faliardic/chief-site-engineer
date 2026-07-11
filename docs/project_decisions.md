@@ -1,5 +1,53 @@
 # Proje Kararlari
 
+## 198 Roadmap and Current Checkpoint Resynchronization Karari
+
+- Adim 198, ana proje dokumantasyonunu Adim 197 guvenli noktasina gore senkronize eder.
+- Guncel guvenli nokta Adim 197'dir; merge commit `947350ff9348f79965fec282c28e2fa858d7356a` olarak kaydedilir.
+- Adim 193-197 araligi factual olarak ozetlenir: CSE handoff protocol, read-only status command, explicit post-merge state finalization, GitHub Actions `pytest` workflow ve finalized checkpoint/billing constraint record.
+- Guncel local test sayisi `413 passed` olarak kaydedilir.
+- CI bulunmadigi yonundeki eski ifade artik dogru degildir: `.github/workflows/pytest.yml` vardir.
+- GitHub-hosted runner startup su anda account billing lock nedeniyle dissal olarak engellenmektedir; bu durum pytest failure veya workflow code defect olarak yorumlanmaz.
+- Required status checks, basarili bir GitHub Actions `pytest` kosusu olana kadar disabled kalmalidir.
+- Sonraki teknik yon handover QC/checklist phase closure ve downstream consumer boundary review olarak kaydedilir; API/GUI/CLI implementation baslatilmaz.
+- Hard validation ve generated `blocked` status explicit future scope olmadan eklenmez.
+- Podcast cadence review sonucu catch-up pending durum vardir: Adim 181-185, 186-190 ve 191-195 icin podcast notlari beklemededir; Adim 196-200 notu Adim 200 tamamlanmadan dogrudan gerekli degildir.
+- Bu adim documentation/state-only kalir; production code, tests, workflow, exports, ZIP, persistence, audit, backup/restore, migration, deployment, release, publishing ve secrets degistirilmez.
+
+## 197 Merged Checkpoint and Billing Constraint Karari
+
+- Adim 197, Step 196 merge sonrasi state semantigini latest merged/finalized checkpoint olarak sabitler.
+- `.cse/state/project_state.json` merged/finalized checkpoint'i temsil eder; acik draft work kendi task/result/branch/issue/PR kayitlariyla izlenir.
+- GitHub billing lock, CI runner startup oncesi dissal execution constraint olarak kaydedilir.
+- Billing lock pytest failure, workflow YAML failure veya required status check basarisi olarak siniflandirilmaz.
+
+## 196 GitHub Actions Pytest Workflow Karari
+
+- Adim 196, `.github/workflows/pytest.yml` workflow'unu ekler.
+- Workflow PR-to-master ve push-to-master icin `git diff --check` ve `python -m pytest` kosacak sekilde tanimlidir.
+- Workflow deployment, release, publishing, secrets, automatic merge veya branch mutation yapmaz.
+- Required checks, GitHub Actions uzerinde basarili `pytest` kosusu olana kadar policy gate olarak acilmaz.
+
+## 195 Explicit Post-Merge State Finalization Karari
+
+- Adim 195, `scripts/cse_status.py --finalize-state` yolunu ekler.
+- Finalized state yazimi yalniz explicit CLI metadata ile yapilir; GitHub issue/PR state otomatik tahmin edilmez.
+- Default `python scripts/cse_status.py` read-only diagnostic komut olarak kalir.
+- Script otomatik staging, cleaning, commit, push, branch change veya merge yapmaz.
+
+## 194 Read-only CSE Status Command Karari
+
+- Adim 194, repository handoff durumunu read-only raporlayan CSE status command'i ekler.
+- Branch, HEAD, divergence, git status, diff check, exports, ZIP ve opsiyonel pytest gorunurlugu saglanir.
+- Varsayilan davranis test kosmaz ve repo mutasyonu yapmaz.
+
+## 193 GitHub-native CSE Handoff Protocol Karari
+
+- Adim 193, `.cse/` altinda task, result, template ve project state tabanli GitHub-native ChatGPT/Codex handoff protokolunu kurar.
+- Canonical reusable template dosyalari `.cse/templates/` altinda kalir.
+- Duplicate `.cse/tasks/TASK_TEMPLATE.md` ve `.cse/results/RESULT_TEMPLATE.md` dosyalari repo source of truth'u karistirmamasi icin kaldirilir.
+- ZIP dosyalari emergency/offline backup olarak tracked scope disinda kalir.
+
 ## 192 Export / Handover QC Checklist Formatter Test Example Karari
 
 - Adim 192, `format_export_handover_qc_review_checklist_as_markdown(checklist)` helper'i icin test examples ve regression boundary standardini documentation-only olarak netlestirir.
