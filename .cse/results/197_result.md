@@ -6,7 +6,7 @@
 - Pull request: #10, open draft
 - Branch: `step-197-finalize-ci-state`
 - Base commit: `df9c04fa033b9c2d42e1690e9263a91856c5e512`
-- Result commit: pending final commit
+- Result commit: `aa678c9c62319eb88b4d8eb3fec51425f5730c66`
 - Finalized checkpoint: Step 196
 - Finalized merge commit: `df9c04fa033b9c2d42e1690e9263a91856c5e512`
 
@@ -61,8 +61,8 @@ python scripts/cse_status.py --finalize-state \
 - Existing production application behavior changed: no
 
 ## Git State
-- Commit: pending final commit
-- Push: pending
+- Commit: `aa678c9c62319eb88b4d8eb3fec51425f5730c66`
+- Push: completed to `origin/step-197-finalize-ci-state`
 - Draft PR: #10 remains draft
 - Merge: not authorized
 
