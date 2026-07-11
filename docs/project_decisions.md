@@ -1,5 +1,17 @@
 # Proje Kararlari
 
+## 192 Export / Handover QC Checklist Formatter Test Example Karari
+
+- Adim 192, `format_export_handover_qc_review_checklist_as_markdown(checklist)` helper'i icin test examples ve regression boundary standardini documentation-only olarak netlestirir.
+- Test example kategorileri success, failure, mixed, empty, missing field, unknown status, unsupported input, no mutation, no file/export output, no hard validation, no generated `blocked` status ve existing helper regression davranislarini kapsar.
+- Formatter input olarak `build_export_handover_qc_review_checklist(...)` ciktisi olan JSON-ready checklist dict'i beklemeye devam eder ve output olarak insan incelemesine uygun Markdown/string dondurur.
+- Formatter checklist, summary veya report sonucunu yeniden hesaplamaz; input dict'i mutate etmez; dosya yazmaz; export uretmez; `exports/` altina cikti birakmaz.
+- `is_blocking` otomatik karar, kayit reddi veya bloklama mekanizmasi degildir; `requires_human_review` yalniz insan inceleme sinyalidir.
+- Unsupported input guvenli ve gorunur fallback olarak okunur; hard validation, automatic rejection veya generated `blocked` status'a donusturulmez.
+- Bu adim yeni test eklemez; ileride kod/test adimi gerekirse ayri adim olmali ve Extra High reasoning onerilmelidir.
+- Hard validation, automatic rejection, migration, backup/restore, API/GUI/CLI behavior, database/repository access, audit event creation ve export helper yerine dogrudan dosya yazma kapsam disidir.
+- Kod/test/helper davranisi, export ciktisi, commit ve push eklenmez.
+
 ## 191 Export / Handover QC Checklist Formatter Usage Karari
 
 - Adim 191, `format_export_handover_qc_review_checklist_as_markdown(checklist)` helper'i icin usage documentation, example standardization ve edge case yorumlama standardini documentation-only olarak netlestirir.

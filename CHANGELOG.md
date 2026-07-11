@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 192
+
+- Added documentation-only test example and regression boundary standardization for `format_export_handover_qc_review_checklist_as_markdown(checklist)`.
+- Documented that formatter examples protect success, failure, mixed, empty, missing field, unknown status, unsupported input, no mutation, no file/export output, no hard validation, no generated `blocked` status, and existing helper regression behavior.
+- Clarified that the formatter remains a presentation-safe Markdown layer over the JSON-ready checklist dict from `build_export_handover_qc_review_checklist(...)`.
+- Standardized regression boundaries: no checklist/summary/report recompute, no input mutation, no file writing, no `exports/` output, no `blocked` status, no automatic decision from `is_blocking`, and `requires_human_review` as human-review signal only.
+- Documented that unsupported input fallback remains visible and safe for review, but must not become hard validation or automatic rejection.
+- Kept this as documentation-only; no code, tests, export output, staged files, commit, push, hard validation, `blocked` status, API/GUI/CLI, database/repository access, audit event, backup/restore, or migration behavior was added.
+
 ## Step 191
 
 - Added documentation-only usage, example, and edge case standardization for `format_export_handover_qc_review_checklist_as_markdown(checklist)`.
