@@ -136,3 +136,275 @@ def test_main_json_format_is_parseable(monkeypatch, capsys, tmp_path):
         "schema_version": 1,
         "repo_root": str(tmp_path.resolve()),
     }
+
+
+def test_default_command_does_not_write_state(monkeypatch, tmp_path):
+    writes = []
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        cse_status,
+        "collect_status",
+        lambda repo_root, run_tests, upstream_ref: {"schema_version": 1},
+    )
+    monkeypatch.setattr(
+        cse_status,
+        "write_json_output",
+        lambda report, output_path, overwrite: writes.append(output_path),
+    )
+
+    result = cse_status.main(["--format", "json"])
+
+    assert result == 0
+    assert writes == []
+
+
+def test_finalize_state_requires_explicit_metadata(monkeypatch, capsys, tmp_path):
+    monkeypatch.chdir(tmp_path)
+
+    result = cse_status.main(["--finalize-state"])
+
+    captured = capsys.readouterr()
+    assert result == 2
+    assert "Missing required finalization metadata" in captured.err
+    assert "state-output" in captured.err
+
+
+def test_finalize_state_refuses_to_overwrite_without_flag(monkeypatch, tmp_path):
+    output_path = tmp_path / "project_state.json"
+    output_path.write_text("old", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    result = cse_status.main(
+        [
+            "--finalize-state",
+            "--step",
+            "194",
+            "--issue",
+            "3",
+            "--pull-request",
+            "4",
+            "--issue-state",
+            "closed",
+            "--pull-request-state",
+            "merged",
+            "--source-branch",
+            "step-194-cse-status-report",
+            "--base-branch",
+            "master",
+            "--merge-commit",
+            "de95bc0ed7f3115bba80d4410dfa2f518fb6bfe1",
+            "--verification-summary",
+            "tests passed",
+            "--next-action",
+            "start next task",
+            "--state-output",
+            str(output_path),
+        ]
+    )
+
+    assert result == 2
+    assert output_path.read_text(encoding="utf-8") == "old"
+
+
+def test_build_finalized_state_is_deterministic_and_explicit(monkeypatch, tmp_path):
+    args = cse_status.build_parser().parse_args(
+        [
+            "--finalize-state",
+            "--step",
+            "194",
+            "--issue",
+            "3",
+            "--pull-request",
+            "4",
+            "--issue-state",
+            "closed",
+            "--pull-request-state",
+            "merged",
+            "--source-branch",
+            "step-194-cse-status-report",
+            "--base-branch",
+            "master",
+            "--merge-commit",
+            "de95bc0ed7f3115bba80d4410dfa2f518fb6bfe1",
+            "--verification-summary",
+            "406 passed",
+            "--next-action",
+            "start step 195",
+            "--state-output",
+            str(tmp_path / "state.json"),
+            "--overwrite",
+        ]
+    )
+    monkeypatch.setattr(cse_status, "collect_exports", lambda repo_root: {"clean": True})
+    monkeypatch.setattr(cse_status, "collect_zip_files", lambda repo_root: {"count": 0})
+    monkeypatch.setattr(cse_status, "collect_head", lambda repo_root: {"branch": "master"})
+    monkeypatch.setattr(
+        cse_status,
+        "collect_divergence",
+        lambda repo_root, upstream_ref: {"available": True, "ahead": 0, "behind": 0},
+    )
+    monkeypatch.setattr(
+        cse_status,
+        "collect_git_lists",
+        lambda repo_root: {"staged_files": [], "tracked_worktree_changes": []},
+    )
+
+    state = cse_status.build_finalized_state(args, tmp_path, "origin/master")
+
+    assert state["workflow_status"] == "merged_finalized"
+    assert state["merge_authorized"] is True
+    assert state["remote_state_source"] == "explicit_cli_metadata"
+    assert state["pull_request_state"] == "merged"
+    assert state["verification"] == {"summary": "406 passed"}
+    assert json.dumps(state, sort_keys=True) == json.dumps(state, sort_keys=True)
+
+
+def test_finalize_state_writes_parseable_json_with_overwrite(monkeypatch, tmp_path):
+    output_path = tmp_path / "project_state.json"
+    output_path.write_text("old", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cse_status, "collect_exports", lambda repo_root: {"clean": True})
+    monkeypatch.setattr(cse_status, "collect_zip_files", lambda repo_root: {"count": 0})
+    monkeypatch.setattr(cse_status, "collect_head", lambda repo_root: {"branch": "master"})
+    monkeypatch.setattr(
+        cse_status,
+        "collect_divergence",
+        lambda repo_root, upstream_ref: {"available": True, "ahead": 0, "behind": 0},
+    )
+    monkeypatch.setattr(
+        cse_status,
+        "collect_git_lists",
+        lambda repo_root: {"staged_files": [], "tracked_worktree_changes": []},
+    )
+
+    result = cse_status.main(
+        [
+            "--finalize-state",
+            "--step",
+            "194",
+            "--issue",
+            "3",
+            "--pull-request",
+            "4",
+            "--issue-state",
+            "closed",
+            "--pull-request-state",
+            "merged",
+            "--source-branch",
+            "step-194-cse-status-report",
+            "--base-branch",
+            "master",
+            "--merge-commit",
+            "de95bc0ed7f3115bba80d4410dfa2f518fb6bfe1",
+            "--verification-summary",
+            "tests passed",
+            "--next-action",
+            "start next task",
+            "--state-output",
+            str(output_path),
+            "--overwrite",
+        ]
+    )
+
+    assert result == 0
+    state = json.loads(output_path.read_text(encoding="utf-8"))
+    assert state["step"] == 194
+    assert state["pull_request_state"] == "merged"
+
+
+def test_finalize_state_uses_no_git_mutation_commands(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_run(args, cwd):
+        calls.append(args)
+        if args[:3] == ["git", "branch", "--show-current"]:
+            return command(args, stdout="master\n")
+        if args[:3] == ["git", "log", "-1"]:
+            return command(args, stdout="abc123\x00Subject\n")
+        if args[:3] == ["git", "rev-parse", "--verify"]:
+            return command(args, stdout="base\n")
+        if args[:3] == ["git", "rev-list", "--left-right"]:
+            return command(args, stdout="0\t0\n")
+        return command(args)
+
+    args = cse_status.build_parser().parse_args(
+        [
+            "--finalize-state",
+            "--step",
+            "194",
+            "--issue",
+            "3",
+            "--pull-request",
+            "4",
+            "--issue-state",
+            "closed",
+            "--pull-request-state",
+            "merged",
+            "--source-branch",
+            "step-194-cse-status-report",
+            "--base-branch",
+            "master",
+            "--merge-commit",
+            "de95bc0ed7f3115bba80d4410dfa2f518fb6bfe1",
+            "--verification-summary",
+            "tests passed",
+            "--next-action",
+            "start next task",
+            "--state-output",
+            str(tmp_path / "state.json"),
+        ]
+    )
+    monkeypatch.setattr(cse_status, "run_command", fake_run)
+
+    cse_status.build_finalized_state(args, tmp_path, "origin/master")
+
+    forbidden = {"add", "commit", "push", "merge", "checkout", "switch", "clean", "reset"}
+    assert not any(call[0] == "git" and call[1] in forbidden for call in calls)
+
+
+def test_finalize_state_does_not_mutate_exports_or_zip_files(monkeypatch, tmp_path):
+    exports = tmp_path / "exports"
+    exports.mkdir()
+    gitkeep = exports / ".gitkeep"
+    gitkeep.write_text("\n", encoding="utf-8")
+    zip_file = tmp_path / "backup.zip"
+    zip_file.write_text("zip", encoding="utf-8")
+    before = {
+        gitkeep: gitkeep.read_text(encoding="utf-8"),
+        zip_file: zip_file.read_text(encoding="utf-8"),
+    }
+    args = cse_status.build_parser().parse_args(
+        [
+            "--finalize-state",
+            "--step",
+            "194",
+            "--issue",
+            "3",
+            "--pull-request",
+            "4",
+            "--issue-state",
+            "closed",
+            "--pull-request-state",
+            "merged",
+            "--source-branch",
+            "step-194-cse-status-report",
+            "--base-branch",
+            "master",
+            "--merge-commit",
+            "de95bc0ed7f3115bba80d4410dfa2f518fb6bfe1",
+            "--verification-summary",
+            "tests passed",
+            "--next-action",
+            "start next task",
+            "--state-output",
+            str(tmp_path / "state.json"),
+        ]
+    )
+    monkeypatch.setattr(cse_status, "collect_head", lambda repo_root: {})
+    monkeypatch.setattr(cse_status, "collect_divergence", lambda repo_root, upstream_ref: {})
+    monkeypatch.setattr(cse_status, "collect_git_lists", lambda repo_root: {})
+
+    cse_status.build_finalized_state(args, tmp_path, "origin/master")
+
+    assert gitkeep.read_text(encoding="utf-8") == before[gitkeep]
+    assert zip_file.read_text(encoding="utf-8") == before[zip_file]

@@ -238,6 +238,64 @@ def collect_status(repo_root: Path, run_tests: bool, upstream_ref: str) -> dict[
     }
 
 
+FINALIZE_REQUIRED_ARGS = (
+    "step",
+    "issue",
+    "pull_request",
+    "issue_state",
+    "pull_request_state",
+    "source_branch",
+    "base_branch",
+    "merge_commit",
+    "verification_summary",
+    "next_action",
+    "state_output",
+)
+
+
+def validate_finalize_args(args: argparse.Namespace) -> list[str]:
+    missing = []
+    for name in FINALIZE_REQUIRED_ARGS:
+        value = getattr(args, name)
+        if value is None or value == "":
+            missing.append(name.replace("_", "-"))
+    return missing
+
+
+def build_finalized_state(
+    args: argparse.Namespace,
+    repo_root: Path,
+    upstream_ref: str,
+) -> dict[str, object]:
+    return {
+        "protocol_version": 1,
+        "step": args.step,
+        "finalized_step": args.step,
+        "issue": args.issue,
+        "issue_state": args.issue_state,
+        "pull_request": args.pull_request,
+        "pull_request_state": args.pull_request_state,
+        "source_branch": args.source_branch,
+        "base_branch": args.base_branch,
+        "merge_commit": args.merge_commit,
+        "workflow_status": "merged_finalized",
+        "merge_authorized": True,
+        "remote_state_source": "explicit_cli_metadata",
+        "verification": {
+            "summary": args.verification_summary,
+        },
+        "exports": collect_exports(repo_root),
+        "zip_files": collect_zip_files(repo_root),
+        "local_git_evidence": {
+            "head": collect_head(repo_root),
+            "divergence": collect_divergence(repo_root, upstream_ref),
+            "git": collect_git_lists(repo_root),
+            "note": "Local evidence only; remote PR and issue state came from explicit CLI metadata.",
+        },
+        "next_action": args.next_action,
+    }
+
+
 def render_text(report: dict[str, object]) -> str:
     head = report["head"]
     divergence = report["divergence"]
@@ -322,12 +380,73 @@ def build_parser() -> argparse.ArgumentParser:
         default="origin/master",
         help="Remote ref used for divergence reporting.",
     )
+    parser.add_argument(
+        "--finalize-state",
+        action="store_true",
+        help="Write an explicit post-merge finalized state JSON.",
+    )
+    parser.add_argument("--step", type=int, help="Finalized step number.")
+    parser.add_argument("--issue", type=int, help="Issue number for the finalized step.")
+    parser.add_argument(
+        "--pull-request",
+        type=int,
+        help="Pull request number for the finalized step.",
+    )
+    parser.add_argument(
+        "--issue-state",
+        choices=("closed", "completed"),
+        help="Explicit issue state supplied by the user.",
+    )
+    parser.add_argument(
+        "--pull-request-state",
+        choices=("merged",),
+        help="Explicit pull request state supplied by the user.",
+    )
+    parser.add_argument(
+        "--source-branch",
+        "--merged-branch",
+        dest="source_branch",
+        help="Branch that was merged.",
+    )
+    parser.add_argument("--base-branch", help="Base branch that received the merge.")
+    parser.add_argument("--merge-commit", help="Merge commit SHA supplied by the user.")
+    parser.add_argument(
+        "--verification-summary",
+        help="Explicit verification and test summary for the finalized state.",
+    )
+    parser.add_argument(
+        "--next-action",
+        help="Recommended next action after finalization.",
+    )
+    parser.add_argument(
+        "--state-output",
+        type=Path,
+        help="Explicit path for writing finalized project state JSON.",
+    )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     repo_root = Path.cwd().resolve()
+
+    if args.finalize_state:
+        missing = validate_finalize_args(args)
+        if missing:
+            print(
+                "Missing required finalization metadata: " + ", ".join(missing),
+                file=sys.stderr,
+            )
+            return 2
+        report = build_finalized_state(args, repo_root, args.upstream_ref)
+        try:
+            write_json_output(report, args.state_output, args.overwrite)
+        except FileExistsError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        print(json.dumps(report, indent=2, sort_keys=True))
+        return 0
+
     report = collect_status(repo_root, args.run_tests, args.upstream_ref)
 
     if args.json_output is not None:
