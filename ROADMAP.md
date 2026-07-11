@@ -7,7 +7,7 @@ Adim 203 - Official Local Sync Protocol
 Merge commit: 583f8539d9522027f1578a91b0298a8bdf21a1c9
 ```
 
-Adim 203, master uzerindeki guncel guvenli noktadir. Step 204 acik branch future handover QC presentation view-model icin fixture naming and assertion checklist calismasidir ve merge edilene kadar yeni guvenli nokta olarak sayilmaz.
+Adim 203, master uzerindeki guncel guvenli noktadir. Step 204, `docs/204_handover_qc_fixture_naming_and_assertion_checklist_plan.md` ve `learning/204_handover_qc_fixture_naming_and_assertion_checklist_plan.md` ile future handover QC fixture adlandirma, sahiplik/konum ve assertion checklist sinirlarini documentation/state-only olarak kaydeden acik branch calismasidir. Step 204 merge edilene kadar yeni guvenli nokta sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 

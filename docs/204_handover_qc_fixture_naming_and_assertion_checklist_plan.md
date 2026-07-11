@@ -1,10 +1,12 @@
-# Step 204 - Handover QC Fixture Assertion Plan
+# Step 204 - Handover QC Fixture Naming and Assertion Checklist Plan
 
 ## Purpose
 
 This step converts the Step 202 canonical handover QC presentation examples into a documentation-only fixture naming and assertion checklist plan.
 
 The plan is for a future handover QC presentation view-model implementation. This step does not create executable fixture files, executable tests, production code, API behavior, GUI behavior, CLI behavior, persistence, audit behavior, export output, ZIP output, hard validation, or package decision logic.
+
+It also fixes deterministic artifact-family names and future test-layer ownership/location without creating any fixture directory or executable file.
 
 ## Source of Truth
 
@@ -20,21 +22,21 @@ Optional Markdown remains display-only text produced by:
 format_export_handover_qc_review_checklist_as_markdown(checklist)
 ```
 
-Future consumers must not parse Markdown as structured truth. Markdown may be displayed as a preview only.
+Future consumers must not parse Markdown as structured truth. Markdown may be displayed as a preview only. It is an optional display regression artifact and never replaces the structured source checklist.
 
 ## Fixture Naming Standard
 
 These names are reserved for future fixture or test-data implementation. They are not created as executable files in this step.
 
-| Case id | Future fixture name | Source scenario | Primary assertion focus |
-| --- | --- | --- | --- |
-| `success_only` | `handover_qc_view_model_success_only` | Checklist with only successful export results | Success visibility remains review-ready, not official approval |
-| `failure_only` | `handover_qc_view_model_failure_only` | Checklist with only review/failure results | Human review is visible, not automatic rejection or blocking |
-| `mixed` | `handover_qc_view_model_mixed` | Checklist with both success and review items | Mixed rows remain visible without package decision logic |
-| `empty_zero_count` | `handover_qc_view_model_empty_zero_count` | Checklist with zero item count | Empty-state wording is shown without hard validation |
-| `missing_optional_fields` | `handover_qc_view_model_missing_optional_fields` | Checklist with absent optional display fields | Missing optional fields use presentation fallback text |
-| `unknown_status_additional_fields` | `handover_qc_view_model_unknown_status_additional_fields` | Checklist with unrecognized status and extra fields | Unknown status remains review visibility only |
-| `unsupported_input_fallback` | `handover_qc_view_model_unsupported_input_fallback` | Unsupported non-checklist input | Safe fallback notice is shown without parsing Markdown |
+| `case_id` | `source_checklist_fixture_name` | `expected_view_model_fixture_name` | `expected_markdown_fixture_name` | `expected_review_visibility_fixture_name` | `primary_assertion_focus` |
+| --- | --- | --- | --- | --- | --- |
+| `success_only` | `handover_qc_source_checklist_success_only` | `handover_qc_expected_view_model_success_only` | `handover_qc_expected_markdown_success_only` | `handover_qc_expected_review_visibility_success_only` | Success visibility remains review-ready, not official approval |
+| `failure_only` | `handover_qc_source_checklist_failure_only` | `handover_qc_expected_view_model_failure_only` | `handover_qc_expected_markdown_failure_only` | `handover_qc_expected_review_visibility_failure_only` | Human review is visible, not automatic rejection or blocking |
+| `mixed` | `handover_qc_source_checklist_mixed` | `handover_qc_expected_view_model_mixed` | `handover_qc_expected_markdown_mixed` | `handover_qc_expected_review_visibility_mixed` | Mixed rows remain visible without package decision logic |
+| `empty_zero_count` | `handover_qc_source_checklist_empty_zero_count` | `handover_qc_expected_view_model_empty_zero_count` | `handover_qc_expected_markdown_empty_zero_count` | `handover_qc_expected_review_visibility_empty_zero_count` | Empty-state wording is shown without hard validation |
+| `missing_optional_fields` | `handover_qc_source_checklist_missing_optional_fields` | `handover_qc_expected_view_model_missing_optional_fields` | `handover_qc_expected_markdown_missing_optional_fields` | `handover_qc_expected_review_visibility_missing_optional_fields` | Missing optional fields use presentation fallback text |
+| `unknown_status_additional_fields` | `handover_qc_source_checklist_unknown_status_additional_fields` | `handover_qc_expected_view_model_unknown_status_additional_fields` | `handover_qc_expected_markdown_unknown_status_additional_fields` | `handover_qc_expected_review_visibility_unknown_status_additional_fields` | Unknown status remains review visibility only |
+| `unsupported_input_fallback` | `handover_qc_source_checklist_unsupported_input_fallback` | `handover_qc_expected_view_model_unsupported_input_fallback` | `handover_qc_expected_markdown_unsupported_input_fallback` | `handover_qc_expected_review_visibility_unsupported_input_fallback` | Safe fallback notice is shown without parsing Markdown |
 
 ## Future Fixture Metadata Shape
 
@@ -50,6 +52,38 @@ side_effect_assertions
 ```
 
 The metadata should remain descriptive. It must not introduce persistence, audit IDs, export writes, package decisions, or official approval/rejection state.
+
+## Future Ownership and Location
+
+Fixture data may be created only by a separate explicitly authorized future test-layer task. Its future location contract is:
+
+```text
+tests/fixtures/handover_qc/source_checklists/<case>.json
+tests/fixtures/handover_qc/expected_view_models/<case>.json
+tests/fixtures/handover_qc/expected_markdown/<case>.md
+tests/fixtures/handover_qc/expected_review_visibility/<case>.json
+```
+
+Future fixture-contract tests may live only in:
+
+```text
+tests/test_handover_qc_view_model_fixtures.py
+```
+
+Ownership rules:
+
+1. The future test layer owns fixture data under `tests/fixtures/handover_qc/`.
+2. Production code must not import from `tests/fixtures/`.
+3. This documentation is the specification source, not a runtime dependency.
+4. Source checklist fixtures represent the structured checklist contract.
+5. Expected view-model fixtures represent presentation mapping expectations only.
+6. Expected Markdown fixtures are optional display regression artifacts only.
+7. Expected review-visibility fixtures represent human-review visibility only.
+8. Official handover fixtures must exclude private or non-transferable information.
+9. Credentials, secrets, private field notes, local caches, and user-specific non-transferable information must not enter fixtures.
+10. Fixtures are not persistence, audit, export-writing, or package-decision mechanisms.
+
+Step 204 does not physically create `tests/fixtures/`, any JSON/Markdown fixture, or any test file.
 
 ## Assertion Checklist - All Future Fixtures
 
@@ -108,44 +142,44 @@ If a future product requirement needs one of these fields, it must be handled in
 
 ## Case-Specific Assertion Notes
 
-### `handover_qc_view_model_success_only`
+### `handover_qc_expected_view_model_success_only`
 
 - Expected status label: `Ready for review`.
 - Expected human-review indicator: `No review signal from checklist`.
 - Must not mean official approval, acceptance, or transfer completion.
 - Must still show read-only and non-blocking notices.
 
-### `handover_qc_view_model_failure_only`
+### `handover_qc_expected_view_model_failure_only`
 
 - Expected status label: `Needs human review`.
 - Expected human-review indicator: `Human review required`.
 - Must not mean automatic rejection, hard validation, or package blocking.
 - Item rows should expose the review reason and next-action hint for a human reviewer.
 
-### `handover_qc_view_model_mixed`
+### `handover_qc_expected_view_model_mixed`
 
 - Expected overall status label: `Needs human review`.
 - Must show success and review item rows without collapsing them into a package decision.
 - Must preserve item-level visibility for both completed and review-needed outputs.
 
-### `handover_qc_view_model_empty_zero_count`
+### `handover_qc_expected_view_model_empty_zero_count`
 
 - Expected fallback: `No checklist items are available for display. Review the source export summary/report before making a handover decision.`
 - Must not create an error state, blocked state, or hard validation failure.
 
-### `handover_qc_view_model_missing_optional_fields`
+### `handover_qc_expected_view_model_missing_optional_fields`
 
 - Expected missing optional field fallback: `Not available`.
 - Expected missing next action fallback: `Review source export result before deciding next action`.
 - Must not reject the checklist because optional display fields are absent.
 
-### `handover_qc_view_model_unknown_status_additional_fields`
+### `handover_qc_expected_view_model_unknown_status_additional_fields`
 
 - Expected unknown status label: `Unknown status; treat as review visibility only`.
 - Additional fields may be preserved for display only where useful.
 - Additional fields must not create package decisions, audit records, persistence state, or blocking behavior.
 
-### `handover_qc_view_model_unsupported_input_fallback`
+### `handover_qc_expected_view_model_unsupported_input_fallback`
 
 - Expected fallback: `Checklist unavailable; review the source export summary/report before making a handover decision.`
 - Must not parse Markdown to recover structured truth.
@@ -153,7 +187,13 @@ If a future product requirement needs one of these fields, it must be handled in
 
 ## Future Test Conversion Boundary
 
-A future implementation step may convert this plan into executable fixtures and tests only if that future task explicitly authorizes test file changes and any needed production implementation.
+```text
+A separate explicitly authorized future task may create canonical
+fixture data and fixture-contract tests for the seven documented
+handover QC cases.
+```
+
+That future task may create only the seven canonical source/expected fixture sets, test naming/location and schema/integrity, test expected view-model and review-visibility contracts, and verify that optional Markdown remains display-only. It may not add a presentation consumer, production behavior, API/GUI/CLI behavior, persistence, database/repository access, audit, export writing, package decisions, hard validation, generated `blocked`, or production feature expansion.
 
 That future step should preserve this order:
 
@@ -167,4 +207,4 @@ This Step 204 branch intentionally stops at documentation and state records.
 
 ## Local-First Evidence Required for This Step
 
-Completion of this step requires the official local repository evidence recorded in `.cse/results/204_result.md` and `.cse/state/project_state.json`, including synchronized master SHA, branch SHA, divergence, changed files, pytest, diff check, protected path diff, physical local file presence, `exports/` status, ignored ZIP status, push result, and final working-tree status.
+Completion of this step requires the official local repository evidence recorded in `.cse/results/204_result.md` and `.cse/state/project_state.json`, including synchronized master SHA, verified content-correction SHA and divergence, changed files, pytest, diff check, protected path diff, physical local file presence, `exports/` status, ignored local-only file integrity, push result, and final working-tree status.
