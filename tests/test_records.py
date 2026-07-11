@@ -399,6 +399,138 @@ def test_field_observation_repository_update_status_allows_archived_record() -> 
     assert repository.list_by_status("closed") == [archived_record]
 
 
+def test_field_observation_repository_update_reporting_returns_none_for_missing_id() -> None:
+    repository = FieldObservationRepository()
+    record = _field_observation("obs-001")
+    repository.add(record)
+
+    result = repository.update_reporting(
+        "obs-999",
+        "Saha ekibi",
+        "2026-07-11T20:00:00",
+    )
+
+    assert result is None
+    assert repository.list_all() == [record]
+    assert record.reported_to is None
+    assert record.reported_at is None
+
+
+def test_field_observation_repository_update_reporting_sets_reporting_context() -> None:
+    repository = FieldObservationRepository()
+    record = _field_observation("obs-001")
+    repository.add(record)
+
+    result = repository.update_reporting(
+        "obs-001",
+        "Kontrol Muhendisi",
+        "2026-07-11T20:05:00",
+    )
+
+    assert result is record
+    assert record.reported_to == "Kontrol Muhendisi"
+    assert record.reported_at == "2026-07-11T20:05:00"
+    assert repository.find_by_id("obs-001") is record
+
+
+def test_field_observation_repository_update_reporting_changes_only_reporting_fields() -> None:
+    repository = FieldObservationRepository()
+    record = _field_observation("obs-001", status="closed", is_archived=True)
+    record.closed_at = "2026-07-11T20:10:00"
+    record.notes = "Existing official note."
+    record.created_by = "fatih"
+    repository.add(record)
+
+    result = repository.update_reporting(
+        "obs-001",
+        "Kalite ekibi",
+        "2026-07-11T20:15:00",
+    )
+
+    assert result is record
+    assert record.reported_to == "Kalite ekibi"
+    assert record.reported_at == "2026-07-11T20:15:00"
+    assert record.status == "closed"
+    assert record.closed_at == "2026-07-11T20:10:00"
+    assert record.notes == "Existing official note."
+    assert record.created_by == "fatih"
+    assert record.is_archived is True
+
+
+def test_field_observation_repository_update_reporting_changes_only_target_record() -> None:
+    repository = FieldObservationRepository()
+    target_record = _field_observation("obs-001")
+    other_record = _field_observation("obs-002")
+
+    repository.add(target_record)
+    repository.add(other_record)
+
+    result = repository.update_reporting(
+        "obs-001",
+        "Proje muduru",
+        "2026-07-11T20:20:00",
+    )
+
+    assert result is target_record
+    assert target_record.reported_to == "Proje muduru"
+    assert target_record.reported_at == "2026-07-11T20:20:00"
+    assert other_record.reported_to is None
+    assert other_record.reported_at is None
+    assert repository.list_all() == [target_record, other_record]
+
+
+def test_field_observation_repository_update_reporting_preserves_exact_strings() -> None:
+    repository = FieldObservationRepository()
+    record = _field_observation("obs-001")
+    repository.add(record)
+
+    result = repository.update_reporting(
+        "obs-001",
+        "  Kontrol Ekibi  ",
+        " 2026-07-11T20:25:00 ",
+    )
+
+    assert result is record
+    assert record.reported_to == "  Kontrol Ekibi  "
+    assert record.reported_at == " 2026-07-11T20:25:00 "
+
+
+def test_field_observation_repository_update_reporting_allows_archived_record() -> None:
+    repository = FieldObservationRepository()
+    archived_record = _field_observation("obs-001", is_archived=True)
+    repository.add(archived_record)
+
+    result = repository.update_reporting(
+        "obs-001",
+        "Arsiv kontrol ekibi",
+        "2026-07-11T20:30:00",
+    )
+
+    assert result is archived_record
+    assert archived_record.reported_to == "Arsiv kontrol ekibi"
+    assert archived_record.reported_at == "2026-07-11T20:30:00"
+    assert archived_record.is_archived is True
+
+
+def test_field_observation_repository_update_reporting_keeps_record_count_stable() -> None:
+    repository = FieldObservationRepository()
+    first_record = _field_observation("obs-001")
+    second_record = _field_observation("obs-002")
+
+    repository.add(first_record)
+    repository.add(second_record)
+
+    result = repository.update_reporting(
+        "obs-001",
+        "Saha sefi",
+        "2026-07-11T20:35:00",
+    )
+
+    assert result is first_record
+    assert repository.count() == 2
+    assert repository.list_all() == [first_record, second_record]
+
+
 def test_nonconformity_repository_adds_and_lists_records() -> None:
     repository = NonconformityRepository()
     record = NonconformityRecord(

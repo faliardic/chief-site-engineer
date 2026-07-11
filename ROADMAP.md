@@ -3,11 +3,11 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 212 - FieldObservationRepository Project/Status Filters
-PR #41 merge commit: e5842131882034eaf0cf5c8ec198f17c0f063dbe
+Adim 213 - FieldObservationRepository Status Update
+PR #43 merge commit: 45c2b2e2828dfea74121033bf01a868e6821b544
 ```
 
-Adim 212, PR #41 squash merge commit `e5842131882034eaf0cf5c8ec198f17c0f063dbe` ile master uzerindeki guncel guvenli noktadir. Step 213, Issue #42 kapsaminda `FieldObservationRepository` icin explicit status update davranisini ekleyen aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Adim 213, PR #43 squash merge commit `45c2b2e2828dfea74121033bf01a868e6821b544` ile master uzerindeki guncel guvenli noktadir. Step 214, Issue #44 kapsaminda `FieldObservationRepository` icin explicit reporting-context update davranisini ekleyen aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -157,6 +157,8 @@ Adim 212'de `FieldObservationRepository` icin `list_by_project_id(project_id)` v
 
 Adim 213'te `FieldObservationRepository.update_status(observation_id, new_status)` explicit status mutation davranisi eklendi. Method existing `find_by_id(...)` lookup'ini kullanir, missing id icin `None` dondurur, bulunan stored record'un yalniz `status` alanini degistirir ve ayni record nesnesini dondurur. `closed_at`, `reported_at`, notes, archive state veya baska alan otomatik degismez; status validation/enum/normalization, transition rule, close/reopen helper, persistence, attachment integration, API/GUI/CLI, audit/history/task/NCR/decision generation ve Step 214 eklenmedi.
 
+Adim 214'te `FieldObservationRepository.update_reporting(observation_id, reported_to, reported_at)` explicit reporting-context enrichment davranisi eklendi. Method existing `find_by_id(...)` lookup'ini kullanir, missing id icin `None` dondurur, bulunan stored record'un yalniz `reported_to` ve `reported_at` alanlarini degistirir ve ayni record nesnesini dondurur. Status otomatik `tracking` yapilmaz; current-time generation, contact lookup/normalization, other field updates, reporting history, audit/task/NCR/notification/decision generation, persistence, attachment integration, API/GUI/CLI ve Step 215 eklenmedi.
+
 Adim 160'da mevcut exception tabanli file-writing helper davranisini bozmadan future result contract wrapper API boundary documentation-only olarak planlandi; `write_*` helperlarin korunmasi, olasi `try_write_*` wrapper isimleri, result alanlari, error mapping, geriye uyumluluk ve handover QC gorunurlugu netlestirildi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 
 Adim 161'de Adim 160 API boundary'sine bagli future result contract wrapper implementation plan documentation-only olarak netlestirildi; `try_write_json_ready_dict_to_file(...)` ve `try_write_markdown_text_to_file(...)` wrapper davranisi, basari/hata result sozlesmesi, error mapping, overwrite/path safety davranisi, geriye uyumluluk ve handover QC gorunurlugu belgelendi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
@@ -186,7 +188,7 @@ Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test
 Guncel test durumu:
 
 ```text
-431 passed
+438 passed
 ```
 
 Proje su anda domain model, bellek ici repository, test, dokumantasyon, learning ve NotebookLM podcast notlari cekirdegi seviyesindedir.
@@ -523,8 +525,16 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 - [x] Adim 213 - Status filtresinin update'i hemen yansittigi ve yeni/duplicate record olusmadigi test edildi.
 - [x] Adim 213 - Automatic timestamps, validation, enums, close/reopen workflow, other field updates, archive gating, persistence, attachment integration, API/GUI/CLI, audit ve Step 214 baslatilmadi.
 
+## Step 214 - FieldObservationRepository Reporting Update
+
+- [x] Adim 214 - `update_reporting(observation_id, reported_to, reported_at)` explicit reporting-context update method'u eklendi.
+- [x] Adim 214 - Missing id icin `None`, found id icin ayni stored record nesnesi donduruldu.
+- [x] Adim 214 - Yalniz `reported_to` ve `reported_at` alanlarinin degistigi; status, closed timestamp, notes, creator ve archive state'in korundugu test edildi.
+- [x] Adim 214 - Exact string preservation, archived record allowance ve stable count davranislari test edildi.
+- [x] Adim 214 - Automatic status change, timestamp generation, contact lookup/normalization, other field updates, persistence, attachment integration, API/GUI/CLI, audit ve Step 215 baslatilmadi.
+
 ## Sonraki Calisma Onerisi
 
-Adim 213 merge edildikten sonra Field MVP icin sonraki dar adimlar attachment, location, reported-to, explicit close/reopen policy veya export/reporting alanlarindan biri olabilir; bunlar ayri issue ile netlestirilmelidir. Ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur; persistence, attachment integration, broader filters, automatic lifecycle rules, export/API/audit/validation henuz uygulanmamistir.
+Adim 214 merge edildikten sonra Field MVP icin sonraki dar adimlar attachment, location, explicit close/reopen policy veya export/reporting consumers alanlarindan biri olabilir; bunlar ayri issue ile netlestirilmelidir. Ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur; persistence, attachment integration, broader filters/mutations, automatic lifecycle rules, contact normalization, export/API/audit/validation henuz uygulanmamistir.
 
 Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Podcast 030 Adim 196-200 araligini, Podcast 031 Adim 201-205 araligini ve Podcast 032 Adim 206-210 araligini kapsar; sonraki dogal podcast araligi Steps 211-215'tir.

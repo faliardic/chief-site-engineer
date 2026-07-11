@@ -1,5 +1,21 @@
 # Proje Kararlari
 
+## 214 FieldObservationRepository Reporting Update Karari
+
+- `FieldObservationRepository`, `update_reporting(observation_id, reported_to, reported_at)` explicit reporting-context enrichment method'unu saglar.
+- Method existing `find_by_id(...)` lookup davranisini kullanir.
+- Missing `observation_id` icin `None` dondurur ve repository contents degismez.
+- Found record icin yalniz `record.reported_to = reported_to` ve `record.reported_at = reported_at` assignment'lari yapilir; ayni stored record nesnesi dondurulur.
+- `reported_to` ve `reported_at` trim, normalize, validate, map, parse veya convert edilmez.
+- Contact lookup, contact ID, relationship resolution veya normalization eklenmez.
+- Status otomatik `tracking` veya baska bir degere alinmaz.
+- `closed_at`, notes, `created_by`, `is_archived` veya baska alan otomatik set/clear edilmez.
+- Archived observation kayitlari explicit reporting update'ten engellenmez; archive gating bu adimin kapsami degildir.
+- Step 213, PR #43 squash merge commit `45c2b2e2828dfea74121033bf01a868e6821b544` ile latest merged/finalized safe point'tir; Issue #42 completed olarak kaydedilir.
+- Step 214, Issue #44 ve `step-214-field-observation-reporting-update` branch'i uzerinde aktif unmerged explicit reporting-update isidir.
+- Podcast 032 latest completed podcast olarak Steps 206-210 araligini kapsar; sonraki besli podcast araligi Steps 211-215'tir.
+- Automatic status change, current-time generation, contact normalization, other field updates, reporting history, audit/task/NCR/notification/decision generation, persistence, attachment integration, API/GUI/CLI, generated `blocked`, daily export, weekly summary ve Step 215 uygulanmamistir.
+
 ## 213 FieldObservationRepository Status Update Karari
 
 - `FieldObservationRepository`, `update_status(observation_id, new_status)` explicit status mutation method'unu saglar.

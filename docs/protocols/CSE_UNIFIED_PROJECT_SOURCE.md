@@ -940,41 +940,41 @@ Gerçek şantiye
 
 ### Son doğrulanmış merged GitHub noktası
 
-- Step: **212**
-- PR: **#41**
-- Issue: **#40**
+- Step: **213**
+- PR: **#43**
+- Issue: **#42**
 - Merge commit:
 
 ```text
-e5842131882034eaf0cf5c8ec198f17c0f063dbe
+45c2b2e2828dfea74121033bf01a868e6821b544
 ```
 
-- Latest merged safe point test seviyesi: **425 passed**
-- Aktif Step 213 yerel test seviyesi: **431 passed**
+- Latest merged safe point test seviyesi: **431 passed**
+- Aktif Step 214 yerel test seviyesi: **438 passed**
 - GitHub Actions: manuel olarak devre dışı
 - Podcast 032: Steps 206-210 latest completed podcast
 - Sonraki doğal podcast aralığı: Steps 211-215
 
 ### Yerel senkronizasyon durumu
 
-Step 213 baslangicinda resmî `V:` yerel master `e5842131882034eaf0cf5c8ec198f17c0f063dbe` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
+Step 214 baslangicinda resmî `V:` yerel master `45c2b2e2828dfea74121033bf01a868e6821b544` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
 
 ### Aktif iş
 
-- Step: **213**
-- Issue: **#42**
-- Amaç: `FieldObservationRepository` icin explicit `status` update davranisini eklemek
+- Step: **214**
+- Issue: **#44**
+- Amaç: `FieldObservationRepository` icin explicit `reported_to` / `reported_at` update davranisini eklemek
 - Branch:
 
 ```text
-step-213-field-observation-status-update
+step-214-field-observation-reporting-update
 ```
 
-- Bu adim dar repository explicit mutation isidir.
+- Bu adim dar repository explicit reporting-context enrichment isidir.
 - `FieldObservationRecord` halen tek Field-MVP model implementasyonudur.
-- `FieldObservationRepository` baseline-level bellek ici repository'dir; project/status exact filtreleri ve Step 213 kapsaminda tek explicit status update davranisi vardir.
-- Persistence, attachment integration, broader filters, automatic lifecycle rules, export/reporting, API/GUI/CLI, audit ve validation henuz uygulanmamistir.
-- Step 214 baslatilmamistir.
+- `FieldObservationRepository` baseline-level bellek ici repository'dir; project/status exact filtreleri, explicit status update ve Step 214 kapsaminda tek explicit reporting-context update davranisi vardir.
+- Persistence, attachment integration, broader filters/mutations, automatic lifecycle rules, contact normalization, export/reporting consumers, API/GUI/CLI, audit ve validation henuz uygulanmamistir.
+- Step 215 baslatilmamistir.
 
 ---
 
@@ -1012,7 +1012,7 @@ step-213-field-observation-status-update
 
 ### 29.7 Eski aktif Step bilgileri
 
-Step 203, 204, 205, 206, 207, 208, 209, 210, 211 ve aktif Step 212 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 212’dir; Step 213 aktif unmerged explicit status-update aşamasındadır.
+Step 203, 204, 205, 206, 207, 208, 209, 210, 211, 212 ve aktif Step 213 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 213’tür; Step 214 aktif unmerged explicit reporting-update aşamasındadır.
 
 ### 29.8 Eski modül sırasının bağlayıcı olması
 
