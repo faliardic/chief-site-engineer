@@ -1,5 +1,20 @@
 # Proje Kararlari
 
+## 202 Canonical Handover QC View-Model Examples and Wording Karari
+
+- Adim 202, future handover QC presentation view-model consumer'lari icin canonical example ve wording standardizasyonunu documentation-only olarak hazirlar.
+- Structured source of truth `build_export_handover_qc_review_checklist(summary, report)` ciktisi olarak kalir.
+- `format_export_handover_qc_review_checklist_as_markdown(checklist)` optional presentation text olarak kalir; future consumer Markdown'u structured truth olarak parse etmemelidir.
+- Status wording standardi `Ready for review`, `Needs human review`, `Review status unknown` ve unknown status icin `Unknown status; treat as review visibility only` ifadelerini kullanir.
+- Human-review wording standardi `Human review required` ve `No review signal from checklist` ifadelerini kullanir; bu ifadeler resmi kabul, ret veya paket karari degildir.
+- Empty state, missing optional field, unknown status ve missing next-action fallback metinleri insan incelemesi icin sabitlenir.
+- Canonical examples success-only, failure-only, mixed, empty/zero-count, missing optional fields, unknown status/additional fields ve unsupported input fallback kategorilerini kapsar.
+- `is_read_only=True`, `is_blocking=False` ve `requires_human_review` yalniz human-review visibility semantics olarak korunur.
+- Generated `blocked` status, automatic acceptance/rejection/approval/package blocking, official transfer decision, persistence, audit, backup/restore, migration ve hard validation eklenmez.
+- Official transferable handover data ile private/non-transferable information ayrimi her ornekte korunur.
+- Sonraki dar teknik onerim future handover QC presentation view-model icin documentation-only fixture naming and assertion checklist hazirlamaktir; implementation baslatilmaz.
+- Production code, tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, file/export output ve ZIP mutasyonu eklenmez.
+
 ## 201 Podcast 030 - Adim 196-200 NotebookLM Podcast Notu Karari
 
 - Adim 201, Podcast 030'u documentation-only olarak hazirlar.
