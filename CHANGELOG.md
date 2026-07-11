@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 216
+
+- Added Podcast 033 source note at `docs/podcast_notes/033_adim_211_215_notebooklm_podcast_notu.md`, covering only Steps 211-215.
+- Summarized the arc from Podcast 032 closure to project/status filters, explicit status update, explicit reporting-context update, and location/category filters.
+- Updated repository truth so Step 215 / PR #47 / Issue #46 / merge commit `7b3361087cdb51fe1e76caa6f2cd91ff005cdfe2` is the latest merged/finalized safe point and Podcast 033 remains active unmerged Step 216 work.
+- Recorded that Podcast 033 becomes the latest completed podcast only after Step 216 merges; the next five-step podcast range after that merge is Steps 216-220.
+- Kept this scope documentation/state/podcast-only; no production code, executable tests, repository behavior, persistence, attachment integration, export/reporting consumers, API/GUI/CLI, generated `blocked`, Podcast 034, Step 217, workflow changes, Actions enablement, ZIP mutation, or Desktop archive mutation was added.
+
 ## Step 215
 
 - Added `FieldObservationRepository.list_by_location(location)` and `FieldObservationRepository.list_by_category(category)` for exact read-only in-memory visibility.

@@ -1,5 +1,17 @@
 # Proje Kararlari
 
+## 216 Podcast 033 Steps 211-215 Karari
+
+- Podcast 033, `docs/podcast_notes/033_adim_211_215_notebooklm_podcast_notu.md` dosyasinda yalniz Steps 211-215 araligini kapsayan NotebookLM kaynak notu olarak hazirlanir.
+- Step 216 documentation/state/podcast-only bir adimdir; product behavior, production code veya executable test eklemez.
+- Podcast 033, Step 211 Podcast 032 kapanisini; Step 212 project/status filtrelerini; Step 213 explicit status update'i; Step 214 explicit reporting update'i; Step 215 location/category filtrelerini anlatir.
+- Step 212-215 davranislari automatic, validated, normalized, persistent veya field-ready application behavior gibi sunulmaz.
+- Step 215, PR #47 squash merge commit `7b3361087cdb51fe1e76caa6f2cd91ff005cdfe2` ile latest merged/finalized safe point'tir; Issue #46 completed olarak kaydedilir.
+- Step 216, Issue #48 ve `step-216-podcast-033-steps-211-215` branch'i uzerinde aktif unmerged podcast/state isidir.
+- Podcast 032, Step 216 merge edilene kadar latest completed podcast olarak Steps 206-210 araligini kapsar.
+- Podcast 033, Step 216 merge edildikten sonra latest completed podcast olur; sonraki besli podcast araligi Steps 216-220 olur.
+- Podcast 034, Step 217, persistence, attachment integration, export/reporting consumers, API/GUI/CLI, audit/history/task/NCR/decision generation, hard validation, generated `blocked`, workflow changes ve ZIP/Desktop archive mutation uygulanmamistir.
+
 ## 215 FieldObservationRepository Location ve Category Filter Karari
 
 - `FieldObservationRepository`, `list_by_location(location)` ve `list_by_category(category)` read-only filtrelerini saglar.

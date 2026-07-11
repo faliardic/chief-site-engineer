@@ -9,8 +9,8 @@ Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici reposit
 Son guvenli nokta:
 
 ```text
-Adim 214 - FieldObservationRepository reporting update
-PR #45 merge commit: 768178a85844aae10c46008e28eafa23822fd631
+Adim 215 - FieldObservationRepository location/category filters
+PR #47 merge commit: 7b3361087cdb51fe1e76caa6f2cd91ff005cdfe2
 ```
 
 Guncel test sonucu:
@@ -22,10 +22,10 @@ Guncel test sonucu:
 Mevcut calisma durumu:
 
 ```text
-Adim 215 - FieldObservationRepository location/category filters
+Adim 216 - Podcast 033 for Steps 211-215
 ```
 
-Adim 214, PR #45 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 215, `FieldObservationRepository` icin exact read-only location/category filtrelerini ekleyen aktif branch isidir; henuz merge edilmemistir.
+Adim 215, PR #47 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 216, Steps 211-215 araligini kapsayan Podcast 033 notunu hazirlayan aktif documentation/state/podcast isidir; henuz merge edilmemistir.
 
 ## Repo Koku
 
@@ -117,12 +117,13 @@ Son eklenen podcast notlari:
 - `docs/podcast_notes/030_adim_196_200_notebooklm_podcast_notu.md`
 - `docs/podcast_notes/031_adim_201_205_notebooklm_podcast_notu.md`
 - `docs/podcast_notes/032_adim_206_210_notebooklm_podcast_notu.md`
+- `docs/podcast_notes/033_adim_211_215_notebooklm_podcast_notu.md`
 
-Podcast 032, latest completed podcast olarak Steps 206-210 araligini kapsar. Bu notlar, export/result/handover QC hattini, official local sync protokolunu, canonical instruction workflow'unu, Field MVP observation contract/model/repository baslangicini ve CSE veri koruma / ozel alan politikalarini podcast anlatimina uygun sekilde ozetler. Sonraki dogal podcast araligi Steps 211-215'tir.
+Podcast 032, Step 216 merge edilene kadar latest completed podcast olarak Steps 206-210 araligini kapsar. Podcast 033, Steps 211-215 icin aktif unmerged podcast artifact'idir; merge edildikten sonra latest completed podcast olur. Sonraki dogal podcast araligi Step 216 merge sonrasinda Steps 216-220 olur.
 
 ## Kalite Kontrol ve CI Durumu
 
-- Guncel yerel Step 215 branch test sonucu `445 passed` olarak dogrulanir.
+- Guncel merged safe point test tabani `445 passed` olarak dogrulanir.
 - `.github/workflows/pytest.yml` GitHub Actions workflow'u repoda bulunur.
 - Otomatik Actions calismasi account billing/runner-start kisiti nedeniyle manuel olarak devre disidir.
 - Required status checks etkin degildir.
