@@ -96,7 +96,10 @@
     "force_push_authorized": false,
     "merge_authorized": false,
     "pull_request": null,
-    "pull_request_creation_by_codex": false
+    "pull_request_creation_by_codex": false,
+    "verified_content_commit_divergence": "0 0",
+    "verified_content_commit_local_sha": "7df6451e0c6e7332a8293cf326ce25e15b548598",
+    "verified_content_commit_remote_sha": "7df6451e0c6e7332a8293cf326ce25e15b548598"
   },
   "required_files": [
     "docs/protocols/CSE_PROJECT_INSTRUCTIONS.md",
@@ -114,13 +117,14 @@
   "tests": {
     "command": "python -m pytest",
     "result": "passed",
-    "summary": "413 passed in 1.18s"
+    "content_verification_summary": "413 passed in 1.18s",
+    "metadata_finalization_summary": "413 passed in 1.17s"
   },
-  "workflow_status": "step_205_documentation_state_content_verified_before_push",
+  "workflow_status": "step_205_documentation_state_content_push_verified_before_metadata_finalization",
   "working_tree": {
     "authorized_scope_only": true,
     "required_files_physically_present": true,
-    "result": "step_205_authorized_content_verified_before_commit"
+    "result": "result_and_state_metadata_finalization_only_after_verified_content_push"
   },
   "zip": {
     "ignored_zip_touched": false,
