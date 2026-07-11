@@ -3,11 +3,11 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 200 - Handover QC Downstream Presentation Consumer Contract and Test Matrix Plan
-Merge commit: 1d2d0bce33ad14362df54c2adc68910c02c16102
+Adim 201 - Podcast 030 Steps 196-200 Documentation Follow-up
+Merge commit: 3918bfbe73d79ea6dcb9228ebcbd2818322965ec
 ```
 
-Adim 200, master uzerindeki guncel guvenli noktadir. Step 201 acik draft Podcast 030 / Steps 196-200 documentation follow-up calismasidir ve merge edilene kadar yeni guvenli nokta olarak sayilmaz.
+Adim 201, master uzerindeki guncel guvenli noktadir. Step 202 acik draft canonical handover QC view-model examples and wording standardization calismasidir ve merge edilene kadar yeni guvenli nokta olarak sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -146,6 +146,8 @@ Adim 199'da Step 181-192 export/handover QC checklist ve Markdown formatter fazi
 Adim 200'de future handover QC screen ve export review presentation consumer icin documentation-only input boundary, view-model contract, fallback display behavior ve regression/test matrix planlandi. Existing checklist helper ve Markdown formatter davranislari korunur; `is_read_only=True`, `is_blocking=False`, `requires_human_review` insan inceleme sinyali, no generated `blocked` status, no automatic acceptance/rejection/blocking ve official-transferable/private-non-transferable separation semantics tekrar sabitlenir. API/GUI/CLI implementation, persistence, audit, backup/restore, migration, hard validation, test/production/workflow degisikligi, ZIP ve export ciktisi eklenmez.
 
 Adim 201'de Podcast 030 documentation-only olarak hazirlandi ve yalniz Adim 196-200 araligini kapsadi. Not; minimal GitHub Actions `pytest` workflow'u, explicit merged-state finalization, billing lock'un external CI execution constraint olarak siniflandirilmasi, roadmap/current checkpoint resynchronization, handover QC checklist phase closure ve downstream presentation consumer contract/test matrix planini NotebookLM-friendly sekilde ozetler. Production code, tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, ZIP ve export ciktisi eklenmez.
+
+Adim 202'de future handover QC presentation view-model consumer'lari icin canonical examples ve wording standardization documentation-only olarak hazirlandi. Structured source of truth `build_export_handover_qc_review_checklist(summary, report)` ciktisi olarak korunur; optional Markdown yalniz presentation text olarak kalir ve structured truth olarak parse edilmez. Success-only, failure-only, mixed, empty/zero-count, missing optional fields, unknown status/additional fields ve unsupported input fallback ornekleri; status label, human-review indicator, empty state, missing-field fallback, unknown-status visibility ve item next-action wording'i standardize edilir. `is_read_only=True`, `is_blocking=False`, `requires_human_review` insan inceleme sinyali, no generated `blocked` status, no automatic acceptance/rejection/blocking ve official-transferable/private-non-transferable separation semantics korunur. Production code, tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, ZIP ve export ciktisi eklenmez.
 
 Adim 160'da mevcut exception tabanli file-writing helper davranisini bozmadan future result contract wrapper API boundary documentation-only olarak planlandi; `write_*` helperlarin korunmasi, olasi `try_write_*` wrapper isimleri, result alanlari, error mapping, geriye uyumluluk ve handover QC gorunurlugu netlestirildi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 
@@ -415,8 +417,16 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 - [x] Adim 201 - `is_read_only=True`, `is_blocking=False`, `requires_human_review` human-review signal only, no generated `blocked` status ve no automatic acceptance/rejection/blocking semantics podcast notunda tekrar korundu.
 - [x] Adim 201 - Official-transferable ve private/non-transferable information ayrimi podcast notunda acik tutuldu.
 
+## Canonical Handover QC View-Model Wording - Adim 202
+
+- [x] Adim 202 - Future handover QC presentation view-model icin canonical examples ve wording standardization documentation-only olarak hazirlandi.
+- [x] Adim 202 - `build_export_handover_qc_review_checklist(summary, report)` structured source of truth olarak, optional Markdown ise presentation-only output olarak sabitlendi.
+- [x] Adim 202 - Success-only, failure-only, mixed, empty/zero-count, missing optional fields, unknown status/additional fields ve unsupported input fallback ornekleri standardize edildi.
+- [x] Adim 202 - Status label, human-review indicator, empty state, missing-field fallback, unknown-status visibility ve item next-action wording'i future consumer'lar icin belgelendi.
+- [x] Adim 202 - Official-transferable ve private/non-transferable information ayrimi her ornekte korundu.
+
 ## Sonraki Calisma Onerisi
 
-Adim 201 sonrasi tek dar teknik onerim, future handover QC presentation view-model icin documentation-only canonical examples and wording standardization hazirlamaktir. Bu adim da API/GUI/CLI implementation, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, file/export output veya official package decision behavior baslatmamalidir.
+Adim 202 sonrasi tek dar teknik onerim, future handover QC presentation view-model icin documentation-only fixture naming and assertion checklist hazirlamaktir. Bu adim da API/GUI/CLI implementation, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, file/export output veya official package decision behavior baslatmamalidir.
 
 Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Son mevcut podcast notu Podcast 030'dur ve Adim 196-200 araligini kapsar. Adim 201 kapsaminda Podcast 030 olusturuldu.
