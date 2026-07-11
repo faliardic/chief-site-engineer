@@ -6,7 +6,7 @@
 - Pull request: #4, open draft
 - Branch: `step-194-cse-status-report`
 - Base commit: `51d6bc9283fab92bc303d0d96b6a17768d28979e`
-- Result commit: pending at the time this file was written
+- Result commit: `9d98a898461722ba8871a38b7599bb328c11d78a`
 
 ## Work Completed
 - Added `scripts/cse_status.py`, a read-only local CSE status reporter.
@@ -25,7 +25,7 @@
 
 ## Verification
 - Focused tests: `python -m pytest tests/test_cse_status.py` -> `8 passed in 0.07s`
-- Full tests: `python -m pytest` -> `406 passed in 0.70s`
+- Full tests: `python -m pytest` -> `406 passed in 1.44s`
 - `git diff --check`: passed
 - New command without tests: `python scripts/cse_status.py` -> passed
 - New command with tests: `python scripts/cse_status.py --run-tests` -> passed; nested pytest reported `406 passed in 0.66s`
@@ -48,7 +48,7 @@
 - Existing production application behavior changed: no
 
 ## Git State
-- Commit: pending at the time this file was written
+- Commit: `9d98a898461722ba8871a38b7599bb328c11d78a`
 - Push: pending at the time this file was written
 - Draft PR: #4 remains draft
 - Merge: not authorized
