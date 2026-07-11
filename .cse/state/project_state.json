@@ -1,0 +1,20 @@
+{
+  "protocol_version": 1,
+  "step": 193,
+  "issue": 1,
+  "branch": "step-193-github-handoff-protocol",
+  "base_branch": "master",
+  "base_commit": "12e042850515005ed7baa55d9eb273dad8d201e3",
+  "result_commit": null,
+  "workflow_status": "draft_pr_pending",
+  "tests": {
+    "command": "python -m pytest",
+    "result": "not_run_by_github_connector"
+  },
+  "diff_check": "not_run_by_github_connector",
+  "exports_clean": "requires_local_verification",
+  "zip_untouched": true,
+  "production_code_changed": false,
+  "tests_changed": false,
+  "next_action": "Review draft PR and run local verification before merge"
+}
