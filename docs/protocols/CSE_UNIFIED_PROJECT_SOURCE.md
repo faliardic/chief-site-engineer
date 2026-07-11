@@ -23,7 +23,7 @@ Bu kaynak hazırlanırken aşağıdaki proje kaynakları birlikte incelenmiştir
 5. `CSE_STRATEGIC_PRODUCT_DIRECTION.md`
 6. `CSE_GUNCEL_PROJE_TALIMATLARI.md`
 7. `STEP_204_CODEX_DUZELTME_TALIMATI.md`
-8. Bu sohbet içinde kesinleştirilen Step 206, Step 207, Step 208 ve Step 209 kararları
+8. Bu sohbet içinde kesinleştirilen Step 206, Step 207, Step 208, Step 209 ve Step 210 kararları
 9. Güncel GitHub Issue/PR/merge gerçekliği
 
 ### Kaynakların kullanım biçimi
@@ -940,37 +940,38 @@ Gerçek şantiye
 
 ### Son doğrulanmış merged GitHub noktası
 
-- Step: **208**
-- PR: **#33**
-- Issue: **#32**
+- Step: **209**
+- PR: **#35**
+- Issue: **#34**
 - Merge commit:
 
 ```text
-335fb83c989f3fbf1057d88ebe02045174efcdc9
+f1fd7b8e6add21369b3d5f4c44d014994538fc1c
 ```
 
-- Son doğrulanan test seviyesi: **413 passed**
+- Son doğrulanan test seviyesi: **416 passed**
 - GitHub Actions: manuel olarak devre dışı
 - Podcast 031: Steps 201-205 tamamlandı
 
 ### Yerel senkronizasyon durumu
 
-Step 209 baslangicinda resmî `V:` yerel master `335fb83c989f3fbf1057d88ebe02045174efcdc9` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
+Step 210 baslangicinda resmî `V:` yerel master `f1fd7b8e6add21369b3d5f4c44d014994538fc1c` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
 
 ### Aktif iş
 
-- Step: **209**
-- Issue: **#34**
-- Amaç: ilk Field MVP icin minimal `FieldObservationRecord` dataclass ve focused value/default testlerini eklemek
+- Step: **210**
+- Issue: **#36**
+- Amaç: merge edilmis `FieldObservationRecord` icin minimal bellek ici `FieldObservationRepository` baseline'i ve focused repository testlerini eklemek
 - Branch:
 
 ```text
-step-209-field-observation-record-model
+step-210-field-observation-repository-baseline
 ```
 
-- Bu adim narrow model/test isidir.
-- Field-MVP implementation yalniz minimal `FieldObservationRecord` dataclass ve focused test kapsaminda baslamistir.
-- Attachment linking, repository/persistence, export/reporting, API/GUI/CLI, audit ve validation henuz uygulanmamistir.
+- Bu adim narrow repository/test isidir.
+- `FieldObservationRecord` halen tek Field-MVP model implementasyonudur.
+- `FieldObservationRepository` yalniz baseline-level bellek ici repository'dir.
+- Persistence, attachment integration, filters, lifecycle updates, export/reporting, API/GUI/CLI, audit ve validation henuz uygulanmamistir.
 
 ---
 
@@ -1008,7 +1009,7 @@ step-209-field-observation-record-model
 
 ### 29.7 Eski aktif Step bilgileri
 
-Step 203, 204, 205, 206, 207 ve aktif Step 208 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 208’dir; Step 209 aktif unmerged model/test aşamasındadır.
+Step 203, 204, 205, 206, 207, 208 ve aktif Step 209 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 209’dur; Step 210 aktif unmerged repository-baseline aşamasındadır.
 
 ### 29.8 Eski modül sırasının bağlayıcı olması
 

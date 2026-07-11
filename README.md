@@ -9,23 +9,23 @@ Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici reposit
 Son guvenli nokta:
 
 ```text
-Adim 208 - First Field MVP observation record contract
-PR #33 merge commit: 335fb83c989f3fbf1057d88ebe02045174efcdc9
+Adim 209 - Minimal FieldObservationRecord model
+PR #35 merge commit: f1fd7b8e6add21369b3d5f4c44d014994538fc1c
 ```
 
 Guncel test sonucu:
 
 ```text
-416 passed
+420 passed
 ```
 
 Mevcut calisma durumu:
 
 ```text
-Adim 209 - Minimal FieldObservationRecord model
+Adim 210 - FieldObservationRepository baseline
 ```
 
-Adim 208, PR #33 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 209, ilk Field MVP icin minimal `FieldObservationRecord` dataclass ve focused value/default testlerini ekleyen aktif model/test isidir; henuz merge edilmemistir.
+Adim 209, PR #35 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 210, ilk Field MVP icin minimal bellek ici `FieldObservationRepository` baseline'ini ekleyen aktif repository/test isidir; henuz merge edilmemistir.
 
 ## Repo Koku
 
@@ -38,7 +38,7 @@ V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer
 Proje su ana parcalardan olusur:
 
 - `app/models.py`: Santiye, kalite, uygunsuzluk, NCR, dosya eki ve yardimci domain modelleri.
-- `app/records.py`: Bellek ici kayit listeleme ve `NonconformityRepository` davranislari.
+- `app/records.py`: Bellek ici kayit listeleme, `FieldObservationRepository` baseline'i ve `NonconformityRepository` davranislari.
 - `app/attachments.py`: Canonical attachment path helper fonksiyonu.
 - `app/attachment_integrity.py`: Attachment integrity status sabitleri, result/report modelleri, helper ve serializer fonksiyonlari.
 - `app/main.py`: Basit uygulama baslangic mesaji.
@@ -75,6 +75,7 @@ Adim 205 itibariyla proje su alanlarda ilerlemistir:
 - Audit target record id format ve validation tasarimi dokumantasyonu.
 - Dosya eki saklama, adlandirma, arsiv guvenligi, silme/tasima karar dokumantasyonu.
 - Minimal `FieldObservationRecord` dataclass ve focused value/default testleri.
+- Minimal bellek ici `FieldObservationRepository` baseline'i; add/list/count/find ve duplicate `observation_id` reddi.
 - CSE ana proje ilkeleri ve veri koruma politikasi.
 - Resmi kayit / Santiye Sefi Ozel Alani izolasyon politikasi.
 - Santiye sefi devir ve ozel alan politikasi.
@@ -116,7 +117,7 @@ Bu notlar, export/result/handover QC hattini, official local sync protokolunu, c
 
 ## Kalite Kontrol ve CI Durumu
 
-- Guncel yerel test tabani `413 passed` olarak dogrulanir.
+- Guncel yerel test tabani `420 passed` olarak dogrulanir.
 - `.github/workflows/pytest.yml` GitHub Actions workflow'u repoda bulunur.
 - Otomatik Actions calismasi account billing/runner-start kisiti nedeniyle manuel olarak devre disidir.
 - Required status checks etkin degildir.
@@ -166,7 +167,7 @@ python -m pytest
 Beklenen guncel sonuc:
 
 ```text
-413 passed
+420 passed
 ```
 
 ## Basit Calistirma
@@ -210,7 +211,7 @@ Bu proje ayni zamanda Python ve yazilim gelistirme ogrenim arsivi uretir.
 
 ## Sonraki Urun Yonu
 
-Adim 205 repository truth synchronization merge edildikten sonra ilk urun yonu, veri omurgasini guvenilir tutan dar bir saha MVP'sidir:
+Adim 209 merge edildikten sonra ilk urun yonu, veri omurgasini guvenilir tutan dar bir saha MVP'sidir:
 
 - hizli observation kaydi,
 - attachment,
@@ -220,4 +221,4 @@ Adim 205 repository truth synchronization merge edildikten sonra ilk urun yonu, 
 - daily export,
 - weekly summary.
 
-CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. Adim 209, Field MVP implementasyonunu yalniz minimal `FieldObservationRecord` dataclass ve focused test kapsaminda baslatir; attachment linking, repository/persistence, export/reporting, API/GUI/CLI, audit ve validation henuz eklenmemistir.
+CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. Adim 210, Field MVP implementasyonunu yalniz minimal bellek ici `FieldObservationRepository` baseline'i kadar ilerletir; persistence, filters, lifecycle updates, attachment linking, export/reporting, API/GUI/CLI, audit ve validation henuz eklenmemistir.

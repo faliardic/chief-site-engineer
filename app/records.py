@@ -1,6 +1,6 @@
 from typing import TypeVar
 
-from app.models import NonconformityRecord
+from app.models import FieldObservationRecord, NonconformityRecord
 
 
 RecordT = TypeVar("RecordT")
@@ -35,6 +35,32 @@ def filter_records_by_status(records: list[RecordT], status: str) -> list[Record
 
 def list_records_by_project(records: list[RecordT], project_id: str) -> list[RecordT]:
     return filter_records_by_project_id(records, project_id)
+
+
+class FieldObservationRepository:
+    """Stores field observation records in memory."""
+
+    def __init__(self) -> None:
+        self._records: list[FieldObservationRecord] = []
+
+    def add(self, record: FieldObservationRecord) -> None:
+        if self.find_by_id(record.observation_id) is not None:
+            raise ValueError(
+                f"FieldObservationRecord with id '{record.observation_id}' already exists."
+            )
+        self._records.append(record)
+
+    def list_all(self) -> list[FieldObservationRecord]:
+        return list(self._records)
+
+    def count(self) -> int:
+        return len(self._records)
+
+    def find_by_id(self, observation_id: str) -> FieldObservationRecord | None:
+        for record in self._records:
+            if record.observation_id == observation_id:
+                return record
+        return None
 
 
 class NonconformityRepository:
