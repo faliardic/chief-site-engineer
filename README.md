@@ -9,23 +9,23 @@ Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici reposit
 Son guvenli nokta:
 
 ```text
-Adim 210 - FieldObservationRepository baseline
-PR #37 merge commit: c7dbd94076f9e23c928f27ea377a97debad6636b
+Adim 211 - Podcast 032 for Steps 206-210
+PR #39 merge commit: 26509f35abb0cb706d2a085715310358cf5d2421
 ```
 
 Guncel test sonucu:
 
 ```text
-420 passed
+425 passed
 ```
 
 Mevcut calisma durumu:
 
 ```text
-Adim 211 - Podcast 032 for Steps 206-210
+Adim 212 - FieldObservationRepository project and status filters
 ```
 
-Adim 210, PR #37 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 211, Steps 206-210 icin Podcast 032 kaynak notunu ekleyen aktif documentation/podcast isidir; henuz merge edilmemistir.
+Adim 211, PR #39 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 212, `FieldObservationRepository` icin exact project/status filtrelerini ekleyen aktif branch isidir; henuz merge edilmemistir.
 
 ## Repo Koku
 
@@ -76,6 +76,7 @@ Adim 205 itibariyla proje su alanlarda ilerlemistir:
 - Dosya eki saklama, adlandirma, arsiv guvenligi, silme/tasima karar dokumantasyonu.
 - Minimal `FieldObservationRecord` dataclass ve focused value/default testleri.
 - Minimal bellek ici `FieldObservationRepository` baseline'i; add/list/count/find ve duplicate `observation_id` reddi.
+- `FieldObservationRepository` icin read-only exact `project_id` ve `status` filtreleri.
 - CSE ana proje ilkeleri ve veri koruma politikasi.
 - Resmi kayit / Santiye Sefi Ozel Alani izolasyon politikasi.
 - Santiye sefi devir ve ozel alan politikasi.
@@ -114,11 +115,11 @@ Son eklenen podcast notlari:
 - `docs/podcast_notes/031_adim_201_205_notebooklm_podcast_notu.md`
 - `docs/podcast_notes/032_adim_206_210_notebooklm_podcast_notu.md`
 
-Podcast 032, Step 211 branch'i uzerinde aktif artifact'tir; merge sonrasinda latest completed podcast olur ve Steps 206-210 araligini kapsar. Bu notlar, export/result/handover QC hattini, official local sync protokolunu, canonical instruction workflow'unu, Field MVP observation contract/model/repository baslangicini ve CSE veri koruma / ozel alan politikalarini podcast anlatimina uygun sekilde ozetler.
+Podcast 032, latest completed podcast olarak Steps 206-210 araligini kapsar. Bu notlar, export/result/handover QC hattini, official local sync protokolunu, canonical instruction workflow'unu, Field MVP observation contract/model/repository baslangicini ve CSE veri koruma / ozel alan politikalarini podcast anlatimina uygun sekilde ozetler. Sonraki dogal podcast araligi Steps 211-215'tir.
 
 ## Kalite Kontrol ve CI Durumu
 
-- Guncel yerel test tabani `420 passed` olarak dogrulanir.
+- Guncel yerel test tabani `425 passed` olarak dogrulanir.
 - `.github/workflows/pytest.yml` GitHub Actions workflow'u repoda bulunur.
 - Otomatik Actions calismasi account billing/runner-start kisiti nedeniyle manuel olarak devre disidir.
 - Required status checks etkin degildir.
@@ -168,7 +169,7 @@ python -m pytest
 Beklenen guncel sonuc:
 
 ```text
-420 passed
+425 passed
 ```
 
 ## Basit Calistirma
@@ -212,7 +213,7 @@ Bu proje ayni zamanda Python ve yazilim gelistirme ogrenim arsivi uretir.
 
 ## Sonraki Urun Yonu
 
-Adim 210 merge edildikten sonra ilk urun yonu, veri omurgasini guvenilir tutan dar bir saha MVP'sidir:
+Adim 212 branch calismasi boyunca ilk urun yonu, veri omurgasini guvenilir tutan dar bir saha MVP'sidir:
 
 - hizli observation kaydi,
 - attachment,
@@ -222,4 +223,4 @@ Adim 210 merge edildikten sonra ilk urun yonu, veri omurgasini guvenilir tutan d
 - daily export,
 - weekly summary.
 
-CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. `FieldObservationRecord` ve minimal bellek ici `FieldObservationRepository` baseline'i implement edilmis durumdadir; persistence, filters, lifecycle updates, attachment linking, export/reporting, API/GUI/CLI, audit ve validation henuz eklenmemistir.
+CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. `FieldObservationRecord`, minimal bellek ici `FieldObservationRepository` baseline'i ve repository icinde read-only exact `project_id` / `status` filtreleri implement edilmis durumdadir; persistence, broader filters, lifecycle updates, attachment linking, export/reporting, API/GUI/CLI, audit ve validation henuz eklenmemistir.

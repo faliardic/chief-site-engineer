@@ -940,40 +940,41 @@ Gerçek şantiye
 
 ### Son doğrulanmış merged GitHub noktası
 
-- Step: **210**
-- PR: **#37**
-- Issue: **#36**
+- Step: **211**
+- PR: **#39**
+- Issue: **#38**
 - Merge commit:
 
 ```text
-c7dbd94076f9e23c928f27ea377a97debad6636b
+26509f35abb0cb706d2a085715310358cf5d2421
 ```
 
-- Son doğrulanan test seviyesi: **420 passed**
+- Latest merged safe point test seviyesi: **420 passed**
+- Aktif Step 212 yerel test seviyesi: **425 passed**
 - GitHub Actions: manuel olarak devre dışı
-- Podcast 031: Steps 201-205 tamamlandı
-- Podcast 032: Step 211 aktif artifact; merge sonrasinda Steps 206-210 icin latest completed podcast olur
+- Podcast 032: Steps 206-210 latest completed podcast
+- Sonraki doğal podcast aralığı: Steps 211-215
 
 ### Yerel senkronizasyon durumu
 
-Step 211 baslangicinda resmî `V:` yerel master `c7dbd94076f9e23c928f27ea377a97debad6636b` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
+Step 212 baslangicinda resmî `V:` yerel master `26509f35abb0cb706d2a085715310358cf5d2421` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
 
 ### Aktif iş
 
-- Step: **211**
-- Issue: **#38**
-- Amaç: Steps 206-210 icin Podcast 032 NotebookLM kaynak notunu eklemek ve Step 210 merge gercegini repository truth kayitlarina islemek
+- Step: **212**
+- Issue: **#40**
+- Amaç: `FieldObservationRepository` icin exact `project_id` ve `status` filtrelerini eklemek
 - Branch:
 
 ```text
-step-211-podcast-032-steps-206-210
+step-212-field-observation-project-status-filters
 ```
 
-- Bu adim documentation/state/podcast-only isidir.
+- Bu adim dar repository read-only visibility isidir.
 - `FieldObservationRecord` halen tek Field-MVP model implementasyonudur.
-- `FieldObservationRepository` yalniz baseline-level bellek ici repository'dir.
-- Persistence, attachment integration, filters, lifecycle updates, export/reporting, API/GUI/CLI, audit ve validation henuz uygulanmamistir.
-- Step 212 baslatilmamistir.
+- `FieldObservationRepository` baseline-level bellek ici repository'dir ve Step 212 kapsaminda yalniz project/status exact filtreleri eklenir.
+- Persistence, attachment integration, broader filters, lifecycle updates, export/reporting, API/GUI/CLI, audit ve validation henuz uygulanmamistir.
+- Step 213 baslatilmamistir.
 
 ---
 

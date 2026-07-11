@@ -20,14 +20,22 @@ class DummyRecord:
     pass
 
 
-def _field_observation(observation_id: str) -> FieldObservationRecord:
+def _field_observation(
+    observation_id: str,
+    *,
+    project_id: str = "prj-001",
+    status: str = "open",
+    is_archived: bool = False,
+) -> FieldObservationRecord:
     return FieldObservationRecord(
         observation_id=observation_id,
-        project_id="prj-001",
+        project_id=project_id,
         observed_at="2026-07-11T18:30:00",
         location="A Blok 2. Kat",
         category="quality",
         description=f"Field observation {observation_id}",
+        status=status,
+        is_archived=is_archived,
     )
 
 
@@ -180,6 +188,125 @@ def test_field_observation_repository_list_all_returns_copy() -> None:
 
     assert repository.list_all() == [record]
     assert repository.count() == 1
+
+
+def test_field_observation_repository_filters_by_project_id_exact_matches_in_order() -> None:
+    repository = FieldObservationRepository()
+
+    assert repository.list_by_project_id("prj-001") == []
+
+    first_record = _field_observation("obs-001", project_id="prj-001")
+    other_project_record = _field_observation("obs-002", project_id="prj-002")
+    second_record = _field_observation("obs-003", project_id="prj-001")
+    case_variant_record = _field_observation("obs-004", project_id="PRJ-001")
+
+    repository.add(first_record)
+    repository.add(other_project_record)
+    repository.add(second_record)
+    repository.add(case_variant_record)
+
+    assert repository.list_by_project_id("prj-001") == [first_record, second_record]
+    assert repository.list_by_project_id("prj-002") == [other_project_record]
+    assert repository.list_by_project_id("PRJ-001") == [case_variant_record]
+    assert repository.list_by_project_id(" prj-001 ") == []
+    assert repository.list_by_project_id("prj-999") == []
+
+
+def test_field_observation_repository_filters_by_status_documented_values() -> None:
+    repository = FieldObservationRepository()
+
+    assert repository.list_by_status("open") == []
+
+    open_record = _field_observation("obs-001", status="open")
+    tracking_record = _field_observation("obs-002", status="tracking")
+    closed_record = _field_observation("obs-003", status="closed")
+    second_open_record = _field_observation("obs-004", status="open")
+
+    repository.add(open_record)
+    repository.add(tracking_record)
+    repository.add(closed_record)
+    repository.add(second_open_record)
+
+    assert repository.list_by_status("open") == [open_record, second_open_record]
+    assert repository.list_by_status("tracking") == [tracking_record]
+    assert repository.list_by_status("closed") == [closed_record]
+    assert repository.list_by_status("Open") == []
+    assert repository.list_by_status(" closed ") == []
+    assert repository.list_by_status("review") == []
+
+
+def test_field_observation_repository_project_and_status_filters_are_independent() -> None:
+    repository = FieldObservationRepository()
+    project_open_record = _field_observation(
+        "obs-001",
+        project_id="prj-001",
+        status="open",
+    )
+    project_closed_record = _field_observation(
+        "obs-002",
+        project_id="prj-001",
+        status="closed",
+    )
+    other_project_open_record = _field_observation(
+        "obs-003",
+        project_id="prj-002",
+        status="open",
+    )
+
+    repository.add(project_open_record)
+    repository.add(project_closed_record)
+    repository.add(other_project_open_record)
+
+    assert repository.list_by_project_id("prj-001") == [
+        project_open_record,
+        project_closed_record,
+    ]
+    assert repository.list_by_status("open") == [
+        project_open_record,
+        other_project_open_record,
+    ]
+
+
+def test_field_observation_repository_filtered_lists_are_copies() -> None:
+    repository = FieldObservationRepository()
+    first_record = _field_observation("obs-001", project_id="prj-001", status="open")
+    second_record = _field_observation("obs-002", project_id="prj-001", status="open")
+    other_record = _field_observation("obs-003", project_id="prj-002", status="closed")
+
+    repository.add(first_record)
+    repository.add(second_record)
+    repository.add(other_record)
+
+    project_records = repository.list_by_project_id("prj-001")
+    status_records = repository.list_by_status("open")
+    project_records.clear()
+    status_records.append(other_record)
+
+    assert repository.list_by_project_id("prj-001") == [first_record, second_record]
+    assert repository.list_by_status("open") == [first_record, second_record]
+    assert repository.count() == 3
+
+
+def test_field_observation_repository_filters_include_archived_matching_records() -> None:
+    repository = FieldObservationRepository()
+    active_record = _field_observation(
+        "obs-001",
+        project_id="prj-001",
+        status="tracking",
+    )
+    archived_record = _field_observation(
+        "obs-002",
+        project_id="prj-001",
+        status="tracking",
+        is_archived=True,
+    )
+
+    repository.add(active_record)
+    repository.add(archived_record)
+
+    assert repository.list_by_project_id("prj-001") == [active_record, archived_record]
+    assert repository.list_by_status("tracking") == [active_record, archived_record]
+    assert archived_record.is_archived is True
 
 
 def test_nonconformity_repository_adds_and_lists_records() -> None:

@@ -1,5 +1,21 @@
 # Proje Kararlari
 
+## 212 FieldObservationRepository Project ve Status Filter Karari
+
+- `FieldObservationRepository`, `list_by_project_id(project_id)` ve `list_by_status(status)` read-only filtrelerini saglar.
+- `list_by_project_id(project_id)`, yalniz `record.project_id == project_id` exact match sonucunu dondurur.
+- `list_by_status(status)`, yalniz `record.status == status` exact match sonucunu dondurur.
+- Filtreler case-sensitive calisir; trim, normalize, validation, enum, fallback veya status vocabulary enforcement yapmaz.
+- Eslesmeyen veya bilinmeyen degerler `[]` dondurur.
+- Sonuclar repository ekleme sirasini korur.
+- Her filtre cagrisi yeni bir liste dondurur; disarida donen liste mutate edilirse repository storage degismez.
+- Record nesneleri kopyalanmaz ve mutate edilmez; mevcut in-memory repository sozlesmesi korunur.
+- Archived matching record'lar filtre sonucundan dislanmaz; bu method'lar active/archive filtresi degildir.
+- Step 211, PR #39 squash merge commit `26509f35abb0cb706d2a085715310358cf5d2421` ile latest merged/finalized safe point'tir; Issue #38 completed olarak kaydedilir.
+- Step 212, Issue #40 ve `step-212-field-observation-project-status-filters` branch'i uzerinde aktif unmerged repository filter isidir.
+- Podcast 032 latest completed podcast olarak Steps 206-210 araligini kapsar; sonraki besli podcast araligi Steps 211-215'tir.
+- Category/location/reported_to/date-time/text-search/active/archive-only/combined filters, lifecycle mutation, summaries/reporting, persistence, attachment integration, validation/normalization/enums/constants, API/GUI/CLI, audit/task/NCR conversion, generated `blocked`, daily export, weekly summary ve Step 213 uygulanmamistir.
+
 ## 211 Podcast 032 for Steps 206-210 Karari
 
 - Podcast 032, yalniz Steps 206-210 araligini kapsayan NotebookLM kaynak notu olarak `docs/podcast_notes/032_adim_206_210_notebooklm_podcast_notu.md` dosyasinda hazirlanir.
