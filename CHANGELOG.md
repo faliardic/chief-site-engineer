@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 210
+
+- Added minimal in-memory `FieldObservationRepository` to `app/records.py` for the merged `FieldObservationRecord` model.
+- Added focused repository tests for empty state, add/list/count/find behavior, duplicate `observation_id` rejection, accepting different ids, and `list_all()` returning a list copy.
+- Updated repository truth so Step 209 / PR #35 / Issue #34 / merge commit `f1fd7b8e6add21369b3d5f4c44d014994538fc1c` is the latest merged/finalized safe point and Step 210 remains active unmerged repository-baseline work.
+- Recorded that `FieldObservationRecord` remains the only Field-MVP model implemented and `FieldObservationRepository` is only an in-memory baseline-level repository.
+- Kept Podcast 031 as latest; Steps 206-210 become ready for Podcast 032 only after Step 210 merges, and Podcast 032 was not created.
+- Kept this scope narrow; no filters, lifecycle updates, archive/restore/delete/bulk operations, summaries/reporting, persistence/database/JSON/SQLite, attachment linking/file operations, validation/normalization, API/GUI/CLI, audit/task/NCR/conversion/decisions/generated blocked behavior, daily export, weekly summary, workflow changes, Actions enablement, ZIP mutation, Desktop archive mutation, Step 211, or Podcast 032 was added.
+
 ## Step 209
 
 - Added minimal `FieldObservationRecord` dataclass to `app/models.py` for the first Field MVP official fast observation record.

@@ -3,11 +3,11 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 208 - First Field MVP Observation Record Contract
-PR #33 merge commit: 335fb83c989f3fbf1057d88ebe02045174efcdc9
+Adim 209 - Minimal FieldObservationRecord Model
+PR #35 merge commit: f1fd7b8e6add21369b3d5f4c44d014994538fc1c
 ```
 
-Adim 208, PR #33 squash merge commit `335fb83c989f3fbf1057d88ebe02045174efcdc9` ile master uzerindeki guncel guvenli noktadir. Step 209, Issue #34 kapsaminda minimal `FieldObservationRecord` dataclass ve focused value/default testleri ekleyen aktif model/test branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Adim 209, PR #35 squash merge commit `f1fd7b8e6add21369b3d5f4c44d014994538fc1c` ile master uzerindeki guncel guvenli noktadir. Step 210, Issue #36 kapsaminda minimal bellek ici `FieldObservationRepository` baseline'i ve focused repository testleri ekleyen aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -180,7 +180,7 @@ Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test
 Guncel test durumu:
 
 ```text
-413 passed
+420 passed
 ```
 
 Proje su anda domain model, bellek ici repository, test, dokumantasyon, learning ve NotebookLM podcast notlari cekirdegi seviyesindedir.
@@ -483,13 +483,21 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 
 ## Step 209 - Minimal FieldObservationRecord Model
 
-- [ ] Adim 209 - Minimal `FieldObservationRecord` dataclass'i mevcut model stiline uygun olarak eklenecek.
-- [ ] Adim 209 - Required fields ve default values Step 208 contract'iyle eslenecek.
-- [ ] Adim 209 - Focused tests minimal construction/default, optional/lifecycle field value holding ve documented status value holding davranisini dogrulayacak.
-- [ ] Adim 209 - Validation, repository/persistence, attachment integration, export/reporting, API/GUI/CLI, audit ve additional Field-MVP model eklenmeyecek.
+- [x] Adim 209 - Minimal `FieldObservationRecord` dataclass'i mevcut model stiline uygun olarak eklendi.
+- [x] Adim 209 - Required fields ve default values Step 208 contract'iyle eslendi.
+- [x] Adim 209 - Focused tests minimal construction/default, optional/lifecycle field value holding ve documented status value holding davranisini dogruladi.
+- [x] Adim 209 - Validation, repository/persistence, attachment integration, export/reporting, API/GUI/CLI, audit ve additional Field-MVP model eklenmedi.
+
+## Step 210 - FieldObservationRepository Baseline
+
+- [ ] Adim 210 - Minimal bellek ici `FieldObservationRepository` baseline'i mevcut repository stiline uygun olarak eklenecek.
+- [ ] Adim 210 - `add`, `list_all`, `count` ve `find_by_id` davranislari eklenecek.
+- [ ] Adim 210 - Duplicate `observation_id` `ValueError` ile reddedilecek; farkli `observation_id` kabul edilecek.
+- [ ] Adim 210 - `list_all()` ic koleksiyonu degistirmeyen liste kopyasi dondurecek.
+- [ ] Adim 210 - Filters, lifecycle updates, archive/restore/delete/bulk ops, persistence, attachment linking, export/reporting, API/GUI/CLI, audit, validation ve Podcast 032 eklenmeyecek.
 
 ## Sonraki Calisma Onerisi
 
-Adim 209 merge edilmeden Step 210 baslatilmaz. Adim 209 sonrasi dogal besli podcast araligi halen Steps 206-210'dur; ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur, fakat attachment/repository/export/API/audit/validation henuz uygulanmamistir.
+Adim 210 merge edildikten sonra onerilen sonraki adim Step 211 - Podcast 032'dir. Podcast 032 yalniz Step 206-210 araligini kapsayacak sekilde Step 210 merge sonrasi hazirlanmalidir. Ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur; persistence, attachment integration, filters, updates, export/API/audit/validation henuz uygulanmamistir.
 
 Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Podcast 030 Adim 196-200 araligini, Podcast 031 Adim 201-205 araligini kapsar.

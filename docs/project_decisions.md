@@ -1,5 +1,17 @@
 # Proje Kararlari
 
+## 210 FieldObservationRepository Baseline Karari
+
+- `FieldObservationRepository`, merge edilmis `FieldObservationRecord` modeli icin minimal bellek ici repository baseline'i olarak `app/records.py` icine eklendi.
+- Repository `add(record)`, `list_all()`, `count()` ve `find_by_id(observation_id)` davranislarini saglar.
+- `add(record)`, ayni `observation_id` daha once eklenmisse `ValueError` uretir; farkli `observation_id` degerlerini kabul eder.
+- `list_all()`, ic listedeki record nesnelerini kopyalamadan yeni bir liste dondurur; disarida dondurulen listeyi degistirmek repository'nin ic koleksiyonunu degistirmez.
+- Record nesneleri repository icinde normalize edilmez, kopyalanmaz veya mutate edilmez.
+- Step 209, PR #35 squash merge commit `f1fd7b8e6add21369b3d5f4c44d014994538fc1c` ile latest merged/finalized safe point'tir; Issue #34 completed olarak kaydedilir.
+- Step 210, Issue #36 ve `step-210-field-observation-repository-baseline` branch'i uzerinde aktif unmerged repository-baseline isidir.
+- `FieldObservationRecord` halen tek Field-MVP model implementasyonudur; `FieldObservationRepository` yalniz baseline-level bellek ici repository'dir.
+- Filters, lifecycle updates, archive/restore/delete/bulk operations, persistence/database/JSON/SQLite, attachment integration, export/reporting, API/GUI/CLI, audit/task/NCR/conversion/decision generation, validation/normalization, generated `blocked`, daily export, weekly summary, Step 211 ve Podcast 032 uygulanmamistir.
+
 ## 209 Minimal FieldObservationRecord Model Karari
 
 - `FieldObservationRecord`, ilk Field MVP resmi hizli saha gozlem kaydi icin minimal dataclass olarak `app/models.py` icine eklendi.
@@ -9,9 +21,9 @@
 - Focused testler minimal construction/default, optional/lifecycle field value holding ve documented status value holding davranisini dogrular.
 - Step 209, Field MVP implementasyonunu yalniz bu dar dataclass/test kapsaminda baslatir.
 - Attachment linking, repository/persistence, export/reporting, API/GUI/CLI, audit, structured location/contact normalization ve validation henuz uygulanmamistir.
-- Step 208, PR #33 squash merge commit `335fb83c989f3fbf1057d88ebe02045174efcdc9` ile latest merged/finalized safe point'tir; Issue #32 completed olarak kaydedilir.
-- Step 209, Issue #34 ve `step-209-field-observation-record-model` branch'i uzerinde aktif unmerged model/test isidir.
-- Step 210 baslatilmaz; ek Field-MVP model, repository, persistence, attachment integration veya validation eklenmez.
+- Step 209, PR #35 squash merge commit `f1fd7b8e6add21369b3d5f4c44d014994538fc1c` ile merge edildi ve Step 210 baslangicindaki latest merged/finalized safe point oldu.
+- Step 209 kapsaminda ek Field-MVP model, repository, persistence, attachment integration veya validation eklenmedi.
+- Repository baseline isi Step 210 / Issue #36 kapsaminda ayri adim olarak baslatildi.
 
 ## 208 First Field MVP Observation Record Contract Karari
 

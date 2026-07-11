@@ -1,7 +1,13 @@
 import pytest
 
-from app.models import DailySiteLog, NonconformityRecord, TrackingRecord
+from app.models import (
+    DailySiteLog,
+    FieldObservationRecord,
+    NonconformityRecord,
+    TrackingRecord,
+)
 from app.records import (
+    FieldObservationRepository,
     NonconformityRepository,
     count_records,
     filter_records_by_project_id,
@@ -12,6 +18,17 @@ from app.records import (
 
 class DummyRecord:
     pass
+
+
+def _field_observation(observation_id: str) -> FieldObservationRecord:
+    return FieldObservationRecord(
+        observation_id=observation_id,
+        project_id="prj-001",
+        observed_at="2026-07-11T18:30:00",
+        location="A Blok 2. Kat",
+        category="quality",
+        description=f"Field observation {observation_id}",
+    )
 
 
 def test_list_records_returns_given_list() -> None:
@@ -111,6 +128,58 @@ def test_record_helpers_handle_empty_lists() -> None:
     assert count_records(records) == 0
     assert filter_records_by_project_id(records, "prj-001") == []
     assert filter_records_by_status(records, "draft") == []
+
+
+def test_field_observation_repository_starts_empty() -> None:
+    repository = FieldObservationRepository()
+
+    assert repository.list_all() == []
+    assert repository.count() == 0
+    assert repository.find_by_id("obs-missing") is None
+
+
+def test_field_observation_repository_adds_lists_counts_and_finds_records() -> None:
+    repository = FieldObservationRepository()
+    first_record = _field_observation("obs-001")
+    second_record = _field_observation("obs-002")
+
+    repository.add(first_record)
+    repository.add(second_record)
+
+    assert repository.list_all() == [first_record, second_record]
+    assert repository.count() == 2
+    assert repository.find_by_id("obs-001") == first_record
+    assert repository.find_by_id("obs-002") == second_record
+    assert repository.find_by_id("obs-999") is None
+
+
+def test_field_observation_repository_rejects_duplicate_id_and_accepts_different_ids() -> None:
+    repository = FieldObservationRepository()
+    first_record = _field_observation("obs-001")
+    duplicate_record = _field_observation("obs-001")
+    different_record = _field_observation("obs-002")
+
+    repository.add(first_record)
+
+    with pytest.raises(ValueError, match="obs-001"):
+        repository.add(duplicate_record)
+
+    repository.add(different_record)
+
+    assert repository.list_all() == [first_record, different_record]
+    assert repository.count() == 2
+
+
+def test_field_observation_repository_list_all_returns_copy() -> None:
+    repository = FieldObservationRepository()
+    record = _field_observation("obs-001")
+    repository.add(record)
+
+    listed_records = repository.list_all()
+    listed_records.clear()
+
+    assert repository.list_all() == [record]
+    assert repository.count() == 1
 
 
 def test_nonconformity_repository_adds_and_lists_records() -> None:
