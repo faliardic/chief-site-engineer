@@ -106,11 +106,11 @@
   "tests": {
     "command": "python -m pytest",
     "result": "passed",
-    "summary": "413 passed in 2.00s"
+    "summary": "413 passed in 1.84s"
   },
   "tests_changed": false,
   "workflow_changed": false,
-  "workflow_status": "pushed_to_open_draft_pr_pending",
+  "workflow_status": "pushed_to_open_draft_pr",
   "working_tree": {
     "changes": [
       "A docs/202_handover_qc_canonical_view_model_examples_and_wording_standardization.md",
@@ -122,7 +122,7 @@
       "M .cse/state/project_state.json"
     ],
     "ignored_files_remaining": 0,
-    "result": "authorized_changes_only_before_commit"
+    "result": "clean_after_push"
   },
   "zip": {
     "ignored_zip_touched": false,
