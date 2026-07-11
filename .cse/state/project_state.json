@@ -126,8 +126,19 @@
     "ordinary_push_authorized": true,
     "force_push_authorized": false,
     "pull_request_creation_by_codex": false,
+    "pull_request_status": "not_created_by_codex_pending_chatgpt_inspection",
     "merge_authorized": false,
+    "merge_performed": false,
     "branch_deletion_authorized": false,
+    "verified_content_push": {
+      "successful": true,
+      "local_sha": "9c8a2db33abb4c20ac502b9efb865f68f927d45f",
+      "remote_sha": "9c8a2db33abb4c20ac502b9efb865f68f927d45f",
+      "divergence": "0 0"
+    },
+    "metadata_finalization": {
+      "final_branch_sha_evidence_in_issue_comment_after_push": true
+    },
     "final_remote_sha_evidence_location": "GitHub Issue #28 completion comment after push"
   },
   "required_files": [
@@ -144,6 +155,6 @@
     "docs/206_step_205_merged_truth_podcast_031_and_instruction_authority_closure.md",
     "learning/206_step_205_merged_truth_podcast_031_and_instruction_authority_closure.md"
   ],
-  "workflow_status": "step_206_local_verification_passed_before_commit_and_push",
+  "workflow_status": "step_206_content_push_verified_before_metadata_finalization",
   "forbidden_scope_added": false
 }
