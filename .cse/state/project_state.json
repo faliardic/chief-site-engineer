@@ -1,71 +1,151 @@
 {
-  "protocol_version": 1,
-  "step": 196,
-  "issue": 7,
-  "pull_request": 8,
-  "pull_request_state": "open_draft",
-  "branch": "step-196-github-actions-pytest",
   "base_branch": "master",
-  "base_commit": "e98ba58554857e2719b1c4e1315e8edd31f2f919",
-  "result_commit": "d2a9fff2f86200995c3ce2fa98647aeec2eee2a4",
-  "workflow_status": "pushed_to_open_draft_pr",
-  "implemented_command": {
-    "path": ".github/workflows/pytest.yml",
-    "workflow_name": "CI",
-    "job_id": "pytest",
-    "job_name": "pytest",
-    "python_version": "3.12",
-    "triggers": [
-      "pull_request to master",
-      "push to master"
-    ],
-    "permissions": {
-      "contents": "read"
-    },
-    "steps": [
-      "actions/checkout@v4",
-      "actions/setup-python@v5",
-      "python -m pip install -r requirements.txt",
-      "git diff --check",
-      "python -m pytest"
-    ]
-  },
-  "tests": {
-    "command": "python -m pytest",
-    "result": "passed",
-    "summary": "413 passed in 1.91s"
-  },
-  "diff_check": {
-    "command": "git diff --check",
-    "result": "passed"
-  },
   "exports": {
-    "result": "clean",
+    "clean": true,
     "contents": [
+      ".gitkeep"
+    ],
+    "exists": true,
+    "expected_only": [
       ".gitkeep"
     ]
   },
-  "zip": {
-    "ignored_zip_touched": false,
-    "zip_files_found": 0
+  "finalized_step": 196,
+  "issue": 7,
+  "issue_state": "closed",
+  "local_git_evidence": {
+    "divergence": {
+      "ahead": 1,
+      "available": true,
+      "behind": 0,
+      "commands": {
+        "count": {
+          "command": [
+            "git",
+            "rev-list",
+            "--left-right",
+            "--count",
+            "origin/master...HEAD"
+          ],
+          "ok": true,
+          "returncode": 0,
+          "stderr": [],
+          "stdout": [
+            "0\t1"
+          ]
+        },
+        "verify": {
+          "command": [
+            "git",
+            "rev-parse",
+            "--verify",
+            "origin/master"
+          ],
+          "ok": true,
+          "returncode": 0,
+          "stderr": [],
+          "stdout": [
+            "df9c04fa033b9c2d42e1690e9263a91856c5e512"
+          ]
+        }
+      },
+      "upstream": "origin/master"
+    },
+    "git": {
+      "commands": {
+        "ignored": {
+          "command": [
+            "git",
+            "status",
+            "--ignored",
+            "--short",
+            "--untracked-files=all"
+          ],
+          "ok": true,
+          "returncode": 0,
+          "stderr": [],
+          "stdout": []
+        },
+        "staged": {
+          "command": [
+            "git",
+            "diff",
+            "--name-status",
+            "--cached"
+          ],
+          "ok": true,
+          "returncode": 0,
+          "stderr": [],
+          "stdout": []
+        },
+        "tracked": {
+          "command": [
+            "git",
+            "diff",
+            "--name-status"
+          ],
+          "ok": true,
+          "returncode": 0,
+          "stderr": [],
+          "stdout": []
+        }
+      },
+      "ignored_files": [],
+      "staged_files": [],
+      "tracked_worktree_changes": [],
+      "untracked_files": []
+    },
+    "head": {
+      "branch": "step-197-finalize-ci-state",
+      "commands": {
+        "branch": {
+          "command": [
+            "git",
+            "branch",
+            "--show-current"
+          ],
+          "ok": true,
+          "returncode": 0,
+          "stderr": [],
+          "stdout": [
+            "step-197-finalize-ci-state"
+          ]
+        },
+        "head": {
+          "command": [
+            "git",
+            "log",
+            "-1",
+            "--format=%H%x00%s"
+          ],
+          "ok": true,
+          "returncode": 0,
+          "stderr": [],
+          "stdout": [
+            "2745ad5b7baa2bfb0c77d5d74311d3bddaf49c9b\u0000Add Step 197 finalized CI state task"
+          ]
+        }
+      },
+      "commit": "2745ad5b7baa2bfb0c77d5d74311d3bddaf49c9b",
+      "message": "Add Step 197 finalized CI state task"
+    },
+    "note": "Local evidence only; remote PR and issue state came from explicit CLI metadata."
   },
-  "command_verification": {
-    "workflow_yaml_parse": "passed",
-    "workflow_structural_validation": "passed"
+  "merge_authorized": true,
+  "merge_commit": "df9c04fa033b9c2d42e1690e9263a91856c5e512",
+  "next_action": "Continue with local verification and PR review; keep required status checks disabled until billing is resolved and pytest succeeds on GitHub Actions",
+  "protocol_version": 1,
+  "pull_request": 8,
+  "pull_request_state": "merged",
+  "remote_state_source": "explicit_cli_metadata",
+  "source_branch": "step-196-github-actions-pytest",
+  "step": 196,
+  "verification": {
+    "summary": "Local pytest: 413 passed in 1.91s; workflow YAML/structure passed; GitHub runner did not start because the account is billing-locked"
   },
-  "working_tree": {
-    "result": "clean_after_push",
-    "changes": [
-      "A .github/workflows/pytest.yml",
-      "A .cse/results/196_result.md",
-      "M .cse/state/project_state.json",
-      "A .cse/tasks/196_task.md"
-    ],
-    "ignored_files_remaining": 0
-  },
-  "production_code_changed": false,
-  "tests_changed": false,
-  "forbidden_scope_added": false,
-  "merge_authorized": false,
-  "next_action": "Review draft PR #8 and merge only after explicit user approval"
+  "workflow_status": "merged_finalized",
+  "zip_files": {
+    "count": 0,
+    "files": []
+  }
 }
