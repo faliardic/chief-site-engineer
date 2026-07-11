@@ -3,11 +3,11 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 215 - FieldObservationRepository Location/Category Filters
-PR #47 merge commit: 7b3361087cdb51fe1e76caa6f2cd91ff005cdfe2
+Adim 216 - Podcast 033 for Steps 211-215
+PR #49 merge commit: 43345c7e57ea9a786354d9ee8348f39aaf53af8f
 ```
 
-Adim 215, PR #47 squash merge commit `7b3361087cdb51fe1e76caa6f2cd91ff005cdfe2` ile master uzerindeki guncel guvenli noktadir. Step 216, Issue #48 kapsaminda Steps 211-215 icin Podcast 033 notunu hazirlayan aktif documentation/state/podcast calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Adim 216, PR #49 squash merge commit `43345c7e57ea9a786354d9ee8348f39aaf53af8f` ile master uzerindeki guncel guvenli noktadir. Step 217, Issue #50 kapsaminda mevcut `FileAttachmentRecord` metadata nesneleri icin minimal bellek ici repository baseline'i ekleyen aktif unmerged calismadir; merge edilene kadar yeni guvenli nokta sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -163,6 +163,8 @@ Adim 215'te `FieldObservationRepository.list_by_location(location)` ve `FieldObs
 
 Adim 216'da Steps 211-215 araligi icin Podcast 033 documentation/state artifact'i hazirlandi. Not; Podcast 032 kapanisi, project/status filtreleri, explicit status update, explicit reporting-context update ve location/category filtrelerini NotebookLM-friendly Turkce kaynak olarak ozetler. Bu adim product behavior, production code, executable tests, persistence, attachment integration, export/reporting consumers, API/GUI/CLI, Podcast 034 veya Step 217 eklemez.
 
+Adim 217'de mevcut `FileAttachmentRecord` metadata nesneleri icin minimal bellek ici `FileAttachmentRepository` baseline'i eklendi. Repository `add`, `list_all`, `count` ve `find_by_id` method'larini saglar; exact/case-sensitive duplicate `attachment_id` reddi yapar, insertion order'i korur, her `list_all()` cagrisi icin yeni liste dondurur ve stored metadata record nesnelerini kopyalamaz veya mutate etmez. Related-record filters, FieldObservation-specific attachment linking, physical file operations, persistence, validation, API/GUI/CLI, audit, Podcast 034 ve Step 218 eklenmedi.
+
 Adim 160'da mevcut exception tabanli file-writing helper davranisini bozmadan future result contract wrapper API boundary documentation-only olarak planlandi; `write_*` helperlarin korunmasi, olasi `try_write_*` wrapper isimleri, result alanlari, error mapping, geriye uyumluluk ve handover QC gorunurlugu netlestirildi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 
 Adim 161'de Adim 160 API boundary'sine bagli future result contract wrapper implementation plan documentation-only olarak netlestirildi; `try_write_json_ready_dict_to_file(...)` ve `try_write_markdown_text_to_file(...)` wrapper davranisi, basari/hata result sozlesmesi, error mapping, overwrite/path safety davranisi, geriye uyumluluk ve handover QC gorunurlugu belgelendi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
@@ -192,7 +194,7 @@ Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test
 Guncel test durumu:
 
 ```text
-445 passed
+453 passed
 ```
 
 Proje su anda domain model, bellek ici repository, test, dokumantasyon, learning ve NotebookLM podcast notlari cekirdegi seviyesindedir.
@@ -554,8 +556,17 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 - [x] Adim 216 - Repository truth Step 215 / PR #47 / Issue #46 / merge `7b3361087cdb51fe1e76caa6f2cd91ff005cdfe2` latest merged safe point olacak sekilde guncellendi.
 - [x] Adim 216 - Production code, executable tests, repository behavior, workflow, Podcast 034 ve Step 217 baslatilmadi.
 
+## Step 217 - FileAttachmentRepository Baseline
+
+- [x] Adim 217 - `FileAttachmentRepository` minimal bellek ici metadata repository olarak eklendi.
+- [x] Adim 217 - `add`, `list_all`, `count` ve `find_by_id` method'lari uygulandi.
+- [x] Adim 217 - Duplicate exact `attachment_id` `ValueError` ile reddedildi; case-different id degerleri distinct kaldi.
+- [x] Adim 217 - Insertion order, new-list behavior, same-object return ve metadata non-mutation davranislari test edildi.
+- [x] Adim 217 - `docs/217_file_attachment_repository_baseline.md` ve `learning/217_file_attachment_repository_baseline.md` olusturuldu.
+- [x] Adim 217 - Related-record filters, FieldObservation-specific attachment lookup/linking, physical file operations, persistence, validation/enums/constants, API/GUI/CLI, audit, Podcast 034 ve Step 218 baslatilmadi.
+
 ## Sonraki Calisma Onerisi
 
-Adim 216 merge edildikten sonra Podcast 033 latest completed podcast olur ve sonraki dogal podcast araligi Steps 216-220 olarak kaydedilir. Field MVP icin sonraki dar teknik adimlar attachment, explicit close/reopen policy veya export/reporting consumers alanlarindan biri olabilir; bunlar ayri issue ile netlestirilmelidir. Ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur; persistence, attachment integration, broader filters/mutations, automatic lifecycle rules, structured location/contact normalization, export/API/audit/validation henuz uygulanmamistir.
+Adim 217 merge edildikten sonra attachment slice icin sonraki dogal dar adim related-record filtreleri, observation attachment linking sozlesmesi veya upload/persistence oncesi boundary dokumantasyonu olabilir; bunlar ayri issue ile netlestirilmelidir. Ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur; persistence, physical file operations, broader filters/mutations, automatic lifecycle rules, structured location/contact normalization, export/API/audit/validation henuz uygulanmamistir.
 
-Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Podcast 030 Adim 196-200 araligini, Podcast 031 Adim 201-205 araligini, Podcast 032 Adim 206-210 araligini kapsar; Podcast 033 Steps 211-215 icin aktif unmerged artifact'tir.
+Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Podcast 030 Adim 196-200 araligini, Podcast 031 Adim 201-205 araligini, Podcast 032 Adim 206-210 araligini, Podcast 033 Adim 211-215 araligini kapsar. Sonraki dogal podcast araligi Steps 216-220 olur.

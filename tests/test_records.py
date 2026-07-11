@@ -3,11 +3,13 @@ import pytest
 from app.models import (
     DailySiteLog,
     FieldObservationRecord,
+    FileAttachmentRecord,
     NonconformityRecord,
     TrackingRecord,
 )
 from app.records import (
     FieldObservationRepository,
+    FileAttachmentRepository,
     NonconformityRepository,
     count_records,
     filter_records_by_project_id,
@@ -39,6 +41,184 @@ def _field_observation(
         status=status,
         is_archived=is_archived,
     )
+
+
+def _file_attachment(
+    attachment_id: str,
+    *,
+    related_record_type: str = "nonconformity",
+    related_record_id: str = "NCR-001",
+    file_name: str = "photo_001.jpg",
+    file_path: str = "attachments/PRJ-001/nonconformity/NCR-001/photo_001.jpg",
+    file_type: str = "image",
+    mime_type: str = "image/jpeg",
+    uploaded_at: str | None = "2026-07-11T20:00:00",
+    uploaded_by: str | None = "Santiye sefi",
+    original_file_name: str | None = "IMG_0001.JPG",
+    description: str | None = "Saha kanit fotografi.",
+    notes: str | None = "Mevcut metadata aynen korunmali.",
+    file_size: int | None = 2048,
+) -> FileAttachmentRecord:
+    return FileAttachmentRecord(
+        attachment_id=attachment_id,
+        related_record_type=related_record_type,
+        related_record_id=related_record_id,
+        file_name=file_name,
+        file_path=file_path,
+        file_type=file_type,
+        mime_type=mime_type,
+        uploaded_at=uploaded_at,
+        uploaded_by=uploaded_by,
+        original_file_name=original_file_name,
+        description=description,
+        notes=notes,
+        file_size=file_size,
+    )
+
+
+def test_file_attachment_repository_starts_empty() -> None:
+    repository = FileAttachmentRepository()
+
+    assert repository.list_all() == []
+    assert repository.count() == 0
+    assert repository.find_by_id("att-missing") is None
+
+
+def test_file_attachment_repository_adds_and_finds_same_record_object() -> None:
+    repository = FileAttachmentRepository()
+    record = _file_attachment("att-001")
+
+    repository.add(record)
+
+    assert repository.list_all() == [record]
+    assert repository.count() == 1
+    assert repository.find_by_id("att-001") is record
+
+
+def test_file_attachment_repository_preserves_insertion_order_for_distinct_records() -> None:
+    repository = FileAttachmentRepository()
+    first_record = _file_attachment("att-001")
+    second_record = _file_attachment("att-002", file_name="photo_002.jpg")
+    third_record = _file_attachment(
+        "att-003",
+        file_type="pdf",
+        mime_type="application/pdf",
+    )
+
+    repository.add(first_record)
+    repository.add(second_record)
+    repository.add(third_record)
+
+    assert repository.list_all() == [first_record, second_record, third_record]
+    assert repository.count() == 3
+
+
+def test_file_attachment_repository_rejects_duplicate_exact_id_without_changing_contents() -> None:
+    repository = FileAttachmentRepository()
+    first_record = _file_attachment("att-001")
+    duplicate_record = _file_attachment("att-001", file_name="duplicate.jpg")
+
+    repository.add(first_record)
+
+    with pytest.raises(ValueError, match="att-001"):
+        repository.add(duplicate_record)
+
+    assert repository.list_all() == [first_record]
+    assert repository.count() == 1
+    assert repository.find_by_id("att-001") is first_record
+
+
+def test_file_attachment_repository_keeps_case_different_ids_distinct() -> None:
+    repository = FileAttachmentRepository()
+    lower_case_record = _file_attachment("att-001")
+    upper_case_record = _file_attachment("ATT-001", file_name="case-variant.jpg")
+
+    repository.add(lower_case_record)
+    repository.add(upper_case_record)
+
+    assert repository.list_all() == [lower_case_record, upper_case_record]
+    assert repository.find_by_id("att-001") is lower_case_record
+    assert repository.find_by_id("ATT-001") is upper_case_record
+    assert repository.count() == 2
+
+
+def test_file_attachment_repository_list_all_returns_copy() -> None:
+    repository = FileAttachmentRepository()
+    record = _file_attachment("att-001")
+    repository.add(record)
+
+    listed_records = repository.list_all()
+    second_listed_records = repository.list_all()
+    listed_records.clear()
+
+    assert second_listed_records is not repository.list_all()
+    assert repository.list_all() == [record]
+    assert repository.count() == 1
+
+
+def test_file_attachment_repository_does_not_mutate_attachment_metadata_fields() -> None:
+    repository = FileAttachmentRepository()
+    record = _file_attachment(
+        "att-001",
+        related_record_type="field_observation",
+        related_record_id="obs-001",
+        file_name="observation-photo.jpg",
+        file_path="attachments/PRJ-001/field_observation/obs-001/observation-photo.jpg",
+        file_type="image",
+        mime_type="image/jpeg",
+        uploaded_at="2026-07-11T21:00:00",
+        uploaded_by="Saha muhendisi",
+        original_file_name="WhatsApp Image 2026-07-11.jpeg",
+        description="Kolon kalip kontrol fotografi.",
+        notes="Ek not korunmali.",
+        file_size=4096,
+    )
+
+    repository.add(record)
+    found_record = repository.find_by_id("att-001")
+    listed_record = repository.list_all()[0]
+
+    assert found_record is record
+    assert listed_record is record
+    assert record.attachment_id == "att-001"
+    assert record.related_record_type == "field_observation"
+    assert record.related_record_id == "obs-001"
+    assert record.file_name == "observation-photo.jpg"
+    assert (
+        record.file_path
+        == "attachments/PRJ-001/field_observation/obs-001/observation-photo.jpg"
+    )
+    assert record.file_type == "image"
+    assert record.mime_type == "image/jpeg"
+    assert record.uploaded_at == "2026-07-11T21:00:00"
+    assert record.uploaded_by == "Saha muhendisi"
+    assert record.original_file_name == "WhatsApp Image 2026-07-11.jpeg"
+    assert record.description == "Kolon kalip kontrol fotografi."
+    assert record.notes == "Ek not korunmali."
+    assert record.file_size == 4096
+
+
+def test_file_attachment_repository_does_not_change_existing_record_repositories() -> None:
+    observation_repository = FieldObservationRepository()
+    nonconformity_repository = NonconformityRepository()
+    observation = _field_observation("obs-001", status="open")
+    nonconformity = NonconformityRecord(
+        nonconformity_id="NCR-217",
+        project_id="prj-001",
+        date="2026-07-11",
+        title="Mevcut repository regresyon kontrolu",
+        description="Step 217 attachment repository eklerken mevcut davranis korunmali.",
+    )
+
+    observation_repository.add(observation)
+    nonconformity_repository.add(nonconformity)
+
+    assert observation_repository.find_by_id("obs-001") is observation
+    assert observation_repository.update_status("obs-001", "tracking") is observation
+    assert observation_repository.list_by_status("tracking") == [observation]
+    assert nonconformity_repository.find_by_id("NCR-217") is nonconformity
+    assert nonconformity_repository.exists("NCR-217") is True
+    assert nonconformity_repository.count() == 1
 
 
 def test_list_records_returns_given_list() -> None:
