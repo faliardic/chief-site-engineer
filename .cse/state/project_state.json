@@ -55,6 +55,11 @@
       "branch_divergence",
       "final_working_tree_status"
     ],
+    "protocol_files_updated": [
+      ".cse/README.md",
+      ".cse/templates/task_template.md",
+      ".cse/templates/result_template.md"
+    ],
     "existing_ignored_zip": "chief-site-engineer_adim_080_guvenli_nokta.zip",
     "codex_opens_draft_pr": false
   },
@@ -71,13 +76,16 @@
   "tests": {
     "command": "python -m pytest",
     "result": "passed",
-    "summary": "413 passed in 2.04s"
+    "summary": "413 passed in 2.32s"
   },
   "tests_changed": false,
   "workflow_changed": false,
   "workflow_status": "pushed_branch_for_chatgpt_pr_creation",
   "working_tree": {
     "changes": [
+      "M .cse/README.md",
+      "M .cse/templates/task_template.md",
+      "M .cse/templates/result_template.md",
       "A .cse/tasks/203_task.md",
       "A docs/203_official_local_sync_protocol.md",
       "A learning/203_official_local_sync_protocol.md",

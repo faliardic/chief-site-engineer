@@ -68,6 +68,9 @@ If a future task already has a local branch, inspect status first, then use fast
 
 Completion requires the authorized files to physically exist in the official local working tree. For Step 203, that includes:
 
+- `.cse/README.md`
+- `.cse/templates/task_template.md`
+- `.cse/templates/result_template.md`
 - `.cse/tasks/203_task.md`
 - `docs/203_official_local_sync_protocol.md`
 - `learning/203_official_local_sync_protocol.md`
@@ -78,6 +81,14 @@ Completion requires the authorized files to physically exist in the official loc
 - `docs/project_decisions.md`
 
 For later steps, apply the same rule to that step's task, docs, learning, result, state, and authorized project documentation files.
+
+## Protocol File Requirements
+
+The reusable protocol files must also describe local-first work:
+
+- `.cse/README.md` must define the standard flow as official-local-first, including stop-on-unexpected-local-change behavior, fast-forward-only `master` sync, local branch creation, physical local file creation, local verification, local commit/push, GitHub-only incompleteness, and post-merge local `master` fast-forward.
+- `.cse/templates/task_template.md` must require local-first preconditions, synchronization commands and evidence, local working-copy requirements, local branch divergence checks, and post-merge sync boundaries.
+- `.cse/templates/result_template.md` must require reporting the official local path, synchronized master SHA, result branch SHA, local/remote divergence, physically present local files, tests, diff check, protected paths, exports, ZIP status, final working tree status, and push result.
 
 ## Required Local Verification
 

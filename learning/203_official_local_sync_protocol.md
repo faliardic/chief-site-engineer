@@ -9,3 +9,5 @@ The sync rule is deliberately conservative: fetch, fast-forward `master`, verify
 The existing ignored ZIP is treated as an offline/emergency artifact. It may be reported, but it should not be touched during normal Step work.
 
 The narrow next habit after this step is to use this protocol for every future issue before editing files: local safety check first, fast-forward sync second, branch work third, verification and push last.
+
+The reusable protocol files matter as much as the step-specific docs. If `.cse/README.md` or the task/result templates still describe GitHub-first handoff, future steps will drift back into remote-only behavior. Step 203 therefore updates those canonical files so every future task starts with local sync evidence and ends with local verification, divergence, push, and post-merge sync reporting.

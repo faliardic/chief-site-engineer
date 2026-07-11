@@ -3,6 +3,9 @@
 ## Step 203
 
 - Added documentation-only official local sync protocol required by Issue #21.
+- Updated `.cse/README.md` so the standard flow is explicitly official-local-first.
+- Updated `.cse/templates/task_template.md` with mandatory local-first preconditions, synchronization evidence, local branch creation, divergence checks, physical local file existence, and post-merge sync boundary.
+- Updated `.cse/templates/result_template.md` with mandatory local path, synchronized master SHA, branch SHA, divergence, local file presence, verification, final working-tree, and push result reporting fields.
 - Added `.cse/tasks/203_task.md`.
 - Added `docs/203_official_local_sync_protocol.md`.
 - Added `learning/203_official_local_sync_protocol.md`.

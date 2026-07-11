@@ -5,6 +5,9 @@
 - Adim 203, Issue #21 talimatina gore official local working copy protokolunu documentation-only olarak sabitler.
 - Official local repository path `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer` proje dosyasi olusturma, duzenleme, verification, commit ve push icin primary working copy olarak kaydedilir.
 - GitHub connector veya web/API uzerinden olusturulan dosyalar tek basina completion sayilmaz; GitHub synchronized remote ve review surface olarak kalir.
+- `.cse/README.md` standard flow'u local-first hale getirir; ChatGPT/GitHub-only branch veya task creation completion olarak kabul edilmez.
+- `.cse/templates/task_template.md` future task'lar icin local-first precondition, master sync evidence, local branch creation, local file presence, divergence ve post-merge sync boundary alanlarini zorunlu hale getirir.
+- `.cse/templates/result_template.md` future result report'lari icin official local path, synchronized master SHA, branch SHA, divergence, local file presence, verification, protected paths, exports, ZIP, final working tree ve push result raporlamasini zorunlu hale getirir.
 - Branch degistirme veya pull oncesinde `git status --short --branch` ve ignored/untracked gorunurluk ile local working tree incelenmelidir.
 - Unexpected tracked, staged veya untracked project changes varsa Codex durup raporlamalidir; otomatik reset, clean, stash, delete veya overwrite yapmamalidir.
 - Existing ignored ZIP emergency/offline artifact olarak kalir ve normal step calismasinda dokunulmaz.

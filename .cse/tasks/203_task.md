@@ -23,6 +23,9 @@ Issue #21 requires all Step 203 work to be executed from the official local repo
 
 ## Authorized Changes
 
+- `.cse/README.md`
+- `.cse/templates/task_template.md`
+- `.cse/templates/result_template.md`
 - `.cse/tasks/203_task.md`
 - `docs/203_official_local_sync_protocol.md`
 - `learning/203_official_local_sync_protocol.md`
@@ -41,9 +44,12 @@ Issue #21 requires all Step 203 work to be executed from the official local repo
 4. Verify local `master` and `origin/master` both equal `a5fcadf1108dce409d7a1ddd9928b6a9cbb730c9`; divergence must be `0 0`.
 5. Create local branch `step-203-official-local-sync-protocol` from synchronized `master`.
 6. Document the local-first sync protocol, safety rule, required checks, branch/push reporting, and GitHub connector boundary.
-7. Update project docs, learning, result, and state factually.
-8. Run local verification from the official local repository.
-9. Commit and push the local branch.
+7. Update `.cse/README.md` so the standard flow is explicitly local-first and GitHub-only file creation is incomplete.
+8. Update `.cse/templates/task_template.md` with mandatory local-first preconditions, master synchronization evidence, local branch creation, physical local file presence, divergence checks, and post-merge sync boundary.
+9. Update `.cse/templates/result_template.md` with mandatory local path, synchronized master SHA, branch SHA, divergence, local file presence, verification, final working tree, and push reporting fields.
+10. Update project docs, learning, result, and state factually.
+11. Run local verification from the official local repository.
+12. Commit and push the local branch.
 
 ## Required Verification
 
@@ -55,6 +61,7 @@ Issue #21 requires all Step 203 work to be executed from the official local repo
 - existing ignored ZIP remains untouched
 - final branch divergence against remote branch is reported after push
 - final working tree status is reported
+- `.cse/README.md`, `.cse/templates/task_template.md`, and `.cse/templates/result_template.md` reflect the local-first protocol
 
 ## Forbidden Scope
 

@@ -8,6 +8,9 @@ This step documented the local-first execution protocol required by Issue #21. T
 
 ## Files Changed
 
+- Updated `.cse/README.md`.
+- Updated `.cse/templates/task_template.md`.
+- Updated `.cse/templates/result_template.md`.
 - Added `.cse/tasks/203_task.md`.
 - Added `docs/203_official_local_sync_protocol.md`.
 - Added `learning/203_official_local_sync_protocol.md`.
@@ -45,8 +48,21 @@ This step documented the local-first execution protocol required by Issue #21. T
 - `python -m pytest`: passed, `413 passed in 2.04s`.
 - `git diff --check`: passed.
 - Protected production/test/workflow diff: empty for `app/models.py`, `tests/test_models.py`, and `.github/workflows/pytest.yml`.
-- Changed-file scope: only authorized Step 203 documentation/state/result files.
+- Changed-file scope: only authorized Step 203 protocol, documentation, state, and result files.
 - `exports/` cleanup/status: clean; only `.gitkeep` present.
 - ZIP status: existing ignored `chief-site-engineer_adim_080_guvenli_nokta.zip` remained untouched.
 - Cache cleanup: removed `.pytest_cache`, `app/__pycache__`, `scripts/__pycache__`, and `tests/__pycache__` after repo-root path validation.
 - Draft PR creation by Codex: not performed, per Issue #21.
+
+## Follow-up Correction
+
+- Updated `.cse/README.md` so the standard flow is explicitly official-local-first.
+- Updated `.cse/templates/task_template.md` with mandatory local-first preconditions, master synchronization evidence, local branch requirements, local file presence, divergence checks, and post-merge sync boundary.
+- Updated `.cse/templates/result_template.md` with mandatory reporting fields for official local path, synchronized master SHA, result branch SHA, local/remote divergence, physical local file presence, tests, diff check, protected paths, exports, ZIP, final working tree, post-push status, and push result.
+- `python -m pytest`: passed, `413 passed in 2.32s`.
+- `git diff --check`: passed.
+- Protected production/test/workflow diff: empty for `app/models.py`, `tests/test_models.py`, and `.github/workflows/pytest.yml`.
+- Changed-file scope: only authorized Step 203 protocol, documentation, state, and result files.
+- `exports/` cleanup/status: clean; only `.gitkeep` present.
+- ZIP status: existing ignored `chief-site-engineer_adim_080_guvenli_nokta.zip` remained untouched.
+- Cache cleanup: removed `.pytest_cache`, `app/__pycache__`, `scripts/__pycache__`, and `tests/__pycache__` after repo-root path validation.
