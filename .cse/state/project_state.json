@@ -1,83 +1,11 @@
 {
   "base_branch": "master",
-  "base_commit": "3918bfbe73d79ea6dcb9228ebcbd2818322965ec",
-  "branch": "step-202-canonical-view-model-wording",
-  "canonical_view_model_wording": {
-    "consumer_implemented": false,
-    "documentation_only": true,
-    "examples": [
-      "success_only",
-      "failure_only",
-      "mixed",
-      "empty_zero_count",
-      "missing_optional_fields",
-      "unknown_status_additional_fields",
-      "unsupported_input_fallback"
-    ],
-    "markdown_parsing_as_structured_truth": false,
-    "non_blocking_semantics": {
-      "automatic_acceptance": false,
-      "automatic_approval": false,
-      "automatic_package_blocking": false,
-      "automatic_rejection": false,
-      "generated_blocked_status": false,
-      "is_blocking": false,
-      "is_read_only": true,
-      "requires_human_review": "human_review_signal_only"
-    },
-    "official_transfer_boundary": {
-      "official_transferable_data": [
-        "approved_project_documentation",
-        "structured_export_result_summary",
-        "structured_export_result_report",
-        "handover_qc_checklist",
-        "explicitly_selected_presentation_markdown",
-        "explicit_export_package_from_separate_export_writing_flow"
-      ],
-      "private_non_transferable_data_excluded": [
-        "private_workspace_notes",
-        "user_specific_context",
-        "credentials_or_secrets",
-        "local_cache_files",
-        "non_transferable_personal_information",
-        "informal_notes_not_approved_for_official_transfer"
-      ]
-    },
-    "optional_presentation_markdown": "format_export_handover_qc_review_checklist_as_markdown(checklist)",
-    "regression_expectations": [
-      "wording_stability",
-      "fallback_safety",
-      "structured_checklist_source_of_truth",
-      "optional_markdown_display_only",
-      "input_immutability",
-      "no_summary_report_or_checklist_recomputation",
-      "no_file_or_export_output",
-      "no_persistence_or_audit_side_effect",
-      "no_hard_validation",
-      "no_generated_blocked_status",
-      "no_automatic_acceptance_rejection_approval_or_package_blocking",
-      "official_transferable_private_non_transferable_separation"
-    ],
-    "source_of_truth": "build_export_handover_qc_review_checklist(summary, report)",
-    "standardized_wording": {
-      "empty_state": "No checklist items are available for display. Review the source export summary/report before making a handover decision.",
-      "human_review_false": "No review signal from checklist",
-      "human_review_true": "Human review required",
-      "missing_field_fallback": "Not available",
-      "missing_next_action": "Review source export result before deciding next action",
-      "non_blocking_notice": "Does not block package transfer",
-      "read_only_notice": "Read-only QC visibility",
-      "status_review": "Needs human review",
-      "status_success": "Ready for review",
-      "status_unknown": "Review status unknown",
-      "unknown_status": "Unknown status; treat as review visibility only",
-      "unsupported_input": "Checklist unavailable; review the source export summary/report before making a handover decision."
-    }
-  },
+  "base_commit": "a5fcadf1108dce409d7a1ddd9928b6a9cbb730c9",
+  "branch": "step-203-official-local-sync-protocol",
   "current_safe_point": {
-    "merge_commit": "3918bfbe73d79ea6dcb9228ebcbd2818322965ec",
+    "merge_commit": "a5fcadf1108dce409d7a1ddd9928b6a9cbb730c9",
     "semantics": "latest_merged_master_checkpoint",
-    "step": 201
+    "step": 202
   },
   "diff_check": {
     "command": "git diff --check",
@@ -90,9 +18,46 @@
     "result": "clean"
   },
   "forbidden_scope_added": false,
-  "issue": 19,
+  "issue": 21,
   "merge_authorized": false,
-  "next_action": "Review draft PR #20; after merge, the next narrow technical step is documentation-only fixture naming and assertion checklist planning for a future handover QC presentation view-model implementation.",
+  "next_action": "Push branch step-203-official-local-sync-protocol for ChatGPT inspection and draft PR creation; do not merge.",
+  "official_local_sync_protocol": {
+    "documentation_only": true,
+    "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
+    "github_only_changes_count_as_completion": false,
+    "github_role": "synchronized_remote_and_review_surface",
+    "local_role": "primary_working_copy_for_files_verification_commit_and_push",
+    "pre_change_safety_rule": "inspect tracked staged untracked and ignored status before branch changes pulls edits or commits; stop and report unexpected project changes",
+    "automatic_reset_clean_stash_delete_or_overwrite_allowed": false,
+    "master_sync": {
+      "command_sequence": [
+        "git fetch origin --prune",
+        "git checkout master",
+        "git pull --ff-only origin master"
+      ],
+      "expected_master_sha": "a5fcadf1108dce409d7a1ddd9928b6a9cbb730c9",
+      "local_master_sha_after_pull": "a5fcadf1108dce409d7a1ddd9928b6a9cbb730c9",
+      "origin_master_sha_after_fetch": "a5fcadf1108dce409d7a1ddd9928b6a9cbb730c9",
+      "divergence_after_sync": "0 0"
+    },
+    "branch": {
+      "name": "step-203-official-local-sync-protocol",
+      "created_from": "synchronized_master",
+      "initial_sha": "a5fcadf1108dce409d7a1ddd9928b6a9cbb730c9"
+    },
+    "required_verification": [
+      "python -m pytest",
+      "git diff --check",
+      "git diff -- app/models.py tests/test_models.py .github/workflows/pytest.yml",
+      "changed_file_scope",
+      "exports_clean",
+      "ignored_zip_untouched",
+      "branch_divergence",
+      "final_working_tree_status"
+    ],
+    "existing_ignored_zip": "chief-site-engineer_adim_080_guvenli_nokta.zip",
+    "codex_opens_draft_pr": false
+  },
   "production_code_changed": false,
   "protected_paths": {
     ".github/workflows/pytest.yml": "unchanged",
@@ -100,45 +65,30 @@
     "tests/test_models.py": "unchanged"
   },
   "protocol_version": 1,
-  "pull_request": 20,
-  "pull_request_state": "open_draft",
-  "step": 202,
+  "pull_request": null,
+  "pull_request_state": "not_created_by_codex_issue_21_instruction",
+  "step": 203,
   "tests": {
     "command": "python -m pytest",
     "result": "passed",
-    "summary": "413 passed in 2.06s"
+    "summary": "413 passed in 2.04s"
   },
   "tests_changed": false,
   "workflow_changed": false,
-  "workflow_status": "pushed_to_open_draft_pr",
+  "workflow_status": "pushed_branch_for_chatgpt_pr_creation",
   "working_tree": {
     "changes": [
-      "A docs/202_handover_qc_canonical_view_model_examples_and_wording_standardization.md",
-      "A learning/202_handover_qc_canonical_view_model_examples_and_wording_standardization.md",
+      "A .cse/tasks/203_task.md",
+      "A docs/203_official_local_sync_protocol.md",
+      "A learning/203_official_local_sync_protocol.md",
+      "A .cse/results/203_result.md",
+      "M .cse/state/project_state.json",
       "M ROADMAP.md",
       "M CHANGELOG.md",
-      "M docs/project_decisions.md",
-      "A .cse/results/202_result.md",
-      "M .cse/state/project_state.json"
+      "M docs/project_decisions.md"
     ],
-    "ignored_files_remaining": 0,
+    "ignored_files_remaining": 1,
     "result": "clean_after_push"
-  },
-  "official_local_sync": {
-    "local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
-    "source_of_truth": "official_local_working_copy",
-    "branch": "step-202-canonical-view-model-wording",
-    "divergence_after_sync": "0 0",
-    "state_fields_verified": {
-      "workflow_status": "pushed_to_open_draft_pr",
-      "working_tree_result": "clean_after_push"
-    },
-    "tests": "413 passed in 2.06s",
-    "diff_check": "passed",
-    "exports": "clean_only_gitkeep",
-    "zip_files_existing_untouched": [
-      "chief-site-engineer_adim_080_guvenli_nokta.zip"
-    ]
   },
   "zip": {
     "ignored_zip_touched": false,

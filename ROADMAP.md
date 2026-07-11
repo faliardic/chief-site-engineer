@@ -3,11 +3,11 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 201 - Podcast 030 Steps 196-200 Documentation Follow-up
-Merge commit: 3918bfbe73d79ea6dcb9228ebcbd2818322965ec
+Adim 202 - Canonical Handover QC View-Model Examples and Wording Standardization
+Merge commit: a5fcadf1108dce409d7a1ddd9928b6a9cbb730c9
 ```
 
-Adim 201, master uzerindeki guncel guvenli noktadir. Step 202 acik draft canonical handover QC view-model examples and wording standardization calismasidir ve merge edilene kadar yeni guvenli nokta olarak sayilmaz.
+Adim 202, master uzerindeki guncel guvenli noktadir. Step 203 acik branch official local sync protocol calismasidir ve merge edilene kadar yeni guvenli nokta olarak sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -148,6 +148,8 @@ Adim 200'de future handover QC screen ve export review presentation consumer ici
 Adim 201'de Podcast 030 documentation-only olarak hazirlandi ve yalniz Adim 196-200 araligini kapsadi. Not; minimal GitHub Actions `pytest` workflow'u, explicit merged-state finalization, billing lock'un external CI execution constraint olarak siniflandirilmasi, roadmap/current checkpoint resynchronization, handover QC checklist phase closure ve downstream presentation consumer contract/test matrix planini NotebookLM-friendly sekilde ozetler. Production code, tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, ZIP ve export ciktisi eklenmez.
 
 Adim 202'de future handover QC presentation view-model consumer'lari icin canonical examples ve wording standardization documentation-only olarak hazirlandi. Structured source of truth `build_export_handover_qc_review_checklist(summary, report)` ciktisi olarak korunur; optional Markdown yalniz presentation text olarak kalir ve structured truth olarak parse edilmez. Success-only, failure-only, mixed, empty/zero-count, missing optional fields, unknown status/additional fields ve unsupported input fallback ornekleri; status label, human-review indicator, empty state, missing-field fallback, unknown-status visibility ve item next-action wording'i standardize edilir. `is_read_only=True`, `is_blocking=False`, `requires_human_review` insan inceleme sinyali, no generated `blocked` status, no automatic acceptance/rejection/blocking ve official-transferable/private-non-transferable separation semantics korunur. Production code, tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, ZIP ve export ciktisi eklenmez.
+
+Adim 203'te Issue #21 uyarinca official local working copy protocol documentation-only olarak sabitlendi. `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer` proje dosyasi olusturma, duzenleme, verification, commit ve push icin primary working copy olarak kaydedilir; GitHub synchronized remote ve review surface olarak kalir. Branch/pull oncesi local status inspection, fast-forward-only master sync, expected master SHA dogrulama, branch divergence, required local verification, exports cleanliness ve ignored ZIP untouched status raporlamasi standardize edilir. Production code, tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, export output, ZIP mutasyonu, PR creation ve merge behavior eklenmez.
 
 Adim 160'da mevcut exception tabanli file-writing helper davranisini bozmadan future result contract wrapper API boundary documentation-only olarak planlandi; `write_*` helperlarin korunmasi, olasi `try_write_*` wrapper isimleri, result alanlari, error mapping, geriye uyumluluk ve handover QC gorunurlugu netlestirildi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 
@@ -425,8 +427,16 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 - [x] Adim 202 - Status label, human-review indicator, empty state, missing-field fallback, unknown-status visibility ve item next-action wording'i future consumer'lar icin belgelendi.
 - [x] Adim 202 - Official-transferable ve private/non-transferable information ayrimi her ornekte korundu.
 
+## Official Local Sync Protocol - Adim 203
+
+- [x] Adim 203 - Official local repository path `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer` primary working copy olarak kaydedildi.
+- [x] Adim 203 - Branch/pull oncesi local working tree inspection ve unexpected local changes icin stop-and-report kuralı belgelendi.
+- [x] Adim 203 - Fast-forward-only `master` synchronization, expected master SHA, branch creation, divergence, pytest, diff check, protected-path diff, exports ve ZIP reporting protocol'u belgelendi.
+- [x] Adim 203 - GitHub-only file creation'in completion sayilmayacagi; commit/push'un local repo uzerinden yapilacagi netlestirildi.
+- [x] Adim 203 - Issue #21 kapsaminda Codex'in draft PR acmayacagi ve ChatGPT review/PR acma surecinin ayri kalacagi kaydedildi.
+
 ## Sonraki Calisma Onerisi
 
-Adim 202 sonrasi tek dar teknik onerim, future handover QC presentation view-model icin documentation-only fixture naming and assertion checklist hazirlamaktir. Bu adim da API/GUI/CLI implementation, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, file/export output veya official package decision behavior baslatmamalidir.
+Adim 203 sonrasi tek dar teknik onerim, future handover QC presentation view-model icin documentation-only fixture naming and assertion checklist hazirlamaktir. Her yeni adim once official local sync protocol'u uygulamali; API/GUI/CLI implementation, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, file/export output veya official package decision behavior baslatmamalidir.
 
 Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Son mevcut podcast notu Podcast 030'dur ve Adim 196-200 araligini kapsar. Adim 201 kapsaminda Podcast 030 olusturuldu.

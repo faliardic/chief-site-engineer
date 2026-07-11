@@ -1,5 +1,19 @@
 # Changelog
 
+## Step 203
+
+- Added documentation-only official local sync protocol required by Issue #21.
+- Added `.cse/tasks/203_task.md`.
+- Added `docs/203_official_local_sync_protocol.md`.
+- Added `learning/203_official_local_sync_protocol.md`.
+- Added `.cse/results/203_result.md`.
+- Updated `.cse/state/project_state.json`, `ROADMAP.md`, `CHANGELOG.md`, and `docs/project_decisions.md`.
+- Recorded `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer` as the official local working copy for project file creation, editing, verification, commit, and push.
+- Documented the safety rule: inspect local tracked, staged, and untracked changes before branch changes or pulls; stop and report unexpected project changes.
+- Documented the fast-forward-only synchronization sequence for `master`, expected Step 203 base commit `a5fcadf1108dce409d7a1ddd9928b6a9cbb730c9`, and required `0 0` divergence.
+- Documented required local verification, changed-file scope reporting, export cleanliness, ignored ZIP preservation, and protected-path diff checks.
+- Kept this as documentation/state-only; no production code, tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, export output, ZIP mutation, PR creation, or merge behavior was added.
+
 ## Step 202
 
 - Added documentation-only canonical examples and wording standards for future handover QC presentation view-model consumers.
