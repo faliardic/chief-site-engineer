@@ -1,5 +1,19 @@
 # Changelog
 
+## Step 207
+
+- Added tracked unified project source at `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md` from the approved `CHIEF_SITE_ENGINEER_EXE_BIRLESTIRILMIS_PROJE_KAYNAGI.md` source without reconstruction or shortening.
+- Added `docs/protocols/CSE_PROJECT_SOURCE_REGISTER.md` to classify source files, copied references, unavailable originals, and no-fabrication / no-raw-ZIP rules.
+- Added `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md` so future chats resume from GitHub with `devam` or `GitHub'dan devam et` rather than uploaded ZIP/handoff packages.
+- Added accessible reference source copies under `docs/reference_sources/` using ASCII-safe filenames.
+- Updated canonical instructions with explicit authority domains: unified product source, operational instructions, current Issue/task scope, and state/result evidence.
+- Added mandatory Codex pre-read rules to canonical instructions, `.cse/README.md`, and task/result templates.
+- Added the ChatGPT decision rule: say `Codex çalışmalı` only when local execution is needed and briefly explain why.
+- Added Codex-required and Codex-not-required categories, batched execution, post-merge sync batching, and metadata-churn avoidance policy.
+- Updated repository truth so Step 206 / PR #29 / Issue #28 / merge commit `3b05fae76766cedc8840eea6c0fc2f51440354e4` is the latest merged/finalized safe point and Step 207 remains active unmerged documentation/state/protocol work.
+- Kept Podcast 031 as latest and the next podcast range as Steps 206-210.
+- Kept this as documentation/state/protocol-only; no production code, executable tests/fixtures, workflow behavior, Actions enablement, required checks, API/GUI/CLI implementation, persistence, audit, backup/restore, migration, hard validation, generated `blocked`, export output, ZIP mutation, Desktop archive mutation, Step 208, field-MVP implementation, PR creation, merge, force push, or branch deletion was added.
+
 ## Step 206
 
 - Updated tracked canonical project instructions so `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` is the single authoritative project instruction source.

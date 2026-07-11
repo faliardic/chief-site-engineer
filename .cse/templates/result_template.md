@@ -15,6 +15,16 @@
 - Pull request: `<number or not created>`
 - Push result: `<pushed|not pushed|not authorized>`
 
+## Required Sources Read
+
+- `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`: `<read|missing|not applicable>`
+- `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`: `<read|missing|not applicable>`
+- Current GitHub Issue: `<read|missing|not applicable>`
+- `.cse/tasks/NNN_task.md`: `<read|missing|not applicable>`
+- `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md`: `<read when task concerns workflow/handoff/bootstrap/source authority|not applicable>`
+- Source conflict found: `<yes|no>`
+- Conflict handling: `<none|stopped|resolved by authorized update>`
+
 ## Changes
 
 ### Created
@@ -43,6 +53,7 @@
 
 - `python -m pytest`: `<result>`
 - `git diff --check`: `<result>`
+- Required-source pre-read: `<confirmed|details>`
 - Protected path diff (`app/models.py`, `tests/test_models.py`, `.github/workflows/pytest.yml`): `<empty|details>`
 - Staged files: `<result>`
 - `exports/`: `<result>`

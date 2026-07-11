@@ -12,6 +12,21 @@ Describe one small, testable, reversible outcome.
 - Working branch: `step-NNN-<purpose>`
 - Official local working directory: `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer`
 
+## Required Sources Read
+
+Codex must read these sources in order before editing:
+
+1. `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
+2. `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
+3. current GitHub Issue
+4. `.cse/tasks/NNN_task.md`
+
+If this task concerns workflow, handoff, bootstrap, source authority, or new-chat recovery, also read:
+
+- `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md`
+
+If a required tracked source is missing or the task contradicts an unresolved permanent product/data/safety rule, stop before edits and report.
+
 ## Local-First Preconditions
 
 - Work must start from the official local repository.
@@ -83,6 +98,7 @@ All task, result, state, documentation, and project files for this step must phy
 - `python -m pytest`
 - `git diff --check`
 - `git diff -- app/models.py tests/test_models.py .github/workflows/pytest.yml` must be empty unless explicitly authorized.
+- Confirm required sources were read and no unresolved conflict was found.
 - Confirm changed/staged files match scope.
 - Confirm `exports/` is clean unless explicitly authorized.
 - Confirm ignored ZIP files remain untouched.

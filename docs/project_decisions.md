@@ -1,5 +1,25 @@
 # Proje Kararlari
 
+## 207 Unified Project Source, GitHub Bootstrap ve Codex Invocation Policy Karari
+
+- `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`, product purpose, strategy, data principles, product layers, roadmap, source-conflict resolutions ve long-term architecture icin ust tracked proje kaynagidir.
+- `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`, operational workflow, Git/GitHub/Codex rules, safety, verification ve execution protocol icin yetkili kaynaktir.
+- Guncel GitHub Issue ve `.cse/tasks/<step>_task.md`, yalniz mevcut step'in authorized scope'unu belirler; kalici product/data principles veya safety rules sessizce override edilemez.
+- `.cse/state/project_state.json` ve ilgili `.cse/results/<step>_result.md`, factual state/evidence kayitlaridir.
+- `docs/protocols/CSE_PROJECT_SOURCE_REGISTER.md`, approved source set, copied reference files, unavailable originals, no-fabrication ve no-raw-ZIP kurallarini kaydeder.
+- `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md`, yeni chat'in GitHub'dan baslamasini kalici hale getirir; normal continuation icin ZIP/handoff upload veya uzun prompt kopyalama gerekmez.
+- Yeni chat'te kullanici normalde `devam` veya `GitHub'dan devam et` diyebilir; ChatGPT GitHub repository, Issue, PR ve merge state'i okuyarak sonraki aksiyonu belirler.
+- ChatGPT, Codex gerekip gerekmedigine karar verir. Local execution gerekiyorsa kullaniciya `Codex çalışmalı` der ve nedenini kisaca aciklar.
+- Codex local project-file edits, local tests/scripts/validation/hash/path/worktree/ignored-file/ZIP checks, branch checkout, stage/commit/push, local error resolution ve GitHub'in guvenle yapamayacagi local operations icin gerekir.
+- Codex planning, reasoning, architecture, summaries, GitHub Issue/PR/diff/comment/review/merge-state inspection, Issue/comment creation, branch push edildikten sonra Draft PR creation, ready/review/merge GitHub-native actions, web research ve local evidence gerekmeyen state reporting icin normalde gerekmez.
+- Default execution modeli: `1 technical step = 1 primary Codex run`, `blocking correction = at most 1 correction run`, `post-merge sync = batch into the next Codex-required run when safe`.
+- Non-blocking wording veya metadata observations icin ayri Codex run uretilmez; repository truth, tests, PR review veya merge safety blocked olmadikca correction bir sonraki consolidated run'a biriktirilir.
+- Bir result/state dosyasi kendi commit SHA'sini iceremiyor diye ekstra metadata commit uretilmez; final branch-head SHA ve divergence Issue completion comment ve PR metadata icinde kaydedilebilir.
+- Her Codex execution edit oncesi `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`, `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`, current GitHub Issue ve `.cse/tasks/<step>_task.md` kaynaklarini bu sirayla okur. Workflow/handoff/bootstrap/source-authority task'larinda `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md` de okunur.
+- Step 206, PR #29 squash merge commit `3b05fae76766cedc8840eea6c0fc2f51440354e4` ile latest merged/finalized safe point'tir; Issue #28 completed olarak kaydedilir.
+- Step 207, Issue #30 ve `step-207-codex-invocation-policy` branch'i uzerinde documentation/state/protocol aktif isidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+- Production code, executable test/fixture, workflow behavior, Actions enablement, required checks, API/GUI/CLI implementation, persistence, audit, backup/restore, migration, hard validation, generated `blocked`, export output, ZIP mutation, Desktop archive mutation, raw ZIP package commit, replacement handoff ZIP, Step 208 ve field-MVP implementation eklenmez.
+
 ## 206 Step 205 Merged Truth, Podcast 031 ve Instruction Authority Closure Karari
 
 - Tracked canonical proje talimat kaynagi `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` dosyasidir; current instruction authority icin tek yetkili kaynak budur.

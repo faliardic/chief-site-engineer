@@ -3,11 +3,11 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 205 - Canonical Project Instructions and Repository Truth Synchronization
-PR #26 merge commit: 92a15f2a55e6bfda42d50b8ef7dea651ff496f62
+Adim 206 - Step 205 Merged Truth, Podcast 031, and Instruction Authority Closure
+PR #29 merge commit: 3b05fae76766cedc8840eea6c0fc2f51440354e4
 ```
 
-Adim 205, PR #26 squash merge commit `92a15f2a55e6bfda42d50b8ef7dea651ff496f62` ile master uzerindeki guncel guvenli noktadir. Step 206, Issue #28 kapsaminda Step 205 merged truth kayitlarini finalize eden, Podcast 031'i ekleyen, podcast protocol'unu tazeleyen ve instruction authority'yi tracked canonical dosyada birlestiren aktif documentation/state-only branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Adim 206, PR #29 squash merge commit `3b05fae76766cedc8840eea6c0fc2f51440354e4` ile master uzerindeki guncel guvenli noktadir. Step 207, Issue #30 kapsaminda unified project source, source register, GitHub-native new-chat bootstrap ve Codex invocation / batched execution policy ekleyen aktif documentation/state/protocol branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -455,15 +455,25 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 
 ## Step 206 - Podcast 031 and Instruction Authority Closure
 
-- [ ] Adim 206 - Step 205 / PR #26 / Issue #25 / merge commit `92a15f2a55e6bfda42d50b8ef7dea651ff496f62` latest merged/finalized safe point olarak README, state, roadmap, changelog, decisions ve canonical Section 17 icinde eslenecek.
-- [ ] Adim 206 - `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` tek yetkili proje talimat kaynagi olacak; `CSE_GUNCEL_PROJE_TALIMATLARI.md` sadece ignored local mirror olarak tutulacak ve canonical metinle birebir eslenecek.
-- [ ] Adim 206 - Official workspace rule `Set-Location`, exact `git rev-parse --show-toplevel` check, wrong-root stop rule, no automatic `C:` clone/workspace ve GitHub Issue evidence exchange maddeleriyle sertlestirilecek.
-- [ ] Adim 206 - Podcast 031, yalniz Steps 201-205 araligini kapsayacak sekilde eklenecek.
-- [ ] Adim 206 - `docs/podcast_notes/README.md` stale Step 022 current-state metninden arindirilarak durable cadence ve factual Podcast 030/031 state ile guncellenecek.
-- [ ] Adim 206 - Desktop archive repository risk kaydi non-blocking unresolved local archive item olarak belgelenecek; Desktop repository'ye dokunulmayacak.
+- [x] Adim 206 - Step 205 / PR #26 / Issue #25 / merge commit `92a15f2a55e6bfda42d50b8ef7dea651ff496f62` latest merged/finalized safe point olarak README, state, roadmap, changelog, decisions ve canonical Section 17 icinde eslendi.
+- [x] Adim 206 - `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` tek yetkili operasyon talimat kaynagi oldu; `CSE_GUNCEL_PROJE_TALIMATLARI.md` sadece ignored local mirror olarak tutuldu ve canonical metinle birebir eslendi.
+- [x] Adim 206 - Official workspace rule `Set-Location`, exact `git rev-parse --show-toplevel` check, wrong-root stop rule, no automatic `C:` clone/workspace ve GitHub Issue evidence exchange maddeleriyle sertlestirildi.
+- [x] Adim 206 - Podcast 031, yalniz Steps 201-205 araligini kapsayacak sekilde eklendi.
+- [x] Adim 206 - `docs/podcast_notes/README.md` stale Step 022 current-state metninden arindirilarak durable cadence ve factual Podcast 030/031 state ile guncellendi.
+- [x] Adim 206 - Desktop archive repository risk kaydi non-blocking unresolved local archive item olarak belgelendi; Desktop repository'ye dokunulmadi.
+
+## Step 207 - Unified Source and Codex Invocation Policy
+
+- [ ] Adim 207 - `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md` approved merged source'tan tracked ust proje kaynagi olarak eklenecek.
+- [ ] Adim 207 - `docs/protocols/CSE_PROJECT_SOURCE_REGISTER.md` source set, erisim durumu, unavailable sources ve copied reference files icin kayit olacak.
+- [ ] Adim 207 - `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md` yeni chat'in GitHub'dan ZIP/handoff yuklemeden devam etme kuralini kalici hale getirecek.
+- [ ] Adim 207 - ChatGPT'nin Codex gerekip gerekmedigine karar vermesi, gerekirse `Codex çalışmalı` demesi ve nedenini aciklamasi protokole eklenecek.
+- [ ] Adim 207 - Codex-required / Codex-not-required kategorileri, batched execution, post-merge sync batching ve metadata churn avoidance kalici operasyon kuralina donusecek.
+- [ ] Adim 207 - Her Codex execution icin required source pre-read sirası instructions, `.cse/README.md`, task template ve result template icinde kalici hale gelecek.
+- [ ] Adim 207 - Step 206 / PR #29 / Issue #28 / merge commit `3b05fae76766cedc8840eea6c0fc2f51440354e4` latest safe point olarak state ve ana dokumanlarda kaydedilecek.
 
 ## Sonraki Calisma Onerisi
 
-Adim 206 merge edilmeden Step 207 veya field-MVP implementation baslatilmaz. Adim 206 sonrasi dogal besli podcast araligi Step 206 ile baslar; ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur.
+Adim 207 merge edilmeden Step 208 veya field-MVP implementation baslatilmaz. Adim 207 sonrasi dogal besli podcast araligi halen Steps 206-210'dur; ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur.
 
 Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Podcast 030 Adim 196-200 araligini, Podcast 031 Adim 201-205 araligini kapsar.
