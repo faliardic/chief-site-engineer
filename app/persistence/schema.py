@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -75,6 +75,12 @@ SCHEMA_MIGRATIONS: tuple[Migration, ...] = (
                 payload_json TEXT NOT NULL
             )
             """,
+        ),
+    ),
+    Migration(
+        version=2,
+        statements=(
+            "ALTER TABLE field_observations ADD COLUMN notes TEXT",
         ),
     ),
 )

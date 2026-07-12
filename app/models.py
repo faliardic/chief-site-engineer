@@ -81,6 +81,9 @@ class FieldObservationRecord:
     notes: str | None = None
     is_archived: bool = False
     revision: int = 1
+    created_at: str | None = None
+    updated_at: str | None = None
+    archived_at: str | None = None
 
 
 @dataclass
