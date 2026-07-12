@@ -1,33 +1,33 @@
 {
-  "step": 217,
+  "step": 218,
   "base_branch": "master",
-  "base_commit": "43345c7e57ea9a786354d9ee8348f39aaf53af8f",
+  "base_commit": "075acdbc77927925092b748b77aad7c0ce13d9ef",
   "active_work": {
-    "issue": 50,
-    "step": 217,
-    "branch": "step-217-file-attachment-repository-baseline",
-    "file_attachment_repository_baseline": true,
+    "issue": 52,
+    "step": 218,
+    "branch": "step-218-file-attachment-related-record-filters",
+    "file_attachment_repository_related_record_filters": true,
     "documentation_learning_state_and_tests": true,
-    "merge_claim_for_step_217": false,
-    "step_218_started": false,
+    "merge_claim_for_step_218": false,
+    "step_219_started": false,
     "podcast_034_created": false,
-    "local_test_summary": "453 passed"
+    "local_test_summary": "461 passed"
   },
   "current_safe_point": {
     "semantics": "latest_merged_finalized_checkpoint",
-    "step": 216,
-    "issue": 48,
+    "step": 217,
+    "issue": 50,
     "issue_state": "completed",
-    "pull_request": 49,
+    "pull_request": 51,
     "pull_request_state": "merged",
-    "merge_commit": "43345c7e57ea9a786354d9ee8348f39aaf53af8f",
-    "local_test_summary": "445 passed"
+    "merge_commit": "075acdbc77927925092b748b77aad7c0ce13d9ef",
+    "local_test_summary": "453 passed"
   },
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
-    "local_master_sha": "43345c7e57ea9a786354d9ee8348f39aaf53af8f",
-    "origin_master_sha": "43345c7e57ea9a786354d9ee8348f39aaf53af8f",
+    "local_master_sha": "075acdbc77927925092b748b77aad7c0ce13d9ef",
+    "origin_master_sha": "075acdbc77927925092b748b77aad7c0ce13d9ef",
     "divergence": "0 0",
     "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
     "misspelled_workspace_present": false,
@@ -248,7 +248,23 @@
             "step_068_file_attachment_model_documentation": true,
             "step_080_file_attachment_metadata_integrity_summary": true,
             "step_089_attachment_metadata_integrity_rules": true,
-            "step_208_field_observation_contract": true,
+        "step_208_field_observation_contract": true,
+        "podcast_033": true,
+        "new_chat_bootstrap": false
+        },
+        "step_218_sources_read": {
+            "unified_project_source": true,
+            "project_instructions": true,
+            "github_issue_52_with_scope_comments": true,
+            "task_218": true,
+            "app_models": true,
+            "app_records": true,
+            "tests_test_records": true,
+            "file_attachment_repository_baseline_documentation": true,
+            "file_attachment_repository_baseline_learning": true,
+            "step_068_file_attachment_model_documentation": true,
+            "step_080_file_attachment_metadata_integrity_summary": true,
+            "step_089_attachment_metadata_integrity_rules": true,
             "podcast_033": true,
             "new_chat_bootstrap": false
         },
@@ -435,7 +451,7 @@
       ]
     },
     "file_attachment_repository": {
-      "status": "implemented_minimal_in_memory_metadata_repository",
+      "status": "implemented_in_memory_metadata_repository_with_related_record_filters",
       "path": "app/records.py",
       "tests_path": "tests/test_records.py",
       "model": "FileAttachmentRecord",
@@ -443,6 +459,8 @@
       "methods": [
         "add",
         "list_all",
+        "list_by_related_record_type",
+        "list_by_related_record_id",
         "count",
         "find_by_id"
       ],
@@ -454,11 +472,16 @@
       "preserves_insertion_order": true,
       "find_by_id_returns_same_stored_record": true,
       "missing_id_returns_none": true,
+      "related_record_type_filter_exact_case_sensitive": true,
+      "related_record_id_filter_exact_case_sensitive": true,
+      "related_record_filters_return_new_lists": true,
+      "related_record_filters_preserve_insertion_order": true,
+      "related_record_type_and_id_filters_are_independent": true,
+      "related_record_filters_return_same_stored_records": true,
+      "related_record_filters_do_not_validate_related_record_existence": true,
       "record_objects_not_copied": true,
       "record_objects_not_mutated": true,
       "not_implemented": [
-        "list_by_related_record_type",
-        "list_by_related_record_id",
         "combined_related_record_filtering",
         "field_observation_specific_attachment_lookup",
         "field_observation_specific_attachment_linking",
@@ -472,18 +495,18 @@
         "api_gui_cli",
         "audit_history_task_ncr_notification_decision_generation",
         "generated_blocked",
-        "step_218",
+        "step_219",
         "podcast_034"
       ]
     }
   },
   "protected_paths": {
-    "app/models.py": "unchanged_in_step_217",
-    "tests/test_models.py": "unchanged_in_step_217",
-    "app/attachment_integrity.py": "unchanged_in_step_217",
-    "tests/test_attachment_integrity.py": "unchanged_in_step_217",
+    "app/models.py": "unchanged_in_step_218",
+    "tests/test_models.py": "unchanged_in_step_218",
+    "app/attachment_integrity.py": "unchanged_in_step_218",
+    "tests/test_attachment_integrity.py": "unchanged_in_step_218",
     ".github/workflows/pytest.yml": "unchanged",
-    "docs/podcast_notes/033_adim_211_215_notebooklm_podcast_notu.md": "unchanged_in_step_217"
+    "docs/podcast_notes/033_adim_211_215_notebooklm_podcast_notu.md": "unchanged_in_step_218"
   },
   "exports": {
     "expected_contents": [
@@ -497,22 +520,22 @@
     "pull_request_creation_by_codex": false,
     "merge_authorized": false,
     "branch_deletion_authorized": false,
-    "final_remote_sha_evidence_location": "GitHub Issue #50 completion comment after push"
+    "final_remote_sha_evidence_location": "GitHub Issue #52 completion comment after push"
   },
   "required_files": [
-    ".cse/tasks/217_task.md",
-    ".cse/results/217_result.md",
+    ".cse/tasks/218_task.md",
+    ".cse/results/218_result.md",
     ".cse/state/project_state.json",
     "app/records.py",
     "tests/test_records.py",
-    "docs/217_file_attachment_repository_baseline.md",
-    "learning/217_file_attachment_repository_baseline.md",
+    "docs/218_file_attachment_repository_related_record_filters.md",
+    "learning/218_file_attachment_repository_related_record_filters.md",
     "README.md",
     "ROADMAP.md",
     "CHANGELOG.md",
     "docs/project_decisions.md",
     "docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md"
   ],
-  "workflow_status": "step_217_file_attachment_repository_baseline_completed_before_commit_and_push",
+  "workflow_status": "step_218_file_attachment_related_record_filters_completed_before_commit_and_push",
   "forbidden_scope_added": false
 }

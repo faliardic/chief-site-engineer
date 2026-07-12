@@ -1,5 +1,22 @@
 # Proje Kararlari
 
+## 218 FileAttachmentRepository Related-Record Filtre Karari
+
+- `FileAttachmentRepository`, mevcut `FileAttachmentRecord` metadata nesnelerini `related_record_type` veya `related_record_id` alanina gore read-only listeleyebilir.
+- `list_by_related_record_type(related_record_type)`, yalniz `record.related_record_type == related_record_type` exact match sonucunu dondurur.
+- `list_by_related_record_id(related_record_id)`, yalniz `record.related_record_id == related_record_id` exact match sonucunu dondurur.
+- Filtreler case-sensitive calisir; trim, normalize, parse, map, validation, enum veya fallback yapmaz.
+- Eslesmeyen, bilinmeyen, case-different veya whitespace-different degerler icin `[]` dondurulur.
+- Sonuclar repository ekleme sirasini korur.
+- Her filtre cagrisi yeni bir liste dondurur; disarida donen liste mutate edilirse repository storage degismez.
+- Record nesneleri kopyalanmaz ve metadata alanlari mutate edilmez.
+- Type filtresi ve id filtresi birbirinden bagimsiz kalir; combined type+id query eklenmez.
+- Bagli `FieldObservationRecord`, `NonconformityRecord` veya baska kayit varligi kontrol edilmez.
+- Step 217, PR #51 squash merge commit `075acdbc77927925092b748b77aad7c0ce13d9ef` ile latest merged/finalized safe point'tir; Issue #50 completed olarak kaydedilir.
+- Podcast 033 latest completed podcast olarak Steps 211-215 araligini kapsar; sonraki besli podcast araligi Steps 216-220 olur.
+- Step 218, Issue #52 ve `step-218-file-attachment-related-record-filters` branch'i uzerinde aktif unmerged related-record filter isidir.
+- FieldObservation-specific attachment lookup/linking, automatic attachment creation, physical file operations, filesystem checks, path generation/normalization, persistence, lifecycle behavior, validation/enums/constants, API/GUI/CLI, audit/history/task/NCR/decision generation, generated `blocked`, Step 219 ve Podcast 034 uygulanmamistir.
+
 ## 217 FileAttachmentRepository Baseline Karari
 
 - `FileAttachmentRepository`, mevcut `FileAttachmentRecord` metadata nesnelerini bellek icinde saklayan minimal repository olarak eklendi.
