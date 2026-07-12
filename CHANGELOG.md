@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 217
+
+- Added minimal in-memory `FileAttachmentRepository` for existing `FileAttachmentRecord` metadata objects.
+- Added focused repository tests for empty state, add/list/count/find behavior, insertion order, exact duplicate `attachment_id` rejection, case-sensitive identity, `list_all()` copy behavior, metadata non-mutation, and existing repository regression coverage.
+- Added `docs/217_file_attachment_repository_baseline.md` and `learning/217_file_attachment_repository_baseline.md`.
+- Updated repository truth so Step 216 / PR #49 / Issue #48 / merge commit `43345c7e57ea9a786354d9ee8348f39aaf53af8f` is the latest merged/finalized safe point and Step 217 remains active unmerged attachment metadata repository baseline work.
+- Kept this scope narrow; no related-record filters, FieldObservation-specific attachment lookup/linking, automatic attachment creation, physical file operations, filesystem checks, path generation/normalization, persistence, lifecycle behavior, validation/enums/constants, API/GUI/CLI, audit/history/task/NCR/decision generation, generated `blocked`, Step 218, Podcast 034, workflow changes, Actions enablement, ZIP mutation, or Desktop archive mutation was added.
+
 ## Step 216
 
 - Added Podcast 033 source note at `docs/podcast_notes/033_adim_211_215_notebooklm_podcast_notu.md`, covering only Steps 211-215.

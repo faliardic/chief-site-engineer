@@ -1,33 +1,33 @@
 {
-  "step": 216,
+  "step": 217,
   "base_branch": "master",
-  "base_commit": "7b3361087cdb51fe1e76caa6f2cd91ff005cdfe2",
+  "base_commit": "43345c7e57ea9a786354d9ee8348f39aaf53af8f",
   "active_work": {
-    "issue": 48,
-    "step": 216,
-    "branch": "step-216-podcast-033-steps-211-215",
-    "podcast_033_steps_211_215": true,
-    "documentation_state_podcast_only": true,
-    "merge_claim_for_step_216": false,
-    "step_217_started": false,
+    "issue": 50,
+    "step": 217,
+    "branch": "step-217-file-attachment-repository-baseline",
+    "file_attachment_repository_baseline": true,
+    "documentation_learning_state_and_tests": true,
+    "merge_claim_for_step_217": false,
+    "step_218_started": false,
     "podcast_034_created": false,
-    "local_test_summary": "445 passed"
+    "local_test_summary": "453 passed"
   },
   "current_safe_point": {
     "semantics": "latest_merged_finalized_checkpoint",
-    "step": 215,
-    "issue": 46,
+    "step": 216,
+    "issue": 48,
     "issue_state": "completed",
-    "pull_request": 47,
+    "pull_request": 49,
     "pull_request_state": "merged",
-    "merge_commit": "7b3361087cdb51fe1e76caa6f2cd91ff005cdfe2",
+    "merge_commit": "43345c7e57ea9a786354d9ee8348f39aaf53af8f",
     "local_test_summary": "445 passed"
   },
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
-    "local_master_sha": "7b3361087cdb51fe1e76caa6f2cd91ff005cdfe2",
-    "origin_master_sha": "7b3361087cdb51fe1e76caa6f2cd91ff005cdfe2",
+    "local_master_sha": "43345c7e57ea9a786354d9ee8348f39aaf53af8f",
+    "origin_master_sha": "43345c7e57ea9a786354d9ee8348f39aaf53af8f",
     "divergence": "0 0",
     "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
     "misspelled_workspace_present": false,
@@ -216,7 +216,7 @@
       "tests_test_records": true,
       "new_chat_bootstrap": false
     },
-    "step_216_sources_read": {
+        "step_216_sources_read": {
       "unified_project_source": true,
       "project_instructions": true,
       "github_issue_48_with_scope_comments": true,
@@ -234,8 +234,24 @@
       "step_214_reporting_update_documentation": true,
       "step_215_location_category_filter_documentation": true,
       "merged_pr_39_evidence": true,
-      "new_chat_bootstrap": false
-    },
+            "new_chat_bootstrap": false
+        },
+        "step_217_sources_read": {
+            "unified_project_source": true,
+            "project_instructions": true,
+            "github_issue_50_with_scope_comments": true,
+            "task_217": true,
+            "app_models": true,
+            "app_records": true,
+            "tests_test_records": true,
+            "tests_test_models_regression_awareness": true,
+            "step_068_file_attachment_model_documentation": true,
+            "step_080_file_attachment_metadata_integrity_summary": true,
+            "step_089_attachment_metadata_integrity_rules": true,
+            "step_208_field_observation_contract": true,
+            "podcast_033": true,
+            "new_chat_bootstrap": false
+        },
     "unresolved_conflict_found": false
   },
   "canonical_project_instructions": {
@@ -259,17 +275,12 @@
   },
   "podcast": {
     "latest_completed": {
-      "podcast": 32,
-      "range": "206-210",
-      "path": "docs/podcast_notes/032_adim_206_210_notebooklm_podcast_notu.md"
-    },
-    "active_artifact": {
       "podcast": 33,
       "range": "211-215",
-      "path": "docs/podcast_notes/033_adim_211_215_notebooklm_podcast_notu.md",
-      "becomes_latest_completed_after_step_216_merge": true
+      "path": "docs/podcast_notes/033_adim_211_215_notebooklm_podcast_notu.md"
     },
-    "next_five_step_range": "216-220_after_step_216_merge"
+    "active_artifact": null,
+    "next_five_step_range": "216-220"
   },
   "ci": {
     "workflow_exists": true,
@@ -293,7 +304,8 @@
     "field_mvp_explicit_reporting_enrichment_added_in_step_214": true,
     "field_mvp_read_only_location_category_visibility_added_in_step_215": true,
     "field_mvp_product_behavior_added_in_step_216": false,
-    "podcast_033_active_in_step_216": true,
+    "podcast_033_completed_in_step_216": true,
+    "field_mvp_attachment_repository_started_in_step_217": true,
     "next_product_direction": {
       "name": "first_field_mvp",
       "scope": [
@@ -421,15 +433,57 @@
         "daily_export",
         "weekly_summary"
       ]
+    },
+    "file_attachment_repository": {
+      "status": "implemented_minimal_in_memory_metadata_repository",
+      "path": "app/records.py",
+      "tests_path": "tests/test_records.py",
+      "model": "FileAttachmentRecord",
+      "identity_field": "attachment_id",
+      "methods": [
+        "add",
+        "list_all",
+        "count",
+        "find_by_id"
+      ],
+      "duplicate_rejection": true,
+      "duplicate_rejection_exception": "ValueError",
+      "duplicate_detection_exact_case_sensitive": true,
+      "case_different_ids_are_distinct": true,
+      "list_all_returns_copy": true,
+      "preserves_insertion_order": true,
+      "find_by_id_returns_same_stored_record": true,
+      "missing_id_returns_none": true,
+      "record_objects_not_copied": true,
+      "record_objects_not_mutated": true,
+      "not_implemented": [
+        "list_by_related_record_type",
+        "list_by_related_record_id",
+        "combined_related_record_filtering",
+        "field_observation_specific_attachment_lookup",
+        "field_observation_specific_attachment_linking",
+        "automatic_file_attachment_creation",
+        "upload_download_copy_move_rename_delete_preview_thumbnail_compression_zip",
+        "filesystem_existence_readability_integrity_checks",
+        "path_generation_normalization_allowed_root_enforcement",
+        "persistence_database_json_sqlite",
+        "status_archive_lifecycle_behavior",
+        "new_validation_enums_constants",
+        "api_gui_cli",
+        "audit_history_task_ncr_notification_decision_generation",
+        "generated_blocked",
+        "step_218",
+        "podcast_034"
+      ]
     }
   },
   "protected_paths": {
-    "app/models.py": "unchanged_in_step_216",
-    "app/records.py": "unchanged_in_step_216",
-    "tests/test_models.py": "unchanged_in_step_216",
-    "tests/test_records.py": "unchanged_in_step_216",
+    "app/models.py": "unchanged_in_step_217",
+    "tests/test_models.py": "unchanged_in_step_217",
+    "app/attachment_integrity.py": "unchanged_in_step_217",
+    "tests/test_attachment_integrity.py": "unchanged_in_step_217",
     ".github/workflows/pytest.yml": "unchanged",
-    "docs/podcast_notes/032_adim_206_210_notebooklm_podcast_notu.md": "unchanged_in_step_216"
+    "docs/podcast_notes/033_adim_211_215_notebooklm_podcast_notu.md": "unchanged_in_step_217"
   },
   "exports": {
     "expected_contents": [
@@ -443,20 +497,22 @@
     "pull_request_creation_by_codex": false,
     "merge_authorized": false,
     "branch_deletion_authorized": false,
-    "final_remote_sha_evidence_location": "GitHub Issue #48 completion comment after push"
+    "final_remote_sha_evidence_location": "GitHub Issue #50 completion comment after push"
   },
   "required_files": [
-    ".cse/tasks/216_task.md",
-    ".cse/results/216_result.md",
+    ".cse/tasks/217_task.md",
+    ".cse/results/217_result.md",
     ".cse/state/project_state.json",
-    "docs/podcast_notes/033_adim_211_215_notebooklm_podcast_notu.md",
-    "docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md",
+    "app/records.py",
+    "tests/test_records.py",
+    "docs/217_file_attachment_repository_baseline.md",
+    "learning/217_file_attachment_repository_baseline.md",
     "README.md",
     "ROADMAP.md",
     "CHANGELOG.md",
     "docs/project_decisions.md",
-    "docs/podcast_notes/README.md"
+    "docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md"
   ],
-  "workflow_status": "step_216_podcast_033_steps_211_215_completed_before_commit_and_push",
+  "workflow_status": "step_217_file_attachment_repository_baseline_completed_before_commit_and_push",
   "forbidden_scope_added": false
 }

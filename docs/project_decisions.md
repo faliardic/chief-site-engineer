@@ -1,5 +1,17 @@
 # Proje Kararlari
 
+## 217 FileAttachmentRepository Baseline Karari
+
+- `FileAttachmentRepository`, mevcut `FileAttachmentRecord` metadata nesnelerini bellek icinde saklayan minimal repository olarak eklendi.
+- Repository method'lari yalniz `add`, `list_all`, `count` ve `find_by_id` olarak tutulur.
+- Kimlik alani `attachment_id` olarak kullanilir; duplicate detection exact ve case-sensitive calisir.
+- Duplicate exact `attachment_id` `ValueError` ile reddedilir ve repository contents degismez.
+- `list_all()` her cagrida yeni liste dondurur; stored record nesneleri kopyalanmaz veya mutate edilmez.
+- Step 216, PR #49 squash merge commit `43345c7e57ea9a786354d9ee8348f39aaf53af8f` ile latest merged/finalized safe point'tir; Issue #48 completed olarak kaydedilir.
+- Podcast 033 latest completed podcast olarak Steps 211-215 araligini kapsar; sonraki besli podcast araligi Steps 216-220 olur.
+- Step 217, Issue #50 ve `step-217-file-attachment-repository-baseline` branch'i uzerinde aktif unmerged attachment metadata repository baseline isidir.
+- Related-record filters, FieldObservation-specific attachment lookup/linking, automatic attachment creation, physical file operations, filesystem checks, path generation/normalization, persistence, lifecycle behavior, validation/enums/constants, API/GUI/CLI, audit/history/task/NCR/decision generation, generated `blocked`, Step 218 ve Podcast 034 uygulanmamistir.
+
 ## 216 Podcast 033 Steps 211-215 Karari
 
 - Podcast 033, `docs/podcast_notes/033_adim_211_215_notebooklm_podcast_notu.md` dosyasinda yalniz Steps 211-215 araligini kapsayan NotebookLM kaynak notu olarak hazirlanir.

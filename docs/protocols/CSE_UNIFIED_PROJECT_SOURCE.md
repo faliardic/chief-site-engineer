@@ -940,42 +940,42 @@ Gerçek şantiye
 
 ### Son doğrulanmış merged GitHub noktası
 
-- Step: **215**
-- PR: **#47**
-- Issue: **#46**
+- Step: **216**
+- PR: **#49**
+- Issue: **#48**
 - Merge commit:
 
 ```text
-7b3361087cdb51fe1e76caa6f2cd91ff005cdfe2
+43345c7e57ea9a786354d9ee8348f39aaf53af8f
 ```
 
 - Latest merged safe point test seviyesi: **445 passed**
-- Aktif Step 216 yerel test seviyesi: **445 passed**
+- Aktif Step 217 yerel test seviyesi: **453 passed**
 - GitHub Actions: manuel olarak devre dışı
-- Podcast 032: Steps 206-210 latest completed podcast before Step 216 merges
-- Podcast 033: Steps 211-215 active unmerged podcast artifact
-- Sonraki doğal podcast aralığı: Steps 216-220 after Step 216 merges
+- Podcast 033: Steps 211-215 latest completed podcast
+- Sonraki doğal podcast aralığı: Steps 216-220
 
 ### Yerel senkronizasyon durumu
 
-Step 216 baslangicinda resmî `V:` yerel master `7b3361087cdb51fe1e76caa6f2cd91ff005cdfe2` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
+Step 217 baslangicinda resmî `V:` yerel master `43345c7e57ea9a786354d9ee8348f39aaf53af8f` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
 
 ### Aktif iş
 
-- Step: **216**
-- Issue: **#48**
-- Amaç: Steps 211-215 icin Podcast 033 NotebookLM kaynak notunu hazirlamak
+- Step: **217**
+- Issue: **#50**
+- Amaç: mevcut `FileAttachmentRecord` metadata nesneleri icin minimal bellek ici repository baseline'i eklemek
 - Branch:
 
 ```text
-step-216-podcast-033-steps-211-215
+step-217-file-attachment-repository-baseline
 ```
 
-- Bu adim documentation/state/podcast-only istir.
+- Bu adim dar kapsamli production code, focused test, documentation, learning ve state isidir.
 - `FieldObservationRecord` halen tek Field-MVP model implementasyonudur.
 - `FieldObservationRepository` baseline-level bellek ici repository'dir; project/status/location/category exact filtreleri, explicit status update ve explicit reporting-context update davranisi vardir.
-- Persistence, attachment integration, broader filters/mutations, automatic lifecycle rules, structured location/contact normalization, export/reporting consumers, API/GUI/CLI, audit ve validation henuz uygulanmamistir.
-- Product behavior, Podcast 034 ve Step 217 baslatilmamistir.
+- `FileAttachmentRepository` mevcut `FileAttachmentRecord` metadata nesneleri icin minimal bellek ici repository baseline'i saglar; `add`, `list_all`, `count` ve `find_by_id` method'lari vardir.
+- Persistence, observation-specific attachment linking, physical file operations, related-record filters, broader filters/mutations, automatic lifecycle rules, structured location/contact normalization, export/reporting consumers, API/GUI/CLI, audit ve ek validation henuz uygulanmamistir.
+- Podcast 034 ve Step 218 baslatilmamistir.
 
 ---
 
@@ -1013,7 +1013,7 @@ step-216-podcast-033-steps-211-215
 
 ### 29.7 Eski aktif Step bilgileri
 
-Step 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214 ve aktif Step 215 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 215’tir; Step 216 aktif unmerged Podcast 033 aşamasındadır.
+Step 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, aktif Step 215 ve aktif Step 216 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 216'dir; Step 217 aktif unmerged FileAttachmentRepository baseline aşamasındadır.
 
 ### 29.8 Eski modül sırasının bağlayıcı olması
 

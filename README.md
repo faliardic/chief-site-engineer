@@ -9,23 +9,23 @@ Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici reposit
 Son guvenli nokta:
 
 ```text
-Adim 215 - FieldObservationRepository location/category filters
-PR #47 merge commit: 7b3361087cdb51fe1e76caa6f2cd91ff005cdfe2
+Adim 216 - Podcast 033 for Steps 211-215
+PR #49 merge commit: 43345c7e57ea9a786354d9ee8348f39aaf53af8f
 ```
 
 Guncel test sonucu:
 
 ```text
-445 passed
+453 passed
 ```
 
 Mevcut calisma durumu:
 
 ```text
-Adim 216 - Podcast 033 for Steps 211-215
+Adim 217 - FileAttachmentRepository baseline
 ```
 
-Adim 215, PR #47 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 216, Steps 211-215 araligini kapsayan Podcast 033 notunu hazirlayan aktif documentation/state/podcast isidir; henuz merge edilmemistir.
+Adim 216, PR #49 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 217, mevcut `FileAttachmentRecord` metadata nesneleri icin minimal bellek ici `FileAttachmentRepository` baseline'ini ekleyen aktif unmerged isidir.
 
 ## Repo Koku
 
@@ -38,7 +38,7 @@ V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer
 Proje su ana parcalardan olusur:
 
 - `app/models.py`: Santiye, kalite, uygunsuzluk, NCR, dosya eki ve yardimci domain modelleri.
-- `app/records.py`: Bellek ici kayit listeleme, `FieldObservationRepository` baseline'i ve `NonconformityRepository` davranislari.
+- `app/records.py`: Bellek ici kayit listeleme, `FileAttachmentRepository`, `FieldObservationRepository` ve `NonconformityRepository` davranislari.
 - `app/attachments.py`: Canonical attachment path helper fonksiyonu.
 - `app/attachment_integrity.py`: Attachment integrity status sabitleri, result/report modelleri, helper ve serializer fonksiyonlari.
 - `app/main.py`: Basit uygulama baslangic mesaji.
@@ -76,6 +76,7 @@ Adim 205 itibariyla proje su alanlarda ilerlemistir:
 - Dosya eki saklama, adlandirma, arsiv guvenligi, silme/tasima karar dokumantasyonu.
 - Minimal `FieldObservationRecord` dataclass ve focused value/default testleri.
 - Minimal bellek ici `FieldObservationRepository` baseline'i; add/list/count/find ve duplicate `observation_id` reddi.
+- Minimal bellek ici `FileAttachmentRepository` baseline'i; add/list/count/find ve duplicate `attachment_id` reddi.
 - `FieldObservationRepository` icin read-only exact `project_id` ve `status` filtreleri.
 - `FieldObservationRepository` icin read-only exact `location` ve `category` filtreleri.
 - `FieldObservationRepository` icin explicit `update_status(observation_id, new_status)` davranisi.
@@ -119,11 +120,11 @@ Son eklenen podcast notlari:
 - `docs/podcast_notes/032_adim_206_210_notebooklm_podcast_notu.md`
 - `docs/podcast_notes/033_adim_211_215_notebooklm_podcast_notu.md`
 
-Podcast 032, Step 216 merge edilene kadar latest completed podcast olarak Steps 206-210 araligini kapsar. Podcast 033, Steps 211-215 icin aktif unmerged podcast artifact'idir; merge edildikten sonra latest completed podcast olur. Sonraki dogal podcast araligi Step 216 merge sonrasinda Steps 216-220 olur.
+Podcast 033, latest completed podcast olarak Steps 211-215 araligini kapsar. Sonraki dogal podcast araligi Steps 216-220 olur.
 
 ## Kalite Kontrol ve CI Durumu
 
-- Guncel merged safe point test tabani `445 passed` olarak dogrulanir.
+- Guncel merged safe point test tabani `445 passed` olarak dogrulanir; Step 217 branch'inde local test seviyesi `453 passed` olarak dogrulanir.
 - `.github/workflows/pytest.yml` GitHub Actions workflow'u repoda bulunur.
 - Otomatik Actions calismasi account billing/runner-start kisiti nedeniyle manuel olarak devre disidir.
 - Required status checks etkin degildir.
@@ -173,7 +174,7 @@ python -m pytest
 Beklenen guncel sonuc:
 
 ```text
-445 passed
+453 passed
 ```
 
 ## Basit Calistirma
@@ -217,7 +218,7 @@ Bu proje ayni zamanda Python ve yazilim gelistirme ogrenim arsivi uretir.
 
 ## Sonraki Urun Yonu
 
-Adim 212 branch calismasi boyunca ilk urun yonu, veri omurgasini guvenilir tutan dar bir saha MVP'sidir:
+Adim 217 branch calismasi boyunca ilk urun yonu, veri omurgasini guvenilir tutan dar bir saha MVP'sidir:
 
 - hizli observation kaydi,
 - attachment,
@@ -227,4 +228,4 @@ Adim 212 branch calismasi boyunca ilk urun yonu, veri omurgasini guvenilir tutan
 - daily export,
 - weekly summary.
 
-CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. `FieldObservationRecord`, minimal bellek ici `FieldObservationRepository` baseline'i, repository icinde read-only exact `project_id` / `status` filtreleri, explicit status update ve explicit reporting-context update davranislari implement edilmis durumdadir; persistence, broader filters/mutations, automatic lifecycle rules, contact normalization, attachment linking, export/reporting, API/GUI/CLI, audit ve validation henuz eklenmemistir.
+CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. `FieldObservationRecord`, minimal bellek ici `FieldObservationRepository` baseline'i, observation repository icinde read-only exact filtreler, explicit status/reporting update davranislari ve minimal bellek ici `FileAttachmentRepository` metadata baseline'i implement edilmis durumdadir; persistence, broader filters/mutations, automatic lifecycle rules, contact normalization, observation-specific attachment linking, physical file operations, export/reporting, API/GUI/CLI, audit ve ek validation henuz eklenmemistir.
