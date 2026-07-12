@@ -7,6 +7,7 @@ from types import TracebackType
 from .errors import UnitOfWorkStateError
 from .migrations import connect_database, migrate_database
 from .repositories import (
+    SQLiteAttachmentMetadataRepository,
     SQLiteFieldObservationRepository,
     SQLiteObservationEventRepository,
     SQLiteProjectRepository,
@@ -22,6 +23,7 @@ class SQLiteUnitOfWork:
         self._projects: SQLiteProjectRepository | None = None
         self._observations: SQLiteFieldObservationRepository | None = None
         self._events: SQLiteObservationEventRepository | None = None
+        self._attachments: SQLiteAttachmentMetadataRepository | None = None
         self._used = False
         self._completed = False
 
@@ -43,6 +45,12 @@ class SQLiteUnitOfWork:
             raise UnitOfWorkStateError("Unit of Work is not active")
         return self._events
 
+    @property
+    def attachments(self) -> SQLiteAttachmentMetadataRepository:
+        if self._attachments is None:
+            raise UnitOfWorkStateError("Unit of Work is not active")
+        return self._attachments
+
     def __enter__(self) -> "SQLiteUnitOfWork":
         if self._used:
             raise UnitOfWorkStateError("Unit of Work instance has already been used")
@@ -54,6 +62,7 @@ class SQLiteUnitOfWork:
             migrate_database(connection)
             connection.execute("BEGIN IMMEDIATE")
             self._connection = connection
+
             def is_active() -> bool:
                 return self._connection is connection
 
@@ -66,6 +75,10 @@ class SQLiteUnitOfWork:
                 is_active=is_active,
             )
             self._events = SQLiteObservationEventRepository(
+                connection,
+                is_active=is_active,
+            )
+            self._attachments = SQLiteAttachmentMetadataRepository(
                 connection,
                 is_active=is_active,
             )
@@ -109,6 +122,7 @@ class SQLiteUnitOfWork:
                 self._projects = None
                 self._observations = None
                 self._events = None
+                self._attachments = None
         return False
 
     def _require_active_connection(self) -> sqlite3.Connection:

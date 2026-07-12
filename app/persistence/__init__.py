@@ -24,15 +24,18 @@ from .errors import (
 )
 from .records import (
     OBSERVATION_EVENT_TYPES,
+    AttachmentMetadataRecord,
     ObservationEventRecord,
     ProjectRecord,
     serialize_event_payload,
 )
 from .repositories import (
+    AttachmentMetadataRepositoryPort,
     FieldObservationRepositoryPort,
     ObservationEventRepositoryPort,
     ProjectRepositoryPort,
     SQLiteFieldObservationRepository,
+    SQLiteAttachmentMetadataRepository,
     SQLiteObservationEventRepository,
     SQLiteProjectRepository,
 )
@@ -41,6 +44,8 @@ from .unit_of_work import SQLiteUnitOfWork
 
 __all__ = [
     "ATTACHMENT_STATUSES",
+    "AttachmentMetadataRecord",
+    "AttachmentMetadataRepositoryPort",
     "ArchivedRecordError",
     "ConstraintViolation",
     "DuplicateRecordError",
@@ -61,6 +66,7 @@ __all__ = [
     "SCHEMA_MIGRATIONS",
     "SCHEMA_VERSION",
     "SQLiteFieldObservationRepository",
+    "SQLiteAttachmentMetadataRepository",
     "SQLiteObservationEventRepository",
     "SQLiteProjectRepository",
     "SQLiteUnitOfWork",
