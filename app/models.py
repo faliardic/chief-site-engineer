@@ -80,6 +80,7 @@ class FieldObservationRecord:
     closed_at: str | None = None
     notes: str | None = None
     is_archived: bool = False
+    revision: int = 1
 
 
 @dataclass

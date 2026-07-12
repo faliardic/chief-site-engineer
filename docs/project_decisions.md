@@ -1,5 +1,16 @@
 # Proje Kararlari
 
+## Issue 71 SQLite Schema v1 ve Migration Temeli Karari
+
+- Ilk kalici veri omurgasi Python standard library `sqlite3` ve SQLite ile kurulur; ayrintili karar kaynagi `docs/adr/ADR-001-sqlite-persistence-and-managed-attachments.md` dosyasidir.
+- Schema v1; `projects`, `field_observations`, `attachments`, `observation_events` ve `schema_migrations` tablolarini kapsar.
+- Migration runner foreign key enforcement'i acar, pending migration'lari tek transaction icinde uygular, surum kaydini yalniz basarida ekler ve tekrar cagrida v1'i yeniden uygulamaz.
+- Yeni persistent record ID sozlesmesi canonical UUID string, storage zaman sozlesmesi UTC ISO 8601 `Z`, observation status sozlesmesi `open` / `tracking` / `closed` ve baslangic revision degeri `1` olarak belirlenir.
+- `closed` ile `closed_at`, revision alt siniri, attachment size, relative path benzersizligi, primary key ve foreign key kurallari SQLite constraint'leriyle korunur.
+- Existing bellek-ici repository davranisi gereksiz yere degistirilmez; CRUD adapter, Unit of Work, application service, status transition ve revision artirma sonraki gorevlere birakilir.
+- Attachment binary'leri DB'ye gomulmez; future managed file store koordinasyonu ve startup reconciliation bu gorevde yalniz mimari sinir olarak tanimlanir.
+- ORM, yeni dependency, UI/API/CLI, backup/restore, cloud sync, multi-user, encryption, README/ROADMAP/state churn ve Step 226 degisikligi yapilmaz.
+
 ## 225 Podcast 035 Note-Contained Summary Contract Karari
 
 - Podcast 035, Steps 221-225 icin mandatory 12-section note olarak olusturulur ve Section 6 icinde Steps 001-220 tarihini kendi basina tasir.
