@@ -6,6 +6,8 @@ import pytest
 
 from app.persistence import (
     Migration,
+    SCHEMA_MIGRATIONS,
+    SCHEMA_VERSION,
     connect_database,
     migrate_database,
     validate_utc_timestamp,
@@ -111,7 +113,7 @@ def _insert_attachment(
     )
 
 
-def test_fresh_database_migrates_to_schema_v1(tmp_path: Path) -> None:
+def test_fresh_database_migrates_to_current_schema(tmp_path: Path) -> None:
     database_path = tmp_path / "fresh.sqlite3"
     connection = connect_database(database_path)
 
@@ -123,11 +125,17 @@ def test_fresh_database_migrates_to_schema_v1(tmp_path: Path) -> None:
                 "SELECT name FROM sqlite_master WHERE type = 'table'"
             )
         }
+        observation_columns = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info(field_observations)"
+            )
+        }
     finally:
         connection.close()
 
     assert database_path.is_file()
-    assert version == 1
+    assert version == SCHEMA_VERSION == 2
     assert table_names == {
         "schema_migrations",
         "projects",
@@ -135,6 +143,7 @@ def test_fresh_database_migrates_to_schema_v1(tmp_path: Path) -> None:
         "attachments",
         "observation_events",
     }
+    assert "notes" in observation_columns
 
 
 def test_migration_is_idempotent(tmp_path: Path) -> None:
@@ -159,19 +168,58 @@ def test_migration_is_idempotent(tmp_path: Path) -> None:
     finally:
         connection.close()
 
-    assert first_version == second_version == 1
+    assert first_version == second_version == SCHEMA_VERSION == 2
     assert second_tables == first_tables
-    assert migration_count == 1
+    assert migration_count == 2
 
 
-def test_schema_migrations_records_version_one(database: sqlite3.Connection) -> None:
-    migration_row = database.execute(
-        "SELECT version, applied_at FROM schema_migrations"
-    ).fetchone()
+def test_schema_migrations_records_every_version(database: sqlite3.Connection) -> None:
+    migration_rows = list(
+        database.execute(
+            "SELECT version, applied_at FROM schema_migrations ORDER BY version"
+        )
+    )
 
-    assert migration_row is not None
-    assert migration_row[0] == 1
-    assert validate_utc_timestamp(migration_row[1]) == migration_row[1]
+    assert [row[0] for row in migration_rows] == [1, 2]
+    assert all(
+        validate_utc_timestamp(row[1]) == row[1] for row in migration_rows
+    )
+
+
+def test_version_one_database_migrates_to_version_two_idempotently(
+    tmp_path: Path,
+) -> None:
+    connection = connect_database(tmp_path / "v1-to-v2.sqlite3")
+
+    try:
+        assert migrate_database(connection, migrations=SCHEMA_MIGRATIONS[:1]) == 1
+        columns_before = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info(field_observations)"
+            )
+        }
+
+        assert migrate_database(connection) == 2
+        assert migrate_database(connection) == 2
+        columns_after = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info(field_observations)"
+            )
+        }
+        versions = [
+            row[0]
+            for row in connection.execute(
+                "SELECT version FROM schema_migrations ORDER BY version"
+            )
+        ]
+    finally:
+        connection.close()
+
+    assert "notes" not in columns_before
+    assert "notes" in columns_after
+    assert versions == [1, 2]
 
 
 def test_foreign_keys_are_enabled_and_violation_is_rejected(
@@ -296,3 +344,35 @@ def test_migration_failure_rolls_back_schema_and_version_record(tmp_path: Path) 
         connection.close()
 
     assert remaining_tables == []
+
+
+def test_unknown_future_migration_version_is_rejected_without_schema_change(
+    tmp_path: Path,
+) -> None:
+    connection = connect_database(tmp_path / "future-version.sqlite3")
+
+    try:
+        migrate_database(connection)
+        connection.execute(
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",
+            (99, TIMESTAMP),
+        )
+
+        with pytest.raises(RuntimeError, match="unknown migration versions: 99"):
+            migrate_database(connection)
+
+        versions = [
+            row[0]
+            for row in connection.execute(
+                "SELECT version FROM schema_migrations ORDER BY version"
+            )
+        ]
+        notes_count = connection.execute(
+            "SELECT COUNT(*) FROM pragma_table_info('field_observations') "
+            "WHERE name = 'notes'"
+        ).fetchone()[0]
+    finally:
+        connection.close()
+
+    assert versions == [1, 2, 99]
+    assert notes_count == 1
