@@ -1,5 +1,17 @@
 # Proje Kararlari
 
+## 226 Embedded DWG and Document Viewer Nihai Urun Hedefi Karari
+
+- CSE'nin uzun vadeli canonical viewer adi `Embedded DWG and Document Viewer`, Turkce karsiligi `Gomulu DWG ve Dokuman Viewer` olarak belirlenmistir.
+- Nihai deneyim harici uygulama launcher'i degildir; dosya CSE icinde acilir ve staged olarak goruntuleme, zoom/pan, sayfa veya sheet navigation, arama, layer visibility, olcum, markup, anchor, kayit baglama, revizyon karsilastirma, paylasim, offline freshness ve ileride audit yetenekleri kazanir.
+- DWG, DXF, PDF, DOCX, XLSX, CSV, TXT/Markdown, PNG/JPG/JPEG/WEBP/TIFF ile muhendislik/proje dokumanlari uzun vadeli format hedefidir. Step 226 sonunda tum format destekleri `not_started` durumundadir.
+- Storage/metadata, rendering, annotation/measurement, record linking, revision comparison, offline caching ve external editing ayri capability katmanlaridir; bir katmanin varligi digerinin uygulanmis oldugu anlamina gelmez.
+- Mobil ve PC ayni canonical dosya, revizyon, metadata, anchor ve kayit iliskilerini kullanir. Mobil saha odakli hizli goruntuleme/markup/linking, PC genis ekranli inceleme/layer/measurement/comparison onceligine sahiptir.
+- CSE, AutoCAD, Revit, Word, Excel veya hesap yaziliminin tam authoring/editor yerine gecmez. Harici uygulama acma yalniz ileri duzey duzenleme veya desteklenmeyen durumlar icin optional escape hatch'tir.
+- On bir asamali uzun vadeli sira storage ve metadata temelinden baslar; Field MVP, guvenilir attachment storage ve metadata yakin donemde viewer zenginliginden daha yuksek onceligini korur.
+- Step 225, PR #68 squash merge commit `022da791fe098e815ee026ec175dd9d3ec673474` ve `503 passed` ile latest merged/finalized safe point'tir.
+- Step 226, Issue #69 ve `step-226-embedded-dwg-document-viewer-target` branch'i uzerinde documentation/state/learning-only aktif istir. Production code, executable test, dependency, viewer/rendering kutuphanesi, file operation, API/UI davranisi, Step 227 ve Podcast 036 uygulanmamistir.
+
 ## 225 Podcast 035 Note-Contained Summary Contract Karari
 
 - Podcast 035, Steps 221-225 icin mandatory 12-section note olarak olusturulur ve Section 6 icinde Steps 001-220 tarihini kendi basina tasir.

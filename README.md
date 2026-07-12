@@ -9,23 +9,23 @@ Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici reposit
 Son guvenli nokta:
 
 ```text
-Adim 224 - Rolling NotebookLM podcast source protocol
-PR #66 merge commit: 68c00edab667bbfd0467f4684921c0f6b453d4a7
+Adim 225 - Podcast 035 note summary contract
+PR #68 merge commit: 022da791fe098e815ee026ec175dd9d3ec673474
 ```
 
 Guncel test sonucu:
 
 ```text
-494 passed
+503 passed
 ```
 
 Mevcut calisma durumu:
 
 ```text
-Adim 225 - Podcast 035 note summary contract
+Adim 226 - Embedded DWG and Document Viewer final product target
 ```
 
-Adim 224, PR #66 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 225, Podcast 035'i Steps 221-225 icin olusturan ve strict notlarda prior-step headings'i section siniri icinde zorunlu kilan aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Adim 225, PR #68 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 226, Issue #69 kapsaminda CSE icindeki uzun vadeli `Embedded DWG and Document Viewer` urun hedefini tanimlayan documentation-only branch calismasidir; herhangi bir viewer kutuphanesi, format destegi, dosya islemi, API veya UI eklemez ve merge edilene kadar yeni guvenli nokta sayilmaz.
 
 ## Repo Koku
 
@@ -126,7 +126,7 @@ Son eklenen podcast notlari:
 - `docs/podcast_notes/034_adim_216_220_notebooklm_podcast_notu.md`
 - `docs/podcast_notes/035_adim_221_225_notebooklm_podcast_notu.md`
 
-Podcast 035, latest generated podcast source olarak Steps 221-225 araligini kapsar. Kendi Section 6 bolumunde Steps 001-220 icin 220 ayri historical summary tasir. Step 225 merge edilene kadar latest merged safe point Step 224 olarak kalir.
+Podcast 035, latest generated podcast source olarak Steps 221-225 araligini kapsar. Kendi Section 6 bolumunde Steps 001-220 icin 220 ayri historical summary tasir. Step 225 merge edilerek latest merged safe point olmustur; sonraki dogal podcast araligi Steps 226-230'dur.
 
 NotebookLM'e bir kez eklenecek stable website source:
 
@@ -138,7 +138,7 @@ Generator `python scripts/build_notebooklm_podcast_source.py` komutuyla `docs/no
 
 ## Kalite Kontrol ve CI Durumu
 
-- Guncel merged safe point test tabani `494 passed` olarak dogrulanir; Step 225 generator focused test paketi `24 passed`, tam yerel suite `503 passed` seviyesindedir.
+- Guncel merged safe point test tabani Step 225 icin `503 passed` olarak dogrulanir. Step 226 production code veya executable test davranisi eklemez; ayni tam suite ile korunur.
 - `.github/workflows/pytest.yml` GitHub Actions workflow'u repoda bulunur.
 - Otomatik Actions calismasi account billing/runner-start kisiti nedeniyle manuel olarak devre disidir.
 - Required status checks etkin degildir.
@@ -163,6 +163,7 @@ Asagidaki ozellikler henuz eklenmedi:
 - Deployment.
 - Tam backup/restore akisi.
 - Thumbnail, preview, video oynatma veya streaming.
+- Gomulu DWG veya dokuman render/viewer motoru ve desteklenen format implementasyonlari.
 - Otomatik audit trail uretimi.
 
 Bu sinir bilincli olarak korunuyor. Proje kucuk, testli ve izlenebilir adimlarla buyutuluyor.
@@ -188,7 +189,7 @@ python -m pytest
 Beklenen guncel sonuc:
 
 ```text
-471 passed
+503 passed
 ```
 
 ## Basit Calistirma
@@ -220,6 +221,7 @@ Onemli dokumantasyon dosyalari:
 - `docs/120_audit_event_target_record_type_validation.md`
 - `docs/121_audit_event_target_record_id_format_tasarimi.md`
 - `docs/122_audit_event_target_record_id_validation_tasarimi.md`
+- `docs/226_embedded_dwg_document_viewer_final_product_target.md`
 - `docs/080_file_attachment_metadata_butunluk_ozeti.md`
 - `docs/089_attachment_metadata_integrity_kurallari.md`
 - `docs/podcast_notes/`
@@ -232,7 +234,11 @@ Bu proje ayni zamanda Python ve yazilim gelistirme ogrenim arsivi uretir.
 
 ## Sonraki Urun Yonu
 
-Adim 225 boyunca ilk urun yonu, veri omurgasini guvenilir tutan dar bir saha MVP'sidir:
+Adim 226 ile uzun vadeli `Embedded DWG and Document Viewer` hedefi tanimlanmistir. Nihai deneyim, dosyayi yalniz harici uygulamada acan bir launcher degil; CSE icinde goruntuleme, gezinme, arama, katman, olcum, isaretleme, kayit baglama, revizyon karsilastirma ve offline freshness yeteneklerini asamali olarak sunan gomulu bir viewer'dir. Harici uygulamalar yalniz ileri duzey duzenleme veya desteklenmeyen durumlar icin istege bagli kacis yoludur.
+
+Uzun vadeli format hedefi DWG, DXF, PDF, DOCX, XLSX, CSV, TXT/Markdown, PNG/JPG/JPEG/WEBP/TIFF ve ilgili muhendislik/proje dokumanlarini kapsar. Bu hedef bir uygulama iddiasi degildir: tum format destekleri ve viewer davranislari halen `not_started` durumundadir.
+
+Yakin donem urun yonu ise veri omurgasini guvenilir tutan dar saha MVP'si olarak korunur:
 
 - hizli observation kaydi,
 - attachment,
@@ -242,4 +248,4 @@ Adim 225 boyunca ilk urun yonu, veri omurgasini guvenilir tutan dar bir saha MVP
 - daily export,
 - weekly summary.
 
-CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. `FieldObservationRecord`, bellek ici observation repository davranislari ve `FileAttachmentRepository.list_for_field_observation(...)` dahil attachment metadata lookup hatti implement edilmistir. Step 224 rolling NotebookLM protocolunu kurdu; Step 225 strict podcast note'un kendi icinde prior history tasimasini enforce eder. Bu iki adim ana urun davranisini genisletmez. Persistence, physical file operations, export/reporting, API/GUI/CLI, audit ve ek validation henuz eklenmemistir.
+CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. `FieldObservationRecord`, bellek ici observation repository davranislari ve `FileAttachmentRepository.list_for_field_observation(...)` dahil attachment metadata lookup hatti implement edilmistir. Step 224 rolling NotebookLM protocolunu kurdu; Step 225 strict podcast note'un kendi icinde prior history tasimasini enforce etti; Step 226 ise viewer'in yalniz nihai hedefini ve asamali sinirlarini belgeler. Persistence, physical file operations, export/reporting, API/GUI/CLI, audit, viewer/rendering ve ek validation henuz eklenmemistir.

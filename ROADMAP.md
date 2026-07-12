@@ -3,11 +3,11 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 224 - Rolling NotebookLM podcast source protocol
-PR #66 merge commit: 68c00edab667bbfd0467f4684921c0f6b453d4a7
+Adim 225 - Podcast 035 note summary contract
+PR #68 merge commit: 022da791fe098e815ee026ec175dd9d3ec673474
 ```
 
-Adim 224, PR #66 squash merge commit `68c00edab667bbfd0467f4684921c0f6b453d4a7` ile master uzerindeki guncel guvenli noktadir. Step 225, Issue #67 kapsaminda Podcast 035 artifact'ini ve note-contained prior-step summary validation contract'ini ekleyen aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Adim 225, PR #68 squash merge commit `022da791fe098e815ee026ec175dd9d3ec673474` ile master uzerindeki guncel guvenli noktadir. Step 226, Issue #69 kapsaminda gomulu DWG ve dokuman viewer nihai urun hedefini tanimlayan aktif documentation-only branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -657,8 +657,18 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 - [x] Adim 225 - Focused generator tests `24 passed`, full local suite `503 passed` olarak dogrulandi.
 - [x] Adim 225 - Main product code, workflow, NotebookLM automation, historical podcast, ZIP ve exports mutation eklenmedi; Step 226 baslatilmadi.
 
+## Step 226 - Embedded DWG and Document Viewer Final Product Target
+
+- [x] Adim 226 - CSE icinde acilan, launcher olmayan gomulu viewer nihai urun hedefi tanimlandi.
+- [x] Adim 226 - DWG, DXF, PDF, DOCX, XLSX, CSV, TXT/Markdown, PNG/JPG/JPEG/WEBP/TIFF ve muhendislik/proje dokumanlari staged content hedefleri olarak kaydedildi.
+- [x] Adim 226 - Storage/metadata, rendering, annotation/measurement, record linking, revision comparison, offline caching ve external editing ayri capability katmanlari olarak sinirlandi.
+- [x] Adim 226 - Mobil ve PC ayni canonical dosya, revizyon, metadata ve iliskileri kullanirken farkli etkileşim oncelikleriyle tanimlandi.
+- [x] Adim 226 - AutoCAD, Revit, Word, Excel veya hesap yazilimi yerine gecme hedefi reddedildi; harici uygulamalar yalniz ileri duzey duzenleme ve desteklenmeyen durumlar icin optional escape hatch olarak korundu.
+- [x] Adim 226 - On bir asamali uzun vadeli delivery sirasi ve sekiz kabul hedefi dokumante edildi.
+- [x] Adim 226 - Tum viewer/format implementasyonlari `not_started` tutuldu; production code, executable tests, dependency, file operation, API, UI, Step 227 ve Podcast 036 eklenmedi.
+
 ## Sonraki Calisma Onerisi
 
-Step 225 merge/finalize edildikten sonra sonraki teknik yon ayri Issue ile secilmelidir. Attachment convenience helper usage boundary, upload/persistence oncesi storage contract veya daily export/weekly summary hatti olasi dar yonlerdir. Step 226 bu adimda baslatilmaz.
+Step 226 merge/finalize edildikten sonra sonraki teknik yon ayri Issue ile secilmelidir. Viewer hedefinin uzun vadeli sirasi belgelense de yakin donemde Field MVP ve attachment storage/metadata temelleri daha yuksek onceligini korur. Step 227 bu adimda baslatilmaz.
 
 Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcast 032 Adim 206-210, Podcast 033 Adim 211-215, Podcast 034 Adim 216-220 ve Podcast 035 Adim 221-225 araligini kapsar. Sonraki dogal podcast araligi Steps 226-230 olur.

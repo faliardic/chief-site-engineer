@@ -512,34 +512,34 @@ Güncel kural:
 
 ### Son güvenli GitHub noktası
 
-- Tamamlanan adım: **Step 224**
-- Merge edilen PR: **#66**
-- Tamamlanan Issue: **#64**
+- Tamamlanan adım: **Step 225**
+- Merge edilen PR: **#68**
+- Tamamlanan Issue: **#67**
 - `master` commit:
 
 ```text
-68c00edab667bbfd0467f4684921c0f6b453d4a7
+022da791fe098e815ee026ec175dd9d3ec673474
 ```
 
-- Son doğrulanan yerel test sonucu: **494 passed**
+- Son doğrulanan yerel test sonucu: **503 passed**
 - GitHub Actions: workflow mevcut, otomatik execution manuel olarak devre dışı
 
 ### Aktif iş
 
-- Issue: **#67**
-- Adım: **Step 225 — Podcast 035 note summary contract**
+- Issue: **#69**
+- Adım: **Step 226 — Embedded DWG and Document Viewer final product target**
 - Branch:
 
 ```text
-step-225-podcast-035-note-summary-contract
+step-226-embedded-dwg-document-viewer-target
 ```
 
-- Kapsam: **podcast/strict-validator/tests/generated-source/documentation/learning/state**
+- Kapsam: **documentation/learning/state only**
 - Codex modeli: **GPT-5.6 Sol**
-- Reasoning: **Extra High**
-- Secim nedeni: strict note contract, executable regressions, 220-summary self-contained note, deterministic outputs ve multi-file canonical state.
-- Podcast 035, Steps 221-225 icin active artifact ve rolling source latest note'tur; kendi icinde Steps 001-220 summaries tasir.
-- Step 225 merge iddiasi, PR creation, merge, main product behavior veya Step 226 bu aktif is kapsaminda yazilmaz.
+- Reasoning: **High**
+- Secim nedeni: kanonik kaynaklar ve state boyunca tutarli, documentation-only bir urun/mimari hedef karari gerektirmesi.
+- `Embedded DWG and Document Viewer`, launcher olmayan uzun vadeli CSE-ici viewer hedefidir; tum format destekleri ve uygulama davranislari `not_started` durumundadir.
+- Step 226 merge iddiasi, PR creation, merge, production code, executable tests, dependency/viewer library, file operation, API/UI behavior, Step 227 veya Podcast 036 bu aktif is kapsaminda yazilmaz.
 
 Bu bölüm proje ilerledikçe güncellenir; yukarıdaki kalıcı kurallar değişmez.
 

@@ -1311,3 +1311,17 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Ascending Order Validation`: Numarali degerlerin kucukten buyuge beklenen sirayla geldigini kontrol eden validation.
 
 `Self-Contained Note`: Kendi kapsamini ve gerekli historical context'i baska bir nota bagimli olmadan tasiyan not.
+
+`Embedded Viewer`: File content'ini external application'a gecmeden mevcut product surface icinde render eden read/review katmani.
+
+`Rendering`: Structured veya binary file content'ini page, sheet, drawing, text, table ya da image olarak goruntulenebilir bicime donusturme islemi.
+
+`Markup`: Original file'i full authoring ile degistirmeden review icin eklenen note, arrow, box, highlight veya revision cloud.
+
+`Document Anchor`: Bir drawing point, region, page, sheet veya document section'i CSE record relationship'i icin isaretleyen stable referans.
+
+`Revision Freshness`: Goruntulenen veya cached file revision'inin canonical current revision ile guncellik iliskisi.
+
+`Escape Hatch`: Normal product flow'u degistirmeden yalniz advanced veya unsupported case icin sunulan optional alternatif command.
+
+`Capability Matrix`: Format, platform ve tool combination'larinda hangi capability'nin available, limited veya unavailable oldugunu gosteren tablo.

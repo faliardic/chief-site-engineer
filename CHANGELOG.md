@@ -1,5 +1,16 @@
 # Changelog
 
+## Step 226
+
+- Added the unreleased, documentation-only final product target for the in-app `Embedded DWG and Document Viewer`.
+- Defined staged targets for DWG, DXF, PDF, DOCX, XLSX, CSV, TXT/Markdown, PNG/JPG/JPEG/WEBP/TIFF, and related engineering/project documents without claiming implemented format support.
+- Separated storage/metadata, rendering, annotations/measurements, record linking, revision comparison, offline caching, and external editing into explicit capability layers.
+- Defined shared canonical file/revision/metadata/relationship truth for mobile and PC, with device-specific interaction priorities.
+- Kept external applications as optional escape hatches for advanced editing or unsupported cases; CSE is not intended to replace AutoCAD, Revit, Word, Excel, or calculation software.
+- Recorded the eleven-stage delivery sequence, eight acceptance outcomes, risk gates, and `not_started` implementation status.
+- Recorded Step 225 / PR #68 / Issue #67 / merge commit `022da791fe098e815ee026ec175dd9d3ec673474` with `503 passed` as the latest merged/finalized safe point.
+- Kept production code, executable tests, dependencies, viewer libraries, file operations, API/UI behavior, Step 227, Podcast 036, ZIP, and exports mutation outside scope.
+
 ## Step 225
 
 - Added Podcast 035 for Steps 221-225 using the mandatory 12-section strict note structure.

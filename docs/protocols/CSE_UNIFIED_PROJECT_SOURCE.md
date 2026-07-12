@@ -1,7 +1,7 @@
 # CHIEF SITE ENGINEER exe - Birleştirilmiş Proje Kaynağı
 
 **Belge türü:** Birleştirilmiş ana proje kaynağı
-**Sürüm tarihi:** 2026-07-11
+**Sürüm tarihi:** 2026-07-12
 **Durum:** Proje kaynaklarına eklenmeye hazır önerilen kanonik üst kaynak
 **Önerilen dosya adı:** `CSE_BIRLESTIRILMIS_PROJE_KAYNAGI.md`
 **Önerilen repo yolu:** `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
@@ -936,42 +936,110 @@ Gerçek şantiye
 
 ---
 
+## 27.1 Embedded DWG and Document Viewer Nihai Ürün Hedefi
+
+CSE'nin uzun vadeli canonical viewer adı **Embedded DWG and Document Viewer**, Türkçe karşılığı **Gömülü DWG ve Doküman Viewer** olarak belirlenmiştir.
+
+Nihai deneyim, dosyayı yalnızca harici uygulamada açan bir launcher değildir. Kullanıcı dosyayı CSE içinde açabilmeli; format ve teslim aşamasına göre görüntüleme, zoom/pan, sayfa veya sheet navigation, arama, layer visibility, ölçüm, markup, document anchor, kayıt bağlantısı, revizyon karşılaştırma, paylaşım, offline freshness ve ileride audit yeteneklerine erişebilmelidir. Harici uygulama açma yalnız ileri düzey düzenleme veya desteklenmeyen durumlar için isteğe bağlı bir escape hatch'tir.
+
+### Aşamalı içerik hedefi
+
+- DWG ve DXF çizimleri
+- PDF dokümanları
+- DOCX belgeleri
+- XLSX ve CSV tabloları
+- TXT ve Markdown metinleri
+- PNG, JPG, JPEG, WEBP ve TIFF görselleri
+- Mühendislik/proje dokümanları, raporlar ve bunların ileride tanımlanacak kontrollü türevleri
+
+Bu liste uygulanmış format desteği iddiası değildir. Step 226 sonunda bütün viewer ve format implementasyonları `not_started` durumundadır.
+
+### Capability katmanları
+
+1. **Storage ve metadata:** canonical dosya kimliği, yol/referans, tür, boyut, hash, revizyon ve ilişki metadata'sı.
+2. **Rendering:** içeriği cihazda veya kontrollü servis üzerinden görüntülenebilir hâle getirme.
+3. **Annotation ve measurement:** markup, yorum, ölçüm, koordinat/sayfa/sheet bağlamı ve anchor.
+4. **Record linking:** çizim veya doküman noktasını observation, task, NCR, RFI, submittal ve diğer kayıtlarla ilişkilendirme.
+5. **Revision comparison:** aynı canonical dokümanın revizyonlarını tanıma, karşılaştırma ve superseded/current durumunu gösterme.
+6. **Offline caching:** yerel kopyanın hangi canonical revizyona ait olduğunu ve freshness durumunu görünür kılma.
+7. **External editing:** ileri düzey authoring için harici uygulamaya kontrollü geçiş; viewer'ın ana deneyiminin yerine geçmez.
+
+Bir katmanın uygulanması diğer katmanların var olduğu anlamına gelmez. Storage/metadata doğruluğu rendering'den, markup dosyanın kendisinden, record linking revizyon karşılaştırmadan ve offline cache canonical kaynaktan ayrı sınırlar olarak tasarlanır.
+
+### Mobil ve PC hedefleri
+
+- Mobil deneyim hızlı saha açılışı, pan/zoom, basit markup, fotoğraf/observation/task bağlantısı, güncel revizyon uyarısı ve offline okunabilirlik önceliğine sahiptir.
+- PC deneyimi büyük ekran incelemesi, layer kontrolü, hassas ölçüm, çok sayfalı veya çok sheet'li gezinme, arama, side-by-side/overlay revizyon karşılaştırma ve yoğun kayıt bağlantısı önceliğine sahiptir.
+- Her iki cihaz aynı canonical dosya kimliğini, revizyonu, metadata'yı, anchor'ları ve kayıt ilişkilerini görür; cihazlar birbirinden kopuk kopya gerçekleri üretmez.
+
+### Ürün sınırı
+
+CSE; AutoCAD, Revit, Word, Excel veya hesap yazılımlarının tam authoring/editor yerine geçmez. Amaç, şantiye kararını destekleyen dosyayı CSE bağlamında güvenilir biçimde görmek, ilişkilendirmek, kanıtlamak ve revizyonunu izlemektir.
+
+### Uzun vadeli teslim sırası
+
+1. Attachment storage ve metadata sözleşmesini sağlamlaştırma
+2. Canonical file identity, revision ve freshness modeli
+3. Görsel ve metin tabanlı basit preview
+4. PDF embedded viewing
+5. Office/CSV/TXT/Markdown güvenli görüntüleme veya kontrollü dönüşüm
+6. DXF/DWG temel viewing feasibility ve vendor/format kararı
+7. Pan/zoom/navigation/search/layer görünürlüğü
+8. Markup, measurement ve document anchor modeli
+9. Observation/task/NCR/RFI/submittal record linking
+10. Revision comparison, sharing ve offline cache yönetimi
+11. Audit, permission, performance ve saha güvenilirliği sertleştirmesi
+
+### Nihai kabul hedefleri
+
+1. Desteklenen dosya CSE içinden ayrılmadan açılır.
+2. Kullanıcı formatına uygun temel gezinme ve arama yapabilir.
+3. Layer/measurement/markup yalnız desteklenen capability durumunda görünür ve güvenilir çalışır.
+4. Bir anchor canonical dosya ve revizyon bağlamıyla proje kaydına bağlanabilir.
+5. Revizyon değiştiğinde eski markup/link ilişkileri sessizce yanlış revizyona taşınmaz.
+6. Mobil ve PC aynı canonical metadata ve ilişkileri gösterir.
+7. Offline kopyanın freshness durumu kullanıcıya açıktır.
+8. Desteklenmeyen veya ileri düzey düzenleme gerektiren durumda kontrollü external-editing yolu vardır; bu yol ana embedded deneyimin yerini almaz.
+
+Field MVP, güvenilir attachment storage ve metadata temelleri yakın dönemde viewer zenginliğinden daha yüksek önceliğe sahiptir. Her rendering/vendor/dependency veya format implementasyonu ayrı Issue, risk değerlendirmesi, test ve güvenlik kapısı gerektirir.
+
+---
+
 ## 28. Güncel Proje Gerçeği
 
 ### Son doğrulanmış merged GitHub noktası
 
-- Step: **224**
-- PR: **#66**
-- Issue: **#64**
+- Step: **225**
+- PR: **#68**
+- Issue: **#67**
 - Merge commit:
 
 ```text
-68c00edab667bbfd0467f4684921c0f6b453d4a7
+022da791fe098e815ee026ec175dd9d3ec673474
 ```
 
-- Latest merged safe point test seviyesi: **494 passed**
-- Aktif Step 225 focused generator test seviyesi: **24 passed**
-- Aktif Step 225 full local test seviyesi: **503 passed**
+- Latest merged safe point test seviyesi: **503 passed**
+- Aktif Step 226 production/executable test değişikliği: **yok**
 - GitHub Actions: manuel olarak devre dışı
-- Podcast 035: Steps 221-225 latest generated/active podcast source
+- Podcast 035: Steps 221-225 latest generated podcast source
 - Next podcast range after Step 225: Steps 226-230
 
 ### Yerel senkronizasyon durumu
 
-Step 225 baslangicinda resmî `V:` yerel master `68c00edab667bbfd0467f4684921c0f6b453d4a7` commit'ine fast-forward edildi ve `origin/master...master` divergence `0 0` olarak dogrulandi.
+Step 226 baslangicinda resmî `V:` yerel master `022da791fe098e815ee026ec175dd9d3ec673474` commit'ine fast-forward edildi ve `origin/master...master` divergence `0 0` olarak dogrulandi.
 
 ### Aktif iş
 
-- Step: **225**
-- Issue: **#67**
-- Amaç: Podcast 035'i olusturmak ve strict notes icin note-contained prior-step summary contract'ini enforce etmek
+- Step: **226**
+- Issue: **#69**
+- Amaç: CSE icin Embedded DWG and Document Viewer nihai urun hedefini, capability sinirlarini ve asamali teslim yonunu tanimlamak
 - Branch:
 
 ```text
-step-225-podcast-035-note-summary-contract
+step-226-embedded-dwg-document-viewer-target
 ```
 
-- Bu adim podcast artifact, generator validation, executable regression tests, generated source, documentation, learning ve state isidir; ana CSE urun davranisini genisletmez.
+- Bu adim documentation, learning ve state isidir; ana CSE urun davranisini genisletmez.
 - `FieldObservationRecord` halen tek Field-MVP model implementasyonudur.
 - `FieldObservationRepository` baseline-level bellek ici repository'dir; project/status/location/category exact filtreleri, explicit status update ve explicit reporting-context update davranisi vardir.
 - `FileAttachmentRepository` mevcut `FileAttachmentRecord` metadata nesneleri icin minimal bellek ici repository baseline'i saglar; `add`, `list_all`, `list_by_related_record_type`, `list_by_related_record_id`, `list_by_related_record`, `list_for_field_observation`, `count` ve `find_by_id` method'lari vardir.
@@ -979,12 +1047,14 @@ step-225-podcast-035-note-summary-contract
 - Field Observation attachment relationship, documentation-only olarak yalniz `related_record_type == "field_observation"` ve `related_record_id == FieldObservationRecord.observation_id` exact pair kosuluyla tanimlanir.
 - `docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md`, NotebookLM icin canonical rolling source ve stable public URL path'idir.
 - Generator latest numbered podcast notunu full content olarak ekler; current safe point'e kadar her teknik adimi ayri baslikla ozetler ve manifest count ile dogrular.
-- Podcast 034 legacy contract ile okunmaya devam eder. Podcast 035, mandatory 12-section contract ve kendi Section 6 bolumunde Steps 001-220 ayri summaries ile latest source olur.
+- Podcast 034 legacy contract ile okunmaya devam eder. Podcast 035, mandatory 12-section contract ve kendi Section 6 bolumunde Steps 001-220 ayri summaries ile latest source'tur.
 - Strict validator expected prior headings'i yalniz previous-summary section siniri icinde exactly once ve ascending order kabul eder; missing, duplicate, out-of-order ve section-disindaki headings reddedilir.
 - NotebookLM saved website source auto-refresh davranisi dogrulanmamistir; repository yalniz stable URL ve current file content sozlesmesini garanti eder.
-- Her Codex instruction model, reasoning level ve secim nedenini aciklar; contract/regression-sensitive islerde current selector'daki en guclu full Codex model ve `extra high` kullanilir.
+- Her Codex instruction model, reasoning level ve secim nedenini aciklar. Step 226 documentation-only urun/mimari karari icin GPT-5.6 Sol ve `high` reasoning secilmistir.
+- Embedded DWG and Document Viewer hedefi dokumante edilmistir; viewer implementation status `not_started`, tum format destekleri `false/not_started` ve vendor/library karari `none` durumundadir.
+- Mobil ve PC ayni canonical dosya/revizyon/metadata/iliski gercegini kullanacak sekilde hedeflenir; CSE tam AutoCAD/Revit/Word/Excel/calculation authoring replacement'i degildir.
 - Persistence, physical file operations, broader filters/mutations, automatic lifecycle rules, structured location/contact normalization, export/reporting consumers, API/GUI/CLI, audit ve ek validation henuz uygulanmamistir.
-- Step 225 merge edilmemistir ve Step 226 baslatilmamistir. NotebookLM API/browser/upload/audio automation uygulanmamistir.
+- Step 226 merge edilmemistir; Step 227 ve Podcast 036 baslatilmamistir. Production code, executable tests, dependency/viewer/rendering library, file operation, API/UI davranisi ve NotebookLM API/browser/upload/audio automation uygulanmamistir.
 
 ---
 
@@ -1022,7 +1092,7 @@ step-225-podcast-035-note-summary-contract
 
 ### 29.7 Eski aktif Step bilgileri
 
-Step 203-223 arasini veya Step 224'u aktif is olarak gosteren kaynaklar tarihsel duruma dusmustur. Guncel merged safe point Step 224'tur; Step 225 aktif unmerged Podcast 035 note-summary contract/test/generated-source asamasindadir.
+Step 203-224 arasini veya Step 225'i aktif is olarak gosteren kaynaklar tarihsel duruma dusmustur. Guncel merged safe point Step 225'tir; Step 226 aktif unmerged Embedded DWG and Document Viewer documentation/state/learning asamasindadir.
 
 ### 29.8 Eski modül sırasının bağlayıcı olması
 
@@ -1076,7 +1146,7 @@ Dünya örnekleri raporunda önerilen otomatik CI ve branch protection uzun vade
 
 ## 31. Bir Sonraki Ürün Yönü
 
-Operasyonel protokol ve kaynak birleşimi kapatıldıktan sonra ürün geliştirme yönü yeniden saha değerine dönmelidir.
+Operasyonel protokol ve kaynak birleşimi kapatıldıktan sonra ürün geliştirme yönü yeniden saha değerine dönmelidir. Embedded DWG and Document Viewer uzun vadeli hedefi Step 226'da tanımlanmıştır; yakın dönem sırasını tek başına değiştirmez.
 
 Önerilen sonraki ürün fazı:
 

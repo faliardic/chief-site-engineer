@@ -1,36 +1,36 @@
 {
-  "step": 225,
+  "step": 226,
   "base_branch": "master",
-  "base_commit": "68c00edab667bbfd0467f4684921c0f6b453d4a7",
+  "base_commit": "022da791fe098e815ee026ec175dd9d3ec673474",
   "active_work": {
-    "issue": 67,
-    "step": 225,
-    "branch": "step-225-podcast-035-note-summary-contract",
-    "podcast_validation_tests_documentation_learning_state": true,
-    "strict_note_prior_step_summary_contract_implemented": true,
-    "podcast_035_created": true,
-    "podcast_035_prior_step_summary_count": 220,
-    "rolling_source_refreshed_to_podcast_035": true,
-    "merge_claim_for_step_225": false,
-    "step_226_started": false,
-    "focused_test_summary": "24 passed",
-    "local_test_summary": "503 passed"
+    "issue": 69,
+    "step": 226,
+    "branch": "step-226-embedded-dwg-document-viewer-target",
+    "documentation_state_learning_only": true,
+    "embedded_dwg_document_viewer_final_product_target_documented": true,
+    "viewer_implementation_status": "not_started",
+    "file_format_support_implemented": false,
+    "viewer_library_or_vendor_selected": false,
+    "local_test_summary": "503 passed",
+    "merge_claim_for_step_226": false,
+    "step_227_started": false,
+    "podcast_036_created": false
   },
   "current_safe_point": {
     "semantics": "latest_merged_finalized_checkpoint",
-    "step": 224,
-    "issue": 64,
+    "step": 225,
+    "issue": 67,
     "issue_state": "completed",
-    "pull_request": 66,
+    "pull_request": 68,
     "pull_request_state": "merged",
-    "merge_commit": "68c00edab667bbfd0467f4684921c0f6b453d4a7",
-    "local_test_summary": "494 passed"
+    "merge_commit": "022da791fe098e815ee026ec175dd9d3ec673474",
+    "local_test_summary": "503 passed"
   },
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
-    "local_master_sha": "68c00edab667bbfd0467f4684921c0f6b453d4a7",
-    "origin_master_sha": "68c00edab667bbfd0467f4684921c0f6b453d4a7",
+    "local_master_sha": "022da791fe098e815ee026ec175dd9d3ec673474",
+    "origin_master_sha": "022da791fe098e815ee026ec175dd9d3ec673474",
     "divergence": "0 0",
     "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
     "misspelled_workspace_present": false,
@@ -122,6 +122,11 @@
       "model": "GPT-5.6 Sol",
       "reasoning": "extra_high",
       "reason": "strict_note_summary_contract_executable_regressions_large_self_contained_history_deterministic_outputs_and_multi_file_state"
+    },
+    "step_226_selection": {
+      "model": "GPT-5.6 Sol",
+      "reasoning": "high",
+      "reason": "documentation_only_product_architecture_decision_across_canonical_sources_and_state_without_code_change"
     }
   },
   "required_source_pre_read": {
@@ -400,6 +405,18 @@
             "roadmap_current_step_titles": true,
             "project_state": true
         },
+        "step_226_sources_read": {
+            "unified_project_source": true,
+            "project_instructions": true,
+            "github_issue_69": true,
+            "github_issue_69_comments": true,
+            "task_226": true,
+            "attachment_storage_naming_documentation": true,
+            "attachment_archive_safety_documentation": true,
+            "product_vision_documentation": true,
+            "project_state": true,
+            "new_chat_bootstrap": false
+        },
     "unresolved_conflict_found": false
   },
   "canonical_project_instructions": {
@@ -412,7 +429,8 @@
     "root_mirror_committed": false,
     "root_mirror_synced_in_step_224": true,
     "root_mirror_synced_in_step_225": true,
-    "sha256_evidence_location": ".cse/results/225_result.md"
+    "root_mirror_synced_in_step_226": true,
+    "sha256_evidence_location": ".cse/results/226_result.md"
   },
   "github_centered_workflow": {
     "chatgpt_verifies_github_before_next_action": true,
@@ -425,20 +443,11 @@
   },
   "podcast": {
     "latest_completed": {
-      "podcast": 34,
-      "range": "216-220",
-      "path": "docs/podcast_notes/034_adim_216_220_notebooklm_podcast_notu.md"
-    },
-    "active_artifact": {
       "podcast": 35,
       "range": "221-225",
-      "path": "docs/podcast_notes/035_adim_221_225_notebooklm_podcast_notu.md",
-      "created": true,
-      "strict_note_contract_valid": true,
-      "prior_step_summary_range": "001-220",
-      "prior_step_summary_count": 220,
-      "step_225_merge_claim": false
+      "path": "docs/podcast_notes/035_adim_221_225_notebooklm_podcast_notu.md"
     },
+    "active_artifact": null,
     "next_five_step_range": "226-230",
     "rolling_source_protocol": {
       "implemented_in_step": 224,
@@ -490,6 +499,47 @@
     "podcast_035_created_in_step_225": true,
     "strict_podcast_note_prior_step_summary_contract_implemented_in_step_225": true,
     "field_mvp_product_behavior_added_in_step_225": false,
+    "field_mvp_product_behavior_added_in_step_226": false,
+    "embedded_dwg_document_viewer": {
+      "canonical_name": "Embedded DWG and Document Viewer",
+      "turkish_name": "Gomulu DWG ve Dokuman Viewer",
+      "final_product_target_documented_in_step": 226,
+      "target_experience": "embedded_in_app_viewing_not_launcher",
+      "implementation_status": "not_started",
+      "vendor_or_library_selected": false,
+      "rendering_code_added": false,
+      "file_processing_behavior_added": false,
+      "supported_formats_implemented": [],
+      "long_term_format_targets": [
+        "dwg",
+        "dxf",
+        "pdf",
+        "docx",
+        "xlsx",
+        "csv",
+        "txt",
+        "markdown",
+        "png",
+        "jpg",
+        "jpeg",
+        "webp",
+        "tiff",
+        "approved_future_project_document_types"
+      ],
+      "capability_layers": [
+        "file_storage_and_metadata",
+        "embedded_rendering_and_viewing",
+        "annotations_and_measurements",
+        "cse_record_linking",
+        "revision_comparison",
+        "offline_caching",
+        "advanced_external_editing"
+      ],
+      "mobile_and_pc_share_canonical_file_revision_metadata_and_relationships": true,
+      "full_cad_bim_office_or_calculation_authoring_replacement": false,
+      "near_term_priority_override": false,
+      "field_mvp_and_reliable_storage_foundations_remain_prior": true
+    },
     "next_product_direction": {
       "name": "first_field_mvp",
       "scope": [
@@ -699,14 +749,17 @@
     }
   },
   "protected_paths": {
-    "app/models.py": "unchanged_in_step_225",
-    "tests/test_models.py": "unchanged_in_step_225",
-    "app/records.py": "unchanged_in_step_225",
-    "tests/test_records.py": "unchanged_in_step_225",
-    "app/attachment_integrity.py": "unchanged_in_step_225",
-    "tests/test_attachment_integrity.py": "unchanged_in_step_225",
+    "app/models.py": "unchanged_in_step_226",
+    "tests/test_models.py": "unchanged_in_step_226",
+    "app/records.py": "unchanged_in_step_226",
+    "tests/test_records.py": "unchanged_in_step_226",
+    "app/attachment_integrity.py": "unchanged_in_step_226",
+    "tests/test_attachment_integrity.py": "unchanged_in_step_226",
+    "scripts/build_notebooklm_podcast_source.py": "unchanged_in_step_226",
+    "tests/test_notebooklm_podcast_source.py": "unchanged_in_step_226",
+    "pyproject.toml": "unchanged_in_step_226",
     ".github/workflows/pytest.yml": "unchanged",
-    "docs/podcast_notes/034_adim_216_220_notebooklm_podcast_notu.md": "unchanged_in_step_225"
+    "docs/podcast_notes/035_adim_221_225_notebooklm_podcast_notu.md": "unchanged_in_step_226"
   },
   "exports": {
     "expected_contents": [
@@ -720,27 +773,22 @@
     "pull_request_creation_by_codex": false,
     "merge_authorized": false,
     "branch_deletion_authorized": false,
-    "final_remote_sha_evidence_location": "GitHub Issue #67 completion comment after push"
+    "final_remote_sha_evidence_location": "GitHub Issue #69 completion comment after push"
   },
   "required_files": [
-    ".cse/tasks/225_task.md",
-    ".cse/results/225_result.md",
+    ".cse/tasks/226_task.md",
+    ".cse/results/226_result.md",
     ".cse/state/project_state.json",
-    "docs/podcast_notes/035_adim_221_225_notebooklm_podcast_notu.md",
-    "docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md",
-    "docs/notebooklm/CSE_PODCAST_SOURCE_MANIFEST.json",
-    "scripts/build_notebooklm_podcast_source.py",
-    "tests/test_notebooklm_podcast_source.py",
-    "learning/225_podcast_035_note_summary_contract.md",
+    "docs/226_embedded_dwg_document_viewer_final_product_target.md",
+    "learning/226_embedded_dwg_document_viewer_final_product_target.md",
     "learning/GLOSSARY.md",
     "README.md",
     "ROADMAP.md",
     "CHANGELOG.md",
     "docs/project_decisions.md",
     "docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md",
-    "docs/protocols/CSE_PROJECT_INSTRUCTIONS.md",
-    "docs/podcast_notes/README.md"
+    "docs/protocols/CSE_PROJECT_INSTRUCTIONS.md"
   ],
-  "workflow_status": "step_225_podcast_035_note_summary_contract_completed_before_commit_and_push",
+  "workflow_status": "step_226_embedded_dwg_document_viewer_target_completed_before_commit_and_push",
   "forbidden_scope_added": false
 }
