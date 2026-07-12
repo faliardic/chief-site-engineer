@@ -940,45 +940,45 @@ Gerçek şantiye
 
 ### Son doğrulanmış merged GitHub noktası
 
-- Step: **220**
-- PR: **#58**
-- Issue: **#57**
+- Step: **221**
+- PR: **#60**
+- Issue: **#59**
 - Merge commit:
 
 ```text
-1623e32437e1555ab398b245c4984566c163825f
+7c326740ef968e7fda3094eaf04f8dec8ecbf333
 ```
 
 - Latest merged safe point test seviyesi: **471 passed**
-- Aktif Step 221 yerel test beklentisi: **471 passed**
+- Aktif Step 222 yerel test beklentisi: **471 passed**
 - GitHub Actions: manuel olarak devre dışı
-- Podcast 033: Steps 211-215 latest completed podcast
-- Podcast 034: Steps 216-220 active Step 221 artifact
+- Podcast 034: Steps 216-220 latest completed podcast
+- Next podcast range: Steps 221-225
 
 ### Yerel senkronizasyon durumu
 
-Step 221 baslangicinda resmî `V:` yerel master `1623e32437e1555ab398b245c4984566c163825f` commit'ine fast-forward edildi ve `origin/master...master` divergence `0 0` olarak dogrulandi.
+Step 222 baslangicinda resmî `V:` yerel master `7c326740ef968e7fda3094eaf04f8dec8ecbf333` commit'ine fast-forward edildi ve `origin/master...master` divergence `0 0` olarak dogrulandi.
 
 ### Aktif iş
 
-- Step: **221**
-- Issue: **#59**
-- Amaç: Steps 216-220 icin Podcast 034 NotebookLM kaynak notunu olusturmak
+- Step: **222**
+- Issue: **#61**
+- Amaç: Future Field Observation attachment convenience lookup helper'i icin API boundary ve test matrix planlamak
 - Branch:
 
 ```text
-step-221-podcast-034-steps-216-220
+step-222-field-observation-attachment-convenience-lookup-boundary
 ```
 
-- Bu adim documentation/state/podcast-only istir.
+- Bu adim documentation/state/learning-only istir.
 - `FieldObservationRecord` halen tek Field-MVP model implementasyonudur.
 - `FieldObservationRepository` baseline-level bellek ici repository'dir; project/status/location/category exact filtreleri, explicit status update ve explicit reporting-context update davranisi vardir.
 - `FileAttachmentRepository` mevcut `FileAttachmentRecord` metadata nesneleri icin minimal bellek ici repository baseline'i saglar; `add`, `list_all`, `list_by_related_record_type`, `list_by_related_record_id`, `list_by_related_record`, `count` ve `find_by_id` method'lari vardir.
 - `FileAttachmentRepository` related-record filtreleri exact, case-sensitive ve read-only'dir; combined type+id filter ayni metadata record uzerinde iki alanin birlikte eslesmesini gerektirir.
 - Field Observation attachment relationship, documentation-only olarak yalniz `related_record_type == "field_observation"` ve `related_record_id == FieldObservationRecord.observation_id` exact pair kosuluyla tanimlanir.
-- Step 221 branch'inde Podcast 034, Steps 216-220 araligini NotebookLM-friendly Turkce kaynak notu olarak kapatir; bu documentation/state/podcast-only calisma merge edilene kadar latest merged safe point degildir.
+- Step 222 branch'inde future `list_for_field_observation(observation_id)` helper'i icin API boundary ve future test matrix documentation-only olarak planlanir; helper bu adimda implement edilmez.
 - Persistence, observation-specific convenience lookup, physical file operations, broader filters/mutations, automatic lifecycle rules, structured location/contact normalization, export/reporting consumers, API/GUI/CLI, audit ve ek validation henuz uygulanmamistir.
-- Podcast 035 ve Step 222 baslatilmamistir.
+- Podcast 035 ve Step 223 baslatilmamistir.
 
 ---
 
@@ -1016,7 +1016,7 @@ step-221-podcast-034-steps-216-220
 
 ### 29.7 Eski aktif Step bilgileri
 
-Step 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, aktif Step 215, aktif Step 216, aktif Step 217, aktif Step 218, aktif Step 219 ve aktif Step 220 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 220'dir; Step 221 aktif unmerged Podcast 034 documentation/state/podcast-only aşamasındadır.
+Step 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, aktif Step 215, aktif Step 216, aktif Step 217, aktif Step 218, aktif Step 219, aktif Step 220 ve aktif Step 221 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 221'dir; Step 222 aktif unmerged Field Observation attachment convenience lookup boundary documentation/state/learning-only aşamasındadır.
 
 ### 29.8 Eski modül sırasının bağlayıcı olması
 

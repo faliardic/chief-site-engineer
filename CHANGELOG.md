@@ -1,5 +1,15 @@
 # Changelog
 
+## Step 222
+
+- Added documentation-only Field Observation attachment convenience lookup boundary for future `FileAttachmentRepository.list_for_field_observation(observation_id)`.
+- Defined the future helper as semantically equivalent to `list_by_related_record("field_observation", observation_id)` and preferably delegated to the existing combined helper.
+- Added the future test matrix for exact matches, partial-match exclusion, case/whitespace sensitivity, empty/unknown results, new-list behavior, same-object returns, non-mutation, count/order stability, missing observation non-validation, equivalence with the combined helper, and existing filter regression coverage.
+- Added `docs/222_field_observation_attachment_convenience_lookup_boundary.md` and `learning/222_field_observation_attachment_convenience_lookup_boundary.md`.
+- Added `.cse/tasks/222_task.md` and `.cse/results/222_result.md`.
+- Updated repository truth so Step 221 / PR #60 / Issue #59 / merge commit `7c326740ef968e7fda3094eaf04f8dec8ecbf333` is the latest merged/finalized safe point and Step 222 remains active unmerged documentation/state/learning-only work.
+- Kept this scope documentation-only; no production code, executable tests, `FileAttachmentRepository` method, `FieldObservationRepository` method, model field/behavior, constants/enums/validation, automatic attachment creation/linking, relationship existence validation, physical file operations, persistence, API/GUI/CLI, export/report consumers, audit/history/task/NCR/decision generation, generated `blocked`, Podcast 035, Step 223, workflow changes, ZIP mutation, or Desktop archive mutation was added.
+
 ## Step 221
 
 - Added `docs/podcast_notes/034_adim_216_220_notebooklm_podcast_notu.md` for Steps 216-220.
