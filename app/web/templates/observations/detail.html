@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Gozlem Detayi{% endblock %}
+{% block content %}
+<h1>Gozlem Detayi</h1>
+<span class="badge {{ detail.observation.status }}">{{ detail.observation.status }}</span>
+<h2>{{ detail.observation.description }}</h2>
+<dl><dt>Proje</dt><dd>{{ detail.project.name }}</dd><dt>Konum</dt><dd>{{ detail.observation.location }}</dd><dt>Kategori</dt><dd>{{ detail.observation.category }}</dd><dt>Not</dt><dd>{{ detail.observation.notes or '-' }}</dd></dl>
+
+<h2>Dosyalar</h2>
+{% for attachment in detail.attachments %}
+<div class="attachment"><strong>{{ attachment.metadata.original_name }}</strong> <span class="badge {{ attachment.verification.status }}">{{ attachment.verification.status }}</span>
+{% if attachment.verification.valid %}<a href="{{ url_for('attachment_download', attachment_id=attachment.metadata.attachment_id) }}">Goruntule / indir</a>{% else %}<p class="alert">Dosya sunulamiyor: {{ attachment.verification.status }}</p>{% endif %}</div>
+{% else %}<p>Dosya eklenmedi.</p>{% endfor %}
+
+<h2>Durum guncelle</h2>
+<form method="post" action="{{ url_for('observation_status', observation_id=detail.observation.observation_id) }}">
+  <input type="hidden" name="expected_revision" value="{{ detail.observation.revision }}">
+  <label>Yeni durum <select name="new_status">{% for status in ('open', 'tracking', 'closed') %}<option {% if detail.observation.status == status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></label>
+  <button>Durumu kaydet</button>
+</form>
+
+<h2>Bildirilen kisi</h2>
+<form method="post" action="{{ url_for('observation_reporting', observation_id=detail.observation.observation_id) }}">
+  <input type="hidden" name="expected_revision" value="{{ detail.observation.revision }}">
+  <label>Bildirilen <input name="reported_to" required value="{{ detail.observation.reported_to or '' }}"></label>
+  <label>Bildirim zamani (Europe/Istanbul) <input type="datetime-local" name="reported_at" required></label>
+  <button>Bildirimi kaydet</button>
+</form>
+
+<h2>Olay gecmisi</h2><ol>{% for event in detail.events %}<li>{{ event.event_type }} — {{ event.occurred_at }}</li>{% endfor %}</ol>
+{% endblock %}

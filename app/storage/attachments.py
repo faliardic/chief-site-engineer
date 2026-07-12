@@ -132,37 +132,73 @@ class ManagedAttachmentStore:
         source = Path(source_path)
         source_stat = self._validate_source(source)
         original_name = source.name
-        staging_relative = build_staging_relative_path(attachment_id)
-        final_relative = build_attachment_relative_path(
+        with self._open_source(source, source_stat) as source_file:
+            return self._stage_stream(
+                source_file,
+                original_name,
+                observation_id,
+                attachment_id,
+            )
+
+    def stage_stream(
+        self,
+        binary_stream: BinaryIO,
+        original_name: str,
+        observation_id: str,
+        attachment_id: str,
+    ) -> StagedAttachment:
+        """Stage an upload stream with the same integrity contract as a file copy."""
+
+        try:
+            validate_canonical_uuid(observation_id, "observation_id")
+            validate_canonical_uuid(attachment_id, "attachment_id")
+        except ValueError as exc:
+            raise UnsafeAttachmentPathError(str(exc)) from exc
+        if not isinstance(original_name, str) or not original_name.strip():
+            raise SourceFileError("original_name must be non-empty")
+        if not callable(getattr(binary_stream, "read", None)):
+            raise SourceFileError("binary_stream must be readable")
+        return self._stage_stream(
+            binary_stream,
+            original_name,
             observation_id,
             attachment_id,
-            original_name,
+        )
+
+    def _stage_stream(
+        self,
+        binary_stream: BinaryIO,
+        original_name: str,
+        observation_id: str,
+        attachment_id: str,
+    ) -> StagedAttachment:
+        staging_relative = build_staging_relative_path(attachment_id)
+        final_relative = build_attachment_relative_path(
+            observation_id, attachment_id, original_name
         )
         staging_path = self._managed_path(staging_relative)
         created_staging = False
-
         try:
-            with self._open_source(source, source_stat) as source_file:
-                try:
-                    staging_file = staging_path.open("xb")
-                except FileExistsError as exc:
-                    raise AttachmentCollisionError(
-                        f"staging destination already exists: {staging_relative}"
-                    ) from exc
-                created_staging = True
-                with staging_file:
-                    digest = hashlib.sha256()
-                    size_bytes = 0
-                    while True:
-                        chunk = self._read_chunk(source_file)
-                        if not chunk:
-                            break
-                        written = staging_file.write(chunk)
-                        if written != len(chunk):
-                            raise OSError("partial staging write")
-                        digest.update(chunk)
-                        size_bytes += written
-                    self._flush_and_sync(staging_file)
+            try:
+                staging_file = staging_path.open("xb")
+            except FileExistsError as exc:
+                raise AttachmentCollisionError(
+                    f"staging destination already exists: {staging_relative}"
+                ) from exc
+            created_staging = True
+            with staging_file:
+                digest = hashlib.sha256()
+                size_bytes = 0
+                while True:
+                    chunk = self._read_chunk(binary_stream)
+                    if not chunk:
+                        break
+                    written = staging_file.write(chunk)
+                    if written != len(chunk):
+                        raise OSError("partial staging write")
+                    digest.update(chunk)
+                    size_bytes += written
+                self._flush_and_sync(staging_file)
         except AttachmentCollisionError:
             raise
         except Exception as exc:

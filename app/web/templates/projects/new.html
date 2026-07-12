@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Yeni Proje{% endblock %}
+{% block content %}
+<h1>Yeni Proje</h1>
+<form method="post">
+  <label>Proje adi <input name="name" required maxlength="200"></label>
+  <button type="submit">Projeyi olustur</button>
+</form>
+{% endblock %}
