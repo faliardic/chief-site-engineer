@@ -12,6 +12,7 @@ from flask import (
     request,
     stream_with_context,
     url_for,
+    send_file,
 )
 from werkzeug.utils import secure_filename
 
@@ -21,7 +22,9 @@ from app.application import (
     UploadStream,
 )
 from app.persistence import PersistenceError, RecordNotFound, RevisionConflict
+from app.operations import DailyExportService
 from app.storage import ManagedAttachmentStore
+from app.storage.paths import validate_canonical_uuid
 
 
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
@@ -55,6 +58,7 @@ def create_app(data_root: str | Path) -> Flask:
             root / "cse.sqlite3",
             ManagedAttachmentStore(root / "attachments"),
         ),
+        CSE_EXPORT_SERVICE=DailyExportService(root),
     )
 
     def service() -> ObservationApplicationService:
@@ -200,6 +204,32 @@ def create_app(data_root: str | Path) -> Flask:
             f'attachment; filename="{download_name}"'
         )
         return response
+
+    @app.post("/exports/daily")
+    def daily_export() -> Response | tuple[str, int]:
+        try:
+            artifact = app.config["CSE_EXPORT_SERVICE"].build_daily_export(
+                request.form.get("local_date", "")
+            )
+        except Exception:
+            return "Günlük çıktı oluşturulamadı.", 400
+        return redirect(url_for("export_download", export_id=artifact.artifact_id))
+
+    @app.get("/exports/<export_id>")
+    def export_download(export_id: str) -> Response:
+        try:
+            validate_canonical_uuid(export_id, "export_id")
+        except ValueError:
+            abort(404)
+        path = root / "exports" / f"{export_id}.zip"
+        if not path.is_file():
+            abort(404)
+        return send_file(
+            path,
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name=f"cse-daily-{export_id}.zip",
+        )
 
     return app
 
