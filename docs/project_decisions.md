@@ -1,5 +1,15 @@
 # Proje Kararlari
 
+## 221 Podcast 034 Steps 216-220 Karari
+
+- Podcast 034, Steps 216-220 araligi icin documentation/state/podcast-only artifact olarak olusturuldu.
+- Podcast 034; Podcast 033 kapanisi, `FileAttachmentRepository` baseline, independent related-record filtreleri, Field Observation attachment linking contract ve exact combined related-record lookup hattini kapsar.
+- Bu adim production code, executable test, repository behavior, model behavior veya workflow degisikligi eklemez.
+- Step 220, PR #58 squash merge commit `1623e32437e1555ab398b245c4984566c163825f` ile latest merged/finalized safe point'tir; Issue #57 completed olarak kaydedilir.
+- Step 221, Issue #59 ve `step-221-podcast-034-steps-216-220` branch'i uzerinde aktif unmerged documentation/state/podcast-only isidir.
+- Podcast 034 branch uzerinde fiziksel olarak olusturuldu; Step 221 merge/finalize edilene kadar Step 221 guvenli nokta veya merge claim olarak yazilmaz.
+- FieldObservation-specific convenience lookup, automatic attachment creation/linking, referenced observation existence validation, physical file operations, persistence, API/GUI/CLI, export/report consumers, audit/history/task/NCR/decision generation, generated `blocked`, Podcast 035 ve Step 222 uygulanmamistir.
+
 ## 220 FileAttachmentRepository Combined Related-Record Filter Karari
 
 - `FileAttachmentRepository.list_by_related_record(related_record_type, related_record_id)` exact combined filtre olarak eklendi.

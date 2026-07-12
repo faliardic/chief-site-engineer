@@ -9,8 +9,8 @@ Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici reposit
 Son guvenli nokta:
 
 ```text
-Adim 219 - Field Observation attachment linking contract
-PR #56 merge commit: 4d006a2f49f10792a74dca068ea415ba37200797
+Adim 220 - FileAttachmentRepository combined related-record filter
+PR #58 merge commit: 1623e32437e1555ab398b245c4984566c163825f
 ```
 
 Guncel test sonucu:
@@ -22,10 +22,10 @@ Guncel test sonucu:
 Mevcut calisma durumu:
 
 ```text
-Adim 220 - FileAttachmentRepository combined related-record filter
+Adim 221 - Podcast 034 for Steps 216-220
 ```
 
-Adim 219, PR #56 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 220, mevcut `FileAttachmentRecord` metadata nesneleri icin exact combined `related_record_type` + `related_record_id` filtresini ekleyen aktif unmerged isidir.
+Adim 220, PR #58 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 221, Steps 216-220 araligi icin Podcast 034 kaynak notunu olusturan documentation/state/podcast-only aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
 
 ## Repo Koku
 
@@ -120,12 +120,13 @@ Son eklenen podcast notlari:
 - `docs/podcast_notes/031_adim_201_205_notebooklm_podcast_notu.md`
 - `docs/podcast_notes/032_adim_206_210_notebooklm_podcast_notu.md`
 - `docs/podcast_notes/033_adim_211_215_notebooklm_podcast_notu.md`
+- `docs/podcast_notes/034_adim_216_220_notebooklm_podcast_notu.md`
 
-Podcast 033, latest completed podcast olarak Steps 211-215 araligini kapsar. Sonraki dogal podcast araligi Steps 216-220 olur.
+Podcast 033, latest completed podcast olarak Steps 211-215 araligini kapsar. Podcast 034, Step 221 branch'inde Steps 216-220 araligi icin olusturulan aktif podcast artifact'idir; Step 221 merge/finalize edilene kadar latest completed podcast olarak sayilmaz.
 
 ## Kalite Kontrol ve CI Durumu
 
-- Guncel merged safe point test tabani `461 passed` olarak dogrulanir; Step 220 branch'inde local test seviyesi `471 passed` olarak dogrulanir.
+- Guncel merged safe point test tabani `471 passed` olarak dogrulanir; Step 221 branch'i documentation/state/podcast-only calismadir ve local test seviyesi `471 passed` olarak korunmalidir.
 - `.github/workflows/pytest.yml` GitHub Actions workflow'u repoda bulunur.
 - Otomatik Actions calismasi account billing/runner-start kisiti nedeniyle manuel olarak devre disidir.
 - Required status checks etkin degildir.
