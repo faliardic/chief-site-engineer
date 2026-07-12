@@ -77,6 +77,18 @@ class FileAttachmentRepository:
             if record.related_record_id == related_record_id
         ]
 
+    def list_by_related_record(
+        self,
+        related_record_type: str,
+        related_record_id: str,
+    ) -> list[FileAttachmentRecord]:
+        return [
+            record
+            for record in self._records
+            if record.related_record_type == related_record_type
+            and record.related_record_id == related_record_id
+        ]
+
     def count(self) -> int:
         return len(self._records)
 
