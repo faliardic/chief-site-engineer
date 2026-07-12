@@ -3,11 +3,11 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 222 - Field Observation attachment convenience lookup boundary
-PR #62 merge commit: 8ba82cf2109df9d8cd385a5c38ee58a637afba9c
+Adim 223 - Field Observation attachment convenience lookup
+PR #65 merge commit: 932dbf3ffd076ddc124825adce78226d2ce8fb57
 ```
 
-Adim 222, PR #62 squash merge commit `8ba82cf2109df9d8cd385a5c38ee58a637afba9c` ile master uzerindeki guncel guvenli noktadir. Step 223, Issue #63 kapsaminda `FileAttachmentRepository.list_for_field_observation(observation_id)` convenience lookup helper'ini ve focused regression testlerini ekleyen aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Adim 223, PR #65 squash merge commit `932dbf3ffd076ddc124825adce78226d2ce8fb57` ile master uzerindeki guncel guvenli noktadir. Step 224, Issue #64 kapsaminda rolling NotebookLM source generator, permanent instruction, manifest ve regression testlerini ekleyen aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -636,8 +636,19 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 - [x] Adim 223 - Focused tests delegation, partial match rejection, case/whitespace sensitivity, new-list, same-object, non-mutation, missing existence non-validation ve existing filter regression davranislarini dogruladi.
 - [x] Adim 223 - Production scope yalniz `app/records.py` ve `tests/test_records.py` ile sinirli tutuldu; model, workflow, Podcast 035 ve Step 224 baslatilmadi.
 
+## Step 224 - Rolling NotebookLM Podcast Source Protocol
+
+- [x] Adim 224 - `NOTEBOOKLM_INSTRUCTIONS.md` kalici yorumlama ve Turkce podcast sozlesmesi olarak eklendi.
+- [x] Adim 224 - Stable `CSE_PODCAST_LATEST_SOURCE.md` yolu ve public raw GitHub URL'si tanimlandi.
+- [x] Adim 224 - Latest numbered podcast note, full note content, 001-223 cumulative step summaries, safe point, deferred scope ve metadata deterministic olarak birlestirildi.
+- [x] Adim 224 - `CSE_PODCAST_SOURCE_MANIFEST.json` latest podcast/range/path, rolling source, instruction, safe point ve summary count alanlariyla eklendi.
+- [x] Adim 224 - Malformed/duplicate/missing source failures, determinism, UTF-8, no historical mutation ve no side effects focused tests ile guvence altina alindi.
+- [x] Adim 224 - Focused generator testleri `15 passed`, tam yerel suite `494 passed` olarak dogrulandi.
+- [x] Adim 224 - Kalici Codex model/reasoning/secim-gerekcesi politikasi canonical talimat ve state'e eklendi.
+- [x] Adim 224 - Podcast 035, NotebookLM API/browser/upload/audio automation, ana urun behavior, workflow, ZIP ve exports mutation eklenmedi.
+
 ## Sonraki Calisma Onerisi
 
-Step 223 merge/finalize edildikten sonra attachment slice icin sonraki teknik dar adimlar convenience helper usage boundary dokumantasyonu veya upload/persistence oncesi attachment storage siniri olabilir; bunlar ayri issue ile netlestirilmelidir. Ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur; persistence, physical file operations, broader filters/mutations, automatic lifecycle rules, structured location/contact normalization, export/API/audit/validation henuz uygulanmamistir.
+Step 224 merge/finalize edildikten sonra Podcast 035, Steps 221-225 tamamlandiginda yeni 12 bolumlu note contract ile olusturulabilir. Attachment slice icin convenience helper usage boundary veya upload/persistence oncesi storage siniri ayri issue gerektirir. Ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur.
 
 Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Podcast 030 Adim 196-200 araligini, Podcast 031 Adim 201-205 araligini, Podcast 032 Adim 206-210 araligini, Podcast 033 Adim 211-215 araligini ve Podcast 034 Adim 216-220 araligini kapsar. Sonraki dogal podcast araligi Steps 221-225 olur.

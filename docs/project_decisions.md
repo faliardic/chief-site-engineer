@@ -1,5 +1,19 @@
 # Proje Kararlari
 
+## 224 Rolling NotebookLM Podcast Source Protokolu Karari
+
+- NotebookLM'e her podcastte yeniden source ve instruction eklemek yerine `docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md` tek stable website source olarak kullanilir.
+- Permanent yorumlama sozlesmesi `docs/notebooklm/NOTEBOOKLM_INSTRUCTIONS.md` icinde tutulur ve rolling source'un en ustune tam olarak eklenir.
+- Generator latest numbered podcast notunu secerek full content, 001-current-safe-step ayri ozetleri, safe point/test kaniti, deferred scope ve deterministic metadata ile birlestirir.
+- `CHANGELOG.md` Step 001-223 summary inventory icin canonical makine-okunur kaynak, `ROADMAP.md` mevcut yeni adimlarin kisa baslik kaynagi ve `.cse/state/project_state.json` current safe point kaynagidir.
+- Podcast 034 legacy note formatinda oldugu icin legacy required sections ile kabul edilir; Podcast 035 ve sonrasinda Issue #64'teki 12 bolumlu yeni note contract zorunludur.
+- Stable public URL `https://raw.githubusercontent.com/faliardic/chief-site-engineer/master/docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md` olarak tanimlanir. NotebookLM saved website source auto-refresh davranisi dogrulanmamistir.
+- Her Codex instruction model, reasoning level ve secim nedenini acikca yazar; contract/regression-sensitive islerde selector'daki en guclu full Codex model ve `extra high` reasoning kullanilir.
+- Step 223, PR #65 squash merge commit `932dbf3ffd076ddc124825adce78226d2ce8fb57` ile latest merged/finalized safe point'tir; Issue #63 completed olarak kaydedilir.
+- Step 224, Issue #64 ve `step-224-notebooklm-rolling-podcast-source` branch'i uzerinde aktif unmerged generator/test/documentation isidir.
+- Step 224 local verification sonucu focused `15 passed` ve full suite `494 passed` olarak kaydedilir; bu urunun field-ready oldugu anlamina gelmez.
+- Podcast 035, NotebookLM API/browser/upload/audio automation, ana urun UI/API/CLI, workflow, ZIP, Desktop archive, historical podcast ve exports mutation uygulanmamistir.
+
 ## 223 Field Observation Attachment Convenience Lookup Karari
 
 - `FileAttachmentRepository.list_for_field_observation(observation_id)` helper'i eklendi.

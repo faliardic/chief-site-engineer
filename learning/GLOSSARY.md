@@ -1285,3 +1285,17 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `API Boundary`: Bir methodun hangi girdileri alacagini, ne dondurecegini, hangi yan etkileri yapmayacagini ve hangi sorumluluklari ustlenmeyecegini tanimlayan sinir.
 
 `Future Test Matrix`: Kod henuz yazilmadan veya yeni davranis genisletilmeden once, ileride yazilacak testlerin hangi davranislari kontrol edecegini gosteren plan.
+
+`Rolling Source`: Dosya yolu degismeden icerigi en yeni canonical duruma gore yeniden uretilen kaynak.
+
+`Stable URL`: Icerik guncellense bile adresi degismeyen web baglantisi.
+
+`Deterministic Generator`: Ayni girdilerle her calistiginda byte-for-byte ayni ciktiyi ureten program.
+
+`Manifest`: Uretilen artifact'in kaynak, surum, aralik, yol ve sayim bilgilerini makine-okunabilir alanlarla kaydeden envanter dosyasi.
+
+`Side Effect`: Bir fonksiyonun return degeri disinda dosya, network, global state veya dis sistem uzerinde olusturdugu etki.
+
+`UTF-8`: Unicode karakterleri byte olarak saklayan ve Turkce karakterleri koruyan yaygin text encoding bicimi.
+
+`Backward Compatibility`: Yeni sozlesme eklenirken daha once uretilmis gecerli veri veya dosyalarin bozulmadan okunabilmesi.
