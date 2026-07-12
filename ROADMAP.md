@@ -3,11 +3,11 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 217 - FileAttachmentRepository baseline
-PR #51 merge commit: 075acdbc77927925092b748b77aad7c0ce13d9ef
+Adim 218 - FileAttachmentRepository related-record filters
+PR #53 merge commit: 62b95867165f5ff6b3aec85fc841557bc678df42
 ```
 
-Adim 217, PR #51 squash merge commit `075acdbc77927925092b748b77aad7c0ce13d9ef` ile master uzerindeki guncel guvenli noktadir. Step 218, Issue #52 kapsaminda mevcut `FileAttachmentRecord` metadata nesneleri icin read-only related-record type/id filtreleri ekleyen aktif unmerged calismadir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Adim 218, PR #53 squash merge commit `62b95867165f5ff6b3aec85fc841557bc678df42` ile master uzerindeki guncel guvenli noktadir. Step 219, Issue #54 kapsaminda Field Observation attachment linking contract'ini documentation/state/learning-only olarak tanimlayan aktif unmerged calismadir; merge edilene kadar yeni guvenli nokta sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -166,6 +166,8 @@ Adim 216'da Steps 211-215 araligi icin Podcast 033 documentation/state artifact'
 Adim 217'de mevcut `FileAttachmentRecord` metadata nesneleri icin minimal bellek ici `FileAttachmentRepository` baseline'i eklendi. Repository `add`, `list_all`, `count` ve `find_by_id` method'larini saglar; exact/case-sensitive duplicate `attachment_id` reddi yapar, insertion order'i korur, her `list_all()` cagrisi icin yeni liste dondurur ve stored metadata record nesnelerini kopyalamaz veya mutate etmez. Related-record filters, FieldObservation-specific attachment linking, physical file operations, persistence, validation, API/GUI/CLI, audit, Podcast 034 ve Step 218 eklenmedi.
 
 Adim 218'de mevcut `FileAttachmentRecord` metadata nesneleri icin `FileAttachmentRepository.list_by_related_record_type(...)` ve `FileAttachmentRepository.list_by_related_record_id(...)` read-only filtreleri eklendi. Filtreler exact, case-sensitive string equality kullanir, trim/normalize/parse/map/validate yapmaz, insertion order'i korur, her cagri yeni liste dondurur, ayni stored record nesnelerini referansla verir ve metadata'yi mutate etmez. Type ve id filtreleri bagimsizdir; combined type+id filter, FieldObservation-specific attachment lookup/linking, physical file operations, persistence, validation, API/GUI/CLI, audit, Podcast 034 ve Step 219 eklenmedi.
+
+Adim 219'da `FieldObservationRecord` ile mevcut `FileAttachmentRecord` metadata kayitlari arasindaki attachment linking contract documentation-only olarak tanimlandi. Bir attachment metadata kaydi yalniz ayni kayit uzerinde `related_record_type == "field_observation"` ve `related_record_id == FieldObservationRecord.observation_id` exact pair kosulu saglanirsa field observation attachment link'i sayilir. Cardinality, ownership, orphan/existence behavior, independent filter read-boundary riski, future `list_by_related_record(...)` ve `list_for_field_observation(...)` sinirlari ve future test matrix belgelendi. Production code, executable tests, combined filter implementation, convenience lookup, physical file operations, persistence, validation, API/GUI/CLI, audit, Podcast 034 ve Step 220 eklenmedi.
 
 Adim 160'da mevcut exception tabanli file-writing helper davranisini bozmadan future result contract wrapper API boundary documentation-only olarak planlandi; `write_*` helperlarin korunmasi, olasi `try_write_*` wrapper isimleri, result alanlari, error mapping, geriye uyumluluk ve handover QC gorunurlugu netlestirildi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
 
@@ -577,8 +579,18 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 - [x] Adim 218 - `docs/218_file_attachment_repository_related_record_filters.md` ve `learning/218_file_attachment_repository_related_record_filters.md` olusturuldu.
 - [x] Adim 218 - Combined filter, FieldObservation-specific attachment lookup/linking, physical file operations, persistence, validation/enums/constants, API/GUI/CLI, audit, Podcast 034 ve Step 219 baslatilmadi.
 
+## Step 219 - Field Observation Attachment Linking Contract
+
+- [x] Adim 219 - Field Observation attachment relationship identity documentation-only olarak tanimlandi.
+- [x] Adim 219 - Exact pair kuralı `related_record_type == "field_observation"` ve `related_record_id == FieldObservationRecord.observation_id` olarak kaydedildi.
+- [x] Adim 219 - Cardinality, ownership ve orphan/existence behavior sinirlari belgelendi.
+- [x] Adim 219 - Bagimsiz Step 218 filtrelerinin safe combined relationship query olmadigi aciklandi.
+- [x] Adim 219 - Future `list_by_related_record(...)` ve `list_for_field_observation(...)` boundaries implement edilmeden dokumante edildi.
+- [x] Adim 219 - Future test matrix yazildi.
+- [x] Adim 219 - Production code, executable tests, combined filter implementation, convenience lookup, physical file operations, persistence, validation/enums/constants, API/GUI/CLI, audit, Podcast 034 ve Step 220 baslatilmadi.
+
 ## Sonraki Calisma Onerisi
 
-Adim 218 merge edildikten sonra attachment slice icin sonraki dogal dar adim observation attachment linking sozlesmesi, combined filter API boundary dokumantasyonu veya upload/persistence oncesi boundary dokumantasyonu olabilir; bunlar ayri issue ile netlestirilmelidir. Ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur; persistence, physical file operations, broader filters/mutations, automatic lifecycle rules, structured location/contact normalization, export/API/audit/validation henuz uygulanmamistir.
+Adim 219 merge edildikten sonra attachment slice icin sonraki dogal dar adim combined `list_by_related_record(...)` implementation'i, Field Observation convenience lookup icin ayri API boundary veya upload/persistence oncesi boundary dokumantasyonu olabilir; bunlar ayri issue ile netlestirilmelidir. Ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur; persistence, physical file operations, broader filters/mutations, automatic lifecycle rules, structured location/contact normalization, export/API/audit/validation henuz uygulanmamistir.
 
 Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Podcast 030 Adim 196-200 araligini, Podcast 031 Adim 201-205 araligini, Podcast 032 Adim 206-210 araligini, Podcast 033 Adim 211-215 araligini kapsar. Sonraki dogal podcast araligi Steps 216-220 olur.

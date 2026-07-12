@@ -940,43 +940,44 @@ Gerçek şantiye
 
 ### Son doğrulanmış merged GitHub noktası
 
-- Step: **217**
-- PR: **#51**
-- Issue: **#50**
+- Step: **218**
+- PR: **#53**
+- Issue: **#52**
 - Merge commit:
 
 ```text
-075acdbc77927925092b748b77aad7c0ce13d9ef
+62b95867165f5ff6b3aec85fc841557bc678df42
 ```
 
-- Latest merged safe point test seviyesi: **453 passed**
-- Aktif Step 218 yerel test seviyesi: **461 passed**
+- Latest merged safe point test seviyesi: **461 passed**
+- Aktif Step 219 yerel test seviyesi: **461 passed**
 - GitHub Actions: manuel olarak devre dışı
 - Podcast 033: Steps 211-215 latest completed podcast
 - Sonraki doğal podcast aralığı: Steps 216-220
 
 ### Yerel senkronizasyon durumu
 
-Step 218 baslangicinda resmî `V:` yerel master `075acdbc77927925092b748b77aad7c0ce13d9ef` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
+Step 219 baslangicinda resmî `V:` yerel master `62b95867165f5ff6b3aec85fc841557bc678df42` commit'ine fast-forward edildi ve `master...origin/master` divergence `0 0` olarak dogrulandi.
 
 ### Aktif iş
 
-- Step: **218**
-- Issue: **#52**
-- Amaç: mevcut `FileAttachmentRecord` metadata nesneleri icin read-only related-record type/id filtreleri eklemek
+- Step: **219**
+- Issue: **#54**
+- Amaç: `FieldObservationRecord` ile mevcut `FileAttachmentRecord` metadata kayitlari arasindaki attachment linking contract'i tanimlamak
 - Branch:
 
 ```text
-step-218-file-attachment-related-record-filters
+step-219-field-observation-attachment-linking-contract
 ```
 
-- Bu adim dar kapsamli production code, focused test, documentation, learning ve state isidir.
+- Bu adim documentation/state/learning-only contract isidir.
 - `FieldObservationRecord` halen tek Field-MVP model implementasyonudur.
 - `FieldObservationRepository` baseline-level bellek ici repository'dir; project/status/location/category exact filtreleri, explicit status update ve explicit reporting-context update davranisi vardir.
 - `FileAttachmentRepository` mevcut `FileAttachmentRecord` metadata nesneleri icin minimal bellek ici repository baseline'i saglar; `add`, `list_all`, `list_by_related_record_type`, `list_by_related_record_id`, `count` ve `find_by_id` method'lari vardir.
 - `FileAttachmentRepository` related-record filtreleri exact, case-sensitive, read-only ve birbirinden bagimsizdir; combined type+id filter veya related record existence validation yoktur.
+- Field Observation attachment relationship, documentation-only olarak yalniz `related_record_type == "field_observation"` ve `related_record_id == FieldObservationRecord.observation_id` exact pair kosuluyla tanimlanir.
 - Persistence, observation-specific attachment linking, physical file operations, broader filters/mutations, automatic lifecycle rules, structured location/contact normalization, export/reporting consumers, API/GUI/CLI, audit ve ek validation henuz uygulanmamistir.
-- Podcast 034 ve Step 219 baslatilmamistir.
+- Podcast 034 ve Step 220 baslatilmamistir.
 
 ---
 
@@ -1014,7 +1015,7 @@ step-218-file-attachment-related-record-filters
 
 ### 29.7 Eski aktif Step bilgileri
 
-Step 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, aktif Step 215, aktif Step 216 ve aktif Step 217 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 217'dir; Step 218 aktif unmerged FileAttachmentRepository related-record filter aşamasındadır.
+Step 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, aktif Step 215, aktif Step 216, aktif Step 217 ve aktif Step 218 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 218'dir; Step 219 aktif unmerged Field Observation attachment linking contract aşamasındadır.
 
 ### 29.8 Eski modül sırasının bağlayıcı olması
 

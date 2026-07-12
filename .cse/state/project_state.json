@@ -1,33 +1,33 @@
 {
-  "step": 218,
+  "step": 219,
   "base_branch": "master",
-  "base_commit": "075acdbc77927925092b748b77aad7c0ce13d9ef",
+  "base_commit": "62b95867165f5ff6b3aec85fc841557bc678df42",
   "active_work": {
-    "issue": 52,
-    "step": 218,
-    "branch": "step-218-file-attachment-related-record-filters",
-    "file_attachment_repository_related_record_filters": true,
-    "documentation_learning_state_and_tests": true,
-    "merge_claim_for_step_218": false,
-    "step_219_started": false,
+    "issue": 54,
+    "step": 219,
+    "branch": "step-219-field-observation-attachment-linking-contract",
+    "field_observation_attachment_linking_contract": true,
+    "documentation_learning_state_only": true,
+    "merge_claim_for_step_219": false,
+    "step_220_started": false,
     "podcast_034_created": false,
     "local_test_summary": "461 passed"
   },
   "current_safe_point": {
     "semantics": "latest_merged_finalized_checkpoint",
-    "step": 217,
-    "issue": 50,
+    "step": 218,
+    "issue": 52,
     "issue_state": "completed",
-    "pull_request": 51,
+    "pull_request": 53,
     "pull_request_state": "merged",
-    "merge_commit": "075acdbc77927925092b748b77aad7c0ce13d9ef",
-    "local_test_summary": "453 passed"
+    "merge_commit": "62b95867165f5ff6b3aec85fc841557bc678df42",
+    "local_test_summary": "461 passed"
   },
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
-    "local_master_sha": "075acdbc77927925092b748b77aad7c0ce13d9ef",
-    "origin_master_sha": "075acdbc77927925092b748b77aad7c0ce13d9ef",
+    "local_master_sha": "62b95867165f5ff6b3aec85fc841557bc678df42",
+    "origin_master_sha": "62b95867165f5ff6b3aec85fc841557bc678df42",
     "divergence": "0 0",
     "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
     "misspelled_workspace_present": false,
@@ -264,6 +264,26 @@
             "file_attachment_repository_baseline_learning": true,
             "step_068_file_attachment_model_documentation": true,
             "step_080_file_attachment_metadata_integrity_summary": true,
+        "step_089_attachment_metadata_integrity_rules": true,
+        "podcast_033": true,
+        "new_chat_bootstrap": false
+        },
+        "step_219_sources_read": {
+            "unified_project_source": true,
+            "project_instructions": true,
+            "github_issue_54_with_scope_comments": true,
+            "task_219": true,
+            "app_models": true,
+            "app_records": true,
+            "tests_test_records": true,
+            "step_208_field_observation_contract": true,
+            "step_209_field_observation_model_documentation": true,
+            "step_217_file_attachment_repository_baseline_documentation": true,
+            "step_218_file_attachment_related_record_filters_documentation": true,
+            "learning_217_file_attachment_repository_baseline": true,
+            "learning_218_file_attachment_related_record_filters": true,
+            "step_068_file_attachment_model_documentation": true,
+            "step_080_file_attachment_metadata_integrity_summary": true,
             "step_089_attachment_metadata_integrity_rules": true,
             "podcast_033": true,
             "new_chat_bootstrap": false
@@ -479,6 +499,18 @@
       "related_record_type_and_id_filters_are_independent": true,
       "related_record_filters_return_same_stored_records": true,
       "related_record_filters_do_not_validate_related_record_existence": true,
+      "field_observation_attachment_linking_contract_documented": true,
+      "field_observation_attachment_linking_type_literal": "field_observation",
+      "field_observation_attachment_linking_id_field": "FieldObservationRecord.observation_id",
+      "field_observation_attachment_linking_requires_exact_type_and_id_pair": true,
+      "field_observation_attachment_linking_case_sensitive": true,
+      "field_observation_attachment_linking_no_trim_normalize_parse_map_alias_prefix_inference": true,
+      "field_observation_attachment_linking_cardinality": "zero_one_or_many_attachments_per_field_observation",
+      "field_observation_attachment_linking_relationship_owner": "FileAttachmentRecord",
+      "field_observation_attachment_linking_does_not_mutate_observation_record": true,
+      "field_observation_attachment_linking_missing_observation_not_validated_by_repository": true,
+      "future_combined_related_record_filter_boundary_documented": true,
+      "future_field_observation_convenience_lookup_boundary_documented": true,
       "record_objects_not_copied": true,
       "record_objects_not_mutated": true,
       "not_implemented": [
@@ -495,18 +527,20 @@
         "api_gui_cli",
         "audit_history_task_ncr_notification_decision_generation",
         "generated_blocked",
-        "step_219",
+        "step_220",
         "podcast_034"
       ]
     }
   },
   "protected_paths": {
-    "app/models.py": "unchanged_in_step_218",
-    "tests/test_models.py": "unchanged_in_step_218",
-    "app/attachment_integrity.py": "unchanged_in_step_218",
-    "tests/test_attachment_integrity.py": "unchanged_in_step_218",
+    "app/models.py": "unchanged_in_step_219",
+    "app/records.py": "unchanged_in_step_219",
+    "tests/test_models.py": "unchanged_in_step_219",
+    "tests/test_records.py": "unchanged_in_step_219",
+    "app/attachment_integrity.py": "unchanged_in_step_219",
+    "tests/test_attachment_integrity.py": "unchanged_in_step_219",
     ".github/workflows/pytest.yml": "unchanged",
-    "docs/podcast_notes/033_adim_211_215_notebooklm_podcast_notu.md": "unchanged_in_step_218"
+    "docs/podcast_notes/033_adim_211_215_notebooklm_podcast_notu.md": "unchanged_in_step_219"
   },
   "exports": {
     "expected_contents": [
@@ -520,22 +554,20 @@
     "pull_request_creation_by_codex": false,
     "merge_authorized": false,
     "branch_deletion_authorized": false,
-    "final_remote_sha_evidence_location": "GitHub Issue #52 completion comment after push"
+    "final_remote_sha_evidence_location": "GitHub Issue #54 completion comment after push"
   },
   "required_files": [
-    ".cse/tasks/218_task.md",
-    ".cse/results/218_result.md",
+    ".cse/tasks/219_task.md",
+    ".cse/results/219_result.md",
     ".cse/state/project_state.json",
-    "app/records.py",
-    "tests/test_records.py",
-    "docs/218_file_attachment_repository_related_record_filters.md",
-    "learning/218_file_attachment_repository_related_record_filters.md",
+    "docs/219_field_observation_attachment_linking_contract.md",
+    "learning/219_field_observation_attachment_linking_contract.md",
     "README.md",
     "ROADMAP.md",
     "CHANGELOG.md",
     "docs/project_decisions.md",
     "docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md"
   ],
-  "workflow_status": "step_218_file_attachment_related_record_filters_completed_before_commit_and_push",
+  "workflow_status": "step_219_field_observation_attachment_linking_contract_completed_before_commit_and_push",
   "forbidden_scope_added": false
 }

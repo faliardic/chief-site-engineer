@@ -1,5 +1,22 @@
 # Proje Kararlari
 
+## 219 Field Observation Attachment Linking Contract Karari
+
+- Field Observation attachment relationship, yalniz ayni `FileAttachmentRecord` uzerinde `related_record_type == "field_observation"` ve `related_record_id == FieldObservationRecord.observation_id` exact match oldugunda kurulmus sayilir.
+- Iki karsilastirma da case-sensitive string equality ile yapilir; trim, normalize, parse, map, alias veya prefix inference uygulanmaz.
+- `"field_observation"` literal degeri, bu contract icin Field MVP attachment relationship type degeridir; global enum, constant set, model validation veya migration eklenmez.
+- Bir `FieldObservationRecord` sifir, bir veya cok attachment metadata kaydina sahip olabilir; attachment relationship alanlarinin sahibi `FileAttachmentRecord` olarak kalir.
+- `FieldObservationRecord` icine attachment id listesi, reverse collection veya embedded attachment data eklenmez.
+- `attachment_id`, attachment repository identity alani olarak kalir ve mevcut duplicate rejection kurallari korunur.
+- Model ve repository katmani referenced observation var mi diye kontrol etmez; missing observation reference gorunur metadata durumudur, otomatik red veya onarim sebebi degildir.
+- Step 218 bagimsiz `list_by_related_record_type(...)` ve `list_by_related_record_id(...)` filtreleri implemented kalir; bunlar tek basina guvenli combined relationship query olarak sunulmaz.
+- Future `list_by_related_record(related_record_type, related_record_id)` helper'i, ileride uygulanirsa iki exact kosulu ayni metadata record uzerinde birlikte aramalidir.
+- Future `list_for_field_observation(observation_id)` helper'i, ileride uygulanirsa `("field_observation", observation_id)` exact pair davranisina denk olmalidir.
+- Step 218, PR #53 squash merge commit `62b95867165f5ff6b3aec85fc841557bc678df42` ile latest merged/finalized safe point'tir; Issue #52 completed olarak kaydedilir.
+- Podcast 033 latest completed podcast olarak Steps 211-215 araligini kapsar; sonraki besli podcast araligi Steps 216-220 olur.
+- Step 219, Issue #54 ve `step-219-field-observation-attachment-linking-contract` branch'i uzerinde aktif unmerged documentation/state/learning contract isidir.
+- Production code, executable tests, combined related-record filter, FieldObservation convenience lookup, physical file operations, persistence, lifecycle behavior, validation/enums/constants, API/GUI/CLI, audit/history/task/NCR/decision generation, generated `blocked`, Step 220 ve Podcast 034 uygulanmamistir.
+
 ## 218 FileAttachmentRepository Related-Record Filtre Karari
 
 - `FileAttachmentRepository`, mevcut `FileAttachmentRecord` metadata nesnelerini `related_record_type` veya `related_record_id` alanina gore read-only listeleyebilir.

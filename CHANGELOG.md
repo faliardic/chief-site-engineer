@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 219
+
+- Added documentation-only Field Observation attachment linking contract for existing `FieldObservationRecord` and `FileAttachmentRecord` metadata.
+- Defined that a field observation attachment relationship exists only when `related_record_type == "field_observation"` and `related_record_id == FieldObservationRecord.observation_id` are both exact matches on the same `FileAttachmentRecord`.
+- Documented cardinality, relationship ownership, orphan/existence behavior, read-boundary risks of independent filters, future `list_by_related_record(...)` and `list_for_field_observation(...)` boundaries, and the future test matrix.
+- Added `docs/219_field_observation_attachment_linking_contract.md` and `learning/219_field_observation_attachment_linking_contract.md`.
+- Updated repository truth so Step 218 / PR #53 / Issue #52 / merge commit `62b95867165f5ff6b3aec85fc841557bc678df42` is the latest merged/finalized safe point and Step 219 remains active unmerged documentation/state/learning contract work.
+- Kept this scope documentation-only; no production code, executable tests, combined related-record filter, FieldObservation convenience lookup, model fields, validation/enums/constants, physical file operations, persistence, lifecycle behavior, API/GUI/CLI, audit/history/task/NCR/decision generation, generated `blocked`, Step 220, Podcast 034, workflow changes, Actions enablement, ZIP mutation, or Desktop archive mutation was added.
+
 ## Step 218
 
 - Added `FileAttachmentRepository.list_by_related_record_type(...)` and `FileAttachmentRepository.list_by_related_record_id(...)` for exact read-only in-memory metadata visibility.

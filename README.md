@@ -9,8 +9,8 @@ Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici reposit
 Son guvenli nokta:
 
 ```text
-Adim 217 - FileAttachmentRepository baseline
-PR #51 merge commit: 075acdbc77927925092b748b77aad7c0ce13d9ef
+Adim 218 - FileAttachmentRepository related-record filters
+PR #53 merge commit: 62b95867165f5ff6b3aec85fc841557bc678df42
 ```
 
 Guncel test sonucu:
@@ -22,10 +22,10 @@ Guncel test sonucu:
 Mevcut calisma durumu:
 
 ```text
-Adim 218 - FileAttachmentRepository related-record filters
+Adim 219 - Field Observation attachment linking contract
 ```
 
-Adim 217, PR #51 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 218, mevcut `FileAttachmentRecord` metadata nesnelerini `related_record_type` ve `related_record_id` alanlariyla read-only listeleyen aktif unmerged isidir.
+Adim 218, PR #53 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 219, `FieldObservationRecord` ile mevcut `FileAttachmentRecord` metadata kayitlari arasindaki attachment linking contract'ini dokumante eden aktif unmerged documentation/state/learning isidir.
 
 ## Repo Koku
 
@@ -77,6 +77,7 @@ Adim 205 itibariyla proje su alanlarda ilerlemistir:
 - Minimal `FieldObservationRecord` dataclass ve focused value/default testleri.
 - Minimal bellek ici `FieldObservationRepository` baseline'i; add/list/count/find ve duplicate `observation_id` reddi.
 - Minimal bellek ici `FileAttachmentRepository` baseline'i; add/list/count/find, duplicate `attachment_id` reddi ve read-only exact `related_record_type` / `related_record_id` filtreleri.
+- Field Observation attachment linking contract: `related_record_type == "field_observation"` ve `related_record_id == FieldObservationRecord.observation_id` exact pair iliskisi documentation-only olarak tanimlandi.
 - `FieldObservationRepository` icin read-only exact `project_id` ve `status` filtreleri.
 - `FieldObservationRepository` icin read-only exact `location` ve `category` filtreleri.
 - `FieldObservationRepository` icin explicit `update_status(observation_id, new_status)` davranisi.
@@ -124,7 +125,7 @@ Podcast 033, latest completed podcast olarak Steps 211-215 araligini kapsar. Son
 
 ## Kalite Kontrol ve CI Durumu
 
-- Guncel merged safe point test tabani `453 passed` olarak dogrulanir; Step 218 branch'inde local test seviyesi `461 passed` olarak dogrulanir.
+- Guncel merged safe point test tabani `461 passed` olarak dogrulanir; Step 219 documentation-only branch'inde local test seviyesi `461 passed` olarak korunur.
 - `.github/workflows/pytest.yml` GitHub Actions workflow'u repoda bulunur.
 - Otomatik Actions calismasi account billing/runner-start kisiti nedeniyle manuel olarak devre disidir.
 - Required status checks etkin degildir.
@@ -218,7 +219,7 @@ Bu proje ayni zamanda Python ve yazilim gelistirme ogrenim arsivi uretir.
 
 ## Sonraki Urun Yonu
 
-Adim 218 branch calismasi boyunca ilk urun yonu, veri omurgasini guvenilir tutan dar bir saha MVP'sidir:
+Adim 219 branch calismasi boyunca ilk urun yonu, veri omurgasini guvenilir tutan dar bir saha MVP'sidir:
 
 - hizli observation kaydi,
 - attachment,
@@ -228,4 +229,4 @@ Adim 218 branch calismasi boyunca ilk urun yonu, veri omurgasini guvenilir tutan
 - daily export,
 - weekly summary.
 
-CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. `FieldObservationRecord`, minimal bellek ici `FieldObservationRepository` baseline'i, observation repository icinde read-only exact filtreler, explicit status/reporting update davranislari ve minimal bellek ici `FileAttachmentRepository` metadata baseline'i implement edilmis durumdadir. Attachment repository artik `related_record_type` ve `related_record_id` alanlari icin bagimsiz exact filtreler de saglar; persistence, broader filters/mutations, automatic lifecycle rules, contact normalization, observation-specific attachment linking, combined attachment filter, physical file operations, export/reporting, API/GUI/CLI, audit ve ek validation henuz eklenmemistir.
+CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. `FieldObservationRecord`, minimal bellek ici `FieldObservationRepository` baseline'i, observation repository icinde read-only exact filtreler, explicit status/reporting update davranislari ve minimal bellek ici `FileAttachmentRepository` metadata baseline'i implement edilmis durumdadir. Attachment repository artik `related_record_type` ve `related_record_id` alanlari icin bagimsiz exact filtreler de saglar. Field Observation attachment linking contract documentation-only olarak tanimlanmistir; persistence, broader filters/mutations, automatic lifecycle rules, contact normalization, implemented observation-specific attachment lookup, combined attachment filter, physical file operations, export/reporting, API/GUI/CLI, audit ve ek validation henuz eklenmemistir.
