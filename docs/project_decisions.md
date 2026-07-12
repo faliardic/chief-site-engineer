@@ -1,5 +1,22 @@
 # Proje Kararlari
 
+## 220 FileAttachmentRepository Combined Related-Record Filter Karari
+
+- `FileAttachmentRepository.list_by_related_record(related_record_type, related_record_id)` exact combined filtre olarak eklendi.
+- Method yalniz mevcut bellek ici `_records` listesini okur.
+- Bir `FileAttachmentRecord`, yalniz ayni record uzerinde `record.related_record_type == related_record_type` ve `record.related_record_id == related_record_id` exact match oldugunda sonuc listesine girer.
+- Karsilastirmalar case-sensitive calisir; trim, normalize, parse, map, alias, prefix inference, validation veya fallback yapilmaz.
+- Empty repository, unknown pair ve partial match durumlari icin `[]` dondurulur.
+- Sonuclar insertion order'i korur ve her cagri yeni liste dondurur.
+- Donen elemanlar ayni stored `FileAttachmentRecord` nesneleridir; metadata alanlari kopyalanmaz veya mutate edilmez.
+- Related record'un gercekten var olup olmadigi repository tarafindan kontrol edilmez.
+- Step 218 independent `list_by_related_record_type(...)` ve `list_by_related_record_id(...)` filtreleri degismeden kalir.
+- Step 219 Field Observation attachment linking contract implemented/documented truth olarak korunur; `list_for_field_observation(...)` convenience helper eklenmez.
+- Step 219, PR #56 squash merge commit `4d006a2f49f10792a74dca068ea415ba37200797` ile latest merged/finalized safe point'tir; Issue #54 completed olarak kaydedilir.
+- Podcast 033 latest completed podcast olarak Steps 211-215 araligini kapsar; Step 220 merge edildikten sonra Podcast 034 icin dogal aralik Steps 216-220 olur.
+- Step 220, Issue #57 ve `step-220-file-attachment-combined-related-record-filter` branch'i uzerinde aktif unmerged combined related-record filter isidir.
+- Record-type-specific convenience lookup, relationship existence validation, physical file operations, persistence, lifecycle behavior, model fields, validation/enums/constants, API/GUI/CLI, audit/history/task/NCR/decision generation, generated `blocked`, Step 221 ve Podcast 034 uygulanmamistir.
+
 ## 219 Field Observation Attachment Linking Contract Karari
 
 - Field Observation attachment relationship, yalniz ayni `FileAttachmentRecord` uzerinde `related_record_type == "field_observation"` ve `related_record_id == FieldObservationRecord.observation_id` exact match oldugunda kurulmus sayilir.

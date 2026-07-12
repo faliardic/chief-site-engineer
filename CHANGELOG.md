@@ -1,5 +1,14 @@
 # Changelog
 
+## Step 220
+
+- Added `FileAttachmentRepository.list_by_related_record(...)` for exact combined related-record metadata filtering.
+- Added focused repository tests for exact type+ID pair matching, same-id/different-type exclusion, same-type/different-id exclusion, case/whitespace sensitivity, empty/unknown results, new-list behavior, same-object returns, metadata non-mutation, count/order stability, missing related-record non-validation, and existing repository regression coverage.
+- Added `docs/220_file_attachment_repository_combined_related_record_filter.md` and `learning/220_file_attachment_repository_combined_related_record_filter.md`.
+- Updated repository truth so Step 219 / PR #56 / Issue #54 / merge commit `4d006a2f49f10792a74dca068ea415ba37200797` is the latest merged/finalized safe point and Step 220 remains active unmerged combined related-record filter work.
+- Recorded that Podcast 033 remains the latest completed podcast and that Podcast 034 is the next natural documentation step after Step 220 merges, covering Steps 216-220.
+- Kept this scope narrow; no `list_for_field_observation(...)`, record-type-specific convenience lookup, related-record existence validation, physical file operations, persistence, lifecycle behavior, model fields, validation/enums/constants, API/GUI/CLI, audit/history/task/NCR/decision generation, generated `blocked`, Step 221, Podcast 034, workflow changes, Actions enablement, ZIP mutation, or Desktop archive mutation was added.
+
 ## Step 219
 
 - Added documentation-only Field Observation attachment linking contract for existing `FieldObservationRecord` and `FileAttachmentRecord` metadata.
