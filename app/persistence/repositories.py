@@ -1,10 +1,12 @@
 """Repository ports and SQLite adapters for the first persistent Field MVP."""
 
 import sqlite3
+import re
 from collections.abc import Callable
 from typing import NoReturn, Protocol
 
 from app.models import FieldObservationRecord
+from app.storage.paths import validate_attachment_relative_path
 
 from .contracts import (
     INITIAL_REVISION,
@@ -26,6 +28,7 @@ from .errors import (
 )
 from .records import (
     OBSERVATION_EVENT_TYPES,
+    AttachmentMetadataRecord,
     ObservationEventRecord,
     ProjectRecord,
     canonicalize_event_payload_json,
@@ -92,6 +95,21 @@ class ObservationEventRepositoryPort(Protocol):
         self,
         observation_id: str,
     ) -> list[ObservationEventRecord]: ...
+
+
+class AttachmentMetadataRepositoryPort(Protocol):
+    """Persistence-neutral managed attachment metadata contract."""
+
+    def add(self, record: AttachmentMetadataRecord) -> None: ...
+
+    def get(self, attachment_id: str) -> AttachmentMetadataRecord: ...
+
+    def list_for_observation(
+        self,
+        observation_id: str,
+    ) -> list[AttachmentMetadataRecord]: ...
+
+    def list_all(self) -> list[AttachmentMetadataRecord]: ...
 
 
 class _SQLiteRepository:
@@ -479,6 +497,91 @@ class SQLiteObservationEventRepository(_SQLiteRepository):
         return [_row_to_event(row) for row in rows]
 
 
+class SQLiteAttachmentMetadataRepository(_SQLiteRepository):
+    """SQLite adapter for managed attachment metadata."""
+
+    def add(self, record: AttachmentMetadataRecord) -> None:
+        self._require_transaction()
+        _validate_attachment_metadata(record)
+        try:
+            self._connection.execute(
+                """
+                INSERT INTO attachments (
+                    id,
+                    observation_id,
+                    original_name,
+                    stored_relative_path,
+                    sha256,
+                    size_bytes,
+                    mime_type,
+                    status,
+                    created_at,
+                    created_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.attachment_id,
+                    record.observation_id,
+                    record.original_name,
+                    record.stored_relative_path,
+                    record.sha256,
+                    record.size_bytes,
+                    record.mime_type,
+                    record.status,
+                    record.created_at,
+                    record.created_by,
+                ),
+            )
+        except sqlite3.IntegrityError as exc:
+            _raise_integrity_error(exc, "attachment metadata")
+
+    def get(self, attachment_id: str) -> AttachmentMetadataRecord:
+        self._ensure_active()
+        _validate_id(attachment_id, "attachment_id")
+        row = self._connection.execute(
+            """
+            SELECT id, observation_id, original_name, stored_relative_path,
+                   sha256, size_bytes, mime_type, status, created_at, created_by
+            FROM attachments
+            WHERE id = ?
+            """,
+            (attachment_id,),
+        ).fetchone()
+        if row is None:
+            raise RecordNotFound("attachment metadata", attachment_id)
+        return _row_to_attachment_metadata(row)
+
+    def list_for_observation(
+        self,
+        observation_id: str,
+    ) -> list[AttachmentMetadataRecord]:
+        self._ensure_active()
+        _validate_id(observation_id, "observation_id")
+        rows = self._connection.execute(
+            """
+            SELECT id, observation_id, original_name, stored_relative_path,
+                   sha256, size_bytes, mime_type, status, created_at, created_by
+            FROM attachments
+            WHERE observation_id = ?
+            ORDER BY created_at, id
+            """,
+            (observation_id,),
+        )
+        return [_row_to_attachment_metadata(row) for row in rows]
+
+    def list_all(self) -> list[AttachmentMetadataRecord]:
+        self._ensure_active()
+        rows = self._connection.execute(
+            """
+            SELECT id, observation_id, original_name, stored_relative_path,
+                   sha256, size_bytes, mime_type, status, created_at, created_by
+            FROM attachments
+            ORDER BY created_at, id
+            """
+        )
+        return [_row_to_attachment_metadata(row) for row in rows]
+
+
 def _row_to_project(row: sqlite3.Row) -> ProjectRecord:
     return ProjectRecord(
         project_id=row["id"],
@@ -517,6 +620,21 @@ def _row_to_event(row: sqlite3.Row) -> ObservationEventRecord:
         actor=row["actor"],
         occurred_at=row["occurred_at"],
         payload_json=row["payload_json"],
+    )
+
+
+def _row_to_attachment_metadata(row: sqlite3.Row) -> AttachmentMetadataRecord:
+    return AttachmentMetadataRecord(
+        attachment_id=row["id"],
+        observation_id=row["observation_id"],
+        original_name=row["original_name"],
+        stored_relative_path=row["stored_relative_path"],
+        sha256=row["sha256"],
+        size_bytes=row["size_bytes"],
+        mime_type=row["mime_type"],
+        status=row["status"],
+        created_at=row["created_at"],
+        created_by=row["created_by"],
     )
 
 
@@ -577,6 +695,35 @@ def _validate_required_text(value: str, field_name: str) -> None:
 def _validate_revision(value: int) -> None:
     if not isinstance(value, int) or isinstance(value, bool) or value < 1:
         raise InvalidRecordError("expected_revision must be an integer >= 1")
+
+
+def _validate_attachment_metadata(record: AttachmentMetadataRecord) -> None:
+    _validate_id(record.attachment_id, "attachment_id")
+    _validate_id(record.observation_id, "observation_id")
+    _validate_required_text(record.original_name, "original_name")
+    try:
+        validate_attachment_relative_path(
+            record.stored_relative_path,
+            record.observation_id,
+            record.attachment_id,
+        )
+    except ValueError as exc:
+        raise InvalidRecordError(f"stored_relative_path: {exc}") from exc
+    if re.fullmatch(r"[0-9a-f]{64}", record.sha256) is None:
+        raise InvalidRecordError("sha256 must be 64 lowercase hexadecimal characters")
+    if (
+        not isinstance(record.size_bytes, int)
+        or isinstance(record.size_bytes, bool)
+        or record.size_bytes < 0
+    ):
+        raise InvalidRecordError("size_bytes must be an integer >= 0")
+    if record.mime_type is not None:
+        _validate_required_text(record.mime_type, "mime_type")
+    if record.status != "active":
+        raise InvalidRecordError("new attachment status must be 'active'")
+    _validate_timestamp(record.created_at, "created_at")
+    if record.created_by is not None:
+        _validate_required_text(record.created_by, "created_by")
 
 
 def _raise_integrity_error(

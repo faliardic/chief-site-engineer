@@ -24,6 +24,22 @@ class ProjectRecord:
 
 
 @dataclass(frozen=True)
+class AttachmentMetadataRecord:
+    """Persistent metadata for one managed attachment binary."""
+
+    attachment_id: str
+    observation_id: str
+    original_name: str
+    stored_relative_path: str
+    sha256: str
+    size_bytes: int
+    mime_type: str | None
+    status: str
+    created_at: str
+    created_by: str | None
+
+
+@dataclass(frozen=True)
 class ObservationEventRecord:
     """Append-only observation event record."""
 

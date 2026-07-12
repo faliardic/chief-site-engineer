@@ -116,6 +116,18 @@ def test_repository_reference_rejects_use_after_context_exit(tmp_path: Path) -> 
         projects.list_all()
 
 
+def test_attachment_repository_reference_rejects_use_after_context_exit(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "closed-attachment-connection.sqlite3"
+
+    with SQLiteUnitOfWork(database_path) as unit_of_work:
+        attachments = unit_of_work.attachments
+
+    with pytest.raises(UnitOfWorkStateError, match="no longer active"):
+        attachments.list_all()
+
+
 def test_commit_requires_active_transaction(tmp_path: Path) -> None:
     unit_of_work = SQLiteUnitOfWork(tmp_path / "commit-state.sqlite3")
 
