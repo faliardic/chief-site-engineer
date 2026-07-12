@@ -1,5 +1,16 @@
 # Changelog
 
+## Step 224
+
+- Added the permanent NotebookLM interpretation contract and stable rolling website source path.
+- Added a deterministic, offline UTF-8 generator that selects the latest numbered podcast note, includes it in full, derives separate summaries for canonical Steps 001-223, and writes a matching manifest.
+- Added clear failure contracts for malformed filenames/ranges, duplicate podcast numbers, missing instructions, missing notes, missing required sections, incomplete canonical step history, and invalid safe-point state.
+- Added focused tests for latest-note selection, full-content inclusion, separate step headings, manifest count, determinism, failure cases, historical-note immutability, network/filesystem boundaries, and Turkish UTF-8 preservation.
+- Verified `15 passed` focused generator tests and `494 passed` full local tests.
+- Added the permanent Codex model, reasoning-level, and selection-reason policy to canonical project instructions and state.
+- Recorded Step 223 / PR #65 / Issue #63 / merge commit `932dbf3ffd076ddc124825adce78226d2ce8fb57` as the latest merged/finalized safe point with `479 passed` baseline evidence.
+- Kept Podcast 034 as latest and did not create Podcast 035; no NotebookLM API/browser/upload/audio automation, product UI/API/CLI, workflow, ZIP, Desktop archive, historical podcast, or exports mutation was added.
+
 ## Step 223
 
 - Added `FileAttachmentRepository.list_for_field_observation(observation_id)` as a Field Observation-specific convenience lookup.

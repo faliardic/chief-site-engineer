@@ -940,45 +940,50 @@ Gerçek şantiye
 
 ### Son doğrulanmış merged GitHub noktası
 
-- Step: **222**
-- PR: **#62**
-- Issue: **#61**
+- Step: **223**
+- PR: **#65**
+- Issue: **#63**
 - Merge commit:
 
 ```text
-8ba82cf2109df9d8cd385a5c38ee58a637afba9c
+932dbf3ffd076ddc124825adce78226d2ce8fb57
 ```
 
-- Latest merged safe point test seviyesi: **471 passed**
-- Aktif Step 223 yerel test seviyesi: **479 passed**
+- Latest merged safe point test seviyesi: **479 passed**
+- Aktif Step 224 focused generator test seviyesi: **15 passed**
+- Aktif Step 224 full local test seviyesi: **494 passed**
 - GitHub Actions: manuel olarak devre dışı
 - Podcast 034: Steps 216-220 latest completed podcast
 - Next podcast range: Steps 221-225
 
 ### Yerel senkronizasyon durumu
 
-Step 223 baslangicinda resmî `V:` yerel master `8ba82cf2109df9d8cd385a5c38ee58a637afba9c` commit'ine fast-forward edildi ve `origin/master...master` divergence `0 0` olarak dogrulandi.
+Step 224 baslangicinda resmî `V:` yerel master `932dbf3ffd076ddc124825adce78226d2ce8fb57` commit'ine fast-forward edildi ve `origin/master...master` divergence `0 0` olarak dogrulandi.
 
 ### Aktif iş
 
-- Step: **223**
-- Issue: **#63**
-- Amaç: Field Observation attachment convenience lookup helper'ini implementation ve focused tests ile eklemek
+- Step: **224**
+- Issue: **#64**
+- Amaç: NotebookLM icin permanent instruction, stable rolling source, deterministic generator, manifest ve regression testleri kurmak
 - Branch:
 
 ```text
-step-223-field-observation-attachment-convenience-lookup
+step-224-notebooklm-rolling-podcast-source
 ```
 
-- Bu adim dar kapsamli production code, focused test, documentation, learning ve state isidir.
+- Bu adim generator, executable regression tests, documentation, learning ve state isidir; ana CSE urun davranisini genisletmez.
 - `FieldObservationRecord` halen tek Field-MVP model implementasyonudur.
 - `FieldObservationRepository` baseline-level bellek ici repository'dir; project/status/location/category exact filtreleri, explicit status update ve explicit reporting-context update davranisi vardir.
 - `FileAttachmentRepository` mevcut `FileAttachmentRecord` metadata nesneleri icin minimal bellek ici repository baseline'i saglar; `add`, `list_all`, `list_by_related_record_type`, `list_by_related_record_id`, `list_by_related_record`, `list_for_field_observation`, `count` ve `find_by_id` method'lari vardir.
 - `FileAttachmentRepository` related-record filtreleri exact, case-sensitive ve read-only'dir; combined type+id filter ayni metadata record uzerinde iki alanin birlikte eslesmesini gerektirir. Field Observation convenience lookup, `list_by_related_record("field_observation", observation_id)` delegasyonu olarak uygulanir.
 - Field Observation attachment relationship, documentation-only olarak yalniz `related_record_type == "field_observation"` ve `related_record_id == FieldObservationRecord.observation_id` exact pair kosuluyla tanimlanir.
-- Step 223 branch'inde `list_for_field_observation(observation_id)` helper'i uygulanir ve focused tests ile dogrulanir; helper ikinci bir `_records` filtering implementation'i eklemez.
+- `docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md`, NotebookLM icin canonical rolling source ve stable public URL path'idir.
+- Generator latest numbered podcast notunu full content olarak ekler; current safe point'e kadar her teknik adimi ayri baslikla ozetler ve manifest count ile dogrular.
+- Podcast 034 legacy note contract ile latest kalir; Podcast 035 ve sonrasi yeni 12 bolumlu note contract'i izler.
+- NotebookLM saved website source auto-refresh davranisi dogrulanmamistir; repository yalniz stable URL ve current file content sozlesmesini garanti eder.
+- Her Codex instruction model, reasoning level ve secim nedenini aciklar; contract/regression-sensitive islerde current selector'daki en guclu full Codex model ve `extra high` kullanilir.
 - Persistence, physical file operations, broader filters/mutations, automatic lifecycle rules, structured location/contact normalization, export/reporting consumers, API/GUI/CLI, audit ve ek validation henuz uygulanmamistir.
-- Podcast 035 ve Step 224 baslatilmamistir.
+- Podcast 035 olusturulmamistir; NotebookLM API/browser/upload/audio automation uygulanmamistir.
 
 ---
 
@@ -1016,7 +1021,7 @@ step-223-field-observation-attachment-convenience-lookup
 
 ### 29.7 Eski aktif Step bilgileri
 
-Step 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, aktif Step 215, aktif Step 216, aktif Step 217, aktif Step 218, aktif Step 219, aktif Step 220, aktif Step 221 ve aktif Step 222 bilgisi taşıyan kaynaklar tarihsel duruma düşmüştür. Güncel merged safe point Step 222'dir; Step 223 aktif unmerged Field Observation attachment convenience lookup implementation/test aşamasındadır.
+Step 203-222 arasini veya Step 223'u aktif is olarak gosteren kaynaklar tarihsel duruma dusmustur. Guncel merged safe point Step 223'tur; Step 224 aktif unmerged rolling NotebookLM source generator/test/protocol asamasindadir.
 
 ### 29.8 Eski modül sırasının bağlayıcı olması
 

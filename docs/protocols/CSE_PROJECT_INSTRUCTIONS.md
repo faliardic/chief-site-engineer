@@ -361,7 +361,9 @@ Her adımda aşağıdaki dosyalar kullanılır:
 - Resmî yerel repo yolu
 - Beklenen base commit
 - Branch adı
+- Codex model secimi
 - Reasoning seviyesi
+- Model/reasoning secim nedeni
 - Yetkili dosyalar
 - Yapılacak iş
 - Yasak kapsam
@@ -446,12 +448,24 @@ Resmî yerel repository project-file changes için execution source, GitHub ise 
 
 ---
 
-## 14. Reasoning Seviyesi
+## 14. Codex Modeli ve Reasoning Seviyesi
+
+Her yeni Codex instruction ve `.cse/tasks/<step>_task.md` kaydi acikca su uc bilgiyi tasir:
+
+1. Codex model secimi
+2. Reasoning seviyesi
+3. Model ve seviyenin neden secildigi
+
+Model isimleri UI'da degisebilecegi icin obsolete hard-coded model adi korunmaz; kullanicinin current Codex selector'unda gorunen tam etiket kullanilir.
 
 - **High:** dokümantasyon-only adımlar, rutin Git/GitHub durumu, protokol/state güncellemeleri.
 - **Extra High:** Python mantığı, veri sözleşmeleri, parser/formatter, test matrisi, CLI, migration sınırları, regresyon riski ve karmaşık CI tanısı.
 
-Her Issue ve task dosyasında Codex ve ChatGPT review seviyesi açıkça yazılır.
+- Documentation-only, routine verification, commit/push ve low-risk state sync icin selector'daki standard full Codex model ve `high` reasoning kullanilir.
+- Production code, executable tests, generator scripts, contracts, regressions, migrations veya multi-file behavior changes icin selector'daki en guclu full Codex model ve `extra high` reasoning kullanilir.
+- Contract-defining veya regression-sensitive CSE islerinde Spark, fast veya lightweight varyant secilmez.
+
+Her Issue ve task dosyasında model, reasoning ve secim gerekcesi acikca yazilir.
 
 ---
 
@@ -498,34 +512,34 @@ Güncel kural:
 
 ### Son güvenli GitHub noktası
 
-- Tamamlanan adım: **Step 206**
-- Merge edilen PR: **#29**
-- Tamamlanan Issue: **#28**
+- Tamamlanan adım: **Step 223**
+- Merge edilen PR: **#65**
+- Tamamlanan Issue: **#63**
 - `master` commit:
 
 ```text
-3b05fae76766cedc8840eea6c0fc2f51440354e4
+932dbf3ffd076ddc124825adce78226d2ce8fb57
 ```
 
-- Son doğrulanan yerel test sonucu: **413 passed**
+- Son doğrulanan yerel test sonucu: **479 passed**
 - GitHub Actions: workflow mevcut, otomatik execution manuel olarak devre dışı
 
 ### Aktif iş
 
-- Issue: **#30**
-- Adım: **Step 207 — Unified project source and Codex invocation policy**
+- Issue: **#64**
+- Adım: **Step 224 — Rolling NotebookLM podcast source protocol**
 - Branch:
 
 ```text
-step-207-codex-invocation-policy
+step-224-notebooklm-rolling-podcast-source
 ```
 
-- Kapsam: **documentation/state/protocol-only**
-- Reasoning: **High**
-- Bu adim unified project source, source register, GitHub-native new-chat bootstrap ve Codex invocation / batched execution policy ekler.
-- Podcast 031 son podcast notudur; sonraki podcast araligi Steps 206-210'dur.
-- Field-MVP implementation baslamadi.
-- Step 207 merge iddiasi, PR creation, merge veya product implementation bu aktif is kapsaminda yazilmaz.
+- Kapsam: **generator/tests/documentation/learning/state**
+- Codex modeli: **current selector'daki en guclu full Codex model; Spark/fast/lightweight degil**
+- Reasoning: **Extra High**
+- Secim nedeni: deterministic generator, cumulative history, manifest, UTF-8 ve failure/regression contracts.
+- Podcast 034 son podcast notudur; sonraki podcast araligi Steps 221-225'tir.
+- Step 224 merge iddiasi, PR creation, merge, Podcast 035 veya ana urun behavior bu aktif is kapsaminda yazilmaz.
 
 Bu bölüm proje ilerledikçe güncellenir; yukarıdaki kalıcı kurallar değişmez.
 

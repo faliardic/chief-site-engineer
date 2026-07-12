@@ -9,23 +9,23 @@ Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici reposit
 Son guvenli nokta:
 
 ```text
-Adim 222 - Field Observation attachment convenience lookup boundary
-PR #62 merge commit: 8ba82cf2109df9d8cd385a5c38ee58a637afba9c
+Adim 223 - Field Observation attachment convenience lookup
+PR #65 merge commit: 932dbf3ffd076ddc124825adce78226d2ce8fb57
 ```
 
 Guncel test sonucu:
 
 ```text
-471 passed
+479 passed
 ```
 
 Mevcut calisma durumu:
 
 ```text
-Adim 223 - Field Observation attachment convenience lookup
+Adim 224 - Rolling NotebookLM podcast source protocol
 ```
 
-Adim 222, PR #62 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 223, `FileAttachmentRepository.list_for_field_observation(observation_id)` convenience lookup helper'ini ve focused regression testlerini ekleyen aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Adim 223, PR #65 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 224, NotebookLM icin kalici talimat, degismeyen rolling website source yolu, deterministic generator, manifest ve regression testleri ekleyen aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
 
 ## Repo Koku
 
@@ -46,6 +46,8 @@ Proje su ana parcalardan olusur:
 - `docs/`: Adim bazli karar, kapsam, politika, denetim ve kullanim dokumantasyonu.
 - `learning/`: Python ve proje ogrenim notlari.
 - `docs/podcast_notes/`: NotebookLM podcast kaynak notlari.
+- `docs/notebooklm/`: Kalici NotebookLM talimati, rolling source ve manifest.
+- `scripts/build_notebooklm_podcast_source.py`: En guncel podcast notu ile canonical proje gecmisinden rolling source ureten deterministic generator.
 - `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`: Urun amaci, strateji, veri ilkeleri, urun katmanlari, roadmap ve uzun vadeli mimari icin birlesik ust kaynak.
 - `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`: Git/GitHub/Codex operasyon, safety, verification ve execution protocol kaynagi.
 - `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md`: Yeni chat'in GitHub'dan ZIP/handoff yuklemeden nasil devam edecegini anlatan bootstrap kaynagi.
@@ -125,9 +127,17 @@ Son eklenen podcast notlari:
 
 Podcast 034, latest completed podcast olarak Steps 216-220 araligini kapsar. Sonraki dogal podcast araligi Steps 221-225 olur.
 
+NotebookLM'e bir kez eklenecek stable website source:
+
+```text
+https://raw.githubusercontent.com/faliardic/chief-site-engineer/master/docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md
+```
+
+Generator `python scripts/build_notebooklm_podcast_source.py` komutuyla `docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md` ve `docs/notebooklm/CSE_PODCAST_SOURCE_MANIFEST.json` dosyalarini gunceller. Repository stable URL ve current content sozlesmesini korur; NotebookLM'in kaydedilmis website source'u otomatik yeniledigi dogrulanmamistir ve gerekirse NotebookLM arayuzunde refresh kontrol edilir.
+
 ## Kalite Kontrol ve CI Durumu
 
-- Guncel merged safe point test tabani `471 passed` olarak dogrulanir; Step 223 branch'inde local test seviyesi `479 passed` olarak dogrulanir.
+- Guncel merged safe point test tabani `479 passed` olarak dogrulanir; Step 224 generator focused test paketi `15 passed`, tam yerel suite `494 passed` seviyesindedir.
 - `.github/workflows/pytest.yml` GitHub Actions workflow'u repoda bulunur.
 - Otomatik Actions calismasi account billing/runner-start kisiti nedeniyle manuel olarak devre disidir.
 - Required status checks etkin degildir.
@@ -221,7 +231,7 @@ Bu proje ayni zamanda Python ve yazilim gelistirme ogrenim arsivi uretir.
 
 ## Sonraki Urun Yonu
 
-Adim 220 branch calismasi boyunca ilk urun yonu, veri omurgasini guvenilir tutan dar bir saha MVP'sidir:
+Adim 224 boyunca ilk urun yonu, veri omurgasini guvenilir tutan dar bir saha MVP'sidir:
 
 - hizli observation kaydi,
 - attachment,
@@ -231,4 +241,4 @@ Adim 220 branch calismasi boyunca ilk urun yonu, veri omurgasini guvenilir tutan
 - daily export,
 - weekly summary.
 
-CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. `FieldObservationRecord`, minimal bellek ici `FieldObservationRepository` baseline'i, observation repository icinde read-only exact filtreler, explicit status/reporting update davranislari ve minimal bellek ici `FileAttachmentRepository` metadata baseline'i implement edilmis durumdadir. Attachment repository artik `related_record_type`, `related_record_id` ve exact combined related-record pair icin read-only filtreler saglar. Field Observation attachment linking contract documentation-only olarak tanimlanmistir; persistence, broader filters/mutations, automatic lifecycle rules, contact normalization, implemented observation-specific attachment lookup, Field Observation convenience lookup, physical file operations, export/reporting, API/GUI/CLI, audit ve ek validation henuz eklenmemistir. Step 220 merge edildikten sonra Podcast 034 icin dogal aralik Steps 216-220 olur.
+CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. `FieldObservationRecord`, bellek ici observation repository davranislari ve `FileAttachmentRepository.list_for_field_observation(...)` dahil attachment metadata lookup hatti implement edilmistir. Step 224 ana urun davranisini genisletmez; podcast bilgisini tek stable website source'ta guncel tutan repository-side protokolu kurar. Persistence, physical file operations, export/reporting, API/GUI/CLI, audit ve ek validation henuz eklenmemistir.

@@ -1,0 +1,11 @@
+{
+  "instruction_path": "docs/notebooklm/NOTEBOOKLM_INSTRUCTIONS.md",
+  "latest_note_path": "docs/podcast_notes/034_adim_216_220_notebooklm_podcast_notu.md",
+  "latest_podcast": 34,
+  "latest_safe_point_commit": "932dbf3ffd076ddc124825adce78226d2ce8fb57",
+  "latest_safe_point_step": 223,
+  "latest_step_range": "216-220",
+  "previous_step_summary_count": 223,
+  "rolling_source_path": "docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md",
+  "stable_public_url": "https://raw.githubusercontent.com/faliardic/chief-site-engineer/master/docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md"
+}

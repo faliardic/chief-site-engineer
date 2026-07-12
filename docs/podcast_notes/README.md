@@ -61,71 +61,59 @@ Ornekler:
 - Podcast 031 kapsami: Steps 201-205
 - Podcast 032: `docs/podcast_notes/032_adim_206_210_notebooklm_podcast_notu.md`
 - Podcast 032 kapsami: Steps 206-210
-- Podcast 032 latest completed sayilmasi: Step 211 merge edildikten sonra
-- Podcast 033 active artifact: `docs/podcast_notes/033_adim_211_215_notebooklm_podcast_notu.md`
+- Podcast 033: `docs/podcast_notes/033_adim_211_215_notebooklm_podcast_notu.md`
 - Podcast 033 kapsami: Steps 211-215
-- Podcast 033 latest completed sayilmasi: Step 216 merge edildikten sonra
-- Sonraki besli aralik: Steps 216-220, Step 216 merge edildikten sonra
+- Podcast 034: `docs/podcast_notes/034_adim_216_220_notebooklm_podcast_notu.md`
+- Podcast 034 kapsami: Steps 216-220
+- Latest completed podcast: Podcast 034
+- Sonraki besli aralik: Steps 221-225
 
 Bu factual state yeni podcastler eklendikce guncellenir, ancak burada eski proje asamasi ornekleri veya cabuk bayatlayan "aktif adim" metinleri tutulmaz.
 
-## Podcast Notu Icerigi
+## Rolling NotebookLM Source Protokolu
 
-Her podcast notu su basliklari icermelidir:
+NotebookLM'e her yeni podcast notunu elle eklemek yerine su stable website source bir kez eklenir:
 
 ```text
-# CSE NotebookLM Podcast Notu - Adim XXX-YYY
-
-## 1. Bolumun Ana Konusu
-Bu 5 adimda sistemin hangi ana yetenegi gelisti?
-
-## 2. Kisa Ozet
-5-10 cumlelik genel anlatim.
-
-## 3. Adim Adim Gelisim
-Her adim icin:
-- Adim numarasi
-- Eklenen model / yapi / karar
-- Bu eklemenin amaci
-- Hangi dosyalar guncellendi?
-- Hangi test eklendi?
-- Ogrenme acisindan ne kazandirdi?
-
-## 4. Teknik Kazanimlar
-Bu bolumde ogrenilen Python, test, dataclass, modelleme, dokumantasyon veya proje yonetimi konulari.
-
-## 5. Santiye Sefi Acisindan Anlami
-Bu 5 adim gercek santiye yonetiminde neye karsilik geliyor?
-
-## 6. Sistem Mimarisi Acisindan Anlami
-CHIEF SITE ENGINEER uygulamasi bu 5 adimda nasil daha guclu hale geldi?
-
-## 7. Ozellikle Eklenmeyen Seyler
-Bu aralikta bilincli olarak eklenmeyen seyler:
-- Veritabani
-- API
-- GUI
-- JSON kayit
-- Dosya islemi
-- Buyuk mimari sicrama
-
-## 8. Ogrenme Notlari
-Python learner acisindan onemli dersler.
-
-## 9. Podcast Sunucusu Icin Anlatim Talimati
-NotebookLM podcastinde konusma su tarzda olmali:
-- Turkce anlat
-- Teknik ama anlasilir konus
-- Santiye sefi bakis acisini koru
-- Kod tarafini basitlestirerek acikla
-- Her adimi ayri ayri ama akici bicimde bagla
-- Projenin kucuk, guvenli ve testli ilerledigini vurgula
-- Gereksiz abarti yapma
-- Sanki bir muhendislik gunlugu anlatiliyormus gibi ilerle
-
-## 10. NotebookLM'e Verilecek Kisa Direktif
-Asagidaki metin NotebookLM'e podcast uretimi icin ayrica verilecek.
+https://raw.githubusercontent.com/faliardic/chief-site-engineer/master/docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md
 ```
+
+Permanent instruction, rolling source ve manifest:
+
+```text
+docs/notebooklm/NOTEBOOKLM_INSTRUCTIONS.md
+docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md
+docs/notebooklm/CSE_PODCAST_SOURCE_MANIFEST.json
+```
+
+Yeni podcast notu olusturulduktan ve canonical state guncellendikten sonra su komut calistirilir:
+
+```powershell
+python scripts/build_notebooklm_podcast_source.py
+```
+
+NotebookLM'in saved website source'u otomatik refresh ettigi dogrulanmamistir; gerekirse kullanici NotebookLM arayuzunde refresh durumunu kontrol eder.
+
+## Podcast Notu Icerigi
+
+Podcast 035 ve sonraki her podcast notu en az su basliklari icermelidir:
+
+```text
+1. NotebookLM kullanim talimati / instruction reference
+2. Notun kapsami
+3. Donemin ana temasi
+4. Guncel adimlarin ayrintili anlatimi
+5. Guncel donem ozeti
+6. Onceki Adimlarin Ayri Ayri Ozeti
+7. Birikimli urun ve teknik durum
+8. Test ve guvenli nokta kaniti
+9. Bilerek ertelenenler
+10. Sonraki dogal yon
+11. NotebookLM kisa direktifi
+12. Kapanis sorusu ve kisa cevap
+```
+
+Onceki adimlar bolumunde her canonical adim `### Adim NNN - kisa baslik` biciminde ayri tanimlanir. Generator bu birikimli ozetleri rolling source icinde canonical `CHANGELOG.md`, `ROADMAP.md`, `.cse` state ve tracked step dokumanlarindan yeniden kurar.
 
 ## NotebookLM Podcast Direktifi Sablonu
 
