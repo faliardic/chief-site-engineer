@@ -1,5 +1,17 @@
 # Proje Kararlari
 
+## 222 Field Observation Attachment Convenience Lookup Boundary Karari
+
+- Future `FileAttachmentRepository.list_for_field_observation(observation_id)` helper'i documentation-only olarak planlandi; bu adim helper'i implement etmez.
+- Future helper davranisi `list_by_related_record("field_observation", observation_id)` ile semantic equivalent olacak sekilde tanimlandi.
+- Future implementation icin filtering logic'i kopyalamak yerine existing combined helper'a delegation tercih edilir.
+- Helper exact, case-sensitive ve non-normalizing davranisi korumalidir; trim, parse, map, alias, prefix inference veya validation yapmamalidir.
+- Helper `FieldObservationRepository` sorgulamamali, referenced observation existence validation yapmamali, attachment metadata veya `FieldObservationRecord` mutate etmemelidir.
+- Future test matrix; exact match, partial match rejection, case/whitespace sensitivity, empty/unknown results, new-list behavior, same-object returns, non-mutation, count/order stability, missing existence non-validation, combined helper equivalence ve existing filter regression basliklarini kapsar.
+- Step 221, PR #60 squash merge commit `7c326740ef968e7fda3094eaf04f8dec8ecbf333` ile latest merged/finalized safe point'tir; Issue #59 completed olarak kaydedilir.
+- Step 222, Issue #61 ve `step-222-field-observation-attachment-convenience-lookup-boundary` branch'i uzerinde aktif unmerged documentation/state/learning-only isidir.
+- Production code, executable tests, repository methods, model fields/behavior, constants/enums/validation, automatic attachment creation/linking, physical file operations, persistence, API/GUI/CLI, export/report consumers, audit/history/task/NCR/decision generation, generated `blocked`, Podcast 035 ve Step 223 uygulanmamistir.
+
 ## 221 Podcast 034 Steps 216-220 Karari
 
 - Podcast 034, Steps 216-220 araligi icin documentation/state/podcast-only artifact olarak olusturuldu.
