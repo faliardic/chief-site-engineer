@@ -1,4 +1,5 @@
 import hashlib
+import io
 import os
 from dataclasses import replace
 from pathlib import Path
@@ -13,6 +14,23 @@ from app.storage import (
     SourceFileError,
     UnsafeAttachmentPathError,
 )
+
+
+def test_stage_stream_accepts_empty_file_and_uses_managed_paths(tmp_path: Path) -> None:
+    store = ManagedAttachmentStore(tmp_path / "managed", chunk_size=2)
+    staged = store.stage_stream(
+        io.BytesIO(b""),
+        "../../empty.TXT",
+        OBSERVATION_ID,
+        ATTACHMENT_ID,
+    )
+
+    assert staged.size_bytes == 0
+    assert staged.sha256 == hashlib.sha256(b"").hexdigest()
+    assert staged.final_relative_path == (
+        f"attachments/{OBSERVATION_ID}/{ATTACHMENT_ID}.txt"
+    )
+    assert (store.root / staged.staging_relative_path).is_file()
 
 
 OBSERVATION_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"

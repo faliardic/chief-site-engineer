@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Yeni Gozlem{% endblock %}
+{% block content %}
+<h1>Yeni Gozlem</h1>
+<form method="post" enctype="multipart/form-data">
+  <label>Proje <select name="project_id" required>{% for project in projects %}<option value="{{ project.project_id }}">{{ project.name }}</option>{% endfor %}</select></label>
+  <label>Konum <input name="location" required></label>
+  <label>Kategori <input name="category" required></label>
+  <label>Kisa aciklama <textarea name="description" required></textarea></label>
+  <label>Not <textarea name="notes"></textarea></label>
+  <label>Dosya / fotograf (en fazla 25 MiB) <input type="file" name="upload"></label>
+  <button type="submit">Gozlemi kaydet</button>
+</form>
+{% endblock %}
