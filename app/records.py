@@ -89,6 +89,12 @@ class FileAttachmentRepository:
             and record.related_record_id == related_record_id
         ]
 
+    def list_for_field_observation(
+        self,
+        observation_id: str,
+    ) -> list[FileAttachmentRecord]:
+        return self.list_by_related_record("field_observation", observation_id)
+
     def count(self) -> int:
         return len(self._records)
 

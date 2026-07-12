@@ -788,6 +788,245 @@ def test_file_attachment_repository_combined_related_record_preserves_existing_f
     assert nonconformity_repository.count() == 1
 
 
+def test_file_attachment_repository_field_observation_convenience_delegates_to_combined_helper() -> None:
+    repository = FileAttachmentRepository()
+    delegated_result = [
+        _file_attachment(
+            "att-delegated",
+            related_record_type="field_observation",
+            related_record_id="obs-001",
+        )
+    ]
+    captured_arguments: list[tuple[str, str]] = []
+
+    def fake_list_by_related_record(
+        related_record_type: str,
+        related_record_id: str,
+    ) -> list[FileAttachmentRecord]:
+        captured_arguments.append((related_record_type, related_record_id))
+        return delegated_result
+
+    repository.list_by_related_record = fake_list_by_related_record  # type: ignore[method-assign]
+
+    assert repository.list_for_field_observation("obs-001") is delegated_result
+    assert captured_arguments == [("field_observation", "obs-001")]
+
+
+def test_file_attachment_repository_field_observation_convenience_exact_matches_in_order_and_excludes_partial_matches() -> None:
+    repository = FileAttachmentRepository()
+    first_field_attachment = _file_attachment(
+        "att-001",
+        related_record_type="field_observation",
+        related_record_id="obs-001",
+    )
+    same_id_other_type = _file_attachment(
+        "att-002",
+        related_record_type="nonconformity",
+        related_record_id="obs-001",
+    )
+    same_type_other_id = _file_attachment(
+        "att-003",
+        related_record_type="field_observation",
+        related_record_id="obs-002",
+    )
+    second_field_attachment = _file_attachment(
+        "att-004",
+        related_record_type="field_observation",
+        related_record_id="obs-001",
+    )
+
+    repository.add(first_field_attachment)
+    repository.add(same_id_other_type)
+    repository.add(same_type_other_id)
+    repository.add(second_field_attachment)
+
+    assert repository.list_for_field_observation("obs-001") == [
+        first_field_attachment,
+        second_field_attachment,
+    ]
+
+
+def test_file_attachment_repository_field_observation_convenience_rejects_case_and_whitespace_different_ids() -> None:
+    repository = FileAttachmentRepository()
+    exact_attachment = _file_attachment(
+        "att-001",
+        related_record_type="field_observation",
+        related_record_id="obs-001",
+    )
+    case_variant_attachment = _file_attachment(
+        "att-002",
+        related_record_type="field_observation",
+        related_record_id="OBS-001",
+    )
+    whitespace_variant_attachment = _file_attachment(
+        "att-003",
+        related_record_type="field_observation",
+        related_record_id=" obs-001 ",
+    )
+
+    repository.add(exact_attachment)
+    repository.add(case_variant_attachment)
+    repository.add(whitespace_variant_attachment)
+
+    assert repository.list_for_field_observation("obs-001") == [exact_attachment]
+    assert repository.list_for_field_observation("OBS-001") == [
+        case_variant_attachment
+    ]
+    assert repository.list_for_field_observation("obs-001 ") == []
+    assert repository.list_for_field_observation(" obs-001 ") == [
+        whitespace_variant_attachment
+    ]
+
+
+def test_file_attachment_repository_field_observation_convenience_empty_and_unknown_id_return_empty() -> None:
+    empty_repository = FileAttachmentRepository()
+    repository = FileAttachmentRepository()
+    attachment = _file_attachment(
+        "att-001",
+        related_record_type="field_observation",
+        related_record_id="obs-001",
+    )
+
+    repository.add(attachment)
+
+    assert empty_repository.list_for_field_observation("obs-001") == []
+    assert repository.list_for_field_observation("unknown-observation") == []
+
+
+def test_file_attachment_repository_field_observation_convenience_returns_new_lists_and_external_mutation_does_not_change_contents() -> None:
+    repository = FileAttachmentRepository()
+    first_attachment = _file_attachment(
+        "att-001",
+        related_record_type="field_observation",
+        related_record_id="obs-001",
+    )
+    second_attachment = _file_attachment(
+        "att-002",
+        related_record_type="field_observation",
+        related_record_id="obs-001",
+    )
+
+    repository.add(first_attachment)
+    repository.add(second_attachment)
+
+    listed_records = repository.list_for_field_observation("obs-001")
+    second_listed_records = repository.list_for_field_observation("obs-001")
+    listed_records.clear()
+
+    assert second_listed_records == [first_attachment, second_attachment]
+    assert second_listed_records is not repository.list_for_field_observation(
+        "obs-001"
+    )
+    assert repository.list_for_field_observation("obs-001") == [
+        first_attachment,
+        second_attachment,
+    ]
+
+
+def test_file_attachment_repository_field_observation_convenience_returns_same_objects_without_mutating_metadata() -> None:
+    repository = FileAttachmentRepository()
+    record = _file_attachment(
+        "att-001",
+        related_record_type="field_observation",
+        related_record_id="obs-001",
+        file_name="field-observation-photo.jpg",
+        file_path="attachments/PRJ-001/field_observation/obs-001/field-observation-photo.jpg",
+        file_type="image",
+        mime_type="image/jpeg",
+        uploaded_at="2026-07-13T10:00:00",
+        uploaded_by="Saha muhendisi",
+        original_file_name="IMG_2230.JPG",
+        description="Step 223 convenience lookup fotografi.",
+        notes="Metadata degismemeli.",
+        file_size=6144,
+    )
+
+    repository.add(record)
+    result = repository.list_for_field_observation("obs-001")
+
+    assert result == [record]
+    assert result[0] is record
+    assert record.attachment_id == "att-001"
+    assert record.related_record_type == "field_observation"
+    assert record.related_record_id == "obs-001"
+    assert record.file_name == "field-observation-photo.jpg"
+    assert (
+        record.file_path
+        == "attachments/PRJ-001/field_observation/obs-001/field-observation-photo.jpg"
+    )
+    assert record.file_type == "image"
+    assert record.mime_type == "image/jpeg"
+    assert record.uploaded_at == "2026-07-13T10:00:00"
+    assert record.uploaded_by == "Saha muhendisi"
+    assert record.original_file_name == "IMG_2230.JPG"
+    assert record.description == "Step 223 convenience lookup fotografi."
+    assert record.notes == "Metadata degismemeli."
+    assert record.file_size == 6144
+
+
+def test_file_attachment_repository_field_observation_convenience_keeps_count_order_and_allows_missing_observation_reference() -> None:
+    repository = FileAttachmentRepository()
+    orphan_attachment = _file_attachment(
+        "att-001",
+        related_record_type="field_observation",
+        related_record_id="missing-observation",
+    )
+    nonmatching_attachment = _file_attachment(
+        "att-002",
+        related_record_type="nonconformity",
+        related_record_id="missing-observation",
+    )
+
+    repository.add(orphan_attachment)
+    repository.add(nonmatching_attachment)
+    before_lookup = repository.list_all()
+
+    assert repository.list_for_field_observation("missing-observation") == [
+        orphan_attachment
+    ]
+    assert repository.list_all() == before_lookup
+    assert repository.list_all() == [orphan_attachment, nonmatching_attachment]
+    assert repository.count() == 2
+
+
+def test_file_attachment_repository_field_observation_convenience_matches_combined_helper_and_preserves_existing_filters() -> None:
+    repository = FileAttachmentRepository()
+    field_attachment = _file_attachment(
+        "att-001",
+        related_record_type="field_observation",
+        related_record_id="obs-001",
+    )
+    nonconformity_attachment = _file_attachment(
+        "att-002",
+        related_record_type="nonconformity",
+        related_record_id="obs-001",
+    )
+    other_field_attachment = _file_attachment(
+        "att-003",
+        related_record_type="field_observation",
+        related_record_id="obs-002",
+    )
+
+    repository.add(field_attachment)
+    repository.add(nonconformity_attachment)
+    repository.add(other_field_attachment)
+
+    assert repository.list_for_field_observation(
+        "obs-001"
+    ) == repository.list_by_related_record("field_observation", "obs-001")
+    assert repository.list_by_related_record_type("field_observation") == [
+        field_attachment,
+        other_field_attachment,
+    ]
+    assert repository.list_by_related_record_id("obs-001") == [
+        field_attachment,
+        nonconformity_attachment,
+    ]
+    assert repository.list_by_related_record("field_observation", "obs-002") == [
+        other_field_attachment
+    ]
+
+
 def test_list_records_returns_given_list() -> None:
     records = [
         DailySiteLog(log_id="log-001", project_id="prj-001", date="2026-06-05"),

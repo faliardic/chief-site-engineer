@@ -9,8 +9,8 @@ Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici reposit
 Son guvenli nokta:
 
 ```text
-Adim 221 - Podcast 034 for Steps 216-220
-PR #60 merge commit: 7c326740ef968e7fda3094eaf04f8dec8ecbf333
+Adim 222 - Field Observation attachment convenience lookup boundary
+PR #62 merge commit: 8ba82cf2109df9d8cd385a5c38ee58a637afba9c
 ```
 
 Guncel test sonucu:
@@ -22,10 +22,10 @@ Guncel test sonucu:
 Mevcut calisma durumu:
 
 ```text
-Adim 222 - Field Observation attachment convenience lookup boundary
+Adim 223 - Field Observation attachment convenience lookup
 ```
 
-Adim 221, PR #60 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 222, gelecekteki `FileAttachmentRepository.list_for_field_observation(observation_id)` convenience lookup helper'i icin API boundary ve future test matrix planlayan documentation/state/learning-only aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Adim 222, PR #62 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 223, `FileAttachmentRepository.list_for_field_observation(observation_id)` convenience lookup helper'ini ve focused regression testlerini ekleyen aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
 
 ## Repo Koku
 
@@ -76,9 +76,9 @@ Adim 205 itibariyla proje su alanlarda ilerlemistir:
 - Dosya eki saklama, adlandirma, arsiv guvenligi, silme/tasima karar dokumantasyonu.
 - Minimal `FieldObservationRecord` dataclass ve focused value/default testleri.
 - Minimal bellek ici `FieldObservationRepository` baseline'i; add/list/count/find ve duplicate `observation_id` reddi.
-- Minimal bellek ici `FileAttachmentRepository` baseline'i; add/list/count/find, duplicate `attachment_id` reddi, read-only exact `related_record_type` / `related_record_id` filtreleri ve exact combined `list_by_related_record(...)` filtresi.
+- Minimal bellek ici `FileAttachmentRepository` baseline'i; add/list/count/find, duplicate `attachment_id` reddi, read-only exact `related_record_type` / `related_record_id` filtreleri, exact combined `list_by_related_record(...)` filtresi ve Field Observation convenience `list_for_field_observation(...)` lookup helper'i.
 - Field Observation attachment linking contract: `related_record_type == "field_observation"` ve `related_record_id == FieldObservationRecord.observation_id` exact pair iliskisi documentation-only olarak tanimlandi.
-- Field Observation attachment convenience lookup boundary: future `list_for_field_observation(observation_id)` helper'inin `list_by_related_record("field_observation", observation_id)` ile semantic equivalent kalmasi documentation-only olarak planlandi.
+- Field Observation attachment convenience lookup: `list_for_field_observation(observation_id)` helper'i `list_by_related_record("field_observation", observation_id)` delegasyonu olarak eklendi.
 - `FieldObservationRepository` icin read-only exact `project_id` ve `status` filtreleri.
 - `FieldObservationRepository` icin read-only exact `location` ve `category` filtreleri.
 - `FieldObservationRepository` icin explicit `update_status(observation_id, new_status)` davranisi.
@@ -127,7 +127,7 @@ Podcast 034, latest completed podcast olarak Steps 216-220 araligini kapsar. Son
 
 ## Kalite Kontrol ve CI Durumu
 
-- Guncel merged safe point test tabani `471 passed` olarak dogrulanir; Step 222 branch'i documentation/state/learning-only calismadir ve local test seviyesi `471 passed` olarak korunmalidir.
+- Guncel merged safe point test tabani `471 passed` olarak dogrulanir; Step 223 branch'inde local test seviyesi `479 passed` olarak dogrulanir.
 - `.github/workflows/pytest.yml` GitHub Actions workflow'u repoda bulunur.
 - Otomatik Actions calismasi account billing/runner-start kisiti nedeniyle manuel olarak devre disidir.
 - Required status checks etkin degildir.
