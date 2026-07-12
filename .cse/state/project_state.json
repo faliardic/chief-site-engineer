@@ -1,35 +1,36 @@
 {
-  "step": 224,
+  "step": 225,
   "base_branch": "master",
-  "base_commit": "932dbf3ffd076ddc124825adce78226d2ce8fb57",
+  "base_commit": "68c00edab667bbfd0467f4684921c0f6b453d4a7",
   "active_work": {
-    "issue": 64,
-    "step": 224,
-    "branch": "step-224-notebooklm-rolling-podcast-source",
-    "generator_tests_documentation_learning_state": true,
-    "rolling_notebooklm_source_protocol_implemented": true,
-    "stable_public_source_path_defined": true,
-    "permanent_instruction_contract_defined": true,
-    "merge_claim_for_step_224": false,
-    "podcast_035_created": false,
-    "focused_test_summary": "15 passed",
-    "local_test_summary": "494 passed"
+    "issue": 67,
+    "step": 225,
+    "branch": "step-225-podcast-035-note-summary-contract",
+    "podcast_validation_tests_documentation_learning_state": true,
+    "strict_note_prior_step_summary_contract_implemented": true,
+    "podcast_035_created": true,
+    "podcast_035_prior_step_summary_count": 220,
+    "rolling_source_refreshed_to_podcast_035": true,
+    "merge_claim_for_step_225": false,
+    "step_226_started": false,
+    "focused_test_summary": "24 passed",
+    "local_test_summary": "503 passed"
   },
   "current_safe_point": {
     "semantics": "latest_merged_finalized_checkpoint",
-    "step": 223,
-    "issue": 63,
+    "step": 224,
+    "issue": 64,
     "issue_state": "completed",
-    "pull_request": 65,
+    "pull_request": 66,
     "pull_request_state": "merged",
-    "merge_commit": "932dbf3ffd076ddc124825adce78226d2ce8fb57",
-    "local_test_summary": "479 passed"
+    "merge_commit": "68c00edab667bbfd0467f4684921c0f6b453d4a7",
+    "local_test_summary": "494 passed"
   },
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
-    "local_master_sha": "932dbf3ffd076ddc124825adce78226d2ce8fb57",
-    "origin_master_sha": "932dbf3ffd076ddc124825adce78226d2ce8fb57",
+    "local_master_sha": "68c00edab667bbfd0467f4684921c0f6b453d4a7",
+    "origin_master_sha": "68c00edab667bbfd0467f4684921c0f6b453d4a7",
     "divergence": "0 0",
     "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
     "misspelled_workspace_present": false,
@@ -116,6 +117,11 @@
       "model": "strongest_full_codex_model_visible_in_current_selector",
       "reasoning": "extra_high",
       "reason": "deterministic_generator_cumulative_history_manifest_utf8_failure_contracts_and_regression_tests"
+    },
+    "step_225_selection": {
+      "model": "GPT-5.6 Sol",
+      "reasoning": "extra_high",
+      "reason": "strict_note_summary_contract_executable_regressions_large_self_contained_history_deterministic_outputs_and_multi_file_state"
     }
   },
   "required_source_pre_read": {
@@ -376,6 +382,24 @@
             "roadmap_current_step_titles": true,
             "project_state": true
         },
+        "step_225_sources_read": {
+            "unified_project_source": true,
+            "project_instructions": true,
+            "github_issue_67": true,
+            "github_issue_67_comments": true,
+            "task_225": true,
+            "new_chat_bootstrap": true,
+            "podcast_034": true,
+            "podcast_readme": true,
+            "step_222_documentation": true,
+            "step_223_documentation": true,
+            "step_224_result": true,
+            "rolling_source_generator": true,
+            "rolling_source_tests": true,
+            "changelog_canonical_step_history": true,
+            "roadmap_current_step_titles": true,
+            "project_state": true
+        },
     "unresolved_conflict_found": false
   },
   "canonical_project_instructions": {
@@ -387,7 +411,8 @@
     "root_mirror_staged": false,
     "root_mirror_committed": false,
     "root_mirror_synced_in_step_224": true,
-    "sha256_evidence_location": ".cse/results/224_result.md"
+    "root_mirror_synced_in_step_225": true,
+    "sha256_evidence_location": ".cse/results/225_result.md"
   },
   "github_centered_workflow": {
     "chatgpt_verifies_github_before_next_action": true,
@@ -404,8 +429,17 @@
       "range": "216-220",
       "path": "docs/podcast_notes/034_adim_216_220_notebooklm_podcast_notu.md"
     },
-    "active_artifact": null,
-    "next_five_step_range": "221-225",
+    "active_artifact": {
+      "podcast": 35,
+      "range": "221-225",
+      "path": "docs/podcast_notes/035_adim_221_225_notebooklm_podcast_notu.md",
+      "created": true,
+      "strict_note_contract_valid": true,
+      "prior_step_summary_range": "001-220",
+      "prior_step_summary_count": 220,
+      "step_225_merge_claim": false
+    },
+    "next_five_step_range": "226-230",
     "rolling_source_protocol": {
       "implemented_in_step": 224,
       "instruction_path": "docs/notebooklm/NOTEBOOKLM_INSTRUCTIONS.md",
@@ -413,9 +447,11 @@
       "manifest_path": "docs/notebooklm/CSE_PODCAST_SOURCE_MANIFEST.json",
       "generator_path": "scripts/build_notebooklm_podcast_source.py",
       "stable_public_url": "https://raw.githubusercontent.com/faliardic/chief-site-engineer/master/docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md",
-      "latest_podcast": 34,
-      "latest_step_range": "216-220",
-      "previous_step_summary_count": 223,
+      "latest_podcast": 35,
+      "latest_step_range": "221-225",
+      "latest_note_path": "docs/podcast_notes/035_adim_221_225_notebooklm_podcast_notu.md",
+      "previous_step_summary_count": 224,
+      "latest_note_prior_step_summary_count": 220,
       "network_access": false,
       "deterministic": true,
       "utf8": true,
@@ -451,6 +487,9 @@
     "field_observation_attachment_convenience_lookup_implemented_in_step_223": true,
     "notebooklm_rolling_podcast_source_protocol_implemented_in_step_224": true,
     "podcast_035_created_in_step_224": false,
+    "podcast_035_created_in_step_225": true,
+    "strict_podcast_note_prior_step_summary_contract_implemented_in_step_225": true,
+    "field_mvp_product_behavior_added_in_step_225": false,
     "next_product_direction": {
       "name": "first_field_mvp",
       "scope": [
@@ -655,20 +694,19 @@
         "new_validation_enums_constants",
         "api_gui_cli",
         "audit_history_task_ncr_notification_decision_generation",
-        "generated_blocked",
-        "podcast_035"
+        "generated_blocked"
       ]
     }
   },
   "protected_paths": {
-    "app/models.py": "unchanged_in_step_224",
-    "tests/test_models.py": "unchanged_in_step_224",
-    "app/records.py": "unchanged_in_step_224",
-    "tests/test_records.py": "unchanged_in_step_224",
-    "app/attachment_integrity.py": "unchanged_in_step_224",
-    "tests/test_attachment_integrity.py": "unchanged_in_step_224",
+    "app/models.py": "unchanged_in_step_225",
+    "tests/test_models.py": "unchanged_in_step_225",
+    "app/records.py": "unchanged_in_step_225",
+    "tests/test_records.py": "unchanged_in_step_225",
+    "app/attachment_integrity.py": "unchanged_in_step_225",
+    "tests/test_attachment_integrity.py": "unchanged_in_step_225",
     ".github/workflows/pytest.yml": "unchanged",
-    "docs/podcast_notes/034_adim_216_220_notebooklm_podcast_notu.md": "unchanged_in_step_224"
+    "docs/podcast_notes/034_adim_216_220_notebooklm_podcast_notu.md": "unchanged_in_step_225"
   },
   "exports": {
     "expected_contents": [
@@ -682,18 +720,18 @@
     "pull_request_creation_by_codex": false,
     "merge_authorized": false,
     "branch_deletion_authorized": false,
-    "final_remote_sha_evidence_location": "GitHub Issue #64 completion comment after push"
+    "final_remote_sha_evidence_location": "GitHub Issue #67 completion comment after push"
   },
   "required_files": [
-    ".cse/tasks/224_task.md",
-    ".cse/results/224_result.md",
+    ".cse/tasks/225_task.md",
+    ".cse/results/225_result.md",
     ".cse/state/project_state.json",
-    "docs/notebooklm/NOTEBOOKLM_INSTRUCTIONS.md",
+    "docs/podcast_notes/035_adim_221_225_notebooklm_podcast_notu.md",
     "docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md",
     "docs/notebooklm/CSE_PODCAST_SOURCE_MANIFEST.json",
     "scripts/build_notebooklm_podcast_source.py",
     "tests/test_notebooklm_podcast_source.py",
-    "learning/224_notebooklm_rolling_podcast_source_protocol.md",
+    "learning/225_podcast_035_note_summary_contract.md",
     "learning/GLOSSARY.md",
     "README.md",
     "ROADMAP.md",
@@ -703,6 +741,6 @@
     "docs/protocols/CSE_PROJECT_INSTRUCTIONS.md",
     "docs/podcast_notes/README.md"
   ],
-  "workflow_status": "step_224_notebooklm_rolling_podcast_source_protocol_completed_before_commit_and_push",
+  "workflow_status": "step_225_podcast_035_note_summary_contract_completed_before_commit_and_push",
   "forbidden_scope_added": false
 }

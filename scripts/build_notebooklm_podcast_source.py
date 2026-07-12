@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import json
 import re
 import unicodedata
@@ -22,6 +23,15 @@ STEP_HEADING_PATTERN = re.compile(
 ROADMAP_HEADING_PATTERN = re.compile(
     r"^##\s+Step\s+(?P<step>\d{3})\s+-\s+(?P<title>.+)$",
     re.MULTILINE,
+)
+SECTION_HEADING_PATTERN = re.compile(
+    r"^##(?!#)[ \t]+(?P<title>[^\r\n]+)[ \t]*$",
+    re.MULTILINE,
+)
+PRIOR_STEP_HEADING_PATTERN = re.compile(
+    r"^###[ \t]+Ad[ıi]m[ \t]+(?P<step>\d{3})(?!\d)"
+    r"[ \t]+(?:—|-)[ \t]+[^\r\n]+$",
+    re.IGNORECASE | re.MULTILINE,
 )
 STRICT_REQUIRED_SECTIONS = (
     "notebooklm kullanim talimati",
@@ -89,6 +99,62 @@ def _normalized_heading(value: str) -> str:
     return re.sub(r"[^a-z0-9']+", " ", without_marks).strip()
 
 
+def _find_section_body(text: str, normalized_title: str) -> str:
+    headings = list(SECTION_HEADING_PATTERN.finditer(text))
+    matching_indexes = [
+        index
+        for index, heading in enumerate(headings)
+        if normalized_title in _normalized_heading(heading.group("title"))
+    ]
+    if not matching_indexes:
+        raise PodcastSourceError(
+            f"Strict podcast note is missing section: {normalized_title}"
+        )
+    if len(matching_indexes) > 1:
+        raise PodcastSourceError(
+            f"Strict podcast note has duplicate sections: {normalized_title}"
+        )
+
+    index = matching_indexes[0]
+    start = headings[index].end()
+    end = headings[index + 1].start() if index + 1 < len(headings) else len(text)
+    return text[start:end]
+
+
+def _validate_strict_prior_step_summaries(note: PodcastNote) -> None:
+    section = _find_section_body(
+        note.text,
+        "onceki adimlarin ayri ayri ozeti",
+    )
+    section_steps = [
+        int(match.group("step"))
+        for match in PRIOR_STEP_HEADING_PATTERN.finditer(section)
+    ]
+    expected_steps = list(range(1, note.step_start))
+    expected_set = set(expected_steps)
+    expected_occurrences = [step for step in section_steps if step in expected_set]
+    counts = Counter(expected_occurrences)
+
+    duplicates = [step for step in expected_steps if counts[step] > 1]
+    if duplicates:
+        formatted = ", ".join(f"Adım {step:03d}" for step in duplicates)
+        raise PodcastSourceError(
+            f"Podcast {note.number:03d} has duplicate prior-step headings: {formatted}"
+        )
+
+    missing = [step for step in expected_steps if counts[step] == 0]
+    if missing:
+        formatted = ", ".join(f"Adım {step:03d}" for step in missing)
+        raise PodcastSourceError(
+            f"Podcast {note.number:03d} is missing prior-step headings: {formatted}"
+        )
+
+    if expected_occurrences != expected_steps:
+        raise PodcastSourceError(
+            f"Podcast {note.number:03d} prior-step headings are out of ascending order"
+        )
+
+
 def _validate_note_sections(note: PodcastNote) -> None:
     headings = [
         _normalized_heading(match.group(1))
@@ -107,6 +173,8 @@ def _validate_note_sections(note: PodcastNote) -> None:
         raise PodcastSourceError(
             f"Podcast {note.number:03d} is missing required sections: {missing_text}"
         )
+    if note.number >= 35:
+        _validate_strict_prior_step_summaries(note)
 
 
 def find_latest_podcast_note(notes_dir: Path) -> PodcastNote:

@@ -940,38 +940,38 @@ Gerçek şantiye
 
 ### Son doğrulanmış merged GitHub noktası
 
-- Step: **223**
-- PR: **#65**
-- Issue: **#63**
+- Step: **224**
+- PR: **#66**
+- Issue: **#64**
 - Merge commit:
 
 ```text
-932dbf3ffd076ddc124825adce78226d2ce8fb57
+68c00edab667bbfd0467f4684921c0f6b453d4a7
 ```
 
-- Latest merged safe point test seviyesi: **479 passed**
-- Aktif Step 224 focused generator test seviyesi: **15 passed**
-- Aktif Step 224 full local test seviyesi: **494 passed**
+- Latest merged safe point test seviyesi: **494 passed**
+- Aktif Step 225 focused generator test seviyesi: **24 passed**
+- Aktif Step 225 full local test seviyesi: **503 passed**
 - GitHub Actions: manuel olarak devre dışı
-- Podcast 034: Steps 216-220 latest completed podcast
-- Next podcast range: Steps 221-225
+- Podcast 035: Steps 221-225 latest generated/active podcast source
+- Next podcast range after Step 225: Steps 226-230
 
 ### Yerel senkronizasyon durumu
 
-Step 224 baslangicinda resmî `V:` yerel master `932dbf3ffd076ddc124825adce78226d2ce8fb57` commit'ine fast-forward edildi ve `origin/master...master` divergence `0 0` olarak dogrulandi.
+Step 225 baslangicinda resmî `V:` yerel master `68c00edab667bbfd0467f4684921c0f6b453d4a7` commit'ine fast-forward edildi ve `origin/master...master` divergence `0 0` olarak dogrulandi.
 
 ### Aktif iş
 
-- Step: **224**
-- Issue: **#64**
-- Amaç: NotebookLM icin permanent instruction, stable rolling source, deterministic generator, manifest ve regression testleri kurmak
+- Step: **225**
+- Issue: **#67**
+- Amaç: Podcast 035'i olusturmak ve strict notes icin note-contained prior-step summary contract'ini enforce etmek
 - Branch:
 
 ```text
-step-224-notebooklm-rolling-podcast-source
+step-225-podcast-035-note-summary-contract
 ```
 
-- Bu adim generator, executable regression tests, documentation, learning ve state isidir; ana CSE urun davranisini genisletmez.
+- Bu adim podcast artifact, generator validation, executable regression tests, generated source, documentation, learning ve state isidir; ana CSE urun davranisini genisletmez.
 - `FieldObservationRecord` halen tek Field-MVP model implementasyonudur.
 - `FieldObservationRepository` baseline-level bellek ici repository'dir; project/status/location/category exact filtreleri, explicit status update ve explicit reporting-context update davranisi vardir.
 - `FileAttachmentRepository` mevcut `FileAttachmentRecord` metadata nesneleri icin minimal bellek ici repository baseline'i saglar; `add`, `list_all`, `list_by_related_record_type`, `list_by_related_record_id`, `list_by_related_record`, `list_for_field_observation`, `count` ve `find_by_id` method'lari vardir.
@@ -979,11 +979,12 @@ step-224-notebooklm-rolling-podcast-source
 - Field Observation attachment relationship, documentation-only olarak yalniz `related_record_type == "field_observation"` ve `related_record_id == FieldObservationRecord.observation_id` exact pair kosuluyla tanimlanir.
 - `docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md`, NotebookLM icin canonical rolling source ve stable public URL path'idir.
 - Generator latest numbered podcast notunu full content olarak ekler; current safe point'e kadar her teknik adimi ayri baslikla ozetler ve manifest count ile dogrular.
-- Podcast 034 legacy note contract ile latest kalir; Podcast 035 ve sonrasi yeni 12 bolumlu note contract'i izler.
+- Podcast 034 legacy contract ile okunmaya devam eder. Podcast 035, mandatory 12-section contract ve kendi Section 6 bolumunde Steps 001-220 ayri summaries ile latest source olur.
+- Strict validator expected prior headings'i yalniz previous-summary section siniri icinde exactly once ve ascending order kabul eder; missing, duplicate, out-of-order ve section-disindaki headings reddedilir.
 - NotebookLM saved website source auto-refresh davranisi dogrulanmamistir; repository yalniz stable URL ve current file content sozlesmesini garanti eder.
 - Her Codex instruction model, reasoning level ve secim nedenini aciklar; contract/regression-sensitive islerde current selector'daki en guclu full Codex model ve `extra high` kullanilir.
 - Persistence, physical file operations, broader filters/mutations, automatic lifecycle rules, structured location/contact normalization, export/reporting consumers, API/GUI/CLI, audit ve ek validation henuz uygulanmamistir.
-- Podcast 035 olusturulmamistir; NotebookLM API/browser/upload/audio automation uygulanmamistir.
+- Step 225 merge edilmemistir ve Step 226 baslatilmamistir. NotebookLM API/browser/upload/audio automation uygulanmamistir.
 
 ---
 
@@ -1021,7 +1022,7 @@ step-224-notebooklm-rolling-podcast-source
 
 ### 29.7 Eski aktif Step bilgileri
 
-Step 203-222 arasini veya Step 223'u aktif is olarak gosteren kaynaklar tarihsel duruma dusmustur. Guncel merged safe point Step 223'tur; Step 224 aktif unmerged rolling NotebookLM source generator/test/protocol asamasindadir.
+Step 203-223 arasini veya Step 224'u aktif is olarak gosteren kaynaklar tarihsel duruma dusmustur. Guncel merged safe point Step 224'tur; Step 225 aktif unmerged Podcast 035 note-summary contract/test/generated-source asamasindadir.
 
 ### 29.8 Eski modül sırasının bağlayıcı olması
 

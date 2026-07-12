@@ -1,5 +1,16 @@
 # Changelog
 
+## Step 225
+
+- Added Podcast 035 for Steps 221-225 using the mandatory 12-section strict note structure.
+- Embedded 220 separate, canonical, ascending historical summaries for Steps 001-220 inside Podcast 035 itself.
+- Strengthened strict-note validation to locate the previous-summary Markdown section and reject missing, duplicate, out-of-order, or out-of-section expected headings with clear errors.
+- Preserved Podcast 034 legacy compatibility and did not require current-range steps inside the prior-summary section.
+- Added focused regressions plus tracked Podcast 035/manifest/Podcast 034 hash integration coverage; verified `24 passed` focused and `503 passed` full local tests.
+- Refreshed the rolling source and manifest to Podcast 035 / Steps 221-225 with 224 cumulative canonical summaries and Step 224 merged safe-point evidence.
+- Recorded Step 224 / PR #66 / Issue #64 / merge commit `68c00edab667bbfd0467f4684921c0f6b453d4a7` as the latest merged/finalized safe point.
+- Kept main product code, workflows, NotebookLM automation, historical notes, ZIP, Desktop archive, exports mutation, and Step 226 outside scope.
+
 ## Step 224
 
 - Added the permanent NotebookLM interpretation contract and stable rolling website source path.
