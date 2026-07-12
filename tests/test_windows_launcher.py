@@ -17,6 +17,7 @@ from app.launcher import (
     APPLICATION_ID,
     LauncherError,
     find_existing_instance,
+    instance_id_for_data_root,
     launch,
     resolve_default_paths,
 )
@@ -68,15 +69,33 @@ def test_missing_local_appdata_and_file_data_root_have_clear_errors(
 
 
 def test_health_endpoint_is_minimal_identity_and_readiness(tmp_path: Path) -> None:
-    response = create_app(tmp_path / "data").test_client().get("/health")
+    data_root = tmp_path / "data"
+    response = create_app(data_root).test_client().get("/health")
 
     assert response.status_code == 200
     assert response.get_json() == {
         "application": APPLICATION_ID,
+        "instance_id": instance_id_for_data_root(data_root),
         "ready": True,
         "version": "0.2",
     }
     assert str(tmp_path).encode() not in response.data
+    assert len(response.get_json()["instance_id"]) == 64
+
+
+def test_instance_id_is_stable_for_resolve_and_windows_normcase(
+    tmp_path: Path,
+) -> None:
+    data_root = tmp_path / "DataRoot"
+    equivalent = data_root / "child" / ".."
+
+    assert instance_id_for_data_root(data_root) == instance_id_for_data_root(
+        equivalent
+    )
+    if os.name == "nt":
+        assert instance_id_for_data_root(data_root) == instance_id_for_data_root(
+            Path(str(data_root).upper())
+        )
 
 
 def test_double_click_command_checks_python_dependencies_and_starts_launcher() -> None:
@@ -94,9 +113,12 @@ def test_existing_cse_instance_opens_browser_without_new_server(tmp_path: Path) 
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     opened: list[str] = []
+    expected_instance_id = instance_id_for_data_root(tmp_path / "data")
 
     try:
-        assert find_existing_instance([port]) == f"http://127.0.0.1:{port}"
+        assert find_existing_instance([port], expected_instance_id) == (
+            f"http://127.0.0.1:{port}"
+        )
         result = launch(
             tmp_path / "data",
             tmp_path / "logs",
@@ -138,6 +160,7 @@ def test_foreign_service_is_not_cse_and_next_port_starts_after_ready(
     foreign_thread.start()
     opened: list[str] = []
     health_at_browser_open: list[dict[str, object]] = []
+    expected_instance_id = instance_id_for_data_root(tmp_path / "data")
 
     def open_after_ready(url: str) -> bool:
         opened.append(url)
@@ -145,7 +168,7 @@ def test_foreign_service_is_not_cse_and_next_port_starts_after_ready(
         return True
 
     try:
-        assert find_existing_instance([occupied_port]) is None
+        assert find_existing_instance([occupied_port], expected_instance_id) is None
         result = launch(
             tmp_path / "data",
             tmp_path / "logs",
@@ -163,8 +186,65 @@ def test_foreign_service_is_not_cse_and_next_port_starts_after_ready(
     assert result.port == next_port
     assert opened == [f"http://127.0.0.1:{next_port}"]
     assert health_at_browser_open == [
-        {"application": APPLICATION_ID, "ready": True, "version": "0.2"}
+        {
+            "application": APPLICATION_ID,
+            "instance_id": expected_instance_id,
+            "ready": True,
+            "version": "0.2",
+        }
     ]
+
+
+def test_different_data_root_instance_uses_next_port_and_requested_dataset(
+    tmp_path: Path,
+) -> None:
+    default_root = tmp_path / "default-data"
+    requested_root = tmp_path / "requested-data"
+    default_service = ObservationApplicationService(
+        default_root / "cse.sqlite3",
+        ManagedAttachmentStore(default_root / "attachments"),
+    )
+    requested_service = ObservationApplicationService(
+        requested_root / "cse.sqlite3",
+        ManagedAttachmentStore(requested_root / "attachments"),
+    )
+    default_service.create_project("Default Veri Seti")
+    requested_service.create_project("Istenen Veri Seti")
+
+    occupied_port = free_port()
+    next_port = free_port()
+    default_server = make_server(
+        "127.0.0.1", occupied_port, create_app(default_root)
+    )
+    default_thread = threading.Thread(
+        target=default_server.serve_forever, daemon=True
+    )
+    default_thread.start()
+    try:
+        assert find_existing_instance(
+            [occupied_port], instance_id_for_data_root(requested_root)
+        ) is None
+        result = launch(
+            requested_root,
+            tmp_path / "logs",
+            candidate_ports=[occupied_port, next_port],
+            open_browser=False,
+            block=False,
+        )
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{next_port}/observations", timeout=1
+        ) as response:
+            page = response.read().decode("utf-8")
+    finally:
+        default_server.shutdown()
+        default_thread.join(timeout=2)
+        if "result" in locals():
+            result.shutdown()
+
+    assert result.port == next_port
+    assert result.already_running is False
+    assert "Istenen Veri Seti" in page
+    assert "Default Veri Seti" not in page
 
 
 def test_browser_failure_keeps_server_and_writes_clear_log(tmp_path: Path) -> None:
@@ -274,6 +354,7 @@ def test_real_subprocess_starts_localhost_and_second_launch_reuses_it(
 
     assert health == {
         "application": APPLICATION_ID,
+        "instance_id": instance_id_for_data_root(data_root),
         "ready": True,
         "version": "0.2",
     }

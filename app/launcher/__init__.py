@@ -1,6 +1,11 @@
 """Windows one-click launcher surfaces."""
 
-from .contracts import APPLICATION_ID, APPLICATION_VERSION, LOOPBACK_HOST
+from .contracts import (
+    APPLICATION_ID,
+    APPLICATION_VERSION,
+    LOOPBACK_HOST,
+    instance_id_for_data_root,
+)
 
 
 _WINDOWS_EXPORTS = {
@@ -24,6 +29,7 @@ __all__ = [
     "APPLICATION_ID",
     "APPLICATION_VERSION",
     "LOOPBACK_HOST",
+    "instance_id_for_data_root",
     "LaunchResult",
     "LauncherError",
     "LauncherPaths",

@@ -19,7 +19,7 @@ from werkzeug.serving import BaseWSGIServer, WSGIRequestHandler, make_server
 
 from app.web import create_app
 
-from .contracts import APPLICATION_ID, LOOPBACK_HOST
+from .contracts import APPLICATION_ID, LOOPBACK_HOST, instance_id_for_data_root
 
 
 DEFAULT_PORT = 5000
@@ -79,9 +79,11 @@ def resolve_default_paths(environment: Mapping[str, str] | None = None) -> Launc
     )
 
 
-def find_existing_instance(ports: Iterable[int]) -> str | None:
+def find_existing_instance(
+    ports: Iterable[int], expected_instance_id: str
+) -> str | None:
     for port in ports:
-        if _is_cse_ready(port):
+        if _is_cse_ready(port, expected_instance_id):
             return _url(port)
     return None
 
@@ -102,6 +104,7 @@ def launch(
     data = _ensure_directory(data_root, "Veri")
     logs = _ensure_directory(logs_root, "Log")
     logger = _configure_logger(logs / "launcher.log")
+    expected_instance_id = instance_id_for_data_root(data)
     ports = list(
         candidate_ports
         if candidate_ports is not None
@@ -110,7 +113,7 @@ def launch(
     if not ports or any(port < 1 or port > 65535 for port in ports):
         raise LauncherError("Port aralığı geçersiz.")
 
-    existing_url = find_existing_instance(ports)
+    existing_url = find_existing_instance(ports, expected_instance_id)
     if existing_url is not None:
         browser_opened = _open_browser(
             existing_url, browser_open, open_browser, logger
@@ -156,7 +159,7 @@ def launch(
     url = _url(selected_port)
     deadline = time.monotonic() + startup_timeout
     while time.monotonic() < deadline:
-        if _is_cse_ready(selected_port):
+        if _is_cse_ready(selected_port, expected_instance_id):
             break
         time.sleep(0.05)
     else:
@@ -239,7 +242,7 @@ def _open_browser(
     return opened
 
 
-def _is_cse_ready(port: int) -> bool:
+def _is_cse_ready(port: int, expected_instance_id: str) -> bool:
     try:
         request = urllib.request.Request(
             f"{_url(port)}/health",
@@ -251,7 +254,11 @@ def _is_cse_ready(port: int) -> bool:
             payload = json.load(response)
     except (OSError, ValueError, json.JSONDecodeError, urllib.error.URLError):
         return False
-    return payload.get("application") == APPLICATION_ID and payload.get("ready") is True
+    return (
+        payload.get("application") == APPLICATION_ID
+        and payload.get("instance_id") == expected_instance_id
+        and payload.get("ready") is True
+    )
 
 
 def _port_is_available(port: int) -> bool:

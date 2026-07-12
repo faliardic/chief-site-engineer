@@ -22,7 +22,11 @@ from app.application import (
     ObservationApplicationService,
     UploadStream,
 )
-from app.launcher.contracts import APPLICATION_ID, APPLICATION_VERSION
+from app.launcher.contracts import (
+    APPLICATION_ID,
+    APPLICATION_VERSION,
+    instance_id_for_data_root,
+)
 from app.persistence import PersistenceError, RecordNotFound, RevisionConflict
 from app.operations import DailyExportService
 from app.storage import ManagedAttachmentStore
@@ -56,6 +60,7 @@ def create_app(data_root: str | Path) -> Flask:
     app.config.update(
         MAX_CONTENT_LENGTH=MAX_UPLOAD_BYTES,
         CSE_DATA_ROOT=root,
+        CSE_INSTANCE_ID=instance_id_for_data_root(root),
         CSE_SERVICE=ObservationApplicationService(
             root / "cse.sqlite3",
             ManagedAttachmentStore(root / "attachments"),
@@ -74,6 +79,7 @@ def create_app(data_root: str | Path) -> Flask:
     def health() -> Response:
         return jsonify(
             application=APPLICATION_ID,
+            instance_id=app.config["CSE_INSTANCE_ID"],
             ready=True,
             version=APPLICATION_VERSION,
         )
