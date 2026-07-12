@@ -221,6 +221,273 @@ def test_file_attachment_repository_does_not_change_existing_record_repositories
     assert nonconformity_repository.count() == 1
 
 
+def test_file_attachment_repository_related_record_type_filter_exact_matches_in_order() -> None:
+    repository = FileAttachmentRepository()
+    first_observation_attachment = _file_attachment(
+        "att-001",
+        related_record_type="field_observation",
+        related_record_id="obs-001",
+    )
+    nonconformity_attachment = _file_attachment(
+        "att-002",
+        related_record_type="nonconformity",
+        related_record_id="NCR-001",
+    )
+    second_observation_attachment = _file_attachment(
+        "att-003",
+        related_record_type="field_observation",
+        related_record_id="obs-002",
+    )
+    case_variant_attachment = _file_attachment(
+        "att-004",
+        related_record_type="Field_Observation",
+        related_record_id="obs-003",
+    )
+    whitespace_variant_attachment = _file_attachment(
+        "att-005",
+        related_record_type=" field_observation ",
+        related_record_id="obs-004",
+    )
+
+    repository.add(first_observation_attachment)
+    repository.add(nonconformity_attachment)
+    repository.add(second_observation_attachment)
+    repository.add(case_variant_attachment)
+    repository.add(whitespace_variant_attachment)
+
+    result = repository.list_by_related_record_type("field_observation")
+
+    assert result == [first_observation_attachment, second_observation_attachment]
+    assert repository.list_by_related_record_type("unknown") == []
+    assert repository.list_by_related_record_type("Field_Observation") == [
+        case_variant_attachment
+    ]
+    assert repository.list_by_related_record_type("field_observation ") == []
+    assert repository.list_by_related_record_type(" field_observation ") == [
+        whitespace_variant_attachment
+    ]
+
+
+def test_file_attachment_repository_related_record_id_filter_exact_matches_in_order() -> None:
+    repository = FileAttachmentRepository()
+    first_ncr_attachment = _file_attachment(
+        "att-001",
+        related_record_id="NCR-001",
+    )
+    observation_attachment = _file_attachment(
+        "att-002",
+        related_record_type="field_observation",
+        related_record_id="obs-001",
+    )
+    second_ncr_attachment = _file_attachment(
+        "att-003",
+        related_record_id="NCR-001",
+    )
+    case_variant_attachment = _file_attachment(
+        "att-004",
+        related_record_id="ncr-001",
+    )
+    whitespace_variant_attachment = _file_attachment(
+        "att-005",
+        related_record_id=" NCR-001 ",
+    )
+
+    repository.add(first_ncr_attachment)
+    repository.add(observation_attachment)
+    repository.add(second_ncr_attachment)
+    repository.add(case_variant_attachment)
+    repository.add(whitespace_variant_attachment)
+
+    result = repository.list_by_related_record_id("NCR-001")
+
+    assert result == [first_ncr_attachment, second_ncr_attachment]
+    assert repository.list_by_related_record_id("unknown") == []
+    assert repository.list_by_related_record_id("ncr-001") == [case_variant_attachment]
+    assert repository.list_by_related_record_id("NCR-001 ") == []
+    assert repository.list_by_related_record_id(" NCR-001 ") == [
+        whitespace_variant_attachment
+    ]
+
+
+def test_file_attachment_repository_related_record_type_and_id_filters_are_independent() -> None:
+    repository = FileAttachmentRepository()
+    observation_attachment = _file_attachment(
+        "att-001",
+        related_record_type="field_observation",
+        related_record_id="shared-001",
+    )
+    other_observation_attachment = _file_attachment(
+        "att-002",
+        related_record_type="field_observation",
+        related_record_id="obs-002",
+    )
+    nonconformity_attachment = _file_attachment(
+        "att-003",
+        related_record_type="nonconformity",
+        related_record_id="shared-001",
+    )
+
+    repository.add(observation_attachment)
+    repository.add(other_observation_attachment)
+    repository.add(nonconformity_attachment)
+
+    assert repository.list_by_related_record_type("field_observation") == [
+        observation_attachment,
+        other_observation_attachment,
+    ]
+    assert repository.list_by_related_record_id("shared-001") == [
+        observation_attachment,
+        nonconformity_attachment,
+    ]
+
+
+def test_file_attachment_repository_related_record_filters_return_empty_for_empty_repository() -> None:
+    repository = FileAttachmentRepository()
+
+    assert repository.list_by_related_record_type("field_observation") == []
+    assert repository.list_by_related_record_id("obs-001") == []
+
+
+def test_file_attachment_repository_related_record_filtered_lists_are_copies() -> None:
+    repository = FileAttachmentRepository()
+    type_match = _file_attachment(
+        "att-001",
+        related_record_type="field_observation",
+        related_record_id="obs-001",
+    )
+    id_match = _file_attachment(
+        "att-002",
+        related_record_type="nonconformity",
+        related_record_id="obs-001",
+    )
+    repository.add(type_match)
+    repository.add(id_match)
+
+    listed_by_type = repository.list_by_related_record_type("field_observation")
+    second_listed_by_type = repository.list_by_related_record_type("field_observation")
+    listed_by_id = repository.list_by_related_record_id("obs-001")
+    second_listed_by_id = repository.list_by_related_record_id("obs-001")
+    listed_by_type.clear()
+    listed_by_id.clear()
+
+    assert second_listed_by_type is not repository.list_by_related_record_type(
+        "field_observation"
+    )
+    assert second_listed_by_id is not repository.list_by_related_record_id("obs-001")
+    assert repository.list_by_related_record_type("field_observation") == [type_match]
+    assert repository.list_by_related_record_id("obs-001") == [type_match, id_match]
+
+
+def test_file_attachment_repository_related_record_filters_return_same_objects_without_mutating_metadata() -> None:
+    repository = FileAttachmentRepository()
+    record = _file_attachment(
+        "att-001",
+        related_record_type="field_observation",
+        related_record_id="obs-001",
+        file_name="observation-photo.jpg",
+        file_path="attachments/PRJ-001/field_observation/obs-001/observation-photo.jpg",
+        file_type="image",
+        mime_type="image/jpeg",
+        uploaded_at="2026-07-11T21:00:00",
+        uploaded_by="Saha muhendisi",
+        original_file_name="IMG_0001.JPG",
+        description="Kolon kalip kontrol fotografi.",
+        notes="Ek not korunmali.",
+        file_size=4096,
+    )
+
+    repository.add(record)
+    type_result = repository.list_by_related_record_type("field_observation")
+    id_result = repository.list_by_related_record_id("obs-001")
+
+    assert type_result == [record]
+    assert id_result == [record]
+    assert type_result[0] is record
+    assert id_result[0] is record
+    assert record.attachment_id == "att-001"
+    assert record.related_record_type == "field_observation"
+    assert record.related_record_id == "obs-001"
+    assert record.file_name == "observation-photo.jpg"
+    assert (
+        record.file_path
+        == "attachments/PRJ-001/field_observation/obs-001/observation-photo.jpg"
+    )
+    assert record.file_type == "image"
+    assert record.mime_type == "image/jpeg"
+    assert record.uploaded_at == "2026-07-11T21:00:00"
+    assert record.uploaded_by == "Saha muhendisi"
+    assert record.original_file_name == "IMG_0001.JPG"
+    assert record.description == "Kolon kalip kontrol fotografi."
+    assert record.notes == "Ek not korunmali."
+    assert record.file_size == 4096
+
+
+def test_file_attachment_repository_related_record_filters_keep_count_and_order_stable() -> None:
+    repository = FileAttachmentRepository()
+    first_record = _file_attachment(
+        "att-001",
+        related_record_type="field_observation",
+        related_record_id="obs-001",
+    )
+    second_record = _file_attachment(
+        "att-002",
+        related_record_type="nonconformity",
+        related_record_id="NCR-001",
+    )
+    third_record = _file_attachment(
+        "att-003",
+        related_record_type="field_observation",
+        related_record_id="obs-002",
+    )
+
+    repository.add(first_record)
+    repository.add(second_record)
+    repository.add(third_record)
+    before_filtering = repository.list_all()
+
+    assert repository.list_by_related_record_type("field_observation") == [
+        first_record,
+        third_record,
+    ]
+    assert repository.list_by_related_record_id("NCR-001") == [second_record]
+    assert repository.list_all() == before_filtering
+    assert repository.list_all() == [first_record, second_record, third_record]
+    assert repository.count() == 3
+
+
+def test_file_attachment_repository_related_record_filters_do_not_change_existing_repository_behaviors() -> None:
+    attachment_repository = FileAttachmentRepository()
+    observation_repository = FieldObservationRepository()
+    nonconformity_repository = NonconformityRepository()
+    attachment = _file_attachment(
+        "att-001",
+        related_record_type="field_observation",
+        related_record_id="obs-001",
+    )
+    observation = _field_observation("obs-001", status="open")
+    nonconformity = NonconformityRecord(
+        nonconformity_id="NCR-218",
+        project_id="prj-001",
+        date="2026-07-12",
+        title="Related-record filtre regresyon kontrolu",
+        description="Step 218 filtreleri mevcut repository davranislarini bozmamali.",
+    )
+
+    attachment_repository.add(attachment)
+    observation_repository.add(observation)
+    nonconformity_repository.add(nonconformity)
+
+    assert attachment_repository.find_by_id("att-001") is attachment
+    assert attachment_repository.list_all() == [attachment]
+    assert attachment_repository.count() == 1
+    assert observation_repository.find_by_id("obs-001") is observation
+    assert observation_repository.update_status("obs-001", "tracking") is observation
+    assert observation_repository.list_by_status("tracking") == [observation]
+    assert nonconformity_repository.find_by_id("NCR-218") is nonconformity
+    assert nonconformity_repository.exists("NCR-218") is True
+    assert nonconformity_repository.count() == 1
+
+
 def test_list_records_returns_given_list() -> None:
     records = [
         DailySiteLog(log_id="log-001", project_id="prj-001", date="2026-06-05"),

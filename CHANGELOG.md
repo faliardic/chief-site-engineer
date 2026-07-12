@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 218
+
+- Added `FileAttachmentRepository.list_by_related_record_type(...)` and `FileAttachmentRepository.list_by_related_record_id(...)` for exact read-only in-memory metadata visibility.
+- Added focused repository tests for related-record type/id exact matching, case-sensitive and whitespace-sensitive behavior, independent filters, empty repository results, new-list behavior, same-object returns, metadata non-mutation, stable count/order, and existing repository regression coverage.
+- Added `docs/218_file_attachment_repository_related_record_filters.md` and `learning/218_file_attachment_repository_related_record_filters.md`.
+- Updated repository truth so Step 217 / PR #51 / Issue #50 / merge commit `075acdbc77927925092b748b77aad7c0ce13d9ef` is the latest merged/finalized safe point and Step 218 remains active unmerged related-record filter work.
+- Kept this scope narrow; no combined related-record filter, FieldObservation-specific attachment lookup/linking, automatic attachment creation, physical file operations, filesystem checks, path generation/normalization, persistence, lifecycle behavior, validation/enums/constants, API/GUI/CLI, audit/history/task/NCR/decision generation, generated `blocked`, Step 219, Podcast 034, workflow changes, Actions enablement, ZIP mutation, or Desktop archive mutation was added.
+
 ## Step 217
 
 - Added minimal in-memory `FileAttachmentRepository` for existing `FileAttachmentRecord` metadata objects.
