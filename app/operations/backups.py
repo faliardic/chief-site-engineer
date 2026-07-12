@@ -349,6 +349,18 @@ class BackupService:
             if name != "cse.sqlite3":
                 if len(path.parts) != 3 or path.parts[0] != "attachments":
                     raise BackupValidationError("attachment archive path is invalid")
+                observation_id = path.parts[1]
+                attachment_id = path.parts[2][:36]
+                try:
+                    validate_attachment_relative_path(
+                        name,
+                        observation_id,
+                        attachment_id,
+                    )
+                except ValueError as exc:
+                    raise BackupValidationError(
+                        "attachment archive path is invalid"
+                    ) from exc
             if (
                 not isinstance(expected, dict)
                 or set(expected) != {"sha256", "size_bytes"}

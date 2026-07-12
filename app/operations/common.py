@@ -63,11 +63,13 @@ def write_zip_bytes(bundle: zipfile.ZipFile, name: str, data: bytes) -> None:
 def validate_safe_archive_name(name: str) -> PurePosixPath:
     if not isinstance(name, str) or not name or "\\" in name:
         raise ValueError("archive entry must use a non-empty POSIX path")
-    if name.startswith("/") or ":" in name.split("/", 1)[0]:
+    if name.startswith("/"):
         raise ValueError("archive entry cannot be absolute")
     parts = name.split("/")
     if any(part in {"", ".", ".."} for part in parts):
         raise ValueError("archive entry contains an unsafe segment")
+    if any(":" in part for part in parts):
+        raise ValueError("archive entry cannot contain a colon")
     return PurePosixPath(name)
 
 

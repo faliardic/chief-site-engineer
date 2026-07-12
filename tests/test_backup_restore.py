@@ -183,6 +183,81 @@ def test_unsafe_archive_names_are_rejected(tmp_path: Path, unsafe_name: str) -> 
         BackupService(tmp_path).verify_backup(archive)
 
 
+@pytest.mark.parametrize(
+    "unsafe_attachment_path",
+    [
+        (
+            "attachments/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/"
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.jpg:stream"
+        ),
+        (
+            "attachments/C:/"
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.jpg"
+        ),
+        (
+            "attachments/not-a-canonical-uuid/"
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.jpg"
+        ),
+        (
+            "attachments/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/"
+            "not-a-canonical-uuid.jpg"
+        ),
+    ],
+)
+def test_attachment_archive_path_is_rejected_before_restore_extraction(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    unsafe_attachment_path: str,
+) -> None:
+    archive = tmp_path / "unsafe-attachment-path.zip"
+    database_bytes = b"database-placeholder"
+    attachment_bytes = b"attachment-placeholder"
+    database_digest = {
+        "sha256": hashlib.sha256(database_bytes).hexdigest(),
+        "size_bytes": len(database_bytes),
+    }
+    attachment_digest = {
+        "sha256": hashlib.sha256(attachment_bytes).hexdigest(),
+        "size_bytes": len(attachment_bytes),
+    }
+    manifest = {
+        "backup_format_version": 1,
+        "created_at": "2026-07-13T10:00:00Z",
+        "schema_version": 2,
+        "attachment_count": 1,
+        "observation_count": 1,
+        "event_count": 1,
+        "files": {
+            "cse.sqlite3": database_digest,
+            unsafe_attachment_path: attachment_digest,
+        },
+        "attachments": [
+            {"path": unsafe_attachment_path, **attachment_digest}
+        ],
+    }
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr("manifest.json", json.dumps(manifest))
+        bundle.writestr("cse.sqlite3", database_bytes)
+        bundle.writestr(unsafe_attachment_path, attachment_bytes)
+
+    backup = BackupService(tmp_path)
+    extraction_called = False
+
+    def fail_if_extracted(*_args: object) -> None:
+        nonlocal extraction_called
+        extraction_called = True
+
+    monkeypatch.setattr(backup, "_extract_entry", fail_if_extracted)
+    with pytest.raises(BackupValidationError):
+        backup.verify_backup(archive)
+    target = tmp_path / "must-not-exist"
+    with pytest.raises(BackupValidationError):
+        backup.restore_backup(archive, target)
+
+    assert extraction_called is False
+    assert not target.exists()
+
+
 def test_symlink_and_duplicate_entries_are_rejected(tmp_path: Path) -> None:
     symlink_archive = tmp_path / "symlink.zip"
     info = zipfile.ZipInfo("attachments/link")
