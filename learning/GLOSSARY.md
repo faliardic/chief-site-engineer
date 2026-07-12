@@ -1273,3 +1273,15 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Backward Compatibility`: Yeni kurallar eklendiginde eski veri veya eski kullanimlarin bozulmadan calismaya devam etmesi.
 
 `ID Normalizer`: Farkli yazilmis kimlik degerlerini tek standart bicime donusturmeyi hedefleyen mekanizma.
+
+`Convenience Helper`: Zaten mevcut olan daha genel bir islemi, belli bir kullanim niyetini daha okunur hale getiren yardimci method.
+
+`Convenience Lookup`: Daha genel bir arama veya filtreleme methodunun belirli bir kayit tipi ya da kullanim senaryosu icin okunur kisaltmasi.
+
+`Delegation`: Bir methodun asil isi kendi icinde yeniden yazmak yerine baska bir methoda devretmesi.
+
+`Semantic Equivalence`: Iki farkli cagri veya ifade biciminin ayni anlam ve ayni sonucu vermesi.
+
+`API Boundary`: Bir methodun hangi girdileri alacagini, ne dondurecegini, hangi yan etkileri yapmayacagini ve hangi sorumluluklari ustlenmeyecegini tanimlayan sinir.
+
+`Future Test Matrix`: Kod henuz yazilmadan veya yeni davranis genisletilmeden once, ileride yazilacak testlerin hangi davranislari kontrol edecegini gosteren plan.

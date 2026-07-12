@@ -1,5 +1,15 @@
 # Changelog
 
+## Step 223
+
+- Added `FileAttachmentRepository.list_for_field_observation(observation_id)` as a Field Observation-specific convenience lookup.
+- Implemented the helper as delegation to `list_by_related_record("field_observation", observation_id)` without duplicating `_records` filtering logic.
+- Added focused repository tests for delegation, exact Field Observation matches, same-id/different-type exclusion, same-type/different-id exclusion, case/whitespace sensitivity, empty/unknown results, new-list behavior, same-object returns, metadata non-mutation, count/order stability, missing observation non-validation, equivalence with the combined helper, and existing filter regression coverage.
+- Added `docs/223_field_observation_attachment_convenience_lookup.md` and `learning/223_field_observation_attachment_convenience_lookup.md`.
+- Added `.cse/tasks/223_task.md` and `.cse/results/223_result.md`.
+- Updated repository truth so Step 222 / PR #62 / Issue #61 / merge commit `8ba82cf2109df9d8cd385a5c38ee58a637afba9c` is the latest merged/finalized safe point and Step 223 remains active unmerged implementation/test/documentation work.
+- Kept this scope narrow; no model fields, constants/enums, hard validation, `FieldObservationRepository` methods, automatic attachment creation/linking, reverse attachment collection, relationship existence validation, physical file operations, persistence, API/GUI/CLI, export/report consumers, audit/history/task/NCR/decision generation, generated `blocked`, Podcast 035, Step 224, workflow changes, ZIP mutation, or Desktop archive mutation was added.
+
 ## Step 222
 
 - Added documentation-only Field Observation attachment convenience lookup boundary for future `FileAttachmentRepository.list_for_field_observation(observation_id)`.

@@ -1,5 +1,17 @@
 # Proje Kararlari
 
+## 223 Field Observation Attachment Convenience Lookup Karari
+
+- `FileAttachmentRepository.list_for_field_observation(observation_id)` helper'i eklendi.
+- Helper yalniz `list_by_related_record("field_observation", observation_id)` cagrisi ile delegation yapar; ikinci bir `_records` filtering implementation'i eklenmez.
+- `"field_observation"` literal degeri Step 219 contract ile ayni tutulur.
+- Exact, case-sensitive, non-normalizing, validation-free, insertion-order preserving, new-list, same-object ve metadata non-mutation davranislari existing combined helper uzerinden korunur.
+- Helper `FieldObservationRepository` sorgulamaz, referenced observation existence validation yapmaz, `FieldObservationRecord` veya attachment metadata mutate etmez.
+- Focused tests delegation, exact match, partial match rejection, case/whitespace sensitivity, empty/unknown results, new-list behavior, same-object returns, non-mutation, count/order stability, missing existence non-validation, combined helper equivalence ve existing filter regression davranislarini kapsar.
+- Step 222, PR #62 squash merge commit `8ba82cf2109df9d8cd385a5c38ee58a637afba9c` ile latest merged/finalized safe point'tir; Issue #61 completed olarak kaydedilir.
+- Step 223, Issue #63 ve `step-223-field-observation-attachment-convenience-lookup` branch'i uzerinde aktif unmerged implementation/test/documentation isidir.
+- Model fields, constants/enums, hard validation, `FieldObservationRepository` methods, automatic attachment creation/linking, physical file operations, persistence, API/GUI/CLI, export/report consumers, audit/history/task/NCR/decision generation, generated `blocked`, Podcast 035 ve Step 224 uygulanmamistir.
+
 ## 222 Field Observation Attachment Convenience Lookup Boundary Karari
 
 - Future `FileAttachmentRepository.list_for_field_observation(observation_id)` helper'i documentation-only olarak planlandi; bu adim helper'i implement etmez.
