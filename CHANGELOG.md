@@ -1,5 +1,13 @@
 # Changelog
 
+## Step 221
+
+- Added `docs/podcast_notes/034_adim_216_220_notebooklm_podcast_notu.md` for Steps 216-220.
+- Added `.cse/tasks/221_task.md` and `.cse/results/221_result.md`.
+- Updated repository truth so Step 220 / PR #58 / Issue #57 / merge commit `1623e32437e1555ab398b245c4984566c163825f` is the latest merged/finalized safe point and Step 221 remains active unmerged documentation/state/podcast-only work.
+- Recorded Podcast 034 as the active Step 221 podcast artifact for Steps 216-220 without claiming Step 221 as merged/finalized.
+- Kept this scope documentation-only; no production code, executable tests, repository behavior, FieldObservation-specific convenience lookup, automatic attachment creation/linking, referenced observation existence validation, physical file operations, persistence, API/GUI/CLI, export/report consumers, audit/history/task/NCR/decision generation, generated `blocked`, Podcast 035, Step 222, workflow changes, ZIP mutation, or Desktop archive mutation was added.
+
 ## Step 220
 
 - Added `FileAttachmentRepository.list_by_related_record(...)` for exact combined related-record metadata filtering.
