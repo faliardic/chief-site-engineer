@@ -10,6 +10,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    jsonify,
     stream_with_context,
     url_for,
     send_file,
@@ -21,6 +22,7 @@ from app.application import (
     ObservationApplicationService,
     UploadStream,
 )
+from app.launcher.contracts import APPLICATION_ID, APPLICATION_VERSION
 from app.persistence import PersistenceError, RecordNotFound, RevisionConflict
 from app.operations import DailyExportService
 from app.storage import ManagedAttachmentStore
@@ -67,6 +69,14 @@ def create_app(data_root: str | Path) -> Flask:
     @app.get("/")
     def index() -> Response:
         return redirect(url_for("observation_list"))
+
+    @app.get("/health")
+    def health() -> Response:
+        return jsonify(
+            application=APPLICATION_ID,
+            ready=True,
+            version=APPLICATION_VERSION,
+        )
 
     @app.route("/projects/new", methods=["GET", "POST"])
     def project_new() -> str | Response:
