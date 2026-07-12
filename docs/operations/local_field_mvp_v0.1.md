@@ -7,6 +7,18 @@ python -m pip install -r requirements.txt
 python -m app.web --data-root C:\cse-data
 ```
 
+Windows'ta normal kullanım için repository kökündeki `CSE_Baslat.cmd` dosyasına
+çift tıklayın. Başlatıcı varsayılan olarak verileri
+`%LOCALAPPDATA%\ChiefSiteEngineer\data`, logları ise
+`%LOCALAPPDATA%\ChiefSiteEngineer\logs` altında tutar ve hazır olduğunda
+tarayıcıyı açar. Mevcut bir v0.1 veri kökü açıkça seçilecekse:
+
+```powershell
+CSE_Baslat.cmd --data-root C:\mevcut-cse-data
+```
+
+Başlatıcı sessiz veri taşıma veya silme yapmaz.
+
 Uygulama varsayılan olarak yalnız `127.0.0.1` üzerinde açılır. Loopback dışı
 bir adres için `--allow-network` açıkça verilmelidir. Bu MVP authentication,
 authorization, TLS veya production WSGI sunucusu içermez; public internet için
