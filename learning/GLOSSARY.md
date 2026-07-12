@@ -1299,3 +1299,15 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `UTF-8`: Unicode karakterleri byte olarak saklayan ve Turkce karakterleri koruyan yaygin text encoding bicimi.
 
 `Backward Compatibility`: Yeni sozlesme eklenirken daha once uretilmis gecerli veri veya dosyalarin bozulmadan okunabilmesi.
+
+`Markdown Section Boundary`: Bir Markdown heading ile ayni seviyedeki sonraki heading arasinda kalan icerik siniri.
+
+`Expected Heading Range`: Bir dokuman contract'inda bulunmasi zorunlu heading numaralarinin baslangic ve bitis dizisi.
+
+`Heading Multiplicity`: Ayni heading kimliginin bir section veya dokuman icinde kac defa gorundugu.
+
+`Out-of-Section Heading`: Dogru isim veya numarayi tasidigi halde zorunlu section sinirinin disinda bulunan heading.
+
+`Ascending Order Validation`: Numarali degerlerin kucukten buyuge beklenen sirayla geldigini kontrol eden validation.
+
+`Self-Contained Note`: Kendi kapsamini ve gerekli historical context'i baska bir nota bagimli olmadan tasiyan not.

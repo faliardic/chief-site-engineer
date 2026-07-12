@@ -65,8 +65,10 @@ Ornekler:
 - Podcast 033 kapsami: Steps 211-215
 - Podcast 034: `docs/podcast_notes/034_adim_216_220_notebooklm_podcast_notu.md`
 - Podcast 034 kapsami: Steps 216-220
-- Latest completed podcast: Podcast 034
-- Sonraki besli aralik: Steps 221-225
+- Podcast 035: `docs/podcast_notes/035_adim_221_225_notebooklm_podcast_notu.md`
+- Podcast 035 kapsami: Steps 221-225
+- Latest generated/active podcast source: Podcast 035
+- Sonraki besli aralik: Steps 226-230
 
 Bu factual state yeni podcastler eklendikce guncellenir, ancak burada eski proje asamasi ornekleri veya cabuk bayatlayan "aktif adim" metinleri tutulmaz.
 
@@ -113,7 +115,7 @@ Podcast 035 ve sonraki her podcast notu en az su basliklari icermelidir:
 12. Kapanis sorusu ve kisa cevap
 ```
 
-Onceki adimlar bolumunde her canonical adim `### Adim NNN - kisa baslik` biciminde ayri tanimlanir. Generator bu birikimli ozetleri rolling source icinde canonical `CHANGELOG.md`, `ROADMAP.md`, `.cse` state ve tracked step dokumanlarindan yeniden kurar.
+Onceki adimlar bolumunde her canonical adim `### Adim NNN - kisa baslik` biciminde ayri tanimlanir. Podcast 035 ve sonrasi icin generator strict validator'i `001..note.step_start-1` headings'ini bu bolumun gercek Markdown siniri icinde exactly once ve ascending order zorunlu tutar. Section disindaki headings contract'i karsilamaz; current-range steps bu bolumde zorunlu degildir. Rolling source cumulative ozetleri note-contained ozetlerin yerine gecmez.
 
 ## NotebookLM Podcast Direktifi Sablonu
 

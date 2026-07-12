@@ -3,11 +3,11 @@
 ## Guncel Guvenli Nokta
 
 ```text
-Adim 223 - Field Observation attachment convenience lookup
-PR #65 merge commit: 932dbf3ffd076ddc124825adce78226d2ce8fb57
+Adim 224 - Rolling NotebookLM podcast source protocol
+PR #66 merge commit: 68c00edab667bbfd0467f4684921c0f6b453d4a7
 ```
 
-Adim 223, PR #65 squash merge commit `932dbf3ffd076ddc124825adce78226d2ce8fb57` ile master uzerindeki guncel guvenli noktadir. Step 224, Issue #64 kapsaminda rolling NotebookLM source generator, permanent instruction, manifest ve regression testlerini ekleyen aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Adim 224, PR #66 squash merge commit `68c00edab667bbfd0467f4684921c0f6b453d4a7` ile master uzerindeki guncel guvenli noktadir. Step 225, Issue #67 kapsaminda Podcast 035 artifact'ini ve note-contained prior-step summary validation contract'ini ekleyen aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -647,8 +647,18 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 - [x] Adim 224 - Kalici Codex model/reasoning/secim-gerekcesi politikasi canonical talimat ve state'e eklendi.
 - [x] Adim 224 - Podcast 035, NotebookLM API/browser/upload/audio automation, ana urun behavior, workflow, ZIP ve exports mutation eklenmedi.
 
+## Step 225 - Podcast 035 Note Summary Contract
+
+- [x] Adim 225 - `035_adim_221_225_notebooklm_podcast_notu.md` mandatory 12-section structure ile olusturuldu.
+- [x] Adim 225 - Note Section 6 icinde Steps 001-220 tam bir kez, ascending order ve ayri heading'lerle tasindi.
+- [x] Adim 225 - Strict note validator previous-summary section boundary'sini bulur ve missing, duplicate, out-of-order veya section-disindaki headings'i reddeder.
+- [x] Adim 225 - Current-range steps previous-summary section icinde zorunlu tutulmadi; Podcast 034 legacy compatibility korundu.
+- [x] Adim 225 - Rolling source latest Podcast 035 / Steps 221-225 ve 224 cumulative canonical summary ile yenilendi.
+- [x] Adim 225 - Focused generator tests `24 passed`, full local suite `503 passed` olarak dogrulandi.
+- [x] Adim 225 - Main product code, workflow, NotebookLM automation, historical podcast, ZIP ve exports mutation eklenmedi; Step 226 baslatilmadi.
+
 ## Sonraki Calisma Onerisi
 
-Step 224 merge/finalize edildikten sonra Podcast 035, Steps 221-225 tamamlandiginda yeni 12 bolumlu note contract ile olusturulabilir. Attachment slice icin convenience helper usage boundary veya upload/persistence oncesi storage siniri ayri issue gerektirir. Ilk field MVP yonu yine hizli observation kaydi, attachment, location, status tracking, reported-to, daily export ve weekly summary olarak korunur.
+Step 225 merge/finalize edildikten sonra sonraki teknik yon ayri Issue ile secilmelidir. Attachment convenience helper usage boundary, upload/persistence oncesi storage contract veya daily export/weekly summary hatti olasi dar yonlerdir. Step 226 bu adimda baslatilmaz.
 
-Podcast cadence notu: `docs/podcast_notes/README.md` her 5 adimda bir podcast notu kuralini kaydeder. Podcast 030 Adim 196-200 araligini, Podcast 031 Adim 201-205 araligini, Podcast 032 Adim 206-210 araligini, Podcast 033 Adim 211-215 araligini ve Podcast 034 Adim 216-220 araligini kapsar. Sonraki dogal podcast araligi Steps 221-225 olur.
+Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcast 032 Adim 206-210, Podcast 033 Adim 211-215, Podcast 034 Adim 216-220 ve Podcast 035 Adim 221-225 araligini kapsar. Sonraki dogal podcast araligi Steps 226-230 olur.

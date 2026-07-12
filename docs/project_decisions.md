@@ -1,5 +1,18 @@
 # Proje Kararlari
 
+## 225 Podcast 035 Note-Contained Summary Contract Karari
+
+- Podcast 035, Steps 221-225 icin mandatory 12-section note olarak olusturulur ve Section 6 icinde Steps 001-220 tarihini kendi basina tasir.
+- Strict Podcast 035+ validator yalniz required section presence kontroluyle yetinmez; previous-summary section'in gercek Markdown sinirini bulur.
+- Expected prior headings `001..note.step_start-1` exactly once ve ascending order zorunludur; missing, duplicate, out-of-order ve section-disindaki headings clear error verir.
+- Current-range steps previous-summary section icinde zorunlu degildir; Podcast 034 ve onceki notes legacy contract ile okunmaya devam eder.
+- Note-contained summaries, rolling source cumulative summaries'nin yerine gecmez; iki katman da self-contained source ve canonical current-state amaciyla korunur.
+- Rolling source latest Podcast 035 / range `221-225`; safe point Step 224 ve cumulative summary count `224` olarak yenilenir.
+- Step 224, PR #66 squash merge commit `68c00edab667bbfd0467f4684921c0f6b453d4a7` ile latest merged/finalized safe point'tir; Issue #64 completed olarak kaydedilir.
+- Step 225, Issue #67 ve `step-225-podcast-035-note-summary-contract` branch'i uzerinde active unmerged podcast/validator/test/documentation isidir.
+- Focused `24 passed` ve full `503 passed` test kaniti urun field-ready iddiasi degildir.
+- Main product code, workflow, NotebookLM automation, historical note mutation, ZIP/exports mutation ve Step 226 uygulanmamistir.
+
 ## 224 Rolling NotebookLM Podcast Source Protokolu Karari
 
 - NotebookLM'e her podcastte yeniden source ve instruction eklemek yerine `docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md` tek stable website source olarak kullanilir.

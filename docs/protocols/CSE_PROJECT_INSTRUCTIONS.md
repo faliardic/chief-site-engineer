@@ -487,7 +487,7 @@ Dokümantasyon üretmek, gerçek kod/test/yerel dosya kanıtının yerine geçme
 
 ### Podcast kuralı
 
-Her beş adımlık teknik blok tamamlandığında NotebookLM podcast notu oluşturulur. Podcast 030, Steps 196-200 araligini kapsar. Podcast 031, Steps 201-205 araligini kapsar. Dogal sonraki besli aralik Step 206 ile baslar.
+Her bes adimlik teknik blok tamamlandiginda NotebookLM podcast notu olusturulur. Podcast 035 ve sonraki strict notes, kendi previous-summary section'i icinde `001..note.step_start-1` canonical step headings'ini exactly once ve ascending order ile tasir. Rolling source cumulative summaries bu note-contained contract'in yerine gecmez.
 
 ---
 
@@ -512,34 +512,34 @@ Güncel kural:
 
 ### Son güvenli GitHub noktası
 
-- Tamamlanan adım: **Step 223**
-- Merge edilen PR: **#65**
-- Tamamlanan Issue: **#63**
+- Tamamlanan adım: **Step 224**
+- Merge edilen PR: **#66**
+- Tamamlanan Issue: **#64**
 - `master` commit:
 
 ```text
-932dbf3ffd076ddc124825adce78226d2ce8fb57
+68c00edab667bbfd0467f4684921c0f6b453d4a7
 ```
 
-- Son doğrulanan yerel test sonucu: **479 passed**
+- Son doğrulanan yerel test sonucu: **494 passed**
 - GitHub Actions: workflow mevcut, otomatik execution manuel olarak devre dışı
 
 ### Aktif iş
 
-- Issue: **#64**
-- Adım: **Step 224 — Rolling NotebookLM podcast source protocol**
+- Issue: **#67**
+- Adım: **Step 225 — Podcast 035 note summary contract**
 - Branch:
 
 ```text
-step-224-notebooklm-rolling-podcast-source
+step-225-podcast-035-note-summary-contract
 ```
 
-- Kapsam: **generator/tests/documentation/learning/state**
-- Codex modeli: **current selector'daki en guclu full Codex model; Spark/fast/lightweight degil**
+- Kapsam: **podcast/strict-validator/tests/generated-source/documentation/learning/state**
+- Codex modeli: **GPT-5.6 Sol**
 - Reasoning: **Extra High**
-- Secim nedeni: deterministic generator, cumulative history, manifest, UTF-8 ve failure/regression contracts.
-- Podcast 034 son podcast notudur; sonraki podcast araligi Steps 221-225'tir.
-- Step 224 merge iddiasi, PR creation, merge, Podcast 035 veya ana urun behavior bu aktif is kapsaminda yazilmaz.
+- Secim nedeni: strict note contract, executable regressions, 220-summary self-contained note, deterministic outputs ve multi-file canonical state.
+- Podcast 035, Steps 221-225 icin active artifact ve rolling source latest note'tur; kendi icinde Steps 001-220 summaries tasir.
+- Step 225 merge iddiasi, PR creation, merge, main product behavior veya Step 226 bu aktif is kapsaminda yazilmaz.
 
 Bu bölüm proje ilerledikçe güncellenir; yukarıdaki kalıcı kurallar değişmez.
 

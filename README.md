@@ -9,23 +9,23 @@ Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici reposit
 Son guvenli nokta:
 
 ```text
-Adim 223 - Field Observation attachment convenience lookup
-PR #65 merge commit: 932dbf3ffd076ddc124825adce78226d2ce8fb57
+Adim 224 - Rolling NotebookLM podcast source protocol
+PR #66 merge commit: 68c00edab667bbfd0467f4684921c0f6b453d4a7
 ```
 
 Guncel test sonucu:
 
 ```text
-479 passed
+494 passed
 ```
 
 Mevcut calisma durumu:
 
 ```text
-Adim 224 - Rolling NotebookLM podcast source protocol
+Adim 225 - Podcast 035 note summary contract
 ```
 
-Adim 223, PR #65 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 224, NotebookLM icin kalici talimat, degismeyen rolling website source yolu, deterministic generator, manifest ve regression testleri ekleyen aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Adim 224, PR #66 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 225, Podcast 035'i Steps 221-225 icin olusturan ve strict notlarda prior-step headings'i section siniri icinde zorunlu kilan aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
 
 ## Repo Koku
 
@@ -124,8 +124,9 @@ Son eklenen podcast notlari:
 - `docs/podcast_notes/032_adim_206_210_notebooklm_podcast_notu.md`
 - `docs/podcast_notes/033_adim_211_215_notebooklm_podcast_notu.md`
 - `docs/podcast_notes/034_adim_216_220_notebooklm_podcast_notu.md`
+- `docs/podcast_notes/035_adim_221_225_notebooklm_podcast_notu.md`
 
-Podcast 034, latest completed podcast olarak Steps 216-220 araligini kapsar. Sonraki dogal podcast araligi Steps 221-225 olur.
+Podcast 035, latest generated podcast source olarak Steps 221-225 araligini kapsar. Kendi Section 6 bolumunde Steps 001-220 icin 220 ayri historical summary tasir. Step 225 merge edilene kadar latest merged safe point Step 224 olarak kalir.
 
 NotebookLM'e bir kez eklenecek stable website source:
 
@@ -137,7 +138,7 @@ Generator `python scripts/build_notebooklm_podcast_source.py` komutuyla `docs/no
 
 ## Kalite Kontrol ve CI Durumu
 
-- Guncel merged safe point test tabani `479 passed` olarak dogrulanir; Step 224 generator focused test paketi `15 passed`, tam yerel suite `494 passed` seviyesindedir.
+- Guncel merged safe point test tabani `494 passed` olarak dogrulanir; Step 225 generator focused test paketi `24 passed`, tam yerel suite `503 passed` seviyesindedir.
 - `.github/workflows/pytest.yml` GitHub Actions workflow'u repoda bulunur.
 - Otomatik Actions calismasi account billing/runner-start kisiti nedeniyle manuel olarak devre disidir.
 - Required status checks etkin degildir.
@@ -231,7 +232,7 @@ Bu proje ayni zamanda Python ve yazilim gelistirme ogrenim arsivi uretir.
 
 ## Sonraki Urun Yonu
 
-Adim 224 boyunca ilk urun yonu, veri omurgasini guvenilir tutan dar bir saha MVP'sidir:
+Adim 225 boyunca ilk urun yonu, veri omurgasini guvenilir tutan dar bir saha MVP'sidir:
 
 - hizli observation kaydi,
 - attachment,
@@ -241,4 +242,4 @@ Adim 224 boyunca ilk urun yonu, veri omurgasini guvenilir tutan dar bir saha MVP
 - daily export,
 - weekly summary.
 
-CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. `FieldObservationRecord`, bellek ici observation repository davranislari ve `FileAttachmentRepository.list_for_field_observation(...)` dahil attachment metadata lookup hatti implement edilmistir. Step 224 ana urun davranisini genisletmez; podcast bilgisini tek stable website source'ta guncel tutan repository-side protokolu kurar. Persistence, physical file operations, export/reporting, API/GUI/CLI, audit ve ek validation henuz eklenmemistir.
+CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. `FieldObservationRecord`, bellek ici observation repository davranislari ve `FileAttachmentRepository.list_for_field_observation(...)` dahil attachment metadata lookup hatti implement edilmistir. Step 224 rolling NotebookLM protocolunu kurdu; Step 225 strict podcast note'un kendi icinde prior history tasimasini enforce eder. Bu iki adim ana urun davranisini genisletmez. Persistence, physical file operations, export/reporting, API/GUI/CLI, audit ve ek validation henuz eklenmemistir.
