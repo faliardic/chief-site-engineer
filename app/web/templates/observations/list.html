@@ -8,6 +8,12 @@
   <label>Durum <select name="status"><option value="">Tumu</option>{% for status in ('open', 'tracking', 'closed') %}<option {% if selected_status == status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></label>
   <button>Filtrele</button>
 </form>
+<form method="post" action="{{ url_for('daily_export') }}">
+  <label>Günlük çıktı tarihi (Europe/Istanbul)
+    <input type="date" name="local_date" required>
+  </label>
+  <button>Günlük çıktıyı indir</button>
+</form>
 <div class="cards">
 {% for observation in observations %}
   <a class="card" href="{{ url_for('observation_detail', observation_id=observation.observation_id) }}">

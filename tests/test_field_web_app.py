@@ -1,4 +1,6 @@
 import io
+import zipfile
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from app.web import create_app, istanbul_datetime_local_to_utc
@@ -61,6 +63,7 @@ def test_multipart_upload_download_and_verification(tmp_path: Path) -> None:
     assert response.data == b"image-bytes"
     assert b"saha.jpg" in response.headers["Content-Disposition"].encode()
     assert str(tmp_path).encode() not in response.data
+    assert str(tmp_path) not in str(response.headers)
 
     reopened = create_app(tmp_path)
     reopened_page = reopened.test_client().get(created.headers["Location"])
@@ -153,3 +156,41 @@ def test_invalid_attachment_is_not_served_and_upload_limit_returns_413(
         content_type="multipart/form-data",
     )
     assert too_large.status_code == 413
+
+
+def test_daily_export_web_flow_returns_managed_zip_without_path_leak(
+    tmp_path: Path,
+) -> None:
+    app = create_app(tmp_path)
+    client = app.test_client()
+    client.post("/projects/new", data={"name": "Ornek"})
+    project_id = app.config["CSE_SERVICE"].list_projects()[0].project_id
+    created = client.post(
+        "/observations/new",
+        data={
+            "project_id": project_id,
+            "location": "A",
+            "category": "quality",
+            "description": "Export",
+        },
+    )
+    observation_id = created.headers["Location"].rsplit("/", 1)[-1]
+    observed_at = app.config["CSE_SERVICE"].get_observation_detail(
+        observation_id
+    ).observation.observed_at
+    local_date = (
+        datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
+        .astimezone(timezone(timedelta(hours=3)))
+        .date()
+        .isoformat()
+    )
+
+    response = client.post("/exports/daily", data={"local_date": local_date})
+    assert response.status_code == 302
+    download = client.get(response.headers["Location"])
+    assert download.status_code == 200
+    assert download.mimetype == "application/zip"
+    assert str(tmp_path).encode() not in download.data
+    assert str(tmp_path) not in str(download.headers)
+    with zipfile.ZipFile(io.BytesIO(download.data)) as bundle:
+        assert "export_manifest.json" in bundle.namelist()
