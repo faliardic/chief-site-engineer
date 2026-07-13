@@ -27,13 +27,19 @@ from app.launcher.contracts import (
     APPLICATION_VERSION,
     instance_id_for_data_root,
 )
-from app.persistence import PersistenceError, RecordNotFound, RevisionConflict
+from app.persistence import (
+    ArchivedRecordError,
+    PersistenceError,
+    RecordNotFound,
+    RevisionConflict,
+)
 from app.operations import DailyExportService
 from app.storage import ManagedAttachmentStore
 from app.storage.paths import validate_canonical_uuid
 
 
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+MAX_SEARCH_QUERY_LENGTH = 200
 ISTANBUL_TIMEZONE = timezone(timedelta(hours=3), name="Europe/Istanbul")
 SAFE_PREVIEW_MIME_TYPES = frozenset(
     {"image/gif", "image/jpeg", "image/png", "image/webp"}
@@ -54,6 +60,7 @@ INTEGRITY_LABELS = {
 }
 EVENT_LABELS = {
     "observation_created": "Gözlem oluşturuldu",
+    "observation_details_updated": "Gözlem bilgileri güncellendi",
     "observation_status_changed": "Durum güncellendi",
     "observation_reporting_updated": "Bildirim bilgisi güncellendi",
     "observation_archived": "Gözlem arşivlendi",
@@ -179,18 +186,35 @@ def create_app(data_root: str | Path) -> Flask:
         return render_template("projects/new.html", error=error)
 
     @app.get("/observations")
-    def observation_list() -> str:
+    def observation_list() -> str | tuple[str, int]:
         projects = service().list_projects()
         project_id = request.args.get("project_id") or None
         status = request.args.get("status") or None
-        observations = service().list_observations(project_id, status)
-        return render_template(
+        raw_query = request.args.get("q", "")
+        error = None
+        response_status = 200
+        try:
+            observations = service().list_observations(project_id, status, raw_query)
+        except ValueError:
+            observations = []
+            error = (
+                f"Arama metni en fazla {MAX_SEARCH_QUERY_LENGTH} karakter olabilir."
+            )
+            response_status = 400
+        rendered = render_template(
             "observations/list.html",
             projects=projects,
             observations=observations,
             selected_project=project_id,
             selected_status=status,
+            selected_query=raw_query[:MAX_SEARCH_QUERY_LENGTH],
+            filters_active=bool(project_id or status or raw_query.strip()),
+            project_names={project.project_id: project.name for project in projects},
+            error=error,
         )
+        if response_status != 200:
+            return rendered, response_status
+        return rendered
 
     @app.route("/observations/new", methods=["GET", "POST"])
     def observation_new() -> str | Response:
@@ -228,6 +252,7 @@ def create_app(data_root: str | Path) -> Flask:
         except RecordNotFound:
             abort(404)
         saved_messages = {
+            "details": "Gözlem bilgileri kaydedildi.",
             "status": "Durum bilgisi kaydedildi.",
             "reporting": "Bildirim bilgisi kaydedildi.",
         }
@@ -236,6 +261,100 @@ def create_app(data_root: str | Path) -> Flask:
             detail=detail,
             error=None,
             success=saved_messages.get(request.args.get("saved", "")),
+        )
+
+    @app.route("/observations/<observation_id>/edit", methods=["GET", "POST"])
+    def observation_edit(observation_id: str) -> str | Response | tuple[str, int]:
+        try:
+            detail = service().get_observation_detail(observation_id)
+        except RecordNotFound:
+            abort(404)
+        if detail.observation.is_archived:
+            return (
+                render_template(
+                    "observations/detail.html",
+                    detail=detail,
+                    error="Arşivlenmiş gözlem düzenlenemez.",
+                    success=None,
+                ),
+                409,
+            )
+
+        if request.method == "GET":
+            form_values = {
+                "location": detail.observation.location,
+                "category": detail.observation.category,
+                "description": detail.observation.description,
+                "notes": detail.observation.notes or "",
+            }
+            return render_template(
+                "observations/edit.html",
+                observation=detail.observation,
+                form_values=form_values,
+                expected_revision=str(detail.observation.revision),
+                error=None,
+            )
+
+        form_values = {
+            "location": request.form.get("location", ""),
+            "category": request.form.get("category", ""),
+            "description": request.form.get("description", ""),
+            "notes": request.form.get("notes", ""),
+        }
+        expected_revision = request.form.get("expected_revision", "")
+        try:
+            service().update_observation_details(
+                observation_id,
+                int(expected_revision),
+                form_values["location"],
+                form_values["category"],
+                form_values["description"],
+                form_values["notes"],
+            )
+        except RevisionConflict:
+            current = service().get_observation_detail(observation_id).observation
+            return (
+                render_template(
+                    "observations/edit.html",
+                    observation=current,
+                    form_values=form_values,
+                    expected_revision=expected_revision,
+                    error=(
+                        "Kayıt başka bir işlem tarafından güncellendi. "
+                        "Devam etmeden önce sayfayı yenileyin."
+                    ),
+                ),
+                409,
+            )
+        except ArchivedRecordError:
+            current_detail = service().get_observation_detail(observation_id)
+            return (
+                render_template(
+                    "observations/detail.html",
+                    detail=current_detail,
+                    error="Arşivlenmiş gözlem düzenlenemez.",
+                    success=None,
+                ),
+                409,
+            )
+        except (PersistenceError, ValueError) as exc:
+            current = service().get_observation_detail(observation_id).observation
+            return (
+                render_template(
+                    "observations/edit.html",
+                    observation=current,
+                    form_values=form_values,
+                    expected_revision=expected_revision,
+                    error=_safe_error(exc),
+                ),
+                400,
+            )
+        return redirect(
+            url_for(
+                "observation_detail",
+                observation_id=observation_id,
+                saved="details",
+            )
         )
 
     @app.post("/observations/<observation_id>/status")

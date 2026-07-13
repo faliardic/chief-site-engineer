@@ -8,6 +8,7 @@ from typing import cast
 
 OBSERVATION_EVENT_TYPES: tuple[str, ...] = (
     "observation_created",
+    "observation_details_updated",
     "observation_status_changed",
     "observation_reporting_updated",
     "observation_archived",

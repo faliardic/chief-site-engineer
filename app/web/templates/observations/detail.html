@@ -20,6 +20,10 @@
   <dt>Bildirim Zamanı</dt><dd>{{ utc_to_istanbul_display(detail.observation.reported_at) }}</dd>
 </dl>
 
+{% if not detail.observation.is_archived %}
+<p><a class="button" href="{{ url_for('observation_edit', observation_id=detail.observation.observation_id) }}">Gözlemi Düzenle</a></p>
+{% endif %}
+
 <section aria-labelledby="attachments-title">
   <h2 id="attachments-title">Dosyalar</h2>
   {% for attachment in detail.attachments %}
@@ -49,6 +53,7 @@
   {% endfor %}
 </section>
 
+{% if not detail.observation.is_archived %}
 <section class="detail-actions" aria-label="Gözlem işlemleri">
   <div class="action-panel">
     <h2>Durumu Güncelle</h2>
@@ -79,6 +84,7 @@
     </form>
   </div>
 </section>
+{% endif %}
 
 <section aria-labelledby="history-title">
   <h2 id="history-title">Olay Geçmişi</h2>

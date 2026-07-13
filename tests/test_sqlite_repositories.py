@@ -366,6 +366,102 @@ def test_reporting_update_rejects_noncanonical_timestamps_without_mutation(
     assert unchanged.revision == 1
 
 
+def test_detail_update_changes_only_allowed_fields_and_no_op_is_stable(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "detail-update.sqlite3"
+    original = _observation(
+        status="closed",
+        closed_at=T1,
+        notes="Eski not",
+    )
+    original.reported_to = "Saha formeni"
+    original.reported_at = T1
+    original.created_by = "Santiye sefi"
+    _seed_observation(database_path, observation=original)
+
+    with SQLiteUnitOfWork(database_path) as unit_of_work:
+        updated = unit_of_work.observations.update_details(
+            OBSERVATION_ID,
+            expected_revision=1,
+            location="B Blok 3. Kat",
+            category="safety",
+            description="Korkuluk bilgisi düzeltildi.",
+            notes="Yeni not",
+            occurred_at=T2,
+        )
+        unit_of_work.commit()
+
+    assert updated.location == "B Blok 3. Kat"
+    assert updated.category == "safety"
+    assert updated.description == "Korkuluk bilgisi düzeltildi."
+    assert updated.notes == "Yeni not"
+    assert updated.updated_at == T2
+    assert updated.revision == 2
+    assert updated.observation_id == original.observation_id
+    assert updated.project_id == original.project_id
+    assert updated.observed_at == original.observed_at
+    assert updated.status == original.status == "closed"
+    assert updated.reported_to == original.reported_to
+    assert updated.reported_at == original.reported_at
+    assert updated.created_by == original.created_by
+    assert updated.created_at == original.created_at
+    assert updated.closed_at == original.closed_at == T1
+    assert updated.archived_at == original.archived_at
+
+    with SQLiteUnitOfWork(database_path) as unit_of_work:
+        same = unit_of_work.observations.update_details(
+            OBSERVATION_ID,
+            expected_revision=2,
+            location=updated.location,
+            category=updated.category,
+            description=updated.description,
+            notes=updated.notes,
+            occurred_at=T3,
+        )
+        unit_of_work.commit()
+
+    assert same == updated
+    assert same.revision == 2
+    assert same.updated_at == T2
+
+
+def test_detail_update_rejects_stale_archived_and_empty_values(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "detail-update-guards.sqlite3"
+    _seed_observation(database_path)
+
+    with SQLiteUnitOfWork(database_path) as unit_of_work:
+        with pytest.raises(RevisionConflict):
+            unit_of_work.observations.update_details(
+                OBSERVATION_ID, 99, "B", "quality", "Düzeltme", None, T2
+            )
+        with pytest.raises(InvalidRecordError):
+            unit_of_work.observations.update_details(
+                OBSERVATION_ID, 1, "   ", "quality", "Düzeltme", None, T2
+            )
+
+    with SQLiteUnitOfWork(database_path) as unit_of_work:
+        archived = unit_of_work.observations.archive(OBSERVATION_ID, 1, T2)
+        unit_of_work.commit()
+
+    with SQLiteUnitOfWork(database_path) as unit_of_work:
+        with pytest.raises(ArchivedRecordError):
+            unit_of_work.observations.update_details(
+                OBSERVATION_ID,
+                archived.revision,
+                "B",
+                "quality",
+                "Düzeltme",
+                None,
+                T3,
+            )
+        unchanged = unit_of_work.observations.get(OBSERVATION_ID)
+
+    assert unchanged == archived
+
+
 def test_archive_persists_timestamp_and_blocks_later_mutation(tmp_path: Path) -> None:
     database_path = tmp_path / "archive.sqlite3"
     _seed_observation(database_path)

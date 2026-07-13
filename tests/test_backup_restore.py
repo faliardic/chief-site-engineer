@@ -94,6 +94,58 @@ def test_backup_online_snapshot_verify_restore_and_reopen(tmp_path: Path) -> Non
     assert after == before
 
 
+def test_backup_restore_preserves_edited_revision_and_event(tmp_path: Path) -> None:
+    source = tmp_path / "edited-source"
+    ids = iter(
+        [
+            "11111111-1111-4111-8111-111111111111",
+            "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        ]
+    )
+    service = ObservationApplicationService(
+        source / "cse.sqlite3",
+        ManagedAttachmentStore(source / "attachments"),
+        clock=lambda: "2026-07-13T09:00:00Z",
+        uuid_factory=lambda: next(ids),
+    )
+    project = service.create_project("Örnek")
+    observation = service.create_observation(
+        project.project_id, "A", "quality", "Eski açıklama", None, None
+    )
+    service.update_observation_details(
+        observation.observation_id,
+        1,
+        "B",
+        "safety",
+        "Yeni açıklama",
+        "Yeni not",
+    )
+
+    archive = tmp_path / "edited.csebackup.zip"
+    backup = BackupService(source, clock=lambda: "2026-07-13T10:00:00Z")
+    result = backup.create_backup(archive)
+    target = tmp_path / "edited-restored"
+    backup.restore_backup(archive, target)
+    restored = ObservationApplicationService(
+        target / "cse.sqlite3", ManagedAttachmentStore(target / "attachments")
+    ).get_observation_detail(observation.observation_id)
+
+    assert result.observation_count == 1
+    assert result.event_count == 2
+    assert restored.observation.location == "B"
+    assert restored.observation.category == "safety"
+    assert restored.observation.description == "Yeni açıklama"
+    assert restored.observation.notes == "Yeni not"
+    assert restored.observation.revision == 2
+    assert restored.events[-1].event_type == "observation_details_updated"
+    assert restored.events[-1].payload == {
+        "changed_fields": ["location", "category", "description", "notes"],
+        "revision": 2,
+    }
+
+
 def test_missing_or_tampered_attachment_fails_closed(tmp_path: Path) -> None:
     source = tmp_path / "source"
     observation_id, attachment_id = seed(source)

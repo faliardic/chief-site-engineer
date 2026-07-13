@@ -29,6 +29,7 @@ T3 = "2026-07-12T11:00:00Z"
 def test_observation_event_vocabulary_is_explicit() -> None:
     assert OBSERVATION_EVENT_TYPES == (
         "observation_created",
+        "observation_details_updated",
         "observation_status_changed",
         "observation_reporting_updated",
         "observation_archived",
