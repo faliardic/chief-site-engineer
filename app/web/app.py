@@ -35,6 +35,81 @@ from app.storage.paths import validate_canonical_uuid
 
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 ISTANBUL_TIMEZONE = timezone(timedelta(hours=3), name="Europe/Istanbul")
+SAFE_PREVIEW_MIME_TYPES = frozenset(
+    {"image/gif", "image/jpeg", "image/png", "image/webp"}
+)
+STATUS_LABELS = {
+    "open": "Açık",
+    "tracking": "Takipte",
+    "closed": "Kapalı",
+}
+INTEGRITY_LABELS = {
+    "valid": "Dosya doğrulandı",
+    "missing": "Dosya bulunamadı",
+    "corrupt": "Dosya bütünlüğü doğrulanamadı",
+    "mismatch": "Dosya bütünlüğü doğrulanamadı",
+    "hash_mismatch": "Dosya bütünlüğü doğrulanamadı",
+    "size_mismatch": "Dosya bütünlüğü doğrulanamadı",
+    "unsafe_path": "Dosya güvenliği doğrulanamadı",
+}
+EVENT_LABELS = {
+    "observation_created": "Gözlem oluşturuldu",
+    "observation_status_changed": "Durum güncellendi",
+    "observation_reporting_updated": "Bildirim bilgisi güncellendi",
+    "observation_archived": "Gözlem arşivlendi",
+}
+
+
+def status_label(value: str) -> str:
+    """Return a Turkish presentation label without changing stored values."""
+
+    return STATUS_LABELS.get(value, "Durum bilgisi kullanılamıyor")
+
+
+def integrity_label(value: str) -> str:
+    """Return a safe Turkish attachment-integrity label."""
+
+    return INTEGRITY_LABELS.get(value, "Dosya bütünlüğü doğrulanamadı")
+
+
+def event_label(value: str) -> str:
+    """Return a Turkish event label with a non-technical fallback."""
+
+    return EVENT_LABELS.get(value, "Gözlem kaydı güncellendi")
+
+
+def utc_to_istanbul_display(value: str | None) -> str:
+    """Format a stored UTC timestamp for the Europe/Istanbul user surface."""
+
+    if not value:
+        return "-"
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return "Zaman bilgisi kullanılamıyor"
+    return parsed.astimezone(ISTANBUL_TIMEZONE).strftime("%d.%m.%Y %H:%M")
+
+
+def utc_to_istanbul_input(value: str | None) -> str:
+    """Format a stored UTC timestamp for an HTML datetime-local input."""
+
+    if not value:
+        return ""
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return ""
+    return parsed.astimezone(ISTANBUL_TIMEZONE).strftime("%Y-%m-%dT%H:%M")
+
+
+def is_safe_image_preview(mime_type: str | None) -> bool:
+    """Allow inline previews only for a small passive raster-image set."""
+
+    return mime_type in SAFE_PREVIEW_MIME_TYPES
 
 
 def istanbul_datetime_local_to_utc(value: str) -> str:
@@ -45,7 +120,7 @@ def istanbul_datetime_local_to_utc(value: str) -> str:
             tzinfo=ISTANBUL_TIMEZONE
         )
     except (TypeError, ValueError) as exc:
-        raise ValueError("Bildirim zamani gecersiz.") from exc
+        raise ValueError("Bildirim zamanı geçersiz.") from exc
     return local.astimezone(timezone.utc).isoformat(timespec="seconds").replace(
         "+00:00", "Z"
     )
@@ -66,6 +141,14 @@ def create_app(data_root: str | Path) -> Flask:
             ManagedAttachmentStore(root / "attachments"),
         ),
         CSE_EXPORT_SERVICE=DailyExportService(root),
+    )
+    app.jinja_env.globals.update(
+        event_label=event_label,
+        integrity_label=integrity_label,
+        is_safe_image_preview=is_safe_image_preview,
+        status_label=status_label,
+        utc_to_istanbul_display=utc_to_istanbul_display,
+        utc_to_istanbul_input=utc_to_istanbul_input,
     )
 
     def service() -> ObservationApplicationService:
@@ -144,7 +227,16 @@ def create_app(data_root: str | Path) -> Flask:
             detail = service().get_observation_detail(observation_id)
         except RecordNotFound:
             abort(404)
-        return render_template("observations/detail.html", detail=detail, error=None)
+        saved_messages = {
+            "status": "Durum bilgisi kaydedildi.",
+            "reporting": "Bildirim bilgisi kaydedildi.",
+        }
+        return render_template(
+            "observations/detail.html",
+            detail=detail,
+            error=None,
+            success=saved_messages.get(request.args.get("saved", "")),
+        )
 
     @app.post("/observations/<observation_id>/status")
     def observation_status(observation_id: str) -> str | Response:
@@ -160,16 +252,24 @@ def create_app(data_root: str | Path) -> Flask:
                 render_template(
                     "observations/detail.html",
                     detail=detail,
-                    error="Kayit baska bir islem tarafindan guncellendi. Sayfayi yenileyin.",
+                    error="Kayıt başka bir işlem tarafından güncellendi. Sayfayı yenileyin.",
+                    success=None,
                 ),
                 409,
             )
         except (PersistenceError, ValueError) as exc:
             detail = service().get_observation_detail(observation_id)
             return render_template(
-                "observations/detail.html", detail=detail, error=_safe_error(exc)
+                "observations/detail.html",
+                detail=detail,
+                error=_safe_error(exc),
+                success=None,
             ), 400
-        return redirect(url_for("observation_detail", observation_id=observation_id))
+        return redirect(
+            url_for(
+                "observation_detail", observation_id=observation_id, saved="status"
+            )
+        )
 
     @app.post("/observations/<observation_id>/reporting")
     def observation_reporting(observation_id: str) -> str | Response:
@@ -188,14 +288,24 @@ def create_app(data_root: str | Path) -> Flask:
             return render_template(
                 "observations/detail.html",
                 detail=detail,
-                error="Kayit baska bir islem tarafindan guncellendi. Sayfayi yenileyin.",
+                error="Kayıt başka bir işlem tarafından güncellendi. Sayfayı yenileyin.",
+                success=None,
             ), 409
         except (PersistenceError, ValueError) as exc:
             detail = service().get_observation_detail(observation_id)
             return render_template(
-                "observations/detail.html", detail=detail, error=_safe_error(exc)
+                "observations/detail.html",
+                detail=detail,
+                error=_safe_error(exc),
+                success=None,
             ), 400
-        return redirect(url_for("observation_detail", observation_id=observation_id))
+        return redirect(
+            url_for(
+                "observation_detail",
+                observation_id=observation_id,
+                saved="reporting",
+            )
+        )
 
     @app.get("/attachments/<attachment_id>")
     def attachment_download(attachment_id: str) -> Response:
@@ -216,9 +326,15 @@ def create_app(data_root: str | Path) -> Flask:
         response = Response(
             generate(), mimetype=metadata.mime_type or "application/octet-stream"
         )
+        disposition = "attachment"
+        if request.args.get("view") == "1" and is_safe_image_preview(
+            metadata.mime_type
+        ):
+            disposition = "inline"
         response.headers["Content-Disposition"] = (
-            f'attachment; filename="{download_name}"'
+            f'{disposition}; filename="{download_name}"'
         )
+        response.headers["X-Content-Type-Options"] = "nosniff"
         return response
 
     @app.post("/exports/daily")
@@ -252,5 +368,5 @@ def create_app(data_root: str | Path) -> Flask:
 
 def _safe_error(error: Exception) -> str:
     if isinstance(error, ApplicationServiceError):
-        return "Islem tamamlanamadi; dosya butunluk kontrolu gerekebilir."
+        return "İşlem tamamlanamadı; dosya bütünlük kontrolü gerekebilir."
     return "Girdileri kontrol edip yeniden deneyin."

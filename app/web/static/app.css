@@ -16,11 +16,30 @@ button, .button { background: #176b47; color: white; border: 0; cursor: pointer;
 .badge { display: inline-block; width: fit-content; padding: .25rem .55rem; border-radius: 999px; background: #dbe7ef; font-size: .85rem; }
 .valid { background: #c9f1d9; } .missing, .hash_mismatch, .size_mismatch, .unsafe_path { background: #ffd8d8; }
 .alert { padding: .8rem; background: #ffe9c7; border-left: 4px solid #a85800; overflow-wrap: anywhere; }
+.success { padding: .8rem; background: #d8f3e4; border-left: 4px solid #176b47; overflow-wrap: anywhere; }
 dl { display: grid; grid-template-columns: minmax(100px, 1fr) 3fr; gap: .5rem; }
 dt { font-weight: 700; } dd { margin: 0; overflow-wrap: anywhere; }
 .attachment { background: white; padding: 1rem; margin-bottom: .75rem; overflow-wrap: anywhere; }
+.detail-heading, .attachment-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.detail-heading h1 { margin-bottom: .35rem; }
+.detail-heading h2 { margin-top: 0; font-size: 1.2rem; }
+.observation-summary { padding: 1rem; background: white; }
+.attachment-heading { margin-bottom: .75rem; }
+.attachment-preview-link { display: block; width: fit-content; max-width: 100%; }
+.attachment-preview { display: block; width: auto; max-width: 100%; max-height: 420px; border-radius: .4rem; object-fit: contain; }
+.attachment-links { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: .75rem; }
+.detail-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+.action-panel { min-width: 0; padding: 1rem; background: white; }
+.action-panel h2 { margin-top: 0; }
+.event-history { display: grid; gap: .75rem; padding-left: 1.5rem; }
+.event-history li { padding: .75rem; background: white; overflow-wrap: anywhere; }
+.event-history time { display: block; margin-top: .25rem; color: #52606d; }
 @media (max-width: 640px) {
   .filters { grid-template-columns: 1fr; }
-  .title-row { align-items: stretch; flex-direction: column; }
+  .title-row, .detail-heading, .attachment-heading { align-items: stretch; flex-direction: column; }
+  .detail-actions { grid-template-columns: 1fr; }
   dl { grid-template-columns: 1fr; }
+  dd { margin-bottom: .5rem; }
+  .attachment-links { flex-direction: column; }
+  .attachment-links a { min-height: 44px; display: grid; align-items: center; }
 }

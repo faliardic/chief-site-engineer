@@ -1,31 +1,94 @@
 {% extends "base.html" %}
-{% block title %}Gozlem Detayi{% endblock %}
+{% block title %}Gözlem Detayı{% endblock %}
 {% block content %}
-<h1>Gozlem Detayi</h1>
-<span class="badge {{ detail.observation.status }}">{{ detail.observation.status }}</span>
-<h2>{{ detail.observation.description }}</h2>
-<dl><dt>Proje</dt><dd>{{ detail.project.name }}</dd><dt>Konum</dt><dd>{{ detail.observation.location }}</dd><dt>Kategori</dt><dd>{{ detail.observation.category }}</dd><dt>Not</dt><dd>{{ detail.observation.notes or '-' }}</dd></dl>
+{% if success %}<p class="success" role="status">{{ success }}</p>{% endif %}
 
-<h2>Dosyalar</h2>
-{% for attachment in detail.attachments %}
-<div class="attachment"><strong>{{ attachment.metadata.original_name }}</strong> <span class="badge {{ attachment.verification.status }}">{{ attachment.verification.status }}</span>
-{% if attachment.verification.valid %}<a href="{{ url_for('attachment_download', attachment_id=attachment.metadata.attachment_id) }}">Goruntule / indir</a>{% else %}<p class="alert">Dosya sunulamiyor: {{ attachment.verification.status }}</p>{% endif %}</div>
-{% else %}<p>Dosya eklenmedi.</p>{% endfor %}
+<div class="detail-heading">
+  <div>
+    <h1>Gözlem Detayı</h1>
+    <h2>{{ detail.observation.description }}</h2>
+  </div>
+  <span class="badge {{ detail.observation.status }}">{{ status_label(detail.observation.status) }}</span>
+</div>
 
-<h2>Durum guncelle</h2>
-<form method="post" action="{{ url_for('observation_status', observation_id=detail.observation.observation_id) }}">
-  <input type="hidden" name="expected_revision" value="{{ detail.observation.revision }}">
-  <label>Yeni durum <select name="new_status">{% for status in ('open', 'tracking', 'closed') %}<option {% if detail.observation.status == status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></label>
-  <button>Durumu kaydet</button>
-</form>
+<dl class="observation-summary">
+  <dt>Proje</dt><dd>{{ detail.project.name }}</dd>
+  <dt>Konum</dt><dd>{{ detail.observation.location }}</dd>
+  <dt>Kategori</dt><dd>{{ detail.observation.category }}</dd>
+  <dt>Not</dt><dd>{{ detail.observation.notes or '-' }}</dd>
+  <dt>Bildirilen Kişi</dt><dd>{{ detail.observation.reported_to or '-' }}</dd>
+  <dt>Bildirim Zamanı</dt><dd>{{ utc_to_istanbul_display(detail.observation.reported_at) }}</dd>
+</dl>
 
-<h2>Bildirilen kisi</h2>
-<form method="post" action="{{ url_for('observation_reporting', observation_id=detail.observation.observation_id) }}">
-  <input type="hidden" name="expected_revision" value="{{ detail.observation.revision }}">
-  <label>Bildirilen <input name="reported_to" required value="{{ detail.observation.reported_to or '' }}"></label>
-  <label>Bildirim zamani (Europe/Istanbul) <input type="datetime-local" name="reported_at" required></label>
-  <button>Bildirimi kaydet</button>
-</form>
+<section aria-labelledby="attachments-title">
+  <h2 id="attachments-title">Dosyalar</h2>
+  {% for attachment in detail.attachments %}
+  <article class="attachment">
+    <div class="attachment-heading">
+      <strong>{{ attachment.metadata.original_name }}</strong>
+      <span class="badge {{ attachment.verification.status }}">{{ integrity_label(attachment.verification.status) }}</span>
+    </div>
+    {% if attachment.verification.valid %}
+      {% if is_safe_image_preview(attachment.metadata.mime_type) %}
+      <a class="attachment-preview-link" href="{{ url_for('attachment_download', attachment_id=attachment.metadata.attachment_id, view=1) }}" target="_blank" rel="noopener">
+        <img class="attachment-preview" src="{{ url_for('attachment_download', attachment_id=attachment.metadata.attachment_id, view=1) }}" alt="{{ attachment.metadata.original_name }} önizlemesi" loading="lazy">
+      </a>
+      <div class="attachment-links">
+        <a href="{{ url_for('attachment_download', attachment_id=attachment.metadata.attachment_id, view=1) }}" target="_blank" rel="noopener">Tam Boy Görüntüle</a>
+        <a href="{{ url_for('attachment_download', attachment_id=attachment.metadata.attachment_id) }}">İndir</a>
+      </div>
+      {% else %}
+      <a href="{{ url_for('attachment_download', attachment_id=attachment.metadata.attachment_id) }}">İndir</a>
+      {% endif %}
+    {% else %}
+    <p class="alert">Dosya güvenli biçimde sunulamıyor.</p>
+    {% endif %}
+  </article>
+  {% else %}
+  <p>Dosya eklenmedi.</p>
+  {% endfor %}
+</section>
 
-<h2>Olay gecmisi</h2><ol>{% for event in detail.events %}<li>{{ event.event_type }} — {{ event.occurred_at }}</li>{% endfor %}</ol>
+<section class="detail-actions" aria-label="Gözlem işlemleri">
+  <div class="action-panel">
+    <h2>Durumu Güncelle</h2>
+    <form method="post" action="{{ url_for('observation_status', observation_id=detail.observation.observation_id) }}">
+      <input type="hidden" name="expected_revision" value="{{ detail.observation.revision }}">
+      <label>Yeni Durum
+        <select name="new_status">
+          {% for status in ('open', 'tracking', 'closed') %}
+          <option value="{{ status }}"{% if detail.observation.status == status %} selected{% endif %}>{{ status_label(status) }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button>Durumu Kaydet</button>
+    </form>
+  </div>
+
+  <div class="action-panel">
+    <h2>Bildirim Bilgisi</h2>
+    <form method="post" action="{{ url_for('observation_reporting', observation_id=detail.observation.observation_id) }}">
+      <input type="hidden" name="expected_revision" value="{{ detail.observation.revision }}">
+      <label>Bildirilen Kişi
+        <input name="reported_to" required value="{{ detail.observation.reported_to or '' }}">
+      </label>
+      <label>Bildirim Zamanı (Europe/Istanbul)
+        <input type="datetime-local" name="reported_at" required value="{{ utc_to_istanbul_input(detail.observation.reported_at) }}">
+      </label>
+      <button>Bildirimi Kaydet</button>
+    </form>
+  </div>
+</section>
+
+<section aria-labelledby="history-title">
+  <h2 id="history-title">Olay Geçmişi</h2>
+  <ol class="event-history">
+    {% for event in detail.events %}
+    <li>
+      <strong>{{ event_label(event.event_type) }}</strong>
+      <time>{{ utc_to_istanbul_display(event.occurred_at) }}</time>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
 {% endblock %}
