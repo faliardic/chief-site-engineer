@@ -61,6 +61,17 @@ class FieldObservationRepositoryPort(Protocol):
 
     def list_by_status(self, status: str) -> list[FieldObservationRecord]: ...
 
+    def update_details(
+        self,
+        observation_id: str,
+        expected_revision: int,
+        location: str,
+        category: str,
+        description: str,
+        notes: str | None,
+        occurred_at: str,
+    ) -> FieldObservationRecord: ...
+
     def update_status(
         self,
         observation_id: str,
@@ -287,6 +298,65 @@ class SQLiteFieldObservationRepository(_SQLiteRepository):
             "WHERE status = ? ORDER BY observed_at, id",
             (status,),
         )
+
+    def update_details(
+        self,
+        observation_id: str,
+        expected_revision: int,
+        location: str,
+        category: str,
+        description: str,
+        notes: str | None,
+        occurred_at: str,
+    ) -> FieldObservationRecord:
+        """Update only the editable text fields with optimistic concurrency."""
+
+        self._require_transaction()
+        _validate_id(observation_id, "observation_id")
+        _validate_revision(expected_revision)
+        _validate_required_text(location, "location")
+        _validate_required_text(category, "category")
+        _validate_required_text(description, "description")
+        if notes is not None and not isinstance(notes, str):
+            raise InvalidRecordError("notes must be a string or None")
+        _validate_timestamp(occurred_at, "occurred_at")
+
+        current = self.get(observation_id)
+        self._validate_mutation_target(current, expected_revision)
+        editable_before = (
+            current.location,
+            current.category,
+            current.description,
+            current.notes,
+        )
+        editable_after = (location, category, description, notes)
+        if editable_before == editable_after:
+            return current
+
+        cursor = self._connection.execute(
+            """
+            UPDATE field_observations
+            SET location = ?,
+                category = ?,
+                description = ?,
+                notes = ?,
+                updated_at = ?,
+                revision = revision + 1
+            WHERE id = ? AND revision = ? AND archived_at IS NULL
+            """,
+            (
+                location,
+                category,
+                description,
+                notes,
+                occurred_at,
+                observation_id,
+                expected_revision,
+            ),
+        )
+        if cursor.rowcount != 1:
+            self._raise_mutation_failure(observation_id, expected_revision)
+        return self.get(observation_id)
 
     def update_status(
         self,

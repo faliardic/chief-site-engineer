@@ -125,6 +125,154 @@ def test_stale_revision_leaves_record_and_events_unchanged(tmp_path: Path) -> No
     assert len(detail.events) == 1
 
 
+def test_unicode_literal_search_combines_with_project_and_status_filters(
+    tmp_path: Path,
+) -> None:
+    second_project_id = "22222222-2222-4222-8222-222222222222"
+    second_observation_id = "99999999-9999-4999-8999-999999999999"
+    ids = [
+        PROJECT_ID,
+        second_project_id,
+        OBSERVATION_ID,
+        EVENT_IDS[0],
+        second_observation_id,
+        EVENT_IDS[1],
+        EVENT_IDS[2],
+        EVENT_IDS[3],
+    ]
+    service = make_service(tmp_path, ids)
+    service.create_project("İstanbul Metro Projesi")
+    service.create_project("Kuzey Sahası")
+    first = service.create_observation(
+        PROJECT_ID,
+        "A Blok",
+        "Kalite",
+        "Kalıp kontrolü",
+        "Literal %_' <etiket>",
+        None,
+    )
+    second = service.create_observation(
+        second_project_id,
+        "Depo",
+        "Güvenlik",
+        "Takip kaydı",
+        None,
+        None,
+    )
+    service.update_reporting(
+        first.observation_id,
+        1,
+        "Şantiye Şefi",
+        "2026-07-13T10:00:00Z",
+    )
+    service.update_status(second.observation_id, 1, "tracking")
+    first_current = service.get_observation_detail(first.observation_id).observation
+    second_current = service.get_observation_detail(second.observation_id).observation
+
+    assert service.list_observations(q="   ") == [second_current, first_current]
+    assert service.list_observations(q="istanbul") == [first_current]
+    assert service.list_observations(q="A BLOK") == [first_current]
+    assert service.list_observations(q="kalite") == [first_current]
+    assert service.list_observations(q="KONTROLÜ") == [first_current]
+    assert service.list_observations(q="%_' <etiket>") == [first_current]
+    assert service.list_observations(q="şefİ") == [first_current]
+    assert service.list_observations(
+        project_id=second_project_id,
+        status="tracking",
+        q="TAKİP",
+    ) == [second_current]
+    assert service.list_observations(q="eşleşmeyen") == []
+    with pytest.raises(ValueError, match="200"):
+        service.list_observations(q="x" * 201)
+
+
+def test_detail_update_event_no_op_conflict_and_immutable_fields(
+    tmp_path: Path,
+) -> None:
+    service = make_service(
+        tmp_path,
+        [PROJECT_ID, OBSERVATION_ID, EVENT_IDS[0], EVENT_IDS[1]],
+    )
+    service.create_project("Örnek")
+    created = service.create_observation(
+        PROJECT_ID, "A", "quality", "Kontrol", "Eski not", None
+    )
+    before = service.get_observation_detail(OBSERVATION_ID)
+
+    updated = service.update_observation_details(
+        OBSERVATION_ID,
+        expected_revision=1,
+        location="B Blok",
+        category="safety",
+        description="Korkuluk düzeltildi",
+        notes="Yeni not",
+    )
+    same = service.update_observation_details(
+        OBSERVATION_ID,
+        expected_revision=2,
+        location=updated.location,
+        category=updated.category,
+        description=updated.description,
+        notes=updated.notes,
+    )
+
+    assert updated.revision == same.revision == 2
+    detail = service.get_observation_detail(OBSERVATION_ID)
+    assert [event.event_type for event in detail.events] == [
+        "observation_created",
+        "observation_details_updated",
+    ]
+    assert detail.events[-1].payload == {
+        "changed_fields": ["location", "category", "description", "notes"],
+        "revision": 2,
+    }
+    assert detail.observation.project_id == created.project_id
+    assert detail.observation.observed_at == created.observed_at
+    assert detail.observation.status == created.status
+    assert detail.observation.reported_to == created.reported_to
+    assert detail.observation.reported_at == created.reported_at
+    assert detail.observation.created_by == created.created_by
+    assert detail.observation.created_at == created.created_at
+    assert detail.observation.closed_at == created.closed_at
+    assert detail.observation.archived_at == created.archived_at
+    assert detail.attachments == before.attachments
+
+    with pytest.raises(RevisionConflict):
+        service.update_observation_details(
+            OBSERVATION_ID, 1, "C", "quality", "Stale", None
+        )
+    after_conflict = service.get_observation_detail(OBSERVATION_ID)
+    assert after_conflict.observation == detail.observation
+    assert after_conflict.events == detail.events
+
+
+def test_detail_update_event_failure_rolls_back_record(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = make_service(
+        tmp_path,
+        [PROJECT_ID, OBSERVATION_ID, EVENT_IDS[0], EVENT_IDS[1]],
+    )
+    service.create_project("Örnek")
+    service.create_observation(PROJECT_ID, "A", "quality", "Kontrol", None, None)
+    monkeypatch.setattr(
+        SQLiteObservationEventRepository,
+        "add",
+        lambda *_: (_ for _ in ()).throw(InvalidRecordError("event failed")),
+    )
+
+    with pytest.raises(InvalidRecordError, match="event failed"):
+        service.update_observation_details(
+            OBSERVATION_ID, 1, "B", "quality", "Düzeltme", None
+        )
+
+    detail = service.get_observation_detail(OBSERVATION_ID)
+    assert detail.observation.location == "A"
+    assert detail.observation.revision == 1
+    assert [event.event_type for event in detail.events] == ["observation_created"]
+
+
 def test_finalize_failure_rolls_back_db_and_leaves_stale_staging(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

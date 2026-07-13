@@ -105,6 +105,59 @@ def test_empty_day_export_is_valid_and_deterministic(tmp_path: Path) -> None:
     assert read_zip_json(output_one, "export_manifest.json")["record_count"] == 0
 
 
+def test_daily_export_includes_edited_details_revision_and_event(tmp_path: Path) -> None:
+    ids = iter(
+        [
+            "11111111-1111-4111-8111-111111111111",
+            "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        ]
+    )
+    times = iter(
+        [
+            "2026-07-13T08:00:00Z",
+            "2026-07-13T09:00:00Z",
+            "2026-07-13T10:00:00Z",
+        ]
+    )
+    service = ObservationApplicationService(
+        tmp_path / "cse.sqlite3",
+        ManagedAttachmentStore(tmp_path / "attachments"),
+        clock=lambda: next(times),
+        uuid_factory=lambda: next(ids),
+    )
+    project = service.create_project("Örnek")
+    observation = service.create_observation(
+        project.project_id, "A", "quality", "Eski açıklama", None, None
+    )
+    service.update_observation_details(
+        observation.observation_id,
+        1,
+        "B",
+        "safety",
+        "Yeni açıklama",
+        "Yeni not",
+    )
+
+    artifact = DailyExportService(
+        tmp_path,
+        clock=lambda: "2026-07-13T11:00:00Z",
+        uuid_factory=lambda: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    ).build_daily_export("2026-07-13")
+    records = read_zip_json(artifact.path, "observations.json")
+
+    assert records[0]["location"] == "B"
+    assert records[0]["category"] == "safety"
+    assert records[0]["description"] == "Yeni açıklama"
+    assert records[0]["notes"] == "Yeni not"
+    assert records[0]["revision"] == 2
+    assert records[0]["event_types"] == [
+        "observation_created",
+        "observation_details_updated",
+    ]
+
+
 def test_export_write_or_rename_failure_leaves_no_final(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

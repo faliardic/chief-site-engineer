@@ -1,5 +1,6 @@
 """Transaction-aware observation use cases for the local Field MVP."""
 
+import unicodedata
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -22,6 +23,10 @@ from app.storage import (
     ManagedAttachmentStore,
     StagedAttachment,
 )
+
+
+MAX_SEARCH_QUERY_LENGTH = 200
+EDITABLE_DETAIL_FIELDS = ("location", "category", "description", "notes")
 
 
 @dataclass(frozen=True)
@@ -194,9 +199,21 @@ class ObservationApplicationService:
         return observation
 
     def list_observations(
-        self, project_id: str | None = None, status: str | None = None
+        self,
+        project_id: str | None = None,
+        status: str | None = None,
+        q: str | None = None,
     ) -> list[FieldObservationRecord]:
+        query = (q or "").strip()
+        if len(query) > MAX_SEARCH_QUERY_LENGTH:
+            raise ValueError(
+                f"search query cannot exceed {MAX_SEARCH_QUERY_LENGTH} characters"
+            )
         with self._uow_factory() as unit_of_work:
+            projects = {
+                project.project_id: project.name
+                for project in unit_of_work.projects.list_all()
+            }
             if project_id is not None:
                 records = unit_of_work.observations.list_by_project_id(project_id)
             elif status is not None:
@@ -205,6 +222,23 @@ class ObservationApplicationService:
                 records = unit_of_work.observations.list_all()
         if project_id is not None and status is not None:
             records = [record for record in records if record.status == status]
+        if query:
+            query_key = _search_key(query)
+            records = [
+                record
+                for record in records
+                if any(
+                    query_key in _search_key(value)
+                    for value in (
+                        projects.get(record.project_id, ""),
+                        record.location,
+                        record.category,
+                        record.description,
+                        record.notes or "",
+                        record.reported_to or "",
+                    )
+                )
+            ]
         return records
 
     def get_observation_detail(self, observation_id: str) -> ObservationDetail:
@@ -236,6 +270,50 @@ class ObservationApplicationService:
                         occurred_at,
                         {"from": before.status, "to": updated.status,
                          "revision": updated.revision},
+                    )
+                )
+            unit_of_work.commit()
+        return updated
+
+    def update_observation_details(
+        self,
+        observation_id: str,
+        expected_revision: int,
+        location: str,
+        category: str,
+        description: str,
+        notes: str | None,
+    ) -> FieldObservationRecord:
+        """Update the editable detail allowlist and append one audit event."""
+
+        occurred_at = self._clock()
+        normalized_notes = notes if notes is not None and notes.strip() else None
+        with self._uow_factory() as unit_of_work:
+            before = unit_of_work.observations.get(observation_id)
+            updated = unit_of_work.observations.update_details(
+                observation_id,
+                expected_revision,
+                location,
+                category,
+                description,
+                normalized_notes,
+                occurred_at,
+            )
+            changed_fields = [
+                field_name
+                for field_name in EDITABLE_DETAIL_FIELDS
+                if getattr(before, field_name) != getattr(updated, field_name)
+            ]
+            if changed_fields:
+                unit_of_work.events.add(
+                    self._event(
+                        observation_id,
+                        "observation_details_updated",
+                        occurred_at,
+                        {
+                            "changed_fields": changed_fields,
+                            "revision": updated.revision,
+                        },
                     )
                 )
             unit_of_work.commit()
@@ -327,3 +405,10 @@ class ObservationApplicationService:
     def _is_staging_present(self, staged: StagedAttachment) -> bool:
         report = self.attachment_store.reconcile([])
         return staged.staging_relative_path in report.stale_staging_files
+
+
+def _search_key(value: str) -> str:
+    """Return a Unicode-aware, Turkish-friendly key for literal searching."""
+
+    decomposed = unicodedata.normalize("NFKD", value).casefold()
+    return decomposed.replace("\u0307", "").replace("ı", "i")

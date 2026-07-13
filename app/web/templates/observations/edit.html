@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Gözlemi Düzenle{% endblock %}
+{% block content %}
+<h1>Gözlemi Düzenle</h1>
+<p>Yalnız konum, kategori, açıklama ve not alanları değiştirilebilir.</p>
+<form method="post" action="{{ url_for('observation_edit', observation_id=observation.observation_id) }}">
+  <input type="hidden" name="expected_revision" value="{{ expected_revision }}">
+  <label>Konum
+    <input name="location" required value="{{ form_values.location }}">
+  </label>
+  <label>Kategori
+    <input name="category" required value="{{ form_values.category }}">
+  </label>
+  <label>Açıklama
+    <textarea name="description" required>{{ form_values.description }}</textarea>
+  </label>
+  <label>Not
+    <textarea name="notes">{{ form_values.notes }}</textarea>
+  </label>
+  <div class="form-actions">
+    <button type="submit">Kaydet</button>
+    <a class="button secondary" href="{{ url_for('observation_detail', observation_id=observation.observation_id) }}">İptal</a>
+  </div>
+</form>
+{% endblock %}

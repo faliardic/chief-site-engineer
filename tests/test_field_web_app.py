@@ -340,3 +340,202 @@ def test_daily_export_web_flow_returns_managed_zip_without_path_leak(
     assert str(tmp_path) not in str(download.headers)
     with zipfile.ZipFile(io.BytesIO(download.data)) as bundle:
         assert "export_manifest.json" in bundle.namelist()
+
+
+def test_observation_list_search_preserves_filters_and_handles_literal_input(
+    tmp_path: Path,
+) -> None:
+    app = create_app(tmp_path)
+    client = app.test_client()
+    client.post("/projects/new", data={"name": "İstanbul Projesi"})
+    project_id = app.config["CSE_SERVICE"].list_projects()[0].project_id
+    first = client.post(
+        "/observations/new",
+        data={
+            "project_id": project_id,
+            "location": "A Blok",
+            "category": "Kalite",
+            "description": "Kalıp kontrolü",
+            "notes": "Literal %_' <etiket>",
+        },
+    )
+    client.post(
+        "/observations/new",
+        data={
+            "project_id": project_id,
+            "location": "B Blok",
+            "category": "Güvenlik",
+            "description": "Korkuluk kontrolü",
+        },
+    )
+    first_id = first.headers["Location"].rsplit("/", 1)[-1]
+    app.config["CSE_SERVICE"].update_reporting(
+        first_id, 1, "Şantiye Şefi", "2026-07-13T10:00:00Z"
+    )
+
+    unfiltered = client.get("/observations", query_string={"q": "   "})
+    assert "Kalıp kontrolü".encode() in unfiltered.data
+    assert "Korkuluk kontrolü".encode() in unfiltered.data
+
+    combined = client.get(
+        "/observations",
+        query_string={
+            "project_id": project_id,
+            "status": "open",
+            "q": "şefİ",
+        },
+    )
+    assert combined.status_code == 200
+    assert "Kalıp kontrolü".encode() in combined.data
+    assert "Korkuluk kontrolü".encode() not in combined.data
+    assert f'value="{project_id}" selected'.encode() in combined.data
+    assert b'value="open" selected' in combined.data
+    assert 'value="şefİ"'.encode() in combined.data
+    assert "Filtreleri Temizle".encode() in combined.data
+
+    literal = client.get("/observations", query_string={"q": "%_' <etiket>"})
+    assert literal.status_code == 200
+    assert "Kalıp kontrolü".encode() in literal.data
+    assert b"<etiket>" not in literal.data
+    assert b"&lt;etiket&gt;" in literal.data
+
+    empty = client.get("/observations", query_string={"q": "<script>"})
+    assert empty.status_code == 200
+    assert "Aramanızla eşleşen gözlem bulunamadı.".encode() in empty.data
+    assert b"<script>" not in empty.data
+    assert b"&lt;script&gt;" in empty.data
+
+    too_long = client.get("/observations", query_string={"q": "x" * 201})
+    assert too_long.status_code == 400
+    assert "Arama metni en fazla 200 karakter olabilir.".encode() in too_long.data
+    assert b"Traceback" not in too_long.data
+
+
+def test_observation_edit_prg_escape_restart_conflict_and_allowlist(
+    tmp_path: Path,
+) -> None:
+    app = create_app(tmp_path)
+    client = app.test_client()
+    client.post("/projects/new", data={"name": "Örnek"})
+    project_id = app.config["CSE_SERVICE"].list_projects()[0].project_id
+    created = client.post(
+        "/observations/new",
+        data={
+            "project_id": project_id,
+            "location": "A Blok",
+            "category": "Kalite",
+            "description": "Kalıp kontrolü",
+            "notes": "Eski not",
+        },
+    )
+    observation_id = created.headers["Location"].rsplit("/", 1)[-1]
+    original = app.config["CSE_SERVICE"].get_observation_detail(observation_id)
+
+    edit_page = client.get(f"/observations/{observation_id}/edit")
+    assert edit_page.status_code == 200
+    assert "Gözlemi Düzenle".encode() in edit_page.data
+    assert b'value="A Blok"' in edit_page.data
+    assert "Kalıp kontrolü".encode() in edit_page.data
+    assert "İptal".encode() in edit_page.data
+
+    updated = client.post(
+        f"/observations/{observation_id}/edit",
+        data={
+            "expected_revision": "1",
+            "location": "B Blok",
+            "category": "Güvenlik",
+            "description": "<script>alert(1)</script>",
+            "notes": "Yeni not",
+            "project_id": "22222222-2222-4222-8222-222222222222",
+            "status": "closed",
+            "reported_to": "Değişmemeli",
+            "reported_at": "2026-07-13T15:30",
+        },
+    )
+    assert updated.status_code == 302
+    assert updated.headers["Location"].endswith("?saved=details")
+    saved = client.get(updated.headers["Location"])
+    assert "Gözlem bilgileri kaydedildi.".encode() in saved.data
+    assert "Gözlem bilgileri güncellendi".encode() in saved.data
+    assert b"observation_details_updated" not in saved.data
+    assert b"<script>alert(1)</script>" not in saved.data
+    assert b"&lt;script&gt;alert(1)&lt;/script&gt;" in saved.data
+
+    detail = app.config["CSE_SERVICE"].get_observation_detail(observation_id)
+    assert detail.observation.revision == 2
+    assert detail.observation.project_id == original.observation.project_id
+    assert detail.observation.status == original.observation.status
+    assert detail.observation.reported_to == original.observation.reported_to
+    assert detail.observation.reported_at == original.observation.reported_at
+    assert detail.attachments == original.attachments
+    assert detail.events[-1].payload == {
+        "changed_fields": ["location", "category", "description", "notes"],
+        "revision": 2,
+    }
+
+    conflict = client.post(
+        f"/observations/{observation_id}/edit",
+        data={
+            "expected_revision": "1",
+            "location": "Çakışan konum",
+            "category": "Kalite",
+            "description": "Çakışan açıklama",
+            "notes": "Çakışan not",
+        },
+    )
+    assert conflict.status_code == 409
+    assert "sayfayı yenileyin".encode() in conflict.data
+    assert "Çakışan konum".encode() in conflict.data
+    after_conflict = app.config["CSE_SERVICE"].get_observation_detail(observation_id)
+    assert after_conflict.observation == detail.observation
+    assert after_conflict.events == detail.events
+
+    invalid = client.post(
+        f"/observations/{observation_id}/edit",
+        data={
+            "expected_revision": "2",
+            "location": "   ",
+            "category": "Kalite",
+            "description": "Girilen açıklama",
+            "notes": "Formda kalsın",
+        },
+    )
+    assert invalid.status_code == 400
+    assert "Girdileri kontrol edip yeniden deneyin.".encode() in invalid.data
+    assert "Girilen açıklama".encode() in invalid.data
+    assert "Formda kalsın".encode() in invalid.data
+
+    reopened = create_app(tmp_path)
+    reopened_detail = reopened.config["CSE_SERVICE"].get_observation_detail(
+        observation_id
+    )
+    assert reopened_detail.observation == detail.observation
+    assert reopened_detail.events == detail.events
+    reopened_page = reopened.test_client().get(f"/observations/{observation_id}")
+    assert "Gözlem bilgileri güncellendi".encode() in reopened_page.data
+
+
+def test_archived_observation_has_no_edit_surface(tmp_path: Path) -> None:
+    app = create_app(tmp_path)
+    client = app.test_client()
+    client.post("/projects/new", data={"name": "Örnek"})
+    project_id = app.config["CSE_SERVICE"].list_projects()[0].project_id
+    created = client.post(
+        "/observations/new",
+        data={
+            "project_id": project_id,
+            "location": "A",
+            "category": "Kalite",
+            "description": "Arşiv testi",
+        },
+    )
+    observation_id = created.headers["Location"].rsplit("/", 1)[-1]
+    app.config["CSE_SERVICE"].archive_observation(observation_id, 1)
+
+    detail = client.get(created.headers["Location"])
+    assert "Gözlemi Düzenle".encode() not in detail.data
+    assert "Durumu Güncelle".encode() not in detail.data
+    assert "Bildirim Bilgisi".encode() not in detail.data
+    direct = client.get(f"/observations/{observation_id}/edit")
+    assert direct.status_code == 409
+    assert "Arşivlenmiş gözlem düzenlenemez.".encode() in direct.data
