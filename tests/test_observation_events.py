@@ -109,6 +109,40 @@ def test_event_add_list_round_trip_uses_deterministic_json_and_order(
     assert events[0].payload == {"a": 1, "z": 2}
 
 
+def test_same_timestamp_events_keep_insertion_order_after_reopen(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "same-timestamp-events.sqlite3"
+    _seed_observation(database_path)
+    inserted_events = [
+        _event(THIRD_EVENT_ID, occurred_at=T2),
+        _event(
+            EVENT_ID,
+            event_type="observation_details_updated",
+            occurred_at=T2,
+        ),
+        _event(
+            SECOND_EVENT_ID,
+            event_type="observation_status_changed",
+            occurred_at=T2,
+        ),
+    ]
+
+    with SQLiteUnitOfWork(database_path) as unit_of_work:
+        for event in inserted_events:
+            unit_of_work.events.add(event)
+        unit_of_work.commit()
+
+    with SQLiteUnitOfWork(database_path) as reopened:
+        stored_events = reopened.events.list_for_observation(OBSERVATION_ID)
+
+    assert [event.event_id for event in stored_events] == [
+        THIRD_EVENT_ID,
+        EVENT_ID,
+        SECOND_EVENT_ID,
+    ]
+
+
 @pytest.mark.parametrize("payload_json", ["not-json", "[]", '"text"'])
 def test_event_rejects_payload_that_is_not_valid_json_object(
     tmp_path: Path,

@@ -415,6 +415,7 @@ def test_observation_edit_prg_escape_restart_conflict_and_allowlist(
     tmp_path: Path,
 ) -> None:
     app = create_app(tmp_path)
+    app.config["CSE_SERVICE"]._clock = lambda: "2026-07-13T09:00:00Z"
     client = app.test_client()
     client.post("/projects/new", data={"name": "Örnek"})
     project_id = app.config["CSE_SERVICE"].list_projects()[0].project_id
