@@ -695,8 +695,21 @@ Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcas
 - [x] Backup format v1’i koruma, schema v2 eski backup’ı yeni hedefte migrate etme ve tracking manifest count eklememe kararı verildi.
 - [x] Kişisel tracking verisinin günlük resmî observation export’una girmemesi ve byte-level regression sınırı tanımlandı.
 - [x] Puantaj iş günü kabul senaryosu restart, snooze, template edit, deactivation ve backup/restore durumlarıyla tamamlandı.
-- [ ] Production domain/recurrence implementasyonu ayrı görevde yapılacak.
+- [x] Production domain kayıtları, hızlı capture normalization, saf recurrence ve görünüm sınıflandırmaları Issue #100 kapsamında executable testlerle uygulandı.
 - [ ] SQLite migration/repository/event implementasyonu ayrı görevde yapılacak.
 - [ ] Transactional service/backfill implementasyonu ayrı görevde yapılacak.
 - [ ] Backup compatibility ve export exclusion executable testleri ayrı görevlerde yapılacak.
 - [ ] Minimum UI yalnız veri sözleşmesi implementation’ı doğrulandıktan sonra ele alınacak.
+
+## Issue 100 - Saha Takibi Task 2/5 Domain ve Saf Recurrence
+
+- [x] `FollowUpItem`, `RoutineTemplate`, `RoutineOccurrence` ve üç event ailesi immutable domain kayıtları olarak eklendi.
+- [x] Yalnız `capture_text` alanını normalize edip ilk `title` değerini aynı metinden üreten saf hızlı yakalama sınırı eklendi.
+- [x] Nullable proje, observation için project zorunluluğu, açık/terminal status ve outcome/timestamp değişmezleri executable validation ile korundu.
+- [x] `daily`, `weekdays`, `weekly`, `monthly` yerel tarih eşleşmeleri ve bugün dahil yedi günlük sınırlı pencere saf fonksiyonlarla eklendi.
+- [x] `Europe/Istanbul` `ZoneInfo` dönüşümüyle yerel tarih/saat ve canonical UTC snapshot planı eklendi.
+- [x] Geçmiş uygun gün için `missed`, bugün için `open` saf occurrence planı eklendi; gelecek gün reddedildi.
+- [x] Follow-up `inbox/overdue/today/upcoming`, occurrence `overdue/today/upcoming` ve tekilleştirilmiş “Şimdi ilgilen” bileşimi eklendi; `now` domain kategorisi eklenmedi.
+- [x] Domain ve recurrence için kapsamlı focused executable test matrisi eklendi.
+- [ ] SQLite schema v3, migration, repository, Unit of Work ve transactional application service sonraki ayrı görevlerde uygulanacak.
+- [ ] Backup/restore compatibility, export exclusion ve minimum UI sonraki ayrı görevlerde uygulanacak.
