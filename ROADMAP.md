@@ -1,5 +1,22 @@
 # Roadmap
 
+## Birinci Ürün Önceliği - Saha Takibi v0.1
+
+Saha Takibi v0.1, mevcut güvenilir gözlem, SQLite, attachment, backup ve günlük export omurgasından sonraki birinci ürün önceliğidir.
+
+Issue #98 bu yönün production implementation’ı değil, domain ve veri sözleşmesi aşamasıdır. Kesin kaynak `docs/field_tracking_v0_1_contract.md` dosyasıdır.
+
+Bu öncelik şu sırayla ilerler:
+
+1. Yalnız `capture_text` isteyen hızlı `+ Unutma` create sınırı; deterministic başlangıç başlığı; nullable follow-up/template projesi; Unutma Kutusu veya planlı `active/waiting` değişmezi; `RoutineOccurrence` ve saf recurrence hesaplayıcısı.
+2. SQLite schema v3 migration, ayrı repository ve deterministic append-only event tabloları.
+3. Optimistic revision kullanan transactional application service ve yedi günlük idempotent lazy backfill.
+4. Schema v2 backup backward restore, schema v3 round-trip ve aktif data root koruması.
+5. Kişisel tracking verisinin mevcut günlük resmî export’tan dışlandığını kanıtlayan regression testleri.
+6. Bu veri omurgası doğrulandıktan sonra minimum Saha Takibi UI’si.
+
+İlk beş aşama tamamlanmadan background scheduler, notification, PWA/mobil, AI sınıflandırma, takım görevlendirme veya geniş puantaj/personel modülü başlatılmaz.
+
 ## Guncel Guvenli Nokta
 
 ```text
@@ -662,3 +679,24 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 Step 225 merge/finalize edildikten sonra sonraki teknik yon ayri Issue ile secilmelidir. Attachment convenience helper usage boundary, upload/persistence oncesi storage contract veya daily export/weekly summary hatti olasi dar yonlerdir. Step 226 bu adimda baslatilmaz.
 
 Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcast 032 Adim 206-210, Podcast 033 Adim 211-215, Podcast 034 Adim 216-220 ve Podcast 035 Adim 221-225 araligini kapsar. Sonraki dogal podcast araligi Steps 226-230 olur.
+
+## Issue 98 - Saha Takibi v0.1 Sözleşme Aşaması
+
+- [x] Mevcut schema v2, migration, repository, Unit of Work, backup/restore ve daily export sınırları incelendi.
+- [x] `FollowUpItem`, `RoutineTemplate` ve `RoutineOccurrence` alanları ve yaşam döngüleri kesinleştirildi.
+- [x] Hızlı create command’ında yalnız `capture_text` zorunlu; ilk title deterministic normalize edilmiş aynı metin; sonraki title düzenlemesi serbest olarak düzeltildi.
+- [x] Follow-up ve routine template projesi nullable yapıldı; projesiz kayıtların kişisel çalışma alanında kalması ve observation bağında project eşleşmesi kesinleştirildi.
+- [x] Zamanlanmamış açık kaydın yalnız `inbox` olacağı; `active/waiting` kaydın `next_attention_at` taşımak zorunda olduğu database/application sınırıyla kaydedildi.
+- [x] `now` domain kategorisinden çıkarıldı; `overdue/today/upcoming` yalnız planlı kayıtlar, “Şimdi ilgilen” ise overdue + zamanı gelmiş today + önemli inbox UI bileşimi olarak tanımlandı.
+- [x] `daily`, `weekdays`, `weekly`, `monthly` recurrence davranışı, Europe/Istanbul yerel tarih temeli ve UTC snapshot kararı kaydedildi.
+- [x] Aynı template+yerel tarih unique/idempotency kuralı ve bugün dahil yedi günlük sınırlı lazy backfill seçildi.
+- [x] Revision, no-op, deterministic aggregate sequence ve transactional event append sınırı tanımlandı.
+- [x] SQLite schema v3 migration planı; mevcut veri ve hard-delete yasağı korunarak yazıldı.
+- [x] Backup format v1’i koruma, schema v2 eski backup’ı yeni hedefte migrate etme ve tracking manifest count eklememe kararı verildi.
+- [x] Kişisel tracking verisinin günlük resmî observation export’una girmemesi ve byte-level regression sınırı tanımlandı.
+- [x] Puantaj iş günü kabul senaryosu restart, snooze, template edit, deactivation ve backup/restore durumlarıyla tamamlandı.
+- [ ] Production domain/recurrence implementasyonu ayrı görevde yapılacak.
+- [ ] SQLite migration/repository/event implementasyonu ayrı görevde yapılacak.
+- [ ] Transactional service/backfill implementasyonu ayrı görevde yapılacak.
+- [ ] Backup compatibility ve export exclusion executable testleri ayrı görevlerde yapılacak.
+- [ ] Minimum UI yalnız veri sözleşmesi implementation’ı doğrulandıktan sonra ele alınacak.

@@ -1,5 +1,30 @@
 # Proje Kararlari
 
+## Issue 98 - Saha Takibi v0.1 Domain ve Veri Sözleşmesi
+
+- Saha Takibi v0.1, mevcut gözlem/attachment/export omurgasından sonraki birinci ürün önceliğidir; bu görev sözleşme ve dokümantasyon aşamasıdır, production model/schema/UI eklemez.
+- Tek seferlik işler `FollowUpItem`, tekrar kuralı `RoutineTemplate`, belirli yerel günün bağımsız sonucu `RoutineOccurrence` olarak ayrılır.
+- Hızlı `+ Unutma` create command’ında yalnız `capture_text` zorunludur; whitespace normalize edilir, ilk `title` AI kullanılmadan aynı değere eşitlenir ve kullanıcı title’ı daha sonra revision kontrollü mutation ile düzenleyebilir.
+- `FollowUpItem.project_id` ve `RoutineTemplate.project_id` nullable’dır; projesiz kayıt kişisel çalışma alanında kalır ve sonradan projeye bağlanabilir.
+- Follow-up observation’a bağlanırsa projesiz kayıt aynı transaction’da observation projesini alır; farklı mevcut proje reddedilir. SQLite `CHECK` ve composite observation/project foreign key repository bypass durumunu da engeller.
+- Bütün yeni ana/event kimlikleri canonical UUID; kalıcı anlar canonical UTC `Z`; recurrence takvimi `Europe/Istanbul` yerel tarihidir.
+- Follow-up status allowed list’i `inbox`, `active`, `waiting`, `completed`, `cancelled`; occurrence status’u `open`, `closed` olarak kalır.
+- Açık ve zamanlanmamış follow-up yalnız `inbox` olabilir; `active` veya `waiting` mutlaka `next_attention_at` taşır. Database minimum invariant’ı `CHECK` ile, application service create/planlama transition’ını daha güçlü validation ile korur.
+- Unutma Kutusu ayrı `inbox` sorgusudur. `overdue`, `today`, `upcoming` yalnız planlı `active/waiting` kayıtlar için türetilir; `now` temel domain kategorisi değildir.
+- “Şimdi ilgilen” bir UI query bileşimidir: overdue + zamanı gelmiş today + önemli inbox; bu bileşim kalıcı status veya yeni domain kategorisi oluşturmaz.
+- Recurrence türleri `daily`, `weekdays`, `weekly`, `monthly`; ilk `weekdays` tanımı Pazartesi–Cuma’dır ve resmî tatil otomasyonu içermez.
+- Aynı template ve yerel tarih için tek occurrence, database `UNIQUE(routine_template_id, occurrence_local_date)` constraint’iyle korunur; conflict idempotent no-op’tur.
+- Otomatik lazy backfill bugün dahil son yedi Europe/Istanbul yerel takvim günüyle sınırlıdır; geçmiş uygun gün yeni oluşursa `missed`, bugünün occurrence’ı `open` olur; sınırsız geçmiş üretimi yapılmaz.
+- Template güncellemesi yalnız henüz üretilmemiş occurrence’ları etkiler; pasifleştirme ve occurrence sonucu geçmiş satırları değiştirmez; erteleme yalnız mevcut occurrence’ın `next_attention_at` değerini değiştirir.
+- Üç event ailesi aggregate içi artan `sequence` ile deterministic ve append-only tutulur; ana mutation ile event append tek Unit of Work transaction’ında atomiktir.
+- Üç ana kayıtta optimistic revision uygulanır; stale write ana kayıt/event değiştirmeden reddedilir, gerçek değişiklik olmayan çağrı revision veya event artırmaz.
+- İlk implementation migration’ı mevcut schema version `2`den `3`e çıkarır; mevcut project/observation/attachment/event tablolarını değiştirmeden yedi yeni tracking tablosu ekler ve hata halinde tam rollback yapar.
+- Yeni tracking tabloları mevcut SQLite snapshot backup’a otomatik girer; backup format version `1` korunur ve v0.1’de tracking count manifest alanı eklenmez.
+- Schema version `2` eski backup, yalnız var olmayan yeni hedefe çıkarıldıktan sonra geçici restore kökünde schema `3`e migrate edilir; aktif/var olan data root üzerine restore reddi korunur.
+- Kişisel follow-up/routine/occurrence/event verisi mevcut günlük resmî export’a varsayılan olarak girmez; export formatı, entry’leri, observation count anlamı ve manifesti değişmez.
+- Ayrıntılı sözleşme `docs/field_tracking_v0_1_contract.md`; öğretici açıklama `learning/issue_098_saha_takibi_domain_ve_veri_sozlesmesi.md` içindedir.
+- Sonraki işler domain/recurrence, schema/repository, transactional service, backup compatibility, export exclusion ve ancak sonrasında minimum UI olarak ayrı küçük görevlere bölünür.
+
 ## 225 Podcast 035 Note-Contained Summary Contract Karari
 
 - Podcast 035, Steps 221-225 icin mandatory 12-section note olarak olusturulur ve Section 6 icinde Steps 001-220 tarihini kendi basina tasir.

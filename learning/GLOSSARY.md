@@ -1325,3 +1325,47 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Fail-closed indirme`: Dosya kimligi, varligi veya butunlugu dogrulanamazsa indirme vermemeyi ve guvenli hata gostermeyi ifade eder.
 
 `Exclusive output`: Hedef dosya zaten varsa uzerine yazmak yerine islemi durduran dosya olusturma sozlesmesidir.
+
+`Aggregate`: Birlikte değiştirilmesi gereken ana kayıt ve ona bağlı geçmiş/alt kayıtların oluşturduğu tutarlılık sınırı. Saha Takibi v0.1'de bir occurrence ve event geçmişi aynı aggregate mutation sınırındadır.
+
+`Recurrence`: Bir işin hangi yerel takvim günlerinde yeniden oluşacağını belirleyen tekrar kuralıdır.
+
+`Routine Template`: Recurrence türü, yerel saat, timezone ve tarih aralığını taşıyan; belirli günün sonucunu taşımayan rutin şablonudur.
+
+`Routine Occurrence`: Bir rutin şablonunun belirli bir yerel tarihte oluşan ve kendi status, sonuç, erteleme ve revision değerlerine sahip bağımsız örneğidir.
+
+`Idempotency`: Aynı işlemin tekrar çalıştırılmasının ilk başarılı sonuçtan sonra ek kayıt veya başka yan etki üretmemesi özelliğidir.
+
+`Backfill`: Uygulama çalışmadığı sırada oluşması gereken sınırlı yakın geçmiş kayıtlarını sonradan üretme işlemidir.
+
+`Lazy Generation`: Gelecekteki bütün kayıtları önceden üretmek yerine, kayıtları ihtiyaç anında ve sınırlı pencere içinde oluşturma yaklaşımıdır.
+
+`Snapshot Field`: Kaynak kayıt daha sonra değişse bile geçmiş nesnede üretim anındaki değeri sabit tutan alandır. `scheduled_local_time` bunun örneğidir.
+
+`Optimistic Concurrency`: Kaydı sürekli kilitlemek yerine yazma anında beklenen revision ile güncel revision'ı karşılaştırarak stale write çakışmasını yakalama yöntemidir.
+
+`Append-Only Event`: Yeni satır eklenebilen fakat geçmiş satırları güncellenmeyen veya silinmeyen olay kaydıdır.
+
+`Aggregate Sequence`: Event'lerin aynı aggregate içindeki kesin mantıksal sırasını gösteren, 1'den başlayan artan tamsayıdır.
+
+`Derived View`: Database'e ayrı status olarak yazılmayıp kalıcı alanlar ve güncel zamandan sorgu anında hesaplanan görünüm değeridir. `overdue` bunun örneğidir.
+
+`Export Exclusion`: Belirli bir veri alanının başka bir çıktı sözleşmesine varsayılan olarak dahil edilmemesi kuralıdır.
+
+`Byte-for-Byte Equality`: İki dosyanın uzunluk ve bütün byte değerleriyle tamamen aynı olmasıdır; tracking verisinin resmî export'u değiştirmediğini güçlü biçimde test etmekte kullanılır.
+
+`Boundary Normalization`: Kullanıcı girdisini application sınırında anlamını değiştirmeden kararlı biçime getirme işlemidir. Hızlı yakalamada baş/son whitespace kaldırılır ve ardışık whitespace tek boşluk yapılır.
+
+`Deterministic Initial Title`: AI kullanmadan, normalize edilmiş `capture_text` değerini ilk `title` olarak birebir kullanma kuralıdır. Kullanıcı title alanını daha sonra değiştirebilir.
+
+`Unutma Kutusu`: `status = inbox` olan, henüz planlanmamış açık kişisel takiplerin ayrı ve görünür sorgusudur.
+
+`Planned Open Follow-Up`: `status` değeri `active` veya `waiting` olan ve zorunlu `next_attention_at` taşıyan açık takip kaydıdır.
+
+`Şimdi İlgilen Görünümü`: Kalıcı status veya temel domain kategorisi değildir; overdue planlı kayıtlar, zamanı gelmiş today kayıtları ve önemli inbox kayıtlarının tekilleştirilmiş UI sorgu bileşimidir.
+
+`Query Composition`: Yeni bir kalıcı status oluşturmadan birden fazla sorgu sonucunu birleştirerek ekran görünümü üretme yaklaşımıdır.
+
+`Nullable Project Link`: Kaydın başlangıçta herhangi bir projeye bağlanmadan kişisel çalışma alanında kalabilmesini sağlayan opsiyonel `project_id` ilişkisidir.
+
+`Composite Foreign Key`: Child kayıttaki birden fazla kolonun parent kayıttaki kolonlarla birlikte eşleşmesini zorunlu kılan foreign key'dir. Follow-up observation bağlantısında observation ve project kimliklerinin aynı çifte ait olmasını korur.
