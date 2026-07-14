@@ -4,8 +4,14 @@
 
 - Saha Takibi v0.1, mevcut gözlem/attachment/export omurgasından sonraki birinci ürün önceliğidir; bu görev sözleşme ve dokümantasyon aşamasıdır, production model/schema/UI eklemez.
 - Tek seferlik işler `FollowUpItem`, tekrar kuralı `RoutineTemplate`, belirli yerel günün bağımsız sonucu `RoutineOccurrence` olarak ayrılır.
+- Hızlı `+ Unutma` create command’ında yalnız `capture_text` zorunludur; whitespace normalize edilir, ilk `title` AI kullanılmadan aynı değere eşitlenir ve kullanıcı title’ı daha sonra revision kontrollü mutation ile düzenleyebilir.
+- `FollowUpItem.project_id` ve `RoutineTemplate.project_id` nullable’dır; projesiz kayıt kişisel çalışma alanında kalır ve sonradan projeye bağlanabilir.
+- Follow-up observation’a bağlanırsa projesiz kayıt aynı transaction’da observation projesini alır; farklı mevcut proje reddedilir. SQLite `CHECK` ve composite observation/project foreign key repository bypass durumunu da engeller.
 - Bütün yeni ana/event kimlikleri canonical UUID; kalıcı anlar canonical UTC `Z`; recurrence takvimi `Europe/Istanbul` yerel tarihidir.
-- Follow-up status allowed list’i `inbox`, `active`, `waiting`, `completed`, `cancelled`; occurrence status’u `open`, `closed`; zaman grupları `now`, `today`, `overdue`, `upcoming` türetilmiş değerlerdir ve status olarak saklanmaz.
+- Follow-up status allowed list’i `inbox`, `active`, `waiting`, `completed`, `cancelled`; occurrence status’u `open`, `closed` olarak kalır.
+- Açık ve zamanlanmamış follow-up yalnız `inbox` olabilir; `active` veya `waiting` mutlaka `next_attention_at` taşır. Database minimum invariant’ı `CHECK` ile, application service create/planlama transition’ını daha güçlü validation ile korur.
+- Unutma Kutusu ayrı `inbox` sorgusudur. `overdue`, `today`, `upcoming` yalnız planlı `active/waiting` kayıtlar için türetilir; `now` temel domain kategorisi değildir.
+- “Şimdi ilgilen” bir UI query bileşimidir: overdue + zamanı gelmiş today + önemli inbox; bu bileşim kalıcı status veya yeni domain kategorisi oluşturmaz.
 - Recurrence türleri `daily`, `weekdays`, `weekly`, `monthly`; ilk `weekdays` tanımı Pazartesi–Cuma’dır ve resmî tatil otomasyonu içermez.
 - Aynı template ve yerel tarih için tek occurrence, database `UNIQUE(routine_template_id, occurrence_local_date)` constraint’iyle korunur; conflict idempotent no-op’tur.
 - Otomatik lazy backfill bugün dahil son yedi Europe/Istanbul yerel takvim günüyle sınırlıdır; geçmiş uygun gün yeni oluşursa `missed`, bugünün occurrence’ı `open` olur; sınırsız geçmiş üretimi yapılmaz.

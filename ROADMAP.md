@@ -8,7 +8,7 @@ Issue #98 bu yönün production implementation’ı değil, domain ve veri sözl
 
 Bu öncelik şu sırayla ilerler:
 
-1. `FollowUpItem`, `RoutineTemplate` ve `RoutineOccurrence` domain/validation sabitleri ile saf recurrence hesaplayıcısı.
+1. Yalnız `capture_text` isteyen hızlı `+ Unutma` create sınırı; deterministic başlangıç başlığı; nullable follow-up/template projesi; Unutma Kutusu veya planlı `active/waiting` değişmezi; `RoutineOccurrence` ve saf recurrence hesaplayıcısı.
 2. SQLite schema v3 migration, ayrı repository ve deterministic append-only event tabloları.
 3. Optimistic revision kullanan transactional application service ve yedi günlük idempotent lazy backfill.
 4. Schema v2 backup backward restore, schema v3 round-trip ve aktif data root koruması.
@@ -684,6 +684,10 @@ Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcas
 
 - [x] Mevcut schema v2, migration, repository, Unit of Work, backup/restore ve daily export sınırları incelendi.
 - [x] `FollowUpItem`, `RoutineTemplate` ve `RoutineOccurrence` alanları ve yaşam döngüleri kesinleştirildi.
+- [x] Hızlı create command’ında yalnız `capture_text` zorunlu; ilk title deterministic normalize edilmiş aynı metin; sonraki title düzenlemesi serbest olarak düzeltildi.
+- [x] Follow-up ve routine template projesi nullable yapıldı; projesiz kayıtların kişisel çalışma alanında kalması ve observation bağında project eşleşmesi kesinleştirildi.
+- [x] Zamanlanmamış açık kaydın yalnız `inbox` olacağı; `active/waiting` kaydın `next_attention_at` taşımak zorunda olduğu database/application sınırıyla kaydedildi.
+- [x] `now` domain kategorisinden çıkarıldı; `overdue/today/upcoming` yalnız planlı kayıtlar, “Şimdi ilgilen” ise overdue + zamanı gelmiş today + önemli inbox UI bileşimi olarak tanımlandı.
 - [x] `daily`, `weekdays`, `weekly`, `monthly` recurrence davranışı, Europe/Istanbul yerel tarih temeli ve UTC snapshot kararı kaydedildi.
 - [x] Aynı template+yerel tarih unique/idempotency kuralı ve bugün dahil yedi günlük sınırlı lazy backfill seçildi.
 - [x] Revision, no-op, deterministic aggregate sequence ve transactional event append sınırı tanımlandı.

@@ -65,6 +65,7 @@ class RoutineTemplate:
     recurrence_type: str
     local_time: str
     timezone: str
+    project_id: str | None = None
     revision: int = 1
 
 
@@ -90,6 +91,7 @@ Satır satır açıklama:
 - `recurrence_type`: Günlük, iş günü, haftalık veya aylık kuralı taşır.
 - `local_time`: Kullanıcının gördüğü `17:00` gibi yerel saattir.
 - `timezone`: Yerel saatin hangi zaman bölgesinde yorumlanacağını söyler.
+- `project_id`: Nullable’dır; projesiz rutin kişisel çalışma alanında kalabilir.
 - `class RoutineOccurrence`: Tek bir yerel güne ait bağımsız kaydı tanımlar.
 - `routine_template_id`: Occurrence’ın hangi şablondan doğduğunu gösterir.
 - `occurrence_local_date`: Pazartesi ile Salı occurrence’ını ayıran yerel tarihtir.
@@ -109,13 +111,19 @@ Tek seferlik takip, recurrence kuralına ihtiyaç duymaz.
 
 ```python
 @dataclass(frozen=True)
+class CreateFollowUp:
+    capture_text: str
+
+
+@dataclass(frozen=True)
 class FollowUpItem:
     follow_up_id: str
     capture_text: str
     title: str
     item_type: str
     status: str
-    project_id: str
+    project_id: str | None = None
+    observation_id: str | None = None
     next_attention_at: str | None = None
     deadline_at: str | None = None
     revision: int = 1
@@ -123,22 +131,61 @@ class FollowUpItem:
 
 Satır satır açıklama:
 
-- `capture_text`: Sahada ilk yazılan özgün cümleyi korur.
-- `title`: Listede kısa ve okunur başlıktır.
+- `CreateFollowUp`: Hızlı `+ Unutma` use-case’inin girdisidir.
+- `capture_text`: Create command’daki tek zorunlu kullanıcı alanıdır.
+- `FollowUpItem`: Sistem varsayımları uygulandıktan sonra kalıcı olacak ana kayıttır.
+- `title`: Listede kısa ve okunur başlıktır; create ekranında ikinci bir zorunlu alan değildir.
 - `item_type`: İş yapma, birinden bekleme veya tekrar kontrol niyetini taşır.
 - `status`: Kaydın yaşam döngüsünü taşır.
-- `project_id`: Takibin hangi projeye ait olduğunu kesinleştirir.
+- `project_id`: Nullable’dır; null değer kaydın kişisel çalışma alanında olduğunu gösterir.
+- `observation_id`: İsteğe bağlı observation bağıdır; doluysa proje eşleşmesi korunur.
 - `next_attention_at`: Kaydın ne zaman tekrar öne çıkacağını belirtir.
 - `deadline_at`: Gerçek son tarihtir; dikkat zamanıyla aynı değildir.
 
-Sunu şöyle yaptık ki hızlı saha notunun özgün anlamı kaybolmadan sonradan düzenli bir liste başlığı kullanılabilsin: `capture_text` ve `title` alanlarını ayırdık.
+İlk başlık deterministik olarak hazırlanır:
+
+```python
+def normalize_capture_text(value: str) -> str:
+    normalized = " ".join(value.split())
+    if not normalized:
+        raise ValueError("capture_text cannot be empty")
+    return normalized
+
+
+normalized = normalize_capture_text(command.capture_text)
+item = FollowUpItem(
+    follow_up_id=new_id(),
+    capture_text=normalized,
+    title=normalized,
+    item_type="action",
+    status="inbox",
+)
+```
+
+Satır satır açıklama:
+
+- `value.split()`: Baş/son boşlukları kaldırır ve whitespace parçalarını ayırır.
+- `" ".join(...)`: Ardışık boşlukları tek boşluk olarak birleştirir.
+- `if not normalized`: Sadece boşluk girilmiş değeri reddeder.
+- `capture_text=normalized`: Kalıcı hızlı yakalama metnini belirler.
+- `title=normalized`: AI kullanmadan ilk başlığı aynı metne eşitler.
+- `item_type="action"`: Kullanıcı henüz tür seçmediği için güvenli başlangıç değeridir.
+- `status="inbox"`: Zamanlanmamış kayıt görünür Unutma Kutusu’nda başlar.
+- `project_id` ve `next_attention_at` verilmediği için nullable varsayılanlarını alır.
+
+Kullanıcı `title` alanını daha sonra ayrı bir revision kontrollü mutation ile düzenleyebilir. Bu title mutation’ı `capture_text` değerini değiştirmez.
+
+Sunu şöyle yaptık ki `+ Unutma` kaydı 5–8 saniyede tek metinle oluşsun: create command’ını yalnız `capture_text` ile sınırladık, diğer kalıcı alanları deterministik sistem varsayımlarıyla doldurduk.
 
 Örnek:
 
 ```text
+Kullanıcı girdisi = "  B blok perde filizlerini   beton öncesi kontrol et.  "
 capture_text = "B blok perde filizlerini beton öncesi kontrol et."
-title = "B blok perde filizi kontrolü"
-condition_text = "Beton öncesi"
+ilk title = "B blok perde filizlerini beton öncesi kontrol et."
+sonradan düzenlenen title = "B blok perde filizi kontrolü"
+project_id = None
+status = "inbox"
 ```
 
 ## 6. Stored status ile derived view arasındaki fark
@@ -155,43 +202,112 @@ FOLLOW_UP_STATUSES = (
 )
 ```
 
-Ekran grubu ise zamana bakılarak hesaplanır:
+Database ve application birlikte şu açık kayıt değişmezini korur:
+
+```sql
+CHECK (
+    status IN ('completed', 'cancelled')
+    OR status = 'inbox'
+    OR next_attention_at IS NOT NULL
+)
+```
+
+Bu `CHECK` ne yapar?
+
+- Terminal kayıtların ayrı kapanış kurallarına tabi olmasına izin verir.
+- `inbox` kaydın `next_attention_at = NULL` olmasına izin verir.
+- Açık `active` veya `waiting` kaydın null dikkat zamanı taşımasını reddeder.
+
+Application service daha güçlü bir lifecycle uygular:
+
+```python
+def validate_open_follow_up(status: str, next_attention_at: str | None) -> None:
+    if status in {"active", "waiting"} and next_attention_at is None:
+        raise ValueError("planned follow-up requires next_attention_at")
+
+
+def schedule(item: FollowUpItem, next_attention_at: str, *, waiting: bool):
+    target_status = "waiting" if waiting else "active"
+    validate_open_follow_up(target_status, next_attention_at)
+    return replace(
+        item,
+        status=target_status,
+        next_attention_at=next_attention_at,
+        revision=item.revision + 1,
+    )
+```
+
+- `active/waiting` kontrolü zamanlanmamış açık kaydın sessizce kaybolmasını engeller.
+- Planlama status ve zamanı aynı mutation içinde yazar.
+- Plan kaldırılırsa kayıt `inbox + None` durumuna birlikte geçirilir.
+- Database `CHECK`, repository bypass veya yarış durumunda son savunmadır.
+
+Unutma Kutusu ile zaman grupları ayrıdır:
 
 ```python
 def attention_group(
     status: str,
-    next_attention_at: datetime | None,
-    deadline_at: datetime | None,
+    effective_attention_at: datetime | None,
     now: datetime,
 ) -> str | None:
-    if status in {"completed", "cancelled"}:
+    if status not in {"active", "waiting"}:
         return None
+    if effective_attention_at is None:
+        raise ValueError("planned follow-up requires attention time")
 
-    candidates = [
-        value for value in (next_attention_at, deadline_at) if value is not None
-    ]
-    if not candidates:
-        return "now"
-
-    attention_at = min(candidates)
-    if attention_at < now:
+    attention_date = effective_attention_at.astimezone(ISTANBUL).date()
+    today = now.astimezone(ISTANBUL).date()
+    if attention_date < today:
         return "overdue"
-    if attention_at.astimezone(ISTANBUL).date() == now.astimezone(ISTANBUL).date():
+    if attention_date == today:
         return "today"
     return "upcoming"
 ```
 
 Bu örnek kodda:
 
-- Terminal kayıtlar açık iş ekranına sokulmaz.
-- Dikkat ve deadline alanlarından dolu olanların en erkeni seçilir.
-- Zaman geçmişse `overdue` hesaplanır.
-- Aynı yerel gündeyse `today`, daha sonraysa `upcoming` hesaplanır.
-- Hiç zaman yoksa kayıt kullanıcının önündeki plansız iş anlamında `now` olur.
+- Yalnız planlı `active/waiting` kayıtlar zaman grubuna girer.
+- `inbox` kayıtları zaman grubu yerine ayrı Unutma Kutusu sorgusunda görünür.
+- Önceki yerel gün `overdue`, aynı gün `today`, sonraki gün `upcoming` olur.
+- `today` içindeki `effective_attention_at <= now` kayıtlar “zamanı gelmiş bugün” alt kümesidir.
+- `now` adında kalıcı veya temel türetilmiş domain kategorisi yoktur.
+
+Ana “Şimdi ilgilen” yüzeyi yeni bir status değildir. UI şu sorguların birleşimini yapabilir:
+
+```text
+overdue planlı kayıtlar
++ zamanı gelmiş today kayıtları
++ is_important = true olan inbox kayıtları
+= Şimdi ilgilen görünümü
+```
 
 `overdue` database’e yazılsaydı saat ilerlediğinde bütün satırları güncellemek gerekirdi. Türetilmiş değer olarak bırakınca aynı kalıcı veri farklı anda doğru görünümü üretir.
 
-Sunu şöyle yaptık ki zaman ilerlediğinde database’e sahte status mutation’ları yazılmasın: yaşam döngüsü status’unu kalıcı, zaman grubunu hesaplanan değer yaptık.
+Sunu şöyle yaptık ki zamanlanmamış açık kayıt kaybolmasın ve UI bileşimi domain modeline dönüşmesin: plansız kaydı Unutma Kutusu’nda tuttuk, planlı kayda zaman zorunluluğu verdik ve “Şimdi ilgilen”i sorgu birleşimi yaptık.
+
+### 6.1 Observation ve project tutarlılığı
+
+`project_id` nullable olsa da observation bağlantısı proje belirsizliği yaratamaz.
+
+```python
+observation = unit_of_work.observations.get(observation_id)
+if item.project_id is not None and item.project_id != observation.project_id:
+    raise ValueError("follow-up and observation projects must match")
+
+linked = replace(
+    item,
+    project_id=observation.project_id,
+    observation_id=observation.observation_id,
+    revision=item.revision + 1,
+)
+```
+
+- Follow-up projesizse observation projesi aynı mutation’da atanır.
+- Follow-up farklı projedeyse sessizce taşınmaz; işlem reddedilir.
+- Application ana kayıt ile event’i aynı transaction’da yazar.
+- Database, `observation_id IS NULL OR project_id IS NOT NULL` `CHECK` ve `(observation_id, project_id)` composite foreign key ile aynı eşleşmeyi son savunma olarak korur.
+
+Sunu şöyle yaptık ki kişisel/projesiz takip mümkün olsun fakat observation bağlandığında iki farklı proje birbirine karışmasın: nullable proje ile composite observation–project tutarlılığını birlikte tanımladık.
 
 ## 7. Timezone ve UTC neden birlikte gerekir?
 
@@ -453,6 +569,65 @@ Sunu şöyle yaptık ki kişisel takip alanı resmî kayıt alanına sessizce s�
 
 ## 15. Test kodları hangi davranışları doğrulayacak?
 
+### Hızlı yakalama testi
+
+```python
+def test_quick_capture_requires_only_text_and_builds_deterministic_title(service):
+    item = service.create_follow_up(
+        CreateFollowUp("  B blok   filizlerini kontrol et.  ")
+    )
+
+    assert item.capture_text == "B blok filizlerini kontrol et."
+    assert item.title == item.capture_text
+    assert item.status == "inbox"
+    assert item.project_id is None
+    assert item.next_attention_at is None
+```
+
+Bu test create command’da proje veya ayrı title istenmediğini, whitespace normalization’ın AI olmadan deterministik çalıştığını ve zamanlanmamış kaydın Unutma Kutusu’nda başladığını doğrular.
+
+### Açık kayıt planlama değişmezi testi
+
+```python
+@pytest.mark.parametrize("status", ["active", "waiting"])
+def test_planned_open_status_requires_attention_time(service, status):
+    item = service.create_follow_up(CreateFollowUp("Belgeyi kontrol et"))
+
+    with pytest.raises(ValueError, match="requires next_attention_at"):
+        service.change_status(
+            item.follow_up_id,
+            expected_revision=1,
+            status=status,
+            next_attention_at=None,
+        )
+```
+
+Bu test `active/waiting + NULL` birleşiminin application sınırında reddedildiğini gösterir. Ayrı migration testi aynı birleşimin database `CHECK` tarafından da reddedildiğini doğrulamalıdır.
+
+### Observation–project tutarlılığı testi
+
+```python
+def test_linking_observation_assigns_missing_project_and_rejects_mismatch(service):
+    personal = service.create_follow_up(CreateFollowUp("Perdeyi yeniden ölç"))
+    linked = service.link_observation(
+        personal.follow_up_id,
+        expected_revision=1,
+        observation_id=OBSERVATION_ID,
+    )
+
+    assert linked.project_id == OBSERVATION_PROJECT_ID
+    assert linked.observation_id == OBSERVATION_ID
+
+    with pytest.raises(ValueError, match="projects must match"):
+        service.link_observation(
+            OTHER_PROJECT_FOLLOW_UP_ID,
+            expected_revision=1,
+            observation_id=OBSERVATION_ID,
+        )
+```
+
+Bu test projesiz kaydın observation projesini alabildiğini, farklı projedeki kaydın ise sessizce taşınmadığını doğrular.
+
 ### Idempotency testi
 
 ```python
@@ -517,6 +692,10 @@ Bu test event üretimi başarısızsa ana occurrence mutation’ının da rollba
 | Çakışan düzenlemeyi fark ettik | `expected_revision` ve revision artışı tanımladık | Eski ekran yeni veriyi ezmemeli | Stale write reddedilir |
 | Backup formatını koruduk | Yeni tabloları SQLite snapshot’a bıraktık, manifest count eklemedik | Exact manifest alanları eski okuyucuyu kırar | Format v1 korunur |
 | Kişisel veriyi resmî export’tan ayırdık | Daily export’un yalnız observation akışını okumasını sabitledik | Kişisel not resmî kayda sızmamalı | Veri izolasyonu test edilebilir olur |
+| Hızlı yakalamayı tek alana indirdik | Create command’da yalnız `capture_text` aldık ve title’ı deterministic eşitledik | İkinci zorunlu alan 5–8 saniyelik akışı bozuyordu | `+ Unutma` tek metinle oluşur |
+| Proje bağını opsiyonel yaptık | Follow-up ve template project alanını nullable tanımladık | Her kişisel hatırlatma başlangıçta projeye ait olmayabilir | Projesiz kayıt güvenle inbox’ta kalır |
+| Zamanlanmamış kaydın kaybolmasını engelledik | `active/waiting` için zaman zorunlu, plansız kayıt için `inbox` kullandık | Zamansız aktif kayıt görünümden düşebilirdi | Her açık kayıt ya planlıdır ya Unutma Kutusu’ndadır |
+| UI bileşimini domain’den ayırdık | “Şimdi ilgilen”i üç sorgunun union’ı yaptık | `now` adında belirsiz kalıcı kategori gerekmiyordu | Ekran değişebilir, domain sade kalır |
 
 ## 17. Yeni öğrendiğimiz yazılım kavramları
 
@@ -586,6 +765,27 @@ Belirli bir veri alanının başka bir çıktı sözleşmesine varsayılan olara
 Bu projedeki karşılığı:
 Kişisel takip ve rutin verisi resmî günlük observation export’una girmez.
 
+### Boundary normalization
+
+Kullanıcı girdisinin application sınırında, anlamını değiştirmeden tek kararlı biçime getirilmesidir.
+
+Bu projedeki karşılığı:
+`capture_text` baş/son whitespace’ten temizlenir ve ardışık whitespace tek boşluk yapılır; ilk title aynı değerdir.
+
+### Composite foreign key
+
+Bir ilişkiyi tek kolon yerine iki veya daha fazla kolonun birlikte eşleşmesiyle koruyan foreign key’dir.
+
+Bu projedeki karşılığı:
+Follow-up içindeki `(observation_id, project_id)` çifti observation’ın `(id, project_id)` çiftiyle eşleşir.
+
+### Query composition
+
+Bir ekran sonucunu yeni kalıcı status üretmeden birden fazla sorgunun birleşiminden oluşturma yaklaşımıdır.
+
+Bu projedeki karşılığı:
+“Şimdi ilgilen”, overdue, zamanı gelmiş today ve önemli inbox sonuçlarının tekilleştirilmiş birleşimidir.
+
 ## 18. Mini sözlük
 
 - **Template:** Tekrar kuralını taşıyan şablon.
@@ -598,17 +798,21 @@ Kişisel takip ve rutin verisi resmî günlük observation export’una girmez.
 - **Unique constraint:** Aynı anahtar birleşiminin ikinci kez eklenmesini database seviyesinde engelleyen kural.
 - **Fail-closed:** Doğrulama belirsiz veya başarısızsa işleme devam etmeme yaklaşımı.
 - **Byte-for-byte:** İki dosyanın bütün byte’larının aynı olması.
+- **Unutma Kutusu:** `status = inbox` olan kişisel, henüz planlanmamış açık kayıtların ayrı sorgusu.
+- **Şimdi ilgilen:** Kalıcı status değil; overdue, zamanı gelmiş today ve önemli inbox kayıtlarının UI query bileşimi.
+- **Composite foreign key:** Birden fazla kolonun birlikte parent kayda uymasını zorunlu kılan veritabanı ilişkisi.
 
 ## 19. Bu adımda bilinçli olarak ne yapmadık?
 
 - Python domain class’larını production code’a eklemedik.
 - SQLite schema version’ını yükseltmedik.
 - Repository veya application service yazmadık.
-- UI, notification veya scheduler eklemedik.
+- UI, notification veya scheduler eklemedik; yalnız gelecekteki “Şimdi ilgilen” query bileşimini sözleşme olarak tanımladık.
 - Resmî tatil hesabı yapmadık.
 - Puantajı personel/ücret/bordro modülüne çevirmedik.
 - Kişisel tracking export’u üretmedik.
 - Mevcut günlük resmî export formatını değiştirmedik.
+- AI ile başlık üretmedik; ilk title yalnız deterministic whitespace normalization ile oluşturulur.
 
 Bunu bilinçli yaptık; çünkü Issue #98 önce sınırların kesinleşmesini istiyor. Recurrence ve geçmiş kuralları belirsizken production kodu yazmak, daha sonra veri migration’ı ve geriye uyumluluk problemi oluştururdu.
 

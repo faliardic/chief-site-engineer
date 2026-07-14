@@ -1353,3 +1353,19 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Export Exclusion`: Belirli bir veri alanının başka bir çıktı sözleşmesine varsayılan olarak dahil edilmemesi kuralıdır.
 
 `Byte-for-Byte Equality`: İki dosyanın uzunluk ve bütün byte değerleriyle tamamen aynı olmasıdır; tracking verisinin resmî export'u değiştirmediğini güçlü biçimde test etmekte kullanılır.
+
+`Boundary Normalization`: Kullanıcı girdisini application sınırında anlamını değiştirmeden kararlı biçime getirme işlemidir. Hızlı yakalamada baş/son whitespace kaldırılır ve ardışık whitespace tek boşluk yapılır.
+
+`Deterministic Initial Title`: AI kullanmadan, normalize edilmiş `capture_text` değerini ilk `title` olarak birebir kullanma kuralıdır. Kullanıcı title alanını daha sonra değiştirebilir.
+
+`Unutma Kutusu`: `status = inbox` olan, henüz planlanmamış açık kişisel takiplerin ayrı ve görünür sorgusudur.
+
+`Planned Open Follow-Up`: `status` değeri `active` veya `waiting` olan ve zorunlu `next_attention_at` taşıyan açık takip kaydıdır.
+
+`Şimdi İlgilen Görünümü`: Kalıcı status veya temel domain kategorisi değildir; overdue planlı kayıtlar, zamanı gelmiş today kayıtları ve önemli inbox kayıtlarının tekilleştirilmiş UI sorgu bileşimidir.
+
+`Query Composition`: Yeni bir kalıcı status oluşturmadan birden fazla sorgu sonucunu birleştirerek ekran görünümü üretme yaklaşımıdır.
+
+`Nullable Project Link`: Kaydın başlangıçta herhangi bir projeye bağlanmadan kişisel çalışma alanında kalabilmesini sağlayan opsiyonel `project_id` ilişkisidir.
+
+`Composite Foreign Key`: Child kayıttaki birden fazla kolonun parent kayıttaki kolonlarla birlikte eşleşmesini zorunlu kılan foreign key'dir. Follow-up observation bağlantısında observation ve project kimliklerinin aynı çifte ait olmasını korur.

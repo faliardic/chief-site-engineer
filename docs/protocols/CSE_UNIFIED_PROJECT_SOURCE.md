@@ -1155,11 +1155,15 @@ Issue #98 ile ürün yönü, mevcut gözlem/attachment/SQLite/backup/export omur
 
 Değişmez ürün sınırları:
 
+- `+ Unutma` hızlı create akışında kullanıcıdan yalnız `capture_text` istenir; ilk title deterministic whitespace normalization ile aynı metindir ve sonradan düzenlenebilir.
+- Follow-up ve routine template proje bağlantısı nullable’dır; projesiz kayıt kişisel çalışma alanında kalır. Observation bağlanan follow-up’ın project değeri observation projesiyle aynı olmak zorundadır.
+- Zamanlanmamış açık follow-up yalnız `inbox` olabilir; `active/waiting` mutlaka `next_attention_at` taşır. Unutma Kutusu `inbox` kayıtlarının ayrı sorgusudur.
+- `overdue`, `today`, `upcoming` yalnız planlı `active/waiting` kayıtlar için türetilir. `now` domain kategorisi değildir; “Şimdi ilgilen” overdue, zamanı gelmiş today ve önemli inbox kayıtlarının UI bileşimidir.
 - Yerel recurrence kararı `Europe/Istanbul`; kalıcı gerçek anlar UTC’dir.
 - Bugün dahil son yedi yerel gün için lazy/idempotent backfill yapılır; sınırsız geçmiş üretimi yapılmaz.
 - Aynı template ve yerel tarih için yalnız bir occurrence olabilir.
 - Template güncellemesi, pasifleştirme, tamamlama ve erteleme geçmiş occurrence’ları yeniden yazmaz.
-- Yaşam döngüsü status’ları saklanır; `now`, `today`, `overdue`, `upcoming` zaman görünümleri sorgu anında türetilir.
+- Yaşam döngüsü status’ları saklanır; planlı kayıtların `overdue`, `today`, `upcoming` zaman görünümleri sorgu anında türetilir.
 - Mutation ve append-only event aynı transaction’da atomiktir; optimistic revision ve no-op davranışı mevcut observation sözleşmesiyle uyumludur.
 - Yeni tablolar SQLite schema v3 ile eklenir; mevcut project/observation/attachment/event verisi değiştirilmez ve hard delete eklenmez.
 - Tracking verisi SQLite snapshot backup içinde taşınır fakat mevcut günlük resmî observation export’una varsayılan olarak girmez.

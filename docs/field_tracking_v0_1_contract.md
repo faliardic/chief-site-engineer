@@ -49,7 +49,11 @@ Issue #98 başlamadan önceki güvenli nokta `9b631fef4f3c4a290daa3b8d651d4fc9af
 ### 3.3 Metin ve önem
 
 - Zorunlu metinler trim sonrası boş olamaz.
-- Kullanıcının yazdığı metin saklanır; otomatik sınıflandırma, yeniden yazma veya kişi eşleştirme yapılmaz.
+- Hızlı `+ Unutma` create command’ında kullanıcıdan alınan tek zorunlu alan `capture_text` değeridir.
+- `capture_text` boundary normalization sırasında baş/son boşluklardan temizlenir ve ardışık whitespace tek boşluğa indirilir; harfler, Türkçe karakterler, noktalama ve büyük/küçük harf değiştirilmez.
+- İlk `title`, AI veya sınıflandırma kullanılmadan bu normalize edilmiş `capture_text` değerine birebir eşitlenir.
+- Kullanıcı `title` alanını daha sonra optimistic revision kullanan ayrıntı mutation’ıyla düzenleyebilir; `capture_text` ilk yakalama metni olarak korunur.
+- Kullanıcının yazdığı anlam otomatik sınıflandırma, yeniden yazma veya kişi eşleştirme ile değiştirilmez.
 - İlk sürümde önem alanı `is_important: bool` olarak tutulur. Çok seviyeli priority sözlüğü eklenmez.
 
 ### 3.4 Revision ve no-op
@@ -67,6 +71,16 @@ Issue #98 başlamadan önceki güvenli nokta `9b631fef4f3c4a290daa3b8d651d4fc9af
 - Template `inactive` yapılır.
 - Occurrence sonuçlandırılır; geçmiş kayıt fiziksel olarak silinmez.
 
+### 3.6 Kişisel çalışma alanı ve proje bağlantısı
+
+- `FollowUpItem.project_id` ve `RoutineTemplate.project_id` nullable’dır.
+- Projesiz kayıt geçersiz veya orphan sayılmaz; şantiye şefinin kişisel çalışma alanında kalır ve resmî günlük export’a girmez.
+- Kullanıcı kaydı daha sonra bir projeye bağlayabilir veya observation bağlantısı yoksa proje bağını kaldırabilir.
+- `FollowUpItem.observation_id` doluysa observation var olmalı ve `project_id` aynı observation’ın `project_id` değeriyle eşleşmelidir.
+- Observation bağlama sırasında follow-up projesizse application service observation projesini aynı mutation içinde atar. Follow-up zaten farklı bir projeye bağlıysa işlem sessizce proje değiştirmez; validation hatasıyla atomik olarak reddedilir.
+- Observation bağlıyken `project_id` tek başına temizlenemez veya farklı projeye geçirilemez. Önce observation bağlantısının açık bir mutation ile kaldırılması gerekir.
+- Bu eşleşme yalnız serbest application kontrolüne bırakılmaz; SQLite sınırı bölüm 9.2’deki composite foreign key ve `CHECK` ile de korunur.
+
 ## 4. `FollowUpItem` sözleşmesi
 
 ### 4.1 Alanlar
@@ -74,17 +88,17 @@ Issue #98 başlamadan önceki güvenli nokta `9b631fef4f3c4a290daa3b8d651d4fc9af
 | Alan | Tür / null | Kural |
 | --- | --- | --- |
 | `follow_up_id` | UUID, zorunlu | Değişmez kimlik. |
-| `capture_text` | text, zorunlu | Hızlı yakalamada girilen özgün metin; sonradan düzenlenen başlıktan ayrıdır. |
-| `title` | text, zorunlu | Listede görünen kısa başlık. İlk oluşturma sırasında açıkça verilir; otomatik AI özeti yoktur. |
+| `capture_text` | text, zorunlu | Hızlı yakalamada kullanıcıdan alınan tek zorunlu create alanı; whitespace normalize edilir. |
+| `title` | text, zorunlu kalıcı alan | Create input’u değildir. İlk değeri normalize edilmiş `capture_text` ile aynıdır; kullanıcı daha sonra düzenleyebilir. |
 | `description` | text, nullable | Ayrıntılı açıklama. |
 | `item_type` | enum, zorunlu | `action`, `waiting`, `recheck`. |
 | `status` | enum, zorunlu | `inbox`, `active`, `waiting`, `completed`, `cancelled`. |
-| `project_id` | UUID, zorunlu | Var olan `projects.id` kaydına foreign key. |
-| `observation_id` | UUID, nullable | Var olan `field_observations.id` kaydına isteğe bağlı bağlantı. |
+| `project_id` | UUID, nullable | Var olan `projects.id` kaydına isteğe bağlı foreign key; null kayıt kişisel çalışma alanındadır. |
+| `observation_id` | UUID, nullable | Var olan observation’a bağlantı; doluysa `project_id` aynı observation projesi olmak zorundadır. |
 | `location` | text, nullable | İlk sürümde serbest metin; ayrı location migration’ı yoktur. |
 | `related_person` | text, nullable | İlk sürümde serbest metin; contact foreign key zorunlu değildir. |
 | `is_important` | bool, zorunlu | Varsayılan `false`. |
-| `next_attention_at` | UTC timestamp, nullable | Kaydın yeniden öne çıkacağı an. |
+| `next_attention_at` | UTC timestamp, duruma bağlı | `inbox` için nullable; `active` veya `waiting` için zorunlu. |
 | `deadline_at` | UTC timestamp, nullable | Gerçek son tarih; `next_attention_at` ile aynı şey değildir. |
 | `condition_text` | text, nullable | “Belge gelince”, “beton öncesi” gibi koşul. |
 | `outcome_type` | enum, nullable | `completed`, `not_required`, `converted_to_observation`, `cancelled`. Yalnız terminal durumda doludur. |
@@ -97,28 +111,33 @@ Issue #98 başlamadan önceki güvenli nokta `9b631fef4f3c4a290daa3b8d651d4fc9af
 
 ### 4.2 Yaşam döngüsü
 
-- Yeni kayıt hızlı yakalamada varsayılan olarak `inbox` durumunda başlar.
-- Planlanan ve sahiplenilen kayıt `active` olabilir.
-- Başka kişiden veya koşuldan cevap bekleyen kayıt `waiting` olabilir.
+- Yeni kayıt yalnız `capture_text` ile oluşturulur; `title` normalize edilmiş aynı metin, `item_type = action`, `status = inbox`, `project_id = NULL`, `next_attention_at = NULL` ve `is_important = false` sistem varsayılanlarıyla başlar.
+- `inbox`, zamanlanmamış açık kayıtların görünür Unutma Kutusu’dur; `next_attention_at` null olabilir.
+- Planlanan ve sahiplenilen kayıt `active` olur ve mutlaka `next_attention_at` taşır.
+- Başka kişiden veya koşuldan cevap bekleyen kayıt `waiting` olur ve mutlaka yeniden bakılacak `next_attention_at` taşır.
 - `item_type` ile `status` aynı kavram değildir. Örneğin `waiting` türünde yakalanan kayıt önce `inbox`, sonra `waiting` durumunda olabilir.
-- `completed` ve `cancelled` terminal durumlardır; yeniden açma bunları `active` durumuna getirir.
+- `completed` ve `cancelled` terminal durumlardır. Yeniden açmada yeni dikkat zamanı verilmezse kayıt `inbox`, verilirse `active` olur.
 - `completed` durumda `completed_at` ve `outcome_type` zorunludur; `cancelled_at` boş olmalıdır.
 - `cancelled` durumda `cancelled_at` ve `outcome_type = cancelled` zorunludur; `completed_at` boş olmalıdır.
 - Terminal olmayan durumda iki kapanış zamanı ile iki outcome alanı boş olmalıdır.
 - Yeniden açma kapanış zamanlarını ve outcome alanlarını ana kayıttan temizler; önceki sonuç append-only event içinde korunur.
 - `waiting` durumunda kişi veya koşul girilmesi tavsiye edilir fakat hızlı saha akışını engelleyen database constraint yapılmaz.
+- Sonuçlanmamış ve `next_attention_at` taşımayan kayıt yalnız `inbox` olabilir. `active` veya `waiting` kaydın sessizce zamanlanmamış kalmasına izin verilmez.
 
 ### 4.3 Planlama ve görünüm
 
 - İlk planlama `follow_up.scheduled`, mevcut planın değişmesi `follow_up.rescheduled` event’i üretir.
+- Planlama mutation’ı `next_attention_at` ile birlikte hedef status’u `active` veya `waiting` olarak atomik yazar.
 - `next_attention_at` ile `deadline_at` için zorunlu sıralama constraint’i yoktur. Kullanıcı, deadline yaklaşmadan önce veya özel durumda sonra dikkat zamanı seçebilir.
-- Açık kayıt için etkin dikkat anı, dolu alanlar arasındaki en erken `next_attention_at` veya `deadline_at` değeridir.
-- `overdue`: etkin dikkat anı geçmiş olan açık kayıt.
-- `now`: dikkat/deadline zamanı olmayan açık kayıt.
-- `today`: etkin dikkat anı gelecekte ve Europe/Istanbul yerel tarihi bugün olan açık kayıt.
-- `upcoming`: etkin dikkat anı bugünden sonra olan açık kayıt.
-- Terminal kayıtlar bu dört açık iş grubuna girmez.
-- Bu değerler database status alanına yazılmaz; sorgu zamanı türetilir.
+- Unutma Kutusu, `status = inbox` kayıtlarının ayrı ve doğrudan sorgusudur; zaman kategorisi değildir.
+- Yalnız `active` veya `waiting` kayıt için etkin dikkat anı, `next_attention_at` ile varsa `deadline_at` değerlerinin en erkenidir.
+- `overdue`: etkin dikkat yerel tarihi bugünden önce olan planlı `active/waiting` kayıt.
+- `today`: etkin dikkat yerel tarihi bugün olan planlı `active/waiting` kayıt. Bunun `effective_attention_at <= now` alt kümesi “zamanı gelmiş bugün”dir.
+- `upcoming`: etkin dikkat yerel tarihi bugünden sonra olan planlı `active/waiting` kayıt.
+- `now` bir status, domain kategorisi veya temel türetilmiş kategori değildir.
+- Ana “Şimdi ilgilen” ekranı bir UI query bileşimidir: `overdue` kayıtlar + zamanı gelmiş `today` kayıtları + `is_important = true` olan `inbox` kayıtları. Aynı kayıt birden fazla koşula uyarsa tek gösterilir.
+- Terminal kayıtlar ile normal/önemsiz inbox kayıtları bu UI bileşimine otomatik girmez.
+- `overdue`, `today` ve `upcoming` database’e yazılmaz; sorgu anında türetilir.
 
 ## 5. `RoutineTemplate` sözleşmesi
 
@@ -129,7 +148,7 @@ Issue #98 başlamadan önceki güvenli nokta `9b631fef4f3c4a290daa3b8d651d4fc9af
 | `routine_template_id` | UUID, zorunlu | Değişmez kimlik. |
 | `title` | text, zorunlu | Örnek: `Puantajı tamamla`. |
 | `description` | text, nullable | Rutin ayrıntısı. |
-| `project_id` | UUID, zorunlu | `projects.id` foreign key. |
+| `project_id` | UUID, nullable | İsteğe bağlı `projects.id` foreign key; null template kişisel çalışma alanındadır. |
 | `recurrence_type` | enum, zorunlu | `daily`, `weekdays`, `weekly`, `monthly`. |
 | `local_time` | `HH:MM`, zorunlu | Planlanan yerel saat. |
 | `timezone` | IANA name, zorunlu | v0.1’de yalnız `Europe/Istanbul`. |
@@ -204,7 +223,7 @@ Bir `weekly` template için en az bir satır bulunması, template ve weekday sat
 - `overdue`: açık occurrence için `next_attention_at < now`.
 - `today`: açık occurrence’ın `next_attention_at` yerel tarihi bugün ve zamanı henüz gelmemiş.
 - `upcoming`: açık occurrence’ın dikkat tarihi bugünden sonra.
-- Occurrence’ın zorunlu bir dikkat anı olduğu için normal üretimde `now` grubuna düşen zamansız occurrence yoktur.
+- `now` occurrence için de status veya görünüm kategorisi değildir; occurrence her zaman zorunlu bir dikkat anı taşır.
 - Bu gruplar kalıcı status değildir.
 
 ## 7. Lazy ve sınırlı backfill politikası
@@ -326,15 +345,29 @@ routine_occurrence_events
 ### 9.2 Ana constraint ve index’ler
 
 - Bütün ana ve event ID alanları primary key’dir.
-- Project, observation, template ve aggregate ilişkileri foreign key’dir; `ON DELETE CASCADE` kullanılmaz.
+- Nullable project alanları dolu olduğunda `projects(id)` foreign key’iyle doğrulanır; null değer kişisel çalışma alanını temsil eder.
+- Observation, template ve aggregate ilişkileri foreign key’dir; `ON DELETE CASCADE` kullanılmaz.
 - `routine_occurrences(routine_template_id, occurrence_local_date)` unique constraint taşır.
 - Her event tablosu `(aggregate_id, sequence)` unique constraint taşır.
 - Enum alanları SQLite `CHECK` ile allowed list’e sınırlandırılır.
 - Boolean alanları `CHECK(value IN (0, 1))` kullanır.
 - Revision alanları `CHECK(revision >= 1)` kullanır.
 - Template tarih aralığı `end_date IS NULL OR end_date >= start_date` constraint’i taşır.
-- Status ile outcome/timestamp birlikteliği database `CHECK` ve application validation ile birlikte korunur.
+- Follow-up açık-planlama değişmezi database’te şu eşdeğer `CHECK` ile korunur: `status IN ('completed', 'cancelled') OR status = 'inbox' OR next_attention_at IS NOT NULL`. Böylece açık `active/waiting` satır null dikkat zamanı taşıyamaz; terminal kurallar ayrı `CHECK` ile korunur.
+- Database `CHECK`, `inbox` için null değere izin verir. Application service daha güçlü lifecycle kuralını uygular: create her zaman `inbox + NULL`; planlama aynı transaction’da `active/waiting + timestamp`; plan kaldırma kaydı `inbox + NULL` yapar.
+- Observation–project çifti için `CHECK(observation_id IS NULL OR project_id IS NOT NULL)` uygulanır.
+- `field_observations(id, project_id)` üzerinde composite unique parent key oluşturulur ve `follow_up_items(observation_id, project_id)` bu çifte composite foreign key verir. Böylece observation bağlı follow-up farklı veya null proje ile kalıcı yazılamaz.
+- Application service observation’ı okuyup projesiz follow-up’a observation projesini atar; farklı mevcut projeyi mutation/event yazmadan reddeder. Database constraint yarış veya repository bypass durumunda son savunmadır.
+- Diğer status ile outcome/timestamp birliktelikleri database `CHECK` ve application validation ile birlikte korunur.
 - Listeleme için follow-up `(status, next_attention_at)`, template `(status, project_id)` ve occurrence `(routine_template_id, occurrence_local_date)` index’leri eklenir.
+
+| Değişmez | Database sorumluluğu | Application service sorumluluğu |
+| --- | --- | --- |
+| Hızlı create | `capture_text` ve `title` `NOT NULL`; status allowed list | Yalnız capture text alır, normalize eder, title’ı aynı değere eşitler ve diğer varsayılanları üretir |
+| Açık planlama | `active/waiting + NULL` birleşimini `CHECK` ile reddeder | Create’i `inbox + NULL`; planlamayı `active/waiting + timestamp`; plan kaldırmayı `inbox + NULL` olarak atomik yapar |
+| Nullable proje | Dolu değeri `projects(id)` foreign key ile doğrular | Projesiz kayıtları kişisel sorgularda görünür tutar; sonradan bağlama/ayırma use-case’ini yönetir |
+| Observation–project | Observation varsa project zorunlu `CHECK`; composite foreign key ile aynı çifti zorunlu kılar | Observation’ı okur; null projeyi atar, farklı projeyi reddeder; mutation ile event’i birlikte yazar |
+| Terminal durum | Status/outcome/completed/cancelled zaman `CHECK`’leri | İzin verilen transition, revision, no-op ve event payload’ını doğrular |
 
 ### 9.3 Güvenli upgrade
 
@@ -383,6 +416,12 @@ class FollowUpApplicationService:
     def schedule(
         self, follow_up_id: str, expected_revision: int, command: ScheduleFollowUp
     ) -> FollowUpItem: ...
+    def move_to_inbox(
+        self, follow_up_id: str, expected_revision: int
+    ) -> FollowUpItem: ...
+    def set_project(
+        self, follow_up_id: str, expected_revision: int, project_id: str | None
+    ) -> FollowUpItem: ...
     def mark_waiting(
         self, follow_up_id: str, expected_revision: int, command: MarkWaiting
     ) -> FollowUpItem: ...
@@ -407,7 +446,7 @@ class FollowUpApplicationService:
 class RoutineApplicationService:
     def create_template(self, command: CreateRoutineTemplate) -> RoutineTemplate: ...
     def get_template(self, routine_template_id: str) -> RoutineTemplate: ...
-    def list_templates(self, project_id: str, status: str | None = None) -> tuple[RoutineTemplate, ...]: ...
+    def list_templates(self, query: RoutineTemplateQuery) -> tuple[RoutineTemplate, ...]: ...
     def update_template(
         self,
         routine_template_id: str,
@@ -436,16 +475,17 @@ class RoutineApplicationService:
     ) -> tuple[RoutineOccurrenceEvent, ...]: ...
 ```
 
-Buradaki command/query sınıfları transport veya UI modeli değildir; use-case girdilerini isimlendiren immutable application değerleridir. `convert_to_observation` var olan ve ayrıca oluşturulmuş bir observation kimliğini bağlar; bu sözleşme otomatik observation üretmez.
+Buradaki command/query sınıfları transport veya UI modeli değildir; use-case girdilerini isimlendiren immutable application değerleridir. `CreateFollowUp` yalnız normalize edilecek `capture_text` alanını zorunlu taşır; başlık, status, tür, proje, zaman ve önem create input’u değildir. `UpdateFollowUp` sonradan title/açıklama/tür/konum/kişi/önem/koşul düzenlemesini taşır fakat `capture_text` ilk yakalama metnini değiştirmez. `move_to_inbox` planı kaldırırken status ve zamanı birlikte değiştirir. `set_project`, observation bağlıyken null veya farklı proje kabul etmez. `FollowUpQuery` Unutma Kutusu ile planlı görünüm sorgularını birbirinden ayırır. `RoutineTemplateQuery`, `project_id = None` ile kişisel template’leri açıkça sorgulayabilir. `convert_to_observation` var olan ve ayrıca oluşturulmuş bir observation kimliğini bağlar; bu sözleşme otomatik observation üretmez.
 
 Service davranışı:
 
 1. Komut girdisini doğrular.
 2. Tek Unit of Work açar.
 3. Güncel aggregate ve revision’ı okur.
-4. Gerçek değişiklik yoksa event eklemeden mevcut kaydı döndürür.
-5. Ana kaydı değiştirir ve event’i append eder.
-6. Tek commit yapar.
+4. Follow-up status/zaman ile observation/project çapraz-kayıt değişmezlerini doğrular.
+5. Gerçek değişiklik yoksa event eklemeden mevcut kaydı döndürür.
+6. Ana kaydı değiştirir ve event’i append eder.
+7. Tek commit yapar.
 
 Event insert başarısızsa ana mutation; ana mutation başarısızsa event insert kalıcı olmaz.
 
@@ -525,6 +565,14 @@ Proje: 63516-2'nin canonical project UUID karşılığı
 
 ### 14.1 Domain ve repository
 
+- `CreateFollowUp` için yalnız `capture_text` zorunluluğu; title’ın deterministic whitespace normalization sonrası aynı değer olması.
+- Sonraki title düzenlemesinin capture text’i değiştirmemesi.
+- Nullable follow-up/template project ve kişisel çalışma alanı sorguları.
+- Observation bağlamada null projenin observation projesine atanması, farklı projenin application ve database seviyesinde reddi.
+- `inbox + NULL`, `active/waiting + timestamp` kabulü; `active/waiting + NULL` reddi.
+- Zamanlanmamış açık kaydın yalnız Unutma Kutusu sorgusunda bulunması.
+- `overdue/today/upcoming` sorgularının yalnız planlı `active/waiting` kayıtları alması ve `now` domain kategorisinin bulunmaması.
+- “Şimdi ilgilen” UI query bileşiminde overdue, zamanı gelmiş today ve önemli inbox union/dedup davranışı.
 - Canonical/non-canonical UUID kabul ve ret testleri.
 - Her enum allowed list ve unsupported değer testleri.
 - Terminal status/outcome/timestamp birlikteliği.
@@ -569,7 +617,7 @@ Proje: 63516-2'nin canonical project UUID karşılığı
 - Web UI ve `+ Unutma` formu.
 - Background scheduler, Windows notification ve uygulama kapalıyken çalışan servis.
 - PWA/mobil, WhatsApp veya e-posta.
-- AI sınıflandırma, başlık üretme veya önem tahmini.
+- AI sınıflandırma, AI başlık üretimi veya önem tahmini. Deterministic whitespace normalization AI değildir.
 - Takım görevlendirme, yetki ve çok kullanıcılı sahiplik.
 - Resmî tatil takvimi, vardiya ve geofence.
 - Otomatik resmî gözlem oluşturma.
