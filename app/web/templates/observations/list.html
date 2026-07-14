@@ -18,6 +18,13 @@
   </label>
   <button>Günlük çıktıyı indir</button>
 </form>
+<section class="backup-panel" aria-labelledby="backup-title">
+  <h2 id="backup-title">Tam veri yedeği</h2>
+  <p>Gözlemler, olay geçmişi ve ek dosyalar doğrulanarak tek bir tam yedek hazırlanır.</p>
+  <form method="post" action="{{ url_for('backup_create') }}">
+    <button type="submit">Yedek oluştur ve indir</button>
+  </form>
+</section>
 <div class="cards">
 {% for observation in observations %}
   <a class="card" href="{{ url_for('observation_detail', observation_id=observation.observation_id) }}">

@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from uuid import uuid4
 
 from flask import (
     Flask,
@@ -33,13 +34,16 @@ from app.persistence import (
     RecordNotFound,
     RevisionConflict,
 )
-from app.operations import DailyExportService
+from app.operations import BackupService, DailyExportService
 from app.storage import ManagedAttachmentStore
 from app.storage.paths import validate_canonical_uuid
 
 
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 MAX_SEARCH_QUERY_LENGTH = 200
+BACKUP_ERROR_MESSAGE = (
+    "Yedek oluşturulamadı. Veri ve dosya bütünlüğünü kontrol edip yeniden deneyin."
+)
 ISTANBUL_TIMEZONE = timezone(timedelta(hours=3), name="Europe/Istanbul")
 SAFE_PREVIEW_MIME_TYPES = frozenset(
     {"image/gif", "image/jpeg", "image/png", "image/webp"}
@@ -148,6 +152,8 @@ def create_app(data_root: str | Path) -> Flask:
             ManagedAttachmentStore(root / "attachments"),
         ),
         CSE_EXPORT_SERVICE=DailyExportService(root),
+        CSE_BACKUP_SERVICE=BackupService(root),
+        CSE_BACKUP_ID_FACTORY=lambda: str(uuid4()),
     )
     app.jinja_env.globals.update(
         event_label=event_label,
@@ -456,6 +462,62 @@ def create_app(data_root: str | Path) -> Flask:
         response.headers["X-Content-Type-Options"] = "nosniff"
         return response
 
+    @app.post("/backups")
+    def backup_create() -> Response | tuple[str, int]:
+        artifact = None
+        try:
+            artifact_id = str(app.config["CSE_BACKUP_ID_FACTORY"]())
+            path = _backup_artifact_path(root, artifact_id)
+            backup_service = app.config["CSE_BACKUP_SERVICE"]
+            artifact = backup_service.create_backup(path)
+            backup_service.verify_backup(artifact.path)
+        except Exception:
+            if artifact is not None:
+                try:
+                    artifact.path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            return (
+                render_template(
+                    "backups/error.html",
+                    error=BACKUP_ERROR_MESSAGE,
+                ),
+                409,
+            )
+        return redirect(url_for("backup_download", artifact_id=artifact_id))
+
+    @app.get("/backups/<artifact_id>")
+    def backup_download(artifact_id: str) -> Response | tuple[str, int]:
+        try:
+            path = _backup_artifact_path(root, artifact_id)
+        except ValueError:
+            abort(404)
+        if not path.is_file():
+            abort(404)
+        try:
+            app.config["CSE_BACKUP_SERVICE"].verify_backup(path)
+            modified = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
+        except Exception:
+            return (
+                render_template(
+                    "backups/error.html",
+                    error=BACKUP_ERROR_MESSAGE,
+                ),
+                409,
+            )
+        download_name = (
+            f"cse-tam-yedek-{modified:%Y%m%d-%H%M%S}-"
+            f"{artifact_id[:8]}.csebackup.zip"
+        )
+        response = send_file(
+            path,
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name=download_name,
+        )
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
     @app.post("/exports/daily")
     def daily_export() -> Response | tuple[str, int]:
         try:
@@ -489,3 +551,8 @@ def _safe_error(error: Exception) -> str:
     if isinstance(error, ApplicationServiceError):
         return "İşlem tamamlanamadı; dosya bütünlük kontrolü gerekebilir."
     return "Girdileri kontrol edip yeniden deneyin."
+
+
+def _backup_artifact_path(root: Path, artifact_id: str) -> Path:
+    validate_canonical_uuid(artifact_id, "backup_artifact_id")
+    return root / "backups" / f"{artifact_id}.csebackup.zip"
