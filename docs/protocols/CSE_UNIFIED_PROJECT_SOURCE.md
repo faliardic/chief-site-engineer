@@ -1140,3 +1140,35 @@ Operasyonel Git/GitHub/Codex execution kurallari icin tracked kaynak:
 ```text
 docs/protocols/CSE_PROJECT_INSTRUCTIONS.md
 ```
+
+---
+
+## 33. Güncel Birinci Ürün Önceliği: Saha Takibi v0.1
+
+Issue #98 ile ürün yönü, mevcut gözlem/attachment/SQLite/backup/export omurgasının üzerine Saha Takibi v0.1 eklemek olarak kesinleştirilmiştir. Bu karar, bu belgenin 31. bölümündeki genel “takip ve kapanış” yönünü somutlaştırır.
+
+İlk kapsam üç ayrı domain kaydıdır:
+
+- `FollowUpItem`: tek seferlik action, waiting veya recheck takibi.
+- `RoutineTemplate`: günlük, iş günü, haftalık veya aylık tekrar kuralı.
+- `RoutineOccurrence`: belirli Europe/Istanbul yerel gününde oluşan ve geçmişi şablondan bağımsız kalan gerçekleşme.
+
+Değişmez ürün sınırları:
+
+- Yerel recurrence kararı `Europe/Istanbul`; kalıcı gerçek anlar UTC’dir.
+- Bugün dahil son yedi yerel gün için lazy/idempotent backfill yapılır; sınırsız geçmiş üretimi yapılmaz.
+- Aynı template ve yerel tarih için yalnız bir occurrence olabilir.
+- Template güncellemesi, pasifleştirme, tamamlama ve erteleme geçmiş occurrence’ları yeniden yazmaz.
+- Yaşam döngüsü status’ları saklanır; `now`, `today`, `overdue`, `upcoming` zaman görünümleri sorgu anında türetilir.
+- Mutation ve append-only event aynı transaction’da atomiktir; optimistic revision ve no-op davranışı mevcut observation sözleşmesiyle uyumludur.
+- Yeni tablolar SQLite schema v3 ile eklenir; mevcut project/observation/attachment/event verisi değiştirilmez ve hard delete eklenmez.
+- Tracking verisi SQLite snapshot backup içinde taşınır fakat mevcut günlük resmî observation export’una varsayılan olarak girmez.
+- Puantaj ilk aşamada yalnız “her iş günü yapılacak rutin” kabul örneğidir; personel, saat, ücret veya bordro veri modülü değildir.
+
+Kesin domain, recurrence, persistence, backup/restore ve export exclusion sözleşmesi:
+
+```text
+docs/field_tracking_v0_1_contract.md
+```
+
+Implementation sırası domain/recurrence, schema/repository, transactional service/backfill, backup compatibility, export exclusion ve son olarak minimum UI’dir. Notification, background scheduler, PWA/mobil ve AI bu çekirdek doğrulanmadan önce başlatılmaz.
