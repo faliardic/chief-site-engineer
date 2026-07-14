@@ -5,9 +5,10 @@
 - Immutable `FollowUpItem`, `RoutineTemplate`, `RoutineOccurrence` ve üç append-only event domain kaydı ailesi `app/field_tracking.py` içinde eklendi.
 - AI veya otomatik sınıflandırma kullanmayan deterministic hızlı capture normalizasyonu ve ilk title üretimi eklendi.
 - Saf daily, weekdays, weekly ve monthly recurrence eşleşmeleri; yedi günlük sınırlı tarih hesabı; Europe/Istanbul `ZoneInfo` UTC schedule snapshot’ları eklendi.
+- Inactive template için `deactivated_at` İstanbul yerel gününe çevrilerek yalnız pasifleştirme gününden önceki recurrence/start/end uyumlu eksik tarihler sınırlı backfill’e açıldı; pasifleştirme günü ve sonrası dışlandı.
 - `now` domain kategorisi eklenmeden saf follow-up/occurrence görünüm sınıflandırmaları ve tekilleştirilmiş “Şimdi ilgilen” bileşimi eklendi.
 - IANA `ZoneInfo("Europe/Istanbul")` davranışının sistem timezone veritabanı olmayan Windows kurulumlarında çalışması için `tzdata` eklendi.
-- Kayıt, değişmez, recurrence, timezone snapshot, event sözlüğü ve deterministic payload davranışlarını kapsayan 84 focused executable test eklendi; full suite `759 passed, 7 skipped` sonucu verdi.
+- Kayıt, değişmez, recurrence, inactive backfill sınırı, timezone snapshot, event sözlüğü ve deterministic payload davranışlarını kapsayan 92 focused executable test eklendi; full suite `767 passed, 7 skipped` sonucu verdi.
 - SQLite schema/migration, repository, Unit of Work, application service, UI, scheduler, notification, backup/restore, export ve gerçek kullanıcı data root’u bu görevin dışında tutuldu.
 
 ## Step 225

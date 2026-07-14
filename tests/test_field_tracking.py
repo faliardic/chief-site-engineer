@@ -380,7 +380,7 @@ def test_template_accepts_nullable_project_and_rejects_bad_project_uuid() -> Non
         _template(project_id="project-1")
 
 
-def test_inactive_template_requires_timestamp_and_matches_no_new_date() -> None:
+def test_inactive_template_requires_timestamp_and_excludes_deactivation_date() -> None:
     inactive = _template(status="inactive", deactivated_at=UPDATED_AT)
     assert not matches_routine_date(inactive, date(2026, 7, 14))
 
@@ -388,6 +388,77 @@ def test_inactive_template_requires_timestamp_and_matches_no_new_date() -> None:
         _template(status="inactive")
     with pytest.raises(ValueError, match="active template"):
         _template(status="active", deactivated_at=UPDATED_AT)
+
+
+@pytest.mark.parametrize(
+    ("local_date", "expected"),
+    [
+        (date(2026, 7, 13), True),
+        (date(2026, 7, 14), False),
+        (date(2026, 7, 15), False),
+    ],
+)
+def test_inactive_template_matches_only_before_deactivation_local_date(
+    local_date: date, expected: bool
+) -> None:
+    template = _template(
+        status="inactive", deactivated_at="2026-07-14T09:00:00Z"
+    )
+    assert matches_routine_date(template, local_date) is expected
+
+
+def test_inactive_deactivation_uses_istanbul_day_across_utc_boundary() -> None:
+    template = _template(
+        status="inactive",
+        deactivated_at="2026-07-13T22:30:00Z",
+    )
+
+    assert matches_routine_date(template, date(2026, 7, 13))
+    assert not matches_routine_date(template, date(2026, 7, 14))
+
+
+def test_inactive_due_window_returns_only_pre_deactivation_dates() -> None:
+    template = _template(
+        status="inactive", deactivated_at="2026-07-14T09:00:00Z"
+    )
+
+    assert due_routine_dates(template, date(2026, 7, 15)) == (
+        date(2026, 7, 9),
+        date(2026, 7, 10),
+        date(2026, 7, 11),
+        date(2026, 7, 12),
+        date(2026, 7, 13),
+    )
+
+
+def test_inactive_pre_deactivation_date_builds_schedule() -> None:
+    template = _template(
+        status="inactive", deactivated_at="2026-07-14T09:00:00Z"
+    )
+
+    schedule = build_occurrence_schedule(template, date(2026, 7, 13))
+    assert schedule.occurrence_local_date == "2026-07-13"
+    with pytest.raises(ValueError, match="does not match"):
+        build_occurrence_schedule(template, date(2026, 7, 14))
+
+
+def test_inactive_pre_deactivation_past_date_can_be_planned_missed() -> None:
+    template = _template(
+        status="inactive", deactivated_at="2026-07-14T09:00:00Z"
+    )
+
+    plan = plan_routine_occurrence(
+        template, date(2026, 7, 13), date(2026, 7, 15)
+    )
+    assert plan.status == "closed"
+    assert plan.outcome_type == "missed"
+
+
+def test_active_template_still_matches_dates_without_deactivation_cutoff() -> None:
+    template = _template(status="active")
+    assert matches_routine_date(template, date(2026, 7, 13))
+    assert matches_routine_date(template, date(2026, 7, 14))
+    assert matches_routine_date(template, date(2026, 7, 15))
 
 
 @pytest.mark.parametrize(

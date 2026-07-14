@@ -187,6 +187,29 @@ Anlamları:
 
 Monthly kuralında “31 yoksa ayın son gününe taşı” davranışı yazılmadı. Fonksiyon yalnız gerçekten var olan `date` nesnesinin gününü karşılaştırdığı için Şubat otomatik kaydırma üretmez.
 
+### Inactive template geçmiş backfill sınırı
+
+Inactive olmak, şablonun geçmişteki bütün uygun günlerini yok saymak değildir. `deactivated_at` canonical UTC anı önce Europe/Istanbul yerel tarihine çevrilir:
+
+```python
+if template.status == RoutineTemplateStatus.INACTIVE:
+    deactivation_local_date = _istanbul_local_date(template.deactivated_at)
+    if local_date >= deactivation_local_date:
+        return False
+```
+
+Satır satır:
+
+1. Bu ek sınır yalnız inactive template için çalışır; active akışa dokunmaz.
+2. `_istanbul_local_date(...)`, UTC anını `ZoneInfo("Europe/Istanbul")` ile yerel güne çevirir.
+3. `local_date == deactivation_local_date` pasifleştirme günüdür ve eşleşmez.
+4. Pasifleştirme gününden sonraki tarihler de eşleşmez.
+5. Daha eski tarih, ayrıca start/end ve recurrence kurallarını sağlıyorsa eşleşmeye devam eder.
+
+Örneğin `2026-07-13T22:30:00Z`, UTC takviminde 13 Temmuz görünür; fakat İstanbul’da `2026-07-14 01:30` anıdır. Bu nedenle 13 Temmuz geçmiş backfill için uygun olabilir, 14 Temmuz pasifleştirme yerel günü olduğu için yeni occurrence üretmez.
+
+Bu kontrol `matches_routine_date` içinde tek yerde olduğu için onu kullanan `due_routine_dates`, `build_occurrence_schedule` ve `plan_routine_occurrence` aynı kesme kuralını otomatik paylaşır.
+
 ## 7. Bugün dahil yedi günlük pencere
 
 Gerçek başlangıç hesabı:
@@ -431,6 +454,7 @@ Akışta database açma, dosya yazma, sistem saatini okuma veya UUID üretme ad�
 - Recurrence’ı saf fonksiyon yaptık ki SQLite veya UI beklemeden bütün takvim kenarları test edilebilsin.
 - `ZoneInfo("Europe/Istanbul")` ve `tzdata` kullandık ki sabit offset kuralı yazmadan Windows’ta da aynı IANA davranışı çalışsın.
 - Yedi günlük pencereyi fonksiyon içinde sınırladık ki uygulama uzun süre kapalı kaldığında sınırsız geçmiş kayıt planlamasın.
+- Inactive template için UTC pasifleştirme anını İstanbul yerel gününe çevirdik ki pasifleştirme öncesi sınırlı geçmiş backfill kaybolmasın, pasifleştirme günü ve sonrası da yanlışlıkla yeniden üretilmesin.
 - Event payload’ını mevcut deterministic serializer’dan geçirdik ki JSON key sırası ve geçersiz değer reddi observation omurgasıyla aynı olsun.
 - “Şimdi ilgilen”i predicate ve tekilleştirilmiş seçim olarak yazdık ki `now` yanlışlıkla yeni status veya domain kategorisine dönüşmesin.
 

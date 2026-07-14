@@ -10,6 +10,7 @@
 - Recurrence hesaplayıcısı sistem saatini, database’i veya filesystem’i okumaz. Template, yerel tarih, bugün ve pencere açık argümanlardır; sonuç eski tarihten bugüne deterministiktir.
 - IANA `ZoneInfo("Europe/Istanbul")` zorunluluğunu Windows’ta da çalıştırmak için `tzdata` runtime bağımlılığı eklenir; sabit `+03:00` domain kuralı yazılmaz.
 - Saf occurrence planı kimlik veya event UUID üretmez. Uygun geçmiş gün `closed/missed`, bugün `open` olarak planlanır; kalıcı insert, iki aşamalı revision/event akışı sonraki transactional service görevidir.
+- Inactive template bütün tarihleri koşulsuz dışlamaz: canonical UTC `deactivated_at`, `Europe/Istanbul` yerel tarihine çevrilir; yalnız recurrence ile start/end kurallarına uyan ve `local_date < deactivation_local_date` olan eksik geçmiş günler sınırlı backfill için eşleşir. Pasifleştirme yerel günü ve sonrası eşleşmez; active template davranışı değişmez.
 - `now` enum/status eklenmez. “Şimdi ilgilen”, overdue + zamanı gelmiş today + önemli inbox kayıtlarını giriş sırasını koruyarak ve kimliğe göre tekilleştirerek seçen saf query composition’dır.
 - Bu görev schema version, migration, repository, Unit of Work, application service, web UI, scheduler, notification, backup/restore veya export davranışı değiştirmez.
 

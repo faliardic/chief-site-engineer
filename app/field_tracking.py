@@ -569,11 +569,13 @@ class RoutineOccurrenceEvent:
 
 
 def matches_routine_date(template: RoutineTemplate, local_date: date) -> bool:
-    """Return whether an active template matches one explicit local date."""
+    """Return whether a template may produce one explicit local date."""
 
     local_date = _require_date(local_date, "local_date")
-    if template.status != RoutineTemplateStatus.ACTIVE:
-        return False
+    if template.status == RoutineTemplateStatus.INACTIVE:
+        deactivation_local_date = _istanbul_local_date(template.deactivated_at)
+        if local_date >= deactivation_local_date:
+            return False
     start = _local_date_from_string(template.start_date)
     end = (
         _local_date_from_string(template.end_date)
