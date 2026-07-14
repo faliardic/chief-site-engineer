@@ -1317,3 +1317,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Tie-breaker`: Ana siralama degerleri esit oldugunda hangi kaydin once gelecegini belirleyen ikinci kuraldir.
 
 `Deterministik Siralama`: Ayni kalici veri her okundugunda ayni kayit sirasinin elde edilmesidir.
+
+`Managed backup artifact`: Uygulamanin kendi kontrol ettigi klasorde, sunucu tarafindan uretilmis kimlik ve adla saklanan dogrulanmis yedek dosyasidir.
+
+`Artifact kimligi`: Bir cikti dosyasini kullanici tarafindan verilen path yerine guvenli bicimde bulmak icin kullanilan benzersiz kimliktir. Issue 93'te canonical UUID kullanilir.
+
+`Fail-closed indirme`: Dosya kimligi, varligi veya butunlugu dogrulanamazsa indirme vermemeyi ve guvenli hata gostermeyi ifade eder.
+
+`Exclusive output`: Hedef dosya zaten varsa uzerine yazmak yerine islemi durduran dosya olusturma sozlesmesidir.

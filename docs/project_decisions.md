@@ -2386,3 +2386,11 @@
 - `observation_events` append-only oldugu ve insert islemleri `rowid` vermedigi icin `rowid`, ayni timestamp icindeki eklenme sirasini temsil edecek.
 - Cozum mevcut tabloyu, event ID/timestamp/payload degerlerini degistirmeyecek ve schema migration gerektirmeyecek.
 - Reopen ve SQLite backup/restore sonrasi sira, ters leksikografik UUID kullanan regresyon testleriyle korunacak.
+
+## Issue 93 - Tek tik dogrulanmis web yedegi
+
+- Web yedekleri Windows dosya kilidi ve streaming cleanup yarisi olusturmamak icin `CSE_DATA_ROOT/backups/` altinda managed artifact olarak saklanacak.
+- Artifact yolu kullanici girdisinden uretilmeyecek; canonical UUID artifact kimligi sunucu tarafinda olusturulacak ve download route ayni kimligi yeniden dogrulayacak.
+- Mevcut `BackupService` yedegi olusturup dogrulayacak; download route artifact'i tekrar dogrulamadan dosyayi sunmayacak.
+- Managed `backups/` klasoru backup girdisi olmayacak; mevcut motor yalniz SQLite snapshot ve veritabaninda kayitli attachment dosyalarini arşivleyecek.
+- Basarisiz backup teknik ayrinti veya path gostermeden guvenli Turkce mesajla fail-closed olacak; restore UI, retention ve otomatik silme eklenmeyecek.

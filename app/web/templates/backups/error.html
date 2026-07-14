@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Yedek Oluşturulamadı{% endblock %}
+{% block content %}
+<h1>Yedek oluşturulamadı</h1>
+<p>Eksik veya bütünlüğü doğrulanamayan veriler yedeğe eklenmez.</p>
+<p><a class="button secondary" href="{{ url_for('observation_list') }}">Gözlem listesine dön</a></p>
+{% endblock %}
