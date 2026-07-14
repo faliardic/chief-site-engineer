@@ -100,8 +100,8 @@ def test_backup_restore_preserves_edited_revision_and_event(tmp_path: Path) -> N
         [
             "11111111-1111-4111-8111-111111111111",
             "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-            "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            "ffffffff-ffff-4fff-8fff-ffffffffffff",
+            "00000000-0000-4000-8000-000000000000",
         ]
     )
     service = ObservationApplicationService(
@@ -139,6 +139,10 @@ def test_backup_restore_preserves_edited_revision_and_event(tmp_path: Path) -> N
     assert restored.observation.description == "Yeni açıklama"
     assert restored.observation.notes == "Yeni not"
     assert restored.observation.revision == 2
+    assert [event.event_type for event in restored.events] == [
+        "observation_created",
+        "observation_details_updated",
+    ]
     assert restored.events[-1].event_type == "observation_details_updated"
     assert restored.events[-1].payload == {
         "changed_fields": ["location", "category", "description", "notes"],

@@ -2378,3 +2378,11 @@
 - Handover QC yorumunda basarili export sonucunun gorunur olabilecegi, basarisiz export sonucunun `review required` veya `attention` olarak yorumlanabilecegi, ancak `blocked` status uretilmeyecegi ve failure contract'in otomatik duzeltme veya migration baslatmayacagi belirtildi.
 - Future test matrix basliklari success contract summary, failure contract summary, mixed success/failure result list, missing optional fields, unknown status, unsupported input, input immutability, no file writing, no blocked status, no hard validation, no recomputation of wrapper result, markdown summary contains safe user message ve technical detail is preserved but not overused in user-facing summary olarak belgelendi.
 - Bu adim documentation-only plan adimidir; uygulama kodu, test dosyalari, existing helper davranisi, JSON/Markdown export cikti dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event uretimi, database/repository davranisi, ZIP/cache staging, commit veya push eklenmedi.
+
+## Issue 92 - Ayni timestamp observation event sirasi
+
+- Observation event gecmisi once `occurred_at`, esitlik halinde SQLite `rowid` ile siralanacak.
+- Rastgele UUID event `id` degeri kronolojik tie-breaker olarak kullanilmayacak.
+- `observation_events` append-only oldugu ve insert islemleri `rowid` vermedigi icin `rowid`, ayni timestamp icindeki eklenme sirasini temsil edecek.
+- Cozum mevcut tabloyu, event ID/timestamp/payload degerlerini degistirmeyecek ve schema migration gerektirmeyecek.
+- Reopen ve SQLite backup/restore sonrasi sira, ters leksikografik UUID kullanan regresyon testleriyle korunacak.

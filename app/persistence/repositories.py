@@ -560,7 +560,7 @@ class SQLiteObservationEventRepository(_SQLiteRepository):
             SELECT id, observation_id, event_type, actor, occurred_at, payload_json
             FROM observation_events
             WHERE observation_id = ?
-            ORDER BY occurred_at, id
+            ORDER BY occurred_at, rowid
             """,
             (observation_id,),
         )

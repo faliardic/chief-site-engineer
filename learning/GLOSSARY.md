@@ -1311,3 +1311,9 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Ascending Order Validation`: Numarali degerlerin kucukten buyuge beklenen sirayla geldigini kontrol eden validation.
 
 `Self-Contained Note`: Kendi kapsamini ve gerekli historical context'i baska bir nota bagimli olmadan tasiyan not.
+
+`SQLite rowid`: SQLite'in normal bir tablodaki her satira otomatik verdigi tamsayi kimliktir. Bu projede append-only observation event satirlarinin ayni timestamp icindeki eklenme sirasini ayirmak icin kullanilir.
+
+`Tie-breaker`: Ana siralama degerleri esit oldugunda hangi kaydin once gelecegini belirleyen ikinci kuraldir.
+
+`Deterministik Siralama`: Ayni kalici veri her okundugunda ayni kayit sirasinin elde edilmesidir.
