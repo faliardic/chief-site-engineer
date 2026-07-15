@@ -1,245 +1,171 @@
 # CHIEF SITE ENGINEER
 
-CHIEF SITE ENGINEER, santiye sefi icin kontrol, takip, gunluk kayit, kalite kaydi, uygunsuzluk / NCR izleme, dosya eki metadata, attachment integrity ve dokumantasyon disiplini gelistirmek amaciyla kurulan sade bir Python projesidir.
+CHIEF SITE ENGINEER (CSE), aktif şantiye şefinin kâğıt müsvedde, ajanda, WhatsApp, telefon galerisi, Excel, klasör ve kişisel hafıza arasında dağılan bilgiyi tek güvenilir saha hafızasında yönetmesine yardım eden local-first bir **Saha Komuta Sistemi**dir.
 
-Proje su anda gercek bir urun uygulamasi degil; domain model, bellek ici repository davranislari, testler, karar dokumantasyonu, learning notlari ve NotebookLM podcast notlari ureten bir cekirdek gelistirme alanidir.
-
-## Guncel Durum
-
-Son guvenli nokta:
+Ana çalışma döngüsü:
 
 ```text
-Adim 224 - Rolling NotebookLM podcast source protocol
-PR #66 merge commit: 68c00edab667bbfd0467f4684921c0f6b453d4a7
+Yakala -> İşle -> Takip et -> Doğrula -> Günlüğe al
 ```
 
-Guncel test sonucu:
+CSE büyük inşaat yönetim platformlarının küçültülmüş kopyası değildir. Ürün filtresi şudur:
+
+> Bu özellik şantiye şefinin sahada unutmamasını, kanıtlamasını, takip etmesini, raporlamasını veya daha sonra geri çağırmasını kolaylaştırıyor mu?
+
+## Normal kullanım
+
+Windows'ta repository kökündeki `CSE_Baslat.cmd` dosyasına çift tıklayın. Başlatıcı:
+
+- veriyi varsayılan olarak `%LOCALAPPDATA%\ChiefSiteEngineer\data` altında tutar;
+- logları `%LOCALAPPDATA%\ChiefSiteEngineer\logs` altında tutar;
+- uygun bir local port seçer ve hazır olduğunda tarayıcıyı açar;
+- mevcut veri kökünü sessizce taşımaz veya silmez.
+
+Belirli bir veri köküyle çalıştırmak için:
+
+```powershell
+CSE_Baslat.cmd --data-root C:\mevcut-cse-data
+```
+
+Geliştirici çalıştırması:
+
+```powershell
+python -m pip install -r requirements.txt
+python -m app.web --data-root C:\cse-data
+```
+
+Uygulama varsayılan olarak yalnız `127.0.0.1` loopback adresinde açılır. Loopback dışı kullanım açık `--allow-network` seçimi gerektirir; mevcut MVP authentication, authorization veya TLS içermediği için public internet üzerinde yayınlanmamalıdır.
+
+## Merge edilmiş güncel kabiliyetler
+
+`master` üzerindeki son doğrulanmış güvenli nokta:
 
 ```text
-494 passed
+Issue #102
+PR #104
+merge commit 9b25152ae38b72470e332929cb3a30ff955b75f1
 ```
 
-Mevcut calisma durumu:
+Local Field MVP bugün şunları sağlar:
+
+- SQLite persistence ve sürümlü migration runner;
+- managed attachment store, güvenli path üretimi ve bütünlük doğrulaması;
+- local Flask web akışı;
+- proje oluşturma;
+- saha gözlemi oluşturma, listeleme, arama, ayrıntı görüntüleme ve revision kontrollü güncelleme;
+- gözlem durum ve bildirim bilgilerinin güncellenmesi;
+- revision conflict koruması;
+- günlük Markdown/CSV/JSON export paketi;
+- SQLite snapshot tabanlı backup, backup doğrulama ve yalnız yeni hedefe izole restore;
+- Windows tek tık launcher;
+- Saha Takibi v0.1 domain kayıtları ve saf `Europe/Istanbul` recurrence hesapları;
+- SQLite schema v3 içinde Saha Takibi repository ve append-only event persistence altyapısı.
+
+Saha Takibi için domain/recurrence ve SQLite persistence tamamlanmıştır. Transactional application service, yedi günlük lazy backfill orchestration, eski backup uyumluluğu kabulü, resmî export izolasyonu regresyonu ve `+ Unutma` / `Bugün` / `Unutma Kutusu` kullanıcı arayüzü henüz tamamlanmamıştır.
+
+## Saha Takibi v0.1
+
+Birinci ürün geliştirme önceliği [Saha Takibi v0.1 sözleşmesidir](docs/field_tracking_v0_1_contract.md).
+
+Kullanıcı yüzeyi:
 
 ```text
-Adim 225 - Podcast 035 note summary contract
+Saha Takibi
++ Unutma
 ```
 
-Adim 224, PR #66 ile squash merge edildi ve master uzerindeki guncel guvenli nokta oldu. Adim 225, Podcast 035'i Steps 221-225 icin olusturan ve strict notlarda prior-step headings'i section siniri icinde zorunlu kilan aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Hızlı yakalamada kullanıcıdan alınan tek zorunlu içerik `Ne unutulmamalı?` metnidir; hedef ortanca yakalama süresi 8 saniyenin altındadır.
 
-## Repo Koku
+Değişmez sınırlar:
 
-```text
-V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer
+- açık konu ya sonuçlandırılır ya da ne zaman yeniden görüneceği bellidir;
+- `next_attention_at` gerçek `deadline_at` ile aynı değildir;
+- bildirimi kapatmak işi tamamlamaz;
+- kişisel takip ile resmî saha gözlemi ayrıdır;
+- projeye bağlamak kişisel takibi otomatik resmî yapmaz;
+- resmî gözleme dönüşüm açık kullanıcı işlemidir;
+- hard delete yoktur;
+- geçmiş rutin gerçekleşmeleri template değişikliğiyle yeniden yazılmaz.
+
+Auth olmadığı için bugünkü “kişisel” tanımı başka Windows kullanıcılarına karşı cryptographic privacy iddiası değildir. Yalnız resmî proje kayıtları ve resmî exportlardan ayrılmış kullanıcı çalışma verisini ifade eder.
+
+## Operasyon komutları
+
+Günlük export:
+
+```powershell
+python -m app.ops export-daily --data-root C:\cse-data --date 2026-07-15 --output C:\exports\daily.zip
 ```
 
-## Mimari Ozet
+Backup ve doğrulama:
 
-Proje su ana parcalardan olusur:
-
-- `app/models.py`: Santiye, kalite, uygunsuzluk, NCR, dosya eki ve yardimci domain modelleri.
-- `app/records.py`: Bellek ici kayit listeleme, `FileAttachmentRepository`, `FieldObservationRepository` ve `NonconformityRepository` davranislari.
-- `app/attachments.py`: Canonical attachment path helper fonksiyonu.
-- `app/attachment_integrity.py`: Attachment integrity status sabitleri, result/report modelleri, helper ve serializer fonksiyonlari.
-- `app/main.py`: Basit uygulama baslangic mesaji.
-- `tests/`: Model, repository, attachment path ve attachment integrity davranislarini dogrulayan pytest testleri.
-- `docs/`: Adim bazli karar, kapsam, politika, denetim ve kullanim dokumantasyonu.
-- `learning/`: Python ve proje ogrenim notlari.
-- `docs/podcast_notes/`: NotebookLM podcast kaynak notlari.
-- `docs/notebooklm/`: Kalici NotebookLM talimati, rolling source ve manifest.
-- `scripts/build_notebooklm_podcast_source.py`: En guncel podcast notu ile canonical proje gecmisinden rolling source ureten deterministic generator.
-- `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`: Urun amaci, strateji, veri ilkeleri, urun katmanlari, roadmap ve uzun vadeli mimari icin birlesik ust kaynak.
-- `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`: Git/GitHub/Codex operasyon, safety, verification ve execution protocol kaynagi.
-- `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md`: Yeni chat'in GitHub'dan ZIP/handoff yuklemeden nasil devam edecegini anlatan bootstrap kaynagi.
-
-## Mevcut Teknik Kapsam
-
-Adim 205 itibariyla proje su alanlarda ilerlemistir:
-
-- Temel santiye domain modelleri.
-- Gunluk saha, beton dokum, yapi denetim, malzeme, toplanti, RFI/submittal ve ilgili kayit modelleri.
-- Uygunsuzluk adayi ve kesin uygunsuzluk / NCR surecleri.
-- `NonconformityRepository` icin bellek ici ekleme, listeleme, filtreleme, sayma, guncelleme, arsivleme ve restore davranislari.
-- `FileAttachmentRecord` ile fotograf, video, PDF, belge, ses ve diger dosya ekleri icin metadata modeli.
-- Dosya eki icin `original_file_name`, `uploaded_by`, `uploaded_at`, `notes`, `file_name`, `file_path`, `file_type`, `mime_type`, `file_size`, `related_record_type` ve `related_record_id` karar hatti.
-- Dosya eki path standardi: `attachments/{project_id}/{record_type}/{yyyy}/{mm}/{dd}/{record_id}/{safe_file_name}`.
-- Canonical attachment path helper fonksiyonu.
-- Attachment metadata integrity kurallari.
-- Attachment integrity status constants.
-- `AttachmentIntegrityResult`.
-- Single-record attachment integrity helper.
-- `AttachmentIntegrityReportSummary`.
-- `AttachmentIntegrityReport`.
-- Attachment integrity report serializer fonksiyonlari.
-- Attachment integrity JSON string ve JSON file export helper fonksiyonlari.
-- Attachment scanner dry-run helper baslangici.
-- `AuditEventRecord` modeli, event type validation, target record pair validation ve target record type sozlesmesi.
-- Audit target record id format ve validation tasarimi dokumantasyonu.
-- Dosya eki saklama, adlandirma, arsiv guvenligi, silme/tasima karar dokumantasyonu.
-- Minimal `FieldObservationRecord` dataclass ve focused value/default testleri.
-- Minimal bellek ici `FieldObservationRepository` baseline'i; add/list/count/find ve duplicate `observation_id` reddi.
-- Minimal bellek ici `FileAttachmentRepository` baseline'i; add/list/count/find, duplicate `attachment_id` reddi, read-only exact `related_record_type` / `related_record_id` filtreleri, exact combined `list_by_related_record(...)` filtresi ve Field Observation convenience `list_for_field_observation(...)` lookup helper'i.
-- Field Observation attachment linking contract: `related_record_type == "field_observation"` ve `related_record_id == FieldObservationRecord.observation_id` exact pair iliskisi documentation-only olarak tanimlandi.
-- Field Observation attachment convenience lookup: `list_for_field_observation(observation_id)` helper'i `list_by_related_record("field_observation", observation_id)` delegasyonu olarak eklendi.
-- `FieldObservationRepository` icin read-only exact `project_id` ve `status` filtreleri.
-- `FieldObservationRepository` icin read-only exact `location` ve `category` filtreleri.
-- `FieldObservationRepository` icin explicit `update_status(observation_id, new_status)` davranisi.
-- `FieldObservationRepository` icin explicit `update_reporting(observation_id, reported_to, reported_at)` davranisi.
-- CSE ana proje ilkeleri ve veri koruma politikasi.
-- Resmi kayit / Santiye Sefi Ozel Alani izolasyon politikasi.
-- Santiye sefi devir ve ozel alan politikasi.
-- Adim 001-120 araligi icin NotebookLM podcast notlari.
-- GitHub-centered Issue/Branch/Task/Result workflow ve resmi `V:` local repository execution protokolu.
-- Tracked canonical proje talimatlari: `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`.
-
-## CSE Politika Dokumanlari
-
-Onemli politika dokumanlari:
-
-- `docs/cse_ana_proje_ilkeleri.md`: CSE'nin once veri omurgasi, sonra otomasyon, en son AI yaklasimini ve genel mimari pusulasini tanimlar.
-- `docs/veri_silme_onleme_politikasi.md`: Resmi proje kayitlarinin fiziksel olarak silinmemesi ilkesini aciklar.
-- `docs/ozel_alan_resmi_kayit_izolasyon_politikasi.md`: Santiye Sefi Ozel Alani ile resmi proje kayitlari arasindaki siniri tanimlar.
-- `docs/santiye_sefi_devir_ve_ozel_alan_politikasi.md`: Santiye sefi degisimi, istifa ve devir senaryolarinda ozel alanin nasil korunacagini aciklar.
-
-Temel kararlar:
-
-- Resmi kayitlar fiziksel olarak silinmez.
-- Hard delete yerine archive, void, superseded veya soft-delete yaklasimlari tercih edilir.
-- Santiye Sefi Ozel Alani kullaniciya aittir.
-- Yeni santiye sefi eski santiye sefinin ozel alanina erisemez.
-- Devir yalnizca explicit handover package veya resmi kayit uzerinden yapilir.
-- Fotograf, video, PDF, belge ve ses dosyalari veritabanina gomulmez; dosya yolu / referans ve metadata ile izlenir.
-
-## NotebookLM Podcast Notlari
-
-Podcast notlari `docs/podcast_notes/` altindadir.
-
-Son eklenen podcast notlari:
-
-- `docs/podcast_notes/027_adim_157_161_notebooklm_podcast_notu.md`
-- `docs/podcast_notes/028_adim_162_166_notebooklm_podcast_notu.md`
-- `docs/podcast_notes/029_adim_167_180_notebooklm_podcast_notu.md`
-- `docs/podcast_notes/030_adim_196_200_notebooklm_podcast_notu.md`
-- `docs/podcast_notes/031_adim_201_205_notebooklm_podcast_notu.md`
-- `docs/podcast_notes/032_adim_206_210_notebooklm_podcast_notu.md`
-- `docs/podcast_notes/033_adim_211_215_notebooklm_podcast_notu.md`
-- `docs/podcast_notes/034_adim_216_220_notebooklm_podcast_notu.md`
-- `docs/podcast_notes/035_adim_221_225_notebooklm_podcast_notu.md`
-
-Podcast 035, latest generated podcast source olarak Steps 221-225 araligini kapsar. Kendi Section 6 bolumunde Steps 001-220 icin 220 ayri historical summary tasir. Step 225 merge edilene kadar latest merged safe point Step 224 olarak kalir.
-
-NotebookLM'e bir kez eklenecek stable website source:
-
-```text
-https://raw.githubusercontent.com/faliardic/chief-site-engineer/master/docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md
+```powershell
+python -m app.ops backup --data-root C:\cse-data --output C:\backups\field.csebackup.zip
+python -m app.ops verify-backup --archive C:\backups\field.csebackup.zip
 ```
 
-Generator `python scripts/build_notebooklm_podcast_source.py` komutuyla `docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md` ve `docs/notebooklm/CSE_PODCAST_SOURCE_MANIFEST.json` dosyalarini gunceller. Repository stable URL ve current content sozlesmesini korur; NotebookLM'in kaydedilmis website source'u otomatik yeniledigi dogrulanmamistir ve gerekirse NotebookLM arayuzunde refresh kontrol edilir.
+İzole restore:
 
-## Kalite Kontrol ve CI Durumu
+```powershell
+python -m app.ops restore --archive C:\backups\field.csebackup.zip --target-root C:\cse-restored
+python -m app.web --data-root C:\cse-restored
+```
 
-- Guncel merged safe point test tabani `494 passed` olarak dogrulanir; Step 225 generator focused test paketi `24 passed`, tam yerel suite `503 passed` seviyesindedir.
-- `.github/workflows/pytest.yml` GitHub Actions workflow'u repoda bulunur.
-- Otomatik Actions calismasi account billing/runner-start kisiti nedeniyle manuel olarak devre disidir.
-- Required status checks etkin degildir.
-- Guvenlik kaniti yerel pytest, `git diff --check`, protected-path diff ve Git divergence kontrolleriyle uretilir.
-- ZIP dosyalari repo kapsamindan dislanir ve local emergency/offline artifact olarak dokunulmadan korunur.
-- `.gitattributes` Python, Markdown ve text dosyalari icin LF satir sonu tercihini korur.
+Ayrıntılı kullanım için [Local Field MVP operasyon belgesine](docs/operations/local_field_mvp_v0.1.md) bakın.
 
-## Henuz Olmayan Ozellikler
+## Kurulum ve test
 
-Asagidaki ozellikler henuz eklenmedi:
+Python 3.12 veya daha yeni bir sürüm önerilir.
 
-- Gercek database / SQLite / ORM.
-- JSON persistence.
-- Gercek dosya yukleme servisi.
-- Fiziksel dosya kopyalama, silme veya tasima.
-- Gercek attachment scanner.
-- API.
-- GUI.
-- CLI.
-- Authentication / authorization.
-- Kullanici, rol veya yetki sistemi.
-- Deployment.
-- Tam backup/restore akisi.
-- Thumbnail, preview, video oynatma veya streaming.
-- Otomatik audit trail uretimi.
-
-Bu sinir bilincli olarak korunuyor. Proje kucuk, testli ve izlenebilir adimlarla buyutuluyor.
-
-## Kurulum
-
-Python 3.11+ onerilir.
-
-```bash
+```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
+python -m pytest -rs
 ```
 
-## Test
-
-Repo kokunde:
-
-```bash
-python -m pytest
-```
-
-Beklenen guncel sonuc:
+Issue #103 branch'inde doğrulanan full-suite sonucu:
 
 ```text
-471 passed
+788 passed, 7 skipped in 14.84s
 ```
 
-## Basit Calistirma
+Yedi skip, Windows ortamında symlink oluşturma ayrıcalığı bulunmayan mevcut güvenlik testleridir.
 
-`app/main.py` su anda sadece basit bir baslangic mesaji dondurur:
+## Bilinçli sınırlar
 
-```bash
-python -m app.main
-```
+Mevcut uygulama:
 
-Bu komut tam bir CLI veya urun uygulamasi anlamina gelmez.
+- local ve tek kullanıcı odaklıdır;
+- public internet için uygun değildir;
+- auth, authorization ve TLS içermez;
+- cloud sync, PWA veya offline multi-device sync içermez;
+- background notification veya scheduler içermez;
+- Saha Takibi application service ve UI içermez;
+- gerçek saha pilotu ve kabulü tamamlanmadığı için field-ready veya production-ready olarak tanımlanmaz.
 
-## Dokumantasyon
+## Ürün sırası
 
-Onemli dokumantasyon dosyalari:
+Yakın ürün yönü:
 
-- `CHANGELOG.md`
-- `ROADMAP.md`
-- `docs/project_decisions.md`
-- `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
-- `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
-- `docs/protocols/CSE_PROJECT_SOURCE_REGISTER.md`
-- `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md`
-- `docs/100_guvenli_nokta_final_kalite_kontrol.md`
-- `docs/101_genel_proje_denetimi_ve_mimari_saglik_raporu.md`
-- `docs/117_audit_event_target_record_iliski_kurallari.md`
-- `docs/118_audit_event_target_record_pair_validation.md`
-- `docs/119_audit_event_target_record_type_sozlesmesi.md`
-- `docs/120_audit_event_target_record_type_validation.md`
-- `docs/121_audit_event_target_record_id_format_tasarimi.md`
-- `docs/122_audit_event_target_record_id_validation_tasarimi.md`
-- `docs/080_file_attachment_metadata_butunluk_ozeti.md`
-- `docs/089_attachment_metadata_integrity_kurallari.md`
-- `docs/podcast_notes/`
+1. Local Field MVP omurgasını koru.
+2. Saha Takibi domain ve recurrence — tamamlandı.
+3. Saha Takibi SQLite persistence — PR #104 ile tamamlandı.
+4. Transactional application service ve lazy backfill.
+5. Backup/restore compatibility ve resmî export izolasyonu.
+6. Minimum `+ Unutma` / `Bugün` / `Unutma Kutusu` UI.
+7. Gerçek saha pilotu.
+8. Kayıtlı mühendislik hesap defteri.
+9. Günlük şantiye logu kontrol/yayınlama zinciri.
+10. Canlı Proje Haritası read-model ve navigasyon yüzeyi.
+11. Offline/PWA, auth, multi-user, cloud ve AI — daha sonra.
 
-## Learning Sistemi
+## Kaynak otoritesi
 
-Bu proje ayni zamanda Python ve yazilim gelistirme ogrenim arsivi uretir.
+- Kalıcı ürün yönü: `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
+- Git/GitHub/Codex güvenliği: `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
+- Aktif görev kapsamı: current GitHub Issue
+- Değişken repository durumu: GitHub `master`, PR, Issue ve branch kanıtı
+- Yerel factual mirror: `.cse/state/project_state.json`
 
-`learning/` altindaki dosyalar; dataclass, repository, test, metadata modelleme, attachment integrity, karar dokumantasyonu ve proje disiplini gibi konulari adim adim aciklar.
-
-## Sonraki Urun Yonu
-
-Adim 225 boyunca ilk urun yonu, veri omurgasini guvenilir tutan dar bir saha MVP'sidir:
-
-- hizli observation kaydi,
-- attachment,
-- location,
-- status tracking,
-- reported-to,
-- daily export,
-- weekly summary.
-
-CSE halen testli domain/data/dokumantasyon cekirdegidir; field-ready application degildir. Urun ilkesi guvenilir veri omurgasi once, otomasyon sonra, AI en son olarak korunur. `FieldObservationRecord`, bellek ici observation repository davranislari ve `FileAttachmentRepository.list_for_field_observation(...)` dahil attachment metadata lookup hatti implement edilmistir. Step 224 rolling NotebookLM protocolunu kurdu; Step 225 strict podcast note'un kendi icinde prior history tasimasini enforce eder. Bu iki adim ana urun davranisini genisletmez. Persistence, physical file operations, export/reporting, API/GUI/CLI, audit ve ek validation henuz eklenmemistir.
+README, ROADMAP, eski ZIP, handoff veya `.cse/state`, güncel GitHub kanıtıyla çelişirse GitHub repository gerçeğinin yerine geçmez.

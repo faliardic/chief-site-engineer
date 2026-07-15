@@ -1,30 +1,34 @@
 # Roadmap
 
-## Birinci Ürün Önceliği - Saha Takibi v0.1
+## Güncel Ürün Sırası
 
-Saha Takibi v0.1, mevcut güvenilir gözlem, SQLite, attachment, backup ve günlük export omurgasından sonraki birinci ürün önceliğidir.
+1. [x] Local Field MVP omurgasını koru.
+2. [x] Saha Takibi domain ve recurrence.
+3. [x] Saha Takibi SQLite persistence — PR #104.
+4. [ ] Transactional application service ve yedi günlük idempotent lazy backfill.
+5. [ ] Backup/restore compatibility ve resmî export izolasyonu.
+6. [ ] Minimum `+ Unutma` / `Bugün` / `Unutma Kutusu` UI.
+7. [ ] Gerçek saha pilotu.
+8. [ ] Kayıtlı mühendislik hesap defteri.
+9. [ ] Günlük şantiye logu kontrol/yayınlama zinciri.
+10. [ ] Canlı Proje Haritası read-model ve navigasyon yüzeyi.
+11. [ ] Offline/PWA, auth, multi-user, cloud ve AI — daha sonra.
 
-Issue #98 bu yönün production implementation’ı değil, domain ve veri sözleşmesi aşamasıdır. Kesin kaynak `docs/field_tracking_v0_1_contract.md` dosyasıdır.
+Kesin Saha Takibi kaynağı `docs/field_tracking_v0_1_contract.md`, bağlayıcı Epic ise GitHub #97'dir. Application service, backup compatibility, export isolation ve UI henüz tamamlanmış değildir.
 
-Bu öncelik şu sırayla ilerler:
+## Güncel Doğrulanmış Güvenli Nokta
 
-1. Yalnız `capture_text` isteyen hızlı `+ Unutma` create sınırı; deterministic başlangıç başlığı; nullable follow-up/template projesi; Unutma Kutusu veya planlı `active/waiting` değişmezi; `RoutineOccurrence` ve saf recurrence hesaplayıcısı.
-2. SQLite schema v3 migration, ayrı repository ve deterministic append-only event tabloları.
-3. Optimistic revision kullanan transactional application service ve yedi günlük idempotent lazy backfill.
-4. Schema v2 backup backward restore, schema v3 round-trip ve aktif data root koruması.
-5. Kişisel tracking verisinin mevcut günlük resmî export’tan dışlandığını kanıtlayan regression testleri.
-6. Bu veri omurgası doğrulandıktan sonra minimum Saha Takibi UI’si.
-
-İlk beş aşama tamamlanmadan background scheduler, notification, PWA/mobil, AI sınıflandırma, takım görevlendirme veya geniş puantaj/personel modülü başlatılmaz.
-
-## Guncel Guvenli Nokta
+Issue #102, PR #104 ile squash merge edildi. `master` üzerindeki doğrulanmış merge commit'i:
 
 ```text
-Adim 224 - Rolling NotebookLM podcast source protocol
-PR #66 merge commit: 68c00edab667bbfd0467f4684921c0f6b453d4a7
+9b25152ae38b72470e332929cb3a30ff955b75f1
 ```
 
-Adim 224, PR #66 squash merge commit `68c00edab667bbfd0467f4684921c0f6b453d4a7` ile master uzerindeki guncel guvenli noktadir. Step 225, Issue #67 kapsaminda Podcast 035 artifact'ini ve note-contained prior-step summary validation contract'ini ekleyen aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Issue #103 yalnız kanonik dokümantasyon ve repository truth hizalamasıdır; production davranışını değiştirmez ve merge edilene kadar bu güvenli noktayı ilerletmez.
+
+## Tarihsel Roadmap Kaydı
+
+Aşağıdaki uzun adım günlüğü proje karar geçmişidir. Eski “güncel”, “aktif” veya “henüz yok” ifadeleri yazıldıkları dönemin snapshot'ıdır; bugünkü repository durumunu belirlemez.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -220,15 +224,15 @@ Adim 169'da future export result summary/report layer icin API boundary ve test 
 
 Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
 
-Guncel test durumu:
+Adım 101 dönemindeki tarihsel test snapshot'ı:
 
 ```text
 471 passed
 ```
 
-Proje su anda domain model, bellek ici repository, test, dokumantasyon, learning ve NotebookLM podcast notlari cekirdegi seviyesindedir.
+Bu tarihsel noktada proje domain model, bellek içi repository, test, dokümantasyon, learning ve NotebookLM podcast notları çekirdeği seviyesindeydi. Sonraki Local Field MVP ve Saha Takibi çalışmaları bu durumu ilerletmiştir.
 
-Guncel CI durumu:
+Bu tarihsel kayıtta CI durumu:
 
 - CI workflow var: `.github/workflows/pytest.yml`.
 - Workflow kodu `git diff --check` ve `python -m pytest` kosacak sekilde tanimli.
@@ -236,7 +240,7 @@ Guncel CI durumu:
 - Yeni push sonrasinda Actions run olusmamasi beklenen davranistir; bu durum pytest failure veya workflow kodu hatasi olarak yorumlanmaz.
 - Required status checks devre disidir ve Step 205 bunlari etkinlestirmez.
 
-## Henuz Olmayan Uretim Ozellikleri
+## Adım 101 Döneminde Henüz Olmayan Üretim Özellikleri
 
 Asagidaki ozellikler henuz eklenmedi:
 
@@ -674,9 +678,9 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 - [x] Adim 225 - Focused generator tests `24 passed`, full local suite `503 passed` olarak dogrulandi.
 - [x] Adim 225 - Main product code, workflow, NotebookLM automation, historical podcast, ZIP ve exports mutation eklenmedi; Step 226 baslatilmadi.
 
-## Sonraki Calisma Onerisi
+## Step 225 Sonrası Tarihsel Çalışma Önerisi
 
-Step 225 merge/finalize edildikten sonra sonraki teknik yon ayri Issue ile secilmelidir. Attachment convenience helper usage boundary, upload/persistence oncesi storage contract veya daily export/weekly summary hatti olasi dar yonlerdir. Step 226 bu adimda baslatilmaz.
+Bu öneri Step 225 dönemine aittir ve güncel ürün sırasını belirlemez. Bugünkü sonraki dar production adımı Saha Takibi transactional application service ve lazy backfill'dir; ayrı GitHub Issue ile yetkilendirilmelidir.
 
 Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcast 032 Adim 206-210, Podcast 033 Adim 211-215, Podcast 034 Adim 216-220 ve Podcast 035 Adim 221-225 araligini kapsar. Sonraki dogal podcast araligi Steps 226-230 olur.
 
@@ -727,3 +731,12 @@ Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcas
 - [x] Fresh v3 ile v2→v3 şema eşitliği ve mevcut project/observation/attachment/event satırlarının birebir korunması geçici database testleriyle doğrulandı.
 - [ ] Transactional application service ve occurrence ensure/backfill orchestration Task 4/5 kapsamında ele alınacak.
 - [ ] Backup compatibility, export exclusion ve minimum UI sonraki ayrı görevlerde ele alınacak.
+
+## Issue 103 - Kanonik Talimatlar v2 ve Repository Truth
+
+- [x] CSE, local-first Saha Komuta Sistemi ve `Yakala -> İşle -> Takip et -> Doğrula -> Günlüğe al` döngüsüyle tanımlandı.
+- [x] Kalıcı ürün politikası, operasyon talimatı, aktif Issue kapsamı ve değişken GitHub repository durumu ayrı otorite yüzeylerine ayrıldı.
+- [x] Eski Step 224/225 current-state metinleri tarihsel bağlama çekildi.
+- [x] Local Field MVP kabiliyetleri ve PR #104 sonrası Saha Takibi durumu güncel kanıtla hizalandı.
+- [x] Mühendislik hesap defteri, kontrollü günlük log ve Canlı Proje Haritası gerçek saha pilotundan sonraya yerleştirildi.
+- [x] Production Python, schema, migration, repository, UI ve test davranışı değiştirilmedi.

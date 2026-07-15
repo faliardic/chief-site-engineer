@@ -1,5 +1,19 @@
 # Proje Kararlari
 
+## Issue 103 - Kanonik Ürün Yönü ve Repository Truth Kararları
+
+- CSE, büyük platformların küçültülmüş kopyası değil; `Yakala -> İşle -> Takip et -> Doğrula -> Günlüğe al` döngüsüyle çalışan local-first **Saha Komuta Sistemi**dir.
+- Ürün, sahadaki kâğıt notu yasaklamaz; bilgiyi bir kez yakalayıp takip, kanıt, hesap, günlük ve daha sonra geri çağırma için tekrar yazmadan kullanmayı hedefler.
+- Kalıcı ürün amacı `CSE_UNIFIED_PROJECT_SOURCE.md`, operasyon/Git güvenliği `CSE_PROJECT_INSTRUCTIONS.md`, aktif kapsam current GitHub Issue, değişken repository durumu GitHub `master`/PR/Issue/branch kanıtıdır.
+- `.cse/state`, README, ROADMAP, handoff ve ZIP current GitHub truth'u override edemez; state yalnız ikincil factual mirror'dır.
+- Kalıcı operasyon talimatına sabit eski commit, test sayısı, aktif Issue veya Step snapshot'ı gömülmez; current state her görev başında GitHub ve resmî `V:` kopyasında yeniden doğrulanır.
+- Yeni branch standardı `codex/issue-<issue_no>-<slug>` olur. Eski `step-NNN-*` branch'ler yeniden adlandırılmaz; aynı anda yalnız bir aktif production implementation görevi ve en fazla bir incelemede PR bulunur.
+- Local Field MVP omurgası korunur. Saha Takibi domain/recurrence ile schema v3 persistence tamamlanmıştır; sıradaki production adımı transactional application service ve lazy backfill'dir.
+- Backup compatibility, resmî export izolasyonu ve minimum Saha Takibi UI tamamlanmadan gerçek saha pilotu başlamaz; mühendislik hesap defteri, günlük yayın zinciri ve Canlı Proje Haritası pilot sonrasına gelir.
+- Kişisel takip/resmî kayıt ayrımı korunur. Auth olmadığı için “kişisel” başka Windows kullanıcılarına karşı cryptographic privacy değil, resmî kayıtlardan ve resmî exportlardan ayrılmış çalışma verisi demektir.
+- Günlük kaynak kayıtlardan üretilen, akşam kontrol edilip yayımlanan snapshot'tır; yayımlanmış günlük sessizce değiştirilmez.
+- Canlı Proje Haritası source record değil read-model/projeksiyondur; dokunarak odaklanır ve wheel/pinch/pan/serbest zoom içermez. Hesaplanmış balon yerine kaynak kayıt düzenlenir.
+
 ## Issue 102 - Saha Takibi SQLite v3 ve Repository Kararları
 
 - Schema v3, v1/v2 migration metinleri değiştirilmeden zincirin sonuna eklenen tek immutable migration'dır; gerçek kullanıcı data root'u bu görevde migrate edilmez.

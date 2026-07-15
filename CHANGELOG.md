@@ -1,5 +1,17 @@
 # Changelog
 
+## Issue 103 - Kanonik Proje Talimatları v2 ve Repository Truth
+
+- CSE'nin ana ürün tanımı local-first **Saha Komuta Sistemi**, çalışma döngüsü `Yakala -> İşle -> Takip et -> Doğrula -> Günlüğe al` olarak kanonik kaynaklara işlendi.
+- Sahadaki kâğıt müsvedde, hızlı hesap, zihinde taşınan dönüş bekleme, hatırlatıcı ve gün sonunda tekrar yazma problemi açık kullanıcı ihtiyacı olarak kaydedildi.
+- Kalıcı ürün politikası, operasyon/Git güvenliği, aktif Issue kapsamı ve değişken GitHub repository durumu ayrı otorite yüzeylerine ayrıldı; `.cse/state` ikincil factual mirror olarak tanımlandı.
+- Yeni branch standardı `codex/issue-<issue_no>-<slug>` olarak belirlendi; eski `step-NNN-*` branch'lerin tarihsel olarak korunacağı kaydedildi.
+- README ve ROADMAP, Issue #102 / PR #104 / merge commit `9b25152ae38b72470e332929cb3a30ff955b75f1` sonrasındaki gerçek Local Field MVP ve Saha Takibi kabiliyetleriyle hizalandı.
+- Saha Takibi domain/recurrence ve SQLite persistence tamamlandı; transactional service/backfill, backup compatibility, resmî export izolasyonu ve minimum UI bekliyor olarak korundu.
+- Kayıtlı mühendislik hesap defteri, kontrollü/yayımlanmış günlük log ve dokunarak odaklanan Canlı Proje Haritası minimum UI ve gerçek saha pilotundan sonraya yerleştirildi.
+- Eski Step 224/225 current-state ve test snapshot'ları kalıcı talimattan kaldırıldı veya tarihsel bağlama çekildi.
+- Bu görev dokümantasyon/state kapsamındadır; production Python, test davranışı, schema, UI, dependency, workflow, backup/export artifact'ı veya gerçek kullanıcı verisi değiştirilmedi.
+
 ## Issue 102 - Saha Takibi SQLite Schema v3 ve Persistence
 
 - `SCHEMA_VERSION` 3'e çıkarıldı ve mevcut v1/v2 migration zincirine yedi Saha Takibi tablosu, composite observation-project parent key'i, foreign key/CHECK/unique/index kuralları ekleyen tek immutable migration eklendi.
