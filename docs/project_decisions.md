@@ -1,5 +1,17 @@
 # Proje Kararlari
 
+## Issue 102 - Saha Takibi SQLite v3 ve Repository Kararları
+
+- Schema v3, v1/v2 migration metinleri değiştirilmeden zincirin sonuna eklenen tek immutable migration'dır; gerçek kullanıcı data root'u bu görevde migrate edilmez.
+- Observation bağlı follow-up için `field_observations(id, project_id)` composite unique parent key ve `follow_up_items(observation_id, project_id)` composite foreign key kullanılır; `ON DELETE CASCADE` kullanılmaz.
+- SQLite `CHECK` kuralları enum/boolean/revision, planlı follow-up dikkat zamanı ve terminal alan birlikteliklerini korur; geçiş izni, cross-record lookup ve event payload içeriği sonraki application service sınırında kalır.
+- Domain nesneleri ile SQLite satırları ayrı, açık mapper fonksiyonlarıyla dönüştürülür; SQLite'tan okunan kayıt domain constructor'ından geçirilerek bozuk kalıcı satır fail-closed reddedilir.
+- Ana repository'ler add/get/deterministic query ve `expected_revision` isteyen update yüzeyi taşır. Gerçek no-op revision artırmaz; `capture_text`, oluşturma anı ve occurrence schedule snapshot alanları repository mutation'ında değiştirilemez.
+- Occurrence insert'i template + Europe/Istanbul yerel tarih unique anahtarını idempotency sınırı kabul eder; aynı anahtarla tekrar çağrı yeni satır üretmek yerine mevcut domain kaydını döndürür.
+- Event repository'leri yalnız add ve aggregate-history list sunar; update/delete API'si yoktur ve sıralama yalnız aggregate `sequence` değeridir.
+- Altı tracking repository'si mevcut `SQLiteUnitOfWork` connection/transaction'ını paylaşır; aggregate yazısı ile event append birlikte commit veya rollback olur.
+- Application service, lazy occurrence orchestration, UI, scheduler, notification, backup/restore compatibility ve export bu görevde uygulanmaz.
+
 ## Issue 100 - Saha Takibi Domain ve Saf Recurrence Uygulaması
 
 - Mevcut `app/models.py` çok büyük olduğu için Saha Takibi kayıtları ve saf hesapları küçük, bağımsız `app/field_tracking.py` modülünde tutulur; yeni katman veya framework eklenmez.
