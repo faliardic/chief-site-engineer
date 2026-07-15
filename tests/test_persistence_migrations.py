@@ -135,13 +135,20 @@ def test_fresh_database_migrates_to_current_schema(tmp_path: Path) -> None:
         connection.close()
 
     assert database_path.is_file()
-    assert version == SCHEMA_VERSION == 2
+    assert version == SCHEMA_VERSION == 3
     assert table_names == {
         "schema_migrations",
         "projects",
         "field_observations",
         "attachments",
         "observation_events",
+        "follow_up_items",
+        "follow_up_events",
+        "routine_templates",
+        "routine_template_weekdays",
+        "routine_occurrences",
+        "routine_template_events",
+        "routine_occurrence_events",
     }
     assert "notes" in observation_columns
 
@@ -168,9 +175,9 @@ def test_migration_is_idempotent(tmp_path: Path) -> None:
     finally:
         connection.close()
 
-    assert first_version == second_version == SCHEMA_VERSION == 2
+    assert first_version == second_version == SCHEMA_VERSION == 3
     assert second_tables == first_tables
-    assert migration_count == 2
+    assert migration_count == 3
 
 
 def test_schema_migrations_records_every_version(database: sqlite3.Connection) -> None:
@@ -180,13 +187,13 @@ def test_schema_migrations_records_every_version(database: sqlite3.Connection) -
         )
     )
 
-    assert [row[0] for row in migration_rows] == [1, 2]
+    assert [row[0] for row in migration_rows] == [1, 2, 3]
     assert all(
         validate_utc_timestamp(row[1]) == row[1] for row in migration_rows
     )
 
 
-def test_version_one_database_migrates_to_version_two_idempotently(
+def test_version_one_database_migrates_to_current_version_idempotently(
     tmp_path: Path,
 ) -> None:
     connection = connect_database(tmp_path / "v1-to-v2.sqlite3")
@@ -200,8 +207,8 @@ def test_version_one_database_migrates_to_version_two_idempotently(
             )
         }
 
-        assert migrate_database(connection) == 2
-        assert migrate_database(connection) == 2
+        assert migrate_database(connection) == 3
+        assert migrate_database(connection) == 3
         columns_after = {
             row[1]
             for row in connection.execute(
@@ -219,7 +226,7 @@ def test_version_one_database_migrates_to_version_two_idempotently(
 
     assert "notes" not in columns_before
     assert "notes" in columns_after
-    assert versions == [1, 2]
+    assert versions == [1, 2, 3]
 
 
 def test_foreign_keys_are_enabled_and_violation_is_rejected(
@@ -374,5 +381,188 @@ def test_unknown_future_migration_version_is_rejected_without_schema_change(
     finally:
         connection.close()
 
-    assert versions == [1, 2, 99]
+    assert versions == [1, 2, 3, 99]
     assert notes_count == 1
+
+
+def _schema_signature(connection: sqlite3.Connection) -> list[tuple[object, ...]]:
+    return list(
+        connection.execute(
+            """
+            SELECT type, name, tbl_name, sql
+            FROM sqlite_master
+            WHERE name NOT LIKE 'sqlite_%'
+            ORDER BY type, name
+            """
+        )
+    )
+
+
+def test_fresh_v3_and_v2_upgrade_produce_identical_schema(tmp_path: Path) -> None:
+    fresh = connect_database(tmp_path / "fresh-v3.sqlite3")
+    upgraded = connect_database(tmp_path / "upgraded-v3.sqlite3")
+
+    try:
+        assert migrate_database(fresh) == 3
+        assert migrate_database(upgraded, migrations=SCHEMA_MIGRATIONS[:2]) == 2
+        assert migrate_database(upgraded) == 3
+
+        assert _schema_signature(upgraded) == _schema_signature(fresh)
+        assert upgraded.execute("PRAGMA foreign_key_check").fetchall() == []
+        assert fresh.execute("PRAGMA foreign_key_check").fetchall() == []
+    finally:
+        fresh.close()
+        upgraded.close()
+
+
+def test_v2_upgrade_preserves_existing_rows_and_event_payload_exactly(
+    tmp_path: Path,
+) -> None:
+    connection = connect_database(tmp_path / "preserved-v2.sqlite3")
+    attachment_id = "7ff50c62-4ed0-4c21-8d0e-e8ce97c98bb6"
+    event_id = "8fabee8d-2494-4bb8-97cb-d308e86fd74c"
+    payload_json = '{"description":"kalıp","revision":1}'
+
+    try:
+        assert migrate_database(connection, migrations=SCHEMA_MIGRATIONS[:2]) == 2
+        _insert_project(connection)
+        _insert_observation(connection)
+        _insert_attachment(
+            connection,
+            attachment_id,
+            "attachments/preserved/photo.jpg",
+        )
+        connection.execute(
+            """
+            INSERT INTO observation_events (
+                id, observation_id, event_type, actor, occurred_at, payload_json
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                event_id,
+                OBSERVATION_ID,
+                "observation_created",
+                "Santiye sefi",
+                TIMESTAMP,
+                payload_json,
+            ),
+        )
+        before = {
+            table: list(connection.execute(f"SELECT * FROM {table} ORDER BY rowid"))
+            for table in (
+                "projects",
+                "field_observations",
+                "attachments",
+                "observation_events",
+            )
+        }
+
+        assert migrate_database(connection) == 3
+        after = {
+            table: list(connection.execute(f"SELECT * FROM {table} ORDER BY rowid"))
+            for table in before
+        }
+    finally:
+        connection.close()
+
+    assert after == before
+    assert after["observation_events"][0][-1] == payload_json
+
+
+def test_v3_failure_rolls_back_partial_schema_and_version(tmp_path: Path) -> None:
+    connection = connect_database(tmp_path / "failed-v3.sqlite3")
+    failing_v3 = Migration(
+        version=3,
+        statements=(
+            "CREATE TABLE partial_tracking_table (id TEXT PRIMARY KEY)",
+            "CREATE TABLE broken_tracking_table (",
+        ),
+    )
+
+    try:
+        assert migrate_database(connection, migrations=SCHEMA_MIGRATIONS[:2]) == 2
+        with pytest.raises(sqlite3.OperationalError):
+            migrate_database(
+                connection,
+                migrations=(*SCHEMA_MIGRATIONS[:2], failing_v3),
+            )
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+        versions = [
+            row[0]
+            for row in connection.execute(
+                "SELECT version FROM schema_migrations ORDER BY version"
+            )
+        ]
+    finally:
+        connection.close()
+
+    assert "partial_tracking_table" not in tables
+    assert "broken_tracking_table" not in tables
+    assert versions == [1, 2]
+
+
+def test_v3_tracking_tables_do_not_use_on_delete_cascade(
+    database: sqlite3.Connection,
+) -> None:
+    tracking_tables = (
+        "follow_up_items",
+        "follow_up_events",
+        "routine_templates",
+        "routine_template_weekdays",
+        "routine_occurrences",
+        "routine_template_events",
+        "routine_occurrence_events",
+    )
+    definitions = {
+        table: database.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+            (table,),
+        ).fetchone()[0]
+        for table in tracking_tables
+    }
+
+    assert all("ON DELETE CASCADE" not in sql.upper() for sql in definitions.values())
+    assert all(
+        row[6] == "NO ACTION"
+        for table in tracking_tables
+        for row in database.execute(f"PRAGMA foreign_key_list({table})")
+    )
+
+
+def test_v3_declares_required_tracking_indexes_and_composite_foreign_key(
+    database: sqlite3.Connection,
+) -> None:
+    index_names = {
+        row[0]
+        for row in database.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'index'"
+        )
+    }
+    follow_up_foreign_keys = list(
+        database.execute("PRAGMA foreign_key_list(follow_up_items)")
+    )
+    composite_rows = [
+        row
+        for row in follow_up_foreign_keys
+        if row[2] == "field_observations"
+    ]
+
+    assert {
+        "ux_field_observations_id_project",
+        "ix_follow_up_status_attention",
+        "ix_follow_up_project_status",
+        "ix_follow_up_observation",
+        "ix_routine_template_status_project",
+        "ix_routine_occurrence_status_attention",
+        "ix_routine_occurrence_template_date",
+    } <= index_names
+    assert {(row[3], row[4]) for row in composite_rows} == {
+        ("observation_id", "id"),
+        ("project_id", "project_id"),
+    }
+    assert len({row[0] for row in composite_rows}) == 1

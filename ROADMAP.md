@@ -696,7 +696,7 @@ Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcas
 - [x] Kişisel tracking verisinin günlük resmî observation export’una girmemesi ve byte-level regression sınırı tanımlandı.
 - [x] Puantaj iş günü kabul senaryosu restart, snooze, template edit, deactivation ve backup/restore durumlarıyla tamamlandı.
 - [x] Production domain kayıtları, hızlı capture normalization, saf recurrence ve görünüm sınıflandırmaları Issue #100 kapsamında executable testlerle uygulandı.
-- [ ] SQLite migration/repository/event implementasyonu ayrı görevde yapılacak.
+- [x] SQLite schema v3 migration, domain-SQLite mapping, altı repository/event adapter'ı ve Unit of Work bağlantıları Issue #102 kapsamında uygulandı.
 - [ ] Transactional service/backfill implementasyonu ayrı görevde yapılacak.
 - [ ] Backup compatibility ve export exclusion executable testleri ayrı görevlerde yapılacak.
 - [ ] Minimum UI yalnız veri sözleşmesi implementation’ı doğrulandıktan sonra ele alınacak.
@@ -711,5 +711,19 @@ Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcas
 - [x] Geçmiş uygun gün için `missed`, bugün için `open` saf occurrence planı eklendi; gelecek gün reddedildi.
 - [x] Follow-up `inbox/overdue/today/upcoming`, occurrence `overdue/today/upcoming` ve tekilleştirilmiş “Şimdi ilgilen” bileşimi eklendi; `now` domain kategorisi eklenmedi.
 - [x] Domain ve recurrence için kapsamlı focused executable test matrisi eklendi.
-- [ ] SQLite schema v3, migration, repository, Unit of Work ve transactional application service sonraki ayrı görevlerde uygulanacak.
+- [x] SQLite schema v3, migration, repository ve Unit of Work bağlantıları Issue #102 kapsamında uygulandı.
+- [ ] Transactional application service ve occurrence ensure/backfill orchestration sonraki ayrı görevde uygulanacak.
 - [ ] Backup/restore compatibility, export exclusion ve minimum UI sonraki ayrı görevlerde uygulanacak.
+
+## Issue 102 - Saha Takibi Task 3/5 SQLite v3 ve Persistence
+
+- [x] Schema version 3, v1/v2 zincirini değiştirmeyen tek immutable migration olarak eklendi.
+- [x] Follow-up, routine template, weekday relation, routine occurrence ve üç append-only event tablosu gerekli foreign key, CHECK, unique ve index kurallarıyla eklendi.
+- [x] Observation-project composite foreign key'i, nullable kişisel proje kayıtları ve `active/waiting + NULL next_attention_at` reddi database seviyesinde korundu.
+- [x] Üç aggregate ve üç event ailesi için açık domain-SQLite mapper'ları, repository port'ları ve SQLite adapter'ları eklendi.
+- [x] Event geçmişleri yalnız aggregate sequence ile deterministik okundu; duplicate sequence ve hard-delete/cascade davranışı reddedildi.
+- [x] Routine occurrence insert'i template + yerel tarih anahtarında idempotent primitive olarak eklendi.
+- [x] Altı tracking repository'si mevcut SQLite Unit of Work transaction'ına bağlandı; aggregate + event commit/rollback atomikliği kanıtlandı.
+- [x] Fresh v3 ile v2→v3 şema eşitliği ve mevcut project/observation/attachment/event satırlarının birebir korunması geçici database testleriyle doğrulandı.
+- [ ] Transactional application service ve occurrence ensure/backfill orchestration Task 4/5 kapsamında ele alınacak.
+- [ ] Backup compatibility, export exclusion ve minimum UI sonraki ayrı görevlerde ele alınacak.

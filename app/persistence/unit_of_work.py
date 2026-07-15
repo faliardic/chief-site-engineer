@@ -5,6 +5,14 @@ from pathlib import Path
 from types import TracebackType
 
 from .errors import UnitOfWorkStateError
+from .field_tracking_repositories import (
+    SQLiteFollowUpEventRepository,
+    SQLiteFollowUpRepository,
+    SQLiteRoutineOccurrenceEventRepository,
+    SQLiteRoutineOccurrenceRepository,
+    SQLiteRoutineTemplateEventRepository,
+    SQLiteRoutineTemplateRepository,
+)
 from .migrations import connect_database, migrate_database
 from .repositories import (
     SQLiteAttachmentMetadataRepository,
@@ -24,6 +32,14 @@ class SQLiteUnitOfWork:
         self._observations: SQLiteFieldObservationRepository | None = None
         self._events: SQLiteObservationEventRepository | None = None
         self._attachments: SQLiteAttachmentMetadataRepository | None = None
+        self._follow_ups: SQLiteFollowUpRepository | None = None
+        self._follow_up_events: SQLiteFollowUpEventRepository | None = None
+        self._routine_templates: SQLiteRoutineTemplateRepository | None = None
+        self._routine_template_events: SQLiteRoutineTemplateEventRepository | None = None
+        self._routine_occurrences: SQLiteRoutineOccurrenceRepository | None = None
+        self._routine_occurrence_events: (
+            SQLiteRoutineOccurrenceEventRepository | None
+        ) = None
         self._used = False
         self._completed = False
 
@@ -50,6 +66,42 @@ class SQLiteUnitOfWork:
         if self._attachments is None:
             raise UnitOfWorkStateError("Unit of Work is not active")
         return self._attachments
+
+    @property
+    def follow_ups(self) -> SQLiteFollowUpRepository:
+        if self._follow_ups is None:
+            raise UnitOfWorkStateError("Unit of Work is not active")
+        return self._follow_ups
+
+    @property
+    def follow_up_events(self) -> SQLiteFollowUpEventRepository:
+        if self._follow_up_events is None:
+            raise UnitOfWorkStateError("Unit of Work is not active")
+        return self._follow_up_events
+
+    @property
+    def routine_templates(self) -> SQLiteRoutineTemplateRepository:
+        if self._routine_templates is None:
+            raise UnitOfWorkStateError("Unit of Work is not active")
+        return self._routine_templates
+
+    @property
+    def routine_template_events(self) -> SQLiteRoutineTemplateEventRepository:
+        if self._routine_template_events is None:
+            raise UnitOfWorkStateError("Unit of Work is not active")
+        return self._routine_template_events
+
+    @property
+    def routine_occurrences(self) -> SQLiteRoutineOccurrenceRepository:
+        if self._routine_occurrences is None:
+            raise UnitOfWorkStateError("Unit of Work is not active")
+        return self._routine_occurrences
+
+    @property
+    def routine_occurrence_events(self) -> SQLiteRoutineOccurrenceEventRepository:
+        if self._routine_occurrence_events is None:
+            raise UnitOfWorkStateError("Unit of Work is not active")
+        return self._routine_occurrence_events
 
     def __enter__(self) -> "SQLiteUnitOfWork":
         if self._used:
@@ -79,6 +131,30 @@ class SQLiteUnitOfWork:
                 is_active=is_active,
             )
             self._attachments = SQLiteAttachmentMetadataRepository(
+                connection,
+                is_active=is_active,
+            )
+            self._follow_ups = SQLiteFollowUpRepository(
+                connection,
+                is_active=is_active,
+            )
+            self._follow_up_events = SQLiteFollowUpEventRepository(
+                connection,
+                is_active=is_active,
+            )
+            self._routine_templates = SQLiteRoutineTemplateRepository(
+                connection,
+                is_active=is_active,
+            )
+            self._routine_template_events = SQLiteRoutineTemplateEventRepository(
+                connection,
+                is_active=is_active,
+            )
+            self._routine_occurrences = SQLiteRoutineOccurrenceRepository(
+                connection,
+                is_active=is_active,
+            )
+            self._routine_occurrence_events = SQLiteRoutineOccurrenceEventRepository(
                 connection,
                 is_active=is_active,
             )
@@ -123,6 +199,12 @@ class SQLiteUnitOfWork:
                 self._observations = None
                 self._events = None
                 self._attachments = None
+                self._follow_ups = None
+                self._follow_up_events = None
+                self._routine_templates = None
+                self._routine_template_events = None
+                self._routine_occurrences = None
+                self._routine_occurrence_events = None
         return False
 
     def _require_active_connection(self) -> sqlite3.Connection:

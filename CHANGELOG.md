@@ -1,5 +1,15 @@
 # Changelog
 
+## Issue 102 - Saha Takibi SQLite Schema v3 ve Persistence
+
+- `SCHEMA_VERSION` 3'e çıkarıldı ve mevcut v1/v2 migration zincirine yedi Saha Takibi tablosu, composite observation-project parent key'i, foreign key/CHECK/unique/index kuralları ekleyen tek immutable migration eklendi.
+- `FollowUpItem`, `RoutineTemplate`, `RoutineOccurrence` ve üç event ailesi için açık domain-SQLite mapper'ları ile altı repository port/SQLite adapter yüzeyi eklendi.
+- Follow-up ve template için nullable kişisel proje sorguları, optimistic revision kontrollü update/no-op davranışı ve occurrence için `(routine_template_id, occurrence_local_date)` tabanlı idempotent `add_if_absent` primitive'i eklendi.
+- Üç event repository'si yalnız append/list yüzeyi taşır; geçmişler timestamp veya UUID yerine yalnız `ORDER BY sequence` ile deterministik okunur ve duplicate aggregate sequence reddedilir.
+- `SQLiteUnitOfWork`, altı yeni repository'yi mevcut connection ve transaction içinde sunacak şekilde genişletildi; aggregate mutation ile event append commit/rollback atomikliği test edildi.
+- Fresh v3 ile v2→v3 şema eşitliği, mevcut dört tablo verisinin birebir korunması, composite foreign key, planlı follow-up dikkat zamanı, occurrence idempotency, append-only event ve hard-delete/cascade yasağı geçici database testleriyle doğrulandı.
+- Application service, occurrence ensure/backfill orchestration, UI, scheduler, notification, backup uyumluluğu, export davranışı ve gerçek kullanıcı data root'u kapsam dışında tutuldu.
+
 ## Issue 100 - Saha Takibi Domain ve Saf Recurrence
 
 - Immutable `FollowUpItem`, `RoutineTemplate`, `RoutineOccurrence` ve üç append-only event domain kaydı ailesi `app/field_tracking.py` içinde eklendi.

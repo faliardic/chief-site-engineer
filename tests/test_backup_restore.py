@@ -9,6 +9,7 @@ import pytest
 
 from app.application import ObservationApplicationService, UploadStream
 from app.operations import BackupService, BackupValidationError
+from app.persistence import SCHEMA_VERSION
 from app.storage import ManagedAttachmentStore
 from app.web import create_app
 
@@ -75,7 +76,7 @@ def test_backup_online_snapshot_verify_restore_and_reopen(tmp_path: Path) -> Non
     restored = backup.restore_backup(archive, target)
 
     assert result.attachment_count == 1
-    assert manifest["schema_version"] == 2
+    assert manifest["schema_version"] == SCHEMA_VERSION
     assert restored.target_created is True
     service = ObservationApplicationService(
         target / "cse.sqlite3", ManagedAttachmentStore(target / "attachments")
@@ -279,7 +280,7 @@ def test_attachment_archive_path_is_rejected_before_restore_extraction(
     manifest = {
         "backup_format_version": 1,
         "created_at": "2026-07-13T10:00:00Z",
-        "schema_version": 2,
+        "schema_version": SCHEMA_VERSION,
         "attachment_count": 1,
         "observation_count": 1,
         "event_count": 1,

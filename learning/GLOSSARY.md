@@ -1379,3 +1379,17 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `tzdata`: İşletim sisteminde IANA timezone veritabanı bulunmadığında Python `zoneinfo` modülüne timezone verisi sağlayan pakettir. Özellikle Windows kurulumlarında `Europe/Istanbul` anahtarının taşınabilir çalışmasını sağlar.
 
 `Predicate`: Bir kaydın belirli bir koşula uyup uymadığını `True` veya `False` ile döndüren saf yardımcıdır. `is_now_attention_item` bunun örneğidir.
+
+`Immutable Migration`: Yayına girdikten sonra eski SQL adımları değiştirilmeden, yeni schema değişikliğinin daha yüksek sürümlü yeni bir migration olarak zincirin sonuna eklenmesi yaklaşımıdır.
+
+`Domain-SQLite Mapper`: Domain nesnesinin alanlarını SQLite kolonlarına, SQLite satırını da yeniden doğrulanan domain nesnesine açıkça çeviren persistence sınırı fonksiyonudur.
+
+`Repository Port`: Application veya domain tarafının ihtiyaç duyduğu kayıt işlemlerini belirleyen, SQLite gibi belirli bir storage teknolojisine bağımlı olmayan arayüz sözleşmesidir.
+
+`SQLite Adapter`: Repository port davranışını SQLite SQL komutları ve aynı Unit of Work connection'ı üzerinde uygulayan somut sınıftır.
+
+`Idempotent Insert Primitive`: Aynı doğal unique anahtarla tekrar çağrıldığında ikinci satır üretmeyip mevcut kaydı döndüren düşük seviyeli ekleme işlemidir. Routine occurrence için anahtar template kimliği + yerel tarihtir.
+
+`Composite Parent Key`: Child tablodaki composite foreign key'in birlikte referans verdiği, parent tablodaki birden fazla kolondan oluşan unique anahtardır.
+
+`SQLite Three-Valued Logic`: SQL koşullarının `TRUE`, `FALSE` yanında `NULL/UNKNOWN` sonucu da üretebilmesidir. `CHECK` içinde zorunlu nullable alanları korurken açık `IS NOT NULL` kullanmayı gerektirir.
