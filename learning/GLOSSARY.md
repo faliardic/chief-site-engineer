@@ -1369,3 +1369,13 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Nullable Project Link`: Kaydın başlangıçta herhangi bir projeye bağlanmadan kişisel çalışma alanında kalabilmesini sağlayan opsiyonel `project_id` ilişkisidir.
 
 `Composite Foreign Key`: Child kayıttaki birden fazla kolonun parent kayıttaki kolonlarla birlikte eşleşmesini zorunlu kılan foreign key'dir. Follow-up observation bağlantısında observation ve project kimliklerinin aynı çifte ait olmasını korur.
+
+`Value Object (Değer Nesnesi)`: Kimliğinden çok taşıdığı doğrulanmış değerlerle anlam kazanan küçük domain nesnesidir. `RoutineOccurrenceSchedule`, yerel tarih/saat ile UTC snapshot değerlerini birlikte taşır.
+
+`Frozen Dataclass`: `@dataclass(frozen=True)` ile oluşturulduktan sonra alanlarına doğrudan yeni değer atanamayan Python kayıt sınıfıdır. Mutation yerine yeni bir revision nesnesi üretilmesini teşvik eder.
+
+`ZoneInfo`: Python standart kütüphanesinde IANA timezone adlarını kullanarak yerel tarih/saat ile UTC arasında dönüşüm yapan sınıftır. Bu projede `ZoneInfo("Europe/Istanbul")` kullanılır.
+
+`tzdata`: İşletim sisteminde IANA timezone veritabanı bulunmadığında Python `zoneinfo` modülüne timezone verisi sağlayan pakettir. Özellikle Windows kurulumlarında `Europe/Istanbul` anahtarının taşınabilir çalışmasını sağlar.
+
+`Predicate`: Bir kaydın belirli bir koşula uyup uymadığını `True` veya `False` ile döndüren saf yardımcıdır. `is_now_attention_item` bunun örneğidir.

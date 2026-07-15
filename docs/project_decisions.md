@@ -1,5 +1,19 @@
 # Proje Kararlari
 
+## Issue 100 - Saha Takibi Domain ve Saf Recurrence Uygulaması
+
+- Mevcut `app/models.py` çok büyük olduğu için Saha Takibi kayıtları ve saf hesapları küçük, bağımsız `app/field_tracking.py` modülünde tutulur; yeni katman veya framework eklenmez.
+- Domain kayıtları `frozen=True, slots=True` dataclass olarak tanımlanır. UUID, UTC, enum, revision, status/outcome ve recurrence alan değişmezleri nesne oluşturma sınırında doğrulanır.
+- Canonical UUID ve UTC için ikinci helper ailesi yazılmaz; mevcut `app.persistence.contracts` yardımcıları yeniden kullanılır. Event payload determinism'i mevcut JSON serializer üzerinden korunur.
+- Hızlı create factory’sinde dışarıdan verilen iş içeriği yalnız `capture_text` değeridir; whitespace normalize edilir ve ilk title aynı değere eşitlenir. Kimlik ve UTC oluşturma anı dışarıdaki application sınırının teknik girdileridir.
+- `RoutineTemplate.project_id` ve `FollowUpItem.project_id` nullable kalır. Domain, observation kimliği varsa project kimliğini zorunlu tutar; observation ile project’in gerçekten aynı aggregate’e ait olduğunun lookup kontrolü sonraki application/repository görevidir.
+- Recurrence hesaplayıcısı sistem saatini, database’i veya filesystem’i okumaz. Template, yerel tarih, bugün ve pencere açık argümanlardır; sonuç eski tarihten bugüne deterministiktir.
+- IANA `ZoneInfo("Europe/Istanbul")` zorunluluğunu Windows’ta da çalıştırmak için `tzdata` runtime bağımlılığı eklenir; sabit `+03:00` domain kuralı yazılmaz.
+- Saf occurrence planı kimlik veya event UUID üretmez. Uygun geçmiş gün `closed/missed`, bugün `open` olarak planlanır; kalıcı insert, iki aşamalı revision/event akışı sonraki transactional service görevidir.
+- Inactive template bütün tarihleri koşulsuz dışlamaz: canonical UTC `deactivated_at`, `Europe/Istanbul` yerel tarihine çevrilir; yalnız recurrence ile start/end kurallarına uyan ve `local_date < deactivation_local_date` olan eksik geçmiş günler sınırlı backfill için eşleşir. Pasifleştirme yerel günü ve sonrası eşleşmez; active template davranışı değişmez.
+- `now` enum/status eklenmez. “Şimdi ilgilen”, overdue + zamanı gelmiş today + önemli inbox kayıtlarını giriş sırasını koruyarak ve kimliğe göre tekilleştirerek seçen saf query composition’dır.
+- Bu görev schema version, migration, repository, Unit of Work, application service, web UI, scheduler, notification, backup/restore veya export davranışı değiştirmez.
+
 ## Issue 98 - Saha Takibi v0.1 Domain ve Veri Sözleşmesi
 
 - Saha Takibi v0.1, mevcut gözlem/attachment/export omurgasından sonraki birinci ürün önceliğidir; bu görev sözleşme ve dokümantasyon aşamasıdır, production model/schema/UI eklemez.
