@@ -1401,3 +1401,9 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Schema Signature`: `sqlite_master` içindeki table/index adı, bağlı tablo ve SQL tanımlarının sıralı bütünüdür; fresh migration ile upgrade yolunun aynı şemaya ulaştığını karşılaştırmak için kullanılır.
 
 `Replacement Table`: Table rebuild sırasında yeni constraint sözleşmesiyle oluşturulan, veri kopyalandıktan sonra asıl tablo adını alan geçici yeni tablodur.
+
+`Application Service (Uygulama Servisi)`: Bir kullanım senaryosunda domain kayıtlarını, repository çağrılarını ve transaction sınırını koordine eden; UI veya transport modeli olmayan uygulama katmanı sınıfıdır.
+
+`Unit of Work`: Aynı işleme ait birden fazla repository yazısını tek database transaction'ında toplayan; commit olursa hepsini kalıcılaştıran, hata olursa hepsini rollback eden sınırdır.
+
+`Dependency Injection (Bağımlılık Enjeksiyonu)`: Saat, UUID üretici veya Unit of Work factory gibi dış davranışları sınıfa içeride sabitlemek yerine constructor üzerinden vermektir. Testlerde zamanı ve kimliği deterministik yapmayı sağlar.

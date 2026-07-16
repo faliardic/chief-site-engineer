@@ -1,5 +1,18 @@
 # Proje Kararlari
 
+## Issue 109 - FollowUpApplicationService Çekirdek Kararları
+
+- Application command/query sınıfları transport veya UI modeli değil, `frozen=True, slots=True` application değerleridir; service public API'si `app/application/__init__.py` üzerinden açıkça export edilir.
+- Hızlı create'in tek kullanıcı içeriği `capture_text` olarak kalır; kimlik ve zaman service'in enjekte edilebilir UUID/clock bağımlılıklarıdır. Varsayılanlar canonical lowercase UUID ve canonical UTC `Z` üretir.
+- Update command boundary'sinde title whitespace'i tek boşluğa indirilir; optional text alanları trim edilir ve boş sonuç `None` olur. No-op karşılaştırması bu normalize edilmiş değerlerle yapılır.
+- Read/query işlemleri her zaman repository `list_all()` deterministic sırasını temel alır; status, project, personal, observation ve view filtreleri service-side uygulanarak portlara yeni sorgu API'si eklenmez.
+- `overdue/today/upcoming` mevcut `classify_follow_up(...)`, `now` mevcut `select_now_attention_items(...)` ile hesaplanır. `as_of_utc` canonical UTC olarak doğrulanır ve yerel gün `ZoneInfo("Europe/Istanbul")` ile belirlenir.
+- Her mutation önce aggregate'i okur ve stale revision'ı no-op kararından önce reddeder. Gerçek no-op clock/UUID tüketmez; revision, `updated_at` ve event geçmişi değişmez.
+- Gerçek mutation'da immutable domain kaydının yeni revision'ı `dataclasses.replace(...)` ile üretilir; repository update, history okuma, event append ve commit aynı `SQLiteUnitOfWork` içindedir.
+- Event sequence repository'ye allocator eklenmeden, aynı `BEGIN IMMEDIATE` transaction'da `list_for_follow_up(...)` sonucunun son sequence değerinden bir artırılarak hesaplanır.
+- Terminal planlama/inbox transition ve observation bağlı project değiştirme `InvalidRecordError`; missing project `RecordNotFound`; stale write `RevisionConflict` olarak açık hata türleriyle korunur ve generic hatada yutulmaz.
+- Bu görev terminal complete/cancel/reopen, observation link/convert, routine/backfill, UI, schema/migration, backup/export veya gerçek kullanıcı data root'u davranışını genişletmez.
+
 ## Issue 107 - Follow-up Event Vocabulary ve SQLite v4 Kararları
 
 - Event adları mevcut anlamları yeniden kullanmak yerine gelecekteki mutation'larla birebir eşleştirilir: `update_details -> follow_up.details_updated`, `move_to_inbox -> follow_up.moved_to_inbox`, `set_project -> follow_up.project_changed`.

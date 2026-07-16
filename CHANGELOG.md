@@ -1,5 +1,16 @@
 # Changelog
 
+## Issue 109 - FollowUpApplicationService Çekirdek Akışları
+
+- Immutable create/update/schedule command değerleri, compose edilebilir follow-up query değeri ve kalıcı status üretmeyen `FollowUpView` uygulama enum'u eklendi.
+- `FollowUpApplicationService`; hızlı capture create, get/list/history, ayrıntı güncelleme, ilk/yeniden planlama, Unutma Kutusu'na taşıma ve proje bağlama/değiştirme/kaldırma use-case'leriyle eklendi.
+- Clock ve UUID üretimi enjekte edilebilir tutuldu; varsayılanlar canonical UTC `Z` ve lowercase canonical UUID üretir, local actor trim sonrası boş olamaz.
+- Her gerçek mutation aggregate update ile append-only event'i aynı `BEGIN IMMEDIATE` Unit of Work içinde tek commit ile yazar; sequence mevcut geçmişin son değerinden application service tarafından türetilir.
+- Stale revision hiçbir kayıt/event değiştirmeden reddedilir; normalize edilmiş gerçek no-op revision, `updated_at`, event, clock veya UUID tüketmez.
+- `inbox/overdue/today/upcoming/now` görünümleri mevcut domain helper'larıyla ve `Europe/Istanbul` gün sınırıyla repository sırası korunarak compose edilir.
+- Focused testler create/read/query, bütün mutation payload'ları, no-op, stale revision, event/commit failure rollback, observation-project koruması ve repository/schema sınırlarını kapsar.
+- Schema/migration, repository portları, routine/backfill, terminal yaşam döngüleri, observation bağlama/dönüştürme, web/UI, backup/export ve gerçek kullanıcı data root'u değiştirilmedi.
+
 ## Issue 107 - Follow-up Event Vocabulary ve SQLite Schema v4
 
 - `FollowUpEventType` sırası korunarak sona `follow_up.details_updated`, `follow_up.moved_to_inbox` ve `follow_up.project_changed` eklendi; türetilmiş `FOLLOW_UP_EVENT_TYPES` allowed list'i otomatik genişledi.

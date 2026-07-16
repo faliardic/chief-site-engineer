@@ -4,7 +4,7 @@
 
 Bu belge, GitHub Issue #98 kapsamında Saha Takibi v0.1 için uygulanacak domain ve veri sınırını kesinleştirir. Bu aşama production kodu, migration, UI veya scheduler eklemez. Sonraki implementation görevleri bu sözleşmeyi doğrudan testlere ve koda çevirecektir.
 
-Issue #107 güncellemesi, gelecekteki `update_details`, `move_to_inbox` ve `set_project` mutation'ları için eksik event adlarını ve payload sözleşmesini ekler. Bu güncelleme yalnız event vocabulary ile SQLite schema v4 persistence sınırını uygular; `FollowUpApplicationService`, command/query sınıfları, backfill ve web route henüz uygulanmış değildir.
+Issue #107 güncellemesi, `update_details`, `move_to_inbox` ve `set_project` mutation'ları için eksik event adlarını ve payload sözleşmesini eklemiştir. Issue #109; `FollowUpApplicationService` çekirdeğinin create/read/query/update/schedule/inbox/project/history dilimini uygular. Terminal yaşam döngüleri, observation bağlama/dönüştürme, routine service/backfill ve web route henüz uygulanmış değildir.
 
 Sözleşme üç ana kaydı kapsar:
 
@@ -514,6 +514,8 @@ class RoutineApplicationService:
 
 Buradaki command/query sınıfları transport veya UI modeli değildir; use-case girdilerini isimlendiren immutable application değerleridir. `CreateFollowUp` yalnız normalize edilecek `capture_text` alanını zorunlu taşır; başlık, status, tür, proje, zaman ve önem create input’u değildir. `UpdateFollowUp` sonradan title/açıklama/tür/konum/kişi/önem/koşul düzenlemesini taşır fakat `capture_text` ilk yakalama metnini değiştirmez. `move_to_inbox` planı kaldırırken status ve zamanı birlikte değiştirir. `set_project`, observation bağlıyken null veya farklı proje kabul etmez. `FollowUpQuery` Unutma Kutusu ile planlı görünüm sorgularını birbirinden ayırır. `RoutineTemplateQuery`, `project_id = None` ile kişisel template’leri açıkça sorgulayabilir. `convert_to_observation` var olan ve ayrıca oluşturulmuş bir observation kimliğini bağlar; bu sözleşme otomatik observation üretmez.
 
+Issue #109 application boundary normalization kararı: update title baş/son ve ardışık whitespace'i tek boşlukla kararlılaştırır; optional açıklama/konum/kişi/koşul metinlerini trim eder ve boş sonucu `None` yapar. Enum, bool ve canonical UTC deadline command oluşturulurken doğrulanır. No-op kararı bu normalize edilmiş sonuçla güncel aggregate karşılaştırılarak verilir; böylece yalnız biçimsel boşluk farkı revision veya event üretmez.
+
 Service davranışı:
 
 1. Komut girdisini doğrular.
@@ -667,7 +669,7 @@ Bu sözleşmeden sonra işler küçük ve test edilebilir görevler olarak ayrı
 
 1. Domain record/validation sabitleri ve saf recurrence hesaplayıcısı.
 2. SQLite schema v3 migration ve repository/event port/adaptörleri; schema v4 follow-up mutation-event vocabulary preflight'ı.
-3. Transactional application service ve sınırlı idempotent occurrence üretimi.
+3. Transactional application service: Issue #109 ile follow-up çekirdek dilimi tamamlandı; terminal/observation ve routine sınırlı idempotent occurrence üretimi ayrı görevlerde bekliyor.
 4. Backup schema 2 backward restore ve schema 3 round-trip testleri.
 5. Resmî daily export exclusion regression testi.
 6. Bunlar doğrulandıktan sonra minimum Saha Takibi UI’si.
