@@ -20,6 +20,8 @@ Bu belge, yeni bir CHIEF SITE ENGINEER sohbetinin ZIP veya handoff paketi isteme
 
 Stale state, README, ROADMAP, ZIP, handoff veya sohbet hafızası güncel GitHub kanıtını override edemez.
 
+Tek kullanıcılı kişisel saha asistanı dönüşümünün bağlayıcı üst yol haritası GitHub Epic #105’tir. Yeni sohbet, kullanıcı modelini multi-user/role/tenant/SaaS yönüne genişleten veya mobil/offline/bildirimi saha pilotu sonrasına atan eski metinleri current product direction olarak kullanmaz.
+
 ## Fresh-chat okuma sırası
 
 1. `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
@@ -27,9 +29,10 @@ Stale state, README, ROADMAP, ZIP, handoff veya sohbet hafızası güncel GitHub
 3. Bu bootstrap belgesi
 4. `origin/master` HEAD ve son merge durumu
 5. açık GitHub Issue ve PR'lar
-6. ilgili branch/commit diff'i ve current Issue completion evidence'i
-7. `.cse/state/project_state.json`
-8. aktif `.cse/tasks/<issue_no>_task.md` ve ilgili `.cse/results/<issue_no>_result.md`
+6. aktif işin bağlı olduğu üst Epic veya bağlayıcı yol haritası
+7. ilgili branch/commit diff'i ve current Issue completion evidence'i
+8. `.cse/state/project_state.json`
+9. aktif `.cse/tasks/<issue_no>_task.md` ve ilgili `.cse/results/<issue_no>_result.md`
 
 Bu sıra kalıcı politika ile değişken repository durumunu birbirine karıştırmaz.
 

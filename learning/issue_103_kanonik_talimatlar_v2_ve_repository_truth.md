@@ -51,7 +51,19 @@ Eski README: database ve GUI yok
 
 ### Local-first
 
-Ana çalışma verisinin önce kullanıcının yerel cihazında tutulduğu ürün yaklaşımıdır. Bu, otomatik olarak encryption, auth veya başka Windows kullanıcılarına karşı gizlilik sağlandığı anlamına gelmez.
+Ana çalışma verisinin veri sahibinin kendi cihazlarında tutulduğu ürün yaklaşımıdır. `Local-first`, `Windows-first` demek değildir: telefon, bilgisayar veya daha sonra seçilecek başka bir owner device aynı kişisel veri sınırında olabilir. Bu yaklaşım otomatik olarak encryption, uygulama kilidi veya başka işletim sistemi kullanıcılarına karşı gizlilik sağlamaz.
+
+### Mobile-first
+
+Saha akışının önce telefon ekranı, dokunma hareketi, bağlantı kesintisi ve birkaç saniyelik kullanım süresi düşünülerek tasarlanmasıdır. Mobile-first, bütün kodun telefonda yazılması değil; ilk gerçek kullanıcı deneyiminin şantiye şefinin sahadaki ana cihazına göre doğrulanmasıdır.
+
+### Single-owner security
+
+Çok kullanıcılı rol matrisi yerine tek veri sahibinin cihaz ve yedek güvenliğini koruyan yaklaşımdır. Uygulama kilidi, mümkünse cihaz biyometrisi, güvenilen cihazlar, şifreli backup, owner-only telefon–PC senkronizasyonu ve güvenli yerel ağ bu sınırın parçalarıdır.
+
+### Deprecation
+
+Bir sınıfı veya API’yi hemen silmeden, yeni geliştirmede tercih edilmeyeceğini ve kontrollü biçimde başka bir yapıya dönüştürüleceğini ilan etmektir. Deprecation fiziksel silme değildir; önce kullanım envanteri, karşılık doğrulaması ve test güvenliği gerekir.
 
 ### Loopback
 
@@ -133,18 +145,26 @@ codex/issue-103-canonical-instructions-v2
 
 Eski `step-NNN-*` branch'leri yeniden adlandırmadık. Çünkü tarihsel Git referanslarını değiştirmek geçmiş kanıtı gereksiz yere zorlaştırır.
 
-## Ürün sırası neden böyle?
+## Ürün sırası neden düzeltildi?
 
-| Sıra | Karar | Neden |
+İlk commit, minimum hesap ve günlük zaman çizelgesini pilot sonrasına atıyordu. Bu teknik olarak sade görünse de ürün kabul ölçütünü karşılamıyordu: şantiye şefi hesap müsveddesi ve akşam yeniden yazılan günlük için hâlâ kâğıda ihtiyaç duyacaktı.
+
+Epic #105 sırası bu nedenle şöyledir:
+
+| Faz | Karar | Neden |
 | --- | --- | --- |
-| 1 | Local Field MVP omurgasını koru | Mevcut gözlem, attachment, export ve backup değeri kaybolmamalı |
-| 2 | Domain ve recurrence | Takip kuralları önce saf ve test edilebilir olmalı |
-| 3 | SQLite persistence | Restart sonrası veri kalıcılığı gerekir |
-| 4 | Transactional service/backfill | Repository primitive'lerini güvenli use-case'e dönüştürür |
-| 5 | Backup/export kabulü | Kişisel takip kaybolmamalı ve resmî export'a sızmamalı |
-| 6 | Minimum UI | Kullanıcı ancak güvenli alt katman üzerinde çalışmalı |
-| 7 | Saha pilotu | Gerçek kullanım sürtünmesi ölçülmeli |
-| 8+ | Hesap defteri, günlük, harita | Çekirdek takip sahada doğrulandıktan sonra değer üretir |
+| 0 | Tek kullanıcı yönünü kanonikleştir | Yanlış multi-user/kurumsal varsayımlar sonraki mimariyi yönlendirmesin |
+| 1 | Transactional service ve lazy backfill | Repository primitive’lerini atomik use-case akışına dönüştürür |
+| 2 | Backup/restore ve export izolasyonu | Kişisel takip kaybolmasın, resmî çıktıya istemeden sızmasın |
+| 3 | Mobil runtime ve veri sahipliği ADR | Telefon–PC veri otoritesi koddan önce kesinleşsin |
+| 4 | Kâğıdı Bırakma Sürümü | Not, takip, attachment, minimum hesap ve günlük taslağı tek akışta birleşsin |
+| 5 | Offline ve bildirim güvenilirliği | Sahada ağ yokken kayıt kaybolmasın ve takip teslim edilsin |
+| 6–7 | 7 ve 30 günlük pilotlar | Kâğıda dönüş nedenleri ve gerçek sürtünme ölçülsün |
+| 8 | Gelişmiş hesap defteri | Minimum hesap şeridi gerçek kullanım verisiyle büyüsün |
+| 9 | Günlük yayın/revizyon zinciri | Düzenlenebilir taslak kontrollü immutable kayda dönüşsün |
+| 10 | Canlı Proje Haritası | Kaynak kayıtlar doğrulandıktan sonra read-model değer üretsin |
+| 11 | Kanıtlanmış kişisel yardımcılar | Yalnız sahada karşılığı görülen araçlar eklensin |
+| 12 | Kişisel AI | AI temiz ve denenmiş kişisel veri omurgasının üstüne gelsin |
 
 ## Mevcut test kodu bize neyi kanıtlıyor?
 
@@ -211,15 +231,148 @@ GitHub Issue #103 iznini oku
 -> Issue #103 completion comment
 ```
 
+Nihai düzeltme turu ilk commit’i yeniden yazmadı:
+
+```text
+Epic #105 ve Issue #103 nihai yorumunu oku
+-> mevcut branch head = 2dd38c... doğrula
+-> remote divergence = 0 0 doğrula
+-> aynı branch üzerinde yalnız allowlist dosyalarını düzelt
+-> full suite + compile + JSON + protected diff kontrolleri
+-> tek normal correction commit
+-> normal push
+-> Issue #103 yeni factual evidence
+```
+
+Buradaki “aynı branch” önemlidir. `amend`, `rebase` veya force-push yapılmadığı için ilk commit tarihsel kanıt olarak kalır; yeni karar ikinci normal commit ile görünür olur.
+
 ## Hangi dosyada ne yaptık?
 
-- `CSE_UNIFIED_PROJECT_SOURCE.md`: ürün kimliği, kullanıcı problemi, ürün sırası, hesap defteri, günlük ve Harita kararları.
-- `CSE_PROJECT_INSTRUCTIONS.md`: kalıcı politika ile değişken state ayrımı, Issue branch standardı ve current-state doğrulama prosedürü.
+- `CSE_UNIFIED_PROJECT_SOURCE.md`: tek kullanıcı ürün kimliği, single-owner security, Epic #105 sırası, Kâğıdı Bırakma kapsamı ve legacy envanter yönü.
+- `CSE_PROJECT_INSTRUCTIONS.md`: kalıcı politika ile değişken state ayrımı, tek kullanıcı değişmezi, mobil-first öncelik, Issue branch standardı ve current-state doğrulama prosedürü.
 - `CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md`: yeni sohbetin stale state yerine GitHub'dan devam etme sırası.
-- `README.md`: gerçek Local Field MVP kabiliyetleri, launcher kullanımı ve güvenlik sınırları.
-- `ROADMAP.md`: PR #104 sonrası tamamlanan ve bekleyen ürün aşamaları.
-- `.cse/state/project_state.json`: safe point ile aktif dokümantasyon işinin ayrılması.
+- `README.md`: gerçek Local Field MVP kabiliyetleri, tek sahipli ürün modeli, launcher kullanımı ve güvenlik sınırları.
+- `ROADMAP.md`: Epic #105 Faz 0–12, Faz 4 minimum yüzeyi ve legacy envanter görevi.
+- `.cse/state/project_state.json`: safe point ile aktif düzeltme işinin ayrılması ve aynı faz sırasının makinece okunabilir aynası.
 - `CHANGELOG.md` ve `project_decisions.md`: bu adımın tarihsel değişiklik ve kalıcı karar izi.
+
+## Gerçek kod envanterini nasıl okuduk?
+
+Bu görev production kodunu değiştirmedi. Fakat legacy yönünü tahminle yazmamak için mevcut sınıfları salt okunur inceledik.
+
+`app/models.py` içindeki eski takip modeli:
+
+```python
+@dataclass
+class TrackingRecord:
+    record_id: str
+    project_id: str
+    title: str
+    description: str
+    date: str
+    responsible_party: str | None = None
+    status: str = "open"
+```
+
+Satır satır:
+
+- `@dataclass`, sınıfın alanlardan oluşan sade bir veri taşıyıcısı olduğunu gösterir.
+- `record_id` eski modelin kimliğidir.
+- `project_id` zorunludur; yeni `FollowUpItem` ise kişisel/projesiz takibi desteklemek için nullable project taşır.
+- `responsible_party` bir metindir; bu alan başka bir sistem kullanıcısı veya görev atama hesabı anlamına gelmez.
+- `status`, eski serbest metinli yaşam döngüsüdür; yeni takip modelinde enum ve daha sıkı değişmezler vardır.
+
+Yeni aktif takip çekirdeği `app/field_tracking.py` içindedir:
+
+```python
+@dataclass(frozen=True, slots=True)
+class FollowUpItem:
+    follow_up_id: str
+    capture_text: str
+    title: str
+    created_at: str
+    updated_at: str
+    project_id: str | None = None
+    related_person: str | None = None
+    next_attention_at: str | None = None
+    deadline_at: str | None = None
+    revision: int = 1
+```
+
+Satır satır teknik fark:
+
+- `frozen=True`, nesne kurulduktan sonra alanların doğrudan değiştirilememesini sağlar.
+- `slots=True`, alan sözleşmesini dar ve bellek kullanımını öngörülebilir tutar.
+- `capture_text`, `+ Unutma` akışındaki ilk kullanıcı içeriğidir.
+- `project_id: str | None`, kişisel takibin projeye bağlanmadan yaşayabilmesini sağlar.
+- `related_person`, kayıt bağlamıdır; kullanıcı hesabı değildir.
+- `next_attention_at`, konunun tekrar ne zaman görünmesi gerektiğidir.
+- `deadline_at`, gerçek son tarihtir; dikkat zamanı ile aynı kavram değildir.
+- `revision`, optimistic concurrency kontrolünün temelidir.
+
+Bu yüzden karar “`TrackingRecord` dosyasını hemen sil” olmadı. Doğru karar şudur:
+
+```text
+önce kullanım envanteri
+-> yeni karşılığı doğrula
+-> import/test tüketicilerini bul
+-> deprecation planı
+-> ayrı yetkili görev
+-> ancak kanıt varsa fiziksel temizlik
+```
+
+## Attachment örneği neden aynı yaklaşımı gerektiriyor?
+
+Gerçek kodda iki model birlikte bulunuyor:
+
+```python
+@dataclass
+class AttachmentRecord:
+    """Represents the legacy generic attachment reference model."""
+
+@dataclass
+class FileAttachmentRecord:
+    """Represents the canonical file attachment metadata model."""
+```
+
+İlk docstring açıkça `legacy`, ikincisi `canonical` diyor. Buna rağmen import kullanan tarihsel testler veya repository’ler bulunabilir. Bu nedenle sınıf adını görmek silme yetkisi vermez; yalnız envanter için güçlü bir sinyal verir.
+
+## Teknik karar tablosu
+
+| Eski aday | Yön | Bu görevde yapılan |
+| --- | --- | --- |
+| `TrackingRecord`, `TaskCandidateRecord` | `FollowUpItem` | Sadece envanter/deprecation kararı |
+| `AttachmentRecord`, `FileAttachmentRecord` | Kalıcı metadata/store | İki modelin gerçek kod varlığı doğrulandı |
+| `DailySiteLog`, `DailyReportRecord` | Gelecekte `DailyLogSnapshot` | Minimum taslak ile immutable yayın ayrıldı |
+| Party/contact/supplier modelleri | Tek kişi/kurum referansı | Bunların kullanıcı hesabı olmadığı yazıldı |
+| Meeting/RFI/Submittal | Not + takip + beklenen cevap | Ayrı kurumsal workflow hedefi çıkarıldı |
+| NCR prototip zinciri | Gözlem + aksiyon + kanıt + sonuç | Silme yapılmadan yeniden değerlendirme yönü |
+| `app/records.py` in-memory repository’leri | SQLite karşılığı sonrası deprecation | Production dosyası değiştirilmedi |
+
+## State JSON düzeltmesi
+
+Yeni state aynası ürün yönünü string listelerle açıkça taşır:
+
+```json
+{
+  "product_identity": "local_first_mobile_first_single_owner_personal_field_assistant",
+  "product_owner_user": "site_manager_only",
+  "binding_product_roadmap": [
+    "phase_0_issue_103_single_owner_direction_correction",
+    "phase_1_field_tracking_transactional_service_and_seven_day_lazy_backfill",
+    "phase_2_backup_restore_compatibility_and_official_export_isolation",
+    "phase_3_mobile_runtime_and_data_ownership_adr",
+    "phase_4_mobile_first_paperless_field_slice"
+  ]
+}
+```
+
+Satır satır:
+
+- `product_identity`, ürünün hem local-first hem mobile-first hem de single-owner olduğunu tek değerde görünür yapar.
+- `product_owner_user`, tek gerçek kullanıcıyı makinece okunabilir biçimde kaydeder.
+- `binding_product_roadmap`, sıra kaymasının README veya ROADMAP içinde sessizce oluşmasını yakalamayı kolaylaştırır.
+- Faz 1 ve sonrası listede bulunur ama “tamamlandı” olarak işaretlenmez; bu liste sıra sözleşmesidir, completion iddiası değildir.
 
 ## Şunu şöyle yaptık ki...
 
@@ -227,9 +380,15 @@ Kalıcı talimatlardan sabit eski commit ve test snapshot'larını çıkardık k
 
 Aktif işi `current_safe_point` içine yazmadık ki merge edilmemiş branch tamamlanmış gibi görünmesin.
 
-README'yi production kabiliyeti varmış gibi abartmadan güncelledik ki kullanıcı hem çalışan local uygulamayı görebilsin hem de auth, notification ve Saha Takibi UI gibi eksikleri açıkça bilsin.
+README'yi production kabiliyeti varmış gibi abartmadan güncelledik ki kullanıcı hem çalışan local uygulamayı görebilsin hem de uygulama kilidi, mobil runtime, offline, notification ve Saha Takibi application service/UI gibi eksikleri açıkça bilsin.
 
-Harita, günlük ve hesap defterini Saha Takibi saha pilotundan sonraya koyduk ki çekirdek “unutmama ve takip” problemi çözülmeden yeni ve dikkat dağıtıcı ürün yüzeyleri başlamasın.
+Minimum hesap şeridi ile günlük zaman çizelgesini Kâğıdı Bırakma Sürümü’ne aldık ki şantiye şefi takip için telefonu kullanırken hesap ve akşam yeniden yazma için tekrar kâğıda dönmesin.
+
+Gelişmiş hesap defteri, immutable günlük yayın zinciri ve Harita’yı ayrı sonraki fazlarda tuttuk ki ilk mobil pilot gereksiz karmaşıklaşmasın; fakat pilotun kâğıdı gerçekten bırakmaya yetecek minimum bütünlüğü eksilmesin.
+
+Multi-user/role/tenant/SaaS hedeflerini “daha sonra” listesinden tamamen çıkardık ki tek şantiye şefi için tasarlanan veri ve ekranlar gelecekteki hayalî kurumsal kullanıcılar uğruna karmaşıklaşmasın.
+
+Legacy sınıfları silmedik, yalnız envanter/deprecation yönü verdik ki mevcut import, test ve tarihsel veri sözleşmeleri ayrı kanıt olmadan kırılmasın.
 
 ## Bilinçli olarak yapmadıklarımız
 

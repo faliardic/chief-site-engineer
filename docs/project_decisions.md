@@ -2,17 +2,22 @@
 
 ## Issue 103 - Kanonik Ürün Yönü ve Repository Truth Kararları
 
-- CSE, büyük platformların küçültülmüş kopyası değil; `Yakala -> İşle -> Takip et -> Doğrula -> Günlüğe al` döngüsüyle çalışan local-first **Saha Komuta Sistemi**dir.
-- Ürün, sahadaki kâğıt notu yasaklamaz; bilgiyi bir kez yakalayıp takip, kanıt, hesap, günlük ve daha sonra geri çağırma için tekrar yazmadan kullanmayı hedefler.
+- Issue #103'ün nihai düzeltmesi ve bağlayıcı üst yol haritası Epic #105'tir; ilk branch commit'indeki çelişen geniş kullanıcı, kurumsal gelecek ve geç mobil öncelik kararları tarihsel kalır.
+- CSE, yalnız şantiye şefi tarafından kullanılan; not, takip, hatırlatıcı, hesap, fotoğraf, belge, günlük, arama ve proje hafızasını birleştiren local-first ve mobile-first kişisel saha asistanıdır.
+- Ürün araç bakımından geniş, kullanıcı modeli bakımından tek sahipli kalır. Şirket, taşeron, işveren, yapı denetim ve diğer kişiler sistem kullanıcısı değil kişi/kurum veya ilgili taraf kayıt referansıdır.
+- Multi-user hesap, role/tenant, firma portalı, takım collaboration, kurumsal workflow, şirket portföy dashboard'u, SaaS/billing ve çok taraflı cloud collaboration aktif veya uzun vadeli ürün hedefi değildir.
+- Tek kullanıcı güvenliği kaldırmaz: uygulama kilidi/cihaz biyometrisi, güvenilen cihaz, şifreli backup, owner-only telefon-PC senkronizasyonu, güvenli yerel ağ ve açık export/devir single-owner security sınırıdır.
+- Kişisel/resmî ayrımı erişim rolü değil export/devir kapsamıdır. Projeye bağlanan kişisel takip otomatik resmî olmaz; dönüşüm açık şantiye şefi işlemidir.
+- `local-first`, `Windows-first` değildir. Mobil runtime, offline, notification ve owner-only sync ilk gerçek saha pilotlarından önce ele alınır.
+- Local Field MVP korunur; Saha Takibi domain/recurrence ile schema v3 persistence tamamlanmıştır. Transactional application service ve lazy backfill sıradaki dar production adımıdır.
+- Ürün sırası: Issue #103 yön düzeltmesi -> application service/backfill -> backup/export izolasyonu -> mobil runtime/veri ADR -> Kâğıdı Bırakma Sürümü -> offline/bildirim -> 7 günlük pilot -> 30 günlük pilot -> gelişmiş hesap -> günlük yayın zinciri -> Harita -> kanıtlanmış yardımcılar -> kişisel AI.
+- Kâğıdı Bırakma Sürümü takip/rutin/attachment/arama/backup görünürlüğüne ek olarak minimum hızlı hesap şeridi ve günlük zaman çizelgesi/düzenlenebilir taslak taşır.
+- Gelişmiş hesap defteri 30 günlük pilot sonrasında, immutable günlük yayınlama/revizyon zinciri ayrı sonraki fazda kalır.
+- Canlı Proje Haritası source record değil read-model/projeksiyondur; dokunarak odaklanır, wheel/pinch/trackpad zoom/pan/serbest zoom içermez ve hesaplanmış balon yerine kaynak kayıt düzenlenir.
+- Legacy model envanteri `Aktif çekirdek`, `Dönüştürülecek`, `Legacy/arşivlenecek`, `Silme adayı` sözlüğüyle ayrı görevdir; bu karar fiziksel silme yetkisi vermez.
 - Kalıcı ürün amacı `CSE_UNIFIED_PROJECT_SOURCE.md`, operasyon/Git güvenliği `CSE_PROJECT_INSTRUCTIONS.md`, aktif kapsam current GitHub Issue, değişken repository durumu GitHub `master`/PR/Issue/branch kanıtıdır.
-- `.cse/state`, README, ROADMAP, handoff ve ZIP current GitHub truth'u override edemez; state yalnız ikincil factual mirror'dır.
-- Kalıcı operasyon talimatına sabit eski commit, test sayısı, aktif Issue veya Step snapshot'ı gömülmez; current state her görev başında GitHub ve resmî `V:` kopyasında yeniden doğrulanır.
+- `.cse/state`, README, ROADMAP, handoff, ZIP, öğrenme ve podcast çıktıları current GitHub truth'u override edemez; öğrenme/podcast production zincirini bloke etmez.
 - Yeni branch standardı `codex/issue-<issue_no>-<slug>` olur. Eski `step-NNN-*` branch'ler yeniden adlandırılmaz; aynı anda yalnız bir aktif production implementation görevi ve en fazla bir incelemede PR bulunur.
-- Local Field MVP omurgası korunur. Saha Takibi domain/recurrence ile schema v3 persistence tamamlanmıştır; sıradaki production adımı transactional application service ve lazy backfill'dir.
-- Backup compatibility, resmî export izolasyonu ve minimum Saha Takibi UI tamamlanmadan gerçek saha pilotu başlamaz; mühendislik hesap defteri, günlük yayın zinciri ve Canlı Proje Haritası pilot sonrasına gelir.
-- Kişisel takip/resmî kayıt ayrımı korunur. Auth olmadığı için “kişisel” başka Windows kullanıcılarına karşı cryptographic privacy değil, resmî kayıtlardan ve resmî exportlardan ayrılmış çalışma verisi demektir.
-- Günlük kaynak kayıtlardan üretilen, akşam kontrol edilip yayımlanan snapshot'tır; yayımlanmış günlük sessizce değiştirilmez.
-- Canlı Proje Haritası source record değil read-model/projeksiyondur; dokunarak odaklanır ve wheel/pinch/pan/serbest zoom içermez. Hesaplanmış balon yerine kaynak kayıt düzenlenir.
 
 ## Issue 102 - Saha Takibi SQLite v3 ve Repository Kararları
 

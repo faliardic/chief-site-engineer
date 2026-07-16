@@ -1,7 +1,7 @@
 # CSE Güncel Proje Talimatları
 
 **Belge türü:** Operasyonel proje talimatı / execution protocol
-**Geçerlilik tarihi:** 2026-07-15
+**Geçerlilik tarihi:** 2026-07-16
 **Canonical proje yolu:** `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
 **Durum:** Bu tracked belge, Git/GitHub/Codex calisma kurallari, guvenlik, verification ve execution protocol icin yetkili kaynaktir. Urun amaci, strateji, veri ilkeleri, urun katmanlari ve uzun vadeli mimari icin `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md` ust kaynaktir.
 
@@ -9,7 +9,12 @@
 
 ## 1. Projenin Amacı
 
-CSE, aktif şantiye şefinin kâğıt müsvedde, ajanda, WhatsApp, telefon galerisi, Excel, klasör ve kişisel hafıza arasında dağılan bilgiyi tek güvenilir saha hafızasında yönettiği local-first bir **Saha Komuta Sistemi**dir.
+CSE, yalnız şantiye şefi tarafından kullanılan; not, takip, hatırlatıcı, hesap, fotoğraf, belge, günlük, arama ve proje hafızasını tek güvenilir akışta birleştiren local-first ve mobile-first **kişisel saha asistanı**dır.
+
+```text
+Araç bakımından geniş
+Kullanıcı modeli bakımından tek sahipli
+```
 
 Ana ürün döngüsü:
 
@@ -17,7 +22,7 @@ Ana ürün döngüsü:
 Yakala -> İşle -> Takip et -> Doğrula -> Günlüğe al
 ```
 
-CSE’nin amacı büyük inşaat yönetim platformlarının küçük bir kopyasını yapmak değildir. İlk gerçek rakipleri şunlardır:
+CSE’nin amacı büyük inşaat yönetim platformlarının küçük bir kopyasını veya kurumsal ortak çalışma sistemi yapmak değildir. Uygulamaya yalnız şantiye şefi girer; diğer kişi ve firmalar sistem kullanıcısı değil kayıt referansıdır. İlk gerçek rakipleri şunlardır:
 
 - WhatsApp grupları
 - Telefon galerisi
@@ -44,13 +49,15 @@ Cevap hayırsa özellik ertelenir veya kapsam dışı bırakılır.
 5. Kanıt niteliği taşıyan işlemler audit izi bırakacak şekilde tasarlanır; audit davranışı yalnız açık görev kapsamında uygulanır.
 6. Medya dosyaları veritabanına gömülmez; dosya yolu, metadata ve bütünlük kontrolleriyle yönetilir.
 7. Attachment metadata kaydı fiziksel dosya ile bütünlük içinde olmalıdır.
-8. Özel alan verileri kullanıcıya aittir ve proje devrinde yeni şantiye şefine aktarılmaz.
-9. Yeni şantiye şefinin özel alanı sıfırdan açılır.
-10. Devir için gerekli bilgi özel alanda bırakılmaz; resmî kayda veya açıkça seçilmiş handover package içine dönüştürülür.
+8. Kişisel çalışma verisi tek sahibine aittir ve resmî export/devir kapsamına otomatik girmez.
+9. Şirketler, ekipler ve diğer kişiler kullanıcı hesabı değil; kişi/kurum ve ilgili taraf kayıt referanslarıdır.
+10. Devir için gerekli bilgi kişisel alanda bırakılmaz; açık kullanıcı işlemiyle resmî kayda veya seçilmiş handover package içine dönüştürülür.
 11. Hard validation, otomatik blocking, migration, persistence, audit, backup/restore, API, GUI ve CLI çalışmaları ayrı ve açık görev kapsamı gerektirir.
 12. `requires_human_review` yalnız insan inceleme sinyalidir; otomatik kabul, ret, onay veya paket engelleme kararı değildir.
 13. Sistem kendiliğinden `blocked` durumu üretmez.
 14. Resmî-devredilebilir veri ile özel-devredilemez veri bütün ekran, export ve devir örneklerinde ayrı tutulur.
+15. Multi-user, role, tenant, firma portalı, kurumsal workflow ve SaaS aktif veya uzun vadeli ürün hedefi değildir.
+16. Tek kullanıcı kararı güvenliği kaldırmaz; uygulama kilidi, güvenilen cihaz, şifreli backup, owner-only senkronizasyon ve güvenli yerel ağ ayrı güvenlik sınırıdır.
 
 ---
 
@@ -80,7 +87,29 @@ Cevap hayırsa özellik ertelenir veya kapsam dışı bırakılır.
 
 Merge edilmiş Local Field MVP; SQLite persistence, managed attachment store, local Flask web akışı, proje/gözlem create-list-detail-update, revision conflict koruması, arama, günlük export, backup/verify/izole restore ve Windows launcher içerir.
 
-Birinci production önceliği Saha Takibi v0.1'dir. Domain/recurrence ile schema v3 repository/event persistence tamamlanmıştır; application service, lazy backfill, backup compatibility, resmî export izolasyonu ve minimum UI henüz tamamlanmamıştır. Bu çekirdek değer kanıtlanmadan karmaşık dashboard, çok kullanıcı, bulut, ağır AI veya geniş platform modülleri önceliklendirilmez.
+Saha Takibi domain/recurrence ile schema v3 repository/event persistence tamamlanmıştır; application service, lazy backfill, backup compatibility, resmî export izolasyonu ve kullanıcı yüzeyi henüz tamamlanmamıştır.
+
+Epic #105 bağlayıcı üst yol haritasıdır:
+
+```text
+0. Issue #103 tek kullanıcılı yön düzeltmesi
+1. Transactional application service ve 7 günlük lazy backfill
+2. Backup/restore compatibility ve resmî export izolasyonu
+3. Mobil runtime ve veri sahipliği ADR
+4. Mobil-first Kâğıdı Bırakma Sürümü
+5. Offline ve bildirim güvenilirliği
+6. 7 günlük gerçek saha pilotu
+7. 30 günlük ana uygulama pilotu
+8. Gelişmiş mühendislik hesap defteri
+9. Günlük log yayınlama/revizyon zinciri
+10. Canlı Proje Haritası
+11. Kanıtlanmış kişisel yardımcı araçlar
+12. Kişisel AI asistanı
+```
+
+Kâğıdı Bırakma Sürümü takip görünümleri, rutin, attachment, arama ve backup görünürlüğüne ek olarak minimum hızlı hesap şeridi ile günlük zaman çizelgesi/düzenlenebilir taslağı da ilk pilot öncesinde içerir.
+
+Multi-user/role/tenant/SaaS/kurumsal portal hedefleri “daha sonra” listesine alınmaz. `local-first`, `Windows-first` değildir; mobil, offline, notification ve owner-only sync gerçek saha pilotlarından önce ele alınır.
 
 ---
 
@@ -511,10 +540,11 @@ Her teknik adımda uygun olduğunda:
 güncellenir.
 
 Dokümantasyon üretmek, gerçek kod/test/yerel dosya kanıtının yerine geçmez.
+Öğrenme, podcast ve tarihsel çıktı korunur; fakat current-state veya ürün otoritesi değildir ve gerçek saha değeri üreten production zincirini bloke etmez.
 
 ### Podcast kuralı
 
-Her bes adimlik teknik blok tamamlandiginda NotebookLM podcast notu olusturulur. Podcast 035 ve sonraki strict notes, kendi previous-summary section'i icinde `001..note.step_start-1` canonical step headings'ini exactly once ve ascending order ile tasir. Rolling source cumulative summaries bu note-contained contract'in yerine gecmez.
+Beş adımlık podcast cadence'i tarihsel öğrenme protokolüdür; production fazları için giriş kapısı değildir. Podcast üretildiğinde Podcast 035 ve sonraki strict notes, kendi previous-summary section'i içinde `001..note.step_start-1` canonical step headings'ini exactly once ve ascending order ile taşır.
 
 ---
 
@@ -564,4 +594,4 @@ Güncel durum iddiası README, ROADMAP, handoff, ZIP, eski task/result veya sohb
 
 ## 19. Ana Karar Cümlesi
 
-> CSE; `Yakala -> İşle -> Takip et -> Doğrula -> Günlüğe al` döngüsüyle çalışan local-first Saha Komuta Sistemi'dir; resmî `V:` kopyasını yürütme kaynağı, GitHub'ı senkronize koordinasyon ve inceleme yüzeyi olarak kullanır, resmî kayıt ile kişisel çalışma verisini ayırır ve küçük, testli, belgeli adımlarla gelişir.
+> CSE, yalnız şantiye şefinin kullandığı; `Yakala -> İşle -> Takip et -> Doğrula -> Günlüğe al` döngüsüyle çalışan local-first ve mobile-first kişisel saha asistanıdır. Araç bakımından geniş, kullanıcı modeli bakımından tek sahipli kalır; resmî kayıt ile kişisel çalışma verisini erişim rolüyle değil export/devir kapsamıyla ayırır.

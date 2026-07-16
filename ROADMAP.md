@@ -2,19 +2,53 @@
 
 ## Güncel Ürün Sırası
 
-1. [x] Local Field MVP omurgasını koru.
-2. [x] Saha Takibi domain ve recurrence.
-3. [x] Saha Takibi SQLite persistence — PR #104.
-4. [ ] Transactional application service ve yedi günlük idempotent lazy backfill.
-5. [ ] Backup/restore compatibility ve resmî export izolasyonu.
-6. [ ] Minimum `+ Unutma` / `Bugün` / `Unutma Kutusu` UI.
-7. [ ] Gerçek saha pilotu.
-8. [ ] Kayıtlı mühendislik hesap defteri.
-9. [ ] Günlük şantiye logu kontrol/yayınlama zinciri.
-10. [ ] Canlı Proje Haritası read-model ve navigasyon yüzeyi.
-11. [ ] Offline/PWA, auth, multi-user, cloud ve AI — daha sonra.
+0. [x] Tek kullanıcılı kişisel saha asistanı yönünü kanonikleştir — Issue #103.
+1. [ ] Saha Takibi transactional application service ve 7 günlük lazy backfill.
+2. [ ] Backup/restore compatibility ve resmî export izolasyonu.
+3. [ ] Mobil runtime ve veri sahipliği ADR.
+4. [ ] Mobil-first Kâğıdı Bırakma Sürümü.
+5. [ ] Offline ve bildirim güvenilirliği.
+6. [ ] 7 günlük gerçek saha pilotu.
+7. [ ] 30 günlük ana uygulama pilotu.
+8. [ ] Gelişmiş mühendislik hesap defteri.
+9. [ ] Günlük şantiye logu yayınlama/revizyon zinciri.
+10. [ ] Canlı Proje Haritası.
+11. [ ] Gerçek kullanımın kanıtladığı kişisel yardımcı araçlar.
+12. [ ] Kişisel AI asistanı.
 
-Kesin Saha Takibi kaynağı `docs/field_tracking_v0_1_contract.md`, bağlayıcı Epic ise GitHub #97'dir. Application service, backup compatibility, export isolation ve UI henüz tamamlanmış değildir.
+Bağlayıcı üst yol haritası GitHub Epic #105'tir. Saha Takibi domain/recurrence ve SQLite persistence PR #104 ile tamamlanmıştır; Faz 1 ve sonrası henüz tamamlanmamıştır.
+
+## Faz 4 Minimum Kâğıdı Bırakma Kapsamı
+
+İlk gerçek saha pilotundan önce aynı mobil-first ürün diliminde:
+
+- `+ Yakala` / `+ Unutma`;
+- Bugün / Şimdi ilgilen / Geciken;
+- Dönüş bekliyorum / tekrar kontrol;
+- rutinler;
+- fotoğraf veya dosya ekleme;
+- minimum hızlı hesap şeridi;
+- günlük zaman çizelgesi ve düzenlenebilir taslak;
+- arama;
+- backup durumu/görünürlüğü.
+
+Gelişmiş hesap defteri Faz 8'de, immutable günlük yayınlama/revizyon zinciri Faz 9'da kalır; minimum hesap ve günlük taslağı ise Faz 4'ün parçasıdır.
+
+## Legacy Model Envanteri ve Deprecation Görevi
+
+Ayrı ve production koduna dokunmayan envanter görevi:
+
+- `TrackingRecord` / `TaskCandidateRecord` -> `FollowUpItem`;
+- `AttachmentRecord` / `FileAttachmentRecord` -> kalıcı attachment metadata/store;
+- `DailySiteLog` / `DailyReportRecord` -> gelecekte `DailyLogSnapshot`;
+- `ProjectPartyRecord` / `ContactPersonRecord` / `SupplierRecord` -> tek kişi/kurum referansı;
+- `MeetingActionRecord` / `RFIRecord` / `SubmittalRecord` -> not + takip + beklenen cevap ilişkisi;
+- karmaşık NCR prototip zinciri -> gözlem + aksiyon + kanıt + sonuç;
+- `app/records.py` in-memory repository'leri -> SQLite karşılıkları doğrulandıktan sonra deprecation.
+
+Sınıflandırma: `Aktif çekirdek`, `Dönüştürülecek`, `Legacy/arşivlenecek`, `Silme adayı`.
+
+Bu envanter fiziksel silme, rename, import taşıma veya test kaldırma yetkisi vermez.
 
 ## Güncel Doğrulanmış Güvenli Nokta
 
@@ -734,9 +768,14 @@ Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcas
 
 ## Issue 103 - Kanonik Talimatlar v2 ve Repository Truth
 
-- [x] CSE, local-first Saha Komuta Sistemi ve `Yakala -> İşle -> Takip et -> Doğrula -> Günlüğe al` döngüsüyle tanımlandı.
+- [x] CSE, yalnız şantiye şefinin kullandığı local-first ve mobile-first kişisel saha asistanı olarak tanımlandı.
+- [x] Araç bakımından geniş, kullanıcı modeli bakımından tek sahipli ürün değişmezi Epic #105 ile kanonikleştirildi.
+- [x] Diğer kişi/firmalar kullanıcı değil kayıt referansı; multi-user/role/tenant/SaaS/kurumsal portal hedefleri kalıcı kapsam dışı yapıldı.
+- [x] Single-owner security; uygulama kilidi, güvenilen cihaz, şifreli backup, owner-only sync ve güvenli yerel ağ yönüyle ayrıştırıldı.
 - [x] Kalıcı ürün politikası, operasyon talimatı, aktif Issue kapsamı ve değişken GitHub repository durumu ayrı otorite yüzeylerine ayrıldı.
 - [x] Eski Step 224/225 current-state metinleri tarihsel bağlama çekildi.
 - [x] Local Field MVP kabiliyetleri ve PR #104 sonrası Saha Takibi durumu güncel kanıtla hizalandı.
-- [x] Mühendislik hesap defteri, kontrollü günlük log ve Canlı Proje Haritası gerçek saha pilotundan sonraya yerleştirildi.
+- [x] Mobil runtime/offline/bildirim pilot önüne; minimum hesap şeridi ve günlük zaman çizelgesi Kâğıdı Bırakma Sürümü içine alındı.
+- [x] Gelişmiş hesap defteri, immutable günlük yayın zinciri ve Canlı Proje Haritası pilotlar sonrasındaki ayrı fazlarda tutuldu.
+- [x] Legacy model envanteri/deprecation yönü gerçek sınıf adlarıyla yazıldı; fiziksel silme yetkisi verilmedi.
 - [x] Production Python, schema, migration, repository, UI ve test davranışı değiştirilmedi.

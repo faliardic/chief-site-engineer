@@ -3,7 +3,8 @@
 ## Yetkili kaynaklar
 
 - GitHub Issue: `#103`
-- Bağlı Epic: `#97`
+- Bağlayıcı üst yol haritası: Epic `#105`
+- Saha Takibi alt sözleşmesi: Epic `#97` ve `docs/field_tracking_v0_1_contract.md`
 - Önceki tamamlanan görev: Issue `#102`, squash-merge PR `#104`
 - Resmî yerel repo: `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer`
 - Base branch: `master`
@@ -18,7 +19,7 @@
 
 ## Amaç
 
-CSE'yi local-first bir **Saha Komuta Sistemi** olarak kanonik kaynaklarda tanımlamak; `Yakala -> İşle -> Takip et -> Doğrula -> Günlüğe al` döngüsünü, Saha Takibi v0.1 önceliğini ve ürünün gerçek Local Field MVP kabiliyetlerini README, ROADMAP, proje kararları ve `.cse` state ile aynı doğrulanmış repository gerçeğine bağlamak.
+CSE'yi yalnız şantiye şefinin kullandığı local-first ve mobile-first **kişisel saha asistanı** olarak kanonik kaynaklarda tanımlamak; `Yakala -> İşle -> Takip et -> Doğrula -> Günlüğe al` döngüsünü, Epic #105 fazlarını ve ürünün gerçek Local Field MVP kabiliyetlerini README, ROADMAP, proje kararları ve `.cse` state ile aynı doğrulanmış repository gerçeğine bağlamak.
 
 ## Yetkili dosyalar
 
@@ -43,6 +44,20 @@ CSE'yi local-first bir **Saha Komuta Sistemi** olarak kanonik kaynaklarda tanım
 5. Kayıtlı mühendislik hesap defteri, kontrollü günlük log ve Canlı Proje Haritası sınırlarını doğru sıraya yerleştir.
 6. `.cse/state` içinde son merge edilmiş güvenli noktayı Issue #102 / PR #104 / `9b25152...` olarak kaydet; Issue #103'ü ayrı aktif dokümantasyon işi olarak göster.
 7. Öğrenme notunda gerçek belge/JSON/PowerShell örnekleriyle kararları öğretici biçimde açıkla.
+
+## Nihai düzeltme kapsamı — Epic #105
+
+İlk branch commit’i `2dd38cff15bd428f0075724848d779f0e4970184` tarihsel kanıttır; amend/rebase veya force-push yapılmaz. Aynı branch üzerinde tek normal correction commit hedeflenir.
+
+1. Uygulamanın tek gerçek kullanıcısını şantiye şefi olarak kanonikleştir; diğer kişi/firmaları kayıt referansı yap.
+2. Multi-user, role/tenant, firma portalı, kurumsal workflow, SaaS/billing ve çok taraflı cloud collaboration hedeflerini aktif ve uzun vadeli kapsamdan çıkar.
+3. Role-based hedef yerine uygulama kilidi, güvenilen cihaz, şifreli backup, owner-only sync, güvenli yerel ağ ve açık export/devirden oluşan single-owner security sınırını yaz.
+4. Kişisel/resmî ayrımı erişim rolü değil export/devir kapsamı olarak açıkla; kişisel→resmî dönüşümü açık kullanıcı işlemi olarak koru.
+5. Epic #105’in 0-12 faz sırasını README, ROADMAP, unified source, decisions ve state içinde aynılaştır.
+6. Mobil runtime/veri sahipliği ADR, offline ve bildirimi gerçek saha pilotlarının önüne al; `local-first != Windows-first` kararını yaz.
+7. Minimum hesap şeridi ile günlük zaman çizelgesi/düzenlenebilir taslağı ilk mobil Kâğıdı Bırakma Sürümü’ne dahil et.
+8. Legacy model adaylarını gerçek sınıf adlarıyla envanter/deprecation yönüne bağla; production kodu silme veya değiştirme.
+9. Öğrenme/podcast tarihçesini koru fakat product/current-state otoritesi veya production engeli yapma.
 
 ## Yasak kapsam
 

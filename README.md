@@ -1,6 +1,11 @@
 # CHIEF SITE ENGINEER
 
-CHIEF SITE ENGINEER (CSE), aktif şantiye şefinin kâğıt müsvedde, ajanda, WhatsApp, telefon galerisi, Excel, klasör ve kişisel hafıza arasında dağılan bilgiyi tek güvenilir saha hafızasında yönetmesine yardım eden local-first bir **Saha Komuta Sistemi**dir.
+CHIEF SITE ENGINEER (CSE), yalnız şantiye şefi tarafından kullanılan; not, takip, hatırlatıcı, hesap, fotoğraf, belge, günlük, arama ve proje hafızasını tek güvenilir akışta birleştiren local-first ve mobile-first **kişisel saha asistanı**dır.
+
+```text
+Araç bakımından geniş
+Kullanıcı modeli bakımından tek sahipli
+```
 
 Ana çalışma döngüsü:
 
@@ -8,7 +13,9 @@ Ana çalışma döngüsü:
 Yakala -> İşle -> Takip et -> Doğrula -> Günlüğe al
 ```
 
-CSE büyük inşaat yönetim platformlarının küçültülmüş kopyası değildir. Ürün filtresi şudur:
+CSE büyük inşaat yönetim platformlarının küçültülmüş kopyası veya kurumsal ortak çalışma platformu değildir. Uygulamaya yalnız şantiye şefi girer. Şirket, taşeron, işveren, yapı denetim ve diğer kişiler sistem kullanıcısı değil; kişi, firma, bildirilen taraf, sorumlu taraf veya belge kaynağı gibi kayıt referanslarıdır.
+
+Ürün filtresi şudur:
 
 > Bu özellik şantiye şefinin sahada unutmamasını, kanıtlamasını, takip etmesini, raporlamasını veya daha sonra geri çağırmasını kolaylaştırıyor mu?
 
@@ -87,7 +94,17 @@ Değişmez sınırlar:
 - hard delete yoktur;
 - geçmiş rutin gerçekleşmeleri template değişikliğiyle yeniden yazılmaz.
 
-Auth olmadığı için bugünkü “kişisel” tanımı başka Windows kullanıcılarına karşı cryptographic privacy iddiası değildir. Yalnız resmî proje kayıtları ve resmî exportlardan ayrılmış kullanıcı çalışma verisini ifade eder.
+Bugünkü local MVP'de uygulama kilidi veya şifreli veri katmanı bulunmadığı için “kişisel” tanımı başka cihaz/işletim sistemi kullanıcılarına karşı cryptographic privacy iddiası değildir. Ayrım bir erişim rolü değil, çıktı kapsamıdır:
+
+```text
+Kişisel çalışma verisi
+-> resmî export/devir dışında
+
+Proje/resmî kayıt
+-> açık kullanıcı işlemiyle günlük, rapor veya devir çıktısına alınabilir
+```
+
+Tek kullanıcı kararı güvenliği kaldırmaz. Uzun vadeli güvenlik yönü; uygulama kilidi ve mümkünse cihaz biyometrisi, güvenilen cihazlar, şifreli backup, owner-only telefon-PC senkronizasyonu, güvenli yerel ağ erişimi ve veri sahibinin açık export/devir işlemidir. Public internet, kurumsal identity provider, role-based access veya tenant mimarisi ürün hedefi değildir.
 
 ## Operasyon komutları
 
@@ -127,7 +144,7 @@ python -m pytest -rs
 Issue #103 branch'inde doğrulanan full-suite sonucu:
 
 ```text
-788 passed, 7 skipped in 14.84s
+788 passed, 7 skipped in 16.66s
 ```
 
 Yedi skip, Windows ortamında symlink oluşturma ayrıcalığı bulunmayan mevcut güvenlik testleridir.
@@ -139,26 +156,32 @@ Mevcut uygulama:
 - local ve tek kullanıcı odaklıdır;
 - public internet için uygun değildir;
 - auth, authorization ve TLS içermez;
-- cloud sync, PWA veya offline multi-device sync içermez;
+- mobile runtime, offline çalışma veya owner-only cihaz senkronizasyonu içermez;
 - background notification veya scheduler içermez;
 - Saha Takibi application service ve UI içermez;
 - gerçek saha pilotu ve kabulü tamamlanmadığı için field-ready veya production-ready olarak tanımlanmaz.
 
+`local-first`, `Windows-first` demek değildir. Verinin şantiye şefine ait olduğu ve kendi cihazlarında çalıştığı anlamına gelir. Mobil runtime, offline davranış, notification ve owner-only telefon-PC senkronizasyonu; çok kullanıcılı auth veya cloud collaboration ile aynı uzak hedef değildir.
+
 ## Ürün sırası
 
-Yakın ürün yönü:
+Bağlayıcı üst yol haritası GitHub Epic #105'tir:
 
-1. Local Field MVP omurgasını koru.
-2. Saha Takibi domain ve recurrence — tamamlandı.
-3. Saha Takibi SQLite persistence — PR #104 ile tamamlandı.
-4. Transactional application service ve lazy backfill.
-5. Backup/restore compatibility ve resmî export izolasyonu.
-6. Minimum `+ Unutma` / `Bugün` / `Unutma Kutusu` UI.
-7. Gerçek saha pilotu.
-8. Kayıtlı mühendislik hesap defteri.
-9. Günlük şantiye logu kontrol/yayınlama zinciri.
-10. Canlı Proje Haritası read-model ve navigasyon yüzeyi.
-11. Offline/PWA, auth, multi-user, cloud ve AI — daha sonra.
+0. Tek kullanıcılı kişisel saha asistanı yönünü kanonikleştir — Issue #103.
+1. Saha Takibi transactional application service ve 7 günlük lazy backfill.
+2. Backup/restore compatibility ve resmî export izolasyonu.
+3. Mobil runtime ve veri sahipliği ADR.
+4. Mobil-first Kâğıdı Bırakma Sürümü.
+5. Offline ve bildirim güvenilirliği.
+6. 7 günlük gerçek saha pilotu.
+7. 30 günlük ana uygulama pilotu.
+8. Gelişmiş mühendislik hesap defteri.
+9. Günlük şantiye logu yayınlama/revizyon zinciri.
+10. Canlı Proje Haritası.
+11. Gerçek kullanımın kanıtladığı kişisel yardımcı araçlar.
+12. Kişisel AI asistanı.
+
+Domain/recurrence ve SQLite persistence tamamlanmıştır; Faz 1 ve sonrası tamamlanmamıştır. Kâğıdı Bırakma Sürümü yalnız `+ Unutma` ekranından ibaret değildir: takip görünümleri, rutinler, attachment, arama ve backup görünürlüğünün yanında minimum hızlı hesap şeridi ile günlük zaman çizelgesi/düzenlenebilir taslak da ilk mobil saha pilotundan önce aynı bütünleşik yüzeyde bulunmalıdır.
 
 ## Kaynak otoritesi
 

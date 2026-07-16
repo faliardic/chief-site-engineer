@@ -1,7 +1,7 @@
 # CHIEF SITE ENGINEER exe - Birleştirilmiş Proje Kaynağı
 
 **Belge türü:** Birleştirilmiş ana proje kaynağı
-**Sürüm tarihi:** 2026-07-15
+**Sürüm tarihi:** 2026-07-16
 **Durum:** Tracked kanonik ürün ve kalıcı politika kaynağı
 **Kanonik repo yolu:** `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
 
@@ -40,7 +40,12 @@ Bu kaynak hazırlanırken aşağıdaki proje kaynakları birlikte incelenmiştir
 
 ## 2. Ana Proje Tanımı
 
-CHIEF SITE ENGINEER (CSE), büyük inşaat yönetim platformlarının küçültülmüş kopyası değildir. Aktif şantiye şefinin kâğıt müsvedde, ajanda, WhatsApp, telefon galerisi, Excel, klasör ve kişisel hafıza arasında dağılan bilgiyi tek güvenilir saha hafızasında yönetmesini sağlayan local-first bir **Saha Komuta Sistemi**dir.
+CHIEF SITE ENGINEER (CSE), yalnız şantiye şefi tarafından kullanılan; not, takip, hatırlatıcı, hesap, fotoğraf, belge, günlük, arama ve proje hafızasını tek güvenilir akışta birleştiren local-first ve mobile-first **kişisel saha asistanı**dır.
+
+```text
+Araç bakımından geniş
+Kullanıcı modeli bakımından tek sahipli
+```
 
 Ana çalışma döngüsü:
 
@@ -79,7 +84,7 @@ CSE'nin hedefi not almayı yasaklamak değildir. Hedef, bilgiyi bir kez yakalay�
 
 ### Ana karar cümlesi
 
-> CSE; sahadaki bilgiyi bir kez yakalayan, işleyen, takip eden, doğrulayan ve günlük kayda dönüştüren; resmî kayıt ile kişisel çalışma verisini ayıran local-first Saha Komuta Sistemi'dir.
+> CSE, yalnız şantiye şefi tarafından kullanılan; not, takip, hatırlatıcı, hesap, fotoğraf, belge, günlük, arama ve proje hafızasını tek güvenilir akışta birleştiren local-first ve mobile-first kişisel saha asistanıdır.
 
 ---
 
@@ -129,9 +134,9 @@ CSE’nin farkı çok modüllü olması değil, aşağıdaki işleri sade ve gü
 5. Kanıt niteliği taşıyan işlemler audit izi bırakabilecek şekilde modellenir; gerçek audit davranışı yalnız açık görev kapsamında uygulanır.
 6. Medya dosyaları veritabanına gömülmez; dosya yolu, metadata ve bütünlük kontrolleriyle yönetilir.
 7. Her attachment metadata kaydı fiziksel dosyayla tutarlı olmalıdır.
-8. Özel alan verileri kullanıcıya aittir ve proje devrinde otomatik olarak yeni şantiye şefine aktarılmaz.
-9. Yeni şantiye şefinin özel alanı sıfırdan açılır.
-10. Eski şantiye şefinin özel alanına erişim rol değişikliğiyle devredilmez.
+8. Kişisel çalışma verisi tek sahibine aittir ve resmî export veya devir kapsamına otomatik girmez.
+9. Bir aktif proje ve geçmiş proje arşivi desteklenebilir; kurumsal proje portföyü hedeflenmez.
+10. Şirketler, ekipler ve diğer kişiler sistem kullanıcısı değil; kişi/kurum ve ilgili taraf kayıt referanslarıdır.
 11. Devir için gerekli bilgi özel alanda bırakılmaz; resmî kayda veya açıkça seçilmiş handover package içine dönüştürülür.
 12. `requires_human_review` yalnız insan inceleme sinyalidir.
 13. Sistem kendiliğinden `blocked` üretmez.
@@ -139,6 +144,8 @@ CSE’nin farkı çok modüllü olması değil, aşağıdaki işleri sade ve gü
 15. Hard validation, migration, persistence, audit, backup/restore, API, GUI ve CLI ayrı ve açık görev gerektirir.
 16. Offline, backup, restore, audit ve encryption gibi yüksek riskli alanlar önce belgelenir, sonra kontrollü uygulanır.
 17. Saha için ağır ve kullanılmayan formlar yerine hızlı kayıt, güvenilir arşiv ve kanıt zinciri önceliklidir.
+18. Uygulamaya yalnız şantiye şefi girer; multi-user, role, tenant, firma portalı ve SaaS ürün hedefi değildir.
+19. Tek kullanıcı kararı güvenliği kaldırmaz; güvenlik owner-only cihaz, uygulama kilidi, şifreli backup ve kontrollü senkronizasyon sınırında ele alınır.
 
 ### Tasarım ilkesi ile uygulanmış özellik ayrımı
 
@@ -146,18 +153,15 @@ Bir ilkenin belgede bulunması, o davranışın mevcut kodda tam uygulanmış ol
 
 ---
 
-## 5. Hedef Kullanıcılar
+## 5. Tek Kullanıcı Modeli
 
-İlk hedef kullanıcı grupları:
+Uygulamanın tek gerçek kullanıcısı şantiye şefidir.
 
-- Şantiye şefleri
-- Saha mühendisleri
-- Kontrol mühendisleri
-- Yapı denetim ve saha kontrol ekipleri
-- Küçük ve orta ölçekli müteahhitler
-- Kendi kayıt düzenini kurmak isteyen mühendisler
+- Şirket, taşeron, işveren, yapı denetim, saha mühendisi ve kontrol mühendisi kullanıcı hesabı değildir.
+- Bu taraflar yalnız `Contact`, `CompanyReference`, bildirilen kişi, beklenen taraf, sorumlu taraf, talimat veren veya belge kaynağı olarak kayıtlarda bulunabilir.
+- Çok kullanıcılı ekip üyeliği, firma paneli, rol matrisi veya kurumsal collaboration kapsam dışıdır.
 
-İlk ürün, herkes için değil; aktif sahada çalışan ve kayıt/fotoğraf/takip karmaşası yaşayan mühendis için tasarlanır.
+Bir aktif proje ile geçmiş proje arşivi desteklenebilir; kurumsal portföy yönetimi hedeflenmez.
 
 ---
 
@@ -222,17 +226,20 @@ Merge edilmiş Local Field MVP ilk altı hedefi destekleyen SQLite persistence v
 
 Bu omurganın üzerindeki birinci ürün önceliği Saha Takibi v0.1'dir. Domain/recurrence ve SQLite schema v3 repository/event persistence tamamlanmıştır; transactional application service, lazy backfill, backup uyumluluğu kabulü, resmî export izolasyonu ve minimum UI tamamlanmamıştır.
 
-### İlk MVP’de öncelik verilmeyecekler
+### Kalıcı ürün kapsamı dışında kalanlar
 
-- Karmaşık dashboard
-- Çok kullanıcı ve firma yönetimi
-- Bulut ölçekleme
-- Ağır AI özellikleri
-- Büyük raporlama ekranları
-- Geniş SaaS modülleri
-- Tam otomatik karar mekanizmaları
+- multi-user hesap ve üyelik sistemi
+- rol/yetki matrisi ve tenant mimarisi
+- firma bazlı veri ayrımı ve şirket portföy dashboard'u
+- taşeron, işveren veya yapı denetim portalı
+- takım görevlendirme ve ekip içi mesajlaşma
+- kurumsal onay zinciri ve workflow motoru
+- SaaS hazırlığı, firma lisanslama ve billing
+- çok taraflı cloud collaboration
+- ERP veya genel entegrasyon pazarı olma hedefi
+- tam otomatik resmî karar mekanizmaları
 
-Bu özellikler, çekirdek saha değeri gerçek kullanımda kanıtlandıktan sonra ele alınır.
+Bunlar “daha sonra” backlog'u değildir. CSE araç bakımından geniş, kullanıcı modeli bakımından tek sahipli kalır.
 
 ---
 
@@ -254,9 +261,9 @@ Dünya örnekleri şu ortak omurgayı göstermektedir:
 
 - Önce şantiye şefi çekirdeği kurulmalı.
 - Günlük kayıt, görsel kanıt, görev ve çizim ilişkisi ilk değer eşiğidir.
-- Tek platform hedefi başlangıç değil, uzun vadeli sonuçtur.
+- Tek sahipli kişisel akış, kurumsal tek platform hedefinden daha üst üründür.
 - AI değeri ancak birleşik ve güvenilir veriden doğar.
-- Kurumsal güven; veri sahipliği, yetki, revizyon ve audit disiplininden doğar.
+- Güven; veri sahipliği, owner-only cihaz sınırı, revision, backup ve audit disiplininden doğar.
 
 ### Doğrudan kopyalanmayacak yaklaşım
 
@@ -310,7 +317,9 @@ CSE büyük platformların bütün modüllerini başlangıçta taklit etmeyecekt
 - Hızlı saha cep defteri
 - Kişisel risk/takip panosu
 
-### Katman 5 - Yapı Denetim ve EBİS/YDS
+### Katman 5 - Kişisel yardımcı kayıt bağlamı
+
+Yapı denetim, EBİS/YDS ve diğer taraflar uygulama kullanıcısı değil; şantiye şefinin kişisel saha hafızasındaki kayıt bağlamıdır.
 
 - Yapı denetim kontrol takip defteri
 - Kontrol çağrıları
@@ -322,21 +331,21 @@ CSE büyük platformların bütün modüllerini başlangıçta taklit etmeyecekt
 - Numune sonuç kapanışı
 - Uygunsuzluk ve kanıt ilişkileri
 
-### Katman 6 - Arayüz ve offline
+### Katman 6 - Mobil-first arayüz ve offline
 
 - Responsive web arayüz
 - PWA
 - Offline read cache
 - Kontrollü offline kayıt ve senkronizasyon
 
-### Katman 7 - Organizasyon ve ürünleşme
+### Katman 7 - Tek sahipli güvenlik ve cihaz sürekliliği
 
-- Çoklu proje
-- Kullanıcı ve rol sistemi
-- Firma bazlı veri ayrımı
-- Audit log sertleştirme
-- Kurumsal raporlama
-- SaaS hazırlığı
+- Uygulama kilidi ve mümkünse cihaz biyometrisi
+- Güvenilen cihazlar
+- Şifreli backup
+- Owner-only telefon-PC senkronizasyonu
+- Güvenli yerel ağ erişimi
+- Veri sahibinin açık export/devir işlemi
 
 ### Katman 8 - Arama, analitik ve AI
 
@@ -349,9 +358,17 @@ CSE büyük platformların bütün modüllerini başlangıçta taklit etmeyecekt
 
 ## 10. Şantiye Şefi Özel Alanı
 
-Özel alan, resmî proje kaydı değildir. Kullanıcının kişisel notlarını, tecrübelerini, telefon rehberini, hatırlatıcılarını ve karar derslerini saklar.
+Özel alan, resmî proje kaydı değildir. Tek kullanıcı olan şantiye şefinin kişisel notlarını, tecrübelerini, kişi/kurum referanslarını, hatırlatıcılarını ve karar derslerini saklar.
 
-Mevcut local MVP'de auth bulunmadığı için “kişisel” sözcüğü başka Windows kullanıcılarına karşı cryptographic privacy garantisi vermez. Bugünkü anlamı, resmî proje kayıtları ve resmî exportlardan ayrılmış kullanıcı çalışma verisidir.
+Mevcut local MVP'de uygulama kilidi veya encryption bulunmadığı için “kişisel” sözcüğü cryptographic privacy garantisi vermez. Bugünkü anlamı bir erişim rolü değil, çıktı kapsamıdır:
+
+```text
+Kişisel çalışma verisi
+-> resmî export/devir dışında
+
+Proje/resmî kayıt
+-> açık kullanıcı işlemiyle günlük, rapor veya devir çıktısına alınabilir
+```
 
 ### Kayıt sınıfları
 
@@ -361,11 +378,11 @@ Mevcut local MVP'de auth bulunmadığı için “kişisel” sözcüğü başka 
 
 ### Gizlilik kuralları
 
-- Varsayılan olarak yalnız ilgili kullanıcı görür.
-- Firma yöneticisi otomatik erişemez.
-- Proje devrinde otomatik aktarılmaz.
-- Resmî devir için gereken bilgi kullanıcı tarafından açıkça resmî kayda dönüştürülür.
-- Özel alan ile resmî kayıt arasında otomatik ve görünmez aktarım yapılmaz.
+- Kişisel çalışma verisi varsayılan olarak resmî export ve devir dışında kalır.
+- Firma veya başka bir taraf sistem hesabıyla erişemez; böyle hesaplar ürün modelinde yoktur.
+- Projeye bağlanmak kaydı otomatik resmî yapmaz.
+- Resmî devir için gereken bilgi şantiye şefi tarafından açıkça resmî kayda dönüştürülür.
+- Kişisel alan ile resmî kayıt arasında otomatik veya görünmez aktarım yapılmaz.
 
 ### V1 işlevleri
 
@@ -411,29 +428,47 @@ Dönüşüm açık kullanıcı işlemi olmalıdır.
 
 ## 11. Modül Yol Haritasının Güncel Yorumu
 
-Eski yol haritalarındaki 001-034 modül listesi uzun vadeli backlog olarak korunur; ancak bu sıra artık bağlayıcı uygulama sırası değildir.
+Eski yol haritalarındaki 001-034 modül listesi tarihsel referanstır. Yalnız gerçek kullanımın kanıtladığı kişisel yardımcı araç adayları Epic #105 Faz 11'de yeniden değerlendirilir; kurumsal ürün hedefleri geri dönmez.
 
 ### Güncel öncelik sırası
 
 ```text
-1. Local Field MVP omurgasını koru
-2. Saha Takibi domain ve recurrence — tamamlandı
-3. Saha Takibi SQLite persistence — PR #104 ile tamamlandı
-4. Transactional application service ve lazy backfill
-5. Backup/restore compatibility ve resmî export izolasyonu
-6. Minimum + Unutma / Bugün / Unutma Kutusu UI
-7. Gerçek saha pilotu
-8. Kayıtlı mühendislik hesap defteri
-9. Günlük şantiye logu kontrol/yayınlama zinciri
-10. Canlı Proje Haritası read-model ve navigasyon yüzeyi
-11. Offline/PWA, auth, multi-user, cloud ve AI — daha sonra
+0. Tek kullanıcılı kişisel saha asistanı yönünü kanonikleştir — Issue #103
+1. Saha Takibi transactional application service ve 7 günlük lazy backfill
+2. Backup/restore compatibility ve resmî export izolasyonu
+3. Mobil runtime ve veri sahipliği ADR
+4. Mobil-first Kâğıdı Bırakma Sürümü
+5. Offline ve bildirim güvenilirliği
+6. 7 günlük gerçek saha pilotu
+7. 30 günlük ana uygulama pilotu
+8. Gelişmiş mühendislik hesap defteri
+9. Günlük şantiye logu yayınlama/revizyon zinciri
+10. Canlı Proje Haritası
+11. Gerçek kullanımın kanıtladığı kişisel yardımcı araçlar
+12. Kişisel AI asistanı
 ```
 
 Henüz yapılmayan application service, backup compatibility, export isolation ve UI tamamlanmış gösterilemez.
 
+### Mobil-first Kâğıdı Bırakma Sürümü
+
+İlk gerçek saha pilotundan önce aşağıdaki minimum bütünleşik yüzey aynı ürün diliminde bulunmalıdır:
+
+- `+ Yakala` / `+ Unutma`;
+- Bugün / Şimdi ilgilen / Geciken;
+- Dönüş bekliyorum / tekrar kontrol;
+- rutinler;
+- fotoğraf veya dosya ekleme;
+- minimum hızlı hesap şeridi;
+- günlük zaman çizelgesi ve düzenlenebilir taslak;
+- arama;
+- backup durumu/görünürlüğü.
+
+Minimum hesap şeridi ile günlük zaman çizelgesi pilot öncesidir; gelişmiş hesap araçları ve yayımlanmış immutable günlük zinciri sonraki fazlarda kalır.
+
 ### Kayıtlı mühendislik hesap defteri
 
-Bu özellik minimum Saha Takibi UI ve gerçek saha pilotundan sonra gelir. Hesap kaydı yalnız sonucu değil şunları korur:
+İlk Kâğıdı Bırakma Sürümü minimum hızlı hesap şeridi taşır. Bu bölümdeki gelişmiş ve kaydedilebilir mühendislik hesap defteri 30 günlük ana uygulama pilotundan sonra gelir ve yalnız sonucu değil şunları korur:
 
 - girdiler;
 - birimler;
@@ -449,7 +484,9 @@ Kişisel hesap otomatik resmî metraj değildir. Resmî aktarma açık kullanıc
 
 ### Günlük şantiye logu
 
-Günlük, müsveddelerin tekrar yazıldığı ikinci defter değildir. Gün içinde kaynak kayıtlardan oluşan taslak akşam kontrol edilip yayımlanan bir snapshot olur. Yayımlanmış günlük sessizce değişmez; düzeltme yeni revizyon veya ek ile yapılır.
+İlk Kâğıdı Bırakma Sürümü gün içindeki kayıtları gösteren zaman çizelgesi ve düzenlenebilir günlük taslağı taşır.
+
+Gelişmiş günlük zincirinde taslak akşam kontrol edilip yayımlanan bir snapshot olur. Yayımlanmış günlük sessizce değişmez; düzeltme yeni revizyon veya ek ile yapılır.
 
 ### Canlı Proje Haritası
 
@@ -463,7 +500,7 @@ Taşıyıcı baloncuğa dokun
 -> baloncuk büyüyerek yeni odak olur
 
 Yaprak baloncuğa dokun
--> ayrıntılı ve yetkiye göre düzenlenebilir kayıt çalışma ekranı
+-> ayrıntılı ve düzenlenebilir kaynak kayıt çalışma ekranı
 ```
 
 Haritada mouse wheel zoom, pinch zoom, trackpad zoom, pan/sürükleme, serbest zoom veya `+/-` zoom kontrolü bulunmaz. Tam uzak görünümde yalnız proje adını taşıyan en büyük daire görünür. `88/140`, `231 m³` veya `4 açık takip` gibi hesaplanmış balonlar doğrudan düzenlenmez; kaynak kayıt düzenlenir ve özet yeniden hesaplanır.
@@ -481,7 +518,23 @@ Harita minimum Saha Takibi UI ve gerçek saha kabulünden önce production önce
 
 ### Eski modül numaraları
 
-Eski modül numaraları arşiv referansı olarak kullanılabilir; yeni teknik adımların numarasıyla karıştırılmamalıdır. Teknik Step numaraları Git/GitHub geliştirme geçmişini, modül numaraları ise ürün backlog’unu temsil eder.
+Eski modül numaraları arşiv referansı olarak kullanılabilir; yeni teknik adımların numarasıyla karıştırılmamalıdır. Teknik Step numaraları Git/GitHub geliştirme geçmişini, modül numaraları ise tarihsel ürün backlog’unu temsil eder.
+
+### Legacy model envanteri ve deprecation yönü
+
+Fiziksel silme öncesinde ayrı bir envanter görevi şu adayları sınıflandırır:
+
+- `TrackingRecord` / `TaskCandidateRecord` -> `FollowUpItem` yönü;
+- `AttachmentRecord` / `FileAttachmentRecord` -> kalıcı attachment metadata/store yönü;
+- `DailySiteLog` / `DailyReportRecord` -> gelecekte `DailyLogSnapshot` yönü;
+- `ProjectPartyRecord` / `ContactPersonRecord` / `SupplierRecord` -> tek kişi/kurum referans yönü;
+- `MeetingActionRecord` / `RFIRecord` / `SubmittalRecord` -> not + takip + beklenen cevap ilişkisi;
+- karmaşık NCR prototip zinciri -> gözlem + aksiyon + kanıt + sonuç temelinde yeniden değerlendirme;
+- `app/records.py` in-memory repository'leri -> SQLite karşılıkları doğrulandıktan sonra deprecation.
+
+Sınıflandırma sözlüğü `Aktif çekirdek`, `Dönüştürülecek`, `Legacy/arşivlenecek` ve `Silme adayı`dır.
+
+Bu yön fiziksel silme, rename, import taşıma veya test kaldırma yetkisi vermez.
 
 ---
 
@@ -496,7 +549,7 @@ Uzun vadeli mimari katmanlı olmalıdır:
 - Export/report katmanı
 - API
 - Web/PWA arayüzü
-- Auth/role/tenant katmanı
+- Single-owner security ve owner-only cihaz senkronizasyonu
 - Audit ve backup/restore
 - Search/AI katmanı
 
@@ -520,7 +573,7 @@ Mevcut sınırlar:
 - local ve tek kullanıcı odaklıdır;
 - public internet için uygun değildir;
 - auth, authorization ve TLS yoktur;
-- cloud sync, PWA ve offline multi-device sync yoktur;
+- mobile runtime, offline kayıt ve owner-only cihaz senkronizasyonu yoktur;
 - background notification ve scheduler yoktur;
 - Saha Takibi application service ve UI henüz yoktur.
 
@@ -530,7 +583,7 @@ Bu nedenle “field-ready” veya “production-ready” iddiası yapılmaz.
 
 ## 13. Öğrenme Sistemi
 
-CSE yalnız ürün değil, aynı zamanda uygulamalı öğrenme sistemidir.
+CSE, ürün geliştirmeyi uygulamalı öğrenmeyle açıklar; ancak öğrenme çıktısı gerçek saha değeri üreten production zincirinin önüne geçmez.
 
 Öğrenme eksenleri:
 
@@ -542,6 +595,7 @@ CSE yalnız ürün değil, aynı zamanda uygulamalı öğrenme sistemidir.
 ### Öğrenme dosyası ilkesi
 
 Her teknik adımda her kategori için zorunlu dosya üretilmez. İlgili olduğunda uygun öğrenme dosyası oluşturulur.
+Podcast ve tarihsel öğrenme belgeleri korunur; current-state veya ürün otoritesi sayılmaz ve production işini bloke etmez.
 
 Önerilen öğrenme notu yapısı:
 
@@ -980,13 +1034,12 @@ CSE yayınlanmak için acele etmez.
 
 Önerilen sıra:
 
-1. Kişisel saha kullanımı
-2. Gerçek şantiye verisiyle test
-3. Çekirdek özellikleri sadeleştirme
-4. Kullanım sürtünmelerini azaltma
-5. Kapalı kullanıcı testi
-6. Küçük ekip kullanımı
-7. Ürünleşme/yayın değerlendirmesi
+1. Mobil-first Kâğıdı Bırakma Sürümü'nü şantiye şefinin ana uygulaması yapma
+2. 7 günlük gerçek saha pilotu
+3. 30 günlük ana uygulama pilotu
+4. Backup/restore tatbikatı ve veri kaybı kontrolü
+5. Kullanım sürtünmelerini ve kâğıda dönüş nedenlerini azaltma
+6. Gerçek kullanımın kanıtladığı kişisel yardımcı araçları değerlendirme
 
 ### Saha geri besleme döngüsü
 
@@ -1023,7 +1076,7 @@ Bu bölüm kalıcı ürün politikasından ayrı bir factual snapshot'tır. Gün
 
 ### Aktif dokümantasyon işi
 
-Issue #103, `codex/issue-103-canonical-instructions-v2` branch'inde kanonik kaynak ve repository truth hizalamasıdır. Production davranışını değiştirmez ve merge edilene kadar `current_safe_point` sayılmaz.
+Issue #103, `codex/issue-103-canonical-instructions-v2` branch'inde Epic #105'e bağlı tek kullanıcılı kişisel saha asistanı yönü ve repository truth hizalamasıdır. Production davranışını değiştirmez ve merge edilene kadar `current_safe_point` sayılmaz.
 
 ### Current-state doğrulama sırası
 
@@ -1074,7 +1127,7 @@ Step 203-225 aralığını aktif iş veya son güvenli nokta olarak gösteren me
 
 ### 29.8 Eski modül sırasının bağlayıcı olması
 
-001-034 modül listesi uzun vadeli backlog referansıdır. İlk saha MVP yönü daha yüksek önceliklidir.
+001-034 modül listesi tarihsel backlog referansıdır. Yalnız gerçek kullanımın kanıtladığı kişisel yardımcı araçlar Epic #105 Faz 11'de yeniden değerlendirilir; kurumsal/multi-user hedefler geri alınmaz.
 
 ### 29.9 Her iteration için üç ayrı learning dosyası
 
@@ -1124,7 +1177,7 @@ Dünya örnekleri raporunda önerilen otomatik CI ve branch protection uzun vade
 
 ## 31. Bir Sonraki Ürün Yönü
 
-Issue #102 / PR #104 sonrasında sıradaki dar production yönü, Saha Takibi transactional application service ve yedi günlük idempotent lazy backfill orchestration'dır. Sonraki aşamalar backup/restore compatibility, resmî export izolasyonu, minimum UI ve gerçek saha pilotudur.
+Epic #105'e göre sıradaki dar production yönü, Saha Takibi transactional application service ve yedi günlük idempotent lazy backfill orchestration'dır. Ardından backup/restore compatibility ve resmî export izolasyonu; mobil runtime/veri sahipliği ADR; mobil-first Kâğıdı Bırakma Sürümü; offline/bildirim güvenilirliği ve saha pilotları gelir.
 
 Her aşama ayrı ve açık GitHub Issue ile sınırlandırılır. Henüz uygulanmayan aşama tamamlanmış gösterilmez.
 
@@ -1132,7 +1185,7 @@ Her aşama ayrı ve açık GitHub Issue ile sınırlandırılır. Henüz uygulan
 
 ## 32. Son Karar
 
-CHIEF SITE ENGINEER exe projesi bundan sonra şu ana düzende ilerlemelidir:
+CSE yalnız şantiye şefinin kullandığı, araç bakımından geniş ve kullanıcı modeli bakımından tek sahipli kişisel saha asistanıdır; şu ana döngüde ilerler:
 
 ```text
 Yakala
@@ -1180,7 +1233,7 @@ docs/protocols/CSE_PROJECT_INSTRUCTIONS.md
 
 ## 33. Güncel Birinci Ürün Önceliği: Saha Takibi v0.1
 
-Issue #98 ile ürün yönü, mevcut gözlem/attachment/SQLite/backup/export omurgasının üzerine Saha Takibi v0.1 eklemek olarak kesinleştirilmiştir. Epic #97 bağlayıcı ürün kapsamıdır.
+Issue #98 ve Epic #97 Saha Takibi domain sözleşmesini belirler. Üst ürün yönü ve faz sırası için bağlayıcı kaynak Epic #105'tir.
 
 İlk kapsam üç ayrı domain kaydıdır:
 
@@ -1230,8 +1283,9 @@ Implementation durumu ve sırası:
 1. Domain/recurrence — tamamlandı.
 2. Schema v3/repository/event persistence — PR #104 ile tamamlandı.
 3. Transactional service/backfill — bekliyor.
-4. Backup compatibility — bekliyor.
-5. Resmî export exclusion kabulü — bekliyor.
-6. Minimum UI — önceki aşamalar doğrulandıktan sonra.
+4. Backup compatibility ve resmî export exclusion kabulü — bekliyor.
+5. Mobil runtime ve veri sahipliği ADR — bekliyor.
+6. Mobil-first Kâğıdı Bırakma Sürümü — bekliyor.
+7. Offline ve bildirim güvenilirliği — bekliyor.
 
-Notification, background scheduler, PWA/mobil ve AI bu çekirdek doğrulanmadan önce başlatılmaz.
+Mobil runtime, offline ve notification; auth/multi-user/cloud ile aynı uzak hedef değildir ve gerçek saha pilotlarından önce gelir. Kişisel AI, temiz veri omurgası ve saha pilotlarından sonra gelir.
