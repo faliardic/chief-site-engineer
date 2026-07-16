@@ -17,19 +17,35 @@ from .field_tracking import (
     ScheduleFollowUp,
     UpdateFollowUp,
 )
+from .routines import (
+    CloseRoutineOccurrence,
+    CreateRoutineTemplate,
+    RoutineApplicationService,
+    RoutineOccurrenceQuery,
+    RoutineOccurrenceView,
+    RoutineTemplateQuery,
+    UpdateRoutineTemplate,
+)
 
 __all__ = [
     "ApplicationServiceError",
     "AttachmentDetail",
+    "CloseRoutineOccurrence",
     "CompleteFollowUp",
     "CreateFollowUp",
+    "CreateRoutineTemplate",
     "FollowUpApplicationService",
     "FollowUpQuery",
     "FollowUpView",
     "MarkWaiting",
     "ObservationApplicationService",
     "ObservationDetail",
+    "RoutineApplicationService",
+    "RoutineOccurrenceQuery",
+    "RoutineOccurrenceView",
+    "RoutineTemplateQuery",
     "ScheduleFollowUp",
     "UpdateFollowUp",
+    "UpdateRoutineTemplate",
     "UploadStream",
 ]

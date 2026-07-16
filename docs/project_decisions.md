@@ -2514,3 +2514,17 @@
 - Mevcut `BackupService` yedegi olusturup dogrulayacak; download route artifact'i tekrar dogrulamadan dosyayi sunmayacak.
 - Managed `backups/` klasoru backup girdisi olmayacak; mevcut motor yalniz SQLite snapshot ve veritabaninda kayitli attachment dosyalarini arşivleyecek.
 - Basarisiz backup teknik ayrinti veya path gostermeden guvenli Turkce mesajla fail-closed olacak; restore UI, retention ve otomatik silme eklenmeyecek.
+
+## Issue 115 - RoutineApplicationService ve Yedi Gunluk Lazy Backfill
+
+- Routine orchestration ayri `app/application/routines.py` modulunde tutulacak; mevcut follow-up service gereksiz buyutulmeyecek.
+- Command/query degerleri frozen application value object olacak; transport veya UI modeli olmayacak.
+- Template title whitespace'i kararlilastirilacak, optional text trim edilip bos sonuc `None` olacak; timezone kullanici girdisi olmayacak ve `Europe/Istanbul` kalacak.
+- Template update yalniz command allowlist'ini degistirecek; no-op clock/UUID/event tuketmeyecek ve gercek update event'i alfabetik exact `changed_fields` tasiyacak.
+- `ensure_occurrences`, canonical `as_of_utc` anindan bugun dahil son yedi Istanbul yerel gununu uretecek; future veya daha eski eksik gun icat etmeyecek.
+- Gecmis eksik occurrence once open revision 1 ve created event olarak, sonra ayni transaction'da closed/missed revision 2 ve missed event olarak yazilacak.
+- Existing natural-key occurrence tamamen idempotent olacak; application pre-check ile repository `add_if_absent`/SQLite unique constraint birlikte savunma saglayacak.
+- List/view sorgulari salt-okunur kalacak ve otomatik ensure/backfill calistirmayacak.
+- Snooze, close ve reopen schedule snapshot alanlarini degistirmeyecek; kullanici `missed` sonucu veremeyecek.
+- Schema/migration/mapping/repository/UoW portlari genisletilmeyecek; mevcut `BEGIN IMMEDIATE` transaction ve append-only event repository'leri kullanilacak.
+- Web/UI, scheduler/notification, backup/export, mobile/offline/sync ve gercek kullanici data root'u ayri gorevlere birakilacak.

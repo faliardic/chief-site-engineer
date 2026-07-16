@@ -4,7 +4,7 @@
 
 Bu belge, GitHub Issue #98 kapsamında Saha Takibi v0.1 için uygulanacak domain ve veri sınırını kesinleştirir. Bu aşama production kodu, migration, UI veya scheduler eklemez. Sonraki implementation görevleri bu sözleşmeyi doğrudan testlere ve koda çevirecektir.
 
-Issue #107 güncellemesi, `update_details`, `move_to_inbox` ve `set_project` mutation'ları için eksik event adlarını ve payload sözleşmesini eklemiştir. Issue #109 `FollowUpApplicationService` çekirdeğini, Issue #111 bekleme/terminal yaşam döngüsünü, Issue #112 observation link ve açık resmî dönüşüm sınırını uygular. Routine service/backfill ve web route henüz uygulanmış değildir.
+Issue #107 güncellemesi, `update_details`, `move_to_inbox` ve `set_project` mutation'ları için eksik event adlarını ve payload sözleşmesini eklemiştir. Issue #109 `FollowUpApplicationService` çekirdeğini, Issue #111 bekleme/terminal yaşam döngüsünü, Issue #112 observation link ve açık resmî dönüşüm sınırını, Issue #115 ise `RoutineApplicationService` ile yedi günlük lazy backfill'i uygular. Web route/UI, scheduler, backup compatibility ve export izolasyonu henüz uygulanmış değildir.
 
 Sözleşme üç ana kaydı kapsar:
 
@@ -240,7 +240,7 @@ Bir `weekly` template için en az bir satır bulunması, template ve weekday sat
 
 ### 7.1 Seçilen pencere
 
-Uygulama açıldığında veya rutin görünümü istendiğinde `ensure_occurrences(today_local)` çalışır.
+Application boundary, explicit canonical UTC `as_of_utc` ile `ensure_occurrences(as_of_utc)` çalıştırır; service bu anı `Europe/Istanbul` yerel gününe çevirir. Salt-okunur list/view sorguları kendiliğinden backfill başlatmaz.
 
 - Otomatik pencere, bugün dahil son **7 Europe/Istanbul yerel takvim günüdür**: `today - 6 gün` ile `today` arası.
 - Pencere template `start_date` ve varsa `end_date` ile daraltılır.
@@ -450,9 +450,9 @@ RoutineApplicationService
 
 `FollowUpApplicationService` oluşturma, okuma/sorgulama, ayrıntı/proje/planlama değişiklikleri, beklemeye alma, tamamlama, iptal, yeniden açma, mevcut observation'a bağlama ve açık kullanıcı onaylı resmî gözleme dönüşüm use-case’lerini koordine eder.
 
-`RoutineApplicationService` template oluşturma/güncelleme/pasifleştirme, occurrence ensure/backfill, erteleme, sonuçlandırma ve yeniden açma use-case’lerini koordine eder.
+`RoutineApplicationService` template oluşturma/güncelleme/pasifleştirme, occurrence ensure/backfill, erteleme, sonuçlandırma ve yeniden açma use-case’lerini koordine eder. Issue #115 implementation'ı mevcut repository portlarını genişletmeden bu orchestration'ı `app/application/routines.py` içinde uygular.
 
-`FollowUpApplicationService` yüzeyinin çekirdeği Issue #109, bekleme/terminal yaşam döngüsü Issue #111 ve observation link/conversion sınırı Issue #112 ile uygulanmıştır. `RoutineApplicationService` bağlayıcı gelecek API sözleşmesi olarak kalır.
+`FollowUpApplicationService` yüzeyinin çekirdeği Issue #109, bekleme/terminal yaşam döngüsü Issue #111 ve observation link/conversion sınırı Issue #112 ile uygulanmıştır. `RoutineApplicationService` template/occurrence lifecycle ve sınırlı backfill yüzeyi Issue #115 ile uygulanmıştır.
 
 Service API yüzeyi aşağıdaki isim ve sorumluluklarla sınırlıdır:
 
@@ -529,7 +529,7 @@ class RoutineApplicationService:
         self, routine_occurrence_id: str, expected_revision: int, next_attention_at: str
     ) -> RoutineOccurrence: ...
     def close_occurrence(
-        self, routine_occurrence_id: str, expected_revision: int, command: CloseOccurrence
+        self, routine_occurrence_id: str, expected_revision: int, command: CloseRoutineOccurrence
     ) -> RoutineOccurrence: ...
     def reopen_occurrence(
         self, routine_occurrence_id: str, expected_revision: int, next_attention_at: str
@@ -542,7 +542,7 @@ class RoutineApplicationService:
     ) -> tuple[RoutineOccurrenceEvent, ...]: ...
 ```
 
-Buradaki command/query sınıfları transport veya UI modeli değildir; use-case girdilerini isimlendiren immutable application değerleridir. `CreateFollowUp` yalnız normalize edilecek `capture_text` alanını zorunlu taşır; başlık, status, tür, proje, zaman ve önem create input’u değildir. `UpdateFollowUp` sonradan title/açıklama/tür/konum/kişi/önem/koşul düzenlemesini taşır fakat `capture_text` ilk yakalama metnini değiştirmez. `move_to_inbox` planı kaldırırken status ve zamanı birlikte değiştirir. `set_project`, observation bağlıyken null veya farklı proje kabul etmez. `FollowUpQuery` Unutma Kutusu ile planlı görünüm sorgularını birbirinden ayırır. `RoutineTemplateQuery`, `project_id = None` ile kişisel template’leri açıkça sorgulayabilir. `convert_to_observation` var olan ve ayrıca oluşturulmuş bir observation kimliğini bağlar; bu sözleşme otomatik observation üretmez.
+Buradaki command/query sınıfları transport veya UI modeli değildir; use-case girdilerini isimlendiren immutable application değerleridir. `CreateFollowUp` yalnız normalize edilecek `capture_text` alanını zorunlu taşır; başlık, status, tür, proje, zaman ve önem create input’u değildir. `UpdateFollowUp` sonradan title/açıklama/tür/konum/kişi/önem/koşul düzenlemesini taşır fakat `capture_text` ilk yakalama metnini değiştirmez. `move_to_inbox` planı kaldırırken status ve zamanı birlikte değiştirir. `set_project`, observation bağlıyken null veya farklı proje kabul etmez. `FollowUpQuery` Unutma Kutusu ile planlı görünüm sorgularını birbirinden ayırır. `RoutineTemplateQuery.personal_only=True`, nullable proje bağlantısına sahip kişisel template'leri açıkça seçer; `project_id` ile birlikte kullanılamaz. `RoutineOccurrenceQuery` template/status/view filtrelerini birleştirir ve view sorgularında canonical `as_of_utc` ister. `CloseRoutineOccurrence`, kullanıcıya yalnız `completed`, `no_work` ve `not_required` sonuçlarını açar; `missed` yalnız geçmiş lazy backfill sonucudur. `convert_to_observation` var olan ve ayrıca oluşturulmuş bir observation kimliğini bağlar; bu sözleşme otomatik observation üretmez.
 
 Issue #109 application boundary normalization kararı: update title baş/son ve ardışık whitespace'i tek boşlukla kararlılaştırır; optional açıklama/konum/kişi/koşul metinlerini trim eder ve boş sonucu `None` yapar. Enum, bool ve canonical UTC deadline command oluşturulurken doğrulanır. No-op kararı bu normalize edilmiş sonuçla güncel aggregate karşılaştırılarak verilir; böylece yalnız biçimsel boşluk farkı revision veya event üretmez.
 
@@ -699,7 +699,7 @@ Bu sözleşmeden sonra işler küçük ve test edilebilir görevler olarak ayrı
 
 1. Domain record/validation sabitleri ve saf recurrence hesaplayıcısı.
 2. SQLite schema v3 migration ve repository/event port/adaptörleri; schema v4 follow-up mutation-event vocabulary preflight'ı.
-3. Transactional application service: Issue #109 ile follow-up çekirdek, Issue #111 ile bekleme/terminal yaşam döngüsü, Issue #112 ile observation link/conversion tamamlandı; routine sınırlı idempotent occurrence üretimi ayrı görevde bekliyor.
+3. Transactional application service: Issue #109 ile follow-up çekirdek, Issue #111 ile bekleme/terminal yaşam döngüsü, Issue #112 ile observation link/conversion ve Issue #115 ile routine lifecycle/sınırlı idempotent occurrence üretimi tamamlandı.
 4. Backup schema 2 backward restore ve schema 3 round-trip testleri.
 5. Resmî daily export exclusion regression testi.
 6. Bunlar doğrulandıktan sonra minimum Saha Takibi UI’si.
