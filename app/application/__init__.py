@@ -8,10 +8,12 @@ from .observations import (
     UploadStream,
 )
 from .field_tracking import (
+    CompleteFollowUp,
     CreateFollowUp,
     FollowUpApplicationService,
     FollowUpQuery,
     FollowUpView,
+    MarkWaiting,
     ScheduleFollowUp,
     UpdateFollowUp,
 )
@@ -19,10 +21,12 @@ from .field_tracking import (
 __all__ = [
     "ApplicationServiceError",
     "AttachmentDetail",
+    "CompleteFollowUp",
     "CreateFollowUp",
     "FollowUpApplicationService",
     "FollowUpQuery",
     "FollowUpView",
+    "MarkWaiting",
     "ObservationApplicationService",
     "ObservationDetail",
     "ScheduleFollowUp",

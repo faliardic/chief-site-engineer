@@ -16,6 +16,7 @@ from app.field_tracking import (
     FollowUpEventType,
     FollowUpItem,
     FollowUpItemType,
+    FollowUpOutcome,
     FollowUpStatus,
     FollowUpViewGroup,
     classify_follow_up,
@@ -43,6 +44,11 @@ DETAIL_FIELDS = (
     "title",
 )
 PLANNED_STATUSES = (FollowUpStatus.ACTIVE, FollowUpStatus.WAITING)
+OPEN_STATUSES = (
+    FollowUpStatus.INBOX,
+    FollowUpStatus.ACTIVE,
+    FollowUpStatus.WAITING,
+)
 TERMINAL_STATUSES = (FollowUpStatus.COMPLETED, FollowUpStatus.CANCELLED)
 
 
@@ -115,6 +121,46 @@ class ScheduleFollowUp:
             allowed = tuple(status.value for status in PLANNED_STATUSES)
             raise ValueError(f"target_status must be one of {allowed}")
         object.__setattr__(self, "target_status", target_status)
+
+
+@dataclass(frozen=True, slots=True)
+class MarkWaiting:
+    next_attention_at: str
+    related_person: str | None = None
+    condition_text: str | None = None
+
+    def __post_init__(self) -> None:
+        validate_utc_timestamp(self.next_attention_at)
+        for field_name in ("related_person", "condition_text"):
+            object.__setattr__(
+                self,
+                field_name,
+                _normalize_optional_text(getattr(self, field_name), field_name),
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class CompleteFollowUp:
+    outcome_type: FollowUpOutcome
+    outcome_note: str | None = None
+
+    def __post_init__(self) -> None:
+        outcome_type = _coerce_enum(
+            self.outcome_type, FollowUpOutcome, "outcome_type"
+        )
+        allowed_outcomes = (
+            FollowUpOutcome.COMPLETED,
+            FollowUpOutcome.NOT_REQUIRED,
+        )
+        if outcome_type not in allowed_outcomes:
+            allowed = tuple(outcome.value for outcome in allowed_outcomes)
+            raise ValueError(f"outcome_type must be one of {allowed}")
+        object.__setattr__(self, "outcome_type", outcome_type)
+        object.__setattr__(
+            self,
+            "outcome_note",
+            _normalize_optional_text(self.outcome_note, "outcome_note"),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -454,6 +500,224 @@ class FollowUpApplicationService:
             unit_of_work.commit()
             return stored
 
+    def mark_waiting(
+        self,
+        follow_up_id: str,
+        expected_revision: int,
+        command: MarkWaiting,
+    ) -> FollowUpItem:
+        validate_record_id(follow_up_id)
+        _validate_expected_revision(expected_revision)
+        _require_instance(command, MarkWaiting, "command")
+        with self._uow_factory() as unit_of_work:
+            current = unit_of_work.follow_ups.get(follow_up_id)
+            self._require_current_revision(current, expected_revision)
+            if current.status == FollowUpStatus.WAITING:
+                if (
+                    current.next_attention_at == command.next_attention_at
+                    and current.related_person == command.related_person
+                    and current.condition_text == command.condition_text
+                ):
+                    return current
+                raise InvalidRecordError(
+                    "waiting follow-up cannot start waiting again with "
+                    "different values"
+                )
+            if current.status not in (
+                FollowUpStatus.INBOX,
+                FollowUpStatus.ACTIVE,
+            ):
+                raise InvalidRecordError(
+                    "only inbox or active follow-up can start waiting"
+                )
+
+            occurred_at = self._now()
+            updated = replace(
+                current,
+                status=FollowUpStatus.WAITING,
+                next_attention_at=command.next_attention_at,
+                related_person=command.related_person,
+                condition_text=command.condition_text,
+                revision=current.revision + 1,
+                updated_at=occurred_at,
+            )
+            stored = unit_of_work.follow_ups.update(
+                updated, expected_revision=expected_revision
+            )
+            unit_of_work.follow_up_events.add(
+                self._event(
+                    stored,
+                    sequence=self._next_sequence(unit_of_work, follow_up_id),
+                    event_type=FollowUpEventType.WAITING_STARTED,
+                    occurred_at=occurred_at,
+                    payload={
+                        "condition_text": stored.condition_text,
+                        "from_status": current.status.value,
+                        "next_attention_at": stored.next_attention_at,
+                        "previous_next_attention_at": current.next_attention_at,
+                        "related_person": stored.related_person,
+                        "revision": stored.revision,
+                    },
+                )
+            )
+            unit_of_work.commit()
+            return stored
+
+    def complete(
+        self,
+        follow_up_id: str,
+        expected_revision: int,
+        command: CompleteFollowUp,
+    ) -> FollowUpItem:
+        validate_record_id(follow_up_id)
+        _validate_expected_revision(expected_revision)
+        _require_instance(command, CompleteFollowUp, "command")
+        with self._uow_factory() as unit_of_work:
+            current = unit_of_work.follow_ups.get(follow_up_id)
+            self._require_current_revision(current, expected_revision)
+            if current.status not in OPEN_STATUSES:
+                raise InvalidRecordError(
+                    "only open follow-up can be completed"
+                )
+
+            occurred_at = self._now()
+            updated = replace(
+                current,
+                status=FollowUpStatus.COMPLETED,
+                outcome_type=command.outcome_type,
+                outcome_note=command.outcome_note,
+                completed_at=occurred_at,
+                cancelled_at=None,
+                next_attention_at=None,
+                revision=current.revision + 1,
+                updated_at=occurred_at,
+            )
+            stored = unit_of_work.follow_ups.update(
+                updated, expected_revision=expected_revision
+            )
+            unit_of_work.follow_up_events.add(
+                self._event(
+                    stored,
+                    sequence=self._next_sequence(unit_of_work, follow_up_id),
+                    event_type=FollowUpEventType.COMPLETED,
+                    occurred_at=occurred_at,
+                    payload={
+                        "from_status": current.status.value,
+                        "outcome_note": stored.outcome_note,
+                        "outcome_type": stored.outcome_type.value,
+                        "previous_next_attention_at": current.next_attention_at,
+                        "revision": stored.revision,
+                    },
+                )
+            )
+            unit_of_work.commit()
+            return stored
+
+    def cancel(
+        self,
+        follow_up_id: str,
+        expected_revision: int,
+        outcome_note: str | None,
+    ) -> FollowUpItem:
+        validate_record_id(follow_up_id)
+        _validate_expected_revision(expected_revision)
+        normalized_note = _normalize_optional_text(outcome_note, "outcome_note")
+        with self._uow_factory() as unit_of_work:
+            current = unit_of_work.follow_ups.get(follow_up_id)
+            self._require_current_revision(current, expected_revision)
+            if current.status not in OPEN_STATUSES:
+                raise InvalidRecordError("only open follow-up can be cancelled")
+
+            occurred_at = self._now()
+            updated = replace(
+                current,
+                status=FollowUpStatus.CANCELLED,
+                outcome_type=FollowUpOutcome.CANCELLED,
+                outcome_note=normalized_note,
+                completed_at=None,
+                cancelled_at=occurred_at,
+                next_attention_at=None,
+                revision=current.revision + 1,
+                updated_at=occurred_at,
+            )
+            stored = unit_of_work.follow_ups.update(
+                updated, expected_revision=expected_revision
+            )
+            unit_of_work.follow_up_events.add(
+                self._event(
+                    stored,
+                    sequence=self._next_sequence(unit_of_work, follow_up_id),
+                    event_type=FollowUpEventType.CANCELLED,
+                    occurred_at=occurred_at,
+                    payload={
+                        "from_status": current.status.value,
+                        "outcome_note": stored.outcome_note,
+                        "outcome_type": stored.outcome_type.value,
+                        "previous_next_attention_at": current.next_attention_at,
+                        "revision": stored.revision,
+                    },
+                )
+            )
+            unit_of_work.commit()
+            return stored
+
+    def reopen(
+        self,
+        follow_up_id: str,
+        expected_revision: int,
+        next_attention_at: str | None,
+    ) -> FollowUpItem:
+        validate_record_id(follow_up_id)
+        _validate_expected_revision(expected_revision)
+        if next_attention_at is not None:
+            validate_utc_timestamp(next_attention_at)
+        with self._uow_factory() as unit_of_work:
+            current = unit_of_work.follow_ups.get(follow_up_id)
+            self._require_current_revision(current, expected_revision)
+            if current.status not in TERMINAL_STATUSES:
+                raise InvalidRecordError(
+                    "only completed or cancelled follow-up can be reopened"
+                )
+
+            occurred_at = self._now()
+            target_status = (
+                FollowUpStatus.ACTIVE
+                if next_attention_at is not None
+                else FollowUpStatus.INBOX
+            )
+            previous_outcome_type = current.outcome_type
+            updated = replace(
+                current,
+                status=target_status,
+                next_attention_at=next_attention_at,
+                outcome_type=None,
+                outcome_note=None,
+                completed_at=None,
+                cancelled_at=None,
+                revision=current.revision + 1,
+                updated_at=occurred_at,
+            )
+            stored = unit_of_work.follow_ups.update(
+                updated, expected_revision=expected_revision
+            )
+            unit_of_work.follow_up_events.add(
+                self._event(
+                    stored,
+                    sequence=self._next_sequence(unit_of_work, follow_up_id),
+                    event_type=FollowUpEventType.REOPENED,
+                    occurred_at=occurred_at,
+                    payload={
+                        "from_status": current.status.value,
+                        "next_attention_at": stored.next_attention_at,
+                        "previous_outcome_type": previous_outcome_type.value,
+                        "revision": stored.revision,
+                        "status": stored.status.value,
+                    },
+                )
+            )
+            unit_of_work.commit()
+            return stored
+
     def _event(
         self,
         item: FollowUpItem,
@@ -546,10 +810,12 @@ def _require_instance(value: object, expected_type: type[object], name: str) -> 
 
 
 __all__ = [
+    "CompleteFollowUp",
     "CreateFollowUp",
     "FollowUpApplicationService",
     "FollowUpQuery",
     "FollowUpView",
+    "MarkWaiting",
     "ScheduleFollowUp",
     "UpdateFollowUp",
 ]

@@ -1,38 +1,40 @@
 {
   "state_version": 2,
   "legacy_last_numbered_step": 225,
-  "current_issue": 109,
+  "current_issue": 111,
   "base_branch": "master",
-  "base_commit": "c08f05ed52e503d966475d256bd433957f8a9adb",
+  "base_commit": "230a7238f01066e784f369d1793df2d4f3375f4d",
   "active_work": {
-    "issue": 109,
-    "type": "follow_up_application_service_core",
+    "issue": 111,
+    "type": "follow_up_waiting_and_terminal_lifecycle",
     "binding_epic": 105,
     "field_tracking_epic": 97,
-    "branch": "codex/issue-109-follow-up-application-service-core",
-    "base_commit": "c08f05ed52e503d966475d256bd433957f8a9adb",
+    "branch": "codex/issue-111-follow-up-terminal-lifecycle",
+    "base_commit": "230a7238f01066e784f369d1793df2d4f3375f4d",
     "commit_strategy": "one_ordinary_commit_without_amend_rebase_or_force_push",
     "schema_version": 4,
     "public_application_api": [
       "CreateFollowUp",
       "UpdateFollowUp",
       "ScheduleFollowUp",
+      "MarkWaiting",
+      "CompleteFollowUp",
       "FollowUpQuery",
       "FollowUpView",
       "FollowUpApplicationService"
     ],
     "production_behavior_changed": true,
     "follow_up_application_service_core_implemented": true,
-    "terminal_lifecycle_implemented": false,
+    "terminal_lifecycle_implemented": true,
     "observation_link_or_conversion_implemented": false,
     "routine_application_service_implemented": false,
     "ui_or_backfill_implemented": false,
     "real_user_data_root_accessed": false,
     "merge_claim": false,
     "pull_request_created": false,
-    "focused_test_summary": "36 passed in 0.81s",
-    "related_regression_test_summary": "169 passed in 2.04s",
-    "full_test_summary": "831 passed, 7 skipped in 15.09s",
+    "focused_test_summary": "76 passed in 1.83s",
+    "related_regression_test_summary": "covered by full 871-test regression suite",
+    "full_test_summary": "871 passed, 7 skipped in 15.52s",
     "schema_version_unchanged": true,
     "repository_ports_unchanged": true,
     "compileall_passed": true,
@@ -44,18 +46,18 @@
     "semantics": "latest_merged_finalized_checkpoint",
     "step": 225,
     "step_semantics": "last_legacy_numbered_step_preceding_issue_centered_workflow",
-    "issue": 107,
+    "issue": 109,
     "issue_state": "completed",
-    "pull_request": 108,
+    "pull_request": 110,
     "pull_request_state": "merged",
-    "merge_commit": "c08f05ed52e503d966475d256bd433957f8a9adb",
-    "local_test_summary": "795 passed, 7 skipped (Issue #107 completion evidence)"
+    "merge_commit": "230a7238f01066e784f369d1793df2d4f3375f4d",
+    "local_test_summary": "831 passed, 7 skipped (Issue #109 completion evidence)"
   },
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
-    "local_master_sha": "c08f05ed52e503d966475d256bd433957f8a9adb",
-    "origin_master_sha": "c08f05ed52e503d966475d256bd433957f8a9adb",
+    "local_master_sha": "230a7238f01066e784f369d1793df2d4f3375f4d",
+    "origin_master_sha": "230a7238f01066e784f369d1793df2d4f3375f4d",
     "divergence": "0 0",
     "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
     "misspelled_workspace_present": false,
@@ -162,6 +164,11 @@
       "model": "GPT-5 current full Codex",
       "reasoning": "extra_high",
       "reason": "application_service_transition_contract_atomic_aggregate_event_writes_optimistic_revision_no_op_deterministic_queries_and_user_data_safety"
+    },
+    "issue_111_selection": {
+      "model": "GPT-5 current full Codex",
+      "reasoning": "extra_high",
+      "reason": "waiting_and_terminal_transition_matrix_stale_before_no_op_atomic_event_writes_and_user_data_safety"
     }
   },
   "required_source_pre_read": {
@@ -483,6 +490,20 @@
             "project_state": true,
             "task_109": true
         },
+        "issue_111_sources_read": {
+            "unified_project_source": true,
+            "project_instructions": true,
+            "github_issue_111_with_all_comments": true,
+            "github_epic_105_with_comments": true,
+            "github_epic_97_with_comments": true,
+            "field_tracking_v0_1_contract": true,
+            "follow_up_application_service_and_public_exports": true,
+            "field_tracking_domain_and_event_invariants": true,
+            "persistence_mapping_repositories_uow_and_errors": true,
+            "follow_up_application_domain_persistence_and_uow_tests": true,
+            "project_state": true,
+            "task_111": true
+        },
     "unresolved_conflict_found": false
   },
   "canonical_project_instructions": {
@@ -547,7 +568,7 @@
     "workflow_changed": false
   },
   "product_maturity": {
-    "state": "local_field_mvp_with_follow_up_application_service_core",
+    "state": "local_field_mvp_with_follow_up_waiting_and_terminal_lifecycle",
     "field_ready_application": false,
     "production_ready_application": false,
     "product_identity": "local_first_mobile_first_single_owner_personal_field_assistant",
@@ -592,10 +613,11 @@
       "domain_and_recurrence",
       "sqlite_schema_v3_repository_and_event_persistence",
       "sqlite_schema_v4_follow_up_mutation_event_vocabulary",
-      "follow_up_application_service_core_create_read_query_update_schedule_inbox_project_history"
+      "follow_up_application_service_core_create_read_query_update_schedule_inbox_project_history",
+      "follow_up_waiting_complete_cancel_and_reopen_lifecycle"
     ],
     "field_tracking_pending": [
-      "follow_up_terminal_lifecycle_and_observation_link_conversion",
+      "follow_up_observation_link_and_conversion",
       "routine_application_service_and_seven_day_idempotent_lazy_backfill",
       "backup_restore_compatibility_and_official_export_isolation",
       "mobile_runtime_and_data_ownership_adr",
@@ -663,7 +685,6 @@
     "next_product_direction": {
       "name": "complete_remaining_field_tracking_phase_one_application_services",
       "scope": [
-        "follow_up_terminal_lifecycle",
         "follow_up_observation_link_and_conversion",
         "routine_application_service",
         "seven_day_idempotent_occurrence_backfill"
@@ -866,11 +887,11 @@
     }
   },
   "protected_paths": {
-    "app_web_and_observation_application_service": "must_remain_unchanged_in_issue_109",
-    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_109",
-    "backup_and_export_production": "must_remain_unchanged_in_issue_109",
-    ".github/workflows": "must_remain_unchanged_in_issue_109",
-    "requirements.txt": "must_remain_unchanged_in_issue_109",
+    "app_web_and_observation_application_service": "must_remain_unchanged_in_issue_111",
+    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_111",
+    "backup_and_export_production": "must_remain_unchanged_in_issue_111",
+    ".github/workflows": "must_remain_unchanged_in_issue_111",
+    "requirements.txt": "must_remain_unchanged_in_issue_111",
     "reports": "user_files_preserved_untracked_and_unchanged",
     "exports/.gitkeep": "must_remain_present_and_unchanged",
     "ignored_zip_and_cache": "must_remain_unchanged"
@@ -887,11 +908,11 @@
     "pull_request_creation_by_codex": false,
     "merge_authorized": false,
     "branch_deletion_authorized": false,
-    "final_remote_sha_evidence_location": "GitHub Issue #109 completion comment after push"
+    "final_remote_sha_evidence_location": "GitHub Issue #111 completion comment after push"
   },
   "required_files": [
-    ".cse/tasks/109_task.md",
-    ".cse/results/109_result.md",
+    ".cse/tasks/111_task.md",
+    ".cse/results/111_result.md",
     ".cse/state/project_state.json",
     "app/application/field_tracking.py",
     "app/application/__init__.py",
@@ -901,8 +922,8 @@
     "CHANGELOG.md",
     "docs/project_decisions.md",
     "learning/GLOSSARY.md",
-    "learning/issue_109_follow_up_application_service_core.md"
+    "learning/issue_111_follow_up_terminal_lifecycle.md"
   ],
-  "workflow_status": "issue_109_implementation_and_local_verification_complete_before_commit_and_push",
+  "workflow_status": "issue_111_implementation_and_local_verification_complete_before_commit_and_push",
   "forbidden_scope_added": false
 }

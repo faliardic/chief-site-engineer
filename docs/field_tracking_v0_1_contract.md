@@ -117,8 +117,11 @@ Issue #98 başlamadan önceki güvenli nokta `9b631fef4f3c4a290daa3b8d651d4fc9af
 - `inbox`, zamanlanmamış açık kayıtların görünür Unutma Kutusu’dur; `next_attention_at` null olabilir.
 - Planlanan ve sahiplenilen kayıt `active` olur ve mutlaka `next_attention_at` taşır.
 - Başka kişiden veya koşuldan cevap bekleyen kayıt `waiting` olur ve mutlaka yeniden bakılacak `next_attention_at` taşır.
+- `mark_waiting`, yalnız `inbox` veya `active` kaydı `waiting` yapar; yeni dikkat anını, nullable ilgili kişiyi ve nullable koşulu birlikte yazar. Zaten `waiting` olan kayıtta bu üç alan normalize edilmiş komutla tamamen aynıysa işlem no-op'tur; herhangi biri farklıysa ikinci bir `waiting_started` event'i üretmeden reddedilir.
 - `item_type` ile `status` aynı kavram değildir. Örneğin `waiting` türünde yakalanan kayıt önce `inbox`, sonra `waiting` durumunda olabilir.
-- `completed` ve `cancelled` terminal durumlardır. Yeniden açmada yeni dikkat zamanı verilmezse kayıt `inbox`, verilirse `active` olur.
+- `complete`, yalnız açık `inbox/active/waiting` kayıtları `completed` yapar. Sonuç yalnız `completed` veya `not_required` olabilir; `converted_to_observation` ve `cancelled` bu komutta reddedilir. Kapanış etkin dikkat anını temizler fakat `deadline_at` değerini korur.
+- `cancel`, yalnız açık `inbox/active/waiting` kayıtları `outcome_type = cancelled` ile `cancelled` yapar. Normalize edilmiş sonuç notu nullable kalabilir; kapanış etkin dikkat anını temizler fakat `deadline_at` değerini korur.
+- `completed` ve `cancelled` terminal durumlardır; complete/cancel terminal kayıtta tekrar çalıştırılmaz. Yeniden açmada yeni dikkat zamanı verilmezse kayıt `inbox`, canonical UTC dikkat zamanı verilirse `active` olur.
 - `completed` durumda `completed_at` ve `outcome_type` zorunludur; `cancelled_at` boş olmalıdır.
 - `cancelled` durumda `cancelled_at` ve `outcome_type = cancelled` zorunludur; `completed_at` boş olmalıdır.
 - Terminal olmayan durumda iki kapanış zamanı ile iki outcome alanı boş olmalıdır.
@@ -316,13 +319,17 @@ follow_up.project_changed
 
 Yeni mutation event payload sözleşmesi şöyledir:
 
-| Gelecek mutation | Event | Minimum deterministic payload |
+| Mutation | Event | Minimum deterministic payload |
 | --- | --- | --- |
 | `update_details` | `follow_up.details_updated` | Mutation sonrası `revision` ve alfabetik sıralı, benzersiz string değerlerden oluşan `changed_fields`. İlk yakalama kanıtı olan immutable `capture_text` bu listede bulunamaz. |
 | `move_to_inbox` | `follow_up.moved_to_inbox` | Mutation sonrası `revision`, önceki `from_status` ve önceki `previous_next_attention_at`. Mutation sonucu ana kayıt `status = inbox`, `next_attention_at = NULL` olur. |
 | `set_project` | `follow_up.project_changed` | Mutation sonrası `revision`, önceki `from_project_id` ve yeni `project_id`. Projesiz taraflar JSON `null` olarak korunur. Bu event yalnız observation bağlantısı olmayan follow-up için gelecekteki izinli project mutation'ını temsil eder. |
+| `mark_waiting` | `follow_up.waiting_started` | Mutation sonrası `revision`; önceki `from_status` ve `previous_next_attention_at`; yeni `next_attention_at`, `related_person` ve `condition_text`. Nullable değerler JSON `null` kalır. |
+| `complete` | `follow_up.completed` | Mutation sonrası `revision`; önceki `from_status` ve `previous_next_attention_at`; yeni `outcome_type` ve nullable `outcome_note`. |
+| `cancel` | `follow_up.cancelled` | Mutation sonrası `revision`; önceki `from_status` ve `previous_next_attention_at`; `outcome_type = cancelled` ve nullable `outcome_note`. |
+| `reopen` | `follow_up.reopened` | Mutation sonrası `revision`; önceki `from_status` ve `previous_outcome_type`; yeni `status` ve nullable `next_attention_at`. |
 
-`changed_fields` bir entity snapshot'ı değildir; yalnız gerçekten değişen, application service tarafından izin verilen ayrıntı alanlarını taşır. Liste sırası payload üreticisi tarafından alfabetik yapılır, JSON object anahtarları mevcut deterministic serializer tarafından canonical sırada yazılır. Bu görev payload'ı üreten application service'i eklemez.
+`changed_fields` bir entity snapshot'ı değildir; yalnız gerçekten değişen, application service tarafından izin verilen ayrıntı alanlarını taşır. Liste sırası payload üreticisi tarafından alfabetik yapılır, JSON object anahtarları mevcut deterministic serializer tarafından canonical sırada yazılır. Issue #109 ilk üç, Issue #111 son dört mutation payload'ını aynı append-only event sınırında uygular.
 
 ### 8.3 Rutin event türleri
 
@@ -434,13 +441,29 @@ FollowUpApplicationService
 RoutineApplicationService
 ```
 
-`FollowUpApplicationService` oluşturma, planlama/yeniden planlama, beklemeye alma, tamamlama, iptal, yeniden açma, observation bağlama ve resmî gözleme dönüştürme use-case’lerini koordine eder.
+`FollowUpApplicationService` oluşturma, okuma/sorgulama, ayrıntı/proje/planlama değişiklikleri, beklemeye alma, tamamlama, iptal ve yeniden açma use-case’lerini koordine eder. Observation bağlama ve resmî gözleme dönüştürme henüz uygulanmamıştır.
 
 `RoutineApplicationService` template oluşturma/güncelleme/pasifleştirme, occurrence ensure/backfill, erteleme, sonuçlandırma ve yeniden açma use-case’lerini koordine eder.
 
-Bu sınıf adları bağlayıcı gelecek API sözleşmesidir. Issue #107 bu sınıfları veya aşağıdaki method'ları production koduna eklemez; yalnız bu method'ların daha sonra kullanacağı event adlarını persistence katmanında hazırlar.
+`FollowUpApplicationService` yüzeyinin çekirdeği Issue #109, bekleme ve terminal yaşam döngüsü Issue #111 ile uygulanmıştır. `RoutineApplicationService` ile observation link/convert method'ları bağlayıcı gelecek API sözleşmesi olarak kalır.
 
-Gelecek service API yüzeyi aşağıdaki isim ve sorumluluklarla sınırlıdır:
+Service API yüzeyi aşağıdaki isim ve sorumluluklarla sınırlıdır:
+
+```python
+@dataclass(frozen=True, slots=True)
+class MarkWaiting:
+    next_attention_at: str
+    related_person: str | None = None
+    condition_text: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CompleteFollowUp:
+    outcome_type: FollowUpOutcome
+    outcome_note: str | None = None
+```
+
+İki komut application sınırında doğrulanır. `MarkWaiting.next_attention_at` canonical UTC `Z` olmalıdır; optional metinler trim edilir ve boşsa `None` olur. `CompleteFollowUp.outcome_type` yalnız `completed/not_required` kabul eder; sonuç notu aynı optional metin kuralını kullanır.
 
 ```python
 class FollowUpApplicationService:
@@ -669,7 +692,7 @@ Bu sözleşmeden sonra işler küçük ve test edilebilir görevler olarak ayrı
 
 1. Domain record/validation sabitleri ve saf recurrence hesaplayıcısı.
 2. SQLite schema v3 migration ve repository/event port/adaptörleri; schema v4 follow-up mutation-event vocabulary preflight'ı.
-3. Transactional application service: Issue #109 ile follow-up çekirdek dilimi tamamlandı; terminal/observation ve routine sınırlı idempotent occurrence üretimi ayrı görevlerde bekliyor.
+3. Transactional application service: Issue #109 ile follow-up çekirdek, Issue #111 ile bekleme/terminal yaşam döngüsü tamamlandı; observation ve routine sınırlı idempotent occurrence üretimi ayrı görevlerde bekliyor.
 4. Backup schema 2 backward restore ve schema 3 round-trip testleri.
 5. Resmî daily export exclusion regression testi.
 6. Bunlar doğrulandıktan sonra minimum Saha Takibi UI’si.
