@@ -12,7 +12,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from app.persistence import AttachmentMetadataRecord, SCHEMA_VERSION
+from app.persistence import (
+    AttachmentMetadataRecord,
+    SCHEMA_VERSION,
+    SQLiteUnitOfWork,
+    connect_database,
+    migrate_database,
+)
 from app.storage import ManagedAttachmentStore
 from app.storage.paths import validate_attachment_relative_path
 
@@ -31,6 +37,7 @@ from .common import (
 
 
 BACKUP_FORMAT_VERSION = 1
+RESTORABLE_SCHEMA_VERSIONS = (2, 3, 4)
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -169,6 +176,7 @@ class BackupService:
                         raise BackupValidationError(
                             f"backup file integrity mismatch: {name}"
                         )
+                self._verify_archive_contents(bundle, manifest)
                 return manifest
         except BackupValidationError:
             raise
@@ -189,18 +197,25 @@ class BackupService:
         moved = False
         try:
             with zipfile.ZipFile(archive_path) as bundle:
-                files = manifest["files"]
-                self._extract_entry(
-                    bundle, "cse.sqlite3", temporary / "cse.sqlite3",
-                    files["cse.sqlite3"],
+                self._extract_archive_files(
+                    bundle,
+                    temporary,
+                    manifest["files"],
                 )
-                for name, expected in sorted(files.items()):
-                    if name == "cse.sqlite3":
-                        continue
-                    relative = validate_safe_archive_name(name)
-                    destination = temporary / "attachments" / Path(*relative.parts)
-                    self._extract_entry(bundle, name, destination, expected)
-            self._validate_restored_database(temporary, manifest)
+            source_schema_version = int(manifest["schema_version"])
+            self._validate_restored_database(
+                temporary,
+                manifest,
+                source_schema_version,
+            )
+            if source_schema_version < SCHEMA_VERSION:
+                self._migrate_restored_database(temporary / "cse.sqlite3")
+            self._validate_restored_database(
+                temporary,
+                manifest,
+                SCHEMA_VERSION,
+            )
+            self._validate_current_repositories(temporary / "cse.sqlite3")
             self._atomic_move(temporary, target)
             moved = True
             return RestoreResult(True, int(manifest["attachment_count"]))
@@ -273,22 +288,58 @@ class BackupService:
         if {"sha256": digest.hexdigest(), "size_bytes": size} != expected:
             raise BackupValidationError("restored file integrity mismatch")
 
+    def _verify_archive_contents(
+        self,
+        bundle: zipfile.ZipFile,
+        manifest: dict[str, object],
+    ) -> None:
+        with tempfile.TemporaryDirectory(prefix=".cse-backup-verify-") as work:
+            temporary = Path(work)
+            self._extract_archive_files(bundle, temporary, manifest["files"])
+            self._validate_restored_database(
+                temporary,
+                manifest,
+                int(manifest["schema_version"]),
+            )
+
+    def _extract_archive_files(
+        self,
+        bundle: zipfile.ZipFile,
+        temporary_root: Path,
+        files: dict[str, dict[str, object]],
+    ) -> None:
+        self._extract_entry(
+            bundle,
+            "cse.sqlite3",
+            temporary_root / "cse.sqlite3",
+            files["cse.sqlite3"],
+        )
+        for name, expected in sorted(files.items()):
+            if name == "cse.sqlite3":
+                continue
+            relative = validate_safe_archive_name(name)
+            destination = temporary_root / "attachments" / Path(*relative.parts)
+            self._extract_entry(bundle, name, destination, expected)
+
     def _validate_restored_database(
-        self, temporary_root: Path, manifest: dict[str, object]
+        self,
+        temporary_root: Path,
+        manifest: dict[str, object],
+        expected_schema_version: int = SCHEMA_VERSION,
     ) -> None:
         database = temporary_root / "cse.sqlite3"
-        connection = sqlite3.connect(database)
+        connection = _connect_read_only_database(database)
         try:
             integrity = connection.execute("PRAGMA integrity_check").fetchone()[0]
             if integrity != "ok":
                 raise BackupValidationError("restored database integrity check failed")
-            versions = {
+            versions = [
                 row[0]
                 for row in connection.execute(
                     "SELECT version FROM schema_migrations ORDER BY version"
                 )
-            }
-            if versions != set(range(1, SCHEMA_VERSION + 1)):
+            ]
+            if versions != list(range(1, expected_schema_version + 1)):
                 raise BackupValidationError("restored database migration version is unknown")
             metadata = _read_attachment_metadata(connection)
             observation_count = connection.execute(
@@ -301,6 +352,8 @@ class BackupService:
             raise BackupValidationError("restored database is invalid") from exc
         finally:
             connection.close()
+        if len(metadata) != manifest["attachment_count"]:
+            raise BackupValidationError("restored attachment count mismatch")
         if observation_count != manifest["observation_count"]:
             raise BackupValidationError("restored observation count mismatch")
         if event_count != manifest["event_count"]:
@@ -319,6 +372,53 @@ class BackupService:
         ):
             raise BackupValidationError("restored attachment reconciliation failed")
 
+    def _migrate_restored_database(self, database: Path) -> None:
+        connection = connect_database(database)
+        try:
+            version = migrate_database(connection)
+        except Exception as exc:
+            raise BackupValidationError(
+                "restored database migration failed"
+            ) from exc
+        finally:
+            connection.close()
+        if version != SCHEMA_VERSION:
+            raise BackupValidationError("restored database migration is incomplete")
+
+    def _validate_current_repositories(self, database: Path) -> None:
+        try:
+            with SQLiteUnitOfWork(database) as unit_of_work:
+                unit_of_work.projects.list_all()
+                observations = unit_of_work.observations.list_all()
+                unit_of_work.attachments.list_all()
+                follow_ups = unit_of_work.follow_ups.list_all()
+                templates = unit_of_work.routine_templates.list_all()
+                for observation in observations:
+                    unit_of_work.events.list_for_observation(
+                        observation.observation_id
+                    )
+                for follow_up in follow_ups:
+                    unit_of_work.follow_up_events.list_for_follow_up(
+                        follow_up.follow_up_id
+                    )
+                for template in templates:
+                    unit_of_work.routine_template_events.list_for_template(
+                        template.routine_template_id
+                    )
+                    occurrences = (
+                        unit_of_work.routine_occurrences.list_for_template(
+                            template.routine_template_id
+                        )
+                    )
+                    for occurrence in occurrences:
+                        unit_of_work.routine_occurrence_events.list_for_occurrence(
+                            occurrence.routine_occurrence_id
+                        )
+        except Exception as exc:
+            raise BackupValidationError(
+                "restored database repository validation failed"
+            ) from exc
+
     def _validate_manifest(self, manifest: object) -> None:
         if not isinstance(manifest, dict):
             raise BackupValidationError("backup manifest must be an object")
@@ -336,7 +436,12 @@ class BackupService:
             raise BackupValidationError("backup manifest fields are invalid")
         if manifest["backup_format_version"] != BACKUP_FORMAT_VERSION:
             raise BackupValidationError("backup format version is unsupported")
-        if manifest["schema_version"] != SCHEMA_VERSION:
+        schema_version = manifest["schema_version"]
+        if (
+            not isinstance(schema_version, int)
+            or isinstance(schema_version, bool)
+            or schema_version not in RESTORABLE_SCHEMA_VERSIONS
+        ):
             raise BackupValidationError("backup schema version is unsupported")
         files = manifest["files"]
         if not isinstance(files, dict) or "cse.sqlite3" not in files:
@@ -420,6 +525,10 @@ def _read_snapshot_inventory(
         raise BackupValidationError("snapshot database is invalid") from exc
     finally:
         connection.close()
+
+
+def _connect_read_only_database(database: Path) -> sqlite3.Connection:
+    return sqlite3.connect(f"{database.resolve().as_uri()}?mode=ro", uri=True)
 
 
 def _read_attachment_metadata(

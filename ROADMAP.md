@@ -4,7 +4,7 @@
 
 0. [x] Tek kullanıcılı kişisel saha asistanı yönünü kanonikleştir — Issue #103.
 1. [x] Saha Takibi transactional application service ve 7 günlük lazy backfill. Follow-up çekirdek dilimi Issue #109, waiting/terminal yaşam döngüsü Issue #111, observation link/conversion Issue #112 ve routine/backfill dilimi Issue #115 ile uygulandı.
-2. [ ] Backup/restore compatibility ve resmî export izolasyonu.
+2. [x] Backup/restore compatibility ve resmî export izolasyonu — Issue #117 ile gerçek schema 2/3→4 restore, schema 4 tracking round-trip ve byte-identical resmî export regresyonları uygulandı.
 3. [ ] Mobil runtime ve veri sahipliği ADR.
 4. [ ] Mobil-first Kâğıdı Bırakma Sürümü.
 5. [ ] Offline ve bildirim güvenilirliği.
@@ -16,7 +16,7 @@
 11. [ ] Gerçek kullanımın kanıtladığı kişisel yardımcı araçlar.
 12. [ ] Kişisel AI asistanı.
 
-Bağlayıcı üst yol haritası GitHub Epic #105'tir. Saha Takibi domain/recurrence, SQLite persistence, follow-up application-service ve routine application-service/yedi günlük lazy backfill tamamlanmıştır. Sıradaki ayrı faz backup/restore compatibility ve resmî export izolasyonudur; mobil/UI veya sonraki fazlar henüz tamamlanmamıştır.
+Bağlayıcı üst yol haritası GitHub Epic #105'tir. Saha Takibi domain/recurrence, SQLite persistence, iki transactional application service, yedi günlük lazy backfill ve backup/restore–resmî export güvenlik kapısı tamamlanmıştır. Sıradaki ayrı faz mobil runtime ve veri sahipliği ADR'sidir; mobil UI, offline/bildirim ve saha pilotları henüz tamamlanmamıştır.
 
 ## Faz 4 Minimum Kâğıdı Bırakma Kapsamı
 

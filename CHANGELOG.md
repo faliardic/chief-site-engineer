@@ -1,5 +1,17 @@
 # Changelog
 
+## Issue 117 - Backup/Restore Uyumluluğu ve Resmî Export İzolasyonu
+
+- Backup format `1` için restore edilebilir schema allowlist'i `(2, 3, 4)` olarak tek kaynakta tanımlandı; schema `1`, sıfır/negatif/bool, migration gap'i ve future schema fail-closed reddediliyor.
+- `verify_backup`, digest ve archive-path kontrollerinden sonra embedded `cse.sqlite3` ile attachment dosyalarını private temporary köke çıkarıp migration çalıştırmadan `PRAGMA integrity_check`, exact migration zinciri, observation/event/attachment count ve reconciliation doğrulaması yapıyor.
+- `restore_backup`, yalnız var olmayan target için archive verify → temporary extraction → pre-migration doğrulama → temporary DB migration → post-migration doğrulama → repository okumaları → tek atomic move sırasını uyguluyor.
+- Gerçek schema 2 fixture'ı v3 ve v4 migration'larıyla schema 4'e yükseltilirken observation, attachment ve observation-event payload metni korundu; yeni tracking tablolarının boş olduğu doğrulandı.
+- Gerçek schema 3 fixture'ı yalnız v4 migration'ıyla yükseltildi; follow-up, routine template, occurrence ve event satırları ile `payload_json` text'i byte-for-byte korundu.
+- Schema 4 fixture'ında details/conversion follow-up geçmişi, missed ve open routine occurrence'ları ile snooze/close/reopen geçmişi backup→verify→restore sonrasında aggregate, revision, sequence ve payload düzeyinde aynı kaldı.
+- Migration statement, pre-migration count ve post-migration repository validation hata testleri target bırakılmadığını, temporary root'un temizlendiğini ve source archive'ın değişmediğini kanıtladı.
+- Aynı resmî observation verisine sahip tracking verili/verisiz iki root'un deterministic günlük export ZIP'leri byte-for-byte aynı çıktı; entry/manifest sözleşmesi değişmedi ve tracking metni/kimliği/event/outcome/count sızıntısı bulunmadı.
+- `BACKUP_FORMAT_VERSION`, daily export format version, iki manifest alan kümesi, ZIP entry adları, count anlamları, schema/migration metinleri, export production kodu, application/persistence/web/UI ve gerçek kullanıcı data root'u değiştirilmedi.
+
 ## Issue 115 - RoutineApplicationService ve Yedi Günlük Lazy Backfill
 
 - Immutable template/occurrence command-query değerleri ile public `RoutineApplicationService` uygulama servisi eklendi.
