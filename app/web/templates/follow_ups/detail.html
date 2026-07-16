@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}{{ item.title }} · Saha Takibi{% endblock %}
+{% block content %}
+{% if success %}<p class="success" role="status">{{ success }}</p>{% endif %}
+
+<div class="detail-heading tracking-detail-heading">
+  <div>
+    <p class="eyebrow">Saha Takibi · {{ follow_up_type_label(item.item_type) }}</p>
+    <h1>{{ item.title }}</h1>
+    <div class="card-topline">
+      <span class="badge status-{{ item.status.value }}">{{ follow_up_status_label(item.status) }}</span>
+      {% if item.is_important %}<span class="badge important-badge">Önemli</span>{% endif %}
+      <span class="muted">Revizyon {{ item.revision }}</span>
+    </div>
+  </div>
+  <a class="button secondary" href="{{ url_for('follow_up_inbox') }}">Unutma Kutusu'na dön</a>
+</div>
+
+<section class="summary-panel" aria-labelledby="follow-up-summary-title">
+  <h2 id="follow-up-summary-title">Takip özeti</h2>
+  <dl>
+    <dt>İlk yakalanan not</dt><dd>{{ item.capture_text }}</dd>
+    <dt>Açıklama</dt><dd>{{ item.description or '-' }}</dd>
+    <dt>Proje</dt><dd>{{ project_names.get(item.project_id, 'Kişisel / projesiz') }}</dd>
+    <dt>Konum</dt><dd>{{ item.location or '-' }}</dd>
+    <dt>İlgili kişi</dt><dd>{{ item.related_person or '-' }}</dd>
+    <dt>Koşul / beklenen şey</dt><dd>{{ item.condition_text or '-' }}</dd>
+    <dt>Dikkat zamanı</dt><dd>{{ utc_to_istanbul_display(item.next_attention_at) }}</dd>
+    <dt>Son tarih</dt><dd>{{ utc_to_istanbul_display(item.deadline_at) }}</dd>
+    <dt>Sonuç</dt><dd>{{ follow_up_outcome_label(item.outcome_type) }}</dd>
+    <dt>Sonuç notu</dt><dd>{{ item.outcome_note or '-' }}</dd>
+    {% if item.observation_id %}<dt>Bağlı gözlem</dt><dd><a href="{{ url_for('observation_detail', observation_id=item.observation_id) }}">Gözlemi aç</a></dd>{% endif %}
+    <dt>Oluşturulma</dt><dd>{{ utc_to_istanbul_display(item.created_at) }}</dd>
+    <dt>Son güncelleme</dt><dd>{{ utc_to_istanbul_display(item.updated_at) }}</dd>
+  </dl>
+</section>
+
+{% if item.status.value in ('inbox', 'active', 'waiting') %}
+<div class="detail-actions tracking-actions">
+  <section class="action-panel">
+    <h2>Ayrıntıları düzenle</h2>
+    <form method="post" action="{{ url_for('follow_up_details', follow_up_id=item.follow_up_id) }}">
+      <input type="hidden" name="expected_revision" value="{{ item.revision }}">
+      <label>Başlık
+        <input name="title" required value="{{ form_values.get('title', item.title) }}">
+      </label>
+      <label>Açıklama
+        <textarea name="description">{{ form_values.get('description', item.description or '') }}</textarea>
+      </label>
+      <label>Takip türü
+        {% set selected_type = form_values.get('item_type', item.item_type.value) %}
+        <select name="item_type" required>
+          <option value="action"{% if selected_type == 'action' %} selected{% endif %}>Yapılacak</option>
+          <option value="waiting"{% if selected_type == 'waiting' %} selected{% endif %}>Dönüş bekleniyor</option>
+          <option value="recheck"{% if selected_type == 'recheck' %} selected{% endif %}>Tekrar kontrol</option>
+        </select>
+      </label>
+      <label>Konum <input name="location" value="{{ form_values.get('location', item.location or '') }}"></label>
+      <label>İlgili kişi <input name="related_person" value="{{ form_values.get('related_person', item.related_person or '') }}"></label>
+      <label>Koşul / beklenen şey <textarea name="condition_text">{{ form_values.get('condition_text', item.condition_text or '') }}</textarea></label>
+      <label>Son tarih <input type="datetime-local" name="deadline_at" value="{{ form_values.get('deadline_at', utc_to_istanbul_input(item.deadline_at)) }}"></label>
+      <label class="checkbox-label"><input type="checkbox" name="is_important" value="1"{% if (form_values and form_values.get('is_important') == '1') or (not form_values and item.is_important) %} checked{% endif %}> Önemli olarak işaretle</label>
+      <button type="submit">Ayrıntıları kaydet</button>
+    </form>
+  </section>
+
+  <section class="action-panel">
+    <h2>Proje bağlantısı</h2>
+    {% if item.observation_id %}
+      <p class="alert">Bu takip bir gözleme bağlı olduğu için proje bağlantısı gözlemle birlikte korunur.</p>
+    {% else %}
+    <form method="post" action="{{ url_for('follow_up_project', follow_up_id=item.follow_up_id) }}">
+      <input type="hidden" name="expected_revision" value="{{ item.revision }}">
+      {% set selected_project = form_values.get('project_id', item.project_id or '') %}
+      <label>Proje
+        <select name="project_id">
+          <option value="">Kişisel / projesiz</option>
+          {% for project in projects %}<option value="{{ project.project_id }}"{% if selected_project == project.project_id %} selected{% endif %}>{{ project.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <button type="submit">Proje bağlantısını kaydet</button>
+    </form>
+    {% endif %}
+  </section>
+
+  <section class="action-panel">
+    <h2>Dikkat zamanını planla</h2>
+    <form method="post" action="{{ url_for('follow_up_schedule', follow_up_id=item.follow_up_id) }}">
+      <input type="hidden" name="expected_revision" value="{{ item.revision }}">
+      <label>Tekrar göster
+        <input type="datetime-local" name="next_attention_at" required value="{{ form_values.get('next_attention_at', utc_to_istanbul_input(item.next_attention_at)) }}">
+      </label>
+      {% set target_status = form_values.get('target_status', 'active') %}
+      <label>Durum
+        <select name="target_status">
+          <option value="active"{% if target_status == 'active' %} selected{% endif %}>Aktif</option>
+          <option value="waiting"{% if target_status == 'waiting' %} selected{% endif %}>Beklemede</option>
+        </select>
+      </label>
+      <button type="submit">Planla</button>
+    </form>
+  </section>
+
+  <section class="action-panel">
+    <h2>Beklemeye al</h2>
+    <form method="post" action="{{ url_for('follow_up_waiting', follow_up_id=item.follow_up_id) }}">
+      <input type="hidden" name="expected_revision" value="{{ item.revision }}">
+      <label>Tekrar göster
+        <input type="datetime-local" name="next_attention_at" required value="{{ form_values.get('next_attention_at', utc_to_istanbul_input(item.next_attention_at)) }}">
+      </label>
+      <label>Kimden dönüş bekleniyor? <input name="related_person" value="{{ form_values.get('related_person', item.related_person or '') }}"></label>
+      <label>Beklenen koşul <textarea name="condition_text">{{ form_values.get('condition_text', item.condition_text or '') }}</textarea></label>
+      <button class="secondary" type="submit">Beklemeye al</button>
+    </form>
+  </section>
+
+  {% if item.status.value != 'inbox' %}
+  <section class="action-panel compact-panel">
+    <h2>Unutma Kutusu'na taşı</h2>
+    <p>Dikkat zamanı kaldırılır; ilk not ve tüm geçmiş korunur.</p>
+    <form method="post" action="{{ url_for('follow_up_move_to_inbox', follow_up_id=item.follow_up_id) }}">
+      <input type="hidden" name="expected_revision" value="{{ item.revision }}">
+      <button class="secondary" type="submit">Unutma Kutusu'na taşı</button>
+    </form>
+  </section>
+  {% endif %}
+
+  <section class="action-panel">
+    <h2>Sonuçlandır</h2>
+    <form method="post" action="{{ url_for('follow_up_complete', follow_up_id=item.follow_up_id) }}">
+      <input type="hidden" name="expected_revision" value="{{ item.revision }}">
+      <label>Sonuç
+        <select name="outcome_type">
+          <option value="completed">Yapıldı</option>
+          <option value="not_required">Artık gerekli değil</option>
+        </select>
+      </label>
+      <label>Sonuç notu <textarea name="outcome_note">{{ form_values.get('outcome_note', '') }}</textarea></label>
+      <button type="submit">Tamamla</button>
+    </form>
+    <form method="post" action="{{ url_for('follow_up_cancel', follow_up_id=item.follow_up_id) }}" class="separated-form">
+      <input type="hidden" name="expected_revision" value="{{ item.revision }}">
+      <label>İptal notu <textarea name="outcome_note">{{ form_values.get('outcome_note', '') }}</textarea></label>
+      <button class="danger-button" type="submit">İptal et</button>
+    </form>
+  </section>
+</div>
+{% else %}
+<section class="action-panel reopen-panel">
+  <h2>Takibi yeniden aç</h2>
+  <p>Sonuç bilgisi geçmişte kalır; takip yeniden açık hale gelir.</p>
+  <form method="post" action="{{ url_for('follow_up_reopen', follow_up_id=item.follow_up_id) }}">
+    <input type="hidden" name="expected_revision" value="{{ item.revision }}">
+    <label>İsterseniz dikkat zamanı belirleyin
+      <input type="datetime-local" name="next_attention_at" value="{{ form_values.get('next_attention_at', '') }}">
+    </label>
+    <button type="submit">Yeniden aç</button>
+  </form>
+</section>
+{% endif %}
+
+<section aria-labelledby="follow-up-history-title">
+  <div class="section-heading"><h2 id="follow-up-history-title">İşlem geçmişi</h2><span class="count-badge">{{ history|length }}</span></div>
+  <ol class="event-history">
+    {% for event in history %}
+    <li>
+      <strong>{{ event.sequence }}. {{ follow_up_event_label(event.event_type) }}</strong>
+      <time>{{ utc_to_istanbul_display(event.occurred_at) }}</time>
+      {% for line in event_payload_summary(event.payload) %}<span class="event-detail">{{ line }}</span>{% endfor %}
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+{% endblock %}

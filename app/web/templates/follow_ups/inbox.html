@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Unutma Kutusu · Chief Site Engineer{% endblock %}
+{% block content %}
+{% if success %}<p class="success" role="status">{{ success }}</p>{% endif %}
+
+<div class="page-heading">
+  <div>
+    <p class="eyebrow">Saha Takibi</p>
+    <h1>Unutma Kutusu</h1>
+    <p class="muted">Henüz planlanmamış açık konular. Ayrıntıyı açıp proje veya dikkat zamanı ekleyebilirsiniz.</p>
+  </div>
+</div>
+
+<section class="quick-capture" aria-labelledby="inbox-capture-title">
+  <div>
+    <p class="eyebrow">Hızlı yakala</p>
+    <h2 id="inbox-capture-title">+ Unutma</h2>
+  </div>
+  <form method="post" action="{{ url_for('follow_up_create') }}" class="capture-form">
+    <input type="hidden" name="return_to" value="inbox">
+    <label for="inbox-capture">Ne unutulmamalı?</label>
+    <div class="capture-row">
+      <input id="inbox-capture" name="capture_text" required autocomplete="off" value="{{ capture_text }}" placeholder="Örn. Vinç bakım belgesini iste">
+      <button type="submit">Kaydet</button>
+    </div>
+  </form>
+</section>
+
+<section aria-labelledby="inbox-list-title">
+  <div class="section-heading"><h2 id="inbox-list-title">Planlanmamış takipler</h2><span class="count-badge">{{ follow_ups|length }}</span></div>
+  <div class="tracking-list card-grid">
+    {% for item in follow_ups %}
+    <a class="tracking-card{% if item.is_important %} important{% endif %}" href="{{ url_for('follow_up_detail', follow_up_id=item.follow_up_id) }}">
+      <div class="card-topline">
+        <span class="badge status-inbox">{{ follow_up_status_label(item.status) }}</span>
+        {% if item.is_important %}<span class="badge important-badge">Önemli</span>{% endif %}
+      </div>
+      <strong>{{ item.title }}</strong>
+      <span>{{ project_names.get(item.project_id, 'Kişisel / projesiz') }}</span>
+      <time>Yakalandı: {{ utc_to_istanbul_display(item.created_at) }}</time>
+    </a>
+    {% else %}
+    <p class="empty-state wide">Unutma Kutusu boş. Yeni bir konu yakalamak için yukarıdaki tek alan yeterli.</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

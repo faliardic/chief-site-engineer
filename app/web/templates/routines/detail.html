@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}{{ template.title }} · Rutinler{% endblock %}
+{% block content %}
+{% if success %}<p class="success" role="status">{{ success }}</p>{% endif %}
+<div class="detail-heading tracking-detail-heading">
+  <div>
+    <p class="eyebrow">Rutin · {{ routine_recurrence_summary(template) }}</p>
+    <h1>{{ template.title }}</h1>
+    <div class="card-topline">
+      <span class="badge status-{{ template.status.value }}">{{ routine_template_status_label(template.status) }}</span>
+      {% if template.is_important %}<span class="badge important-badge">Önemli</span>{% endif %}
+      <span class="muted">Revizyon {{ template.revision }}</span>
+    </div>
+  </div>
+  <a class="button secondary" href="{{ url_for('routine_list') }}">Rutinlere dön</a>
+</div>
+
+<section class="summary-panel" aria-labelledby="routine-summary-title">
+  <h2 id="routine-summary-title">Rutin özeti</h2>
+  <dl>
+    <dt>Açıklama</dt><dd>{{ template.description or '-' }}</dd>
+    <dt>Proje</dt><dd>{{ project_names.get(template.project_id, 'Kişisel / projesiz') }}</dd>
+    <dt>Tekrar</dt><dd>{{ routine_recurrence_summary(template) }}</dd>
+    <dt>Yerel saat</dt><dd>{{ template.local_time }} · Europe/Istanbul</dd>
+    <dt>Başlangıç</dt><dd>{{ local_date_display(template.start_date) }}</dd>
+    <dt>Bitiş</dt><dd>{{ local_date_display(template.end_date) }}</dd>
+    <dt>Oluşturulma</dt><dd>{{ utc_to_istanbul_display(template.created_at) }}</dd>
+    {% if template.deactivated_at %}<dt>Pasifleştirilme</dt><dd>{{ utc_to_istanbul_display(template.deactivated_at) }}</dd>{% endif %}
+  </dl>
+</section>
+
+{% if template.status.value == 'active' %}
+<section class="action-panel compact-panel deactivate-panel">
+  <h2>Rutini pasifleştir</h2>
+  <p>Yeni gerçekleşme oluşturulmaz; mevcut geçmiş ve gerçekleşmeler korunur.</p>
+  <form method="post" action="{{ url_for('routine_deactivate', routine_template_id=template.routine_template_id) }}">
+    <input type="hidden" name="expected_revision" value="{{ template.revision }}">
+    <button class="danger-button" type="submit">Pasifleştir</button>
+  </form>
+</section>
+{% endif %}
+
+<section aria-labelledby="occurrence-title">
+  <div class="section-heading"><h2 id="occurrence-title">Gerçekleşmeler</h2><span class="count-badge">{{ occurrences|length }}</span></div>
+  <div class="occurrence-list">
+    {% for occurrence in occurrences %}
+    <article class="occurrence-card{% if occurrence.status.value == 'closed' %} closed{% endif %}">
+      <div class="card-topline">
+        <strong>{{ local_date_display(occurrence.occurrence_local_date) }} · {{ occurrence.scheduled_local_time }}</strong>
+        <span class="badge status-{{ occurrence.status.value }}">{{ routine_occurrence_status_label(occurrence.status) }}</span>
+      </div>
+      <dl class="compact-dl">
+        <dt>Plan anı</dt><dd>{{ utc_to_istanbul_display(occurrence.scheduled_at_utc) }}</dd>
+        <dt>Dikkat zamanı</dt><dd>{{ utc_to_istanbul_display(occurrence.next_attention_at) }}</dd>
+        <dt>Sonuç</dt><dd>{{ routine_outcome_label(occurrence.outcome_type) }}</dd>
+        <dt>Sonuç notu</dt><dd>{{ occurrence.outcome_note or '-' }}</dd>
+        <dt>Revizyon</dt><dd>{{ occurrence.revision }}</dd>
+      </dl>
+      {% if occurrence.status.value == 'open' %}
+      <div class="inline-actions two-column-actions">
+        <form method="post" action="{{ url_for('routine_occurrence_snooze', routine_occurrence_id=occurrence.routine_occurrence_id) }}" class="compact-form">
+          <input type="hidden" name="expected_revision" value="{{ occurrence.revision }}">
+          <label>Tekrar göster <input type="datetime-local" name="next_attention_at" required value="{{ utc_to_istanbul_input(occurrence.next_attention_at) }}"></label>
+          <button class="secondary" type="submit">Ertele</button>
+        </form>
+        <form method="post" action="{{ url_for('routine_occurrence_close', routine_occurrence_id=occurrence.routine_occurrence_id) }}" class="compact-form">
+          <input type="hidden" name="expected_revision" value="{{ occurrence.revision }}">
+          <label>Sonuç
+            <select name="outcome_type">
+              <option value="completed">Tamamlandı</option>
+              <option value="no_work">Çalışma yoktu</option>
+              <option value="not_required">Gerekli değildi</option>
+            </select>
+          </label>
+          <label>Sonuç notu <textarea name="outcome_note">{{ form_values.get('outcome_note', '') }}</textarea></label>
+          <button type="submit">Sonuçlandır</button>
+        </form>
+      </div>
+      {% else %}
+      <form method="post" action="{{ url_for('routine_occurrence_reopen', routine_occurrence_id=occurrence.routine_occurrence_id) }}" class="compact-form reopen-form">
+        <input type="hidden" name="expected_revision" value="{{ occurrence.revision }}">
+        <label>Tekrar göster <input type="datetime-local" name="next_attention_at" required value="{{ utc_to_istanbul_input(occurrence.next_attention_at) }}"></label>
+        <button type="submit">Yeniden aç</button>
+      </form>
+      {% endif %}
+    </article>
+    {% else %}<p class="empty-state wide">Bu rutin için henüz gerçekleşme oluşmadı. Uygun tarih geldiğinde Bugün ekranı kaydı oluşturur.</p>{% endfor %}
+  </div>
+</section>
+
+<section aria-labelledby="routine-history-title">
+  <div class="section-heading"><h2 id="routine-history-title">Rutin geçmişi</h2><span class="count-badge">{{ history|length }}</span></div>
+  <ol class="event-history">
+    {% for event in history %}
+    <li>
+      <strong>{{ event.sequence }}. {{ routine_event_label(event.event_type) }}</strong>
+      <time>{{ utc_to_istanbul_display(event.occurred_at) }}</time>
+      {% for line in event_payload_summary(event.payload) %}<span class="event-detail">{{ line }}</span>{% endfor %}
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+{% endblock %}

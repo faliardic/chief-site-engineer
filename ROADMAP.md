@@ -5,6 +5,7 @@
 0. [x] Tek kullanıcılı kişisel saha asistanı yönünü kanonikleştir — Issue #103.
 1. [x] Saha Takibi transactional application service ve 7 günlük lazy backfill. Follow-up çekirdek dilimi Issue #109, waiting/terminal yaşam döngüsü Issue #111, observation link/conversion Issue #112 ve routine/backfill dilimi Issue #115 ile uygulandı.
 2. [x] Backup/restore compatibility ve resmî export izolasyonu — Issue #117 ile gerçek schema 2/3→4 restore, schema 4 tracking round-trip ve byte-identical resmî export regresyonları uygulandı.
+2A. [x] İlk test edilebilir PC Saha Takibi web yüzeyi — Issue #119 branch'inde Bugün, Unutma Kutusu, hızlı yakalama, follow-up yaşam döngüsü, rutinler, occurrence işlemleri ve restart kabulü tamamlandı; PR incelemesine hazır, henüz merge edilmedi.
 3. [ ] Mobil runtime ve veri sahipliği ADR.
 4. [ ] Mobil-first Kâğıdı Bırakma Sürümü.
 5. [ ] Offline ve bildirim güvenilirliği.
@@ -16,7 +17,7 @@
 11. [ ] Gerçek kullanımın kanıtladığı kişisel yardımcı araçlar.
 12. [ ] Kişisel AI asistanı.
 
-Bağlayıcı üst yol haritası GitHub Epic #105'tir. Saha Takibi domain/recurrence, SQLite persistence, iki transactional application service, yedi günlük lazy backfill ve backup/restore–resmî export güvenlik kapısı tamamlanmıştır. Sıradaki ayrı faz mobil runtime ve veri sahipliği ADR'sidir; mobil UI, offline/bildirim ve saha pilotları henüz tamamlanmamıştır.
+Bağlayıcı üst yol haritası GitHub Epic #105'tir. Saha Takibi domain/recurrence, SQLite persistence, iki transactional application service, yedi günlük lazy backfill, backup/restore–resmî export güvenlik kapısı ve ilk test edilebilir PC web yüzeyi tamamlanmıştır. Issue #119 merge edilmiş sayılmaz; PR incelemesine hazır aktif branch durumundadır. Sıradaki ayrı faz mobil runtime ve veri sahipliği ADR'sidir; mobil UI, offline/bildirim ve saha pilotları henüz tamamlanmamıştır.
 
 ## Faz 4 Minimum Kâğıdı Bırakma Kapsamı
 
@@ -714,7 +715,7 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 
 ## Step 225 Sonrası Tarihsel Çalışma Önerisi
 
-Bu öneri Step 225 dönemine aittir ve güncel ürün sırasını belirlemez. Bugünkü sonraki dar production adımı Saha Takibi transactional application service ve lazy backfill'dir; ayrı GitHub Issue ile yetkilendirilmelidir.
+Bu öneri Step 225 dönemine aittir ve güncel ürün sırasını belirlemez. Transactional service, lazy backfill, backup/export güvenlik kapısı ve ilk test edilebilir PC web yüzeyi sonraki Issue'larla tamamlanmıştır; güncel sonraki ürün yönü üstteki listede yer alan mobil runtime ve veri sahipliği ADR'sidir.
 
 Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcast 032 Adim 206-210, Podcast 033 Adim 211-215, Podcast 034 Adim 216-220 ve Podcast 035 Adim 221-225 araligini kapsar. Sonraki dogal podcast araligi Steps 226-230 olur.
 
@@ -735,9 +736,9 @@ Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcas
 - [x] Puantaj iş günü kabul senaryosu restart, snooze, template edit, deactivation ve backup/restore durumlarıyla tamamlandı.
 - [x] Production domain kayıtları, hızlı capture normalization, saf recurrence ve görünüm sınıflandırmaları Issue #100 kapsamında executable testlerle uygulandı.
 - [x] SQLite schema v3 migration, domain-SQLite mapping, altı repository/event adapter'ı ve Unit of Work bağlantıları Issue #102 kapsamında uygulandı.
-- [ ] Transactional service/backfill implementasyonu ayrı görevde yapılacak.
-- [ ] Backup compatibility ve export exclusion executable testleri ayrı görevlerde yapılacak.
-- [ ] Minimum UI yalnız veri sözleşmesi implementation’ı doğrulandıktan sonra ele alınacak.
+- [x] Transactional service/backfill Issue #109, #111, #112 ve #115 ile uygulandı.
+- [x] Backup compatibility ve export exclusion Issue #117 ile executable testlerle doğrulandı.
+- [x] İlk test edilebilir PC UI Issue #119 branch'inde tamamlandı ve PR incelemesine hazırlandı.
 
 ## Issue 100 - Saha Takibi Task 2/5 Domain ve Saf Recurrence
 
@@ -750,8 +751,8 @@ Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcas
 - [x] Follow-up `inbox/overdue/today/upcoming`, occurrence `overdue/today/upcoming` ve tekilleştirilmiş “Şimdi ilgilen” bileşimi eklendi; `now` domain kategorisi eklenmedi.
 - [x] Domain ve recurrence için kapsamlı focused executable test matrisi eklendi.
 - [x] SQLite schema v3, migration, repository ve Unit of Work bağlantıları Issue #102 kapsamında uygulandı.
-- [ ] Transactional application service ve occurrence ensure/backfill orchestration sonraki ayrı görevde uygulanacak.
-- [ ] Backup/restore compatibility, export exclusion ve minimum UI sonraki ayrı görevlerde uygulanacak.
+- [x] Transactional application service ve occurrence ensure/backfill orchestration Issue #109, #111, #112 ve #115 ile uygulandı.
+- [x] Backup/restore compatibility ve export exclusion Issue #117; ilk test edilebilir PC UI Issue #119 ile tamamlandı.
 
 ## Issue 102 - Saha Takibi Task 3/5 SQLite v3 ve Persistence
 
@@ -763,8 +764,8 @@ Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcas
 - [x] Routine occurrence insert'i template + yerel tarih anahtarında idempotent primitive olarak eklendi.
 - [x] Altı tracking repository'si mevcut SQLite Unit of Work transaction'ına bağlandı; aggregate + event commit/rollback atomikliği kanıtlandı.
 - [x] Fresh v3 ile v2→v3 şema eşitliği ve mevcut project/observation/attachment/event satırlarının birebir korunması geçici database testleriyle doğrulandı.
-- [ ] Transactional application service ve occurrence ensure/backfill orchestration Task 4/5 kapsamında ele alınacak.
-- [ ] Backup compatibility, export exclusion ve minimum UI sonraki ayrı görevlerde ele alınacak.
+- [x] Transactional application service ve occurrence ensure/backfill orchestration Issue #109, #111, #112 ve #115 ile uygulandı.
+- [x] Backup compatibility ve export exclusion Issue #117; ilk test edilebilir PC UI Issue #119 ile tamamlandı.
 
 ## Issue 103 - Kanonik Talimatlar v2 ve Repository Truth
 
@@ -790,8 +791,8 @@ Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcas
 - [x] Fresh v4/v3→v4 schema eşitliği, tam rollback, allowed/unknown türler, duplicate sequence, foreign key ve repository round-trip testleri eklendi.
 - [x] Mapping/repository API değişikliği gerekmedi; event update/delete/sequence allocator eklenmedi.
 - [x] `FollowUpApplicationService` çekirdek optimistic mutation/no-op ve atomik event üretimi Issue #109; waiting/terminal yaşam döngüsü Issue #111 ile uygulandı.
-- [ ] Rutin application service ve yedi günlük idempotent lazy backfill ayrı küçük görevde uygulanacak.
-- [ ] Backup backward compatibility ve resmî export izolasyonu Epic #105 Faz 2'de executable kabul testleriyle tamamlanacak.
+- [x] Rutin application service ve yedi günlük idempotent lazy backfill Issue #115 ile uygulandı.
+- [x] Backup backward compatibility ve resmî export izolasyonu Issue #117 ile executable kabul testleriyle tamamlandı.
 
 ## Issue 109 - FollowUpApplicationService Çekirdek Akışları
 
@@ -804,7 +805,7 @@ Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcas
 - [x] Repository portlarına sequence/update/delete API'si, schema v5/migration, web/UI, backup/export değişikliği eklenmedi.
 - [x] Waiting, complete, cancel ve reopen follow-up yaşam döngüleri Issue #111 ile uygulandı.
 - [x] Observation bağlama/dönüştürme Issue #112 ile uygulandı.
-- [ ] Routine application service ile yedi günlük idempotent lazy backfill ayrı dar görevde uygulanacak.
+- [x] Routine application service ile yedi günlük idempotent lazy backfill Issue #115 ile uygulandı.
 
 ## Issue 111 - Follow-up Bekleme ve Terminal Yaşam Döngüleri
 
@@ -827,3 +828,17 @@ Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcas
 - [x] Exact converted retry no-op; diğer completed outcome ve cancelled conversion reddi uygulandı.
 - [x] UUID validation, event insert ve commit hatalarında link/conversion aggregate-event rollback'i test edildi.
 - [x] Otomatik observation creation, persistence/schema, observation service, routine/backfill, web/UI ve backup/export kapsamına girilmedi.
+
+## Issue 119 - İlk Test Edilebilir PC Saha Takibi Arayüzü
+
+- [x] `/` başlangıcı `/today` görünümüne yönlendirildi; üst navigasyonda Bugün, Unutma Kutusu, Rutinler ve Gözlemler görünür hale getirildi.
+- [x] Observation, follow-up ve routine application service'leri aynı `cse.sqlite3` dosyasına bağlandı; schema sürümü `4` kaldı.
+- [x] Bugün görünümü Şimdi ilgilen, Gecikenler, Bugün ve Bugünkü rutinler bölümlerini Europe/Istanbul kullanıcı zamanı ile sunuyor.
+- [x] Tek alanlı `+ Unutma` formu normalize edilmiş capture text, PRG redirect, HTML escaping ve immutable ilk yakalama kanıtıyla uygulandı.
+- [x] Follow-up detail; ayrıntı, proje, planlama, bekleme, inbox, complete, cancel ve reopen işlemlerini revision korumasıyla sunuyor.
+- [x] Rutin list/create/detail/deactivate ile occurrence snooze/close/reopen işlemleri server-rendered formlarla sunuluyor.
+- [x] Aynı `/today` yenilemesinin duplicate occurrence/event üretmediği ve restart sonrasında revision/history'nin aynı SQLite'tan okunduğu doğrulandı.
+- [x] Mevcut observation, backup ve resmî günlük export akışları korundu; follow-up capture text'i ve routine başlığı resmî export'a sızmadı.
+- [x] Web paketi `17 passed`, ilgili regresyonlar `56 passed`, full suite `983 passed, 7 skipped` olarak doğrulandı.
+- [x] `SCHEMA_VERSION == 4`; domain/application/persistence/operations protected path diff'i boş; gerçek `CSE_DATA_ROOT` kullanılmadı.
+- [x] PC web sürümü PR incelemesine hazırlandı; merge claim, PR oluşturma, mobile/PWA/offline/sync/notification/auth kapsamı eklenmedi.

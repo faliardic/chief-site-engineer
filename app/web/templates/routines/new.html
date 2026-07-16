@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Yeni Rutin · Chief Site Engineer{% endblock %}
+{% block content %}
+<div class="detail-heading">
+  <div><p class="eyebrow">Saha Takibi</p><h1>Yeni rutin</h1><p class="muted">Saatler Europe/Istanbul yerel saatine göre kaydedilir.</p></div>
+  <a class="button secondary" href="{{ url_for('routine_list') }}">Rutinlere dön</a>
+</div>
+
+<form method="post" class="action-panel routine-form">
+  <label>Başlık <input name="title" required value="{{ form_values.get('title', '') }}" placeholder="Örn. Puantajı tamamla"></label>
+  <label>Açıklama <textarea name="description">{{ form_values.get('description', '') }}</textarea></label>
+  <label>Proje
+    <select name="project_id">
+      <option value="">Kişisel / projesiz</option>
+      {% for project in projects %}<option value="{{ project.project_id }}"{% if form_values.get('project_id') == project.project_id %} selected{% endif %}>{{ project.name }}</option>{% endfor %}
+    </select>
+  </label>
+  {% set recurrence = form_values.get('recurrence_type', 'daily') %}
+  <label>Tekrar
+    <select name="recurrence_type" required>
+      <option value="daily"{% if recurrence == 'daily' %} selected{% endif %}>Her gün</option>
+      <option value="weekdays"{% if recurrence == 'weekdays' %} selected{% endif %}>Her iş günü</option>
+      <option value="weekly"{% if recurrence == 'weekly' %} selected{% endif %}>Haftanın seçili günleri</option>
+      <option value="monthly"{% if recurrence == 'monthly' %} selected{% endif %}>Ayın belirli günü</option>
+    </select>
+  </label>
+  <label>Saat <input type="time" name="local_time" required value="{{ form_values.get('local_time', '08:00') }}"></label>
+  <div class="form-grid">
+    <label>Başlangıç tarihi <input type="date" name="start_date" required value="{{ form_values.get('start_date', '') }}"></label>
+    <label>Bitiş tarihi (isteğe bağlı) <input type="date" name="end_date" value="{{ form_values.get('end_date', '') }}"></label>
+  </div>
+  <fieldset>
+    <legend>Haftalık rutin günleri</legend>
+    <p class="field-help">“Haftanın seçili günleri” seçeneğinde en az bir gün işaretleyin.</p>
+    <div class="checkbox-grid">
+      {% for weekday, label in iso_weekday_labels.items() %}
+      <label class="checkbox-label"><input type="checkbox" name="weekdays" value="{{ weekday }}"{% if weekday|string in selected_weekdays %} checked{% endif %}> {{ label }}</label>
+      {% endfor %}
+    </div>
+  </fieldset>
+  <label>Ayın günü
+    <input type="number" name="month_day" min="1" max="31" value="{{ form_values.get('month_day', '') }}">
+    <span class="field-help">Yalnız “Ayın belirli günü” seçeneğinde 1–31 arasında girin.</span>
+  </label>
+  <label class="checkbox-label"><input type="checkbox" name="is_important" value="1"{% if form_values.get('is_important') == '1' %} checked{% endif %}> Önemli olarak işaretle</label>
+  <button type="submit">Rutini oluştur</button>
+</form>
+{% endblock %}
