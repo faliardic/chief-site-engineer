@@ -1400,6 +1400,12 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 
 `Schema Signature`: `sqlite_master` içindeki table/index adı, bağlı tablo ve SQL tanımlarının sıralı bütünüdür; fresh migration ile upgrade yolunun aynı şemaya ulaştığını karşılaştırmak için kullanılır.
 
+`Restore Allowlist`: Bir yedekten geri yüklenmesine açıkça izin verilen schema sürümlerinin kapalı listesidir. Listede bulunmayan eski, bozuk veya gelecekteki sürümler otomatik tahmin edilmez ve fail-closed reddedilir.
+
+`Pre-migration Doğrulama`: Eski bir database üzerinde hiçbir migration çalıştırmadan önce integrity, migration zinciri, kayıt sayıları ve attachment ilişkilerinin kendi sürüm sözleşmesine göre kontrol edilmesidir.
+
+`Post-migration Doğrulama`: Migration tamamlandıktan sonra güncel schema zincirinin, veri bütünlüğünün ve repository katmanının bütün kayıtları okuyabildiğinin tekrar kontrol edilmesidir.
+
 `Replacement Table`: Table rebuild sırasında yeni constraint sözleşmesiyle oluşturulan, veri kopyalandıktan sonra asıl tablo adını alan geçici yeni tablodur.
 
 `Application Service (Uygulama Servisi)`: Bir kullanım senaryosunda domain kayıtlarını, repository çağrılarını ve transaction sınırını koordine eden; UI veya transport modeli olmayan uygulama katmanı sınıfıdır.

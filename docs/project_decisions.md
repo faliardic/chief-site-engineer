@@ -2528,3 +2528,14 @@
 - Snooze, close ve reopen schedule snapshot alanlarini degistirmeyecek; kullanici `missed` sonucu veremeyecek.
 - Schema/migration/mapping/repository/UoW portlari genisletilmeyecek; mevcut `BEGIN IMMEDIATE` transaction ve append-only event repository'leri kullanilacak.
 - Web/UI, scheduler/notification, backup/export, mobile/offline/sync ve gercek kullanici data root'u ayri gorevlere birakilacak.
+
+## Issue 117 - Backup/Restore Uyumlulugu ve Resmi Export Izolasyonu
+
+- Backup ve daily export format surumleri `1`, exact manifest field setleri, ZIP entry adlari ve observation/event/record count anlamlari degismeyecek.
+- Restore edilebilir schema allowlist'i `(2, 3, 4)` olacak; schema degeri integer olmak zorunda olacak ve manifest ile embedded `schema_migrations` zinciri birebir eslesecek.
+- `verify_backup` migration calistirmayacak; embedded database ve attachment'lari private temporary alanda read-only integrity, exact migration, count ve reconciliation kontrollerinden gecirecek.
+- Schema 2 veya 3 migration'i yalniz restore'un private temporary database'i uzerinde calisacak; source archive, source database, aktif data root veya var olan target uzerinde in-place migration yapilmayacak.
+- Restore target'i ancak pre-migration ve post-migration database/attachment kontrolleri ile schema 4 repository okumalarinin tamami gectikten sonra tek atomic move ile gorunur olacak.
+- Schema 4 tracking verisi ayri manifest count alanlariyla degil, SQLite snapshot digest'i ve restore sonrasi aggregate/event kabul testleriyle korunacak.
+- Resmi daily export kodu yalniz mevcut project/observation/attachment/observation-event omurgasini okumaya devam edecek; tracking verili ve verisiz koklerin deterministic ZIP byte esitligi executable guvence olacak.
+- Export izolasyon testi sizinti bulmadigi icin `app/operations/exports.py` degistirilmeyecek.
