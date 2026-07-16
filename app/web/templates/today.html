@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Bugün · Chief Site Engineer{% endblock %}
+{% block content %}
+{% if success %}<p class="success" role="status">{{ success }}</p>{% endif %}
+
+<div class="page-heading">
+  <div>
+    <p class="eyebrow">Saha Takibi</p>
+    <h1>Bugün</h1>
+    <p class="muted">Şu anda ilgilenmeniz gereken kişisel takipler ve rutinler.</p>
+  </div>
+</div>
+
+<section class="quick-capture" aria-labelledby="quick-capture-title">
+  <div>
+    <p class="eyebrow">Hızlı yakala</p>
+    <h2 id="quick-capture-title">+ Unutma</h2>
+    <p>Yalnız hatırlamak istediğiniz şeyi yazın; ayrıntıları sonra ekleyebilirsiniz.</p>
+  </div>
+  <form method="post" action="{{ url_for('follow_up_create') }}" class="capture-form">
+    <input type="hidden" name="return_to" value="today">
+    <label for="today-capture">Ne unutulmamalı?</label>
+    <div class="capture-row">
+      <input id="today-capture" name="capture_text" required autocomplete="off" value="{{ capture_text }}" placeholder="Örn. Kalıp kotunu tekrar kontrol et">
+      <button type="submit">Kaydet</button>
+    </div>
+  </form>
+</section>
+
+<div class="dashboard-grid">
+  <section class="dashboard-section accent-now" aria-labelledby="now-title">
+    <div class="section-heading"><h2 id="now-title">Şimdi ilgilen</h2><span class="count-badge">{{ now_follow_ups|length }}</span></div>
+    <div class="tracking-list">
+      {% for item in now_follow_ups %}
+      <a class="tracking-card{% if item.is_important %} important{% endif %}" href="{{ url_for('follow_up_detail', follow_up_id=item.follow_up_id) }}">
+        <div class="card-topline">
+          <span class="badge status-{{ item.status.value }}">{{ follow_up_status_label(item.status) }}</span>
+          {% if item.is_important %}<span class="badge important-badge">Önemli</span>{% endif %}
+        </div>
+        <strong>{{ item.title }}</strong>
+        <span>{{ project_names.get(item.project_id, 'Kişisel') }}</span>
+        {% if item.next_attention_at %}<time>{{ utc_to_istanbul_display(item.next_attention_at) }}</time>{% endif %}
+      </a>
+      {% else %}<p class="empty-state">Şu anda öne çıkan bir takip yok.</p>{% endfor %}
+    </div>
+  </section>
+
+  <section class="dashboard-section accent-overdue" aria-labelledby="overdue-title">
+    <div class="section-heading"><h2 id="overdue-title">Gecikenler</h2><span class="count-badge">{{ overdue_follow_ups|length + overdue_occurrences|length }}</span></div>
+    <div class="tracking-list">
+      {% for item in overdue_follow_ups %}
+      <a class="tracking-card overdue" href="{{ url_for('follow_up_detail', follow_up_id=item.follow_up_id) }}">
+        <span class="badge danger-badge">Geciken takip</span>
+        <strong>{{ item.title }}</strong>
+        <time>{{ utc_to_istanbul_display(item.next_attention_at) }}</time>
+      </a>
+      {% endfor %}
+      {% for occurrence in overdue_occurrences %}
+      <article class="tracking-card overdue">
+        <div class="card-topline">
+          <span class="badge danger-badge">Geciken rutin</span>
+          <a href="{{ url_for('routine_detail', routine_template_id=occurrence.routine_template_id) }}">Rutin detayı</a>
+        </div>
+        <strong>{{ template_names.get(occurrence.routine_template_id, 'Rutin') }}</strong>
+        <span>{{ local_date_display(occurrence.occurrence_local_date) }} · {{ occurrence.scheduled_local_time }}</span>
+        <div class="inline-actions">
+          <form method="post" action="{{ url_for('routine_occurrence_close', routine_occurrence_id=occurrence.routine_occurrence_id) }}" class="compact-form">
+            <input type="hidden" name="expected_revision" value="{{ occurrence.revision }}">
+            <input type="hidden" name="return_to" value="today">
+            <label>Sonuç
+              <select name="outcome_type">
+                <option value="completed">Tamamlandı</option>
+                <option value="no_work">Çalışma yoktu</option>
+                <option value="not_required">Gerekli değildi</option>
+              </select>
+            </label>
+            <button type="submit">Sonuçlandır</button>
+          </form>
+        </div>
+      </article>
+      {% endfor %}
+      {% if not overdue_follow_ups and not overdue_occurrences %}<p class="empty-state">Geciken açık kayıt yok.</p>{% endif %}
+    </div>
+  </section>
+
+  <section class="dashboard-section" aria-labelledby="today-follow-title">
+    <div class="section-heading"><h2 id="today-follow-title">Bugün</h2><span class="count-badge">{{ today_follow_ups|length }}</span></div>
+    <div class="tracking-list">
+      {% for item in today_follow_ups %}
+      <a class="tracking-card{% if item.is_important %} important{% endif %}" href="{{ url_for('follow_up_detail', follow_up_id=item.follow_up_id) }}">
+        <div class="card-topline">
+          <span class="badge status-{{ item.status.value }}">{{ follow_up_status_label(item.status) }}</span>
+          {% if item.is_important %}<span class="badge important-badge">Önemli</span>{% endif %}
+        </div>
+        <strong>{{ item.title }}</strong>
+        <span>{{ project_names.get(item.project_id, 'Kişisel') }}</span>
+        <time>{{ utc_to_istanbul_display(item.next_attention_at) }}</time>
+      </a>
+      {% else %}<p class="empty-state">Bugüne planlanan takip yok.</p>{% endfor %}
+    </div>
+  </section>
+
+  <section class="dashboard-section accent-routine" aria-labelledby="today-routine-title">
+    <div class="section-heading"><h2 id="today-routine-title">Bugünkü rutinler</h2><span class="count-badge">{{ today_occurrences|length }}</span></div>
+    <div class="tracking-list">
+      {% for occurrence in today_occurrences %}
+      <article class="tracking-card routine-card">
+        <div class="card-topline">
+          <span class="badge status-open">Açık</span>
+          <a href="{{ url_for('routine_detail', routine_template_id=occurrence.routine_template_id) }}">Rutin detayı</a>
+        </div>
+        <strong>{{ template_names.get(occurrence.routine_template_id, 'Rutin') }}</strong>
+        <span>Plan: {{ local_date_display(occurrence.occurrence_local_date) }} {{ occurrence.scheduled_local_time }}</span>
+        <span>Dikkat: {{ utc_to_istanbul_display(occurrence.next_attention_at) }}</span>
+        <div class="inline-actions two-column-actions">
+          <form method="post" action="{{ url_for('routine_occurrence_snooze', routine_occurrence_id=occurrence.routine_occurrence_id) }}" class="compact-form">
+            <input type="hidden" name="expected_revision" value="{{ occurrence.revision }}">
+            <input type="hidden" name="return_to" value="today">
+            <label>Tekrar göster
+              <input type="datetime-local" name="next_attention_at" required value="{{ utc_to_istanbul_input(occurrence.next_attention_at) }}">
+            </label>
+            <button class="secondary" type="submit">Ertele</button>
+          </form>
+          <form method="post" action="{{ url_for('routine_occurrence_close', routine_occurrence_id=occurrence.routine_occurrence_id) }}" class="compact-form">
+            <input type="hidden" name="expected_revision" value="{{ occurrence.revision }}">
+            <input type="hidden" name="return_to" value="today">
+            <label>Sonuç
+              <select name="outcome_type">
+                <option value="completed">Tamamlandı</option>
+                <option value="no_work">Çalışma yoktu</option>
+                <option value="not_required">Gerekli değildi</option>
+              </select>
+            </label>
+            <button type="submit">Sonuçlandır</button>
+          </form>
+        </div>
+      </article>
+      {% else %}<p class="empty-state">Bugün için açık rutin yok.</p>{% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}

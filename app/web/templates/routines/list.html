@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Rutinler · Chief Site Engineer{% endblock %}
+{% block content %}
+{% if success %}<p class="success" role="status">{{ success }}</p>{% endif %}
+<div class="page-heading title-row">
+  <div>
+    <p class="eyebrow">Saha Takibi</p>
+    <h1>Rutinler</h1>
+    <p class="muted">Tekrarlayan saha işlerini bir kez tanımlayın; günlük gerçekleşmeleri Bugün ekranından yönetin.</p>
+  </div>
+  <a class="button" href="{{ url_for('routine_new') }}">Yeni rutin</a>
+</div>
+
+<section aria-labelledby="routine-list-title">
+  <div class="section-heading"><h2 id="routine-list-title">Rutin tanımları</h2><span class="count-badge">{{ templates|length }}</span></div>
+  <div class="card-grid">
+    {% for template in templates %}
+    <a class="tracking-card{% if template.is_important %} important{% endif %}" href="{{ url_for('routine_detail', routine_template_id=template.routine_template_id) }}">
+      <div class="card-topline">
+        <span class="badge status-{{ template.status.value }}">{{ routine_template_status_label(template.status) }}</span>
+        {% if template.is_important %}<span class="badge important-badge">Önemli</span>{% endif %}
+      </div>
+      <strong>{{ template.title }}</strong>
+      <span>{{ routine_recurrence_summary(template) }} · {{ template.local_time }}</span>
+      <span>{{ project_names.get(template.project_id, 'Kişisel / projesiz') }}</span>
+    </a>
+    {% else %}<p class="empty-state wide">Henüz rutin tanımlanmadı. İlk rutini oluşturmak için “Yeni rutin” düğmesini kullanın.</p>{% endfor %}
+  </div>
+</section>
+{% endblock %}

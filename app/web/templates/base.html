@@ -7,7 +7,17 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
 </head>
 <body>
-  <header><a href="{{ url_for('observation_list') }}">Chief Site Engineer</a></header>
+  <header class="app-header">
+    <div class="header-inner">
+      <a class="brand" href="{{ url_for('today') }}">Chief Site Engineer</a>
+      <nav aria-label="Ana navigasyon">
+        <a href="{{ url_for('today') }}"{% if request.endpoint == 'today' %} aria-current="page"{% endif %}>Bugün</a>
+        <a href="{{ url_for('follow_up_inbox') }}"{% if request.endpoint and request.endpoint.startswith('follow_up') %} aria-current="page"{% endif %}>Unutma Kutusu</a>
+        <a href="{{ url_for('routine_list') }}"{% if request.endpoint and request.endpoint.startswith('routine') %} aria-current="page"{% endif %}>Rutinler</a>
+        <a href="{{ url_for('observation_list') }}"{% if request.endpoint and request.endpoint.startswith('observation') %} aria-current="page"{% endif %}>Gözlemler</a>
+      </nav>
+    </div>
+  </header>
   <main>
     {% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
     {% block content %}{% endblock %}
