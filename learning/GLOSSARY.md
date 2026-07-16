@@ -1407,3 +1407,7 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Unit of Work`: Aynı işleme ait birden fazla repository yazısını tek database transaction'ında toplayan; commit olursa hepsini kalıcılaştıran, hata olursa hepsini rollback eden sınırdır.
 
 `Dependency Injection (Bağımlılık Enjeksiyonu)`: Saat, UUID üretici veya Unit of Work factory gibi dış davranışları sınıfa içeride sabitlemek yerine constructor üzerinden vermektir. Testlerde zamanı ve kimliği deterministik yapmayı sağlar.
+
+`Terminal Durum`: Bir kaydın normal açık geçişlerinin sona erdiği kapanış durumudur. Follow-up için `completed` ve `cancelled` terminaldir; tekrar değiştirilebilmesi için açık bir `reopen` işlemi gerekir.
+
+`Reopen (Yeniden Açma)`: Terminal kaydın outcome ve kapanış zamanı alanlarını temizleyerek yeniden açık yaşam döngüsüne alınmasıdır. Bu projede dikkat zamanı yoksa `inbox`, varsa `active` üretilir.

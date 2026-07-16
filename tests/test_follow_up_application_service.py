@@ -4,10 +4,12 @@ from pathlib import Path
 import pytest
 
 from app.application import (
+    CompleteFollowUp,
     CreateFollowUp,
     FollowUpApplicationService,
     FollowUpQuery,
     FollowUpView,
+    MarkWaiting,
     ScheduleFollowUp,
     UpdateFollowUp,
 )
@@ -788,3 +790,476 @@ def test_repository_ports_and_schema_are_not_expanded(tmp_path: Path) -> None:
         assert not hasattr(unit_of_work.follow_up_events, "update")
         assert not hasattr(unit_of_work.follow_up_events, "delete")
         assert not hasattr(unit_of_work.follow_up_events, "allocate_sequence")
+
+
+def test_lifecycle_commands_are_immutable_normalized_and_validated() -> None:
+    waiting = MarkWaiting(NEXT_AT, "   ", "  Beton sonucunu bekle  ")
+    completion = CompleteFollowUp(
+        "completed", "  Uygun bulundu  "  # type: ignore[arg-type]
+    )
+
+    assert waiting.related_person is None
+    assert waiting.condition_text == "Beton sonucunu bekle"
+    assert completion.outcome_type is FollowUpOutcome.COMPLETED
+    assert completion.outcome_note == "Uygun bulundu"
+    with pytest.raises(FrozenInstanceError):
+        waiting.next_attention_at = LATER_AT  # type: ignore[misc]
+    with pytest.raises(ValueError, match="ending in Z"):
+        MarkWaiting("2026-07-16T12:00:00+00:00")
+    for outcome in (
+        FollowUpOutcome.CONVERTED_TO_OBSERVATION,
+        FollowUpOutcome.CANCELLED,
+    ):
+        with pytest.raises(ValueError, match="outcome_type"):
+            CompleteFollowUp(outcome)
+
+
+@pytest.mark.parametrize("initial", [FollowUpStatus.INBOX, FollowUpStatus.ACTIVE])
+def test_mark_waiting_sets_context_preserves_record_and_writes_payload(
+    tmp_path: Path, initial: FollowUpStatus
+) -> None:
+    database_path = tmp_path / f"waiting-{initial.value}.sqlite3"
+    previous_attention = LATER_AT if initial is FollowUpStatus.ACTIVE else None
+    original = _item(
+        FOLLOW_UP_ID,
+        created_at=CREATED_AT,
+        status=initial,
+        next_attention_at=previous_attention,
+        deadline_at="2026-07-20T09:00:00Z",
+        is_important=True,
+    )
+    _seed_items(database_path, original)
+    service = _service(
+        database_path, ids=(EVENT_IDS[0],), times=(UPDATED_AT,)
+    )
+
+    waiting = service.mark_waiting(
+        FOLLOW_UP_ID,
+        1,
+        MarkWaiting(NEXT_AT, "  Ahmet Usta  ", "  Numune sonucu  "),
+    )
+
+    assert waiting.status is FollowUpStatus.WAITING
+    assert waiting.next_attention_at == NEXT_AT
+    assert waiting.related_person == "Ahmet Usta"
+    assert waiting.condition_text == "Numune sonucu"
+    assert waiting.deadline_at == original.deadline_at
+    assert waiting.capture_text == original.capture_text
+    assert waiting.is_important is True
+    assert waiting.revision == 2
+    assert waiting.updated_at == UPDATED_AT
+    event = service.list_history(FOLLOW_UP_ID)[0]
+    assert event.event_type is FollowUpEventType.WAITING_STARTED
+    assert event.payload == {
+        "condition_text": "Numune sonucu",
+        "from_status": initial.value,
+        "next_attention_at": NEXT_AT,
+        "previous_next_attention_at": previous_attention,
+        "related_person": "Ahmet Usta",
+        "revision": 2,
+    }
+
+
+def test_mark_waiting_null_context_and_exact_no_op_consume_nothing(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "waiting-noop.sqlite3"
+    original = FollowUpItem(
+        follow_up_id=FOLLOW_UP_ID,
+        capture_text="Cevabı bekle",
+        title="Cevabı bekle",
+        status=FollowUpStatus.WAITING,
+        next_attention_at=NEXT_AT,
+        created_at=CREATED_AT,
+        updated_at=CREATED_AT,
+    )
+    _seed_items(database_path, original)
+    service = _service(database_path, ids=(), times=())
+
+    same = service.mark_waiting(FOLLOW_UP_ID, 1, MarkWaiting(NEXT_AT, " ", ""))
+
+    assert same == original
+    assert service.list_history(FOLLOW_UP_ID) == ()
+    with pytest.raises(RevisionConflict):
+        service.mark_waiting(FOLLOW_UP_ID, 2, MarkWaiting(NEXT_AT))
+    with pytest.raises(InvalidRecordError, match="different values"):
+        service.mark_waiting(FOLLOW_UP_ID, 1, MarkWaiting(LATER_AT))
+
+
+@pytest.mark.parametrize(
+    "terminal", [FollowUpStatus.COMPLETED, FollowUpStatus.CANCELLED]
+)
+def test_mark_waiting_rejects_terminal_status(
+    tmp_path: Path, terminal: FollowUpStatus
+) -> None:
+    database_path = tmp_path / f"waiting-terminal-{terminal.value}.sqlite3"
+    original = _item(FOLLOW_UP_ID, created_at=CREATED_AT, terminal=terminal)
+    _seed_items(database_path, original)
+
+    with pytest.raises(InvalidRecordError, match="inbox or active"):
+        FollowUpApplicationService(database_path).mark_waiting(
+            FOLLOW_UP_ID, 1, MarkWaiting(NEXT_AT)
+        )
+    assert FollowUpApplicationService(database_path).get_follow_up(
+        FOLLOW_UP_ID
+    ) == original
+
+
+@pytest.mark.parametrize(
+    ("initial", "outcome"),
+    [
+        (initial, outcome)
+        for initial in (
+            FollowUpStatus.INBOX,
+            FollowUpStatus.ACTIVE,
+            FollowUpStatus.WAITING,
+        )
+        for outcome in (
+            FollowUpOutcome.COMPLETED,
+            FollowUpOutcome.NOT_REQUIRED,
+        )
+    ],
+)
+def test_complete_supports_all_open_statuses_and_allowed_outcomes(
+    tmp_path: Path, initial: FollowUpStatus, outcome: FollowUpOutcome
+) -> None:
+    database_path = tmp_path / f"complete-{initial.value}-{outcome.value}.sqlite3"
+    previous_attention = None if initial is FollowUpStatus.INBOX else NEXT_AT
+    original = _item(
+        FOLLOW_UP_ID,
+        created_at=CREATED_AT,
+        status=initial,
+        next_attention_at=previous_attention,
+        deadline_at="2026-07-20T09:00:00Z",
+    )
+    _seed_items(database_path, original)
+    service = _service(
+        database_path, ids=(EVENT_IDS[0],), times=(UPDATED_AT,)
+    )
+
+    completed = service.complete(
+        FOLLOW_UP_ID, 1, CompleteFollowUp(outcome, "  Kontrol edildi  ")
+    )
+
+    assert completed.status is FollowUpStatus.COMPLETED
+    assert completed.outcome_type is outcome
+    assert completed.outcome_note == "Kontrol edildi"
+    assert completed.completed_at == UPDATED_AT
+    assert completed.cancelled_at is None
+    assert completed.next_attention_at is None
+    assert completed.deadline_at == original.deadline_at
+    assert completed.revision == 2
+    event = service.list_history(FOLLOW_UP_ID)[0]
+    assert event.event_type is FollowUpEventType.COMPLETED
+    assert event.payload == {
+        "from_status": initial.value,
+        "outcome_note": "Kontrol edildi",
+        "outcome_type": outcome.value,
+        "previous_next_attention_at": previous_attention,
+        "revision": 2,
+    }
+
+
+@pytest.mark.parametrize(
+    "terminal", [FollowUpStatus.COMPLETED, FollowUpStatus.CANCELLED]
+)
+def test_complete_rejects_terminal_and_checks_stale_first(
+    tmp_path: Path, terminal: FollowUpStatus
+) -> None:
+    database_path = tmp_path / f"complete-terminal-{terminal.value}.sqlite3"
+    original = _item(FOLLOW_UP_ID, created_at=CREATED_AT, terminal=terminal)
+    _seed_items(database_path, original)
+    service = FollowUpApplicationService(database_path)
+
+    with pytest.raises(RevisionConflict):
+        service.complete(
+            FOLLOW_UP_ID, 2, CompleteFollowUp(FollowUpOutcome.COMPLETED)
+        )
+    with pytest.raises(InvalidRecordError, match="open follow-up"):
+        service.complete(
+            FOLLOW_UP_ID, 1, CompleteFollowUp(FollowUpOutcome.COMPLETED)
+        )
+    assert service.get_follow_up(FOLLOW_UP_ID) == original
+
+
+@pytest.mark.parametrize(
+    "initial",
+    [FollowUpStatus.INBOX, FollowUpStatus.ACTIVE, FollowUpStatus.WAITING],
+)
+def test_cancel_supports_all_open_statuses_and_normalizes_note(
+    tmp_path: Path, initial: FollowUpStatus
+) -> None:
+    database_path = tmp_path / f"cancel-{initial.value}.sqlite3"
+    previous_attention = None if initial is FollowUpStatus.INBOX else NEXT_AT
+    original = _item(
+        FOLLOW_UP_ID,
+        created_at=CREATED_AT,
+        status=initial,
+        next_attention_at=previous_attention,
+        deadline_at="2026-07-20T09:00:00Z",
+    )
+    _seed_items(database_path, original)
+    service = _service(
+        database_path, ids=(EVENT_IDS[0],), times=(UPDATED_AT,)
+    )
+
+    cancelled = service.cancel(FOLLOW_UP_ID, 1, "  Artık gerekli değil  ")
+
+    assert cancelled.status is FollowUpStatus.CANCELLED
+    assert cancelled.outcome_type is FollowUpOutcome.CANCELLED
+    assert cancelled.outcome_note == "Artık gerekli değil"
+    assert cancelled.cancelled_at == UPDATED_AT
+    assert cancelled.completed_at is None
+    assert cancelled.next_attention_at is None
+    assert cancelled.deadline_at == original.deadline_at
+    event = service.list_history(FOLLOW_UP_ID)[0]
+    assert event.event_type is FollowUpEventType.CANCELLED
+    assert event.payload == {
+        "from_status": initial.value,
+        "outcome_note": "Artık gerekli değil",
+        "outcome_type": "cancelled",
+        "previous_next_attention_at": previous_attention,
+        "revision": 2,
+    }
+
+
+@pytest.mark.parametrize(
+    "terminal", [FollowUpStatus.COMPLETED, FollowUpStatus.CANCELLED]
+)
+def test_cancel_rejects_terminal_and_checks_stale_first(
+    tmp_path: Path, terminal: FollowUpStatus
+) -> None:
+    database_path = tmp_path / f"cancel-terminal-{terminal.value}.sqlite3"
+    original = _item(FOLLOW_UP_ID, created_at=CREATED_AT, terminal=terminal)
+    _seed_items(database_path, original)
+    service = FollowUpApplicationService(database_path)
+
+    with pytest.raises(RevisionConflict):
+        service.cancel(FOLLOW_UP_ID, 2, None)
+    with pytest.raises(InvalidRecordError, match="open follow-up"):
+        service.cancel(FOLLOW_UP_ID, 1, "   ")
+    assert service.get_follow_up(FOLLOW_UP_ID) == original
+
+
+@pytest.mark.parametrize(
+    ("terminal", "attention", "expected_status"),
+    [
+        (FollowUpStatus.COMPLETED, None, FollowUpStatus.INBOX),
+        (FollowUpStatus.COMPLETED, NEXT_AT, FollowUpStatus.ACTIVE),
+        (FollowUpStatus.CANCELLED, None, FollowUpStatus.INBOX),
+        (FollowUpStatus.CANCELLED, NEXT_AT, FollowUpStatus.ACTIVE),
+    ],
+)
+def test_reopen_clears_terminal_fields_and_selects_target_status(
+    tmp_path: Path,
+    terminal: FollowUpStatus,
+    attention: str | None,
+    expected_status: FollowUpStatus,
+) -> None:
+    database_path = tmp_path / (
+        f"reopen-{terminal.value}-{expected_status.value}.sqlite3"
+    )
+    _seed_projects(database_path)
+    outcome = (
+        FollowUpOutcome.COMPLETED
+        if terminal is FollowUpStatus.COMPLETED
+        else FollowUpOutcome.CANCELLED
+    )
+    timestamp_field = (
+        {"completed_at": CREATED_AT}
+        if terminal is FollowUpStatus.COMPLETED
+        else {"cancelled_at": CREATED_AT}
+    )
+    original = FollowUpItem(
+        follow_up_id=FOLLOW_UP_ID,
+        capture_text="Yeniden değerlendir",
+        title="Yeniden değerlendir",
+        description="Korunacak ayrıntı",
+        location="A Blok",
+        status=terminal,
+        project_id=PROJECT_ID,
+        outcome_type=outcome,
+        outcome_note="Eski sonuç",
+        deadline_at="2026-07-20T09:00:00Z",
+        created_at=CREATED_AT,
+        updated_at=CREATED_AT,
+        **timestamp_field,
+    )
+    _seed_items(database_path, original)
+    service = _service(
+        database_path, ids=(EVENT_IDS[0],), times=(UPDATED_AT,)
+    )
+
+    reopened = service.reopen(FOLLOW_UP_ID, 1, attention)
+
+    assert reopened.status is expected_status
+    assert reopened.next_attention_at == attention
+    assert reopened.outcome_type is None
+    assert reopened.outcome_note is None
+    assert reopened.completed_at is None
+    assert reopened.cancelled_at is None
+    assert reopened.deadline_at == original.deadline_at
+    assert reopened.project_id == PROJECT_ID
+    assert reopened.description == "Korunacak ayrıntı"
+    assert reopened.location == "A Blok"
+    event = service.list_history(FOLLOW_UP_ID)[0]
+    assert event.event_type is FollowUpEventType.REOPENED
+    assert event.payload == {
+        "from_status": terminal.value,
+        "next_attention_at": attention,
+        "previous_outcome_type": outcome.value,
+        "revision": 2,
+        "status": expected_status.value,
+    }
+
+
+def test_reopen_rejects_noncanonical_attention_without_changes(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "reopen-invalid-attention.sqlite3"
+    original = _item(
+        FOLLOW_UP_ID,
+        created_at=CREATED_AT,
+        terminal=FollowUpStatus.COMPLETED,
+    )
+    _seed_items(database_path, original)
+    service = FollowUpApplicationService(database_path)
+
+    with pytest.raises(ValueError, match="ending in Z"):
+        service.reopen(FOLLOW_UP_ID, 1, "2026-07-16T12:00:00+00:00")
+    assert service.get_follow_up(FOLLOW_UP_ID) == original
+    assert service.list_history(FOLLOW_UP_ID) == ()
+
+
+@pytest.mark.parametrize(
+    "initial",
+    [FollowUpStatus.INBOX, FollowUpStatus.ACTIVE, FollowUpStatus.WAITING],
+)
+def test_reopen_rejects_nonterminal_and_checks_stale_first(
+    tmp_path: Path, initial: FollowUpStatus
+) -> None:
+    database_path = tmp_path / f"reopen-open-{initial.value}.sqlite3"
+    attention = None if initial is FollowUpStatus.INBOX else NEXT_AT
+    original = _item(
+        FOLLOW_UP_ID,
+        created_at=CREATED_AT,
+        status=initial,
+        next_attention_at=attention,
+    )
+    _seed_items(database_path, original)
+    service = FollowUpApplicationService(database_path)
+
+    with pytest.raises(RevisionConflict):
+        service.reopen(FOLLOW_UP_ID, 2, None)
+    with pytest.raises(InvalidRecordError, match="completed or cancelled"):
+        service.reopen(FOLLOW_UP_ID, 1, None)
+    assert service.get_follow_up(FOLLOW_UP_ID) == original
+
+
+def test_lifecycle_events_append_in_order_across_reopen(tmp_path: Path) -> None:
+    database_path = tmp_path / "lifecycle-sequence.sqlite3"
+    service = _service(
+        database_path,
+        times=(
+            CREATED_AT,
+            UPDATED_AT,
+            LATER_AT,
+            NEXT_AT,
+            "2026-07-16T13:00:00Z",
+        ),
+    )
+    created = service.create_follow_up(CreateFollowUp("Yaşam döngüsü"))
+    waiting = service.mark_waiting(
+        FOLLOW_UP_ID, created.revision, MarkWaiting(NEXT_AT)
+    )
+    completed = service.complete(
+        FOLLOW_UP_ID,
+        waiting.revision,
+        CompleteFollowUp(FollowUpOutcome.NOT_REQUIRED, "   "),
+    )
+    reopened = service.reopen(FOLLOW_UP_ID, completed.revision, None)
+    service.cancel(FOLLOW_UP_ID, reopened.revision, None)
+
+    history = service.list_history(FOLLOW_UP_ID)
+    assert [event.sequence for event in history] == [1, 2, 3, 4, 5]
+    assert [event.event_type for event in history] == [
+        FollowUpEventType.CREATED,
+        FollowUpEventType.WAITING_STARTED,
+        FollowUpEventType.COMPLETED,
+        FollowUpEventType.REOPENED,
+        FollowUpEventType.CANCELLED,
+    ]
+    assert history[2].payload["outcome_note"] is None
+    assert history[4].payload["outcome_note"] is None
+
+
+@pytest.mark.parametrize("operation", ["waiting", "complete", "cancel", "reopen"])
+@pytest.mark.parametrize("failure", ["uuid", "event_insert", "commit"])
+def test_lifecycle_failures_roll_back_aggregate_and_event(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    operation: str,
+    failure: str,
+) -> None:
+    database_path = tmp_path / f"lifecycle-{operation}-{failure}.sqlite3"
+    if operation == "reopen":
+        original = _item(
+            FOLLOW_UP_ID,
+            created_at=CREATED_AT,
+            terminal=FollowUpStatus.COMPLETED,
+        )
+    else:
+        original = _item(
+            FOLLOW_UP_ID,
+            created_at=CREATED_AT,
+            status=FollowUpStatus.ACTIVE,
+            next_attention_at=LATER_AT,
+        )
+    _seed_items(database_path, original)
+
+    class CommitFailingUnitOfWork(SQLiteUnitOfWork):
+        def commit(self) -> None:
+            raise OSError("commit failed")
+
+    if failure == "commit":
+        uow_factory = lambda: CommitFailingUnitOfWork(database_path)
+    else:
+        uow_factory = None
+    event_id = "NOT-A-UUID" if failure == "uuid" else EVENT_IDS[0]
+    service = _service(
+        database_path,
+        ids=(event_id,),
+        times=(UPDATED_AT,),
+        uow_factory=uow_factory,
+    )
+    if failure == "event_insert":
+        monkeypatch.setattr(
+            SQLiteFollowUpEventRepository,
+            "add",
+            lambda *_: (_ for _ in ()).throw(
+                InvalidRecordError("event failed")
+            ),
+        )
+
+    expected_error = {
+        "uuid": ValueError,
+        "event_insert": InvalidRecordError,
+        "commit": OSError,
+    }[failure]
+    with pytest.raises(expected_error):
+        if operation == "waiting":
+            service.mark_waiting(FOLLOW_UP_ID, 1, MarkWaiting(NEXT_AT))
+        elif operation == "complete":
+            service.complete(
+                FOLLOW_UP_ID,
+                1,
+                CompleteFollowUp(FollowUpOutcome.COMPLETED),
+            )
+        elif operation == "cancel":
+            service.cancel(FOLLOW_UP_ID, 1, None)
+        else:
+            service.reopen(FOLLOW_UP_ID, 1, NEXT_AT)
+
+    check = FollowUpApplicationService(database_path)
+    assert check.get_follow_up(FOLLOW_UP_ID) == original
+    assert check.list_history(FOLLOW_UP_ID) == ()

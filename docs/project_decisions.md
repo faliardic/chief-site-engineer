@@ -1,5 +1,17 @@
 # Proje Kararlari
 
+## Issue 111 - Follow-up Bekleme ve Terminal Yaşam Döngüsü Kararları
+
+- `MarkWaiting` ve `CompleteFollowUp`, mevcut application command yaklaşımını izleyen `frozen=True, slots=True` değerleridir; `app.application` public API'sinden export edilir.
+- Waiting komutu canonical UTC `next_attention_at` ister. `related_person` ve `condition_text` trim edilir; boş sonuç `None` olur ve ikisinin birlikte boş kalması izinlidir.
+- Zaten waiting olan kayıtta dikkat anı, ilgili kişi ve koşulun üçü aynıysa gerçek no-op kabul edilir. Stale revision bu karardan önce kontrol edilir; alanlardan biri farklıysa ikinci `waiting_started` event'i yerine `InvalidRecordError` üretilir.
+- Complete yalnız `completed/not_required` outcome kabul eder. `converted_to_observation` ayrı açık dönüşüm use-case'ine, `cancelled` ise `cancel(...)` method'una ait kalır.
+- Complete ve cancel yalnız `inbox/active/waiting` kaynak durumlarında çalışır; etkin dikkat anını temizler, deadline'ı korur ve sırasıyla `completed_at` veya `cancelled_at` değerini enjekte edilen clock'tan alır.
+- Reopen yalnız `completed/cancelled` durumundan çalışır; outcome/timestamp alanlarını temizler. Nullable attention `inbox + NULL`, timestamp ise `active + timestamp` üretir; önceki outcome append-only reopened event'inde korunur.
+- Bütün transition'lar aggregate/revision'ı mevcut Unit of Work içinde okur; gerçek update, son history sequence + 1 event insert'i ve commit aynı `BEGIN IMMEDIATE` transaction'ında gerçekleşir. Repository/UoW API'si genişletilmez.
+- UUID validation, event insert veya commit hatası transaction'ı rollback eder. No-op clock/UUID tüketmez; açık hata türleri generic application hatasına çevrilmez.
+- Observation link/convert, routine/backfill, schema/migration/mapping/repository/UoW, web/UI, requirements ve backup/export davranışları bu görevde kapsam dışıdır.
+
 ## Issue 109 - FollowUpApplicationService Çekirdek Kararları
 
 - Application command/query sınıfları transport veya UI modeli değil, `frozen=True, slots=True` application değerleridir; service public API'si `app/application/__init__.py` üzerinden açıkça export edilir.

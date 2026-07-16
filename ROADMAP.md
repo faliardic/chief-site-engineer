@@ -3,7 +3,7 @@
 ## Güncel Ürün Sırası
 
 0. [x] Tek kullanıcılı kişisel saha asistanı yönünü kanonikleştir — Issue #103.
-1. [ ] Saha Takibi transactional application service ve 7 günlük lazy backfill. Follow-up çekirdek create/read/query/update/schedule/inbox/project/history dilimi Issue #109 ile uygulandı; terminal/observation ve routine/backfill dilimleri bekliyor.
+1. [ ] Saha Takibi transactional application service ve 7 günlük lazy backfill. Follow-up çekirdek dilimi Issue #109, waiting/terminal yaşam döngüsü Issue #111 ile uygulandı; observation ve routine/backfill dilimleri bekliyor.
 2. [ ] Backup/restore compatibility ve resmî export izolasyonu.
 3. [ ] Mobil runtime ve veri sahipliği ADR.
 4. [ ] Mobil-first Kâğıdı Bırakma Sürümü.
@@ -16,7 +16,7 @@
 11. [ ] Gerçek kullanımın kanıtladığı kişisel yardımcı araçlar.
 12. [ ] Kişisel AI asistanı.
 
-Bağlayıcı üst yol haritası GitHub Epic #105'tir. Saha Takibi domain/recurrence, SQLite persistence ve follow-up application-service çekirdeği tamamlanmıştır; Faz 1'in terminal/observation/routine/backfill dilimleri ile sonraki fazlar henüz tamamlanmamıştır.
+Bağlayıcı üst yol haritası GitHub Epic #105'tir. Saha Takibi domain/recurrence, SQLite persistence, follow-up application-service çekirdeği ve waiting/terminal yaşam döngüsü tamamlanmıştır; Faz 1'in observation/routine/backfill dilimleri ile sonraki fazlar henüz tamamlanmamıştır.
 
 ## Faz 4 Minimum Kâğıdı Bırakma Kapsamı
 
@@ -789,7 +789,7 @@ Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcas
 - [x] Mevcut event alanları ve `payload_json` metni birebir korundu; diğer tablolar, no-cascade ve append-only sequence davranışı değişmedi.
 - [x] Fresh v4/v3→v4 schema eşitliği, tam rollback, allowed/unknown türler, duplicate sequence, foreign key ve repository round-trip testleri eklendi.
 - [x] Mapping/repository API değişikliği gerekmedi; event update/delete/sequence allocator eklenmedi.
-- [ ] `FollowUpApplicationService`, optimistic mutation/no-op ve atomik event üretimi sonraki dar Faz 1 görevinde uygulanacak.
+- [x] `FollowUpApplicationService` çekirdek optimistic mutation/no-op ve atomik event üretimi Issue #109; waiting/terminal yaşam döngüsü Issue #111 ile uygulandı.
 - [ ] Rutin application service ve yedi günlük idempotent lazy backfill ayrı küçük görevde uygulanacak.
 - [ ] Backup backward compatibility ve resmî export izolasyonu Epic #105 Faz 2'de executable kabul testleriyle tamamlanacak.
 
@@ -802,5 +802,17 @@ Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcas
 - [x] İlk planlama ve yeniden planlama `scheduled/rescheduled`; planı kaldırma `moved_to_inbox`; proje değişimi `project_changed` event'ini doğru nullable payload ile üretir.
 - [x] Stale revision, gerçek no-op, event failure ve commit failure sınırları aggregate/event geçmişinde yarım yazı bırakmadan test edildi.
 - [x] Repository portlarına sequence/update/delete API'si, schema v5/migration, web/UI, backup/export değişikliği eklenmedi.
-- [ ] Terminal follow-up yaşam döngüleri ve observation bağlama/dönüştürme ayrı dar görevde uygulanacak.
+- [x] Waiting, complete, cancel ve reopen follow-up yaşam döngüleri Issue #111 ile uygulandı.
+- [ ] Observation bağlama/dönüştürme ayrı dar görevde uygulanacak.
 - [ ] Routine application service ile yedi günlük idempotent lazy backfill ayrı dar görevde uygulanacak.
+
+## Issue 111 - Follow-up Bekleme ve Terminal Yaşam Döngüleri
+
+- [x] `MarkWaiting` ve `CompleteFollowUp` immutable command değerleri canonical UTC ve optional text normalizasyonuyla eklendi.
+- [x] Inbox/active → waiting geçişi; exact waiting no-op, farklı ikinci bekleme reddi ve nullable kişi/koşul payload'ı uygulandı.
+- [x] Bütün açık durumlardan `completed/not_required` completion ve cancelled outcome'lu cancel geçişleri uygulandı.
+- [x] Completed/cancelled kaydın dikkat anına göre inbox/active yeniden açılması ve bütün terminal alanlarının temizlenmesi uygulandı.
+- [x] Dört mutation için revision, önceki durum/zaman/sonuç ve yeni değerleri taşıyan append-only event payload'ları eklendi.
+- [x] UUID validation, event insert ve commit hatalarında aggregate/event'in birlikte rollback edilmesi focused testlerle doğrulandı.
+- [x] Deadline, capture, proje/observation ve diğer ayrıntı koruması; stale-before-no-op ve clock/UUID tüketmeyen exact no-op doğrulandı.
+- [x] Schema v4, migration, mapper, repository/UoW portu, observation/routine, web/UI ve backup/export sınırları değiştirilmedi.

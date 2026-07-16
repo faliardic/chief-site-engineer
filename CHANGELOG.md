@@ -1,5 +1,15 @@
 # Changelog
 
+## Issue 111 - Follow-up Bekleme ve Terminal Yaşam Döngüleri
+
+- Immutable `MarkWaiting` ve `CompleteFollowUp` application command değerleri canonical UTC, enum ve optional text normalizasyon kurallarıyla eklendi ve public API'den export edildi.
+- `mark_waiting`, açık inbox/active kaydı waiting yapar; dikkat anı, ilgili kişi ve koşulu birlikte yazar. Waiting kayıttaki üç değer tamamen aynıysa stale kontrolünden sonra clock/UUID/event tüketmeyen no-op, farklıysa açık validation hatasıdır.
+- `complete`, açık kaydı yalnız `completed` veya `not_required` sonucu ile tamamlar; `cancel` açık kaydı cancelled sonucuyla iptal eder. İki işlem de etkin dikkat anını temizler, deadline'ı korur ve doğru terminal zamanı yazar.
+- `reopen`, completed/cancelled kaydın terminal alanlarını temizler; dikkat anı yoksa inbox, canonical UTC dikkat anı varsa active durumuna geçirir.
+- Her gerçek yaşam döngüsü mutation'ı aggregate update ve append-only event'i aynı mevcut `BEGIN IMMEDIATE` Unit of Work transaction'ında yazar; sequence geçmişin son değerinden üretilir.
+- Focused test matrisi bütün kaynak/terminal durumları, izinli ve yasak outcome'ları, normalization/no-op/stale önceliğini, payload/sıra/alan korumasını ve dört işlem için UUID validation, event insert ve commit rollback'ini kapsar.
+- Schema/migration/mapping/repository/UoW portları, observation link/convert, routine/backfill, web/UI, requirements, backup/export ve gerçek kullanıcı data root'u değiştirilmedi.
+
 ## Issue 109 - FollowUpApplicationService Çekirdek Akışları
 
 - Immutable create/update/schedule command değerleri, compose edilebilir follow-up query değeri ve kalıcı status üretmeyen `FollowUpView` uygulama enum'u eklendi.
