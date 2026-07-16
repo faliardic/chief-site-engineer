@@ -3,7 +3,7 @@
 ## Güncel Ürün Sırası
 
 0. [x] Tek kullanıcılı kişisel saha asistanı yönünü kanonikleştir — Issue #103.
-1. [ ] Saha Takibi transactional application service ve 7 günlük lazy backfill.
+1. [ ] Saha Takibi transactional application service ve 7 günlük lazy backfill. Follow-up çekirdek create/read/query/update/schedule/inbox/project/history dilimi Issue #109 ile uygulandı; terminal/observation ve routine/backfill dilimleri bekliyor.
 2. [ ] Backup/restore compatibility ve resmî export izolasyonu.
 3. [ ] Mobil runtime ve veri sahipliği ADR.
 4. [ ] Mobil-first Kâğıdı Bırakma Sürümü.
@@ -16,7 +16,7 @@
 11. [ ] Gerçek kullanımın kanıtladığı kişisel yardımcı araçlar.
 12. [ ] Kişisel AI asistanı.
 
-Bağlayıcı üst yol haritası GitHub Epic #105'tir. Saha Takibi domain/recurrence ve SQLite persistence PR #104 ile tamamlanmıştır; Faz 1 ve sonrası henüz tamamlanmamıştır.
+Bağlayıcı üst yol haritası GitHub Epic #105'tir. Saha Takibi domain/recurrence, SQLite persistence ve follow-up application-service çekirdeği tamamlanmıştır; Faz 1'in terminal/observation/routine/backfill dilimleri ile sonraki fazlar henüz tamamlanmamıştır.
 
 ## Faz 4 Minimum Kâğıdı Bırakma Kapsamı
 
@@ -792,3 +792,15 @@ Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcas
 - [ ] `FollowUpApplicationService`, optimistic mutation/no-op ve atomik event üretimi sonraki dar Faz 1 görevinde uygulanacak.
 - [ ] Rutin application service ve yedi günlük idempotent lazy backfill ayrı küçük görevde uygulanacak.
 - [ ] Backup backward compatibility ve resmî export izolasyonu Epic #105 Faz 2'de executable kabul testleriyle tamamlanacak.
+
+## Issue 109 - FollowUpApplicationService Çekirdek Akışları
+
+- [x] Hızlı `+ Unutma` create yalnız capture text alır; canonical UUID/UTC teknik değerleri enjekte edilebilir ve ilk `follow_up.created` event'i aynı transaction'da yazılır.
+- [x] Get/list/history ile status/project/personal/observation filtreleri repository deterministic sırasını koruyarak compose edilir.
+- [x] Inbox/overdue/today/upcoming ve “Şimdi ilgilen” görünümleri mevcut domain helper'ları ve `Europe/Istanbul` gün sınırıyla hesaplanır.
+- [x] Ayrıntı update allowlist'i immutable capture/status/project/attention/outcome/created alanlarını korur ve exact alfabetik `changed_fields` event'i üretir.
+- [x] İlk planlama ve yeniden planlama `scheduled/rescheduled`; planı kaldırma `moved_to_inbox`; proje değişimi `project_changed` event'ini doğru nullable payload ile üretir.
+- [x] Stale revision, gerçek no-op, event failure ve commit failure sınırları aggregate/event geçmişinde yarım yazı bırakmadan test edildi.
+- [x] Repository portlarına sequence/update/delete API'si, schema v5/migration, web/UI, backup/export değişikliği eklenmedi.
+- [ ] Terminal follow-up yaşam döngüleri ve observation bağlama/dönüştürme ayrı dar görevde uygulanacak.
+- [ ] Routine application service ile yedi günlük idempotent lazy backfill ayrı dar görevde uygulanacak.
