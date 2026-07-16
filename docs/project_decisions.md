@@ -1,5 +1,18 @@
 # Proje Kararlari
 
+## Issue 112 - Follow-up Observation Link ve Conversion Kararları
+
+- Link ve conversion yeni command sınıfı gerektirmez; iki public service method'u mevcut canonical follow-up ID, observation ID ve expected revision değerlerini alır.
+- Follow-up ve observation aynı `SQLiteUnitOfWork` içinde okunur. Stale revision, no-op/transition kararından ve observation lookup'tan önce kontrol edilir.
+- Observation'ın `project_id` değeri source of truth'tur. Null follow-up project aynı mutation içinde atanır; aynı project korunur; farklı project `InvalidRecordError` ile atomik reddedilir.
+- Mevcut farklı observation sessizce replace edilmez. Aynı observation/project link'i gerçek no-op'tur ve clock, UUID, revision, `updated_at` veya event tüketmez.
+- `link_observation`, açık veya terminal follow-up'ın status, outcome, attention, deadline ve ayrıntı alanlarını değiştirmez. Link kişisel kaydı otomatik resmî kayda dönüştürmez.
+- `convert_to_observation`, yalnız açık inbox/active/waiting kayıt için açık kullanıcı işlemidir; status completed, outcome converted, outcome note/attention null ve completed timestamp clock değeri olur.
+- Conversion var olan observation/project ilişkisini kullanır veya aynı mutation içinde kurar; tek converted event üretir ve ayrıca linked event yazmaz.
+- Aynı observation/project ile exact converted retry stale kontrolünden sonra no-op olabilir. Başka completed outcome veya cancelled kayıt conversion ile yeniden yazılamaz.
+- Aggregate update, son history sequence + 1 event insert'i ve commit aynı mevcut `BEGIN IMMEDIATE` transaction'ında kalır; UUID validation, event insert veya commit hatası tam rollback üretir.
+- Otomatik observation oluşturma/kopyalama, observation application service, schema/migration/mapping/repository/UoW, routine/backfill, web/UI, requirements ve backup/export bu görevde kapsam dışıdır.
+
 ## Issue 111 - Follow-up Bekleme ve Terminal Yaşam Döngüsü Kararları
 
 - `MarkWaiting` ve `CompleteFollowUp`, mevcut application command yaklaşımını izleyen `frozen=True, slots=True` değerleridir; `app.application` public API'sinden export edilir.

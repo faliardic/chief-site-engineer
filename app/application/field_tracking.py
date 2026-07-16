@@ -718,6 +718,126 @@ class FollowUpApplicationService:
             unit_of_work.commit()
             return stored
 
+    def link_observation(
+        self,
+        follow_up_id: str,
+        expected_revision: int,
+        observation_id: str,
+    ) -> FollowUpItem:
+        validate_record_id(follow_up_id)
+        _validate_expected_revision(expected_revision)
+        validate_record_id(observation_id)
+        with self._uow_factory() as unit_of_work:
+            current = unit_of_work.follow_ups.get(follow_up_id)
+            self._require_current_revision(current, expected_revision)
+            observation = unit_of_work.observations.get(observation_id)
+            self._require_observation_target(
+                current,
+                observation.observation_id,
+                observation.project_id,
+            )
+            if current.observation_id == observation.observation_id:
+                return current
+
+            occurred_at = self._now()
+            updated = replace(
+                current,
+                observation_id=observation.observation_id,
+                project_id=observation.project_id,
+                revision=current.revision + 1,
+                updated_at=occurred_at,
+            )
+            stored = unit_of_work.follow_ups.update(
+                updated, expected_revision=expected_revision
+            )
+            unit_of_work.follow_up_events.add(
+                self._event(
+                    stored,
+                    sequence=self._next_sequence(unit_of_work, follow_up_id),
+                    event_type=FollowUpEventType.OBSERVATION_LINKED,
+                    occurred_at=occurred_at,
+                    payload={
+                        "from_project_id": current.project_id,
+                        "observation_id": stored.observation_id,
+                        "project_id": stored.project_id,
+                        "revision": stored.revision,
+                        "status": stored.status.value,
+                    },
+                )
+            )
+            unit_of_work.commit()
+            return stored
+
+    def convert_to_observation(
+        self,
+        follow_up_id: str,
+        expected_revision: int,
+        observation_id: str,
+    ) -> FollowUpItem:
+        validate_record_id(follow_up_id)
+        _validate_expected_revision(expected_revision)
+        validate_record_id(observation_id)
+        with self._uow_factory() as unit_of_work:
+            current = unit_of_work.follow_ups.get(follow_up_id)
+            self._require_current_revision(current, expected_revision)
+            observation = unit_of_work.observations.get(observation_id)
+            self._require_observation_target(
+                current,
+                observation.observation_id,
+                observation.project_id,
+            )
+            if (
+                current.status == FollowUpStatus.COMPLETED
+                and current.outcome_type
+                == FollowUpOutcome.CONVERTED_TO_OBSERVATION
+                and current.outcome_note is None
+                and current.observation_id == observation.observation_id
+                and current.project_id == observation.project_id
+                and current.next_attention_at is None
+            ):
+                return current
+            if current.status not in OPEN_STATUSES:
+                raise InvalidRecordError(
+                    "only open follow-up can convert to observation"
+                )
+
+            occurred_at = self._now()
+            updated = replace(
+                current,
+                status=FollowUpStatus.COMPLETED,
+                outcome_type=FollowUpOutcome.CONVERTED_TO_OBSERVATION,
+                outcome_note=None,
+                completed_at=occurred_at,
+                cancelled_at=None,
+                next_attention_at=None,
+                observation_id=observation.observation_id,
+                project_id=observation.project_id,
+                revision=current.revision + 1,
+                updated_at=occurred_at,
+            )
+            stored = unit_of_work.follow_ups.update(
+                updated, expected_revision=expected_revision
+            )
+            unit_of_work.follow_up_events.add(
+                self._event(
+                    stored,
+                    sequence=self._next_sequence(unit_of_work, follow_up_id),
+                    event_type=FollowUpEventType.CONVERTED_TO_OBSERVATION,
+                    occurred_at=occurred_at,
+                    payload={
+                        "from_project_id": current.project_id,
+                        "from_status": current.status.value,
+                        "observation_id": stored.observation_id,
+                        "outcome_type": stored.outcome_type.value,
+                        "previous_next_attention_at": current.next_attention_at,
+                        "project_id": stored.project_id,
+                        "revision": stored.revision,
+                    },
+                )
+            )
+            unit_of_work.commit()
+            return stored
+
     def _event(
         self,
         item: FollowUpItem,
@@ -751,6 +871,27 @@ class FollowUpApplicationService:
         if item.revision != expected_revision:
             raise RevisionConflict(
                 item.follow_up_id, expected_revision, item.revision
+            )
+
+    @staticmethod
+    def _require_observation_target(
+        item: FollowUpItem,
+        observation_id: str,
+        observation_project_id: str,
+    ) -> None:
+        if (
+            item.observation_id is not None
+            and item.observation_id != observation_id
+        ):
+            raise InvalidRecordError(
+                "follow-up is already linked to a different observation"
+            )
+        if (
+            item.project_id is not None
+            and item.project_id != observation_project_id
+        ):
+            raise InvalidRecordError(
+                "follow-up project must match observation project"
             )
 
     def _now(self) -> str:

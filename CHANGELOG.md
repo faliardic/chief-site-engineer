@@ -1,5 +1,16 @@
 # Changelog
 
+## Issue 112 - Follow-up Observation Bağlantısı ve Resmî Gözleme Dönüşüm
+
+- `FollowUpApplicationService.link_observation(...)`, var olan observation'ı açık veya terminal follow-up'a lifecycle alanlarını değiştirmeden bağlayacak şekilde eklendi.
+- Observation projesi source of truth kabul edildi; projesiz follow-up aynı mutation içinde projeyi edinir, aynı proje korunur, farklı proje ve farklı mevcut observation açık validation hatasıyla reddedilir.
+- Aynı observation/project bağlantısı stale kontrolünden sonra clock/UUID/event tüketmeyen exact no-op'tur; link kişisel kaydı otomatik resmî kayda dönüştürmez.
+- `convert_to_observation(...)`, yalnız açık follow-up'ı mevcut observation'a bağlayıp `completed + converted_to_observation` sonucuyla kapatır; attention ve outcome note temizlenir, deadline/capture/ayrıntılar korunur.
+- Conversion tek `follow_up.converted_to_observation` event'i üretir; aynı mutation için ayrıca `observation_linked` event'i yazılmaz. Exact converted retry no-op, diğer terminal sonuçları reddedilir.
+- İki gerçek mutation aggregate update ve append-only event'i aynı mevcut `BEGIN IMMEDIATE` Unit of Work transaction'ında yazar; sequence mevcut history'den türetilir.
+- Focused test matrisi lifecycle/project/observation sınırları, missing kayıtlar, no-op/stale, payload/sequence ve iki işlem için UUID validation, event insert ve commit rollback'ini kapsar.
+- Otomatik observation oluşturma, observation application service, schema/migration/mapping/repository/UoW, routine/backfill, web/UI, requirements, workflow, backup/export ve gerçek kullanıcı data root'u değiştirilmedi.
+
 ## Issue 111 - Follow-up Bekleme ve Terminal Yaşam Döngüleri
 
 - Immutable `MarkWaiting` ve `CompleteFollowUp` application command değerleri canonical UTC, enum ve optional text normalizasyon kurallarıyla eklendi ve public API'den export edildi.

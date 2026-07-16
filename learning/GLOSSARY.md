@@ -1411,3 +1411,9 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Terminal Durum`: Bir kaydın normal açık geçişlerinin sona erdiği kapanış durumudur. Follow-up için `completed` ve `cancelled` terminaldir; tekrar değiştirilebilmesi için açık bir `reopen` işlemi gerekir.
 
 `Reopen (Yeniden Açma)`: Terminal kaydın outcome ve kapanış zamanı alanlarını temizleyerek yeniden açık yaşam döngüsüne alınmasıdır. Bu projede dikkat zamanı yoksa `inbox`, varsa `active` üretilir.
+
+`Source of Truth (Tek Doğru Kaynak)`: Aynı bilginin birden fazla kayıtta yer aldığı durumda hangi kaydın yetkili değer kabul edildiğini belirleyen kuraldır. Follow-up observation bağlantısında proje için observation'ın `project_id` değeri yetkilidir.
+
+`Relationship Link (İlişki Bağı)`: İki mevcut kaydı kimlikleriyle ilişkilendiren fakat tek başına kayıtların yaşam döngüsü anlamını değiştirmeyen bağlantıdır. Observation link'i follow-up'ı otomatik resmî kayda dönüştürmez.
+
+`Explicit Conversion (Açık Dönüşüm)`: Kullanıcının açık işlemiyle bir kaydın ilişki kurmanın ötesinde yeni bir sonuç anlamına geçirilmesidir. Bu projede follow-up `converted_to_observation` sonucu ile terminal tamamlanır.
