@@ -1431,3 +1431,21 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Missed Outcome`: Geçmiş bir due gün application çalışmadığı için zamanında sonuçlandırılamadıysa lazy backfill tarafından otomatik verilen terminal sonuçtur. Kullanıcı close command'ı bu sonucu doğrudan seçemez.
 
 `Stale-Before-No-Op`: Bir mutation mevcut değerle aynı görünse bile önce `expected_revision` kontrolünün yapılması kuralıdır. Eski revision taşıyan tekrar çağrı sessiz başarı sayılmaz.
+
+`Post/Redirect/Get (PRG)`: Bir formun başarılı POST işleminden sonra tarayıcıyı GET sayfasına yönlendirme desenidir. Kullanıcı sayfayı yenilediğinde aynı mutation'ın istemeden tekrar gönderilmesini önler.
+
+`Server-Rendered HTML`: Sayfanın ana HTML içeriğinin tarayıcıdaki bir JavaScript uygulaması yerine sunucuda template ile üretilmesidir. Issue #119 yüzeyinde Flask ve Jinja template'leri kullanılır.
+
+`Responsive Tek Kolon`: Geniş ekrandaki grid veya yan yana panellerin dar ekranda okunabilir tek sütuna dönüşmesi düzenidir. Issue #119 CSS'i 640 px altında bu davranışı uygular.
+
+`:focus-visible`: Klavye gibi odak göstergesine ihtiyaç duyan etkileşimlerde görünür focus stili sağlayan CSS seçicisidir. Mouse tıklamasında gereksiz odak halkasını azaltırken klavye erişilebilirliğini korur.
+
+`Dokunma Hedefi`: Kullanıcının tıklayacağı veya dokunacağı buton, bağlantı ve form kontrolünün etkileşim alanıdır. İlk PC yüzeyinde temel hedef yüksekliği en az 44 px tutulur.
+
+`Sunum Sözlüğü`: Storage enum veya event değerini değiştirmeden kullanıcıya insan okunur Türkçe etiket gösteren mapping katmanıdır. Bilinmeyen değerler güvenli fallback ile sunulur.
+
+`Request-Scoped Canonical Now`: Tek HTTP request içindeki bütün zaman hesaplarının paylaştığı, bir kez üretilmiş UTC anıdır. Bugün görünümünde occurrence üretimi ve bütün listeler aynı `now_utc` değerini kullanır.
+
+`Restart Acceptance`: Uygulama nesnesi kapatılıp aynı data root ile yeniden oluşturulduğunda kayıt, revision ve event geçmişinin aynı SQLite verisinden geri okunabildiğini doğrulayan kabul testidir.
+
+`İlk Test Edilebilir PC Sürümü`: Ürünün bütün uzun vadeli özelliklerini tamamlamadan, gerçek kullanıcının bilgisayarda temel uçtan uca akışı deneyebildiği dar ve doğrulanmış sürümdür. Issue #119 sürümü mobile/PWA/offline/sync/notification/auth içermez.

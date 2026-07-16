@@ -1,5 +1,24 @@
 # Changelog
 
+## Issue 119 - İlk Test Edilebilir PC Saha Takibi Arayüzü
+
+- Mevcut Flask web uygulamasında observation, follow-up ve routine application service'leri aynı data root altındaki `cse.sqlite3` dosyasına açık config anahtarlarıyla bağlandı.
+- `/` başlangıcı `/today` görünümüne yönlendirildi; Bugün, Unutma Kutusu, Rutinler ve Gözlemler ana navigasyonu eklendi.
+- Bugün görünümü aynı request için tek canonical UTC anı kullanarak Şimdi ilgilen, Gecikenler, Bugün ve Bugünkü rutinler bölümlerini server-rendered HTML ile sunuyor.
+- Hızlı `+ Unutma` formu yalnız `CreateFollowUp(capture_text)` kullanıyor; normalization, güvenli validation, PRG redirect, HTML escaping ve immutable ilk yakalama metni korunuyor.
+- Follow-up inbox/detail/history ile details, project, schedule, waiting, move-to-inbox, complete, cancel ve reopen formları mevcut application service API'lerine bağlandı.
+- Rutin list/create/detail/deactivate ile occurrence snooze/close/reopen formları günlük, iş günü, haftalık ve aylık recurrence validation'ıyla sunuldu.
+- Bütün mutation formlarında hidden `expected_revision`, stale revision için HTTP 409, missing/invalid kayıt için 404 ve kullanıcı değerini koruyan güvenli validation yüzeyi uygulandı.
+- `datetime-local` girdileri `Europe/Istanbul` kabul edilip canonical UTC'ye çevriliyor; storage timestamp'leri kullanıcı yüzeyinde İstanbul yerel saatiyle gösteriliyor.
+- Responsive tek kolon düzeni, en az 44 px etkileşim hedefi ve `:focus-visible` klavye görünürlüğü eklendi; haricî CSS/JS, SPA veya client-side state store eklenmedi.
+- `/today` tekrar yenilemesinin aynı routine occurrence/event'i çoğaltmadığı; app yeniden oluşturulduğunda follow-up ve occurrence revision/history'nin aynı SQLite dosyasından okunduğu kabul testiyle doğrulandı.
+- Mevcut observation create/detail, backup create/download ve resmî günlük export akışları korundu; observation verisi export'ta görünürken follow-up capture text'i ve routine başlığı export'a sızmadı.
+- İki Codex kesintisinden sonra yerel WIP silinmeden `37f905e9d30255c39edc1db6ea4125544531c8d8` checkpoint commit'iyle güvenli biçimde korundu; stabilizasyon Issue #120-#124 dilimleriyle aynı branch üzerinde tamamlandı.
+- Web paketi `17 passed`, ilgili web/observation/backup/export regresyonları `56 passed`, full suite `983 passed, 7 skipped` olarak doğrulandı; skip'ler Windows symlink ayrıcalığı sınırlarıdır.
+- `SCHEMA_VERSION == 4` kaldı; domain/application/persistence/operations, requirements ve workflow sözleşmeleri değiştirilmedi.
+- Gerçek `CSE_DATA_ROOT` kullanılmadı; `reports/`, ignored ZIP/cache ve `exports/.gitkeep` korundu.
+- Branch PR incelemesine hazırlandı ancak PR açılmadı ve merge edilmiş sayılmadı; mobile/PWA/offline/sync/notification/auth kapsam dışında kaldı.
+
 ## Issue 117 - Backup/Restore Uyumluluğu ve Resmî Export İzolasyonu
 
 - Backup format `1` için restore edilebilir schema allowlist'i `(2, 3, 4)` olarak tek kaynakta tanımlandı; schema `1`, sıfır/negatif/bool, migration gap'i ve future schema fail-closed reddediliyor.

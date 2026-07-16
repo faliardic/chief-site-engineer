@@ -1,16 +1,22 @@
 {
   "state_version": 2,
   "legacy_last_numbered_step": 225,
-  "current_issue": 117,
+  "current_issue": 119,
   "base_branch": "master",
-  "base_commit": "27b5c460b9af3092ebe228d7c92a7f0aae22fcdc",
+  "base_commit": "3f71ed220ab595045ae8fd59303a048b53534e24",
   "active_work": {
-    "issue": 117,
-    "type": "backup_restore_compatibility_and_official_export_isolation",
+    "issue": 119,
+    "supporting_finalization_issue": 125,
+    "type": "first_testable_pc_field_tracking_ui",
+    "issue_state": "completed",
+    "review_status": "ready_for_pull_request_review_not_merged",
     "binding_epic": 105,
     "field_tracking_epic": 97,
-    "branch": "codex/issue-117-backup-restore-export-isolation",
-    "base_commit": "27b5c460b9af3092ebe228d7c92a7f0aae22fcdc",
+    "branch": "codex/issue-119-first-testable-pc-field-tracking-ui",
+    "base_commit": "3f71ed220ab595045ae8fd59303a048b53534e24",
+    "interrupted_wip_checkpoint_commit": "37f905e9d30255c39edc1db6ea4125544531c8d8",
+    "last_verified_implementation_head": "a809d90d81b89ffee976b6cdee357f39e3fec941",
+    "final_documentation_commit_evidence_location": "GitHub Issue #119 and Issue #125 completion comments after push",
     "commit_strategy": "one_ordinary_commit_without_amend_rebase_or_force_push",
     "schema_version": 4,
     "backup_format_version": 1,
@@ -22,41 +28,46 @@
     "observation_link_or_conversion_implemented": true,
     "routine_application_service_implemented": true,
     "seven_day_lazy_backfill_implemented": true,
+    "web_ui_implemented": true,
+    "today_dashboard_implemented": true,
+    "quick_capture_and_inbox_implemented": true,
+    "follow_up_detail_and_lifecycle_ui_implemented": true,
+    "routine_and_occurrence_ui_implemented": true,
+    "restart_persistence_verified": true,
     "schema_two_and_three_restore_migration_implemented": true,
     "schema_four_tracking_round_trip_verified": true,
     "official_daily_export_tracking_isolation_verified": true,
     "export_production_code_changed": false,
     "migration_statements_changed": false,
-    "web_ui_implemented": false,
     "real_user_data_root_accessed": false,
     "merge_claim": false,
     "pull_request_created": false,
-    "focused_test_summary": "39 passed in 3.12s",
-    "related_regression_test_summary": "214 migration/persistence/UoW/application-service tests passed in 4.35s",
-    "full_test_summary": "966 passed, 7 skipped in 20.72s",
+    "focused_test_summary": "17 passed in 1.93s",
+    "related_regression_test_summary": "56 web/observation/backup/export tests passed in 6.00s",
+    "full_test_summary": "983 passed, 7 skipped in 24.38s",
     "schema_version_unchanged": true,
     "repository_ports_unchanged": true,
     "compileall_passed": true,
     "state_json_valid": true,
     "diff_check_passed": true,
-    "verification_status": "all_required_local_checks_passed_before_commit"
+    "verification_status": "issue_119_complete_ready_for_pull_request_review_not_merged"
   },
   "current_safe_point": {
     "semantics": "latest_merged_finalized_checkpoint",
     "step": 225,
     "step_semantics": "last_legacy_numbered_step_preceding_issue_centered_workflow",
-    "issue": 115,
+    "issue": 117,
     "issue_state": "completed",
-    "pull_request": 116,
+    "pull_request": 118,
     "pull_request_state": "merged",
-    "merge_commit": "27b5c460b9af3092ebe228d7c92a7f0aae22fcdc",
-    "local_test_summary": "948 passed, 7 skipped (Issue #115 completion evidence)"
+    "merge_commit": "3f71ed220ab595045ae8fd59303a048b53534e24",
+    "local_test_summary": "966 passed, 7 skipped (Issue #117 completion evidence)"
   },
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
-    "local_master_sha": "27b5c460b9af3092ebe228d7c92a7f0aae22fcdc",
-    "origin_master_sha": "27b5c460b9af3092ebe228d7c92a7f0aae22fcdc",
+    "local_master_sha": "3f71ed220ab595045ae8fd59303a048b53534e24",
+    "origin_master_sha": "3f71ed220ab595045ae8fd59303a048b53534e24",
     "divergence": "0 0",
     "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
     "misspelled_workspace_present": false,
@@ -183,6 +194,16 @@
       "model": "GPT-5 current full Codex",
       "reasoning": "extra_high",
       "reason": "legacy_backup_acceptance_fail_closed_archive_validation_temporary_sqlite_migration_atomic_restore_tracking_round_trip_official_personal_export_isolation_and_real_user_data_safety"
+    },
+    "issue_119_selection": {
+      "model": "GPT-5 current full Codex",
+      "reasoning": "extra_high",
+      "reason": "shared_sqlite_web_integration_optimistic_revision_prg_timezone_conversion_restart_persistence_and_full_regression_risk"
+    },
+    "issue_125_selection": {
+      "model": "standard full Codex model visible in current selector",
+      "reasoning": "high",
+      "reason": "documentation_only_multi_file_finalization_repository_truth_and_pr_readiness_consistency"
     }
   },
   "required_source_pre_read": {
@@ -560,6 +581,23 @@
             "project_state": true,
             "task_117": true
         },
+        "issue_119_sources_read": {
+            "unified_project_source": true,
+            "project_instructions": true,
+            "github_issue_119_with_all_comments": true,
+            "github_epic_105_and_field_tracking_epic_97": true,
+            "field_tracking_v0_1_contract": true,
+            "follow_up_routine_and_observation_application_services": true,
+            "web_routes_templates_css_and_existing_web_tests": true,
+            "project_state": true,
+            "task_119": true
+        },
+        "issue_125_sources_read": {
+            "github_issue_125_with_all_comments": true,
+            "issue_119_task_and_issue_120_to_124_results": true,
+            "changelog_roadmap_decisions_glossary_and_project_state": true,
+            "issue_124_full_regression_evidence": true
+        },
     "unresolved_conflict_found": false
   },
   "canonical_project_instructions": {
@@ -624,7 +662,7 @@
     "workflow_changed": false
   },
   "product_maturity": {
-    "state": "local_field_mvp_with_field_tracking_phase_two_data_safety_gate_complete_on_active_branch",
+    "state": "local_field_mvp_with_first_testable_pc_field_tracking_ui_complete_on_unmerged_branch",
     "field_ready_application": false,
     "production_ready_application": false,
     "product_identity": "local_first_mobile_first_single_owner_personal_field_assistant",
@@ -633,6 +671,9 @@
     "product_loop": "capture_process_follow_up_verify_log",
     "other_people_and_companies_are": "record_references_not_system_users",
     "official_personal_boundary": "export_and_handover_scope_not_access_role",
+    "first_testable_pc_field_tracking_version": true,
+    "first_testable_pc_field_tracking_ready_for_pr_review": true,
+    "first_testable_pc_field_tracking_merged": false,
     "local_first_semantics": "owner_devices_and_owner_data_not_windows_first",
     "single_owner_security_direction": [
       "application_lock_and_device_biometrics_when_available",
@@ -675,16 +716,36 @@
       "routine_application_service_template_and_occurrence_lifecycle",
       "seven_day_idempotent_lazy_backfill_with_missed_closure",
       "schema_two_and_three_backup_restore_compatibility",
-      "schema_four_tracking_round_trip",
-      "official_daily_export_tracking_isolation"
-    ],
-    "field_tracking_pending": [
+    "schema_four_tracking_round_trip",
+    "official_daily_export_tracking_isolation",
+    "today_inbox_quick_capture_follow_up_routine_and_occurrence_pc_web_ui",
+    "restart_persistence_and_official_export_boundary_acceptance"
+  ],
+  "field_tracking_pending": [
       "mobile_runtime_and_data_ownership_adr",
       "mobile_first_paperless_field_slice",
       "offline_and_notification_reliability",
       "seven_day_field_pilot",
-      "thirty_day_primary_app_pilot"
+    "thirty_day_primary_app_pilot"
+  ],
+  "first_testable_pc_field_tracking_ui": {
+    "issue": 119,
+    "branch": "codex/issue-119-first-testable-pc-field-tracking-ui",
+    "status": "completed_ready_for_pull_request_review_not_merged",
+    "surfaces": [
+      "today",
+      "forget_me_not_inbox",
+      "quick_capture",
+      "follow_up_detail_and_lifecycle",
+      "routine_templates",
+      "routine_occurrence_lifecycle",
+      "observations_navigation"
     ],
+    "restart_persistence_verified": true,
+    "official_export_tracking_isolation_verified": true,
+    "mobile_runtime_included": false,
+    "offline_sync_notifications_or_auth_included": false
+  },
     "binding_product_roadmap": [
       "phase_0_issue_103_single_owner_direction_correction",
       "phase_1_field_tracking_transactional_service_and_seven_day_lazy_backfill",
@@ -946,12 +1007,11 @@
     }
   },
   "protected_paths": {
-    "app_web_and_application_services": "must_remain_unchanged_in_issue_117",
-    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_117",
-    "backup_production": "authorized_narrow_change_in_issue_117",
-    "export_production": "must_remain_unchanged_unless_executable_leak_is_proven_in_issue_117",
-    ".github/workflows": "must_remain_unchanged_in_issue_117",
-    "requirements.txt": "must_remain_unchanged_in_issue_117",
+    "app_and_tests": "must_remain_unchanged_in_issue_125_documentation_only_finalization",
+    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "unchanged_in_issue_119_and_issue_125",
+    "backup_and_export_production": "unchanged_in_issue_119_and_issue_125",
+    ".github/workflows": "unchanged_in_issue_119_and_issue_125",
+    "requirements.txt": "unchanged_in_issue_119_and_issue_125",
     "reports": "user_files_preserved_untracked_and_unchanged",
     "exports/.gitkeep": "must_remain_present_and_unchanged",
     "ignored_zip_and_cache": "must_remain_unchanged"
@@ -968,21 +1028,20 @@
     "pull_request_creation_by_codex": false,
     "merge_authorized": false,
     "branch_deletion_authorized": false,
-    "final_remote_sha_evidence_location": "GitHub Issue #117 completion comment after push"
+    "final_remote_sha_evidence_location": "GitHub Issue #119 and Issue #125 completion comments after push"
   },
   "required_files": [
-    ".cse/tasks/117_task.md",
-    ".cse/results/117_result.md",
+    ".cse/tasks/119_task.md",
+    ".cse/results/119_result.md",
+    ".cse/tasks/125_task.md",
+    ".cse/results/125_result.md",
     ".cse/state/project_state.json",
-    "app/operations/backups.py",
-    "tests/test_backup_restore.py",
-    "tests/test_daily_export.py",
     "ROADMAP.md",
     "CHANGELOG.md",
     "docs/project_decisions.md",
     "learning/GLOSSARY.md",
-    "learning/issue_117_backup_restore_export_isolation.md"
+    "learning/issue_119_first_testable_pc_field_tracking_ui.md"
   ],
-  "workflow_status": "issue_117_implementation_and_local_verification_complete_before_commit_and_push",
+  "workflow_status": "issue_119_completed_ready_for_pull_request_review_not_merged",
   "forbidden_scope_added": false
 }

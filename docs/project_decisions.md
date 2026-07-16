@@ -2539,3 +2539,24 @@
 - Schema 4 tracking verisi ayri manifest count alanlariyla degil, SQLite snapshot digest'i ve restore sonrasi aggregate/event kabul testleriyle korunacak.
 - Resmi daily export kodu yalniz mevcut project/observation/attachment/observation-event omurgasini okumaya devam edecek; tracking verili ve verisiz koklerin deterministic ZIP byte esitligi executable guvence olacak.
 - Export izolasyon testi sizinti bulmadigi icin `app/operations/exports.py` degistirilmeyecek.
+
+## Issue 119 - İlk Test Edilebilir PC Saha Takibi Arayüzü
+
+- İlk PC yüzeyi yeni domain, persistence veya operations sözleşmesi üretmeyecek; mevcut `ObservationApplicationService`, `FollowUpApplicationService` ve `RoutineApplicationService` web katmanında compose edilecek.
+- Üç application service aynı explicit data root içindeki tek `cse.sqlite3` dosyasını kullanacak; global singleton, ikinci database, background thread veya scheduler eklenmeyecek.
+- `/` başlangıcı `/today` görünümüne yönlenecek; ana navigasyon Bugün, Unutma Kutusu, Rutinler ve Gözlemler yüzeylerini koruyacak.
+- Bugün görünümü her request için tek canonical `now_utc` üretecek; routine occurrence ensure işlemi bu değerle çağrılacak ve listeler aynı zaman sınırını paylaşacak.
+- “Şimdi ilgilen” yeni bir kalıcı status olmayacak; mevcut follow-up query görünümünden okunacak.
+- Hızlı create formu yalnız `capture_text` taşıyacak ve yalnız `CreateFollowUp` kullanacak; başlık, status, proje veya zaman create formuna eklenmeyecek.
+- Başarılı mutation'lar Post/Redirect/Get uygulayacak; refresh aynı POST'u veya event'i istemeden tekrar üretmeyecek.
+- Kullanıcı `datetime-local` girdisi `Europe/Istanbul` kabul edilip application service'e canonical UTC olarak verilecek; timezone kullanıcı seçimi olmayacak.
+- Web mutation formları hidden `expected_revision` taşıyacak; stale revision HTTP 409 ve yenileme mesajı, validation HTTP 400 ve güvenli kullanıcı mesajı üretecek.
+- Follow-up detail ilk `capture_text` değerini değişmez kanıt olarak gösterecek; storage enum/event değerleri değişmeden Türkçe sunum sözlüğü kullanılacak.
+- Routine occurrence mutation'ları schedule snapshot alanlarını değiştirmeyecek; `/today` refresh aynı template + yerel tarih occurrence/event'ini çoğaltmayacak.
+- UI server-rendered HTML/CSS kalacak; SPA, UI framework, haricî CDN, client-side state store veya JavaScript zorunluluğu eklenmeyecek.
+- Erişilebilirlik tabanı en az 44 px hedef, görünür `:focus-visible` durumu ve 640 px altında tek kolon responsive düzen olacak.
+- İlk PC kabul akışı temporary data root üzerinde app restart, revision/history kalıcılığı, observation regresyonu, backup ve resmî export izolasyonunu birlikte kanıtlayacak.
+- Resmî günlük export yalnız project/observation/attachment/observation-event omurgasını okuyacak; follow-up ve routine verisi varsayılan resmî export'a sızmayacak.
+- Schema `4`, domain/application/persistence/operations sözleşmeleri, backup/export formatları, requirements ve workflow bu UI görevinde değişmeyecek.
+- Mobile runtime, PWA, offline, sync, notification, auth ve gerçek kullanıcı data root'u ilk test edilebilir PC sürümünün kapsamı dışında kalacak.
+- Issue #119 branch'i testleri geçmiş ve PR incelemesine hazır olabilir; PR oluşturulmadan ve merge edilmeden repository state merge claim taşımayacak.
