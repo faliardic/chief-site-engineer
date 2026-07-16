@@ -624,6 +624,40 @@ def test_today_occurrence_is_idempotent_and_mutations_use_revisions(
     assert history[1].payload["outcome_type"] == RoutineOccurrenceOutcome.COMPLETED.value
 
 
+def test_routine_missing_records_are_404(tmp_path: Path) -> None:
+    app = _app(tmp_path)
+    client = app.test_client()
+    missing_template_id = _uuid(777777)
+    missing_occurrence_id = _uuid(888888)
+
+    assert client.get("/routines/not-a-uuid").status_code == 404
+    assert client.get(f"/routines/{missing_template_id}").status_code == 404
+    assert client.post(
+        f"/routines/{missing_template_id}/deactivate",
+        data={"expected_revision": "1"},
+    ).status_code == 404
+
+    occurrence_requests = (
+        (
+            "snooze",
+            {"expected_revision": "1", "next_attention_at": "2026-07-16T18:00"},
+        ),
+        (
+            "close",
+            {"expected_revision": "1", "outcome_type": "completed"},
+        ),
+        (
+            "reopen",
+            {"expected_revision": "1", "next_attention_at": "2026-07-16T18:00"},
+        ),
+    )
+    for action, data in occurrence_requests:
+        response = client.post(
+            f"/routine-occurrences/{missing_occurrence_id}/{action}", data=data
+        )
+        assert response.status_code == 404
+
+
 def test_routine_deactivation_conflict_and_missing_occurrence_are_safe(
     tmp_path: Path,
 ) -> None:
