@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 @dataclass(frozen=True)
@@ -319,6 +319,48 @@ SCHEMA_MIGRATIONS: tuple[Migration, ...] = (
             CREATE INDEX ix_routine_occurrence_template_date
             ON routine_occurrences(routine_template_id, occurrence_local_date)
             """,
+        ),
+    ),
+    Migration(
+        version=4,
+        statements=(
+            """
+            CREATE TABLE follow_up_events_v4 (
+                id TEXT PRIMARY KEY,
+                follow_up_id TEXT NOT NULL REFERENCES follow_up_items(id),
+                sequence INTEGER NOT NULL CHECK(sequence >= 1),
+                event_type TEXT NOT NULL CHECK(event_type IN (
+                    'follow_up.created',
+                    'follow_up.scheduled',
+                    'follow_up.rescheduled',
+                    'follow_up.waiting_started',
+                    'follow_up.completed',
+                    'follow_up.cancelled',
+                    'follow_up.reopened',
+                    'follow_up.observation_linked',
+                    'follow_up.converted_to_observation',
+                    'follow_up.details_updated',
+                    'follow_up.moved_to_inbox',
+                    'follow_up.project_changed'
+                )),
+                actor TEXT NOT NULL CHECK(length(trim(actor)) > 0),
+                occurred_at TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                UNIQUE(follow_up_id, sequence)
+            )
+            """,
+            """
+            INSERT INTO follow_up_events_v4 (
+                id, follow_up_id, sequence, event_type, actor, occurred_at,
+                payload_json
+            )
+            SELECT
+                id, follow_up_id, sequence, event_type, actor, occurred_at,
+                payload_json
+            FROM follow_up_events
+            """,
+            "DROP TABLE follow_up_events",
+            "ALTER TABLE follow_up_events_v4 RENAME TO follow_up_events",
         ),
     ),
 )

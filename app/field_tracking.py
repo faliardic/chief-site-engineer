@@ -81,6 +81,9 @@ class FollowUpEventType(str, Enum):
     REOPENED = "follow_up.reopened"
     OBSERVATION_LINKED = "follow_up.observation_linked"
     CONVERTED_TO_OBSERVATION = "follow_up.converted_to_observation"
+    DETAILS_UPDATED = "follow_up.details_updated"
+    MOVED_TO_INBOX = "follow_up.moved_to_inbox"
+    PROJECT_CHANGED = "follow_up.project_changed"
 
 
 class RoutineTemplateEventType(str, Enum):

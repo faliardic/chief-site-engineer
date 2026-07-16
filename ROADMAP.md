@@ -779,3 +779,16 @@ Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcas
 - [x] Gelişmiş hesap defteri, immutable günlük yayın zinciri ve Canlı Proje Haritası pilotlar sonrasındaki ayrı fazlarda tutuldu.
 - [x] Legacy model envanteri/deprecation yönü gerçek sınıf adlarıyla yazıldı; fiziksel silme yetkisi verilmedi.
 - [x] Production Python, schema, migration, repository, UI ve test davranışı değiştirilmedi.
+
+## Issue 107 - Follow-up Mutation Event Vocabulary ve SQLite v4
+
+- [x] `FollowUpEventType` sonuna `details_updated`, `moved_to_inbox` ve `project_changed` anlamları eklendi; eski sıra ve değerler korundu.
+- [x] Gelecek `update_details`, `move_to_inbox` ve `set_project` mutation'larının minimum deterministic payload sözleşmesi yazıldı.
+- [x] Schema version 4, v1/v2/v3 statement içeriklerini değiştirmeyen tek immutable migration olarak eklendi.
+- [x] Yalnız `follow_up_events` tablosu aynı kolon/constraint/FK sözleşmesi ve genişletilmiş event CHECK list'iyle transaction içinde yeniden kuruldu.
+- [x] Mevcut event alanları ve `payload_json` metni birebir korundu; diğer tablolar, no-cascade ve append-only sequence davranışı değişmedi.
+- [x] Fresh v4/v3→v4 schema eşitliği, tam rollback, allowed/unknown türler, duplicate sequence, foreign key ve repository round-trip testleri eklendi.
+- [x] Mapping/repository API değişikliği gerekmedi; event update/delete/sequence allocator eklenmedi.
+- [ ] `FollowUpApplicationService`, optimistic mutation/no-op ve atomik event üretimi sonraki dar Faz 1 görevinde uygulanacak.
+- [ ] Rutin application service ve yedi günlük idempotent lazy backfill ayrı küçük görevde uygulanacak.
+- [ ] Backup backward compatibility ve resmî export izolasyonu Epic #105 Faz 2'de executable kabul testleriyle tamamlanacak.

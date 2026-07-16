@@ -1,5 +1,17 @@
 # Proje Kararlari
 
+## Issue 107 - Follow-up Event Vocabulary ve SQLite v4 Kararları
+
+- Event adları mevcut anlamları yeniden kullanmak yerine gelecekteki mutation'larla birebir eşleştirilir: `update_details -> follow_up.details_updated`, `move_to_inbox -> follow_up.moved_to_inbox`, `set_project -> follow_up.project_changed`.
+- Mevcut dokuz `FollowUpEventType` değeri ve sırası değiştirilmez; üç yeni değer enum'un sonuna eklenir. `FOLLOW_UP_EVENT_TYPES` enum'dan türemeye devam eder.
+- Ayrıntı event payload'ı mutation sonrası `revision` ve alfabetik sıralı benzersiz `changed_fields` taşır; immutable ilk yakalama kanıtı `capture_text` değiştirilemez ve listede bulunamaz.
+- Inbox event payload'ı `revision`, `from_status`, `previous_next_attention_at`; project event payload'ı `revision`, `from_project_id`, `project_id` taşır. Nullable proje değerleri JSON `null` olarak korunur.
+- SQLite `CHECK` constraint doğrudan genişletilmediği için schema v4 yalnız `follow_up_events` tablosunu replacement/copy/drop/rename akışıyla yeniden kurar. Bütün adımlar migration runner'ın tek `BEGIN IMMEDIATE` transaction'ındadır.
+- v1/v2/v3 migration statement içerikleri immutable geçmiş kabul edilir. V4, kolon/nullability/PK/FK/sequence/actor/payload/unique/no-cascade sözleşmesini aynen korur ve yalnız event allowed list'ine üç değer ekler.
+- Existing `payload_json` migration sırasında parse veya serialize edilmez; `INSERT ... SELECT` ile metin değeri aynen taşınır. Diğer tabloların schema veya satırları değiştirilmez.
+- Genel domain-SQLite event mapper ve append-only repository yeni enum değerlerini zaten taşıdığı için mapping/repository kodu değiştirilmez. Event API'si yalnız add/list ve `ORDER BY sequence` olarak kalır.
+- Issue #107 application service, command/query dataclass, sequence allocator, backfill, UI/web route, notification, backup formatı veya resmî daily export uygulamaz.
+
 ## Issue 103 - Kanonik Ürün Yönü ve Repository Truth Kararları
 
 - Issue #103'ün nihai düzeltmesi ve bağlayıcı üst yol haritası Epic #105'tir; ilk branch commit'indeki çelişen geniş kullanıcı, kurumsal gelecek ve geç mobil öncelik kararları tarihsel kalır.

@@ -597,7 +597,13 @@ def test_event_vocabularies_match_contract() -> None:
         "follow_up.reopened",
         "follow_up.observation_linked",
         "follow_up.converted_to_observation",
+        "follow_up.details_updated",
+        "follow_up.moved_to_inbox",
+        "follow_up.project_changed",
     )
+    assert set(FOLLOW_UP_EVENT_TYPES) == {
+        member.value for member in FollowUpEventType
+    }
     assert ROUTINE_TEMPLATE_EVENT_TYPES == (
         "routine_template.created",
         "routine_template.updated",
@@ -612,6 +618,57 @@ def test_event_vocabularies_match_contract() -> None:
         "routine_occurrence.missed",
         "routine_occurrence.reopened",
     )
+
+
+@pytest.mark.parametrize(
+    ("event_type", "payload", "expected_json"),
+    [
+        (
+            FollowUpEventType.DETAILS_UPDATED,
+            {"revision": 2, "changed_fields": ["description", "title"]},
+            '{"changed_fields":["description","title"],"revision":2}',
+        ),
+        (
+            FollowUpEventType.MOVED_TO_INBOX,
+            {
+                "revision": 3,
+                "previous_next_attention_at": "2026-07-15T08:00:00Z",
+                "from_status": "active",
+            },
+            (
+                '{"from_status":"active","previous_next_attention_at":'
+                '"2026-07-15T08:00:00Z","revision":3}'
+            ),
+        ),
+        (
+            FollowUpEventType.PROJECT_CHANGED,
+            {"project_id": PROJECT_ID, "revision": 4, "from_project_id": None},
+            (
+                '{"from_project_id":null,"project_id":'
+                f'"{PROJECT_ID}","revision":4}}'
+            ),
+        ),
+    ],
+)
+def test_follow_up_mutation_event_payloads_are_deterministic(
+    event_type: FollowUpEventType,
+    payload: dict[str, object],
+    expected_json: str,
+) -> None:
+    event = FollowUpEvent(
+        event_id=EVENT_ID,
+        follow_up_id=FOLLOW_UP_ID,
+        sequence=1,
+        event_type=event_type,
+        actor="Santiye şefi",
+        occurred_at=CREATED_AT,
+        payload=payload,
+    )
+
+    assert event.payload_json == expected_json
+    if event_type is FollowUpEventType.DETAILS_UPDATED:
+        assert event.payload["changed_fields"] == ["description", "title"]
+        assert "capture_text" not in event.payload["changed_fields"]
 
 
 @pytest.mark.parametrize(
