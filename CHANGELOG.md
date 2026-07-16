@@ -1,5 +1,17 @@
 # Changelog
 
+## Issue 115 - RoutineApplicationService ve Yedi Günlük Lazy Backfill
+
+- Immutable template/occurrence command-query değerleri ile public `RoutineApplicationService` uygulama servisi eklendi.
+- Template create/get/list/update/deactivate/history akışları; nullable kişisel proje, project existence kontrolü, optimistic revision, normalize no-op ve alfabetik `changed_fields` event payload'ıyla uygulandı.
+- `ensure_occurrences(as_of_utc)`, son yedi `Europe/Istanbul` yerel gününü mevcut saf recurrence helper'larıyla hesaplar; future veya daha eski eksik gün üretmez.
+- Yeni geçmiş occurrence önce open revision 1 + `routine_occurrence.created`, sonra aynı transaction'da closed/missed revision 2 + `routine_occurrence.missed` olarak yazılır; bugünün occurrence'ı open revision 1 kalır.
+- Aynı template/yerel gün tekrarında mevcut occurrence döner; ikinci ensure event/revision/clock/UUID tüketmez. `add_if_absent` ve unique constraint son savunma olarak korunur.
+- Occurrence list/view/history, snooze, üç kullanıcı close outcome'u ve reopen lifecycle'ı schedule snapshot alanlarını değiştirmeden uygulandı.
+- Aggregate mutation, append-only sequence ve commit mevcut tek `BEGIN IMMEDIATE` Unit of Work transaction'ında atomiktir; event/commit failure rollback testleri eklendi.
+- Focused suite `48 passed`, ilgili domain/persistence/UoW/follow-up regresyonu `224 passed`, full suite `948 passed, 7 skipped` sonucuna ulaştı.
+- Schema/migration/mapping/repository/UoW portları, observation/follow-up production servisi, web/UI, requirements/workflow, backup/export ve gerçek kullanıcı data root'u değiştirilmedi.
+
 ## Issue 112 - Follow-up Observation Bağlantısı ve Resmî Gözleme Dönüşüm
 
 - `FollowUpApplicationService.link_observation(...)`, var olan observation'ı açık veya terminal follow-up'a lifecycle alanlarını değiştirmeden bağlayacak şekilde eklendi.

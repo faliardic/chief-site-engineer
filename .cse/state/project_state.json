@@ -1,40 +1,40 @@
 {
   "state_version": 2,
   "legacy_last_numbered_step": 225,
-  "current_issue": 112,
+  "current_issue": 115,
   "base_branch": "master",
-  "base_commit": "c1182a43500814887a5f804d95dab09019912cc6",
+  "base_commit": "0df88681e289b89941a55925e608186917772ee2",
   "active_work": {
-    "issue": 112,
-    "type": "follow_up_observation_link_and_conversion",
+    "issue": 115,
+    "type": "routine_application_service_and_seven_day_lazy_backfill",
     "binding_epic": 105,
     "field_tracking_epic": 97,
-    "branch": "codex/issue-112-follow-up-observation-link-convert",
-    "base_commit": "c1182a43500814887a5f804d95dab09019912cc6",
+    "branch": "codex/issue-115-routine-application-service-backfill",
+    "base_commit": "0df88681e289b89941a55925e608186917772ee2",
     "commit_strategy": "one_ordinary_commit_without_amend_rebase_or_force_push",
     "schema_version": 4,
     "public_application_api": [
-      "CreateFollowUp",
-      "UpdateFollowUp",
-      "ScheduleFollowUp",
-      "MarkWaiting",
-      "CompleteFollowUp",
-      "FollowUpQuery",
-      "FollowUpView",
-      "FollowUpApplicationService"
+      "CreateRoutineTemplate",
+      "UpdateRoutineTemplate",
+      "RoutineTemplateQuery",
+      "RoutineOccurrenceQuery",
+      "RoutineOccurrenceView",
+      "CloseRoutineOccurrence",
+      "RoutineApplicationService"
     ],
     "production_behavior_changed": true,
     "follow_up_application_service_core_implemented": true,
     "terminal_lifecycle_implemented": true,
     "observation_link_or_conversion_implemented": true,
-    "routine_application_service_implemented": false,
-    "ui_or_backfill_implemented": false,
+    "routine_application_service_implemented": true,
+    "seven_day_lazy_backfill_implemented": true,
+    "web_ui_implemented": false,
     "real_user_data_root_accessed": false,
     "merge_claim": false,
     "pull_request_created": false,
-    "focused_test_summary": "105 passed in 2.17s",
-    "related_regression_test_summary": "38 observation/persistence/UoW tests passed in 0.87s",
-    "full_test_summary": "900 passed, 7 skipped in 15.32s",
+    "focused_test_summary": "48 passed in 1.06s",
+    "related_regression_test_summary": "224 domain/persistence/UoW/follow-up tests passed in 3.91s",
+    "full_test_summary": "948 passed, 7 skipped in 18.59s",
     "schema_version_unchanged": true,
     "repository_ports_unchanged": true,
     "compileall_passed": true,
@@ -46,18 +46,18 @@
     "semantics": "latest_merged_finalized_checkpoint",
     "step": 225,
     "step_semantics": "last_legacy_numbered_step_preceding_issue_centered_workflow",
-    "issue": 111,
+    "issue": 112,
     "issue_state": "completed",
-    "pull_request": 113,
+    "pull_request": 114,
     "pull_request_state": "merged",
-    "merge_commit": "c1182a43500814887a5f804d95dab09019912cc6",
-    "local_test_summary": "871 passed, 7 skipped (Issue #111 completion evidence)"
+    "merge_commit": "0df88681e289b89941a55925e608186917772ee2",
+    "local_test_summary": "900 passed, 7 skipped (Issue #112 completion evidence)"
   },
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
-    "local_master_sha": "c1182a43500814887a5f804d95dab09019912cc6",
-    "origin_master_sha": "c1182a43500814887a5f804d95dab09019912cc6",
+    "local_master_sha": "0df88681e289b89941a55925e608186917772ee2",
+    "origin_master_sha": "0df88681e289b89941a55925e608186917772ee2",
     "divergence": "0 0",
     "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
     "misspelled_workspace_present": false,
@@ -174,6 +174,11 @@
       "model": "GPT-5 current full Codex",
       "reasoning": "extra_high",
       "reason": "personal_official_boundary_cross_record_project_invariants_terminal_conversion_atomic_events_and_rollback_safety"
+    },
+    "issue_115_selection": {
+      "model": "GPT-5 current full Codex",
+      "reasoning": "extra_high",
+      "reason": "recurrence_template_lifecycle_idempotent_seven_day_backfill_missed_closure_append_only_sequence_and_user_data_safety"
     }
   },
   "required_source_pre_read": {
@@ -524,6 +529,20 @@
             "project_state": true,
             "task_112": true
         },
+        "issue_115_sources_read": {
+            "unified_project_source": true,
+            "project_instructions": true,
+            "github_issue_115_with_all_comments": true,
+            "github_epic_105_with_comments": true,
+            "github_epic_97_with_comments": true,
+            "field_tracking_v0_1_contract": true,
+            "field_tracking_domain_and_recurrence_helpers": true,
+            "follow_up_application_service_and_public_exports": true,
+            "field_tracking_mapping_repositories_and_uow": true,
+            "routine_domain_persistence_uow_and_application_tests": true,
+            "project_state": true,
+            "task_115": true
+        },
     "unresolved_conflict_found": false
   },
   "canonical_project_instructions": {
@@ -588,7 +607,7 @@
     "workflow_changed": false
   },
   "product_maturity": {
-    "state": "local_field_mvp_with_follow_up_observation_link_and_conversion",
+    "state": "local_field_mvp_with_complete_field_tracking_phase_one_application_services",
     "field_ready_application": false,
     "production_ready_application": false,
     "product_identity": "local_first_mobile_first_single_owner_personal_field_assistant",
@@ -635,10 +654,11 @@
       "sqlite_schema_v4_follow_up_mutation_event_vocabulary",
       "follow_up_application_service_core_create_read_query_update_schedule_inbox_project_history",
       "follow_up_waiting_complete_cancel_and_reopen_lifecycle",
-      "follow_up_observation_link_and_explicit_conversion"
+      "follow_up_observation_link_and_explicit_conversion",
+      "routine_application_service_template_and_occurrence_lifecycle",
+      "seven_day_idempotent_lazy_backfill_with_missed_closure"
     ],
     "field_tracking_pending": [
-      "routine_application_service_and_seven_day_idempotent_lazy_backfill",
       "backup_restore_compatibility_and_official_export_isolation",
       "mobile_runtime_and_data_ownership_adr",
       "mobile_first_paperless_field_slice",
@@ -703,10 +723,11 @@
     "strict_podcast_note_prior_step_summary_contract_implemented_in_step_225": true,
     "field_mvp_product_behavior_added_in_step_225": false,
     "next_product_direction": {
-      "name": "complete_remaining_field_tracking_phase_one_application_services",
+      "name": "field_tracking_backup_restore_compatibility_and_official_export_isolation",
       "scope": [
-        "routine_application_service",
-        "seven_day_idempotent_occurrence_backfill"
+        "schema_2_and_3_backup_restore_compatibility",
+        "schema_4_tracking_round_trip",
+        "official_daily_export_tracking_exclusion"
       ]
     },
     "field_observation_record_contract": {
@@ -906,11 +927,11 @@
     }
   },
   "protected_paths": {
-    "app_web_and_observation_application_service": "must_remain_unchanged_in_issue_112",
-    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_112",
-    "backup_and_export_production": "must_remain_unchanged_in_issue_112",
-    ".github/workflows": "must_remain_unchanged_in_issue_112",
-    "requirements.txt": "must_remain_unchanged_in_issue_112",
+    "app_web_observation_and_follow_up_application_service": "must_remain_unchanged_in_issue_115",
+    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_115",
+    "backup_and_export_production": "must_remain_unchanged_in_issue_115",
+    ".github/workflows": "must_remain_unchanged_in_issue_115",
+    "requirements.txt": "must_remain_unchanged_in_issue_115",
     "reports": "user_files_preserved_untracked_and_unchanged",
     "exports/.gitkeep": "must_remain_present_and_unchanged",
     "ignored_zip_and_cache": "must_remain_unchanged"
@@ -927,21 +948,22 @@
     "pull_request_creation_by_codex": false,
     "merge_authorized": false,
     "branch_deletion_authorized": false,
-    "final_remote_sha_evidence_location": "GitHub Issue #112 completion comment after push"
+    "final_remote_sha_evidence_location": "GitHub Issue #115 completion comment after push"
   },
   "required_files": [
-    ".cse/tasks/112_task.md",
-    ".cse/results/112_result.md",
+    ".cse/tasks/115_task.md",
+    ".cse/results/115_result.md",
     ".cse/state/project_state.json",
-    "app/application/field_tracking.py",
-    "tests/test_follow_up_application_service.py",
+    "app/application/routines.py",
+    "app/application/__init__.py",
+    "tests/test_routine_application_service.py",
     "docs/field_tracking_v0_1_contract.md",
     "ROADMAP.md",
     "CHANGELOG.md",
     "docs/project_decisions.md",
     "learning/GLOSSARY.md",
-    "learning/issue_112_follow_up_observation_link_conversion.md"
+    "learning/issue_115_routine_application_service.md"
   ],
-  "workflow_status": "issue_112_implementation_and_local_verification_complete_before_commit_and_push",
+  "workflow_status": "issue_115_implementation_and_local_verification_complete_before_commit_and_push",
   "forbidden_scope_added": false
 }

@@ -1417,3 +1417,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Relationship Link (İlişki Bağı)`: İki mevcut kaydı kimlikleriyle ilişkilendiren fakat tek başına kayıtların yaşam döngüsü anlamını değiştirmeyen bağlantıdır. Observation link'i follow-up'ı otomatik resmî kayda dönüştürmez.
 
 `Explicit Conversion (Açık Dönüşüm)`: Kullanıcının açık işlemiyle bir kaydın ilişki kurmanın ötesinde yeni bir sonuç anlamına geçirilmesidir. Bu projede follow-up `converted_to_observation` sonucu ile terminal tamamlanır.
+
+`Lazy Backfill`: Uygulama her açılışta bütün geçmişi üretmek yerine, ihtiyaç anında yalnız önceden belirlenmiş yakın geçmiş penceresindeki eksik kayıtları tamamlar. CSE rutinlerinde pencere bugün dahil son yedi İstanbul yerel günüdür.
+
+`Schedule Snapshot`: Bir occurrence oluşturulduğu anda template'in yerel tarih, yerel saat ve UTC karşılığının occurrence içine tarihsel kopya olarak yazılmasıdır. Template daha sonra değişse bile geçmiş snapshot yeniden hesaplanmaz.
+
+`Missed Outcome`: Geçmiş bir due gün application çalışmadığı için zamanında sonuçlandırılamadıysa lazy backfill tarafından otomatik verilen terminal sonuçtur. Kullanıcı close command'ı bu sonucu doğrudan seçemez.
+
+`Stale-Before-No-Op`: Bir mutation mevcut değerle aynı görünse bile önce `expected_revision` kontrolünün yapılması kuralıdır. Eski revision taşıyan tekrar çağrı sessiz başarı sayılmaz.
