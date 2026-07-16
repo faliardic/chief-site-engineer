@@ -1,5 +1,15 @@
 # Changelog
 
+## Issue 107 - Follow-up Event Vocabulary ve SQLite Schema v4
+
+- `FollowUpEventType` sırası korunarak sona `follow_up.details_updated`, `follow_up.moved_to_inbox` ve `follow_up.project_changed` eklendi; türetilmiş `FOLLOW_UP_EVENT_TYPES` allowed list'i otomatik genişledi.
+- Üç mutation event'inin minimum payload sözleşmesi `revision`, ayrıntı değişiklikleri için sıralı `changed_fields`, inbox geçişi için önceki status/zaman ve proje değişimi için nullable önce/sonra proje kimliği olarak belgelendi.
+- `SCHEMA_VERSION` 4'e çıkarıldı; v1/v2/v3 migration statement içerikleri değiştirilmeden yalnız `follow_up_events` tablosunu transaction içinde yeniden kuran tek v4 migration eklendi.
+- Rebuild mevcut event satırlarının kimlik, aggregate, sequence, tür, aktör, zaman ve `payload_json` metnini aynen kopyalar; primary key, foreign key, CHECK, unique, nullability ve no-cascade sözleşmesini korur.
+- Fresh v4/v3→v4 schema signature eşitliği, mevcut payload metninin birebir korunması, yeni allowed türler, unknown CHECK reddi, duplicate sequence, foreign key/no-cascade ve v4 hata rollback'i geçici SQLite testleriyle kapsandı.
+- Event repository mapping veya API değişmedi; yeni türler mevcut genel mapper ile round-trip olur, okuma yalnız `sequence` sırasındadır ve update/delete/sequence allocator eklenmedi.
+- Application service, command/query sınıfları, backfill, UI/web route, backup formatı/manifest alanları ve resmî günlük export davranışı bu görevde değiştirilmedi; gerçek kullanıcı data root'una erişilmedi.
+
 ## Issue 103 - Kanonik Proje Talimatları v2 ve Repository Truth
 
 ### Nihai Epic #105 düzeltmesi

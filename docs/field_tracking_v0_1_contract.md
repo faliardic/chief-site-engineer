@@ -4,6 +4,8 @@
 
 Bu belge, GitHub Issue #98 kapsamında Saha Takibi v0.1 için uygulanacak domain ve veri sınırını kesinleştirir. Bu aşama production kodu, migration, UI veya scheduler eklemez. Sonraki implementation görevleri bu sözleşmeyi doğrudan testlere ve koda çevirecektir.
 
+Issue #107 güncellemesi, gelecekteki `update_details`, `move_to_inbox` ve `set_project` mutation'ları için eksik event adlarını ve payload sözleşmesini ekler. Bu güncelleme yalnız event vocabulary ile SQLite schema v4 persistence sınırını uygular; `FollowUpApplicationService`, command/query sınıfları, backfill ve web route henüz uygulanmış değildir.
+
 Sözleşme üç ana kaydı kapsar:
 
 1. `FollowUpItem`: tek seferlik kişisel takip kaydı.
@@ -305,9 +307,22 @@ follow_up.cancelled
 follow_up.reopened
 follow_up.observation_linked
 follow_up.converted_to_observation
+follow_up.details_updated
+follow_up.moved_to_inbox
+follow_up.project_changed
 ```
 
 İlk oluşturma dikkat zamanı taşıyorsa önce `follow_up.created`, sonra `follow_up.scheduled` yazılır. Resmî gözleme dönüştürme, oluşturulan observation kimliğini payload içinde taşır ve follow-up’ı `outcome_type = converted_to_observation` ile tamamlar.
+
+Yeni mutation event payload sözleşmesi şöyledir:
+
+| Gelecek mutation | Event | Minimum deterministic payload |
+| --- | --- | --- |
+| `update_details` | `follow_up.details_updated` | Mutation sonrası `revision` ve alfabetik sıralı, benzersiz string değerlerden oluşan `changed_fields`. İlk yakalama kanıtı olan immutable `capture_text` bu listede bulunamaz. |
+| `move_to_inbox` | `follow_up.moved_to_inbox` | Mutation sonrası `revision`, önceki `from_status` ve önceki `previous_next_attention_at`. Mutation sonucu ana kayıt `status = inbox`, `next_attention_at = NULL` olur. |
+| `set_project` | `follow_up.project_changed` | Mutation sonrası `revision`, önceki `from_project_id` ve yeni `project_id`. Projesiz taraflar JSON `null` olarak korunur. Bu event yalnız observation bağlantısı olmayan follow-up için gelecekteki izinli project mutation'ını temsil eder. |
+
+`changed_fields` bir entity snapshot'ı değildir; yalnız gerçekten değişen, application service tarafından izin verilen ayrıntı alanlarını taşır. Liste sırası payload üreticisi tarafından alfabetik yapılır, JSON object anahtarları mevcut deterministic serializer tarafından canonical sırada yazılır. Bu görev payload'ı üreten application service'i eklemez.
 
 ### 8.3 Rutin event türleri
 
@@ -328,7 +343,7 @@ Event payload’ı en az mutation sonrası `revision` değerini ve değişen ala
 
 ## 9. SQLite migration planı
 
-İlk implementation adımı `SCHEMA_VERSION` değerini `2`den `3`e çıkaran tek immutable migration ekleyecektir.
+İlk persistence implementation'ı `SCHEMA_VERSION` değerini `2`den `3`e çıkaran immutable migration ile yedi tracking tablosunu eklemiştir. Issue #107, v1/v2/v3 migration statement içeriklerine dokunmadan zincirin sonuna yalnız event allowed list'ini genişleten schema v4 migration'ını ekler.
 
 ### 9.1 Yeni tablolar
 
@@ -374,8 +389,28 @@ routine_occurrence_events
 - Mevcut `projects`, `field_observations`, `attachments` ve `observation_events` tablolarında ALTER/DELETE/UPDATE yapılmaz.
 - Migration’ın herhangi bir statement’ı başarısızsa sürüm kaydı dahil bütün migration rollback olur.
 - Bilinmeyen veya sırası bozuk migration sürümü mevcut fail-closed davranışla reddedilir.
-- Fresh database ve sürüm 2’den upgrade aynı sürüm 3 şemasını üretmelidir.
+- Fresh database ve sürüm 3 fixture'dan upgrade aynı sürüm 4 şemasını üretmelidir.
 - Migration testi, upgrade öncesi observation/project/attachment/event satırlarını ve payload değerlerini upgrade sonrası birebir karşılaştırmalıdır.
+
+### 9.4 Schema v4 follow-up event table rebuild
+
+SQLite mevcut bir `CHECK` constraint'ini doğrudan genişletmediği için v4 yalnız `follow_up_events` tablosunu transaction içinde yeniden kurar:
+
+```text
+aynı kolon/constraint/FK sözleşmesiyle replacement tablo oluştur
+-> mevcut yedi kolonu INSERT ... SELECT ile aynen kopyala
+-> eski follow_up_events tablosunu düşür
+-> replacement tabloyu follow_up_events olarak yeniden adlandır
+-> schema_migrations içine version 4 yaz
+-> commit
+```
+
+- Kolon sırası, nullability, primary key, follow-up foreign key, `sequence >= 1`, dolu `actor`, zorunlu `payload_json` ve `UNIQUE(follow_up_id, sequence)` korunur.
+- Foreign key `ON DELETE CASCADE` kazanmaz.
+- Mevcut `id`, `follow_up_id`, `sequence`, `event_type`, `actor`, `occurred_at` ve `payload_json` değerleri yeniden yorumlanmadan kopyalanır; payload metninin whitespace ve anahtar sırası dâhil içeriği değişmez.
+- Allowed list yalnız eski dokuz event ile üç yeni mutation event'inden oluşur; bilinmeyen değer database `CHECK` tarafından reddedilir.
+- Diğer tabloların schema tanımı veya satırları değiştirilmez.
+- Rebuild'in herhangi bir statement'ı başarısızsa replacement/drop/rename işlemleri ve version 4 kaydı birlikte rollback olur; database version 3 olarak kalır.
 
 ## 10. Repository ve application service sınırı
 
@@ -402,6 +437,8 @@ RoutineApplicationService
 `FollowUpApplicationService` oluşturma, planlama/yeniden planlama, beklemeye alma, tamamlama, iptal, yeniden açma, observation bağlama ve resmî gözleme dönüştürme use-case’lerini koordine eder.
 
 `RoutineApplicationService` template oluşturma/güncelleme/pasifleştirme, occurrence ensure/backfill, erteleme, sonuçlandırma ve yeniden açma use-case’lerini koordine eder.
+
+Bu sınıf adları bağlayıcı gelecek API sözleşmesidir. Issue #107 bu sınıfları veya aşağıdaki method'ları production koduna eklemez; yalnız bu method'ların daha sonra kullanacağı event adlarını persistence katmanında hazırlar.
 
 Gelecek service API yüzeyi aşağıdaki isim ve sorumluluklarla sınırlıdır:
 
@@ -510,9 +547,9 @@ Mevcut `observation_count` ve `event_count` alanlarının anlamı değişmez; bu
 
 ### 11.3 Backward compatibility
 
-- Yeni backup’lar backup format `1`, schema version `3` taşır.
-- Uygulama schema version `2` taşıyan eski format `1` backup’ı doğrulayıp yalnız yeni ve var olmayan hedef köke çıkarabilmelidir.
-- Eski snapshot önce kendi manifest observation/attachment/event sayılarıyla doğrulanır, sonra geçici restore kökünde normal migration runner ile sürüm 3’e yükseltilir.
+- Yeni backup'lar backup format `1`, schema version `4` taşır; manifest alan kümesi ve count anlamları değişmez.
+- Gelecek compatibility görevi schema version `2` veya `3` taşıyan eski format `1` backup'ı doğrulayıp yalnız yeni ve var olmayan hedef köke çıkarabilmelidir.
+- Eski snapshot önce kendi manifest observation/attachment/event sayılarıyla doğrulanır, sonra geçici restore kökünde normal migration runner ile sürüm 4’e yükseltilir.
 - Bu yükseltmede yeni tracking tabloları boş oluşur; eski observation ve attachment verisi değişmez.
 - Schema version `1`, bilinmeyen ileri sürüm veya format version `1` dışı archive otomatik kabul edilmez.
 - Aktif gerçek `CSE_DATA_ROOT` veya var olan herhangi bir hedef üzerine restore yapılmaz. Mevcut `target.exists()` reddi korunur.
@@ -558,7 +595,7 @@ Proje: 63516-2'nin canonical project UUID karşılığı
 | Perşembe template 16:30 | Henüz üretilmemiş günler 16:30 kullanır; Pazartesi–Çarşamba snapshot’ları değişmez. |
 | Template pasifleştirme | Gelecek gün occurrence üretilmez; bütün geçmiş occurrence ve event’ler kalır. |
 | Restart | Unique constraint ve kalıcı satırlar aynı sonuçları döndürür. |
-| Backup/restore | Schema 3 snapshot bütün template/occurrence/outcome/event verisini korur. |
+| Backup/restore | Schema 4 snapshot bütün template/occurrence/outcome/event verisini korur; backup format ve manifest alan kümesi değişmez. |
 | Günlük resmî export | Puantaj rutini ve sonuçları export’a girmez. |
 
 ## 14. Uygulama görevleri için test matrisi
@@ -604,11 +641,11 @@ Proje: 63516-2'nin canonical project UUID karşılığı
 
 ### 14.4 Migration, backup ve export
 
-- Fresh schema 3 ve schema 2 -> 3 upgrade eşitliği.
+- Fresh schema 4 ve schema 3 -> 4 upgrade eşitliği.
 - Existing observation/project/attachment/event fixture’larının birebir korunması.
 - Migration hata anında tam rollback.
-- Schema 3 backup/restore round-trip ve tracking count içerik karşılaştırması.
-- Schema 2 eski backup’ın yeni, boş hedefe restore+migrate edilmesi.
+- Schema 4 backup/restore round-trip ve tracking count içerik karşılaştırması.
+- Schema 2/3 eski backup’ın yeni, boş hedefe restore+migrate edilmesi.
 - Var olan/aktif target root restore reddi.
 - Tracking verili ve verisiz resmî günlük export’un byte-for-byte eşitliği.
 
@@ -629,7 +666,7 @@ Proje: 63516-2'nin canonical project UUID karşılığı
 Bu sözleşmeden sonra işler küçük ve test edilebilir görevler olarak ayrılmalıdır:
 
 1. Domain record/validation sabitleri ve saf recurrence hesaplayıcısı.
-2. SQLite schema v3 migration ve repository/event port/adaptörleri.
+2. SQLite schema v3 migration ve repository/event port/adaptörleri; schema v4 follow-up mutation-event vocabulary preflight'ı.
 3. Transactional application service ve sınırlı idempotent occurrence üretimi.
 4. Backup schema 2 backward restore ve schema 3 round-trip testleri.
 5. Resmî daily export exclusion regression testi.

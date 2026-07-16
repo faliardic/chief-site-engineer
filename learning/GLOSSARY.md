@@ -1393,3 +1393,11 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Composite Parent Key`: Child tablodaki composite foreign key'in birlikte referans verdiği, parent tablodaki birden fazla kolondan oluşan unique anahtardır.
 
 `SQLite Three-Valued Logic`: SQL koşullarının `TRUE`, `FALSE` yanında `NULL/UNKNOWN` sonucu da üretebilmesidir. `CHECK` içinde zorunlu nullable alanları korurken açık `IS NOT NULL` kullanmayı gerektirir.
+
+`Event Vocabulary`: Kalıcı event geçmişinde kullanılmasına izin verilen ve her biri açık bir iş anlamı taşıyan event adları kümesidir.
+
+`SQLite Table Rebuild`: SQLite'ta doğrudan değiştirilemeyen bir tablo constraint'ini güncellemek için replacement tablo oluşturma, mevcut satırları kopyalama, eski tabloyu düşürme ve replacement tabloyu eski adla yeniden adlandırma tekniğidir.
+
+`Schema Signature`: `sqlite_master` içindeki table/index adı, bağlı tablo ve SQL tanımlarının sıralı bütünüdür; fresh migration ile upgrade yolunun aynı şemaya ulaştığını karşılaştırmak için kullanılır.
+
+`Replacement Table`: Table rebuild sırasında yeni constraint sözleşmesiyle oluşturulan, veri kopyalandıktan sonra asıl tablo adını alan geçici yeni tablodur.

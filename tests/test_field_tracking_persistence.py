@@ -133,15 +133,21 @@ def _follow_up_event(
     event_id: str = EVENT_ONE_ID,
     sequence: int = 1,
     occurred_at: str = T1,
+    event_type: FollowUpEventType = FollowUpEventType.CREATED,
+    payload: dict[str, object] | None = None,
 ) -> FollowUpEvent:
     return FollowUpEvent(
         event_id=event_id,
         follow_up_id=FOLLOW_UP_ID,
         sequence=sequence,
-        event_type=FollowUpEventType.CREATED,
+        event_type=event_type,
         actor="Santiye sefi",
         occurred_at=occurred_at,
-        payload={"revision": 1, "title": "Kalıp kontrolü"},
+        payload=(
+            payload
+            if payload is not None
+            else {"revision": 1, "title": "Kalıp kontrolü"}
+        ),
     )
 
 
@@ -379,7 +385,64 @@ def test_three_event_histories_are_append_only_and_order_only_by_sequence(
         ) == [occurrence_event]
         assert not hasattr(unit_of_work.follow_up_events, "update")
         assert not hasattr(unit_of_work.follow_up_events, "delete")
+        assert not hasattr(unit_of_work.follow_up_events, "allocate_sequence")
         assert not hasattr(unit_of_work.follow_ups, "delete")
+
+
+def test_new_follow_up_event_types_round_trip_in_sequence_order(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "follow-up-mutation-events.sqlite3"
+    events = [
+        _follow_up_event(
+            event_id="ffffffff-ffff-4fff-8fff-ffffffffffff",
+            sequence=1,
+            event_type=FollowUpEventType.DETAILS_UPDATED,
+            payload={
+                "revision": 2,
+                "changed_fields": ["description", "title"],
+            },
+        ),
+        _follow_up_event(
+            event_id="eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+            sequence=2,
+            event_type=FollowUpEventType.MOVED_TO_INBOX,
+            payload={
+                "revision": 3,
+                "from_status": "active",
+                "previous_next_attention_at": T3,
+            },
+        ),
+        _follow_up_event(
+            event_id="dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            sequence=3,
+            event_type=FollowUpEventType.PROJECT_CHANGED,
+            payload={
+                "revision": 4,
+                "from_project_id": None,
+                "project_id": PROJECT_ID,
+            },
+        ),
+    ]
+
+    with SQLiteUnitOfWork(database_path) as unit_of_work:
+        unit_of_work.follow_ups.add(_follow_up())
+        for event in reversed(events):
+            unit_of_work.follow_up_events.add(event)
+        unit_of_work.commit()
+
+    with SQLiteUnitOfWork(database_path) as unit_of_work:
+        stored = unit_of_work.follow_up_events.list_for_follow_up(FOLLOW_UP_ID)
+        assert stored == events
+        assert [event.occurred_at for event in stored] == [T1, T1, T1]
+        assert [event.event_id for event in stored] == [
+            "ffffffff-ffff-4fff-8fff-ffffffffffff",
+            "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+            "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        ]
+        assert not hasattr(unit_of_work.follow_up_events, "update")
+        assert not hasattr(unit_of_work.follow_up_events, "delete")
+        assert not hasattr(unit_of_work.follow_up_events, "allocate_sequence")
 
 
 def test_duplicate_event_sequence_is_rejected(tmp_path: Path) -> None:
