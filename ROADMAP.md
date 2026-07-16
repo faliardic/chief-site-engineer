@@ -1,30 +1,68 @@
 # Roadmap
 
-## Birinci Ürün Önceliği - Saha Takibi v0.1
+## Güncel Ürün Sırası
 
-Saha Takibi v0.1, mevcut güvenilir gözlem, SQLite, attachment, backup ve günlük export omurgasından sonraki birinci ürün önceliğidir.
+0. [x] Tek kullanıcılı kişisel saha asistanı yönünü kanonikleştir — Issue #103.
+1. [ ] Saha Takibi transactional application service ve 7 günlük lazy backfill.
+2. [ ] Backup/restore compatibility ve resmî export izolasyonu.
+3. [ ] Mobil runtime ve veri sahipliği ADR.
+4. [ ] Mobil-first Kâğıdı Bırakma Sürümü.
+5. [ ] Offline ve bildirim güvenilirliği.
+6. [ ] 7 günlük gerçek saha pilotu.
+7. [ ] 30 günlük ana uygulama pilotu.
+8. [ ] Gelişmiş mühendislik hesap defteri.
+9. [ ] Günlük şantiye logu yayınlama/revizyon zinciri.
+10. [ ] Canlı Proje Haritası.
+11. [ ] Gerçek kullanımın kanıtladığı kişisel yardımcı araçlar.
+12. [ ] Kişisel AI asistanı.
 
-Issue #98 bu yönün production implementation’ı değil, domain ve veri sözleşmesi aşamasıdır. Kesin kaynak `docs/field_tracking_v0_1_contract.md` dosyasıdır.
+Bağlayıcı üst yol haritası GitHub Epic #105'tir. Saha Takibi domain/recurrence ve SQLite persistence PR #104 ile tamamlanmıştır; Faz 1 ve sonrası henüz tamamlanmamıştır.
 
-Bu öncelik şu sırayla ilerler:
+## Faz 4 Minimum Kâğıdı Bırakma Kapsamı
 
-1. Yalnız `capture_text` isteyen hızlı `+ Unutma` create sınırı; deterministic başlangıç başlığı; nullable follow-up/template projesi; Unutma Kutusu veya planlı `active/waiting` değişmezi; `RoutineOccurrence` ve saf recurrence hesaplayıcısı.
-2. SQLite schema v3 migration, ayrı repository ve deterministic append-only event tabloları.
-3. Optimistic revision kullanan transactional application service ve yedi günlük idempotent lazy backfill.
-4. Schema v2 backup backward restore, schema v3 round-trip ve aktif data root koruması.
-5. Kişisel tracking verisinin mevcut günlük resmî export’tan dışlandığını kanıtlayan regression testleri.
-6. Bu veri omurgası doğrulandıktan sonra minimum Saha Takibi UI’si.
+İlk gerçek saha pilotundan önce aynı mobil-first ürün diliminde:
 
-İlk beş aşama tamamlanmadan background scheduler, notification, PWA/mobil, AI sınıflandırma, takım görevlendirme veya geniş puantaj/personel modülü başlatılmaz.
+- `+ Yakala` / `+ Unutma`;
+- Bugün / Şimdi ilgilen / Geciken;
+- Dönüş bekliyorum / tekrar kontrol;
+- rutinler;
+- fotoğraf veya dosya ekleme;
+- minimum hızlı hesap şeridi;
+- günlük zaman çizelgesi ve düzenlenebilir taslak;
+- arama;
+- backup durumu/görünürlüğü.
 
-## Guncel Guvenli Nokta
+Gelişmiş hesap defteri Faz 8'de, immutable günlük yayınlama/revizyon zinciri Faz 9'da kalır; minimum hesap ve günlük taslağı ise Faz 4'ün parçasıdır.
+
+## Legacy Model Envanteri ve Deprecation Görevi
+
+Ayrı ve production koduna dokunmayan envanter görevi:
+
+- `TrackingRecord` / `TaskCandidateRecord` -> `FollowUpItem`;
+- `AttachmentRecord` / `FileAttachmentRecord` -> kalıcı attachment metadata/store;
+- `DailySiteLog` / `DailyReportRecord` -> gelecekte `DailyLogSnapshot`;
+- `ProjectPartyRecord` / `ContactPersonRecord` / `SupplierRecord` -> tek kişi/kurum referansı;
+- `MeetingActionRecord` / `RFIRecord` / `SubmittalRecord` -> not + takip + beklenen cevap ilişkisi;
+- karmaşık NCR prototip zinciri -> gözlem + aksiyon + kanıt + sonuç;
+- `app/records.py` in-memory repository'leri -> SQLite karşılıkları doğrulandıktan sonra deprecation.
+
+Sınıflandırma: `Aktif çekirdek`, `Dönüştürülecek`, `Legacy/arşivlenecek`, `Silme adayı`.
+
+Bu envanter fiziksel silme, rename, import taşıma veya test kaldırma yetkisi vermez.
+
+## Güncel Doğrulanmış Güvenli Nokta
+
+Issue #102, PR #104 ile squash merge edildi. `master` üzerindeki doğrulanmış merge commit'i:
 
 ```text
-Adim 224 - Rolling NotebookLM podcast source protocol
-PR #66 merge commit: 68c00edab667bbfd0467f4684921c0f6b453d4a7
+9b25152ae38b72470e332929cb3a30ff955b75f1
 ```
 
-Adim 224, PR #66 squash merge commit `68c00edab667bbfd0467f4684921c0f6b453d4a7` ile master uzerindeki guncel guvenli noktadir. Step 225, Issue #67 kapsaminda Podcast 035 artifact'ini ve note-contained prior-step summary validation contract'ini ekleyen aktif branch calismasidir; merge edilene kadar yeni guvenli nokta sayilmaz.
+Issue #103 yalnız kanonik dokümantasyon ve repository truth hizalamasıdır; production davranışını değiştirmez ve merge edilene kadar bu güvenli noktayı ilerletmez.
+
+## Tarihsel Roadmap Kaydı
+
+Aşağıdaki uzun adım günlüğü proje karar geçmişidir. Eski “güncel”, “aktif” veya “henüz yok” ifadeleri yazıldıkları dönemin snapshot'ıdır; bugünkü repository durumunu belirlemez.
 
 Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
 
@@ -220,15 +258,15 @@ Adim 169'da future export result summary/report layer icin API boundary ve test 
 
 Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
 
-Guncel test durumu:
+Adım 101 dönemindeki tarihsel test snapshot'ı:
 
 ```text
 471 passed
 ```
 
-Proje su anda domain model, bellek ici repository, test, dokumantasyon, learning ve NotebookLM podcast notlari cekirdegi seviyesindedir.
+Bu tarihsel noktada proje domain model, bellek içi repository, test, dokümantasyon, learning ve NotebookLM podcast notları çekirdeği seviyesindeydi. Sonraki Local Field MVP ve Saha Takibi çalışmaları bu durumu ilerletmiştir.
 
-Guncel CI durumu:
+Bu tarihsel kayıtta CI durumu:
 
 - CI workflow var: `.github/workflows/pytest.yml`.
 - Workflow kodu `git diff --check` ve `python -m pytest` kosacak sekilde tanimli.
@@ -236,7 +274,7 @@ Guncel CI durumu:
 - Yeni push sonrasinda Actions run olusmamasi beklenen davranistir; bu durum pytest failure veya workflow kodu hatasi olarak yorumlanmaz.
 - Required status checks devre disidir ve Step 205 bunlari etkinlestirmez.
 
-## Henuz Olmayan Uretim Ozellikleri
+## Adım 101 Döneminde Henüz Olmayan Üretim Özellikleri
 
 Asagidaki ozellikler henuz eklenmedi:
 
@@ -674,9 +712,9 @@ Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokuman
 - [x] Adim 225 - Focused generator tests `24 passed`, full local suite `503 passed` olarak dogrulandi.
 - [x] Adim 225 - Main product code, workflow, NotebookLM automation, historical podcast, ZIP ve exports mutation eklenmedi; Step 226 baslatilmadi.
 
-## Sonraki Calisma Onerisi
+## Step 225 Sonrası Tarihsel Çalışma Önerisi
 
-Step 225 merge/finalize edildikten sonra sonraki teknik yon ayri Issue ile secilmelidir. Attachment convenience helper usage boundary, upload/persistence oncesi storage contract veya daily export/weekly summary hatti olasi dar yonlerdir. Step 226 bu adimda baslatilmaz.
+Bu öneri Step 225 dönemine aittir ve güncel ürün sırasını belirlemez. Bugünkü sonraki dar production adımı Saha Takibi transactional application service ve lazy backfill'dir; ayrı GitHub Issue ile yetkilendirilmelidir.
 
 Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcast 032 Adim 206-210, Podcast 033 Adim 211-215, Podcast 034 Adim 216-220 ve Podcast 035 Adim 221-225 araligini kapsar. Sonraki dogal podcast araligi Steps 226-230 olur.
 
@@ -727,3 +765,17 @@ Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcas
 - [x] Fresh v3 ile v2→v3 şema eşitliği ve mevcut project/observation/attachment/event satırlarının birebir korunması geçici database testleriyle doğrulandı.
 - [ ] Transactional application service ve occurrence ensure/backfill orchestration Task 4/5 kapsamında ele alınacak.
 - [ ] Backup compatibility, export exclusion ve minimum UI sonraki ayrı görevlerde ele alınacak.
+
+## Issue 103 - Kanonik Talimatlar v2 ve Repository Truth
+
+- [x] CSE, yalnız şantiye şefinin kullandığı local-first ve mobile-first kişisel saha asistanı olarak tanımlandı.
+- [x] Araç bakımından geniş, kullanıcı modeli bakımından tek sahipli ürün değişmezi Epic #105 ile kanonikleştirildi.
+- [x] Diğer kişi/firmalar kullanıcı değil kayıt referansı; multi-user/role/tenant/SaaS/kurumsal portal hedefleri kalıcı kapsam dışı yapıldı.
+- [x] Single-owner security; uygulama kilidi, güvenilen cihaz, şifreli backup, owner-only sync ve güvenli yerel ağ yönüyle ayrıştırıldı.
+- [x] Kalıcı ürün politikası, operasyon talimatı, aktif Issue kapsamı ve değişken GitHub repository durumu ayrı otorite yüzeylerine ayrıldı.
+- [x] Eski Step 224/225 current-state metinleri tarihsel bağlama çekildi.
+- [x] Local Field MVP kabiliyetleri ve PR #104 sonrası Saha Takibi durumu güncel kanıtla hizalandı.
+- [x] Mobil runtime/offline/bildirim pilot önüne; minimum hesap şeridi ve günlük zaman çizelgesi Kâğıdı Bırakma Sürümü içine alındı.
+- [x] Gelişmiş hesap defteri, immutable günlük yayın zinciri ve Canlı Proje Haritası pilotlar sonrasındaki ayrı fazlarda tutuldu.
+- [x] Legacy model envanteri/deprecation yönü gerçek sınıf adlarıyla yazıldı; fiziksel silme yetkisi verilmedi.
+- [x] Production Python, schema, migration, repository, UI ve test davranışı değiştirilmedi.

@@ -1,36 +1,40 @@
 {
-  "step": 225,
+  "state_version": 2,
+  "legacy_last_numbered_step": 225,
+  "current_issue": 103,
   "base_branch": "master",
-  "base_commit": "68c00edab667bbfd0467f4684921c0f6b453d4a7",
+  "base_commit": "9b25152ae38b72470e332929cb3a30ff955b75f1",
   "active_work": {
-    "issue": 67,
-    "step": 225,
-    "branch": "step-225-podcast-035-note-summary-contract",
-    "podcast_validation_tests_documentation_learning_state": true,
-    "strict_note_prior_step_summary_contract_implemented": true,
-    "podcast_035_created": true,
-    "podcast_035_prior_step_summary_count": 220,
-    "rolling_source_refreshed_to_podcast_035": true,
-    "merge_claim_for_step_225": false,
-    "step_226_started": false,
-    "focused_test_summary": "24 passed",
-    "local_test_summary": "503 passed"
+    "issue": 103,
+    "type": "final_single_owner_personal_field_assistant_canonical_correction",
+    "binding_epic": 105,
+    "branch": "codex/issue-103-canonical-instructions-v2",
+    "base_commit": "9b25152ae38b72470e332929cb3a30ff955b75f1",
+    "previous_branch_head": "2dd38cff15bd428f0075724848d779f0e4970184",
+    "correction_commit_strategy": "one_ordinary_commit_without_amend_rebase_or_force_push",
+    "production_behavior_changed": false,
+    "merge_claim": false,
+    "pull_request_created": false,
+    "first_commit_full_test_summary": "788 passed, 7 skipped in 14.84s",
+    "correction_full_test_summary": "788 passed, 7 skipped in 16.66s",
+    "correction_verification_status": "all_required_checks_passed_before_commit"
   },
   "current_safe_point": {
     "semantics": "latest_merged_finalized_checkpoint",
-    "step": 224,
-    "issue": 64,
+    "step": 225,
+    "step_semantics": "last_legacy_numbered_step_preceding_issue_centered_workflow",
+    "issue": 102,
     "issue_state": "completed",
-    "pull_request": 66,
+    "pull_request": 104,
     "pull_request_state": "merged",
-    "merge_commit": "68c00edab667bbfd0467f4684921c0f6b453d4a7",
-    "local_test_summary": "494 passed"
+    "merge_commit": "9b25152ae38b72470e332929cb3a30ff955b75f1",
+    "local_test_summary": "788 passed, 7 skipped (Issue #102 completion evidence)"
   },
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
-    "local_master_sha": "68c00edab667bbfd0467f4684921c0f6b453d4a7",
-    "origin_master_sha": "68c00edab667bbfd0467f4684921c0f6b453d4a7",
+    "local_master_sha": "9b25152ae38b72470e332929cb3a30ff955b75f1",
+    "origin_master_sha": "9b25152ae38b72470e332929cb3a30ff955b75f1",
     "divergence": "0 0",
     "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
     "misspelled_workspace_present": false,
@@ -122,6 +126,11 @@
       "model": "GPT-5.6 Sol",
       "reasoning": "extra_high",
       "reason": "strict_note_summary_contract_executable_regressions_large_self_contained_history_deterministic_outputs_and_multi_file_state"
+    },
+    "issue_103_selection": {
+      "model": "GPT-5 current full Codex",
+      "reasoning": "extra_high",
+      "reason": "canonical_source_authority_multi_document_consistency_historical_preservation_and_repository_truth_drift_risk"
     }
   },
   "required_source_pre_read": {
@@ -400,6 +409,21 @@
             "roadmap_current_step_titles": true,
             "project_state": true
         },
+        "issue_103_sources_read": {
+            "unified_project_source": true,
+            "project_instructions": true,
+            "new_chat_bootstrap": true,
+            "github_issue_103_with_all_comments": true,
+            "github_epic_97": true,
+            "field_tracking_v0_1_contract": true,
+            "readme_roadmap_changelog_project_decisions": true,
+            "project_state": true,
+            "pull_request_104_diff_and_metadata": true,
+            "github_issue_102_completion_evidence": true,
+            "local_field_mvp_operations": true,
+            "launcher_web_persistence_boundaries": true,
+            "task_103": true
+        },
     "unresolved_conflict_found": false
   },
   "canonical_project_instructions": {
@@ -410,9 +434,11 @@
     "root_mirror_ignored_via": ".git/info/exclude",
     "root_mirror_staged": false,
     "root_mirror_committed": false,
+    "root_mirror_current_sync_verified": false,
+    "root_mirror_sync_required_for_issue_103": false,
     "root_mirror_synced_in_step_224": true,
     "root_mirror_synced_in_step_225": true,
-    "sha256_evidence_location": ".cse/results/225_result.md"
+    "historical_sha256_evidence_location": ".cse/results/225_result.md"
   },
   "github_centered_workflow": {
     "chatgpt_verifies_github_before_next_action": true,
@@ -425,21 +451,16 @@
   },
   "podcast": {
     "latest_completed": {
-      "podcast": 34,
-      "range": "216-220",
-      "path": "docs/podcast_notes/034_adim_216_220_notebooklm_podcast_notu.md"
-    },
-    "active_artifact": {
       "podcast": 35,
       "range": "221-225",
       "path": "docs/podcast_notes/035_adim_221_225_notebooklm_podcast_notu.md",
       "created": true,
       "strict_note_contract_valid": true,
       "prior_step_summary_range": "001-220",
-      "prior_step_summary_count": 220,
-      "step_225_merge_claim": false
+      "prior_step_summary_count": 220
     },
-    "next_five_step_range": "226-230",
+    "active_artifact": null,
+    "legacy_next_five_step_range": "226-230",
     "rolling_source_protocol": {
       "implemented_in_step": 224,
       "instruction_path": "docs/notebooklm/NOTEBOOKLM_INSTRUCTIONS.md",
@@ -467,9 +488,96 @@
     "workflow_changed": false
   },
   "product_maturity": {
-    "state": "tested_domain_data_documentation_core",
+    "state": "local_field_mvp_with_field_tracking_sqlite_v3_persistence",
     "field_ready_application": false,
-    "product_rule": "reliable_data_backbone_first_automation_later_ai_last",
+    "production_ready_application": false,
+    "product_identity": "local_first_mobile_first_single_owner_personal_field_assistant",
+    "product_owner_user": "site_manager_only",
+    "product_breadth_rule": "broad_toolset_single_owner_user_model",
+    "product_loop": "capture_process_follow_up_verify_log",
+    "other_people_and_companies_are": "record_references_not_system_users",
+    "official_personal_boundary": "export_and_handover_scope_not_access_role",
+    "local_first_semantics": "owner_devices_and_owner_data_not_windows_first",
+    "single_owner_security_direction": [
+      "application_lock_and_device_biometrics_when_available",
+      "trusted_devices",
+      "encrypted_backup",
+      "owner_only_phone_pc_sync",
+      "safe_local_network_access",
+      "explicit_owner_export_and_handover"
+    ],
+    "permanently_excluded_product_goals": [
+      "multi_user_accounts_and_membership",
+      "role_permission_matrix_and_tenant_architecture",
+      "company_based_data_partitioning",
+      "contractor_employer_inspection_portals",
+      "team_assignment_and_internal_messaging",
+      "corporate_approval_workflow_engine",
+      "company_portfolio_dashboard",
+      "saas_licensing_and_billing",
+      "multi_party_cloud_collaboration",
+      "erp_or_general_integration_marketplace"
+    ],
+    "merged_local_field_mvp_capabilities": [
+      "sqlite_persistence_and_migrations",
+      "managed_attachment_store_and_integrity",
+      "local_flask_web",
+      "project_and_observation_create_list_detail_update",
+      "revision_conflict_protection",
+      "search",
+      "daily_export",
+      "backup_verify_isolated_restore",
+      "windows_launcher"
+    ],
+    "field_tracking_completed": [
+      "domain_and_recurrence",
+      "sqlite_schema_v3_repository_and_event_persistence"
+    ],
+    "field_tracking_pending": [
+      "transactional_application_service_and_lazy_backfill",
+      "backup_restore_compatibility_and_official_export_isolation",
+      "mobile_runtime_and_data_ownership_adr",
+      "mobile_first_paperless_field_slice",
+      "offline_and_notification_reliability",
+      "seven_day_field_pilot",
+      "thirty_day_primary_app_pilot"
+    ],
+    "binding_product_roadmap": [
+      "phase_0_issue_103_single_owner_direction_correction",
+      "phase_1_field_tracking_transactional_service_and_seven_day_lazy_backfill",
+      "phase_2_backup_restore_compatibility_and_official_export_isolation",
+      "phase_3_mobile_runtime_and_data_ownership_adr",
+      "phase_4_mobile_first_paperless_field_slice",
+      "phase_5_offline_and_notification_reliability",
+      "phase_6_seven_day_real_field_pilot",
+      "phase_7_thirty_day_primary_app_pilot",
+      "phase_8_advanced_engineering_calculator_notebook",
+      "phase_9_daily_site_log_publish_and_revision_chain",
+      "phase_10_live_project_map",
+      "phase_11_usage_proven_personal_helper_tools",
+      "phase_12_personal_ai_assistant"
+    ],
+    "initial_mobile_field_slice": [
+      "quick_capture_and_forget_me_not",
+      "today_now_overdue_waiting_and_recheck_views",
+      "routines",
+      "photo_and_file_attachments",
+      "minimum_quick_calculation_tape",
+      "daily_timeline_and_editable_draft",
+      "search",
+      "backup_status_visibility"
+    ],
+    "legacy_inventory_direction": {
+      "classification_vocabulary": [
+        "active_core",
+        "to_be_transformed",
+        "legacy_to_archive",
+        "deletion_candidate"
+      ],
+      "physical_deletion_authorized": false,
+      "production_code_changed_in_issue_103": false
+    },
+    "product_rule": "single_owner_mobile_field_value_before_later_personal_capabilities_and_ai",
     "field_mvp_implementation_started_in_step_207": false,
     "field_mvp_implementation_started_in_step_208": false,
     "field_mvp_implementation_started_in_step_209": true,
@@ -491,15 +599,12 @@
     "strict_podcast_note_prior_step_summary_contract_implemented_in_step_225": true,
     "field_mvp_product_behavior_added_in_step_225": false,
     "next_product_direction": {
-      "name": "first_field_mvp",
+      "name": "field_tracking_transactional_application_service_and_lazy_backfill",
       "scope": [
-        "fast_observation_record",
-        "attachment",
-        "location",
-        "status_tracking",
-        "reported_to",
-        "daily_export",
-        "weekly_summary"
+        "follow_up_application_service",
+        "routine_application_service",
+        "seven_day_idempotent_occurrence_backfill",
+        "atomic_aggregate_and_event_mutations"
       ]
     },
     "field_observation_record_contract": {
@@ -699,14 +804,13 @@
     }
   },
   "protected_paths": {
-    "app/models.py": "unchanged_in_step_225",
-    "tests/test_models.py": "unchanged_in_step_225",
-    "app/records.py": "unchanged_in_step_225",
-    "tests/test_records.py": "unchanged_in_step_225",
-    "app/attachment_integrity.py": "unchanged_in_step_225",
-    "tests/test_attachment_integrity.py": "unchanged_in_step_225",
-    ".github/workflows/pytest.yml": "unchanged",
-    "docs/podcast_notes/034_adim_216_220_notebooklm_podcast_notu.md": "unchanged_in_step_225"
+    "app": "must_remain_unchanged_in_issue_103",
+    "tests": "must_remain_unchanged_in_issue_103",
+    ".github/workflows": "must_remain_unchanged_in_issue_103",
+    "requirements.txt": "must_remain_unchanged_in_issue_103",
+    "reports": "user_files_preserved_untracked_and_unchanged",
+    "exports/.gitkeep": "must_remain_present_and_unchanged",
+    "ignored_zip_and_cache": "must_remain_unchanged"
   },
   "exports": {
     "expected_contents": [
@@ -720,27 +824,21 @@
     "pull_request_creation_by_codex": false,
     "merge_authorized": false,
     "branch_deletion_authorized": false,
-    "final_remote_sha_evidence_location": "GitHub Issue #67 completion comment after push"
+    "final_remote_sha_evidence_location": "GitHub Issue #103 completion comment after push"
   },
   "required_files": [
-    ".cse/tasks/225_task.md",
-    ".cse/results/225_result.md",
+    ".cse/tasks/103_task.md",
+    ".cse/results/103_result.md",
     ".cse/state/project_state.json",
-    "docs/podcast_notes/035_adim_221_225_notebooklm_podcast_notu.md",
-    "docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md",
-    "docs/notebooklm/CSE_PODCAST_SOURCE_MANIFEST.json",
-    "scripts/build_notebooklm_podcast_source.py",
-    "tests/test_notebooklm_podcast_source.py",
-    "learning/225_podcast_035_note_summary_contract.md",
-    "learning/GLOSSARY.md",
     "README.md",
     "ROADMAP.md",
     "CHANGELOG.md",
     "docs/project_decisions.md",
     "docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md",
     "docs/protocols/CSE_PROJECT_INSTRUCTIONS.md",
-    "docs/podcast_notes/README.md"
+    "docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md",
+    "learning/issue_103_kanonik_talimatlar_v2_ve_repository_truth.md"
   ],
-  "workflow_status": "step_225_podcast_035_note_summary_contract_completed_before_commit_and_push",
+  "workflow_status": "issue_103_final_epic_105_correction_verified_before_commit_and_push",
   "forbidden_scope_added": false
 }

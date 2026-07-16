@@ -1,5 +1,34 @@
 # Changelog
 
+## Issue 103 - Kanonik Proje Talimatları v2 ve Repository Truth
+
+### Nihai Epic #105 düzeltmesi
+
+- CSE, yalnız şantiye şefi tarafından kullanılan local-first ve mobile-first kişisel saha asistanı olarak kanonikleştirildi; ürün ilkesi `Araç bakımından geniş / Kullanıcı modeli bakımından tek sahipli` biçiminde kesinleştirildi.
+- Şirket, taşeron, işveren, yapı denetim ve diğer kişi/firmalar sistem kullanıcısı değil kişi/kurum veya ilgili taraf kayıt referansı olarak tanımlandı.
+- Multi-user hesap, role/tenant, firma portalı, kurumsal workflow, şirket portföyü, SaaS/billing ve çok taraflı cloud collaboration aktif ve uzun vadeli ürün hedeflerinden çıkarıldı.
+- Güvenlik yönü role-based access yerine uygulama kilidi/biometri, güvenilen cihaz, şifreli backup, owner-only telefon-PC senkronizasyonu, güvenli yerel ağ ve açık export/devir işlemi olarak yeniden tanımlandı.
+- Kişisel/resmî ayrımın erişim rolü değil export/devir kapsamı olduğu; projeye bağlanan kişisel kaydın otomatik resmîleşmeyeceği korundu.
+- Epic #105’in 0-12 faz sırası README, ROADMAP, unified source, project decisions, instructions ve state içinde aynılaştırıldı.
+- Mobil runtime/veri sahipliği ADR, offline ve bildirim güvenilirliği gerçek saha pilotlarının önüne alındı; `local-first` kavramının `Windows-first` olmadığı açıklandı.
+- İlk mobil Kâğıdı Bırakma Sürümü’ne takip/rutin/attachment/arama/backup görünürlüğünün yanında minimum hızlı hesap şeridi ile günlük zaman çizelgesi/düzenlenebilir taslak eklendi.
+- Gelişmiş hesap defteri, immutable günlük yayınlama/revizyon zinciri ve Canlı Proje Haritası sonraki ayrı fazlarda tutuldu; mevcut Harita etkileşim kararları korundu.
+- Legacy model envanteri/deprecation yönü gerçek sınıf adları ve `Aktif çekirdek / Dönüştürülecek / Legacy-arşivlenecek / Silme adayı` sözlüğüyle kaydedildi; fiziksel kod silinmedi.
+- Öğrenme ve podcast çıktılarının tarihsel olarak korunacağı, fakat current-state veya ürün otoritesi olmayacağı ve production zincirini bloke etmeyeceği kanonikleştirildi.
+- Düzeltme yalnız Issue #103 allowlist’indeki dokümantasyon/state/task/result dosyalarındadır; production Python, test, schema, UI, dependency, workflow ve gerçek kullanıcı verisi değiştirilmedi.
+
+### İlk commit tarihsel kaydı
+
+- CSE'nin ana ürün tanımı local-first **Saha Komuta Sistemi**, çalışma döngüsü `Yakala -> İşle -> Takip et -> Doğrula -> Günlüğe al` olarak kanonik kaynaklara işlendi.
+- Sahadaki kâğıt müsvedde, hızlı hesap, zihinde taşınan dönüş bekleme, hatırlatıcı ve gün sonunda tekrar yazma problemi açık kullanıcı ihtiyacı olarak kaydedildi.
+- Kalıcı ürün politikası, operasyon/Git güvenliği, aktif Issue kapsamı ve değişken GitHub repository durumu ayrı otorite yüzeylerine ayrıldı; `.cse/state` ikincil factual mirror olarak tanımlandı.
+- Yeni branch standardı `codex/issue-<issue_no>-<slug>` olarak belirlendi; eski `step-NNN-*` branch'lerin tarihsel olarak korunacağı kaydedildi.
+- README ve ROADMAP, Issue #102 / PR #104 / merge commit `9b25152ae38b72470e332929cb3a30ff955b75f1` sonrasındaki gerçek Local Field MVP ve Saha Takibi kabiliyetleriyle hizalandı.
+- Saha Takibi domain/recurrence ve SQLite persistence tamamlandı; transactional service/backfill, backup compatibility, resmî export izolasyonu ve minimum UI bekliyor olarak korundu.
+- Kayıtlı mühendislik hesap defteri, kontrollü/yayımlanmış günlük log ve dokunarak odaklanan Canlı Proje Haritası minimum UI ve gerçek saha pilotundan sonraya yerleştirildi.
+- Eski Step 224/225 current-state ve test snapshot'ları kalıcı talimattan kaldırıldı veya tarihsel bağlama çekildi.
+- Bu görev dokümantasyon/state kapsamındadır; production Python, test davranışı, schema, UI, dependency, workflow, backup/export artifact'ı veya gerçek kullanıcı verisi değiştirilmedi.
+
 ## Issue 102 - Saha Takibi SQLite Schema v3 ve Persistence
 
 - `SCHEMA_VERSION` 3'e çıkarıldı ve mevcut v1/v2 migration zincirine yedi Saha Takibi tablosu, composite observation-project parent key'i, foreign key/CHECK/unique/index kuralları ekleyen tek immutable migration eklendi.

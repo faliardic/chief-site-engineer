@@ -1,90 +1,110 @@
 # CSE New Chat GitHub Bootstrap
 
 **Repository:** `faliardic/chief-site-engineer`
+
 **Default branch:** `master`
+
 **Official local execution repository:** `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer`
 
-This document defines how a new CHIEF SITE ENGINEER chat resumes the project from GitHub without requiring uploaded ZIP or handoff packages.
+Bu belge, yeni bir CHIEF SITE ENGINEER sohbetinin ZIP veya handoff paketi istemeden GitHub repository gerçeğinden devam etme yöntemini tanımlar.
 
-## Fresh-Chat Read Order
+## Kaynak rolleri
 
-For a fresh ChatGPT conversation, read current GitHub repository truth in this order:
+| Bilgi | Yetkili yüzey |
+| --- | --- |
+| Kalıcı ürün yönü | `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md` |
+| Operasyon ve Git/Codex güvenliği | `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` |
+| Aktif görev kapsamı | current GitHub Issue |
+| Değişken repository durumu | GitHub `master`, PR, Issue, branch ve commit kanıtı |
+| İkincil factual mirror | `.cse/state/project_state.json` |
+
+Stale state, README, ROADMAP, ZIP, handoff veya sohbet hafızası güncel GitHub kanıtını override edemez.
+
+Tek kullanıcılı kişisel saha asistanı dönüşümünün bağlayıcı üst yol haritası GitHub Epic #105’tir. Yeni sohbet, kullanıcı modelini multi-user/role/tenant/SaaS yönüne genişleten veya mobil/offline/bildirimi saha pilotu sonrasına atan eski metinleri current product direction olarak kullanmaz.
+
+## Fresh-chat okuma sırası
 
 1. `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
 2. `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
-3. `.cse/state/project_state.json`
-4. the latest open GitHub Issue and relevant recent PR/merge state
-5. the active `.cse/tasks/<step>_task.md` and relevant `.cse/results/<step>_result.md`
+3. Bu bootstrap belgesi
+4. `origin/master` HEAD ve son merge durumu
+5. açık GitHub Issue ve PR'lar
+6. aktif işin bağlı olduğu üst Epic veya bağlayıcı yol haritası
+7. ilgili branch/commit diff'i ve current Issue completion evidence'i
+8. `.cse/state/project_state.json`
+9. aktif `.cse/tasks/<issue_no>_task.md` ve ilgili `.cse/results/<issue_no>_result.md`
 
-## Continuation Behavior
+Bu sıra kalıcı politika ile değişken repository durumunu birbirine karıştırmaz.
 
-The user should normally be able to open a new chat and say only:
+## Continuation davranışı
+
+Kullanıcı yeni sohbette yalnız şunu yazabilmelidir:
 
 ```text
 devam
 ```
 
-or:
+veya:
 
 ```text
 GitHub'dan devam et
 ```
 
-ChatGPT must inspect the GitHub repository and current Issue/PR state before proposing or taking the next action.
+ChatGPT yeni işlem öncesinde GitHub Issue, PR, branch, diff, yorum, merge state ve beklenen base SHA'yı doğrular. Kullanıcının uzun instruction veya completion bloklarını ChatGPT ile Codex arasında taşıması beklenmez.
 
-## No ZIP or Handoff Upload Required
+## ZIP veya handoff gerekmez
 
-No handoff ZIP, source ZIP, copied prompt block, or manually pasted status report is required for normal continuation.
+Normal devam için handoff ZIP, source ZIP, kopyalanmış prompt veya manuel durum raporu gerekmez. `chat_handoff/` yardımcı ve tarihseldir; Git, GitHub veya current Issue yerine geçmez.
 
-`chat_handoff/` remains optional and historical. It is never required to resume the project.
+Mevcut ignored ZIP yalnız emergency/offline backup artifact'ıdır. GitHub geçici olarak erişilemiyorsa stale ZIP, memory veya handoff'a sessizce düşülmez; current repository truth'un doğrulanamadığı açıkça söylenir.
 
-Existing ignored ZIP files remain emergency/offline backup artifacts only. They are not new-chat dependencies.
+## GitHub ve yerel execution yüzeyleri
 
-If GitHub is temporarily unavailable, ChatGPT must not silently fall back to stale ZIPs, stale memory, or old handoff text. It must state that current repository truth cannot be verified and wait or request an explicit alternative source.
+GitHub şu işler için koordinasyon ve repository-truth yüzeyidir:
 
-Uploaded or local source files may be used to establish or update tracked canonical sources in an authorized step. Once tracked and merged, future chats read the GitHub versions.
+- Issue ve PR;
+- branch ve merge durumu;
+- diff ve review;
+- continuation kararı.
 
-## GitHub and Local Execution Surfaces
+Resmî `V:` repository şu işler için execution yüzeyidir:
 
-GitHub is the current coordination and repository-truth surface for:
+- local dosya düzenleme;
+- test ve validation;
+- path, hash, ZIP, export ve worktree kontrolü;
+- branch oluşturma veya checkout;
+- commit ve push.
 
-- Issues
-- PRs
-- branch state
-- merge state
-- source review
-- continuation decisions
+GitHub connector üzerinden proje dosyası üretmek yerel uygulama tamamlandı anlamına gelmez.
 
-The official local `V:` repository is the local execution surface when Codex is required for:
+## Codex çağırma kuralı
 
-- local file edits,
-- tests and validation,
-- ignored-file or ZIP inspection,
-- path/hash/worktree checks,
-- branch checkout,
-- commit and push.
-
-## Codex Invocation Rule
-
-ChatGPT decides whether Codex is needed.
-
-When local execution is needed, ChatGPT explicitly tells the user:
+ChatGPT local execution gerekiyorsa kullanıcıya açıkça şunu söyler:
 
 ```text
 Codex çalışmalı
 ```
 
-and briefly states why.
+Yalnız GitHub-native inceleme, planlama, Issue/PR/comment/review/merge-state veya kavramsal analiz için Codex normalde gerekmez.
 
-When the next action is GitHub-native inspection, planning, issue/PR/comment/review/merge-state work, web research, or conceptual analysis, Codex is normally not required.
+## Issue merkezli branch standardı
 
-## Codex Pre-Read Alignment
+Yeni branch adları:
 
-Codex's required pre-read remains:
+```text
+codex/issue-<issue_no>-<slug>
+```
 
-1. `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
-2. `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
-3. the current GitHub Issue
-4. `.cse/tasks/<step>_task.md`
+Eski `step-NNN-*` branch'ler tarihsel olarak korunur ve yeniden adlandırılmaz. Aynı anda yalnız bir aktif production implementation görevi ve en fazla bir incelemede PR bulunur.
 
-Codex should also read this bootstrap document when the current task concerns workflow, handoff, bootstrap, source authority, or new-chat recovery.
+## Codex pre-read hizalaması
+
+Source-authority veya bootstrap görevi yapan Codex şu sırayı uygular:
+
+1. unified product source;
+2. operational instructions;
+3. bu bootstrap belgesi;
+4. current GitHub Issue ve scope/izin yorumları;
+5. `.cse/tasks/<issue_no>_task.md`.
+
+Sonra resmî `V:` root, `origin/master` SHA, expected base SHA ve divergence doğrulanır; koşullar sağlanmadan edit yapılmaz.
