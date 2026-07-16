@@ -3,7 +3,7 @@
 ## Güncel Ürün Sırası
 
 0. [x] Tek kullanıcılı kişisel saha asistanı yönünü kanonikleştir — Issue #103.
-1. [ ] Saha Takibi transactional application service ve 7 günlük lazy backfill. Follow-up çekirdek dilimi Issue #109, waiting/terminal yaşam döngüsü Issue #111 ile uygulandı; observation ve routine/backfill dilimleri bekliyor.
+1. [ ] Saha Takibi transactional application service ve 7 günlük lazy backfill. Follow-up çekirdek dilimi Issue #109, waiting/terminal yaşam döngüsü Issue #111, observation link/conversion Issue #112 ile uygulandı; routine/backfill dilimi bekliyor.
 2. [ ] Backup/restore compatibility ve resmî export izolasyonu.
 3. [ ] Mobil runtime ve veri sahipliği ADR.
 4. [ ] Mobil-first Kâğıdı Bırakma Sürümü.
@@ -16,7 +16,7 @@
 11. [ ] Gerçek kullanımın kanıtladığı kişisel yardımcı araçlar.
 12. [ ] Kişisel AI asistanı.
 
-Bağlayıcı üst yol haritası GitHub Epic #105'tir. Saha Takibi domain/recurrence, SQLite persistence, follow-up application-service çekirdeği ve waiting/terminal yaşam döngüsü tamamlanmıştır; Faz 1'in observation/routine/backfill dilimleri ile sonraki fazlar henüz tamamlanmamıştır.
+Bağlayıcı üst yol haritası GitHub Epic #105'tir. Saha Takibi domain/recurrence, SQLite persistence ve follow-up application-service'in çekirdek, waiting/terminal ve observation link/conversion dilimleri tamamlanmıştır; Faz 1'in routine/backfill dilimi ile sonraki fazlar henüz tamamlanmamıştır.
 
 ## Faz 4 Minimum Kâğıdı Bırakma Kapsamı
 
@@ -803,7 +803,7 @@ Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcas
 - [x] Stale revision, gerçek no-op, event failure ve commit failure sınırları aggregate/event geçmişinde yarım yazı bırakmadan test edildi.
 - [x] Repository portlarına sequence/update/delete API'si, schema v5/migration, web/UI, backup/export değişikliği eklenmedi.
 - [x] Waiting, complete, cancel ve reopen follow-up yaşam döngüleri Issue #111 ile uygulandı.
-- [ ] Observation bağlama/dönüştürme ayrı dar görevde uygulanacak.
+- [x] Observation bağlama/dönüştürme Issue #112 ile uygulandı.
 - [ ] Routine application service ile yedi günlük idempotent lazy backfill ayrı dar görevde uygulanacak.
 
 ## Issue 111 - Follow-up Bekleme ve Terminal Yaşam Döngüleri
@@ -816,3 +816,14 @@ Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcas
 - [x] UUID validation, event insert ve commit hatalarında aggregate/event'in birlikte rollback edilmesi focused testlerle doğrulandı.
 - [x] Deadline, capture, proje/observation ve diğer ayrıntı koruması; stale-before-no-op ve clock/UUID tüketmeyen exact no-op doğrulandı.
 - [x] Schema v4, migration, mapper, repository/UoW portu, observation/routine, web/UI ve backup/export sınırları değiştirilmedi.
+
+## Issue 112 - Follow-up Observation Bağlantısı ve Dönüşüm
+
+- [x] Var olan observation'a açık/terminal follow-up link'i, lifecycle alanlarını değiştirmeden uygulandı.
+- [x] Observation project source-of-truth; null project adoption, same project koruması ve different project rejection ile uygulandı.
+- [x] Same observation exact no-op ve different existing observation rejection sınırları eklendi.
+- [x] Açık inbox/active/waiting kaydın `completed + converted_to_observation` sonucuyla atomik dönüşümü uygulandı.
+- [x] Conversion attention'ı temizler, deadline/capture/detail alanlarını korur ve yalnız converted event üretir.
+- [x] Exact converted retry no-op; diğer completed outcome ve cancelled conversion reddi uygulandı.
+- [x] UUID validation, event insert ve commit hatalarında link/conversion aggregate-event rollback'i test edildi.
+- [x] Otomatik observation creation, persistence/schema, observation service, routine/backfill, web/UI ve backup/export kapsamına girilmedi.

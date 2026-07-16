@@ -4,7 +4,7 @@
 
 Bu belge, GitHub Issue #98 kapsamında Saha Takibi v0.1 için uygulanacak domain ve veri sınırını kesinleştirir. Bu aşama production kodu, migration, UI veya scheduler eklemez. Sonraki implementation görevleri bu sözleşmeyi doğrudan testlere ve koda çevirecektir.
 
-Issue #107 güncellemesi, `update_details`, `move_to_inbox` ve `set_project` mutation'ları için eksik event adlarını ve payload sözleşmesini eklemiştir. Issue #109; `FollowUpApplicationService` çekirdeğinin create/read/query/update/schedule/inbox/project/history dilimini uygular. Terminal yaşam döngüleri, observation bağlama/dönüştürme, routine service/backfill ve web route henüz uygulanmış değildir.
+Issue #107 güncellemesi, `update_details`, `move_to_inbox` ve `set_project` mutation'ları için eksik event adlarını ve payload sözleşmesini eklemiştir. Issue #109 `FollowUpApplicationService` çekirdeğini, Issue #111 bekleme/terminal yaşam döngüsünü, Issue #112 observation link ve açık resmî dönüşüm sınırını uygular. Routine service/backfill ve web route henüz uygulanmış değildir.
 
 Sözleşme üç ana kaydı kapsar:
 
@@ -80,6 +80,8 @@ Issue #98 başlamadan önceki güvenli nokta `9b631fef4f3c4a290daa3b8d651d4fc9af
 - Kullanıcı kaydı daha sonra bir projeye bağlayabilir veya observation bağlantısı yoksa proje bağını kaldırabilir.
 - `FollowUpItem.observation_id` doluysa observation var olmalı ve `project_id` aynı observation’ın `project_id` değeriyle eşleşmelidir.
 - Observation bağlama sırasında follow-up projesizse application service observation projesini aynı mutation içinde atar. Follow-up zaten farklı bir projeye bağlıysa işlem sessizce proje değiştirmez; validation hatasıyla atomik olarak reddedilir.
+- Observation'ın `project_id` değeri link ve conversion işlemlerinde source of truth'tur. Aynı observation bağlantısı exact no-op olabilir; farklı mevcut observation sessizce değiştirilmez.
+- Yalnız observation bağlamak takip kaydını resmî kayda dönüştürmez ve status/outcome/attention/deadline alanlarını değiştirmez. Kişisel→resmî dönüşüm ayrı ve açık `convert_to_observation` kullanıcı işlemidir.
 - Observation bağlıyken `project_id` tek başına temizlenemez veya farklı projeye geçirilemez. Önce observation bağlantısının açık bir mutation ile kaldırılması gerekir.
 - Bu eşleşme yalnız serbest application kontrolüne bırakılmaz; SQLite sınırı bölüm 9.2’deki composite foreign key ve `CHECK` ile de korunur.
 
@@ -126,6 +128,9 @@ Issue #98 başlamadan önceki güvenli nokta `9b631fef4f3c4a290daa3b8d651d4fc9af
 - `cancelled` durumda `cancelled_at` ve `outcome_type = cancelled` zorunludur; `completed_at` boş olmalıdır.
 - Terminal olmayan durumda iki kapanış zamanı ile iki outcome alanı boş olmalıdır.
 - Yeniden açma kapanış zamanlarını ve outcome alanlarını ana kayıttan temizler; önceki sonuç append-only event içinde korunur.
+- `link_observation`, açık veya terminal kayda var olan observation ilişkisi ekleyebilir fakat lifecycle alanlarını değiştiremez. Aynı observation/project exact no-op; farklı project veya farklı mevcut observation açık hatadır.
+- `convert_to_observation`, yalnız açık `inbox/active/waiting` kaydı var olan observation'a bağlayıp `status = completed`, `outcome_type = converted_to_observation` yapar. Outcome note ve etkin attention temizlenir, `completed_at` yazılır; deadline, capture ve ayrıntılar korunur.
+- Zaten aynı observation/project ile converted durumda olan exact sonuç stale kontrolünden sonra no-op olabilir. Başka completed outcome veya cancelled kayıt conversion ile yeniden yazılamaz.
 - `waiting` durumunda kişi veya koşul girilmesi tavsiye edilir fakat hızlı saha akışını engelleyen database constraint yapılmaz.
 - Sonuçlanmamış ve `next_attention_at` taşımayan kayıt yalnız `inbox` olabilir. `active` veya `waiting` kaydın sessizce zamanlanmamış kalmasına izin verilmez.
 
@@ -315,7 +320,7 @@ follow_up.moved_to_inbox
 follow_up.project_changed
 ```
 
-İlk oluşturma dikkat zamanı taşıyorsa önce `follow_up.created`, sonra `follow_up.scheduled` yazılır. Resmî gözleme dönüştürme, oluşturulan observation kimliğini payload içinde taşır ve follow-up’ı `outcome_type = converted_to_observation` ile tamamlar.
+İlk oluşturma dikkat zamanı taşıyorsa önce `follow_up.created`, sonra `follow_up.scheduled` yazılır. Resmî gözleme dönüştürme otomatik observation üretmez; önceden oluşturulmuş observation kimliğini payload içinde taşır ve follow-up’ı `outcome_type = converted_to_observation` ile tamamlar.
 
 Yeni mutation event payload sözleşmesi şöyledir:
 
@@ -328,8 +333,10 @@ Yeni mutation event payload sözleşmesi şöyledir:
 | `complete` | `follow_up.completed` | Mutation sonrası `revision`; önceki `from_status` ve `previous_next_attention_at`; yeni `outcome_type` ve nullable `outcome_note`. |
 | `cancel` | `follow_up.cancelled` | Mutation sonrası `revision`; önceki `from_status` ve `previous_next_attention_at`; `outcome_type = cancelled` ve nullable `outcome_note`. |
 | `reopen` | `follow_up.reopened` | Mutation sonrası `revision`; önceki `from_status` ve `previous_outcome_type`; yeni `status` ve nullable `next_attention_at`. |
+| `link_observation` | `follow_up.observation_linked` | Mutation sonrası `revision`, `observation_id`, nullable `from_project_id`, observation kaynaklı `project_id` ve değişmeyen `status`. |
+| `convert_to_observation` | `follow_up.converted_to_observation` | Mutation sonrası `revision`; önceki `from_status`, `previous_next_attention_at` ve nullable `from_project_id`; mevcut `observation_id`, observation kaynaklı `project_id` ve `outcome_type = converted_to_observation`. Aynı mutation ayrıca linked event üretmez. |
 
-`changed_fields` bir entity snapshot'ı değildir; yalnız gerçekten değişen, application service tarafından izin verilen ayrıntı alanlarını taşır. Liste sırası payload üreticisi tarafından alfabetik yapılır, JSON object anahtarları mevcut deterministic serializer tarafından canonical sırada yazılır. Issue #109 ilk üç, Issue #111 son dört mutation payload'ını aynı append-only event sınırında uygular.
+`changed_fields` bir entity snapshot'ı değildir; yalnız gerçekten değişen, application service tarafından izin verilen ayrıntı alanlarını taşır. Liste sırası payload üreticisi tarafından alfabetik yapılır, JSON object anahtarları mevcut deterministic serializer tarafından canonical sırada yazılır. Issue #109 ilk üç, Issue #111 yaşam döngüsü dört ve Issue #112 observation iki mutation payload'ını aynı append-only event sınırında uygular.
 
 ### 8.3 Rutin event türleri
 
@@ -441,11 +448,11 @@ FollowUpApplicationService
 RoutineApplicationService
 ```
 
-`FollowUpApplicationService` oluşturma, okuma/sorgulama, ayrıntı/proje/planlama değişiklikleri, beklemeye alma, tamamlama, iptal ve yeniden açma use-case’lerini koordine eder. Observation bağlama ve resmî gözleme dönüştürme henüz uygulanmamıştır.
+`FollowUpApplicationService` oluşturma, okuma/sorgulama, ayrıntı/proje/planlama değişiklikleri, beklemeye alma, tamamlama, iptal, yeniden açma, mevcut observation'a bağlama ve açık kullanıcı onaylı resmî gözleme dönüşüm use-case’lerini koordine eder.
 
 `RoutineApplicationService` template oluşturma/güncelleme/pasifleştirme, occurrence ensure/backfill, erteleme, sonuçlandırma ve yeniden açma use-case’lerini koordine eder.
 
-`FollowUpApplicationService` yüzeyinin çekirdeği Issue #109, bekleme ve terminal yaşam döngüsü Issue #111 ile uygulanmıştır. `RoutineApplicationService` ile observation link/convert method'ları bağlayıcı gelecek API sözleşmesi olarak kalır.
+`FollowUpApplicationService` yüzeyinin çekirdeği Issue #109, bekleme/terminal yaşam döngüsü Issue #111 ve observation link/conversion sınırı Issue #112 ile uygulanmıştır. `RoutineApplicationService` bağlayıcı gelecek API sözleşmesi olarak kalır.
 
 Service API yüzeyi aşağıdaki isim ve sorumluluklarla sınırlıdır:
 
@@ -692,7 +699,7 @@ Bu sözleşmeden sonra işler küçük ve test edilebilir görevler olarak ayrı
 
 1. Domain record/validation sabitleri ve saf recurrence hesaplayıcısı.
 2. SQLite schema v3 migration ve repository/event port/adaptörleri; schema v4 follow-up mutation-event vocabulary preflight'ı.
-3. Transactional application service: Issue #109 ile follow-up çekirdek, Issue #111 ile bekleme/terminal yaşam döngüsü tamamlandı; observation ve routine sınırlı idempotent occurrence üretimi ayrı görevlerde bekliyor.
+3. Transactional application service: Issue #109 ile follow-up çekirdek, Issue #111 ile bekleme/terminal yaşam döngüsü, Issue #112 ile observation link/conversion tamamlandı; routine sınırlı idempotent occurrence üretimi ayrı görevde bekliyor.
 4. Backup schema 2 backward restore ve schema 3 round-trip testleri.
 5. Resmî daily export exclusion regression testi.
 6. Bunlar doğrulandıktan sonra minimum Saha Takibi UI’si.

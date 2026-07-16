@@ -43,6 +43,7 @@ SEVENTH_FOLLOW_UP_ID = "12345678-1234-4234-8234-123456789abc"
 PROJECT_ID = "11111111-1111-4111-8111-111111111111"
 SECOND_PROJECT_ID = "22222222-2222-4222-8222-222222222222"
 OBSERVATION_ID = "33333333-3333-4333-8333-333333333333"
+SECOND_OBSERVATION_ID = "44444444-4444-4444-8444-444444444444"
 EVENT_IDS = tuple(
     f"{number:08x}-{number:04x}-4{number:03x}-8{number:03x}-{number:012x}"
     for number in range(1, 20)
@@ -150,6 +151,31 @@ def _seed_projects(database_path: Path) -> None:
         unit_of_work.projects.add(
             ProjectRecord(SECOND_PROJECT_ID, "İkinci", CREATED_AT)
         )
+        unit_of_work.commit()
+
+
+def _observation(
+    observation_id: str = OBSERVATION_ID,
+    project_id: str = PROJECT_ID,
+) -> FieldObservationRecord:
+    return FieldObservationRecord(
+        observation_id=observation_id,
+        project_id=project_id,
+        observed_at=CREATED_AT,
+        location="A Blok",
+        category="quality",
+        description=f"Gözlem {observation_id[:4]}",
+        created_at=CREATED_AT,
+        updated_at=CREATED_AT,
+    )
+
+
+def _seed_observations(
+    database_path: Path, *observations: FieldObservationRecord
+) -> None:
+    with SQLiteUnitOfWork(database_path) as unit_of_work:
+        for observation in observations:
+            unit_of_work.observations.add(observation)
         unit_of_work.commit()
 
 
@@ -1263,3 +1289,452 @@ def test_lifecycle_failures_roll_back_aggregate_and_event(
     check = FollowUpApplicationService(database_path)
     assert check.get_follow_up(FOLLOW_UP_ID) == original
     assert check.list_history(FOLLOW_UP_ID) == ()
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        FollowUpStatus.INBOX,
+        FollowUpStatus.ACTIVE,
+        FollowUpStatus.WAITING,
+        FollowUpStatus.COMPLETED,
+        FollowUpStatus.CANCELLED,
+    ],
+)
+def test_link_observation_adopts_project_and_preserves_lifecycle(
+    tmp_path: Path, status: FollowUpStatus
+) -> None:
+    database_path = tmp_path / f"link-{status.value}.sqlite3"
+    _seed_projects(database_path)
+    _seed_observations(database_path, _observation())
+    if status in (FollowUpStatus.COMPLETED, FollowUpStatus.CANCELLED):
+        original = _item(
+            FOLLOW_UP_ID,
+            created_at=CREATED_AT,
+            terminal=status,
+            deadline_at=NEXT_AT,
+        )
+    else:
+        attention = None if status is FollowUpStatus.INBOX else LATER_AT
+        original = _item(
+            FOLLOW_UP_ID,
+            created_at=CREATED_AT,
+            status=status,
+            next_attention_at=attention,
+            deadline_at=NEXT_AT,
+            is_important=True,
+        )
+    _seed_items(database_path, original)
+    service = _service(
+        database_path, ids=(EVENT_IDS[0],), times=(UPDATED_AT,)
+    )
+
+    linked = service.link_observation(FOLLOW_UP_ID, 1, OBSERVATION_ID)
+
+    assert linked.observation_id == OBSERVATION_ID
+    assert linked.project_id == PROJECT_ID
+    assert linked.status is original.status
+    assert linked.outcome_type is original.outcome_type
+    assert linked.outcome_note == original.outcome_note
+    assert linked.completed_at == original.completed_at
+    assert linked.cancelled_at == original.cancelled_at
+    assert linked.next_attention_at == original.next_attention_at
+    assert linked.deadline_at == original.deadline_at
+    assert linked.capture_text == original.capture_text
+    assert linked.is_important == original.is_important
+    assert linked.revision == 2
+    assert linked.updated_at == UPDATED_AT
+    event = service.list_history(FOLLOW_UP_ID)[0]
+    assert event.sequence == 1
+    assert event.event_type is FollowUpEventType.OBSERVATION_LINKED
+    assert event.payload == {
+        "from_project_id": None,
+        "observation_id": OBSERVATION_ID,
+        "project_id": PROJECT_ID,
+        "revision": 2,
+        "status": status.value,
+    }
+
+
+def test_link_observation_preserves_matching_project(tmp_path: Path) -> None:
+    database_path = tmp_path / "link-same-project.sqlite3"
+    _seed_projects(database_path)
+    _seed_observations(database_path, _observation())
+    original = _item(
+        FOLLOW_UP_ID,
+        created_at=CREATED_AT,
+        project_id=PROJECT_ID,
+    )
+    _seed_items(database_path, original)
+    service = _service(
+        database_path, ids=(EVENT_IDS[0],), times=(UPDATED_AT,)
+    )
+
+    linked = service.link_observation(FOLLOW_UP_ID, 1, OBSERVATION_ID)
+
+    assert linked.project_id == PROJECT_ID
+    assert service.list_history(FOLLOW_UP_ID)[0].payload[
+        "from_project_id"
+    ] == PROJECT_ID
+
+
+def test_link_observation_exact_no_op_checks_stale_and_consumes_nothing(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "link-noop.sqlite3"
+    _seed_projects(database_path)
+    _seed_observations(database_path, _observation())
+    original = _item(
+        FOLLOW_UP_ID,
+        created_at=CREATED_AT,
+        project_id=PROJECT_ID,
+        observation_id=OBSERVATION_ID,
+    )
+    _seed_items(database_path, original)
+    service = _service(database_path, ids=(), times=())
+
+    same = service.link_observation(FOLLOW_UP_ID, 1, OBSERVATION_ID)
+
+    assert same == original
+    assert service.list_history(FOLLOW_UP_ID) == ()
+    with pytest.raises(RevisionConflict):
+        service.link_observation(FOLLOW_UP_ID, 2, OBSERVATION_ID)
+
+
+@pytest.mark.parametrize("operation", ["link", "convert"])
+def test_observation_operations_reject_different_project(
+    tmp_path: Path, operation: str
+) -> None:
+    database_path = tmp_path / f"{operation}-different-project.sqlite3"
+    _seed_projects(database_path)
+    _seed_observations(database_path, _observation())
+    original = _item(
+        FOLLOW_UP_ID,
+        created_at=CREATED_AT,
+        project_id=SECOND_PROJECT_ID,
+    )
+    _seed_items(database_path, original)
+    service = FollowUpApplicationService(database_path)
+
+    with pytest.raises(InvalidRecordError, match="must match"):
+        if operation == "link":
+            service.link_observation(FOLLOW_UP_ID, 1, OBSERVATION_ID)
+        else:
+            service.convert_to_observation(FOLLOW_UP_ID, 1, OBSERVATION_ID)
+    assert service.get_follow_up(FOLLOW_UP_ID) == original
+    assert service.list_history(FOLLOW_UP_ID) == ()
+
+
+@pytest.mark.parametrize("operation", ["link", "convert"])
+def test_observation_operations_reject_different_existing_observation(
+    tmp_path: Path, operation: str
+) -> None:
+    database_path = tmp_path / f"{operation}-different-observation.sqlite3"
+    _seed_projects(database_path)
+    _seed_observations(
+        database_path,
+        _observation(),
+        _observation(SECOND_OBSERVATION_ID),
+    )
+    original = _item(
+        FOLLOW_UP_ID,
+        created_at=CREATED_AT,
+        project_id=PROJECT_ID,
+        observation_id=OBSERVATION_ID,
+    )
+    _seed_items(database_path, original)
+    service = FollowUpApplicationService(database_path)
+
+    with pytest.raises(InvalidRecordError, match="different observation"):
+        if operation == "link":
+            service.link_observation(
+                FOLLOW_UP_ID, 1, SECOND_OBSERVATION_ID
+            )
+        else:
+            service.convert_to_observation(
+                FOLLOW_UP_ID, 1, SECOND_OBSERVATION_ID
+            )
+    assert service.get_follow_up(FOLLOW_UP_ID) == original
+    assert service.list_history(FOLLOW_UP_ID) == ()
+
+
+@pytest.mark.parametrize("operation", ["link", "convert"])
+def test_observation_operations_reject_missing_observation_and_invalid_ids(
+    tmp_path: Path, operation: str
+) -> None:
+    database_path = tmp_path / f"{operation}-missing.sqlite3"
+    original = _item(FOLLOW_UP_ID, created_at=CREATED_AT)
+    _seed_items(database_path, original)
+    service = FollowUpApplicationService(database_path)
+    missing_id = "99999999-9999-4999-8999-999999999999"
+
+    with pytest.raises(RecordNotFound, match="field observation"):
+        if operation == "link":
+            service.link_observation(FOLLOW_UP_ID, 1, missing_id)
+        else:
+            service.convert_to_observation(FOLLOW_UP_ID, 1, missing_id)
+    with pytest.raises(RevisionConflict):
+        if operation == "link":
+            service.link_observation(FOLLOW_UP_ID, 2, missing_id)
+        else:
+            service.convert_to_observation(FOLLOW_UP_ID, 2, missing_id)
+    with pytest.raises(ValueError, match="canonical UUID"):
+        if operation == "link":
+            service.link_observation(FOLLOW_UP_ID, 1, "not-an-id")
+        else:
+            service.convert_to_observation(FOLLOW_UP_ID, 1, "not-an-id")
+    assert service.get_follow_up(FOLLOW_UP_ID) == original
+
+
+@pytest.mark.parametrize("operation", ["link", "convert"])
+def test_observation_operations_preserve_missing_follow_up_behavior(
+    tmp_path: Path, operation: str
+) -> None:
+    database_path = tmp_path / f"{operation}-missing-follow-up.sqlite3"
+    _seed_projects(database_path)
+    _seed_observations(database_path, _observation())
+    service = FollowUpApplicationService(database_path)
+
+    with pytest.raises(RecordNotFound, match="follow-up"):
+        if operation == "link":
+            service.link_observation(FOLLOW_UP_ID, 1, OBSERVATION_ID)
+        else:
+            service.convert_to_observation(FOLLOW_UP_ID, 1, OBSERVATION_ID)
+
+
+@pytest.mark.parametrize(
+    "status",
+    [FollowUpStatus.INBOX, FollowUpStatus.ACTIVE, FollowUpStatus.WAITING],
+)
+def test_convert_to_observation_completes_open_status_and_preserves_details(
+    tmp_path: Path, status: FollowUpStatus
+) -> None:
+    database_path = tmp_path / f"convert-{status.value}.sqlite3"
+    _seed_projects(database_path)
+    _seed_observations(database_path, _observation())
+    previous_attention = None if status is FollowUpStatus.INBOX else LATER_AT
+    original = FollowUpItem(
+        follow_up_id=FOLLOW_UP_ID,
+        capture_text="Resmî gözleme dönüştür",
+        title="Kalıp açıklığı",
+        description="Korunacak ayrıntı",
+        item_type=FollowUpItemType.RECHECK,
+        status=status,
+        location="A Blok",
+        related_person="Ahmet Usta",
+        is_important=True,
+        next_attention_at=previous_attention,
+        deadline_at=NEXT_AT,
+        condition_text="Beton öncesi",
+        created_at=CREATED_AT,
+        updated_at=CREATED_AT,
+    )
+    _seed_items(database_path, original)
+    service = _service(
+        database_path, ids=(EVENT_IDS[0],), times=(UPDATED_AT,)
+    )
+
+    converted = service.convert_to_observation(
+        FOLLOW_UP_ID, 1, OBSERVATION_ID
+    )
+
+    assert converted.status is FollowUpStatus.COMPLETED
+    assert converted.outcome_type is FollowUpOutcome.CONVERTED_TO_OBSERVATION
+    assert converted.outcome_note is None
+    assert converted.completed_at == UPDATED_AT
+    assert converted.cancelled_at is None
+    assert converted.next_attention_at is None
+    assert converted.observation_id == OBSERVATION_ID
+    assert converted.project_id == PROJECT_ID
+    assert converted.deadline_at == NEXT_AT
+    assert converted.capture_text == original.capture_text
+    assert converted.title == original.title
+    assert converted.description == original.description
+    assert converted.item_type is original.item_type
+    assert converted.location == original.location
+    assert converted.related_person == original.related_person
+    assert converted.is_important is True
+    assert converted.condition_text == original.condition_text
+    assert converted.revision == 2
+    event = service.list_history(FOLLOW_UP_ID)[0]
+    assert event.sequence == 1
+    assert event.event_type is FollowUpEventType.CONVERTED_TO_OBSERVATION
+    assert event.payload == {
+        "from_project_id": None,
+        "from_status": status.value,
+        "observation_id": OBSERVATION_ID,
+        "outcome_type": "converted_to_observation",
+        "previous_next_attention_at": previous_attention,
+        "project_id": PROJECT_ID,
+        "revision": 2,
+    }
+
+
+def test_convert_prelinked_same_project_writes_only_converted_event(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "convert-prelinked.sqlite3"
+    _seed_projects(database_path)
+    _seed_observations(database_path, _observation())
+    original = _item(
+        FOLLOW_UP_ID,
+        created_at=CREATED_AT,
+        project_id=PROJECT_ID,
+        observation_id=OBSERVATION_ID,
+    )
+    _seed_items(database_path, original)
+    service = _service(
+        database_path, ids=(EVENT_IDS[0],), times=(UPDATED_AT,)
+    )
+
+    converted = service.convert_to_observation(
+        FOLLOW_UP_ID, 1, OBSERVATION_ID
+    )
+
+    assert converted.project_id == PROJECT_ID
+    history = service.list_history(FOLLOW_UP_ID)
+    assert [event.event_type for event in history] == [
+        FollowUpEventType.CONVERTED_TO_OBSERVATION
+    ]
+    assert history[0].payload["from_project_id"] == PROJECT_ID
+
+
+def test_exact_converted_retry_is_no_op_after_stale_check(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "convert-noop.sqlite3"
+    _seed_projects(database_path)
+    _seed_observations(database_path, _observation())
+    original = FollowUpItem(
+        follow_up_id=FOLLOW_UP_ID,
+        capture_text="Dönüştürüldü",
+        title="Dönüştürüldü",
+        status=FollowUpStatus.COMPLETED,
+        project_id=PROJECT_ID,
+        observation_id=OBSERVATION_ID,
+        outcome_type=FollowUpOutcome.CONVERTED_TO_OBSERVATION,
+        completed_at=CREATED_AT,
+        created_at=CREATED_AT,
+        updated_at=CREATED_AT,
+    )
+    _seed_items(database_path, original)
+    service = _service(database_path, ids=(), times=())
+
+    same = service.convert_to_observation(FOLLOW_UP_ID, 1, OBSERVATION_ID)
+
+    assert same == original
+    assert service.list_history(FOLLOW_UP_ID) == ()
+    with pytest.raises(RevisionConflict):
+        service.convert_to_observation(FOLLOW_UP_ID, 2, OBSERVATION_ID)
+
+
+@pytest.mark.parametrize(
+    "terminal",
+    [
+        FollowUpStatus.COMPLETED,
+        FollowUpStatus.CANCELLED,
+    ],
+)
+def test_convert_rejects_other_terminal_outcomes(
+    tmp_path: Path, terminal: FollowUpStatus
+) -> None:
+    database_path = tmp_path / f"convert-terminal-{terminal.value}.sqlite3"
+    _seed_projects(database_path)
+    _seed_observations(database_path, _observation())
+    original = _item(
+        FOLLOW_UP_ID,
+        created_at=CREATED_AT,
+        terminal=terminal,
+    )
+    _seed_items(database_path, original)
+    service = FollowUpApplicationService(database_path)
+
+    with pytest.raises(InvalidRecordError, match="open follow-up"):
+        service.convert_to_observation(FOLLOW_UP_ID, 1, OBSERVATION_ID)
+    assert service.get_follow_up(FOLLOW_UP_ID) == original
+    assert service.list_history(FOLLOW_UP_ID) == ()
+
+
+def test_link_then_conversion_append_one_event_each_in_sequence(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "link-convert-sequence.sqlite3"
+    _seed_projects(database_path)
+    _seed_observations(database_path, _observation())
+    service = _service(
+        database_path,
+        ids=(FOLLOW_UP_ID, EVENT_IDS[0], EVENT_IDS[1], EVENT_IDS[2]),
+        times=(CREATED_AT, UPDATED_AT, LATER_AT),
+    )
+    created = service.create_follow_up(CreateFollowUp("Dönüştür"))
+    linked = service.link_observation(
+        FOLLOW_UP_ID, created.revision, OBSERVATION_ID
+    )
+    service.convert_to_observation(
+        FOLLOW_UP_ID, linked.revision, OBSERVATION_ID
+    )
+
+    history = service.list_history(FOLLOW_UP_ID)
+    assert [event.sequence for event in history] == [1, 2, 3]
+    assert [event.event_type for event in history] == [
+        FollowUpEventType.CREATED,
+        FollowUpEventType.OBSERVATION_LINKED,
+        FollowUpEventType.CONVERTED_TO_OBSERVATION,
+    ]
+
+
+@pytest.mark.parametrize("operation", ["link", "convert"])
+@pytest.mark.parametrize("failure", ["uuid", "event_insert", "commit"])
+def test_observation_operation_failures_roll_back_aggregate_and_event(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    operation: str,
+    failure: str,
+) -> None:
+    database_path = tmp_path / f"{operation}-{failure}.sqlite3"
+    _seed_projects(database_path)
+    _seed_observations(database_path, _observation())
+    original = _item(FOLLOW_UP_ID, created_at=CREATED_AT)
+    _seed_items(database_path, original)
+
+    class CommitFailingUnitOfWork(SQLiteUnitOfWork):
+        def commit(self) -> None:
+            raise OSError("commit failed")
+
+    uow_factory = (
+        (lambda: CommitFailingUnitOfWork(database_path))
+        if failure == "commit"
+        else None
+    )
+    event_id = "NOT-A-UUID" if failure == "uuid" else EVENT_IDS[0]
+    service = _service(
+        database_path,
+        ids=(event_id,),
+        times=(UPDATED_AT,),
+        uow_factory=uow_factory,
+    )
+    if failure == "event_insert":
+        monkeypatch.setattr(
+            SQLiteFollowUpEventRepository,
+            "add",
+            lambda *_: (_ for _ in ()).throw(
+                InvalidRecordError("event failed")
+            ),
+        )
+    expected_error = {
+        "uuid": ValueError,
+        "event_insert": InvalidRecordError,
+        "commit": OSError,
+    }[failure]
+
+    with pytest.raises(expected_error):
+        if operation == "link":
+            service.link_observation(FOLLOW_UP_ID, 1, OBSERVATION_ID)
+        else:
+            service.convert_to_observation(FOLLOW_UP_ID, 1, OBSERVATION_ID)
+
+    check = FollowUpApplicationService(database_path)
+    assert check.get_follow_up(FOLLOW_UP_ID) == original
+    assert check.list_history(FOLLOW_UP_ID) == ()
+    with SQLiteUnitOfWork(database_path) as unit_of_work:
+        assert unit_of_work.observations.get(OBSERVATION_ID) == _observation()
