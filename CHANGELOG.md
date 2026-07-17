@@ -1,5 +1,15 @@
 # Changelog
 
+## Issue 147 - MemoryIndex / RecordRef Read-Model ADR'si
+
+- Observation, follow-up ve routine occurrence kaynaklarını tek source tabloya taşımadan ortak Hafıza listeleme, filtreleme, literal arama, timeline ve diagnostic yüzeylerine bağlayan yeniden üretilebilir `MemoryIndex / RecordRef` sözleşmesi kabul edildi.
+- Source of truth domain aggregate + append-only event history olarak korundu; read-model'in source mutation, sessiz repair, scope dönüşümü veya resmî çıktı kararı yapamayacağı kesinleştirildi.
+- Kanonik anahtar `(record_type, source_id)` ve rebuild/restore boyunca kararlı `cse-record-ref/v1/{record_type}/{source_id}` token'ı seçildi. İlk allowlist `observation`, `follow_up`, `routine_occurrence` olarak sınırlandı.
+- Ortak alanlar, dört değerli normalized status ile kayıpsız `status_detail`, deterministic title/search text, deep link, source fingerprint ve projection version dahil kayıt türü bazında eşlendi.
+- Normal mutation için source + event + idempotent projection upsert'inin aynı transaction'da olduğu hybrid strateji; explicit deterministic rebuild için shadow generation, atomik aktivasyon ve `ready | stale | rebuilding | failed` maintenance durumu kararlaştırıldı.
+- Hafıza ve diagnostic consumer'ları read-model'i kullanabilir; Hafızayı İndir ve bütün resmî/proje çıktıları adayları source scope/project/archive/attachment/publication kurallarından yeniden doğrulamak zorundadır. Private veri debug/cache/output yüzeylerinde fail-closed korunur.
+- Production Python, test, schema, migration, persistence, UI, template, CSS, backup/export formatı ve gerçek kullanıcı verisi değiştirilmedi; kararlar `docs/adr/ADR-0002-memory-index-record-ref-read-model.md` içinde executable acceptance matrisiyle kaydedildi.
+
 ## Issue 145 - Tek Hafıza ve Kayıt Kapsamı ADR'si
 
 - Bütün observation, follow-up, routine occurrence ve gelecekteki kayıt türlerini ayrı uygulama dünyalarına bölmeden ortak **Hafıza** arama/timeline deneyiminde buluşturma kararı kabul edildi.

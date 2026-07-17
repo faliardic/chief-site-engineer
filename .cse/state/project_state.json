@@ -1,20 +1,20 @@
 {
   "state_version": 2,
   "legacy_last_numbered_step": 225,
-  "current_issue": 145,
+  "current_issue": 147,
   "base_branch": "master",
-  "base_commit": "c449762cbcc5685017d3b2f2d0292a2b039cae53",
+  "base_commit": "ccf47a46fa4252446b1790437bc56371a028b406",
   "active_work": {
-    "issue": 145,
-    "type": "single_memory_and_record_scope_adr",
+    "issue": 147,
+    "type": "memory_index_record_ref_read_model_adr",
     "issue_state": "active",
     "review_status": "local_verified_not_yet_published",
     "binding_execution_epic": 127,
     "binding_phase_epic": 128,
     "product_epic": 105,
     "field_tracking_epic": 97,
-    "branch": "codex/issue-145-single-memory-scope-adr",
-    "base_commit": "c449762cbcc5685017d3b2f2d0292a2b039cae53",
+    "branch": "codex/issue-147-memory-index-record-ref-adr",
+    "base_commit": "ccf47a46fa4252446b1790437bc56371a028b406",
     "commit_strategy": "one_ordinary_commit_without_amend_rebase_or_force_push",
     "schema_version": 4,
     "backup_format_version": 1,
@@ -24,7 +24,7 @@
     "real_user_data_root_accessed": false,
     "merge_claim": false,
     "pull_request_created": false,
-    "full_test_summary": "983 passed, 7 skipped in 27.20s",
+    "full_test_summary": "983 passed, 7 skipped in 22.83s",
     "compileall_passed": true,
     "state_json_valid": true,
     "diff_check_passed": true,
@@ -34,18 +34,18 @@
   },
   "current_safe_point": {
     "semantics": "latest_merged_finalized_checkpoint",
-    "issue": 143,
+    "issue": 145,
     "issue_state": "completed",
-    "pull_request": 144,
+    "pull_request": 146,
     "pull_request_state": "merged",
-    "merge_commit": "c449762cbcc5685017d3b2f2d0292a2b039cae53",
-    "local_test_summary": "983 passed, 7 skipped in 27.20s (Issue #145 branch local rerun; production and tests unchanged)"
+    "merge_commit": "ccf47a46fa4252446b1790437bc56371a028b406",
+    "local_test_summary": "983 passed, 7 skipped in 27.20s (Issue #145 local verification; production and tests unchanged)"
   },
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
-    "local_master_sha": "c449762cbcc5685017d3b2f2d0292a2b039cae53",
-    "origin_master_sha": "c449762cbcc5685017d3b2f2d0292a2b039cae53",
+    "local_master_sha": "ccf47a46fa4252446b1790437bc56371a028b406",
+    "origin_master_sha": "ccf47a46fa4252446b1790437bc56371a028b406",
     "divergence": "0 0",
     "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
     "misspelled_workspace_present": false,
@@ -182,6 +182,11 @@
       "model": "standard full Codex model visible in current selector",
       "reasoning": "high",
       "reason": "documentation_only_multi_file_finalization_repository_truth_and_pr_readiness_consistency"
+    },
+    "issue_147_selection": {
+      "model": "standart full Codex",
+      "reasoning": "high",
+      "reason": "documentation_only_read_model_contract_three_domain_mappings_privacy_boundary_and_repository_truth_consistency"
     }
   },
   "required_source_pre_read": {
@@ -576,6 +581,20 @@
             "changelog_roadmap_decisions_glossary_and_project_state": true,
             "issue_124_full_regression_evidence": true
         },
+        "issue_147_sources_read": {
+            "unified_project_source": true,
+            "project_instructions": true,
+            "github_issue_147_with_all_comments": true,
+            "github_epics_127_128_105_97": true,
+            "github_issue_145_and_adr_0001": true,
+            "readme_roadmap_changelog_project_decisions": true,
+            "field_tracking_v0_1_contract": true,
+            "schema_records_mapping_repositories_and_uow": true,
+            "observation_follow_up_and_routine_application_services": true,
+            "web_deep_link_routes": true,
+            "project_state": true,
+            "task_147": true
+        },
     "unresolved_conflict_found": false
   },
   "canonical_project_instructions": {
@@ -787,15 +806,15 @@
     "strict_podcast_note_prior_step_summary_contract_implemented_in_step_225": true,
     "field_mvp_product_behavior_added_in_step_225": false,
     "active_program_work": {
-      "issue": 145,
-      "name": "single_memory_and_record_scope_adr",
+      "issue": 147,
+      "name": "memory_index_record_ref_read_model_adr",
       "scope": [
-        "single_memory_user_experience",
-        "private_and_project_output_scope",
-        "project_link_and_scope_separation",
-        "explicit_scope_conversion",
-        "backup_memory_download_and_project_package_defaults",
-        "migration_compatibility_and_executable_acceptance_matrix"
+        "reproducible_common_memory_read_model",
+        "record_ref_identity_and_type_allowlist",
+        "observation_follow_up_routine_occurrence_mappings",
+        "transactional_projection_and_explicit_rebuild",
+        "drift_diagnostics_and_consumer_boundaries",
+        "private_data_fail_closed_output_boundary"
       ],
       "production_behavior_changed": false
     },
@@ -826,6 +845,46 @@
       "schema_or_migration_implemented": false,
       "memory_index_implemented": false,
       "ui_implemented": false
+    },
+    "memory_index_record_ref_decision": {
+      "status": "accepted_in_issue_147_adr_not_implemented",
+      "adr": "docs/adr/ADR-0002-memory-index-record-ref-read-model.md",
+      "source_of_truth": "domain_aggregate_plus_append_only_event_history",
+      "read_model_is_rebuildable_projection": true,
+      "source_mutation_or_automatic_repair_allowed": false,
+      "canonical_key": [
+        "record_type",
+        "source_id"
+      ],
+      "record_ref_id_format": "cse-record-ref/v1/{record_type}/{source_id}",
+      "record_type_allowlist": [
+        "observation",
+        "follow_up",
+        "routine_occurrence"
+      ],
+      "normalized_status_values": [
+        "open",
+        "waiting",
+        "completed",
+        "cancelled"
+      ],
+      "source_status_detail_preserved": true,
+      "update_strategy": "hybrid_transactional_upsert_plus_explicit_deterministic_rebuild",
+      "normal_mutation_projection_same_transaction": true,
+      "idempotent_upsert_key": "record_type_and_source_id",
+      "full_rebuild_strategy": "validated_shadow_generation_then_atomic_activation",
+      "maintenance_status_values": [
+        "ready",
+        "stale",
+        "rebuilding",
+        "failed"
+      ],
+      "drift_is_visible_diagnostic_not_source_repair": true,
+      "project_id_implies_project_scope": false,
+      "official_output_revalidates_source_scope_and_project": true,
+      "schema_or_migration_implemented": false,
+      "projector_or_repository_implemented": false,
+      "ui_or_consumer_implemented": false
     },
     "field_observation_record_contract": {
       "status": "defined_documentation_only",
@@ -1024,11 +1083,11 @@
     }
   },
   "protected_paths": {
-    "app_and_tests": "must_remain_unchanged_in_issue_145_single_memory_scope_adr",
-    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_145",
-    "backup_and_export_production": "must_remain_unchanged_in_issue_145",
-    ".github/workflows": "must_remain_unchanged_in_issue_145",
-    "requirements.txt_and_pyproject.toml": "must_remain_unchanged_in_issue_145",
+    "app_and_tests": "must_remain_unchanged_in_issue_147_memory_index_record_ref_adr",
+    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_147",
+    "backup_and_export_production": "must_remain_unchanged_in_issue_147",
+    ".github/workflows": "must_remain_unchanged_in_issue_147",
+    "requirements.txt_and_pyproject.toml": "must_remain_unchanged_in_issue_147",
     "reports": "user_files_preserved_untracked_and_unchanged",
     "exports/.gitkeep": "must_remain_present_and_unchanged",
     "ignored_zip_and_cache": "must_remain_unchanged"
@@ -1045,18 +1104,18 @@
     "pull_request_creation_by_codex": false,
     "merge_authorized": false,
     "branch_deletion_authorized": false,
-    "final_remote_sha_evidence_location": "GitHub Issue #145 completion comment after push"
+    "final_remote_sha_evidence_location": "GitHub Issue #147 completion comment after push"
   },
   "required_files": [
-    ".cse/tasks/145_task.md",
-    ".cse/results/145_result.md",
+    ".cse/tasks/147_task.md",
+    ".cse/results/147_result.md",
     ".cse/state/project_state.json",
-    "docs/adr/ADR-0001-single-memory-and-record-scope.md",
-    "learning/145_single_memory_and_record_scope_adr.md",
+    "docs/adr/ADR-0002-memory-index-record-ref-read-model.md",
+    "learning/147_memory_index_record_ref_adr.md",
     "ROADMAP.md",
     "CHANGELOG.md",
     "docs/project_decisions.md"
   ],
-  "workflow_status": "issue_145_local_verified_not_yet_published",
+  "workflow_status": "issue_147_local_verified_not_yet_published",
   "forbidden_scope_added": false
 }
