@@ -1,5 +1,28 @@
 # Proje Kararlari
 
+## Issue 169 - Owner-only Güvenlik ve Veri Sahipliği Kararları
+
+- CSE tek kullanıcı ürünüdür; bu karar auth, app lock, session, encryption veya
+  cihaz güveni varmış gibi yorumlanamaz.
+- Normal launcher yalnız `127.0.0.1` kullanır. LAN ayrı security gate olmadan
+  güvenli production modu değildir; public exposure critical blocker'dır.
+- `private | project` erişim kontrolü değil output/paylaşım uygunluğudur.
+  Project ID veya MemoryIndex source scope ve revision yerine geçemez.
+- Source domain kayıtları ve append-only event geçmişi truth'tur; projection,
+  cache, artifact, diagnostic ve pilot log source değildir.
+- Backup v1 integrity/recovery kontrolü taşır fakat şifreli değildir. Verify ve
+  new-target clean Restore olmadan recovery garantisi verilmez.
+- Confirmed data loss/corruption, private/wrong-project leakage, unauthorized
+  LAN/public access, Backup/Restore, malicious attachment ve update integrity
+  failure pilotu ve ürün genişlemesini durdurur.
+- App lock/session, encrypted Backup/Hafızayı İndir, secure LAN, health
+  diagnostics, redacted logs, signed update/supply-chain ve recovery drill
+  ayrı executable implementation Issue'larıdır.
+- GitHub kullanıcı verisi storage alanı değildir; uninstall/update data root'u
+  sessizce silemez; diagnostic/pilot kayıtları minimizasyon ve retention ister.
+- Issue #169 production/test/schema/migration/UI/route/CLI veya network
+  davranışı değiştirmedi ve gerçek exposure/penetration testi yürütmedi.
+
 ## Issue 167 - Saha Kabul Metrikleri ve Pilot Protokolü Kararları
 
 - Saha kabulü yalnız hız metriği değildir; performans, veri kaybı, missed follow-up, attachment bütünlüğü, Backup/Restore, haricî araca dönüş, privacy ve ölçüm bütünlüğü birlikte değerlendirilir.
