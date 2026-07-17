@@ -8,7 +8,6 @@ import sqlite3
 import tempfile
 import zipfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
@@ -21,6 +20,7 @@ from app.persistence import (
 )
 from app.storage import ManagedAttachmentStore
 from app.storage.paths import validate_attachment_relative_path
+from app.time_contracts import utc_now
 
 from .common import (
     atomic_rename,
@@ -64,9 +64,7 @@ class BackupService:
         self,
         data_root: str | Path,
         *,
-        clock=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds").replace(
-            "+00:00", "Z"
-        ),
+        clock=utc_now,
     ) -> None:
         self.data_root = Path(data_root).resolve()
         self.database_path = self.data_root / "cse.sqlite3"

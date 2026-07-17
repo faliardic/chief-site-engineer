@@ -1446,6 +1446,14 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 
 `Request-Scoped Canonical Now`: Tek HTTP request içindeki bütün zaman hesaplarının paylaştığı, bir kez üretilmiş UTC anıdır. Bugün görünümünde occurrence üretimi ve bütün listeler aynı `now_utc` değerini kullanır.
 
+`Timezone-aware datetime`: Hangi UTC offset'inde olduğunu taşıyan Python tarih/saat değeridir. CSE kalıcı anları yalnız aware değerden üretir.
+
+`Naive datetime`: UTC offset veya timezone bilgisi taşımayan Python tarih/saat değeridir. Aynı duvar saatinin hangi gerçek ana karşılık geldiği bilinmediği için CSE bunu sessizce UTC kabul etmez.
+
+`Migration Preflight`: Migration uygulamadan önce schema ve mevcut değer risklerini salt-okunur biçimde sayan hazırlık incelemesidir. Issue #173 preflight'ı veri düzeltmez ve yalnız explicit temp/test database kabul eder.
+
+`DST Fold`: Yaz/kış saati geri geçişinde aynı yerel duvar saatinin iki kez oluştuğu belirsizliktir. Python `datetime.fold` bu iki occurrence'ı ayırır; CSE gerçek anları UTC saklayarak karışmayı önler.
+
 `Restart Acceptance`: Uygulama nesnesi kapatılıp aynı data root ile yeniden oluşturulduğunda kayıt, revision ve event geçmişinin aynı SQLite verisinden geri okunabildiğini doğrulayan kabul testidir.
 
 `İlk Test Edilebilir PC Sürümü`: Ürünün bütün uzun vadeli özelliklerini tamamlamadan, gerçek kullanıcının bilgisayarda temel uçtan uca akışı deneyebildiği dar ve doğrulanmış sürümdür. Issue #119 sürümü mobile/PWA/offline/sync/notification/auth içermez.

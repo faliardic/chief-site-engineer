@@ -48,9 +48,9 @@ Uygulama varsayılan olarak yalnız `127.0.0.1` loopback adresinde açılır. Lo
 `master` üzerindeki son doğrulanmış repository güvenli noktası:
 
 ```text
-Issue #169
-PR #170
-merge commit 3024ea45421593cfd03375b8594832ce27d684ab
+Issue #171
+PR #172
+merge commit 16dfec0e0eec76bea2370781c52f63c74ae91b96
 ```
 
 Son production kabiliyet dilimi Issue #119 / PR #126 ile merge edilmiştir.
@@ -80,17 +80,17 @@ Local Field MVP bugün şunları sağlar:
 - restart sonrasında aynı SQLite verisi, revision ve append-only event geçmişi kalıcılığı.
 
 İlk test edilebilir PC Saha Takibi yüzeyi merge edilmiştir. Bağlayıcı yürütme
-programı GitHub Issue #127, faz backlog'u Issue #128–#140'tır. Faz 0'ın son
-aktif işi Issue #171 closure doğrulamasıdır. Bu branch merge edildikten sonra
-sıradaki tek dar aday, Issue #129 içindeki P1.01 olay zamanı sözleşmesi ve
-migration preflight'tır. Mobile runtime, offline/sync, notification, uygulama
+programı GitHub Issue #127, faz backlog'u Issue #128–#140'tır. Faz 0 closure
+Issue #171 / PR #172 ile merge edilmiştir. Faz 1'in ilk dar production işi
+Issue #173 olay zamanı sözleşmesi ve salt-okunur migration preflight'tır.
+Mobile runtime, offline/sync, notification, uygulama
 kilidi ve gerçek saha pilotları henüz tamamlanmamıştır.
 
 ## Saha Takibi v0.1
 
 Merge edilmiş Saha Takibi çekirdeğinin bağlayıcı davranışları
 [Saha Takibi v0.1 sözleşmesinde](docs/field_tracking_v0_1_contract.md) korunur.
-Güncel sıradaki ürün işi Issue #171 merge'i sonrasında Faz 1 / P1.01'dir.
+Güncel sıradaki ürün işi Issue #173 ile Faz 1 / P1.01'dir.
 
 Kullanıcı yüzeyi:
 
@@ -181,6 +181,21 @@ Faz 0 merged kanıtı, current production ayrımı ve Faz 1 kapısı
 [closure doğrulamasında](docs/171_phase_0_closure_validation.md) birlikte
 gösterilir.
 
+## Zaman sözleşmesi ve migration preflight
+
+Issue #173 ile yeni kalıcı timestamp üretimi timezone-aware UTC
+`YYYY-MM-DDTHH:MM:SSZ`, kullanıcı sunumu ise `Europe/Istanbul` olarak
+merkezileştirilmiştir. `observed_at` / `occurred_at` olay anı, `created_at` ilk
+kalıcı giriş ve `updated_at` son başarılı mutation anlamındadır. Naive değer
+sessizce UTC sayılmaz.
+
+Migration preflight yalnız koddan açıkça verilen `temporary` veya `test` SQLite
+dosyasını `mode=ro` + `query_only` ile inceler. Schema 2/3/4 timestamp
+kolonlarının count/min/max/mapping/warning/blocker bilgisini JSON-ready ve
+veri-minimal raporlar; migration veya row rewrite yapmaz. Aktif data root için
+otomatik keşif ya da kullanıcı komutu eklenmemiştir. Ayrıntılar
+[Issue #173 sözleşmesindedir](docs/173_time_contract_and_migration_preflight.md).
+
 ## Bilinçli sınırlar
 
 Mevcut uygulama:
@@ -213,10 +228,10 @@ Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürüt
 - Issue #140 — Faz 12: owner-only güvenlik, bakım, güncelleme ve ürünleştirme.
 
 Bu backlog'un açık olması bütün fazların aynı anda aktif olduğu anlamına gelmez.
-Aynı anda yalnız bir production implementation görevi yürütülür. Issue #171,
-Faz 0'ın documentation/state-only closure işidir; `scope`, archive/unarchive,
-`MemoryIndex`, Hafıza UI veya yeni artifact ailesi uygulamaz. Closure branch
-merge edilince sıradaki tek faz Issue #129, ilk dar aday ise P1.01'dir.
+Aynı anda yalnız bir production implementation görevi yürütülür. Faz 0 Issue
+#171 / PR #172 ile kapanmış, Issue #173 Faz 1 P1.01 olarak başlamıştır. Bu iş
+`scope`, archive/unarchive, `MemoryIndex`, Hafıza UI, schema migration veya yeni
+artifact ailesi uygulamaz.
 
 ## Kaynak otoritesi
 

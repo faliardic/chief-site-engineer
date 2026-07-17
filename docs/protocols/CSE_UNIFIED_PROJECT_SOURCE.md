@@ -1086,27 +1086,30 @@ Bu bölüm kalıcı ürün politikasından ayrı bir factual snapshot'tır. Gün
 
 ### 2026-07-17 doğrulanmış merged nokta
 
-- Tamamlanan Faz 0 görevi: Issue **#169**
-- Squash-merge PR: **#170**
+- Tamamlanan Faz 0 closure görevi: Issue **#171**
+- Squash-merge PR: **#172**
 - `master` commit:
 
 ```text
-3024ea45421593cfd03375b8594832ce27d684ab
+16dfec0e0eec76bea2370781c52f63c74ae91b96
 ```
 
 - İlk PC Saha Takibi production yüzeyi Issue #119 / PR #126 ile merge edildi.
 - SQLite schema 4, Backup format 1 ve Günlük Çıktı format 1 current'tır.
-- P0.01–P0.09 repository truth, dört ADR, legacy envanteri, pilot protokolü ve
-  owner-only security threat model olarak merge edildi.
+- P0.01–P0.10 repository truth, dört ADR, legacy envanteri, pilot protokolü,
+  owner-only security threat model ve closure kapısı olarak merge edildi.
 - Scope field, archive/unarchive, MemoryIndex, Hafıza UI, yeni artifact aileleri,
   mobile/offline, app lock ve encryption uygulanmadı.
 - GitHub Actions hesabın runner/billing sınırı nedeniyle manuel olarak devre dışı kalır; yerel doğrulama zorunludur.
 
-### Aktif dokümantasyon işi
+### Aktif production işi
 
-Issue #171, `codex/issue-171-phase-0-closure-validation` branch'inde Faz 0
-closure ve Faz 1 geçiş kapısıdır. Production davranışını değiştirmez ve merge
-edilene kadar `current_safe_point` sayılmaz.
+Issue #173, `codex/issue-173-p1-01-time-contract-migration-preflight` branch'inde
+Faz 1'in ilk dar işidir. Olay/entry/update anlamlarını, canonical UTC storage,
+`Europe/Istanbul` presentation ve yalnız explicit temp/test database için
+salt-okunur preflight'ı uygular. Schema migration, gerçek data root, P1.02 form,
+archive/unarchive ve MemoryIndex başlatmaz; merge edilene kadar current safe
+point sayılmaz.
 
 ### Current-state doğrulama sırası
 
@@ -1207,8 +1210,9 @@ Dünya örnekleri raporunda önerilen otomatik CI ve branch protection uzun vade
 
 ## 31. Bir Sonraki Ürün Yönü
 
-Issue #171 merge'i sonrasında sıradaki tek faz Issue #129 Güvenilir Hafıza yaşam
-döngüsüdür. İlk dar aday P1.01 olay zamanı sözleşmesi ve migration preflight'tır:
+Issue #171 / PR #172 merge'i sonrasında sıradaki tek faz Issue #129 Güvenilir
+Hafıza yaşam döngüsüdür. İlk dar iş Issue #173 / P1.01 olay zamanı sözleşmesi ve
+migration preflight'tır:
 `observed/occurred`, `created` ve `updated` anlamı; UTC storage;
 Europe/Istanbul presentation; geçmiş/future/DST kuralları ve mevcut satırların
 geriye uyumluluğu önce kesinleştirilir.
@@ -1272,8 +1276,8 @@ docs/protocols/CSE_PROJECT_INSTRUCTIONS.md
 ## 33. Saha Takibi v0.1 Bağlayıcı Sözleşme Kaydı
 
 Issue #98 ve Epic #97 Saha Takibi domain sözleşmesini belirler. Bu bölüm
-uygulanmış çekirdeğin bağlayıcı kurallarını korur; güncel sıradaki ürün işi
-§31'deki Faz 1 / P1.01 seçimidir. Üst ürün yönü ve faz sırası için bağlayıcı
+uygulanmış çekirdeğin bağlayıcı kurallarını korur; güncel ürün işi §31'deki
+Issue #173 / Faz 1 / P1.01'dir. Üst ürün yönü ve faz sırası için bağlayıcı
 kaynak Epic #105 ve yürütme programı Issue #127'dir.
 
 İlk kapsam üç ayrı domain kaydıdır:

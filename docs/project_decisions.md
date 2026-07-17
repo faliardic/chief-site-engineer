@@ -2697,3 +2697,23 @@
 - Tek Hafıza UX ve `private | project` kapsamı, `MemoryIndex` / `RecordRef` read-model'i ile Backup / Hafızayı İndir / Proje Paketi ayrımları sonraki ayrı ADR Issue'larında kesinleştirilecek; Issue #141 veri modeli davranışını değiştirmez.
 - Mevcut kişisel takip ile proje/resmî kayıt ayrımı erişim rolü değil export/devir kapsamı olarak korunur; kişisel follow-up/routine verisi bu görevde resmî günlük export'a dahil edilmez.
 - Schema sürümü `4`, backup formatı `1` ve günlük export formatı `1` olarak korunur.
+
+## Issue 173 — Olay Zamanı Sözleşmesi ve Migration Preflight
+
+- `observed_at` / `occurred_at` olayın gerçekleştiği an, `created_at` ilk
+  kalıcı CSE girişi, `updated_at` son başarılı mutation anıdır.
+- Yeni kalıcı timestamp üretimi timezone-aware UTC seconds
+  `YYYY-MM-DDTHH:MM:SSZ`; user presentation `Europe/Istanbul` olur.
+- Explicit non-UTC offset normalize edilebilir; naive/invalid değer sessizce
+  onarılmaz. Legacy six-microsecond UTC read-compatible fakat preflight
+  warning'idir.
+- Historical event/entry/update/lifecycle zamanları sabit `as_of` sonrasında
+  blocker; schedule/attention/deadline gelecekte olabilir.
+- Migration preflight yalnız çağıranın açıkça verdiği `temporary | test`
+  SQLite dosyasını `mode=ro` + `query_only` ile okur; data-root discovery,
+  migration, schema change ve row rewrite yapmaz.
+- Preflight schema 2/3/4 timestamp allowlist'ini count/min/max/mapping ve
+  warning/blocker bulgularıyla JSON-ready raporlar; raw değer, row ID, business
+  content veya database path sızdırmaz.
+- Schema `4`, Backup format `1`, restore allowlist `(2,3,4)` ve Günlük Çıktı
+  format `1` değişmez. P1.02, archive/unarchive ve MemoryIndex ayrı Issue'dur.

@@ -4,14 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from datetime import date, datetime, timezone
+from datetime import date
 from enum import Enum
 from pathlib import Path
 from uuid import uuid4
-from zoneinfo import ZoneInfo
 
 from app.field_tracking import (
-    ISTANBUL_TIMEZONE,
     RoutineOccurrence,
     RoutineOccurrenceEvent,
     RoutineOccurrenceEventType,
@@ -38,6 +36,7 @@ from app.persistence import (
     validate_record_id,
     validate_utc_timestamp,
 )
+from app.time_contracts import to_istanbul, utc_now
 
 
 TEMPLATE_UPDATE_FIELDS = (
@@ -169,9 +168,7 @@ class CloseRoutineOccurrence:
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace(
-        "+00:00", "Z"
-    )
+    return utc_now()
 
 
 class RoutineApplicationService:
@@ -855,9 +852,7 @@ def _validate_expected_revision(value: int) -> None:
 
 def _istanbul_date(value: str) -> date:
     validate_utc_timestamp(value)
-    return datetime.fromisoformat(f"{value[:-1]}+00:00").astimezone(
-        ZoneInfo(ISTANBUL_TIMEZONE)
-    ).date()
+    return to_istanbul(value).date()
 
 
 def _require_instance(value: object, expected_type: type[object], name: str) -> None:

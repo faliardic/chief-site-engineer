@@ -14,13 +14,14 @@ repository/workflow truth işlerinden sonra Issue #145 / PR #146 Tek Hafıza ve
 kayıt kapsamı, Issue #147 / PR #159 `MemoryIndex / RecordRef` read-model,
 Issue #148 / PR #164 çıktı aileleri, Issue #165 / PR #166 legacy envanteri,
 Issue #167 / PR #168 saha kabul protokolü ve Issue #169 / PR #170 owner-only
-tehdit modeli merge edilmiştir. Faz 0'ın tek aktif işi Issue #171 closure
-doğrulamasıdır; production davranışı değiştirmez. Açık faz Epic'leri aynı anda
-aktif production işleri değildir.
+tehdit modeli merge edilmiştir. Issue #171 / PR #172 Faz 0 closure sonucunu
+`PASS` olarak merge etmiştir. Tek aktif production işi Faz 1'in ilk dar dilimi
+Issue #173 zaman sözleşmesi ve migration preflight'tır. Açık faz Epic'leri aynı
+anda aktif production işleri değildir.
 
 ## Issue #127 Faz Haritası
 
-- [ ] Issue #128 — Faz 0: repository truth, ADR'ler ve yürütme zemini.
+- [x] Issue #128 — Faz 0: repository truth, ADR'ler ve yürütme zemini.
 - [ ] Issue #129 — Faz 1: Güvenilir Hafıza yaşam döngüsü ve ortak kayıt görünümü.
 - [ ] Issue #130 — Faz 2: Tam Hafıza İndirme, doğrulama ve kurtarma standardı.
 - [ ] Issue #131 — Faz 3: mobil runtime, offline güvenilirlik ve gerçek saha pilotları.
@@ -34,11 +35,27 @@ aktif production işleri değildir.
 - [ ] Issue #139 — Faz 11: deterministik arama, semantik geri çağırma ve kaynaklı AI.
 - [ ] Issue #140 — Faz 12: owner-only güvenlik, bakım, güncelleme ve ürünleştirme.
 
-Issue #141–#169 arasındaki P0.01–P0.09 işleri merged kanıta sahiptir. Issue #171,
-bu kanıtları repository truth ile uzlaştırır; P0.10 branch merge edilmeden
-tamamlandı sayılmaz. Closure sonrası sıradaki tek faz Issue #129, ilk dar aday
-P1.01 olay zamanı sözleşmesi ve migration preflight'tır. Faz 1 implementation
-bu branch'te başlamaz.
+Issue #141–#169 arasındaki P0.01–P0.09 işleri merged kanıta sahiptir. Issue #171
+/ PR #172 bu kanıtları repository truth ile uzlaştırmış ve P0.10'u kapatmıştır.
+Sıradaki tek faz Issue #129'dur; P1.01 Issue #173 ile başlamıştır.
+
+## Issue 173 - Olay Zamanı Sözleşmesi ve Migration Preflight
+
+- [x] `observed_at` / `occurred_at`, `created_at` ve `updated_at` anlamları
+  ayrıldı.
+- [x] UTC seconds storage, explicit offset normalization ve
+  `Europe/Istanbul` presentation merkezileştirildi.
+- [x] Naive/invalid fail-closed, seconds/microseconds, past/future ve generic
+  DST davranışı executable testlerle sabitlendi.
+- [x] Observation, follow-up, routine, event, clock, SQLite, Backup/Restore,
+  Günlük Çıktı ve web call-site envanteri çıkarıldı.
+- [x] Yalnız explicit temp/test database kabul eden `mode=ro` + `query_only`
+  preflight eklendi.
+- [x] Schema 2/3/4 kolon, count, min/max, mapping, warning ve blocker report'u
+  veri-minimal JSON-ready sözleşmeyle doğrulandı.
+- [x] Database byte değişmezliği ve hassas içerik sızıntısı yokluğu test edildi.
+- [x] Schema, migration zinciri, Backup v1 ve Günlük Çıktı v1 değiştirilmedi.
+- [ ] P1.02 geriye dönük observation create contract'ı ayrı Issue bekler.
 
 ## Faz 0 Kanonik ADR İndeksi
 
@@ -68,8 +85,7 @@ Hafıza UI, yeni artifact aileleri, app lock veya encryption uygulanmış değil
 - [x] Faz 0 closure sonucu kanıt matrisinden `PASS` olarak üretildi.
 - [x] Sıradaki tek dar aday Issue #129 / P1.01 olarak seçildi.
 - [x] Faz 1 Issue, branch veya implementation başlatılmadı.
-- [ ] P0.10, closure branch merge edildikten sonra Issue #128 üzerinde
-  tamamlandı işaretlenecek.
+- [x] P0.10, Issue #171 / PR #172 merge'iyle Issue #128 üzerinde tamamlandı.
 
 ## Issue 148 - Backup, Hafızayı İndir ve Proje Paketi Ayrım ADR'si
 

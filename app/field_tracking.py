@@ -20,9 +20,10 @@ from app.persistence.contracts import (
     validate_utc_timestamp,
 )
 from app.persistence.records import serialize_event_payload
+from app.time_contracts import ISTANBUL_TIMEZONE_NAME
 
 
-ISTANBUL_TIMEZONE = "Europe/Istanbul"
+ISTANBUL_TIMEZONE = ISTANBUL_TIMEZONE_NAME
 SUPPORTED_TIMEZONES: tuple[str, ...] = (ISTANBUL_TIMEZONE,)
 
 

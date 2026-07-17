@@ -4,7 +4,6 @@ import unicodedata
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import BinaryIO
 from uuid import uuid4
@@ -23,6 +22,7 @@ from app.storage import (
     ManagedAttachmentStore,
     StagedAttachment,
 )
+from app.time_contracts import utc_now
 
 
 MAX_SEARCH_QUERY_LENGTH = 200
@@ -69,9 +69,7 @@ class ApplicationServiceError(Exception):
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace(
-        "+00:00", "Z"
-    )
+    return utc_now()
 
 
 class ObservationApplicationService:

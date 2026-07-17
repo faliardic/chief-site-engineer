@@ -1,5 +1,23 @@
 # Changelog
 
+## Issue #173 - Olay Zamanı Sözleşmesi ve Salt-Okunur Migration Preflight
+
+- `app/time_contracts.py` ile timezone-aware UTC seconds üretimi, explicit
+  offset normalization, legacy six-microsecond parse compatibility,
+  `Europe/Istanbul` sunumu, injectable clock, future policy ve IANA/DST dönüşümü
+  merkezileştirildi.
+- Observation, follow-up, routine, migration, Backup, Günlük Çıktı ve web zaman
+  çağrı noktaları canonical helper'lara bağlandı; web stored naive değeri artık
+  sessizce UTC varsaymıyor.
+- `app/persistence/time_preflight.py`, yalnız explicit `temporary | test`
+  SQLite database'i `mode=ro` + `query_only` ile açarak schema 2/3/4 timestamp
+  kolonlarını veri-minimal JSON-ready report'ta sayar.
+- Preflight migration, schema bump veya row rewrite yapmaz; raw değer, row ID,
+  business content ve database path raporlamaz.
+- UTC/offset/Istanbul/precision/future/DST/fixed-clock ve schema 2/3/4
+  byte-immutability/leakage testleri eklendi; Backup v1, restore `(2,3,4)` ve
+  Günlük Çıktı v1 compatibility korunur.
+
 ## Issue 171 - Faz 0 Kapanış Doğrulaması ve Faz 1 Geçiş Kapısı
 
 - P0.01–P0.09 için Issue #141/#143/#145/#147/#148/#165/#167/#169 ile merged
