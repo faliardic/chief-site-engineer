@@ -8,7 +8,7 @@
 2A. [x] İlk test edilebilir PC Saha Takibi web yüzeyi — Issue #119 / PR #126 ile merge edildi. Bugün, Unutma Kutusu, hızlı yakalama, follow-up yaşam döngüsü, rutinler, occurrence işlemleri, restart kalıcılığı ve resmî export izolasyonu doğrulandı.
 3. [ ] Issue #127 uygulanabilir geliştirme programını bağımlılık sırasıyla yürüt.
 
-Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme programı Issue #127'dir. Issue #141 ve #143 repository/workflow truth işlerinden sonra Issue #145 / PR #146 Tek Hafıza ve kayıt kapsamı, Issue #147 / PR #159 `MemoryIndex / RecordRef` read-model, Issue #148 / PR #164 Backup / Hafızayı İndir / Proje Paketi ayrım ADR'si ve Issue #165 / PR #166 legacy model envanteri merge edilmiştir. Faz 0'ın tek aktif işi Issue #167 ile production davranışı değiştirmeyen saha kabul metrikleri ve pilot protokolüdür. Açık faz Epic'leri aynı anda aktif production işleri değildir; aynı anda yalnız bir production implementation görevi yürütülür.
+Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme programı Issue #127'dir. Issue #141 ve #143 repository/workflow truth işlerinden sonra Issue #145 / PR #146 Tek Hafıza ve kayıt kapsamı, Issue #147 / PR #159 `MemoryIndex / RecordRef` read-model, Issue #148 / PR #164 Backup / Hafızayı İndir / Proje Paketi ayrım ADR'si, Issue #165 / PR #166 legacy model envanteri ve Issue #167 / PR #168 saha kabul protokolü merge edilmiştir. Faz 0'ın tek aktif işi Issue #169 owner-only güvenlik ve veri sahipliği tehdit modelidir; production davranışı değiştirmez. Açık faz Epic'leri aynı anda aktif production işleri değildir; aynı anda yalnız bir production implementation görevi yürütülür.
 
 ## Issue #127 Faz Haritası
 
@@ -26,7 +26,7 @@ Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürüt
 - [ ] Issue #139 — Faz 11: deterministik arama, semantik geri çağırma ve kaynaklı AI.
 - [ ] Issue #140 — Faz 12: owner-only güvenlik, bakım, güncelleme ve ürünleştirme.
 
-Issue #141, Faz 0'ın ilk dar repository truth görevi olarak tamamlandı. Issue #145 / PR #146 Tek Hafıza UX ile `private | project` kayıt kapsamını, Issue #147 / PR #159 ortak `MemoryIndex / RecordRef` read-model sözleşmesini, Issue #148 / PR #164 Backup / Hafızayı İndir / Proje Paketi çıktı aileleriyle mevcut Günlük Çıktı sınırını, Issue #165 / PR #166 ise legacy kaldırma kapılarını kesinleştirdi. Aktif Issue #167 gerçek pilotu yürütmeden 7/30 günlük saha kabul metriklerini, privacy-minimal logları ve stop/Faz 1 kapılarını tanımlar.
+Issue #141, Faz 0'ın ilk dar repository truth görevi olarak tamamlandı. Issue #145 / PR #146 Tek Hafıza UX ile `private | project` kayıt kapsamını, Issue #147 / PR #159 ortak `MemoryIndex / RecordRef` read-model sözleşmesini, Issue #148 / PR #164 Backup / Hafızayı İndir / Proje Paketi çıktı aileleriyle mevcut Günlük Çıktı sınırını, Issue #165 / PR #166 legacy kaldırma kapılarını, Issue #167 / PR #168 ise gerçek pilotu yürütmeden 7/30 günlük saha kabul sözleşmesini kesinleştirdi. Aktif Issue #169 mevcut MVP'nin owner-only güvenlik ve veri sahipliği sınırlarını, riskleri ve Faz 12 executable kapılarını bağlar.
 
 ## Issue 148 - Backup, Hafızayı İndir ve Proje Paketi Ayrım ADR'si
 
@@ -82,6 +82,29 @@ Issue #141, Faz 0'ın ilk dar repository truth görevi olarak tamamlandı. Issue
 - backup durumu/görünürlüğü.
 
 Gelişmiş hesap defteri ve immutable günlük yayınlama/revizyon zinciri, Issue #127 programındaki ilgili sonraki fazlarda kalır; minimum hesap ve günlük taslağı ise mobil saha pilotu öncesi bütünleşik ürün kabulinin parçasıdır.
+
+## Issue 169 - Owner-only Güvenlik ve Veri Sahipliği Tehdit Modeli
+
+- [x] Mevcut MVP; tek kullanıcı, Windows hesabı dayanaklı, loopback-default,
+  auth/app-lock/TLS/encryption içermeyen gerçek posture ile tanımlandı.
+- [x] SQLite/event, managed attachment, data root, artifact, scope, browser,
+  log, repository/release, pilot ve future MemoryIndex varlıkları CIA,
+  source-of-truth ve recovery yolu ile envanterlendi.
+- [x] Uygulama/SQLite, attachment, browser/local web, loopback/LAN/public,
+  Windows hesabı, removable disk, projection, scope/output, GitHub/update ve
+  pilot içerik sınırları on bir trust boundary olarak bağlandı.
+- [x] Yirmi bir threat scenario; on yedi zorunlu alan, likelihood/impact,
+  `low | medium | high | critical` severity ve safety override ile yazıldı.
+- [x] Critical/high riskler current control, açık gap, detection, immediate
+  response, future executable Issue anahtarı ve acceptance evidence ile eşlendi.
+- [x] Veri sahipliği, output confidentiality, plain Backup/Hafızayı İndir,
+  source-vs-projection ve uninstall/update veri koruma sözleşmeleri kaydedildi.
+- [x] Confirmed data loss/corruption, privacy leakage, public/LAN exposure,
+  verify/Restore, attachment ve release integrity failure stop kriteri oldu.
+- [x] App lock/session, encrypted artifact, secure LAN, diagnostics, logs,
+  signed update, supply chain ve recovery drill işleri Faz 12 kapılarına ayrıldı.
+- [x] Hiçbir auth, encryption, network control, security test veya production
+  davranışı uygulanmış gibi gösterilmedi; gerçek network exposure testi yapılmadı.
 
 ## Issue 167 - Saha Kabul Metrikleri ve Pilot Protokolü
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## Issue 169 - Owner-only Güvenlik ve Veri Sahipliği Tehdit Modeli
+
+- Current MVP'nin loopback-default fakat auth, app lock, secure session, TLS ve
+  at-rest/artifact encryption içermeyen güvenlik durumu ADR-0004 ile sabitlendi.
+- On üç asset, on bir trust boundary, aktör sınıfları ve yirmi bir threat
+  scenario owner/data/output/recovery sınırlarıyla envanterlendi.
+- Critical/high riskler mevcut control, açık gap, detection, containment,
+  future mitigation ve executable acceptance evidence ile eşlendi.
+- Veri sahipliği, plain Backup/Hafızayı İndir confidentiality riski,
+  private/project output sınırı, source-of-truth ve incident stop kuralları
+  bağlayıcı hale getirildi.
+- Faz 12 app lock/session, encryption, health diagnostics, safe update,
+  supply-chain, redacted logs ve recovery drill işleri ayrı implementation
+  kapıları olarak tanımlandı.
+- Production/test/schema/migration/UI/route/CLI, server binding, Backup/Günlük
+  Çıktı formatı ve gerçek kullanıcı verisi değiştirilmedi; public/LAN testi
+  yapılmadı.
+
 ## Issue 167 - Saha Kabul Metrikleri ve Pilot Protokolü
 
 - Kayıt açma ve doğru kayıt geri bulma süreleri; exact başlangıç/bitiş, saniye birimi, median, nearest-rank p90, success/failure oranı ve minimum örnek kurallarıyla tanımlandı.
