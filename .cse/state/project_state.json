@@ -1,20 +1,20 @@
 {
   "state_version": 2,
   "legacy_last_numbered_step": 225,
-  "current_issue": 148,
+  "current_issue": 165,
   "base_branch": "master",
   "base_commit": "8fb95811a2e55375081217470e90d7e8d385e8b2",
   "active_work": {
-    "issue": 148,
-    "type": "backup_memory_download_project_package_separation_adr",
+    "issue": 165,
+    "type": "legacy_model_inventory_and_deprecation_plan",
     "issue_state": "active",
     "review_status": "local_verified_not_yet_published",
     "binding_execution_epic": 127,
     "binding_phase_epic": 128,
     "product_epic": 105,
     "field_tracking_epic": 97,
-    "branch": "codex/issue-148-output-family-separation-adr",
-    "base_commit": "8fb95811a2e55375081217470e90d7e8d385e8b2",
+    "branch": "codex/issue-165-legacy-inventory-deprecation-plan",
+    "base_commit": "4d31200753d8c24cefbce949849be67d1683b887",
     "commit_strategy": "one_ordinary_commit_without_amend_rebase_or_force_push",
     "schema_version": 4,
     "backup_format_version": 1,
@@ -26,7 +26,7 @@
     "real_user_data_root_accessed": false,
     "merge_claim": false,
     "pull_request_created": false,
-    "full_test_summary": "983 passed, 7 skipped in 28.84s",
+    "full_test_summary": "983 passed, 7 skipped in 18.78s",
     "compileall_passed": true,
     "state_json_valid": true,
     "diff_check_passed": true,
@@ -36,18 +36,18 @@
   },
   "current_safe_point": {
     "semantics": "latest_merged_finalized_checkpoint",
-    "issue": 147,
+    "issue": 148,
     "issue_state": "completed",
-    "pull_request": 159,
+    "pull_request": 164,
     "pull_request_state": "merged",
-    "merge_commit": "8fb95811a2e55375081217470e90d7e8d385e8b2",
-    "local_test_summary": "983 passed, 7 skipped in 22.83s (Issue #147 local verification; production and tests unchanged)"
+    "merge_commit": "4d31200753d8c24cefbce949849be67d1683b887",
+    "local_test_summary": "983 passed, 7 skipped in 28.84s (Issue #148 local verification; production and tests unchanged)"
   },
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
-    "local_master_sha": "8fb95811a2e55375081217470e90d7e8d385e8b2",
-    "origin_master_sha": "8fb95811a2e55375081217470e90d7e8d385e8b2",
+    "local_master_sha": "4d31200753d8c24cefbce949849be67d1683b887",
+    "origin_master_sha": "4d31200753d8c24cefbce949849be67d1683b887",
     "divergence": "0 0",
     "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
     "misspelled_workspace_present": false,
@@ -194,6 +194,11 @@
       "model": "standart full Codex",
       "reasoning": "high",
       "reason": "documentation_only_output_family_separation_manifest_version_verifier_backward_compatibility_privacy_and_repository_truth_consistency"
+    },
+    "issue_165_selection": {
+      "model": "standart full Codex",
+      "reasoning": "high",
+      "reason": "read_only_legacy_inventory_symbol_reference_graph_schema_restore_format_compatibility_provenance_and_safe_removal_gates"
     }
   },
   "required_source_pre_read": {
@@ -616,6 +621,19 @@
             "project_state": true,
             "task_148": true
         },
+        "issue_165_sources_read": {
+            "unified_project_source": true,
+            "project_instructions": true,
+            "github_issue_165_with_all_comments": true,
+            "github_epics_127_128_105_97": true,
+            "adr_0001_0002_0003": true,
+            "app_models_field_tracking_and_records": true,
+            "application_persistence_storage_operations_web_launcher_ops_and_acceptance": true,
+            "scripts_tests_and_reference_graph": true,
+            "schema_migration_backup_restore_and_daily_export_compatibility": true,
+            "readme_roadmap_changelog_project_decisions_and_project_state": true,
+            "task_165": true
+        },
     "unresolved_conflict_found": false
   },
   "canonical_project_instructions": {
@@ -827,15 +845,15 @@
     "strict_podcast_note_prior_step_summary_contract_implemented_in_step_225": true,
     "field_mvp_product_behavior_added_in_step_225": false,
     "active_program_work": {
-      "issue": 148,
-      "name": "backup_memory_download_project_package_separation_adr",
+      "issue": 165,
+      "name": "legacy_model_inventory_and_deprecation_plan",
       "scope": [
-        "backup_complete_disaster_recovery_and_restore_boundary",
-        "memory_download_complete_owner_archive_without_restore_promise",
-        "project_package_single_project_scope_and_privacy_guards",
-        "daily_export_existing_observation_only_boundary",
-        "independent_format_version_namespaces_and_manifests",
-        "family_specific_verifiers_backward_compatibility_and_encryption_direction"
+        "repository_surface_and_symbol_reference_inventory",
+        "four_class_classification",
+        "runtime_test_schema_format_and_document_dependency_evidence",
+        "replacement_future_action_removal_gate_and_risk",
+        "legacy_provenance_and_terminology_deprecation",
+        "executable_follow_up_issue_sequence_without_physical_deletion"
       ],
       "production_behavior_changed": false
     },
@@ -952,6 +970,27 @@
       "production_format_or_verifier_implemented": false,
       "schema_or_migration_implemented": false,
       "ui_cli_or_web_route_implemented": false
+    },
+    "legacy_model_inventory_decision": {
+      "status": "documented_in_issue_165_not_physically_applied",
+      "document": "docs/165_legacy_model_inventory_and_deprecation_plan.md",
+      "classifications": [
+        "Aktif çekirdek",
+        "Dönüştürülecek",
+        "Legacy / arşivlenecek",
+        "Silme adayı"
+      ],
+      "qualified_deletion_candidate_count": 0,
+      "active_core_includes_schema_migrations_backup_daily_export_and_managed_attachments": true,
+      "field_observation_model_classification": "Dönüştürülecek",
+      "field_tracking_sources_and_application_classification": "Dönüştürülecek",
+      "legacy_models_records_and_helper_chains_classification": "Legacy / arşivlenecek",
+      "historical_docs_learning_tasks_and_results_are_provenance_not_current_authority": true,
+      "removal_requires_zero_runtime_test_fixture_schema_restore_format_and_current_document_dependencies": true,
+      "removal_requires_executable_replacement_and_backward_compatibility_evidence": true,
+      "unknown_dependency_policy": "fail_closed_as_legacy_archive",
+      "physical_delete_rename_or_move_performed": false,
+      "production_test_schema_migration_or_format_changed": false
     },
     "field_observation_record_contract": {
       "status": "defined_documentation_only",
@@ -1150,11 +1189,11 @@
     }
   },
   "protected_paths": {
-    "app_and_tests": "must_remain_unchanged_in_issue_148_output_family_separation_adr",
-    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_148",
-    "backup_and_export_production": "must_remain_unchanged_in_issue_148",
-    ".github/workflows": "must_remain_unchanged_in_issue_148",
-    "requirements.txt_and_pyproject.toml": "must_remain_unchanged_in_issue_148",
+    "app_and_tests": "must_remain_unchanged_in_issue_165_legacy_inventory",
+    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_165",
+    "backup_and_export_production": "must_remain_unchanged_in_issue_165",
+    ".github/workflows": "must_remain_unchanged_in_issue_165",
+    "requirements.txt_and_pyproject.toml": "must_remain_unchanged_in_issue_165",
     "reports": "user_files_preserved_untracked_and_unchanged",
     "exports/.gitkeep": "must_remain_present_and_unchanged",
     "ignored_zip_and_cache": "must_remain_unchanged"
@@ -1171,18 +1210,18 @@
     "pull_request_creation_by_codex": false,
     "merge_authorized": false,
     "branch_deletion_authorized": false,
-    "final_remote_sha_evidence_location": "GitHub Issue #148 completion comment after push"
+    "final_remote_sha_evidence_location": "GitHub Issue #165 completion comment after push"
   },
   "required_files": [
-    ".cse/tasks/148_task.md",
-    ".cse/results/148_result.md",
+    ".cse/tasks/165_task.md",
+    ".cse/results/165_result.md",
     ".cse/state/project_state.json",
-    "docs/adr/ADR-0003-backup-memory-download-project-package.md",
-    "learning/148_backup_memory_download_project_package_adr.md",
+    "docs/165_legacy_model_inventory_and_deprecation_plan.md",
+    "learning/165_legacy_model_inventory_and_deprecation_plan.md",
     "ROADMAP.md",
     "CHANGELOG.md",
     "docs/project_decisions.md"
   ],
-  "workflow_status": "issue_148_local_verified_not_yet_published",
+  "workflow_status": "issue_165_local_verified_not_yet_published",
   "forbidden_scope_added": false
 }
