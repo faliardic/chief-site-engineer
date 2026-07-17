@@ -8,7 +8,7 @@
 2A. [x] İlk test edilebilir PC Saha Takibi web yüzeyi — Issue #119 / PR #126 ile merge edildi. Bugün, Unutma Kutusu, hızlı yakalama, follow-up yaşam döngüsü, rutinler, occurrence işlemleri, restart kalıcılığı ve resmî export izolasyonu doğrulandı.
 3. [ ] Issue #127 uygulanabilir geliştirme programını bağımlılık sırasıyla yürüt.
 
-Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme programı Issue #127'dir. Issue #141 ve #143 repository/workflow truth işlerinden sonra Issue #145 / PR #146 Tek Hafıza ve kayıt kapsamı, Issue #147 / PR #159 `MemoryIndex / RecordRef` read-model, Issue #148 / PR #164 ise Backup / Hafızayı İndir / Proje Paketi ayrım ADR'sini merge etmiştir. Faz 0'ın tek aktif işi Issue #165 ile production davranışı değiştirmeyen legacy model envanteri ve deprecation planıdır. Açık faz Epic'leri aynı anda aktif production işleri değildir; aynı anda yalnız bir production implementation görevi yürütülür.
+Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme programı Issue #127'dir. Issue #141 ve #143 repository/workflow truth işlerinden sonra Issue #145 / PR #146 Tek Hafıza ve kayıt kapsamı, Issue #147 / PR #159 `MemoryIndex / RecordRef` read-model, Issue #148 / PR #164 Backup / Hafızayı İndir / Proje Paketi ayrım ADR'si ve Issue #165 / PR #166 legacy model envanteri merge edilmiştir. Faz 0'ın tek aktif işi Issue #167 ile production davranışı değiştirmeyen saha kabul metrikleri ve pilot protokolüdür. Açık faz Epic'leri aynı anda aktif production işleri değildir; aynı anda yalnız bir production implementation görevi yürütülür.
 
 ## Issue #127 Faz Haritası
 
@@ -26,7 +26,7 @@ Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürüt
 - [ ] Issue #139 — Faz 11: deterministik arama, semantik geri çağırma ve kaynaklı AI.
 - [ ] Issue #140 — Faz 12: owner-only güvenlik, bakım, güncelleme ve ürünleştirme.
 
-Issue #141, Faz 0'ın ilk dar repository truth görevi olarak tamamlandı. Issue #145 / PR #146 Tek Hafıza UX ile `private | project` kayıt kapsamını, Issue #147 / PR #159 ortak `MemoryIndex / RecordRef` read-model sözleşmesini, Issue #148 / PR #164 ise Backup / Hafızayı İndir / Proje Paketi çıktı aileleriyle mevcut Günlük Çıktı sınırını kesinleştirdi. Aktif Issue #165 bu kararların öncesinde oluşmuş model, helper, repository, compatibility ve tarihsel doküman yüzeylerini dört sınıfta envanterler; production davranışı uygulamaz.
+Issue #141, Faz 0'ın ilk dar repository truth görevi olarak tamamlandı. Issue #145 / PR #146 Tek Hafıza UX ile `private | project` kayıt kapsamını, Issue #147 / PR #159 ortak `MemoryIndex / RecordRef` read-model sözleşmesini, Issue #148 / PR #164 Backup / Hafızayı İndir / Proje Paketi çıktı aileleriyle mevcut Günlük Çıktı sınırını, Issue #165 / PR #166 ise legacy kaldırma kapılarını kesinleştirdi. Aktif Issue #167 gerçek pilotu yürütmeden 7/30 günlük saha kabul metriklerini, privacy-minimal logları ve stop/Faz 1 kapılarını tanımlar.
 
 ## Issue 148 - Backup, Hafızayı İndir ve Proje Paketi Ayrım ADR'si
 
@@ -83,6 +83,17 @@ Issue #141, Faz 0'ın ilk dar repository truth görevi olarak tamamlandı. Issue
 
 Gelişmiş hesap defteri ve immutable günlük yayınlama/revizyon zinciri, Issue #127 programındaki ilgili sonraki fazlarda kalır; minimum hesap ve günlük taslağı ise mobil saha pilotu öncesi bütünleşik ürün kabulinin parçasıdır.
 
+## Issue 167 - Saha Kabul Metrikleri ve Pilot Protokolü
+
+- [x] Kayıt açma ve doğru kaydı geri bulma süreleri exact başlangıç/bitiş, median, nearest-rank p90, failure rate ve minimum sample ile tanımlandı.
+- [x] Veri kaybı, missed follow-up, attachment/hash, Backup verify, clean Restore, haricî araca dönüş, scope/privacy sızıntısı ve ölçüm bütünlüğü metrikleri bağlayıcı alan sözleşmesiyle yazıldı.
+- [x] Performance ölçümleri günlük sınırlı sample; safety/privacy/integrity olayları eksiksiz census olarak ayrıldı.
+- [x] Gün 0 preflight, 7 ardışık günlük ilk pilot ve 30 ardışık günlük doğrulama pilotu tekrarlanabilir adımlara bağlandı.
+- [x] Günlük ve summary şablonları source UUID, gerçek kayıt gövdesi, proje/kişi, attachment path/hash, screenshot ve ham mesaj toplamadan kullanılabilir hazırlandı.
+- [x] Suspected veri kaybı/privacy/integrity olayında stop; confirmed safety blocker'da yeni revalidation window ve owner restart kararı zorunlu tutuldu.
+- [x] 7 günlük `PASS_TO_30_DAY` ile 30 günlük Faz 1 gate'leri safety-first sırada tanımlandı; `INSUFFICIENT_EVIDENCE` PASS sayılmadı.
+- [x] Hedeflerin ilk kabul eşikleri olduğu, Issue #167'nin gerçek pilot yürütmediği ve sonraki executable 7 günlük pilotun ayrı Issue gerektirdiği kaydedildi.
+
 ## Issue 165 - Legacy Model Envanteri ve Deprecation Planı
 
 - [x] Repository model, helper, repository, runtime, test, schema/format ve dokümantasyon yüzeyi kanıta dayalı tarandı.
@@ -96,13 +107,13 @@ Gelişmiş hesap defteri ve immutable günlük yayınlama/revizyon zinciri, Issu
 
 ## Güncel Doğrulanmış Güvenli Nokta
 
-Issue #148, PR #164 ile merge edildi. `master` üzerindeki doğrulanmış merge commit'i:
+Issue #165, PR #166 ile merge edildi. `master` üzerindeki doğrulanmış merge commit'i:
 
 ```text
-4d31200753d8c24cefbce949849be67d1683b887
+cb344aded8d0b0d4f5ff340f08393f6dca06971a
 ```
 
-Issue #148'in local full-suite kanıtı `983 passed, 7 skipped` sonucudur. Issue #165 bu commit'ten başlayan documentation/state-only inventory işidir; merge edilene kadar current safe point'i ilerletmez.
+Issue #165'in local full-suite kanıtı `983 passed, 7 skipped` sonucudur. Issue #167 bu commit'ten başlayan documentation/state-only pilot-protocol işidir; merge edilene kadar current safe point'i ilerletmez.
 
 ## Tarihsel Roadmap Kaydı
 
