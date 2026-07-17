@@ -1,5 +1,17 @@
 # Changelog
 
+## Issue 148 - Backup, Hafızayı İndir ve Proje Paketi Ayrım ADR'si
+
+- Backup, Hafızayı İndir, Proje Paketi ve mevcut Günlük Çıktı; amaç, veri kapsamı, kullanıcı beklentisi, restore/paylaşım garantisi ve privacy sınırı bakımından dört ayrı artifact ailesi olarak kesinleştirildi.
+- Backup eksiksiz felaket kurtarma olarak bütün `private` ve `project` kaynakları, event/archive geçmişini ve yönetilen attachment'ları taşımaya devam eder; filtreli/kısmi Backup ve Backup'ı paylaşılabilir proje çıktısı gibi sunmak reddedildi.
+- Hafızayı İndir bütün owner hafızasının insan/makine tarafından okunabilir kişisel arşivi olarak tanımlandı; iki scope, bütün türler, source içerik, event geçmişi ve attachment inventory/dosyaları zorunlu tutuldu, Restore/import garantisi verilmedi.
+- Proje Paketi yalnız seçilen tek projedeki source'tan yeniden doğrulanmış `scope=project` kayıtlar için bağlandı. Project ID'nin tek başına yeterli olmadığı; scope, revision, archive, status, reference, attachment ve publication guard'larının fail-closed çalışacağı kararlaştırıldı.
+- `backup_format_version`, `memory_download_format_version`, `project_package_format_version` ve `daily_export_format_version` bağımsız namespace'leri seçildi. Mevcut Backup v1 anahtarı ve Günlük Çıktı v1'in tarihsel `format_version` wire anahtarı değiştirilmedi.
+- Aileye özgü exact manifest, canonical entry sırası, uncompressed byte üzerinde SHA-256/size, unsafe/duplicate/extra entry reddi, backward compatibility ve bilinmeyen sürümde fail-closed kuralları kaydedildi.
+- Backup Restore güvenliği, Hafızayı İndir artifact bütünlüğü ve Proje Paketi source eligibility/privacy doğrulaması ayrı verifier sorumlulukları olarak ayrıldı; hiçbir verifier source mutation veya sessiz repair yapamaz.
+- Mevcut şifresiz Backup/Günlük Çıktı davranışı korunurken future encryption yönü Backup ve Hafızayı İndir için zorunlu, Proje Paketi ve Günlük Çıktı için ayrı/opsiyonel envelope politikası olarak kaydedildi; key recovery ayrı implementation işinde bırakıldı.
+- Production Python, test, schema, migration, persistence, UI, route, CLI, backup/export wire formatı ve gerçek kullanıcı verisi değiştirilmedi; bağlayıcı karar ve executable acceptance matrisi `docs/adr/ADR-0003-backup-memory-download-project-package.md` içinde toplandı.
+
 ## Issue 147 - MemoryIndex / RecordRef Read-Model ADR'si
 
 - Observation, follow-up ve routine occurrence kaynaklarını tek source tabloya taşımadan ortak Hafıza listeleme, filtreleme, literal arama, timeline ve diagnostic yüzeylerine bağlayan yeniden üretilebilir `MemoryIndex / RecordRef` sözleşmesi kabul edildi.

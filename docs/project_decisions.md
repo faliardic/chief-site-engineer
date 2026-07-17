@@ -1,5 +1,25 @@
 # Proje Kararlari
 
+## Issue 148 - Backup, Hafızayı İndir ve Proje Paketi Kararları
+
+- Backup, Hafızayı İndir, Proje Paketi ve Günlük Çıktı aynı ZIP teknolojisini kullanabilse de dört ayrı artifact ailesidir; bir artifact yalnız tek aileye aittir ve manifest rename ile aileler arası conversion yapılamaz.
+- Backup yalnız eksiksiz felaket kurtarmadır: bütün `private` ve `project` source kayıtlar, append-only event geçmişleri, archive durumları ve yönetilen attachment'lar alınır. Tarih/proje/tür/scope filtresiyle kısmi Backup ve paylaşılabilir proje çıktısı iddiası yasaktır.
+- Restore garantisi yalnız desteklenen `backup_format_version`/schema, başarılı exact manifest-entry-checksum, SQLite integrity/migration/count, attachment reconciliation ve repository doğrulamasından sonra; yalnız yeni hedefte geçerlidir.
+- Hafızayı İndir bütün owner hafızasının insan ve makine tarafından okunabilir kişisel arşividir. İki scope, bütün desteklenen türler, source içerik, project/archive/status/revision, event geçmişi, attachment inventory ve doğrulanmış managed attachment byte'ları taşınır; Restore veya import garantisi yoktur.
+- Proje Paketi tek seçilmiş proje için paylaşılabilir teslim/rapor artifact'ıdır. Dahil edilen her kayıt source'tan yeniden okunarak `scope=project`, aynı selected project, revision/fingerprint, bilinen status/archive, allowlist reference, attachment ve publication guard'larından geçer; kanıt eksikse fail-closed reddedilir.
+- Terminal status archive değildir. Archive kayıtlar varsayılan Proje Paketi seçiminde dışarıda kalır; yalnız açık `include_archived=true` politikasıyla “Tarihsel Ek” inventory'sinde taşınabilir.
+- Project ID scope yerine geçmez. Private, başka projeye ait veya bilinmeyen reference/attachment içeriği Proje Paketi'ne warning/redaction ile sokulmaz; gerekli ilişki güvenle çözülemiyorsa bütün package başarısız olur.
+- Günlük Çıktı mevcut v1 observation/date/attachment-inventory hattında kalır. Daha geniş Proje Paketi'nin alt adı değildir; follow-up/routine private tracking byte-identical izolasyonu ve beş entry'li sözleşmesi değişmez.
+- Dört bağımsız namespace `backup_format_version`, `memory_download_format_version`, `project_package_format_version`, `daily_export_format_version` olarak kabul edildi. Mevcut Günlük Çıktı v1'in tarihsel wire anahtarı `format_version` kalır; rename ayrı v2 implementation ister.
+- Backup v1 ve Günlük Çıktı v1 strict manifest/entry alanları genişletilmez. Hafızayı İndir ve Proje Paketi ilk implementation'ları kendi namespace'lerinde v1 ile başlar ve açık family discriminator taşır.
+- Payload checksum'ı uncompressed entry byte'ları üzerinde lowercase SHA-256 ve byte size'dır. Manifest kendisini checksum listesine almaz; duplicate, case-collision, unsafe, symlink, missing veya extra entry extraction/aktivasyon öncesi reddedilir.
+- Deterministic paketleme mevcut Backup/Günlük sırasını korur; future Hafızayı İndir/Proje Paketi manifest-first ve canonical UTF-8 path sırası kullanır. Sabit source/clock/id ile byte-identical artifact test edilmelidir.
+- Backup'ı Doğrula Restore güvenliğini; Hafızayı İndir verifier'ı kişisel arşiv bütünlüğünü; Proje Paketi preflight/verifier'ı source eligibility ve offline privacy tutarlılığını doğrular. Verifier'lar birbirinin artifact'ını kabul etmez, source/artifact repair veya mutation yapmaz.
+- Bilinmeyen aile/version, eksik eligibility kanıtı veya manifest/file çelişkisi fail-closed reddedilir; fallback parser veya alan tahmini kullanılmaz.
+- Mevcut şifresiz Backup v1 ve Günlük Çıktı v1 değişmez. Future encrypted format yönü Backup ve Hafızayı İndir için zorunlu; Proje Paketi ve Günlük Çıktı için teslim kanalına bağlı opsiyonel outer envelope'dur. Algorithm, KDF ve key recovery ayrı executable Issue ister.
+- Kullanıcı dili `Backup`, `Backup'ı Doğrula`, `Restore`, `Hafızayı İndir`, `Proje Paketi`, `Günlük Çıktı`, `Manifest`, `Format Sürümü`, `Bütünlük Doğrulaması` olarak sabitlendi; “Devir paketi”, “handover backup” ve “tam proje yedeği” yeni ürün dili değildir.
+- Issue #148 production kodu, test, schema, migration, persistence, UI, route, CLI, wire format, encryption veya gerçek kullanıcı verisi uygulamaz.
+
 ## Issue 147 - MemoryIndex / RecordRef Read-Model Kararları
 
 - `MemoryIndex`, ayrı observation/follow-up/routine occurrence domain kaynaklarından üretilen, source of truth olmayan ve tamamen yeniden kurulabilen ortak Hafıza read-model'idir. `RecordRef` source mutation veya otomatik repair yapamaz.
