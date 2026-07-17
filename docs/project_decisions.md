@@ -1,5 +1,19 @@
 # Proje Kararlari
 
+## Issue 165 - Legacy Model Envanteri ve Deprecation Kararları
+
+- Sınıflandırma dosya yaşına veya adına göre değil; production import/call site, test/fixture/smoke/acceptance, schema/migration/restore, Backup/export/parser, kanonik doküman ve uygulanmış replacement kanıtlarının birlikte okunmasıyla yapılır.
+- Dört exact sınıf `Aktif çekirdek`, `Dönüştürülecek`, `Legacy / arşivlenecek` ve `Silme adayı`dır. Replacement yalnız ADR'de tanımlıysa değil, executable implementation ve kabul testleri varsa “mevcut” sayılır.
+- `app/models.py` tek sınıfa alınmaz. `FieldObservationRecord` çalışan source model olarak `Dönüştürülecek`; eski prototip, NCR, attachment, audit, record-ID, export ve handover helper kümeleri ise ayrı legacy inventory satırlarıdır.
+- SQLite schema v4, immutable v1-v4 migration geçmişi, schema 2/3 restore desteği, repository/mapper/UoW, managed attachment store, Backup v1 ve Günlük Çıktı v1 runtime veya backward compatibility nedeniyle aktif çekirdektir.
+- Observation, follow-up ve routine source/application/web yüzeyleri silinmez veya tek tabloya taşınmaz; ADR-0001 scope ve ADR-0002 transactional projection gereksinimleri ayrı migration/implementation Issue'larıyla eklenir.
+- Legacy handover QC/export helper zinciri, ADR-0003 Proje Paketi builder/verifier'ına rename edilmez. Yeni artifact ailesi ayrı namespace, source revalidation, manifest ve privacy acceptance ile uygulanır.
+- Bir symbol/path ancak production, test/fixture, CLI/web/runtime, schema/migration/restore, Backup/export/parser ve current canonical docs bağları sıfır; replacement executable; eski veri/backward-compatibility etkisi açıklanmışsa `Silme adayı` olabilir.
+- Bilinmeyen consumer veya compatibility etkisi fail-closed biçimde `Legacy / arşivlenecek` sonucunu korur. Issue #165 incelemesinde bütün olası gruplar en az bir kapıya takıldığı için doğrulanmış silme adayı yoktur.
+- Learning, podcast, numaralı docs ve tamamlanmış `.cse` kayıtları current product authority değildir; fakat provenance olabilir. Canonical/superseded/archive index ve referans grafiği olmadan toplu silinmez.
+- Current kullanıcı dili owner-only Tek Hafıza, `private | project`, Backup, Hafızayı İndir, Proje Paketi ve Günlük Çıktı sözlüğünü kullanır. `multi-user`, “özel alan”, handover/devir paketi, `blocked`, hard-validation ve generic export dili current yüzeylerde büyütülmez; tarihsel metin doğru provenance etiketiyle korunabilir.
+- Issue #165 production kodu, test, schema, migration, persistence, UI, route, CLI, backup/export formatı, ADR veya gerçek kullanıcı verisi değiştirmez; fiziksel silme/rename/move ayrı açık Issue ve rollback planı ister.
+
 ## Issue 148 - Backup, Hafızayı İndir ve Proje Paketi Kararları
 
 - Backup, Hafızayı İndir, Proje Paketi ve Günlük Çıktı aynı ZIP teknolojisini kullanabilse de dört ayrı artifact ailesidir; bir artifact yalnız tek aileye aittir ve manifest rename ile aileler arası conversion yapılamaz.

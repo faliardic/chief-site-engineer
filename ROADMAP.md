@@ -8,7 +8,7 @@
 2A. [x] İlk test edilebilir PC Saha Takibi web yüzeyi — Issue #119 / PR #126 ile merge edildi. Bugün, Unutma Kutusu, hızlı yakalama, follow-up yaşam döngüsü, rutinler, occurrence işlemleri, restart kalıcılığı ve resmî export izolasyonu doğrulandı.
 3. [ ] Issue #127 uygulanabilir geliştirme programını bağımlılık sırasıyla yürüt.
 
-Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme programı Issue #127'dir. Issue #141 ve #143 repository/workflow truth işlerinden sonra Issue #145 / PR #146 Tek Hafıza ve kayıt kapsamı, Issue #147 / PR #159 ise `MemoryIndex / RecordRef` read-model ADR'sini merge etmiştir. Faz 0'ın tek aktif işi Issue #148 ile production davranışı değiştirmeyen Backup / Hafızayı İndir / Proje Paketi ayrım ADR'sidir. Açık faz Epic'leri aynı anda aktif production işleri değildir; aynı anda yalnız bir production implementation görevi yürütülür.
+Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme programı Issue #127'dir. Issue #141 ve #143 repository/workflow truth işlerinden sonra Issue #145 / PR #146 Tek Hafıza ve kayıt kapsamı, Issue #147 / PR #159 `MemoryIndex / RecordRef` read-model, Issue #148 / PR #164 ise Backup / Hafızayı İndir / Proje Paketi ayrım ADR'sini merge etmiştir. Faz 0'ın tek aktif işi Issue #165 ile production davranışı değiştirmeyen legacy model envanteri ve deprecation planıdır. Açık faz Epic'leri aynı anda aktif production işleri değildir; aynı anda yalnız bir production implementation görevi yürütülür.
 
 ## Issue #127 Faz Haritası
 
@@ -26,7 +26,7 @@ Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürüt
 - [ ] Issue #139 — Faz 11: deterministik arama, semantik geri çağırma ve kaynaklı AI.
 - [ ] Issue #140 — Faz 12: owner-only güvenlik, bakım, güncelleme ve ürünleştirme.
 
-Issue #141, Faz 0'ın ilk dar repository truth görevi olarak tamamlandı. Issue #145 / PR #146 Tek Hafıza UX ile `private | project` kayıt kapsamını, Issue #147 / PR #159 ise ortak `MemoryIndex / RecordRef` read-model sözleşmesini kesinleştirdi. Aktif Issue #148 Backup / Hafızayı İndir / Proje Paketi çıktı ailelerini ve mevcut Günlük Çıktı sınırını ayırır. Bu ADR'ler veri modeli, schema veya production davranışını kendi başına uygulamaz.
+Issue #141, Faz 0'ın ilk dar repository truth görevi olarak tamamlandı. Issue #145 / PR #146 Tek Hafıza UX ile `private | project` kayıt kapsamını, Issue #147 / PR #159 ortak `MemoryIndex / RecordRef` read-model sözleşmesini, Issue #148 / PR #164 ise Backup / Hafızayı İndir / Proje Paketi çıktı aileleriyle mevcut Günlük Çıktı sınırını kesinleştirdi. Aktif Issue #165 bu kararların öncesinde oluşmuş model, helper, repository, compatibility ve tarihsel doküman yüzeylerini dört sınıfta envanterler; production davranışı uygulamaz.
 
 ## Issue 148 - Backup, Hafızayı İndir ve Proje Paketi Ayrım ADR'si
 
@@ -83,31 +83,26 @@ Issue #141, Faz 0'ın ilk dar repository truth görevi olarak tamamlandı. Issue
 
 Gelişmiş hesap defteri ve immutable günlük yayınlama/revizyon zinciri, Issue #127 programındaki ilgili sonraki fazlarda kalır; minimum hesap ve günlük taslağı ise mobil saha pilotu öncesi bütünleşik ürün kabulinin parçasıdır.
 
-## Legacy Model Envanteri ve Deprecation Görevi
+## Issue 165 - Legacy Model Envanteri ve Deprecation Planı
 
-Ayrı ve production koduna dokunmayan envanter görevi:
-
-- `TrackingRecord` / `TaskCandidateRecord` -> `FollowUpItem`;
-- `AttachmentRecord` / `FileAttachmentRecord` -> kalıcı attachment metadata/store;
-- `DailySiteLog` / `DailyReportRecord` -> gelecekte `DailyLogSnapshot`;
-- `ProjectPartyRecord` / `ContactPersonRecord` / `SupplierRecord` -> tek kişi/kurum referansı;
-- `MeetingActionRecord` / `RFIRecord` / `SubmittalRecord` -> not + takip + beklenen cevap ilişkisi;
-- karmaşık NCR prototip zinciri -> gözlem + aksiyon + kanıt + sonuç;
-- `app/records.py` in-memory repository'leri -> SQLite karşılıkları doğrulandıktan sonra deprecation.
-
-Sınıflandırma: `Aktif çekirdek`, `Dönüştürülecek`, `Legacy/arşivlenecek`, `Silme adayı`.
-
-Bu envanter fiziksel silme, rename, import taşıma veya test kaldırma yetkisi vermez.
+- [x] Repository model, helper, repository, runtime, test, schema/format ve dokümantasyon yüzeyi kanıta dayalı tarandı.
+- [x] Her inventory satırı `Aktif çekirdek`, `Dönüştürülecek`, `Legacy / arşivlenecek` veya `Silme adayı` sınıfına bağlandı.
+- [x] `app/models.py` dosya olarak topluca etiketlenmedi; aktif `FieldObservationRecord` ile legacy prototip/helper kümeleri symbol/section seviyesinde ayrıldı.
+- [x] SQLite migration/restore, Backup v1, Günlük Çıktı v1, managed attachment, launcher/ops/acceptance yüzeyleri compatibility dahil aktif çekirdek kabul edildi.
+- [x] Observation/follow-up/routine source/application/web yüzeyleri, ADR-0001/0002 yönüne kontrollü taşınacak çalışan kaynaklar olarak `Dönüştürülecek` sınıfına alındı.
+- [x] Eski modeller, in-memory repository'ler, attachment helper'ları, record-ID/export/handover zincirleri ve tarihsel docs/learning kayıtları bağımlılıkları nedeniyle `Legacy / arşivlenecek` sınıfında tutuldu.
+- [x] Bütün olası gruplar en az bir runtime, test, fixture, compatibility, provenance veya eksik replacement kapısına takıldığı için doğrulanmış `Silme adayı` sayısı sıfır olarak kaydedildi.
+- [x] Deprecation terminolojisi ve executable sonraki Issue sırası belirlendi; fiziksel silme, rename, import taşıma veya test kaldırma yapılmadı.
 
 ## Güncel Doğrulanmış Güvenli Nokta
 
-Issue #147, PR #159 ile merge edildi. `master` üzerindeki doğrulanmış merge commit'i:
+Issue #148, PR #164 ile merge edildi. `master` üzerindeki doğrulanmış merge commit'i:
 
 ```text
-8fb95811a2e55375081217470e90d7e8d385e8b2
+4d31200753d8c24cefbce949849be67d1683b887
 ```
 
-Issue #147'nin local full-suite kanıtı `983 passed, 7 skipped` sonucudur. Issue #148 bu commit'ten başlayan documentation/state-only ADR işidir; merge edilene kadar current safe point'i ilerletmez.
+Issue #148'in local full-suite kanıtı `983 passed, 7 skipped` sonucudur. Issue #165 bu commit'ten başlayan documentation/state-only inventory işidir; merge edilene kadar current safe point'i ilerletmez.
 
 ## Tarihsel Roadmap Kaydı
 

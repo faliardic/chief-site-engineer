@@ -1,5 +1,16 @@
 # Changelog
 
+## Issue 165 - Legacy Model Envanteri ve Deprecation Planı
+
+- Model, helper, repository, application, persistence, operation, web/CLI, script, test, schema/format ve dokümantasyon yüzeyleri production import/call site, test/fixture, restore/export compatibility ve kanonik karar bağlarıyla envanterlendi.
+- Inventory satırları `Aktif çekirdek`, `Dönüştürülecek`, `Legacy / arşivlenecek` ve `Silme adayı` sınıflarıyla; replacement, future action, removal gate ve removal risk alanlarıyla kaydedildi.
+- `app/models.py` içindeki aktif `FieldObservationRecord` symbol'ü legacy prototip ve helper kümelerinden ayrıldı; dosyanın tamamını tek sınıfa koyan yanlış genelleme yapılmadı.
+- SQLite schema/migration/UoW, managed attachment, Backup v1, Günlük Çıktı v1, launcher, ops ve acceptance yüzeyleri runtime veya compatibility için aktif çekirdek olarak korundu.
+- Observation/follow-up/routine source/application/web yüzeyleri ADR-0001 scope ve ADR-0002 projection yönüne ayrı executable Issue'larla taşınmak üzere `Dönüştürülecek` sınıfına alındı.
+- Eski model/NCR/attachment kayıtları, in-memory repository'ler, record-ID/soft-validation/export/handover helper'ları, ilk smoke entry point'i ve tarihsel docs/learning/task/result yüzeyleri direct test, eksik replacement, format veya provenance bağları nedeniyle `Legacy / arşivlenecek` kaldı.
+- Bütün incelenen legacy gruplar en az bir kaldırma kapısında başarısız olduğu için doğrulanmış `Silme adayı` sayısı sıfırdır; fiziksel silme, rename, move, production/test/schema/format değişikliği yapılmadı.
+- Legacy provenance, schema/Backup/export/restore riskleri, terminoloji deprecation sırası ve on executable takip işi `docs/165_legacy_model_inventory_and_deprecation_plan.md` içinde belgelendi.
+
 ## Issue 148 - Backup, Hafızayı İndir ve Proje Paketi Ayrım ADR'si
 
 - Backup, Hafızayı İndir, Proje Paketi ve mevcut Günlük Çıktı; amaç, veri kapsamı, kullanıcı beklentisi, restore/paylaşım garantisi ve privacy sınırı bakımından dört ayrı artifact ailesi olarak kesinleştirildi.
