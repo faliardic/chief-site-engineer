@@ -1,73 +1,51 @@
 {
   "state_version": 2,
   "legacy_last_numbered_step": 225,
-  "current_issue": 119,
+  "current_issue": 141,
   "base_branch": "master",
-  "base_commit": "3f71ed220ab595045ae8fd59303a048b53534e24",
+  "base_commit": "1d4b2b7f9ace5e7d474c4893d24404ceae2faede",
   "active_work": {
-    "issue": 119,
-    "supporting_finalization_issue": 125,
-    "type": "first_testable_pc_field_tracking_ui",
-    "issue_state": "completed",
-    "review_status": "ready_for_pull_request_review_not_merged",
-    "binding_epic": 105,
+    "issue": 141,
+    "type": "repository_truth_roadmap_sync",
+    "issue_state": "active",
+    "review_status": "local_verified_not_yet_published",
+    "binding_execution_epic": 127,
+    "binding_phase_epic": 128,
+    "product_epic": 105,
     "field_tracking_epic": 97,
-    "branch": "codex/issue-119-first-testable-pc-field-tracking-ui",
-    "base_commit": "3f71ed220ab595045ae8fd59303a048b53534e24",
-    "interrupted_wip_checkpoint_commit": "37f905e9d30255c39edc1db6ea4125544531c8d8",
-    "last_verified_implementation_head": "a809d90d81b89ffee976b6cdee357f39e3fec941",
-    "final_documentation_commit_evidence_location": "GitHub Issue #119 and Issue #125 completion comments after push",
+    "branch": "codex/issue-141-repository-truth-roadmap-sync",
+    "base_commit": "1d4b2b7f9ace5e7d474c4893d24404ceae2faede",
     "commit_strategy": "one_ordinary_commit_without_amend_rebase_or_force_push",
     "schema_version": 4,
     "backup_format_version": 1,
     "daily_export_format_version": 1,
     "restorable_schema_versions": [2, 3, 4],
-    "production_behavior_changed": true,
-    "follow_up_application_service_core_implemented": true,
-    "terminal_lifecycle_implemented": true,
-    "observation_link_or_conversion_implemented": true,
-    "routine_application_service_implemented": true,
-    "seven_day_lazy_backfill_implemented": true,
-    "web_ui_implemented": true,
-    "today_dashboard_implemented": true,
-    "quick_capture_and_inbox_implemented": true,
-    "follow_up_detail_and_lifecycle_ui_implemented": true,
-    "routine_and_occurrence_ui_implemented": true,
-    "restart_persistence_verified": true,
-    "schema_two_and_three_restore_migration_implemented": true,
-    "schema_four_tracking_round_trip_verified": true,
-    "official_daily_export_tracking_isolation_verified": true,
-    "export_production_code_changed": false,
-    "migration_statements_changed": false,
+    "production_behavior_changed": false,
     "real_user_data_root_accessed": false,
     "merge_claim": false,
     "pull_request_created": false,
-    "focused_test_summary": "17 passed in 1.93s",
-    "related_regression_test_summary": "56 web/observation/backup/export tests passed in 6.00s",
-    "full_test_summary": "983 passed, 7 skipped in 24.38s",
-    "schema_version_unchanged": true,
-    "repository_ports_unchanged": true,
+    "full_test_summary": "983 passed, 7 skipped in 32.05s",
     "compileall_passed": true,
     "state_json_valid": true,
     "diff_check_passed": true,
-    "verification_status": "issue_119_complete_ready_for_pull_request_review_not_merged"
+    "protected_path_diff_empty": true,
+    "local_verification_status": "passed",
+    "publication_status": "not_yet_committed_or_pushed"
   },
   "current_safe_point": {
     "semantics": "latest_merged_finalized_checkpoint",
-    "step": 225,
-    "step_semantics": "last_legacy_numbered_step_preceding_issue_centered_workflow",
-    "issue": 117,
+    "issue": 119,
     "issue_state": "completed",
-    "pull_request": 118,
+    "pull_request": 126,
     "pull_request_state": "merged",
-    "merge_commit": "3f71ed220ab595045ae8fd59303a048b53534e24",
-    "local_test_summary": "966 passed, 7 skipped (Issue #117 completion evidence)"
+    "merge_commit": "1d4b2b7f9ace5e7d474c4893d24404ceae2faede",
+    "local_test_summary": "983 passed, 7 skipped in 32.05s (Issue #141 local rerun)"
   },
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
-    "local_master_sha": "3f71ed220ab595045ae8fd59303a048b53534e24",
-    "origin_master_sha": "3f71ed220ab595045ae8fd59303a048b53534e24",
+    "local_master_sha": "1d4b2b7f9ace5e7d474c4893d24404ceae2faede",
+    "origin_master_sha": "1d4b2b7f9ace5e7d474c4893d24404ceae2faede",
     "divergence": "0 0",
     "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
     "misspelled_workspace_present": false,
@@ -662,7 +640,7 @@
     "workflow_changed": false
   },
   "product_maturity": {
-    "state": "local_field_mvp_with_first_testable_pc_field_tracking_ui_complete_on_unmerged_branch",
+    "state": "local_field_mvp_with_first_testable_pc_field_tracking_ui_merged",
     "field_ready_application": false,
     "production_ready_application": false,
     "product_identity": "local_first_mobile_first_single_owner_personal_field_assistant",
@@ -672,8 +650,8 @@
     "other_people_and_companies_are": "record_references_not_system_users",
     "official_personal_boundary": "export_and_handover_scope_not_access_role",
     "first_testable_pc_field_tracking_version": true,
-    "first_testable_pc_field_tracking_ready_for_pr_review": true,
-    "first_testable_pc_field_tracking_merged": false,
+    "first_testable_pc_field_tracking_ready_for_pr_review": false,
+    "first_testable_pc_field_tracking_merged": true,
     "local_first_semantics": "owner_devices_and_owner_data_not_windows_first",
     "single_owner_security_direction": [
       "application_lock_and_device_biometrics_when_available",
@@ -704,7 +682,11 @@
       "search",
       "daily_export",
       "backup_verify_isolated_restore",
-      "windows_launcher"
+      "windows_launcher",
+      "today_dashboard",
+      "quick_capture_and_forget_me_not_inbox",
+      "follow_up_detail_and_lifecycle_ui",
+      "routine_template_and_occurrence_ui"
     ],
     "field_tracking_completed": [
       "domain_and_recurrence",
@@ -731,7 +713,8 @@
   "first_testable_pc_field_tracking_ui": {
     "issue": 119,
     "branch": "codex/issue-119-first-testable-pc-field-tracking-ui",
-    "status": "completed_ready_for_pull_request_review_not_merged",
+    "status": "merged_via_pull_request_126",
+    "merge_commit": "1d4b2b7f9ace5e7d474c4893d24404ceae2faede",
     "surfaces": [
       "today",
       "forget_me_not_inbox",
@@ -746,20 +729,21 @@
     "mobile_runtime_included": false,
     "offline_sync_notifications_or_auth_included": false
   },
-    "binding_product_roadmap": [
-      "phase_0_issue_103_single_owner_direction_correction",
-      "phase_1_field_tracking_transactional_service_and_seven_day_lazy_backfill",
-      "phase_2_backup_restore_compatibility_and_official_export_isolation",
-      "phase_3_mobile_runtime_and_data_ownership_adr",
-      "phase_4_mobile_first_paperless_field_slice",
-      "phase_5_offline_and_notification_reliability",
-      "phase_6_seven_day_real_field_pilot",
-      "phase_7_thirty_day_primary_app_pilot",
-      "phase_8_advanced_engineering_calculator_notebook",
-      "phase_9_daily_site_log_publish_and_revision_chain",
-      "phase_10_live_project_map",
-      "phase_11_usage_proven_personal_helper_tools",
-      "phase_12_personal_ai_assistant"
+    "binding_execution_program": 127,
+    "binding_phase_roadmap": [
+      "phase_0_issue_128_repository_truth_adrs_and_execution_ground",
+      "phase_1_issue_129_reliable_memory_lifecycle_and_common_record_view",
+      "phase_2_issue_130_complete_memory_download_validation_and_recovery",
+      "phase_3_issue_131_mobile_runtime_offline_reliability_and_field_pilots",
+      "phase_4_issue_132_command_center_timeline_and_weekly_summary",
+      "phase_5_issue_133_document_report_and_drawing_center",
+      "phase_6_issue_134_site_plan_lite_and_two_week_lookahead",
+      "phase_7_issue_135_work_package_engine_and_concrete_package",
+      "phase_8_issue_136_field_calculations_and_guided_manual_quantity_takeoff",
+      "phase_9_issue_137_pdf_first_drawing_quantity_takeoff_and_validation",
+      "phase_10_issue_138_external_app_device_share_and_safe_import",
+      "phase_11_issue_139_deterministic_search_semantic_retrieval_and_sourced_ai",
+      "phase_12_issue_140_owner_only_security_maintenance_update_and_productization"
     ],
     "initial_mobile_field_slice": [
       "quick_capture_and_forget_me_not",
@@ -802,12 +786,13 @@
     "podcast_035_created_in_step_225": true,
     "strict_podcast_note_prior_step_summary_contract_implemented_in_step_225": true,
     "field_mvp_product_behavior_added_in_step_225": false,
-    "next_product_direction": {
-      "name": "mobile_runtime_and_data_ownership_adr",
+    "active_program_work": {
+      "issue": 141,
+      "name": "repository_truth_and_execution_roadmap_sync",
       "scope": [
-        "phone_or_pc_primary_data_device_decision",
-        "offline_storage_and_owner_only_sync_boundary",
-        "attachment_backup_notification_and_device_security_boundary"
+        "merged_safe_point_sync",
+        "current_documentation_and_state_sync",
+        "phase_issue_map_visibility"
       ]
     },
     "field_observation_record_contract": {
@@ -1007,11 +992,11 @@
     }
   },
   "protected_paths": {
-    "app_and_tests": "must_remain_unchanged_in_issue_125_documentation_only_finalization",
-    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "unchanged_in_issue_119_and_issue_125",
-    "backup_and_export_production": "unchanged_in_issue_119_and_issue_125",
-    ".github/workflows": "unchanged_in_issue_119_and_issue_125",
-    "requirements.txt": "unchanged_in_issue_119_and_issue_125",
+    "app_and_tests": "must_remain_unchanged_in_issue_141_repository_truth_sync",
+    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_141",
+    "backup_and_export_production": "must_remain_unchanged_in_issue_141",
+    ".github/workflows": "must_remain_unchanged_in_issue_141",
+    "requirements.txt_and_pyproject.toml": "must_remain_unchanged_in_issue_141",
     "reports": "user_files_preserved_untracked_and_unchanged",
     "exports/.gitkeep": "must_remain_present_and_unchanged",
     "ignored_zip_and_cache": "must_remain_unchanged"
@@ -1028,20 +1013,17 @@
     "pull_request_creation_by_codex": false,
     "merge_authorized": false,
     "branch_deletion_authorized": false,
-    "final_remote_sha_evidence_location": "GitHub Issue #119 and Issue #125 completion comments after push"
+    "final_remote_sha_evidence_location": "GitHub Issue #141 completion comment after push"
   },
   "required_files": [
-    ".cse/tasks/119_task.md",
-    ".cse/results/119_result.md",
-    ".cse/tasks/125_task.md",
-    ".cse/results/125_result.md",
+    ".cse/tasks/141_task.md",
+    ".cse/results/141_result.md",
     ".cse/state/project_state.json",
+    "README.md",
     "ROADMAP.md",
     "CHANGELOG.md",
-    "docs/project_decisions.md",
-    "learning/GLOSSARY.md",
-    "learning/issue_119_first_testable_pc_field_tracking_ui.md"
+    "docs/project_decisions.md"
   ],
-  "workflow_status": "issue_119_completed_ready_for_pull_request_review_not_merged",
+  "workflow_status": "issue_141_local_verified_not_yet_published",
   "forbidden_scope_added": false
 }

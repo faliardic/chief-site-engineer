@@ -2560,3 +2560,14 @@
 - Schema `4`, domain/application/persistence/operations sözleşmeleri, backup/export formatları, requirements ve workflow bu UI görevinde değişmeyecek.
 - Mobile runtime, PWA, offline, sync, notification, auth ve gerçek kullanıcı data root'u ilk test edilebilir PC sürümünün kapsamı dışında kalacak.
 - Issue #119 branch'i testleri geçmiş ve PR incelemesine hazır olabilir; PR oluşturulmadan ve merge edilmeden repository state merge claim taşımayacak.
+
+## Issue 141 — Repository Truth ve Execution Roadmap Kararları
+
+- Güncel merged head, Issue #119 / PR #126 / merge commit `1d4b2b7f9ace5e7d474c4893d24404ceae2faede` olarak kabul edilecek.
+- Issue #127 execution programı, bağlayıcı ürün Epic'i #105'i değiştirmeden uygulanabilir bağımlılık ve faz sırası sağlar.
+- Issue #128–#140 açık faz backlog'udur; bu Issue'ların açık olması aynı anda aktif production işi oldukları anlamına gelmez.
+- Aynı anda yalnız bir aktif production implementation görevi kuralı korunur.
+- İlk aktif iş Issue #141 repository truth ve roadmap/state senkronizasyonudur; bu iş production davranışı eklemez.
+- Tek Hafıza UX ve `private | project` kapsamı, `MemoryIndex` / `RecordRef` read-model'i ile Backup / Hafızayı İndir / Proje Paketi ayrımları sonraki ayrı ADR Issue'larında kesinleştirilecek; Issue #141 veri modeli davranışını değiştirmez.
+- Mevcut kişisel takip ile proje/resmî kayıt ayrımı erişim rolü değil export/devir kapsamı olarak korunur; kişisel follow-up/routine verisi bu görevde resmî günlük export'a dahil edilmez.
+- Schema sürümü `4`, backup formatı `1` ve günlük export formatı `1` olarak korunur.

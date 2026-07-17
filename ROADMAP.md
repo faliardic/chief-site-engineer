@@ -5,21 +5,30 @@
 0. [x] Tek kullanıcılı kişisel saha asistanı yönünü kanonikleştir — Issue #103.
 1. [x] Saha Takibi transactional application service ve 7 günlük lazy backfill. Follow-up çekirdek dilimi Issue #109, waiting/terminal yaşam döngüsü Issue #111, observation link/conversion Issue #112 ve routine/backfill dilimi Issue #115 ile uygulandı.
 2. [x] Backup/restore compatibility ve resmî export izolasyonu — Issue #117 ile gerçek schema 2/3→4 restore, schema 4 tracking round-trip ve byte-identical resmî export regresyonları uygulandı.
-2A. [x] İlk test edilebilir PC Saha Takibi web yüzeyi — Issue #119 branch'inde Bugün, Unutma Kutusu, hızlı yakalama, follow-up yaşam döngüsü, rutinler, occurrence işlemleri ve restart kabulü tamamlandı; PR incelemesine hazır, henüz merge edilmedi.
-3. [ ] Mobil runtime ve veri sahipliği ADR.
-4. [ ] Mobil-first Kâğıdı Bırakma Sürümü.
-5. [ ] Offline ve bildirim güvenilirliği.
-6. [ ] 7 günlük gerçek saha pilotu.
-7. [ ] 30 günlük ana uygulama pilotu.
-8. [ ] Gelişmiş mühendislik hesap defteri.
-9. [ ] Günlük şantiye logu yayınlama/revizyon zinciri.
-10. [ ] Canlı Proje Haritası.
-11. [ ] Gerçek kullanımın kanıtladığı kişisel yardımcı araçlar.
-12. [ ] Kişisel AI asistanı.
+2A. [x] İlk test edilebilir PC Saha Takibi web yüzeyi — Issue #119 / PR #126 ile merge edildi. Bugün, Unutma Kutusu, hızlı yakalama, follow-up yaşam döngüsü, rutinler, occurrence işlemleri, restart kalıcılığı ve resmî export izolasyonu doğrulandı.
+3. [ ] Issue #127 uygulanabilir geliştirme programını bağımlılık sırasıyla yürüt.
 
-Bağlayıcı üst yol haritası GitHub Epic #105'tir. Saha Takibi domain/recurrence, SQLite persistence, iki transactional application service, yedi günlük lazy backfill, backup/restore–resmî export güvenlik kapısı ve ilk test edilebilir PC web yüzeyi tamamlanmıştır. Issue #119 merge edilmiş sayılmaz; PR incelemesine hazır aktif branch durumundadır. Sıradaki ayrı faz mobil runtime ve veri sahipliği ADR'sidir; mobil UI, offline/bildirim ve saha pilotları henüz tamamlanmamıştır.
+Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme programı Issue #127'dir. İlk aktif iş Issue #141 ile production davranışı değiştirmeyen repository truth/state senkronizasyonudur. Açık faz Epic'leri aynı anda aktif production işleri değildir; aynı anda yalnız bir production implementation görevi yürütülür.
 
-## Faz 4 Minimum Kâğıdı Bırakma Kapsamı
+## Issue #127 Faz Haritası
+
+- [ ] Issue #128 — Faz 0: repository truth, ADR'ler ve yürütme zemini.
+- [ ] Issue #129 — Faz 1: Güvenilir Hafıza yaşam döngüsü ve ortak kayıt görünümü.
+- [ ] Issue #130 — Faz 2: Tam Hafıza İndirme, doğrulama ve kurtarma standardı.
+- [ ] Issue #131 — Faz 3: mobil runtime, offline güvenilirlik ve gerçek saha pilotları.
+- [ ] Issue #132 — Faz 4: şantiye komuta merkezi, ortak timeline ve haftalık özet.
+- [ ] Issue #133 — Faz 5: doküman, rapor ve çizim merkezi.
+- [ ] Issue #134 — Faz 6: Şantiye İş Planı Lite ve iki haftalık lookahead.
+- [ ] Issue #135 — Faz 7: İş Paketi Motoru ve Beton İş Paketi.
+- [ ] Issue #136 — Faz 8: saha hesap araçları ve yönlendirmeli manuel metraj.
+- [ ] Issue #137 — Faz 9: PDF-first çizim destekli metraj ve doğrulama.
+- [ ] Issue #138 — Faz 10: haricî uygulama, cihaz paylaşımı ve güvenli içe aktarma bağlantıları.
+- [ ] Issue #139 — Faz 11: deterministik arama, semantik geri çağırma ve kaynaklı AI.
+- [ ] Issue #140 — Faz 12: owner-only güvenlik, bakım, güncelleme ve ürünleştirme.
+
+Issue #141, Faz 0'ın ilk dar görevidir ve bu roadmap/state senkronizasyonu sırasında veri modeli, schema, backup/export formatı veya production davranışı değiştirmez. Tek Hafıza UX, `MemoryIndex` / `RecordRef` ve Backup / Hafızayı İndir / Proje Paketi ayrımları sonraki ADR Issue'larında kesinleştirilecektir.
+
+## Mobil Saha Pilotu Öncesi Minimum Kâğıdı Bırakma Kapsamı
 
 İlk gerçek saha pilotundan önce aynı mobil-first ürün diliminde:
 
@@ -33,7 +42,7 @@ Bağlayıcı üst yol haritası GitHub Epic #105'tir. Saha Takibi domain/recurre
 - arama;
 - backup durumu/görünürlüğü.
 
-Gelişmiş hesap defteri Faz 8'de, immutable günlük yayınlama/revizyon zinciri Faz 9'da kalır; minimum hesap ve günlük taslağı ise Faz 4'ün parçasıdır.
+Gelişmiş hesap defteri ve immutable günlük yayınlama/revizyon zinciri, Issue #127 programındaki ilgili sonraki fazlarda kalır; minimum hesap ve günlük taslağı ise mobil saha pilotu öncesi bütünleşik ürün kabulinin parçasıdır.
 
 ## Legacy Model Envanteri ve Deprecation Görevi
 
@@ -53,13 +62,13 @@ Bu envanter fiziksel silme, rename, import taşıma veya test kaldırma yetkisi 
 
 ## Güncel Doğrulanmış Güvenli Nokta
 
-Issue #102, PR #104 ile squash merge edildi. `master` üzerindeki doğrulanmış merge commit'i:
+Issue #119, PR #126 ile squash merge edildi. `master` üzerindeki doğrulanmış merge commit'i:
 
 ```text
-9b25152ae38b72470e332929cb3a30ff955b75f1
+1d4b2b7f9ace5e7d474c4893d24404ceae2faede
 ```
 
-Issue #103 yalnız kanonik dokümantasyon ve repository truth hizalamasıdır; production davranışını değiştirmez ve merge edilene kadar bu güvenli noktayı ilerletmez.
+PR #126 için doğrulanan kanıt `983 passed, 7 skipped` sonucudur. Issue #141 yalnız repository truth ve execution roadmap senkronizasyonudur; production davranışını değiştirmez ve merge edilene kadar bu güvenli noktayı ilerletmez.
 
 ## Tarihsel Roadmap Kaydı
 

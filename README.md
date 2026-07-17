@@ -48,9 +48,9 @@ Uygulama varsayılan olarak yalnız `127.0.0.1` loopback adresinde açılır. Lo
 `master` üzerindeki son doğrulanmış güvenli nokta:
 
 ```text
-Issue #102
-PR #104
-merge commit 9b25152ae38b72470e332929cb3a30ff955b75f1
+Issue #119
+PR #126
+merge commit 1d4b2b7f9ace5e7d474c4893d24404ceae2faede
 ```
 
 Local Field MVP bugün şunları sağlar:
@@ -66,9 +66,16 @@ Local Field MVP bugün şunları sağlar:
 - SQLite snapshot tabanlı backup, backup doğrulama ve yalnız yeni hedefe izole restore;
 - Windows tek tık launcher;
 - Saha Takibi v0.1 domain kayıtları ve saf `Europe/Istanbul` recurrence hesapları;
-- SQLite schema v3 içinde Saha Takibi repository ve append-only event persistence altyapısı.
+- SQLite schema v3 içinde Saha Takibi repository ve append-only event persistence altyapısı;
+- Saha Takibi transactional application service'leri ve yedi günlük idempotent lazy backfill;
+- schema 2/3 backup'larını schema 4'e güvenli restore etme ve schema 4 tracking round-trip doğrulaması;
+- kişisel follow-up/routine verisini resmî günlük export'tan ayrı tutan executable izolasyon regresyonu;
+- `/today` başlangıç ekranı ile Şimdi ilgilen, Gecikenler, Bugün ve Bugünkü rutinler görünümleri;
+- hızlı `+ Unutma`, Unutma Kutusu ve follow-up ayrıntı/yaşam döngüsü işlemleri;
+- rutin oluşturma, listeleme, ayrıntı, pasifleştirme ve occurrence sonuçlandırma/erteleme/yeniden açma yüzeyleri;
+- restart sonrasında aynı SQLite verisi, revision ve append-only event geçmişi kalıcılığı.
 
-Saha Takibi için domain/recurrence ve SQLite persistence tamamlanmıştır. Transactional application service, yedi günlük lazy backfill orchestration, eski backup uyumluluğu kabulü, resmî export izolasyonu regresyonu ve `+ Unutma` / `Bugün` / `Unutma Kutusu` kullanıcı arayüzü henüz tamamlanmamıştır.
+İlk test edilebilir PC Saha Takibi yüzeyi merge edilmiştir. Sıradaki bağlayıcı yürütme programı GitHub Issue #127, faz backlog'u ise Issue #128–#140'tır. Mobile runtime, offline/sync, notification, uygulama kilidi ve gerçek saha pilotları henüz tamamlanmamıştır.
 
 ## Saha Takibi v0.1
 
@@ -141,10 +148,10 @@ python -m pip install -r requirements.txt
 python -m pytest -rs
 ```
 
-Issue #103 branch'inde doğrulanan full-suite sonucu:
+Issue #119 / PR #126 için doğrulanan full-suite sonucu:
 
 ```text
-788 passed, 7 skipped in 16.66s
+983 passed, 7 skipped
 ```
 
 Yedi skip, Windows ortamında symlink oluşturma ayrıcalığı bulunmayan mevcut güvenlik testleridir.
@@ -155,33 +162,32 @@ Mevcut uygulama:
 
 - local ve tek kullanıcı odaklıdır;
 - public internet için uygun değildir;
-- auth, authorization ve TLS içermez;
 - mobile runtime, offline çalışma veya owner-only cihaz senkronizasyonu içermez;
 - background notification veya scheduler içermez;
-- Saha Takibi application service ve UI içermez;
+- uygulama kilidi, authentication, authorization veya TLS içermez;
 - gerçek saha pilotu ve kabulü tamamlanmadığı için field-ready veya production-ready olarak tanımlanmaz.
 
 `local-first`, `Windows-first` demek değildir. Verinin şantiye şefine ait olduğu ve kendi cihazlarında çalıştığı anlamına gelir. Mobil runtime, offline davranış, notification ve owner-only telefon-PC senkronizasyonu; çok kullanıcılı auth veya cloud collaboration ile aynı uzak hedef değildir.
 
-## Ürün sırası
+## Uygulanabilir geliştirme programı
 
-Bağlayıcı üst yol haritası GitHub Epic #105'tir:
+Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme programı Issue #127'dir. Faz backlog'u bağımlılık sırasıyla şöyledir:
 
-0. Tek kullanıcılı kişisel saha asistanı yönünü kanonikleştir — Issue #103.
-1. Saha Takibi transactional application service ve 7 günlük lazy backfill.
-2. Backup/restore compatibility ve resmî export izolasyonu.
-3. Mobil runtime ve veri sahipliği ADR.
-4. Mobil-first Kâğıdı Bırakma Sürümü.
-5. Offline ve bildirim güvenilirliği.
-6. 7 günlük gerçek saha pilotu.
-7. 30 günlük ana uygulama pilotu.
-8. Gelişmiş mühendislik hesap defteri.
-9. Günlük şantiye logu yayınlama/revizyon zinciri.
-10. Canlı Proje Haritası.
-11. Gerçek kullanımın kanıtladığı kişisel yardımcı araçlar.
-12. Kişisel AI asistanı.
+- Issue #128 — Faz 0: repository truth, ADR'ler ve yürütme zemini;
+- Issue #129 — Faz 1: Güvenilir Hafıza yaşam döngüsü ve ortak kayıt görünümü;
+- Issue #130 — Faz 2: Tam Hafıza İndirme, doğrulama ve kurtarma standardı;
+- Issue #131 — Faz 3: mobil runtime, offline güvenilirlik ve gerçek saha pilotları;
+- Issue #132 — Faz 4: şantiye komuta merkezi, ortak timeline ve haftalık özet;
+- Issue #133 — Faz 5: doküman, rapor ve çizim merkezi;
+- Issue #134 — Faz 6: Şantiye İş Planı Lite ve iki haftalık lookahead;
+- Issue #135 — Faz 7: İş Paketi Motoru ve Beton İş Paketi;
+- Issue #136 — Faz 8: saha hesap araçları ve yönlendirmeli manuel metraj;
+- Issue #137 — Faz 9: PDF-first çizim destekli metraj ve doğrulama;
+- Issue #138 — Faz 10: haricî uygulama, cihaz paylaşımı ve güvenli içe aktarma bağlantıları;
+- Issue #139 — Faz 11: deterministik arama, semantik geri çağırma ve kaynaklı AI;
+- Issue #140 — Faz 12: owner-only güvenlik, bakım, güncelleme ve ürünleştirme.
 
-Domain/recurrence ve SQLite persistence tamamlanmıştır; Faz 1 ve sonrası tamamlanmamıştır. Kâğıdı Bırakma Sürümü yalnız `+ Unutma` ekranından ibaret değildir: takip görünümleri, rutinler, attachment, arama ve backup görünürlüğünün yanında minimum hızlı hesap şeridi ile günlük zaman çizelgesi/düzenlenebilir taslak da ilk mobil saha pilotundan önce aynı bütünleşik yüzeyde bulunmalıdır.
+Bu backlog'un açık olması bütün fazların aynı anda aktif olduğu anlamına gelmez. Aynı anda yalnız bir production implementation görevi yürütülür; ilk aktif iş Issue #141 ile repository truth ve state senkronizasyonudur. Tek Hafıza, `MemoryIndex` ve Backup / Hafızayı İndir / Proje Paketi ayrımları sonraki dar ADR Issue'larında kesinleştirilecek, bu senkronizasyon veri modeli davranışını değiştirmeyecektir.
 
 ## Kaynak otoritesi
 
