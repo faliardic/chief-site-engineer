@@ -1,5 +1,16 @@
 # Proje Kararlari
 
+## Issue 145 - Tek Hafıza ve Kayıt Kapsamı Kararları
+
+- Kullanıcı ana navigasyonda ayrı kişisel/resmî uygulama dünyaları görmez; bütün kayıt türleri tek **Hafıza** arama ve timeline deneyiminde bulunabilir. Kaynak domain tabloları ve yaşam döngüleri tek tabloya birleştirilmez.
+- Kayıt türü ile `private | project` kapsamı ayrı kavramlardır. Kapsam erişim rolü, tenant, status veya encryption garantisi değil, resmî/proje çıktısına seçilebilme sınırıdır.
+- Proje bağlantısı kapsam değildir. Projesiz veya projeye bağlı private kayıt geçerlidir; project atama, observation link'i, AI, routine işlemi veya read-model rebuild sessiz kapsam dönüşümü yapamaz.
+- Gelecekteki backfill'de bütün observation kayıtları `project`; bütün follow-up, routine template ve routine occurrence kayıtları `private` olur. Observation'a bağlı veya `converted_to_observation` sonuçlu eski follow-up da private kalır; hedef observation ayrı project kaydıdır.
+- `private -> project` açık kullanıcı onayı, zorunlu project bağlantısı, optimistic revision ve aynı transaction'da append-only kapsam event'i gerektirir. Scope değişikliği kayıt türünü değiştirmez ve tek başına yayımlama sayılmaz.
+- Observation, project document/plan/work package ve yayımlanmış çıktı snapshot'ları `project -> private` olamaz. Çalışma kayıtlarında geri dönüş yalnız daha önce çıktı/reference olmadığının kanıtı, açık uyarı/onay, revision ve event ile mümkündür; kanıt yoksa fail-closed reddedilir.
+- Backup bütün private/project hafızayı felaket kurtarma için taşır. Hafızayı İndir iki kapsamı da açık etiketlerle içeren kişisel arşivdir. Proje Paketi, günlük ve rapor yalnız seçilen project bağlantısına sahip project kapsamlı kayıtları alır; private kayıt önce ayrı kapsam dönüşümü olmadan doğrudan seçilemez.
+- Mevcut schema, migration, observation/follow-up/routine davranışı, backup format `1` ve daily export format `1` değiştirilmedi. `MemoryIndex`, kapsam alanı, migration, UI ve çıktı formatları ayrı Issue'lara bırakıldı.
+
 ## Issue 112 - Follow-up Observation Link ve Conversion Kararları
 
 - Link ve conversion yeni command sınıfı gerektirmez; iki public service method'u mevcut canonical follow-up ID, observation ID ve expected revision değerlerini alır.

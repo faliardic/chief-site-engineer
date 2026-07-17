@@ -1,5 +1,14 @@
 # Changelog
 
+## Issue 145 - Tek Hafıza ve Kayıt Kapsamı ADR'si
+
+- Bütün observation, follow-up, routine occurrence ve gelecekteki kayıt türlerini ayrı uygulama dünyalarına bölmeden ortak **Hafıza** arama/timeline deneyiminde buluşturma kararı kabul edildi.
+- `private | project` kapsamı erişim rolü, tenant, lifecycle status veya project bağlantısı değil; resmî/proje çıktısı için paylaşım uygunluğu olarak tanımlandı.
+- Mevcut observation kayıtları için `project`; follow-up, routine template ve routine occurrence kayıtları için `private` başlangıç/backfill mapping'i bağlayıcı hale getirildi. Project bağlantısının veya observation link'inin kapsamı sessizce değiştirmeyeceği kaydedildi.
+- `private -> project` yalnız açık kullanıcı işlemi, güncel revision ve append-only event ile kabul edildi. `project -> private`, observation/yayımlanmış proje kayıtlarında yasak; yayımlanmamış çalışma kayıtlarında kanıtlanabilir publication/reference guard ile koşullu ve fail-closed olarak sınırlandı.
+- Backup'ın iki kapsamı da taşıdığı, Hafızayı İndir'in bütün hafızayı kapsam etiketiyle içerdiği, Proje Paketi/günlük/raporun ise yalnız seçilen projenin `project` kayıtlarını alabileceği kesinleştirildi. Private kaydın doğrudan çıktı seçimi reddedildi; önce açık kapsam dönüşümü zorunlu tutuldu.
+- Mevcut daily export takip/rutin izolasyonu, backup format `1`, schema `4`, source domain tabloları ve production davranışı değiştirilmedi. ADR sonraki migration, `MemoryIndex`, UI ve çıktı implementation görevleri için executable acceptance matrisi sağlıyor.
+
 ## Issue 141 - Repository Truth ve Execution Roadmap Senkronizasyonu
 
 - Issue #119'un ilk test edilebilir PC Saha Takibi web yüzeyi PR #126 ile `1d4b2b7f9ace5e7d474c4893d24404ceae2faede` merge commit'inde `master` üzerine alındı.

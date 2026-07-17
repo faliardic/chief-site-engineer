@@ -8,7 +8,7 @@
 2A. [x] İlk test edilebilir PC Saha Takibi web yüzeyi — Issue #119 / PR #126 ile merge edildi. Bugün, Unutma Kutusu, hızlı yakalama, follow-up yaşam döngüsü, rutinler, occurrence işlemleri, restart kalıcılığı ve resmî export izolasyonu doğrulandı.
 3. [ ] Issue #127 uygulanabilir geliştirme programını bağımlılık sırasıyla yürüt.
 
-Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme programı Issue #127'dir. İlk aktif iş Issue #141 ile production davranışı değiştirmeyen repository truth/state senkronizasyonudur. Açık faz Epic'leri aynı anda aktif production işleri değildir; aynı anda yalnız bir production implementation görevi yürütülür.
+Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme programı Issue #127'dir. Issue #141 repository truth/state senkronizasyonu ve Issue #143 ChatGPT kaynaklarının GitHub'a taşınması merge edilmiştir. Faz 0'ın tek aktif işi Issue #145 ile production davranışı değiştirmeyen Tek Hafıza ve kayıt kapsamı ADR'sidir. Açık faz Epic'leri aynı anda aktif production işleri değildir; aynı anda yalnız bir production implementation görevi yürütülür.
 
 ## Issue #127 Faz Haritası
 
@@ -26,7 +26,20 @@ Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürüt
 - [ ] Issue #139 — Faz 11: deterministik arama, semantik geri çağırma ve kaynaklı AI.
 - [ ] Issue #140 — Faz 12: owner-only güvenlik, bakım, güncelleme ve ürünleştirme.
 
-Issue #141, Faz 0'ın ilk dar görevidir ve bu roadmap/state senkronizasyonu sırasında veri modeli, schema, backup/export formatı veya production davranışı değiştirmez. Tek Hafıza UX, `MemoryIndex` / `RecordRef` ve Backup / Hafızayı İndir / Proje Paketi ayrımları sonraki ADR Issue'larında kesinleştirilecektir.
+Issue #141, Faz 0'ın ilk dar repository truth görevi olarak tamamlandı. Issue #145, Tek Hafıza UX ile `private | project` kayıt kapsamını kesinleştirir; `MemoryIndex` / `RecordRef` ve Backup / Hafızayı İndir / Proje Paketi format ayrımları sonraki ADR Issue'larında devam edecektir. Bu ADR'ler veri modeli, schema veya production davranışını kendi başına uygulamaz.
+
+## Issue 145 - Tek Hafıza ve Kayıt Kapsamı ADR'si
+
+- [x] Kullanıcı için ayrı kişisel/resmî uygulama dünyaları yerine tek **Hafıza** deneyimi kararlaştırıldı.
+- [x] Kayıt türü, kapsam ve proje bağlantısı birbirinden ayrıldı.
+- [x] `private | project` erişim rolü değil resmî/proje çıktısı uygunluğu olarak tanımlandı.
+- [x] Mevcut observation `project`; follow-up, routine template ve routine occurrence `private` başlangıç/backfill mapping'i kesinleştirildi.
+- [x] Project atama, observation link'i, AI ve routine işleminin sessiz kapsam dönüşümü yapmayacağı kaydedildi.
+- [x] `private -> project` için açık kullanıcı işlemi, revision ve append-only event; `project -> private` için kayıt türüne ve publication/reference kanıtına bağlı fail-closed sınır seçildi.
+- [x] Backup bütün kapsamları; Hafızayı İndir bütün hafızayı; Proje Paketi/günlük/rapor yalnız ilgili `project` kapsamını taşıyacak şekilde ayrıldı.
+- [x] Private kaydın resmî/proje çıktısına doğrudan seçimi yasaklandı; önce denetlenebilir kapsam dönüşümü zorunlu tutuldu.
+- [x] Migration, geriye uyumluluk, güvenlik, terminoloji, reddedilen alternatifler ve executable acceptance matrisi `docs/adr/ADR-0001-single-memory-and-record-scope.md` içinde kaydedildi.
+- [x] Production kodu, test, schema, migration, template, CSS, backup ve daily export formatı değiştirilmedi.
 
 ## Mobil Saha Pilotu Öncesi Minimum Kâğıdı Bırakma Kapsamı
 
@@ -62,13 +75,13 @@ Bu envanter fiziksel silme, rename, import taşıma veya test kaldırma yetkisi 
 
 ## Güncel Doğrulanmış Güvenli Nokta
 
-Issue #119, PR #126 ile squash merge edildi. `master` üzerindeki doğrulanmış merge commit'i:
+Issue #143, PR #144 ile squash merge edildi. `master` üzerindeki doğrulanmış merge commit'i:
 
 ```text
-1d4b2b7f9ace5e7d474c4893d24404ceae2faede
+c449762cbcc5685017d3b2f2d0292a2b039cae53
 ```
 
-PR #126 için doğrulanan kanıt `983 passed, 7 skipped` sonucudur. Issue #141 yalnız repository truth ve execution roadmap senkronizasyonudur; production davranışını değiştirmez ve merge edilene kadar bu güvenli noktayı ilerletmez.
+Issue #141'in son local full-suite kanıtı `983 passed, 7 skipped` sonucudur. Issue #143 yalnız ChatGPT kaynaklarını GitHub'a taşımıştır. Issue #145 bu commit'ten başlayan documentation/state-only ADR işidir; merge edilene kadar current safe point'i ilerletmez.
 
 ## Tarihsel Roadmap Kaydı
 
