@@ -1,20 +1,20 @@
 {
   "state_version": 2,
   "legacy_last_numbered_step": 225,
-  "current_issue": 169,
+  "current_issue": 171,
   "base_branch": "master",
-  "base_commit": "9036cee5524aa91ff1e9df92b538c4a7068c87ee",
+  "base_commit": "3024ea45421593cfd03375b8594832ce27d684ab",
   "active_work": {
-    "issue": 169,
-    "type": "owner_only_security_and_data_ownership_threat_model",
+    "issue": 171,
+    "type": "phase_0_closure_validation_and_phase_1_entry_gate",
     "issue_state": "active",
     "review_status": "local_verified_not_yet_published",
     "binding_execution_epic": 127,
     "binding_phase_epic": 128,
     "product_epic": 105,
     "field_tracking_epic": 97,
-    "branch": "codex/issue-169-owner-security-threat-model",
-    "base_commit": "9036cee5524aa91ff1e9df92b538c4a7068c87ee",
+    "branch": "codex/issue-171-phase-0-closure-validation",
+    "base_commit": "3024ea45421593cfd03375b8594832ce27d684ab",
     "commit_strategy": "one_ordinary_commit_without_amend_rebase_or_force_push",
     "schema_version": 4,
     "backup_format_version": 1,
@@ -26,7 +26,7 @@
     "real_user_data_root_accessed": false,
     "merge_claim": false,
     "pull_request_created": false,
-    "full_test_summary": "983 passed, 7 skipped in 28.63s",
+    "full_test_summary": "983 passed, 7 skipped in 22.31s",
     "compileall_passed": true,
     "state_json_valid": true,
     "diff_check_passed": true,
@@ -36,18 +36,18 @@
   },
   "current_safe_point": {
     "semantics": "latest_merged_finalized_checkpoint",
-    "issue": 167,
+    "issue": 169,
     "issue_state": "completed",
-    "pull_request": 168,
+    "pull_request": 170,
     "pull_request_state": "merged",
-    "merge_commit": "9036cee5524aa91ff1e9df92b538c4a7068c87ee",
-    "local_test_summary": "983 passed, 7 skipped in 20.07s (Issue #167 final verification; production and tests unchanged)"
+    "merge_commit": "3024ea45421593cfd03375b8594832ce27d684ab",
+    "local_test_summary": "983 passed, 7 skipped in 21.36s (Issue #169 final verification; production and tests unchanged)"
   },
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
-    "local_master_sha": "9036cee5524aa91ff1e9df92b538c4a7068c87ee",
-    "origin_master_sha": "9036cee5524aa91ff1e9df92b538c4a7068c87ee",
+    "local_master_sha": "3024ea45421593cfd03375b8594832ce27d684ab",
+    "origin_master_sha": "3024ea45421593cfd03375b8594832ce27d684ab",
     "divergence": "0 0",
     "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
     "misspelled_workspace_present": false,
@@ -209,6 +209,11 @@
       "model": "standart full Codex",
       "reasoning": "high",
       "reason": "documentation_only_owner_security_threat_model_assets_trust_boundaries_data_ownership_risk_stop_gates_and_phase_twelve_executable_acceptance"
+    },
+    "issue_171_selection": {
+      "model": "standart full Codex",
+      "reasoning": "high",
+      "reason": "documentation_state_only_phase_zero_closure_four_adr_cross_links_repository_truth_github_epic_alignment_and_single_phase_one_entry_gate"
     }
   },
   "required_source_pre_read": {
@@ -670,6 +675,19 @@
             "backup_restore_attachment_export_and_acceptance_surfaces": true,
             "task_169": true
         },
+        "issue_171_sources_read": {
+            "unified_project_source": true,
+            "project_instructions": true,
+            "github_issue_171_with_all_comments": true,
+            "github_epics_127_128_129_105_97_140_with_comments": true,
+            "phase_zero_issues_141_143_145_147_148_165_167_169_with_comments": true,
+            "merged_prs_142_144_146_159_164_166_168_170": true,
+            "adr_0001_0002_0003_0004": true,
+            "legacy_inventory_and_field_acceptance_protocol": true,
+            "readme_roadmap_changelog_project_decisions_and_project_state": true,
+            "production_test_schema_backup_export_and_web_surfaces_read_only": true,
+            "task_171": true
+        },
     "unresolved_conflict_found": false
   },
   "canonical_project_instructions": {
@@ -881,17 +899,60 @@
     "strict_podcast_note_prior_step_summary_contract_implemented_in_step_225": true,
     "field_mvp_product_behavior_added_in_step_225": false,
     "active_program_work": {
-      "issue": 169,
-      "name": "owner_only_security_and_data_ownership_threat_model",
+      "issue": 171,
+      "name": "phase_0_closure_validation_and_phase_1_entry_gate",
       "scope": [
-        "current_mvp_security_posture_without_claiming_unimplemented_controls",
-        "asset_inventory_trust_boundaries_actors_and_twenty_one_threat_scenarios",
-        "risk_scoring_current_controls_gaps_detection_response_and_acceptance",
-        "data_ownership_scope_output_artifact_and_local_web_security_boundaries",
-        "pilot_and_product_stop_criteria_and_incident_response",
-        "phase_twelve_executable_security_implementation_map"
+        "phase_zero_merged_issue_pr_commit_evidence_matrix",
+        "four_adr_cross_links_and_decision_vs_implementation_boundary",
+        "repository_truth_readme_roadmap_protocol_decision_and_state_alignment",
+        "legacy_pilot_security_and_compatibility_closure_gates",
+        "github_epic_127_and_128_factual_alignment",
+        "single_narrow_phase_one_p1_01_entry_candidate"
       ],
       "production_behavior_changed": false
+    },
+    "phase_zero_closure_decision": {
+      "status": "pass_pending_issue_171_merge_for_p0_10_completion",
+      "document": "docs/171_phase_0_closure_validation.md",
+      "phase_zero_steps_with_merged_evidence": [
+        "P0.01",
+        "P0.02",
+        "P0.03",
+        "P0.04",
+        "P0.05",
+        "P0.06",
+        "P0.07",
+        "P0.08",
+        "P0.09"
+      ],
+      "p0_10_completed_before_merge": false,
+      "canonical_adrs": [
+        "docs/adr/ADR-0001-single-memory-and-record-scope.md",
+        "docs/adr/ADR-0002-memory-index-record-ref-read-model.md",
+        "docs/adr/ADR-0003-backup-memory-download-project-package.md",
+        "docs/adr/ADR-0004-owner-only-security-and-data-ownership-threat-model.md"
+      ],
+      "schema_version": 4,
+      "restorable_schema_versions": [2, 3, 4],
+      "backup_format_version": 1,
+      "daily_export_format_version": 1,
+      "memory_download_implemented": false,
+      "project_package_implemented": false,
+      "real_field_pilot_run": false,
+      "field_ready_or_production_ready_claim": false,
+      "open_phase_zero_blocker": false,
+      "next_phase_epic": 129,
+      "single_next_candidate": "P1.01_event_time_contract_and_migration_preflight",
+      "recommended_branch": "codex/issue-next-p1-01-time-contract-migration-preflight",
+      "recommended_model": "standart full Codex",
+      "recommended_reasoning": "high",
+      "phase_one_issue_branch_or_implementation_started": false,
+      "github_issue_128_p0_01_through_p0_09_checked": true,
+      "github_issue_128_p0_10_checked_before_merge": false,
+      "github_issue_127_and_128_remain_open": true,
+      "github_issue_128_closure_comment": "https://github.com/faliardic/chief-site-engineer/issues/128#issuecomment-5006802667",
+      "github_issue_127_alignment_comment": "https://github.com/faliardic/chief-site-engineer/issues/127#issuecomment-5006802812",
+      "production_test_schema_migration_ui_route_cli_or_format_changed": false
     },
     "single_memory_and_record_scope_decision": {
       "status": "accepted_in_issue_145_adr_not_implemented",
@@ -1340,12 +1401,12 @@
     }
   },
   "protected_paths": {
-    "app_and_tests": "must_remain_unchanged_in_issue_169_owner_security_threat_model",
-    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_169",
-    "web_launcher_server_binding_session_routes_and_cli": "must_remain_unchanged_in_issue_169",
-    "backup_and_export_production": "must_remain_unchanged_in_issue_169",
-    ".github/workflows": "must_remain_unchanged_in_issue_169",
-    "requirements.txt_and_pyproject.toml": "must_remain_unchanged_in_issue_169",
+    "app_and_tests": "must_remain_unchanged_in_issue_171_phase_zero_closure",
+    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_171",
+    "web_launcher_server_binding_session_routes_and_cli": "must_remain_unchanged_in_issue_171",
+    "backup_and_export_production": "must_remain_unchanged_in_issue_171",
+    ".github/workflows": "must_remain_unchanged_in_issue_171",
+    "requirements.txt_and_pyproject.toml": "must_remain_unchanged_in_issue_171",
     "reports": "user_files_preserved_untracked_and_unchanged",
     "exports/.gitkeep": "must_remain_present_and_unchanged",
     "ignored_zip_and_cache": "must_remain_unchanged"
@@ -1362,18 +1423,21 @@
     "pull_request_creation_by_codex": false,
     "merge_authorized": false,
     "branch_deletion_authorized": false,
-    "final_remote_sha_evidence_location": "GitHub Issue #169 completion comment after push"
+    "final_remote_sha_evidence_location": "GitHub Issue #171 completion comment after push"
   },
   "required_files": [
-    ".cse/tasks/169_task.md",
-    ".cse/results/169_result.md",
-    ".cse/state/project_state.json",
-    "docs/adr/ADR-0004-owner-only-security-and-data-ownership-threat-model.md",
-    "learning/169_owner_only_security_and_data_ownership_threat_model.md",
+    "README.md",
     "ROADMAP.md",
     "CHANGELOG.md",
-    "docs/project_decisions.md"
+    "docs/project_decisions.md",
+    "docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md",
+    "docs/protocols/CSE_PROJECT_INSTRUCTIONS.md",
+    "docs/171_phase_0_closure_validation.md",
+    "learning/171_phase_0_closure_validation.md",
+    ".cse/state/project_state.json",
+    ".cse/tasks/171_task.md",
+    ".cse/results/171_result.md"
   ],
-  "workflow_status": "issue_169_local_verified_not_yet_published",
+  "workflow_status": "issue_171_local_verified_not_yet_published",
   "forbidden_scope_added": false
 }

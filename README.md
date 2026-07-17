@@ -45,13 +45,17 @@ Uygulama varsayılan olarak yalnız `127.0.0.1` loopback adresinde açılır. Lo
 
 ## Merge edilmiş güncel kabiliyetler
 
-`master` üzerindeki son doğrulanmış güvenli nokta:
+`master` üzerindeki son doğrulanmış repository güvenli noktası:
 
 ```text
-Issue #119
-PR #126
-merge commit 1d4b2b7f9ace5e7d474c4893d24404ceae2faede
+Issue #169
+PR #170
+merge commit 3024ea45421593cfd03375b8594832ce27d684ab
 ```
+
+Son production kabiliyet dilimi Issue #119 / PR #126 ile merge edilmiştir.
+Issue #141–#169 arasındaki Faz 0 işleri repository truth, ADR, envanter, pilot
+protokolü ve güvenlik modeli üretmiş; production davranışını değiştirmemiştir.
 
 Local Field MVP bugün şunları sağlar:
 
@@ -66,7 +70,7 @@ Local Field MVP bugün şunları sağlar:
 - SQLite snapshot tabanlı backup, backup doğrulama ve yalnız yeni hedefe izole restore;
 - Windows tek tık launcher;
 - Saha Takibi v0.1 domain kayıtları ve saf `Europe/Istanbul` recurrence hesapları;
-- SQLite schema v3 içinde Saha Takibi repository ve append-only event persistence altyapısı;
+- SQLite schema 4 içinde Saha Takibi repository ve append-only event persistence altyapısı;
 - Saha Takibi transactional application service'leri ve yedi günlük idempotent lazy backfill;
 - schema 2/3 backup'larını schema 4'e güvenli restore etme ve schema 4 tracking round-trip doğrulaması;
 - kişisel follow-up/routine verisini resmî günlük export'tan ayrı tutan executable izolasyon regresyonu;
@@ -75,11 +79,18 @@ Local Field MVP bugün şunları sağlar:
 - rutin oluşturma, listeleme, ayrıntı, pasifleştirme ve occurrence sonuçlandırma/erteleme/yeniden açma yüzeyleri;
 - restart sonrasında aynı SQLite verisi, revision ve append-only event geçmişi kalıcılığı.
 
-İlk test edilebilir PC Saha Takibi yüzeyi merge edilmiştir. Sıradaki bağlayıcı yürütme programı GitHub Issue #127, faz backlog'u ise Issue #128–#140'tır. Mobile runtime, offline/sync, notification, uygulama kilidi ve gerçek saha pilotları henüz tamamlanmamıştır.
+İlk test edilebilir PC Saha Takibi yüzeyi merge edilmiştir. Bağlayıcı yürütme
+programı GitHub Issue #127, faz backlog'u Issue #128–#140'tır. Faz 0'ın son
+aktif işi Issue #171 closure doğrulamasıdır. Bu branch merge edildikten sonra
+sıradaki tek dar aday, Issue #129 içindeki P1.01 olay zamanı sözleşmesi ve
+migration preflight'tır. Mobile runtime, offline/sync, notification, uygulama
+kilidi ve gerçek saha pilotları henüz tamamlanmamıştır.
 
 ## Saha Takibi v0.1
 
-Birinci ürün geliştirme önceliği [Saha Takibi v0.1 sözleşmesidir](docs/field_tracking_v0_1_contract.md).
+Merge edilmiş Saha Takibi çekirdeğinin bağlayıcı davranışları
+[Saha Takibi v0.1 sözleşmesinde](docs/field_tracking_v0_1_contract.md) korunur.
+Güncel sıradaki ürün işi Issue #171 merge'i sonrasında Faz 1 / P1.01'dir.
 
 Kullanıcı yüzeyi:
 
@@ -148,13 +159,27 @@ python -m pip install -r requirements.txt
 python -m pytest -rs
 ```
 
-Issue #119 / PR #126 için doğrulanan full-suite sonucu:
+Issue #171 closure baseline'ında doğrulanan full-suite sonucu:
 
 ```text
 983 passed, 7 skipped
 ```
 
 Yedi skip, Windows ortamında symlink oluşturma ayrıcalığı bulunmayan mevcut güvenlik testleridir.
+
+## Faz 0 kanonik karar belgeleri
+
+Faz 0'ın dört ADR'si ayrı sorumluluk taşır ve hiçbiri tek başına production
+implementation kanıtı değildir:
+
+- [ADR-0001 — Tek Hafıza ve kayıt kapsamı](docs/adr/ADR-0001-single-memory-and-record-scope.md)
+- [ADR-0002 — MemoryIndex / RecordRef read-model](docs/adr/ADR-0002-memory-index-record-ref-read-model.md)
+- [ADR-0003 — Backup, Hafızayı İndir ve Proje Paketi ayrımı](docs/adr/ADR-0003-backup-memory-download-project-package.md)
+- [ADR-0004 — Owner-only güvenlik ve veri sahipliği tehdit modeli](docs/adr/ADR-0004-owner-only-security-and-data-ownership-threat-model.md)
+
+Faz 0 merged kanıtı, current production ayrımı ve Faz 1 kapısı
+[closure doğrulamasında](docs/171_phase_0_closure_validation.md) birlikte
+gösterilir.
 
 ## Bilinçli sınırlar
 
@@ -187,7 +212,11 @@ Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürüt
 - Issue #139 — Faz 11: deterministik arama, semantik geri çağırma ve kaynaklı AI;
 - Issue #140 — Faz 12: owner-only güvenlik, bakım, güncelleme ve ürünleştirme.
 
-Bu backlog'un açık olması bütün fazların aynı anda aktif olduğu anlamına gelmez. Aynı anda yalnız bir production implementation görevi yürütülür; ilk aktif iş Issue #141 ile repository truth ve state senkronizasyonudur. Tek Hafıza, `MemoryIndex` ve Backup / Hafızayı İndir / Proje Paketi ayrımları sonraki dar ADR Issue'larında kesinleştirilecek, bu senkronizasyon veri modeli davranışını değiştirmeyecektir.
+Bu backlog'un açık olması bütün fazların aynı anda aktif olduğu anlamına gelmez.
+Aynı anda yalnız bir production implementation görevi yürütülür. Issue #171,
+Faz 0'ın documentation/state-only closure işidir; `scope`, archive/unarchive,
+`MemoryIndex`, Hafıza UI veya yeni artifact ailesi uygulamaz. Closure branch
+merge edilince sıradaki tek faz Issue #129, ilk dar aday ise P1.01'dir.
 
 ## Kaynak otoritesi
 

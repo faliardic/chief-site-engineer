@@ -134,10 +134,10 @@ CSE’nin farkı çok modüllü olması değil, aşağıdaki işleri sade ve gü
 5. Kanıt niteliği taşıyan işlemler audit izi bırakabilecek şekilde modellenir; gerçek audit davranışı yalnız açık görev kapsamında uygulanır.
 6. Medya dosyaları veritabanına gömülmez; dosya yolu, metadata ve bütünlük kontrolleriyle yönetilir.
 7. Her attachment metadata kaydı fiziksel dosyayla tutarlı olmalıdır.
-8. Kişisel çalışma verisi tek sahibine aittir ve resmî export veya devir kapsamına otomatik girmez.
+8. `private` çalışma verisi tek sahibine aittir ve resmî/proje output kapsamına otomatik girmez.
 9. Bir aktif proje ve geçmiş proje arşivi desteklenebilir; kurumsal proje portföyü hedeflenmez.
 10. Şirketler, ekipler ve diğer kişiler sistem kullanıcısı değil; kişi/kurum ve ilgili taraf kayıt referanslarıdır.
-11. Devir için gerekli bilgi özel alanda bırakılmaz; resmî kayda veya açıkça seçilmiş handover package içine dönüştürülür.
+11. Paylaşım için gerekli bilgi private durumda bırakılmaz; açık kullanıcı işlemiyle project kapsama geçirilir ve source uygunluğu doğrulanmış Proje Paketi veya ilgili çıktıya seçilir.
 12. `requires_human_review` yalnız insan inceleme sinyalidir.
 13. Sistem kendiliğinden `blocked` üretmez.
 14. Otomatik kabul, ret, onay, resmî karar veya paket bloklama yapılmaz.
@@ -150,6 +150,18 @@ CSE’nin farkı çok modüllü olması değil, aşağıdaki işleri sade ve gü
 ### Tasarım ilkesi ile uygulanmış özellik ayrımı
 
 Bir ilkenin belgede bulunması, o davranışın mevcut kodda tam uygulanmış olduğu anlamına gelmez. Özellikle audit, persistence, yetkilendirme, encryption ve silmeme politikaları önce tasarım sözleşmesi olarak tutulabilir; uygulama durumu ayrıca doğrulanmalıdır.
+
+### Faz 0 kanonik ADR indeksi
+
+| Belge | Tek karar alanı | Uygulama durumu |
+|---|---|---|
+| `docs/adr/ADR-0001-single-memory-and-record-scope.md` | Tek Hafıza, kayıt türü/proje/kapsam ayrımı ve explicit scope conversion | Scope field/event/migration/UI uygulanmadı |
+| `docs/adr/ADR-0002-memory-index-record-ref-read-model.md` | Source-of-truth, RecordRef, projection, rebuild ve drift | MemoryIndex schema/projector/UI uygulanmadı |
+| `docs/adr/ADR-0003-backup-memory-download-project-package.md` | Backup, Hafızayı İndir, Proje Paketi ve Günlük Çıktı aileleri | Backup v1 ve Daily v1 mevcut; diğer iki aile uygulanmadı |
+| `docs/adr/ADR-0004-owner-only-security-and-data-ownership-threat-model.md` | Owner-only asset/trust boundary/threat/data ownership/stop sözleşmesi | Loopback-default mevcut; app lock/auth/TLS/encryption uygulanmadı |
+
+ADR kararı, production implementation kanıtı değildir. Current davranış
+repository kodu, executable test ve merged commit kanıtıyla ayrıca doğrulanır.
 
 ---
 
@@ -224,7 +236,11 @@ Ofiste:
 
 Merge edilmiş Local Field MVP ilk altı hedefi destekleyen SQLite persistence ve migration runner, managed attachment store, local Flask web akışı, proje/gözlem create-list-detail-update, revision conflict koruması, arama, günlük export, backup/verify/izole restore ve Windows tek tık launcher içerir. Haftalık özet ürün yüzeyi henüz tamamlanmış kabul edilmez.
 
-Bu omurganın üzerindeki birinci ürün önceliği Saha Takibi v0.1'dir. Domain/recurrence ve SQLite schema v3 repository/event persistence tamamlanmıştır; transactional application service, lazy backfill, backup uyumluluğu kabulü, resmî export izolasyonu ve minimum UI tamamlanmamıştır.
+Bu omurganın üzerindeki Saha Takibi v0.1 diliminde domain/recurrence, SQLite
+schema v4 repository/event persistence, transactional application service,
+yedi günlük lazy backfill, Backup compatibility, resmî export izolasyonu ve ilk
+PC UI tamamlanmıştır. Gerçek saha kabulü, mobile/offline/notification ve ortak
+Hafıza yaşam döngüsü tamamlanmamıştır.
 
 ### Kalıcı ürün kapsamı dışında kalanlar
 
@@ -305,7 +321,7 @@ CSE büyük platformların bütün modüllerini başlangıçta taklit etmeyecekt
 - Toplantı tutanakları
 - RFI/submittal lite
 
-### Katman 4 - Şantiye Şefi Özel Alanı
+### Katman 4 - Tek Hafıza ve private çalışma kapsamı
 
 - Kişisel notlar
 - Hatırlatıcılar
@@ -356,35 +372,39 @@ Yapı denetim, EBİS/YDS ve diğer taraflar uygulama kullanıcısı değil; şan
 
 ---
 
-## 10. Şantiye Şefi Özel Alanı
+## 10. Tek Hafıza ve kayıt kapsamı
 
-Özel alan, resmî proje kaydı değildir. Tek kullanıcı olan şantiye şefinin kişisel notlarını, tecrübelerini, kişi/kurum referanslarını, hatırlatıcılarını ve karar derslerini saklar.
+Kullanıcı ayrı “özel alan” ve “resmî alan” uygulamalarında çalışmaz. Tek Hafıza
+içindeki source kayıtlar `private | project` output/paylaşım kapsamı taşır.
+`private`, resmî proje çıktısına doğrudan girmeyen owner çalışma kaydıdır;
+cryptographic privacy, rol veya tenant değildir.
 
 Mevcut local MVP'de uygulama kilidi veya encryption bulunmadığı için “kişisel” sözcüğü cryptographic privacy garantisi vermez. Bugünkü anlamı bir erişim rolü değil, çıktı kapsamıdır:
 
 ```text
-Kişisel çalışma verisi
--> resmî export/devir dışında
+private çalışma kaydı
+-> resmî/proje çıktısı dışında
 
-Proje/resmî kayıt
--> açık kullanıcı işlemiyle günlük, rapor veya devir çıktısına alınabilir
+project kapsamlı kayıt
+-> source uygunluğu yeniden doğrulanarak günlük, rapor veya Proje Paketi adayı
 ```
 
 ### Kayıt sınıfları
 
-1. Tamamen özel not
-2. Projeye bağlı ama özel not
-3. Kullanıcı tarafından resmî kayda dönüştürülmüş not
+1. Kayıt türü: observation, follow-up, routine occurrence gibi domain kimliği.
+2. Kapsam: `private | project` output/paylaşım uygunluğu.
+3. Proje bağlantısı: kapsamdan ayrı ilişki; tek başına `project` kapsamı üretmez.
 
 ### Gizlilik kuralları
 
-- Kişisel çalışma verisi varsayılan olarak resmî export ve devir dışında kalır.
+- `private` çalışma verisi varsayılan olarak resmî/proje çıktısı dışında kalır.
 - Firma veya başka bir taraf sistem hesabıyla erişemez; böyle hesaplar ürün modelinde yoktur.
-- Projeye bağlanmak kaydı otomatik resmî yapmaz.
-- Resmî devir için gereken bilgi şantiye şefi tarafından açıkça resmî kayda dönüştürülür.
-- Kişisel alan ile resmî kayıt arasında otomatik veya görünmez aktarım yapılmaz.
+- Projeye bağlanmak kaydı otomatik `project` yapmaz.
+- Paylaşılacak bilgi açık kullanıcı işlemi, revision ve append-only event ile
+  `project` kapsamına geçirilir.
+- Kapsamlar arasında otomatik veya görünmez aktarım yapılmaz.
 
-### V1 işlevleri
+### Tarihsel yardımcı araç adayları
 
 - Kişisel not ekleme ve listeleme
 - Kategori ve öncelik
@@ -394,7 +414,7 @@ Proje/resmî kayıt
 - Notu kişiye bağlama
 - Günlük hatırlatıcı görünümü
 
-### V1 kapsam dışı
+### Yakın kapsam dışı yardımcı araçlar
 
 - Sesli not
 - AI arama
@@ -413,16 +433,15 @@ Proje/resmî kayıt
 - `PersonalChecklistItem`
 - `DecisionLesson`
 
-### Resmî kayda dönüşüm örnekleri
+### Açık kapsam dönüşümü örnekleri
 
-- Kişisel not -> Görev
-- Kişisel not -> Günlük kayıt
-- Kişisel not -> Uygunsuzluk
-- Kişisel ders -> Checklist maddesi
-- Hatırlatıcı -> Beton/EBİS kaydı
-- Kişi kartı -> Kontrol çağrısı
+- Private çalışma notu -> project kapsamlı observation
+- Private follow-up -> ayrı project observation'a açık conversion
+- Private çalışma kaydı -> açık `private -> project` kapsam dönüşümü
+- Project kapsamlı source -> uygunluk yeniden doğrulaması sonrası çıktı adayı
 
-Dönüşüm açık kullanıcı işlemi olmalıdır.
+Dönüşüm açık kullanıcı işlemi, optimistic revision ve append-only event
+gerektirir. Project bağlantısı, link, AI veya routine işlemi scope değiştiremez.
 
 ---
 
@@ -566,7 +585,11 @@ Merge edilmiş Local Field MVP'de şunlar vardır:
 - backup/verify/izole restore;
 - Windows tek tık launcher;
 - Saha Takibi domain/recurrence;
-- schema v3 ve Saha Takibi repository/event persistence.
+- schema v4 ve Saha Takibi repository/event persistence;
+- Saha Takibi transactional application service ve yedi günlük lazy backfill;
+- `/today`, hızlı `+ Unutma`, follow-up/routine/occurrence web yüzeyleri;
+- schema 2/3 Backup'larını schema 4'e izole Restore ve tracking round-trip;
+- personal tracking'i Günlük Çıktı v1 dışında tutan executable izolasyon.
 
 Mevcut sınırlar:
 
@@ -575,7 +598,9 @@ Mevcut sınırlar:
 - auth, authorization ve TLS yoktur;
 - mobile runtime, offline kayıt ve owner-only cihaz senkronizasyonu yoktur;
 - background notification ve scheduler yoktur;
-- Saha Takibi application service ve UI henüz yoktur.
+- scope field/conversion, archive/unarchive ve MemoryIndex/Hafıza UI yoktur;
+- Hafızayı İndir ve Proje Paketi artifact'ları yoktur;
+- app lock, güvenli session ve encryption yoktur.
 
 Bu nedenle “field-ready” veya “production-ready” iddiası yapılmaz.
 
@@ -1059,24 +1084,29 @@ Gerçek şantiye
 
 Bu bölüm kalıcı ürün politikasından ayrı bir factual snapshot'tır. Güncel durum her yeni görev başında GitHub ve yerel Git kanıtıyla yeniden doğrulanır; bu metin yeni kanıtı override etmez.
 
-### 2026-07-15 doğrulanmış merged nokta
+### 2026-07-17 doğrulanmış merged nokta
 
-- Tamamlanan görev: Issue **#102**
-- Squash-merge PR: **#104**
+- Tamamlanan Faz 0 görevi: Issue **#169**
+- Squash-merge PR: **#170**
 - `master` commit:
 
 ```text
-9b25152ae38b72470e332929cb3a30ff955b75f1
+3024ea45421593cfd03375b8594832ce27d684ab
 ```
 
-- Saha Takibi domain/recurrence tamamlandı.
-- SQLite schema v3 ile Saha Takibi repository/event persistence tamamlandı.
-- Transactional application service, lazy backfill, backup compatibility, resmî export izolasyonu ve UI tamamlanmadı.
+- İlk PC Saha Takibi production yüzeyi Issue #119 / PR #126 ile merge edildi.
+- SQLite schema 4, Backup format 1 ve Günlük Çıktı format 1 current'tır.
+- P0.01–P0.09 repository truth, dört ADR, legacy envanteri, pilot protokolü ve
+  owner-only security threat model olarak merge edildi.
+- Scope field, archive/unarchive, MemoryIndex, Hafıza UI, yeni artifact aileleri,
+  mobile/offline, app lock ve encryption uygulanmadı.
 - GitHub Actions hesabın runner/billing sınırı nedeniyle manuel olarak devre dışı kalır; yerel doğrulama zorunludur.
 
 ### Aktif dokümantasyon işi
 
-Issue #103, `codex/issue-103-canonical-instructions-v2` branch'inde Epic #105'e bağlı tek kullanıcılı kişisel saha asistanı yönü ve repository truth hizalamasıdır. Production davranışını değiştirmez ve merge edilene kadar `current_safe_point` sayılmaz.
+Issue #171, `codex/issue-171-phase-0-closure-validation` branch'inde Faz 0
+closure ve Faz 1 geçiş kapısıdır. Production davranışını değiştirmez ve merge
+edilene kadar `current_safe_point` sayılmaz.
 
 ### Current-state doğrulama sırası
 
@@ -1177,9 +1207,15 @@ Dünya örnekleri raporunda önerilen otomatik CI ve branch protection uzun vade
 
 ## 31. Bir Sonraki Ürün Yönü
 
-Epic #105'e göre sıradaki dar production yönü, Saha Takibi transactional application service ve yedi günlük idempotent lazy backfill orchestration'dır. Ardından backup/restore compatibility ve resmî export izolasyonu; mobil runtime/veri sahipliği ADR; mobil-first Kâğıdı Bırakma Sürümü; offline/bildirim güvenilirliği ve saha pilotları gelir.
+Issue #171 merge'i sonrasında sıradaki tek faz Issue #129 Güvenilir Hafıza yaşam
+döngüsüdür. İlk dar aday P1.01 olay zamanı sözleşmesi ve migration preflight'tır:
+`observed/occurred`, `created` ve `updated` anlamı; UTC storage;
+Europe/Istanbul presentation; geçmiş/future/DST kuralları ve mevcut satırların
+geriye uyumluluğu önce kesinleştirilir.
 
-Her aşama ayrı ve açık GitHub Issue ile sınırlandırılır. Henüz uygulanmayan aşama tamamlanmış gösterilmez.
+P1.01 tamamlanmadan geriye dönük create formu, archive/unarchive, MemoryIndex
+ve birleşik Hafıza implementation sırası atlanmaz. Her aşama ayrı ve açık GitHub
+Issue ile sınırlandırılır; henüz uygulanmayan aşama tamamlanmış gösterilmez.
 
 ---
 
@@ -1209,7 +1245,9 @@ Kullanıcı intent/devam verir
 -> post-merge sync güvenliyse sonraki gerekli Codex çalışmasına eklenir
 ```
 
-Bu belge, ürün yönü, veri ilkeleri, özel alan, modül yol haritası, kaynak otoritesi ve ChatGPT/Codex/GitHub çalışma düzenini tek çatı altında birleştiren ana proje kaynağıdır.
+Bu belge, ürün yönü, veri ilkeleri, Tek Hafıza ve kayıt kapsamı, modül yol
+haritası, kaynak otoritesi ve ChatGPT/Codex/GitHub çalışma düzenini tek çatı
+altında birleştiren ana proje kaynağıdır.
 
 ---
 
@@ -1231,9 +1269,12 @@ docs/protocols/CSE_PROJECT_INSTRUCTIONS.md
 
 ---
 
-## 33. Güncel Birinci Ürün Önceliği: Saha Takibi v0.1
+## 33. Saha Takibi v0.1 Bağlayıcı Sözleşme Kaydı
 
-Issue #98 ve Epic #97 Saha Takibi domain sözleşmesini belirler. Üst ürün yönü ve faz sırası için bağlayıcı kaynak Epic #105'tir.
+Issue #98 ve Epic #97 Saha Takibi domain sözleşmesini belirler. Bu bölüm
+uygulanmış çekirdeğin bağlayıcı kurallarını korur; güncel sıradaki ürün işi
+§31'deki Faz 1 / P1.01 seçimidir. Üst ürün yönü ve faz sırası için bağlayıcı
+kaynak Epic #105 ve yürütme programı Issue #127'dir.
 
 İlk kapsam üç ayrı domain kaydıdır:
 
@@ -1246,7 +1287,10 @@ Değişmez ürün sınırları:
 - `+ Unutma` hızlı create akışında kullanıcıdan yalnız `capture_text` istenir; ilk title deterministic whitespace normalization ile aynı metindir ve sonradan düzenlenebilir.
 - `next_attention_at` kaydın ne zaman yeniden kullanıcı önüne geleceğidir; `deadline_at` gerçek son tarihtir ve aynı kavram değildir.
 - Bildirimi kapatmak veya görünümden çıkmak takip kaydını tamamlamaz.
-- Follow-up ve routine template proje bağlantısı nullable’dır; projesiz kayıt kişisel çalışma alanında kalır. Observation bağlanan follow-up’ın project değeri observation projesiyle aynı olmak zorundadır.
+- Follow-up ve routine template proje bağlantısı nullable’dır; projesiz kayıt
+  current mapping'de `private` kalır. Observation bağlanan follow-up’ın project
+  değeri observation projesiyle aynı olmak zorundadır; bu bağlantı scope'u
+  otomatik değiştirmez.
 - Projeye bağlanmak kişisel takibi otomatik resmî yapmaz; resmî gözleme dönüşüm açık kullanıcı işlemidir.
 - Zamanlanmamış açık follow-up yalnız `inbox` olabilir; `active/waiting` mutlaka `next_attention_at` taşır. Unutma Kutusu `inbox` kayıtlarının ayrı sorgusudur.
 - `overdue`, `today`, `upcoming` yalnız planlı `active/waiting` kayıtlar için türetilir. `now` domain kategorisi değildir; “Şimdi ilgilen” overdue, zamanı gelmiş today ve önemli inbox kayıtlarının UI bileşimidir.

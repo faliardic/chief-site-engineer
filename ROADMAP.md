@@ -8,7 +8,15 @@
 2A. [x] İlk test edilebilir PC Saha Takibi web yüzeyi — Issue #119 / PR #126 ile merge edildi. Bugün, Unutma Kutusu, hızlı yakalama, follow-up yaşam döngüsü, rutinler, occurrence işlemleri, restart kalıcılığı ve resmî export izolasyonu doğrulandı.
 3. [ ] Issue #127 uygulanabilir geliştirme programını bağımlılık sırasıyla yürüt.
 
-Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme programı Issue #127'dir. Issue #141 ve #143 repository/workflow truth işlerinden sonra Issue #145 / PR #146 Tek Hafıza ve kayıt kapsamı, Issue #147 / PR #159 `MemoryIndex / RecordRef` read-model, Issue #148 / PR #164 Backup / Hafızayı İndir / Proje Paketi ayrım ADR'si, Issue #165 / PR #166 legacy model envanteri ve Issue #167 / PR #168 saha kabul protokolü merge edilmiştir. Faz 0'ın tek aktif işi Issue #169 owner-only güvenlik ve veri sahipliği tehdit modelidir; production davranışı değiştirmez. Açık faz Epic'leri aynı anda aktif production işleri değildir; aynı anda yalnız bir production implementation görevi yürütülür.
+Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme
+programı Issue #127'dir. Issue #141 / PR #142 ve Issue #143 / PR #144
+repository/workflow truth işlerinden sonra Issue #145 / PR #146 Tek Hafıza ve
+kayıt kapsamı, Issue #147 / PR #159 `MemoryIndex / RecordRef` read-model,
+Issue #148 / PR #164 çıktı aileleri, Issue #165 / PR #166 legacy envanteri,
+Issue #167 / PR #168 saha kabul protokolü ve Issue #169 / PR #170 owner-only
+tehdit modeli merge edilmiştir. Faz 0'ın tek aktif işi Issue #171 closure
+doğrulamasıdır; production davranışı değiştirmez. Açık faz Epic'leri aynı anda
+aktif production işleri değildir.
 
 ## Issue #127 Faz Haritası
 
@@ -26,7 +34,42 @@ Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürüt
 - [ ] Issue #139 — Faz 11: deterministik arama, semantik geri çağırma ve kaynaklı AI.
 - [ ] Issue #140 — Faz 12: owner-only güvenlik, bakım, güncelleme ve ürünleştirme.
 
-Issue #141, Faz 0'ın ilk dar repository truth görevi olarak tamamlandı. Issue #145 / PR #146 Tek Hafıza UX ile `private | project` kayıt kapsamını, Issue #147 / PR #159 ortak `MemoryIndex / RecordRef` read-model sözleşmesini, Issue #148 / PR #164 Backup / Hafızayı İndir / Proje Paketi çıktı aileleriyle mevcut Günlük Çıktı sınırını, Issue #165 / PR #166 legacy kaldırma kapılarını, Issue #167 / PR #168 ise gerçek pilotu yürütmeden 7/30 günlük saha kabul sözleşmesini kesinleştirdi. Aktif Issue #169 mevcut MVP'nin owner-only güvenlik ve veri sahipliği sınırlarını, riskleri ve Faz 12 executable kapılarını bağlar.
+Issue #141–#169 arasındaki P0.01–P0.09 işleri merged kanıta sahiptir. Issue #171,
+bu kanıtları repository truth ile uzlaştırır; P0.10 branch merge edilmeden
+tamamlandı sayılmaz. Closure sonrası sıradaki tek faz Issue #129, ilk dar aday
+P1.01 olay zamanı sözleşmesi ve migration preflight'tır. Faz 1 implementation
+bu branch'te başlamaz.
+
+## Faz 0 Kanonik ADR İndeksi
+
+- `docs/adr/ADR-0001-single-memory-and-record-scope.md` — Tek Hafıza ve
+  `private | project` kapsamı.
+- `docs/adr/ADR-0002-memory-index-record-ref-read-model.md` — source-of-truth,
+  projection, rebuild ve consumer sınırı.
+- `docs/adr/ADR-0003-backup-memory-download-project-package.md` — Backup,
+  Hafızayı İndir, Proje Paketi ve Günlük Çıktı ayrımı.
+- `docs/adr/ADR-0004-owner-only-security-and-data-ownership-threat-model.md` —
+  owner-only güvenlik, veri sahipliği, trust boundary ve stop kriterleri.
+
+Bu ADR'ler karar sözleşmesidir. Scope field, archive/unarchive, MemoryIndex,
+Hafıza UI, yeni artifact aileleri, app lock veya encryption uygulanmış değildir.
+
+## Issue 171 - Faz 0 Closure Doğrulaması
+
+- [x] P0.01–P0.09 için merged Issue/PR/commit zinciri doğrulandı.
+- [x] Dört ADR current kanonik yüzeylerden exact path ile erişilebilir yapıldı.
+- [x] Repository truth ile README, ROADMAP, protokoller, decisions ve state
+  drift'i yetkili allowlist içinde kapatıldı.
+- [x] Legacy removal gate, 7/30 günlük pilotun yürütülmediği sınır ve current
+  MVP security posture ayrı kanıtlandı.
+- [x] Schema `4`, restore `(2, 3, 4)`, Backup `1` ve Günlük Çıktı `1`
+  compatibility durumu kaydedildi.
+- [x] Çalışan production yüzeyi ile yalnız belgelenmiş gelecek kararları ayrıldı.
+- [x] Faz 0 closure sonucu kanıt matrisinden `PASS` olarak üretildi.
+- [x] Sıradaki tek dar aday Issue #129 / P1.01 olarak seçildi.
+- [x] Faz 1 Issue, branch veya implementation başlatılmadı.
+- [ ] P0.10, closure branch merge edildikten sonra Issue #128 üzerinde
+  tamamlandı işaretlenecek.
 
 ## Issue 148 - Backup, Hafızayı İndir ve Proje Paketi Ayrım ADR'si
 
@@ -130,13 +173,15 @@ Gelişmiş hesap defteri ve immutable günlük yayınlama/revizyon zinciri, Issu
 
 ## Güncel Doğrulanmış Güvenli Nokta
 
-Issue #165, PR #166 ile merge edildi. `master` üzerindeki doğrulanmış merge commit'i:
+Issue #169, PR #170 ile merge edildi. `master` üzerindeki doğrulanmış merge commit'i:
 
 ```text
-cb344aded8d0b0d4f5ff340f08393f6dca06971a
+3024ea45421593cfd03375b8594832ce27d684ab
 ```
 
-Issue #165'in local full-suite kanıtı `983 passed, 7 skipped` sonucudur. Issue #167 bu commit'ten başlayan documentation/state-only pilot-protocol işidir; merge edilene kadar current safe point'i ilerletmez.
+Issue #169'un local full-suite kanıtı `983 passed, 7 skipped` sonucudur. Issue
+#171 bu commit'ten başlayan documentation/state-only closure işidir; merge
+edilene kadar current safe point'i ilerletmez.
 
 ## Tarihsel Roadmap Kaydı
 
