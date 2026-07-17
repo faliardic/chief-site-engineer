@@ -1,0 +1,38 @@
+{
+  "package_name": "CSE_GITHUB_CHATGPT_SOURCES_2026-07-17",
+  "package_version": "2026-07-17.2",
+  "source_policy": "github_only",
+  "repository": "faliardic/chief-site-engineer",
+  "base_master_commit": "1d4b2b7f9ace5e7d474c4893d24404ceae2faede",
+  "issue": 143,
+  "branch": "codex/issue-143-chatgpt-github-sources",
+  "draft_pr_142_merged_at_snapshot": false,
+  "integrity_scheme": "git_blob_sha1",
+  "files": [
+    {
+      "path": "00_READ_ME_FIRST.md",
+      "git_blob_sha1": "abd88bd812508824cd6dfc25399c8d091430dae8"
+    },
+    {
+      "path": "01_CSE_CHATGPT_KANONIK_BAGLAM_2026-07-17.md",
+      "git_blob_sha1": "5b9b409fe37fc3a939768aa3ed8163be7af98d18"
+    },
+    {
+      "path": "02_CSE_UYGULANABILIR_YOL_HARITASI_2026_2.md",
+      "git_blob_sha1": "f50a6ae4147985d40f46d1812a42a092983ee048"
+    },
+    {
+      "path": "03_CSE_CHATGPT_KAYNAK_DEGISTIRME_KAYDI.md",
+      "git_blob_sha1": "b6707d082cea400ef4f1add3644e5c0ccedf8757"
+    },
+    {
+      "path": "04_ISSUE_141_VE_PR_142_DURUM_KANITI.md",
+      "git_blob_sha1": "ffae149348d27c76e34c39d05f349c82aea301ea"
+    }
+  ],
+  "notes": [
+    "GitHub master, current Issue and PR metadata override dated snapshot content.",
+    "The temporary ZIP transport package is not committed.",
+    "The roadmap file is a phase index; detailed canonical checklists remain in Issues #127-#140."
+  ]
+}

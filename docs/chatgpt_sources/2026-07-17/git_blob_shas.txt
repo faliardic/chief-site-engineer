@@ -1,0 +1,8 @@
+abd88bd812508824cd6dfc25399c8d091430dae8  00_READ_ME_FIRST.md
+5b9b409fe37fc3a939768aa3ed8163be7af98d18  01_CSE_CHATGPT_KANONIK_BAGLAM_2026-07-17.md
+f50a6ae4147985d40f46d1812a42a092983ee048  02_CSE_UYGULANABILIR_YOL_HARITASI_2026_2.md
+b6707d082cea400ef4f1add3644e5c0ccedf8757  03_CSE_CHATGPT_KAYNAK_DEGISTIRME_KAYDI.md
+ffae149348d27c76e34c39d05f349c82aea301ea  04_ISSUE_141_VE_PR_142_DURUM_KANITI.md
+
+Integrity scheme: Git blob SHA-1.
+The temporary ZIP package SHA-256 list is intentionally not committed because the GitHub-native roadmap source was normalized to reference canonical Issues #127-#140 instead of duplicating the transport snapshot.
