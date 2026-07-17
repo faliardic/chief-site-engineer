@@ -1,5 +1,19 @@
 # Proje Kararlari
 
+## Issue 167 - Saha Kabul Metrikleri ve Pilot Protokolü Kararları
+
+- Saha kabulü yalnız hız metriği değildir; performans, veri kaybı, missed follow-up, attachment bütünlüğü, Backup/Restore, haricî araca dönüş, privacy ve ölçüm bütünlüğü birlikte değerlendirilir.
+- Capture süresi kullanıcı niyetinden başarılı görünürlüğe/vazgeçişe; retrieval süresi arama niyetinden doğru detail açılışına/vazgeçişe kadardır. Başarılı örneklerde median ve nearest-rank p90, bütün valid örneklerde failure rate ayrıca raporlanır.
+- Performance için aktif günde ilk üç capture ve ilk iki retrieval örneklenir. Veri kaybı, missed follow-up, attachment, Backup/Restore, scope/privacy ve unsafe workaround olayları örneklenmez; census ile tamamı sayılır.
+- 7 günlük gate en az 5 aktif gün, 10 capture, 8 retrieval, bütün gerçek attachment kontrolleri ve Gün 0/Gün 7 Backup verify ister. 30 günlük gate en az 20 aktif gün, 40 capture, 24 retrieval, haftalık verify ve en az bir clean Restore rehearsal ister. Minimum yoksa sonuç `INSUFFICIENT_EVIDENCE`dır.
+- Confirmed veri kaybı, critical CSE kaynaklı missed follow-up, confirmed attachment integrity failure, private/wrong-project leakage ve Backup/Restore failure blocker'dır. Suspected safety olayı triage bitene kadar pilotu durdurur.
+- Backup verify ile clean-target Restore ayrı metriktir. Restore yalnız var olmayan disposable hedefte; repository reopen, revision/event ve attachment reconciliation kontrolleriyle PASS olabilir.
+- Doldurulmuş pilot logu source record, Backup, Hafızayı İndir veya Proje Paketi değildir. Gerçek kayıt/arama metni, source UUID, kişi/proje, attachment içerik/ad/path/hash, screenshot, ham mesaj ve absolute data-root path pilot logunda tutulmaz.
+- Pilot-local `event_id` ve `incident_id`, süre, sayaç, kategori, reason/severity/evidence status ve PASS/FAIL yeterli minimum kanıttır. Hassas incident kanıtı repository veya GitHub'a konmaz; owner-controlled ayrı alanda tutulur.
+- Performance warning kabul edilmiş ölçülebilir revalidation planıyla conditional olabilir. Confirmed safety/privacy blocker plan yazılarak PASS'e çevrilemez; düzeltme sonrası yeni doğrulama penceresi gerekir.
+- 7 günlük devam ve 30 günlük Faz 1 kararı otomatik üretilmez; minimum kanıt ve safety gate sonrası pilot owner tarafından açıkça verilir.
+- Issue #167 gerçek pilot, telemetry/analytics, otomatik timer, background job, cloud, production/test/schema/migration/UI/route/CLI, artifact formatı, ADR veya gerçek kullanıcı verisi uygulamaz.
+
 ## Issue 165 - Legacy Model Envanteri ve Deprecation Kararları
 
 - Sınıflandırma dosya yaşına veya adına göre değil; production import/call site, test/fixture/smoke/acceptance, schema/migration/restore, Backup/export/parser, kanonik doküman ve uygulanmış replacement kanıtlarının birlikte okunmasıyla yapılır.

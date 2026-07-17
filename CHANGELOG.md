@@ -1,5 +1,17 @@
 # Changelog
 
+## Issue 167 - Saha Kabul Metrikleri ve Pilot Protokolü
+
+- Kayıt açma ve doğru kayıt geri bulma süreleri; exact başlangıç/bitiş, saniye birimi, median, nearest-rank p90, success/failure oranı ve minimum örnek kurallarıyla tanımlandı.
+- Confirmed veri kaybı, CSE kaynaklı critical/normal missed follow-up, attachment/hash bütünlüğü, Backup verify, clean Restore rehearsal, haricî araca dönüş, private/project leakage ve measurement completeness için on metriklik bağlayıcı sözlük oluşturuldu.
+- Her metrik `metric_id`, amaç, birim, numerator, denominator, kaynak, toplama, örnekleme, target/warning/blocker, privacy, owner ve review cadence alanlarını taşır.
+- Performance için günlük ilk üç capture ve ilk iki retrieval örneklenirken safety/privacy/integrity/fallback olayları census olarak eksiksiz sayıldı; yetersiz örnek `INSUFFICIENT_EVIDENCE` olarak ayrıldı.
+- Gün 0 preflight, 7 günlük ilk pilot, 30 günlük doğrulama pilotu, yoğun/normal gün trendi, haftalık Backup freshness ve clean-target Restore rehearsal adımları tekrarlanabilir hale getirildi.
+- Suspected safety olayında anında stop, anonim incident ID, source/artifact mutation yasağı, owner-controlled hassas kanıt ve açık owner restart kararı tanımlandı.
+- Günlük ve summary şablonları yalnız anonim ID, süre, sayaç, kategori ve sonuç tutacak; gerçek kayıt/arama metni, source UUID, proje/kişi, attachment path/hash, screenshot, ham mesaj ve absolute data-root path toplamayacak şekilde eklendi.
+- Issue #167'nin gerçek pilot yürütmediği, hedeflerin production garantisi değil ilk kabul eşiği olduğu ve sonraki 7 günlük executable pilotun ayrı Issue gerektirdiği açıkça kaydedildi.
+- Production Python, test, schema, migration, persistence, UI, route, CLI, Backup/Günlük Çıktı formatı, ADR ve gerçek kullanıcı verisi değiştirilmedi.
+
 ## Issue 165 - Legacy Model Envanteri ve Deprecation Planı
 
 - Model, helper, repository, application, persistence, operation, web/CLI, script, test, schema/format ve dokümantasyon yüzeyleri production import/call site, test/fixture, restore/export compatibility ve kanonik karar bağlarıyla envanterlendi.

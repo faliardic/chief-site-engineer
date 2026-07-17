@@ -1,20 +1,20 @@
 {
   "state_version": 2,
   "legacy_last_numbered_step": 225,
-  "current_issue": 165,
+  "current_issue": 167,
   "base_branch": "master",
-  "base_commit": "8fb95811a2e55375081217470e90d7e8d385e8b2",
+  "base_commit": "cb344aded8d0b0d4f5ff340f08393f6dca06971a",
   "active_work": {
-    "issue": 165,
-    "type": "legacy_model_inventory_and_deprecation_plan",
+    "issue": 167,
+    "type": "field_acceptance_metrics_and_pilot_protocol",
     "issue_state": "active",
     "review_status": "local_verified_not_yet_published",
     "binding_execution_epic": 127,
     "binding_phase_epic": 128,
     "product_epic": 105,
     "field_tracking_epic": 97,
-    "branch": "codex/issue-165-legacy-inventory-deprecation-plan",
-    "base_commit": "4d31200753d8c24cefbce949849be67d1683b887",
+    "branch": "codex/issue-167-field-acceptance-pilot-protocol",
+    "base_commit": "cb344aded8d0b0d4f5ff340f08393f6dca06971a",
     "commit_strategy": "one_ordinary_commit_without_amend_rebase_or_force_push",
     "schema_version": 4,
     "backup_format_version": 1,
@@ -26,7 +26,7 @@
     "real_user_data_root_accessed": false,
     "merge_claim": false,
     "pull_request_created": false,
-    "full_test_summary": "983 passed, 7 skipped in 18.78s",
+    "full_test_summary": "983 passed, 7 skipped in 20.37s",
     "compileall_passed": true,
     "state_json_valid": true,
     "diff_check_passed": true,
@@ -36,18 +36,18 @@
   },
   "current_safe_point": {
     "semantics": "latest_merged_finalized_checkpoint",
-    "issue": 148,
+    "issue": 165,
     "issue_state": "completed",
-    "pull_request": 164,
+    "pull_request": 166,
     "pull_request_state": "merged",
-    "merge_commit": "4d31200753d8c24cefbce949849be67d1683b887",
-    "local_test_summary": "983 passed, 7 skipped in 28.84s (Issue #148 local verification; production and tests unchanged)"
+    "merge_commit": "cb344aded8d0b0d4f5ff340f08393f6dca06971a",
+    "local_test_summary": "983 passed, 7 skipped in 18.78s (Issue #165 local verification; production and tests unchanged)"
   },
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
-    "local_master_sha": "4d31200753d8c24cefbce949849be67d1683b887",
-    "origin_master_sha": "4d31200753d8c24cefbce949849be67d1683b887",
+    "local_master_sha": "cb344aded8d0b0d4f5ff340f08393f6dca06971a",
+    "origin_master_sha": "cb344aded8d0b0d4f5ff340f08393f6dca06971a",
     "divergence": "0 0",
     "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
     "misspelled_workspace_present": false,
@@ -199,6 +199,11 @@
       "model": "standart full Codex",
       "reasoning": "high",
       "reason": "read_only_legacy_inventory_symbol_reference_graph_schema_restore_format_compatibility_provenance_and_safe_removal_gates"
+    },
+    "issue_167_selection": {
+      "model": "standart full Codex",
+      "reasoning": "high",
+      "reason": "documentation_only_field_acceptance_metrics_repeatable_seven_and_thirty_day_pilots_privacy_minimization_stop_gates_and_repository_truth_consistency"
     }
   },
   "required_source_pre_read": {
@@ -634,6 +639,19 @@
             "readme_roadmap_changelog_project_decisions_and_project_state": true,
             "task_165": true
         },
+        "issue_167_sources_read": {
+            "unified_project_source": true,
+            "project_instructions": true,
+            "github_issue_167_with_all_comments": true,
+            "github_epics_127_128_105_97": true,
+            "adr_0001_0002_0003": true,
+            "issue_165_legacy_inventory": true,
+            "readme_roadmap_changelog_project_decisions_and_project_state": true,
+            "field_tracking_contract_and_web_acceptance_tests": true,
+            "backup_restore_attachment_and_subprocess_acceptance_surfaces": true,
+            "local_field_mvp_operations": true,
+            "task_167": true
+        },
     "unresolved_conflict_found": false
   },
   "canonical_project_instructions": {
@@ -845,15 +863,15 @@
     "strict_podcast_note_prior_step_summary_contract_implemented_in_step_225": true,
     "field_mvp_product_behavior_added_in_step_225": false,
     "active_program_work": {
-      "issue": 165,
-      "name": "legacy_model_inventory_and_deprecation_plan",
+      "issue": 167,
+      "name": "field_acceptance_metrics_and_pilot_protocol",
       "scope": [
-        "repository_surface_and_symbol_reference_inventory",
-        "four_class_classification",
-        "runtime_test_schema_format_and_document_dependency_evidence",
-        "replacement_future_action_removal_gate_and_risk",
-        "legacy_provenance_and_terminology_deprecation",
-        "executable_follow_up_issue_sequence_without_physical_deletion"
+        "capture_and_retrieval_duration_median_p90_and_failure_metrics",
+        "data_loss_missed_follow_up_attachment_backup_restore_fallback_and_privacy_metrics",
+        "day_zero_preflight_and_repeatable_seven_and_thirty_day_protocols",
+        "privacy_minimal_daily_and_summary_templates",
+        "stop_incident_escalation_and_owner_restart_rules",
+        "day_seven_and_phase_one_evidence_gates_without_running_a_pilot"
       ],
       "production_behavior_changed": false
     },
@@ -991,6 +1009,57 @@
       "unknown_dependency_policy": "fail_closed_as_legacy_archive",
       "physical_delete_rename_or_move_performed": false,
       "production_test_schema_migration_or_format_changed": false
+    },
+    "field_acceptance_pilot_protocol_decision": {
+      "status": "documented_in_issue_167_pilot_not_run",
+      "document": "docs/167_field_acceptance_metrics_and_pilot_protocol.md",
+      "daily_template": "docs/pilot/field_pilot_daily_log_template.md",
+      "summary_template": "docs/pilot/field_pilot_summary_template.md",
+      "metric_ids": [
+        "M01_CAPTURE_DURATION",
+        "M02_RETRIEVAL_DURATION",
+        "M03_CONFIRMED_DATA_LOSS",
+        "M04_MISSED_FOLLOW_UP",
+        "M05_ATTACHMENT_INTEGRITY_FAILURE",
+        "M06_BACKUP_VERIFY_PASS_RATE",
+        "M07_CLEAN_RESTORE_PASS_RATE",
+        "M08_EXTERNAL_FALLBACK_RATE",
+        "M09_SCOPE_PRIVACY_LEAK",
+        "M10_MEASUREMENT_COMPLETENESS"
+      ],
+      "capture_target": {
+        "median_seconds_max": 30,
+        "p90_seconds_max": 60,
+        "failure_rate_percent_max": 5
+      },
+      "retrieval_target": {
+        "median_seconds_max": 20,
+        "p90_seconds_max": 45,
+        "success_rate_percent_min": 95
+      },
+      "seven_day_minimum": {
+        "calendar_days": 7,
+        "active_days": 5,
+        "capture_samples": 10,
+        "retrieval_samples": 8
+      },
+      "thirty_day_minimum": {
+        "calendar_days": 30,
+        "active_days": 20,
+        "capture_samples": 40,
+        "retrieval_samples": 24,
+        "clean_restore_passes": 1
+      },
+      "safety_events_are_census_not_sampled": true,
+      "confirmed_data_loss_critical_missed_follow_up_attachment_failure_and_privacy_leak_target": 0,
+      "backup_verify_target_percent": 100,
+      "suspected_safety_event_stops_pilot_until_triage": true,
+      "confirmed_safety_blocker_requires_new_revalidation_window": true,
+      "insufficient_evidence_is_pass": false,
+      "real_record_content_or_identifiers_allowed_in_pilot_log": false,
+      "telemetry_or_analytics_implemented": false,
+      "real_pilot_run": false,
+      "production_test_schema_migration_ui_cli_or_format_changed": false
     },
     "field_observation_record_contract": {
       "status": "defined_documentation_only",
@@ -1189,11 +1258,11 @@
     }
   },
   "protected_paths": {
-    "app_and_tests": "must_remain_unchanged_in_issue_165_legacy_inventory",
-    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_165",
-    "backup_and_export_production": "must_remain_unchanged_in_issue_165",
-    ".github/workflows": "must_remain_unchanged_in_issue_165",
-    "requirements.txt_and_pyproject.toml": "must_remain_unchanged_in_issue_165",
+    "app_and_tests": "must_remain_unchanged_in_issue_167_field_acceptance_protocol",
+    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_167",
+    "backup_and_export_production": "must_remain_unchanged_in_issue_167",
+    ".github/workflows": "must_remain_unchanged_in_issue_167",
+    "requirements.txt_and_pyproject.toml": "must_remain_unchanged_in_issue_167",
     "reports": "user_files_preserved_untracked_and_unchanged",
     "exports/.gitkeep": "must_remain_present_and_unchanged",
     "ignored_zip_and_cache": "must_remain_unchanged"
@@ -1210,18 +1279,20 @@
     "pull_request_creation_by_codex": false,
     "merge_authorized": false,
     "branch_deletion_authorized": false,
-    "final_remote_sha_evidence_location": "GitHub Issue #165 completion comment after push"
+    "final_remote_sha_evidence_location": "GitHub Issue #167 completion comment after push"
   },
   "required_files": [
-    ".cse/tasks/165_task.md",
-    ".cse/results/165_result.md",
+    ".cse/tasks/167_task.md",
+    ".cse/results/167_result.md",
     ".cse/state/project_state.json",
-    "docs/165_legacy_model_inventory_and_deprecation_plan.md",
-    "learning/165_legacy_model_inventory_and_deprecation_plan.md",
+    "docs/167_field_acceptance_metrics_and_pilot_protocol.md",
+    "docs/pilot/field_pilot_daily_log_template.md",
+    "docs/pilot/field_pilot_summary_template.md",
+    "learning/167_field_acceptance_metrics_and_pilot_protocol.md",
     "ROADMAP.md",
     "CHANGELOG.md",
     "docs/project_decisions.md"
   ],
-  "workflow_status": "issue_165_local_verified_not_yet_published",
+  "workflow_status": "issue_167_local_verified_not_yet_published",
   "forbidden_scope_added": false
 }
