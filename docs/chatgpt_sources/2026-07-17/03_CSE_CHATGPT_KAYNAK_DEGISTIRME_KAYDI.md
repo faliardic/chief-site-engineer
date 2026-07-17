@@ -1,47 +1,49 @@
 # CSE ChatGPT Kaynak Değiştirme Kaydı
 
-**Sürüm:** 2026-07-17.1  
-**Amaç:** ChatGPT proje kaynaklarındaki eski ve çelişen CSE belgelerini temiz bir current-source
-setiyle değiştirmek.
+**Sürüm:** 2026-07-17.2  
+**Karar:** CSE kaynakları yalnız GitHub repository içinde tutulur; ChatGPT proje kaynakları panelinde dosya saklanmaz.
 
 ---
 
-## 1. Önerilen aktif kaynak seti
+## 1. Yeni kaynak modeli
 
-ChatGPT projesinde aktif ve bağlayıcı kaynak olarak yalnız şu dört yeni Markdown dosyasını kullanın:
+Bundan sonra ChatGPT CSE bağlamını GitHub üzerinden okur. Kaynak sırası:
 
-1. `01_CSE_CHATGPT_KANONIK_BAGLAM_2026-07-17.md`
-2. `02_CSE_UYGULANABILIR_YOL_HARITASI_2026_2.md`
-3. `03_CSE_CHATGPT_KAYNAK_DEGISTIRME_KAYDI.md`
-4. `04_ISSUE_141_VE_PR_142_DURUM_KANITI.md`
+1. GitHub `master`, açık/merged PR, Issue ve branch kanıtı
+2. O anda tek aktif GitHub Issue
+3. `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
+4. `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
+5. `.cse/state/project_state.json` ve ilgili task/result kayıtları
+6. `README.md`, `ROADMAP.md`, `CHANGELOG.md`, `docs/project_decisions.md`
+7. `docs/chatgpt_sources/` altındaki tarihli bağlam ve yönlendirme kaynakları
+8. Tarihsel PDF, ZIP ve eski belgeler
 
-Bunlar güncel GitHub truth, uygulanmış/planlanmış ayrımı, 193 adımlı roadmap ve kaynak
-otoritesini birlikte taşır.
-
----
-
-## 2. Mevcut yüklemeler için karar
-
-| Mevcut dosya | Karar | Gerekçe |
-|---|---|---|
-| `CHIEF_SITE_ENGINEER_EXE_BIRLESTIRILMIS_PROJE_KAYNAGI(1).md` | Aktif kaynaklardan çıkar | 11 Temmuz snapshot'ıdır; eski kullanıcı/rol/özel alan/handover ve eski safe-point bilgileri taşır. Güncel tracked kaynak 16 Temmuz ve sonrası GitHub gerçeğidir. |
-| `CSE_STRATEGIC_PRODUCT_DIRECTION.md` | Aktif kaynaklardan çıkar | Stratejik fikirlerin çoğu yeni kanonik bağlama işlendi; hedef kullanıcı ve saha MVP dili güncellendi. |
-| `1. CSE önce güvenilir veri omurgası.txt` | Aktif kaynaklardan çıkar veya yalnız tarihsel tut | Değişmez ilkeler entegre edildi; çok kullanıcılı devir/özel alan maddeleri current tek-sahipli ürün kararıyla birlikte yeniden yorumlandı. |
-| `CSE_CHAT_HANDOFF_PROTOCOL_SOURCE_PACKAGE.zip` | Aktif kaynaklardan çıkar | Haziran tarihli handoff snapshot'ı; GitHub-native continuation ve current Issue düzeninin yerine geçemez. ZIP içerikleri kaynak parser'ında da güvenilir current truth değildir. |
-| `CSE derin mevcut durum araştırması.pdf` | Aktif current kaynaklardan çıkar; yerel arşivde tut | Değerli 17 Temmuz denetimidir fakat bazı hükümleri öneridir: kişisel/resmî ayrımın tamamen kaldırılması, ZIP eşliği ve o andaki repo snapshot'ı current karar değildir. Önerileri #127 programına işlendi. |
-| `Şantiye Şefi İçin Dünya Örneklerine Dayalı Kontrol, Takip ve Arşivleme Sistemi Yol Haritası.pdf` | İsteğe bağlı tarihsel araştırma | Ürün araştırması olarak değerlidir; current status veya uygulama sırası değildir. Aktif kaynakta tutulacaksa yeni kanonik dosyaların altında önceliğe sahiptir. |
-| `CHIEF_SITE_ENGINEER_Guncel_Yol_Haritasi_Ozel_Alan_Ekli.pdf` | İsteğe bağlı tarihsel araştırma | Uzun vadeli modül fikirleri içerir; multi-user/özel alan/devir kararları current ürün yönünü yönetmez. |
-
-En temiz kurulum, eski yedi yüklemeyi ChatGPT projesinden kaldırıp yalnız yeni dört Markdown
-dosyasını yüklemektir. Araştırma PDF'leri yerel arşivde korunabilir.
+`docs/chatgpt_sources/` dosyaları GitHub current truth’un yerine geçmez; ChatGPT’nin hızlı başlangıç ve kaynak çözümleme katmanıdır.
 
 ---
 
-## 3. Bilinen çelişkilerin kesin çözümü
+## 2. ChatGPT proje kaynaklarından silinecek dosyalar
+
+Aşağıdaki yüklemeler ChatGPT proje kaynakları panelinden kaldırılır:
+
+- `CHIEF_SITE_ENGINEER_EXE_BIRLESTIRILMIS_PROJE_KAYNAGI(1).md`
+- `CSE_STRATEGIC_PRODUCT_DIRECTION.md`
+- `1. CSE önce güvenilir veri omurgası.txt`
+- `CSE_CHAT_HANDOFF_PROTOCOL_SOURCE_PACKAGE.zip`
+- `CSE derin mevcut durum araştırması.pdf`
+- `Şantiye Şefi İçin Dünya Örneklerine Dayalı Kontrol, Takip ve Arşivleme Sistemi Yol Haritası.pdf`
+- `CHIEF_SITE_ENGINEER_Guncel_Yol_Haritasi_Ozel_Alan_Ekli.pdf`
+- Geçici `CSE_CHATGPT_SOURCE_UPDATE_2026-07-17` Markdown/JSON/TXT/ZIP dosyaları
+
+Bu dosyaların yerel arşivde tutulması mümkündür; ChatGPT current source olarak kullanılmazlar.
+
+---
+
+## 3. Bilinen çelişkilerin çözümü
 
 ### Kişisel takip / resmî gözlem
 
-Eski rapor “ayrımı kaldır” der. Güncel çözüm:
+Güncel yön:
 
 ```text
 Tek Hafıza kullanıcı deneyimi
@@ -51,67 +53,50 @@ Tek Hafıza kullanıcı deneyimi
 + ortak MemoryIndex / RecordRef read-model
 ```
 
-Bu karar henüz ADR ve production implementation olarak tamamlanmamıştır.
+Bu karar ADR ve production implementation tamamlanana kadar mevcut davranışı sessizce değiştirmez.
 
 ### Çoklu kullanıcı, rol, tenant ve SaaS
 
-Eski yol haritalarındaki bu hedefler current ürün kapsamı değildir. CSE yalnız şantiye şefinin
-single-owner kişisel saha asistanıdır.
+Current ürün kapsamı değildir. CSE yalnız şantiye şefinin single-owner kişisel saha asistanıdır.
 
-### Devir / handover
+### Backup / Hafızayı İndir / Proje Paketi
 
-Handover başlı başına kurumsal ürün modülü değildir. İlerideki `Proje Paketi`, yalnız seçili project
-scope için kontrollü paylaşım/devir çıktısıdır. `Hafızayı İndir` ve `Backup` ayrı kalır.
+Üç ayrı çıktı sözleşmesidir:
 
-### Mevcut ürün seviyesi
+- Backup: felaket kurtarma
+- Hafızayı İndir: bütün kişisel hafızanın insan okunur ve doğrulanabilir arşivi
+- Proje Paketi: seçili proje/project scope için paylaşım çıktısı
 
-Eski kaynaklarda persistence, UI veya Saha Takibi eksik yazabilir. Current master bunları içerir.
-Buna karşılık mobile/offline/notification/app-lock/plan/package/metraj/AI hâlâ uygulanmamıştır.
+### Güncel güvenli nokta
 
-### Güncel safe point
+Bu snapshot hazırlanırken:
 
-- Merged safe point: `1d4b2b7...`
-- Issue #141 branch: `ac2942b...`
-- Draft PR: `#142`
-- PR merge edilmeden `ac2942b...` merged safe point değildir.
+- merged safe point `1d4b2b7...` idi;
+- Issue #141 branch commit’i `ac2942b...` idi;
+- Draft PR #142 açık ve merge edilmemişti.
 
-### State dosyasındaki pre-commit metadata
-
-`.cse/state/project_state.json` ve `.cse/results/141_result.md` içinde commit/push öncesi olgusal
-ifadeler bulunabilir. Metadata churn yasağı nedeniyle final branch SHA ve push sonucu Issue #141
-completion comment'inde tutulmuştur. Bu durumda GitHub completion evidence üstündür.
+Değişken durum için current GitHub PR/Issue/master kanıtı her zaman üstündür.
 
 ---
 
-## 4. ChatGPT kaynak güncelleme işlemi
+## 4. GitHub kaynak bakım kuralı
 
-1. Eski aktif kaynakları ChatGPT proje kaynaklarından kaldırın.
-2. Bu paketi açın.
-3. `00_READ_ME_FIRST.md` dosyasını kullanıcı rehberi olarak saklayın.
-4. `01`–`04` Markdown dosyalarını ayrı ayrı ChatGPT proje kaynaklarına yükleyin.
-5. Kaynak testinde şu soruları sorun:
-   - Son merged safe point nedir?
-   - Issue #141 merge edildi mi?
-   - Şu anda çalışan özellikler hangileri?
-   - Private/project ayrımı kaldırıldı mı?
-   - Faz 6 başlamış mıdır?
-6. Beklenen yanıtlar:
-   - Safe point `1d4b2b7...`
-   - Issue #141 tamamlanmış branch'tir; PR #142 açık ve unmerged
-   - PC Saha Takibi çalışır
-   - Private/project kapsamı mevcut davranışta korunur; tek Hafıza ADR'si backlog'dur
-   - Faz 6 başlamamıştır
+- Yeni kaynak dosyası doğrudan `master` üzerine yazılmaz.
+- Ayrı dar Issue ve branch kullanılır.
+- Mevcut açık PR’ın kapsamı sonradan genişletilmez.
+- Kaynak güncellemesi production davranışı değiştirmiyorsa dokümantasyon-only olarak açıkça belirtilir.
+- Merge edilmemiş branch current merged safe point olarak gösterilmez.
+- Aynı bilginin çok sayıda kopyası oluşturulmaz; ayrıntılı roadmap için GitHub Issue #127 ve #128–#140 kayıtları kanoniktir.
+- Tarihli bağlam dosyaları stale olduğunda silinmek zorunda değildir; üstlerine yeni tarihli snapshot eklenebilir ve current index güncellenebilir.
 
 ---
 
-## 5. Merge sonrası bakım
+## 5. Yeni sohbet başlangıcı
 
-PR #142 squash merge edilince:
+Yeni bir CSE sohbetinde ChatGPT:
 
-- merged commit SHA belirlenir;
-- `01_CSE_CHATGPT_KANONIK_BAGLAM_2026-07-17.md` içindeki safe point güncellenir;
-- `04_ISSUE_141_VE_PR_142_DURUM_KANITI.md` merged duruma çevrilir;
-- Issue #141 kapatılır;
-- Faz 0'dan seçilen yeni tek aktif Issue kaynaklara eklenir.
-
-Bütün 193 adımlı roadmap dosyasını yalnız phase kapsamı değişirse yeniden üretmek gerekir.
+1. Repository `master` ve açık PR’ları doğrular.
+2. Tek aktif Issue’yu belirler.
+3. Kanonik protokol dosyalarını okur.
+4. Gerekirse en yeni `docs/chatgpt_sources/` tarihli snapshot’ını kullanır.
+5. Eski ChatGPT yüklemelerine veya ZIP snapshot’larına dayanmaz.
