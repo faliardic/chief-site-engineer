@@ -1,5 +1,14 @@
 # Changelog
 
+## Issue 141 - Repository Truth ve Execution Roadmap Senkronizasyonu
+
+- Issue #119'un ilk test edilebilir PC Saha Takibi web yüzeyi PR #126 ile `1d4b2b7f9ace5e7d474c4893d24404ceae2faede` merge commit'inde `master` üzerine alındı.
+- Merge edilen yüzey `/today`, hızlı `+ Unutma`, Unutma Kutusu, follow-up ayrıntı ve yaşam döngüsü, rutinler, routine occurrence işlemleri, restart kalıcılığı ve resmî export izolasyonu kabiliyetlerini içeriyor.
+- PR #126 kanıtı full suite için `983 passed, 7 skipped` sonucunu, boş protected-path diff'ini ve gerçek kullanıcı data root'unun kullanılmadığını doğruluyor.
+- Issue #127 uygulanabilir geliştirme programı, #128–#140 faz backlog'u ve Issue #141'in Faz 0 içindeki tek aktif repository truth görevi README, ROADMAP, proje kararları ve state kaydında görünür kılındı.
+- Bu değişiklik yalnız dokümantasyon/state/task/result senkronizasyonudur; production Python, test, schema, migration, template, CSS, requirements, workflow, backup/export formatı veya gerçek kullanıcı verisi değiştirilmedi.
+- Tek Hafıza, archive/unarchive, `MemoryIndex`, mobil runtime, plan, paket, arama/AI ve owner-only güvenlik henüz uygulanmış gibi gösterilmedi; bunlar ilgili sonraki dar Issue'ların kapsamındadır.
+
 ## Issue 119 - İlk Test Edilebilir PC Saha Takibi Arayüzü
 
 - Mevcut Flask web uygulamasında observation, follow-up ve routine application service'leri aynı data root altındaki `cse.sqlite3` dosyasına açık config anahtarlarıyla bağlandı.
