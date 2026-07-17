@@ -1,5 +1,19 @@
 # Proje Kararlari
 
+## Issue 147 - MemoryIndex / RecordRef Read-Model Kararları
+
+- `MemoryIndex`, ayrı observation/follow-up/routine occurrence domain kaynaklarından üretilen, source of truth olmayan ve tamamen yeniden kurulabilen ortak Hafıza read-model'idir. `RecordRef` source mutation veya otomatik repair yapamaz.
+- Kanonik ref anahtarı `(record_type, source_id)` çiftidir. Tek alan isteyen consumer için kararlı token `cse-record-ref/v1/{record_type}/{source_id}` biçiminde deterministik türetilir; random surrogate kimlik kullanılmaz.
+- İlk `record_type` allowlist'i `observation`, `follow_up`, `routine_occurrence` değerleridir. Yeni tür ancak source, mapping, scope, status, search, deep-link, rebuild, privacy ve test sözleşmesiyle eklenebilir.
+- Ortak status `open | waiting | completed | cancelled` sözlüğüne normalize edilir; kaynak status/outcome ayrıntısı zorunlu `status_detail` alanında kayıpsız kalır. Terminal kayıt index'ten çıkarılmaz ve archive ile karıştırılmaz.
+- `RecordRef`; Issue'daki minimum alanlara ek olarak `record_ref_id`, `status_detail`, `detail_path` ve dependency drift'ini de kapsayan `source_fingerprint` taşır. Mapping değişikliği `projection_version` artışı ve rebuild ister.
+- Observation `occurred_at=observed_at`; follow-up `occurred_at=created_at`; routine occurrence `occurred_at=scheduled_at_utc` kullanır. Timeline eşitlik sırası sabit record type order ve source ID ile çözülür.
+- Scope kaynağı ADR-0001'dir; project bağlantısından inference yapılmaz. Scope source alanı uygulanana kadar observation `project`, follow-up ve occurrence `private` compatibility mapping'i kullanılır. Sonraki source scope geçişi version bump/rebuild ister.
+- Normal source mutation, append-only event ve idempotent ref upsert aynı transaction'da commit edilir. Explicit rebuild source ID'ye göre deterministic tarama, shadow generation, validation ve atomik aktivasyon kullanır; partial generation görünür olmaz.
+- Drift missing/orphan/duplicate/stale revision/fingerprint/projection version/alan/privacy sınıflarında read-only diagnostic olarak görünür; source kaydı otomatik değiştirmez. Maintenance durumu `ready | stale | rebuilding | failed` olur.
+- Hafıza, literal arama, timeline, dashboard, haftalık özet, Hafızayı İndir inventory ve diagnostic read-model'i okuyabilir. Mutation source application service'e gider; resmî/proje çıktısı source scope/project/archive/attachment/publication sınırlarını yeniden ve fail-closed doğrular.
+- Production kodu, test, schema, migration, persistence, UI ve çıktı formatları bu ADR'de uygulanmadı.
+
 ## Issue 145 - Tek Hafıza ve Kayıt Kapsamı Kararları
 
 - Kullanıcı ana navigasyonda ayrı kişisel/resmî uygulama dünyaları görmez; bütün kayıt türleri tek **Hafıza** arama ve timeline deneyiminde bulunabilir. Kaynak domain tabloları ve yaşam döngüleri tek tabloya birleştirilmez.
