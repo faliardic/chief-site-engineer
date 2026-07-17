@@ -1,30 +1,32 @@
 {
   "state_version": 2,
   "legacy_last_numbered_step": 225,
-  "current_issue": 147,
+  "current_issue": 148,
   "base_branch": "master",
-  "base_commit": "ccf47a46fa4252446b1790437bc56371a028b406",
+  "base_commit": "8fb95811a2e55375081217470e90d7e8d385e8b2",
   "active_work": {
-    "issue": 147,
-    "type": "memory_index_record_ref_read_model_adr",
+    "issue": 148,
+    "type": "backup_memory_download_project_package_separation_adr",
     "issue_state": "active",
     "review_status": "local_verified_not_yet_published",
     "binding_execution_epic": 127,
     "binding_phase_epic": 128,
     "product_epic": 105,
     "field_tracking_epic": 97,
-    "branch": "codex/issue-147-memory-index-record-ref-adr",
-    "base_commit": "ccf47a46fa4252446b1790437bc56371a028b406",
+    "branch": "codex/issue-148-output-family-separation-adr",
+    "base_commit": "8fb95811a2e55375081217470e90d7e8d385e8b2",
     "commit_strategy": "one_ordinary_commit_without_amend_rebase_or_force_push",
     "schema_version": 4,
     "backup_format_version": 1,
+    "memory_download_format_version": null,
+    "project_package_format_version": null,
     "daily_export_format_version": 1,
     "restorable_schema_versions": [2, 3, 4],
     "production_behavior_changed": false,
     "real_user_data_root_accessed": false,
     "merge_claim": false,
     "pull_request_created": false,
-    "full_test_summary": "983 passed, 7 skipped in 22.83s",
+    "full_test_summary": "983 passed, 7 skipped in 28.84s",
     "compileall_passed": true,
     "state_json_valid": true,
     "diff_check_passed": true,
@@ -34,18 +36,18 @@
   },
   "current_safe_point": {
     "semantics": "latest_merged_finalized_checkpoint",
-    "issue": 145,
+    "issue": 147,
     "issue_state": "completed",
-    "pull_request": 146,
+    "pull_request": 159,
     "pull_request_state": "merged",
-    "merge_commit": "ccf47a46fa4252446b1790437bc56371a028b406",
-    "local_test_summary": "983 passed, 7 skipped in 27.20s (Issue #145 local verification; production and tests unchanged)"
+    "merge_commit": "8fb95811a2e55375081217470e90d7e8d385e8b2",
+    "local_test_summary": "983 passed, 7 skipped in 22.83s (Issue #147 local verification; production and tests unchanged)"
   },
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
-    "local_master_sha": "ccf47a46fa4252446b1790437bc56371a028b406",
-    "origin_master_sha": "ccf47a46fa4252446b1790437bc56371a028b406",
+    "local_master_sha": "8fb95811a2e55375081217470e90d7e8d385e8b2",
+    "origin_master_sha": "8fb95811a2e55375081217470e90d7e8d385e8b2",
     "divergence": "0 0",
     "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
     "misspelled_workspace_present": false,
@@ -187,6 +189,11 @@
       "model": "standart full Codex",
       "reasoning": "high",
       "reason": "documentation_only_read_model_contract_three_domain_mappings_privacy_boundary_and_repository_truth_consistency"
+    },
+    "issue_148_selection": {
+      "model": "standart full Codex",
+      "reasoning": "high",
+      "reason": "documentation_only_output_family_separation_manifest_version_verifier_backward_compatibility_privacy_and_repository_truth_consistency"
     }
   },
   "required_source_pre_read": {
@@ -595,6 +602,20 @@
             "project_state": true,
             "task_147": true
         },
+        "issue_148_sources_read": {
+            "unified_project_source": true,
+            "project_instructions": true,
+            "github_issue_148_with_all_comments": true,
+            "github_epics_127_128_105_97": true,
+            "github_issue_145_and_adr_0001": true,
+            "github_issue_147_and_adr_0002": true,
+            "readme_and_roadmap": true,
+            "backup_and_daily_export_operations": true,
+            "backup_export_cli_and_web_routes": true,
+            "backup_restore_daily_export_and_web_backup_tests": true,
+            "project_state": true,
+            "task_148": true
+        },
     "unresolved_conflict_found": false
   },
   "canonical_project_instructions": {
@@ -806,15 +827,15 @@
     "strict_podcast_note_prior_step_summary_contract_implemented_in_step_225": true,
     "field_mvp_product_behavior_added_in_step_225": false,
     "active_program_work": {
-      "issue": 147,
-      "name": "memory_index_record_ref_read_model_adr",
+      "issue": 148,
+      "name": "backup_memory_download_project_package_separation_adr",
       "scope": [
-        "reproducible_common_memory_read_model",
-        "record_ref_identity_and_type_allowlist",
-        "observation_follow_up_routine_occurrence_mappings",
-        "transactional_projection_and_explicit_rebuild",
-        "drift_diagnostics_and_consumer_boundaries",
-        "private_data_fail_closed_output_boundary"
+        "backup_complete_disaster_recovery_and_restore_boundary",
+        "memory_download_complete_owner_archive_without_restore_promise",
+        "project_package_single_project_scope_and_privacy_guards",
+        "daily_export_existing_observation_only_boundary",
+        "independent_format_version_namespaces_and_manifests",
+        "family_specific_verifiers_backward_compatibility_and_encryption_direction"
       ],
       "production_behavior_changed": false
     },
@@ -885,6 +906,52 @@
       "schema_or_migration_implemented": false,
       "projector_or_repository_implemented": false,
       "ui_or_consumer_implemented": false
+    },
+    "output_family_separation_decision": {
+      "status": "accepted_in_issue_148_adr_not_implemented",
+      "adr": "docs/adr/ADR-0003-backup-memory-download-project-package.md",
+      "artifact_families": [
+        "backup",
+        "memory_download",
+        "project_package",
+        "daily_export"
+      ],
+      "backup_primary_purpose": "complete_disaster_recovery_and_supported_restore",
+      "backup_is_partial_or_filtered": false,
+      "backup_includes_private_and_project_sources_events_archives_and_managed_attachments": true,
+      "memory_download_primary_purpose": "complete_human_and_machine_readable_owner_archive",
+      "memory_download_includes_all_scopes_source_content_events_and_attachment_inventory_and_files": true,
+      "memory_download_promises_restore_or_import": false,
+      "project_package_primary_purpose": "shareable_selected_single_project_delivery_or_report",
+      "project_package_allows_private_records_directly": false,
+      "project_id_alone_is_sufficient": false,
+      "project_package_revalidates_source_scope_project_revision_archive_status_references_attachments_and_publication": true,
+      "daily_export_current_format_and_tracking_isolation_changed": false,
+      "format_version_namespaces": [
+        "backup_format_version",
+        "memory_download_format_version",
+        "project_package_format_version",
+        "daily_export_format_version"
+      ],
+      "backup_current_format_version": 1,
+      "memory_download_implemented_format_version": null,
+      "project_package_implemented_format_version": null,
+      "daily_export_current_format_version": 1,
+      "daily_export_v1_historical_wire_key": "format_version",
+      "payload_checksum": "sha256_of_uncompressed_entry_bytes_with_size_bytes",
+      "deterministic_entry_order_required": true,
+      "manifest_self_checksum_in_manifest": false,
+      "unknown_family_or_version_policy": "fail_closed",
+      "verifiers_are_family_specific_and_read_only": true,
+      "future_encryption_direction": {
+        "backup": "mandatory_in_future_encrypted_format_or_envelope",
+        "memory_download": "mandatory_in_future_standard_artifact",
+        "project_package": "optional_by_delivery_channel",
+        "daily_export": "optional_future_envelope"
+      },
+      "production_format_or_verifier_implemented": false,
+      "schema_or_migration_implemented": false,
+      "ui_cli_or_web_route_implemented": false
     },
     "field_observation_record_contract": {
       "status": "defined_documentation_only",
@@ -1083,11 +1150,11 @@
     }
   },
   "protected_paths": {
-    "app_and_tests": "must_remain_unchanged_in_issue_147_memory_index_record_ref_adr",
-    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_147",
-    "backup_and_export_production": "must_remain_unchanged_in_issue_147",
-    ".github/workflows": "must_remain_unchanged_in_issue_147",
-    "requirements.txt_and_pyproject.toml": "must_remain_unchanged_in_issue_147",
+    "app_and_tests": "must_remain_unchanged_in_issue_148_output_family_separation_adr",
+    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_148",
+    "backup_and_export_production": "must_remain_unchanged_in_issue_148",
+    ".github/workflows": "must_remain_unchanged_in_issue_148",
+    "requirements.txt_and_pyproject.toml": "must_remain_unchanged_in_issue_148",
     "reports": "user_files_preserved_untracked_and_unchanged",
     "exports/.gitkeep": "must_remain_present_and_unchanged",
     "ignored_zip_and_cache": "must_remain_unchanged"
@@ -1104,18 +1171,18 @@
     "pull_request_creation_by_codex": false,
     "merge_authorized": false,
     "branch_deletion_authorized": false,
-    "final_remote_sha_evidence_location": "GitHub Issue #147 completion comment after push"
+    "final_remote_sha_evidence_location": "GitHub Issue #148 completion comment after push"
   },
   "required_files": [
-    ".cse/tasks/147_task.md",
-    ".cse/results/147_result.md",
+    ".cse/tasks/148_task.md",
+    ".cse/results/148_result.md",
     ".cse/state/project_state.json",
-    "docs/adr/ADR-0002-memory-index-record-ref-read-model.md",
-    "learning/147_memory_index_record_ref_adr.md",
+    "docs/adr/ADR-0003-backup-memory-download-project-package.md",
+    "learning/148_backup_memory_download_project_package_adr.md",
     "ROADMAP.md",
     "CHANGELOG.md",
     "docs/project_decisions.md"
   ],
-  "workflow_status": "issue_147_local_verified_not_yet_published",
+  "workflow_status": "issue_148_local_verified_not_yet_published",
   "forbidden_scope_added": false
 }

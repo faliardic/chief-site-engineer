@@ -8,7 +8,7 @@
 2A. [x] İlk test edilebilir PC Saha Takibi web yüzeyi — Issue #119 / PR #126 ile merge edildi. Bugün, Unutma Kutusu, hızlı yakalama, follow-up yaşam döngüsü, rutinler, occurrence işlemleri, restart kalıcılığı ve resmî export izolasyonu doğrulandı.
 3. [ ] Issue #127 uygulanabilir geliştirme programını bağımlılık sırasıyla yürüt.
 
-Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme programı Issue #127'dir. Issue #141 ve #143 repository/workflow truth işlerinden sonra Issue #145 / PR #146 Tek Hafıza ve kayıt kapsamı ADR'sini merge etmiştir. Faz 0'ın tek aktif işi Issue #147 ile production davranışı değiştirmeyen `MemoryIndex / RecordRef` read-model ADR'sidir. Açık faz Epic'leri aynı anda aktif production işleri değildir; aynı anda yalnız bir production implementation görevi yürütülür.
+Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme programı Issue #127'dir. Issue #141 ve #143 repository/workflow truth işlerinden sonra Issue #145 / PR #146 Tek Hafıza ve kayıt kapsamı, Issue #147 / PR #159 ise `MemoryIndex / RecordRef` read-model ADR'sini merge etmiştir. Faz 0'ın tek aktif işi Issue #148 ile production davranışı değiştirmeyen Backup / Hafızayı İndir / Proje Paketi ayrım ADR'sidir. Açık faz Epic'leri aynı anda aktif production işleri değildir; aynı anda yalnız bir production implementation görevi yürütülür.
 
 ## Issue #127 Faz Haritası
 
@@ -26,7 +26,20 @@ Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürüt
 - [ ] Issue #139 — Faz 11: deterministik arama, semantik geri çağırma ve kaynaklı AI.
 - [ ] Issue #140 — Faz 12: owner-only güvenlik, bakım, güncelleme ve ürünleştirme.
 
-Issue #141, Faz 0'ın ilk dar repository truth görevi olarak tamamlandı. Issue #145 / PR #146 Tek Hafıza UX ile `private | project` kayıt kapsamını kesinleştirdi. Aktif Issue #147, ortak `MemoryIndex / RecordRef` read-model sözleşmesini tanımlar; Backup / Hafızayı İndir / Proje Paketi format ayrımı sonraki ADR Issue'sunda devam eder. Bu ADR'ler veri modeli, schema veya production davranışını kendi başına uygulamaz.
+Issue #141, Faz 0'ın ilk dar repository truth görevi olarak tamamlandı. Issue #145 / PR #146 Tek Hafıza UX ile `private | project` kayıt kapsamını, Issue #147 / PR #159 ise ortak `MemoryIndex / RecordRef` read-model sözleşmesini kesinleştirdi. Aktif Issue #148 Backup / Hafızayı İndir / Proje Paketi çıktı ailelerini ve mevcut Günlük Çıktı sınırını ayırır. Bu ADR'ler veri modeli, schema veya production davranışını kendi başına uygulamaz.
+
+## Issue 148 - Backup, Hafızayı İndir ve Proje Paketi Ayrım ADR'si
+
+- [x] Backup eksiksiz felaket kurtarma ve yalnız desteklenen format/schema için doğrulanmış Restore ailesi olarak sabitlendi; filtreli/kısmi Backup reddedildi.
+- [x] Hafızayı İndir bütün owner hafızasının iki scope, bütün türler, event geçmişi ve attachment inventory/dosyalarını taşıyan okunabilir kişisel arşivi olarak tanımlandı; Restore garantisi verilmedi.
+- [x] Proje Paketi yalnız seçilen tek projedeki source'tan yeniden doğrulanmış `scope=project` kayıtlar için paylaşılabilir teslim ailesi olarak sınırlandı.
+- [x] Project ID'nin tek başına yetmediği; scope, revision, archive, status, reference, attachment ve publication guard'larının fail-closed çalışacağı kaydedildi.
+- [x] Mevcut tarih/observation odaklı Günlük Çıktı v1'in daha geniş seçilmiş Proje Paketi'nden ayrı kaldığı ve private tracking byte-identical izolasyonunun değişmediği kesinleştirildi.
+- [x] `backup_format_version`, `memory_download_format_version`, `project_package_format_version` ve `daily_export_format_version` bağımsız namespace'leri kabul edildi; mevcut wire anahtarları değiştirilmedi.
+- [x] Manifest minimumları, deterministic entry sırası, uncompressed byte SHA-256/size, strict path/entry doğrulaması ve backward compatibility/fail-closed kuralları tanımlandı.
+- [x] Backup, Hafızayı İndir ve Proje Paketi verifier sorumlulukları ayrıldı; source mutation, repair veya scope/publication değişikliği yasaklandı.
+- [x] Future encryption yönü ve key recovery sorumluluğu aile bazında kaydedildi; implementation ayrı Issue'ya bırakıldı.
+- [x] Production kodu, test, schema, migration, persistence, UI, route, CLI, backup/export formatı ve gerçek kullanıcı verisi değiştirilmedi.
 
 ## Issue 147 - MemoryIndex / RecordRef Read-Model ADR'si
 
@@ -88,13 +101,13 @@ Bu envanter fiziksel silme, rename, import taşıma veya test kaldırma yetkisi 
 
 ## Güncel Doğrulanmış Güvenli Nokta
 
-Issue #145, PR #146 ile squash merge edildi. `master` üzerindeki doğrulanmış merge commit'i:
+Issue #147, PR #159 ile merge edildi. `master` üzerindeki doğrulanmış merge commit'i:
 
 ```text
-ccf47a46fa4252446b1790437bc56371a028b406
+8fb95811a2e55375081217470e90d7e8d385e8b2
 ```
 
-Issue #145'in local full-suite kanıtı `983 passed, 7 skipped` sonucudur. Issue #147 bu commit'ten başlayan documentation/state-only ADR işidir; merge edilene kadar current safe point'i ilerletmez.
+Issue #147'nin local full-suite kanıtı `983 passed, 7 skipped` sonucudur. Issue #148 bu commit'ten başlayan documentation/state-only ADR işidir; merge edilene kadar current safe point'i ilerletmez.
 
 ## Tarihsel Roadmap Kaydı
 
