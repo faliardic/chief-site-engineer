@@ -49,9 +49,9 @@ Cevap hayırsa özellik ertelenir veya kapsam dışı bırakılır.
 5. Kanıt niteliği taşıyan işlemler audit izi bırakacak şekilde tasarlanır; audit davranışı yalnız açık görev kapsamında uygulanır.
 6. Medya dosyaları veritabanına gömülmez; dosya yolu, metadata ve bütünlük kontrolleriyle yönetilir.
 7. Attachment metadata kaydı fiziksel dosya ile bütünlük içinde olmalıdır.
-8. Kişisel çalışma verisi tek sahibine aittir ve resmî export/devir kapsamına otomatik girmez.
+8. `private` çalışma verisi tek sahibine aittir ve resmî/proje output kapsamına otomatik girmez.
 9. Şirketler, ekipler ve diğer kişiler kullanıcı hesabı değil; kişi/kurum ve ilgili taraf kayıt referanslarıdır.
-10. Devir için gerekli bilgi kişisel alanda bırakılmaz; açık kullanıcı işlemiyle resmî kayda veya seçilmiş handover package içine dönüştürülür.
+10. Paylaşım için gerekli bilgi private durumda bırakılmaz; açık kullanıcı işlemiyle project kapsama geçirilir ve source uygunluğu doğrulanmış Proje Paketi veya ilgili çıktıya seçilir.
 11. Hard validation, otomatik blocking, migration, persistence, audit, backup/restore, API, GUI ve CLI çalışmaları ayrı ve açık görev kapsamı gerektirir.
 12. `requires_human_review` yalnız insan inceleme sinyalidir; otomatik kabul, ret, onay veya paket engelleme kararı değildir.
 13. Sistem kendiliğinden `blocked` durumu üretmez.
@@ -87,7 +87,12 @@ Cevap hayırsa özellik ertelenir veya kapsam dışı bırakılır.
 
 Merge edilmiş Local Field MVP; SQLite persistence, managed attachment store, local Flask web akışı, proje/gözlem create-list-detail-update, revision conflict koruması, arama, günlük export, backup/verify/izole restore ve Windows launcher içerir.
 
-Saha Takibi domain/recurrence ile schema v3 repository/event persistence tamamlanmıştır; application service, lazy backfill, backup compatibility, resmî export izolasyonu ve kullanıcı yüzeyi henüz tamamlanmamıştır.
+Saha Takibi domain/recurrence, schema v4 repository/event persistence,
+transactional application service, yedi günlük lazy backfill, Backup/Restore
+compatibility, resmî export izolasyonu ve ilk PC kullanıcı yüzeyi tamamlanmıştır.
+Scope field/conversion, archive/unarchive, MemoryIndex/Hafıza UI,
+Hafızayı İndir, Proje Paketi, mobile/offline ve owner-only security
+implementation'ları henüz tamamlanmamıştır.
 
 Epic #105 bağlayıcı üst yol haritasıdır:
 
@@ -110,6 +115,18 @@ Epic #105 bağlayıcı üst yol haritasıdır:
 Kâğıdı Bırakma Sürümü takip görünümleri, rutin, attachment, arama ve backup görünürlüğüne ek olarak minimum hızlı hesap şeridi ile günlük zaman çizelgesi/düzenlenebilir taslağı da ilk pilot öncesinde içerir.
 
 Multi-user/role/tenant/SaaS/kurumsal portal hedefleri “daha sonra” listesine alınmaz. `local-first`, `Windows-first` değildir; mobil, offline, notification ve owner-only sync gerçek saha pilotlarından önce ele alınır.
+
+### Faz 0 kanonik karar belgeleri
+
+- `docs/adr/ADR-0001-single-memory-and-record-scope.md`
+- `docs/adr/ADR-0002-memory-index-record-ref-read-model.md`
+- `docs/adr/ADR-0003-backup-memory-download-project-package.md`
+- `docs/adr/ADR-0004-owner-only-security-and-data-ownership-threat-model.md`
+
+Bu dört ADR sırasıyla kapsam, projection, artifact ailesi ve owner-only güvenlik
+kararlarını taşır. ADR kararı production implementation kanıtı değildir;
+uygulama durumu current repository kodu, test ve merged commit üzerinden ayrıca
+doğrulanır.
 
 ---
 
@@ -594,4 +611,4 @@ Güncel durum iddiası README, ROADMAP, handoff, ZIP, eski task/result veya sohb
 
 ## 19. Ana Karar Cümlesi
 
-> CSE, yalnız şantiye şefinin kullandığı; `Yakala -> İşle -> Takip et -> Doğrula -> Günlüğe al` döngüsüyle çalışan local-first ve mobile-first kişisel saha asistanıdır. Araç bakımından geniş, kullanıcı modeli bakımından tek sahipli kalır; resmî kayıt ile kişisel çalışma verisini erişim rolüyle değil export/devir kapsamıyla ayırır.
+> CSE, yalnız şantiye şefinin kullandığı; `Yakala -> İşle -> Takip et -> Doğrula -> Günlüğe al` döngüsüyle çalışan local-first ve mobile-first kişisel saha asistanıdır. Araç bakımından geniş, kullanıcı modeli bakımından tek sahipli kalır; kayıt kapsamını erişim rolüyle değil `private | project` output/paylaşım uygunluğuyla ayırır.

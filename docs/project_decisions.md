@@ -1,5 +1,35 @@
 # Proje Kararlari
 
+## Issue 171 - Faz 0 Closure ve Faz 1 Geçiş Kararları
+
+- Faz 0 closure sonucu `PASS`tır. Bu karar P0.01–P0.09 merged kanıtı, current
+  repository truth, compatibility, pilot/security sınırları ve final full-suite
+  kontrolüne dayanır; field-ready veya production-ready iddiası değildir.
+- P0.10, Issue #171 branch'i merge edilmeden Issue #128 üzerinde tamamlandı
+  işaretlenemez. Issue #127 ve #128 bu çalışma sırasında kapatılmaz.
+- Dört kanonik karar belgesi ayrı sorumluluk taşır:
+  `docs/adr/ADR-0001-single-memory-and-record-scope.md`,
+  `docs/adr/ADR-0002-memory-index-record-ref-read-model.md`,
+  `docs/adr/ADR-0003-backup-memory-download-project-package.md` ve
+  `docs/adr/ADR-0004-owner-only-security-and-data-ownership-threat-model.md`.
+- ADR kararı production implementation değildir. Scope field/conversion,
+  archive/unarchive, MemoryIndex, Hafıza UI, Hafızayı İndir, Proje Paketi, app
+  lock ve encryption henüz uygulanmamıştır.
+- SQLite schema `4`, restore schema allowlist `(2, 3, 4)`, Backup format `1` ve
+  Günlük Çıktı format `1` current compatibility gerçeğidir; Issue #171 bunları
+  veya wire manifestlerini değiştirmez.
+- Legacy removal için doğrulanmış silme adayı `0` kalır. Zero-reference,
+  executable replacement, eski veri ve backward compatibility kanıtı olmadan
+  fiziksel silme yoktur.
+- Gerçek 7/30 günlük pilot yürütülmedi. Pilot eksikliği Faz 0 karar closure'ını
+  değil, gelecekteki field/release readiness kapısını açık tutar.
+- Issue #171 merge'i sonrasında sıradaki tek faz Issue #129'dur. İlk dar aday
+  P1.01 olay zamanı sözleşmesi ve migration preflight'tır; archive veya
+  MemoryIndex işine bağımlılık sırası atlanarak başlanmaz.
+- P1.01 için öneri `standart full Codex` ve `High` reasoning'dir. Gerçek schema
+  migration veya daha geniş production değişikliği ayrıca yetkilendirilmeden
+  bu önerinin parçası değildir.
+
 ## Issue 169 - Owner-only Güvenlik ve Veri Sahipliği Kararları
 
 - CSE tek kullanıcı ürünüdür; bu karar auth, app lock, session, encryption veya

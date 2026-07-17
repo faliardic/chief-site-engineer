@@ -1,5 +1,25 @@
 # Changelog
 
+## Issue 171 - Faz 0 Kapanış Doğrulaması ve Faz 1 Geçiş Kapısı
+
+- P0.01–P0.09 için Issue #141/#143/#145/#147/#148/#165/#167/#169 ile merged
+  PR #142/#144/#146/#159/#164/#166/#168/#170 commit zinciri doğrulandı.
+- On zorunlu alan taşıyan closure matrisi repository truth, Tek Hafıza kapsamı,
+  MemoryIndex source sınırı, dört artifact ailesi, legacy removal gate, pilot,
+  security, compatibility ve current PC kabiliyetlerini uzlaştırdı.
+- ADR-0001–ADR-0004 README, ROADMAP, unified source, project instructions ve
+  project decisions içinden exact path ile erişilebilir yapıldı; karar ile
+  production implementation açıkça ayrıldı.
+- README/protokollerdeki eski schema v3, “Saha Takibi UI yok”, #141 ilk aktif
+  iş ve #169 aktif iş drift'i current `master=3024ea45...` gerçeğiyle kapatıldı.
+- Faz 0 sonucu `PASS` olarak kaydedildi; bu sonuç field-ready veya
+  production-ready iddiası değildir ve P0.10 branch merge edilmeden tamamlandı
+  sayılmaz.
+- Sıradaki tek dar aday Issue #129 / P1.01 olay zamanı sözleşmesi ve migration
+  preflight olarak seçildi; Faz 1 Issue, branch veya implementation başlatılmadı.
+- Production Python, test, schema, migration, persistence, UI, route, CLI,
+  Backup/Günlük Çıktı wire formatı ve gerçek kullanıcı verisi değiştirilmedi.
+
 ## Issue 169 - Owner-only Güvenlik ve Veri Sahipliği Tehdit Modeli
 
 - Current MVP'nin loopback-default fakat auth, app lock, secure session, TLS ve
