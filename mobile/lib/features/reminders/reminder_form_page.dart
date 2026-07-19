@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
@@ -35,6 +37,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   TimeOfDay _deadlineTime = const TimeOfDay(hour: 17, minute: 0);
   bool _submitting = false;
   String? _error;
+  StreamSubscription<void>? _projectSubscription;
 
   @override
   void initState() {
@@ -48,6 +51,9 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
     );
     _customDate = DateTime(local.year, local.month, local.day + 1);
     _deadlineDate = _customDate;
+    _projectSubscription = widget.agenda.projectChanges.listen(
+      (_) => _loadProjects(),
+    );
     _loadProjects();
   }
 
@@ -62,6 +68,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
 
   @override
   void dispose() {
+    _projectSubscription?.cancel();
     _title.dispose();
     _description.dispose();
     _location.dispose();

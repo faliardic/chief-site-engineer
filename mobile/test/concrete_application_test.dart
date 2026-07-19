@@ -121,6 +121,180 @@ void main() {
   );
 
   test(
+    'field tasks repeat hourly and completion or clearing closes and reopens',
+    () async {
+      var detail = await concrete.createPour(_createCommand());
+      var fieldTasks = detail.followUps
+          .where(
+            (item) =>
+                item.itemKey == 'inspection_notification_task' ||
+                item.itemKey == 'laboratory_appointment_task',
+          )
+          .toList(growable: false);
+      expect(
+        fieldTasks.map((item) => item.label),
+        containsAll([
+          'Laboratuvar randevusunu al/doğrula',
+          'Yapı denetime haber ver',
+        ]),
+      );
+      expect(
+        fieldTasks.every((item) => item.dueAt == '2026-07-19T08:00:00Z'),
+        isTrue,
+      );
+      final database = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      var bindings = await database.rawQuery(
+        '''
+        SELECT b.repeat_interval_minutes
+        FROM reminder_notification_bindings b
+        JOIN concrete_follow_up_items c ON c.reminder_id = b.reminder_id
+        WHERE c.concrete_pour_id = ?
+          AND c.item_key IN (
+            'inspection_notification_task', 'laboratory_appointment_task'
+          )
+        ORDER BY c.item_key ASC
+      ''',
+        [pourId],
+      );
+      expect(bindings.map((row) => row['repeat_interval_minutes']), [60, 60]);
+      await database.close();
+
+      detail = await concrete.updatePour(
+        _updatePourCommand(
+          detail,
+          eventId: _uuid(170),
+          laboratoryAppointment: '2026-07-19T08:00:00Z',
+          inspectionNotifiedAt: '2026-07-19T07:30:00Z',
+        ),
+      );
+      fieldTasks = detail.followUps
+          .where((item) => item.itemKey.endsWith('_task'))
+          .toList(growable: false);
+      expect(
+        fieldTasks.every(
+          (item) =>
+              item.status == ConcreteFollowUpStatus.completed &&
+              item.dueAt == null,
+        ),
+        isTrue,
+      );
+      expect(
+        detail.linkedReminders
+            .where(
+              (item) => fieldTasks.any((task) => task.reminderId == item.id),
+            )
+            .every((item) => item.status == ReminderStatus.completed),
+        isTrue,
+      );
+
+      now = DateTime.utc(2026, 7, 19, 7, 10);
+      detail = await concrete.updatePour(
+        _updatePourCommand(detail, eventId: _uuid(171)),
+      );
+      fieldTasks = detail.followUps
+          .where((item) => item.itemKey.endsWith('_task'))
+          .toList(growable: false);
+      expect(
+        fieldTasks.every(
+          (item) =>
+              item.status == ConcreteFollowUpStatus.pending &&
+              item.dueAt == '2026-07-19T08:10:00Z',
+        ),
+        isTrue,
+      );
+      final reopenedDatabase = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      bindings = await reopenedDatabase.rawQuery(
+        '''
+        SELECT b.repeat_interval_minutes
+        FROM reminder_notification_bindings b
+        JOIN concrete_follow_up_items c ON c.reminder_id = b.reminder_id
+        WHERE c.concrete_pour_id = ? AND c.item_key LIKE '%_task'
+      ''',
+        [pourId],
+      );
+      await reopenedDatabase.close();
+      expect(bindings.map((row) => row['repeat_interval_minutes']), [60, 60]);
+      expect(await _count(directories.databaseFile, 'follow_up_items'), 8);
+    },
+  );
+
+  test(
+    'sample sets need no manual code and keep generated identity on update',
+    () async {
+      var detail = await concrete.createPour(_createCommand());
+      detail = await concrete.saveSampleSet(
+        SaveConcreteSampleSetCommand(
+          id: _uuid(180),
+          pourId: pourId,
+          eventId: _uuid(181),
+          expectedPourRevision: detail.pour.revision,
+          expectedSampleRevision: 0,
+          sampleCount: 1,
+          sampleLabels: const ['Küp 1'],
+          sampledAt: '2026-07-19T07:00:00Z',
+          expectedResultDates: const [],
+          status: ConcreteSampleStatus.sampled,
+        ),
+      );
+      expect(detail.sampleSets.single.sampleCode, 'Numune seti 1');
+      final first = detail.sampleSets.single;
+      detail = await concrete.saveSampleSet(
+        SaveConcreteSampleSetCommand(
+          id: first.id,
+          pourId: pourId,
+          eventId: _uuid(182),
+          expectedPourRevision: detail.pour.revision,
+          expectedSampleRevision: first.revision,
+          sampleCount: 1,
+          sampleLabels: const ['Küp 1'],
+          sampledAt: '2026-07-19T07:00:00Z',
+          expectedResultDates: const [],
+          status: ConcreteSampleStatus.sampled,
+          note: 'Kod görünmeden güncellendi',
+        ),
+      );
+      expect(detail.sampleSets.single.sampleCode, 'Numune seti 1');
+      detail = await concrete.saveSampleSet(
+        SaveConcreteSampleSetCommand(
+          id: _uuid(183),
+          pourId: pourId,
+          eventId: _uuid(184),
+          expectedPourRevision: detail.pour.revision,
+          expectedSampleRevision: 0,
+          sampleCount: 1,
+          sampleLabels: const ['Küp 2'],
+          sampledAt: '2026-07-19T07:05:00Z',
+          expectedResultDates: const [],
+          status: ConcreteSampleStatus.sampled,
+        ),
+      );
+      expect(detail.sampleSets.map((item) => item.sampleCode), [
+        'Numune seti 1',
+        'Numune seti 2',
+      ]);
+      final restarted = _application(
+        agenda: agenda,
+        attachments: attachments,
+        exports: exports,
+        directories: directories,
+        clock: () => now,
+      );
+      expect(
+        (await restarted.getPourDetail(
+          pourId,
+        )).sampleSets.map((item) => item.sampleCode),
+        ['Numune seti 1', 'Numune seti 2'],
+      );
+    },
+  );
+
+  test(
     'list grouping literal filters deterministic order and restart persistence',
     () async {
       await concrete.createPour(_createCommand());
@@ -695,6 +869,25 @@ SqliteConcreteApplication _application({
   attachmentStore: attachments,
   exportGateway: exports,
   beforeConcreteEventInsert: beforeEvent,
+);
+
+UpdateConcretePourCommand _updatePourCommand(
+  ConcretePourDetail detail, {
+  required String eventId,
+  String? laboratoryAppointment,
+  String? inspectionNotifiedAt,
+}) => UpdateConcretePourCommand(
+  id: detail.pour.id,
+  eventId: eventId,
+  expectedRevision: detail.pour.revision,
+  elementLocation: detail.pour.elementLocation,
+  plannedAt: detail.pour.plannedAt,
+  concreteClass: detail.pour.concreteClass,
+  plannedVolumeM3: detail.pour.plannedVolumeM3,
+  plantName: detail.pour.plantName,
+  laboratoryName: detail.pour.laboratoryName,
+  laboratoryAppointment: laboratoryAppointment,
+  inspectionNotifiedAt: inspectionNotifiedAt,
 );
 
 CreateConcretePourCommand _createCommand({

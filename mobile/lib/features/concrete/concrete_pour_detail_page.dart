@@ -73,6 +73,104 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
     }
   }
 
+  Future<void> _editFieldNotifications() async {
+    final pour = _detail!.pour;
+    var laboratoryComplete = pour.laboratoryAppointment != null;
+    var inspectionComplete =
+        pour.inspectionNotifiedAt != null ||
+        (pour.inspectionNotifiedPerson?.trim().isNotEmpty ?? false);
+    final inspectionPerson = TextEditingController(
+      text: pour.inspectionNotifiedPerson,
+    );
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Laboratuvar ve yapı denetim'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SwitchListTile(
+                  key: const Key('laboratory-appointment-complete'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Laboratuvar randevusu alındı/doğrulandı'),
+                  value: laboratoryComplete,
+                  onChanged: (value) =>
+                      setDialogState(() => laboratoryComplete = value),
+                ),
+                SwitchListTile(
+                  key: const Key('inspection-notification-complete'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Yapı denetime haber verildi'),
+                  value: inspectionComplete,
+                  onChanged: (value) =>
+                      setDialogState(() => inspectionComplete = value),
+                ),
+                TextField(
+                  controller: inspectionPerson,
+                  decoration: const InputDecoration(
+                    labelText: 'Yapı denetim kişisi (opsiyonel)',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Vazgeç'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Kaydet'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final person = inspectionPerson.text;
+    await Future<void>.delayed(kThemeAnimationDuration);
+    inspectionPerson.dispose();
+    if (accepted != true) return;
+    final now = CseTimeCodec.encodeUtc(DateTime.now().toUtc());
+    await _run(
+      () => widget.concrete.updatePour(
+        UpdateConcretePourCommand(
+          id: pour.id,
+          eventId: RecordId.randomUuid(),
+          expectedRevision: pour.revision,
+          elementLocation: pour.elementLocation,
+          plannedAt: pour.plannedAt,
+          concreteClass: pour.concreteClass,
+          plannedVolumeM3: pour.plannedVolumeM3,
+          blockName: pour.blockName,
+          floorName: pour.floorName,
+          axisName: pour.axisName,
+          targetSlump: pour.targetSlump,
+          orderedVolumeM3: pour.orderedVolumeM3,
+          plantName: pour.plantName,
+          plantBranch: pour.plantBranch,
+          plantContact: pour.plantContact,
+          plantAppointmentReference: pour.plantAppointmentReference,
+          pumpEquipment: pour.pumpEquipment,
+          laboratoryName: pour.laboratoryName,
+          laboratoryContact: pour.laboratoryContact,
+          laboratoryAppointment: laboratoryComplete
+              ? pour.laboratoryAppointment ?? now
+              : null,
+          inspectionNotifiedAt: inspectionComplete
+              ? pour.inspectionNotifiedAt ?? now
+              : null,
+          inspectionNotifiedPerson: inspectionComplete ? person : null,
+          generalNote: pour.generalNote,
+          sampleExceptionReason: pour.sampleExceptionReason,
+          varianceNote: pour.varianceNote,
+        ),
+      ),
+    );
+  }
+
   Future<void> _updateCheck(
     ConcreteCheckItem item,
     ConcreteCheckStatus status,
@@ -208,19 +306,15 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
 
   Future<void> _addSample() async {
     final detail = _detail!;
-    final code = TextEditingController();
     final count = TextEditingController(text: '6');
-    final result = await showDialog<(String, int)?>(
+    final result = await showDialog<int>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Numune seti ekle'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
-              controller: code,
-              decoration: const InputDecoration(labelText: 'Numune kodu'),
-            ),
+            const Text('Numune seti uygulama tarafından sırayla adlandırılır.'),
             TextField(
               controller: count,
               keyboardType: TextInputType.number,
@@ -236,8 +330,8 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
           FilledButton(
             onPressed: () {
               final parsed = int.tryParse(count.text);
-              if (code.text.trim().isNotEmpty && parsed != null && parsed > 0) {
-                Navigator.pop(context, (code.text, parsed));
+              if (parsed != null && parsed > 0) {
+                Navigator.pop(context, parsed);
               }
             },
             child: const Text('Ekle'),
@@ -245,7 +339,7 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
         ],
       ),
     );
-    code.dispose();
+    await Future<void>.delayed(kThemeAnimationDuration);
     count.dispose();
     if (result == null) return;
     final now = CseTimeCodec.encodeUtc(DateTime.now().toUtc());
@@ -257,12 +351,8 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
           eventId: RecordId.randomUuid(),
           expectedPourRevision: detail.pour.revision,
           expectedSampleRevision: 0,
-          sampleCode: result.$1,
-          sampleCount: result.$2,
-          sampleLabels: List.generate(
-            result.$2,
-            (index) => '${result.$1}-${index + 1}',
-          ),
+          sampleCount: result,
+          sampleLabels: List.generate(result, (index) => 'Numune ${index + 1}'),
           expectedResultDates: [
             CseTimeCodec.encodeUtc(
               DateTime.now().toUtc().add(const Duration(days: 7)),
@@ -477,6 +567,14 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
                 runSpacing: 8,
                 children: _transitionButtons(pour.status),
               ),
+              OutlinedButton.icon(
+                key: const Key('edit-concrete-field-notifications'),
+                onPressed: _mutating ? null : _editFieldNotifications,
+                icon: const Icon(Icons.notifications_active_outlined),
+                label: const Text(
+                  'Laboratuvar / yapı denetim durumunu güncelle',
+                ),
+              ),
             ]),
             _section(
               'Döküm öncesi checklist • ${detail.metrics.pendingCheckCount} açık',
@@ -592,16 +690,23 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
                     label: const Text('Numune seti ekle'),
                   ),
                 ),
-                for (final item in detail.sampleSets)
+                for (
+                  var index = 0;
+                  index < detail.sampleSets.length;
+                  index += 1
+                )
                   ListTile(
                     title: Text(
-                      '${item.sampleCode} • ${item.sampleCount} adet',
+                      'Numune seti ${index + 1} • '
+                      '${detail.sampleSets[index].sampleCount} adet',
                     ),
                     subtitle: Text(
-                      '${item.status.label}\nSonuç: ${item.expectedResultDates.map(CseTimeCodec.formatIstanbul).join(', ')}',
+                      '${detail.sampleSets[index].status.label}\nSonuç: '
+                      '${detail.sampleSets[index].expectedResultDates.map(CseTimeCodec.formatIstanbul).join(', ')}',
                     ),
                     trailing: IconButton(
-                      onPressed: () => _attach(sample: item),
+                      onPressed: () =>
+                          _attach(sample: detail.sampleSets[index]),
                       icon: const Icon(Icons.add_a_photo_outlined),
                     ),
                   ),

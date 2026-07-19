@@ -317,9 +317,9 @@ void main() {
     },
   );
 
-  for (final schemaVersion in [1, 2, 3, 4]) {
+  for (final schemaVersion in [1, 2, 3, 4, 5, 6]) {
     test(
-      'schema v$schemaVersion package migrates to v5 without count loss',
+      'schema v$schemaVersion package migrates to v6 without count loss',
       () async {
         final oldRoot = await Directory.systemTemp.createTemp(
           'cse_schema${schemaVersion}_',
@@ -369,7 +369,7 @@ void main() {
         );
 
         expect(preflight.manifest.mobileSchemaVersion, schemaVersion);
-        expect(preflight.migratedSchemaVersion, 5);
+        expect(preflight.migratedSchemaVersion, 6);
         final counts = await _tableCounts(directories);
         final hasAgenda = schemaVersion >= 2 ? 1 : 0;
         final hasAttendance = schemaVersion >= 4 ? 1 : 0;
@@ -379,7 +379,11 @@ void main() {
         expect(counts['follow_up_items'], hasAgenda);
         expect(counts['follow_up_events'], hasAgenda);
         expect(counts['reminder_notification_bindings'], hasAgenda);
+        expect(counts['subcontractors'], hasAttendance);
+        expect(counts['workforce_teams'], hasAttendance);
         expect(counts['workforce_members'], hasAttendance);
+        expect(counts['workforce_compliance_records'], 0);
+        expect(counts['workforce_ppe_assignments'], 0);
         expect(counts['attendance_days'], hasAttendance);
         expect(counts['attendance_entries'], hasAttendance);
         expect(counts['attendance_events'], hasAttendance);
@@ -403,7 +407,7 @@ void main() {
     });
     final databaseBytes = await File(directories.databaseFile).readAsBytes();
     final archive = const CseBackupArchiveCodec().encode(
-      manifest: _manifest(databaseBytes, schemaVersion: 6),
+      manifest: _manifest(databaseBytes, schemaVersion: 7),
       databaseBytes: databaseBytes,
       attachments: const {},
     );
@@ -473,7 +477,7 @@ void main() {
       formatVersion: 1,
       appVersion: '0.1.0',
       buildNumber: '1',
-      mobileSchemaVersion: 5,
+      mobileSchemaVersion: 6,
       createdAtUtc: _now,
       database: const BackupManifestFile(
         logicalPath: 'database.sqlite3',
@@ -505,7 +509,7 @@ void main() {
       formatVersion: 1,
       appVersion: '0.1.0',
       buildNumber: '1',
-      mobileSchemaVersion: 5,
+      mobileSchemaVersion: 6,
       createdAtUtc: _now,
       database: BackupManifestFile(
         logicalPath: 'database.sqlite3',
@@ -708,7 +712,7 @@ void main() {
 
 Future<void> _writePackage(File destination, List<int> databaseBytes) async {
   final archive = const CseBackupArchiveCodec().encode(
-    manifest: _manifest(databaseBytes, schemaVersion: 5),
+    manifest: _manifest(databaseBytes, schemaVersion: 6),
     databaseBytes: databaseBytes,
     attachments: const {},
   );
@@ -821,13 +825,70 @@ Future<void> _seedFullFixture(
       'sync_state': 'scheduled',
       'last_synced_at': _now,
     });
+    await tx.insert('subcontractors', {
+      'id': 'subcontractor-1',
+      'project_id': 'project-1',
+      'name': 'Ana yüklenici',
+      'name_normalized': 'ana yüklenici',
+      'status': 'active',
+      'revision': 1,
+      'created_at': _now,
+      'updated_at': _now,
+    });
+    await tx.insert('workforce_teams', {
+      'id': 'team-1',
+      'project_id': 'project-1',
+      'subcontractor_id': 'subcontractor-1',
+      'name': 'Kalıp',
+      'name_normalized': 'kalıp',
+      'status': 'active',
+      'revision': 1,
+      'created_at': _now,
+      'updated_at': _now,
+    });
     await tx.insert('workforce_members', {
       'id': 'worker-1',
       'project_id': 'project-1',
+      'subcontractor_id': 'subcontractor-1',
+      'team_id': 'team-1',
       'full_name': 'Ayşe Usta',
       'team_name': 'Kalıp',
       'role_name': 'Usta',
       'is_active': 1,
+      'revision': 1,
+      'created_at': _now,
+      'updated_at': _now,
+    });
+    await tx.insert('workforce_events', {
+      'id': 'workforce-event-1',
+      'aggregate_type': 'person',
+      'aggregate_id': 'worker-1',
+      'project_id': 'project-1',
+      'sequence': 1,
+      'event_type': 'person.created',
+      'occurred_at': _now,
+      'payload_json': '{}',
+    });
+    await tx.insert('workforce_compliance_records', {
+      'id': 'compliance-1',
+      'workforce_member_id': 'worker-1',
+      'document_type': 'health_report',
+      'document_number': 'RAPOR-1',
+      'issued_date': '2026-07-01',
+      'expiry_date': '2027-07-01',
+      'source_status': 'valid',
+      'revision': 1,
+      'created_at': _now,
+      'updated_at': _now,
+    });
+    await tx.insert('workforce_ppe_assignments', {
+      'id': 'ppe-1',
+      'workforce_member_id': 'worker-1',
+      'ppe_type': 'Baret',
+      'brand_model': 'CSE-01',
+      'quantity': 1,
+      'assigned_date': '2026-07-19',
+      'status': 'assigned',
       'revision': 1,
       'created_at': _now,
       'updated_at': _now,
@@ -985,9 +1046,36 @@ Future<void> _seedLegacySchema(Database database, int schemaVersion) async {
     'last_synced_at': _now,
   });
   if (schemaVersion < 4) return;
+  if (schemaVersion >= 6) {
+    await database.insert('subcontractors', {
+      'id': 'legacy-subcontractor',
+      'project_id': 'legacy-project',
+      'name': 'Legacy taşeron',
+      'name_normalized': 'legacy taşeron',
+      'status': 'active',
+      'revision': 1,
+      'created_at': _now,
+      'updated_at': _now,
+    });
+    await database.insert('workforce_teams', {
+      'id': 'legacy-team',
+      'project_id': 'legacy-project',
+      'subcontractor_id': 'legacy-subcontractor',
+      'name': 'Legacy ekip',
+      'name_normalized': 'legacy ekip',
+      'status': 'active',
+      'revision': 1,
+      'created_at': _now,
+      'updated_at': _now,
+    });
+  }
   await database.insert('workforce_members', {
     'id': 'legacy-worker',
     'project_id': 'legacy-project',
+    if (schemaVersion >= 6) ...{
+      'subcontractor_id': 'legacy-subcontractor',
+      'team_id': 'legacy-team',
+    },
     'full_name': 'Legacy çalışan',
     'team_name': 'Legacy ekip',
     'role_name': 'Usta',
@@ -1034,7 +1122,12 @@ Future<Map<String, int>> _tableCounts(AppDirectories directories) async {
     'follow_up_items',
     'follow_up_events',
     'reminder_notification_bindings',
+    'subcontractors',
+    'workforce_teams',
     'workforce_members',
+    'workforce_events',
+    'workforce_compliance_records',
+    'workforce_ppe_assignments',
     'attendance_days',
     'attendance_entries',
     'attendance_events',
@@ -1062,7 +1155,12 @@ Future<Map<String, Object?>> _fixtureSnapshot(
     'follow_up_items',
     'follow_up_events',
     'reminder_notification_bindings',
+    'subcontractors',
+    'workforce_teams',
     'workforce_members',
+    'workforce_events',
+    'workforce_compliance_records',
+    'workforce_ppe_assignments',
     'attendance_days',
     'attendance_entries',
     'attendance_events',

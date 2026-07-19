@@ -64,6 +64,7 @@ void main() {
       {'version': 3, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 4, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 5, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 6, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
   });
 
@@ -122,6 +123,11 @@ void main() {
         'concrete_follow_up_items',
         'concrete_attachments',
         'concrete_pour_events',
+        'subcontractors',
+        'workforce_teams',
+        'workforce_events',
+        'workforce_compliance_records',
+        'workforce_ppe_assignments',
       ]),
     );
   });
@@ -673,4 +679,192 @@ void main() {
     expect(projectCount, 1);
     expect(partialCount, 0);
   });
+
+  test(
+    'schema 5 to 6 maps legacy teams atomically and preserves exact history',
+    () async {
+      final versionFive = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+        migrations: AppDatabase.foundationMigrations.take(5).toList(),
+      );
+      await versionFive.open();
+      final database = versionFive.database;
+      await database.insert('projects', {
+        'id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'name': 'Korunan proje',
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      for (final value in const [
+        ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1', ' Kalıp '),
+        ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2', 'kalıp'),
+        ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3', ''),
+      ]) {
+        await database.insert('workforce_members', {
+          'id': value.$1,
+          'project_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          'full_name': 'Korunan ${value.$1.substring(value.$1.length - 1)}',
+          'team_name': value.$2,
+          'role_name': 'Usta',
+          'is_active': 1,
+          'revision': 1,
+          'created_at': '2026-07-19T08:00:00Z',
+          'updated_at': '2026-07-19T08:00:00Z',
+        });
+      }
+      await database.insert('attendance_days', {
+        'id': 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        'project_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'local_date': '2026-07-18',
+        'status': 'draft',
+        'revision': 1,
+        'created_at': '2026-07-18T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await database.insert('attendance_entries', {
+        'id': 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        'attendance_day_id': 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        'workforce_member_id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
+        'result': 'full_day',
+        'overtime_minutes': 60,
+        'created_at': '2026-07-18T08:00:00Z',
+        'updated_at': '2026-07-18T08:00:00Z',
+      });
+      await database.update(
+        'attendance_days',
+        {
+          'status': 'completed',
+          'revision': 2,
+          'updated_at': '2026-07-19T08:00:00Z',
+          'completed_at': '2026-07-19T08:00:00Z',
+        },
+        where: 'id = ?',
+        whereArgs: ['cccccccc-cccc-4ccc-8ccc-cccccccccccc'],
+      );
+      await database.insert('attendance_events', {
+        'id': 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        'attendance_day_id': 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        'sequence': 1,
+        'event_type': 'attendance_day.created',
+        'occurred_at': '2026-07-18T08:00:00Z',
+        'payload_json': '{}',
+      });
+      await versionFive.close();
+
+      final failing = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 9),
+        migrations: [
+          ...AppDatabase.foundationMigrations.take(5),
+          DatabaseMigration(
+            version: 6,
+            apply: (transaction) async {
+              await AppDatabase.foundationMigrations[5].apply(transaction);
+              throw StateError('intentional schema 6 failure');
+            },
+          ),
+        ],
+      );
+      await expectLater(failing.open(), throwsA(isA<DatabaseOpenFailure>()));
+      final afterFailure = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      expect(
+        sqflite.Sqflite.firstIntValue(
+          await afterFailure.rawQuery('PRAGMA user_version'),
+        ),
+        5,
+      );
+      expect(
+        sqflite.Sqflite.firstIntValue(
+          await afterFailure.rawQuery(
+            "SELECT count(*) FROM sqlite_master WHERE name = 'subcontractors'",
+          ),
+        ),
+        0,
+      );
+      expect(await afterFailure.query('workforce_members'), hasLength(3));
+      await afterFailure.close();
+
+      final upgraded = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 9),
+      );
+      await upgraded.open();
+      final subcontractors = await upgraded.database.query(
+        'subcontractors',
+        orderBy: 'name_normalized ASC',
+      );
+      final teams = await upgraded.database.query(
+        'workforce_teams',
+        orderBy: 'name_normalized ASC',
+      );
+      final members = await upgraded.database.query(
+        'workforce_members',
+        orderBy: 'id ASC',
+      );
+      final entry = (await upgraded.database.query(
+        'attendance_entries',
+      )).single;
+      final attendanceEvent = (await upgraded.database.query(
+        'attendance_events',
+      )).single;
+      final workforceEvents = await upgraded.database.query('workforce_events');
+
+      expect(subcontractors, hasLength(2));
+      expect(teams, hasLength(2));
+      expect(
+        subcontractors.map((row) => row['name']),
+        containsAll(['Kalıp', 'Tanımsız ekip']),
+      );
+      expect(members.map((row) => row['id']), [
+        'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
+        'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2',
+        'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3',
+      ]);
+      expect(members.every((row) => row['team_id'] != null), isTrue);
+      expect(members[0]['team_id'], members[1]['team_id']);
+      expect(entry['workforce_member_id'], members.first['id']);
+      expect(entry['overtime_minutes'], 60);
+      expect(attendanceEvent['id'], 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
+      expect(workforceEvents, hasLength(7));
+
+      await expectLater(
+        upgraded.database.update(
+          'workforce_events',
+          {'payload_json': '{"changed":true}'},
+          where: 'id = ?',
+          whereArgs: [workforceEvents.first['id']],
+        ),
+        throwsA(isA<DatabaseException>()),
+      );
+      await expectLater(
+        upgraded.database.delete(
+          'subcontractors',
+          where: 'id = ?',
+          whereArgs: [subcontractors.first['id']],
+        ),
+        throwsA(isA<DatabaseException>()),
+      );
+      await expectLater(
+        upgraded.database.insert('subcontractors', {
+          'id': 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+          'project_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          'name': 'KALIP',
+          'name_normalized': 'kalıp',
+          'status': 'active',
+          'revision': 1,
+          'created_at': '2026-07-19T09:00:00Z',
+          'updated_at': '2026-07-19T09:00:00Z',
+        }),
+        throwsA(isA<DatabaseException>()),
+      );
+      await upgraded.close();
+    },
+  );
 }

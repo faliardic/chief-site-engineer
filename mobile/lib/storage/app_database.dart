@@ -25,7 +25,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 5;
+  static const schemaVersion = 6;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -1392,6 +1392,332 @@ class AppDatabase {
         }
       },
     ),
+    DatabaseMigration(
+      version: 6,
+      apply: (transaction) async {
+        await transaction.execute('''
+          CREATE TABLE subcontractors (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES projects(id),
+            name TEXT NOT NULL,
+            name_normalized TEXT NOT NULL,
+            contact_name TEXT,
+            phone TEXT,
+            note TEXT,
+            status TEXT NOT NULL CHECK (status IN ('active', 'archived')),
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            archived_at TEXT,
+            UNIQUE (project_id, name_normalized),
+            UNIQUE (id, project_id),
+            CHECK (
+              (status = 'active' AND archived_at IS NULL)
+              OR (status = 'archived' AND archived_at IS NOT NULL)
+            )
+          )
+        ''');
+        await transaction.execute('''
+          CREATE TABLE workforce_teams (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES projects(id),
+            subcontractor_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            name_normalized TEXT NOT NULL,
+            lead_name TEXT,
+            note TEXT,
+            status TEXT NOT NULL CHECK (status IN ('active', 'archived')),
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            archived_at TEXT,
+            UNIQUE (subcontractor_id, name_normalized),
+            UNIQUE (id, project_id),
+            FOREIGN KEY (subcontractor_id, project_id)
+              REFERENCES subcontractors(id, project_id),
+            CHECK (
+              (status = 'active' AND archived_at IS NULL)
+              OR (status = 'archived' AND archived_at IS NOT NULL)
+            )
+          )
+        ''');
+
+        await transaction.execute(
+          'ALTER TABLE workforce_members ADD COLUMN subcontractor_id TEXT '
+          'REFERENCES subcontractors(id)',
+        );
+        await transaction.execute(
+          'ALTER TABLE workforce_members ADD COLUMN team_id TEXT '
+          'REFERENCES workforce_teams(id)',
+        );
+        await transaction.execute(
+          'ALTER TABLE workforce_members ADD COLUMN phone TEXT',
+        );
+        await transaction.execute(
+          'ALTER TABLE workforce_members ADD COLUMN note TEXT',
+        );
+
+        await transaction.execute('''
+          CREATE TABLE workforce_events (
+            id TEXT PRIMARY KEY,
+            aggregate_type TEXT NOT NULL CHECK (aggregate_type IN (
+              'subcontractor', 'team', 'person', 'compliance', 'ppe'
+            )),
+            aggregate_id TEXT NOT NULL,
+            project_id TEXT NOT NULL REFERENCES projects(id),
+            sequence INTEGER NOT NULL CHECK (sequence >= 1),
+            event_type TEXT NOT NULL,
+            occurred_at TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            UNIQUE (aggregate_type, aggregate_id, sequence)
+          )
+        ''');
+        await transaction.execute('''
+          CREATE TABLE workforce_compliance_records (
+            id TEXT PRIMARY KEY,
+            workforce_member_id TEXT NOT NULL REFERENCES workforce_members(id),
+            document_type TEXT NOT NULL CHECK (document_type IN (
+              'employment_entry', 'health_report', 'basic_safety_training',
+              'vocational_certificate', 'other'
+            )),
+            document_number TEXT,
+            issued_date TEXT,
+            expiry_date TEXT,
+            source_status TEXT NOT NULL CHECK (source_status IN (
+              'valid', 'missing', 'not_applicable', 'exception'
+            )),
+            note TEXT,
+            reason TEXT,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            archived_at TEXT,
+            CHECK (
+              source_status NOT IN ('not_applicable', 'exception')
+              OR (reason IS NOT NULL AND length(trim(reason)) > 0)
+            )
+          )
+        ''');
+        await transaction.execute('''
+          CREATE TABLE workforce_ppe_assignments (
+            id TEXT PRIMARY KEY,
+            workforce_member_id TEXT NOT NULL REFERENCES workforce_members(id),
+            ppe_type TEXT NOT NULL,
+            brand_model TEXT,
+            size TEXT,
+            serial_tag TEXT,
+            quantity INTEGER NOT NULL CHECK (quantity >= 1),
+            assigned_date TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN (
+              'assigned', 'returned', 'lost', 'damaged', 'archived'
+            )),
+            returned_date TEXT,
+            note TEXT,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            archived_at TEXT,
+            CHECK (
+              status != 'returned' OR returned_date IS NOT NULL
+            ),
+            CHECK (
+              status != 'archived' OR archived_at IS NOT NULL
+            )
+          )
+        ''');
+        await transaction.execute(
+          'ALTER TABLE reminder_notification_bindings '
+          'ADD COLUMN repeat_interval_minutes INTEGER CHECK '
+          '(repeat_interval_minutes IS NULL OR repeat_interval_minutes = 60)',
+        );
+
+        final legacyRows = await transaction.rawQuery('''
+          SELECT project_id, team_name, min(created_at) AS created_at,
+            max(updated_at) AS updated_at
+          FROM workforce_members
+          GROUP BY project_id, team_name
+          ORDER BY project_id ASC, team_name COLLATE NOCASE ASC
+        ''');
+        for (final row in legacyRows) {
+          final projectId = row['project_id']! as String;
+          final rawName = (row['team_name']! as String).trim();
+          final name = rawName.isEmpty ? 'Tanımsız ekip' : rawName;
+          final normalized = _normalizeRegistryName(name);
+          final subcontractorId = _migrationStableUuid(
+            'legacy-subcontractor:$projectId:$normalized',
+          );
+          final teamId = _migrationStableUuid(
+            'legacy-team:$projectId:$normalized',
+          );
+          final createdAt = row['created_at']! as String;
+          final updatedAt = row['updated_at']! as String;
+          await transaction.insert('subcontractors', {
+            'id': subcontractorId,
+            'project_id': projectId,
+            'name': name,
+            'name_normalized': normalized,
+            'status': 'active',
+            'revision': 1,
+            'created_at': createdAt,
+            'updated_at': updatedAt,
+          }, conflictAlgorithm: ConflictAlgorithm.ignore);
+          await transaction.insert('workforce_teams', {
+            'id': teamId,
+            'project_id': projectId,
+            'subcontractor_id': subcontractorId,
+            'name': name,
+            'name_normalized': normalized,
+            'status': 'active',
+            'revision': 1,
+            'created_at': createdAt,
+            'updated_at': updatedAt,
+          }, conflictAlgorithm: ConflictAlgorithm.ignore);
+          await transaction.update(
+            'workforce_members',
+            {'subcontractor_id': subcontractorId, 'team_id': teamId},
+            where: 'project_id = ? AND team_name = ?',
+            whereArgs: [projectId, row['team_name']],
+          );
+          await transaction.insert('workforce_events', {
+            'id': _migrationStableUuid(
+              'legacy-subcontractor-event:$subcontractorId',
+            ),
+            'aggregate_type': 'subcontractor',
+            'aggregate_id': subcontractorId,
+            'project_id': projectId,
+            'sequence': 1,
+            'event_type': 'subcontractor.migrated',
+            'occurred_at': updatedAt,
+            'payload_json': '{}',
+          }, conflictAlgorithm: ConflictAlgorithm.ignore);
+          await transaction.insert('workforce_events', {
+            'id': _migrationStableUuid('legacy-team-event:$teamId'),
+            'aggregate_type': 'team',
+            'aggregate_id': teamId,
+            'project_id': projectId,
+            'sequence': 1,
+            'event_type': 'team.migrated',
+            'occurred_at': updatedAt,
+            'payload_json': '{}',
+          }, conflictAlgorithm: ConflictAlgorithm.ignore);
+        }
+        final migratedMembers = await transaction.query(
+          'workforce_members',
+          orderBy: 'project_id ASC, id ASC',
+        );
+        for (final member in migratedMembers) {
+          await transaction.insert('workforce_events', {
+            'id': _migrationStableUuid('legacy-person-event:${member['id']}'),
+            'aggregate_type': 'person',
+            'aggregate_id': member['id'],
+            'project_id': member['project_id'],
+            'sequence': 1,
+            'event_type': 'person.migrated',
+            'occurred_at': member['updated_at'],
+            'payload_json': '{}',
+          });
+        }
+
+        await transaction.execute('''
+          CREATE TRIGGER workforce_members_registry_required_insert
+          BEFORE INSERT ON workforce_members
+          WHEN NEW.subcontractor_id IS NULL OR NEW.team_id IS NULL
+          BEGIN
+            SELECT RAISE(ABORT, 'workforce registry link is required');
+          END
+        ''');
+        await transaction.execute('''
+          CREATE TRIGGER workforce_members_registry_required_update
+          BEFORE UPDATE OF project_id, subcontractor_id, team_id
+          ON workforce_members
+          WHEN NEW.subcontractor_id IS NULL OR NEW.team_id IS NULL
+            OR NOT EXISTS (
+              SELECT 1 FROM workforce_teams t
+              WHERE t.id = NEW.team_id
+                AND t.subcontractor_id = NEW.subcontractor_id
+                AND t.project_id = NEW.project_id
+            )
+          BEGIN
+            SELECT RAISE(ABORT, 'workforce registry link is invalid');
+          END
+        ''');
+        await transaction.execute('''
+          CREATE TRIGGER workforce_members_registry_valid_insert
+          BEFORE INSERT ON workforce_members
+          WHEN NOT EXISTS (
+            SELECT 1 FROM workforce_teams t
+            WHERE t.id = NEW.team_id
+              AND t.subcontractor_id = NEW.subcontractor_id
+              AND t.project_id = NEW.project_id
+          )
+          BEGIN
+            SELECT RAISE(ABORT, 'workforce registry link is invalid');
+          END
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_subcontractors_project_name
+          ON subcontractors(project_id, status, name_normalized, id)
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_workforce_teams_registry
+          ON workforce_teams(
+            project_id, subcontractor_id, status, name_normalized, id
+          )
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_workforce_members_registry
+          ON workforce_members(
+            project_id, subcontractor_id, team_id, is_active, full_name, id
+          )
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_workforce_compliance_member
+          ON workforce_compliance_records(
+            workforce_member_id, archived_at, document_type, expiry_date, id
+          )
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_workforce_ppe_member
+          ON workforce_ppe_assignments(
+            workforce_member_id, status, assigned_date, id
+          )
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_workforce_events_aggregate
+          ON workforce_events(aggregate_type, aggregate_id, sequence, id)
+        ''');
+        for (final table in ['workforce_events']) {
+          await transaction.execute('''
+            CREATE TRIGGER ${table}_append_only_update
+            BEFORE UPDATE ON $table
+            BEGIN
+              SELECT RAISE(ABORT, 'append-only event history');
+            END
+          ''');
+          await transaction.execute('''
+            CREATE TRIGGER ${table}_append_only_delete
+            BEFORE DELETE ON $table
+            BEGIN
+              SELECT RAISE(ABORT, 'append-only event history');
+            END
+          ''');
+        }
+        for (final table in [
+          'subcontractors',
+          'workforce_teams',
+          'workforce_compliance_records',
+          'workforce_ppe_assignments',
+        ]) {
+          await transaction.execute('''
+            CREATE TRIGGER ${table}_no_physical_delete
+            BEFORE DELETE ON $table
+            BEGIN
+              SELECT RAISE(ABORT, 'physical delete is not allowed');
+            END
+          ''');
+        }
+      },
+    ),
   ];
 
   final String path;
@@ -1489,4 +1815,31 @@ class AppDatabase {
       CseTimeCodec.decodeCanonicalUtc(history[index]['applied_at']! as String);
     }
   }
+}
+
+String _normalizeRegistryName(String value) =>
+    value.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+
+String _migrationStableUuid(String seed) {
+  int hash(String value, int salt) {
+    var result = (2166136261 ^ salt) & 0xffffffff;
+    for (final unit in value.codeUnits) {
+      result ^= unit;
+      result = (result * 16777619) & 0xffffffff;
+    }
+    return result;
+  }
+
+  final raw = List.generate(
+    4,
+    (index) =>
+        hash(seed, 0x9e3779b9 * (index + 1)).toRadixString(16).padLeft(8, '0'),
+  ).join();
+  final chars = raw.split('');
+  chars[12] = '4';
+  chars[16] = '8';
+  final value = chars.join();
+  return '${value.substring(0, 8)}-${value.substring(8, 12)}-'
+      '${value.substring(12, 16)}-${value.substring(16, 20)}-'
+      '${value.substring(20)}';
 }

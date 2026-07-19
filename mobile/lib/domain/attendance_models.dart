@@ -40,6 +40,91 @@ enum AttendanceResult {
 
 enum AttendanceTransition { complete, noWork, reopen }
 
+enum WorkforceRecordStatus {
+  active('active', 'Aktif'),
+  archived('archived', 'Pasif');
+
+  const WorkforceRecordStatus(this.storageValue, this.label);
+
+  final String storageValue;
+  final String label;
+
+  static WorkforceRecordStatus fromStorage(String value) => values.firstWhere(
+    (item) => item.storageValue == value,
+    orElse: () => throw const AgendaValidationFailure(
+      'İş gücü kayıt durumu desteklenmiyor.',
+    ),
+  );
+}
+
+class Subcontractor {
+  const Subcontractor({
+    required this.id,
+    required this.projectId,
+    required this.name,
+    required this.contactName,
+    required this.phone,
+    required this.note,
+    required this.status,
+    required this.activeTeamCount,
+    required this.activePersonCount,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.archivedAt,
+  });
+
+  final String id;
+  final String projectId;
+  final String name;
+  final String? contactName;
+  final String? phone;
+  final String? note;
+  final WorkforceRecordStatus status;
+  final int activeTeamCount;
+  final int activePersonCount;
+  final int revision;
+  final String createdAt;
+  final String updatedAt;
+  final String? archivedAt;
+
+  bool get isActive => status == WorkforceRecordStatus.active;
+}
+
+class WorkforceTeam {
+  const WorkforceTeam({
+    required this.id,
+    required this.projectId,
+    required this.subcontractorId,
+    required this.subcontractorName,
+    required this.name,
+    required this.leadName,
+    required this.note,
+    required this.status,
+    required this.activePersonCount,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.archivedAt,
+  });
+
+  final String id;
+  final String projectId;
+  final String subcontractorId;
+  final String subcontractorName;
+  final String name;
+  final String? leadName;
+  final String? note;
+  final WorkforceRecordStatus status;
+  final int activePersonCount;
+  final int revision;
+  final String createdAt;
+  final String updatedAt;
+  final String? archivedAt;
+
+  bool get isActive => status == WorkforceRecordStatus.active;
+}
+
 class WorkforceMember {
   const WorkforceMember({
     required this.id,
@@ -48,6 +133,11 @@ class WorkforceMember {
     required this.teamName,
     required this.roleName,
     required this.personnelCode,
+    this.subcontractorId,
+    this.subcontractorName,
+    this.teamId,
+    this.phone,
+    this.note,
     required this.isActive,
     required this.revision,
     required this.createdAt,
@@ -61,11 +151,174 @@ class WorkforceMember {
   final String teamName;
   final String roleName;
   final String? personnelCode;
+  final String? subcontractorId;
+  final String? subcontractorName;
+  final String? teamId;
+  final String? phone;
+  final String? note;
   final bool isActive;
   final int revision;
   final String createdAt;
   final String updatedAt;
   final String? archivedAt;
+}
+
+enum ComplianceDocumentType {
+  employmentEntry('employment_entry', 'İşe giriş kaydı'),
+  healthReport('health_report', 'Sağlık raporu'),
+  basicSafetyTraining('basic_safety_training', 'Temel İSG eğitimi'),
+  vocationalCertificate('vocational_certificate', 'Mesleki yeterlilik'),
+  other('other', 'Diğer');
+
+  const ComplianceDocumentType(this.storageValue, this.label);
+  final String storageValue;
+  final String label;
+
+  static ComplianceDocumentType fromStorage(String value) => values.firstWhere(
+    (item) => item.storageValue == value,
+    orElse: () =>
+        throw const AgendaValidationFailure('İSG belge türü desteklenmiyor.'),
+  );
+}
+
+enum ComplianceSourceStatus {
+  valid('valid', 'Geçerli'),
+  missing('missing', 'Eksik'),
+  notApplicable('not_applicable', 'Uygulanamaz'),
+  exception('exception', 'İstisna');
+
+  const ComplianceSourceStatus(this.storageValue, this.label);
+  final String storageValue;
+  final String label;
+
+  static ComplianceSourceStatus fromStorage(String value) => values.firstWhere(
+    (item) => item.storageValue == value,
+    orElse: () => throw const AgendaValidationFailure(
+      'İSG belge kaynak durumu desteklenmiyor.',
+    ),
+  );
+}
+
+enum ComplianceReadStatus {
+  valid('Geçerli'),
+  expiring('Süresi yaklaşıyor'),
+  expired('Süresi geçmiş'),
+  missing('Eksik'),
+  exception('İstisna');
+
+  const ComplianceReadStatus(this.label);
+  final String label;
+}
+
+class WorkforceComplianceRecord {
+  const WorkforceComplianceRecord({
+    required this.id,
+    required this.memberId,
+    required this.documentType,
+    required this.documentNumber,
+    required this.issuedDate,
+    required this.expiryDate,
+    required this.sourceStatus,
+    required this.readStatus,
+    required this.note,
+    required this.reason,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.archivedAt,
+  });
+
+  final String id;
+  final String memberId;
+  final ComplianceDocumentType documentType;
+  final String? documentNumber;
+  final String? issuedDate;
+  final String? expiryDate;
+  final ComplianceSourceStatus sourceStatus;
+  final ComplianceReadStatus readStatus;
+  final String? note;
+  final String? reason;
+  final int revision;
+  final String createdAt;
+  final String updatedAt;
+  final String? archivedAt;
+}
+
+enum PpeAssignmentStatus {
+  assigned('assigned', 'Zimmetli'),
+  returned('returned', 'İade edildi'),
+  lost('lost', 'Kayıp'),
+  damaged('damaged', 'Hasarlı'),
+  archived('archived', 'Arşivlendi');
+
+  const PpeAssignmentStatus(this.storageValue, this.label);
+  final String storageValue;
+  final String label;
+
+  static PpeAssignmentStatus fromStorage(String value) => values.firstWhere(
+    (item) => item.storageValue == value,
+    orElse: () => throw const AgendaValidationFailure(
+      'KKD zimmet durumu desteklenmiyor.',
+    ),
+  );
+}
+
+class WorkforcePpeAssignment {
+  const WorkforcePpeAssignment({
+    required this.id,
+    required this.memberId,
+    required this.ppeType,
+    required this.brandModel,
+    required this.size,
+    required this.serialTag,
+    required this.quantity,
+    required this.assignedDate,
+    required this.status,
+    required this.returnedDate,
+    required this.note,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.archivedAt,
+  });
+
+  final String id;
+  final String memberId;
+  final String ppeType;
+  final String? brandModel;
+  final String? size;
+  final String? serialTag;
+  final int quantity;
+  final String assignedDate;
+  final PpeAssignmentStatus status;
+  final String? returnedDate;
+  final String? note;
+  final int revision;
+  final String createdAt;
+  final String updatedAt;
+  final String? archivedAt;
+}
+
+class WorkforcePersonDetail {
+  const WorkforcePersonDetail({
+    required this.member,
+    required this.compliance,
+    required this.ppeAssignments,
+    required this.missingComplianceCount,
+    required this.validComplianceCount,
+    required this.expiringComplianceCount,
+    required this.expiredComplianceCount,
+    required this.activePpeCount,
+  });
+
+  final WorkforceMember member;
+  final List<WorkforceComplianceRecord> compliance;
+  final List<WorkforcePpeAssignment> ppeAssignments;
+  final int missingComplianceCount;
+  final int validComplianceCount;
+  final int expiringComplianceCount;
+  final int expiredComplianceCount;
+  final int activePpeCount;
 }
 
 class AttendanceDay {
@@ -101,6 +354,8 @@ class AttendanceEntry {
     required this.memberId,
     required this.memberName,
     required this.teamName,
+    this.teamId,
+    this.subcontractorName,
     required this.roleName,
     required this.personnelCode,
     required this.memberIsActive,
@@ -116,6 +371,8 @@ class AttendanceEntry {
   final String memberId;
   final String memberName;
   final String teamName;
+  final String? teamId;
+  final String? subcontractorName;
   final String roleName;
   final String? personnelCode;
   final bool memberIsActive;
@@ -156,10 +413,31 @@ class AttendanceTotals {
 }
 
 class AttendanceTeamSummary {
-  const AttendanceTeamSummary({required this.teamName, required this.totals});
+  const AttendanceTeamSummary({
+    required this.teamName,
+    this.teamId,
+    this.subcontractorName,
+    required this.totals,
+  });
 
   final String teamName;
+  final String? teamId;
+  final String? subcontractorName;
   final AttendanceTotals totals;
+}
+
+class ActiveTeamCount {
+  const ActiveTeamCount({
+    required this.teamId,
+    required this.teamName,
+    required this.subcontractorName,
+    required this.activePersonCount,
+  });
+
+  final String teamId;
+  final String teamName;
+  final String subcontractorName;
+  final int activePersonCount;
 }
 
 class AttendanceEvent {
@@ -228,6 +506,11 @@ class CreateWorkforceMemberCommand {
     required this.teamName,
     required this.roleName,
     this.personnelCode,
+    this.subcontractorId,
+    this.teamId,
+    this.phone,
+    this.note,
+    this.eventId,
   });
 
   final String id;
@@ -236,6 +519,11 @@ class CreateWorkforceMemberCommand {
   final String teamName;
   final String roleName;
   final String? personnelCode;
+  final String? subcontractorId;
+  final String? teamId;
+  final String? phone;
+  final String? note;
+  final String? eventId;
 }
 
 class UpdateWorkforceMemberCommand {
@@ -246,6 +534,11 @@ class UpdateWorkforceMemberCommand {
     required this.teamName,
     required this.roleName,
     this.personnelCode,
+    this.subcontractorId,
+    this.teamId,
+    this.phone,
+    this.note,
+    this.eventId,
   });
 
   final String id;
@@ -254,16 +547,25 @@ class UpdateWorkforceMemberCommand {
   final String teamName;
   final String roleName;
   final String? personnelCode;
+  final String? subcontractorId;
+  final String? teamId;
+  final String? phone;
+  final String? note;
+  final String? eventId;
 }
 
 class ArchiveWorkforceMemberCommand {
   const ArchiveWorkforceMemberCommand({
     required this.id,
     required this.expectedRevision,
+    this.eventId,
+    this.archive = true,
   });
 
   final String id;
   final int expectedRevision;
+  final String? eventId;
+  final bool archive;
 }
 
 class EnsureAttendanceDayCommand {
@@ -321,6 +623,7 @@ class MarkAttendanceFullCommand {
     required this.expectedRevision,
     required this.entryIdsByMember,
     this.teamName,
+    this.teamId,
   });
 
   final String dayId;
@@ -328,6 +631,176 @@ class MarkAttendanceFullCommand {
   final int expectedRevision;
   final Map<String, String> entryIdsByMember;
   final String? teamName;
+  final String? teamId;
+}
+
+class CreateSubcontractorCommand {
+  const CreateSubcontractorCommand({
+    required this.id,
+    required this.eventId,
+    required this.projectId,
+    required this.name,
+    this.contactName,
+    this.phone,
+    this.note,
+  });
+  final String id;
+  final String eventId;
+  final String projectId;
+  final String name;
+  final String? contactName;
+  final String? phone;
+  final String? note;
+}
+
+class UpdateSubcontractorCommand {
+  const UpdateSubcontractorCommand({
+    required this.id,
+    required this.eventId,
+    required this.expectedRevision,
+    required this.name,
+    this.contactName,
+    this.phone,
+    this.note,
+  });
+  final String id;
+  final String eventId;
+  final int expectedRevision;
+  final String name;
+  final String? contactName;
+  final String? phone;
+  final String? note;
+}
+
+class TransitionSubcontractorCommand {
+  const TransitionSubcontractorCommand({
+    required this.id,
+    required this.eventId,
+    required this.expectedRevision,
+    required this.archive,
+  });
+  final String id;
+  final String eventId;
+  final int expectedRevision;
+  final bool archive;
+}
+
+class CreateWorkforceTeamCommand {
+  const CreateWorkforceTeamCommand({
+    required this.id,
+    required this.eventId,
+    required this.projectId,
+    required this.subcontractorId,
+    required this.name,
+    this.leadName,
+    this.note,
+  });
+  final String id;
+  final String eventId;
+  final String projectId;
+  final String subcontractorId;
+  final String name;
+  final String? leadName;
+  final String? note;
+}
+
+class UpdateWorkforceTeamCommand {
+  const UpdateWorkforceTeamCommand({
+    required this.id,
+    required this.eventId,
+    required this.expectedRevision,
+    required this.name,
+    this.leadName,
+    this.note,
+  });
+  final String id;
+  final String eventId;
+  final int expectedRevision;
+  final String name;
+  final String? leadName;
+  final String? note;
+}
+
+class TransitionWorkforceTeamCommand {
+  const TransitionWorkforceTeamCommand({
+    required this.id,
+    required this.eventId,
+    required this.expectedRevision,
+    required this.archive,
+  });
+  final String id;
+  final String eventId;
+  final int expectedRevision;
+  final bool archive;
+}
+
+class SaveComplianceRecordCommand {
+  const SaveComplianceRecordCommand({
+    required this.id,
+    required this.eventId,
+    required this.memberId,
+    required this.expectedRevision,
+    required this.documentType,
+    required this.sourceStatus,
+    this.documentNumber,
+    this.issuedDate,
+    this.expiryDate,
+    this.note,
+    this.reason,
+  });
+  final String id;
+  final String eventId;
+  final String memberId;
+  final int expectedRevision;
+  final ComplianceDocumentType documentType;
+  final ComplianceSourceStatus sourceStatus;
+  final String? documentNumber;
+  final String? issuedDate;
+  final String? expiryDate;
+  final String? note;
+  final String? reason;
+}
+
+class ArchiveComplianceRecordCommand {
+  const ArchiveComplianceRecordCommand({
+    required this.id,
+    required this.eventId,
+    required this.expectedRevision,
+  });
+  final String id;
+  final String eventId;
+  final int expectedRevision;
+}
+
+class SavePpeAssignmentCommand {
+  const SavePpeAssignmentCommand({
+    required this.id,
+    required this.eventId,
+    required this.memberId,
+    required this.expectedRevision,
+    required this.ppeType,
+    required this.quantity,
+    required this.assignedDate,
+    required this.status,
+    this.brandModel,
+    this.size,
+    this.serialTag,
+    this.returnedDate,
+    this.note,
+  });
+  final String id;
+  final String eventId;
+  final String memberId;
+  final int expectedRevision;
+  final String ppeType;
+  final int quantity;
+  final String assignedDate;
+  final PpeAssignmentStatus status;
+  final String? brandModel;
+  final String? size;
+  final String? serialTag;
+  final String? returnedDate;
+  final String? note;
 }
 
 class RemoveAttendanceEntryCommand {

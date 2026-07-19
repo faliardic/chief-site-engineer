@@ -60,6 +60,8 @@ void main() {
       expect(gateway, contains('requestBadgePermission: false'));
       expect(gateway, contains('requestSoundPermission: false'));
       expect(gateway, contains('AndroidScheduleMode.inexactAllowWhileIdle'));
+      expect(gateway, contains('periodicallyShowWithDuration'));
+      expect(gateway, contains('repeatIntervalMinutes'));
       expect(project, contains('IPHONEOS_DEPLOYMENT_TARGET = 13.0'));
       expect(project, contains('com.faliardic.chiefsiteengineer'));
       expect(plist, contains('UIApplicationSceneManifest'));
@@ -84,7 +86,7 @@ void main() {
       final pubspec = File('pubspec.yaml').readAsStringSync();
       final lock = File('pubspec.lock').readAsStringSync();
 
-      expect(schema, contains('static const schemaVersion = 5'));
+      expect(schema, contains('static const schemaVersion = 6'));
       expect(schema, contains('CREATE TABLE workforce_members'));
       expect(schema, contains('CREATE TABLE attendance_days'));
       expect(schema, contains('CREATE TABLE attendance_entries'));

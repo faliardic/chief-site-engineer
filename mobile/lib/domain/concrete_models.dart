@@ -681,7 +681,7 @@ class SaveConcreteSampleSetCommand {
     required this.eventId,
     required this.expectedPourRevision,
     required this.expectedSampleRevision,
-    required this.sampleCode,
+    this.sampleCode,
     required this.sampleCount,
     required this.sampleLabels,
     required this.expectedResultDates,
@@ -702,7 +702,7 @@ class SaveConcreteSampleSetCommand {
   final int expectedPourRevision;
   final int expectedSampleRevision;
   final String? sourceTruckId;
-  final String sampleCode;
+  final String? sampleCode;
   final int sampleCount;
   final List<String> sampleLabels;
   final String? sampledAt;

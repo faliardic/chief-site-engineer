@@ -27,6 +27,9 @@ const event3 = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee3';
 const event4 = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee4';
 const event5 = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee5';
 const event6 = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee6';
+const subcontractor1 = '11111111-1111-4111-8111-111111111111';
+const subcontractor2 = '11111111-1111-4111-8111-111111111112';
+const team1 = '22222222-2222-4222-8222-222222222221';
 
 void main() {
   late Directory temporaryRoot;
@@ -140,6 +143,275 @@ void main() {
       member1,
     );
   });
+
+  test(
+    'registry lifecycle is optimistic append-only and blocks active-person archive',
+    () async {
+      final subcontractor = await attendance.createSubcontractor(
+        const CreateSubcontractorCommand(
+          id: subcontractor1,
+          eventId: '33333333-3333-4333-8333-333333333331',
+          projectId: project1,
+          name: '  Örnek   Taşeron  ',
+          contactName: 'Yetkili',
+        ),
+      );
+      expect(subcontractor.name, 'Örnek   Taşeron');
+      final noOp = await attendance.updateSubcontractor(
+        UpdateSubcontractorCommand(
+          id: subcontractor.id,
+          eventId: '33333333-3333-4333-8333-333333333332',
+          expectedRevision: subcontractor.revision,
+          name: subcontractor.name,
+          contactName: subcontractor.contactName,
+        ),
+      );
+      expect(noOp.revision, 1);
+      await expectLater(
+        attendance.createSubcontractor(
+          const CreateSubcontractorCommand(
+            id: subcontractor2,
+            eventId: '33333333-3333-4333-8333-333333333333',
+            projectId: project1,
+            name: 'örnek taşeron',
+          ),
+        ),
+        throwsA(isA<DatabaseException>()),
+      );
+      final team = await attendance.createTeam(
+        const CreateWorkforceTeamCommand(
+          id: team1,
+          eventId: '33333333-3333-4333-8333-333333333334',
+          projectId: project1,
+          subcontractorId: subcontractor1,
+          name: 'Çevre duvarcı',
+        ),
+      );
+      final member = await attendance.createMember(
+        const CreateWorkforceMemberCommand(
+          id: member1,
+          eventId: '33333333-3333-4333-8333-333333333335',
+          projectId: project1,
+          subcontractorId: subcontractor1,
+          teamId: team1,
+          fullName: 'Ayşe Usta',
+          teamName: 'Çevre duvarcı',
+          roleName: 'Duvarcı',
+        ),
+      );
+      final registry = (await attendance.listSubcontractors(project1)).single;
+      expect(registry.activeTeamCount, 1);
+      expect(registry.activePersonCount, 1);
+      expect(
+        (await attendance.listActiveTeamCounts(project1)).single.teamName,
+        contains('Çevre duvarcı'),
+      );
+      await expectLater(
+        attendance.transitionTeam(
+          TransitionWorkforceTeamCommand(
+            id: team.id,
+            eventId: '33333333-3333-4333-8333-333333333336',
+            expectedRevision: team.revision,
+            archive: true,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      await expectLater(
+        attendance.transitionSubcontractor(
+          TransitionSubcontractorCommand(
+            id: subcontractor.id,
+            eventId: '33333333-3333-4333-8333-333333333337',
+            expectedRevision: subcontractor.revision,
+            archive: true,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      final archivedMember = await attendance.archiveMember(
+        ArchiveWorkforceMemberCommand(
+          id: member.id,
+          eventId: '33333333-3333-4333-8333-333333333338',
+          expectedRevision: member.revision,
+        ),
+      );
+      final archivedTeam = await attendance.transitionTeam(
+        TransitionWorkforceTeamCommand(
+          id: team.id,
+          eventId: '33333333-3333-4333-8333-333333333339',
+          expectedRevision: team.revision,
+          archive: true,
+        ),
+      );
+      final archivedSubcontractor = await attendance.transitionSubcontractor(
+        TransitionSubcontractorCommand(
+          id: subcontractor.id,
+          eventId: '33333333-3333-4333-8333-333333333340',
+          expectedRevision: subcontractor.revision,
+          archive: true,
+        ),
+      );
+      expect(archivedMember.isActive, isFalse);
+      expect(archivedTeam.isActive, isFalse);
+      expect(archivedSubcontractor.isActive, isFalse);
+      await expectLater(
+        attendance.transitionTeam(
+          TransitionWorkforceTeamCommand(
+            id: team.id,
+            eventId: '33333333-3333-4333-8333-333333333342',
+            expectedRevision: archivedTeam.revision,
+            archive: false,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      final reopenedSubcontractor = await attendance.transitionSubcontractor(
+        TransitionSubcontractorCommand(
+          id: subcontractor.id,
+          eventId: '33333333-3333-4333-8333-333333333343',
+          expectedRevision: archivedSubcontractor.revision,
+          archive: false,
+        ),
+      );
+      final reopenedTeam = await attendance.transitionTeam(
+        TransitionWorkforceTeamCommand(
+          id: team.id,
+          eventId: '33333333-3333-4333-8333-333333333344',
+          expectedRevision: archivedTeam.revision,
+          archive: false,
+        ),
+      );
+      final reopenedMember = await attendance.archiveMember(
+        ArchiveWorkforceMemberCommand(
+          id: member.id,
+          eventId: '33333333-3333-4333-8333-333333333345',
+          expectedRevision: archivedMember.revision,
+          archive: false,
+        ),
+      );
+      expect(reopenedSubcontractor.isActive, isTrue);
+      expect(reopenedTeam.isActive, isTrue);
+      expect(reopenedMember.isActive, isTrue);
+      await expectLater(
+        attendance.updateTeam(
+          const UpdateWorkforceTeamCommand(
+            id: team1,
+            eventId: '33333333-3333-4333-8333-333333333341',
+            expectedRevision: 1,
+            name: 'Stale ekip',
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      expect(
+        await _count(directories.databaseFile, 'workforce_events'),
+        9,
+        reason: 'no-op and rejected mutations must not append an event',
+      );
+    },
+  );
+
+  test(
+    'compliance date read-model and PPE lifecycle stay person-linked',
+    () async {
+      await _createMember(attendance, id: member1, name: 'Ayşe', team: 'A');
+      final records = <WorkforceComplianceRecord>[];
+      for (final value in const [
+        (
+          '44444444-4444-4444-8444-444444444441',
+          ComplianceDocumentType.employmentEntry,
+          ComplianceSourceStatus.missing,
+          null,
+        ),
+        (
+          '44444444-4444-4444-8444-444444444442',
+          ComplianceDocumentType.healthReport,
+          ComplianceSourceStatus.valid,
+          '2026-07-29',
+        ),
+        (
+          '44444444-4444-4444-8444-444444444443',
+          ComplianceDocumentType.basicSafetyTraining,
+          ComplianceSourceStatus.valid,
+          '2026-07-18',
+        ),
+        (
+          '44444444-4444-4444-8444-444444444444',
+          ComplianceDocumentType.vocationalCertificate,
+          ComplianceSourceStatus.valid,
+          null,
+        ),
+      ]) {
+        records.add(
+          await attendance.saveComplianceRecord(
+            SaveComplianceRecordCommand(
+              id: value.$1,
+              eventId: value.$1.replaceFirst('44444444', '55555555'),
+              memberId: member1,
+              expectedRevision: 0,
+              documentType: value.$2,
+              sourceStatus: value.$3,
+              expiryDate: value.$4,
+            ),
+          ),
+        );
+      }
+      expect(records.map((item) => item.readStatus), [
+        ComplianceReadStatus.missing,
+        ComplianceReadStatus.expiring,
+        ComplianceReadStatus.expired,
+        ComplianceReadStatus.valid,
+      ]);
+      final ppe = await attendance.savePpeAssignment(
+        const SavePpeAssignmentCommand(
+          id: '66666666-6666-4666-8666-666666666661',
+          eventId: '77777777-7777-4777-8777-777777777771',
+          memberId: member1,
+          expectedRevision: 0,
+          ppeType: 'Baret',
+          quantity: 1,
+          assignedDate: '2026-07-19',
+          status: PpeAssignmentStatus.assigned,
+        ),
+      );
+      final detail = await attendance.getPersonDetail(member1);
+      expect(detail.missingComplianceCount, 1);
+      expect(detail.expiringComplianceCount, 1);
+      expect(detail.expiredComplianceCount, 1);
+      expect(detail.validComplianceCount, 1);
+      expect(detail.activePpeCount, 1);
+      final returned = await attendance.savePpeAssignment(
+        SavePpeAssignmentCommand(
+          id: ppe.id,
+          eventId: '77777777-7777-4777-8777-777777777772',
+          memberId: member1,
+          expectedRevision: ppe.revision,
+          ppeType: ppe.ppeType,
+          quantity: ppe.quantity,
+          assignedDate: ppe.assignedDate,
+          status: PpeAssignmentStatus.returned,
+          returnedDate: '2026-07-20',
+        ),
+      );
+      expect(returned.status, PpeAssignmentStatus.returned);
+      expect((await attendance.getPersonDetail(member1)).activePpeCount, 0);
+      await expectLater(
+        attendance.savePpeAssignment(
+          SavePpeAssignmentCommand(
+            id: ppe.id,
+            eventId: '77777777-7777-4777-8777-777777777773',
+            memberId: member1,
+            expectedRevision: ppe.revision,
+            ppeType: ppe.ppeType,
+            quantity: 1,
+            assignedDate: ppe.assignedDate,
+            status: PpeAssignmentStatus.lost,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+    },
+  );
 
   test(
     'roster results summary ordering no-op and stale revision are exact',

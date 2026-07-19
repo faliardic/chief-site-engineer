@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
@@ -33,6 +35,7 @@ class _ConcretePageState extends State<ConcretePage> {
   late String _day;
   bool _loading = true;
   String? _error;
+  StreamSubscription<void>? _projectSubscription;
 
   @override
   void initState() {
@@ -40,11 +43,15 @@ class _ConcretePageState extends State<ConcretePage> {
     _day = CseTimeCodec.istanbulDayKey(
       CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
     );
+    _projectSubscription = widget.agenda.projectChanges.listen(
+      (_) => _loadProjects(),
+    );
     _loadProjects();
   }
 
   @override
   void dispose() {
+    _projectSubscription?.cancel();
     _search.dispose();
     super.dispose();
   }

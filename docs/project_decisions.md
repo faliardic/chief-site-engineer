@@ -2947,3 +2947,34 @@
   Xcode 26, iOS 26 SDK, Apple hesabı ve repository-dışı signing gerektirir.
 - Saha acceptance checklist'i kanıt şablonudur. Kullanıcı cihazında yapılmayan
   adımlar `not run` kalır; Codex gerçek saha kabulü veya store submission yapmaz.
+
+## Issue 194 — Release 0.1 Saha Düzeltmeleri
+
+- Mobil cihaz source-of-truth'u SQLite olarak kalır. Schema `5 → 6` taşeron,
+  ekip, İSG belge, KKD zimmet ve append-only workforce event tablolarını ekler;
+  Ajanda/reminder/Puantaj/Beton satırlarını değiştirmeden atomik ilerler.
+- Legacy `workforce_members.team_name` değeri normalize edilip deterministik
+  UUID ile hem taşeron hem ekip siciline bağlanır. Boş değer `Tanımsız ekip`
+  olur; personel ID, attendance entry ve attendance event geçmişi korunur.
+- Sicil mutation'ları immutable command + expected revision kullanır. Stale
+  fail-closed, no-op revision/event artırmaz; aggregate row ve append-only event
+  tek SQLite transaction'ında yazılır. Fiziksel silme yoktur.
+- Aktif personeli bulunan ekip/taşeron pasifleştirilemez. Reopen sırası üstten
+  alta taşeron → ekip → personeldir; böylece aktif alt kayıt archived üst kayda
+  bağlanamaz.
+- İSG tarih durumu yalnız deterministik read-model'dir; KKD kaydı yalnız zimmet
+  geçmişidir. Uygulama hukuki uygunluk, işe kabul veya otomatik İSG kararı vermez.
+- Proje kataloğu `AgendaApplication.projectChanges` üzerinden process içi canlı
+  invalidation yayınlar. Kalıcı truth yine `projects` tablosudur; restart sonrası
+  liste SQLite'tan okunur. Duplicate karşılaştırma trim + whitespace collapse +
+  küçük harf normalization ile yapılır.
+- Betonun iki saha görevi exact source link taşır ve saatlik tekrar yalnız
+  platform notification katmanında `inexactAllowWhileIdle` olarak uygulanır.
+  Exact-alarm izni eklenmez; permission/plugin failure SQLite reminder'ı silmez.
+- `Yarın`, due varsa aynı yerel saati bir sonraki Europe/Istanbul takvim gününe,
+  due yoksa ertesi gün 09:00'a taşır ve canonical UTC saklar. Row + event +
+  notification binding tek mutation/reconciliation sözleşmesinde kalır; source
+  observation veya Beton aggregate'i değiştirilmez.
+- Mobil backup formatı `1` olarak kalır; restore allowlist mobil schema `1`–`6`
+  olur. Python schema `4`, desktop Backup `1`, restore allowlist `(2, 3, 4)` ve
+  Günlük Çıktı `1` değiştirilmez.

@@ -51,6 +51,25 @@ void main() {
         ),
       );
       final attendance = firstSuccess.attendance!;
+      await attendance.createSubcontractor(
+        const CreateSubcontractorCommand(
+          id: '22222222-2222-4222-8222-000000000001',
+          eventId: 'eeeeeeee-eeee-4eee-8eee-000000000004',
+          projectId: '11111111-1111-4111-8111-111111111111',
+          name: 'Emülatör Taşeronu',
+          contactName: 'Saha Yetkilisi',
+        ),
+      );
+      await attendance.createTeam(
+        const CreateWorkforceTeamCommand(
+          id: '22222222-2222-4222-8222-000000000002',
+          eventId: 'eeeeeeee-eeee-4eee-8eee-000000000005',
+          projectId: '11111111-1111-4111-8111-111111111111',
+          subcontractorId: '22222222-2222-4222-8222-000000000001',
+          name: 'Emülatör Ekibi',
+          leadName: 'Ekip Lideri',
+        ),
+      );
       await attendance.createMember(
         const CreateWorkforceMemberCommand(
           id: '22222222-2222-4222-8222-222222222222',
@@ -59,6 +78,33 @@ void main() {
           teamName: 'Emülatör Ekibi',
           roleName: 'Saha Ustası',
           personnelCode: 'EMU-01',
+          subcontractorId: '22222222-2222-4222-8222-000000000001',
+          teamId: '22222222-2222-4222-8222-000000000002',
+          eventId: 'eeeeeeee-eeee-4eee-8eee-000000000006',
+        ),
+      );
+      await attendance.saveComplianceRecord(
+        const SaveComplianceRecordCommand(
+          id: '22222222-2222-4222-8222-000000000003',
+          eventId: 'eeeeeeee-eeee-4eee-8eee-000000000007',
+          memberId: '22222222-2222-4222-8222-222222222222',
+          expectedRevision: 0,
+          documentType: ComplianceDocumentType.basicSafetyTraining,
+          sourceStatus: ComplianceSourceStatus.valid,
+          issuedDate: '2026-07-19',
+          expiryDate: '2027-07-19',
+        ),
+      );
+      await attendance.savePpeAssignment(
+        const SavePpeAssignmentCommand(
+          id: '22222222-2222-4222-8222-000000000004',
+          eventId: 'eeeeeeee-eeee-4eee-8eee-000000000008',
+          memberId: '22222222-2222-4222-8222-222222222222',
+          expectedRevision: 0,
+          ppeType: 'Baret',
+          quantity: 1,
+          assignedDate: '2026-07-19',
+          status: PpeAssignmentStatus.assigned,
         ),
       );
       final futureLocal = CseTimeCodec.toIstanbul(
@@ -176,7 +222,20 @@ void main() {
         ),
       );
       expect(concrete.checks, hasLength(11));
-      expect(concrete.linkedReminders.first.concretePourId, concrete.pour.id);
+      final hourlyFieldTasks = concrete.linkedReminders
+          .where(
+            (item) =>
+                item.title.endsWith('Laboratuvar randevusunu al/doğrula') ||
+                item.title.endsWith('Yapı denetime haber ver'),
+          )
+          .toList(growable: false);
+      expect(hourlyFieldTasks, hasLength(2));
+      for (final linked in hourlyFieldTasks) {
+        expect(linked.concretePourId, concrete.pour.id);
+        final notification = await firstSuccess.agenda
+            .getReminderLifecycleDetail(linked.id);
+        expect(notification.notification.repeatIntervalMinutes, 60);
+      }
       concrete = await firstSuccess.concrete!.attachEvidence(
         AttachConcreteEvidenceCommand(
           id: '66666666-6666-4666-8666-666666666666',
@@ -222,8 +281,25 @@ void main() {
         attendanceDay.id,
       );
       expect(attendanceDetail.entries.single.memberName, 'Emülatör Personeli');
+      expect(
+        attendanceDetail.entries.single.subcontractorName,
+        'Emülatör Taşeronu',
+      );
+      expect(
+        attendanceDetail.entries.single.teamId,
+        '22222222-2222-4222-8222-000000000002',
+      );
       expect(attendanceDetail.entries.single.overtimeMinutes, 30);
       expect(attendanceDetail.linkedReminder!.id, attendanceReminder.id);
+      final personDetail = await restartedSuccess.attendance!.getPersonDetail(
+        '22222222-2222-4222-8222-222222222222',
+      );
+      expect(personDetail.member.subcontractorName, 'Emülatör Taşeronu');
+      expect(
+        personDetail.compliance.single.readStatus,
+        ComplianceReadStatus.valid,
+      );
+      expect(personDetail.ppeAssignments.single.ppeType, 'Baret');
       final persistedConcrete = await restartedSuccess.concrete!.getPourDetail(
         concrete.pour.id,
       );
@@ -268,6 +344,15 @@ void main() {
           concrete.pour.id,
         )).attachments.single.integrity,
         ConcreteAttachmentIntegrity.ok,
+      );
+      final restoredPerson = await restartedSuccess.attendance!.getPersonDetail(
+        '22222222-2222-4222-8222-222222222222',
+      );
+      expect(restoredPerson.member.teamName, 'Emülatör Ekibi');
+      expect(restoredPerson.compliance.single.documentNumber, isNull);
+      expect(
+        restoredPerson.ppeAssignments.single.status,
+        PpeAssignmentStatus.assigned,
       );
 
       await tester.pumpWidget(

@@ -1,5 +1,28 @@
 # Changelog
 
+## Issue #194 - Release 0.1 Saha Düzeltmeleri
+
+- Mobil SQLite schema `5` → `6` atomik migration ile mevcut Ajanda, reminder,
+  notification, Puantaj ve Beton kayıtları korunarak taşeron, ekip, İSG belge,
+  KKD zimmet ve append-only personel sicil geçmişi eklendi.
+- Legacy serbest metin ekipleri deterministik taşeron/ekip kimliklerine taşındı;
+  boş değerler `Tanımsız ekip` altında toplandı, personel kimlikleriyle Puantaj
+  entry/event geçmişi değiştirilmedi.
+- Ajanda ana ekranına `Yeni proje` eklendi; normalize duplicate koruması ve
+  canlı proje akışı sayesinde Ajanda, Hatırlatıcı, Puantaj ve Beton seçicileri
+  uygulama yeniden başlatılmadan yenilenir.
+- Puantaj personel girişi taşeron → ekip → personel sicil hiyerarşisine alındı;
+  optimistic yaşam döngüsü, pasifleştirme/reopen sırası, İSG/KKD görünürlüğü ve
+  günlük exact ekip/personel işlemleri tamamlandı.
+- Beton dökümüne exact iki saha görevi, 60 dakikalık inexact notification,
+  alanla eşleşen kapanış/reopen ve kullanıcıdan kod istemeyen deterministik
+  numune seti akışı eklendi.
+- Açık reminder kartlarına İstanbul takviminde `Yarın` işlemi eklendi; mevcut
+  saat korunur, saatsiz kayıt ertesi gün 09:00 olur ve periyodik bildirimin yeni
+  due zamanına kadar bastırılması reconciliation ile güvenceye alındı.
+- Backup format `1`, desktop Python schema/Backup/Günlük Çıktı sözleşmeleri,
+  exact-alarm yokluğu, gerçek kullanıcı verisi ve store kapsamı değiştirilmedi.
+
 ## Issue #191 - Mobil Release Candidate Hardening
 
 - Android release tabanı compile/target API `36`, Java `17`, NDK

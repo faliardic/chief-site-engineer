@@ -7,6 +7,8 @@ import 'package:chief_site_engineer/domain/attendance_models.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_day_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_page.dart';
 import 'package:chief_site_engineer/features/attendance/workforce_page.dart';
+import 'package:chief_site_engineer/features/attendance/workforce_person_detail_page.dart';
+import 'package:chief_site_engineer/features/attendance/workforce_registry_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -109,6 +111,23 @@ void main() {
       ..createMemberFailure = const AgendaValidationFailure(
         'Personel kodu aynı proje içinde zaten kullanılıyor.',
       );
+    final subcontractor = await attendance.createSubcontractor(
+      const CreateSubcontractorCommand(
+        id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        eventId: '11111111-1111-4111-8111-111111111111',
+        projectId: projectId,
+        name: 'Uzun Türkçe Taşeron',
+      ),
+    );
+    await attendance.createTeam(
+      CreateWorkforceTeamCommand(
+        id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+        eventId: '22222222-2222-4222-8222-222222222222',
+        projectId: projectId,
+        subcontractorId: subcontractor.id,
+        name: 'Çok Uzun Türkçe Taşeron Ekibi',
+      ),
+    );
     await tester.pumpWidget(
       MaterialApp(
         home: WorkforceMemberFormPage(
@@ -117,13 +136,18 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('workforce-subcontractor')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Uzun Türkçe Taşeron').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('workforce-team')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Çok Uzun Türkçe Taşeron Ekibi').last);
+    await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('workforce-name')),
       'İşçi Öğrenci Şefi',
-    );
-    await tester.enterText(
-      find.byKey(const Key('workforce-team')),
-      'Çok Uzun Türkçe Taşeron Ekibi',
     );
     await tester.enterText(find.byKey(const Key('workforce-role')), 'Demirci');
     await tester.enterText(find.byKey(const Key('workforce-code')), 'D-01');
@@ -134,6 +158,104 @@ void main() {
     expect(find.text('İşçi Öğrenci Şefi'), findsOneWidget);
     expect(find.text('Çok Uzun Türkçe Taşeron Ekibi'), findsOneWidget);
   });
+
+  testWidgets('member form double tap submits one identity command', (
+    tester,
+  ) async {
+    await _setPhoneSize(tester, const Size(430, 820));
+    final pending = Completer<WorkforceMember>();
+    final attendance = FakeAttendanceApplication()
+      ..createMemberCompleter = pending;
+    final subcontractor = await attendance.createSubcontractor(
+      const CreateSubcontractorCommand(
+        id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        eventId: '11111111-1111-4111-8111-111111111111',
+        projectId: projectId,
+        name: 'Taşeron A',
+      ),
+    );
+    final team = await attendance.createTeam(
+      CreateWorkforceTeamCommand(
+        id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+        eventId: '22222222-2222-4222-8222-222222222222',
+        projectId: projectId,
+        subcontractorId: subcontractor.id,
+        name: 'Ekip A',
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WorkforceMemberFormPage(
+          attendance: attendance,
+          project: _project(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('workforce-subcontractor')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(subcontractor.name).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('workforce-team')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(team.name).last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('workforce-name')),
+      'Tek kayıt personeli',
+    );
+    await tester.enterText(find.byKey(const Key('workforce-role')), 'Usta');
+    final save = find.byKey(const Key('save-workforce-member'));
+    await tester.ensureVisible(save);
+    await tester.tap(save);
+    await tester.pump();
+    await tester.tap(save);
+    await tester.pump();
+    expect(attendance.createMemberCalls, 1);
+    expect(
+      attendance.lastCreateMemberCommand!.subcontractorId,
+      subcontractor.id,
+    );
+    expect(attendance.lastCreateMemberCommand!.teamId, team.id);
+    pending.complete(_member());
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets(
+    'member selectors create and auto-select subcontractor and team',
+    (tester) async {
+      await _setPhoneSize(tester, const Size(430, 820));
+      final attendance = FakeAttendanceApplication();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: WorkforceMemberFormPage(
+            attendance: attendance,
+            project: _project(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('workforce-subcontractor')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('+ Yeni taşeron ekle').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'Yeni Taşeron');
+      await tester.tap(find.text('Oluştur'));
+      await tester.pumpAndSettle();
+      expect(find.text('Yeni Taşeron'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('workforce-team')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('+ Yeni ekip ekle').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'Yeni Ekip');
+      await tester.tap(find.text('Oluştur'));
+      await tester.pumpAndSettle();
+      expect(find.text('Yeni Ekip'), findsOneWidget);
+      expect(attendance.subcontractors, hasLength(1));
+      expect(attendance.teams, hasLength(1));
+    },
+  );
 
   testWidgets('completion and reopen confirmations remain reachable', (
     tester,
@@ -166,6 +288,78 @@ void main() {
     await tester.tap(find.byKey(const Key('confirm-attendance-transition')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('reopen-attendance-day')), findsOneWidget);
+  });
+
+  testWidgets('workforce registry and person tabs fit phone widths', (
+    tester,
+  ) async {
+    await _setPhoneSize(tester, const Size(320, 780));
+    final attendance = FakeAttendanceApplication();
+    final subcontractor = await attendance.createSubcontractor(
+      const CreateSubcontractorCommand(
+        id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        eventId: '11111111-1111-4111-8111-111111111111',
+        projectId: projectId,
+        name: 'Çok Uzun Türkçe Taşeron Unvanı',
+      ),
+    );
+    final team = await attendance.createTeam(
+      CreateWorkforceTeamCommand(
+        id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+        eventId: '22222222-2222-4222-8222-222222222222',
+        projectId: projectId,
+        subcontractorId: subcontractor.id,
+        name: 'Çevre duvarcı ve saha destek ekibi',
+      ),
+    );
+    final member = await attendance.createMember(
+      CreateWorkforceMemberCommand(
+        id: memberId,
+        eventId: '33333333-3333-4333-8333-333333333333',
+        projectId: projectId,
+        subcontractorId: subcontractor.id,
+        teamId: team.id,
+        fullName: 'Çok Uzun Türkçe Personel Adı Öğrenci İşçi',
+        teamName: team.name,
+        roleName: 'Duvar ustası',
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WorkforceRegistryPage(
+          attendance: attendance,
+          project: _project(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('1 aktif ekip • 1 aktif personel'), findsOneWidget);
+    expect(find.text('1 aktif personel'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WorkforcePersonDetailPage(
+          attendance: attendance,
+          memberId: member.id,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Genel / Puantaj'), findsOneWidget);
+    expect(find.text('İSG belgeleri'), findsOneWidget);
+    expect(find.text('KKD zimmetleri'), findsOneWidget);
+    await tester.drag(find.byType(TabBar), const Offset(-180, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('İSG belgeleri'));
+    await tester.pumpAndSettle();
+    expect(find.text('İSG belgesi ekle'), findsOneWidget);
+    await tester.drag(find.byType(TabBar), const Offset(-140, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('KKD zimmetleri'));
+    await tester.pumpAndSettle();
+    expect(find.text('KKD zimmeti ekle'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('notification tap deep-links directly to attendance day', (

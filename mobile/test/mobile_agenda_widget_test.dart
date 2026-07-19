@@ -4,6 +4,7 @@ import 'package:chief_site_engineer/app.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
@@ -55,6 +56,24 @@ void main() {
     updatedAt: '2026-07-19T08:00:00Z',
     revision: 1,
   );
+
+  testWidgets('Ajanda main action creates and selects a live project', (
+    tester,
+  ) async {
+    final fake = FakeAgendaApplication();
+    await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('create-agenda-project')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('agenda-project-name')),
+      'Yeni Saha Projesi',
+    );
+    await tester.tap(find.byKey(const Key('save-agenda-project')));
+    await tester.pumpAndSettle();
+    expect(fake.projects.single.name, 'Yeni Saha Projesi');
+    expect(find.text('Yeni Saha Projesi'), findsOneWidget);
+  });
 
   testWidgets(
     'Ajanda works at 320 px with filters, long Turkish text and 44 px targets',

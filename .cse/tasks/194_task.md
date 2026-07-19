@@ -1,118 +1,56 @@
-# Step 194 - Automated Local CSE Status Report Command
+# Issue #194 Görev Kaydı
 
-## Objective
+## Yürütme
 
-Add a small, read-only local command that gathers the standard CSE handoff checks and emits a deterministic human-readable summary plus JSON output.
+- Resmî repo: `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer`
+- Güvenli base: `be365bb2f2400d54ca53b8de90d9f72ace52c347`
+- Branch: `codex/issue-194-field-feedback-workforce-reminders`
+- Model: Codex standart full model
+- Reasoning: Extra High
+- Seçim nedeni: atomik mobil schema 5→6 migration, legacy personel ve Puantaj
+  geçmişi, canlı proje kataloğu, optimistic registry yaşam döngüsü, native
+  notification reconciliation ve release artifact kapıları aynı veri güvenliği
+  sınırında birlikte doğrulanmalıdır.
 
-## Repository Context
+## Yetkili kapsam
 
-- Repository: `faliardic/chief-site-engineer`
-- Issue: #3
-- Base branch: `master`
-- Expected base commit: `51d6bc9283fab92bc303d0d96b6a17768d28979e`
-- Working branch: `step-194-cse-status-report`
-- Local working directory: `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer`
+- Flutter mobil SQLite schema v6; taşeron, ekip, personel bağlantıları, İSG
+  belge görünürlüğü, KKD zimmet görünürlüğü ve append-only workforce event'leri.
+- Ajanda, Hatırlatıcı, Puantaj ve Beton ekranlarının ortak canlı proje
+  source-of-truth üzerinden uygulama restart'ı olmadan yenilenmesi.
+- Puantaj taşeron → ekip → personel kayıt akışı, exact personel/team kimliğiyle
+  günlük kullanım ve üç görünümlü personel detayı.
+- Yeni beton paketinde iki idempotent bağlı görev, 60 dakikalık inexact yerel
+  bildirim, alan tamamlama/reopen eşitlemesi ve kod istemeyen numune seti akışı.
+- Aktif reminder kartlarında Europe/Istanbul takvimine göre `Yarın` işlemi.
+- Backup format v1 korunarak schema 1–6 staging migration/round-trip;
+  dokümantasyon, learning notu, state kaydı ve gerekli testler.
 
-## Reasoning Level
+## Kabul kapıları
 
-- Codex: extra high
-- ChatGPT review: Extra High
+- Schema 5→6 atomik; deterministic legacy taşeron/ekip eşlemesi exact personel
+  kimliğini, attendance entry/event geçmişini ve önceki bütün mobil veriyi korur.
+- Registry unique/FK/check/no-physical-delete ve optimistic revision kuralları;
+  no-op event üretmez, gerçek mutation aynı UoW içinde append-only event yazar.
+- Proje oluşturma dönüşünde bütün açık modüller yenilenir; duplicate isim
+  fail-closed reddedilir.
+- İSG read-model tarih durumları ve KKD lifecycle yalnız kayıt/görünürlüktür;
+  hukuki uygunluk veya işe kabul kararı üretmez.
+- Beton saha görevleri source reminder'ı çoğaltmaz; `Yarın` saatlik tekrarı yeni
+  due zamanına kadar bastırır; permission/plugin hatasında SQLite görevi kalır.
+- Flutter analyze, bütün unit/widget/integration testleri, API 36 emülatör,
+  Python full suite/compileall, backup/release gate, ARM64/16 KiB, state JSON,
+  `git diff --check`, exact allowlist ve korunan alan kontrolleri geçer.
 
-## Authorized Changes
+## Korunan sınırlar
 
-- `scripts/cse_status.py`
-- focused tests under `tests/`
-- `.cse/results/194_result.md`
-- `.cse/state/project_state.json`
-- documentation files only when directly required for command usage
-
-## Required Work
-
-1. Implement a read-only status command, preferably runnable as:
-
-   ```bash
-   python scripts/cse_status.py
-   ```
-
-2. Support an explicit pytest option so tests are not run silently by every lightweight status check. A reasonable interface is:
-
-   ```bash
-   python scripts/cse_status.py --run-tests
-   ```
-
-3. Gather and report:
-   - current branch
-   - HEAD commit SHA and message
-   - `origin/master...HEAD` divergence when the remote ref exists
-   - staged files
-   - tracked working-tree changes
-   - ignored files visibility
-   - `git diff --check`
-   - `exports/` contents and cleanliness
-   - ZIP files visible in the working tree, with no mutation
-   - pytest result when `--run-tests` is supplied
-
-4. Emit both:
-   - concise human-readable terminal output
-   - deterministic JSON suitable for handoff/state use
-
-5. Use subprocess calls safely:
-   - argument lists, not shell interpolation
-   - captured stdout/stderr
-   - explicit return-code handling
-   - useful behavior when Git, `origin/master`, or pytest is unavailable
-
-6. Add focused tests. Mock subprocess/filesystem boundaries where appropriate; do not require destructive repository operations.
-
-7. Update `.cse/results/194_result.md` and `.cse/state/project_state.json` with factual final results.
-
-## Required Verification
-
-- `python -m pytest`
-- `git diff --check`
-- Confirm changed files match authorized scope.
-- Confirm `exports/` remains clean.
-- Confirm ignored ZIP files remain untouched.
-- Confirm no unrelated production application files changed.
-- Run the new command without tests.
-- Run the new command with `--run-tests`.
-- Validate emitted JSON parses successfully.
-
-## Forbidden Scope
-
-Do not:
-
-- stage files automatically
-- delete or clean ignored files or caches
-- commit, push, merge, or change branches from inside the script
-- write under `exports/`
-- modify ZIP files
-- introduce hard validation or automatic blocking
-- generate application-level `blocked` status
-- add API, GUI, database/repository application access, audit behavior, backup/restore, or migration behavior
-- change existing production application behavior
-
-## Output and Mutation Boundary
-
-The command is diagnostic only. Writing JSON is allowed only when the user explicitly supplies an output-path option; default execution must not modify the repository. If an output path is implemented, use explicit overwrite protection unless `--overwrite` is supplied.
-
-## Commit and Push Permission
-
-- Commit: allowed on `step-194-cse-status-report`
-- Push: allowed to the same branch
-- Pull request: update draft PR #4
-- Merge: not allowed
-
-## Required Result Files
-
-- `.cse/results/194_result.md`
-- `.cse/state/project_state.json`
-
-## Completion Criteria
-
-- The command is read-only by default.
-- Required checks are visible and machine-readable.
-- Focused tests pass.
-- Full test suite passes.
-- No unrelated scope is introduced.
-- Branch is pushed and draft PR #4 is ready for ChatGPT review.
+- Ücret/bordro/maaş/SGK/hakediş, biyometri, cloud sync, çoklu kullanıcı,
+  e-imza, otomatik hukuki karar ve store submission eklenmez.
+- Gerçek kullanıcı verisi, gerçek `CSE_DATA_ROOT`, upload/signing key, Apple
+  sertifikası, provisioning profile veya secret kullanılmaz.
+- `reports/` okunmaz/değiştirilmez; `exports/.gitkeep`, mevcut ZIP ve ignored
+  Flutter cache/build/artifact alanları korunur ve stage edilmez.
+- Yeni ephemeral test signing malzemesi repository dışında oluşturulur; RC APK
+  ignored release-gate alanında bırakılır.
+- Tek ordinary commit `Address mobile field feedback`; normal push; amend,
+  rebase, force-push ve PR yoktur.

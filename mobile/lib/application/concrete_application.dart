@@ -328,8 +328,8 @@ class SqliteConcreteApplication implements ConcreteApplication {
 
   static const _followUpDefinitions = <(String, String, int?)>[
     ('plant_confirmation', 'Santral teyidi', -120),
-    ('inspection_confirmation', 'Yapı denetim teyidi', -120),
-    ('laboratory_confirmation', 'Laboratuvar teyidi', -120),
+    ('inspection_notification_task', 'Yapı denetime haber ver', 60),
+    ('laboratory_appointment_task', 'Laboratuvar randevusunu al/doğrula', 60),
     ('pour_start', 'Döküm başlangıcı', 0),
     ('curing_start', 'Kür başlangıcı', 120),
     ('first_curing_check', 'İlk kür / yüzey kontrolü', 360),
@@ -515,8 +515,13 @@ class SqliteConcreteApplication implements ConcreteApplication {
           },
         );
         for (final definition in _followUpDefinitions) {
+          final isHourlyFieldTask =
+              definition.$1 == 'inspection_notification_task' ||
+              definition.$1 == 'laboratory_appointment_task';
           final dueAt = definition.$3 == null
               ? null
+              : isHourlyFieldTask
+              ? CseTimeCodec.encodeUtc(now.add(const Duration(hours: 1)))
               : CseTimeCodec.encodeUtc(
                   CseTimeCodec.decodeCanonicalUtc(
                     normalized.plannedAt,
@@ -532,8 +537,20 @@ class SqliteConcreteApplication implements ConcreteApplication {
             label: definition.$2,
             dueAt: dueAt,
             occurredAt: timestamp,
+            repeatIntervalMinutes: isHourlyFieldTask ? 60 : null,
           );
         }
+        await _syncFieldReminderTasks(
+          transaction,
+          pourId: normalized.id,
+          projectId: normalized.projectId,
+          laboratoryComplete:
+              normalized.laboratoryAppointment?.trim().isNotEmpty ?? false,
+          inspectionComplete:
+              normalized.inspectionNotifiedAt != null ||
+              (normalized.inspectionNotifiedPerson?.trim().isNotEmpty ?? false),
+          occurredAt: timestamp,
+        );
         return _loadDetail(transaction, normalized.id);
       });
     });
@@ -666,6 +683,9 @@ class SqliteConcreteApplication implements ConcreteApplication {
           whereArgs: [command.id, command.pourId],
           limit: 1,
         );
+        values['sample_code'] ??= existing.isEmpty
+            ? await _nextSampleCode(transaction, command.pourId)
+            : existing.single['sample_code']! as String;
         late final String eventType;
         if (existing.isEmpty) {
           if (command.expectedSampleRevision != 0) throw _staleFailure();
@@ -1144,6 +1164,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
     required String? dueAt,
     required String occurredAt,
     String? sourceSampleSetId,
+    int? repeatIntervalMinutes,
   }) async {
     final followUpId = _stableUuid('concrete-follow-up:$pourId:$itemKey');
     final reminderId = _stableUuid('concrete-reminder:$pourId:$itemKey');
@@ -1195,6 +1216,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
           : NotificationSyncState.unavailable.storageValue,
       'last_synced_at': occurredAt,
       'safe_error_code': dueAt == null ? null : 'pending_sync',
+      'repeat_interval_minutes': repeatIntervalMinutes,
     });
     await transaction.insert('concrete_follow_up_items', {
       'id': followUpId,
@@ -1221,6 +1243,133 @@ class SqliteConcreteApplication implements ConcreteApplication {
         'source_sample_set_id': sourceSampleSetId,
         'due_at': dueAt,
       },
+    );
+  }
+
+  Future<void> _syncFieldReminderTasks(
+    DatabaseExecutor database, {
+    required String pourId,
+    required String projectId,
+    required bool laboratoryComplete,
+    required bool inspectionComplete,
+    required String occurredAt,
+  }) async {
+    await _syncFieldReminderTask(
+      database,
+      pourId: pourId,
+      projectId: projectId,
+      itemKey: 'laboratory_appointment_task',
+      complete: laboratoryComplete,
+      occurredAt: occurredAt,
+    );
+    await _syncFieldReminderTask(
+      database,
+      pourId: pourId,
+      projectId: projectId,
+      itemKey: 'inspection_notification_task',
+      complete: inspectionComplete,
+      occurredAt: occurredAt,
+    );
+  }
+
+  Future<void> _syncFieldReminderTask(
+    DatabaseExecutor database, {
+    required String pourId,
+    required String projectId,
+    required String itemKey,
+    required bool complete,
+    required String occurredAt,
+  }) async {
+    final rows = await database.query(
+      'concrete_follow_up_items',
+      where: 'concrete_pour_id = ? AND item_key = ?',
+      whereArgs: [pourId, itemKey],
+      limit: 1,
+    );
+    if (rows.isEmpty) return;
+    final followUp = _followUpFromRow(rows.single);
+    if (followUp.reminderId == null) {
+      throw const AgendaValidationFailure('Bağlı hatırlatıcı bulunamadı.');
+    }
+    final reminderRows = await database.query(
+      'follow_up_items',
+      columns: ['next_attention_at'],
+      where: 'id = ?',
+      whereArgs: [followUp.reminderId],
+      limit: 1,
+    );
+    if (reminderRows.isEmpty) {
+      throw const AgendaValidationFailure('Bağlı hatırlatıcı bulunamadı.');
+    }
+    final pending = !complete;
+    final targetStatus = pending
+        ? ConcreteFollowUpStatus.pending
+        : ConcreteFollowUpStatus.completed;
+    final dueAt = pending
+        ? followUp.status == ConcreteFollowUpStatus.pending &&
+                  reminderRows.single['next_attention_at'] != null
+              ? reminderRows.single['next_attention_at']! as String
+              : CseTimeCodec.encodeUtc(
+                  CseTimeCodec.decodeCanonicalUtc(
+                    occurredAt,
+                  ).add(const Duration(hours: 1)),
+                )
+        : null;
+    final changed = followUp.status != targetStatus || followUp.dueAt != dueAt;
+    if (changed) {
+      final count = await database.update(
+        'concrete_follow_up_items',
+        {
+          'due_at': dueAt,
+          'status': targetStatus.storageValue,
+          'revision': followUp.revision + 1,
+          'updated_at': occurredAt,
+          'completed_at': pending ? null : occurredAt,
+          'reason': null,
+        },
+        where: 'id = ? AND revision = ?',
+        whereArgs: [followUp.id, followUp.revision],
+      );
+      if (count != 1) throw _staleFailure();
+      await _syncLinkedReminder(
+        database,
+        reminderId: followUp.reminderId!,
+        eventId: _stableUuid(
+          'field-reminder-${pending ? 'reopened' : 'completed'}:'
+          '${followUp.id}:${followUp.revision + 1}',
+        ),
+        projectId: projectId,
+        pourId: pourId,
+        pending: pending,
+        dueAt: dueAt,
+        occurredAt: occurredAt,
+        outcomeNote: complete
+            ? 'Beton paketindeki ilgili alan tamamlandı.'
+            : null,
+      );
+      await _insertConcreteEvent(
+        database,
+        id: _stableUuid(
+          'field-follow-up-${pending ? 'reopened' : 'completed'}:'
+          '${followUp.id}:${followUp.revision + 1}',
+        ),
+        pourId: pourId,
+        eventType: 'follow_up.linked',
+        occurredAt: occurredAt,
+        payload: {
+          'follow_up_id': followUp.id,
+          'reminder_id': followUp.reminderId,
+          'status': targetStatus.storageValue,
+          'due_at': dueAt,
+          'automatic': true,
+        },
+      );
+    }
+    await database.update(
+      'reminder_notification_bindings',
+      {'repeat_interval_minutes': pending ? 60 : null},
+      where: 'reminder_id = ?',
+      whereArgs: [followUp.reminderId],
     );
   }
 
@@ -2087,7 +2236,9 @@ class SqliteConcreteApplication implements ConcreteApplication {
     if (command.expectedSampleRevision < 0) {
       throw const AgendaValidationFailure('Numune revision geçersizdir.');
     }
-    requiredTrimmed(command.sampleCode, 'Numune kodu', maxLength: 120);
+    if (command.sampleCode != null) {
+      requiredTrimmed(command.sampleCode!, 'Numune kodu', maxLength: 120);
+    }
     if (command.sampleCount < 0 ||
         command.sampleLabels.length > command.sampleCount) {
       throw const AgendaValidationFailure(
@@ -2140,11 +2291,9 @@ class SqliteConcreteApplication implements ConcreteApplication {
     SaveConcreteSampleSetCommand value,
   ) => {
     'source_truck_id': value.sourceTruckId,
-    'sample_code': requiredTrimmed(
-      value.sampleCode,
-      'Numune kodu',
-      maxLength: 120,
-    ),
+    'sample_code': value.sampleCode == null
+        ? null
+        : requiredTrimmed(value.sampleCode!, 'Numune kodu', maxLength: 120),
     'sample_count': value.sampleCount,
     'sample_labels_json': jsonEncode(
       value.sampleLabels.map((item) => item.trim()).toList(),
@@ -2472,7 +2621,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
     _validateUpdate(command);
     final now = _readClockOnce();
     final timestamp = CseTimeCodec.encodeUtc(now);
-    return _withDatabase(now, (database) {
+    final detail = await _withDatabase(now, (database) {
       return database.transaction((transaction) async {
         final current = await _requirePour(transaction, command.id);
         _requireRevision(current.revision, command.expectedRevision);
@@ -2521,9 +2670,48 @@ class SqliteConcreteApplication implements ConcreteApplication {
           occurredAt: timestamp,
           payload: values,
         );
+        await _syncFieldReminderTasks(
+          transaction,
+          pourId: current.id,
+          projectId: current.projectId,
+          laboratoryComplete:
+              ((values['laboratory_appointment'] as String?)?.isNotEmpty ??
+              false),
+          inspectionComplete:
+              values['inspection_notified_at'] != null ||
+              ((values['inspection_notified_person'] as String?)?.isNotEmpty ??
+                  false),
+          occurredAt: timestamp,
+        );
         return _loadDetail(transaction, command.id);
       });
     });
+    await _safeReconcileNotifications();
+    return detail;
+  }
+
+  Future<String> _nextSampleCode(
+    DatabaseExecutor database,
+    String pourId,
+  ) async {
+    final countRows = await database.rawQuery(
+      'SELECT count(*) AS value FROM concrete_sample_sets '
+      'WHERE concrete_pour_id = ?',
+      [pourId],
+    );
+    var sequence = (countRows.single['value']! as int) + 1;
+    while (true) {
+      final candidate = 'Numune seti $sequence';
+      final existing = await database.query(
+        'concrete_sample_sets',
+        columns: ['id'],
+        where: 'concrete_pour_id = ? AND sample_code = ?',
+        whereArgs: [pourId, candidate],
+        limit: 1,
+      );
+      if (existing.isEmpty) return candidate;
+      sequence += 1;
+    }
   }
 
   @override

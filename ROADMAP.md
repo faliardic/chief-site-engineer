@@ -37,6 +37,10 @@ process-death journal, privacy/store beyan paketi, iOS privacy statik kapısı,
 release icon/splash ve tekrarlanabilir secretsız CI/Windows release gate'i
 tamamlandı. Gerçek signing, native iOS archive, saha kabulü ve store submission
 hesap/cihaz bağımlı sonraki adımlardır.
+3H. [x] Release 0.1 saha düzeltmeleri — Issue #194 ile canlı proje yenileme,
+schema `6` taşeron → ekip → personel sicili, İSG/KKD görünürlüğü, Beton exact
+saha görevleri ve reminder `Yarın` UX'i uygulandı. Backup format `1`, inexact
+notification ve offline cihaz source-of-truth sınırı korundu.
 
 Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme
 programı Issue #127'dir. Issue #141 / PR #142 ve Issue #143 / PR #144
@@ -51,8 +55,30 @@ dilimini, Issue #183 / PR #184 mobil reminder yaşam döngüsü ve yerel
 notification dilimini, Issue #185 / PR #186 mobil günlük Puantajı, Issue #187 /
 PR #188 mobil Beton Paketi'ni, Issue #189 / PR #190 mobil tam yedek ve geri
 yüklemeyi merge etmiştir. Tek aktif production işi Issue #191 mobil release
-candidate hardening dilimidir.
+candidate hardening diliminden sonra Issue #194 saha düzeltmeleridir.
 Açık faz Epic'leri aynı anda aktif production işleri değildir.
+
+## Issue 194 - Release 0.1 Saha Düzeltmeleri
+
+- [x] Mobil schema `5` → `6` atomik migration ve failure rollback/retry.
+- [x] Legacy ekiplerin deterministik taşeron/ekip eşlemesi; exact personel,
+  attendance entry ve event geçmişi korunumu.
+- [x] Taşeron/ekip/personel sicili, normalized unique ad, optimistic revision,
+  logical archive/reopen sırası ve append-only workforce event geçmişi.
+- [x] Puantaj personel seçicisinde taşeron → ekip hiyerarşisi ve yerinde yeni
+  kayıt akışları; exact team/person kimliğiyle günlük toplu işlemler.
+- [x] Personel Genel/Puantaj, İSG ve KKD görünümleri; belge tarih read-model'i,
+  zimmet/iadeli yaşam döngüsü ve hukuki karar üretmeyen güvenli açıklama.
+- [x] Ajanda ana ekranından proje oluşturma ve bütün açık mobil modüllerde canlı
+  proje katalog yenilemesi; boşluk/büyük-küçük harf normalize duplicate koruması.
+- [x] Beton için exact iki linked saha görevi, 60 dakikalık inexact notification,
+  alan tamamlama/reopen eşitlemesi ve kodsuz numune seti akışı.
+- [x] Reminder `Yarın`: yerel saati koruyan sonraki İstanbul günü, saatsiz kayıt
+  için 09:00, canonical UTC, optimistic event ve double-tap koruması.
+- [x] Backup format `1` içinde mobil schema `1`–`6` staging migration ve schema
+  `6` sicil/bağlantı/event round-trip'i.
+- [ ] Gerçek Android saha kabulü kullanıcı tarafından checklist ile yapılır.
+- [ ] Native iOS archive ve store submission hesap/cihaz bağımlı ayrı iştir.
 
 ## Issue 191 - Mobil Release Candidate Hardening
 

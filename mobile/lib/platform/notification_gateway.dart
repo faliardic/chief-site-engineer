@@ -79,6 +79,7 @@ class ReminderNotificationRequest {
     required this.title,
     required this.body,
     required this.scheduledAtUtc,
+    this.repeatIntervalMinutes,
   }) {
     if (platformId < 1 || platformId > 2147483647) {
       throw const TimeContractViolation('invalid platform notification id');
@@ -89,6 +90,9 @@ class ReminderNotificationRequest {
       throw const TimeContractViolation('invalid reminder notification');
     }
     CseTimeCodec.decodeCanonicalUtc(scheduledAtUtc);
+    if (repeatIntervalMinutes != null && repeatIntervalMinutes != 60) {
+      throw const TimeContractViolation('invalid reminder repeat interval');
+    }
   }
 
   final int platformId;
@@ -96,6 +100,7 @@ class ReminderNotificationRequest {
   final String title;
   final String body;
   final String scheduledAtUtc;
+  final int? repeatIntervalMinutes;
 }
 
 class PendingReminderNotification {
@@ -293,21 +298,34 @@ class FlutterReminderNotificationGateway
   Future<void> schedule(ReminderNotificationRequest request) async {
     await initialize();
     final instant = CseTimeCodec.decodeCanonicalUtc(request.scheduledAtUtc);
+    final details = const NotificationDetails(
+      android: AndroidNotificationDetails(
+        _channelId,
+        _channelName,
+        channelDescription: _channelDescription,
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
+      iOS: DarwinNotificationDetails(),
+    );
+    if (request.repeatIntervalMinutes case final minutes?) {
+      await _plugin.periodicallyShowWithDuration(
+        id: request.platformId,
+        title: request.title,
+        body: request.body,
+        repeatDurationInterval: Duration(minutes: minutes),
+        notificationDetails: details,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        payload: '$_payloadPrefix${request.reminderId}',
+      );
+      return;
+    }
     await _plugin.zonedSchedule(
       id: request.platformId,
       title: request.title,
       body: request.body,
       scheduledDate: timezone.TZDateTime.from(instant, timezone.local),
-      notificationDetails: const NotificationDetails(
-        android: AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          channelDescription: _channelDescription,
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
-        iOS: DarwinNotificationDetails(),
-      ),
+      notificationDetails: details,
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       payload: '$_payloadPrefix${request.reminderId}',
     );

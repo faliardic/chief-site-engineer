@@ -141,6 +141,68 @@ void main() {
   );
 
   test(
+    'tomorrow keeps local clock or uses 09:00 and preserves source',
+    () async {
+      await createProjectAndLog();
+      final sourceBefore = await agenda.getAgendaLogDetail(logId);
+      var scheduled = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(910),
+          title: 'Aynı saatte yarın',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-19T12:45:00Z',
+          projectId: projectId,
+          sourceLogId: logId,
+        ),
+      );
+      scheduled = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: scheduled.id,
+          eventId: eventId(911),
+          expectedRevision: scheduled.revision,
+          action: ReminderMutationAction.snoozeTomorrowMorning,
+        ),
+      );
+      expect(scheduled.nextAttentionAt, '2026-07-20T12:45:00Z');
+      expect(scheduled.revision, 2);
+      expect(
+        notifications.scheduled.last.scheduledAtUtc,
+        '2026-07-20T12:45:00Z',
+      );
+      final lifecycle = await agenda.getReminderLifecycleDetail(scheduled.id);
+      expect(
+        lifecycle.events.map((event) => event.eventType),
+        contains('snoozed'),
+      );
+      final sourceAfter = await agenda.getAgendaLogDetail(logId);
+      expect(sourceAfter.log.revision, sourceBefore.log.revision);
+      expect(sourceAfter.log.updatedAt, sourceBefore.log.updatedAt);
+
+      var inbox = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder2,
+          eventId: eventId(912),
+          title: 'Saati olmayan kayıt',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.inbox,
+        ),
+      );
+      inbox = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: inbox.id,
+          eventId: eventId(913),
+          expectedRevision: inbox.revision,
+          action: ReminderMutationAction.snoozeTomorrowMorning,
+        ),
+      );
+      expect(inbox.status, ReminderStatus.active);
+      expect(inbox.nextAttentionAt, '2026-07-20T06:00:00Z');
+    },
+  );
+
+  test(
     'full lifecycle uses optimistic revision append-only events and no-op',
     () async {
       var reminder = await agenda.createReminder(

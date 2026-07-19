@@ -11,13 +11,370 @@ class FakeAttendanceApplication implements AttendanceApplication {
   });
 
   List<WorkforceMember> members;
+  List<Subcontractor> subcontractors = [];
+  List<WorkforceTeam> teams = [];
+  List<WorkforceComplianceRecord> compliance = [];
+  List<WorkforcePpeAssignment> ppeAssignments = [];
   AttendanceDayDetail? detail;
   AttendanceReminderSetting? setting;
   Object? saveFailure;
   Object? createMemberFailure;
+  Completer<WorkforceMember>? createMemberCompleter;
+  int createMemberCalls = 0;
+  CreateWorkforceMemberCommand? lastCreateMemberCommand;
   Completer<AttendanceDayDetail>? saveCompleter;
   SaveAttendanceRosterCommand? lastRosterCommand;
   int saveCalls = 0;
+
+  @override
+  Future<List<Subcontractor>> listSubcontractors(
+    String projectId, {
+    bool includeArchived = false,
+  }) async => subcontractors
+      .where(
+        (item) =>
+            item.projectId == projectId && (includeArchived || item.isActive),
+      )
+      .map(
+        (item) => Subcontractor(
+          id: item.id,
+          projectId: item.projectId,
+          name: item.name,
+          contactName: item.contactName,
+          phone: item.phone,
+          note: item.note,
+          status: item.status,
+          activeTeamCount: teams
+              .where((team) => team.subcontractorId == item.id && team.isActive)
+              .length,
+          activePersonCount: members
+              .where(
+                (member) =>
+                    member.subcontractorId == item.id && member.isActive,
+              )
+              .length,
+          revision: item.revision,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+          archivedAt: item.archivedAt,
+        ),
+      )
+      .toList(growable: false);
+
+  @override
+  Future<Subcontractor> createSubcontractor(
+    CreateSubcontractorCommand command,
+  ) async {
+    final value = Subcontractor(
+      id: command.id,
+      projectId: command.projectId,
+      name: command.name.trim(),
+      contactName: command.contactName?.trim(),
+      phone: command.phone?.trim(),
+      note: command.note?.trim(),
+      status: WorkforceRecordStatus.active,
+      activeTeamCount: 0,
+      activePersonCount: 0,
+      revision: 1,
+      createdAt: '2026-07-19T08:00:00Z',
+      updatedAt: '2026-07-19T08:00:00Z',
+      archivedAt: null,
+    );
+    subcontractors = [...subcontractors, value];
+    return value;
+  }
+
+  @override
+  Future<Subcontractor> updateSubcontractor(
+    UpdateSubcontractorCommand command,
+  ) async {
+    final index = subcontractors.indexWhere((item) => item.id == command.id);
+    final current = subcontractors[index];
+    final value = Subcontractor(
+      id: current.id,
+      projectId: current.projectId,
+      name: command.name.trim(),
+      contactName: command.contactName?.trim(),
+      phone: command.phone?.trim(),
+      note: command.note?.trim(),
+      status: current.status,
+      activeTeamCount: current.activeTeamCount,
+      activePersonCount: current.activePersonCount,
+      revision: current.revision + 1,
+      createdAt: current.createdAt,
+      updatedAt: '2026-07-19T08:01:00Z',
+      archivedAt: current.archivedAt,
+    );
+    subcontractors = [...subcontractors]..[index] = value;
+    return value;
+  }
+
+  @override
+  Future<Subcontractor> transitionSubcontractor(
+    TransitionSubcontractorCommand command,
+  ) async {
+    final index = subcontractors.indexWhere((item) => item.id == command.id);
+    final current = subcontractors[index];
+    final value = Subcontractor(
+      id: current.id,
+      projectId: current.projectId,
+      name: current.name,
+      contactName: current.contactName,
+      phone: current.phone,
+      note: current.note,
+      status: command.archive
+          ? WorkforceRecordStatus.archived
+          : WorkforceRecordStatus.active,
+      activeTeamCount: current.activeTeamCount,
+      activePersonCount: current.activePersonCount,
+      revision: current.revision + 1,
+      createdAt: current.createdAt,
+      updatedAt: '2026-07-19T08:01:00Z',
+      archivedAt: command.archive ? '2026-07-19T08:01:00Z' : null,
+    );
+    subcontractors = [...subcontractors]..[index] = value;
+    return value;
+  }
+
+  @override
+  Future<List<WorkforceTeam>> listTeams(
+    String projectId, {
+    String? subcontractorId,
+    bool includeArchived = false,
+  }) async => teams
+      .where(
+        (item) =>
+            item.projectId == projectId &&
+            (subcontractorId == null ||
+                item.subcontractorId == subcontractorId) &&
+            (includeArchived || item.isActive),
+      )
+      .map(
+        (item) => WorkforceTeam(
+          id: item.id,
+          projectId: item.projectId,
+          subcontractorId: item.subcontractorId,
+          subcontractorName: item.subcontractorName,
+          name: item.name,
+          leadName: item.leadName,
+          note: item.note,
+          status: item.status,
+          activePersonCount: members
+              .where((member) => member.teamId == item.id && member.isActive)
+              .length,
+          revision: item.revision,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+          archivedAt: item.archivedAt,
+        ),
+      )
+      .toList(growable: false);
+
+  @override
+  Future<WorkforceTeam> createTeam(CreateWorkforceTeamCommand command) async {
+    final subcontractor = subcontractors.firstWhere(
+      (item) => item.id == command.subcontractorId,
+    );
+    final value = WorkforceTeam(
+      id: command.id,
+      projectId: command.projectId,
+      subcontractorId: command.subcontractorId,
+      subcontractorName: subcontractor.name,
+      name: command.name.trim(),
+      leadName: command.leadName?.trim(),
+      note: command.note?.trim(),
+      status: WorkforceRecordStatus.active,
+      activePersonCount: 0,
+      revision: 1,
+      createdAt: '2026-07-19T08:00:00Z',
+      updatedAt: '2026-07-19T08:00:00Z',
+      archivedAt: null,
+    );
+    teams = [...teams, value];
+    return value;
+  }
+
+  @override
+  Future<WorkforceTeam> updateTeam(UpdateWorkforceTeamCommand command) async {
+    final index = teams.indexWhere((item) => item.id == command.id);
+    final current = teams[index];
+    final value = WorkforceTeam(
+      id: current.id,
+      projectId: current.projectId,
+      subcontractorId: current.subcontractorId,
+      subcontractorName: current.subcontractorName,
+      name: command.name.trim(),
+      leadName: command.leadName?.trim(),
+      note: command.note?.trim(),
+      status: current.status,
+      activePersonCount: current.activePersonCount,
+      revision: current.revision + 1,
+      createdAt: current.createdAt,
+      updatedAt: '2026-07-19T08:01:00Z',
+      archivedAt: current.archivedAt,
+    );
+    teams = [...teams]..[index] = value;
+    return value;
+  }
+
+  @override
+  Future<WorkforceTeam> transitionTeam(
+    TransitionWorkforceTeamCommand command,
+  ) async {
+    final index = teams.indexWhere((item) => item.id == command.id);
+    final current = teams[index];
+    final value = WorkforceTeam(
+      id: current.id,
+      projectId: current.projectId,
+      subcontractorId: current.subcontractorId,
+      subcontractorName: current.subcontractorName,
+      name: current.name,
+      leadName: current.leadName,
+      note: current.note,
+      status: command.archive
+          ? WorkforceRecordStatus.archived
+          : WorkforceRecordStatus.active,
+      activePersonCount: current.activePersonCount,
+      revision: current.revision + 1,
+      createdAt: current.createdAt,
+      updatedAt: '2026-07-19T08:01:00Z',
+      archivedAt: command.archive ? '2026-07-19T08:01:00Z' : null,
+    );
+    teams = [...teams]..[index] = value;
+    return value;
+  }
+
+  @override
+  Future<List<ActiveTeamCount>> listActiveTeamCounts(String projectId) async =>
+      teams
+          .where((item) => item.projectId == projectId && item.isActive)
+          .map(
+            (item) => ActiveTeamCount(
+              teamId: item.id,
+              teamName: item.name,
+              subcontractorName: item.subcontractorName,
+              activePersonCount: members
+                  .where(
+                    (member) => member.teamId == item.id && member.isActive,
+                  )
+                  .length,
+            ),
+          )
+          .toList(growable: false);
+
+  @override
+  Future<WorkforcePersonDetail> getPersonDetail(String memberId) async {
+    final member = members.firstWhere((item) => item.id == memberId);
+    final memberCompliance = compliance
+        .where((item) => item.memberId == memberId)
+        .toList();
+    final memberPpe = ppeAssignments
+        .where((item) => item.memberId == memberId)
+        .toList();
+    return WorkforcePersonDetail(
+      member: member,
+      compliance: memberCompliance,
+      ppeAssignments: memberPpe,
+      missingComplianceCount: memberCompliance
+          .where((item) => item.readStatus == ComplianceReadStatus.missing)
+          .length,
+      validComplianceCount: memberCompliance
+          .where((item) => item.readStatus == ComplianceReadStatus.valid)
+          .length,
+      expiringComplianceCount: memberCompliance
+          .where((item) => item.readStatus == ComplianceReadStatus.expiring)
+          .length,
+      expiredComplianceCount: memberCompliance
+          .where((item) => item.readStatus == ComplianceReadStatus.expired)
+          .length,
+      activePpeCount: memberPpe
+          .where((item) => item.status == PpeAssignmentStatus.assigned)
+          .length,
+    );
+  }
+
+  @override
+  Future<WorkforceComplianceRecord> saveComplianceRecord(
+    SaveComplianceRecordCommand command,
+  ) async {
+    final value = WorkforceComplianceRecord(
+      id: command.id,
+      memberId: command.memberId,
+      documentType: command.documentType,
+      documentNumber: command.documentNumber,
+      issuedDate: command.issuedDate,
+      expiryDate: command.expiryDate,
+      sourceStatus: command.sourceStatus,
+      readStatus: command.sourceStatus == ComplianceSourceStatus.missing
+          ? ComplianceReadStatus.missing
+          : command.sourceStatus == ComplianceSourceStatus.valid
+          ? ComplianceReadStatus.valid
+          : ComplianceReadStatus.exception,
+      note: command.note,
+      reason: command.reason,
+      revision: command.expectedRevision + 1,
+      createdAt: '2026-07-19T08:00:00Z',
+      updatedAt: '2026-07-19T08:01:00Z',
+      archivedAt: null,
+    );
+    compliance = [...compliance.where((item) => item.id != value.id), value];
+    return value;
+  }
+
+  @override
+  Future<WorkforceComplianceRecord> archiveComplianceRecord(
+    ArchiveComplianceRecordCommand command,
+  ) async {
+    final current = compliance.firstWhere((item) => item.id == command.id);
+    final value = WorkforceComplianceRecord(
+      id: current.id,
+      memberId: current.memberId,
+      documentType: current.documentType,
+      documentNumber: current.documentNumber,
+      issuedDate: current.issuedDate,
+      expiryDate: current.expiryDate,
+      sourceStatus: current.sourceStatus,
+      readStatus: current.readStatus,
+      note: current.note,
+      reason: current.reason,
+      revision: current.revision + 1,
+      createdAt: current.createdAt,
+      updatedAt: '2026-07-19T08:01:00Z',
+      archivedAt: '2026-07-19T08:01:00Z',
+    );
+    compliance = [...compliance.where((item) => item.id != value.id), value];
+    return value;
+  }
+
+  @override
+  Future<WorkforcePpeAssignment> savePpeAssignment(
+    SavePpeAssignmentCommand command,
+  ) async {
+    final value = WorkforcePpeAssignment(
+      id: command.id,
+      memberId: command.memberId,
+      ppeType: command.ppeType,
+      brandModel: command.brandModel,
+      size: command.size,
+      serialTag: command.serialTag,
+      quantity: command.quantity,
+      assignedDate: command.assignedDate,
+      status: command.status,
+      returnedDate: command.returnedDate,
+      note: command.note,
+      revision: command.expectedRevision + 1,
+      createdAt: '2026-07-19T08:00:00Z',
+      updatedAt: '2026-07-19T08:01:00Z',
+      archivedAt: command.status == PpeAssignmentStatus.archived
+          ? '2026-07-19T08:01:00Z'
+          : null,
+    );
+    ppeAssignments = [
+      ...ppeAssignments.where((item) => item.id != value.id),
+      value,
+    ];
+    return value;
+  }
 
   @override
   Future<WorkforceMember> archiveMember(
@@ -32,6 +389,11 @@ class FakeAttendanceApplication implements AttendanceApplication {
       teamName: current.teamName,
       roleName: current.roleName,
       personnelCode: current.personnelCode,
+      subcontractorId: current.subcontractorId,
+      subcontractorName: current.subcontractorName,
+      teamId: current.teamId,
+      phone: current.phone,
+      note: current.note,
       isActive: false,
       revision: current.revision + 1,
       createdAt: current.createdAt,
@@ -46,6 +408,8 @@ class FakeAttendanceApplication implements AttendanceApplication {
   Future<WorkforceMember> createMember(
     CreateWorkforceMemberCommand command,
   ) async {
+    createMemberCalls += 1;
+    lastCreateMemberCommand = command;
     if (createMemberFailure case final failure?) throw failure;
     final member = WorkforceMember(
       id: command.id,
@@ -54,12 +418,21 @@ class FakeAttendanceApplication implements AttendanceApplication {
       teamName: command.teamName.trim(),
       roleName: command.roleName.trim(),
       personnelCode: command.personnelCode?.trim(),
+      subcontractorId: command.subcontractorId,
+      subcontractorName: subcontractors
+          .where((item) => item.id == command.subcontractorId)
+          .firstOrNull
+          ?.name,
+      teamId: command.teamId,
+      phone: command.phone?.trim(),
+      note: command.note?.trim(),
       isActive: true,
       revision: 1,
       createdAt: '2026-07-19T08:00:00Z',
       updatedAt: '2026-07-19T08:00:00Z',
       archivedAt: null,
     );
+    if (createMemberCompleter case final completer?) return completer.future;
     members = [...members, member];
     return member;
   }
@@ -134,7 +507,9 @@ class FakeAttendanceApplication implements AttendanceApplication {
     final selected = members.where(
       (item) =>
           item.isActive &&
-          (command.teamName == null || item.teamName == command.teamName),
+          (command.teamId != null
+              ? item.teamId == command.teamId
+              : command.teamName == null || item.teamName == command.teamName),
     );
     final entries = selected
         .map(
@@ -144,6 +519,8 @@ class FakeAttendanceApplication implements AttendanceApplication {
             memberId: member.id,
             memberName: member.fullName,
             teamName: member.teamName,
+            teamId: member.teamId,
+            subcontractorName: member.subcontractorName,
             roleName: member.roleName,
             personnelCode: member.personnelCode,
             memberIsActive: true,
@@ -198,6 +575,8 @@ class FakeAttendanceApplication implements AttendanceApplication {
             memberId: member.id,
             memberName: member.fullName,
             teamName: member.teamName,
+            teamId: member.teamId,
+            subcontractorName: member.subcontractorName,
             roleName: member.roleName,
             personnelCode: member.personnelCode,
             memberIsActive: member.isActive,
@@ -293,6 +672,20 @@ class FakeAttendanceApplication implements AttendanceApplication {
       teamName: command.teamName.trim(),
       roleName: command.roleName.trim(),
       personnelCode: command.personnelCode?.trim(),
+      subcontractorId: command.subcontractorId ?? current.subcontractorId,
+      subcontractorName:
+          subcontractors
+              .where(
+                (item) =>
+                    item.id ==
+                    (command.subcontractorId ?? current.subcontractorId),
+              )
+              .firstOrNull
+              ?.name ??
+          current.subcontractorName,
+      teamId: command.teamId ?? current.teamId,
+      phone: command.phone?.trim(),
+      note: command.note?.trim(),
       isActive: current.isActive,
       revision: current.revision + 1,
       createdAt: current.createdAt,

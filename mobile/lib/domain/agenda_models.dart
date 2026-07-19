@@ -250,6 +250,7 @@ class NotificationBinding {
     required this.syncState,
     required this.lastSyncedAt,
     required this.safeErrorCode,
+    this.repeatIntervalMinutes,
   });
 
   final String reminderId;
@@ -258,6 +259,7 @@ class NotificationBinding {
   final NotificationSyncState syncState;
   final String lastSyncedAt;
   final String? safeErrorCode;
+  final int? repeatIntervalMinutes;
 }
 
 class ReminderDetail {
