@@ -2869,3 +2869,29 @@
 - Ücret, bordro, maaş, SGK, hakediş, personel fotoğraf/belgesi, çoklu kullanıcı,
   onay zinciri, cloud sync, Beton Paketi, signing ve store submission kapsam
   dışıdır.
+
+## Issue 187 — Mobil Beton Döküm Paketi
+
+- Beton Paketi ayrı genel `PackageTemplate` motoru değil, ileride
+  genelleştirilebilecek fakat bugün beton dökümüne özel tek aggregate'tir.
+- Source-of-truth mobil SQLite `concrete_pours`; gerçek gelen metraj ayrı mutable
+  kolon değil received/partial truck satırlarının deterministik toplamıdır.
+- Mobil schema `4 → 5` mevcut Ajanda, reminder, notification ve Puantaj verisini
+  koruyan atomik migration'dır. Python schema `4`, Backup `1`, restore allowlist
+  `(2, 3, 4)` ve Günlük Çıktı `1` değişmez.
+- Checklist, truck, sample, follow-up ve aggregate mutation'ları immutable
+  command + expected revision kullanır; no-op revision/event artırmaz.
+- Döküm event geçmişi deterministic sequence ve DB append-only trigger ile
+  korunur. Raw absolute path, secret ve platform exception event'e yazılmaz.
+- Reminder source invariant'ı observation, attendance day ve concrete pour
+  kaynaklarından en fazla birini kabul eder; concrete source project ile
+  composite foreign key üzerinden eşleşir.
+- Package adımı ve linked reminder kapanışı tek SQLite transaction'dadır.
+  Reminder'ın bağımsız mutation'ı source Beton paketini değiştirmez.
+- Kanıt dosyası içerikten MIME sniff, boyut, SHA-256 ve relative path ile
+  doğrulanır; final dosya hazır olmadan row yazılmaz, DB rollback orphan dosyayı
+  temizler. Attachment kaynağı sonradan sessizce değiştirilemez.
+- Kullanıcı açık exception ile ilerleyebilir; uygulama otomatik beton kabulü,
+  reddi veya resmî teknik karar üretmez.
+- Android/iOS aynı Dart sözleşmesini kullanır. Exact-alarm izni, API/cloud,
+  signing, release hardening ve mağaza gönderimi bu dilime eklenmez.

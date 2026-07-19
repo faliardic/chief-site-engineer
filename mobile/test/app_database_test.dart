@@ -63,6 +63,7 @@ void main() {
       {'version': 2, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 3, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 4, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 5, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
   });
 
@@ -114,6 +115,13 @@ void main() {
         'attendance_events',
         'attendance_reminder_settings',
         'attendance_day_reminder_links',
+        'concrete_pours',
+        'concrete_check_items',
+        'concrete_trucks',
+        'concrete_sample_sets',
+        'concrete_follow_up_items',
+        'concrete_attachments',
+        'concrete_pour_events',
       ]),
     );
   });
@@ -498,6 +506,170 @@ void main() {
     await raw.close();
 
     expect(version, 3);
+    expect(projectCount, 1);
+    expect(partialCount, 0);
+  });
+
+  test(
+    'schema 4 to 5 preserves agenda attendance reminders notifications and events',
+    () async {
+      final versionFour = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+        migrations: AppDatabase.foundationMigrations.take(4).toList(),
+      );
+      await versionFour.open();
+      final database = versionFour.database;
+      await database.insert('projects', {
+        'id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'name': 'Korunan proje',
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await database.insert('attendance_days', {
+        'id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        'project_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'local_date': '2026-07-19',
+        'status': 'draft',
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await database.insert('attendance_events', {
+        'id': 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        'attendance_day_id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        'sequence': 1,
+        'event_type': 'attendance_day.created',
+        'occurred_at': '2026-07-19T08:00:00Z',
+        'payload_json': '{}',
+      });
+      await database.insert('follow_up_items', {
+        'id': 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        'capture_text': 'Korunan Puantaj reminder',
+        'title': 'Korunan Puantaj reminder',
+        'item_type': 'action',
+        'status': 'active',
+        'project_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'attendance_day_id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        'next_attention_at': '2026-07-19T14:00:00Z',
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await database.insert('follow_up_events', {
+        'id': 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        'follow_up_id': 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        'sequence': 1,
+        'project_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'source_attendance_day_id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        'event_type': 'created',
+        'occurred_at': '2026-07-19T08:00:00Z',
+        'payload_json': '{}',
+      });
+      await database.insert('reminder_notification_bindings', {
+        'reminder_id': 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        'platform_notification_id': 187,
+        'scheduled_for': '2026-07-19T14:00:00Z',
+        'sync_state': 'scheduled',
+        'last_synced_at': '2026-07-19T08:00:00Z',
+      });
+      await database.insert('attendance_day_reminder_links', {
+        'attendance_day_id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        'reminder_id': 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        'due_at': '2026-07-19T14:00:00Z',
+        'created_at': '2026-07-19T08:00:00Z',
+      });
+      await versionFour.close();
+
+      final upgraded = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 9),
+      );
+      await upgraded.open();
+      final reminder = (await upgraded.database.query(
+        'follow_up_items',
+      )).single;
+      final event = (await upgraded.database.query('follow_up_events')).single;
+      final binding = (await upgraded.database.query(
+        'reminder_notification_bindings',
+      )).single;
+      final link = (await upgraded.database.query(
+        'attendance_day_reminder_links',
+      )).single;
+      final foreignKeys = await upgraded.database.rawQuery(
+        "PRAGMA foreign_key_list('concrete_follow_up_items')",
+      );
+      await upgraded.close();
+
+      expect(
+        reminder['attendance_day_id'],
+        'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      );
+      expect(reminder['concrete_pour_id'], isNull);
+      expect(
+        event['source_attendance_day_id'],
+        'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      );
+      expect(event['source_concrete_pour_id'], isNull);
+      expect(binding['platform_notification_id'], 187);
+      expect(link['reminder_id'], 'dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+      expect(
+        foreignKeys.map((row) => row['table']),
+        contains('follow_up_items'),
+      );
+    },
+  );
+
+  test('failed schema 5 upgrade rolls back intact schema 4 data', () async {
+    final versionFour = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => firstClock,
+      migrations: AppDatabase.foundationMigrations.take(4).toList(),
+    );
+    await versionFour.open();
+    await versionFour.database.insert('projects', {
+      'id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'name': 'Korunan proje',
+      'created_at': '2026-07-19T08:00:00Z',
+      'updated_at': '2026-07-19T08:00:00Z',
+    });
+    await versionFour.close();
+
+    final failing = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => DateTime.utc(2026, 7, 19, 9),
+      migrations: [
+        ...AppDatabase.foundationMigrations.take(4),
+        DatabaseMigration(
+          version: 5,
+          apply: (transaction) async {
+            await transaction.execute('CREATE TABLE partial_v5 (id TEXT)');
+            throw StateError('intentional v5 failure');
+          },
+        ),
+      ],
+    );
+    await expectLater(failing.open(), throwsA(isA<DatabaseOpenFailure>()));
+
+    final raw = await databaseFactoryFfi.openDatabase(
+      directories.databaseFile,
+      options: OpenDatabaseOptions(singleInstance: false),
+    );
+    final version = sqflite.Sqflite.firstIntValue(
+      await raw.rawQuery('PRAGMA user_version'),
+    );
+    final projectCount = sqflite.Sqflite.firstIntValue(
+      await raw.rawQuery('SELECT count(*) FROM projects'),
+    );
+    final partialCount = sqflite.Sqflite.firstIntValue(
+      await raw.rawQuery(
+        "SELECT count(*) FROM sqlite_master WHERE name = 'partial_v5'",
+      ),
+    );
+    await raw.close();
+    expect(version, 4);
     expect(projectCount, 1);
     expect(partialCount, 0);
   });

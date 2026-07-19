@@ -15,7 +15,7 @@ cihaz-içi SQLite ve uygulamaya özel yerel dosya dizinleriyle offline çalış�
 | Android debug application ID | `com.faliardic.chiefsiteengineer.debug` |
 | iOS release bundle ID | `com.faliardic.chiefsiteengineer` |
 | iOS debug bundle ID | `com.faliardic.chiefsiteengineer.debug` |
-| Mobil schema version | `4` |
+| Mobil schema version | `5` |
 | Sunum timezone | `Europe/Istanbul` |
 
 Debug ve release farklı platform kimlikleri ve farklı `debug` / `release` veri
@@ -77,6 +77,12 @@ aggregate'i, entry/event tabloları, reminder setting ve exact day/reminder link
 tablolarını ekler. Personel ve Puantaj kayıtlarında physical delete yoktur;
 completed/no-work gün explicit reopen olmadan düzenlenemez.
 
+Schema `5`, schema `4` Ajanda, reminder, notification, Puantaj ve event
+kayıtlarını koruyan atomik migration ile Beton döküm paketi, on bir built-in
+kontrol, mikser/irsaliye, numune, takip, kanıt ve append-only event tablolarını
+ekler. Beton kaynağı taşıyan reminder aynı anda observation veya Puantaj kaynağı
+taşıyamaz; project composite foreign key ile eşleşir.
+
 ## Mobil Ajanda ve Hatırlatıcı
 
 Ajanda, seçili `Europe/Istanbul` gününü `observed_at`, `created_at`, ID sırasıyla
@@ -132,6 +138,31 @@ Gün CSV'si UTF-8 BOM, CRLF, deterministic sıra ve formula injection koruması
 kullanır. Uygulama içi staging atomiktir; başarısızlık yarım dosya veya yanlış
 success event'i bırakmaz. Günün insan-okunabilir özeti panoya kopyalanabilir;
 CSV platform share sheet ile paylaşılabilir.
+
+## Mobil Beton Paketi
+
+Beton Paketi ekranı Bugün, Yaklaşan, Devam Eden, Takipte ve Kapalı gruplarını;
+proje/tarih/literal filtreleri ve açık checklist/kanıt/takip sayaçlarıyla gösterir.
+Oluşturma komutu proje, mahal, İstanbul yerel zamanı, beton sınıfı ve pozitif
+plan metrajını doğrular; sabit UUID retry ve çift dokunma kilidi kullanır.
+
+Döküm detayında on bir hazırlık kontrolü, hazır/başlat/bitir/takibe al/kapat/
+iptal/reopen geçişleri, mikser ve irsaliye zamanları, received/held/returned/
+partial sonuçları, türetilen gerçek metraj, numune setleri ve linked reminder'lar
+aynı aggregate revision sınırındadır. Required pending kontrol, eksik truck
+kanıtı, açık numune/takip veya açıklamasız metraj farkı kapanışı fail-closed
+engeller; uygulama kullanıcı yerine beton kabul/red kararı üretmez.
+
+Kamera, galeri ve dosya seçici `SafeAttachmentPicker` arkasındadır. JPEG, PNG,
+HEIC ve PDF içerikten MIME sniff edilir; 20 MiB sınırı, SHA-256, staging → atomic
+finalize, package-relative path, duplicate hash uyarısı ve DB failure orphan
+cleanup uygulanır. Permission/plugin failure Beton kaydını silmez; eksik kanıt
+görünür kalır. Reminder ve notification source-of-truth'u SQLite'tır.
+
+Paket raporu UTF-8 BOM'lu insan-okunabilir Markdown, CSV/JSON-ready özet,
+formula injection koruması ve relative attachment manifest/hash bilgisi taşır.
+Dosya atomik stage edilir; `report.exported` event'i yalnız başarıdan sonra
+yazılır ve paylaşım kullanıcı işlemiyle başlar.
 
 ## Zaman sözleşmesi
 
@@ -192,8 +223,9 @@ repository dışında tutulan provisioning/certificate gerekir.
 - Cloud backend veya sync
 - Kullanıcı hesabı/auth server
 - Masaüstü verisinin otomatik migration'ı
-- Log attachment/fotoğraf bağlama
-- Ücret/bordro/SGK/hakediş veya Beton Paketi davranışı
+- Ajanda loguna genel attachment/fotoğraf bağlama
+- Ücret/bordro/SGK/hakediş
+- Genel PackageTemplate motoru veya otomatik beton kabul/red
 - Recurring reminder/routine template
-- Camera/file picker plugin'i veya store submission
+- Store submission
 - Exact-alarm permission, push/server notification

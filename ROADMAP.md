@@ -22,6 +22,10 @@ notification, tap deep-link ve restart reconciliation uygulandı.
 personeli, günlük attendance aggregate/lifecycle, ekip ve kişi-gün toplamları,
 14 günlük exact linked reminder ve güvenli CSV uygulandı. Ücret/bordro/SGK,
 Beton Paketi ve store submission sonraki dilimlerde kalır.
+3E. [x] Release 0.1 mobil Beton Paketi — Issue #187 ile schema `5`, döküm
+planlama/checklist, mikser-irsaliye kanıt zinciri, numune/laboratuvar takibi,
+kür/reminder yaşam döngüsü ve güvenli paket raporu uygulandı. Release hardening
+ve store submission ayrı dilimlerde kalır.
 
 Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme
 programı Issue #127'dir. Issue #141 / PR #142 ve Issue #143 / PR #144
@@ -33,9 +37,24 @@ tehdit modeli merge edilmiştir. Issue #171 / PR #172 Faz 0 closure sonucunu
 `PASS` olarak merge etmiştir. Issue #173 / PR #174 zaman sözleşmesi ve
 migration preflight'ı merge edilmiştir. Issue #179 / PR #182 mobil Ajanda
 dilimini, Issue #183 / PR #184 mobil reminder yaşam döngüsü ve yerel
-notification dilimini merge etmiştir. Tek aktif production işi Issue #185 mobil
-günlük Puantaj dilimidir. Açık faz Epic'leri aynı anda aktif production işleri
-değildir.
+notification dilimini, Issue #185 / PR #186 mobil günlük Puantajı merge
+etmiştir. Tek aktif production işi Issue #187 mobil Beton Paketi dilimidir.
+Açık faz Epic'leri aynı anda aktif production işleri değildir.
+
+## Issue 187 - Mobil Beton Döküm Paketi
+
+- [x] Mobil schema `4` → `5`; eski Ajanda/reminder/notification/Puantaj/event
+  verisi korunumu ve rollback.
+- [x] Döküm planı, on bir hazırlık kontrolü ve optimistic lifecycle.
+- [x] Mikser/irsaliye, kronolojik zamanlar, sonuçlar ve türetilen gerçek metraj.
+- [x] Kamera/galeri/dosya kanıtı, MIME/SHA-256, atomik finalize ve cleanup.
+- [x] Numune seti, laboratuvar teslim/sonuç reminder'ı ve çift yönlü deep-link.
+- [x] Kür, yüzey, kalıp, eksik kanıt ve sonuç follow-up kapanış kapıları.
+- [x] Bugün/yaklaşan/devam/takip/kapalı görünümü ve açık sayaçlar.
+- [x] UTF-8 Markdown + CSV/JSON-ready özet ve attachment manifest/hash.
+- [x] 320–430 px, platform permission failure ve Android integration kapsamı.
+- [ ] Native iOS build/archive macOS + Xcode + repository dışı signing gerektirir.
+- [ ] Release hardening ve store submission ayrı Issue'dur.
 
 ## Issue 185 - Mobil Günlük Puantaj ve Personel
 

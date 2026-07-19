@@ -1878,6 +1878,7 @@ MobileReminder _reminderFromRow(Map<String, Object?> row) {
     projectName: row['project_name'] as String?,
     sourceLogId: row['observation_id'] as String?,
     attendanceDayId: row['attendance_day_id'] as String?,
+    concretePourId: row['concrete_pour_id'] as String?,
     captureText: row['capture_text']! as String,
     title: row['title']! as String,
     description: row['description'] as String?,
