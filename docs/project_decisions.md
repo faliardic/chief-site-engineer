@@ -2918,3 +2918,32 @@
   notification reconciliation ve failure rollback zorunludur.
 - Cloud provider, masaüstü import, otomatik zamanlama, release hardening,
   signing ve store submission Issue #189 kapsamı değildir.
+
+## Issue 191 — Mobil Release Candidate Hardening
+
+- Android production kimliği `com.faliardic.chiefsiteengineer`, compile/target
+  API `36`, Java `17`, NDK `28.2.13676358` ve ARM64 release tabanıdır. Debug
+  kimliği/name/veri kökü production'dan ayrı kalır.
+- Merged release manifestte OS izin allowlist'i yalnız `CAMERA`,
+  `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`'dır. Plugin private signature
+  izni ayrı doğrulanır; broad media/storage, INTERNET, cleartext ve exact alarm
+  fail-closed reddedilir.
+- Release signing debug anahtarına düşmez. Gerçek key properties ve keystore
+  repository dışında olmalıdır. Test kapısının ephemeral keystore'u gerçek
+  upload/app-signing anahtarı değildir ve her çalışmada silinir.
+- Restore journal secretsız ve relative operasyon adlarıyla sınırlıdır.
+  Bootstrap `prepared`, `old_state_moved`, `new_state_activated`, `validated`
+  aşamasını normal servislerden önce çözer; belirsiz durumda recovery kanıtını
+  koruyup mutation açmaz.
+- Mobil schema `5`, backup format `1`, Python schema `4`, desktop backup `1`,
+  restore allowlist `(2, 3, 4)` ve Günlük Çıktı `1` değişmez. Eski mobil schema
+  `1`–`5` yalnız restore staging alanında güncele taşınır.
+- Privacy/store cevaplarının kanıt kaynağı repository dokümanlarıdır. Kaynak ve
+  dependency audit'i doğru kaldığı sürece developer server'a veri/telemetry/
+  ads/tracking gönderilmediği beyan edilir; kullanıcı başlatmalı OS share hedefi
+  CSE'nin kontrolü değildir.
+- `PrivacyInfo.xcprivacy` ve Xcode proje statik kapısı Windows'ta doğrulanır;
+  native iOS archive veya App Store yüklemesi iddia edilmez. Bunlar macOS,
+  Xcode 26, iOS 26 SDK, Apple hesabı ve repository-dışı signing gerektirir.
+- Saha acceptance checklist'i kanıt şablonudur. Kullanıcı cihazında yapılmayan
+  adımlar `not run` kalır; Codex gerçek saha kabulü veya store submission yapmaz.

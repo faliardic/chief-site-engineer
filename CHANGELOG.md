@@ -1,5 +1,28 @@
 # Changelog
 
+## Issue #191 - Mobil Release Candidate Hardening
+
+- Android release tabanı compile/target API `36`, Java `17`, NDK
+  `28.2.13676358`, ARM64 ve 16 KiB page-size artifact kapılarıyla sabitlendi.
+- Broad medya/depolama, exact alarm ve ağ izinleri kaldırıldı; merged release
+  manifest yalnız gerçek kamera, bildirim ve reboot gereksinimleriyle sınırlandı.
+- Debug signing'e düşmeyen repository-dışı Android signing sözleşmesi,
+  secretsız örnek dosya ve finalde temizlenen geçici keystore RC kapısı eklendi.
+- Restore swap'ına atomik ve secretsız process-death journal; bootstrap öncesi
+  rollback/tamamlama, belirsiz durumda veri silmeme ve artık temizliği eklendi.
+- Mobil schema `1`–`5` backup fixture'larının staging'de schema `5`'e veri/event
+  kaybı olmadan yükseltilmesi executable regresyonla sabitlendi.
+- Türkçe/İngilizce privacy policy, taşınabilir HTML, Play Data Safety, Apple App
+  Privacy, izin amacı ve third-party SDK envanterleri eklendi.
+- iOS `PrivacyInfo.xcprivacy`, iPhone-only target, release/debug kimliği ve
+  macOS Xcode 26 archive blocker checklist'i statik kapıya bağlandı.
+- Proje mülkiyetinde adaptive Android ve alpha'sız iOS icon/splash seti;
+  global güvenli hata yüzeyi ve küçük ekran/büyük metin/dark-light testleri eklendi.
+- Secretsız GitHub Actions workflow'u, tek komut Windows release gate'i,
+  unsigned/signed artefakt ayrımı, signer ve checksum doğrulaması tamamlandı.
+- Gerçek kullanıcı verisi, upload/signing key, Apple sertifikası, store
+  submission, yeni iş modülü veya mobil schema değişikliği eklenmedi.
+
 ## Issue #189 - Mobil Tam Yedek ve Geri Yükleme
 
 - Bütün mobil SQLite state'i ve aktif Beton attachment dosyaları parola korumalı,

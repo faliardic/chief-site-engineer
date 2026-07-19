@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="cse_release_background">#123C33</color>
+    <color name="cse_release_accent">#F2C14E</color>
+    <color name="cse_release_foreground">#FFF9E8</color>
+</resources>

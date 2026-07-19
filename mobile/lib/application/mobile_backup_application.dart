@@ -4,6 +4,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:chief_site_engineer/application/restore_recovery_application.dart';
 import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/mobile_backup_models.dart';
@@ -962,11 +963,16 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
     _PreparedRestore prepared,
     DateTime operationTime,
   ) async {
+    final preparedName = path.basename(prepared.root.path);
+    if (!preparedName.startsWith('restore-')) {
+      throw const MobileBackupFailure(
+        'restore_activation_failed',
+        'Restore hazırlık alanı doğrulanamadı.',
+      );
+    }
+    final operationId = preparedName.substring('restore-'.length);
     final rollbackRoot = Directory(
-      path.join(
-        directories.staging.path,
-        'rollback-${_operationId(operationTime)}',
-      ),
+      path.join(directories.staging.path, 'rollback-$operationId'),
     );
     final rollbackDatabase = File(
       path.join(rollbackRoot.path, 'database.sqlite3'),
@@ -974,12 +980,17 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
     final rollbackAttachments = Directory(
       path.join(rollbackRoot.path, 'attachments'),
     );
-    var oldDatabaseMoved = false;
-    var oldAttachmentsMoved = false;
-    var newDatabaseActive = false;
-    var newAttachmentsActive = false;
-    var preserveRollbackArea = false;
+    final recovery = MobileRestoreRecoveryApplication(
+      directories: directories,
+      databaseFactory: databaseFactory,
+      clock: () => operationTime,
+    );
     await rollbackRoot.create(recursive: false);
+    var journal = await recovery.begin(
+      operationId: operationId,
+      preparedDirectory: prepared.root,
+      rollbackDirectory: rollbackRoot,
+    );
     try {
       final activeDatabase = File(directories.databaseFile);
       if (!await activeDatabase.exists() ||
@@ -990,13 +1001,17 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
         );
       }
       await activeDatabase.rename(rollbackDatabase.path);
-      oldDatabaseMoved = true;
       await directories.attachments.rename(rollbackAttachments.path);
-      oldAttachmentsMoved = true;
+      journal = await recovery.advance(
+        journal,
+        RestoreJournalPhase.oldStateMoved,
+      );
       await prepared.databaseFile.rename(directories.databaseFile);
-      newDatabaseActive = true;
       await prepared.attachmentsRoot.rename(directories.attachments.path);
-      newAttachmentsActive = true;
+      journal = await recovery.advance(
+        journal,
+        RestoreJournalPhase.newStateActivated,
+      );
       await restoreHooks.afterSwapBeforeSmoke?.call();
       await _validateDatabaseFile(
         File(directories.databaseFile),
@@ -1009,39 +1024,14 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
         directories.attachments,
         prepared.archive.manifest.attachments,
       );
+      journal = await recovery.advance(journal, RestoreJournalPhase.validated);
       await restoreHooks.beforeNotificationReconcile?.call();
       await notificationReconciler();
+      await recovery.completeValidated(journal);
     } on Object catch (error, stackTrace) {
       try {
-        final failedRoot = Directory(
-          path.join(rollbackRoot.path, 'failed_new'),
-        );
-        await failedRoot.create();
-        if (newDatabaseActive &&
-            await File(directories.databaseFile).exists()) {
-          await File(
-            directories.databaseFile,
-          ).rename(path.join(failedRoot.path, 'database.sqlite3'));
-        }
-        if (newAttachmentsActive && await directories.attachments.exists()) {
-          await directories.attachments.rename(
-            path.join(failedRoot.path, 'attachments'),
-          );
-        }
-        if (oldDatabaseMoved && await rollbackDatabase.exists()) {
-          await rollbackDatabase.rename(directories.databaseFile);
-        }
-        if (oldAttachmentsMoved && await rollbackAttachments.exists()) {
-          await rollbackAttachments.rename(directories.attachments.path);
-        }
-        await _validateDatabaseFile(
-          File(directories.databaseFile),
-          expectedSchema: AppDatabase.schemaVersion,
-          operationTime: operationTime,
-          allowMigration: false,
-        );
+        await recovery.rollbackToOld(journal);
       } on Object {
-        preserveRollbackArea = true;
         throw const MobileBackupFailure(
           'restore_rollback_failed',
           'Restore geri alma işlemi tamamlanamadı; safety backup korunuyor.',
@@ -1056,10 +1046,6 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
               ),
         stackTrace,
       );
-    } finally {
-      if (!preserveRollbackArea) {
-        await _deleteStagingDirectory(rollbackRoot);
-      }
     }
   }
 

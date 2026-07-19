@@ -1543,3 +1543,17 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Compensating Rollback (Telafi Edici Geri Alma)`: Dosya sistemi rename'leri SQLite transaction'ına katılamadığında, başarısız yeni state'i kenara alıp önceki database ve attachment çiftini eski yerine taşıyan açık geri alma akışıdır.
 
 `TOCTOU (Kontrol ve Kullanım Arası Değişim)`: Bir dosyanın ön kontrolden sonra gerçek kullanım anına kadar değiştirilmesi yarışıdır. Restore preflight paket SHA-256 token'ını aktivasyon öncesi yeniden hesaplayarak bu durumda fail-closed durur.
+
+`Restore Journal (Geri Yükleme Günlüğü)`: Database ve dosya kökü swap'ının hangi kalıcı aşamaya ulaştığını küçük, atomik ve secretsız bir kayıtla belirten process-death recovery kanıtıdır.
+
+`Process-Death Recovery`: Exception handler çalışmadan işletim sistemi process'i sonlandırdıktan sonra, bir sonraki bootstrap'ta kalıcı journal ve dosya durumundan eski ya da doğrulanmış yeni state'i güvenli biçimde kurma işlemidir.
+
+`Merged Manifest (Birleşmiş Manifest)`: Uygulama ile bütün Android plugin/dependency manifestlerinin Gradle tarafından birleştirilmiş gerçek build çıktısıdır; nihai izin yüzeyi bu dosyadan denetlenir.
+
+`16 KiB Page Alignment`: Android native `.so` segmentlerinin 16 KiB bellek sayfası kullanan cihazlarda yüklenebilmesi için APK içindeki hizalama sözleşmesidir; `zipalign -P 16` artefakt üzerinde doğrular.
+
+`Privacy Manifest`: iOS uygulaması ve SDK'larının tracking, collected data ve required-reason API beyanlarını plist biçiminde taşıyan `PrivacyInfo.xcprivacy` bundle kaynağıdır.
+
+`Ephemeral Keystore (Geçici Anahtar Deposu)`: Yalnız signed build yolunu sınamak için repository dışında rastgele üretilen, gerçek upload/app-signing kimliği olmayan ve test sonunda silinen anahtar dosyasıdır.
+
+`Release Candidate / RC (Sürüm Adayı)`: Teknik kapılardan geçmiş ve saha kabulüne sunulabilir build'dir; gerçek saha checklist'inin veya mağaza gönderiminin tamamlandığı anlamına gelmez.

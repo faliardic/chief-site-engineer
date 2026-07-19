@@ -1,0 +1,6 @@
+# Copy these field names to a properties file OUTSIDE the repository.
+# Never commit real paths, aliases, passwords, keystores, or certificates.
+storeFile=<external-keystore-file-name>
+storePassword=<runtime-only-secret>
+keyAlias=<external-key-alias>
+keyPassword=<runtime-only-secret>

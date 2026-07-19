@@ -317,43 +317,111 @@ void main() {
     },
   );
 
-  test('supported schema v4 package is migrated in staging to v5', () async {
-    final oldRoot = await Directory.systemTemp.createTemp('cse_schema4_');
-    addTearDown(() async {
-      if (await oldRoot.exists()) await oldRoot.delete(recursive: true);
-    });
-    final oldFile = path.join(oldRoot.path, 'old.sqlite3');
-    final oldDatabase = AppDatabase(
-      path: oldFile,
-      factory: databaseFactoryFfi,
-      clock: () => DateTime.parse(_now),
-      migrations: AppDatabase.foundationMigrations.take(4).toList(),
+  for (final schemaVersion in [1, 2, 3, 4]) {
+    test(
+      'schema v$schemaVersion package migrates to v5 without count loss',
+      () async {
+        final oldRoot = await Directory.systemTemp.createTemp(
+          'cse_schema${schemaVersion}_',
+        );
+        addTearDown(() async {
+          if (await oldRoot.exists()) await oldRoot.delete(recursive: true);
+        });
+        final oldFile = path.join(oldRoot.path, 'old.sqlite3');
+        final oldDatabase = AppDatabase(
+          path: oldFile,
+          factory: databaseFactoryFfi,
+          clock: () => DateTime.parse(_now),
+          migrations: AppDatabase.foundationMigrations
+              .take(schemaVersion)
+              .toList(),
+        );
+        await oldDatabase.open();
+        await SmokeRecordRepository(
+          database: oldDatabase,
+          clock: () => DateTime.parse(_now),
+        ).ensureFoundationRecord();
+        await _seedLegacySchema(oldDatabase.database, schemaVersion);
+        await oldDatabase.close();
+        final databaseBytes = await File(oldFile).readAsBytes();
+        final archive = const CseBackupArchiveCodec().encode(
+          manifest: _manifest(databaseBytes, schemaVersion: schemaVersion),
+          databaseBytes: databaseBytes,
+          attachments: const {},
+        );
+        final package = File(path.join(oldRoot.path, 'old.csebackup'));
+        await package.writeAsBytes(
+          await _testEncryptionCodec().encrypt(archive, _password),
+          flush: true,
+        );
+        final application = _application(directories, gateway: gateway);
+        final preflight = await application.preflightBackup(
+          package.path,
+          _password,
+        );
+
+        await application.restoreBackup(
+          RestoreMobileBackupCommand(
+            packagePath: package.path,
+            password: _password,
+            expectedPackageSha256: preflight.packageSha256,
+          ),
+        );
+
+        expect(preflight.manifest.mobileSchemaVersion, schemaVersion);
+        expect(preflight.migratedSchemaVersion, 5);
+        final counts = await _tableCounts(directories);
+        final hasAgenda = schemaVersion >= 2 ? 1 : 0;
+        final hasAttendance = schemaVersion >= 4 ? 1 : 0;
+        expect(counts['projects'], hasAgenda);
+        expect(counts['field_observations'], hasAgenda);
+        expect(counts['observation_events'], hasAgenda);
+        expect(counts['follow_up_items'], hasAgenda);
+        expect(counts['follow_up_events'], hasAgenda);
+        expect(counts['reminder_notification_bindings'], hasAgenda);
+        expect(counts['workforce_members'], hasAttendance);
+        expect(counts['attendance_days'], hasAttendance);
+        expect(counts['attendance_entries'], hasAttendance);
+        expect(counts['attendance_events'], hasAttendance);
+        expect(counts['concrete_pours'], 0);
+        expect(counts['concrete_pour_events'], 0);
+        expect(counts['concrete_attachments'], 0);
+        expect(await directories.staging.list().toList(), isEmpty);
+      },
     );
-    await oldDatabase.open();
-    await SmokeRecordRepository(
-      database: oldDatabase,
-      clock: () => DateTime.parse(_now),
-    ).ensureFoundationRecord();
-    await oldDatabase.close();
-    final databaseBytes = await File(oldFile).readAsBytes();
+  }
+
+  test('unknown newer schema is rejected before active mutation', () async {
+    final activeProjectCount = await _projectCount(directories);
+    final packageRoot = await Directory.systemTemp.createTemp(
+      'cse_future_schema_',
+    );
+    addTearDown(() async {
+      if (await packageRoot.exists()) {
+        await packageRoot.delete(recursive: true);
+      }
+    });
+    final databaseBytes = await File(directories.databaseFile).readAsBytes();
     final archive = const CseBackupArchiveCodec().encode(
-      manifest: _manifest(databaseBytes, schemaVersion: 4),
+      manifest: _manifest(databaseBytes, schemaVersion: 6),
       databaseBytes: databaseBytes,
       attachments: const {},
     );
-    final package = File(path.join(oldRoot.path, 'old.csebackup'));
+    final package = File(path.join(packageRoot.path, 'future.csebackup'));
     await package.writeAsBytes(
       await _testEncryptionCodec().encrypt(archive, _password),
       flush: true,
     );
 
-    final preflight = await _application(
-      directories,
-      gateway: gateway,
-    ).preflightBackup(package.path, _password);
+    await expectLater(
+      _application(
+        directories,
+        gateway: gateway,
+      ).preflightBackup(package.path, _password),
+      _failureCode('unsupported_schema'),
+    );
 
-    expect(preflight.manifest.mobileSchemaVersion, 4);
-    expect(preflight.migratedSchemaVersion, 5);
+    expect(await _projectCount(directories), activeProjectCount);
     expect(await directories.staging.list().toList(), isEmpty);
   });
 
@@ -832,6 +900,154 @@ Future<void> _seedFullFixture(
   );
   await attachment.parent.create(recursive: true);
   await attachment.writeAsBytes(attachmentBytes, flush: true);
+}
+
+Future<void> _seedLegacySchema(Database database, int schemaVersion) async {
+  if (schemaVersion < 2) return;
+  await database.insert('projects', {
+    'id': 'legacy-project',
+    'name': 'Legacy proje',
+    'created_at': _now,
+    'updated_at': _now,
+    'revision': 1,
+  });
+  await database.insert('field_observations', {
+    'id': 'legacy-observation',
+    'project_id': 'legacy-project',
+    'observed_at': '2026-07-18T07:00:00Z',
+    'created_at': _now,
+    'updated_at': _now,
+    'category': 'inspection',
+    'description': 'Legacy gözlem',
+    'revision': 1,
+  });
+  await database.insert('observation_events', {
+    'id': 'legacy-observation-event',
+    'observation_id': 'legacy-observation',
+    'project_id': 'legacy-project',
+    'event_type': 'observation.created',
+    'occurred_at': _now,
+    'payload_json': '{}',
+  });
+  if (schemaVersion == 2) {
+    await database.insert('follow_up_items', {
+      'id': 'legacy-reminder',
+      'project_id': 'legacy-project',
+      'observation_id': 'legacy-observation',
+      'title': 'Legacy reminder',
+      'item_type': 'action',
+      'status': 'active',
+      'next_attention_at': '2026-07-20T06:00:00Z',
+      'revision': 1,
+      'created_at': _now,
+      'updated_at': _now,
+    });
+    await database.insert('follow_up_events', {
+      'id': 'legacy-reminder-event',
+      'follow_up_id': 'legacy-reminder',
+      'project_id': 'legacy-project',
+      'source_observation_id': 'legacy-observation',
+      'event_type': 'created',
+      'occurred_at': _now,
+      'payload_json': '{}',
+    });
+    return;
+  }
+  await database.insert('follow_up_items', {
+    'id': 'legacy-reminder',
+    'capture_text': 'Legacy reminder',
+    'title': 'Legacy reminder',
+    'item_type': 'action',
+    'status': 'active',
+    'project_id': 'legacy-project',
+    'observation_id': 'legacy-observation',
+    'is_important': 1,
+    'next_attention_at': '2026-07-20T06:00:00Z',
+    'revision': 1,
+    'created_at': _now,
+    'updated_at': _now,
+  });
+  await database.insert('follow_up_events', {
+    'id': 'legacy-reminder-event',
+    'follow_up_id': 'legacy-reminder',
+    'sequence': 1,
+    'project_id': 'legacy-project',
+    'source_observation_id': 'legacy-observation',
+    'event_type': 'created',
+    'occurred_at': _now,
+    'payload_json': '{}',
+  });
+  await database.insert('reminder_notification_bindings', {
+    'reminder_id': 'legacy-reminder',
+    'platform_notification_id': 191,
+    'scheduled_for': '2026-07-20T06:00:00Z',
+    'sync_state': 'scheduled',
+    'last_synced_at': _now,
+  });
+  if (schemaVersion < 4) return;
+  await database.insert('workforce_members', {
+    'id': 'legacy-worker',
+    'project_id': 'legacy-project',
+    'full_name': 'Legacy çalışan',
+    'team_name': 'Legacy ekip',
+    'role_name': 'Usta',
+    'is_active': 1,
+    'revision': 1,
+    'created_at': _now,
+    'updated_at': _now,
+  });
+  await database.insert('attendance_days', {
+    'id': 'legacy-attendance',
+    'project_id': 'legacy-project',
+    'local_date': '2026-07-19',
+    'status': 'draft',
+    'revision': 1,
+    'created_at': _now,
+    'updated_at': _now,
+  });
+  await database.insert('attendance_entries', {
+    'id': 'legacy-attendance-entry',
+    'attendance_day_id': 'legacy-attendance',
+    'workforce_member_id': 'legacy-worker',
+    'result': 'full_day',
+    'overtime_minutes': 30,
+    'created_at': _now,
+    'updated_at': _now,
+  });
+  await database.insert('attendance_events', {
+    'id': 'legacy-attendance-event',
+    'attendance_day_id': 'legacy-attendance',
+    'sequence': 1,
+    'event_type': 'attendance_day.created',
+    'occurred_at': _now,
+    'payload_json': '{}',
+  });
+}
+
+Future<Map<String, int>> _tableCounts(AppDirectories directories) async {
+  final database = await _openRaw(directories);
+  final counts = <String, int>{};
+  for (final table in const [
+    'projects',
+    'field_observations',
+    'observation_events',
+    'follow_up_items',
+    'follow_up_events',
+    'reminder_notification_bindings',
+    'workforce_members',
+    'attendance_days',
+    'attendance_entries',
+    'attendance_events',
+    'concrete_pours',
+    'concrete_pour_events',
+    'concrete_attachments',
+  ]) {
+    counts[table] = Sqflite.firstIntValue(
+      await database.rawQuery('SELECT count(*) FROM $table'),
+    )!;
+  }
+  await database.close();
+  return counts;
 }
 
 Future<Map<String, Object?>> _fixtureSnapshot(
