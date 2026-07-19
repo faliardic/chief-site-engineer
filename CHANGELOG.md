@@ -1,5 +1,34 @@
 # Changelog
 
+## Issue #183 - Mobil Reminder Yaşam Döngüsü ve Yerel Bildirimler
+
+- Mobil SQLite schema `2` → `3` atomik rebuild migration ile v2 Ajanda,
+  linked reminder ve event geçmişi korunarak geniş reminder aggregate'i,
+  optimistic revision, sequence ve operational notification binding eklendi.
+- Hatırlatıcı ekranına bağımsız `+ Unutma`, optional project/saha ayrıntıları,
+  önemli/son tarih/koşul alanları ve yedi hızlı zaman seçeneği eklendi.
+- Ayrıntı güncelleme, schedule/reschedule, 15 dakika/1 saat/yarın snooze,
+  waiting, inbox, complete/cancel outcome ve reopen işlemleri row + event tek
+  transaction ve stale/no-op korumasıyla uygulandı.
+- Şimdi ilgilen, Gecikenler, Bugün, Bekliyorum, Tekrar kontrol, Yaklaşanlar,
+  Unutma Kutusu ve terminal geçmiş read-model'leri deterministik sırayla açıldı.
+- `flutter_local_notifications ^22.0.1` üzerinden Android/iOS timezone-aware
+  schedule, notification tap deep-link ve cold-launch payload yönlendirmesi
+  eklendi.
+- Permission denied, unavailable, plugin failure ve platform kapasitesi reminder
+  kaybı üretmeden görünür safe sync state'e dönüştürüldü; raw exception
+  saklanmadı.
+- Bootstrap reconciliation eksik pending kayıtları yeniden kuruyor;
+  duplicate/stale/orphan kayıtları ve terminal/inbox pending'lerini iptal ediyor.
+- Android `inexactAllowWhileIdle`, reboot receiver ve notification permission
+  kullanıyor; `USE_EXACT_ALARM` / `SCHEDULE_EXACT_ALARM` eklenmedi.
+- Flutter analiz/unit/widget/statik testleri, gerçek Android pending → restart →
+  cancel integration, debug APK, unsigned release AAB ve iOS statik config
+  kapıları doğrulandı.
+- Python/Flask, Backup/Restore, Günlük Çıktı, attachment, recurring routine,
+  Puantaj, Beton Paketi, gerçek kullanıcı verisi ve signing materyali
+  değiştirilmedi.
+
 ## Issue #179 - Mobil Ajanda Logu ve Bağlı Hatırlatıcı
 
 - Mobil SQLite schema `1` → `2` atomik migration ile project, Ajanda logu,

@@ -2,6 +2,7 @@ import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
+import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
 import 'package:flutter/material.dart';
 
 class RemindersPage extends StatefulWidget {
@@ -14,7 +15,7 @@ class RemindersPage extends StatefulWidget {
 }
 
 class _RemindersPageState extends State<RemindersPage> {
-  ReminderViewGroup _group = ReminderViewGroup.inbox;
+  ReminderViewGroup _group = ReminderViewGroup.now;
   List<MobileReminder> _items = const [];
   bool _loading = true;
   String? _error;
@@ -47,9 +48,14 @@ class _RemindersPageState extends State<RemindersPage> {
   }
 
   String _label(ReminderViewGroup group) => switch (group) {
-    ReminderViewGroup.inbox => 'Unutma Kutusu',
+    ReminderViewGroup.now => 'Şimdi ilgilen',
+    ReminderViewGroup.overdue => 'Gecikenler',
     ReminderViewGroup.today => 'Bugün',
+    ReminderViewGroup.waiting => 'Bekliyorum',
+    ReminderViewGroup.recheck => 'Tekrar kontrol',
     ReminderViewGroup.upcoming => 'Yaklaşanlar',
+    ReminderViewGroup.inbox => 'Unutma Kutusu',
+    ReminderViewGroup.history => 'Geçmiş',
   };
 
   @override
@@ -60,6 +66,31 @@ class _RemindersPageState extends State<RemindersPage> {
         key: const Key('reminder-list'),
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 88),
         children: [
+          SizedBox(
+            height: 52,
+            child: FilledButton.icon(
+              key: const Key('quick-reminder'),
+              onPressed: () async {
+                final created = await Navigator.of(context)
+                    .push<MobileReminder>(
+                      MaterialPageRoute(
+                        builder: (_) => ReminderFormPage(agenda: widget.agenda),
+                      ),
+                    );
+                if (created != null && mounted) {
+                  setState(() {
+                    _group = created.status == ReminderStatus.inbox
+                        ? ReminderViewGroup.inbox
+                        : ReminderViewGroup.today;
+                  });
+                  await _reload();
+                }
+              },
+              icon: const Icon(Icons.add_alert_outlined),
+              label: const Text('+ Unutma'),
+            ),
+          ),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -120,14 +151,16 @@ class _RemindersPageState extends State<RemindersPage> {
                     [
                       reminder.kind.label,
                       reminder.status.label,
-                      reminder.projectName,
+                      reminder.projectName ?? 'Kişisel',
                       if (reminder.nextAttentionAt != null)
                         CseTimeCodec.formatIstanbul(reminder.nextAttentionAt!),
                     ].join(' • '),
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  trailing: const Icon(Icons.chevron_right),
+                  trailing: reminder.isImportant
+                      ? const Icon(Icons.priority_high_rounded)
+                      : const Icon(Icons.chevron_right),
                   onTap: () async {
                     await Navigator.of(context).push<void>(
                       MaterialPageRoute(

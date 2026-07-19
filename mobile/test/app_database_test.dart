@@ -61,6 +61,7 @@ void main() {
     expect(history, [
       {'version': 1, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 2, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 3, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
   });
 
@@ -201,5 +202,141 @@ void main() {
 
     expect(version, 0);
     expect(tables, isEmpty);
+  });
+
+  test(
+    'schema 2 to 3 upgrade preserves agenda linked reminder and events',
+    () async {
+      final versionTwo = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+        migrations: AppDatabase.foundationMigrations.take(2).toList(),
+      );
+      await versionTwo.open();
+      final database = versionTwo.database;
+      await database.insert('projects', {
+        'id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'name': 'Korunan proje',
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await database.insert('field_observations', {
+        'id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        'project_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'observed_at': '2026-07-19T07:00:00Z',
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+        'category': 'general_note',
+        'description': 'Korunan Ajanda kaydı',
+      });
+      await database.insert('follow_up_items', {
+        'id': 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        'project_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'observation_id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        'title': 'Korunan hatırlatıcı',
+        'item_type': 'action',
+        'status': 'active',
+        'next_attention_at': '2026-07-20T06:00:00Z',
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await database.insert('follow_up_events', {
+        'id': 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        'follow_up_id': 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        'project_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'source_observation_id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        'event_type': 'created',
+        'occurred_at': '2026-07-19T08:00:00Z',
+        'payload_json': '{}',
+      });
+      await versionTwo.close();
+
+      final upgraded = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 9),
+      );
+      await upgraded.open();
+      final reminder = (await upgraded.database.query(
+        'follow_up_items',
+      )).single;
+      final event = (await upgraded.database.query('follow_up_events')).single;
+      final binding = (await upgraded.database.query(
+        'reminder_notification_bindings',
+      )).single;
+      final observationCount = sqflite.Sqflite.firstIntValue(
+        await upgraded.database.rawQuery(
+          'SELECT COUNT(*) FROM field_observations',
+        ),
+      );
+      await upgraded.close();
+
+      expect(observationCount, 1);
+      expect(reminder['capture_text'], 'Korunan hatırlatıcı');
+      expect(
+        reminder['observation_id'],
+        'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      );
+      expect(event['sequence'], 1);
+      expect(binding['scheduled_for'], '2026-07-20T06:00:00Z');
+      expect(binding['sync_state'], 'unavailable');
+      expect(binding['safe_error_code'], 'reconciliation_required');
+    },
+  );
+
+  test('failed schema 3 upgrade rolls back intact schema 2 data', () async {
+    final versionTwo = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => firstClock,
+      migrations: AppDatabase.foundationMigrations.take(2).toList(),
+    );
+    await versionTwo.open();
+    await versionTwo.database.insert('projects', {
+      'id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'name': 'Korunan proje',
+      'created_at': '2026-07-19T08:00:00Z',
+      'updated_at': '2026-07-19T08:00:00Z',
+    });
+    await versionTwo.close();
+
+    final failing = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => DateTime.utc(2026, 7, 19, 9),
+      migrations: [
+        ...AppDatabase.foundationMigrations.take(2),
+        DatabaseMigration(
+          version: 3,
+          apply: (transaction) async {
+            await transaction.execute('CREATE TABLE partial_v3 (id TEXT)');
+            throw StateError('intentional v3 failure');
+          },
+        ),
+      ],
+    );
+    await expectLater(failing.open(), throwsA(isA<DatabaseOpenFailure>()));
+
+    final raw = await databaseFactoryFfi.openDatabase(
+      directories.databaseFile,
+      options: OpenDatabaseOptions(singleInstance: false),
+    );
+    final version = sqflite.Sqflite.firstIntValue(
+      await raw.rawQuery('PRAGMA user_version'),
+    );
+    final projectCount = sqflite.Sqflite.firstIntValue(
+      await raw.rawQuery('SELECT COUNT(*) FROM projects'),
+    );
+    final partialCount = sqflite.Sqflite.firstIntValue(
+      await raw.rawQuery(
+        "SELECT COUNT(*) FROM sqlite_master WHERE name = 'partial_v3'",
+      ),
+    );
+    await raw.close();
+
+    expect(version, 2);
+    expect(projectCount, 1);
+    expect(partialCount, 0);
   });
 }

@@ -75,6 +75,7 @@ enum ReminderScheduleKind {
   in1Hour('1 saat'),
   todayEnd('Bugün çıkmadan'),
   tomorrowMorning('Yarın sabah'),
+  waiting('Bekliyorum'),
   custom('Özel tarih/saat');
 
   const ReminderScheduleKind(this.label);
@@ -82,7 +83,66 @@ enum ReminderScheduleKind {
   final String label;
 }
 
-enum ReminderViewGroup { inbox, today, upcoming }
+enum ReminderViewGroup {
+  now,
+  overdue,
+  today,
+  waiting,
+  recheck,
+  upcoming,
+  inbox,
+  history,
+}
+
+enum ReminderOutcomeType {
+  completed('completed', 'Tamamlandı'),
+  noLongerNeeded('no_longer_needed', 'Artık gerekli değil');
+
+  const ReminderOutcomeType(this.storageValue, this.label);
+
+  final String storageValue;
+  final String label;
+
+  static ReminderOutcomeType fromStorage(String value) => values.firstWhere(
+    (item) => item.storageValue == value,
+    orElse: () => throw const AgendaValidationFailure(
+      'Hatırlatıcı sonuç türü desteklenmiyor.',
+    ),
+  );
+}
+
+enum ReminderMutationAction {
+  updateDetails,
+  schedule,
+  snooze15Minutes,
+  snooze1Hour,
+  snoozeTomorrowMorning,
+  startWaiting,
+  moveToInbox,
+  complete,
+  cancel,
+  reopen,
+}
+
+enum NotificationSyncState {
+  scheduled('scheduled', 'Bildirim planlandı'),
+  permissionDenied('permission_denied', 'Bildirim izni kapalı'),
+  unavailable('unavailable', 'Bildirim kullanılamıyor'),
+  failed('failed', 'Bildirim planlanamadı'),
+  cancelled('cancelled', 'Bekleyen bildirim yok');
+
+  const NotificationSyncState(this.storageValue, this.label);
+
+  final String storageValue;
+  final String label;
+
+  static NotificationSyncState fromStorage(String value) => values.firstWhere(
+    (item) => item.storageValue == value,
+    orElse: () => throw const AgendaValidationFailure(
+      'Bildirim eşitleme durumu desteklenmiyor.',
+    ),
+  );
+}
 
 class MobileProject {
   const MobileProject({
@@ -134,26 +194,78 @@ class MobileReminder {
     required this.projectId,
     required this.projectName,
     required this.sourceLogId,
+    this.captureText = '',
     required this.title,
+    this.description,
     required this.kind,
     required this.status,
+    this.location,
+    this.relatedPerson,
+    this.isImportant = false,
     required this.nextAttentionAt,
+    this.deadlineAt,
+    this.conditionText,
+    this.outcomeType,
+    this.outcomeNote,
     required this.createdAt,
     required this.updatedAt,
+    this.completedAt,
+    this.cancelledAt,
     required this.revision,
   });
 
   final String id;
-  final String projectId;
-  final String projectName;
-  final String sourceLogId;
+  final String? projectId;
+  final String? projectName;
+  final String? sourceLogId;
+  final String captureText;
   final String title;
+  final String? description;
   final ReminderKind kind;
   final ReminderStatus status;
+  final String? location;
+  final String? relatedPerson;
+  final bool isImportant;
   final String? nextAttentionAt;
+  final String? deadlineAt;
+  final ReminderOutcomeType? outcomeType;
+  final String? outcomeNote;
+  final String? conditionText;
   final String createdAt;
   final String updatedAt;
+  final String? completedAt;
+  final String? cancelledAt;
   final int revision;
+}
+
+class NotificationBinding {
+  const NotificationBinding({
+    required this.reminderId,
+    required this.platformNotificationId,
+    required this.scheduledFor,
+    required this.syncState,
+    required this.lastSyncedAt,
+    required this.safeErrorCode,
+  });
+
+  final String reminderId;
+  final int platformNotificationId;
+  final String? scheduledFor;
+  final NotificationSyncState syncState;
+  final String lastSyncedAt;
+  final String? safeErrorCode;
+}
+
+class ReminderDetail {
+  const ReminderDetail({
+    required this.reminder,
+    required this.events,
+    required this.notification,
+  });
+
+  final MobileReminder reminder;
+  final List<AppendOnlyEvent> events;
+  final NotificationBinding notification;
 }
 
 class AgendaLogDetail {
@@ -196,22 +308,76 @@ class CreateReminderCommand {
   const CreateReminderCommand({
     required this.id,
     required this.eventId,
-    required this.projectId,
-    required this.sourceLogId,
     required this.title,
     required this.kind,
     required this.schedule,
+    this.projectId,
+    this.sourceLogId,
+    this.captureText,
+    this.description,
+    this.location,
+    this.relatedPerson,
+    this.isImportant = false,
+    this.deadlineAt,
+    this.conditionText,
     this.customAttentionAt,
   });
 
   final String id;
   final String eventId;
-  final String projectId;
-  final String sourceLogId;
+  final String? projectId;
+  final String? sourceLogId;
+  final String? captureText;
   final String title;
+  final String? description;
   final ReminderKind kind;
   final ReminderScheduleKind schedule;
+  final String? location;
+  final String? relatedPerson;
+  final bool isImportant;
+  final String? deadlineAt;
+  final String? conditionText;
   final String? customAttentionAt;
+}
+
+class MutateReminderCommand {
+  const MutateReminderCommand({
+    required this.reminderId,
+    required this.eventId,
+    required this.expectedRevision,
+    required this.action,
+    this.title,
+    this.description,
+    this.kind,
+    this.projectId,
+    this.location,
+    this.relatedPerson,
+    this.isImportant,
+    this.deadlineAt,
+    this.conditionText,
+    this.schedule,
+    this.customAttentionAt,
+    this.outcomeType,
+    this.outcomeNote,
+  });
+
+  final String reminderId;
+  final String eventId;
+  final int expectedRevision;
+  final ReminderMutationAction action;
+  final String? title;
+  final String? description;
+  final ReminderKind? kind;
+  final String? projectId;
+  final String? location;
+  final String? relatedPerson;
+  final bool? isImportant;
+  final String? deadlineAt;
+  final String? conditionText;
+  final ReminderScheduleKind? schedule;
+  final String? customAttentionAt;
+  final ReminderOutcomeType? outcomeType;
+  final String? outcomeNote;
 }
 
 class AgendaQuery {
@@ -236,16 +402,18 @@ class AppendOnlyEvent {
     required this.eventType,
     required this.occurredAt,
     required this.payloadJson,
+    this.sequence,
     this.sourceLogId,
   });
 
   final String id;
   final String recordId;
-  final String projectId;
+  final String? projectId;
   final String? sourceLogId;
   final String eventType;
   final String occurredAt;
   final String payloadJson;
+  final int? sequence;
 }
 
 void validateUuid(String value, String field) {

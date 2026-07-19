@@ -5,10 +5,10 @@ import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:flutter/material.dart';
 
 class ReminderFormPage extends StatefulWidget {
-  const ReminderFormPage({required this.agenda, required this.log, super.key});
+  const ReminderFormPage({required this.agenda, this.log, super.key});
 
   final AgendaApplication agenda;
-  final AgendaLog log;
+  final AgendaLog? log;
 
   @override
   State<ReminderFormPage> createState() => _ReminderFormPageState();
@@ -17,30 +17,56 @@ class ReminderFormPage extends StatefulWidget {
 class _ReminderFormPageState extends State<ReminderFormPage> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _title;
+  final _description = TextEditingController();
+  final _location = TextEditingController();
+  final _relatedPerson = TextEditingController();
+  final _condition = TextEditingController();
   late final String _recordId;
   late final String _eventId;
+  List<MobileProject> _projects = const [];
+  String? _projectId;
   ReminderKind _kind = ReminderKind.action;
   ReminderScheduleKind _schedule = ReminderScheduleKind.in15Minutes;
   late DateTime _customDate;
   TimeOfDay _customTime = const TimeOfDay(hour: 9, minute: 0);
+  bool _isImportant = false;
+  bool _hasDeadline = false;
+  late DateTime _deadlineDate;
+  TimeOfDay _deadlineTime = const TimeOfDay(hour: 17, minute: 0);
   bool _submitting = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _title = TextEditingController(text: widget.log.description);
+    _title = TextEditingController(text: widget.log?.description ?? '');
+    _projectId = widget.log?.projectId;
     _recordId = RecordId.randomUuid();
     _eventId = RecordId.randomUuid();
     final local = CseTimeCodec.toIstanbul(
       CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
     );
     _customDate = DateTime(local.year, local.month, local.day + 1);
+    _deadlineDate = _customDate;
+    _loadProjects();
+  }
+
+  Future<void> _loadProjects() async {
+    try {
+      final projects = await widget.agenda.listProjects();
+      if (mounted) setState(() => _projects = projects);
+    } on Object {
+      // Standalone capture remains available without a project.
+    }
   }
 
   @override
   void dispose() {
     _title.dispose();
+    _description.dispose();
+    _location.dispose();
+    _relatedPerson.dispose();
+    _condition.dispose();
     super.dispose();
   }
 
@@ -60,15 +86,33 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
               minute: _customTime.minute,
             )
           : null;
+      final deadline = _hasDeadline
+          ? CseTimeCodec.canonicalFromIstanbulComponents(
+              year: _deadlineDate.year,
+              month: _deadlineDate.month,
+              day: _deadlineDate.day,
+              hour: _deadlineTime.hour,
+              minute: _deadlineTime.minute,
+            )
+          : null;
       final reminder = await widget.agenda.createReminder(
         CreateReminderCommand(
           id: _recordId,
           eventId: _eventId,
-          projectId: widget.log.projectId,
-          sourceLogId: widget.log.id,
+          projectId: widget.log?.projectId ?? _projectId,
+          sourceLogId: widget.log?.id,
+          captureText: _title.text,
           title: _title.text,
-          kind: _kind,
+          description: _description.text,
+          kind: _schedule == ReminderScheduleKind.waiting
+              ? ReminderKind.waiting
+              : _kind,
           schedule: _schedule,
+          location: _location.text,
+          relatedPerson: _relatedPerson.text,
+          isImportant: _isImportant,
+          deadlineAt: deadline,
+          conditionText: _condition.text,
           customAttentionAt: custom,
         ),
       );
@@ -95,22 +139,25 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Hatırlatıcı oluştur')),
+      appBar: AppBar(
+        title: Text(widget.log == null ? '+ Unutma' : 'Hatırlatıcı oluştur'),
+      ),
       body: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  'Kaynak: ${widget.log.description}',
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
+            if (widget.log != null)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    'Kaynak: ${widget.log!.description}',
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
-            ),
             if (_error != null)
               Card(
                 color: Theme.of(context).colorScheme.errorContainer,
@@ -150,6 +197,31 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
               onChanged: (value) => setState(() => _kind = value!),
             ),
             const SizedBox(height: 12),
+            if (widget.log == null && _projects.isNotEmpty) ...[
+              DropdownButtonFormField<String?>(
+                key: const Key('reminder-project'),
+                initialValue: _projectId,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Proje (opsiyonel)',
+                  border: OutlineInputBorder(),
+                ),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('Kişisel / projesiz'),
+                  ),
+                  ..._projects.map(
+                    (project) => DropdownMenuItem<String?>(
+                      value: project.id,
+                      child: Text(project.name),
+                    ),
+                  ),
+                ],
+                onChanged: (value) => setState(() => _projectId = value),
+              ),
+              const SizedBox(height: 12),
+            ],
             DropdownButtonFormField<ReminderScheduleKind>(
               key: const Key('reminder-schedule'),
               initialValue: _schedule,
@@ -166,7 +238,12 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
                     ),
                   )
                   .toList(),
-              onChanged: (value) => setState(() => _schedule = value!),
+              onChanged: (value) => setState(() {
+                _schedule = value!;
+                if (_schedule == ReminderScheduleKind.waiting) {
+                  _kind = ReminderKind.waiting;
+                }
+              }),
             ),
             if (_schedule == ReminderScheduleKind.custom) ...[
               const SizedBox(height: 12),
@@ -206,6 +283,108 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
                 ],
               ),
             ],
+            const SizedBox(height: 16),
+            ExpansionTile(
+              key: const Key('reminder-optional-details'),
+              tilePadding: EdgeInsets.zero,
+              title: const Text('İsteğe bağlı ayrıntılar'),
+              children: [
+                TextField(
+                  key: const Key('reminder-description'),
+                  controller: _description,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Açıklama',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  key: const Key('reminder-location'),
+                  controller: _location,
+                  decoration: const InputDecoration(
+                    labelText: 'Mahál',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  key: const Key('reminder-related-person'),
+                  controller: _relatedPerson,
+                  decoration: const InputDecoration(
+                    labelText: 'İlgili kişi',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  key: const Key('reminder-condition'),
+                  controller: _condition,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Koşul/not',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                SwitchListTile(
+                  key: const Key('reminder-important'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Önemli'),
+                  value: _isImportant,
+                  onChanged: (value) => setState(() => _isImportant = value),
+                ),
+                SwitchListTile(
+                  key: const Key('reminder-has-deadline'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Gerçek son tarih ekle'),
+                  value: _hasDeadline,
+                  onChanged: (value) => setState(() => _hasDeadline = value),
+                ),
+                if (_hasDeadline)
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        key: const Key('reminder-deadline-date'),
+                        onPressed: () async {
+                          final value = await showDatePicker(
+                            context: context,
+                            initialDate: _deadlineDate,
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2100),
+                          );
+                          if (value != null) {
+                            setState(() => _deadlineDate = value);
+                          }
+                        },
+                        icon: const Icon(Icons.event_available_outlined),
+                        label: Text(
+                          '${_deadlineDate.day.toString().padLeft(2, '0')}.'
+                          '${_deadlineDate.month.toString().padLeft(2, '0')}.'
+                          '${_deadlineDate.year}',
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        key: const Key('reminder-deadline-time'),
+                        onPressed: () async {
+                          final value = await showTimePicker(
+                            context: context,
+                            initialTime: _deadlineTime,
+                          );
+                          if (value != null) {
+                            setState(() => _deadlineTime = value);
+                          }
+                        },
+                        icon: const Icon(Icons.schedule),
+                        label: Text(_deadlineTime.format(context)),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
             const SizedBox(height: 20),
             SizedBox(
               height: 52,

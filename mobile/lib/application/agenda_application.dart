@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -23,6 +25,16 @@ abstract interface class AgendaApplication {
 
   Future<MobileReminder> getReminderDetail(String reminderId);
 
+  Future<ReminderDetail> getReminderLifecycleDetail(String reminderId);
+
+  Future<MobileReminder> mutateReminder(MutateReminderCommand command);
+
+  Future<void> reconcileNotifications({bool requestPermission = false});
+
+  String? get initialNotificationReminderId;
+
+  Stream<String> get notificationTaps;
+
   Future<List<AppendOnlyEvent>> listObservationEvents(String logId);
 
   Future<List<AppendOnlyEvent>> listReminderEvents(String reminderId);
@@ -36,14 +48,25 @@ class SqliteAgendaApplication implements AgendaApplication {
     required this.databasePath,
     required this.databaseFactory,
     required this.clock,
+    ReminderNotificationGateway? notificationGateway,
     this.beforeReminderEventInsert,
-  });
+  }) : notificationGateway =
+           notificationGateway ??
+           const UnavailableReminderNotificationGateway();
 
   final String databasePath;
   final DatabaseFactory databaseFactory;
   final UtcClock clock;
+  final ReminderNotificationGateway notificationGateway;
   final ReminderTransactionHook? beforeReminderEventInsert;
   Future<void> _databaseQueue = Future<void>.value();
+
+  @override
+  String? get initialNotificationReminderId =>
+      notificationGateway.initialTapReminderId;
+
+  @override
+  Stream<String> get notificationTaps => notificationGateway.notificationTaps;
 
   @override
   Future<List<MobileProject>> listProjects() async {
@@ -257,7 +280,7 @@ class SqliteAgendaApplication implements AgendaApplication {
         '''
         SELECT f.*, p.name AS project_name
         FROM follow_up_items f
-        JOIN projects p ON p.id = f.project_id
+        LEFT JOIN projects p ON p.id = f.project_id
         WHERE f.observation_id = ?
         ORDER BY f.created_at ASC, f.id ASC
       ''',
@@ -274,43 +297,74 @@ class SqliteAgendaApplication implements AgendaApplication {
   Future<MobileReminder> createReminder(CreateReminderCommand command) async {
     validateUuid(command.id, 'Hatırlatıcı kimliği');
     validateUuid(command.eventId, 'Event kimliği');
-    validateUuid(command.projectId, 'Proje kimliği');
-    validateUuid(command.sourceLogId, 'Kaynak log kimliği');
+    if (command.projectId case final projectId?) {
+      validateUuid(projectId, 'Proje kimliği');
+    }
+    if (command.sourceLogId case final sourceLogId?) {
+      validateUuid(sourceLogId, 'Kaynak log kimliği');
+      if (command.projectId == null) {
+        throw const AgendaValidationFailure(
+          'Kaynak Ajanda kaydı için proje zorunludur.',
+        );
+      }
+    }
     final title = requiredTrimmed(
       command.title,
       'Hatırlatıcı metni',
       maxLength: 500,
     );
+    final captureText = requiredTrimmed(
+      command.captureText ?? title,
+      'Hızlı yakalama metni',
+      maxLength: 500,
+    );
+    final description = optionalTrimmed(command.description, 'Açıklama');
+    final location = optionalTrimmed(command.location, 'Mahál', maxLength: 200);
+    final relatedPerson = optionalTrimmed(
+      command.relatedPerson,
+      'İlgili kişi',
+      maxLength: 200,
+    );
+    final conditionText = optionalTrimmed(command.conditionText, 'Koşul/not');
+    if (command.deadlineAt case final deadline?) {
+      validateCanonicalTimestamp(deadline, 'Gerçek son tarih');
+    }
     final now = _readClockOnce();
     final schedule = _resolveSchedule(command, now);
     final createdAt = CseTimeCodec.encodeUtc(now);
-    return _withDatabase(now, (database) {
+    final reminder = await _withDatabase(now, (database) {
       return database.transaction((transaction) async {
-        final projects = await transaction.query(
-          'projects',
-          where: 'id = ? AND archived_at IS NULL',
-          whereArgs: [command.projectId],
-          limit: 1,
-        );
-        if (projects.isEmpty) {
-          throw const AgendaValidationFailure('Kaynak proje bulunamadı.');
-        }
-        final sources = await transaction.query(
-          'field_observations',
-          where: 'id = ? AND project_id = ? AND archived_at IS NULL',
-          whereArgs: [command.sourceLogId, command.projectId],
-          limit: 1,
-        );
-        if (sources.isEmpty) {
-          throw const AgendaValidationFailure(
-            'Kaynak Ajanda kaydı proje ile eşleşmiyor.',
+        String? projectName;
+        if (command.projectId case final projectId?) {
+          final projects = await transaction.query(
+            'projects',
+            where: 'id = ? AND archived_at IS NULL',
+            whereArgs: [projectId],
+            limit: 1,
           );
+          if (projects.isEmpty) {
+            throw const AgendaValidationFailure('Seçilen proje bulunamadı.');
+          }
+          projectName = _projectFromRow(projects.single).name;
+        }
+        if (command.sourceLogId case final sourceLogId?) {
+          final sources = await transaction.query(
+            'field_observations',
+            where: 'id = ? AND project_id = ? AND archived_at IS NULL',
+            whereArgs: [sourceLogId, command.projectId],
+            limit: 1,
+          );
+          if (sources.isEmpty) {
+            throw const AgendaValidationFailure(
+              'Kaynak Ajanda kaydı proje ile eşleşmiyor.',
+            );
+          }
         }
         final existing = await transaction.rawQuery(
           '''
           SELECT f.*, p.name AS project_name
           FROM follow_up_items f
-          JOIN projects p ON p.id = f.project_id
+          LEFT JOIN projects p ON p.id = f.project_id
           WHERE f.id = ?
           LIMIT 1
         ''',
@@ -318,7 +372,17 @@ class SqliteAgendaApplication implements AgendaApplication {
         );
         if (existing.isNotEmpty) {
           final reminder = _reminderFromRow(existing.single);
-          if (!_sameReminderCommand(reminder, command, title, schedule)) {
+          if (!_sameReminderCommand(
+            reminder,
+            command,
+            captureText,
+            title,
+            description,
+            location,
+            relatedPerson,
+            conditionText,
+            schedule,
+          )) {
             throw const AgendaValidationFailure(
               'Hatırlatıcı kimliği başka bir içerikle kullanılıyor.',
             );
@@ -327,12 +391,19 @@ class SqliteAgendaApplication implements AgendaApplication {
         }
         await transaction.insert('follow_up_items', {
           'id': command.id,
-          'project_id': command.projectId,
-          'observation_id': command.sourceLogId,
+          'capture_text': captureText,
           'title': title,
+          'description': description,
           'item_type': command.kind.storageValue,
           'status': schedule.status.storageValue,
+          'project_id': command.projectId,
+          'observation_id': command.sourceLogId,
+          'location': location,
+          'related_person': relatedPerson,
+          'is_important': command.isImportant ? 1 : 0,
           'next_attention_at': schedule.nextAttentionAt,
+          'deadline_at': command.deadlineAt,
+          'condition_text': conditionText,
           'revision': 1,
           'created_at': createdAt,
           'updated_at': createdAt,
@@ -341,6 +412,7 @@ class SqliteAgendaApplication implements AgendaApplication {
         await transaction.insert('follow_up_events', {
           'id': command.eventId,
           'follow_up_id': command.id,
+          'sequence': 1,
           'project_id': command.projectId,
           'source_observation_id': command.sourceLogId,
           'event_type': 'created',
@@ -350,24 +422,55 @@ class SqliteAgendaApplication implements AgendaApplication {
             'next_attention_at': schedule.nextAttentionAt,
             'source_observation_id': command.sourceLogId,
             'status': schedule.status.storageValue,
-            'title': title,
           }),
+        });
+        final platformId = await _allocatePlatformNotificationId(
+          transaction,
+          command.id,
+        );
+        await transaction.insert('reminder_notification_bindings', {
+          'reminder_id': command.id,
+          'platform_notification_id': platformId,
+          'scheduled_for': schedule.nextAttentionAt,
+          'sync_state': schedule.nextAttentionAt == null
+              ? NotificationSyncState.cancelled.storageValue
+              : NotificationSyncState.unavailable.storageValue,
+          'last_synced_at': createdAt,
+          'safe_error_code': schedule.nextAttentionAt == null
+              ? null
+              : 'pending_sync',
         });
         return MobileReminder(
           id: command.id,
           projectId: command.projectId,
-          projectName: _projectFromRow(projects.single).name,
+          projectName: projectName,
           sourceLogId: command.sourceLogId,
+          captureText: captureText,
           title: title,
+          description: description,
           kind: command.kind,
           status: schedule.status,
+          location: location,
+          relatedPerson: relatedPerson,
+          isImportant: command.isImportant,
           nextAttentionAt: schedule.nextAttentionAt,
+          deadlineAt: command.deadlineAt,
+          conditionText: conditionText,
+          outcomeType: null,
+          outcomeNote: null,
           createdAt: createdAt,
           updatedAt: createdAt,
+          completedAt: null,
+          cancelledAt: null,
           revision: 1,
         );
       });
     });
+    await _reconcileNotificationsAt(
+      now,
+      requestPermission: schedule.nextAttentionAt != null,
+    );
+    return reminder;
   }
 
   @override
@@ -375,26 +478,46 @@ class SqliteAgendaApplication implements AgendaApplication {
     final now = _readClockOnce();
     final today = CseTimeCodec.istanbulDayKey(CseTimeCodec.encodeUtc(now));
     final bounds = CseTimeCodec.istanbulDayBounds(today);
+    final nowValue = CseTimeCodec.encodeUtc(now);
     final (where, arguments) = switch (group) {
-      ReminderViewGroup.inbox => ('f.status = ?', <Object?>['inbox']),
-      ReminderViewGroup.today => (
+      ReminderViewGroup.now => (
+        "f.status IN ('active', 'waiting') AND f.next_attention_at <= ?",
+        <Object?>[nowValue],
+      ),
+      ReminderViewGroup.overdue => (
         "f.status IN ('active', 'waiting') AND f.next_attention_at < ?",
-        <Object?>[bounds.endExclusive],
+        <Object?>[bounds.start],
+      ),
+      ReminderViewGroup.today => (
+        "f.status IN ('active', 'waiting') AND "
+            'f.next_attention_at >= ? AND f.next_attention_at < ?',
+        <Object?>[bounds.start, bounds.endExclusive],
+      ),
+      ReminderViewGroup.waiting => ("f.status = 'waiting'", <Object?>[]),
+      ReminderViewGroup.recheck => (
+        "f.status IN ('active', 'waiting') AND f.item_type = 'recheck'",
+        <Object?>[],
       ),
       ReminderViewGroup.upcoming => (
         "f.status IN ('active', 'waiting') AND f.next_attention_at >= ?",
         <Object?>[bounds.endExclusive],
+      ),
+      ReminderViewGroup.inbox => ('f.status = ?', <Object?>['inbox']),
+      ReminderViewGroup.history => (
+        "f.status IN ('completed', 'cancelled')",
+        <Object?>[],
       ),
     };
     return _withDatabase(now, (database) async {
       final rows = await database.rawQuery('''
         SELECT f.*, p.name AS project_name
         FROM follow_up_items f
-        JOIN projects p ON p.id = f.project_id
+        LEFT JOIN projects p ON p.id = f.project_id
         WHERE $where
         ORDER BY
-          CASE WHEN f.next_attention_at IS NULL THEN 0 ELSE 1 END,
+          CASE WHEN f.next_attention_at IS NULL THEN 1 ELSE 0 END,
           f.next_attention_at ASC,
+          f.is_important DESC,
           f.created_at ASC,
           f.id ASC
       ''', arguments);
@@ -411,7 +534,7 @@ class SqliteAgendaApplication implements AgendaApplication {
         '''
         SELECT f.*, p.name AS project_name
         FROM follow_up_items f
-        JOIN projects p ON p.id = f.project_id
+        LEFT JOIN projects p ON p.id = f.project_id
         WHERE f.id = ?
         LIMIT 1
       ''',
@@ -422,6 +545,195 @@ class SqliteAgendaApplication implements AgendaApplication {
       }
       return _reminderFromRow(rows.single);
     });
+  }
+
+  @override
+  Future<ReminderDetail> getReminderLifecycleDetail(String reminderId) async {
+    validateUuid(reminderId, 'Hatırlatıcı kimliği');
+    final now = _readClockOnce();
+    return _withDatabase(now, (database) async {
+      final rows = await database.rawQuery(
+        '''
+        SELECT f.*, p.name AS project_name
+        FROM follow_up_items f
+        LEFT JOIN projects p ON p.id = f.project_id
+        WHERE f.id = ?
+        LIMIT 1
+        ''',
+        [reminderId],
+      );
+      if (rows.isEmpty) {
+        throw const AgendaValidationFailure('Hatırlatıcı bulunamadı.');
+      }
+      final eventRows = await database.query(
+        'follow_up_events',
+        where: 'follow_up_id = ?',
+        whereArgs: [reminderId],
+        orderBy: 'sequence ASC, id ASC',
+      );
+      final bindingRows = await database.query(
+        'reminder_notification_bindings',
+        where: 'reminder_id = ?',
+        whereArgs: [reminderId],
+        limit: 1,
+      );
+      if (bindingRows.isEmpty) {
+        throw const AgendaValidationFailure(
+          'Hatırlatıcı bildirim bağlantısı bulunamadı.',
+        );
+      }
+      return ReminderDetail(
+        reminder: _reminderFromRow(rows.single),
+        events: eventRows.map(_reminderEventFromRow).toList(growable: false),
+        notification: _notificationBindingFromRow(bindingRows.single),
+      );
+    });
+  }
+
+  @override
+  Future<MobileReminder> mutateReminder(MutateReminderCommand command) async {
+    validateUuid(command.reminderId, 'Hatırlatıcı kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    if (command.expectedRevision < 1) {
+      throw const AgendaValidationFailure('Beklenen revision geçersizdir.');
+    }
+    final now = _readClockOnce();
+    final result = await _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final rows = await transaction.rawQuery(
+          '''
+          SELECT f.*, p.name AS project_name
+          FROM follow_up_items f
+          LEFT JOIN projects p ON p.id = f.project_id
+          WHERE f.id = ?
+          LIMIT 1
+          ''',
+          [command.reminderId],
+        );
+        if (rows.isEmpty) {
+          throw const AgendaValidationFailure('Hatırlatıcı bulunamadı.');
+        }
+        final current = _reminderFromRow(rows.single);
+        if (current.revision != command.expectedRevision) {
+          throw const AgendaValidationFailure(
+            'Hatırlatıcı başka bir işlemle değişti. Ekranı yenileyin.',
+          );
+        }
+        final values = <String, Object?>{
+          'title': current.title,
+          'description': current.description,
+          'item_type': current.kind.storageValue,
+          'status': current.status.storageValue,
+          'project_id': current.projectId,
+          'location': current.location,
+          'related_person': current.relatedPerson,
+          'is_important': current.isImportant ? 1 : 0,
+          'next_attention_at': current.nextAttentionAt,
+          'deadline_at': current.deadlineAt,
+          'condition_text': current.conditionText,
+          'outcome_type': current.outcomeType?.storageValue,
+          'outcome_note': current.outcomeNote,
+          'completed_at': current.completedAt,
+          'cancelled_at': current.cancelledAt,
+        };
+        final eventType = _applyReminderMutation(
+          values: values,
+          current: current,
+          command: command,
+          now: now,
+        );
+        if (_sameReminderValues(current, values)) {
+          return (reminder: current, changed: false);
+        }
+        if (current.sourceLogId != null &&
+            values['project_id'] != current.projectId) {
+          throw const AgendaValidationFailure(
+            'Kaynak Ajanda kaydının projesi değiştirilemez.',
+          );
+        }
+        if (values['project_id'] case final String projectId) {
+          validateUuid(projectId, 'Proje kimliği');
+          final projects = await transaction.query(
+            'projects',
+            where: 'id = ? AND archived_at IS NULL',
+            whereArgs: [projectId],
+            limit: 1,
+          );
+          if (projects.isEmpty) {
+            throw const AgendaValidationFailure('Seçilen proje bulunamadı.');
+          }
+        }
+        final updatedAt = CseTimeCodec.encodeUtc(now);
+        final nextRevision = current.revision + 1;
+        final updated = await transaction.update(
+          'follow_up_items',
+          {...values, 'updated_at': updatedAt, 'revision': nextRevision},
+          where: 'id = ? AND revision = ?',
+          whereArgs: [current.id, current.revision],
+        );
+        if (updated != 1) {
+          throw const AgendaValidationFailure(
+            'Hatırlatıcı başka bir işlemle değişti. Ekranı yenileyin.',
+          );
+        }
+        final sequenceRows = await transaction.rawQuery(
+          '''
+          SELECT COALESCE(MAX(sequence), 0) + 1 AS next_sequence
+          FROM follow_up_events
+          WHERE follow_up_id = ?
+          ''',
+          [current.id],
+        );
+        final sequence = sequenceRows.single['next_sequence']! as int;
+        await beforeReminderEventInsert?.call(transaction);
+        await transaction.insert('follow_up_events', {
+          'id': command.eventId,
+          'follow_up_id': current.id,
+          'sequence': sequence,
+          'project_id': values['project_id'],
+          'source_observation_id': current.sourceLogId,
+          'event_type': eventType,
+          'occurred_at': updatedAt,
+          'payload_json': jsonEncode({
+            'next_attention_at': values['next_attention_at'],
+            'outcome_type': values['outcome_type'],
+            'revision': nextRevision,
+            'status': values['status'],
+          }),
+        });
+        final refreshed = await transaction.rawQuery(
+          '''
+          SELECT f.*, p.name AS project_name
+          FROM follow_up_items f
+          LEFT JOIN projects p ON p.id = f.project_id
+          WHERE f.id = ?
+          LIMIT 1
+          ''',
+          [current.id],
+        );
+        return (reminder: _reminderFromRow(refreshed.single), changed: true);
+      });
+    });
+    if (result.changed) {
+      final shouldRequest = switch (command.action) {
+        ReminderMutationAction.schedule ||
+        ReminderMutationAction.snooze15Minutes ||
+        ReminderMutationAction.snooze1Hour ||
+        ReminderMutationAction.snoozeTomorrowMorning ||
+        ReminderMutationAction.startWaiting => true,
+        _ => false,
+      };
+      await _reconcileNotificationsAt(now, requestPermission: shouldRequest);
+    }
+    return result.reminder;
+  }
+
+  @override
+  Future<void> reconcileNotifications({bool requestPermission = false}) async {
+    await _reconcileNotificationsAt(
+      _readClockOnce(),
+      requestPermission: requestPermission,
+    );
   }
 
   @override
@@ -459,22 +771,501 @@ class SqliteAgendaApplication implements AgendaApplication {
         'follow_up_events',
         where: 'follow_up_id = ?',
         whereArgs: [reminderId],
-        orderBy: 'occurred_at ASC, id ASC',
+        orderBy: 'sequence ASC, id ASC',
       );
+      return rows.map(_reminderEventFromRow).toList(growable: false);
+    });
+  }
+
+  String _applyReminderMutation({
+    required Map<String, Object?> values,
+    required MobileReminder current,
+    required MutateReminderCommand command,
+    required DateTime now,
+  }) {
+    final nowValue = CseTimeCodec.encodeUtc(now);
+    void requireOpen() {
+      if (current.status == ReminderStatus.completed ||
+          current.status == ReminderStatus.cancelled) {
+        throw const AgendaValidationFailure(
+          'Terminal hatırlatıcı önce yeniden açılmalıdır.',
+        );
+      }
+    }
+
+    switch (command.action) {
+      case ReminderMutationAction.updateDetails:
+        values['title'] = requiredTrimmed(
+          command.title ?? current.title,
+          'Başlık',
+          maxLength: 500,
+        );
+        values['description'] = optionalTrimmed(
+          command.description,
+          'Açıklama',
+        );
+        values['item_type'] = (command.kind ?? current.kind).storageValue;
+        values['project_id'] = command.projectId ?? current.projectId;
+        values['location'] = optionalTrimmed(
+          command.location,
+          'Mahál',
+          maxLength: 200,
+        );
+        values['related_person'] = optionalTrimmed(
+          command.relatedPerson,
+          'İlgili kişi',
+          maxLength: 200,
+        );
+        values['is_important'] = (command.isImportant ?? current.isImportant)
+            ? 1
+            : 0;
+        if (command.deadlineAt case final deadline?) {
+          validateCanonicalTimestamp(deadline, 'Gerçek son tarih');
+        }
+        values['deadline_at'] = command.deadlineAt;
+        values['condition_text'] = optionalTrimmed(
+          command.conditionText,
+          'Koşul/not',
+        );
+        return 'details_updated';
+      case ReminderMutationAction.schedule:
+        requireOpen();
+        final scheduleKind = command.schedule;
+        if (scheduleKind == null ||
+            scheduleKind == ReminderScheduleKind.inbox) {
+          throw const AgendaValidationFailure(
+            'Planlama için gelecek bir tarih/saat seçilmelidir.',
+          );
+        }
+        final resolved = _resolveScheduleValues(
+          scheduleKind,
+          command.customAttentionAt,
+          current.kind,
+          now,
+        );
+        values['status'] = resolved.status.storageValue;
+        values['next_attention_at'] = resolved.nextAttentionAt;
+        values['completed_at'] = null;
+        values['cancelled_at'] = null;
+        values['outcome_type'] = null;
+        values['outcome_note'] = null;
+        return current.nextAttentionAt == null ? 'scheduled' : 'rescheduled';
+      case ReminderMutationAction.snooze15Minutes:
+        requireOpen();
+        values['status'] = current.kind == ReminderKind.waiting
+            ? ReminderStatus.waiting.storageValue
+            : ReminderStatus.active.storageValue;
+        values['next_attention_at'] = CseTimeCodec.encodeUtc(
+          now.add(const Duration(minutes: 15)),
+        );
+        return 'snoozed';
+      case ReminderMutationAction.snooze1Hour:
+        requireOpen();
+        values['status'] = current.kind == ReminderKind.waiting
+            ? ReminderStatus.waiting.storageValue
+            : ReminderStatus.active.storageValue;
+        values['next_attention_at'] = CseTimeCodec.encodeUtc(
+          now.add(const Duration(hours: 1)),
+        );
+        return 'snoozed';
+      case ReminderMutationAction.snoozeTomorrowMorning:
+        requireOpen();
+        values['status'] = current.kind == ReminderKind.waiting
+            ? ReminderStatus.waiting.storageValue
+            : ReminderStatus.active.storageValue;
+        values['next_attention_at'] = _tomorrowMorning(now);
+        return 'snoozed';
+      case ReminderMutationAction.startWaiting:
+        requireOpen();
+        values['item_type'] = ReminderKind.waiting.storageValue;
+        values['status'] = ReminderStatus.waiting.storageValue;
+        values['next_attention_at'] = command.customAttentionAt == null
+            ? _tomorrowMorning(now)
+            : _validatedFutureAttention(command.customAttentionAt!, now);
+        return 'waiting_started';
+      case ReminderMutationAction.moveToInbox:
+        requireOpen();
+        values['status'] = ReminderStatus.inbox.storageValue;
+        values['next_attention_at'] = null;
+        return 'moved_to_inbox';
+      case ReminderMutationAction.complete:
+        requireOpen();
+        values['status'] = ReminderStatus.completed.storageValue;
+        values['next_attention_at'] = null;
+        values['completed_at'] = nowValue;
+        values['cancelled_at'] = null;
+        values['outcome_type'] =
+            (command.outcomeType ?? ReminderOutcomeType.completed).storageValue;
+        values['outcome_note'] = optionalTrimmed(
+          command.outcomeNote,
+          'Sonuç notu',
+        );
+        return 'completed';
+      case ReminderMutationAction.cancel:
+        requireOpen();
+        values['status'] = ReminderStatus.cancelled.storageValue;
+        values['next_attention_at'] = null;
+        values['completed_at'] = null;
+        values['cancelled_at'] = nowValue;
+        values['outcome_type'] =
+            ReminderOutcomeType.noLongerNeeded.storageValue;
+        values['outcome_note'] = optionalTrimmed(
+          command.outcomeNote,
+          'İptal notu',
+        );
+        return 'cancelled';
+      case ReminderMutationAction.reopen:
+        if (current.status != ReminderStatus.completed &&
+            current.status != ReminderStatus.cancelled) {
+          return 'reopened';
+        }
+        values['status'] = ReminderStatus.inbox.storageValue;
+        values['next_attention_at'] = null;
+        values['completed_at'] = null;
+        values['cancelled_at'] = null;
+        values['outcome_type'] = null;
+        values['outcome_note'] = null;
+        return 'reopened';
+    }
+  }
+
+  bool _sameReminderValues(
+    MobileReminder current,
+    Map<String, Object?> values,
+  ) {
+    return values['title'] == current.title &&
+        values['description'] == current.description &&
+        values['item_type'] == current.kind.storageValue &&
+        values['status'] == current.status.storageValue &&
+        values['project_id'] == current.projectId &&
+        values['location'] == current.location &&
+        values['related_person'] == current.relatedPerson &&
+        values['is_important'] == (current.isImportant ? 1 : 0) &&
+        values['next_attention_at'] == current.nextAttentionAt &&
+        values['deadline_at'] == current.deadlineAt &&
+        values['condition_text'] == current.conditionText &&
+        values['outcome_type'] == current.outcomeType?.storageValue &&
+        values['outcome_note'] == current.outcomeNote &&
+        values['completed_at'] == current.completedAt &&
+        values['cancelled_at'] == current.cancelledAt;
+  }
+
+  Future<void> _reconcileNotificationsAt(
+    DateTime now, {
+    required bool requestPermission,
+  }) async {
+    final work = await _withDatabase(now, (database) async {
+      final rows = await database.rawQuery('''
+        SELECT
+          f.*, p.name AS project_name,
+          b.platform_notification_id,
+          b.scheduled_for AS binding_scheduled_for,
+          b.sync_state,
+          b.last_synced_at,
+          b.safe_error_code
+        FROM follow_up_items f
+        LEFT JOIN projects p ON p.id = f.project_id
+        JOIN reminder_notification_bindings b ON b.reminder_id = f.id
+        ORDER BY
+          CASE WHEN f.next_attention_at IS NULL THEN 1 ELSE 0 END,
+          f.next_attention_at ASC,
+          f.is_important DESC,
+          f.created_at ASC,
+          f.id ASC
+      ''');
       return rows
           .map(
-            (row) => AppendOnlyEvent(
-              id: row['id']! as String,
-              recordId: row['follow_up_id']! as String,
-              projectId: row['project_id']! as String,
-              sourceLogId: row['source_observation_id']! as String,
-              eventType: row['event_type']! as String,
-              occurredAt: row['occurred_at']! as String,
-              payloadJson: row['payload_json']! as String,
+            (row) => _NotificationWorkItem(
+              reminder: _reminderFromRow(row),
+              binding: _notificationBindingFromJoinedRow(row),
             ),
           )
           .toList(growable: false);
     });
+    if (work.isEmpty) return;
+    final eligible = work
+        .where(
+          (item) =>
+              (item.reminder.status == ReminderStatus.active ||
+                  item.reminder.status == ReminderStatus.waiting) &&
+              item.reminder.nextAttentionAt != null &&
+              CseTimeCodec.decodeCanonicalUtc(
+                item.reminder.nextAttentionAt!,
+              ).isAfter(now),
+        )
+        .toList(growable: false);
+    NotificationPermissionState permission;
+    try {
+      await notificationGateway.initialize();
+      permission = requestPermission
+          ? await notificationGateway.requestPermission()
+          : await notificationGateway.permissionStatus();
+    } on Object {
+      await _writeBindingUpdates(
+        now,
+        work.map(
+          (item) => _BindingUpdate(
+            reminderId: item.reminder.id,
+            scheduledFor: item.reminder.nextAttentionAt,
+            state: eligible.contains(item)
+                ? NotificationSyncState.unavailable
+                : NotificationSyncState.cancelled,
+            safeErrorCode: eligible.contains(item)
+                ? 'plugin_unavailable'
+                : null,
+          ),
+        ),
+      );
+      return;
+    }
+    if (permission != NotificationPermissionState.granted) {
+      for (final item in work) {
+        try {
+          await notificationGateway.cancel(item.binding.platformNotificationId);
+        } on Object {
+          // Reconciliation remains fail-safe; only fixed codes reach SQLite.
+        }
+      }
+      await _writeBindingUpdates(
+        now,
+        work.map(
+          (item) => _BindingUpdate(
+            reminderId: item.reminder.id,
+            scheduledFor: item.reminder.nextAttentionAt,
+            state: eligible.contains(item)
+                ? permission == NotificationPermissionState.denied
+                      ? NotificationSyncState.permissionDenied
+                      : NotificationSyncState.unavailable
+                : NotificationSyncState.cancelled,
+            safeErrorCode: eligible.contains(item)
+                ? permission == NotificationPermissionState.denied
+                      ? 'permission_denied'
+                      : 'platform_unavailable'
+                : null,
+          ),
+        ),
+      );
+      return;
+    }
+    List<PendingReminderNotification> pending;
+    try {
+      pending = await notificationGateway.pendingNotifications();
+    } on Object {
+      await _writeBindingUpdates(
+        now,
+        work.map(
+          (item) => _BindingUpdate(
+            reminderId: item.reminder.id,
+            scheduledFor: item.reminder.nextAttentionAt,
+            state: eligible.contains(item)
+                ? NotificationSyncState.failed
+                : NotificationSyncState.cancelled,
+            safeErrorCode: eligible.contains(item)
+                ? 'pending_query_failed'
+                : null,
+          ),
+        ),
+      );
+      return;
+    }
+    final capacity = notificationGateway.maximumPendingNotifications;
+    final desired = eligible.take(capacity).toList(growable: false);
+    final desiredByPlatformId = {
+      for (final item in desired) item.binding.platformNotificationId: item,
+    };
+    final validPendingIds = <int>{};
+    for (final item in pending) {
+      final expected = desiredByPlatformId[item.platformId];
+      if (expected != null &&
+          expected.reminder.id == item.reminderId &&
+          validPendingIds.add(item.platformId)) {
+        continue;
+      }
+      try {
+        await notificationGateway.cancel(item.platformId);
+      } on Object {
+        // A later bootstrap retries orphan cleanup.
+      }
+    }
+    final updates = <_BindingUpdate>[];
+    for (final item in desired) {
+      final reminder = item.reminder;
+      final binding = item.binding;
+      final scheduledFor = reminder.nextAttentionAt!;
+      final pendingIsCurrent =
+          validPendingIds.contains(binding.platformNotificationId) &&
+          binding.scheduledFor == scheduledFor;
+      if (pendingIsCurrent) {
+        updates.add(
+          _BindingUpdate(
+            reminderId: reminder.id,
+            scheduledFor: scheduledFor,
+            state: NotificationSyncState.scheduled,
+          ),
+        );
+        continue;
+      }
+      try {
+        await notificationGateway.cancel(binding.platformNotificationId);
+        await notificationGateway.schedule(
+          ReminderNotificationRequest(
+            platformId: binding.platformNotificationId,
+            reminderId: reminder.id,
+            title: reminder.title,
+            body: reminder.description ?? reminder.captureText,
+            scheduledAtUtc: scheduledFor,
+          ),
+        );
+        updates.add(
+          _BindingUpdate(
+            reminderId: reminder.id,
+            scheduledFor: scheduledFor,
+            state: NotificationSyncState.scheduled,
+          ),
+        );
+      } on Object {
+        updates.add(
+          _BindingUpdate(
+            reminderId: reminder.id,
+            scheduledFor: scheduledFor,
+            state: NotificationSyncState.failed,
+            safeErrorCode: 'schedule_failed',
+          ),
+        );
+      }
+    }
+    for (final item in eligible.skip(capacity)) {
+      try {
+        await notificationGateway.cancel(item.binding.platformNotificationId);
+      } on Object {
+        // Capacity state remains visible and next bootstrap retries cleanup.
+      }
+      updates.add(
+        _BindingUpdate(
+          reminderId: item.reminder.id,
+          scheduledFor: item.reminder.nextAttentionAt,
+          state: NotificationSyncState.unavailable,
+          safeErrorCode: 'platform_capacity',
+        ),
+      );
+    }
+    for (final item in work.where((item) => !eligible.contains(item))) {
+      try {
+        await notificationGateway.cancel(item.binding.platformNotificationId);
+        updates.add(
+          _BindingUpdate(
+            reminderId: item.reminder.id,
+            state: NotificationSyncState.cancelled,
+          ),
+        );
+      } on Object {
+        updates.add(
+          _BindingUpdate(
+            reminderId: item.reminder.id,
+            state: NotificationSyncState.failed,
+            safeErrorCode: 'cancel_failed',
+          ),
+        );
+      }
+    }
+    await _writeBindingUpdates(now, updates);
+  }
+
+  Future<void> _writeBindingUpdates(
+    DateTime now,
+    Iterable<_BindingUpdate> updates,
+  ) async {
+    final values = updates.toList(growable: false);
+    if (values.isEmpty) return;
+    final syncedAt = CseTimeCodec.encodeUtc(now);
+    await _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        for (final update in values) {
+          final previousRows = await transaction.rawQuery(
+            '''
+            SELECT
+              b.sync_state, b.scheduled_for,
+              f.project_id, f.observation_id
+            FROM reminder_notification_bindings b
+            JOIN follow_up_items f ON f.id = b.reminder_id
+            WHERE b.reminder_id = ?
+            LIMIT 1
+            ''',
+            [update.reminderId],
+          );
+          if (previousRows.isEmpty) continue;
+          final previous = previousRows.single;
+          await transaction.update(
+            'reminder_notification_bindings',
+            {
+              'scheduled_for': update.scheduledFor,
+              'sync_state': update.state.storageValue,
+              'last_synced_at': syncedAt,
+              'safe_error_code': update.safeErrorCode,
+            },
+            where: 'reminder_id = ?',
+            whereArgs: [update.reminderId],
+          );
+          final stateChanged =
+              previous['sync_state'] != update.state.storageValue ||
+              previous['scheduled_for'] != update.scheduledFor;
+          final eventType = switch (update.state) {
+            NotificationSyncState.scheduled when stateChanged =>
+              'notification_scheduled',
+            NotificationSyncState.cancelled when stateChanged =>
+              'notification_cancelled',
+            _ => null,
+          };
+          if (eventType == null) continue;
+          final sequenceRows = await transaction.rawQuery(
+            '''
+            SELECT COALESCE(MAX(sequence), 0) + 1 AS next_sequence
+            FROM follow_up_events
+            WHERE follow_up_id = ?
+            ''',
+            [update.reminderId],
+          );
+          await transaction.insert('follow_up_events', {
+            'id': RecordId.randomUuid(),
+            'follow_up_id': update.reminderId,
+            'sequence': sequenceRows.single['next_sequence']! as int,
+            'project_id': previous['project_id'],
+            'source_observation_id': previous['observation_id'],
+            'event_type': eventType,
+            'occurred_at': syncedAt,
+            'payload_json': jsonEncode({'scheduled_for': update.scheduledFor}),
+          });
+        }
+      });
+    });
+  }
+
+  Future<int> _allocatePlatformNotificationId(
+    Transaction transaction,
+    String reminderId,
+  ) async {
+    var candidate = 2166136261;
+    for (final value in reminderId.codeUnits) {
+      candidate ^= value;
+      candidate = (candidate * 16777619) & 0x7fffffff;
+    }
+    if (candidate == 0) candidate = 1;
+    for (var attempts = 0; attempts < 2147483647; attempts += 1) {
+      final collision = await transaction.query(
+        'reminder_notification_bindings',
+        columns: ['reminder_id'],
+        where: 'platform_notification_id = ?',
+        whereArgs: [candidate],
+        limit: 1,
+      );
+      if (collision.isEmpty || collision.single['reminder_id'] == reminderId) {
+        return candidate;
+      }
+      candidate = candidate == 2147483647 ? 1 : candidate + 1;
+    }
+    throw const AgendaValidationFailure(
+      'Bildirim kimliği güvenli biçimde ayrılamadı.',
+    );
   }
 
   DateTime _readClockOnce() {
@@ -518,11 +1309,23 @@ class SqliteAgendaApplication implements AgendaApplication {
   _ResolvedReminderSchedule _resolveSchedule(
     CreateReminderCommand command,
     DateTime now,
+  ) => _resolveScheduleValues(
+    command.schedule,
+    command.customAttentionAt,
+    command.kind,
+    now,
+  );
+
+  _ResolvedReminderSchedule _resolveScheduleValues(
+    ReminderScheduleKind schedule,
+    String? customAttentionAt,
+    ReminderKind kind,
+    DateTime now,
   ) {
     String? nextAttentionAt;
-    switch (command.schedule) {
+    switch (schedule) {
       case ReminderScheduleKind.inbox:
-        if (command.customAttentionAt != null) {
+        if (customAttentionAt != null) {
           throw const AgendaValidationFailure(
             'Unutma Kutusu için tarih/saat verilmemelidir.',
           );
@@ -545,17 +1348,11 @@ class SqliteAgendaApplication implements AgendaApplication {
           minute: 0,
         );
       case ReminderScheduleKind.tomorrowMorning:
-        final today = CseTimeCodec.istanbulDayKey(CseTimeCodec.encodeUtc(now));
-        final tomorrow = CseTimeCodec.shiftIstanbulDay(today, 1).split('-');
-        nextAttentionAt = CseTimeCodec.canonicalFromIstanbulComponents(
-          year: int.parse(tomorrow[0]),
-          month: int.parse(tomorrow[1]),
-          day: int.parse(tomorrow[2]),
-          hour: 9,
-          minute: 0,
-        );
+        nextAttentionAt = _tomorrowMorning(now);
+      case ReminderScheduleKind.waiting:
+        nextAttentionAt = _tomorrowMorning(now);
       case ReminderScheduleKind.custom:
-        final custom = command.customAttentionAt;
+        final custom = customAttentionAt;
         if (custom == null) {
           throw const AgendaValidationFailure(
             'Özel hatırlatıcı tarih/saat zorunludur.',
@@ -572,13 +1369,36 @@ class SqliteAgendaApplication implements AgendaApplication {
     }
     final status = nextAttentionAt == null
         ? ReminderStatus.inbox
-        : command.kind == ReminderKind.waiting
+        : schedule == ReminderScheduleKind.waiting ||
+              kind == ReminderKind.waiting
         ? ReminderStatus.waiting
         : ReminderStatus.active;
     return _ResolvedReminderSchedule(
       status: status,
       nextAttentionAt: nextAttentionAt,
     );
+  }
+
+  String _tomorrowMorning(DateTime now) {
+    final today = CseTimeCodec.istanbulDayKey(CseTimeCodec.encodeUtc(now));
+    final tomorrow = CseTimeCodec.shiftIstanbulDay(today, 1).split('-');
+    return CseTimeCodec.canonicalFromIstanbulComponents(
+      year: int.parse(tomorrow[0]),
+      month: int.parse(tomorrow[1]),
+      day: int.parse(tomorrow[2]),
+      hour: 9,
+      minute: 0,
+    );
+  }
+
+  String _validatedFutureAttention(String value, DateTime now) {
+    validateCanonicalTimestamp(value, 'Hatırlatıcı zamanı');
+    if (!CseTimeCodec.decodeCanonicalUtc(value).isAfter(now)) {
+      throw const AgendaValidationFailure(
+        'Hatırlatıcı zamanı gelecekte olmalıdır.',
+      );
+    }
+    return value;
   }
 
   bool _sameLogCommand(
@@ -599,15 +1419,33 @@ class SqliteAgendaApplication implements AgendaApplication {
   bool _sameReminderCommand(
     MobileReminder reminder,
     CreateReminderCommand command,
+    String captureText,
     String title,
-    _ResolvedReminderSchedule schedule,
+    String? description,
+    String? location,
+    String? relatedPerson,
+    String? conditionText,
+    _ResolvedReminderSchedule _,
   ) {
+    final originalSchedule = _resolveScheduleValues(
+      command.schedule,
+      command.customAttentionAt,
+      command.kind,
+      CseTimeCodec.decodeCanonicalUtc(reminder.createdAt),
+    );
     return reminder.projectId == command.projectId &&
         reminder.sourceLogId == command.sourceLogId &&
+        reminder.captureText == captureText &&
         reminder.title == title &&
+        reminder.description == description &&
         reminder.kind == command.kind &&
-        reminder.status == schedule.status &&
-        reminder.nextAttentionAt == schedule.nextAttentionAt;
+        reminder.status == originalSchedule.status &&
+        reminder.location == location &&
+        reminder.relatedPerson == relatedPerson &&
+        reminder.isImportant == command.isImportant &&
+        reminder.nextAttentionAt == originalSchedule.nextAttentionAt &&
+        reminder.deadlineAt == command.deadlineAt &&
+        reminder.conditionText == conditionText;
   }
 }
 
@@ -668,30 +1506,129 @@ AgendaLog _logFromRow(Map<String, Object?> row) {
 
 MobileReminder _reminderFromRow(Map<String, Object?> row) {
   final id = row['id']! as String;
-  final projectId = row['project_id']! as String;
-  final sourceLogId = row['observation_id']! as String;
+  final projectId = row['project_id'] as String?;
+  final sourceLogId = row['observation_id'] as String?;
   final createdAt = row['created_at']! as String;
   final updatedAt = row['updated_at']! as String;
   final nextAttentionAt = row['next_attention_at'] as String?;
+  final deadlineAt = row['deadline_at'] as String?;
+  final completedAt = row['completed_at'] as String?;
+  final cancelledAt = row['cancelled_at'] as String?;
   validateUuid(id, 'Hatırlatıcı kimliği');
-  validateUuid(projectId, 'Proje kimliği');
-  validateUuid(sourceLogId, 'Kaynak log kimliği');
+  if (projectId != null) validateUuid(projectId, 'Proje kimliği');
+  if (sourceLogId != null) validateUuid(sourceLogId, 'Kaynak log kimliği');
   validateCanonicalTimestamp(createdAt, 'Hatırlatıcı oluşturma zamanı');
   validateCanonicalTimestamp(updatedAt, 'Hatırlatıcı güncelleme zamanı');
   if (nextAttentionAt != null) {
     validateCanonicalTimestamp(nextAttentionAt, 'Hatırlatıcı zamanı');
   }
+  if (deadlineAt != null) {
+    validateCanonicalTimestamp(deadlineAt, 'Gerçek son tarih');
+  }
+  if (completedAt != null) {
+    validateCanonicalTimestamp(completedAt, 'Tamamlanma zamanı');
+  }
+  if (cancelledAt != null) {
+    validateCanonicalTimestamp(cancelledAt, 'İptal zamanı');
+  }
+  final outcomeValue = row['outcome_type'] as String?;
   return MobileReminder(
     id: id,
     projectId: projectId,
-    projectName: requiredTrimmed(row['project_name']! as String, 'Proje adı'),
+    projectName: row['project_name'] == null
+        ? null
+        : requiredTrimmed(row['project_name']! as String, 'Proje adı'),
     sourceLogId: sourceLogId,
+    captureText: requiredTrimmed(
+      row['capture_text']! as String,
+      'Hızlı yakalama metni',
+    ),
     title: requiredTrimmed(row['title']! as String, 'Hatırlatıcı metni'),
+    description: row['description'] as String?,
     kind: ReminderKind.fromStorage(row['item_type']! as String),
     status: ReminderStatus.fromStorage(row['status']! as String),
+    location: row['location'] as String?,
+    relatedPerson: row['related_person'] as String?,
+    isImportant: row['is_important'] == 1,
     nextAttentionAt: nextAttentionAt,
+    deadlineAt: deadlineAt,
+    conditionText: row['condition_text'] as String?,
+    outcomeType: outcomeValue == null
+        ? null
+        : ReminderOutcomeType.fromStorage(outcomeValue),
+    outcomeNote: row['outcome_note'] as String?,
     createdAt: createdAt,
     updatedAt: updatedAt,
+    completedAt: completedAt,
+    cancelledAt: cancelledAt,
     revision: row['revision']! as int,
   );
+}
+
+AppendOnlyEvent _reminderEventFromRow(Map<String, Object?> row) {
+  final projectId = row['project_id'] as String?;
+  final sourceLogId = row['source_observation_id'] as String?;
+  if (projectId != null) validateUuid(projectId, 'Proje kimliği');
+  if (sourceLogId != null) validateUuid(sourceLogId, 'Kaynak log kimliği');
+  return AppendOnlyEvent(
+    id: row['id']! as String,
+    recordId: row['follow_up_id']! as String,
+    projectId: projectId,
+    sourceLogId: sourceLogId,
+    eventType: row['event_type']! as String,
+    occurredAt: row['occurred_at']! as String,
+    payloadJson: row['payload_json']! as String,
+    sequence: row['sequence']! as int,
+  );
+}
+
+NotificationBinding _notificationBindingFromRow(Map<String, Object?> row) {
+  final scheduledFor = row['scheduled_for'] as String?;
+  final lastSyncedAt = row['last_synced_at']! as String;
+  if (scheduledFor != null) {
+    validateCanonicalTimestamp(scheduledFor, 'Planlanan bildirim zamanı');
+  }
+  validateCanonicalTimestamp(lastSyncedAt, 'Bildirim eşitleme zamanı');
+  return NotificationBinding(
+    reminderId: row['reminder_id']! as String,
+    platformNotificationId: row['platform_notification_id']! as int,
+    scheduledFor: scheduledFor,
+    syncState: NotificationSyncState.fromStorage(row['sync_state']! as String),
+    lastSyncedAt: lastSyncedAt,
+    safeErrorCode: row['safe_error_code'] as String?,
+  );
+}
+
+NotificationBinding _notificationBindingFromJoinedRow(
+  Map<String, Object?> row,
+) {
+  return _notificationBindingFromRow({
+    'reminder_id': row['id'],
+    'platform_notification_id': row['platform_notification_id'],
+    'scheduled_for': row['binding_scheduled_for'],
+    'sync_state': row['sync_state'],
+    'last_synced_at': row['last_synced_at'],
+    'safe_error_code': row['safe_error_code'],
+  });
+}
+
+class _NotificationWorkItem {
+  const _NotificationWorkItem({required this.reminder, required this.binding});
+
+  final MobileReminder reminder;
+  final NotificationBinding binding;
+}
+
+class _BindingUpdate {
+  const _BindingUpdate({
+    required this.reminderId,
+    required this.state,
+    this.scheduledFor,
+    this.safeErrorCode,
+  });
+
+  final String reminderId;
+  final String? scheduledFor;
+  final NotificationSyncState state;
+  final String? safeErrorCode;
 }

@@ -5,6 +5,7 @@ import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -30,11 +31,13 @@ void main() {
         AppEnvironment.debug,
       );
       final observedAt = CseTimeCodec.encodeUtc(DateTime.now().toUtc());
+      final firstNotifications = FlutterReminderNotificationGateway();
       final first = await AppBootstrap(
         environment: AppEnvironment.debug,
         directoriesProvider: () async => directories,
         databaseFactory: databaseFactory,
         clock: () => DateTime.now().toUtc(),
+        notificationGateway: firstNotifications,
       ).start();
       expect(first, isA<BootstrapSuccess>());
       final firstSuccess = first as BootstrapSuccess;
@@ -55,7 +58,7 @@ void main() {
           location: 'A Blok',
         ),
       );
-      await firstSuccess.agenda.createReminder(
+      final reminder = await firstSuccess.agenda.createReminder(
         CreateReminderCommand(
           id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
           eventId: 'eeeeeeee-eeee-4eee-8eee-000000000002',
@@ -63,14 +66,28 @@ void main() {
           sourceLogId: log.id,
           title: 'Android offline reminder',
           kind: ReminderKind.action,
-          schedule: ReminderScheduleKind.inbox,
+          schedule: ReminderScheduleKind.in15Minutes,
         ),
       );
+      final firstNotificationState = await firstSuccess.agenda
+          .getReminderLifecycleDetail(reminder.id);
+      expect(
+        firstNotificationState.notification.syncState,
+        NotificationSyncState.scheduled,
+      );
+      expect(
+        (await firstNotifications.pendingNotifications()).where(
+          (item) => item.reminderId == reminder.id,
+        ),
+        hasLength(1),
+      );
+      final restartedNotifications = FlutterReminderNotificationGateway();
       final restarted = await AppBootstrap(
         environment: AppEnvironment.debug,
         directoriesProvider: () async => directories,
         databaseFactory: databaseFactory,
         clock: () => DateTime.now().toUtc(),
+        notificationGateway: restartedNotifications,
       ).start();
       expect(restarted, isA<BootstrapSuccess>());
       expect(
@@ -106,12 +123,29 @@ void main() {
       expect(find.text('Android offline Ajanda kaydı'), findsOneWidget);
       await tester.tap(find.text('Hatırlatıcı').last);
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Bugün'));
+      await tester.pumpAndSettle();
       await tester.drag(
         find.byKey(const Key('reminder-list')),
         const Offset(0, -200),
       );
       await tester.pumpAndSettle();
       expect(find.text('Android offline reminder'), findsOneWidget);
+
+      await restartedSuccess.agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: reminder.id,
+          eventId: 'eeeeeeee-eeee-4eee-8eee-000000000003',
+          expectedRevision: reminder.revision,
+          action: ReminderMutationAction.complete,
+        ),
+      );
+      expect(
+        (await restartedNotifications.pendingNotifications()).where(
+          (item) => item.reminderId == reminder.id,
+        ),
+        isEmpty,
+      );
     },
   );
 }

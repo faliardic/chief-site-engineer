@@ -25,7 +25,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 2;
+  static const schemaVersion = 3;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -176,6 +176,221 @@ class AppDatabase {
             END
           ''');
         }
+      },
+    ),
+    DatabaseMigration(
+      version: 3,
+      apply: (transaction) async {
+        await transaction.execute(
+          'DROP TRIGGER follow_up_events_append_only_update',
+        );
+        await transaction.execute(
+          'DROP TRIGGER follow_up_events_append_only_delete',
+        );
+        await transaction.execute(
+          'DROP TRIGGER follow_up_items_no_physical_delete',
+        );
+        await transaction.execute(
+          'ALTER TABLE follow_up_events RENAME TO follow_up_events_v2',
+        );
+        await transaction.execute(
+          'ALTER TABLE follow_up_items RENAME TO follow_up_items_v2',
+        );
+        await transaction.execute('''
+          CREATE TABLE follow_up_items (
+            id TEXT PRIMARY KEY,
+            capture_text TEXT NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT,
+            item_type TEXT NOT NULL CHECK (
+              item_type IN ('action', 'waiting', 'recheck')
+            ),
+            status TEXT NOT NULL CHECK (
+              status IN ('inbox', 'active', 'waiting', 'completed', 'cancelled')
+            ),
+            project_id TEXT REFERENCES projects(id),
+            observation_id TEXT,
+            location TEXT,
+            related_person TEXT,
+            is_important INTEGER NOT NULL DEFAULT 0 CHECK (
+              is_important IN (0, 1)
+            ),
+            next_attention_at TEXT,
+            deadline_at TEXT,
+            condition_text TEXT,
+            outcome_type TEXT CHECK (
+              outcome_type IS NULL OR outcome_type IN (
+                'completed', 'no_longer_needed'
+              )
+            ),
+            outcome_note TEXT,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            completed_at TEXT,
+            cancelled_at TEXT,
+            FOREIGN KEY (observation_id, project_id)
+              REFERENCES field_observations(id, project_id),
+            CHECK (observation_id IS NULL OR project_id IS NOT NULL),
+            CHECK (
+              (status = 'inbox' AND next_attention_at IS NULL)
+              OR (status IN ('active', 'waiting') AND next_attention_at IS NOT NULL)
+              OR status IN ('completed', 'cancelled')
+            ),
+            CHECK (
+              (status = 'completed' AND completed_at IS NOT NULL
+                AND cancelled_at IS NULL AND outcome_type IS NOT NULL)
+              OR (status = 'cancelled' AND cancelled_at IS NOT NULL
+                AND completed_at IS NULL AND outcome_type IS NOT NULL)
+              OR (status IN ('inbox', 'active', 'waiting')
+                AND completed_at IS NULL AND cancelled_at IS NULL
+                AND outcome_type IS NULL AND outcome_note IS NULL)
+            )
+          )
+        ''');
+        await transaction.execute('''
+          INSERT INTO follow_up_items (
+            id, capture_text, title, description, item_type, status,
+            project_id, observation_id, location, related_person,
+            is_important, next_attention_at, deadline_at, condition_text,
+            outcome_type, outcome_note, revision, created_at, updated_at,
+            completed_at, cancelled_at
+          )
+          SELECT
+            id, title, title, NULL, item_type, status,
+            project_id, observation_id, NULL, NULL,
+            0, next_attention_at, NULL, NULL,
+            CASE
+              WHEN status = 'completed' THEN 'completed'
+              WHEN status = 'cancelled' THEN 'no_longer_needed'
+              ELSE NULL
+            END,
+            NULL, revision, created_at, updated_at,
+            completed_at, cancelled_at
+          FROM follow_up_items_v2
+        ''');
+        await transaction.execute('''
+          CREATE TABLE follow_up_events (
+            id TEXT PRIMARY KEY,
+            follow_up_id TEXT NOT NULL REFERENCES follow_up_items(id),
+            sequence INTEGER NOT NULL CHECK (sequence >= 1),
+            project_id TEXT REFERENCES projects(id),
+            source_observation_id TEXT,
+            event_type TEXT NOT NULL CHECK (event_type IN (
+              'created', 'scheduled', 'rescheduled', 'details_updated',
+              'waiting_started', 'snoozed', 'completed', 'cancelled',
+              'reopened', 'moved_to_inbox', 'notification_scheduled',
+              'notification_cancelled'
+            )),
+            occurred_at TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            FOREIGN KEY (source_observation_id, project_id)
+              REFERENCES field_observations(id, project_id),
+            UNIQUE (follow_up_id, sequence),
+            CHECK (source_observation_id IS NULL OR project_id IS NOT NULL)
+          )
+        ''');
+        await transaction.execute('''
+          INSERT INTO follow_up_events (
+            id, follow_up_id, sequence, project_id, source_observation_id,
+            event_type, occurred_at, payload_json
+          )
+          SELECT
+            event.id,
+            event.follow_up_id,
+            (
+              SELECT COUNT(*)
+              FROM follow_up_events_v2 previous
+              WHERE previous.follow_up_id = event.follow_up_id
+                AND (
+                  previous.occurred_at < event.occurred_at
+                  OR (previous.occurred_at = event.occurred_at
+                    AND previous.id <= event.id)
+                )
+            ),
+            event.project_id,
+            event.source_observation_id,
+            event.event_type,
+            event.occurred_at,
+            event.payload_json
+          FROM follow_up_events_v2 event
+          ORDER BY event.follow_up_id, event.occurred_at, event.id
+        ''');
+        await transaction.execute('DROP TABLE follow_up_events_v2');
+        await transaction.execute('DROP TABLE follow_up_items_v2');
+        await transaction.execute('''
+          CREATE TABLE reminder_notification_bindings (
+            reminder_id TEXT PRIMARY KEY REFERENCES follow_up_items(id),
+            platform_notification_id INTEGER NOT NULL UNIQUE CHECK (
+              platform_notification_id BETWEEN 1 AND 2147483647
+            ),
+            scheduled_for TEXT,
+            sync_state TEXT NOT NULL CHECK (sync_state IN (
+              'scheduled', 'permission_denied', 'unavailable',
+              'failed', 'cancelled'
+            )),
+            last_synced_at TEXT NOT NULL,
+            safe_error_code TEXT
+          )
+        ''');
+        await transaction.execute('''
+          INSERT INTO reminder_notification_bindings (
+            reminder_id, platform_notification_id, scheduled_for,
+            sync_state, last_synced_at, safe_error_code
+          )
+          SELECT
+            id,
+            ROW_NUMBER() OVER (ORDER BY id),
+            next_attention_at,
+            CASE
+              WHEN status IN ('completed', 'cancelled')
+                OR next_attention_at IS NULL THEN 'cancelled'
+              ELSE 'unavailable'
+            END,
+            updated_at,
+            CASE
+              WHEN status IN ('active', 'waiting')
+                AND next_attention_at IS NOT NULL
+                THEN 'reconciliation_required'
+              ELSE NULL
+            END
+          FROM follow_up_items
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_follow_ups_attention_v3
+          ON follow_up_items(
+            status, next_attention_at, is_important, created_at, id
+          )
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_follow_ups_observation_v3
+          ON follow_up_items(observation_id, created_at, id)
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_notification_bindings_schedule
+          ON reminder_notification_bindings(sync_state, scheduled_for)
+        ''');
+        await transaction.execute('''
+          CREATE TRIGGER follow_up_events_append_only_update
+          BEFORE UPDATE ON follow_up_events
+          BEGIN
+            SELECT RAISE(ABORT, 'append-only event history');
+          END
+        ''');
+        await transaction.execute('''
+          CREATE TRIGGER follow_up_events_append_only_delete
+          BEFORE DELETE ON follow_up_events
+          BEGIN
+            SELECT RAISE(ABORT, 'append-only event history');
+          END
+        ''');
+        await transaction.execute('''
+          CREATE TRIGGER follow_up_items_no_physical_delete
+          BEFORE DELETE ON follow_up_items
+          BEGIN
+            SELECT RAISE(ABORT, 'physical delete is not allowed');
+          END
+        ''');
       },
     ),
   ];
