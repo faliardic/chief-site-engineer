@@ -67,4 +67,19 @@ void main() {
     expect(lock, contains('flutter_local_notifications:'));
     expect(lock, contains('version: "22.1.0"'));
   });
+
+  test('attendance schema and cross-platform share dependency are pinned', () {
+    final schema = File('lib/storage/app_database.dart').readAsStringSync();
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    final lock = File('pubspec.lock').readAsStringSync();
+
+    expect(schema, contains('static const schemaVersion = 4'));
+    expect(schema, contains('CREATE TABLE workforce_members'));
+    expect(schema, contains('CREATE TABLE attendance_days'));
+    expect(schema, contains('CREATE TABLE attendance_entries'));
+    expect(schema, contains('CREATE TABLE attendance_events'));
+    expect(pubspec, contains('share_plus: ^12.0.1'));
+    expect(lock, contains('share_plus:'));
+    expect(lock, contains('version: "12.0.2"'));
+  });
 }

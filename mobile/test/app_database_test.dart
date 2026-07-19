@@ -62,6 +62,7 @@ void main() {
       {'version': 1, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 2, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 3, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 4, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
   });
 
@@ -107,6 +108,12 @@ void main() {
         'observation_events',
         'follow_up_items',
         'follow_up_events',
+        'workforce_members',
+        'attendance_days',
+        'attendance_entries',
+        'attendance_events',
+        'attendance_reminder_settings',
+        'attendance_day_reminder_links',
       ]),
     );
   });
@@ -336,6 +343,161 @@ void main() {
     await raw.close();
 
     expect(version, 2);
+    expect(projectCount, 1);
+    expect(partialCount, 0);
+  });
+
+  test(
+    'schema 3 to 4 preserves agenda reminder notification and events',
+    () async {
+      final versionThree = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+        migrations: AppDatabase.foundationMigrations.take(3).toList(),
+      );
+      await versionThree.open();
+      final database = versionThree.database;
+      await database.insert('projects', {
+        'id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'name': 'Korunan proje',
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await database.insert('field_observations', {
+        'id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        'project_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'observed_at': '2026-07-19T07:00:00Z',
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+        'category': 'general_note',
+        'description': 'Korunan Ajanda kaydı',
+      });
+      await database.insert('follow_up_items', {
+        'id': 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        'capture_text': 'Korunan reminder',
+        'title': 'Korunan reminder',
+        'item_type': 'action',
+        'status': 'active',
+        'project_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'observation_id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        'next_attention_at': '2026-07-20T06:00:00Z',
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await database.insert('follow_up_events', {
+        'id': 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        'follow_up_id': 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        'sequence': 1,
+        'project_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'source_observation_id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        'event_type': 'created',
+        'occurred_at': '2026-07-19T08:00:00Z',
+        'payload_json': '{}',
+      });
+      await database.insert('reminder_notification_bindings', {
+        'reminder_id': 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        'platform_notification_id': 42,
+        'scheduled_for': '2026-07-20T06:00:00Z',
+        'sync_state': 'scheduled',
+        'last_synced_at': '2026-07-19T08:00:00Z',
+      });
+      await versionThree.close();
+
+      final upgraded = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 9),
+      );
+      await upgraded.open();
+      final reminder = (await upgraded.database.query(
+        'follow_up_items',
+      )).single;
+      final event = (await upgraded.database.query('follow_up_events')).single;
+      final binding = (await upgraded.database.query(
+        'reminder_notification_bindings',
+      )).single;
+      final tables = await upgraded.database.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+      );
+      await upgraded.close();
+
+      expect(
+        reminder['observation_id'],
+        'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      );
+      expect(reminder['attendance_day_id'], isNull);
+      expect(
+        event['source_observation_id'],
+        'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      );
+      expect(event['source_attendance_day_id'], isNull);
+      expect(binding['platform_notification_id'], 42);
+      expect(
+        tables.map((row) => row['name']),
+        containsAll([
+          'workforce_members',
+          'attendance_days',
+          'attendance_entries',
+          'attendance_events',
+          'attendance_reminder_settings',
+          'attendance_day_reminder_links',
+        ]),
+      );
+    },
+  );
+
+  test('failed schema 4 upgrade rolls back intact schema 3 data', () async {
+    final versionThree = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => firstClock,
+      migrations: AppDatabase.foundationMigrations.take(3).toList(),
+    );
+    await versionThree.open();
+    await versionThree.database.insert('projects', {
+      'id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'name': 'Korunan proje',
+      'created_at': '2026-07-19T08:00:00Z',
+      'updated_at': '2026-07-19T08:00:00Z',
+    });
+    await versionThree.close();
+
+    final failing = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => DateTime.utc(2026, 7, 19, 9),
+      migrations: [
+        ...AppDatabase.foundationMigrations.take(3),
+        DatabaseMigration(
+          version: 4,
+          apply: (transaction) async {
+            await transaction.execute('CREATE TABLE partial_v4 (id TEXT)');
+            throw StateError('intentional v4 failure');
+          },
+        ),
+      ],
+    );
+    await expectLater(failing.open(), throwsA(isA<DatabaseOpenFailure>()));
+
+    final raw = await databaseFactoryFfi.openDatabase(
+      directories.databaseFile,
+      options: OpenDatabaseOptions(singleInstance: false),
+    );
+    final version = sqflite.Sqflite.firstIntValue(
+      await raw.rawQuery('PRAGMA user_version'),
+    );
+    final projectCount = sqflite.Sqflite.firstIntValue(
+      await raw.rawQuery('SELECT COUNT(*) FROM projects'),
+    );
+    final partialCount = sqflite.Sqflite.firstIntValue(
+      await raw.rawQuery(
+        "SELECT COUNT(*) FROM sqlite_master WHERE name = 'partial_v4'",
+      ),
+    );
+    await raw.close();
+
+    expect(version, 3);
     expect(projectCount, 1);
     expect(partialCount, 0);
   });

@@ -194,6 +194,7 @@ class MobileReminder {
     required this.projectId,
     required this.projectName,
     required this.sourceLogId,
+    this.attendanceDayId,
     this.captureText = '',
     required this.title,
     this.description,
@@ -218,6 +219,7 @@ class MobileReminder {
   final String? projectId;
   final String? projectName;
   final String? sourceLogId;
+  final String? attendanceDayId;
   final String captureText;
   final String title;
   final String? description;
@@ -404,12 +406,14 @@ class AppendOnlyEvent {
     required this.payloadJson,
     this.sequence,
     this.sourceLogId,
+    this.sourceAttendanceDayId,
   });
 
   final String id;
   final String recordId;
   final String? projectId;
   final String? sourceLogId;
+  final String? sourceAttendanceDayId;
   final String eventType;
   final String occurredAt;
   final String payloadJson;

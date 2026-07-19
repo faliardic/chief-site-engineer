@@ -1,4 +1,5 @@
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/application/attendance_application.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
@@ -6,9 +7,10 @@ import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
 import 'package:flutter/material.dart';
 
 class RemindersPage extends StatefulWidget {
-  const RemindersPage({required this.agenda, super.key});
+  const RemindersPage({required this.agenda, this.attendance, super.key});
 
   final AgendaApplication agenda;
+  final AttendanceApplication? attendance;
 
   @override
   State<RemindersPage> createState() => _RemindersPageState();
@@ -166,6 +168,7 @@ class _RemindersPageState extends State<RemindersPage> {
                       MaterialPageRoute(
                         builder: (_) => ReminderDetailPage(
                           agenda: widget.agenda,
+                          attendance: widget.attendance,
                           reminderId: reminder.id,
                         ),
                       ),

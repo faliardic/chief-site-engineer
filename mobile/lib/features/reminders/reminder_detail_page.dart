@@ -1,19 +1,23 @@
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/application/attendance_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
+import 'package:chief_site_engineer/features/attendance/attendance_day_page.dart';
 import 'package:flutter/material.dart';
 
 class ReminderDetailPage extends StatefulWidget {
   const ReminderDetailPage({
     required this.agenda,
     required this.reminderId,
+    this.attendance,
     super.key,
   });
 
   final AgendaApplication agenda;
   final String reminderId;
+  final AttendanceApplication? attendance;
 
   @override
   State<ReminderDetailPage> createState() => _ReminderDetailPageState();
@@ -489,6 +493,26 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
               ),
               icon: const Icon(Icons.event_note_outlined),
               label: const Text('Kaynak Ajanda kaydına dön'),
+            ),
+          ),
+        ],
+        if (reminder.attendanceDayId != null && widget.attendance != null) ...[
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 52,
+            child: FilledButton.tonalIcon(
+              key: const Key('open-source-attendance-day'),
+              onPressed: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => AttendanceDayPage(
+                    attendance: widget.attendance!,
+                    agenda: widget.agenda,
+                    dayId: reminder.attendanceDayId!,
+                  ),
+                ),
+              ),
+              icon: const Icon(Icons.badge_outlined),
+              label: const Text('Kaynak Puantaj gününe dön'),
             ),
           ),
         ],

@@ -1,5 +1,8 @@
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/application/attendance_application.dart';
 import 'package:chief_site_engineer/core/environment.dart';
+import 'package:chief_site_engineer/platform/attendance_export_gateway.dart';
+import 'package:chief_site_engineer/platform/export_gateway.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
@@ -17,12 +20,14 @@ class BootstrapSuccess extends BootstrapResult {
     required this.smokeRecordId,
     required this.smokeRecordCreatedAt,
     required this.agenda,
+    this.attendance,
   });
 
   final String environmentLabel;
   final String smokeRecordId;
   final String smokeRecordCreatedAt;
   final AgendaApplication agenda;
+  final AttendanceApplication? attendance;
 }
 
 class BootstrapFailure extends BootstrapResult {
@@ -86,17 +91,28 @@ class AppBootstrap {
         clock: clock,
         notificationGateway: notificationGateway,
       );
+      final attendance = SqliteAttendanceApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactory,
+        clock: clock,
+        agenda: agenda,
+        exportGateway: DeviceAttendanceExportGateway(
+          stager: LocalExportStager(directories),
+        ),
+      );
       try {
         await notificationGateway.initialize();
       } on Object {
         // SQLite remains source-of-truth when the platform plugin is absent.
       }
+      await attendance.ensureRollingOccurrences();
       await agenda.reconcileNotifications();
       return BootstrapSuccess(
         environmentLabel: environment.label,
         smokeRecordId: smoke.id,
         smokeRecordCreatedAt: smoke.createdAt,
         agenda: agenda,
+        attendance: attendance,
       );
     } on Object {
       return const BootstrapFailure();

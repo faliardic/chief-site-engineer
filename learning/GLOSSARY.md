@@ -1507,3 +1507,13 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Inexact Alarm`: Android'in özel exact-alarm izni gerektirmeden, enerji ve idle politikalarına uygun yaklaşık zamanda çalıştırdığı schedule modudur. Reminder SQLite'ta kesin zamanını korurken OS teslimi küçük sapma gösterebilir.
 
 `Collision-Safe ID Mapping`: UUID gibi bir kimliği integer platform ID'ye çevirirken hash çakışmasını UNIQUE kontrolü ve boş ID aramasıyla güvenli biçimde çözme yöntemidir.
+
+`Attendance Aggregate (Puantaj Aggregate'i)`: Bir proje ve yerel gündeki bütün personel sonuçlarını, gün durumunu, revision'ı ve event geçmişini tek tutarlılık sınırı olarak yöneten kayıt kümesidir.
+
+`Person-Day Equivalent (Kişi-Gün Eşdeğeri)`: Tam günü `1.0`, yarım günü `0.5`, gelmedi ve izinliyi `0.0` sayarak günlük işgücü mevcudunu karşılaştırılabilir toplam olarak ifade eden ölçüdür; ücret veya bordro hesabı değildir.
+
+`Logical Removal (Mantıksal Kaldırma)`: Bir satırı fiziksel `DELETE` yerine `removed_at` gibi bir alanla aktif görünümden çıkarmaktır. Geçmiş ve foreign key bütünlüğü korunur.
+
+`Rolling Occurrence Ensure`: Bugünden başlayan sabit uzunluktaki yerel gün penceresinde eksik occurrence'ları idempotent oluşturup mevcutları ikinci kez üretmeme işlemidir. Puantaj reminder ayarı 14 günlük pencere kullanır.
+
+`Formula Injection`: CSV hücresinin `=`, `+`, `-` veya `@` ile başlaması nedeniyle spreadsheet tarafından kullanıcı metni yerine çalıştırılabilir formül gibi yorumlanması riskidir. Export öncesi literal prefix ve quote escaping ile etkisizleştirilir.
