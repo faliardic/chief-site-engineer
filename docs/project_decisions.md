@@ -2804,3 +2804,35 @@
   reminder lifecycle bu Issue'ya eklenmez.
 - Python schema `4`, Backup format `1`, restore allowlist `(2,3,4)` ve Günlük
   Çıktı format `1` değişmez; mobil schema `2` ayrı namespace'tir.
+
+## Issue 183 — Mobil Reminder Yaşam Döngüsü ve Yerel Bildirimler
+
+- Reminder business source-of-truth'u mobil SQLite `follow_up_items`;
+  Android/iOS pending notification listesi yeniden üretilebilir teslim
+  katmanıdır. Notification dismiss reminder status'unu değiştirmez.
+- Mobil schema `2 → 3`, v2 Ajanda/reminder/event satırlarını koruyan atomik
+  table rebuild migration'dır. Python schema `4`, Backup `1`, restore allowlist
+  `(2, 3, 4)` ve Günlük Çıktı `1` değiştirilmez.
+- Standalone reminder project/source taşımayabilir. Source observation varsa
+  project zorunludur ve `(observation_id, project_id)` composite foreign key
+  aynı projeyi zorunlu kılar.
+- Bütün lifecycle mutation'ları immutable command + expected revision kullanır.
+  Stale revision fail-closed; no-op revision/event artırmaz; row ve append-only
+  sequence event tek SQLite transaction'da yazılır.
+- Platform notification integer ID, UUID'den deterministik 31-bit aday ve UNIQUE
+  linear probe ile collision-safe ayrılır.
+- Platform teslim durumu ayrı `reminder_notification_bindings` tablosundadır.
+  Raw exception, cihaz kimliği, path, secret veya kullanıcı içeriği saklanmaz;
+  yalnız sabit safe error code kullanılır.
+- Permission, plugin veya capacity failure SQLite reminder transaction'ını geri
+  almaz. Açık kayıt due/overdue görünmeye devam eder.
+- Bootstrap reconciliation eksik pending'i yeniden kurar; stale, duplicate,
+  orphan, inbox ve terminal pending kayıtlarını iptal eder. iOS kapasitesinde en
+  yakın due kayıtlar deterministik seçilir; diğerleri kaybolmaz.
+- Android schedule `inexactAllowWhileIdle` kullanır. `USE_EXACT_ALARM` ve
+  `SCHEDULE_EXACT_ALARM` izinleri bu ürün diliminde yasaktır.
+- Android/iOS aynı Dart domain/application sözleşmesini kullanır. Payload yalnız
+  doğrulanmış reminder UUID'siyle detaya gider; invalid payload navigation
+  üretmez.
+- Recurring routine, Puantaj, Beton Paketi, attachment/fotoğraf, cloud/auth,
+  push/server notification, store submission ve signing kapsam dışıdır.

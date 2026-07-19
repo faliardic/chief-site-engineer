@@ -1,5 +1,6 @@
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/core/environment.dart';
+import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
 import 'package:chief_site_engineer/storage/smoke_record.dart';
@@ -34,7 +35,10 @@ class AppBootstrap {
     required this.directoriesProvider,
     required this.databaseFactory,
     required this.clock,
-  });
+    ReminderNotificationGateway? notificationGateway,
+  }) : notificationGateway =
+           notificationGateway ??
+           const UnavailableReminderNotificationGateway();
 
   factory AppBootstrap.production() {
     final environment = AppEnvironment.current();
@@ -46,6 +50,7 @@ class AppBootstrap {
       ),
       databaseFactory: sqflite.databaseFactory,
       clock: () => DateTime.now().toUtc(),
+      notificationGateway: FlutterReminderNotificationGateway(),
     );
   }
 
@@ -53,6 +58,7 @@ class AppBootstrap {
   final Future<AppDirectories> Function() directoriesProvider;
   final sqflite.DatabaseFactory databaseFactory;
   final UtcClock clock;
+  final ReminderNotificationGateway notificationGateway;
 
   Future<BootstrapResult> start() async {
     AppDatabase? database;
@@ -72,15 +78,25 @@ class AppBootstrap {
         database: database,
         clock: clock,
       ).ensureFoundationRecord();
+      await database.close();
+      database = null;
+      final agenda = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactory,
+        clock: clock,
+        notificationGateway: notificationGateway,
+      );
+      try {
+        await notificationGateway.initialize();
+      } on Object {
+        // SQLite remains source-of-truth when the platform plugin is absent.
+      }
+      await agenda.reconcileNotifications();
       return BootstrapSuccess(
         environmentLabel: environment.label,
         smokeRecordId: smoke.id,
         smokeRecordCreatedAt: smoke.createdAt,
-        agenda: SqliteAgendaApplication(
-          databasePath: directories.databaseFile,
-          databaseFactory: databaseFactory,
-          clock: clock,
-        ),
+        agenda: agenda,
       );
     } on Object {
       return const BootstrapFailure();

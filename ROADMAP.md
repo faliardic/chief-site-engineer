@@ -15,6 +15,10 @@ doğrulaması tamamlandı. Tam mobil özellik dilimleri ve store submission ayr�
 log, strict İstanbul zamanı, schema `2`, append-only event geçmişi, logdan
 bağlı reminder, Unutma Kutusu/Bugün/Yaklaşanlar ve çift yönlü deep-link
 uygulandı. Attachment ve native notification sonraki dar dilimlerde kalır.
+3C. [x] Release 0.1 mobil reminder yaşam döngüsü — Issue #183 ile bağımsız
+`+ Unutma`, schema `3`, optimistic lifecycle, sekiz görünüm, Android/iOS yerel
+notification, tap deep-link ve restart reconciliation uygulandı. Recurring
+routine, Puantaj, Beton Paketi ve store submission sonraki dilimlerde kalır.
 
 Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme
 programı Issue #127'dir. Issue #141 / PR #142 ve Issue #143 / PR #144
@@ -24,9 +28,29 @@ Issue #148 / PR #164 çıktı aileleri, Issue #165 / PR #166 legacy envanteri,
 Issue #167 / PR #168 saha kabul protokolü ve Issue #169 / PR #170 owner-only
 tehdit modeli merge edilmiştir. Issue #171 / PR #172 Faz 0 closure sonucunu
 `PASS` olarak merge etmiştir. Issue #173 / PR #174 zaman sözleşmesi ve
-migration preflight'ı merge edilmiştir. Tek aktif production işi P1.02
-Issue #179 mobil Ajanda günlük log ve bağlı reminder dilimidir. Açık faz
-Epic'leri aynı anda aktif production işleri değildir.
+migration preflight'ı merge edilmiştir. Issue #179 / PR #182 mobil Ajanda
+dilimini merge etmiştir. Tek aktif production işi Issue #183 mobil reminder
+yaşam döngüsü ve yerel notification dilimidir. Açık faz Epic'leri aynı anda
+aktif production işleri değildir.
+
+## Issue 183 - Mobil Reminder Yaşam Döngüsü ve Yerel Bildirimler
+
+- [x] Mobil schema `2` → `3` atomik rebuild ve v2 Ajanda/reminder/event korunumu.
+- [x] Standalone veya Ajanda-linked reminder invariant'ları ve collision-safe
+  platform notification ID binding'i.
+- [x] Bağımsız `+ Unutma`, yedi hızlı seçenek ve optional project/saha ayrıntısı.
+- [x] Expected revision, stale conflict, no-op ve row/event transaction sınırı.
+- [x] Update, schedule/reschedule, snooze, waiting, inbox, complete, cancel,
+  outcome ve reopen yaşam döngüsü.
+- [x] Sekiz deterministik read-model, 320–430 px ve 44 px touch target.
+- [x] Android/iOS timezone-aware local notification ve reminder tap deep-link.
+- [x] Permission/plugin failure halinde reminder korunumu ve safe sync state.
+- [x] Bootstrap reconciliation, duplicate/stale/orphan ve capacity yönetimi.
+- [x] Android reboot receiver + inexact schedule; exact-alarm izinleri yok.
+- [x] Gerçek Android pending create/restart/cancel integration, debug APK ve
+  unsigned release AAB.
+- [ ] Native iOS build/archive macOS + Xcode + repository dışı signing gerektirir.
+- [ ] Recurring routine, Puantaj, Beton Paketi ve store submission ayrı Issue'dur.
 
 ## Issue 179 - Mobil Ajanda Logu ve Bağlı Hatırlatıcı
 
@@ -40,7 +64,8 @@ Epic'leri aynı anda aktif production işleri değildir.
 - [x] Ajanda–Hatırlatıcı çift yönlü detail navigation.
 - [x] 320 px uzun Türkçe metin ve minimum 44 px dokunma hedefi testi.
 - [x] Android restart/offline integration, debug APK ve release AAB build.
-- [ ] Attachment/fotoğraf ve native notification ayrı sonraki Issue'lardır.
+- [x] Native notification Issue #183 ile tamamlandı; attachment/fotoğraf ayrı
+  sonraki Issue'dur.
 
 ## Issue #127 Faz Haritası
 

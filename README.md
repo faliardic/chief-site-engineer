@@ -24,7 +24,8 @@ CSE büyük inşaat yönetim platformlarının küçültülmüş kopyası veya k
 `mobile/` altında Flutter/Dart tabanlı Android ve iOS uygulaması bulunur.
 Telefon ilk mobil sürümde ana veri cihazıdır; günlük kullanım bilgisayar,
 Flask sunucusu, LAN veya internet gerektirmez. Issue #180 runtime temelini,
-Issue #179 ise ilk gerçek Ajanda ve bağlı hatırlatıcı dikey dilimini sağlar.
+Issue #179 ilk gerçek Ajanda dilimini, Issue #183 ise bağımsız reminder yaşam
+döngüsü ve yerel notification teslimini sağlar.
 
 Mobil temel şunları içerir:
 
@@ -33,16 +34,19 @@ Mobil temel şunları içerir:
 - Ajanda'da İstanbul gün sınırı, gün navigasyonu, proje/tür/literal filtreler,
   geçmiş log oluşturma, detay ve boş gün görünümü;
 - logdan project/source bağlantılı Unutma Kutusu veya zamanlı hatırlatıcı;
-- Hatırlatıcı'da Unutma Kutusu, Bugün, Yaklaşanlar ve çift yönlü detay linki;
-- cihaz-içi SQLite schema `2`, sürümlü ve atomik migration geçmişi;
+- bağımsız `+ Unutma`, sekiz reminder görünümü, tam tek-seferlik yaşam döngüsü,
+  revision conflict ve append-only event geçmişi;
+- Android/iOS timezone-aware yerel bildirim, tap deep-link ve bootstrap pending
+  reconciliation;
+- cihaz-içi SQLite schema `3`, sürümlü ve atomik migration geçmişi;
 - restart sonrasında korunan smoke kayıt;
 - UTC seconds storage ve `Europe/Istanbul` sunumu;
 - debug/release için ayrı application identity ve veri kökü;
 - attachment, notification, permission ve export için güvenli platform portları.
 
-Bu dilim tam reminder yaşam döngüsü, attachment, native notification, Puantaj
-veya Beton Paketi özelliklerinin tamamlandığı anlamına gelmez. Cloud sync,
-kullanıcı hesabı ve masaüstü verisinin otomatik taşınması yoktur. Mobil
+Bu dilim recurring reminder/routine, attachment, Puantaj veya Beton Paketi
+özelliklerinin tamamlandığı anlamına gelmez. Cloud sync, kullanıcı hesabı,
+push/server notification ve masaüstü verisinin otomatik taşınması yoktur. Mobil
 geliştirme ve build komutları
 [`mobile/README.md`](mobile/README.md) içindedir.
 
@@ -75,9 +79,9 @@ Uygulama varsayılan olarak yalnız `127.0.0.1` loopback adresinde açılır. Lo
 Bu branch'in başladığı son doğrulanmış `master` güvenli noktası:
 
 ```text
-Issue #180
-PR #181
-merge commit 0e081f2c8616f990d56c6fe60f746dd4a5bc7f6d
+Issue #179
+PR #182
+merge commit 290029312f94991f154f5fe2caa8d71db254252f
 ```
 
 Son production kabiliyet dilimi Issue #119 / PR #126 ile merge edilmiştir.
@@ -111,10 +115,11 @@ programı GitHub Issue #127, faz backlog'u Issue #128–#140'tır. Faz 0 closure
 Issue #171 / PR #172 ile merge edilmiştir. Faz 1'in ilk dar production işi
 Issue #173 olay zamanı sözleşmesi ve salt-okunur migration preflight'ı, Issue
 #175 ise geriye dönük observation create sözleşmesini tamamlamıştır. Issue #180
-/ PR #181 mobil runtime temelini merge etmiştir. Issue #179 branch'inde mobil
-Ajanda günlük logu ve logdan bağlı hatırlatıcı ilk özellik dilimi olarak
-uygulanmıştır; attachment, gerçek notification delivery, cloud sync, uygulama
-kilidi ve gerçek saha pilotları henüz tamamlanmamıştır.
+/ PR #181 mobil runtime temelini, Issue #179 / PR #182 mobil Ajanda günlük logu
+ve logdan bağlı hatırlatıcı dilimini merge etmiştir. Issue #183 branch'inde
+bağımsız hızlı reminder, tam yaşam döngüsü ve gerçek Android/iOS yerel
+notification teslimi uygulanmıştır; attachment, recurring routine, cloud sync,
+uygulama kilidi ve gerçek saha pilotları henüz tamamlanmamıştır.
 
 ## Saha Takibi v0.1
 

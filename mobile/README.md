@@ -15,7 +15,7 @@ cihaz-içi SQLite ve uygulamaya özel yerel dosya dizinleriyle offline çalış�
 | Android debug application ID | `com.faliardic.chiefsiteengineer.debug` |
 | iOS release bundle ID | `com.faliardic.chiefsiteengineer` |
 | iOS debug bundle ID | `com.faliardic.chiefsiteengineer.debug` |
-| Mobil schema version | `2` |
+| Mobil schema version | `3` |
 | Sunum timezone | `Europe/Istanbul` |
 
 Debug ve release farklı platform kimlikleri ve farklı `debug` / `release` veri
@@ -64,6 +64,13 @@ reminder fiziksel silinemez. Log/reminder kayıtlarında UUID, revision,
 `created_at`, `updated_at` ve gelecekte archive/lifecycle uyumlu alanlar bulunur.
 Migration veya transaction hatasında yarım tablo, reminder veya event kalmaz.
 
+Schema `3`, schema `2` Ajanda logları, linked reminder'lar ve event geçmişini
+koruyan atomik table rebuild ile reminder aggregate'ini tam yaşam döngüsüne
+genişletir. `follow_up_events.sequence` aggregate içi kesin sırayı verir.
+`reminder_notification_bindings`, collision-safe platform integer ID ile safe
+operational sync state tutar. v3 migration'ın herhangi bir adımı hata verirse
+schema ve veri v2 olarak eksiksiz rollback olur.
+
 ## Mobil Ajanda ve Hatırlatıcı
 
 Ajanda, seçili `Europe/Istanbul` gününü `observed_at`, `created_at`, ID sırasıyla
@@ -74,9 +81,28 @@ ve invalid zamanı mutation öncesi reddeder; hata halinde form state'i korunur.
 Her kart ve log detayından reminder oluşturulabilir. Önerilen metin açıklamadan
 gelir ve değiştirilebilir. `action | waiting | recheck`; 15 dakika, 1 saat,
 bugün çıkmadan, yarın sabah, Unutma Kutusu ve özel tarih/saat desteklenir.
-Reminder ilk insert'ten itibaren source log ve project ID taşır; creation row ve
-event tek transaction'dadır. Hatırlatıcı ekranı Unutma Kutusu, Bugün,
-Yaklaşanlar ve source Ajanda deep-link'ini sunar.
+Linked reminder ilk insert'ten itibaren source log ve project ID taşır;
+standalone reminder ise project/source olmadan oluşturulabilir. Creation ve her
+lifecycle mutation row + append-only event'i tek transaction'da yazar.
+
+Hatırlatıcı ekranı `+ Unutma`, Şimdi ilgilen, Gecikenler, Bugün, Bekliyorum,
+Tekrar kontrol, Yaklaşanlar, Unutma Kutusu ve terminal geçmişi sunar. Detay
+ekranı update, schedule/reschedule, üç snooze, waiting, inbox, complete/cancel
+outcome ve reopen işlemleriyle revision conflict'i görünür kılar.
+
+## Yerel bildirimler
+
+`flutter_local_notifications` Android/iOS adapter'ı canonical UTC reminder
+anını `Europe/Istanbul` timezone-aware schedule'a çevirir. Android
+`inexactAllowWhileIdle` kullanır; exact-alarm izinleri manifest'te yoktur.
+Notification payload reminder UUID'sini taşır ve tap/cold launch ilgili detayı
+açar.
+
+Permission reddi veya plugin hatası SQLite reminder'ını geri almaz. Safe sync
+state detay ekranında görünür. Bootstrap reconciliation SQLite source-of-truth
+ile OS pending listesini uzlaştırır: eksikleri kurar, stale/duplicate/orphan ve
+terminal/inbox pending kayıtlarını iptal eder. Platform kapasitesini aşan uzak
+reminder kaybolmaz; `platform_capacity` state'iyle uygulamada kalır.
 
 ## Zaman sözleşmesi
 
@@ -138,6 +164,7 @@ repository dışında tutulan provisioning/certificate gerekir.
 - Kullanıcı hesabı/auth server
 - Masaüstü verisinin otomatik migration'ı
 - Log attachment/fotoğraf bağlama
-- Tam reminder complete/snooze/cancel yaşam döngüsü
 - Puantaj veya Beton Paketi davranışı
-- Gerçek notification delivery, camera/file picker plugin'i veya store submission
+- Recurring reminder/routine template
+- Camera/file picker plugin'i veya store submission
+- Exact-alarm permission, push/server notification

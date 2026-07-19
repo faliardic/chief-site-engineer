@@ -1495,3 +1495,15 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Serial Database Queue (Seri Veritabanı Kuyruğu)`: Aynı application service üzerindeki kısa SQLite işlemlerini bir önceki Future tamamlandıktan sonra başlatan eşzamanlılık sınırıdır. Android shell'de iki sayfanın aynı dosyayı aynı anda açma yarışını önler.
 
 `Exclusive Upper Bound (Hariç Üst Sınır)`: Tarih aralığının başlangıcı dahil edip sonraki başlangıç anını dışarıda bırakmasıdır. Ajanda sorgusu `start <= observed_at < next_day_start` kullanarak gece yarısı kaydını yalnız doğru güne koyar.
+
+`Optimistic Revision (İyimser Sürüm Kontrolü)`: Kaydı kilitlemek yerine mutation sırasında kullanıcının okuduğu revision ile database'deki güncel revision'ı karşılaştırma yöntemidir. Değerler farklıysa stale işlem fail-closed reddedilir.
+
+`Notification Reconciliation (Bildirim Uzlaştırması)`: SQLite source-of-truth ile Android/iOS pending notification listesini karşılaştırıp eksikleri yeniden planlama, stale/duplicate/orphan kayıtları iptal etme ve güvenli sync state yazma işlemidir.
+
+`Operational Sync State`: Business status'tan ayrı olarak platform tesliminin `scheduled`, `permission_denied`, `unavailable`, `failed` veya `cancelled` durumunu taşıyan yeniden üretilebilir teknik kayıttır.
+
+`Orphan Notification (Sahipsiz Bildirim)`: Platform pending listesinde bulunduğu halde SQLite'ta geçerli ve eşleşen reminder binding'i olmayan bildirimdir; reconciliation sırasında iptal edilir.
+
+`Inexact Alarm`: Android'in özel exact-alarm izni gerektirmeden, enerji ve idle politikalarına uygun yaklaşık zamanda çalıştırdığı schedule modudur. Reminder SQLite'ta kesin zamanını korurken OS teslimi küçük sapma gösterebilir.
+
+`Collision-Safe ID Mapping`: UUID gibi bir kimliği integer platform ID'ye çevirirken hash çakışmasını UNIQUE kontrolü ve boş ID aramasıyla güvenli biçimde çözme yöntemidir.

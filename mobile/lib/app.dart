@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
+import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
 import 'package:flutter/material.dart';
 
@@ -92,6 +95,39 @@ class MobileShell extends StatefulWidget {
 
 class _MobileShellState extends State<MobileShell> {
   int _selectedIndex = 0;
+  StreamSubscription<String>? _notificationTapSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _notificationTapSubscription = widget.bootstrap.agenda.notificationTaps
+        .listen(_openReminderFromNotification);
+    final initial = widget.bootstrap.agenda.initialNotificationReminderId;
+    if (initial != null) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _openReminderFromNotification(initial),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _notificationTapSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _openReminderFromNotification(String reminderId) {
+    if (!mounted) return;
+    setState(() => _selectedIndex = 1);
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ReminderDetailPage(
+          agenda: widget.bootstrap.agenda,
+          reminderId: reminderId,
+        ),
+      ),
+    );
+  }
 
   static const _destinations = <NavigationDestination>[
     NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Başlangıç'),
