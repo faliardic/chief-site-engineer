@@ -2,6 +2,7 @@ import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/attendance_application.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/application/mobile_backup_application.dart';
+import 'package:chief_site_engineer/application/restore_recovery_application.dart';
 import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/platform/attendance_export_gateway.dart';
@@ -45,7 +46,9 @@ class BootstrapSuccess extends BootstrapResult {
 }
 
 class BootstrapFailure extends BootstrapResult {
-  const BootstrapFailure();
+  const BootstrapFailure({this.code = 'startup_failed'});
+
+  final String code;
 }
 
 class AppBootstrap {
@@ -85,6 +88,16 @@ class AppBootstrap {
       final directories = await directoriesProvider();
       if (directories.environment != environment) {
         throw const PathContractViolation('environment directory mismatch');
+      }
+      await directories.ensureRecoveryRootsCreated();
+      try {
+        await MobileRestoreRecoveryApplication(
+          directories: directories,
+          databaseFactory: databaseFactory,
+          clock: clock,
+        ).recoverBeforeBootstrap();
+      } on RestoreRecoveryFailure {
+        return const BootstrapFailure(code: 'restore_recovery_failed');
       }
       await directories.ensureCreated();
       database = AppDatabase(

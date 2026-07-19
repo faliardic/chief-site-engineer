@@ -15,7 +15,12 @@ void main() {
       expect(manifest, contains('ScheduledNotificationReceiver'));
       expect(manifest, contains('ScheduledNotificationBootReceiver'));
       expect(manifest, contains('android.permission.CAMERA'));
-      expect(manifest, contains('android.permission.READ_MEDIA_IMAGES'));
+      expect(manifest, isNot(contains('android.permission.READ_MEDIA_IMAGES')));
+      expect(
+        manifest,
+        isNot(contains('android.permission.READ_EXTERNAL_STORAGE')),
+      );
+      expect(manifest, isNot(contains('android.permission.INTERNET')));
       expect(manifest, isNot(contains('SCHEDULE_EXACT_ALARM')));
       expect(manifest, isNot(contains('USE_EXACT_ALARM')));
     },

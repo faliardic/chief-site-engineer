@@ -9,23 +9,51 @@ import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.
 import 'package:chief_site_engineer/features/memory/memory_backup_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class CseApp extends StatelessWidget {
-  const CseApp({required this.bootstrap, super.key});
+  const CseApp({required this.bootstrap, this.fatalErrors, super.key});
 
   final Future<BootstrapResult> bootstrap;
+  final ValueListenable<String?>? fatalErrors;
 
   @override
   Widget build(BuildContext context) {
+    final listenable = fatalErrors;
+    if (listenable != null) {
+      return ValueListenableBuilder<String?>(
+        valueListenable: listenable,
+        builder: (_, code, _) => _buildMaterialApp(code),
+      );
+    }
+    return _buildMaterialApp(null);
+  }
+
+  Widget _buildMaterialApp(String? fatalErrorCode) {
+    const seed = Color(0xFF1E5D4E);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Chief Site Engineer',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1E5D4E)),
+        colorScheme: ColorScheme.fromSeed(seedColor: seed),
+        materialTapTargetSize: MaterialTapTargetSize.padded,
+        visualDensity: VisualDensity.standard,
         useMaterial3: true,
       ),
-      home: BootstrapGate(bootstrap: bootstrap),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: seed,
+          brightness: Brightness.dark,
+        ),
+        materialTapTargetSize: MaterialTapTargetSize.padded,
+        visualDensity: VisualDensity.standard,
+        useMaterial3: true,
+      ),
+      themeMode: ThemeMode.system,
+      home: fatalErrorCode == null
+          ? BootstrapGate(bootstrap: bootstrap)
+          : SafeDiagnosticScreen(code: fatalErrorCode),
     );
   }
 }
@@ -48,7 +76,7 @@ class BootstrapGate extends StatelessWidget {
         final result = snapshot.requireData;
         return switch (result) {
           BootstrapSuccess() => MobileShell(bootstrap: result),
-          BootstrapFailure() => const BootstrapFailureScreen(),
+          BootstrapFailure() => BootstrapFailureScreen(code: result.code),
         };
       },
     );
@@ -56,29 +84,75 @@ class BootstrapGate extends StatelessWidget {
 }
 
 class BootstrapFailureScreen extends StatelessWidget {
-  const BootstrapFailureScreen({super.key});
+  const BootstrapFailureScreen({required this.code, super.key});
+
+  final String code;
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
+    return Scaffold(
+      body: SafeArea(child: SafeDiagnosticPanel(code: code)),
+    );
+  }
+}
+
+class SafeDiagnosticScreen extends StatelessWidget {
+  const SafeDiagnosticScreen({required this.code, super.key});
+
+  final String code;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(child: SafeDiagnosticPanel(code: code)),
+    );
+  }
+}
+
+class SafeDiagnosticPanel extends StatelessWidget {
+  const SafeDiagnosticPanel({required this.code, super.key});
+
+  final String code;
+
+  @override
+  Widget build(BuildContext context) {
+    final recoveryFailure = code == 'restore_recovery_failed';
+    return Center(
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.storage_rounded, size: 52),
-                SizedBox(height: 16),
+                const Icon(Icons.storage_rounded, size: 52),
+                const SizedBox(height: 16),
                 Text(
-                  'Yerel veri deposu güvenli biçimde açılamadı.',
+                  recoveryFailure
+                      ? 'Yerel hafıza kurtarma işlemi güvenle tamamlanamadı.'
+                      : 'Uygulama güvenli biçimde başlatılamadı.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
-                  'Hiçbir kayıt yazılmadı. Uygulamayı kapatıp yeniden deneyin.',
+                  recoveryFailure
+                      ? 'Veriler silinmedi; kurtarma alanı korundu. Uygulamayı kapatın ve teknik destek için tanı kodunu not edin.'
+                      : 'Yeni kayıt yazılmadı. Uygulamayı kapatıp yeniden deneyin.',
                   textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Semantics(
+                  label: 'Güvenli tanı kodu',
+                  child: Text(
+                    'Tanı kodu: $code',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
                 ),
               ],
             ),

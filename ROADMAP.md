@@ -31,6 +31,12 @@ ve aktif attachment'lar parola korumalı `.csebackup` format `1` paketine alınd
 shared operation coordinator, salt-okunur preflight, safety backup, atomik tam
 değiştirme, rollback ve notification reconciliation uygulandı. Cloud backup,
 release hardening ve store submission ayrı dilimlerde kalır.
+3G. [x] Release 0.1 mobil RC hardening — Issue #191 ile Android API 36,
+16 KiB/ARM64 artefakt kapısı, minimum izinler, dış signing sözleşmesi, restore
+process-death journal, privacy/store beyan paketi, iOS privacy statik kapısı,
+release icon/splash ve tekrarlanabilir secretsız CI/Windows release gate'i
+tamamlandı. Gerçek signing, native iOS archive, saha kabulü ve store submission
+hesap/cihaz bağımlı sonraki adımlardır.
 
 Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme
 programı Issue #127'dir. Issue #141 / PR #142 ve Issue #143 / PR #144
@@ -43,9 +49,28 @@ tehdit modeli merge edilmiştir. Issue #171 / PR #172 Faz 0 closure sonucunu
 migration preflight'ı merge edilmiştir. Issue #179 / PR #182 mobil Ajanda
 dilimini, Issue #183 / PR #184 mobil reminder yaşam döngüsü ve yerel
 notification dilimini, Issue #185 / PR #186 mobil günlük Puantajı, Issue #187 /
-PR #188 mobil Beton Paketi'ni merge etmiştir. Tek aktif production işi Issue
-#189 mobil tam yedek ve geri yükleme dilimidir.
+PR #188 mobil Beton Paketi'ni, Issue #189 / PR #190 mobil tam yedek ve geri
+yüklemeyi merge etmiştir. Tek aktif production işi Issue #191 mobil release
+candidate hardening dilimidir.
 Açık faz Epic'leri aynı anda aktif production işleri değildir.
+
+## Issue 191 - Mobil Release Candidate Hardening
+
+- [x] Android compile/target API `36`, Java 17, NDK ve ARM64 sabitlemesi.
+- [x] Merged manifest sensitive permission allowlist; broad media/storage,
+  INTERNET, cleartext ve exact-alarm yokluğu.
+- [x] Unsigned AAB ile repository-dışı ephemeral signed AAB/APK ayrımı,
+  signer, 16 KiB zipalign ve SHA-256 kapısı.
+- [x] Secretsız restore process-death journal ve bootstrap recovery.
+- [x] Mobil schema `1`–`5` fixture migration/data-event korunumu.
+- [x] Privacy policy, Play/Apple beyan matrisi, izin ve SDK envanteri.
+- [x] iOS privacy manifest, iPhone-only kimlik ve Xcode 26 blocker checklist'i.
+- [x] Proje mülkiyetinde Android/iOS release icon ve splash seti.
+- [x] Güvenli global hata UX'i, 320–430 px, büyük metin ve dark/light testleri.
+- [x] Secretsız workflow ve Windows tek-komut release gate'i.
+- [ ] Gerçek Android saha kabulü kullanıcı tarafından checklist ile yapılır.
+- [ ] Native iOS archive macOS, Xcode 26, Apple Developer ve dış signing ister.
+- [ ] Play Console/App Store Connect gönderimi ayrı, hesap-bağımlı iştir.
 
 ## Issue 189 - Mobil Tam Yedek ve Geri Yükleme
 

@@ -46,8 +46,33 @@ void main() {
         path.isWithin(directories.root.path, directories.backupStateFile),
         isTrue,
       );
+      expect(
+        path.isWithin(directories.root.path, directories.restoreJournalFile),
+        isTrue,
+      );
+      expect(
+        path.isWithin(
+          directories.root.path,
+          directories.restoreJournalNextFile,
+        ),
+        isTrue,
+      );
     },
   );
+
+  test('recovery roots do not recreate active state directories', () async {
+    final directories = AppDirectories.fromSupportRoot(
+      temporaryRoot,
+      AppEnvironment.debug,
+    );
+
+    await directories.ensureRecoveryRootsCreated();
+
+    expect(await directories.root.exists(), isTrue);
+    expect(await directories.staging.exists(), isTrue);
+    expect(await directories.database.exists(), isFalse);
+    expect(await directories.attachments.exists(), isFalse);
+  });
 
   test('debug and release roots are physically distinct', () {
     final debug = AppDirectories.fromSupportRoot(

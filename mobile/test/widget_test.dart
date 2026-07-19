@@ -49,10 +49,56 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Yerel veri deposu güvenli biçimde açılamadı.'),
+      find.text('Uygulama güvenli biçimde başlatılamadı.'),
       findsOneWidget,
     );
-    expect(find.textContaining('Hiçbir kayıt yazılmadı.'), findsOneWidget);
+    expect(find.textContaining('Yeni kayıt yazılmadı.'), findsOneWidget);
+    expect(find.text('Tanı kodu: startup_failed'), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
   });
+
+  testWidgets('fatal errors replace raw exceptions with a safe diagnostic', (
+    tester,
+  ) async {
+    final fatalErrors = ValueNotifier<String?>(null);
+    await tester.pumpWidget(
+      CseApp(
+        bootstrap: Future<BootstrapResult>.value(BootstrapFailure()),
+        fatalErrors: fatalErrors,
+      ),
+    );
+    fatalErrors.value = 'uncaught_async_error';
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tanı kodu: uncaught_async_error'), findsOneWidget);
+    expect(find.textContaining('Exception'), findsNothing);
+    expect(find.textContaining('StackTrace'), findsNothing);
+  });
+
+  for (final width in [320.0, 430.0]) {
+    testWidgets(
+      'safe diagnostic fits ${width.toInt()} px with large Turkish text',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 700);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData(brightness: Brightness.dark),
+            home: const MediaQuery(
+              data: MediaQueryData(textScaler: TextScaler.linear(1.6)),
+              child: SafeDiagnosticScreen(code: 'restore_recovery_failed'),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        expect(find.textContaining('Veriler silinmedi'), findsOneWidget);
+        expect(find.text('Tanı kodu: restore_recovery_failed'), findsOneWidget);
+      },
+    );
+  }
 }

@@ -30,7 +30,8 @@ cse_mobile/<debug|release>/
 ├── database/cse_mobile.sqlite3
 ├── attachments/
 ├── exports_backups/
-└── temp_staging/
+├── temp_staging/
+└── restore_journal.json  # yalnız yarım restore varken
 ```
 
 Bütün child yollar ortak environment kökü altında doğrulanır. Relative path ve
@@ -189,6 +190,38 @@ taşır, incoming çifti etkinleştirir, smoke/hash kontrolü ve notification
 reconciliation çalıştırır. Her hata eski çifti geri getirir; merge/partial
 restore veya OS pending notification backup'ı yoktur.
 
+Restore swap'ından önce secretsız `restore_journal.json` atomik yazılır.
+`prepared → old_state_moved → new_state_activated → validated` aşamaları
+bootstrap'ta servisler ve notification reconciliation açılmadan okunur. Eski
+state'e güvenli dönüş veya doğrulanmış yeni state'in tamamlanması mümkündür.
+Belirsiz durumda journal ile recovery dizini silinmez; normal mutation açılmaz.
+
+## Release candidate kapısı
+
+Android release compile/target API `36`, Java `17`, NDK `28.2.13676358` ve
+ARM64'tür. Main/release merged manifest; `CAMERA`, `POST_NOTIFICATIONS` ve
+`RECEIVE_BOOT_COMPLETED` dışındaki OS sensitive izinleri reddeder. Broad medya/
+storage, `INTERNET`, cleartext ve exact-alarm izni yoktur. Release AAB, universal
+APK, `zipalign -P 16`, signer ve native library inventory birlikte doğrulanır.
+
+Windows tek-komut yerel kapısı repository kökünden çalışır:
+
+```powershell
+.\scripts\release_gate.ps1 `
+  -FlutterCommand C:\tools\flutter\bin\flutter.bat `
+  -BundletoolJar C:\tools\bundletool-all-1.18.3.jar
+```
+
+Script gerçek upload key kullanmaz. Geçici repository-dışı test keystore'unu
+random parola ile üretir, signer yolunu doğrular ve `finally` içinde siler.
+Ignored `mobile/build/release_gate/` altında isimleri açıkça ayrılmış unsigned
+AAB, ephemeral-signed AAB, kurulabilir RC APK ve `RC_SHA256.txt` üretir. Bu
+artefaktlar commitlenmez ve Play Console'a gönderilmez.
+
+Gerçek Play signing ve iOS archive adımları
+[`docs/release/mobile_identity_signing_and_rc.md`](../docs/release/mobile_identity_signing_and_rc.md),
+privacy/store kanıtları ise [`docs/privacy/`](../docs/privacy/) altındadır.
+
 ## Zaman sözleşmesi
 
 - Kalıcı an: aware UTC, exact `YYYY-MM-DDTHH:MM:SSZ`.
@@ -239,8 +272,10 @@ repository dışında tutulan provisioning/certificate gerekir.
 
 - Keystore, signing key, provisioning profile ve certificate commitlenmez.
 - Android release build'e debug signing bağlanmaz.
-- Üretilen release AAB doğrulamada unsigned'dır; mağaza signing ayrı release
-  hardening adımında güvenli dış konfigürasyonla sağlanır.
+- Gerçek release signing yalnız repository dışındaki
+  `CSE_KEY_PROPERTIES_FILE` sözleşmesiyle açılır; eksik alan fail-closed durur.
+- Yerel release kapısındaki ephemeral keystore gerçek upload/app-signing key
+  değildir; yalnız signed artefakt yolunu sınar ve finalde silinir.
 - Build çıktıları ve yerel Flutter/Gradle cache'leri ignored kalır.
 
 ## Bilinçli olarak eklenmeyenler

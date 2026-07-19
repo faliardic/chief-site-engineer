@@ -59,6 +59,8 @@ class AppDirectories {
   String get databaseFile => path.join(database.path, 'cse_mobile.sqlite3');
   String get backupStateFile =>
       path.join(state.path, 'mobile_backup_state.json');
+  String get restoreJournalFile => path.join(root.path, 'restore_journal.json');
+  String get restoreJournalNextFile => '$restoreJournalFile.next';
 
   void validate() {
     final normalizedRoot = path.normalize(path.absolute(root.path));
@@ -87,6 +89,21 @@ class AppDirectories {
       throw const PathContractViolation(
         'backup state escaped its environment root',
       );
+    }
+    for (final journalPath in [restoreJournalFile, restoreJournalNextFile]) {
+      final candidate = path.normalize(path.absolute(journalPath));
+      if (!path.isWithin(normalizedRoot, candidate)) {
+        throw const PathContractViolation(
+          'restore journal escaped its environment root',
+        );
+      }
+    }
+  }
+
+  Future<void> ensureRecoveryRootsCreated() async {
+    validate();
+    for (final directory in [root, exportsBackups, state, staging]) {
+      await directory.create(recursive: true);
     }
   }
 

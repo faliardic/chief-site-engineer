@@ -28,7 +28,8 @@ Issue #179 ilk gerçek Ajanda dilimini, Issue #183 bağımsız reminder yaşam
 döngüsü ve yerel notification teslimini, Issue #185 ise günlük Puantaj ve proje
 personeli iş akışını, Issue #187 ise döküm planından kapanış raporuna mobil
 Beton Paketi'ni, Issue #189 ise parola korumalı tam mobil yedek ve atomik geri
-yüklemeyi sağlar.
+yüklemeyi, Issue #191 ise API 36/16 KiB, minimum izin, privacy, process-death
+recovery ve secretsız release candidate kapılarını sağlar.
 
 Mobil temel şunları içerir:
 
@@ -52,8 +53,11 @@ Mobil temel şunları içerir:
 - restart sonrasında korunan smoke kayıt;
 - UTC seconds storage ve `Europe/Istanbul` sunumu;
 - debug/release için ayrı application identity ve veri kökü;
-- attachment, notification, permission ve export için güvenli platform portları.
-- Ajanda/Reminder/Puantaj/Beton/backup için ortak işlem koordinatörü.
+- attachment, notification, permission ve export için güvenli platform portları;
+- Ajanda/Reminder/Puantaj/Beton/backup için ortak işlem koordinatörü;
+- API 36, ARM64/16 KiB, merged manifest ve privacy manifest release kapıları;
+- restore process-death journal ve bootstrap öncesi fail-closed recovery;
+- Türkçe/İngilizce privacy ile Play/Apple beyan kanıt paketi.
 
 Bu dilim genel PackageTemplate motorunun veya otomatik beton kabul/red kararının
 tamamlandığı anlamına gelmez. Cloud sync, kullanıcı hesabı,
@@ -131,10 +135,11 @@ ve logdan bağlı hatırlatıcı dilimini, Issue #183 / PR #184 bağımsız hız
 reminder, tam yaşam döngüsü ve Android/iOS yerel notification teslimini, Issue
 #185 / PR #186 proje personeli ve günlük Puantajı, Issue #187 / PR #188 Beton
 döküm planı, mikser/irsaliye kanıtı, numune, kür/reminder ve kapanış raporunu
-merge etmiştir. Issue #189 branch'inde parola korumalı tam mobil yedek, güvenli
-preflight, safety backup ve atomik geri yükleme uygulanmıştır; recurring
-routine, cloud sync, uygulama kilidi, release hardening ve gerçek saha pilotları
-henüz tamamlanmamıştır.
+merge etmiştir. Issue #189 / PR #190 parola korumalı tam mobil yedek, güvenli
+preflight, safety backup ve atomik geri yüklemeyi merge etmiştir. Issue #191
+branch'inde mobil release candidate hardening uygulanmıştır; recurring routine,
+cloud sync, uygulama kilidi, gerçek saha kabulü ve store submission henüz
+tamamlanmamıştır.
 
 ## Saha Takibi v0.1
 

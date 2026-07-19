@@ -1,13 +1,45 @@
+import java.io.File
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val repositoryRoot = rootProject.projectDir.parentFile.parentFile.canonicalFile
+val signingPropertiesPath = System.getenv("CSE_KEY_PROPERTIES_FILE")
+val requireReleaseSigning = System.getenv("CSE_REQUIRE_SIGNING") == "true"
+val signingPropertiesFile = signingPropertiesPath?.let(::File)?.canonicalFile
+val signingProperties = Properties()
+
+if (signingPropertiesFile != null) {
+    require(signingPropertiesFile.isFile) {
+        "CSE release signing properties file was not found."
+    }
+    require(!signingPropertiesFile.toPath().startsWith(repositoryRoot.toPath())) {
+        "CSE release signing properties must stay outside the repository."
+    }
+    signingPropertiesFile.inputStream().use(signingProperties::load)
+}
+
+val signingKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+val hasCompleteReleaseSigning = signingPropertiesFile != null &&
+    signingKeys.all { !signingProperties.getProperty(it).isNullOrBlank() }
+
+if (signingPropertiesFile != null && !hasCompleteReleaseSigning) {
+    throw GradleException("CSE release signing properties are incomplete.")
+}
+if (requireReleaseSigning && !hasCompleteReleaseSigning) {
+    throw GradleException(
+        "Signed CSE release requested without external signing properties."
+    )
+}
+
 android {
     namespace = "com.faliardic.chiefsiteengineer"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    compileSdk = 36
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
@@ -18,9 +50,29 @@ android {
     defaultConfig {
         applicationId = "com.faliardic.chiefsiteengineer"
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+
+    signingConfigs {
+        if (hasCompleteReleaseSigning) {
+            create("cseRelease") {
+                val configuredStore = File(
+                    signingPropertiesFile!!.parentFile,
+                    signingProperties.getProperty("storeFile"),
+                ).canonicalFile
+                require(
+                    !configuredStore.toPath().startsWith(repositoryRoot.toPath())
+                ) {
+                    "CSE release keystore must stay outside the repository."
+                }
+                storeFile = configuredStore
+                storePassword = signingProperties.getProperty("storePassword")
+                keyAlias = signingProperties.getProperty("keyAlias")
+                keyPassword = signingProperties.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
@@ -30,9 +82,17 @@ android {
             manifestPlaceholders["appLabel"] = "Chief Site Engineer (Debug)"
         }
         release {
-            // Store signing is intentionally supplied outside the repository.
             manifestPlaceholders["appLabel"] = "Chief Site Engineer"
+            signingConfig = if (hasCompleteReleaseSigning) {
+                signingConfigs.getByName("cseRelease")
+            } else {
+                null
+            }
         }
+    }
+
+    packaging {
+        jniLibs.useLegacyPackaging = false
     }
 }
 
