@@ -7,6 +7,10 @@
 2. [x] Backup/restore compatibility ve resmî export izolasyonu — Issue #117 ile gerçek schema 2/3→4 restore, schema 4 tracking round-trip ve byte-identical resmî export regresyonları uygulandı.
 2A. [x] İlk test edilebilir PC Saha Takibi web yüzeyi — Issue #119 / PR #126 ile merge edildi. Bugün, Unutma Kutusu, hızlı yakalama, follow-up yaşam döngüsü, rutinler, occurrence işlemleri, restart kalıcılığı ve resmî export izolasyonu doğrulandı.
 3. [ ] Issue #127 uygulanabilir geliştirme programını bağımlılık sırasıyla yürüt.
+3A. [x] Release 0.1 mobil temel — Issue #180 ile Flutter Android/iOS kabuğu,
+cihaz-içi SQLite schema/migration/restart kalıcılığı, UTC/İstanbul sözleşmesi,
+yerel dizinler, güvenli platform portları ve Android build/emülatör smoke
+doğrulaması tamamlandı. Tam mobil özellik dilimleri ve store submission ayrı.
 
 Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme
 programı Issue #127'dir. Issue #141 / PR #142 ve Issue #143 / PR #144
@@ -40,6 +44,35 @@ Issue #141–#169 arasındaki P0.01–P0.09 işleri merged kanıta sahiptir. Iss
 / PR #172 bu kanıtları repository truth ile uzlaştırmış ve P0.10'u kapatmıştır.
 Sıradaki tek faz Issue #129'dur; P1.01 Issue #173 / PR #174 ile tamamlanmış,
 P1.02 Issue #175 ile başlamıştır.
+
+## Issue 180 - Release 0.1 Flutter Mobil Temel
+
+- [x] `mobile/` Flutter projesi ile Android ve iOS platform kabukları eklendi.
+- [x] `0.1.0+1`, uygulama adı ve release/debug application/bundle kimlikleri
+  sabitlendi.
+- [x] Başlangıç, Hatırlatıcı, Ajanda, Puantaj ve Beton Paketi ana navigasyonu
+  kuruldu; tamamlanmamış alanlar `Hazırlanıyor` gösteriyor.
+- [x] Application-support altında debug/release ayrılmış database, attachment,
+  export/backup ve temp/staging dizinleri doğrulanıyor.
+- [x] Mobil SQLite schema `1`, append-only migration geçmişi, atomik migration
+  ve restart smoke-record kalıcılığı uygulandı.
+- [x] Database/path hatası kullanıcıya teknik ayrıntı sızdırmadan fail-closed
+  gösteriliyor.
+- [x] Aware UTC seconds storage, offset normalization ve Europe/Istanbul sunumu
+  Python fixture'larıyla eşlendi; naive/invalid değer reddediliyor.
+- [x] Notification, camera/photo/file ve export platform portları izin reddinde
+  crash/mutation üretmiyor.
+- [x] Flutter analyze, unit/widget testleri ve Android emülatör integration
+  smoke testi geçti.
+- [x] Android debug APK ve unsigned release AAB üretildi; signing key/secret
+  repository'ye eklenmedi.
+- [x] iOS project, plist, iOS 13 deployment target, version/build ve bundle
+  kimlikleri statik doğrulandı.
+- [ ] Native iOS archive/TestFlight/App Store doğrulaması macOS + Xcode + Apple
+  Developer hesabı gerektirir ve Issue #180 ortamında açık platform blocker'ıdır.
+- [ ] Gerçek store submission, mobile Ajanda/Hatırlatıcı/Puantaj/Beton Paketi,
+  notification delivery, backup/restore hardening ve privacy metadata sonraki
+  ayrı Issue'lardır.
 
 ## Issue 173 - Olay Zamanı Sözleşmesi ve Migration Preflight
 
