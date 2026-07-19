@@ -1,7 +1,11 @@
 """Domain and storage value contracts used by SQLite persistence."""
 
-from datetime import datetime, timedelta, timezone
 from uuid import UUID
+
+from app.time_contracts import (
+    parse_utc_timestamp,
+    serialize_utc_timestamp,
+)
 
 
 OBSERVATION_STATUSES: tuple[str, ...] = ("open", "tracking", "closed")
@@ -27,36 +31,10 @@ def validate_record_id(value: str) -> str:
     return value
 
 
-def serialize_utc_timestamp(value: datetime) -> str:
-    """Serialize a timezone-aware ``datetime`` as an ISO 8601 UTC string."""
-
-    if value.tzinfo is None or value.utcoffset() is None:
-        raise ValueError("timestamp must be timezone-aware")
-
-    utc_value = value.astimezone(timezone.utc)
-    return utc_value.isoformat().replace("+00:00", "Z")
-
-
 def validate_utc_timestamp(value: str) -> str:
     """Return a canonical UTC timestamp ending in ``Z`` or raise ``ValueError``."""
 
-    error_message = "timestamp must be a UTC ISO 8601 value ending in Z"
-    if (
-        not isinstance(value, str)
-        or value != value.strip()
-        or len(value) < 20
-        or value[10] != "T"
-        or not value.endswith("Z")
-    ):
-        raise ValueError(error_message)
-
-    try:
-        parsed_value = datetime.fromisoformat(f"{value[:-1]}+00:00")
-    except ValueError as exc:
-        raise ValueError(error_message) from exc
-
-    if parsed_value.utcoffset() != timedelta(0):
-        raise ValueError(error_message)
+    parse_utc_timestamp(value)
     return value
 
 

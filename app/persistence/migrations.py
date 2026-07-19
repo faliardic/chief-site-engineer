@@ -2,10 +2,10 @@
 
 import sqlite3
 from collections.abc import Sequence
-from datetime import datetime, timezone
 from pathlib import Path
 
-from .contracts import serialize_utc_timestamp
+from app.time_contracts import utc_now
+
 from .schema import SCHEMA_MIGRATIONS, Migration
 
 
@@ -64,10 +64,7 @@ def migrate_database(
                 connection.execute(statement)
             connection.execute(
                 "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",
-                (
-                    migration.version,
-                    serialize_utc_timestamp(datetime.now(timezone.utc)),
-                ),
+                (migration.version, utc_now()),
             )
             applied_versions.add(migration.version)
     except Exception:

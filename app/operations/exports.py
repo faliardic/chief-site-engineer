@@ -5,13 +5,14 @@ import io
 import os
 import zipfile
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime
 from pathlib import Path
 from uuid import uuid4
 
 from app.persistence import SQLiteUnitOfWork
 from app.storage import ManagedAttachmentStore
 from app.storage.paths import validate_canonical_uuid
+from app.time_contracts import ISTANBUL_TIMEZONE, parse_utc_timestamp, utc_now
 
 from .common import (
     atomic_rename,
@@ -23,7 +24,6 @@ from .common import (
 )
 
 
-ISTANBUL_TIMEZONE = timezone(timedelta(hours=3), name="Europe/Istanbul")
 EXPORT_FILES = (
     "observations.md",
     "observations.csv",
@@ -45,9 +45,7 @@ class DailyExportService:
         self,
         data_root: str | Path,
         *,
-        clock=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds").replace(
-            "+00:00", "Z"
-        ),
+        clock=utc_now,
         uuid_factory=lambda: str(uuid4()),
     ) -> None:
         self.data_root = Path(data_root).resolve()
@@ -270,7 +268,4 @@ def _parse_date(value: date | str) -> date:
 
 
 def _parse_utc(value: str) -> datetime:
-    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    if parsed.tzinfo != timezone.utc:
-        raise ValueError("timestamp must be canonical UTC")
-    return parsed
+    return parse_utc_timestamp(value)

@@ -1,10 +1,9 @@
 """Server-rendered local field interface."""
 
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
-from zoneinfo import ZoneInfo
 
 from flask import (
     Flask,
@@ -69,6 +68,14 @@ from app.persistence import (
 from app.operations import BackupService, DailyExportService
 from app.storage import ManagedAttachmentStore
 from app.storage.paths import validate_canonical_uuid
+from app.time_contracts import (
+    ISTANBUL_TIMEZONE,
+    UTC,
+    format_istanbul_timestamp,
+    serialize_utc_timestamp,
+    to_istanbul,
+    utc_now,
+)
 
 
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
@@ -76,8 +83,6 @@ MAX_SEARCH_QUERY_LENGTH = 200
 BACKUP_ERROR_MESSAGE = (
     "Yedek oluşturulamadı. Veri ve dosya bütünlüğünü kontrol edip yeniden deneyin."
 )
-ISTANBUL_TIMEZONE_NAME = "Europe/Istanbul"
-ISTANBUL_TIMEZONE = ZoneInfo(ISTANBUL_TIMEZONE_NAME)
 SAFE_PREVIEW_MIME_TYPES = frozenset(
     {"image/gif", "image/jpeg", "image/png", "image/webp"}
 )
@@ -344,12 +349,9 @@ def utc_to_istanbul_display(value: str | None) -> str:
     if not value:
         return "-"
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
+        return format_istanbul_timestamp(value, "%d.%m.%Y %H:%M")
     except (TypeError, ValueError):
         return "Zaman bilgisi kullanılamıyor"
-    return parsed.astimezone(ISTANBUL_TIMEZONE).strftime("%d.%m.%Y %H:%M")
 
 
 def utc_to_istanbul_input(value: str | None) -> str:
@@ -358,12 +360,9 @@ def utc_to_istanbul_input(value: str | None) -> str:
     if not value:
         return ""
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
+        return format_istanbul_timestamp(value, "%Y-%m-%dT%H:%M")
     except (TypeError, ValueError):
         return ""
-    return parsed.astimezone(ISTANBUL_TIMEZONE).strftime("%Y-%m-%dT%H:%M")
 
 
 def is_safe_image_preview(mime_type: str | None) -> bool:
@@ -381,9 +380,7 @@ def istanbul_datetime_local_to_utc(value: str) -> str:
         )
     except (TypeError, ValueError) as exc:
         raise ValueError("Bildirim zamanı geçersiz.") from exc
-    return local.astimezone(timezone.utc).isoformat(timespec="seconds").replace(
-        "+00:00", "Z"
-    )
+    return serialize_utc_timestamp(local)
 
 
 def local_date_display(value: str | None) -> str:
@@ -396,9 +393,7 @@ def local_date_display(value: str | None) -> str:
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace(
-        "+00:00", "Z"
-    )
+    return utc_now()
 
 
 def create_app(data_root: str | Path) -> Flask:
@@ -893,12 +888,7 @@ def create_app(data_root: str | Path) -> Flask:
         projects, _project_names = project_context()
         if request.method == "GET":
             now_utc = configured_now_utc()
-            start_date = (
-                datetime.fromisoformat(now_utc.replace("Z", "+00:00"))
-                .astimezone(ISTANBUL_TIMEZONE)
-                .date()
-                .isoformat()
-            )
+            start_date = to_istanbul(now_utc).date().isoformat()
             return render_template(
                 "routines/new.html",
                 projects=projects,
@@ -1403,7 +1393,7 @@ def create_app(data_root: str | Path) -> Flask:
             abort(404)
         try:
             app.config["CSE_BACKUP_SERVICE"].verify_backup(path)
-            modified = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
+            modified = datetime.fromtimestamp(path.stat().st_mtime, UTC)
         except Exception:
             return (
                 render_template(
