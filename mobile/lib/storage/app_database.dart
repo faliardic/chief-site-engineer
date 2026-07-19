@@ -25,7 +25,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 1;
+  static const schemaVersion = 2;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -44,6 +44,138 @@ class AppDatabase {
             created_at TEXT NOT NULL
           )
         ''');
+      },
+    ),
+    DatabaseMigration(
+      version: 2,
+      apply: (transaction) async {
+        await transaction.execute('''
+          CREATE TABLE projects (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            archived_at TEXT
+          )
+        ''');
+        await transaction.execute('''
+          CREATE TABLE field_observations (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES projects(id),
+            observed_at TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            category TEXT NOT NULL CHECK (category IN (
+              'general_note', 'manufacturing', 'inspection',
+              'meeting_decision', 'delivery', 'safety', 'concrete',
+              'issue_delay'
+            )),
+            description TEXT NOT NULL,
+            location TEXT,
+            notes TEXT,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            archived_at TEXT,
+            UNIQUE (id, project_id)
+          )
+        ''');
+        await transaction.execute('''
+          CREATE TABLE observation_events (
+            id TEXT PRIMARY KEY,
+            observation_id TEXT NOT NULL,
+            project_id TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            occurred_at TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            FOREIGN KEY (observation_id, project_id)
+              REFERENCES field_observations(id, project_id)
+          )
+        ''');
+        await transaction.execute('''
+          CREATE TABLE follow_up_items (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES projects(id),
+            observation_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            item_type TEXT NOT NULL CHECK (
+              item_type IN ('action', 'waiting', 'recheck')
+            ),
+            status TEXT NOT NULL CHECK (
+              status IN ('inbox', 'active', 'waiting', 'completed', 'cancelled')
+            ),
+            next_attention_at TEXT,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            completed_at TEXT,
+            cancelled_at TEXT,
+            FOREIGN KEY (observation_id, project_id)
+              REFERENCES field_observations(id, project_id),
+            CHECK (
+              (status = 'inbox' AND next_attention_at IS NULL)
+              OR (status IN ('active', 'waiting') AND next_attention_at IS NOT NULL)
+              OR status IN ('completed', 'cancelled')
+            )
+          )
+        ''');
+        await transaction.execute('''
+          CREATE TABLE follow_up_events (
+            id TEXT PRIMARY KEY,
+            follow_up_id TEXT NOT NULL REFERENCES follow_up_items(id),
+            project_id TEXT NOT NULL,
+            source_observation_id TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            occurred_at TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            FOREIGN KEY (source_observation_id, project_id)
+              REFERENCES field_observations(id, project_id)
+          )
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_observations_agenda_day
+          ON field_observations(observed_at, created_at, id)
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_observations_project_category
+          ON field_observations(project_id, category, observed_at)
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_follow_ups_attention
+          ON follow_up_items(status, next_attention_at, id)
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_follow_ups_observation
+          ON follow_up_items(observation_id, created_at, id)
+        ''');
+        for (final table in ['observation_events', 'follow_up_events']) {
+          await transaction.execute('''
+            CREATE TRIGGER ${table}_append_only_update
+            BEFORE UPDATE ON $table
+            BEGIN
+              SELECT RAISE(ABORT, 'append-only event history');
+            END
+          ''');
+          await transaction.execute('''
+            CREATE TRIGGER ${table}_append_only_delete
+            BEFORE DELETE ON $table
+            BEGIN
+              SELECT RAISE(ABORT, 'append-only event history');
+            END
+          ''');
+        }
+        for (final table in [
+          'projects',
+          'field_observations',
+          'follow_up_items',
+        ]) {
+          await transaction.execute('''
+            CREATE TRIGGER ${table}_no_physical_delete
+            BEFORE DELETE ON $table
+            BEGIN
+              SELECT RAISE(ABORT, 'physical delete is not allowed');
+            END
+          ''');
+        }
       },
     ),
   ];

@@ -60,8 +60,111 @@ void main() {
     expect(restartedRecord.createdAt, firstRecord.createdAt);
     expect(history, [
       {'version': 1, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 2, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
   });
+
+  test('schema 1 upgrades atomically and preserves its smoke record', () async {
+    final versionOne = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => firstClock,
+      migrations: [AppDatabase.foundationMigrations.first],
+    );
+    await versionOne.open();
+    final original = await SmokeRecordRepository(
+      database: versionOne,
+      clock: () => firstClock,
+    ).ensureFoundationRecord();
+    await versionOne.close();
+
+    final upgraded = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => DateTime.utc(2026, 7, 19, 9),
+    );
+    await upgraded.open();
+    final persisted = await SmokeRecordRepository(
+      database: upgraded,
+      clock: () => DateTime.utc(2026, 7, 19, 9),
+    ).ensureFoundationRecord();
+    final version = sqflite.Sqflite.firstIntValue(
+      await upgraded.database.rawQuery('PRAGMA user_version'),
+    );
+    final tables = await upgraded.database.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+    );
+    await upgraded.close();
+
+    expect(version, AppDatabase.schemaVersion);
+    expect(persisted.createdAt, original.createdAt);
+    expect(
+      tables.map((row) => row['name']),
+      containsAll([
+        'projects',
+        'field_observations',
+        'observation_events',
+        'follow_up_items',
+        'follow_up_events',
+      ]),
+    );
+  });
+
+  test(
+    'failed schema 2 upgrade rolls back and preserves schema 1 data',
+    () async {
+      final versionOne = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+        migrations: [AppDatabase.foundationMigrations.first],
+      );
+      await versionOne.open();
+      await SmokeRecordRepository(
+        database: versionOne,
+        clock: () => firstClock,
+      ).ensureFoundationRecord();
+      await versionOne.close();
+
+      final failing = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 9),
+        migrations: [
+          AppDatabase.foundationMigrations.first,
+          DatabaseMigration(
+            version: 2,
+            apply: (transaction) async {
+              await transaction.execute('CREATE TABLE partial_v2 (id TEXT)');
+              throw StateError('intentional v2 failure');
+            },
+          ),
+        ],
+      );
+      await expectLater(failing.open(), throwsA(isA<DatabaseOpenFailure>()));
+
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      final version = sqflite.Sqflite.firstIntValue(
+        await raw.rawQuery('PRAGMA user_version'),
+      );
+      final smokeCount = sqflite.Sqflite.firstIntValue(
+        await raw.rawQuery('SELECT COUNT(*) FROM smoke_records'),
+      );
+      final partialCount = sqflite.Sqflite.firstIntValue(
+        await raw.rawQuery(
+          "SELECT COUNT(*) FROM sqlite_master WHERE name = 'partial_v2'",
+        ),
+      );
+      await raw.close();
+
+      expect(version, 1);
+      expect(smokeCount, 1);
+      expect(partialCount, 0);
+    },
+  );
 
   test('a failed migration rolls back every partial schema write', () async {
     final database = AppDatabase(
@@ -69,7 +172,7 @@ void main() {
       factory: databaseFactoryFfi,
       clock: () => firstClock,
       migrations: [
-        AppDatabase.foundationMigrations.single,
+        AppDatabase.foundationMigrations.first,
         DatabaseMigration(
           version: 2,
           apply: (transaction) async {

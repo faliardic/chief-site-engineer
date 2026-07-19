@@ -59,4 +59,37 @@ void main() {
       );
     }
   });
+
+  test('strict Istanbul local input maps to canonical UTC seconds', () {
+    expect(
+      CseTimeCodec.canonicalFromIstanbulLocal('2026-07-19T00:00'),
+      '2026-07-18T21:00:00Z',
+    );
+    expect(
+      CseTimeCodec.canonicalFromIstanbulLocal('2026-07-19T23:59:58'),
+      '2026-07-19T20:59:58Z',
+    );
+    for (final value in [
+      '2026-02-30T10:00',
+      '2026-07-19 10:00',
+      '2026-07-19T24:00',
+      '2026-07-19T10:00+03:00',
+      ' 2026-07-19T10:00',
+    ]) {
+      expect(
+        () => CseTimeCodec.canonicalFromIstanbulLocal(value),
+        throwsA(isA<TimeContractViolation>()),
+        reason: value,
+      );
+    }
+  });
+
+  test('Istanbul day bounds are inclusive start and exclusive next start', () {
+    final bounds = CseTimeCodec.istanbulDayBounds('2026-07-19');
+
+    expect(bounds.start, '2026-07-18T21:00:00Z');
+    expect(bounds.endExclusive, '2026-07-19T21:00:00Z');
+    expect(CseTimeCodec.shiftIstanbulDay('2026-07-19', -1), '2026-07-18');
+    expect(CseTimeCodec.shiftIstanbulDay('2026-07-19', 1), '2026-07-20');
+  });
 }

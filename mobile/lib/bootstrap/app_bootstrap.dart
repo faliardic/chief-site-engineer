@@ -1,3 +1,4 @@
+import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
@@ -14,11 +15,13 @@ class BootstrapSuccess extends BootstrapResult {
     required this.environmentLabel,
     required this.smokeRecordId,
     required this.smokeRecordCreatedAt,
+    required this.agenda,
   });
 
   final String environmentLabel;
   final String smokeRecordId;
   final String smokeRecordCreatedAt;
+  final AgendaApplication agenda;
 }
 
 class BootstrapFailure extends BootstrapResult {
@@ -73,6 +76,11 @@ class AppBootstrap {
         environmentLabel: environment.label,
         smokeRecordId: smoke.id,
         smokeRecordCreatedAt: smoke.createdAt,
+        agenda: SqliteAgendaApplication(
+          databasePath: directories.databaseFile,
+          databaseFactory: databaseFactory,
+          clock: clock,
+        ),
       );
     } on Object {
       return const BootstrapFailure();

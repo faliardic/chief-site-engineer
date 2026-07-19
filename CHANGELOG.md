@@ -1,5 +1,28 @@
 # Changelog
 
+## Issue #179 - Mobil Ajanda Logu ve Bağlı Hatırlatıcı
+
+- Mobil SQLite schema `1` → `2` atomik migration ile project, Ajanda logu,
+  reminder ve iki append-only event geçmişi source-of-truth tabloları eklendi.
+- Composite project/source foreign key, optimistic revision, hard-delete
+  trigger'ları ve transaction rollback sınırları uygulandı.
+- Ajanda ana navigasyonu günlük log listesi, İstanbul gün navigasyonu,
+  proje/tür/literal filtreler, kart, boş gün ve detay ekranıyla açıldı.
+- Geçmiş log formu strict İstanbul → canonical UTC dönüşümü, future/invalid
+  reddi, input preservation, çift dokunma kilidi ve aynı UUID retry
+  idempotency ile uygulandı.
+- Log kartı ve detayından `action | waiting | recheck` reminder oluşturma;
+  15 dakika, 1 saat, bugün çıkmadan, yarın sabah, Unutma Kutusu ve özel zaman
+  seçenekleri eklendi.
+- Hatırlatıcı navigasyonuna Unutma Kutusu, Bugün, Yaklaşanlar, reminder detayı
+  ve kaynak Ajanda kaydına dönüş bağlantısı eklendi.
+- SQLite işlemleri shell'in eşzamanlı sayfa açılışında güvenli seri kuyruğa
+  alındı; log/reminder row ve creation event aynı transaction'da yazılıyor.
+- Flutter analiz/unit/widget, Android emülatör restart integration, debug APK,
+  unsigned release AAB ve iOS statik config kapıları doğrulandı.
+- Python/Flask, attachment, native notification, Backup/Günlük Çıktı formatı,
+  gerçek kullanıcı verisi ve signing materyali değiştirilmedi.
+
 ## Issue #180 - Flutter Mobil Temel
 
 - `mobile/` altında Flutter `3.44.6` / Dart `3.12.2` tabanlı Android ve iOS

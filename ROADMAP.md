@@ -11,6 +11,10 @@
 cihaz-içi SQLite schema/migration/restart kalıcılığı, UTC/İstanbul sözleşmesi,
 yerel dizinler, güvenli platform portları ve Android build/emülatör smoke
 doğrulaması tamamlandı. Tam mobil özellik dilimleri ve store submission ayrı.
+3B. [x] Release 0.1 mobil Ajanda dilimi 1 — Issue #179 ile cihaz-içi günlük
+log, strict İstanbul zamanı, schema `2`, append-only event geçmişi, logdan
+bağlı reminder, Unutma Kutusu/Bugün/Yaklaşanlar ve çift yönlü deep-link
+uygulandı. Attachment ve native notification sonraki dar dilimlerde kalır.
 
 Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme
 programı Issue #127'dir. Issue #141 / PR #142 ve Issue #143 / PR #144
@@ -21,8 +25,22 @@ Issue #167 / PR #168 saha kabul protokolü ve Issue #169 / PR #170 owner-only
 tehdit modeli merge edilmiştir. Issue #171 / PR #172 Faz 0 closure sonucunu
 `PASS` olarak merge etmiştir. Issue #173 / PR #174 zaman sözleşmesi ve
 migration preflight'ı merge edilmiştir. Tek aktif production işi P1.02
-Issue #175 geriye dönük observation create contract'ıdır. Açık faz Epic'leri
-aynı anda aktif production işleri değildir.
+Issue #179 mobil Ajanda günlük log ve bağlı reminder dilimidir. Açık faz
+Epic'leri aynı anda aktif production işleri değildir.
+
+## Issue 179 - Mobil Ajanda Logu ve Bağlı Hatırlatıcı
+
+- [x] Mobil schema `1` → `2` atomik migration ve eski smoke kaydı korunumu.
+- [x] Project, log, reminder ve iki append-only event tablosu.
+- [x] UTC storage / İstanbul gün sınırı, geçmiş log ve deterministic sıralama.
+- [x] Bugün/önceki/sonraki/tarih seçimi ile proje/tür/literal filtreler.
+- [x] Input-preserving log formu, tek clock okuması, double-tap ve retry koruması.
+- [x] Logdan inbox veya zamanlı action/waiting/recheck reminder oluşturma.
+- [x] Reminder row/source/schedule/event için tek transaction ve rollback.
+- [x] Ajanda–Hatırlatıcı çift yönlü detail navigation.
+- [x] 320 px uzun Türkçe metin ve minimum 44 px dokunma hedefi testi.
+- [x] Android restart/offline integration, debug APK ve release AAB build.
+- [ ] Attachment/fotoğraf ve native notification ayrı sonraki Issue'lardır.
 
 ## Issue #127 Faz Haritası
 

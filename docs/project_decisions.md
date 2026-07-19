@@ -2777,3 +2777,30 @@
 - Python schema `4`, Backup format `1`, restore allowlist `(2,3,4)` ve Günlük
   Çıktı format `1` değiştirilmez; mobil schema veya local export dizini bu
   formatları sessizce genişletmez.
+
+## Issue 179 — Mobil Ajanda Logu ve Bağlı Hatırlatıcı
+
+- Ajanda source-of-truth'u mobil `field_observations`; reminder source-of-truth'u
+  mobil `follow_up_items` olacak. Python tabloları mobil runtime bağımlılığı
+  değil, anlam ve test oracle'ıdır.
+- Mobil schema `2`, schema `1` üzerine tek atomik migration'dır; project, log,
+  reminder ve append-only event tablolarını ekler, smoke verisini korur.
+- Olay zamanı `observed_at`, CSE giriş zamanı `created_at`, son değişiklik
+  `updated_at` olarak ayrı kalır. Storage exact UTC seconds, presentation ve
+  gün sınırı `Europe/Istanbul` olur.
+- Log create ve reminder create immutable command kabul eder; create clock'u
+  yalnız bir kez okunur. Retry boyunca record/event UUID değişmez.
+- Project/source doğrulaması ilk mutation'dan önce tamamlanır. Reminder row,
+  source/project link, schedule ve creation event tek SQLite transaction'dadır.
+- Event geçmişleri update/delete trigger'larıyla append-only; project/log/
+  reminder fiziksel silme trigger'larıyla korunur. Revision `1` ile başlar.
+- Ajanda sırası `observed_at ASC, created_at ASC, id ASC`; arama SQLite wildcard
+  semantiği kullanmadan `instr` ile literal çalışır.
+- Aynı application service'in SQLite açılışları shell sayfalarının eşzamanlı
+  init yarışını önlemek için seri kuyruğa alınır; transaction atomikliği korunur.
+- Ajanda ve Hatırlatıcı ekranları aynı Dart application sözleşmesini Android ve
+  iOS'ta kullanır; Flask route, network veya Python runtime çağrısı yoktur.
+- Attachment/fotoğraf, OS notification delivery, tam edit/archive ve tam
+  reminder lifecycle bu Issue'ya eklenmez.
+- Python schema `4`, Backup format `1`, restore allowlist `(2,3,4)` ve Günlük
+  Çıktı format `1` değişmez; mobil schema `2` ayrı namespace'tir.

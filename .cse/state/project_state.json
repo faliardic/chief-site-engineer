@@ -1,22 +1,22 @@
 {
   "state_version": 2,
   "legacy_last_numbered_step": 225,
-  "current_issue": 180,
+  "current_issue": 179,
   "base_branch": "master",
-  "base_commit": "fef480dc32ec5dabf4dca9394c46c519b7097886",
+  "base_commit": "0e081f2c8616f990d56c6fe60f746dd4a5bc7f6d",
   "active_work": {
-    "issue": 180,
-    "type": "release_01_flutter_mobile_foundation",
+    "issue": 179,
+    "type": "release_01_mobile_agenda_log_reminder_slice",
     "issue_state": "active",
     "review_status": "local_verified_not_yet_published",
     "release_epic": 176,
     "mobile_epic": 131,
     "product_epic": 105,
-    "branch": "codex/issue-180-release-01-mobile-foundation",
-    "base_commit": "fef480dc32ec5dabf4dca9394c46c519b7097886",
+    "branch": "codex/issue-179-mobile-agenda-log-reminder-slice",
+    "base_commit": "0e081f2c8616f990d56c6fe60f746dd4a5bc7f6d",
     "commit_strategy": "one_ordinary_commit_without_amend_rebase_or_force_push",
     "schema_version": 4,
-    "mobile_schema_version": 1,
+    "mobile_schema_version": 2,
     "backup_format_version": 1,
     "memory_download_format_version": null,
     "project_package_format_version": null,
@@ -30,6 +30,9 @@
     "production_behavior_changed": true,
     "schema_migration_added_or_run_on_user_data": false,
     "mobile_local_sqlite_foundation_added": true,
+    "mobile_agenda_log_slice_added": true,
+    "mobile_linked_reminder_slice_added": true,
+    "mobile_schema_1_to_2_migration_added": true,
     "mobile_migrations_atomic": true,
     "mobile_restart_smoke_persistence": true,
     "mobile_storage_timestamp_precision": "utc_seconds",
@@ -46,30 +49,33 @@
     "real_user_data_root_accessed": false,
     "merge_claim": false,
     "pull_request_created": false,
-    "flutter_test_summary": "19 passed",
+    "flutter_test_summary": "38 passed",
     "android_integration_test_summary": "1 passed",
-    "full_test_summary": "1001 passed, 7 skipped in 30.46s",
+    "full_test_summary": "1001 passed, 7 skipped",
     "compileall_passed": true,
     "state_json_valid": true,
     "diff_check_passed": true,
     "protected_path_diff_empty": true,
     "local_verification_status": "passed",
-    "publication_status": "not_yet_committed_or_pushed"
+    "publication_status": "not_yet_committed_or_pushed",
+    "python_or_flask_changed": false,
+    "attachment_binding_added": false,
+    "native_notification_delivery_added": false
   },
   "current_safe_point": {
     "semantics": "latest_merged_finalized_checkpoint",
-    "issue": 175,
+    "issue": 180,
     "issue_state": "completed",
-    "pull_request": 178,
+    "pull_request": 181,
     "pull_request_state": "merged",
-    "merge_commit": "fef480dc32ec5dabf4dca9394c46c519b7097886",
-    "local_test_summary": "1001 passed, 7 skipped (Issue #175 backdated observation create contract)"
+    "merge_commit": "0e081f2c8616f990d56c6fe60f746dd4a5bc7f6d",
+    "local_test_summary": "Flutter 19 passed, Android integration 1 passed, Python 1001 passed / 7 skipped (Issue #180 mobile foundation)"
   },
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
-    "local_master_sha": "fef480dc32ec5dabf4dca9394c46c519b7097886",
-    "origin_master_sha": "fef480dc32ec5dabf4dca9394c46c519b7097886",
+    "local_master_sha": "0e081f2c8616f990d56c6fe60f746dd4a5bc7f6d",
+    "origin_master_sha": "0e081f2c8616f990d56c6fe60f746dd4a5bc7f6d",
     "divergence": "0 0",
     "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
     "misspelled_workspace_present": false,
@@ -251,6 +257,11 @@
       "model": "standart full Codex",
       "reasoning": "extra_high",
       "reason": "explicit_user_and_issue_selection_for_flutter_android_ios_local_sqlite_atomic_migrations_timezone_platform_permissions_builds_and_cross_runtime_regressions"
+    },
+    "issue_179_selection": {
+      "model": "standart full Codex",
+      "reasoning": "extra_high",
+      "reason": "explicit_user_and_issue_selection_for_flutter_mobile_agenda_schema_migration_atomic_log_reminder_transactions_offline_ui_and_cross_runtime_regressions"
     }
   },
   "required_source_pre_read": {
@@ -266,6 +277,14 @@
       "project_instructions": true,
       "github_issue_180_with_all_comments": true,
       "task_180": true,
+      "new_chat_bootstrap": false
+    },
+    "issue_179_sources_read": {
+      "unified_project_source": true,
+      "project_instructions": true,
+      "github_issue_179_with_all_comments": true,
+      "task_179": true,
+      "issue_180_mobile_foundation": true,
       "new_chat_bootstrap": false
     },
     "step_207_sources_read": {
@@ -1455,12 +1474,12 @@
     }
   },
   "protected_paths": {
-    "app_models_and_legacy_tests": "must_remain_unchanged_in_issue_175",
-    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_175",
-    "web_form_templates_routes_launcher_and_server_binding": "must_remain_behaviorally_unchanged_except_create_command_wiring_in_issue_175",
-    "backup_and_export_production": "must_remain_unchanged_in_issue_175",
-    ".github/workflows": "must_remain_unchanged_in_issue_175",
-    "requirements.txt_and_pyproject.toml": "must_remain_unchanged_in_issue_175",
+    "python_app_and_tests": "must_remain_unchanged_in_issue_179",
+    "python_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_179",
+    "web_form_templates_routes_launcher_and_server_binding": "must_remain_unchanged_in_issue_179",
+    "backup_and_export_production": "must_remain_unchanged_in_issue_179",
+    ".github/workflows": "must_remain_unchanged_in_issue_179",
+    "requirements.txt_and_pyproject.toml": "must_remain_unchanged_in_issue_179",
     "reports": "user_files_preserved_untracked_and_unchanged",
     "exports/.gitkeep": "must_remain_present_and_unchanged",
     "ignored_zip_and_cache": "must_remain_unchanged"
@@ -1477,21 +1496,23 @@
     "pull_request_creation_by_codex": false,
     "merge_authorized": false,
     "branch_deletion_authorized": false,
-    "final_remote_sha_evidence_location": "GitHub Issue #175 completion comment after push"
+    "final_remote_sha_evidence_location": "GitHub Issue #179 completion comment after push"
   },
   "required_files": [
     "ROADMAP.md",
     "CHANGELOG.md",
     "docs/project_decisions.md",
-    "app/application/observations.py",
-    "app/application/__init__.py",
-    "tests/test_observation_application_service.py",
-    "docs/175_backdated_observation_create_contract.md",
-    "learning/175_backdated_observation_create_contract.md",
+    "mobile/lib/application/agenda_application.dart",
+    "mobile/lib/domain/agenda_models.dart",
+    "mobile/lib/features/agenda/agenda_page.dart",
+    "mobile/lib/features/reminders/reminders_page.dart",
+    "mobile/lib/storage/app_database.dart",
+    "docs/179_release_01_mobile_agenda_log_reminder_slice.md",
+    "learning/179_release_01_mobile_agenda_log_reminder_slice.md",
     ".cse/state/project_state.json",
-    ".cse/tasks/175_task.md",
-    ".cse/results/175_result.md"
+    ".cse/tasks/179_task.md",
+    ".cse/results/179_result.md"
   ],
-  "workflow_status": "issue_175_local_verified_not_yet_published",
+  "workflow_status": "issue_179_local_verified_not_yet_published",
   "forbidden_scope_added": false
 }
