@@ -26,6 +26,7 @@ from app.application import (
     CloseRoutineOccurrence,
     CompleteFollowUp,
     CreateFollowUp,
+    CreateObservation,
     CreateRoutineTemplate,
     FollowUpApplicationService,
     FollowUpQuery,
@@ -1132,12 +1133,14 @@ def create_app(data_root: str | Path) -> Flask:
                 upload = UploadStream(uploaded.stream, uploaded.filename)
             try:
                 observation = service().create_observation(
-                    request.form.get("project_id", ""),
-                    request.form.get("location", ""),
-                    request.form.get("category", ""),
-                    request.form.get("description", ""),
-                    request.form.get("notes") or None,
-                    upload,
+                    CreateObservation(
+                        project_id=request.form.get("project_id", ""),
+                        location=request.form.get("location", ""),
+                        category=request.form.get("category", ""),
+                        description=request.form.get("description", ""),
+                        notes=request.form.get("notes") or None,
+                        upload=upload,
+                    )
                 )
                 return redirect(
                     url_for("observation_detail", observation_id=observation.observation_id)

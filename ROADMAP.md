@@ -15,9 +15,10 @@ kayıt kapsamı, Issue #147 / PR #159 `MemoryIndex / RecordRef` read-model,
 Issue #148 / PR #164 çıktı aileleri, Issue #165 / PR #166 legacy envanteri,
 Issue #167 / PR #168 saha kabul protokolü ve Issue #169 / PR #170 owner-only
 tehdit modeli merge edilmiştir. Issue #171 / PR #172 Faz 0 closure sonucunu
-`PASS` olarak merge etmiştir. Tek aktif production işi Faz 1'in ilk dar dilimi
-Issue #173 zaman sözleşmesi ve migration preflight'tır. Açık faz Epic'leri aynı
-anda aktif production işleri değildir.
+`PASS` olarak merge etmiştir. Issue #173 / PR #174 zaman sözleşmesi ve
+migration preflight'ı merge edilmiştir. Tek aktif production işi P1.02
+Issue #175 geriye dönük observation create contract'ıdır. Açık faz Epic'leri
+aynı anda aktif production işleri değildir.
 
 ## Issue #127 Faz Haritası
 
@@ -37,7 +38,8 @@ anda aktif production işleri değildir.
 
 Issue #141–#169 arasındaki P0.01–P0.09 işleri merged kanıta sahiptir. Issue #171
 / PR #172 bu kanıtları repository truth ile uzlaştırmış ve P0.10'u kapatmıştır.
-Sıradaki tek faz Issue #129'dur; P1.01 Issue #173 ile başlamıştır.
+Sıradaki tek faz Issue #129'dur; P1.01 Issue #173 / PR #174 ile tamamlanmış,
+P1.02 Issue #175 ile başlamıştır.
 
 ## Issue 173 - Olay Zamanı Sözleşmesi ve Migration Preflight
 
@@ -55,7 +57,27 @@ Sıradaki tek faz Issue #129'dur; P1.01 Issue #173 ile başlamıştır.
   veri-minimal JSON-ready sözleşmeyle doğrulandı.
 - [x] Database byte değişmezliği ve hassas içerik sızıntısı yokluğu test edildi.
 - [x] Schema, migration zinciri, Backup v1 ve Günlük Çıktı v1 değiştirilmedi.
-- [ ] P1.02 geriye dönük observation create contract'ı ayrı Issue bekler.
+- [x] P1.02 geriye dönük observation create contract'ı Issue #175 ile
+  başlatıldı.
+
+## Issue 175 - Geriye Dönük Observation Create Contract
+
+- [x] Observation create girdisi frozen `CreateObservation` command nesnesine
+  taşındı.
+- [x] Optional explicit geçmiş `observed_at` strict canonical UTC seconds ve
+  `TimestampRole.EVENT_TIME` future policy ile doğrulandı.
+- [x] Omitted `observed_at` tek canonical clock değerini kullanıyor.
+- [x] Tek clock okuması observation `created_at/updated_at`, created event
+  `occurred_at` ve attachment metadata `created_at` alanlarına bağlandı.
+- [x] Created event payload'ında `observed_at` ile `created_at` açıkça ayrıldı.
+- [x] Invalid/future command staging, UUID tüketimi ve database/event
+  mutation'dan önce fail-closed duruyor.
+- [x] Existing finalize, event failure, commit failure, rollback ve
+  reconciliation davranışı korundu.
+- [x] Web, acceptance, CLI, Backup/Restore ve Günlük Çıktı geriye uyumluluğu
+  executable regresyonlarla korundu.
+- [x] Schema/migration/repository, yeni form/route, Ajanda UI, archive/scope,
+  MemoryIndex, mobile/offline/notification/security kapsamı başlatılmadı.
 
 ## Faz 0 Kanonik ADR İndeksi
 

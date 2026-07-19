@@ -10,6 +10,7 @@ import pytest
 from app.application import (
     CloseRoutineOccurrence,
     CreateFollowUp,
+    CreateObservation,
     CreateRoutineTemplate,
     FollowUpApplicationService,
     ObservationApplicationService,
@@ -46,12 +47,14 @@ def seed_observation(root: Path, observed_at: str = "2026-07-12T21:30:00Z") -> s
     )
     project = service.create_project("Ornek | Santiye")
     observation = service.create_observation(
-        project.project_id,
-        "A Blok",
-        "quality",
-        "Kalip | kontrolu\nikinci satir",
-        "Not",
-        UploadStream(io.BytesIO(b"photo-bytes"), "saha.jpg"),
+        CreateObservation(
+            project_id=project.project_id,
+            location="A Blok",
+            category="quality",
+            description="Kalip | kontrolu\nikinci satir",
+            notes="Not",
+            upload=UploadStream(io.BytesIO(b"photo-bytes"), "saha.jpg"),
+        )
     )
     return observation.observation_id
 
@@ -296,7 +299,12 @@ def test_daily_export_includes_edited_details_revision_and_event(tmp_path: Path)
     )
     project = service.create_project("Örnek")
     observation = service.create_observation(
-        project.project_id, "A", "quality", "Eski açıklama", None, None
+        CreateObservation(
+            project_id=project.project_id,
+            location="A",
+            category="quality",
+            description="Eski açıklama",
+        )
     )
     service.update_observation_details(
         observation.observation_id,

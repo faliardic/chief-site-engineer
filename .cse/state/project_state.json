@@ -1,20 +1,20 @@
 {
   "state_version": 2,
   "legacy_last_numbered_step": 225,
-  "current_issue": 173,
+  "current_issue": 175,
   "base_branch": "master",
-  "base_commit": "16dfec0e0eec76bea2370781c52f63c74ae91b96",
+  "base_commit": "45dc4a6d473792d39b0cf1cfea7a5baa47c51c18",
   "active_work": {
-    "issue": 173,
-    "type": "phase_1_time_contract_and_read_only_migration_preflight",
+    "issue": 175,
+    "type": "phase_1_backdated_observation_create_contract",
     "issue_state": "active",
     "review_status": "local_verified_not_yet_published",
     "binding_execution_epic": 127,
     "binding_phase_epic": 129,
     "product_epic": 105,
     "field_tracking_epic": 97,
-    "branch": "codex/issue-173-p1-01-time-contract-migration-preflight",
-    "base_commit": "16dfec0e0eec76bea2370781c52f63c74ae91b96",
+    "branch": "codex/issue-175-p1-02-backdated-observation-create-contract",
+    "base_commit": "45dc4a6d473792d39b0cf1cfea7a5baa47c51c18",
     "commit_strategy": "one_ordinary_commit_without_amend_rebase_or_force_push",
     "schema_version": 4,
     "backup_format_version": 1,
@@ -24,12 +24,14 @@
     "restorable_schema_versions": [2, 3, 4],
     "production_behavior_changed": true,
     "schema_migration_added_or_run_on_user_data": false,
-    "preflight_database_kinds": ["temporary", "test"],
-    "preflight_read_only": true,
+    "explicit_observed_at_supported": true,
+    "new_write_timestamp_precision": "utc_seconds",
+    "single_create_clock_read": true,
+    "temporal_validation_before_mutation": true,
     "real_user_data_root_accessed": false,
     "merge_claim": false,
     "pull_request_created": false,
-    "full_test_summary": "997 passed, 7 skipped in 28.73s",
+    "full_test_summary": "1001 passed, 7 skipped in 23.09s",
     "compileall_passed": true,
     "state_json_valid": true,
     "diff_check_passed": true,
@@ -39,18 +41,18 @@
   },
   "current_safe_point": {
     "semantics": "latest_merged_finalized_checkpoint",
-    "issue": 171,
+    "issue": 173,
     "issue_state": "completed",
-    "pull_request": 172,
+    "pull_request": 174,
     "pull_request_state": "merged",
-    "merge_commit": "16dfec0e0eec76bea2370781c52f63c74ae91b96",
-    "local_test_summary": "983 passed, 7 skipped in 22.31s (Issue #171 Phase 0 closure validation)"
+    "merge_commit": "45dc4a6d473792d39b0cf1cfea7a5baa47c51c18",
+    "local_test_summary": "997 passed, 7 skipped in 28.73s (Issue #173 time contract and migration preflight)"
   },
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
-    "local_master_sha": "16dfec0e0eec76bea2370781c52f63c74ae91b96",
-    "origin_master_sha": "16dfec0e0eec76bea2370781c52f63c74ae91b96",
+    "local_master_sha": "45dc4a6d473792d39b0cf1cfea7a5baa47c51c18",
+    "origin_master_sha": "45dc4a6d473792d39b0cf1cfea7a5baa47c51c18",
     "divergence": "0 0",
     "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
     "misspelled_workspace_present": false,
@@ -222,6 +224,11 @@
       "model": "standart full Codex",
       "reasoning": "high",
       "reason": "explicit_user_and_issue_selection_for_narrow_canonical_time_contract_read_only_schema_2_3_4_preflight_and_regression_matrix"
+    },
+    "issue_175_selection": {
+      "model": "standart full Codex",
+      "reasoning": "high",
+      "reason": "explicit_user_and_issue_selection_for_narrow_immutable_observation_create_command_backdated_event_time_single_clock_fail_closed_mutation_boundary_and_regression_matrix"
     }
   },
   "required_source_pre_read": {
@@ -695,6 +702,16 @@
             "readme_roadmap_changelog_project_decisions_and_project_state": true,
             "production_test_schema_backup_export_and_web_surfaces_read_only": true,
             "task_171": true
+        },
+        "issue_175_sources_read": {
+            "unified_project_source": true,
+            "project_instructions": true,
+            "github_issue_175_with_all_comments": true,
+            "merged_pr_174_dependency": true,
+            "issue_173_time_contract_and_preflight": true,
+            "observation_application_service_and_tests": true,
+            "web_acceptance_cli_backup_restore_and_daily_export_surfaces": true,
+            "task_175": true
         },
     "unresolved_conflict_found": false
   },
@@ -1409,12 +1426,12 @@
     }
   },
   "protected_paths": {
-    "app_and_tests": "must_remain_unchanged_in_issue_171_phase_zero_closure",
-    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_171",
-    "web_launcher_server_binding_session_routes_and_cli": "must_remain_unchanged_in_issue_171",
-    "backup_and_export_production": "must_remain_unchanged_in_issue_171",
-    ".github/workflows": "must_remain_unchanged_in_issue_171",
-    "requirements.txt_and_pyproject.toml": "must_remain_unchanged_in_issue_171",
+    "app_models_and_legacy_tests": "must_remain_unchanged_in_issue_175",
+    "app_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_175",
+    "web_form_templates_routes_launcher_and_server_binding": "must_remain_behaviorally_unchanged_except_create_command_wiring_in_issue_175",
+    "backup_and_export_production": "must_remain_unchanged_in_issue_175",
+    ".github/workflows": "must_remain_unchanged_in_issue_175",
+    "requirements.txt_and_pyproject.toml": "must_remain_unchanged_in_issue_175",
     "reports": "user_files_preserved_untracked_and_unchanged",
     "exports/.gitkeep": "must_remain_present_and_unchanged",
     "ignored_zip_and_cache": "must_remain_unchanged"
@@ -1431,21 +1448,21 @@
     "pull_request_creation_by_codex": false,
     "merge_authorized": false,
     "branch_deletion_authorized": false,
-    "final_remote_sha_evidence_location": "GitHub Issue #171 completion comment after push"
+    "final_remote_sha_evidence_location": "GitHub Issue #175 completion comment after push"
   },
   "required_files": [
-    "README.md",
     "ROADMAP.md",
     "CHANGELOG.md",
     "docs/project_decisions.md",
-    "docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md",
-    "docs/protocols/CSE_PROJECT_INSTRUCTIONS.md",
-    "docs/171_phase_0_closure_validation.md",
-    "learning/171_phase_0_closure_validation.md",
+    "app/application/observations.py",
+    "app/application/__init__.py",
+    "tests/test_observation_application_service.py",
+    "docs/175_backdated_observation_create_contract.md",
+    "learning/175_backdated_observation_create_contract.md",
     ".cse/state/project_state.json",
-    ".cse/tasks/171_task.md",
-    ".cse/results/171_result.md"
+    ".cse/tasks/175_task.md",
+    ".cse/results/175_result.md"
   ],
-  "workflow_status": "issue_171_local_verified_not_yet_published",
+  "workflow_status": "issue_175_local_verified_not_yet_published",
   "forbidden_scope_added": false
 }

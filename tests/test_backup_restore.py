@@ -13,6 +13,7 @@ import app.operations.backups as backups_module
 from app.application import (
     CloseRoutineOccurrence,
     CreateFollowUp,
+    CreateObservation,
     CreateRoutineTemplate,
     FollowUpApplicationService,
     ObservationApplicationService,
@@ -419,12 +420,13 @@ def seed(root: Path) -> tuple[str, str]:
     )
     project = service.create_project("Ornek")
     observation = service.create_observation(
-        project.project_id,
-        "A",
-        "quality",
-        "Kontrol",
-        None,
-        UploadStream(io.BytesIO(b"backup-photo"), "photo.jpg"),
+        CreateObservation(
+            project_id=project.project_id,
+            location="A",
+            category="quality",
+            description="Kontrol",
+            upload=UploadStream(io.BytesIO(b"backup-photo"), "photo.jpg"),
+        )
     )
     detail = service.get_observation_detail(observation.observation_id)
     return observation.observation_id, detail.attachments[0].metadata.attachment_id
@@ -491,7 +493,12 @@ def test_backup_restore_preserves_edited_revision_and_event(tmp_path: Path) -> N
     )
     project = service.create_project("Örnek")
     observation = service.create_observation(
-        project.project_id, "A", "quality", "Eski açıklama", None, None
+        CreateObservation(
+            project_id=project.project_id,
+            location="A",
+            category="quality",
+            description="Eski açıklama",
+        )
     )
     service.update_observation_details(
         observation.observation_id,

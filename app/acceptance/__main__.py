@@ -7,7 +7,11 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
-from app.application import ObservationApplicationService, UploadStream
+from app.application import (
+    CreateObservation,
+    ObservationApplicationService,
+    UploadStream,
+)
 from app.operations import BackupService, DailyExportService
 from app.storage import ManagedAttachmentStore
 from app.web import create_app
@@ -31,12 +35,13 @@ def process_a(data_root: Path, handoff_path: Path) -> dict[str, object]:
     service = _service(data_root, clock=lambda: next(times))
     project = service.create_project("Subprocess Santiye")
     observation = service.create_observation(
-        project.project_id,
-        "A Blok",
-        "quality",
-        "Subprocess kontrolu",
-        None,
-        UploadStream(io.BytesIO(PHOTO_BYTES), "photo.jpg"),
+        CreateObservation(
+            project_id=project.project_id,
+            location="A Blok",
+            category="quality",
+            description="Subprocess kontrolu",
+            upload=UploadStream(io.BytesIO(PHOTO_BYTES), "photo.jpg"),
+        )
     )
     detail = service.get_observation_detail(observation.observation_id)
     attachment = detail.attachments[0].metadata

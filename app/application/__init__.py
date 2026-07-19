@@ -3,6 +3,7 @@
 from .observations import (
     ApplicationServiceError,
     AttachmentDetail,
+    CreateObservation,
     ObservationApplicationService,
     ObservationDetail,
     UploadStream,
@@ -33,6 +34,7 @@ __all__ = [
     "CloseRoutineOccurrence",
     "CompleteFollowUp",
     "CreateFollowUp",
+    "CreateObservation",
     "CreateRoutineTemplate",
     "FollowUpApplicationService",
     "FollowUpQuery",

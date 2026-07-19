@@ -2717,3 +2717,25 @@
   content veya database path sızdırmaz.
 - Schema `4`, Backup format `1`, restore allowlist `(2,3,4)` ve Günlük Çıktı
   format `1` değişmez. P1.02, archive/unarchive ve MemoryIndex ayrı Issue'dur.
+
+## Issue 175 — Geriye Dönük Observation Create Contract
+
+- Observation create application sınırı, UI/transport alanları yerine frozen
+  `CreateObservation` command value object kabul edecek.
+- `observed_at` olayın sahada gerçekleştiği an; `created_at` kaydın CSE'ye
+  kalıcı giriş anıdır. Explicit geçmiş olay zamanı entry time ile ezilmeyecek.
+- Omitted `observed_at`, create işleminin tek canonical clock okumasına eşit
+  olacak. Aynı clock değeri `created_at`, `updated_at`, created event
+  `occurred_at` ve attachment metadata `created_at` için kullanılacak.
+- Yeni write girdisi yalnız UTC seconds `YYYY-MM-DDTHH:MM:SSZ` kabul edecek;
+  legacy six-microsecond read compatibility yeni command write izni değildir.
+- `TimestampRole.EVENT_TIME` future policy, UUID üretimi, attachment staging ve
+  Unit of Work açılmadan önce uygulanacak.
+- `observation_created` payload'ı `attachment_ids`, `revision`, `status`,
+  `observed_at` ve `created_at` alanlarını taşıyarak olay/entry ayrımını sonraki
+  Ajanda projection'ları için kayıpsız koruyacak.
+- Existing attachment finalize ile SQLite commit sırası ve hata sonrası
+  cleanup/reconciliation davranışı değişmeyecek.
+- Schema/migration/repository, Backup/Günlük Çıktı wire formatı, yeni web formu,
+  route, Ajanda UI, archive/scope, MemoryIndex ve security bu Issue'ya
+  eklenmeyecek.

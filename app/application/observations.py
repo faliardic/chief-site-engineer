@@ -15,6 +15,7 @@ from app.persistence import (
     ProjectRecord,
     SQLiteUnitOfWork,
     serialize_event_payload,
+    validate_record_id,
 )
 from app.storage import (
     AttachmentStoreError,
@@ -22,7 +23,13 @@ from app.storage import (
     ManagedAttachmentStore,
     StagedAttachment,
 )
-from app.time_contracts import utc_now
+from app.time_contracts import (
+    TimestampRole,
+    parse_utc_timestamp,
+    serialize_utc_timestamp,
+    utc_now,
+    validate_temporal_policy,
+)
 
 
 MAX_SEARCH_QUERY_LENGTH = 200
@@ -33,6 +40,31 @@ EDITABLE_DETAIL_FIELDS = ("location", "category", "description", "notes")
 class UploadStream:
     binary_stream: BinaryIO
     original_name: str
+
+
+@dataclass(frozen=True, slots=True)
+class CreateObservation:
+    project_id: str
+    location: str
+    category: str
+    description: str
+    notes: str | None = None
+    upload: UploadStream | None = None
+    observed_at: str | None = None
+
+    def __post_init__(self) -> None:
+        try:
+            validate_record_id(self.project_id)
+        except ValueError as exc:
+            raise ValueError(f"project_id: {exc}") from exc
+        for field_name in ("location", "category", "description"):
+            _validate_required_text(getattr(self, field_name), field_name)
+        if self.notes is not None and not isinstance(self.notes, str):
+            raise ValueError("notes must be a string or None")
+        if self.upload is not None and not isinstance(self.upload, UploadStream):
+            raise TypeError("upload must be UploadStream or None")
+        if self.observed_at is not None:
+            _validate_canonical_utc_seconds(self.observed_at, "observed_at")
 
 
 @dataclass(frozen=True)
@@ -107,36 +139,40 @@ class ObservationApplicationService:
 
     def create_observation(
         self,
-        project_id: str,
-        location: str,
-        category: str,
-        description: str,
-        notes: str | None,
-        upload: UploadStream | None,
+        command: CreateObservation,
     ) -> FieldObservationRecord:
+        if not isinstance(command, CreateObservation):
+            raise TypeError("command must be CreateObservation")
+        created_at = self._now()
+        observed_at = command.observed_at or created_at
+        validate_temporal_policy(
+            observed_at,
+            role=TimestampRole.EVENT_TIME,
+            as_of_utc=created_at,
+        )
+
         observation_id = self._new_id()
         staged: StagedAttachment | None = None
-        if upload is not None:
+        if command.upload is not None:
             attachment_id = self._new_id()
             staged = self.attachment_store.stage_stream(
-                upload.binary_stream,
-                upload.original_name,
+                command.upload.binary_stream,
+                command.upload.original_name,
                 observation_id,
                 attachment_id,
             )
 
-        occurred_at = self._clock()
         observation = FieldObservationRecord(
             observation_id=observation_id,
-            project_id=project_id,
-            observed_at=occurred_at,
-            location=location,
-            category=category,
-            description=description,
-            notes=notes or None,
+            project_id=command.project_id,
+            observed_at=observed_at,
+            location=command.location,
+            category=command.category,
+            description=command.description,
+            notes=command.notes or None,
             created_by=self._local_actor,
-            created_at=occurred_at,
-            updated_at=occurred_at,
+            created_at=created_at,
+            updated_at=created_at,
         )
         finalized = False
         try:
@@ -146,15 +182,17 @@ class ObservationApplicationService:
                 if staged is not None:
                     attachment_ids.append(staged.attachment_id)
                     unit_of_work.attachments.add(
-                        self._attachment_record(staged, occurred_at)
+                        self._attachment_record(staged, created_at)
                     )
                 unit_of_work.events.add(
                     self._event(
                         observation_id,
                         "observation_created",
-                        occurred_at,
+                        created_at,
                         {
                             "attachment_ids": attachment_ids,
+                            "created_at": created_at,
+                            "observed_at": observed_at,
                             "revision": observation.revision,
                             "status": observation.status,
                         },
@@ -400,6 +438,10 @@ class ObservationApplicationService:
     def _new_id(self) -> str:
         return str(self._uuid_factory())
 
+    def _now(self) -> str:
+        value = self._clock()
+        return _validate_canonical_utc_seconds(value, "clock")
+
     def _is_staging_present(self, staged: StagedAttachment) -> bool:
         report = self.attachment_store.reconcile([])
         return staged.staging_relative_path in report.stale_staging_files
@@ -410,3 +452,20 @@ def _search_key(value: str) -> str:
 
     decomposed = unicodedata.normalize("NFKD", value).casefold()
     return decomposed.replace("\u0307", "").replace("ı", "i")
+
+
+def _validate_required_text(value: object, field_name: str) -> None:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field_name} must be a non-empty string")
+
+
+def _validate_canonical_utc_seconds(value: object, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be a string")
+    try:
+        parsed = parse_utc_timestamp(value)
+    except ValueError as exc:
+        raise ValueError(f"{field_name}: {exc}") from exc
+    if serialize_utc_timestamp(parsed) != value:
+        raise ValueError(f"{field_name} must use canonical UTC seconds")
+    return value

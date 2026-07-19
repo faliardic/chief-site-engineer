@@ -1456,4 +1456,12 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 
 `Restart Acceptance`: Uygulama nesnesi kapatılıp aynı data root ile yeniden oluşturulduğunda kayıt, revision ve event geçmişinin aynı SQLite verisinden geri okunabildiğini doğrulayan kabul testidir.
 
+`Command Object (Komut Nesnesi)`: Bir application kullanım senaryosuna ait girdileri tek, açık ve doğrulanabilir nesnede toplayan değer nesnesidir. `CreateObservation`, observation create alanları ile optional olay zamanını taşır.
+
+`Event Time (Olay Zamanı)`: Kayda konu olan olayın sahada gerçekten gerçekleştiği andır. Observation için `observed_at` bu anlamı taşır ve geriye dönük olabilir.
+
+`Entry Time (Giriş Zamanı)`: Bir kaydın CSE'ye ilk kez kalıcı olarak yazıldığı andır. Observation create işleminde `created_at`, `updated_at`, created event `occurred_at` ve attachment metadata `created_at` aynı giriş zamanından üretilir.
+
+`Single Clock Read (Tek Saat Okuması)`: Tek bir application işlemi içinde saatin yalnız bir kez okunup bütün ilgili timestamp alanlarında aynı snapshot'ın kullanılmasıdır. Böylece birkaç mikrosaniyelik veya test kaynaklı zaman ayrışmaları önlenir.
+
 `İlk Test Edilebilir PC Sürümü`: Ürünün bütün uzun vadeli özelliklerini tamamlamadan, gerçek kullanıcının bilgisayarda temel uçtan uca akışı deneyebildiği dar ve doğrulanmış sürümdür. Issue #119 sürümü mobile/PWA/offline/sync/notification/auth içermez.

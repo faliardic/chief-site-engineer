@@ -1,13 +1,16 @@
 import io
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
 
 from app.application import (
     ApplicationServiceError,
+    CreateObservation,
     ObservationApplicationService,
     UploadStream,
 )
+from app.models import FieldObservationRecord
 from app.persistence import InvalidRecordError, RevisionConflict, SQLiteUnitOfWork
 from app.persistence.repositories import (
     SQLiteAttachmentMetadataRepository,
@@ -25,6 +28,8 @@ EVENT_IDS = [
     "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
     "ffffffff-ffff-4fff-8fff-ffffffffffff",
 ]
+
+
 def make_service(tmp_path: Path, ids: list[str]) -> ObservationApplicationService:
     values = iter(ids)
     return ObservationApplicationService(
@@ -36,10 +41,32 @@ def make_service(tmp_path: Path, ids: list[str]) -> ObservationApplicationServic
     )
 
 
+def create_observation(
+    service: ObservationApplicationService,
+    project_id: str,
+    location: str,
+    category: str,
+    description: str,
+    notes: str | None,
+    upload: UploadStream | None,
+) -> FieldObservationRecord:
+    return service.create_observation(
+        CreateObservation(
+            project_id=project_id,
+            location=location,
+            category=category,
+            description=description,
+            notes=notes,
+            upload=upload,
+        )
+    )
+
+
 def test_project_and_observation_persist_with_created_event(tmp_path: Path) -> None:
     service = make_service(tmp_path, [PROJECT_ID, OBSERVATION_ID, EVENT_IDS[0]])
     project = service.create_project("Ornek Santiye")
-    observation = service.create_observation(
+    observation = create_observation(
+        service,
         project.project_id, "A Blok", "quality", "Kalip kontrolu", "Not", None
     )
 
@@ -53,8 +80,163 @@ def test_project_and_observation_persist_with_created_event(tmp_path: Path) -> N
     assert detail.observation.description == "Kalip kontrolu"
     assert detail.events[0].event_type == "observation_created"
     assert detail.events[0].payload == {
-        "attachment_ids": [], "revision": 1, "status": "open"
+        "attachment_ids": [],
+        "created_at": "2026-07-13T09:00:00Z",
+        "observed_at": "2026-07-13T09:00:00Z",
+        "revision": 1,
+        "status": "open",
     }
+
+
+def test_create_command_is_immutable_and_rejects_noncanonical_event_time() -> None:
+    command = CreateObservation(
+        project_id=PROJECT_ID,
+        location="A Blok",
+        category="quality",
+        description="Kontrol",
+    )
+
+    with pytest.raises(FrozenInstanceError):
+        command.location = "B Blok"  # type: ignore[misc]
+
+    invalid_values = (
+        "2026-07-13T09:00:00",
+        "2026-07-13T09:00:00+00:00",
+        "2026-07-13T09:00:00.000001Z",
+        "not-a-timestamp",
+    )
+    for value in invalid_values:
+        with pytest.raises(ValueError, match="observed_at"):
+            CreateObservation(
+                project_id=PROJECT_ID,
+                location="A Blok",
+                category="quality",
+                description="Kontrol",
+                observed_at=value,
+            )
+
+
+def test_omitted_observed_at_uses_one_clock_read_for_all_create_times(
+    tmp_path: Path,
+) -> None:
+    make_service(tmp_path, [PROJECT_ID]).create_project("Ornek")
+    clock_calls = 0
+
+    def clock() -> str:
+        nonlocal clock_calls
+        clock_calls += 1
+        if clock_calls > 1:
+            raise AssertionError("create clock was read more than once")
+        return "2026-07-13T09:30:00Z"
+
+    ids = iter([OBSERVATION_ID, EVENT_IDS[0]])
+    service = ObservationApplicationService(
+        tmp_path / "cse.sqlite3",
+        ManagedAttachmentStore(tmp_path / "attachments"),
+        clock=clock,
+        uuid_factory=lambda: next(ids),
+    )
+
+    observation = service.create_observation(
+        CreateObservation(PROJECT_ID, "A", "quality", "Kontrol")
+    )
+    detail = service.get_observation_detail(OBSERVATION_ID)
+
+    assert clock_calls == 1
+    assert observation.observed_at == "2026-07-13T09:30:00Z"
+    assert observation.created_at == observation.updated_at
+    assert observation.created_at == observation.observed_at
+    assert detail.events[0].occurred_at == observation.created_at
+
+
+def test_explicit_backdated_time_survives_restart_and_separates_entry_metadata(
+    tmp_path: Path,
+) -> None:
+    make_service(tmp_path, [PROJECT_ID]).create_project("Ornek")
+    clock_calls = 0
+
+    def clock() -> str:
+        nonlocal clock_calls
+        clock_calls += 1
+        return "2026-07-13T09:00:00Z"
+
+    ids = iter([OBSERVATION_ID, ATTACHMENT_ID, EVENT_IDS[0]])
+    service = ObservationApplicationService(
+        tmp_path / "cse.sqlite3",
+        ManagedAttachmentStore(tmp_path / "attachments"),
+        clock=clock,
+        uuid_factory=lambda: next(ids),
+        local_actor="Santiye sefi",
+    )
+    observation = service.create_observation(
+        CreateObservation(
+            project_id=PROJECT_ID,
+            location="A",
+            category="quality",
+            description="Geriye donuk kontrol",
+            upload=UploadStream(io.BytesIO(b"photo"), "photo.jpg"),
+            observed_at="2026-07-12T07:15:00Z",
+        )
+    )
+
+    reopened = ObservationApplicationService(
+        tmp_path / "cse.sqlite3",
+        ManagedAttachmentStore(tmp_path / "attachments"),
+    )
+    detail = reopened.get_observation_detail(OBSERVATION_ID)
+    event = detail.events[0]
+    attachment = detail.attachments[0].metadata
+
+    assert clock_calls == 1
+    assert observation.observed_at == detail.observation.observed_at == (
+        "2026-07-12T07:15:00Z"
+    )
+    assert detail.observation.created_at == "2026-07-13T09:00:00Z"
+    assert detail.observation.updated_at == "2026-07-13T09:00:00Z"
+    assert event.occurred_at == "2026-07-13T09:00:00Z"
+    assert event.payload == {
+        "attachment_ids": [ATTACHMENT_ID],
+        "created_at": "2026-07-13T09:00:00Z",
+        "observed_at": "2026-07-12T07:15:00Z",
+        "revision": 1,
+        "status": "open",
+    }
+    assert attachment.created_at == "2026-07-13T09:00:00Z"
+
+
+def test_future_event_time_fails_before_ids_staging_or_database(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database_path = tmp_path / "cse.sqlite3"
+    store = ManagedAttachmentStore(tmp_path / "attachments")
+
+    def forbidden(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("mutation boundary must not be reached")
+
+    monkeypatch.setattr(store, "stage_stream", forbidden)
+    service = ObservationApplicationService(
+        database_path,
+        store,
+        uow_factory=forbidden,
+        clock=lambda: "2026-07-13T09:00:00Z",
+        uuid_factory=forbidden,
+    )
+
+    with pytest.raises(ValueError, match="event_time must not be in the future"):
+        service.create_observation(
+            CreateObservation(
+                project_id=PROJECT_ID,
+                location="A",
+                category="quality",
+                description="Gelecek olay",
+                upload=UploadStream(io.BytesIO(b"data"), "photo.jpg"),
+                observed_at="2026-07-13T09:00:01Z",
+            )
+        )
+
+    assert not database_path.exists()
+    assert store.reconcile([]).stale_staging_files == ()
 
 
 def test_stream_upload_finalize_metadata_and_reopen_verify_valid(tmp_path: Path) -> None:
@@ -62,7 +244,8 @@ def test_stream_upload_finalize_metadata_and_reopen_verify_valid(tmp_path: Path)
         tmp_path, [PROJECT_ID, OBSERVATION_ID, ATTACHMENT_ID, EVENT_IDS[0]]
     )
     service.create_project("Ornek Santiye")
-    observation = service.create_observation(
+    observation = create_observation(
+        service,
         PROJECT_ID,
         "A Blok",
         "quality",
@@ -89,7 +272,9 @@ def test_status_reporting_archive_create_atomic_events_and_no_op(tmp_path: Path)
         tmp_path, [PROJECT_ID, OBSERVATION_ID, *EVENT_IDS]
     )
     service.create_project("Ornek Santiye")
-    service.create_observation(PROJECT_ID, "A", "safety", "Kontrol", None, None)
+    create_observation(
+        service, PROJECT_ID, "A", "safety", "Kontrol", None, None
+    )
     tracking = service.update_status(OBSERVATION_ID, 1, "tracking")
     same = service.update_status(OBSERVATION_ID, 2, "tracking")
     reported = service.update_reporting(
@@ -115,7 +300,9 @@ def test_status_reporting_archive_create_atomic_events_and_no_op(tmp_path: Path)
 def test_stale_revision_leaves_record_and_events_unchanged(tmp_path: Path) -> None:
     service = make_service(tmp_path, [PROJECT_ID, OBSERVATION_ID, EVENT_IDS[0]])
     service.create_project("Ornek")
-    service.create_observation(PROJECT_ID, "A", "quality", "Kontrol", None, None)
+    create_observation(
+        service, PROJECT_ID, "A", "quality", "Kontrol", None, None
+    )
 
     with pytest.raises(RevisionConflict):
         service.update_status(OBSERVATION_ID, 99, "tracking")
@@ -143,7 +330,8 @@ def test_unicode_literal_search_combines_with_project_and_status_filters(
     service = make_service(tmp_path, ids)
     service.create_project("İstanbul Metro Projesi")
     service.create_project("Kuzey Sahası")
-    first = service.create_observation(
+    first = create_observation(
+        service,
         PROJECT_ID,
         "A Blok",
         "Kalite",
@@ -151,7 +339,8 @@ def test_unicode_literal_search_combines_with_project_and_status_filters(
         "Literal %_' <etiket>",
         None,
     )
-    second = service.create_observation(
+    second = create_observation(
+        service,
         second_project_id,
         "Depo",
         "Güvenlik",
@@ -194,7 +383,8 @@ def test_detail_update_event_no_op_conflict_and_immutable_fields(
         [PROJECT_ID, OBSERVATION_ID, EVENT_IDS[0], EVENT_IDS[1]],
     )
     service.create_project("Örnek")
-    created = service.create_observation(
+    created = create_observation(
+        service,
         PROJECT_ID, "A", "quality", "Kontrol", "Eski not", None
     )
     before = service.get_observation_detail(OBSERVATION_ID)
@@ -255,7 +445,9 @@ def test_detail_update_event_failure_rolls_back_record(
         [PROJECT_ID, OBSERVATION_ID, EVENT_IDS[0], EVENT_IDS[1]],
     )
     service.create_project("Örnek")
-    service.create_observation(PROJECT_ID, "A", "quality", "Kontrol", None, None)
+    create_observation(
+        service, PROJECT_ID, "A", "quality", "Kontrol", None, None
+    )
     monkeypatch.setattr(
         SQLiteObservationEventRepository,
         "add",
@@ -287,7 +479,8 @@ def test_finalize_failure_rolls_back_db_and_leaves_stale_staging(
     )
 
     with pytest.raises(Exception) as error:
-        service.create_observation(
+        create_observation(
+            service,
             PROJECT_ID, "A", "quality", "Kontrol", None,
             UploadStream(io.BytesIO(b"data"), "photo.jpg"),
         )
@@ -313,7 +506,8 @@ def test_stage_failure_starts_no_database_mutation(
     )
 
     with pytest.raises(AttachmentIOError):
-        service.create_observation(
+        create_observation(
+            service,
             PROJECT_ID, "A", "quality", "Kontrol", None,
             UploadStream(io.BytesIO(b"data"), "photo.jpg"),
         )
@@ -337,7 +531,8 @@ def test_metadata_failure_rolls_back_and_discards_staging(
     )
 
     with pytest.raises(ApplicationServiceError) as error:
-        service.create_observation(
+        create_observation(
+            service,
             PROJECT_ID, "A", "quality", "Kontrol", None,
             UploadStream(io.BytesIO(b"data"), "photo.jpg"),
         )
@@ -367,7 +562,8 @@ def test_cleanup_failure_is_explicit_and_staging_remains(
     )
 
     with pytest.raises(ApplicationServiceError) as error:
-        service.create_observation(
+        create_observation(
+            service,
             PROJECT_ID, "A", "quality", "Kontrol", None,
             UploadStream(io.BytesIO(b"data"), "photo.jpg"),
         )
@@ -391,7 +587,8 @@ def test_created_event_failure_rolls_back_metadata_and_discards_staging(
     )
 
     with pytest.raises(ApplicationServiceError):
-        service.create_observation(
+        create_observation(
+            service,
             PROJECT_ID, "A", "quality", "Kontrol", None,
             UploadStream(io.BytesIO(b"data"), "photo.jpg"),
         )
@@ -421,7 +618,8 @@ def test_commit_failure_after_finalize_reports_orphan(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ApplicationServiceError) as error:
-        service.create_observation(
+        create_observation(
+            service,
             PROJECT_ID, "A", "quality", "Kontrol", None,
             UploadStream(io.BytesIO(b"data"), "photo.jpg"),
         )
@@ -448,7 +646,8 @@ def test_stream_fsync_failure_leaves_no_staging_or_database_rows(
     )
 
     with pytest.raises(AttachmentIOError):
-        service.create_observation(
+        create_observation(
+            service,
             PROJECT_ID, "A", "quality", "Kontrol", None,
             UploadStream(io.BytesIO(b"data"), "photo.jpg"),
         )
