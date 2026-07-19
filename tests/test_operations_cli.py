@@ -4,7 +4,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-from app.application import ObservationApplicationService, UploadStream
+from app.application import (
+    CreateObservation,
+    ObservationApplicationService,
+    UploadStream,
+)
 from app.storage import ManagedAttachmentStore
 
 
@@ -25,8 +29,13 @@ def seed(root: Path) -> None:
     )
     project = service.create_project("Ornek")
     service.create_observation(
-        project.project_id, "A", "quality", "Kontrol", None,
-        UploadStream(io.BytesIO(b"backup-photo"), "photo.jpg"),
+        CreateObservation(
+            project_id=project.project_id,
+            location="A",
+            category="quality",
+            description="Kontrol",
+            upload=UploadStream(io.BytesIO(b"backup-photo"), "photo.jpg"),
+        )
     )
 
 

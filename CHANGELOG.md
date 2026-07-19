@@ -1,5 +1,24 @@
 # Changelog
 
+## Issue #175 - Geriye Dönük Observation Create Contract
+
+- Observation create akışı immutable `CreateObservation` command nesnesine
+  geçirildi; optional explicit `observed_at` canonical UTC seconds olarak
+  doğrulanıyor.
+- Explicit geçmiş olay zamanı `FieldObservationRecord.observed_at` içinde
+  korunurken tek service clock okuması `created_at`, `updated_at`, created event
+  `occurred_at` ve attachment metadata `created_at` değerini belirliyor.
+- Future, naive, invalid, offset biçimli veya microsecond precision taşıyan yeni
+  olay zamanı attachment staging ve database mutation başlamadan fail-closed
+  reddediliyor.
+- `observation_created` payload'ı revision/status/attachment ID'lerine ek olarak
+  `observed_at` ve `created_at` ayrımını kalıcı ve geriye izlenebilir taşıyor.
+- Mevcut web, acceptance ve operasyon CLI çağrıları explicit olay zamanı
+  vermeden command sınırına geçirildi; kullanıcı davranışı değişmedi.
+- Schema `4`, restore allowlist `(2, 3, 4)`, Backup format `1` ve Günlük Çıktı
+  format `1` korundu; yeni form/route, migration, repository veya Ajanda UI
+  eklenmedi.
+
 ## Issue #173 - Olay Zamanı Sözleşmesi ve Salt-Okunur Migration Preflight
 
 - `app/time_contracts.py` ile timezone-aware UTC seconds üretimi, explicit
