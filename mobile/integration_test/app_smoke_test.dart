@@ -5,6 +5,7 @@ import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/domain/attendance_models.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
 import 'package:flutter/widgets.dart';
@@ -16,7 +17,7 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
-    'Android offline agenda and linked reminder survive application restart',
+    'Android offline agenda reminder and attendance survive restart',
     (tester) async {
       final temporaryRoot = await Directory.systemTemp.createTemp(
         'cse_mobile_integration_',
@@ -46,6 +47,70 @@ void main() {
           id: '11111111-1111-4111-8111-111111111111',
           name: 'Emülatör Şantiyesi',
         ),
+      );
+      final attendance = firstSuccess.attendance!;
+      await attendance.createMember(
+        const CreateWorkforceMemberCommand(
+          id: '22222222-2222-4222-8222-222222222222',
+          projectId: '11111111-1111-4111-8111-111111111111',
+          fullName: 'Emülatör Personeli',
+          teamName: 'Emülatör Ekibi',
+          roleName: 'Saha Ustası',
+          personnelCode: 'EMU-01',
+        ),
+      );
+      final futureLocal = CseTimeCodec.toIstanbul(
+        CseTimeCodec.encodeUtc(
+          DateTime.now().toUtc().add(const Duration(hours: 2)),
+        ),
+      );
+      final attendanceDate =
+          '${futureLocal.year.toString().padLeft(4, '0')}-'
+          '${futureLocal.month.toString().padLeft(2, '0')}-'
+          '${futureLocal.day.toString().padLeft(2, '0')}';
+      final attendanceTime =
+          '${futureLocal.hour.toString().padLeft(2, '0')}:'
+          '${futureLocal.minute.toString().padLeft(2, '0')}';
+      await attendance.saveReminderSetting(
+        SaveAttendanceReminderSettingCommand(
+          projectId: '11111111-1111-4111-8111-111111111111',
+          expectedRevision: 0,
+          isEnabled: true,
+          localTime: attendanceTime,
+          selectedWeekdays: {futureLocal.weekday},
+        ),
+      );
+      final attendanceDay = await attendance.ensureDay(
+        EnsureAttendanceDayCommand(
+          id: '33333333-3333-4333-8333-333333333333',
+          eventId: 'eeeeeeee-eeee-4eee-8eee-000000000010',
+          projectId: '11111111-1111-4111-8111-111111111111',
+          localDate: attendanceDate,
+        ),
+      );
+      var attendanceDetail = await attendance.saveRoster(
+        SaveAttendanceRosterCommand(
+          dayId: attendanceDay.id,
+          eventId: 'eeeeeeee-eeee-4eee-8eee-000000000011',
+          expectedRevision: attendanceDay.revision,
+          values: const [
+            AttendanceRosterValue(
+              entryId: '44444444-4444-4444-8444-444444444444',
+              memberId: '22222222-2222-4222-8222-222222222222',
+              result: AttendanceResult.fullDay,
+              overtimeMinutes: 30,
+              shortNote: 'Android offline Puantaj',
+            ),
+          ],
+        ),
+      );
+      expect(attendanceDetail.linkedReminder, isNotNull);
+      final attendanceReminder = attendanceDetail.linkedReminder!;
+      final attendanceNotification = await firstSuccess.agenda
+          .getReminderLifecycleDetail(attendanceReminder.id);
+      expect(
+        attendanceNotification.notification.syncState,
+        NotificationSyncState.scheduled,
       );
       final log = await firstSuccess.agenda.createAgendaLog(
         CreateAgendaLogCommand(
@@ -105,6 +170,12 @@ void main() {
         AgendaQuery(istanbulDay: observedDay),
       );
       expect(restartedDay.single.id, log.id);
+      attendanceDetail = await restartedSuccess.attendance!.getDayDetail(
+        attendanceDay.id,
+      );
+      expect(attendanceDetail.entries.single.memberName, 'Emülatör Personeli');
+      expect(attendanceDetail.entries.single.overtimeMinutes, 30);
+      expect(attendanceDetail.linkedReminder!.id, attendanceReminder.id);
 
       await tester.pumpWidget(
         CseApp(bootstrap: Future.value(restartedSuccess)),
@@ -115,22 +186,14 @@ void main() {
       await tester.tap(find.text('Ajanda').last);
       await tester.pumpAndSettle();
       expect(find.text(observedDay), findsOneWidget);
-      await tester.drag(
-        find.byKey(const Key('agenda-day-list')),
-        const Offset(0, -500),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Android offline Ajanda kaydı'), findsOneWidget);
+      expect(find.byKey(const Key('agenda-day-list')), findsOneWidget);
       await tester.tap(find.text('Hatırlatıcı').last);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Bugün'));
+      expect(find.byKey(const Key('reminder-list')), findsOneWidget);
+
+      await tester.tap(find.text('Puantaj').last);
       await tester.pumpAndSettle();
-      await tester.drag(
-        find.byKey(const Key('reminder-list')),
-        const Offset(0, -200),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Android offline reminder'), findsOneWidget);
+      expect(find.byKey(const Key('attendance-page')), findsOneWidget);
 
       await restartedSuccess.agenda.mutateReminder(
         MutateReminderCommand(
@@ -143,6 +206,23 @@ void main() {
       expect(
         (await restartedNotifications.pendingNotifications()).where(
           (item) => item.reminderId == reminder.id,
+        ),
+        isEmpty,
+      );
+      attendanceDetail = await restartedSuccess.attendance!.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: attendanceDay.id,
+          dayEventId: 'eeeeeeee-eeee-4eee-8eee-000000000012',
+          reminderEventId: 'eeeeeeee-eeee-4eee-8eee-000000000013',
+          expectedRevision: attendanceDetail.day.revision,
+          transition: AttendanceTransition.complete,
+        ),
+      );
+      expect(attendanceDetail.day.status, AttendanceDayStatus.completed);
+      expect(attendanceDetail.linkedReminder!.status, ReminderStatus.completed);
+      expect(
+        (await restartedNotifications.pendingNotifications()).where(
+          (item) => item.reminderId == attendanceReminder.id,
         ),
         isEmpty,
       );

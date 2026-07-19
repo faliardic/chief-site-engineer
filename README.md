@@ -24,8 +24,9 @@ CSE büyük inşaat yönetim platformlarının küçültülmüş kopyası veya k
 `mobile/` altında Flutter/Dart tabanlı Android ve iOS uygulaması bulunur.
 Telefon ilk mobil sürümde ana veri cihazıdır; günlük kullanım bilgisayar,
 Flask sunucusu, LAN veya internet gerektirmez. Issue #180 runtime temelini,
-Issue #179 ilk gerçek Ajanda dilimini, Issue #183 ise bağımsız reminder yaşam
-döngüsü ve yerel notification teslimini sağlar.
+Issue #179 ilk gerçek Ajanda dilimini, Issue #183 bağımsız reminder yaşam
+döngüsü ve yerel notification teslimini, Issue #185 ise günlük Puantaj ve proje
+personeli iş akışını sağlar.
 
 Mobil temel şunları içerir:
 
@@ -38,13 +39,16 @@ Mobil temel şunları içerir:
   revision conflict ve append-only event geçmişi;
 - Android/iOS timezone-aware yerel bildirim, tap deep-link ve bootstrap pending
   reconciliation;
-- cihaz-içi SQLite schema `3`, sürümlü ve atomik migration geçmişi;
+- proje personeli, günlük Puantaj, ekip/kişi-gün/fazla mesai toplamları ve
+  linked Puantaj reminder yaşam döngüsü;
+- UTF-8/formula-safe günlük Puantaj CSV'si ve insan-okunabilir özet;
+- cihaz-içi SQLite schema `4`, sürümlü ve atomik migration geçmişi;
 - restart sonrasında korunan smoke kayıt;
 - UTC seconds storage ve `Europe/Istanbul` sunumu;
 - debug/release için ayrı application identity ve veri kökü;
 - attachment, notification, permission ve export için güvenli platform portları.
 
-Bu dilim recurring reminder/routine, attachment, Puantaj veya Beton Paketi
+Bu dilim recurring reminder/routine, attachment, ücret/bordro veya Beton Paketi
 özelliklerinin tamamlandığı anlamına gelmez. Cloud sync, kullanıcı hesabı,
 push/server notification ve masaüstü verisinin otomatik taşınması yoktur. Mobil
 geliştirme ve build komutları
@@ -79,9 +83,9 @@ Uygulama varsayılan olarak yalnız `127.0.0.1` loopback adresinde açılır. Lo
 Bu branch'in başladığı son doğrulanmış `master` güvenli noktası:
 
 ```text
-Issue #179
-PR #182
-merge commit 290029312f94991f154f5fe2caa8d71db254252f
+Issue #183
+PR #184
+merge commit 33a5c18a756174682358f18d69ae66341a0e6caf
 ```
 
 Son production kabiliyet dilimi Issue #119 / PR #126 ile merge edilmiştir.
@@ -116,9 +120,10 @@ Issue #171 / PR #172 ile merge edilmiştir. Faz 1'in ilk dar production işi
 Issue #173 olay zamanı sözleşmesi ve salt-okunur migration preflight'ı, Issue
 #175 ise geriye dönük observation create sözleşmesini tamamlamıştır. Issue #180
 / PR #181 mobil runtime temelini, Issue #179 / PR #182 mobil Ajanda günlük logu
-ve logdan bağlı hatırlatıcı dilimini merge etmiştir. Issue #183 branch'inde
-bağımsız hızlı reminder, tam yaşam döngüsü ve gerçek Android/iOS yerel
-notification teslimi uygulanmıştır; attachment, recurring routine, cloud sync,
+ve logdan bağlı hatırlatıcı dilimini, Issue #183 / PR #184 bağımsız hızlı
+reminder, tam yaşam döngüsü ve Android/iOS yerel notification teslimini merge
+etmiştir. Issue #185 branch'inde proje personeli, günlük Puantaj ve linked
+Puantaj reminder'ı uygulanmıştır; attachment, recurring routine, cloud sync,
 uygulama kilidi ve gerçek saha pilotları henüz tamamlanmamıştır.
 
 ## Saha Takibi v0.1

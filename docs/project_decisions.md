@@ -2836,3 +2836,36 @@
   üretmez.
 - Recurring routine, Puantaj, Beton Paketi, attachment/fotoğraf, cloud/auth,
   push/server notification, store submission ve signing kapsam dışıdır.
+
+## Issue 185 — Mobil Günlük Puantaj ve Personel
+
+- Puantaj source-of-truth'u mobil SQLite'tır. Bir proje + İstanbul yerel günü
+  tek `attendance_day` aggregate'i oluşturur; timestamp'ler canonical UTC
+  seconds kalır.
+- Mobil schema `3 → 4`, mevcut Ajanda/reminder/follow-up event/notification
+  binding verisini koruyan atomik migration'dır. Python schema `4`, Backup `1`,
+  restore allowlist `(2, 3, 4)` ve Günlük Çıktı `1` değiştirilmez.
+- Personel proje bazlıdır. Optional kod proje içinde unique; pasifleştirme ve
+  entry removal logical'dır. Eski günlükler pasif personeli okumaya devam eder.
+- Gün ve personel sonuç mutation'ları immutable command + expected revision
+  kullanır. Stale fail-closed; no-op revision/event artırmaz; row ve monoton
+  append-only event sequence aynı transaction'da yazılır.
+- Günlük/ekip toplamı ve kişi-gün ayrı mutable tabloda tutulmaz; aktif entry
+  satırlarından deterministik türetilir.
+- Tamamlandı veya çalışma yok günü açıkça reopen edilmeden değiştirilemez.
+  Lifecycle row'u, Puantaj event'i ve linked reminder mutation'ı aynı SQLite
+  transaction'ında kalır.
+- Puantaj reminder'ı ilk insert'ten itibaren `project_id` ve
+  `attendance_day_id` taşır; exact link tablosu bir gün/bir reminder invariant'ı
+  kurar. Notification pending listesi yine yeniden üretilebilir teslim katmanıdır.
+- Proje setting'i `Europe/Istanbul` yerel saat ve seçili weekday'leri taşır.
+  Bugünden başlayan 14 günlük pencere deterministic ID + unique anahtarlarla
+  idempotent ensure edilir.
+- Permission/plugin failure business day/reminder/link satırlarını geri almaz.
+  Tamamlama/no-work reminder'ı kapatır; reopen linkteki exact due ile açar.
+- CSV UTF-8 BOM/CRLF, deterministic sıra, quote escaping ve formula injection
+  koruması kullanır. Atomic stage başarısından sonra event yazılır; sonraki
+  event failure staged dosyayı güvenli kök içinde temizler.
+- Ücret, bordro, maaş, SGK, hakediş, personel fotoğraf/belgesi, çoklu kullanıcı,
+  onay zinciri, cloud sync, Beton Paketi, signing ve store submission kapsam
+  dışıdır.

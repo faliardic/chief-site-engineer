@@ -17,8 +17,11 @@ bağlı reminder, Unutma Kutusu/Bugün/Yaklaşanlar ve çift yönlü deep-link
 uygulandı. Attachment ve native notification sonraki dar dilimlerde kalır.
 3C. [x] Release 0.1 mobil reminder yaşam döngüsü — Issue #183 ile bağımsız
 `+ Unutma`, schema `3`, optimistic lifecycle, sekiz görünüm, Android/iOS yerel
-notification, tap deep-link ve restart reconciliation uygulandı. Recurring
-routine, Puantaj, Beton Paketi ve store submission sonraki dilimlerde kalır.
+notification, tap deep-link ve restart reconciliation uygulandı.
+3D. [x] Release 0.1 mobil günlük Puantaj — Issue #185 ile schema `4`, proje
+personeli, günlük attendance aggregate/lifecycle, ekip ve kişi-gün toplamları,
+14 günlük exact linked reminder ve güvenli CSV uygulandı. Ücret/bordro/SGK,
+Beton Paketi ve store submission sonraki dilimlerde kalır.
 
 Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme
 programı Issue #127'dir. Issue #141 / PR #142 ve Issue #143 / PR #144
@@ -29,9 +32,27 @@ Issue #167 / PR #168 saha kabul protokolü ve Issue #169 / PR #170 owner-only
 tehdit modeli merge edilmiştir. Issue #171 / PR #172 Faz 0 closure sonucunu
 `PASS` olarak merge etmiştir. Issue #173 / PR #174 zaman sözleşmesi ve
 migration preflight'ı merge edilmiştir. Issue #179 / PR #182 mobil Ajanda
-dilimini merge etmiştir. Tek aktif production işi Issue #183 mobil reminder
-yaşam döngüsü ve yerel notification dilimidir. Açık faz Epic'leri aynı anda
-aktif production işleri değildir.
+dilimini, Issue #183 / PR #184 mobil reminder yaşam döngüsü ve yerel
+notification dilimini merge etmiştir. Tek aktif production işi Issue #185 mobil
+günlük Puantaj dilimidir. Açık faz Epic'leri aynı anda aktif production işleri
+değildir.
+
+## Issue 185 - Mobil Günlük Puantaj ve Personel
+
+- [x] Mobil schema `3` → `4` atomik migration; Ajanda/reminder/notification/event
+  verisi korunumu ve rollback testi.
+- [x] Proje bazlı personel ekleme, düzenleme, pasifleştirme ve geçmişte okuma.
+- [x] Tam/yarım gün, gelmedi, izinli, fazla mesai, kısa/genel not.
+- [x] Tümünü veya seçili ekibi tek aggregate mutation'ıyla tam gün işaretleme.
+- [x] Taslak, tamamlandı, çalışma yok, explicit reopen ve historical correction.
+- [x] Optimistic revision, idempotent/no-op ve append-only event sequence.
+- [x] Günlük/ekip toplamı, kişi-gün eşdeğeri ve fazla mesai toplamı.
+- [x] Çalışma günleri + İstanbul saati ve rolling 14-day idempotent ensure.
+- [x] Puantaj günü/reminder exact link, kapanış, reopen ve çift yönlü deep-link.
+- [x] UTF-8 CSV, formula injection koruması, atomik stage/failure cleanup ve özet.
+- [x] 320–430 px, 44 px touch target ve Android integration kapsamı.
+- [ ] Native iOS build/archive macOS + Xcode + repository dışı signing gerektirir.
+- [ ] Ücret/bordro/SGK/hakediş, Beton Paketi ve store submission ayrı Issue'dur.
 
 ## Issue 183 - Mobil Reminder Yaşam Döngüsü ve Yerel Bildirimler
 
@@ -50,7 +71,8 @@ aktif production işleri değildir.
 - [x] Gerçek Android pending create/restart/cancel integration, debug APK ve
   unsigned release AAB.
 - [ ] Native iOS build/archive macOS + Xcode + repository dışı signing gerektirir.
-- [ ] Recurring routine, Puantaj, Beton Paketi ve store submission ayrı Issue'dur.
+- [ ] Recurring routine, Beton Paketi ve store submission ayrı Issue'dur;
+  günlük Puantaj Issue #185 ile tamamlandı.
 
 ## Issue 179 - Mobil Ajanda Logu ve Bağlı Hatırlatıcı
 

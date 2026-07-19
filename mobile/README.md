@@ -15,7 +15,7 @@ cihaz-içi SQLite ve uygulamaya özel yerel dosya dizinleriyle offline çalış�
 | Android debug application ID | `com.faliardic.chiefsiteengineer.debug` |
 | iOS release bundle ID | `com.faliardic.chiefsiteengineer` |
 | iOS debug bundle ID | `com.faliardic.chiefsiteengineer.debug` |
-| Mobil schema version | `3` |
+| Mobil schema version | `4` |
 | Sunum timezone | `Europe/Istanbul` |
 
 Debug ve release farklı platform kimlikleri ve farklı `debug` / `release` veri
@@ -71,6 +71,12 @@ genişletir. `follow_up_events.sequence` aggregate içi kesin sırayı verir.
 operational sync state tutar. v3 migration'ın herhangi bir adımı hata verirse
 schema ve veri v2 olarak eksiksiz rollback olur.
 
+Schema `4`, schema `3` Ajanda, reminder, append-only event ve notification
+binding verilerini koruyan atomik migration ile proje personeli, günlük Puantaj
+aggregate'i, entry/event tabloları, reminder setting ve exact day/reminder link
+tablolarını ekler. Personel ve Puantaj kayıtlarında physical delete yoktur;
+completed/no-work gün explicit reopen olmadan düzenlenemez.
+
 ## Mobil Ajanda ve Hatırlatıcı
 
 Ajanda, seçili `Europe/Istanbul` gününü `observed_at`, `created_at`, ID sırasıyla
@@ -103,6 +109,29 @@ state detay ekranında görünür. Bootstrap reconciliation SQLite source-of-tru
 ile OS pending listesini uzlaştırır: eksikleri kurar, stale/duplicate/orphan ve
 terminal/inbox pending kayıtlarını iptal eder. Platform kapasitesini aşan uzak
 reminder kaybolmaz; `platform_capacity` state'iyle uygulamada kalır.
+
+## Mobil Puantaj
+
+Puantaj ekranı proje ve İstanbul yerel tarihiyle çalışır. Personel; ad, ekip/
+taşeron, rol ve optional proje-içi unique kodla eklenir, düzenlenir veya
+pasifleştirilir. Günlük sonuçlar tam gün, yarım gün, gelmedi ve izinlidir; tam/
+yarım gün için fazla mesai dakikası ve her satır için kısa not girilebilir.
+
+Gün taslak, tamamlandı veya çalışma yok durumundadır. Geçmiş bir gün yalnız
+explicit reopen sonrasında düzeltilir. Bütün değişiklikler expected revision ve
+append-only event geçmişi kullanır. Günlük/ekip toplamları, kişi-gün ve fazla
+mesai entry'lerden türetilir.
+
+Proje bazlı Puantaj reminder ayarı seçili çalışma günlerini ve İstanbul yerel
+saatini tutar. Önümüzdeki 14 gün idempotent ensure edilir. Reminder ilk andan
+itibaren exact Puantaj günü/proje linkini taşır; gün tamamlanınca veya çalışma
+yok olunca kapanır, reopen sonrasında aynı due anıyla yeniden etkinleşir.
+Reminder detayından kaynak Puantaj gününe dönülebilir.
+
+Gün CSV'si UTF-8 BOM, CRLF, deterministic sıra ve formula injection koruması
+kullanır. Uygulama içi staging atomiktir; başarısızlık yarım dosya veya yanlış
+success event'i bırakmaz. Günün insan-okunabilir özeti panoya kopyalanabilir;
+CSV platform share sheet ile paylaşılabilir.
 
 ## Zaman sözleşmesi
 
@@ -164,7 +193,7 @@ repository dışında tutulan provisioning/certificate gerekir.
 - Kullanıcı hesabı/auth server
 - Masaüstü verisinin otomatik migration'ı
 - Log attachment/fotoğraf bağlama
-- Puantaj veya Beton Paketi davranışı
+- Ücret/bordro/SGK/hakediş veya Beton Paketi davranışı
 - Recurring reminder/routine template
 - Camera/file picker plugin'i veya store submission
 - Exact-alarm permission, push/server notification

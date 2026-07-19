@@ -1,5 +1,30 @@
 # Changelog
 
+## Issue #185 - Mobil Günlük Puantaj ve Personel
+
+- Mobil SQLite schema `3` → `4` atomik migration ile mevcut Ajanda, reminder,
+  notification binding ve event verileri korunarak personel, Puantaj günü,
+  entry, append-only event, reminder setting ve exact link tabloları eklendi.
+- Proje bazlı personel ekleme/düzenleme/pasifleştirme; proje-içi unique optional
+  kod ve geçmiş Puantajda pasif personeli okumaya devam etme uygulandı.
+- Tam gün, yarım gün, gelmedi, izinli, fazla mesai, kısa not, tümünü/ekibi tam
+  gün ve günlük genel not tek aggregate/revision transaction sınırına alındı.
+- Taslak, tamamlandı, çalışma yok ve explicit reopen; stale/no-op/idempotent
+  korumaları ve append-only sequence event geçmişi eklendi.
+- Günlük ve ekip/taşeron toplamları, kişi-gün eşdeğeri ve fazla mesai özeti
+  deterministic read-model olarak üretildi.
+- Proje bazlı çalışma günleri/İstanbul saati ayarı ve önümüzdeki 14 gün için
+  idempotent Puantaj günü + exact linked reminder ensure akışı eklendi.
+- Tamamlandı/çalışma yok reminder kapanışı, reopen yeniden etkinleştirme,
+  notification reconciliation ve reminder detayından Puantaj gününe deep-link
+  tamamlandı.
+- UTF-8 BOM/CRLF CSV, formula injection koruması, insan-okunabilir özet, atomik
+  staging, failure cleanup ve platform share sheet eklendi.
+- Flutter analiz/unit/widget/integration, Android build, unsigned AAB, iOS statik
+  uyumluluk ve Python regresyon kapıları Issue sonucunda kayıt altına alındı.
+- Python schema/Backup/Günlük Çıktı, gerçek kullanıcı verisi, signing materyali,
+  ücret/bordro/SGK/hakediş, Beton Paketi ve store submission değiştirilmedi.
+
 ## Issue #183 - Mobil Reminder Yaşam Döngüsü ve Yerel Bildirimler
 
 - Mobil SQLite schema `2` → `3` atomik rebuild migration ile v2 Ajanda,

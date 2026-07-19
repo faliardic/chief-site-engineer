@@ -1,22 +1,22 @@
 {
   "state_version": 2,
   "legacy_last_numbered_step": 225,
-  "current_issue": 183,
+  "current_issue": 185,
   "base_branch": "master",
-  "base_commit": "290029312f94991f154f5fe2caa8d71db254252f",
+  "base_commit": "33a5c18a756174682358f18d69ae66341a0e6caf",
   "active_work": {
-    "issue": 183,
-    "type": "release_01_mobile_reminder_lifecycle_notifications",
+    "issue": 185,
+    "type": "release_01_mobile_daily_attendance_workflow",
     "issue_state": "active",
     "review_status": "local_verified_not_yet_published",
     "release_epic": 176,
     "mobile_epic": 131,
     "product_epic": 105,
-    "branch": "codex/issue-183-mobile-reminder-lifecycle-notifications",
-    "base_commit": "290029312f94991f154f5fe2caa8d71db254252f",
+    "branch": "codex/issue-185-mobile-attendance-daily-workforce",
+    "base_commit": "33a5c18a756174682358f18d69ae66341a0e6caf",
     "commit_strategy": "one_ordinary_commit_without_amend_rebase_or_force_push",
     "schema_version": 4,
-    "mobile_schema_version": 3,
+    "mobile_schema_version": 4,
     "backup_format_version": 1,
     "memory_download_format_version": null,
     "project_package_format_version": null,
@@ -34,6 +34,7 @@
     "mobile_linked_reminder_slice_added": true,
     "mobile_schema_1_to_2_migration_added": true,
     "mobile_schema_2_to_3_migration_added": true,
+    "mobile_schema_3_to_4_migration_added": true,
     "mobile_migrations_atomic": true,
     "mobile_restart_smoke_persistence": true,
     "mobile_storage_timestamp_precision": "utc_seconds",
@@ -47,6 +48,15 @@
     "mobile_notification_tap_deep_link_added": true,
     "mobile_exact_alarm_permission_added": false,
     "mobile_notification_safe_failure_state_added": true,
+    "mobile_project_workforce_added": true,
+    "mobile_daily_attendance_aggregate_added": true,
+    "mobile_attendance_optimistic_revision_added": true,
+    "mobile_attendance_append_only_events_added": true,
+    "mobile_attendance_historical_reopen_added": true,
+    "mobile_attendance_rolling_14_day_reminder_added": true,
+    "mobile_attendance_exact_reminder_link_added": true,
+    "mobile_attendance_csv_export_added": true,
+    "mobile_attendance_formula_injection_protection_added": true,
     "debug_release_data_separated": true,
     "android_debug_build_passed": true,
     "android_release_aab_build_passed": true,
@@ -59,7 +69,7 @@
     "real_user_data_root_accessed": false,
     "merge_claim": false,
     "pull_request_created": false,
-    "flutter_test_summary": "60 passed",
+    "flutter_test_summary": "78 passed",
     "android_integration_test_summary": "1 passed",
     "full_test_summary": "1001 passed, 7 skipped",
     "compileall_passed": true,
@@ -70,22 +80,24 @@
     "publication_status": "not_yet_committed_or_pushed",
     "python_or_flask_changed": false,
     "attachment_binding_added": false,
-    "native_notification_delivery_added": true
+    "native_notification_delivery_added": true,
+    "wage_payroll_social_security_or_progress_payment_added": false,
+    "concrete_package_added": false
   },
   "current_safe_point": {
     "semantics": "latest_merged_finalized_checkpoint",
-    "issue": 179,
+    "issue": 183,
     "issue_state": "completed",
-    "pull_request": 182,
+    "pull_request": 184,
     "pull_request_state": "merged",
-    "merge_commit": "290029312f94991f154f5fe2caa8d71db254252f",
-    "local_test_summary": "Flutter 38 passed, Android integration 1 passed, Python 1001 passed / 7 skipped (Issue #179 mobile Agenda slice)"
+    "merge_commit": "33a5c18a756174682358f18d69ae66341a0e6caf",
+    "local_test_summary": "Flutter 60 passed, Android integration 1 passed, Python 1001 passed / 7 skipped (Issue #183 mobile reminder lifecycle slice)"
   },
   "official_local_sync": {
     "official_local_path": "V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer",
     "verified_repository_root": "V:/1_PROJECTS/2_ACTIVE/Python/chief-site-engineer",
-    "local_master_sha": "290029312f94991f154f5fe2caa8d71db254252f",
-    "origin_master_sha": "290029312f94991f154f5fe2caa8d71db254252f",
+    "local_master_sha": "33a5c18a756174682358f18d69ae66341a0e6caf",
+    "origin_master_sha": "33a5c18a756174682358f18d69ae66341a0e6caf",
     "divergence": "0 0",
     "misspelled_workspace_path": "C:\\Users\\Fatih\\Documents\\chieh-site-engineer",
     "misspelled_workspace_present": false,
@@ -277,6 +289,11 @@
       "model": "standart full Codex",
       "reasoning": "extra_high",
       "reason": "explicit_user_and_issue_selection_for_flutter_mobile_schema_rebuild_optimistic_lifecycle_native_notifications_reconciliation_platform_builds_and_cross_runtime_regressions"
+    },
+    "issue_185_selection": {
+      "model": "standart full Codex",
+      "reasoning": "extra_high",
+      "reason": "explicit_user_selection_for_atomic_mobile_schema_migration_workforce_attendance_aggregate_reminder_notification_export_native_builds_and_cross_runtime_regressions"
     }
   },
   "required_source_pre_read": {
@@ -308,6 +325,14 @@
       "github_issue_183_with_all_comments": true,
       "task_183": true,
       "issue_179_mobile_agenda_dependency": true,
+      "new_chat_bootstrap": false
+    },
+    "issue_185_sources_read": {
+      "unified_project_source": true,
+      "project_instructions": true,
+      "github_issue_185_with_all_comments": true,
+      "task_185": true,
+      "issue_183_mobile_reminder_dependency": true,
       "new_chat_bootstrap": false
     },
     "step_207_sources_read": {
@@ -1497,12 +1522,12 @@
     }
   },
   "protected_paths": {
-    "python_app_and_tests": "must_remain_unchanged_in_issue_183",
-    "python_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_183",
-    "web_form_templates_routes_launcher_and_server_binding": "must_remain_unchanged_in_issue_183",
-    "backup_and_export_production": "must_remain_unchanged_in_issue_183",
-    ".github/workflows": "must_remain_unchanged_in_issue_183",
-    "requirements.txt_and_pyproject.toml": "must_remain_unchanged_in_issue_183",
+    "python_app_and_tests": "must_remain_unchanged_in_issue_185",
+    "python_persistence_schema_migrations_mapping_repositories_and_unit_of_work": "must_remain_unchanged_in_issue_185",
+    "web_form_templates_routes_launcher_and_server_binding": "must_remain_unchanged_in_issue_185",
+    "backup_and_export_production": "must_remain_unchanged_in_issue_185",
+    ".github/workflows": "must_remain_unchanged_in_issue_185",
+    "requirements.txt_and_pyproject.toml": "must_remain_unchanged_in_issue_185",
     "reports": "user_files_preserved_untracked_and_unchanged",
     "exports/.gitkeep": "must_remain_present_and_unchanged",
     "ignored_zip_and_cache": "must_remain_unchanged"
@@ -1519,27 +1544,33 @@
     "pull_request_creation_by_codex": false,
     "merge_authorized": false,
     "branch_deletion_authorized": false,
-    "final_remote_sha_evidence_location": "GitHub Issue #183 completion comment after push"
+    "final_remote_sha_evidence_location": "GitHub Issue #185 completion comment after push"
   },
   "required_files": [
     "ROADMAP.md",
     "CHANGELOG.md",
     "docs/project_decisions.md",
+    "mobile/android/gradle.properties",
+    "mobile/lib/application/attendance_application.dart",
     "mobile/lib/application/agenda_application.dart",
+    "mobile/lib/domain/attendance_models.dart",
     "mobile/lib/domain/agenda_models.dart",
-    "mobile/lib/platform/notification_gateway.dart",
+    "mobile/lib/platform/attendance_export_gateway.dart",
     "mobile/lib/bootstrap/app_bootstrap.dart",
     "mobile/lib/app.dart",
-    "mobile/lib/features/reminders/reminder_form_page.dart",
+    "mobile/lib/features/attendance/attendance_page.dart",
+    "mobile/lib/features/attendance/attendance_day_page.dart",
+    "mobile/lib/features/attendance/attendance_settings_page.dart",
+    "mobile/lib/features/attendance/workforce_page.dart",
     "mobile/lib/features/reminders/reminder_detail_page.dart",
     "mobile/lib/features/reminders/reminders_page.dart",
     "mobile/lib/storage/app_database.dart",
-    "docs/183_release_01_mobile_reminder_lifecycle_notifications.md",
-    "learning/183_release_01_mobile_reminder_lifecycle_notifications.md",
+    "docs/185_release_01_mobile_daily_attendance_workflow.md",
+    "learning/185_release_01_mobile_daily_attendance_workflow.md",
     ".cse/state/project_state.json",
-    ".cse/tasks/183_task.md",
-    ".cse/results/183_result.md"
+    ".cse/tasks/185_task.md",
+    ".cse/results/185_result.md"
   ],
-  "workflow_status": "issue_183_local_verified_not_yet_published",
+  "workflow_status": "issue_185_local_verified_not_yet_published",
   "forbidden_scope_added": false
 }

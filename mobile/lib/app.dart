@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
+import 'package:chief_site_engineer/features/attendance/attendance_day_page.dart';
+import 'package:chief_site_engineer/features/attendance/attendance_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
 import 'package:flutter/material.dart';
@@ -116,13 +118,37 @@ class _MobileShellState extends State<MobileShell> {
     super.dispose();
   }
 
-  void _openReminderFromNotification(String reminderId) {
+  Future<void> _openReminderFromNotification(String reminderId) async {
+    if (!mounted) return;
+    try {
+      final reminder = await widget.bootstrap.agenda.getReminderDetail(
+        reminderId,
+      );
+      final attendance = widget.bootstrap.attendance;
+      if (reminder.attendanceDayId != null && attendance != null) {
+        if (!mounted) return;
+        setState(() => _selectedIndex = 3);
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute(
+            builder: (_) => AttendanceDayPage(
+              attendance: attendance,
+              agenda: widget.bootstrap.agenda,
+              dayId: reminder.attendanceDayId!,
+            ),
+          ),
+        );
+        return;
+      }
+    } on Object {
+      // Invalid/stale notification payload falls back to reminder detail.
+    }
     if (!mounted) return;
     setState(() => _selectedIndex = 1);
-    Navigator.of(context).push<void>(
+    await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => ReminderDetailPage(
           agenda: widget.bootstrap.agenda,
+          attendance: widget.bootstrap.attendance,
           reminderId: reminderId,
         ),
       ),
@@ -156,9 +182,21 @@ class _MobileShellState extends State<MobileShell> {
           index: _selectedIndex,
           children: [
             _HomePage(bootstrap: widget.bootstrap),
-            RemindersPage(agenda: widget.bootstrap.agenda),
+            RemindersPage(
+              agenda: widget.bootstrap.agenda,
+              attendance: widget.bootstrap.attendance,
+            ),
             AgendaPage(agenda: widget.bootstrap.agenda),
-            const _PreparingPage(icon: Icons.badge_outlined, title: 'Puantaj'),
+            if (widget.bootstrap.attendance case final attendance?)
+              AttendancePage(
+                attendance: attendance,
+                agenda: widget.bootstrap.agenda,
+              )
+            else
+              const _PreparingPage(
+                icon: Icons.badge_outlined,
+                title: 'Puantaj',
+              ),
             const _PreparingPage(
               icon: Icons.foundation_outlined,
               title: 'Beton Paketi',
