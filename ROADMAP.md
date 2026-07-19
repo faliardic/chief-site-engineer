@@ -26,6 +26,11 @@ Beton Paketi ve store submission sonraki dilimlerde kalır.
 planlama/checklist, mikser-irsaliye kanıt zinciri, numune/laboratuvar takibi,
 kür/reminder yaşam döngüsü ve güvenli paket raporu uygulandı. Release hardening
 ve store submission ayrı dilimlerde kalır.
+3F. [x] Release 0.1 mobil tam yedek/geri yükleme — Issue #189 ile mobil SQLite
+ve aktif attachment'lar parola korumalı `.csebackup` format `1` paketine alındı;
+shared operation coordinator, salt-okunur preflight, safety backup, atomik tam
+değiştirme, rollback ve notification reconciliation uygulandı. Cloud backup,
+release hardening ve store submission ayrı dilimlerde kalır.
 
 Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme
 programı Issue #127'dir. Issue #141 / PR #142 ve Issue #143 / PR #144
@@ -37,9 +42,25 @@ tehdit modeli merge edilmiştir. Issue #171 / PR #172 Faz 0 closure sonucunu
 `PASS` olarak merge etmiştir. Issue #173 / PR #174 zaman sözleşmesi ve
 migration preflight'ı merge edilmiştir. Issue #179 / PR #182 mobil Ajanda
 dilimini, Issue #183 / PR #184 mobil reminder yaşam döngüsü ve yerel
-notification dilimini, Issue #185 / PR #186 mobil günlük Puantajı merge
-etmiştir. Tek aktif production işi Issue #187 mobil Beton Paketi dilimidir.
+notification dilimini, Issue #185 / PR #186 mobil günlük Puantajı, Issue #187 /
+PR #188 mobil Beton Paketi'ni merge etmiştir. Tek aktif production işi Issue
+#189 mobil tam yedek ve geri yükleme dilimidir.
 Açık faz Epic'leri aynı anda aktif production işleri değildir.
+
+## Issue 189 - Mobil Tam Yedek ve Geri Yükleme
+
+- [x] SQLite + aktif attachment'lar için `.csebackup` format `1` manifesti.
+- [x] PBKDF2-HMAC-SHA256 + AES-256-GCM authenticated parola koruması.
+- [x] Ajanda/Reminder/Puantaj/Beton/backup için tek shared operation coordinator.
+- [x] `VACUUM INTO`, integrity/FK ve attachment hash audit'li atomik backup.
+- [x] Traversal/absolute/duplicate/unsupported/oversize fail-closed preflight.
+- [x] Desteklenen eski mobil schema'yı yalnız staging'de migration.
+- [x] İki aşamalı kullanıcı onayı ve preflight sonrası package SHA token'ı.
+- [x] Otomatik safety backup, tam replace, smoke, notification reconcile, rollback.
+- [x] 320–430 px yüzey, input preservation, double-tap ve share/save.
+- [x] Android emülatörde gerçek backup/restore/restart/attachment akışı.
+- [ ] Native iOS archive macOS + Xcode + repository dışı signing gerektirir.
+- [ ] Cloud backup, release hardening ve store submission ayrı Issue'dur.
 
 ## Issue 187 - Mobil Beton Döküm Paketi
 

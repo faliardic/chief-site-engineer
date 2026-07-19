@@ -1,5 +1,26 @@
 # Changelog
 
+## Issue #189 - Mobil Tam Yedek ve Geri Yükleme
+
+- Bütün mobil SQLite state'i ve aktif Beton attachment dosyaları parola korumalı,
+  authenticated `.csebackup` format `1` paketiyle yedeklenebilir hale geldi.
+- PBKDF2-HMAC-SHA256, AES-256-GCM, random salt/nonce ve authenticated başlık;
+  parola/secret/path saklamayan manifest ve son yedek özeti eklendi.
+- Ajanda/Reminder, Puantaj, Beton ve backup/restore tek application-wide seri
+  coordinator altında transaction-safe snapshot sınırına alındı.
+- SQLite `VACUUM INTO`, integrity/FK/smoke/read-model kontrolü ve aktif attachment
+  boyut/SHA-256 audit'iyle staging → self-check → atomic backup finalize eklendi.
+- Restore preflight; format/schema, parola, hash/size, duplicate, traversal,
+  absolute/unsupported/oversize entry, SQLite ve attachment eşliğini fail-closed
+  doğrular; desteklenen eski mobil schema staging'de migrate edilir.
+- İki aşamalı tam değiştirme onayı, otomatik safety backup, database+attachment
+  swap, aktivasyon smoke'u, notification reconciliation ve failure rollback
+  uygulandı; merge veya partial restore eklenmedi.
+- Başlangıç ekranına 320 px güvenli Hafıza ve Yedekleme yüzeyi, kullanıcı
+  kontrollü share/save, preflight özeti ve son başarılı yedek özeti eklendi.
+- Mobil schema `5`, Python schema `4`, masaüstü Backup/restore/Günlük Çıktı
+  sürümleri; gerçek kullanıcı verisi, signing, cloud ve store kapsamı değişmedi.
+
 ## Issue #187 - Mobil Beton Döküm Paketi
 
 - Mobil SQLite schema `4` → `5` atomik migration ile Ajanda, reminder,

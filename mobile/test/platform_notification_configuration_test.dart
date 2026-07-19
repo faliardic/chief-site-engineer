@@ -90,8 +90,12 @@ void main() {
       expect(pubspec, contains('image_picker: ^1.2.1'));
       expect(pubspec, contains('file_picker: ^10.3.10'));
       expect(pubspec, contains('permission_handler: ^12.0.1'));
+      expect(pubspec, contains('archive: ^4.0.9'));
+      expect(pubspec, contains('cryptography: ^2.9.0'));
       expect(lock, contains('share_plus:'));
       expect(lock, contains('version: "12.0.2"'));
+      expect(lock, contains('archive:'));
+      expect(lock, contains('cryptography:'));
     },
   );
 }

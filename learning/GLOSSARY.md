@@ -1527,3 +1527,19 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Atomic Finalize`: Dosyayı önce uygulama staging alanına eksiksiz yazıp sonra aynı güvenli kök içindeki final konuma rename etmektir. Hata halinde yarım final dosya görünmez.
 
 `Evidence Chain (Kanıt Zinciri)`: Bir kanıtın Beton paketi ve varsa kesin truck/sample/check kaynağı, MIME türü, byte boyutu, relative path ve SHA-256 ile birlikte korunmasıdır.
+
+`Authenticated Encryption (Kimliği Doğrulanmış Şifreleme)`: Verinin gizliliğiyle birlikte ciphertext ve bağlanan başlığın değiştirilmediğini doğrulayan şifreleme yöntemidir. Mobil `.csebackup` AES-256-GCM kullanır; yanlış parola veya tamper aynı güvenli hata olur.
+
+`Key Derivation Function / KDF (Anahtar Türetme Fonksiyonu)`: Kullanıcının parolası gibi değişken güçlü girdiden salt ve tekrar sayısıyla sabit uzunlukta kriptografik anahtar üreten işlemdir. Mobil backup PBKDF2-HMAC-SHA256 kullanır ve parolayı pakete yazmaz.
+
+`Consistent Snapshot (Tutarlı Anlık Görüntü)`: Birbiriyle ilişkili database sayfalarının aynı mantıksal ana ait bağımsız kopyasıdır. Mobil backup açık SQLite dosyasını ham kopyalamak yerine exclusive coordinator altında `VACUUM INTO` üretir.
+
+`Application-Wide Operation Coordinator (Uygulama Geneli İşlem Koordinatörü)`: Birden fazla application service'in aynı veri köküne erişimini tek seri Future kuyruğunda düzenleyen sınırdır. Backup/restore, Ajanda/Reminder, Puantaj ve Beton mutation'larının ortasına giremez.
+
+`Restore Preflight (Geri Yükleme Ön Kontrolü)`: Aktif state'i değiştirmeden önce paket formatı, parola, schema, ZIP yolları, boyut/hash, SQLite integrity/FK ve attachment eşliğini staging'de doğrulayan salt-okunur kapıdır.
+
+`Safety Backup (Güvenlik Yedeği)`: Restore swap'ından hemen önce mevcut aktif state'ten otomatik üretilen bağımsız tam pakettir. Aktivasyon veya rollback beklenmeyen biçimde başarısız olsa bile recovery materyali korunur.
+
+`Compensating Rollback (Telafi Edici Geri Alma)`: Dosya sistemi rename'leri SQLite transaction'ına katılamadığında, başarısız yeni state'i kenara alıp önceki database ve attachment çiftini eski yerine taşıyan açık geri alma akışıdır.
+
+`TOCTOU (Kontrol ve Kullanım Arası Değişim)`: Bir dosyanın ön kontrolden sonra gerçek kullanım anına kadar değiştirilmesi yarışıdır. Restore preflight paket SHA-256 token'ını aktivasyon öncesi yeniden hesaplayarak bu durumda fail-closed durur.

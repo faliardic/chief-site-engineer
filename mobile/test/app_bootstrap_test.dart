@@ -47,6 +47,8 @@ void main() {
         (restarted as BootstrapSuccess).smokeRecordCreatedAt,
         (first as BootstrapSuccess).smokeRecordCreatedAt,
       );
+      expect(first.backup, isNotNull);
+      expect(restarted.backup, isNotNull);
     },
   );
 

@@ -19,6 +19,7 @@ class AppDirectories {
     required this.database,
     required this.attachments,
     required this.exportsBackups,
+    required this.state,
     required this.staging,
   });
 
@@ -40,6 +41,7 @@ class AppDirectories {
       database: Directory(path.join(root.path, 'database')),
       attachments: Directory(path.join(root.path, 'attachments')),
       exportsBackups: Directory(path.join(root.path, 'exports_backups')),
+      state: Directory(path.join(root.path, 'state')),
       staging: Directory(path.join(root.path, 'temp_staging')),
     );
     directories.validate();
@@ -51,13 +53,22 @@ class AppDirectories {
   final Directory database;
   final Directory attachments;
   final Directory exportsBackups;
+  final Directory state;
   final Directory staging;
 
   String get databaseFile => path.join(database.path, 'cse_mobile.sqlite3');
+  String get backupStateFile =>
+      path.join(state.path, 'mobile_backup_state.json');
 
   void validate() {
     final normalizedRoot = path.normalize(path.absolute(root.path));
-    for (final directory in [database, attachments, exportsBackups, staging]) {
+    for (final directory in [
+      database,
+      attachments,
+      exportsBackups,
+      state,
+      staging,
+    ]) {
       final candidate = path.normalize(path.absolute(directory.path));
       if (!path.isWithin(normalizedRoot, candidate)) {
         throw const PathContractViolation(
@@ -71,6 +82,12 @@ class AppDirectories {
         'database escaped its environment root',
       );
     }
+    final backupStatePath = path.normalize(path.absolute(backupStateFile));
+    if (!path.isWithin(normalizedRoot, backupStatePath)) {
+      throw const PathContractViolation(
+        'backup state escaped its environment root',
+      );
+    }
   }
 
   Future<void> ensureCreated() async {
@@ -80,6 +97,7 @@ class AppDirectories {
       database,
       attachments,
       exportsBackups,
+      state,
       staging,
     ]) {
       await directory.create(recursive: true);

@@ -2895,3 +2895,26 @@
   reddi veya resmî teknik karar üretmez.
 - Android/iOS aynı Dart sözleşmesini kullanır. Exact-alarm izni, API/cloud,
   signing, release hardening ve mağaza gönderimi bu dilime eklenmez.
+
+## Issue 189 — Mobil Tam Yedek ve Geri Yükleme
+
+- Mobil backup kapsamı bütün SQLite ile `concrete_attachments.archived_at IS
+  NULL` satırlarının fiziksel byte'larıdır; OS pending notification türetilmiş
+  durum olduğu için pakete girmez ve restore sonrası SQLite'tan uzlaştırılır.
+- `.csebackup` format `1`, sınırlı authenticated başlık + PBKDF2-HMAC-SHA256 +
+  AES-256-GCM şifreli ZIP ve exact size/SHA-256 manifest kullanır. Parola,
+  absolute path, secret ve signing verisi kalıcılaştırılmaz.
+- Tek `MobileOperationCoordinator`, Ajanda/Reminder, Puantaj, Beton ve
+  backup/restore işlemlerini aynı seri sınırda tutar. Beton attachment'ın file +
+  DB çok-adımlı mutation'ı da bütünüyle bu sınırdadır.
+- Backup `VACUUM INTO` snapshot, SQLite integrity/FK/read-model ve attachment
+  audit'inden sonra staging → self-check → atomic finalize uygular.
+- Restore preflight salt-okunurdur; path/duplicate/entry/size/hash/schema/
+  SQLite/FK/attachment eşliğini aktif state mutation'ından önce tamamlar.
+- Eski desteklenen mobil schema yalnız staging'de migrate edilir; gelecekteki
+  schema downgrade edilmez. Mobil schema `5` bu Issue'da değişmez.
+- Restore merge değildir. İki kullanıcı onayı, preflight SHA token'ı, otomatik
+  safety backup, database+attachments tam swap, activation smoke,
+  notification reconciliation ve failure rollback zorunludur.
+- Cloud provider, masaüstü import, otomatik zamanlama, release hardening,
+  signing ve store submission Issue #189 kapsamı değildir.

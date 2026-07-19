@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
@@ -48,18 +49,20 @@ class SqliteAgendaApplication implements AgendaApplication {
     required this.databasePath,
     required this.databaseFactory,
     required this.clock,
+    MobileOperationCoordinator? coordinator,
     ReminderNotificationGateway? notificationGateway,
     this.beforeReminderEventInsert,
-  }) : notificationGateway =
+  }) : coordinator = coordinator ?? MobileOperationCoordinator(),
+       notificationGateway =
            notificationGateway ??
            const UnavailableReminderNotificationGateway();
 
   final String databasePath;
   final DatabaseFactory databaseFactory;
   final UtcClock clock;
+  final MobileOperationCoordinator coordinator;
   final ReminderNotificationGateway notificationGateway;
   final ReminderTransactionHook? beforeReminderEventInsert;
-  Future<void> _databaseQueue = Future<void>.value();
 
   @override
   String? get initialNotificationReminderId =>
@@ -1289,27 +1292,19 @@ class SqliteAgendaApplication implements AgendaApplication {
   Future<T> _withDatabase<T>(
     DateTime operationTime,
     Future<T> Function(Database database) action,
-  ) {
-    final completer = Completer<T>();
-    _databaseQueue = _databaseQueue
-        .then((_) async {
-          final appDatabase = AppDatabase(
-            path: databasePath,
-            factory: databaseFactory,
-            clock: () => operationTime,
-          );
-          try {
-            await appDatabase.open();
-            completer.complete(await action(appDatabase.database));
-          } on Object catch (error, stackTrace) {
-            completer.completeError(error, stackTrace);
-          } finally {
-            await appDatabase.close();
-          }
-        })
-        .catchError((Object _, StackTrace _) {});
-    return completer.future;
-  }
+  ) => coordinator.run(() async {
+    final appDatabase = AppDatabase(
+      path: databasePath,
+      factory: databaseFactory,
+      clock: () => operationTime,
+    );
+    try {
+      await appDatabase.open();
+      return await action(appDatabase.database);
+    } finally {
+      await appDatabase.close();
+    }
+  });
 
   _ResolvedReminderSchedule _resolveSchedule(
     CreateReminderCommand command,

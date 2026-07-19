@@ -6,6 +6,7 @@ import 'package:chief_site_engineer/features/attendance/attendance_day_page.dart
 import 'package:chief_site_engineer/features/attendance/attendance_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
+import 'package:chief_site_engineer/features/memory/memory_backup_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
 import 'package:flutter/material.dart';
@@ -285,6 +286,24 @@ class _HomePage extends StatelessWidget {
             subtitle: Text('Cloud sync ve kullanıcı hesabı bu sürümde yoktur.'),
           ),
         ),
+        if (bootstrap.backup case final backup?)
+          Card(
+            child: ListTile(
+              key: const Key('open-memory-backup'),
+              minVerticalPadding: 12,
+              leading: const Icon(Icons.settings_backup_restore_rounded),
+              title: const Text('Hafıza ve Yedekleme'),
+              subtitle: const Text(
+                'Parola korumalı tam mobil yedek oluştur veya geri yükle.',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => MemoryBackupPage(backup: backup),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
