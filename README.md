@@ -27,7 +27,8 @@ Flask sunucusu, LAN veya internet gerektirmez. Issue #180 runtime temelini,
 Issue #179 ilk gerçek Ajanda dilimini, Issue #183 bağımsız reminder yaşam
 döngüsü ve yerel notification teslimini, Issue #185 ise günlük Puantaj ve proje
 personeli iş akışını, Issue #187 ise döküm planından kapanış raporuna mobil
-Beton Paketi'ni sağlar.
+Beton Paketi'ni, Issue #189 ise parola korumalı tam mobil yedek ve atomik geri
+yüklemeyi sağlar.
 
 Mobil temel şunları içerir:
 
@@ -45,11 +46,14 @@ Mobil temel şunları içerir:
 - UTF-8/formula-safe günlük Puantaj CSV'si ve insan-okunabilir özet;
 - döküm checklist'i, mikser/irsaliye kanıtları, numune/laboratuvar ve kür takibi;
 - UTF-8/formula-safe Beton Paketi raporu ve SHA-256 kanıt manifesti;
+- bütün mobil SQLite ve aktif kanıt dosyaları için authenticated `.csebackup`;
+- salt-okunur preflight, otomatik safety backup, tam replace ve rollback;
 - cihaz-içi SQLite schema `5`, sürümlü ve atomik migration geçmişi;
 - restart sonrasında korunan smoke kayıt;
 - UTC seconds storage ve `Europe/Istanbul` sunumu;
 - debug/release için ayrı application identity ve veri kökü;
 - attachment, notification, permission ve export için güvenli platform portları.
+- Ajanda/Reminder/Puantaj/Beton/backup için ortak işlem koordinatörü.
 
 Bu dilim genel PackageTemplate motorunun veya otomatik beton kabul/red kararının
 tamamlandığı anlamına gelmez. Cloud sync, kullanıcı hesabı,
@@ -125,10 +129,12 @@ Issue #173 olay zamanı sözleşmesi ve salt-okunur migration preflight'ı, Issu
 / PR #181 mobil runtime temelini, Issue #179 / PR #182 mobil Ajanda günlük logu
 ve logdan bağlı hatırlatıcı dilimini, Issue #183 / PR #184 bağımsız hızlı
 reminder, tam yaşam döngüsü ve Android/iOS yerel notification teslimini, Issue
-#185 / PR #186 proje personeli ve günlük Puantajı merge etmiştir. Issue #187
-branch'inde Beton döküm planı, mikser/irsaliye kanıtı, numune, kür/reminder ve
-kapanış raporu uygulanmıştır; recurring routine, cloud sync, uygulama kilidi,
-release hardening ve gerçek saha pilotları henüz tamamlanmamıştır.
+#185 / PR #186 proje personeli ve günlük Puantajı, Issue #187 / PR #188 Beton
+döküm planı, mikser/irsaliye kanıtı, numune, kür/reminder ve kapanış raporunu
+merge etmiştir. Issue #189 branch'inde parola korumalı tam mobil yedek, güvenli
+preflight, safety backup ve atomik geri yükleme uygulanmıştır; recurring
+routine, cloud sync, uygulama kilidi, release hardening ve gerçek saha pilotları
+henüz tamamlanmamıştır.
 
 ## Saha Takibi v0.1
 

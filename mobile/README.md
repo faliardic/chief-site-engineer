@@ -164,6 +164,31 @@ formula injection koruması ve relative attachment manifest/hash bilgisi taşır
 Dosya atomik stage edilir; `report.exported` event'i yalnız başarıdan sonra
 yazılır ve paylaşım kullanıcı işlemiyle başlar.
 
+## Mobil Hafıza ve Yedekleme
+
+Başlangıç ekranındaki Hafıza ve Yedekleme yüzeyi, bütün mobil SQLite kayıtlarını
+ve aktif Beton kanıtlarını tek `.csebackup` format `1` paketinde taşır. Paket
+PBKDF2-HMAC-SHA256 ile paroladan türetilen 256-bit anahtar ve AES-256-GCM ile
+authenticated şifrelenir. Random salt/nonce paket başlığındadır; parola, absolute
+path, kullanıcı secret'ı veya signing materyali manifest/state içine yazılmaz.
+
+Backup; tek shared application coordinator altında SQLite `VACUUM INTO`
+snapshot, integrity/FK/read-model smoke ve attachment size/SHA-256 audit'i
+uygular. Staging `.part` yalnız self-check başarılıysa backup dizinine atomik
+rename edilir. Share sheet yalnız kullanıcı düğmesiyle açılır.
+
+Restore preflight aktif state'e dokunmadan magic/format/KDF/schema/parola,
+manifest hash/size, package/entry boyut sınırı, traversal, absolute/backslash,
+duplicate, symlink/directory/extra entry, SQLite integrity/FK ve DB row ↔
+attachment manifest eşliğini doğrular. Desteklenen eski mobil schema yalnız
+staging'de güncel schema'ya migrate edilir; downgrade yoktur.
+
+Kullanıcı checkbox ve ayrı modal ile tam replace'i iki kez onaylar. Service önce
+otomatik safety backup alır, database ve attachments çiftini rollback alanına
+taşır, incoming çifti etkinleştirir, smoke/hash kontrolü ve notification
+reconciliation çalıştırır. Her hata eski çifti geri getirir; merge/partial
+restore veya OS pending notification backup'ı yoktur.
+
 ## Zaman sözleşmesi
 
 - Kalıcı an: aware UTC, exact `YYYY-MM-DDTHH:MM:SSZ`.

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/concrete_models.dart';
@@ -291,9 +292,11 @@ class SqliteConcreteApplication implements ConcreteApplication {
     required this.clock,
     required this.agenda,
     required this.attachmentStore,
+    MobileOperationCoordinator? coordinator,
     ConcreteExportGateway? exportGateway,
     this.beforeConcreteEventInsert,
-  }) : exportGateway =
+  }) : coordinator = coordinator ?? MobileOperationCoordinator(),
+       exportGateway =
            exportGateway ?? const UnavailableConcreteExportGateway();
 
   final String databasePath;
@@ -301,9 +304,9 @@ class SqliteConcreteApplication implements ConcreteApplication {
   final UtcClock clock;
   final AgendaApplication agenda;
   final ConcreteAttachmentStore attachmentStore;
+  final MobileOperationCoordinator coordinator;
   final ConcreteExportGateway exportGateway;
   final ConcreteTransactionHook? beforeConcreteEventInsert;
-  Future<void> _databaseQueue = Future<void>.value();
 
   static const _checkDefinitions = <(String, String, bool)>[
     ('plant_appointment', 'Santral randevusu alındı', true),
@@ -888,11 +891,15 @@ class SqliteConcreteApplication implements ConcreteApplication {
   @override
   Future<ConcretePourDetail> attachEvidence(
     AttachConcreteEvidenceCommand command,
+  ) => coordinator.run(() => _attachEvidenceCoordinated(command));
+
+  Future<ConcretePourDetail> _attachEvidenceCoordinated(
+    AttachConcreteEvidenceCommand command,
   ) async {
     _validateAttachment(command);
     final now = _readClockOnce();
     final timestamp = CseTimeCodec.encodeUtc(now);
-    await _withDatabase(now, (database) {
+    await _withDatabaseUnlocked(now, (database) {
       return _validateAttachmentSources(database, command);
     });
     final staged = await attachmentStore.stage(
@@ -902,7 +909,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
       bytes: command.bytes,
     );
     try {
-      return await _withDatabase(now, (database) {
+      return await _withDatabaseUnlocked(now, (database) {
         return database.transaction((transaction) async {
           final pour = await _requirePour(transaction, command.pourId);
           _requireRevision(pour.revision, command.expectedPourRevision);
@@ -2336,26 +2343,23 @@ class SqliteConcreteApplication implements ConcreteApplication {
   Future<T> _withDatabase<T>(
     DateTime operationTime,
     Future<T> Function(Database database) action,
-  ) {
-    final completer = Completer<T>();
-    _databaseQueue = _databaseQueue
-        .then((_) async {
-          final appDatabase = AppDatabase(
-            path: databasePath,
-            factory: databaseFactory,
-            clock: () => operationTime,
-          );
-          try {
-            await appDatabase.open();
-            completer.complete(await action(appDatabase.database));
-          } on Object catch (error, stackTrace) {
-            completer.completeError(error, stackTrace);
-          } finally {
-            await appDatabase.close();
-          }
-        })
-        .catchError((Object _, StackTrace _) {});
-    return completer.future;
+  ) => coordinator.run(() => _withDatabaseUnlocked(operationTime, action));
+
+  Future<T> _withDatabaseUnlocked<T>(
+    DateTime operationTime,
+    Future<T> Function(Database database) action,
+  ) async {
+    final appDatabase = AppDatabase(
+      path: databasePath,
+      factory: databaseFactory,
+      clock: () => operationTime,
+    );
+    try {
+      await appDatabase.open();
+      return await action(appDatabase.database);
+    } finally {
+      await appDatabase.close();
+    }
   }
 
   @override

@@ -7,6 +7,7 @@ import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attendance_models.dart';
 import 'package:chief_site_engineer/domain/concrete_models.dart';
+import 'package:chief_site_engineer/domain/mobile_backup_models.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
 import 'package:flutter/widgets.dart';
@@ -162,7 +163,7 @@ void main() {
           nextDayStart,
         ).add(const Duration(hours: 9)),
       );
-      final concrete = await firstSuccess.concrete!.createPour(
+      var concrete = await firstSuccess.concrete!.createPour(
         CreateConcretePourCommand(
           id: '55555555-5555-4555-8555-555555555555',
           eventId: 'eeeeeeee-eeee-4eee-8eee-000000000020',
@@ -176,6 +177,23 @@ void main() {
       );
       expect(concrete.checks, hasLength(11));
       expect(concrete.linkedReminders.first.concretePourId, concrete.pour.id);
+      concrete = await firstSuccess.concrete!.attachEvidence(
+        AttachConcreteEvidenceCommand(
+          id: '66666666-6666-4666-8666-666666666666',
+          pourId: concrete.pour.id,
+          eventId: 'eeeeeeee-eeee-4eee-8eee-000000000021',
+          expectedPourRevision: concrete.pour.revision,
+          evidenceType: ConcreteEvidenceType.sitePhoto,
+          originalFileName: 'emulator.jpg',
+          bytes: const [0xff, 0xd8, 0xff, 0xe0, 1, 8, 9],
+          capturedAt: observedAt,
+          description: 'Android yedek taşınabilirlik kanıtı',
+        ),
+      );
+      expect(
+        concrete.attachments.single.integrity,
+        ConcreteAttachmentIntegrity.ok,
+      );
       final restartedNotifications = FlutterReminderNotificationGateway();
       final restarted = await AppBootstrap(
         environment: AppEnvironment.debug,
@@ -211,6 +229,46 @@ void main() {
       );
       expect(persistedConcrete.pour.pourCode, 'EMU-BT-01');
       expect(persistedConcrete.events.first.eventType, 'pour.created');
+      expect(
+        persistedConcrete.attachments.single.integrity,
+        ConcreteAttachmentIntegrity.ok,
+      );
+
+      final backup = restartedSuccess.backup!;
+      final createdBackup = await backup.createBackup(
+        const CreateMobileBackupCommand(
+          password: 'android-integration-parola',
+          passwordConfirmation: 'android-integration-parola',
+        ),
+      );
+      expect(await File(createdBackup.absolutePath).exists(), isTrue);
+      await restartedSuccess.agenda.createProject(
+        const CreateProjectCommand(
+          id: '77777777-7777-4777-8777-777777777777',
+          name: 'Yedek sonrası geçici proje',
+        ),
+      );
+      final backupPreflight = await backup.preflightBackup(
+        createdBackup.absolutePath,
+        'android-integration-parola',
+      );
+      await backup.restoreBackup(
+        RestoreMobileBackupCommand(
+          packagePath: createdBackup.absolutePath,
+          password: 'android-integration-parola',
+          expectedPackageSha256: backupPreflight.packageSha256,
+        ),
+      );
+      expect(
+        (await restartedSuccess.agenda.listProjects()).map((item) => item.id),
+        isNot(contains('77777777-7777-4777-8777-777777777777')),
+      );
+      expect(
+        (await restartedSuccess.concrete!.getPourDetail(
+          concrete.pour.id,
+        )).attachments.single.integrity,
+        ConcreteAttachmentIntegrity.ok,
+      );
 
       await tester.pumpWidget(
         CseApp(bootstrap: Future.value(restartedSuccess)),

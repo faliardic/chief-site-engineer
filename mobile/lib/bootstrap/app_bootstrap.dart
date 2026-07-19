@@ -1,13 +1,16 @@
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/attendance_application.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
+import 'package:chief_site_engineer/application/mobile_backup_application.dart';
 import 'package:chief_site_engineer/core/environment.dart';
+import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/platform/attendance_export_gateway.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/capabilities.dart';
 import 'package:chief_site_engineer/platform/concrete_attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/concrete_export_gateway.dart';
 import 'package:chief_site_engineer/platform/export_gateway.dart';
+import 'package:chief_site_engineer/platform/mobile_backup_gateway.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
@@ -28,6 +31,7 @@ class BootstrapSuccess extends BootstrapResult {
     this.attendance,
     this.concrete,
     this.concreteAttachments,
+    this.backup,
   });
 
   final String environmentLabel;
@@ -37,6 +41,7 @@ class BootstrapSuccess extends BootstrapResult {
   final AttendanceApplication? attendance;
   final ConcreteApplication? concrete;
   final SafeAttachmentPicker? concreteAttachments;
+  final MobileBackupApplication? backup;
 }
 
 class BootstrapFailure extends BootstrapResult {
@@ -94,11 +99,13 @@ class AppBootstrap {
       ).ensureFoundationRecord();
       await database.close();
       database = null;
+      final coordinator = MobileOperationCoordinator();
       final agenda = SqliteAgendaApplication(
         databasePath: directories.databaseFile,
         databaseFactory: databaseFactory,
         clock: clock,
         notificationGateway: notificationGateway,
+        coordinator: coordinator,
       );
       final attendance = SqliteAttendanceApplication(
         databasePath: directories.databaseFile,
@@ -108,6 +115,7 @@ class AppBootstrap {
         exportGateway: DeviceAttendanceExportGateway(
           stager: LocalExportStager(directories),
         ),
+        coordinator: coordinator,
       );
       final concrete = SqliteConcreteApplication(
         databasePath: directories.databaseFile,
@@ -120,6 +128,7 @@ class AppBootstrap {
         exportGateway: DeviceConcreteExportGateway(
           stager: LocalExportStager(directories),
         ),
+        coordinator: coordinator,
       );
       final concreteAttachments = SafeAttachmentPicker(
         permissions: const SafeCapabilityService(DevicePermissionGateway()),
@@ -132,6 +141,26 @@ class AppBootstrap {
       }
       await attendance.ensureRollingOccurrences();
       await agenda.reconcileNotifications();
+      final backup = SqliteMobileBackupApplication(
+        directories: directories,
+        databaseFactory: databaseFactory,
+        clock: clock,
+        coordinator: coordinator,
+        fileGateway: DeviceMobileBackupFileGateway(directories: directories),
+        notificationReconciler: () async {
+          // The restore already owns the application-wide coordinator. A fresh
+          // reader reconciles the newly activated SQLite truth without nesting
+          // another operation on the same serial queue.
+          final restoredAgenda = SqliteAgendaApplication(
+            databasePath: directories.databaseFile,
+            databaseFactory: databaseFactory,
+            clock: clock,
+            notificationGateway: notificationGateway,
+            coordinator: MobileOperationCoordinator(),
+          );
+          await restoredAgenda.reconcileNotifications();
+        },
+      );
       return BootstrapSuccess(
         environmentLabel: environment.label,
         smokeRecordId: smoke.id,
@@ -140,6 +169,7 @@ class AppBootstrap {
         attendance: attendance,
         concrete: concrete,
         concreteAttachments: concreteAttachments,
+        backup: backup,
       );
     } on Object {
       return const BootstrapFailure();

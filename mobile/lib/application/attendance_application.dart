@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
@@ -60,18 +61,20 @@ class SqliteAttendanceApplication implements AttendanceApplication {
     required this.databaseFactory,
     required this.clock,
     required this.agenda,
+    MobileOperationCoordinator? coordinator,
     AttendanceExportGateway? exportGateway,
     this.beforeAttendanceEventInsert,
-  }) : exportGateway =
+  }) : coordinator = coordinator ?? MobileOperationCoordinator(),
+       exportGateway =
            exportGateway ?? const UnavailableAttendanceExportGateway();
 
   final String databasePath;
   final DatabaseFactory databaseFactory;
   final UtcClock clock;
   final AgendaApplication agenda;
+  final MobileOperationCoordinator coordinator;
   final AttendanceExportGateway exportGateway;
   final AttendanceTransactionHook? beforeAttendanceEventInsert;
-  Future<void> _databaseQueue = Future<void>.value();
 
   @override
   Future<List<WorkforceMember>> listMembers(
@@ -1712,27 +1715,19 @@ class SqliteAttendanceApplication implements AttendanceApplication {
   Future<T> _withDatabase<T>(
     DateTime operationTime,
     Future<T> Function(Database database) action,
-  ) {
-    final completer = Completer<T>();
-    _databaseQueue = _databaseQueue
-        .then((_) async {
-          final appDatabase = AppDatabase(
-            path: databasePath,
-            factory: databaseFactory,
-            clock: () => operationTime,
-          );
-          try {
-            await appDatabase.open();
-            completer.complete(await action(appDatabase.database));
-          } on Object catch (error, stackTrace) {
-            completer.completeError(error, stackTrace);
-          } finally {
-            await appDatabase.close();
-          }
-        })
-        .catchError((Object _, StackTrace _) {});
-    return completer.future;
-  }
+  ) => coordinator.run(() async {
+    final appDatabase = AppDatabase(
+      path: databasePath,
+      factory: databaseFactory,
+      clock: () => operationTime,
+    );
+    try {
+      await appDatabase.open();
+      return await action(appDatabase.database);
+    } finally {
+      await appDatabase.close();
+    }
+  });
 }
 
 WorkforceMember _memberFromRow(Map<String, Object?> row) {

@@ -32,6 +32,7 @@ void main() {
         directories.database,
         directories.attachments,
         directories.exportsBackups,
+        directories.state,
         directories.staging,
       ]) {
         expect(await directory.exists(), isTrue);
@@ -39,6 +40,10 @@ void main() {
       }
       expect(
         path.isWithin(directories.root.path, directories.databaseFile),
+        isTrue,
+      );
+      expect(
+        path.isWithin(directories.root.path, directories.backupStateFile),
         isTrue,
       );
     },
