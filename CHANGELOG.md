@@ -1,5 +1,25 @@
 # Changelog
 
+## Issue #187 - Mobil Beton Döküm Paketi
+
+- Mobil SQLite schema `4` → `5` atomik migration ile Ajanda, reminder,
+  notification, Puantaj ve event verileri korunarak Beton döküm aggregate'i,
+  checklist, mikser/irsaliye, numune, takip, kanıt ve event tabloları eklendi.
+- Taslak, hazır, dökülüyor, döküm bitti, takip, kapalı, iptal ve gerekçeli reopen
+  yaşam döngüsü optimistic revision, no-op ve append-only geçmişle uygulandı.
+- On bir built-in hazırlık kontrolü; mikser zaman/metraj/sonuç invariant'ları;
+  truck'lardan türetilen gerçek metraj ve kapanış kanıt kapıları eklendi.
+- Numune setleri, laboratuvar teslimi ve sonuç tarihleri exact Beton kaynağına
+  bağlı reminder'larla; çift yönlü deep-link ve transaction kapanışıyla açıldı.
+- Kamera, galeri ve dosya seçici gerçek platform portuna bağlandı; MIME sniff,
+  boyut, SHA-256, atomik finalize, duplicate uyarısı ve orphan cleanup eklendi.
+- Bugün/yaklaşan/devam eden/takip/kapalı listesi, proje/tarih/literal filtreleri,
+  açık sayaçlar ve 320 px güvenli döküm günü ekranı tamamlandı.
+- UTF-8 Markdown, CSV/JSON-ready özet, formula injection koruması, attachment
+  manifest/hash, atomik export ve başarı sonrası `report.exported` event'i eklendi.
+- Python schema/Backup/restore allowlist/Günlük Çıktı, gerçek kullanıcı verisi,
+  signing materyali, cloud/API ve mağaza gönderimi değiştirilmedi.
+
 ## Issue #185 - Mobil Günlük Puantaj ve Personel
 
 - Mobil SQLite schema `3` → `4` atomik migration ile mevcut Ajanda, reminder,

@@ -14,6 +14,8 @@ void main() {
       expect(manifest, contains('android.permission.RECEIVE_BOOT_COMPLETED'));
       expect(manifest, contains('ScheduledNotificationReceiver'));
       expect(manifest, contains('ScheduledNotificationBootReceiver'));
+      expect(manifest, contains('android.permission.CAMERA'));
+      expect(manifest, contains('android.permission.READ_MEDIA_IMAGES'));
       expect(manifest, isNot(contains('SCHEDULE_EXACT_ALARM')));
       expect(manifest, isNot(contains('USE_EXACT_ALARM')));
     },
@@ -56,6 +58,8 @@ void main() {
       expect(project, contains('IPHONEOS_DEPLOYMENT_TARGET = 13.0'));
       expect(project, contains('com.faliardic.chiefsiteengineer'));
       expect(plist, contains('UIApplicationSceneManifest'));
+      expect(plist, contains('NSCameraUsageDescription'));
+      expect(plist, contains('NSPhotoLibraryUsageDescription'));
     },
   );
 
@@ -68,18 +72,26 @@ void main() {
     expect(lock, contains('version: "22.1.0"'));
   });
 
-  test('attendance schema and cross-platform share dependency are pinned', () {
-    final schema = File('lib/storage/app_database.dart').readAsStringSync();
-    final pubspec = File('pubspec.yaml').readAsStringSync();
-    final lock = File('pubspec.lock').readAsStringSync();
+  test(
+    'concrete schema and cross-platform attachment dependencies are pinned',
+    () {
+      final schema = File('lib/storage/app_database.dart').readAsStringSync();
+      final pubspec = File('pubspec.yaml').readAsStringSync();
+      final lock = File('pubspec.lock').readAsStringSync();
 
-    expect(schema, contains('static const schemaVersion = 4'));
-    expect(schema, contains('CREATE TABLE workforce_members'));
-    expect(schema, contains('CREATE TABLE attendance_days'));
-    expect(schema, contains('CREATE TABLE attendance_entries'));
-    expect(schema, contains('CREATE TABLE attendance_events'));
-    expect(pubspec, contains('share_plus: ^12.0.1'));
-    expect(lock, contains('share_plus:'));
-    expect(lock, contains('version: "12.0.2"'));
-  });
+      expect(schema, contains('static const schemaVersion = 5'));
+      expect(schema, contains('CREATE TABLE workforce_members'));
+      expect(schema, contains('CREATE TABLE attendance_days'));
+      expect(schema, contains('CREATE TABLE attendance_entries'));
+      expect(schema, contains('CREATE TABLE attendance_events'));
+      expect(schema, contains('CREATE TABLE concrete_pours'));
+      expect(schema, contains('CREATE TABLE concrete_attachments'));
+      expect(pubspec, contains('share_plus: ^12.0.1'));
+      expect(pubspec, contains('image_picker: ^1.2.1'));
+      expect(pubspec, contains('file_picker: ^10.3.10'));
+      expect(pubspec, contains('permission_handler: ^12.0.1'));
+      expect(lock, contains('share_plus:'));
+      expect(lock, contains('version: "12.0.2"'));
+    },
+  );
 }

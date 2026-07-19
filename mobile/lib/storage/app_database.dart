@@ -25,7 +25,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 4;
+  static const schemaVersion = 5;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -777,6 +777,619 @@ class AppDatabase {
             SELECT RAISE(ABORT, 'no-work day cannot have entries');
           END
         ''');
+      },
+    ),
+    DatabaseMigration(
+      version: 5,
+      apply: (transaction) async {
+        await transaction.execute('''
+          CREATE TABLE concrete_pours (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES projects(id),
+            pour_code TEXT NOT NULL,
+            element_location TEXT NOT NULL,
+            block_name TEXT,
+            floor_name TEXT,
+            axis_name TEXT,
+            planned_at TEXT NOT NULL,
+            actual_started_at TEXT,
+            actual_ended_at TEXT,
+            concrete_class TEXT NOT NULL,
+            target_slump TEXT,
+            planned_volume_m3 REAL NOT NULL CHECK (planned_volume_m3 >= 0),
+            ordered_volume_m3 REAL CHECK (
+              ordered_volume_m3 IS NULL OR ordered_volume_m3 >= 0
+            ),
+            plant_name TEXT,
+            plant_branch TEXT,
+            plant_contact TEXT,
+            plant_appointment_reference TEXT,
+            pump_equipment TEXT,
+            laboratory_name TEXT,
+            laboratory_contact TEXT,
+            laboratory_appointment TEXT,
+            inspection_notified_at TEXT,
+            inspection_notified_person TEXT,
+            status TEXT NOT NULL CHECK (status IN (
+              'draft', 'prepared', 'pouring', 'poured', 'follow_up',
+              'closed', 'cancelled'
+            )),
+            general_note TEXT,
+            sample_exception_reason TEXT,
+            variance_note TEXT,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            closed_at TEXT,
+            cancelled_at TEXT,
+            UNIQUE (project_id, pour_code),
+            UNIQUE (id, project_id),
+            CHECK (
+              actual_ended_at IS NULL OR actual_started_at IS NOT NULL
+            ),
+            CHECK (
+              actual_ended_at IS NULL OR actual_ended_at >= actual_started_at
+            ),
+            CHECK (
+              (status = 'closed' AND closed_at IS NOT NULL
+                AND cancelled_at IS NULL)
+              OR (status = 'cancelled' AND cancelled_at IS NOT NULL
+                AND closed_at IS NULL)
+              OR (status NOT IN ('closed', 'cancelled')
+                AND closed_at IS NULL AND cancelled_at IS NULL)
+            )
+          )
+        ''');
+        await transaction.execute('''
+          CREATE TABLE concrete_check_items (
+            id TEXT PRIMARY KEY,
+            concrete_pour_id TEXT NOT NULL REFERENCES concrete_pours(id),
+            item_key TEXT NOT NULL,
+            label TEXT NOT NULL,
+            sort_order INTEGER NOT NULL CHECK (sort_order >= 1),
+            is_required INTEGER NOT NULL CHECK (is_required IN (0, 1)),
+            status TEXT NOT NULL CHECK (status IN (
+              'pending', 'completed', 'not_applicable', 'exception'
+            )),
+            note TEXT,
+            reason TEXT,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (concrete_pour_id, item_key),
+            UNIQUE (id, concrete_pour_id),
+            CHECK (
+              status NOT IN ('not_applicable', 'exception')
+              OR (reason IS NOT NULL AND length(trim(reason)) > 0)
+            )
+          )
+        ''');
+        await transaction.execute('''
+          CREATE TABLE concrete_trucks (
+            id TEXT PRIMARY KEY,
+            concrete_pour_id TEXT NOT NULL REFERENCES concrete_pours(id),
+            sequence_no INTEGER NOT NULL CHECK (sequence_no >= 1),
+            vehicle_plate TEXT NOT NULL,
+            delivery_note_number TEXT NOT NULL,
+            plant_snapshot TEXT,
+            batch_time TEXT,
+            arrived_at TEXT,
+            unloading_started_at TEXT,
+            unloading_ended_at TEXT,
+            volume_m3 REAL NOT NULL CHECK (volume_m3 > 0),
+            measured_slump REAL CHECK (
+              measured_slump IS NULL OR measured_slump >= 0
+            ),
+            concrete_temperature REAL,
+            result TEXT NOT NULL CHECK (result IN (
+              'received', 'held', 'returned', 'partial'
+            )),
+            reason TEXT,
+            evidence_exception_reason TEXT,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (concrete_pour_id, sequence_no),
+            UNIQUE (concrete_pour_id, delivery_note_number),
+            UNIQUE (id, concrete_pour_id),
+            CHECK (
+              result = 'received'
+              OR (reason IS NOT NULL AND length(trim(reason)) > 0)
+            ),
+            CHECK (
+              unloading_started_at IS NULL OR arrived_at IS NULL
+              OR unloading_started_at >= arrived_at
+            ),
+            CHECK (
+              unloading_ended_at IS NULL OR unloading_started_at IS NOT NULL
+            ),
+            CHECK (
+              unloading_ended_at IS NULL
+              OR unloading_ended_at >= unloading_started_at
+            )
+          )
+        ''');
+        await transaction.execute('''
+          CREATE TABLE concrete_sample_sets (
+            id TEXT PRIMARY KEY,
+            concrete_pour_id TEXT NOT NULL REFERENCES concrete_pours(id),
+            source_truck_id TEXT,
+            sample_code TEXT NOT NULL,
+            sample_count INTEGER NOT NULL CHECK (sample_count >= 0),
+            sample_labels_json TEXT NOT NULL,
+            sampled_at TEXT,
+            sampled_by TEXT,
+            laboratory_appointment_at TEXT,
+            delivered_at TEXT,
+            delivered_to TEXT,
+            expected_result_dates_json TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN (
+              'planned', 'sampled', 'delivered', 'waiting_result',
+              'completed', 'exception'
+            )),
+            note TEXT,
+            reason TEXT,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (concrete_pour_id, sample_code),
+            UNIQUE (id, concrete_pour_id),
+            FOREIGN KEY (source_truck_id, concrete_pour_id)
+              REFERENCES concrete_trucks(id, concrete_pour_id),
+            CHECK (
+              status NOT IN ('sampled', 'delivered', 'waiting_result',
+                'completed')
+              OR (sampled_at IS NOT NULL AND sample_count > 0)
+            ),
+            CHECK (
+              status NOT IN ('delivered', 'waiting_result', 'completed')
+              OR delivered_at IS NOT NULL
+            ),
+            CHECK (
+              status != 'exception'
+              OR (reason IS NOT NULL AND length(trim(reason)) > 0)
+            )
+          )
+        ''');
+        await transaction.execute('''
+          CREATE TABLE concrete_follow_up_items (
+            id TEXT PRIMARY KEY,
+            concrete_pour_id TEXT NOT NULL REFERENCES concrete_pours(id),
+            source_sample_set_id TEXT,
+            item_key TEXT NOT NULL,
+            label TEXT NOT NULL,
+            due_at TEXT,
+            status TEXT NOT NULL CHECK (status IN (
+              'pending', 'completed', 'exception'
+            )),
+            reminder_id TEXT UNIQUE,
+            note TEXT,
+            reason TEXT,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            completed_at TEXT,
+            UNIQUE (concrete_pour_id, item_key),
+            UNIQUE (id, concrete_pour_id),
+            FOREIGN KEY (source_sample_set_id, concrete_pour_id)
+              REFERENCES concrete_sample_sets(id, concrete_pour_id),
+            CHECK (
+              (status = 'pending' AND completed_at IS NULL)
+              OR (status IN ('completed', 'exception')
+                AND completed_at IS NOT NULL)
+            ),
+            CHECK (
+              status != 'exception'
+              OR (reason IS NOT NULL AND length(trim(reason)) > 0)
+            )
+          )
+        ''');
+        await transaction.execute('''
+          CREATE TABLE concrete_attachments (
+            id TEXT PRIMARY KEY,
+            concrete_pour_id TEXT NOT NULL REFERENCES concrete_pours(id),
+            truck_id TEXT,
+            sample_set_id TEXT,
+            check_item_id TEXT,
+            evidence_type TEXT NOT NULL CHECK (evidence_type IN (
+              'delivery_receipt_scan', 'mixer_photo', 'site_photo',
+              'sample_photo', 'laboratory_delivery_document',
+              'result_document', 'other'
+            )),
+            original_file_name TEXT NOT NULL,
+            mime_type TEXT NOT NULL,
+            byte_size INTEGER NOT NULL CHECK (byte_size > 0),
+            sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
+            relative_path TEXT NOT NULL UNIQUE,
+            captured_at TEXT NOT NULL,
+            description TEXT,
+            created_at TEXT NOT NULL,
+            archived_at TEXT,
+            UNIQUE (concrete_pour_id, sha256),
+            FOREIGN KEY (truck_id, concrete_pour_id)
+              REFERENCES concrete_trucks(id, concrete_pour_id),
+            FOREIGN KEY (sample_set_id, concrete_pour_id)
+              REFERENCES concrete_sample_sets(id, concrete_pour_id),
+            FOREIGN KEY (check_item_id, concrete_pour_id)
+              REFERENCES concrete_check_items(id, concrete_pour_id),
+            CHECK (
+              (truck_id IS NOT NULL) + (sample_set_id IS NOT NULL)
+                + (check_item_id IS NOT NULL) <= 1
+            )
+          )
+        ''');
+        await transaction.execute('''
+          CREATE TABLE concrete_pour_events (
+            id TEXT PRIMARY KEY,
+            concrete_pour_id TEXT NOT NULL REFERENCES concrete_pours(id),
+            sequence INTEGER NOT NULL CHECK (sequence >= 1),
+            event_type TEXT NOT NULL CHECK (event_type IN (
+              'pour.created', 'pour.details_updated', 'check.updated',
+              'pour.prepared', 'pour.started', 'truck.added',
+              'truck.updated', 'evidence.attached', 'sample_set.added',
+              'sample_set.updated', 'follow_up.linked', 'pour.finished',
+              'pour.follow_up_started', 'pour.closed', 'pour.cancelled',
+              'pour.reopened', 'report.exported'
+            )),
+            occurred_at TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            UNIQUE (concrete_pour_id, sequence)
+          )
+        ''');
+
+        await transaction.execute(
+          'DROP TRIGGER follow_up_events_append_only_update',
+        );
+        await transaction.execute(
+          'DROP TRIGGER follow_up_events_append_only_delete',
+        );
+        await transaction.execute(
+          'DROP TRIGGER follow_up_items_no_physical_delete',
+        );
+        await transaction.execute(
+          'DROP TRIGGER attendance_day_reminder_links_no_physical_delete',
+        );
+        for (final index in [
+          'ix_follow_ups_attention_v4',
+          'ix_follow_ups_observation_v4',
+          'ix_follow_ups_attendance_v4',
+          'ix_notification_bindings_schedule_v4',
+        ]) {
+          await transaction.execute('DROP INDEX $index');
+        }
+        await transaction.execute(
+          'ALTER TABLE attendance_day_reminder_links '
+          'RENAME TO attendance_day_reminder_links_v4',
+        );
+        await transaction.execute(
+          'ALTER TABLE reminder_notification_bindings '
+          'RENAME TO reminder_notification_bindings_v4',
+        );
+        await transaction.execute(
+          'ALTER TABLE follow_up_events RENAME TO follow_up_events_v4',
+        );
+        await transaction.execute(
+          'ALTER TABLE follow_up_items RENAME TO follow_up_items_v4',
+        );
+        await transaction.execute('''
+          CREATE TABLE follow_up_items (
+            id TEXT PRIMARY KEY,
+            capture_text TEXT NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT,
+            item_type TEXT NOT NULL CHECK (
+              item_type IN ('action', 'waiting', 'recheck')
+            ),
+            status TEXT NOT NULL CHECK (
+              status IN ('inbox', 'active', 'waiting', 'completed', 'cancelled')
+            ),
+            project_id TEXT REFERENCES projects(id),
+            observation_id TEXT,
+            attendance_day_id TEXT,
+            concrete_pour_id TEXT,
+            location TEXT,
+            related_person TEXT,
+            is_important INTEGER NOT NULL DEFAULT 0 CHECK (
+              is_important IN (0, 1)
+            ),
+            next_attention_at TEXT,
+            deadline_at TEXT,
+            condition_text TEXT,
+            outcome_type TEXT CHECK (
+              outcome_type IS NULL OR outcome_type IN (
+                'completed', 'no_longer_needed'
+              )
+            ),
+            outcome_note TEXT,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            completed_at TEXT,
+            cancelled_at TEXT,
+            FOREIGN KEY (observation_id, project_id)
+              REFERENCES field_observations(id, project_id),
+            FOREIGN KEY (attendance_day_id, project_id)
+              REFERENCES attendance_days(id, project_id),
+            FOREIGN KEY (concrete_pour_id, project_id)
+              REFERENCES concrete_pours(id, project_id),
+            CHECK (
+              (observation_id IS NOT NULL) + (attendance_day_id IS NOT NULL)
+                + (concrete_pour_id IS NOT NULL) <= 1
+            ),
+            CHECK (
+              (observation_id IS NULL AND attendance_day_id IS NULL
+                AND concrete_pour_id IS NULL)
+              OR project_id IS NOT NULL
+            ),
+            CHECK (
+              (status = 'inbox' AND next_attention_at IS NULL)
+              OR (status IN ('active', 'waiting')
+                AND next_attention_at IS NOT NULL)
+              OR status IN ('completed', 'cancelled')
+            ),
+            CHECK (
+              (status = 'completed' AND completed_at IS NOT NULL
+                AND cancelled_at IS NULL AND outcome_type IS NOT NULL)
+              OR (status = 'cancelled' AND cancelled_at IS NOT NULL
+                AND completed_at IS NULL AND outcome_type IS NOT NULL)
+              OR (status IN ('inbox', 'active', 'waiting')
+                AND completed_at IS NULL AND cancelled_at IS NULL
+                AND outcome_type IS NULL AND outcome_note IS NULL)
+            )
+          )
+        ''');
+        await transaction.execute('''
+          INSERT INTO follow_up_items (
+            id, capture_text, title, description, item_type, status,
+            project_id, observation_id, attendance_day_id, concrete_pour_id,
+            location, related_person, is_important, next_attention_at,
+            deadline_at, condition_text, outcome_type, outcome_note, revision,
+            created_at, updated_at, completed_at, cancelled_at
+          )
+          SELECT
+            id, capture_text, title, description, item_type, status,
+            project_id, observation_id, attendance_day_id, NULL,
+            location, related_person, is_important, next_attention_at,
+            deadline_at, condition_text, outcome_type, outcome_note, revision,
+            created_at, updated_at, completed_at, cancelled_at
+          FROM follow_up_items_v4
+        ''');
+        await transaction.execute('''
+          CREATE TABLE follow_up_events (
+            id TEXT PRIMARY KEY,
+            follow_up_id TEXT NOT NULL REFERENCES follow_up_items(id),
+            sequence INTEGER NOT NULL CHECK (sequence >= 1),
+            project_id TEXT REFERENCES projects(id),
+            source_observation_id TEXT,
+            source_attendance_day_id TEXT,
+            source_concrete_pour_id TEXT,
+            event_type TEXT NOT NULL CHECK (event_type IN (
+              'created', 'scheduled', 'rescheduled', 'details_updated',
+              'waiting_started', 'snoozed', 'completed', 'cancelled',
+              'reopened', 'moved_to_inbox', 'notification_scheduled',
+              'notification_cancelled'
+            )),
+            occurred_at TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            FOREIGN KEY (source_observation_id, project_id)
+              REFERENCES field_observations(id, project_id),
+            FOREIGN KEY (source_attendance_day_id, project_id)
+              REFERENCES attendance_days(id, project_id),
+            FOREIGN KEY (source_concrete_pour_id, project_id)
+              REFERENCES concrete_pours(id, project_id),
+            UNIQUE (follow_up_id, sequence),
+            CHECK (
+              (source_observation_id IS NOT NULL)
+                + (source_attendance_day_id IS NOT NULL)
+                + (source_concrete_pour_id IS NOT NULL) <= 1
+            ),
+            CHECK (
+              (source_observation_id IS NULL
+                AND source_attendance_day_id IS NULL
+                AND source_concrete_pour_id IS NULL)
+              OR project_id IS NOT NULL
+            )
+          )
+        ''');
+        await transaction.execute('''
+          INSERT INTO follow_up_events (
+            id, follow_up_id, sequence, project_id,
+            source_observation_id, source_attendance_day_id,
+            source_concrete_pour_id, event_type, occurred_at, payload_json
+          )
+          SELECT
+            id, follow_up_id, sequence, project_id,
+            source_observation_id, source_attendance_day_id,
+            NULL, event_type, occurred_at, payload_json
+          FROM follow_up_events_v4
+        ''');
+        await transaction.execute('''
+          CREATE TABLE reminder_notification_bindings (
+            reminder_id TEXT PRIMARY KEY REFERENCES follow_up_items(id),
+            platform_notification_id INTEGER NOT NULL UNIQUE CHECK (
+              platform_notification_id BETWEEN 1 AND 2147483647
+            ),
+            scheduled_for TEXT,
+            sync_state TEXT NOT NULL CHECK (sync_state IN (
+              'scheduled', 'permission_denied', 'unavailable',
+              'failed', 'cancelled'
+            )),
+            last_synced_at TEXT NOT NULL,
+            safe_error_code TEXT
+          )
+        ''');
+        await transaction.execute('''
+          INSERT INTO reminder_notification_bindings (
+            reminder_id, platform_notification_id, scheduled_for,
+            sync_state, last_synced_at, safe_error_code
+          )
+          SELECT reminder_id, platform_notification_id, scheduled_for,
+            sync_state, last_synced_at, safe_error_code
+          FROM reminder_notification_bindings_v4
+        ''');
+        await transaction.execute('''
+          CREATE TABLE attendance_day_reminder_links (
+            attendance_day_id TEXT PRIMARY KEY REFERENCES attendance_days(id),
+            reminder_id TEXT NOT NULL UNIQUE REFERENCES follow_up_items(id),
+            due_at TEXT NOT NULL,
+            created_at TEXT NOT NULL
+          )
+        ''');
+        await transaction.execute('''
+          INSERT INTO attendance_day_reminder_links (
+            attendance_day_id, reminder_id, due_at, created_at
+          )
+          SELECT attendance_day_id, reminder_id, due_at, created_at
+          FROM attendance_day_reminder_links_v4
+        ''');
+        await transaction.execute(
+          'DROP TABLE attendance_day_reminder_links_v4',
+        );
+        await transaction.execute(
+          'DROP TABLE reminder_notification_bindings_v4',
+        );
+        await transaction.execute('DROP TABLE follow_up_events_v4');
+        await transaction.execute('DROP TABLE follow_up_items_v4');
+
+        // The concrete follow-up table is created before the reminder table is
+        // rebuilt so legacy reminders can be copied without disabling foreign
+        // keys. Rebuild the still-empty v5 table now to make the source link a
+        // real database invariant as well as an application invariant.
+        await transaction.execute(
+          'ALTER TABLE concrete_follow_up_items '
+          'RENAME TO concrete_follow_up_items_unlinked',
+        );
+        await transaction.execute('''
+          CREATE TABLE concrete_follow_up_items (
+            id TEXT PRIMARY KEY,
+            concrete_pour_id TEXT NOT NULL REFERENCES concrete_pours(id),
+            source_sample_set_id TEXT,
+            item_key TEXT NOT NULL,
+            label TEXT NOT NULL,
+            due_at TEXT,
+            status TEXT NOT NULL CHECK (status IN (
+              'pending', 'completed', 'exception'
+            )),
+            reminder_id TEXT UNIQUE REFERENCES follow_up_items(id),
+            note TEXT,
+            reason TEXT,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            completed_at TEXT,
+            UNIQUE (concrete_pour_id, item_key),
+            UNIQUE (id, concrete_pour_id),
+            FOREIGN KEY (source_sample_set_id, concrete_pour_id)
+              REFERENCES concrete_sample_sets(id, concrete_pour_id),
+            CHECK (
+              (status = 'pending' AND completed_at IS NULL)
+              OR (status IN ('completed', 'exception')
+                AND completed_at IS NOT NULL)
+            ),
+            CHECK (
+              status != 'exception'
+              OR (reason IS NOT NULL AND length(trim(reason)) > 0)
+            )
+          )
+        ''');
+        await transaction.execute('''
+          INSERT INTO concrete_follow_up_items (
+            id, concrete_pour_id, source_sample_set_id, item_key, label,
+            due_at, status, reminder_id, note, reason, revision, created_at,
+            updated_at, completed_at
+          )
+          SELECT
+            id, concrete_pour_id, source_sample_set_id, item_key, label,
+            due_at, status, reminder_id, note, reason, revision, created_at,
+            updated_at, completed_at
+          FROM concrete_follow_up_items_unlinked
+        ''');
+        await transaction.execute(
+          'DROP TABLE concrete_follow_up_items_unlinked',
+        );
+
+        await transaction.execute('''
+          CREATE INDEX ix_concrete_pours_project_planned
+          ON concrete_pours(project_id, planned_at, created_at, id)
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_concrete_checks_pour_order
+          ON concrete_check_items(concrete_pour_id, sort_order, id)
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_concrete_trucks_pour_sequence
+          ON concrete_trucks(concrete_pour_id, sequence_no, id)
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_concrete_samples_pour
+          ON concrete_sample_sets(concrete_pour_id, created_at, id)
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_concrete_followups_pour
+          ON concrete_follow_up_items(concrete_pour_id, status, due_at, id)
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_concrete_attachments_pour
+          ON concrete_attachments(
+            concrete_pour_id, archived_at, evidence_type, created_at, id
+          )
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_follow_ups_attention_v5
+          ON follow_up_items(
+            status, next_attention_at, is_important, created_at, id
+          )
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_follow_ups_observation_v5
+          ON follow_up_items(observation_id, created_at, id)
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_follow_ups_attendance_v5
+          ON follow_up_items(attendance_day_id, created_at, id)
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_follow_ups_concrete_v5
+          ON follow_up_items(concrete_pour_id, created_at, id)
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_notification_bindings_schedule_v5
+          ON reminder_notification_bindings(sync_state, scheduled_for)
+        ''');
+        for (final table in ['concrete_pour_events', 'follow_up_events']) {
+          await transaction.execute('''
+            CREATE TRIGGER ${table}_append_only_update
+            BEFORE UPDATE ON $table
+            BEGIN
+              SELECT RAISE(ABORT, 'append-only event history');
+            END
+          ''');
+          await transaction.execute('''
+            CREATE TRIGGER ${table}_append_only_delete
+            BEFORE DELETE ON $table
+            BEGIN
+              SELECT RAISE(ABORT, 'append-only event history');
+            END
+          ''');
+        }
+        for (final table in [
+          'concrete_pours',
+          'concrete_check_items',
+          'concrete_trucks',
+          'concrete_sample_sets',
+          'concrete_follow_up_items',
+          'concrete_attachments',
+          'follow_up_items',
+          'attendance_day_reminder_links',
+        ]) {
+          await transaction.execute('''
+            CREATE TRIGGER ${table}_no_physical_delete
+            BEFORE DELETE ON $table
+            BEGIN
+              SELECT RAISE(ABORT, 'physical delete is not allowed');
+            END
+          ''');
+        }
       },
     ),
   ];

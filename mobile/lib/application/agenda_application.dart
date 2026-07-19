@@ -645,7 +645,9 @@ class SqliteAgendaApplication implements AgendaApplication {
         if (_sameReminderValues(current, values)) {
           return (reminder: current, changed: false);
         }
-        if ((current.sourceLogId != null || current.attendanceDayId != null) &&
+        if ((current.sourceLogId != null ||
+                current.attendanceDayId != null ||
+                current.concretePourId != null) &&
             values['project_id'] != current.projectId) {
           throw const AgendaValidationFailure(
             'Kaynak kaydın projesi değiştirilemez.',
@@ -693,6 +695,7 @@ class SqliteAgendaApplication implements AgendaApplication {
           'project_id': values['project_id'],
           'source_observation_id': current.sourceLogId,
           'source_attendance_day_id': current.attendanceDayId,
+          'source_concrete_pour_id': current.concretePourId,
           'event_type': eventType,
           'occurred_at': updatedAt,
           'payload_json': jsonEncode({
@@ -1438,6 +1441,7 @@ class SqliteAgendaApplication implements AgendaApplication {
     return reminder.projectId == command.projectId &&
         reminder.sourceLogId == command.sourceLogId &&
         reminder.attendanceDayId == null &&
+        reminder.concretePourId == null &&
         reminder.captureText == captureText &&
         reminder.title == title &&
         reminder.description == description &&
@@ -1512,6 +1516,7 @@ MobileReminder _reminderFromRow(Map<String, Object?> row) {
   final projectId = row['project_id'] as String?;
   final sourceLogId = row['observation_id'] as String?;
   final attendanceDayId = row['attendance_day_id'] as String?;
+  final concretePourId = row['concrete_pour_id'] as String?;
   final createdAt = row['created_at']! as String;
   final updatedAt = row['updated_at']! as String;
   final nextAttentionAt = row['next_attention_at'] as String?;
@@ -1523,6 +1528,9 @@ MobileReminder _reminderFromRow(Map<String, Object?> row) {
   if (sourceLogId != null) validateUuid(sourceLogId, 'Kaynak log kimliği');
   if (attendanceDayId != null) {
     validateUuid(attendanceDayId, 'Kaynak Puantaj günü kimliği');
+  }
+  if (concretePourId != null) {
+    validateUuid(concretePourId, 'Kaynak Beton paketi kimliği');
   }
   validateCanonicalTimestamp(createdAt, 'Hatırlatıcı oluşturma zamanı');
   validateCanonicalTimestamp(updatedAt, 'Hatırlatıcı güncelleme zamanı');
@@ -1547,6 +1555,7 @@ MobileReminder _reminderFromRow(Map<String, Object?> row) {
         : requiredTrimmed(row['project_name']! as String, 'Proje adı'),
     sourceLogId: sourceLogId,
     attendanceDayId: attendanceDayId,
+    concretePourId: concretePourId,
     captureText: requiredTrimmed(
       row['capture_text']! as String,
       'Hızlı yakalama metni',
@@ -1577,10 +1586,14 @@ AppendOnlyEvent _reminderEventFromRow(Map<String, Object?> row) {
   final projectId = row['project_id'] as String?;
   final sourceLogId = row['source_observation_id'] as String?;
   final attendanceDayId = row['source_attendance_day_id'] as String?;
+  final concretePourId = row['source_concrete_pour_id'] as String?;
   if (projectId != null) validateUuid(projectId, 'Proje kimliği');
   if (sourceLogId != null) validateUuid(sourceLogId, 'Kaynak log kimliği');
   if (attendanceDayId != null) {
     validateUuid(attendanceDayId, 'Kaynak Puantaj günü kimliği');
+  }
+  if (concretePourId != null) {
+    validateUuid(concretePourId, 'Kaynak Beton paketi kimliği');
   }
   return AppendOnlyEvent(
     id: row['id']! as String,
@@ -1588,6 +1601,7 @@ AppendOnlyEvent _reminderEventFromRow(Map<String, Object?> row) {
     projectId: projectId,
     sourceLogId: sourceLogId,
     sourceAttendanceDayId: attendanceDayId,
+    sourceConcretePourId: concretePourId,
     eventType: row['event_type']! as String,
     occurredAt: row['occurred_at']! as String,
     payloadJson: row['payload_json']! as String,

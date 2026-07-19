@@ -1,10 +1,13 @@
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/attendance_application.dart';
+import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_day_page.dart';
+import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
+import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:flutter/material.dart';
 
 class ReminderDetailPage extends StatefulWidget {
@@ -12,12 +15,16 @@ class ReminderDetailPage extends StatefulWidget {
     required this.agenda,
     required this.reminderId,
     this.attendance,
+    this.concrete,
+    this.concreteAttachments,
     super.key,
   });
 
   final AgendaApplication agenda;
   final String reminderId;
   final AttendanceApplication? attendance;
+  final ConcreteApplication? concrete;
+  final SafeAttachmentPicker? concreteAttachments;
 
   @override
   State<ReminderDetailPage> createState() => _ReminderDetailPageState();
@@ -513,6 +520,29 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
               ),
               icon: const Icon(Icons.badge_outlined),
               label: const Text('Kaynak Puantaj gününe dön'),
+            ),
+          ),
+        ],
+        if (reminder.concretePourId != null &&
+            widget.concrete != null &&
+            widget.concreteAttachments != null) ...[
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 52,
+            child: FilledButton.tonalIcon(
+              key: const Key('open-source-concrete-pour'),
+              onPressed: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => ConcretePourDetailPage(
+                    concrete: widget.concrete!,
+                    agenda: widget.agenda,
+                    attachments: widget.concreteAttachments!,
+                    pourId: reminder.concretePourId!,
+                  ),
+                ),
+              ),
+              icon: const Icon(Icons.foundation_outlined),
+              label: const Text('Kaynak Beton paketine dön'),
             ),
           ),
         ],

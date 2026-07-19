@@ -6,6 +6,7 @@ import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attendance_models.dart';
+import 'package:chief_site_engineer/domain/concrete_models.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
 import 'package:flutter/widgets.dart';
@@ -146,6 +147,35 @@ void main() {
         ),
         hasLength(1),
       );
+      final currentIstanbulDay = CseTimeCodec.istanbulDayKey(
+        CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
+      );
+      final nextIstanbulDay = CseTimeCodec.shiftIstanbulDay(
+        currentIstanbulDay,
+        1,
+      );
+      final nextDayStart = CseTimeCodec.istanbulDayBounds(
+        nextIstanbulDay,
+      ).start;
+      final plannedPourAt = CseTimeCodec.encodeUtc(
+        CseTimeCodec.decodeCanonicalUtc(
+          nextDayStart,
+        ).add(const Duration(hours: 9)),
+      );
+      final concrete = await firstSuccess.concrete!.createPour(
+        CreateConcretePourCommand(
+          id: '55555555-5555-4555-8555-555555555555',
+          eventId: 'eeeeeeee-eeee-4eee-8eee-000000000020',
+          projectId: '11111111-1111-4111-8111-111111111111',
+          pourCode: 'EMU-BT-01',
+          elementLocation: 'Emülatör KOLON A1',
+          plannedAt: plannedPourAt,
+          concreteClass: 'C30/37',
+          plannedVolumeM3: 20,
+        ),
+      );
+      expect(concrete.checks, hasLength(11));
+      expect(concrete.linkedReminders.first.concretePourId, concrete.pour.id);
       final restartedNotifications = FlutterReminderNotificationGateway();
       final restarted = await AppBootstrap(
         environment: AppEnvironment.debug,
@@ -176,6 +206,11 @@ void main() {
       expect(attendanceDetail.entries.single.memberName, 'Emülatör Personeli');
       expect(attendanceDetail.entries.single.overtimeMinutes, 30);
       expect(attendanceDetail.linkedReminder!.id, attendanceReminder.id);
+      final persistedConcrete = await restartedSuccess.concrete!.getPourDetail(
+        concrete.pour.id,
+      );
+      expect(persistedConcrete.pour.pourCode, 'EMU-BT-01');
+      expect(persistedConcrete.events.first.eventType, 'pour.created');
 
       await tester.pumpWidget(
         CseApp(bootstrap: Future.value(restartedSuccess)),
@@ -194,6 +229,13 @@ void main() {
       await tester.tap(find.text('Puantaj').last);
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('attendance-page')), findsOneWidget);
+
+      await tester.tap(find.text('Beton Paketi').last);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('concrete-page')), findsOneWidget);
+      await tester.tap(find.text('Yaklaşan'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('EMU-BT-01'), findsOneWidget);
 
       await restartedSuccess.agenda.mutateReminder(
         MutateReminderCommand(

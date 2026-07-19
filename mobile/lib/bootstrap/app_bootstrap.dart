@@ -1,7 +1,12 @@
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/attendance_application.dart';
+import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/platform/attendance_export_gateway.dart';
+import 'package:chief_site_engineer/platform/attachment_gateway.dart';
+import 'package:chief_site_engineer/platform/capabilities.dart';
+import 'package:chief_site_engineer/platform/concrete_attachment_gateway.dart';
+import 'package:chief_site_engineer/platform/concrete_export_gateway.dart';
 import 'package:chief_site_engineer/platform/export_gateway.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
@@ -21,6 +26,8 @@ class BootstrapSuccess extends BootstrapResult {
     required this.smokeRecordCreatedAt,
     required this.agenda,
     this.attendance,
+    this.concrete,
+    this.concreteAttachments,
   });
 
   final String environmentLabel;
@@ -28,6 +35,8 @@ class BootstrapSuccess extends BootstrapResult {
   final String smokeRecordCreatedAt;
   final AgendaApplication agenda;
   final AttendanceApplication? attendance;
+  final ConcreteApplication? concrete;
+  final SafeAttachmentPicker? concreteAttachments;
 }
 
 class BootstrapFailure extends BootstrapResult {
@@ -100,6 +109,22 @@ class AppBootstrap {
           stager: LocalExportStager(directories),
         ),
       );
+      final concrete = SqliteConcreteApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactory,
+        clock: clock,
+        agenda: agenda,
+        attachmentStore: DeviceConcreteAttachmentStore(
+          directories: directories,
+        ),
+        exportGateway: DeviceConcreteExportGateway(
+          stager: LocalExportStager(directories),
+        ),
+      );
+      final concreteAttachments = SafeAttachmentPicker(
+        permissions: const SafeCapabilityService(DevicePermissionGateway()),
+        picker: FlutterAttachmentPickerPort(),
+      );
       try {
         await notificationGateway.initialize();
       } on Object {
@@ -113,6 +138,8 @@ class AppBootstrap {
         smokeRecordCreatedAt: smoke.createdAt,
         agenda: agenda,
         attendance: attendance,
+        concrete: concrete,
+        concreteAttachments: concreteAttachments,
       );
     } on Object {
       return const BootstrapFailure();

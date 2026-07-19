@@ -1517,3 +1517,13 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Rolling Occurrence Ensure`: Bugünden başlayan sabit uzunluktaki yerel gün penceresinde eksik occurrence'ları idempotent oluşturup mevcutları ikinci kez üretmeme işlemidir. Puantaj reminder ayarı 14 günlük pencere kullanır.
 
 `Formula Injection`: CSV hücresinin `=`, `+`, `-` veya `@` ile başlaması nedeniyle spreadsheet tarafından kullanıcı metni yerine çalıştırılabilir formül gibi yorumlanması riskidir. Export öncesi literal prefix ve quote escaping ile etkisizleştirilir.
+
+`Aggregate (Tutarlılık Kümesi)`: Bir iş işlemi sırasında birlikte doğrulanıp tek transaction sınırında değişen kayıtlar bütünüdür. Beton Paketi; ana döküm, checklist, mikser, numune, takip ve event kayıtlarını aynı revision sınırında koordine eder.
+
+`MIME Sniffing (İçerikten Dosya Türü Tanıma)`: Dosya uzantısına güvenmek yerine başlangıç byte imzasından JPEG, PNG, HEIC veya PDF türünü belirlemektir. Sahte uzantılı kanıt fail-closed reddedilir.
+
+`Content Hash / SHA-256`: Dosya byte'larından üretilen sabit uzunlukta bütünlük özetidir. Aynı binary duplicate tespiti ve restart sonrası missing/tampered diagnostic için kullanılır; dosyanın kendisi değildir.
+
+`Atomic Finalize`: Dosyayı önce uygulama staging alanına eksiksiz yazıp sonra aynı güvenli kök içindeki final konuma rename etmektir. Hata halinde yarım final dosya görünmez.
+
+`Evidence Chain (Kanıt Zinciri)`: Bir kanıtın Beton paketi ve varsa kesin truck/sample/check kaynağı, MIME türü, byte boyutu, relative path ve SHA-256 ile birlikte korunmasıdır.

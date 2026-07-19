@@ -4,6 +4,8 @@ import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_day_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_page.dart';
+import 'package:chief_site_engineer/features/concrete/concrete_page.dart';
+import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
 import 'package:flutter/material.dart';
@@ -139,6 +141,25 @@ class _MobileShellState extends State<MobileShell> {
         );
         return;
       }
+      final concrete = widget.bootstrap.concrete;
+      final attachments = widget.bootstrap.concreteAttachments;
+      if (reminder.concretePourId != null &&
+          concrete != null &&
+          attachments != null) {
+        if (!mounted) return;
+        setState(() => _selectedIndex = 4);
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute(
+            builder: (_) => ConcretePourDetailPage(
+              concrete: concrete,
+              agenda: widget.bootstrap.agenda,
+              attachments: attachments,
+              pourId: reminder.concretePourId!,
+            ),
+          ),
+        );
+        return;
+      }
     } on Object {
       // Invalid/stale notification payload falls back to reminder detail.
     }
@@ -149,6 +170,8 @@ class _MobileShellState extends State<MobileShell> {
         builder: (_) => ReminderDetailPage(
           agenda: widget.bootstrap.agenda,
           attendance: widget.bootstrap.attendance,
+          concrete: widget.bootstrap.concrete,
+          concreteAttachments: widget.bootstrap.concreteAttachments,
           reminderId: reminderId,
         ),
       ),
@@ -197,10 +220,23 @@ class _MobileShellState extends State<MobileShell> {
                 icon: Icons.badge_outlined,
                 title: 'Puantaj',
               ),
-            const _PreparingPage(
-              icon: Icons.foundation_outlined,
-              title: 'Beton Paketi',
-            ),
+            if (widget.bootstrap.concrete case final concrete?)
+              if (widget.bootstrap.concreteAttachments case final attachments?)
+                ConcretePage(
+                  concrete: concrete,
+                  agenda: widget.bootstrap.agenda,
+                  attachments: attachments,
+                )
+              else
+                const _PreparingPage(
+                  icon: Icons.foundation_outlined,
+                  title: 'Beton Paketi',
+                )
+            else
+              const _PreparingPage(
+                icon: Icons.foundation_outlined,
+                title: 'Beton Paketi',
+              ),
           ],
         ),
       ),
