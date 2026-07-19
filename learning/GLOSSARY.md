@@ -1465,3 +1465,21 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Single Clock Read (Tek Saat Okuması)`: Tek bir application işlemi içinde saatin yalnız bir kez okunup bütün ilgili timestamp alanlarında aynı snapshot'ın kullanılmasıdır. Böylece birkaç mikrosaniyelik veya test kaynaklı zaman ayrışmaları önlenir.
 
 `İlk Test Edilebilir PC Sürümü`: Ürünün bütün uzun vadeli özelliklerini tamamlamadan, gerçek kullanıcının bilgisayarda temel uçtan uca akışı deneyebildiği dar ve doğrulanmış sürümdür. Issue #119 sürümü mobile/PWA/offline/sync/notification/auth içermez.
+
+`Flutter`: Tek Dart codebase'inden Android ve iOS gibi birden fazla platform için native uygulama kabuğu ve kullanıcı arayüzü üretmeyi sağlayan uygulama framework'üdür.
+
+`Device of Truth (Ana Veri Cihazı)`: Günlük kullanımda yetkili ve en güncel kalıcı verinin bulunduğu cihazdır. CSE Release 0.1 mobil kararında telefon ana veri cihazıdır; bilgisayar veya cloud runtime zorunlu değildir.
+
+`Offline-first`: Temel create/read davranışının internet bağlantısı olmadan yerel veriyle çalışması, ağ özelliklerinin zorunlu çalışma bağımlılığı olmamasıdır.
+
+`Application ID / Bundle ID`: Android veya iOS işletim sisteminin uygulamayı ve ona ait sandbox'ı benzersiz tanımak için kullandığı reverse-domain kimliğidir.
+
+`Android App Bundle (AAB)`: Google Play'in cihaz mimarisi ve kaynaklarına uygun APK'lar üretmek için kullandığı Android yayın paketidir. Repository'ye signing key koymadan unsigned AAB build edilebilir.
+
+`Atomic Migration`: Schema değişiklikleri, migration geçmişi ve sürüm ilerlemesinin tek transaction içinde yazılması; herhangi bir hata olduğunda bütün adımların birlikte rollback edilmesidir.
+
+`Fail-Closed Bootstrap`: Uygulamanın database, path veya schema hazırlığı doğrulanamazsa normal çalışma ekranını açmaması, yeni kayıt yazmaması ve güvenli hata durumu göstermesidir.
+
+`Platform Port`: Dart application kodunun camera, notification, file picker veya share gibi native davranışlardan ihtiyaç duyduğu küçük arayüzdür; somut plugin bu arayüzün arkasında kalır.
+
+`Smoke Record`: Database'in açılabildiğini ve restart sonrasında aynı kalıcı verinin okunabildiğini doğrulamak için kullanılan küçük, iş verisi olmayan test/foundation kaydıdır.

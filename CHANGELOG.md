@@ -1,5 +1,28 @@
 # Changelog
 
+## Issue #180 - Flutter Mobil Temel
+
+- `mobile/` altında Flutter `3.44.6` / Dart `3.12.2` tabanlı Android ve iOS
+  platform projeleri, `0.1.0+1` sürümü ve sabit application/bundle kimlikleri
+  oluşturuldu.
+- Başlangıç, Hatırlatıcı, Ajanda, Puantaj ve Beton Paketi navigasyon kabuğu
+  eklendi; tamamlanmamış özellikler açık `Hazırlanıyor` durumunda bırakıldı.
+- Debug/release ayrılmış uygulama kimliği ve platform application-support
+  kökünde database, attachment, export/backup ve temp/staging dizinleri eklendi.
+- Mobil SQLite schema `1`, `schema_versions` geçmişi, tek transaction migration,
+  fail-closed bootstrap ve restart sonrasında değişmeyen smoke kayıt uygulandı.
+- Canonical UTC seconds storage, explicit offset normalization,
+  `Europe/Istanbul` sunumu ve naive/invalid değer reddi Python fixture'larıyla
+  eşleştirildi.
+- Notification, camera/photo/file ve export işlemleri için permission denied
+  durumunda platform mutation yapmayan güvenli portlar oluşturuldu.
+- Flutter analyzer, 19 unit/widget testi, Android 36.1 emülatör integration
+  testi, debug APK ve unsigned release AAB build'i doğrulandı.
+- iOS project/plist/bundle/version yapılandırması doğrulandı; native archive ve
+  signing için macOS, Xcode ve Apple Developer hesabı gereksinimi açık kaldı.
+- Python schema `4`, restore allowlist `(2, 3, 4)`, Backup format `1` ve Günlük
+  Çıktı format `1` değiştirilmedi; gerçek kullanıcı verisine erişilmedi.
+
 ## Issue #175 - Geriye Dönük Observation Create Contract
 
 - Observation create akışı immutable `CreateObservation` command nesnesine

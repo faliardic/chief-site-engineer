@@ -19,6 +19,28 @@ CSE büyük inşaat yönetim platformlarının küçültülmüş kopyası veya k
 
 > Bu özellik şantiye şefinin sahada unutmamasını, kanıtlamasını, takip etmesini, raporlamasını veya daha sonra geri çağırmasını kolaylaştırıyor mu?
 
+## Mobil temel
+
+Issue #180 branch'i, `mobile/` altında Flutter/Dart tabanlı Android ve iOS
+uygulama temelini taşır. Telefon ilk mobil sürümde ana veri cihazıdır; günlük
+kullanım bilgisayar, Flask sunucusu, LAN veya internet gerektirmez.
+
+Mobil temel şunları içerir:
+
+- Android ve iOS platform projeleri;
+- Başlangıç, Hatırlatıcı, Ajanda, Puantaj ve Beton Paketi navigasyon kabuğu;
+- tamamlanmamış özelliklerde açık `Hazırlanıyor` durumu;
+- cihaz-içi SQLite, sürümlü ve atomik migration geçmişi;
+- restart sonrasında korunan smoke kayıt;
+- UTC seconds storage ve `Europe/Istanbul` sunumu;
+- debug/release için ayrı application identity ve veri kökü;
+- attachment, notification, permission ve export için güvenli platform portları.
+
+Bu temel Ajanda, Puantaj, Beton Paketi veya notification delivery özelliklerinin
+tamamlandığı anlamına gelmez. Cloud sync, kullanıcı hesabı ve masaüstü verisinin
+otomatik taşınması yoktur. Mobil geliştirme ve build komutları
+[`mobile/README.md`](mobile/README.md) içindedir.
+
 ## Normal kullanım
 
 Windows'ta repository kökündeki `CSE_Baslat.cmd` dosyasına çift tıklayın. Başlatıcı:
@@ -45,12 +67,12 @@ Uygulama varsayılan olarak yalnız `127.0.0.1` loopback adresinde açılır. Lo
 
 ## Merge edilmiş güncel kabiliyetler
 
-`master` üzerindeki son doğrulanmış repository güvenli noktası:
+Bu branch'in başladığı son doğrulanmış `master` güvenli noktası:
 
 ```text
-Issue #171
-PR #172
-merge commit 16dfec0e0eec76bea2370781c52f63c74ae91b96
+Issue #175
+PR #178
+merge commit fef480dc32ec5dabf4dca9394c46c519b7097886
 ```
 
 Son production kabiliyet dilimi Issue #119 / PR #126 ile merge edilmiştir.
@@ -82,9 +104,11 @@ Local Field MVP bugün şunları sağlar:
 İlk test edilebilir PC Saha Takibi yüzeyi merge edilmiştir. Bağlayıcı yürütme
 programı GitHub Issue #127, faz backlog'u Issue #128–#140'tır. Faz 0 closure
 Issue #171 / PR #172 ile merge edilmiştir. Faz 1'in ilk dar production işi
-Issue #173 olay zamanı sözleşmesi ve salt-okunur migration preflight'tır.
-Mobile runtime, offline/sync, notification, uygulama
-kilidi ve gerçek saha pilotları henüz tamamlanmamıştır.
+Issue #173 olay zamanı sözleşmesi ve salt-okunur migration preflight'ı, Issue
+#175 ise geriye dönük observation create sözleşmesini tamamlamıştır. Issue #180
+branch'inde mobil runtime temeli ve cihaz-içi offline SQLite kabuğu eklenmiştir;
+özellik dilimleri, cloud sync, gerçek notification delivery, uygulama kilidi ve
+gerçek saha pilotları henüz tamamlanmamıştır.
 
 ## Saha Takibi v0.1
 
@@ -202,8 +226,8 @@ Mevcut uygulama:
 
 - local ve tek kullanıcı odaklıdır;
 - public internet için uygun değildir;
-- mobile runtime, offline çalışma veya owner-only cihaz senkronizasyonu içermez;
-- background notification veya scheduler içermez;
+- mobil özellik dilimlerini, cloud sync veya owner-only cihaz senkronizasyonunu içermez;
+- background notification delivery içermez; yalnız güvenli zamanlama portu vardır;
 - uygulama kilidi, authentication, authorization veya TLS içermez;
 - gerçek saha pilotu ve kabulü tamamlanmadığı için field-ready veya production-ready olarak tanımlanmaz.
 

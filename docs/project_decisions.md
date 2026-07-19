@@ -2739,3 +2739,41 @@
 - Schema/migration/repository, Backup/Günlük Çıktı wire formatı, yeni web formu,
   route, Ajanda UI, archive/scope, MemoryIndex ve security bu Issue'ya
   eklenmeyecek.
+
+## Issue 180 — Flutter Mobil Temel
+
+- Release 0.1 ana ürün runtime'ı `mobile/` altında tek Dart codebase kullanan
+  Flutter Android/iOS uygulaması olacak; Python/Flask mobil runtime bağımlılığı
+  olmayacak.
+- Telefon ilk sürümde device of truth olacak; database ve attachment dizinleri
+  platform application-support sandbox'ında tutulacak. Cloud sync ve otomatik
+  masaüstü veri migration'ı yapılmayacak.
+- Uygulama sürümü `0.1.0+1`, release kimliği
+  `com.faliardic.chiefsiteengineer`; debug kimliği `.debug` suffix'iyle ayrı
+  olacak. Dart path kökleri de `debug | release` olarak ayrılacak.
+- Mobil schema namespace'i Python schema'dan bağımsız `1` ile başlayacak.
+  `schema_versions` ve SQLite `user_version` tek migration transaction'ında
+  ilerleyecek; başarısız migration partial tablo/history bırakmayacak.
+- İlk kalıcılık kanıtı `mobile-foundation-v1` smoke kaydı olacak. Restart kaydı
+  güncellemeyecek; ilk canonical `created_at` değerini koruyacak.
+- Mobil timestamp write/read sözleşmesi exact UTC seconds `...Z` olacak;
+  `Europe/Istanbul` yalnız presentation sınırıdır. Naive, invalid, fractional
+  veya canonical olmayan mobile storage değeri fail-closed reddedilecek.
+- Bootstrap database/path bozulmasında implementation detail, absolute path
+  veya raw exception göstermeyecek; kullanıcıya hiçbir kayıt yazılmadığını
+  belirten güvenli mesaj sunacak.
+- Notification, attachment picker ve export davranışları platform portları
+  arkasında kalacak. Permission denied/unavailable durumda gerçek platform
+  mutation çağrılmayacak ve crash üretilmeyecek.
+- Android debug ID ve release ID hem OS sandbox'ı hem Dart environment path'i
+  seviyesinde ayrılacak. Release AAB'ye debug signing bağlanmayacak; keystore ve
+  secret repository dışında kalacak.
+- iOS project/bundle/plist/scheme tracked kalacak; Windows'ta statik config
+  doğrulanacak. Native archive ve App Store signing macOS, Xcode ve Apple
+  Developer hesabı gerektiren açık release blocker'ı olarak tutulacak.
+- Ajanda, Hatırlatıcı, Puantaj ve Beton Paketi bu Issue'da yalnız navigasyon ve
+  `Hazırlanıyor` durumu taşır; gerçek özellik davranışları ayrı mobil dikey
+  dilimlerde uygulanacak.
+- Python schema `4`, Backup format `1`, restore allowlist `(2,3,4)` ve Günlük
+  Çıktı format `1` değiştirilmez; mobil schema veya local export dizini bu
+  formatları sessizce genişletmez.
