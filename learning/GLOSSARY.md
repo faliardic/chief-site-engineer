@@ -1483,3 +1483,15 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Platform Port`: Dart application kodunun camera, notification, file picker veya share gibi native davranışlardan ihtiyaç duyduğu küçük arayüzdür; somut plugin bu arayüzün arkasında kalır.
 
 `Smoke Record`: Database'in açılabildiğini ve restart sonrasında aynı kalıcı verinin okunabildiğini doğrulamak için kullanılan küçük, iş verisi olmayan test/foundation kaydıdır.
+
+`Wall Clock (Duvar Saati)`: Kullanıcının takvimde gördüğü yıl/ay/gün/saat/dakika parçalarıdır; tek başına timezone taşımaz. Mobil datetime-local girdisi açıkça `Europe/Istanbul` içinde yorumlandıktan sonra gerçek UTC ana çevrilir.
+
+`Composite Foreign Key (Birleşik Yabancı Anahtar)`: İki tablo arasındaki ilişkinin tek kolon yerine bir kolon çiftiyle doğrulanmasıdır. Mobil reminder, `(observation_id, project_id)` çiftinin aynı log çiftine ait olmasını zorunlu kılar.
+
+`Idempotent Retry`: Aynı command kimliği ve aynı içerikle tekrar edilen işlemin ikinci bir kayıt üretmeden ilk başarılı sonucu döndürmesidir. Aynı kimliğin farklı içerikle tekrarı conflict olarak reddedilir.
+
+`Append-Only Trigger`: Event geçmişinde SQL `UPDATE` veya `DELETE` başlamadan işlemi abort eden database trigger'ıdır. Repository API'si dışındaki ham SQL yollarına karşı da geçmişi korur.
+
+`Serial Database Queue (Seri Veritabanı Kuyruğu)`: Aynı application service üzerindeki kısa SQLite işlemlerini bir önceki Future tamamlandıktan sonra başlatan eşzamanlılık sınırıdır. Android shell'de iki sayfanın aynı dosyayı aynı anda açma yarışını önler.
+
+`Exclusive Upper Bound (Hariç Üst Sınır)`: Tarih aralığının başlangıcı dahil edip sonraki başlangıç anını dışarıda bırakmasıdır. Ajanda sorgusu `start <= observed_at < next_day_start` kullanarak gece yarısı kaydını yalnız doğru güne koyar.

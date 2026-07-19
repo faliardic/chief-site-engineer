@@ -1,4 +1,6 @@
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
+import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
+import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
 import 'package:flutter/material.dart';
 
 class CseApp extends StatelessWidget {
@@ -118,14 +120,8 @@ class _MobileShellState extends State<MobileShell> {
           index: _selectedIndex,
           children: [
             _HomePage(bootstrap: widget.bootstrap),
-            const _PreparingPage(
-              icon: Icons.notifications_none_rounded,
-              title: 'Hatırlatıcı',
-            ),
-            const _PreparingPage(
-              icon: Icons.event_note_outlined,
-              title: 'Ajanda',
-            ),
+            RemindersPage(agenda: widget.bootstrap.agenda),
+            AgendaPage(agenda: widget.bootstrap.agenda),
             const _PreparingPage(icon: Icons.badge_outlined, title: 'Puantaj'),
             const _PreparingPage(
               icon: Icons.foundation_outlined,

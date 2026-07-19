@@ -3,6 +3,8 @@ import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/fake_agenda_application.dart';
+
 void main() {
   testWidgets('mobile shell exposes all release 0.1 navigation entries', (
     tester,
@@ -14,6 +16,7 @@ void main() {
             environmentLabel: 'Geliştirme',
             smokeRecordId: 'mobile-foundation-v1',
             smokeRecordCreatedAt: '2026-07-19T08:00:00Z',
+            agenda: FakeAgendaApplication(),
           ),
         ),
       ),
@@ -33,11 +36,8 @@ void main() {
 
     await tester.tap(find.text('Ajanda').last);
     await tester.pumpAndSettle();
-    expect(find.text('Hazırlanıyor'), findsOneWidget);
-    expect(
-      find.text('Bu alan sonraki dar mobil özellik diliminde açılacak.'),
-      findsOneWidget,
-    );
+    expect(find.text('Bu günde Ajanda kaydı yok.'), findsOneWidget);
+    expect(find.byKey(const Key('create-agenda-log')), findsOneWidget);
   });
 
   testWidgets('database bootstrap failure is fail closed and user safe', (

@@ -15,7 +15,7 @@ cihaz-içi SQLite ve uygulamaya özel yerel dosya dizinleriyle offline çalış�
 | Android debug application ID | `com.faliardic.chiefsiteengineer.debug` |
 | iOS release bundle ID | `com.faliardic.chiefsiteengineer` |
 | iOS debug bundle ID | `com.faliardic.chiefsiteengineer.debug` |
-| Mobil schema version | `1` |
+| Mobil schema version | `2` |
 | Sunum timezone | `Europe/Istanbul` |
 
 Debug ve release farklı platform kimlikleri ve farklı `debug` / `release` veri
@@ -37,7 +37,7 @@ Bütün child yollar ortak environment kökü altında doğrulanır. Relative pa
 root dışına kaçış fail-closed reddedilir. Repository `exports/` klasörü mobil
 runtime tarafından kullanılmaz.
 
-## SQLite bootstrap
+## SQLite bootstrap ve Ajanda migration'ı
 
 İlk açılışta tek transaction içinde:
 
@@ -51,6 +51,33 @@ detayını veya path'i kullanıcıya sızdırmaz ve kayıt yazıldığı iddias�
 bulunmaz. Başarılı açılışta `mobile-foundation-v1` smoke kaydı bir kez eklenir;
 restart aynı `created_at` değerini okur.
 
+Schema `2`, schema `1` verisini koruyan tek atomik migration ile şunları ekler:
+
+- `projects`;
+- günlük log source-of-truth'u `field_observations`;
+- append-only `observation_events`;
+- loga project + observation foreign key'iyle bağlı `follow_up_items`;
+- append-only `follow_up_events`.
+
+Event tabloları update/delete trigger'larıyla salt eklemelidir. Project, log ve
+reminder fiziksel silinemez. Log/reminder kayıtlarında UUID, revision,
+`created_at`, `updated_at` ve gelecekte archive/lifecycle uyumlu alanlar bulunur.
+Migration veya transaction hatasında yarım tablo, reminder veya event kalmaz.
+
+## Mobil Ajanda ve Hatırlatıcı
+
+Ajanda, seçili `Europe/Istanbul` gününü `observed_at`, `created_at`, ID sırasıyla
+gösterir. Bugün/önceki/sonraki/tarih seçimi; proje/tür filtresi ve wildcard
+yorumlamayan literal arama vardır. Log formu geçmiş zamanı kabul eder, gelecek
+ve invalid zamanı mutation öncesi reddeder; hata halinde form state'i korunur.
+
+Her kart ve log detayından reminder oluşturulabilir. Önerilen metin açıklamadan
+gelir ve değiştirilebilir. `action | waiting | recheck`; 15 dakika, 1 saat,
+bugün çıkmadan, yarın sabah, Unutma Kutusu ve özel tarih/saat desteklenir.
+Reminder ilk insert'ten itibaren source log ve project ID taşır; creation row ve
+event tek transaction'dadır. Hatırlatıcı ekranı Unutma Kutusu, Bugün,
+Yaklaşanlar ve source Ajanda deep-link'ini sunar.
+
 ## Zaman sözleşmesi
 
 - Kalıcı an: aware UTC, exact `YYYY-MM-DDTHH:MM:SSZ`.
@@ -58,6 +85,8 @@ restart aynı `created_at` değerini okur.
 - Kullanıcı sunumu: `Europe/Istanbul`.
 - Naive, invalid veya canonical olmayan read değeri reddedilir.
 - Explicit offset girdisi önce UTC'ye normalize edilebilir.
+- Datetime-local girdisi yalnız açık İstanbul wall-clock decoder'ıyla canonical
+  UTC'ye çevrilir; storage katmanı naive değeri kabul etmez.
 
 Python fixture eşliği:
 
@@ -108,5 +137,7 @@ repository dışında tutulan provisioning/certificate gerekir.
 - Cloud backend veya sync
 - Kullanıcı hesabı/auth server
 - Masaüstü verisinin otomatik migration'ı
-- Tam Ajanda, Hatırlatıcı, Puantaj veya Beton Paketi davranışı
+- Log attachment/fotoğraf bağlama
+- Tam reminder complete/snooze/cancel yaşam döngüsü
+- Puantaj veya Beton Paketi davranışı
 - Gerçek notification delivery, camera/file picker plugin'i veya store submission
