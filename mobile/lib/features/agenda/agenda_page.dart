@@ -6,6 +6,7 @@ import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
+import 'package:chief_site_engineer/features/owned_text_input_dialog.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:flutter/material.dart';
 
@@ -50,32 +51,16 @@ class _AgendaPageState extends State<AgendaPage> {
   }
 
   Future<void> _createProject() async {
-    final controller = TextEditingController();
     final name = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Yeni proje'),
-        content: TextField(
-          key: const Key('agenda-project-name'),
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Proje adı'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Vazgeç'),
-          ),
-          FilledButton(
-            key: const Key('save-agenda-project'),
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Oluştur'),
-          ),
-        ],
+      builder: (context) => const OwnedTextInputDialog(
+        title: 'Yeni proje',
+        label: 'Proje adı',
+        confirmLabel: 'Oluştur',
+        inputKey: Key('agenda-project-name'),
+        confirmKey: Key('save-agenda-project'),
       ),
     );
-    await Future<void>.delayed(kThemeAnimationDuration);
-    controller.dispose();
     if (name == null) return;
     try {
       final project = await widget.agenda.createProject(

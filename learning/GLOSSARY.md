@@ -1581,3 +1581,9 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Incremental Hashing (Parçalı Hash Hesabı)`: Büyük dosyanın tamamını RAM'e almadan her stream chunk'ını sırayla hash converter'a verip final digest üretme yöntemidir. Issue #198 import sırasında aynı chunk hem diske hem SHA-256 hesabına gider.
 
 `Orphan Staging Reconciliation (Sahipsiz Staging Uzlaştırması)`: Process kill gibi cleanup callback'inin çalışmadığı durumdan sonra, bootstrap'ın yalnız doğrulanmış staging root içindeki yarım veya süre aşmış dosyaları güvenli kurallarla temizlemesidir.
+
+`Widget Lifecycle Ownership (Widget Yaşam Döngüsü Sahipliği)`: Controller, focus node veya animation gibi kaynağın onu kullanan `State` tarafından oluşturulup aynı `State.dispose()` içinde kapatılması kuralıdır. Issue #200 mikser dialogu parent sayfanın erken dispose yarışını bu sahiplikle kaldırır.
+
+`Reverse Transition (Ters Geçiş Animasyonu)`: Dialog route kapatıldıktan sonra widget'ların ekrandan animasyonla ayrıldığı süredir. `showDialog` future'ı tamamlanmış olsa bile dialog widget ağacı bu süre boyunca render edilebilir.
+
+`Commit Outcome Uncertainty (Commit Sonucu Belirsizliği)`: Framework veya process hatası mutation ile aynı zaman aralığında oluştuğunda DB işleminin hiç çalışmadığı mı, tamamlandığı mı kesin kanıtlanamayan durumdur. Güvenli UI kayıt kontrolü ister ve kör retry önermez.

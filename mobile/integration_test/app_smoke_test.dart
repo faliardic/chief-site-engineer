@@ -257,6 +257,24 @@ void main() {
         concrete.attachments.single.integrity,
         ConcreteAttachmentIntegrity.ok,
       );
+      concrete = await firstSuccess.concrete!.saveTruck(
+        SaveConcreteTruckCommand(
+          id: '66666666-6666-4666-8666-000000000200',
+          pourId: concrete.pour.id,
+          eventId: 'eeeeeeee-eeee-4eee-8eee-000000000022',
+          expectedPourRevision: concrete.pour.revision,
+          expectedTruckRevision: 0,
+          sequenceNo: 1,
+          vehiclePlate: '34 EMU 200',
+          deliveryNoteNumber: null,
+          volumeM3: 8.5,
+          result: ConcreteTruckResult.received,
+          arrivedAt: '2026-07-20T09:10:00Z',
+          unloadingStartedAt: '2026-07-20T09:15:00Z',
+          unloadingEndedAt: '2026-07-20T09:30:00Z',
+          note: 'Restore öncesi null irsaliye',
+        ),
+      );
       final restartedNotifications = FlutterReminderNotificationGateway();
       final restarted = await AppBootstrap(
         environment: AppEnvironment.debug,
@@ -313,6 +331,7 @@ void main() {
         persistedConcrete.attachments.single.integrity,
         ConcreteAttachmentIntegrity.ok,
       );
+      expect(persistedConcrete.trucks.single.deliveryNoteNumber, isNull);
 
       final backup = restartedSuccess.backup!;
       final createdBackup = await backup.createBackup(
@@ -407,6 +426,48 @@ void main() {
       await tester.tap(find.text('Yaklaşan'));
       await tester.pumpAndSettle();
       expect(find.textContaining('EMU-BT-01'), findsOneWidget);
+      await tester.tap(find.textContaining('EMU-BT-01'));
+      await tester.pumpAndSettle();
+      final restoredBeforeEdit = await restartedSuccess.concrete!.getPourDetail(
+        concrete.pour.id,
+      );
+      final restoredTruck = find.textContaining('#1 34 EMU 200');
+      await tester.scrollUntilVisible(restoredTruck, 300);
+      await Scrollable.ensureVisible(
+        tester.element(restoredTruck),
+        alignment: 0.5,
+        duration: Duration.zero,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(restoredTruck);
+      await tester.pumpAndSettle();
+      expect(find.text('Mikseri düzenle'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const Key('concrete-truck-plate')),
+        '34 EMU 201',
+      );
+      await tester.enterText(
+        find.byKey(const Key('concrete-truck-note')),
+        'API 36 lifecycle güvenli',
+      );
+      final truckSave = find.byKey(const Key('save-concrete-truck'));
+      await tester.tap(truckSave);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      final restoredAfterEdit = await restartedSuccess.concrete!.getPourDetail(
+        concrete.pour.id,
+      );
+      expect(restoredAfterEdit.trucks.single.vehiclePlate, '34 EMU 201');
+      expect(restoredAfterEdit.trucks.single.deliveryNoteNumber, isNull);
+      expect(restoredAfterEdit.trucks.single.revision, 2);
+      expect(
+        restoredAfterEdit.events,
+        hasLength(restoredBeforeEdit.events.length + 1),
+      );
+      expect(restoredAfterEdit.events.last.eventType, 'truck.updated');
 
       await restartedSuccess.agenda.mutateReminder(
         MutateReminderCommand(

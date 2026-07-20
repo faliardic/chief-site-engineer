@@ -1,5 +1,22 @@
 # Changelog
 
+## Issue #200 - Mikser Dialog Lifecycle Güvenliği
+
+- Yeni ve mevcut mikser formu, bütün `TextEditingController` nesnelerini kendi
+  `State` yaşam döngüsünde yöneten dedicated dialog'a taşındı.
+- Reverse transition sırasında parent dispose yarışı kaldırıldı; save/cancel ve
+  double tap yolları sıfır veya tam bir mutation sözleşmesiyle test edildi.
+- Null irsaliye, received dışı reason, geliş/boşaltma zamanları, canlı m³,
+  `truck.updated` before/after ve no-op event/revision davranışları korundu.
+- Save validation/stale hatasında immutable form taslağı aynı truck/event
+  kimliğiyle açıkça yeniden açılabilir tutuldu.
+- Beton ve Ajanda local modal controller patternleri State-owned ortak dialog
+  standardına geçirildi; statik audit regresyonu eklendi.
+- Fatal diagnostic, sonucu bilinmeyen mutation için yanlış `yazılmadı` iddiasını
+  kaldırıp yeniden açma, kayıt kontrolü ve kör tekrar etmeme yönlendirmesi verir.
+- API 36 entegrasyonu restore edilmiş null irsaliyeli mikserin UI editini kapsar;
+  mobil schema `7` ve backup format `1` değişmez.
+
 ## Issue #198 - Kalıcı Mobil Yedek İçe Aktarma
 
 - Android picker `.csebackup` sonucu, provider cache path'i state'e alınmadan

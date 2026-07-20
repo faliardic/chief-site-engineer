@@ -142,7 +142,7 @@ class SafeDiagnosticPanel extends StatelessWidget {
                 Text(
                   recoveryFailure
                       ? 'Veriler silinmedi; kurtarma alanı korundu. Uygulamayı kapatın ve teknik destek için tanı kodunu not edin.'
-                      : 'Yeni kayıt yazılmadı. Uygulamayı kapatıp yeniden deneyin.',
+                      : 'İşlem sonucu doğrulanamadı. Uygulamayı kapatıp yeniden açın, ilgili kaydı kontrol edin ve aynı işlemi kontrol etmeden tekrarlamayın.',
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
