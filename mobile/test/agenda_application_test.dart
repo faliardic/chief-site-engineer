@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/platform/agenda_attachment_gateway.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -53,6 +54,7 @@ void main() {
       databasePath: directories.databaseFile,
       databaseFactory: databaseFactoryFfi,
       clock: () => now,
+      attachmentStore: DeviceAgendaAttachmentStore(directories: directories),
     );
     await agenda.createProject(
       const CreateProjectCommand(id: project1, name: 'Kuzey Şantiyesi'),
@@ -459,6 +461,292 @@ void main() {
     expect(await _countRows(directories.databaseFile, 'follow_up_items'), 0);
     expect(await _countRows(directories.databaseFile, 'follow_up_events'), 0);
   });
+
+  test(
+    'log edit no-op stale rollback archive restore and reminder link are safe',
+    () async {
+      await agenda.createProject(
+        const CreateProjectCommand(id: project2, name: 'Güney Şantiyesi'),
+      );
+      final created = await createLog(
+        id: log1,
+        event: 1,
+        observedAt: '2026-07-19T07:00:00Z',
+        description: 'İlk açıklama',
+      );
+      await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(70),
+          projectId: project1,
+          sourceLogId: log1,
+          title: 'Kaynak reminder',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.in15Minutes,
+        ),
+      );
+      final updated = await agenda.updateAgendaLog(
+        UpdateAgendaLogCommand(
+          id: log1,
+          eventId: eventId(71),
+          expectedRevision: created.revision,
+          projectId: project1,
+          observedAt: '2026-07-18T06:15:00Z',
+          category: AgendaCategory.inspection,
+          description: 'Güncellenen açıklama',
+          location: 'B Blok',
+          notes: 'Güvenli before/after',
+        ),
+      );
+      expect(updated.revision, 2);
+      expect(updated.observedAt, '2026-07-18T06:15:00Z');
+      final updatePayload =
+          jsonDecode(
+                (await agenda.listObservationEvents(log1)).last.payloadJson,
+              )
+              as Map<String, dynamic>;
+      expect(updatePayload['before']['description'], 'İlk açıklama');
+      expect(updatePayload['after']['description'], 'Güncellenen açıklama');
+
+      final noOp = await agenda.updateAgendaLog(
+        UpdateAgendaLogCommand(
+          id: log1,
+          eventId: eventId(72),
+          expectedRevision: updated.revision,
+          projectId: updated.projectId,
+          observedAt: updated.observedAt,
+          category: updated.category,
+          description: updated.description,
+          location: updated.location,
+          notes: updated.notes,
+        ),
+      );
+      expect(noOp.revision, 2);
+      expect(
+        (await agenda.listObservationEvents(log1)).map((item) => item.id),
+        isNot(contains(eventId(72))),
+      );
+      await expectLater(
+        agenda.updateAgendaLog(
+          UpdateAgendaLogCommand(
+            id: log1,
+            eventId: eventId(73),
+            expectedRevision: 1,
+            projectId: project1,
+            observedAt: updated.observedAt,
+            category: updated.category,
+            description: 'Stale değişiklik',
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      await expectLater(
+        agenda.updateAgendaLog(
+          UpdateAgendaLogCommand(
+            id: log1,
+            eventId: eventId(74),
+            expectedRevision: updated.revision,
+            projectId: project2,
+            observedAt: updated.observedAt,
+            category: updated.category,
+            description: updated.description,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      expect((await agenda.getReminderDetail(reminder1)).projectId, project1);
+
+      final archived = await agenda.mutateAgendaLogArchive(
+        MutateAgendaLogArchiveCommand(
+          id: log1,
+          eventId: eventId(75),
+          expectedRevision: updated.revision,
+          archive: true,
+        ),
+      );
+      expect(archived.log.archivedAt, isNotNull);
+      expect(
+        await agenda.listAgenda(const AgendaQuery(istanbulDay: '2026-07-18')),
+        isEmpty,
+      );
+      expect(
+        (await agenda.listAgenda(
+          const AgendaQuery(
+            istanbulDay: '2026-07-18',
+            archiveFilter: AgendaArchiveFilter.archived,
+          ),
+        )).single.id,
+        log1,
+      );
+      expect(archived.reminders.single.id, reminder1);
+      final restored = await agenda.mutateAgendaLogArchive(
+        MutateAgendaLogArchiveCommand(
+          id: log1,
+          eventId: eventId(76),
+          expectedRevision: archived.log.revision,
+          archive: false,
+        ),
+      );
+      expect(restored.log.archivedAt, isNull);
+      expect(
+        restored.events.map((item) => item.eventType),
+        containsAll([
+          'agenda_log.updated',
+          'agenda_log.archived',
+          'agenda_log.restored',
+        ]),
+      );
+      expect((await agenda.getReminderDetail(reminder1)).revision, 1);
+
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      await raw.execute('''
+        CREATE TRIGGER fail_agenda_update_event
+        BEFORE INSERT ON observation_events
+        WHEN NEW.event_type = 'agenda_log.updated'
+        BEGIN
+          SELECT RAISE(ABORT, 'forced agenda event failure');
+        END
+      ''');
+      await raw.close();
+      await expectLater(
+        agenda.updateAgendaLog(
+          UpdateAgendaLogCommand(
+            id: log1,
+            eventId: eventId(77),
+            expectedRevision: restored.log.revision,
+            projectId: project1,
+            observedAt: restored.log.observedAt,
+            category: restored.log.category,
+            description: 'Rollback olmamalı',
+          ),
+        ),
+        throwsA(anything),
+      );
+      expect(
+        (await agenda.getAgendaLogDetail(log1)).log.description,
+        'Güncellenen açıklama',
+      );
+    },
+  );
+
+  test(
+    'agenda photos stage attach diagnose archive and restart without partials',
+    () async {
+      final created = await agenda.createAgendaLog(
+        CreateAgendaLogCommand(
+          id: log1,
+          eventId: eventId(80),
+          projectId: project1,
+          observedAt: '2026-07-19T07:00:00Z',
+          category: AgendaCategory.generalNote,
+          description: 'Fotoğraflı log',
+          photos: [
+            AgendaPhotoDraft(
+              id: log2,
+              eventId: eventId(81),
+              originalFileName: 'saha.jpg',
+              bytes: const [0xff, 0xd8, 0xff, 1],
+              capturedAt: '2026-07-19T07:00:00Z',
+            ),
+          ],
+        ),
+      );
+      var detail = await agenda.getAgendaLogDetail(log1);
+      expect(detail.photos.single.id, log2);
+      expect(detail.photos.single.integrity, AgendaAttachmentIntegrity.ok);
+      expect((await agenda.readAgendaPhoto(log2)).bytes, [0xff, 0xd8, 0xff, 1]);
+
+      detail = await agenda.attachAgendaPhoto(
+        AttachAgendaPhotoCommand(
+          logId: log1,
+          id: log3,
+          eventId: eventId(82),
+          expectedLogRevision: created.revision,
+          originalFileName: 'detay.jpg',
+          bytes: const [0xff, 0xd8, 0xff, 2],
+          capturedAt: '2026-07-19T07:05:00Z',
+        ),
+      );
+      expect(detail.photos.map((item) => item.id), [log2, log3]);
+      await expectLater(
+        agenda.attachAgendaPhoto(
+          AttachAgendaPhotoCommand(
+            logId: log1,
+            id: log4,
+            eventId: eventId(83),
+            expectedLogRevision: detail.log.revision,
+            originalFileName: 'duplicate.jpg',
+            bytes: const [0xff, 0xd8, 0xff, 2],
+            capturedAt: '2026-07-19T07:06:00Z',
+          ),
+        ),
+        throwsA(anything),
+      );
+      expect(
+        await File(
+          '${directories.attachments.path}${Platform.pathSeparator}'
+          'agenda${Platform.pathSeparator}$log1${Platform.pathSeparator}'
+          '$log4.jpg',
+        ).exists(),
+        isFalse,
+      );
+      detail = await agenda.archiveAgendaPhoto(
+        ArchiveAgendaPhotoCommand(
+          logId: log1,
+          photoId: log3,
+          eventId: eventId(84),
+          expectedLogRevision: detail.log.revision,
+          expectedPhotoRevision: 1,
+        ),
+      );
+      expect(detail.photos.map((item) => item.id), [log2]);
+      final archivedFile = File(
+        '${directories.attachments.path}${Platform.pathSeparator}'
+        'agenda${Platform.pathSeparator}$log1${Platform.pathSeparator}'
+        '$log3.jpg',
+      );
+      expect(await archivedFile.exists(), isTrue);
+
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      await expectLater(
+        raw.delete(
+          'agenda_log_attachments',
+          where: 'id = ?',
+          whereArgs: [log3],
+        ),
+        throwsA(anything),
+      );
+      await raw.close();
+      final activeFile = File(
+        '${directories.attachments.path}${Platform.pathSeparator}'
+        'agenda${Platform.pathSeparator}$log1${Platform.pathSeparator}'
+        '$log2.jpg',
+      );
+      await activeFile.writeAsBytes(const [0xff, 0xd8, 0xff, 9]);
+      final restarted = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        attachmentStore: DeviceAgendaAttachmentStore(directories: directories),
+      );
+      expect(
+        (await restarted.getAgendaLogDetail(log1)).photos.single.integrity,
+        AgendaAttachmentIntegrity.tampered,
+      );
+      expect(
+        (await restarted.listObservationEvents(
+          log1,
+        )).map((item) => item.eventType),
+        containsAll(['agenda_log.photo_attached', 'agenda_log.photo_archived']),
+      );
+    },
+  );
 
   test(
     'foreign keys and append-only histories are enforced by SQLite',

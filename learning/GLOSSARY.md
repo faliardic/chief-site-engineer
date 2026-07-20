@@ -1569,3 +1569,9 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Ephemeral Keystore (Geçici Anahtar Deposu)`: Yalnız signed build yolunu sınamak için repository dışında rastgele üretilen, gerçek upload/app-signing kimliği olmayan ve test sonunda silinen anahtar dosyasıdır.
 
 `Release Candidate / RC (Sürüm Adayı)`: Teknik kapılardan geçmiş ve saha kabulüne sunulabilir build'dir; gerçek saha checklist'inin veya mağaza gönderiminin tamamlandığı anlamına gelmez.
+
+`Recoverable Archive (Geri Alınabilir Arşiv)`: Kullanıcıdaki silme niyetini fiziksel `DELETE` yerine archive zamanı/durumu yazarak uygulayan ve aynı kayıt kimliğiyle restore'a izin veren yaşam döngüsüdür. Foreign key, bağlı reminder ve append-only geçmiş korunur.
+
+`Partial Unique Index (Koşullu Tekil İndeks)`: Tekillik kuralını tablonun yalnız belirli koşulu sağlayan satırlarına uygulayan SQLite index'idir. CSE mikser irsaliyesinde yalnız dolu değerler tekildir; birden fazla `NULL` çatışmaz.
+
+`Storage Access Framework / SAF`: Android'de uygulamaya geniş depolama izni vermeden, kullanıcıya sistem belge seçici üzerinden hedef dosya/konum seçtiren platform sözleşmesidir. CSE Beton PDF kaydı kullanıcı kontrollü belge save akışını kullanır.

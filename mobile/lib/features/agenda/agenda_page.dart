@@ -6,13 +6,14 @@ import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
-import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
+import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:flutter/material.dart';
 
 class AgendaPage extends StatefulWidget {
-  const AgendaPage({required this.agenda, super.key});
+  const AgendaPage({required this.agenda, this.attachments, super.key});
 
   final AgendaApplication agenda;
+  final SafeAttachmentPicker? attachments;
 
   @override
   State<AgendaPage> createState() => _AgendaPageState();
@@ -25,6 +26,7 @@ class _AgendaPageState extends State<AgendaPage> {
   String? _projectId;
   AgendaCategory? _category;
   String _search = '';
+  AgendaArchiveFilter _archiveFilter = AgendaArchiveFilter.active;
   bool _loading = true;
   String? _error;
   StreamSubscription<void>? _projectSubscription;
@@ -105,6 +107,7 @@ class _AgendaPageState extends State<AgendaPage> {
           projectId: _projectId,
           category: _category,
           literalSearch: _search,
+          archiveFilter: _archiveFilter,
         ),
       );
       if (!mounted) return;
@@ -149,7 +152,10 @@ class _AgendaPageState extends State<AgendaPage> {
 
   Future<void> _openCreateLog() async {
     final day = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => LogFormPage(agenda: widget.agenda)),
+      MaterialPageRoute(
+        builder: (_) =>
+            LogFormPage(agenda: widget.agenda, attachments: widget.attachments),
+      ),
     );
     if (day == null || !mounted) return;
     setState(() => _selectedDay = day);
@@ -159,23 +165,14 @@ class _AgendaPageState extends State<AgendaPage> {
   Future<void> _openDetail(AgendaLog log) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => LogDetailPage(agenda: widget.agenda, logId: log.id),
+        builder: (_) => LogDetailPage(
+          agenda: widget.agenda,
+          attachments: widget.attachments,
+          logId: log.id,
+        ),
       ),
     );
     if (mounted) await _reload();
-  }
-
-  Future<void> _openReminder(AgendaLog log) async {
-    final created = await Navigator.of(context).push<MobileReminder>(
-      MaterialPageRoute(
-        builder: (_) => ReminderFormPage(agenda: widget.agenda, log: log),
-      ),
-    );
-    if (created != null && mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Hatırlatıcı oluşturuldu.')));
-    }
   }
 
   @override
@@ -242,6 +239,27 @@ class _AgendaPageState extends State<AgendaPage> {
               ],
             ),
             const SizedBox(height: 12),
+            SegmentedButton<AgendaArchiveFilter>(
+              key: const Key('agenda-archive-filter'),
+              segments: const [
+                ButtonSegment(
+                  value: AgendaArchiveFilter.active,
+                  icon: Icon(Icons.event_note_outlined),
+                  label: Text('Aktif'),
+                ),
+                ButtonSegment(
+                  value: AgendaArchiveFilter.archived,
+                  icon: Icon(Icons.archive_outlined),
+                  label: Text('Arşivlenenler'),
+                ),
+              ],
+              selected: {_archiveFilter},
+              onSelectionChanged: (values) {
+                setState(() => _archiveFilter = values.single);
+                _reload();
+              },
+            ),
+            const SizedBox(height: 8),
             DropdownButtonFormField<String?>(
               key: const Key('agenda-project-filter'),
               initialValue: _projectId,
@@ -366,16 +384,16 @@ class _AgendaPageState extends State<AgendaPage> {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: OutlinedButton.icon(
-                              onPressed: () => _openReminder(log),
-                              icon: const Icon(Icons.add_alert_outlined),
-                              label: const Text('Hatırlatıcı oluştur'),
+                          if (log.archivedAt != null) ...[
+                            const SizedBox(height: 8),
+                            const Row(
+                              children: [
+                                Icon(Icons.archive_outlined, size: 18),
+                                SizedBox(width: 6),
+                                Text('Arşivde • geri getirilebilir'),
+                              ],
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),

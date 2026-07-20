@@ -1,22 +1,41 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/concrete_models.dart';
 import 'package:chief_site_engineer/platform/export_gateway.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as path;
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 
 abstract interface class ConcreteExportGateway {
+  Future<Uint8List> renderPdf(ConcretePourDetail detail, String generatedAt);
+
   Future<String> stage(String fileName, Uint8List bytes);
+  Future<void> verify(String absolutePath);
   Future<void> cleanup(String absolutePath);
   Future<void> share(String absolutePath, String summary);
+  Future<bool> save(String fileName, String absolutePath);
 }
 
 class UnavailableConcreteExportGateway implements ConcreteExportGateway {
   const UnavailableConcreteExportGateway();
+
   @override
   Future<void> cleanup(String absolutePath) async {}
+
+  @override
+  Future<Uint8List> renderPdf(ConcretePourDetail detail, String generatedAt) =>
+      throw StateError('concrete PDF rendering unavailable');
+
+  @override
+  Future<bool> save(String fileName, String absolutePath) {
+    throw StateError('concrete export storage unavailable');
+  }
+
   @override
   Future<void> share(String absolutePath, String summary) {
     throw StateError('concrete export sharing unavailable');
@@ -26,154 +45,309 @@ class UnavailableConcreteExportGateway implements ConcreteExportGateway {
   Future<String> stage(String fileName, Uint8List bytes) {
     throw StateError('concrete export storage unavailable');
   }
+
+  @override
+  Future<void> verify(String absolutePath) {
+    throw StateError('concrete PDF verification unavailable');
+  }
 }
 
 class DeviceConcreteExportGateway implements ConcreteExportGateway {
   const DeviceConcreteExportGateway({required this.stager});
+
   final LocalExportStager stager;
+
+  @override
+  Future<Uint8List> renderPdf(
+    ConcretePourDetail detail,
+    String generatedAt,
+  ) async {
+    final regular = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
+    final bold = await rootBundle.load('assets/fonts/Roboto-Bold.ttf');
+    return ConcretePackageReportFormatter.pdfBytes(
+      detail,
+      generatedAt: generatedAt,
+      regularFont: regular,
+      boldFont: bold,
+    );
+  }
 
   @override
   Future<String> stage(String fileName, Uint8List bytes) async =>
       (await stager.stage(fileName, bytes)).path;
 
   @override
+  Future<void> verify(String absolutePath) async {
+    final file = _checkedStagedFile(absolutePath);
+    if (!await file.exists()) throw StateError('staged PDF is missing');
+    final bytes = await file.readAsBytes();
+    if (!ConcretePackageReportFormatter.isStructurallyValidPdf(bytes)) {
+      throw StateError('staged PDF verification failed');
+    }
+  }
+
+  @override
   Future<void> cleanup(String absolutePath) async {
+    final file = _checkedStagedFile(absolutePath);
+    if (await file.exists()) await file.delete();
+  }
+
+  @override
+  Future<void> share(String absolutePath, String summary) async {
+    final file = _checkedStagedFile(absolutePath);
+    if (!await file.exists()) throw StateError('concrete PDF is missing');
+    await SharePlus.instance.share(
+      ShareParams(
+        title: 'Beton Paketi PDF Raporu',
+        subject: 'Beton Paketi PDF Raporu',
+        text: summary,
+        files: [XFile(file.path, mimeType: 'application/pdf')],
+      ),
+    );
+  }
+
+  @override
+  Future<bool> save(String fileName, String absolutePath) async {
+    final file = _checkedStagedFile(absolutePath);
+    if (!await file.exists()) throw StateError('concrete PDF is missing');
+    final selected = await FilePicker.platform.saveFile(
+      dialogTitle: 'Beton PDF raporunu kaydet',
+      fileName: fileName,
+      type: FileType.custom,
+      allowedExtensions: const ['pdf'],
+      bytes: await file.readAsBytes(),
+    );
+    return selected != null && selected.trim().isNotEmpty;
+  }
+
+  File _checkedStagedFile(String absolutePath) {
     stager.directories.validate();
     final root = path.normalize(
       path.absolute(stager.directories.exportsBackups.path),
     );
     final candidate = path.normalize(path.absolute(absolutePath));
     if (!path.isWithin(root, candidate)) {
-      throw StateError('concrete export cleanup escaped root');
+      throw StateError('concrete export path escaped root');
     }
-    final file = File(candidate);
-    if (await file.exists()) await file.delete();
-  }
-
-  @override
-  Future<void> share(String absolutePath, String summary) async {
-    await SharePlus.instance.share(
-      ShareParams(
-        title: 'Beton Paketi Raporu',
-        subject: 'Beton Paketi Raporu',
-        text: summary,
-        files: [XFile(absolutePath, mimeType: 'text/markdown')],
-      ),
-    );
+    return File(candidate);
   }
 }
 
 class ConcretePackageReportFormatter {
   ConcretePackageReportFormatter._();
 
-  static Uint8List markdownBytes(ConcretePourDetail detail) =>
-      Uint8List.fromList([
-        0xef,
-        0xbb,
-        0xbf,
-        ...utf8.encode('${markdown(detail)}\n'),
-      ]);
-
-  static String markdown(ConcretePourDetail detail) {
+  static Future<Uint8List> pdfBytes(
+    ConcretePourDetail detail, {
+    required String generatedAt,
+    required ByteData regularFont,
+    required ByteData boldFont,
+  }) async {
+    final normal = pw.Font.ttf(regularFont);
+    final bold = pw.Font.ttf(boldFont);
+    final document = pw.Document(
+      version: PdfVersion.pdf_1_5,
+      compress: true,
+      title: 'Beton Paketi ${detail.pour.pourCode}',
+      author: 'Chief Site Engineer',
+      creator: 'Chief Site Engineer Mobile',
+    );
+    final theme = pw.ThemeData.withFont(base: normal, bold: bold);
     final pour = detail.pour;
     final metrics = detail.metrics;
-    final lines = <String>[
-      '# Beton Paketi — ${_safe(pour.pourCode)}',
-      '',
-      '- Proje: ${_safe(pour.projectName)}',
-      '- Mahal/eleman: ${_safe(pour.elementLocation)}',
-      '- Planlanan zaman: ${pour.plannedAt}',
-      '- Beton sınıfı: ${_safe(pour.concreteClass)}',
-      '- Durum: ${pour.status.label}',
-      '- Planlanan metraj: ${pour.plannedVolumeM3.toStringAsFixed(2)} m³',
-      '- Sipariş metrajı: ${pour.orderedVolumeM3?.toStringAsFixed(2) ?? '-'} m³',
-      '- Gelen metraj: ${metrics.actualDeliveredM3.toStringAsFixed(2)} m³',
-      '- Fark: ${metrics.varianceM3.toStringAsFixed(2)} m³',
-      '',
-      '## Planlama',
-      '',
-      '- Santral: ${_safe(pour.plantName ?? '-')}',
-      '- Laboratuvar: ${_safe(pour.laboratoryName ?? '-')}',
-      '- Yapı denetim: ${_safe(pour.inspectionNotifiedPerson ?? '-')}',
-      '- Pompa/ekipman: ${_safe(pour.pumpEquipment ?? '-')}',
-      '',
-      '## Döküm öncesi checklist',
-      '',
-      for (final item in detail.checks)
-        '- ${item.sortOrder}. ${_safe(item.label)} — ${item.status.label}'
-            '${item.reason == null ? '' : ' — ${_safe(item.reason!)}'}',
-      '',
-      '## Mikser / irsaliye zaman çizelgesi',
-      '',
-      for (final truck in detail.trucks)
-        '- #${truck.sequenceNo} ${_safe(truck.vehiclePlate)} / '
-            '${_safe(truck.deliveryNoteNumber)} — '
-            '${truck.volumeM3.toStringAsFixed(2)} m³ — ${truck.result.label}',
-      '',
-      '## Kanıt manifesti',
-      '',
-      for (final item in detail.attachments)
-        '- ${item.evidenceType.label} | ${_safe(item.originalFileName)} | '
-            '${item.byteSize} byte | `${item.sha256}` | '
-            '${_safe(item.relativePath)} | ${item.integrity.label}',
-      '',
-      '## Numuneler',
-      '',
-      for (final sample in detail.sampleSets)
-        '- ${_safe(sample.sampleCode)} — ${sample.sampleCount} adet — '
-            '${sample.status.label} — sonuç: '
-            '${sample.expectedResultDates.join(', ')}',
-      '',
-      '## Takipler ve hatırlatıcılar',
-      '',
-      for (final item in detail.followUps)
-        '- ${_safe(item.label)} — ${item.status.label}'
-            '${item.dueAt == null ? '' : ' — ${item.dueAt}'}',
-      '',
-      '## Event özeti',
-      '',
-      for (final event in detail.events)
-        '- ${event.sequence}. `${event.eventType}` — ${event.occurredAt}',
-      '',
-      '## JSON-ready özet',
-      '',
-      '```json',
-      const JsonEncoder.withIndent('  ').convert(jsonReady(detail)),
-      '```',
-    ];
-    return lines.join('\n');
+    final targetDifference = metrics.isTargetExceeded
+        ? 'Aşılan: ${formatM3(metrics.excessM3)} m³'
+        : 'Kalan: ${formatM3(metrics.remainingM3)} m³';
+    final pendingChecks = detail.checks
+        .where((item) => item.status == ConcreteCheckStatus.pending)
+        .length;
+    final pendingFollowUps = detail.followUps
+        .where((item) => item.status == ConcreteFollowUpStatus.pending)
+        .length;
+    final deliveryScans = detail.attachments
+        .where(
+          (item) =>
+              item.evidenceType == ConcreteEvidenceType.deliveryNoteScan ||
+              item.evidenceType == ConcreteEvidenceType.deliveryReceiptScan,
+        )
+        .length;
+    final mixerPhotos = detail.attachments
+        .where((item) => item.evidenceType == ConcreteEvidenceType.mixerPhoto)
+        .length;
+
+    document.addPage(
+      pw.MultiPage(
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          theme: theme,
+        ),
+        header: (context) => pw.Container(
+          padding: const pw.EdgeInsets.only(bottom: 8),
+          decoration: const pw.BoxDecoration(
+            border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey400)),
+          ),
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(
+                'BETON PAKETİ RAPORU',
+                style: pw.TextStyle(font: bold, fontSize: 14),
+              ),
+              pw.Text(pour.pourCode),
+            ],
+          ),
+        ),
+        footer: (context) => pw.Align(
+          alignment: pw.Alignment.centerRight,
+          child: pw.Text(
+            'Sayfa ${context.pageNumber}/${context.pagesCount}',
+            style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+          ),
+        ),
+        build: (context) => [
+          pw.SizedBox(height: 12),
+          _pdfSectionTitle('Paket bilgileri', bold),
+          _pdfKeyValues([
+            ['Proje', _safe(pour.projectName)],
+            ['Beton kodu', _safe(pour.pourCode)],
+            ['Eleman / mahal', _safe(pour.elementLocation)],
+            ['Planlanan tarih', CseTimeCodec.formatIstanbul(pour.plannedAt)],
+            ['Beton sınıfı', _safe(pour.concreteClass)],
+            ['Santral', _safe(pour.plantName ?? '—')],
+            ['Laboratuvar', _safe(pour.laboratoryName ?? '—')],
+            ['Durum', pour.status.label],
+          ], bold),
+          pw.SizedBox(height: 10),
+          _pdfSectionTitle('Canlı metraj', bold),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(10),
+            color: PdfColors.grey100,
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Hedef: ${formatM3(pour.plannedVolumeM3)} m³'),
+                pw.Text('Dökülen: ${formatM3(metrics.actualDeliveredM3)} m³'),
+                pw.Text(targetDifference, style: pw.TextStyle(font: bold)),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 10),
+          _pdfSectionTitle('Checklist ve takip özeti', bold),
+          pw.Text(
+            'Checklist: ${detail.checks.length - pendingChecks} tamam/sonuçlandırılmış, '
+            '$pendingChecks açık • Takip: '
+            '${detail.followUps.length - pendingFollowUps} tamam/sonuçlandırılmış, '
+            '$pendingFollowUps açık',
+          ),
+          pw.SizedBox(height: 10),
+          _pdfSectionTitle('Mikserler', bold),
+          if (detail.trucks.isEmpty)
+            pw.Text('Mikser kaydı yok.')
+          else
+            pw.TableHelper.fromTextArray(
+              headers: const [
+                'Sıra',
+                'Plaka',
+                'İrsaliye',
+                'Geliş',
+                'Boşaltma',
+                'm³',
+                'Sonuç',
+              ],
+              data: detail.trucks
+                  .map(
+                    (truck) => [
+                      '${truck.sequenceNo}',
+                      _safe(truck.vehiclePlate),
+                      _safe(truck.deliveryNoteNumber ?? '—'),
+                      truck.arrivedAt == null
+                          ? '—'
+                          : CseTimeCodec.formatIstanbul(truck.arrivedAt!),
+                      truck.unloadingEndedAt == null
+                          ? '—'
+                          : CseTimeCodec.formatIstanbul(
+                              truck.unloadingEndedAt!,
+                            ),
+                      formatM3(truck.volumeM3),
+                      truck.result.label,
+                    ],
+                  )
+                  .toList(growable: false),
+              headerStyle: pw.TextStyle(font: bold, fontSize: 8),
+              cellStyle: const pw.TextStyle(fontSize: 8),
+              cellAlignment: pw.Alignment.centerLeft,
+              headerDecoration: const pw.BoxDecoration(
+                color: PdfColors.grey300,
+              ),
+            ),
+          pw.SizedBox(height: 10),
+          _pdfSectionTitle('Numune setleri', bold),
+          if (detail.sampleSets.isEmpty)
+            pw.Text('Numune seti yok.')
+          else
+            ...detail.sampleSets.map(
+              (sample) => pw.Bullet(
+                text:
+                    '${_safe(sample.sampleCode)} — ${sample.sampleCount} adet — '
+                    '${sample.status.label}',
+              ),
+            ),
+          pw.SizedBox(height: 10),
+          _pdfSectionTitle('Belge ve fotoğraf özeti', bold),
+          pw.Text(
+            'Toplam attachment: ${detail.attachments.length} • '
+            'İrsaliye taraması: $deliveryScans • Mikser fotoğrafı: $mixerPhotos',
+          ),
+          pw.SizedBox(height: 12),
+          pw.Text(
+            'Oluşturulma zamanı: ${CseTimeCodec.formatIstanbul(generatedAt)}',
+            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+          ),
+        ],
+      ),
+    );
+    return Uint8List.fromList(await document.save());
   }
 
-  static Map<String, Object?> jsonReady(ConcretePourDetail detail) => {
-    'pour_id': detail.pour.id,
-    'pour_code': detail.pour.pourCode,
-    'project_id': detail.pour.projectId,
-    'planned_at': detail.pour.plannedAt,
-    'status': detail.pour.status.storageValue,
-    'planned_volume_m3': detail.pour.plannedVolumeM3,
-    'actual_delivered_m3': detail.metrics.actualDeliveredM3,
-    'variance_m3': detail.metrics.varianceM3,
-    'trucks': detail.trucks
-        .map(
-          (truck) => {
-            'sequence_no': truck.sequenceNo,
-            'delivery_note_number': _csvSafe(truck.deliveryNoteNumber),
-            'volume_m3': truck.volumeM3,
-            'result': truck.result.storageValue,
-          },
-        )
-        .toList(growable: false),
-    'attachment_manifest': detail.attachments
-        .map(
-          (item) => {
-            'logical_name': item.relativePath,
-            'type': item.evidenceType.storageValue,
-            'size': item.byteSize,
-            'sha256': item.sha256,
-          },
-        )
-        .toList(growable: false),
-  };
+  static pw.Widget _pdfSectionTitle(String value, pw.Font bold) => pw.Padding(
+    padding: const pw.EdgeInsets.only(bottom: 5),
+    child: pw.Text(value, style: pw.TextStyle(font: bold, fontSize: 12)),
+  );
+
+  static pw.Widget _pdfKeyValues(List<List<String>> rows, pw.Font bold) =>
+      pw.Table(
+        columnWidths: const {
+          0: pw.FixedColumnWidth(120),
+          1: pw.FlexColumnWidth(),
+        },
+        children: rows
+            .map(
+              (row) => pw.TableRow(
+                children: [
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                    child: pw.Text(row[0], style: pw.TextStyle(font: bold)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                    child: pw.Text(row[1]),
+                  ),
+                ],
+              ),
+            )
+            .toList(growable: false),
+      );
+
+  static bool isStructurallyValidPdf(List<int> bytes) {
+    if (bytes.length < 20) return false;
+    final header = ascii.decode(bytes.take(5).toList(), allowInvalid: true);
+    final tailStart = bytes.length > 64 ? bytes.length - 64 : 0;
+    final tail = ascii.decode(bytes.sublist(tailStart), allowInvalid: true);
+    return header == '%PDF-' && tail.contains('%%EOF');
+  }
+
+  static String formatM3(double value) =>
+      value.toStringAsFixed(2).replaceAll('.', ',');
 
   static String truckCsv(ConcretePourDetail detail) {
     final rows = <List<String>>[
@@ -182,7 +356,7 @@ class ConcretePackageReportFormatter {
         (truck) => [
           '${truck.sequenceNo}',
           truck.vehiclePlate,
-          truck.deliveryNoteNumber,
+          truck.deliveryNoteNumber ?? '—',
           truck.volumeM3.toStringAsFixed(2),
           truck.result.label,
         ],
@@ -199,7 +373,7 @@ class ConcretePackageReportFormatter {
 
   static String humanSummary(ConcretePourDetail detail) =>
       '${detail.pour.pourCode} • ${detail.pour.elementLocation} • '
-      '${detail.metrics.actualDeliveredM3.toStringAsFixed(2)} m³ • '
+      '${formatM3(detail.metrics.actualDeliveredM3)} m³ • '
       '${detail.pour.status.label}';
 
   static String _safe(String input) =>

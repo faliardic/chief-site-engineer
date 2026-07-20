@@ -182,8 +182,13 @@ void main() {
         created.absolutePath,
         _password,
       );
+      expect(preflight.manifest.attachments, hasLength(2));
       expect(
-        preflight.manifest.attachments.single.byteSize,
+        preflight.manifest.attachments
+            .singleWhere(
+              (item) => item.logicalPath == 'concrete/pour-1/evidence.bin',
+            )
+            .byteSize,
         expectedBytes.length,
       );
       await application.restoreBackup(
@@ -196,6 +201,15 @@ void main() {
 
       expect(await _fixtureSnapshot(directories), before);
       expect(await attachment.readAsBytes(), expectedBytes);
+      expect(
+        await File(
+          path.join(
+            directories.attachments.path,
+            'agenda/observation-1/site-photo.jpg',
+          ),
+        ).readAsBytes(),
+        const [0xff, 0xd8, 0xff, 0xd9],
+      );
       expect(notificationReconciliations, 1);
       expect(
         (await application.lastSuccessfulBackup())?.fileName,
@@ -317,9 +331,9 @@ void main() {
     },
   );
 
-  for (final schemaVersion in [1, 2, 3, 4, 5, 6]) {
+  for (final schemaVersion in [1, 2, 3, 4, 5, 6, 7]) {
     test(
-      'schema v$schemaVersion package migrates to v6 without count loss',
+      'schema v$schemaVersion package migrates to v7 without count loss',
       () async {
         final oldRoot = await Directory.systemTemp.createTemp(
           'cse_schema${schemaVersion}_',
@@ -369,7 +383,7 @@ void main() {
         );
 
         expect(preflight.manifest.mobileSchemaVersion, schemaVersion);
-        expect(preflight.migratedSchemaVersion, 6);
+        expect(preflight.migratedSchemaVersion, 7);
         final counts = await _tableCounts(directories);
         final hasAgenda = schemaVersion >= 2 ? 1 : 0;
         final hasAttendance = schemaVersion >= 4 ? 1 : 0;
@@ -407,7 +421,7 @@ void main() {
     });
     final databaseBytes = await File(directories.databaseFile).readAsBytes();
     final archive = const CseBackupArchiveCodec().encode(
-      manifest: _manifest(databaseBytes, schemaVersion: 7),
+      manifest: _manifest(databaseBytes, schemaVersion: 8),
       databaseBytes: databaseBytes,
       attachments: const {},
     );
@@ -712,7 +726,7 @@ void main() {
 
 Future<void> _writePackage(File destination, List<int> databaseBytes) async {
   final archive = const CseBackupArchiveCodec().encode(
-    manifest: _manifest(databaseBytes, schemaVersion: 6),
+    manifest: _manifest(databaseBytes, schemaVersion: 7),
     databaseBytes: databaseBytes,
     attachments: const {},
   );
@@ -768,6 +782,8 @@ Future<void> _seedFullFixture(
 ) async {
   final database = await _openRaw(directories);
   final attachmentDigest = sha256.convert(attachmentBytes).toString();
+  const agendaPhotoBytes = <int>[0xff, 0xd8, 0xff, 0xd9];
+  final agendaPhotoDigest = sha256.convert(agendaPhotoBytes).toString();
   await database.transaction((tx) async {
     await tx.insert('projects', {
       'id': 'project-1',
@@ -784,7 +800,8 @@ Future<void> _seedFullFixture(
       'updated_at': _now,
       'category': 'inspection',
       'description': 'Donatı kontrolü tamamlandı.',
-      'revision': 1,
+      'revision': 3,
+      'archived_at': _now,
     });
     await tx.insert('observation_events', {
       'id': 'observation-event-1',
@@ -793,6 +810,40 @@ Future<void> _seedFullFixture(
       'event_type': 'observation.created',
       'occurred_at': _now,
       'payload_json': '{}',
+    });
+    await tx.insert('observation_events', {
+      'id': 'observation-event-2',
+      'observation_id': 'observation-1',
+      'project_id': 'project-1',
+      'event_type': 'agenda_log.updated',
+      'occurred_at': _now,
+      'payload_json':
+          '{"before":{"description":"Donatı kontrolü"},'
+          '"after":{"description":"Donatı kontrolü tamamlandı."}}',
+    });
+    await tx.insert('observation_events', {
+      'id': 'observation-event-3',
+      'observation_id': 'observation-1',
+      'project_id': 'project-1',
+      'event_type': 'agenda_log.archived',
+      'occurred_at': _now,
+      'payload_json': '{"linked_reminders_unchanged":true}',
+    });
+    await tx.insert('agenda_log_attachments', {
+      'id': 'agenda-attachment-1',
+      'observation_id': 'observation-1',
+      'project_id': 'project-1',
+      'attachment_type': 'site_photo',
+      'original_file_name': 'saha-fotografi.jpg',
+      'mime_type': 'image/jpeg',
+      'byte_size': agendaPhotoBytes.length,
+      'sha256': agendaPhotoDigest,
+      'relative_path': 'agenda/observation-1/site-photo.jpg',
+      'description': 'Donatı saha fotoğrafı',
+      'captured_at': _now,
+      'revision': 1,
+      'created_at': _now,
+      'updated_at': _now,
     });
     await tx.insert('follow_up_items', {
       'id': 'reminder-1',
@@ -961,6 +1012,14 @@ Future<void> _seedFullFixture(
   );
   await attachment.parent.create(recursive: true);
   await attachment.writeAsBytes(attachmentBytes, flush: true);
+  final agendaPhoto = File(
+    path.join(
+      directories.attachments.path,
+      'agenda/observation-1/site-photo.jpg',
+    ),
+  );
+  await agendaPhoto.parent.create(recursive: true);
+  await agendaPhoto.writeAsBytes(agendaPhotoBytes, flush: true);
 }
 
 Future<void> _seedLegacySchema(Database database, int schemaVersion) async {
@@ -1134,6 +1193,7 @@ Future<Map<String, int>> _tableCounts(AppDirectories directories) async {
     'concrete_pours',
     'concrete_pour_events',
     'concrete_attachments',
+    'agenda_log_attachments',
   ]) {
     counts[table] = Sqflite.firstIntValue(
       await database.rawQuery('SELECT count(*) FROM $table'),
@@ -1167,6 +1227,7 @@ Future<Map<String, Object?>> _fixtureSnapshot(
     'concrete_pours',
     'concrete_pour_events',
     'concrete_attachments',
+    'agenda_log_attachments',
   ]) {
     result[table] = await database.query(table, orderBy: 'rowid ASC');
   }

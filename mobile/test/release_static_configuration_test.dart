@@ -26,8 +26,7 @@ void main() {
     });
     expect(manifest, contains('android:allowBackup="false"'));
     expect(manifest, contains('android:usesCleartextTraffic="false"'));
-    expect(manifest, isNot(contains('READ_MEDIA_IMAGES')));
-    expect(manifest, isNot(contains('READ_EXTERNAL_STORAGE')));
+    expect(RegExp('tools:node="remove"').allMatches(manifest), hasLength(4));
     expect(manifest, isNot(contains('EXACT_ALARM')));
     expect(manifest, isNot(contains('android.permission.INTERNET')));
   });

@@ -5,6 +5,7 @@ import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/platform/agenda_attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:sqflite/sqflite.dart';
@@ -19,6 +20,18 @@ abstract interface class AgendaApplication {
   Future<List<AgendaLog>> listAgenda(AgendaQuery query);
 
   Future<AgendaLog> createAgendaLog(CreateAgendaLogCommand command);
+
+  Future<AgendaLog> updateAgendaLog(UpdateAgendaLogCommand command);
+
+  Future<AgendaLogDetail> mutateAgendaLogArchive(
+    MutateAgendaLogArchiveCommand command,
+  );
+
+  Future<AgendaLogDetail> attachAgendaPhoto(AttachAgendaPhotoCommand command);
+
+  Future<AgendaLogDetail> archiveAgendaPhoto(ArchiveAgendaPhotoCommand command);
+
+  Future<StoredAttachmentContent> readAgendaPhoto(String photoId);
 
   Future<AgendaLogDetail> getAgendaLogDetail(String logId);
 
@@ -53,17 +66,21 @@ class SqliteAgendaApplication implements AgendaApplication {
     required this.clock,
     MobileOperationCoordinator? coordinator,
     ReminderNotificationGateway? notificationGateway,
+    AgendaAttachmentStore? attachmentStore,
     this.beforeReminderEventInsert,
   }) : coordinator = coordinator ?? MobileOperationCoordinator(),
        notificationGateway =
            notificationGateway ??
-           const UnavailableReminderNotificationGateway();
+           const UnavailableReminderNotificationGateway(),
+       attachmentStore =
+           attachmentStore ?? const UnavailableAgendaAttachmentStore();
 
   final String databasePath;
   final DatabaseFactory databaseFactory;
   final UtcClock clock;
   final MobileOperationCoordinator coordinator;
   final ReminderNotificationGateway notificationGateway;
+  final AgendaAttachmentStore attachmentStore;
   final ReminderTransactionHook? beforeReminderEventInsert;
   final StreamController<void> _projectChanges =
       StreamController<void>.broadcast();
@@ -160,7 +177,9 @@ class SqliteAgendaApplication implements AgendaApplication {
     }
     final search = query.literalSearch.trim();
     final where = <String>[
-      'o.archived_at IS NULL',
+      query.archiveFilter == AgendaArchiveFilter.active
+          ? 'o.archived_at IS NULL'
+          : 'o.archived_at IS NOT NULL',
       'o.observed_at >= ?',
       'o.observed_at < ?',
     ];
@@ -215,8 +234,195 @@ class SqliteAgendaApplication implements AgendaApplication {
       throw const AgendaValidationFailure('Gelecek tarihli olay kaydedilemez.');
     }
     final createdAt = CseTimeCodec.encodeUtc(now);
+    for (final photo in command.photos) {
+      validateUuid(photo.id, 'Fotoğraf kimliği');
+      validateUuid(photo.eventId, 'Fotoğraf event kimliği');
+      validateCanonicalTimestamp(photo.capturedAt, 'Fotoğraf çekim zamanı');
+      optionalTrimmed(photo.description, 'Fotoğraf açıklaması', maxLength: 500);
+    }
+    final existing = await _withDatabase(now, (database) async {
+      final rows = await database.rawQuery(
+        '''
+        SELECT o.*, p.name AS project_name
+        FROM field_observations o
+        JOIN projects p ON p.id = o.project_id
+        WHERE o.id = ? LIMIT 1
+        ''',
+        [command.id],
+      );
+      return rows.isEmpty ? null : _logFromRow(rows.single);
+    });
+    if (existing != null) {
+      if (!_sameLogCommand(existing, command, description, location, notes)) {
+        throw const AgendaValidationFailure(
+          'Log kimliği başka bir içerikle kullanılıyor.',
+        );
+      }
+      return existing;
+    }
+    final staged = <(AgendaPhotoDraft, StagedAgendaPhoto)>[];
+    try {
+      for (final photo in command.photos) {
+        staged.add((
+          photo,
+          await attachmentStore.stage(
+            logId: command.id,
+            attachmentId: photo.id,
+            originalFileName: photo.originalFileName,
+            bytes: photo.bytes,
+          ),
+        ));
+      }
+      return await _withDatabase(now, (database) {
+        return database.transaction((transaction) async {
+          final projects = await transaction.query(
+            'projects',
+            where: 'id = ? AND archived_at IS NULL',
+            whereArgs: [command.projectId],
+            limit: 1,
+          );
+          if (projects.isEmpty) {
+            throw const AgendaValidationFailure('Seçilen proje bulunamadı.');
+          }
+          final project = _projectFromRow(projects.single);
+          await transaction.insert('field_observations', {
+            'id': command.id,
+            'project_id': command.projectId,
+            'observed_at': command.observedAt,
+            'created_at': createdAt,
+            'updated_at': createdAt,
+            'category': command.category.storageValue,
+            'description': description,
+            'location': location,
+            'notes': notes,
+            'revision': 1,
+          });
+          await transaction.insert('observation_events', {
+            'id': command.eventId,
+            'observation_id': command.id,
+            'project_id': command.projectId,
+            'event_type': 'created',
+            'occurred_at': createdAt,
+            'payload_json': jsonEncode({
+              'category': command.category.storageValue,
+              'description': description,
+              'observed_at': command.observedAt,
+            }),
+          });
+          for (final item in staged) {
+            final photo = item.$1;
+            final file = item.$2;
+            await transaction.insert('agenda_log_attachments', {
+              'id': photo.id,
+              'observation_id': command.id,
+              'project_id': command.projectId,
+              'attachment_type': 'site_photo',
+              'original_file_name': photo.originalFileName.trim(),
+              'mime_type': file.mimeType,
+              'byte_size': file.byteSize,
+              'sha256': file.sha256Value,
+              'relative_path': file.relativePath,
+              'description': optionalTrimmed(
+                photo.description,
+                'Fotoğraf açıklaması',
+                maxLength: 500,
+              ),
+              'captured_at': photo.capturedAt,
+              'revision': 1,
+              'created_at': createdAt,
+              'updated_at': createdAt,
+            });
+            await transaction.insert('observation_events', {
+              'id': photo.eventId,
+              'observation_id': command.id,
+              'project_id': command.projectId,
+              'event_type': 'agenda_log.photo_attached',
+              'occurred_at': createdAt,
+              'payload_json': jsonEncode({
+                'photo_id': photo.id,
+                'mime_type': file.mimeType,
+                'byte_size': file.byteSize,
+                'sha256': file.sha256Value,
+              }),
+            });
+          }
+          return AgendaLog(
+            id: command.id,
+            projectId: command.projectId,
+            projectName: project.name,
+            observedAt: command.observedAt,
+            createdAt: createdAt,
+            updatedAt: createdAt,
+            category: command.category,
+            description: description,
+            location: location,
+            notes: notes,
+            revision: 1,
+            archivedAt: null,
+          );
+        });
+      });
+    } on Object {
+      for (final item in staged.reversed) {
+        try {
+          await attachmentStore.cleanup(item.$2.relativePath);
+        } on Object {
+          // The source transaction still fails closed; next diagnostics can
+          // identify an unexpected orphan without creating a DB source row.
+        }
+      }
+      rethrow;
+    }
+  }
+
+  @override
+  Future<AgendaLog> updateAgendaLog(UpdateAgendaLogCommand command) async {
+    validateUuid(command.id, 'Log kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    validateUuid(command.projectId, 'Proje kimliği');
+    validateCanonicalTimestamp(command.observedAt, 'Olay zamanı');
+    if (command.expectedRevision < 1) {
+      throw const AgendaValidationFailure('Beklenen revision geçersizdir.');
+    }
+    final description = requiredTrimmed(
+      command.description,
+      'Kısa açıklama',
+      maxLength: 500,
+    );
+    final location = optionalTrimmed(command.location, 'Mahal', maxLength: 200);
+    final notes = optionalTrimmed(command.notes, 'Ayrıntılı not');
+    final now = _readClockOnce();
+    if (CseTimeCodec.decodeCanonicalUtc(command.observedAt).isAfter(now)) {
+      throw const AgendaValidationFailure('Gelecek tarihli olay kaydedilemez.');
+    }
+    final timestamp = CseTimeCodec.encodeUtc(now);
     return _withDatabase(now, (database) {
       return database.transaction((transaction) async {
+        final current = await _requireAgendaLog(transaction, command.id);
+        if (current.archivedAt != null) {
+          throw const AgendaValidationFailure(
+            'Arşivlenen kayıt geri getirilmeden düzenlenemez.',
+          );
+        }
+        if (current.revision != command.expectedRevision) {
+          throw const AgendaValidationFailure(
+            'Ajanda kaydı başka bir işlemde değişti; yeniden açın.',
+          );
+        }
+        final priorEvent = await transaction.query(
+          'observation_events',
+          where: 'id = ?',
+          whereArgs: [command.eventId],
+          limit: 1,
+        );
+        if (priorEvent.isNotEmpty) {
+          if (priorEvent.single['observation_id'] != current.id) {
+            throw const AgendaValidationFailure(
+              'Event kimliği başka bir Ajanda kaydında kullanılıyor.',
+            );
+          }
+          return current;
+        }
         final projects = await transaction.query(
           'projects',
           where: 'id = ? AND archived_at IS NULL',
@@ -226,100 +432,308 @@ class SqliteAgendaApplication implements AgendaApplication {
         if (projects.isEmpty) {
           throw const AgendaValidationFailure('Seçilen proje bulunamadı.');
         }
-        final project = _projectFromRow(projects.single);
-        final existing = await transaction.rawQuery(
-          '''
-          SELECT o.*, p.name AS project_name
-          FROM field_observations o
-          JOIN projects p ON p.id = o.project_id
-          WHERE o.id = ?
-          LIMIT 1
-        ''',
-          [command.id],
-        );
-        if (existing.isNotEmpty) {
-          final log = _logFromRow(existing.single);
-          if (!_sameLogCommand(log, command, description, location, notes)) {
+        if (current.projectId != command.projectId) {
+          final linked =
+              Sqflite.firstIntValue(
+                await transaction.rawQuery(
+                  'SELECT count(*) FROM follow_up_items '
+                  'WHERE observation_id = ?',
+                  [command.id],
+                ),
+              ) ??
+              0;
+          if (linked > 0) {
             throw const AgendaValidationFailure(
-              'Log kimliği başka bir içerikle kullanılıyor.',
+              'Bağlı hatırlatıcı varken log projesi değiştirilemez.',
             );
           }
-          return log;
         }
-        await transaction.insert('field_observations', {
-          'id': command.id,
+        final before = _agendaEventSnapshot(current);
+        final after = <String, Object?>{
           'project_id': command.projectId,
           'observed_at': command.observedAt,
-          'created_at': createdAt,
-          'updated_at': createdAt,
           'category': command.category.storageValue,
           'description': description,
           'location': location,
           'notes': notes,
-          'revision': 1,
-        });
+        };
+        if (_mapsEqual(before, after)) return current;
+        final changed = await transaction.update(
+          'field_observations',
+          {...after, 'updated_at': timestamp, 'revision': current.revision + 1},
+          where: 'id = ? AND revision = ?',
+          whereArgs: [command.id, current.revision],
+        );
+        if (changed != 1) {
+          throw const AgendaValidationFailure(
+            'Ajanda kaydı başka bir işlemde değişti; yeniden açın.',
+          );
+        }
         await transaction.insert('observation_events', {
           'id': command.eventId,
           'observation_id': command.id,
           'project_id': command.projectId,
-          'event_type': 'created',
-          'occurred_at': createdAt,
-          'payload_json': jsonEncode({
-            'category': command.category.storageValue,
-            'description': description,
-            'observed_at': command.observedAt,
-          }),
+          'event_type': 'agenda_log.updated',
+          'occurred_at': timestamp,
+          'payload_json': jsonEncode({'before': before, 'after': after}),
         });
-        return AgendaLog(
-          id: command.id,
-          projectId: command.projectId,
-          projectName: project.name,
-          observedAt: command.observedAt,
-          createdAt: createdAt,
-          updatedAt: createdAt,
-          category: command.category,
-          description: description,
-          location: location,
-          notes: notes,
-          revision: 1,
-        );
+        return _requireAgendaLog(transaction, command.id);
       });
     });
+  }
+
+  @override
+  Future<AgendaLogDetail> mutateAgendaLogArchive(
+    MutateAgendaLogArchiveCommand command,
+  ) async {
+    validateUuid(command.id, 'Log kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    if (command.expectedRevision < 1) {
+      throw const AgendaValidationFailure('Beklenen revision geçersizdir.');
+    }
+    final now = _readClockOnce();
+    final timestamp = CseTimeCodec.encodeUtc(now);
+    await _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final current = await _requireAgendaLog(transaction, command.id);
+        if (current.revision != command.expectedRevision) {
+          throw const AgendaValidationFailure(
+            'Ajanda kaydı başka bir işlemde değişti; yeniden açın.',
+          );
+        }
+        final alreadyTarget = command.archive
+            ? current.archivedAt != null
+            : current.archivedAt == null;
+        if (alreadyTarget) return;
+        final priorEvent = await transaction.query(
+          'observation_events',
+          where: 'id = ?',
+          whereArgs: [command.eventId],
+          limit: 1,
+        );
+        if (priorEvent.isNotEmpty) {
+          if (priorEvent.single['observation_id'] != current.id) {
+            throw const AgendaValidationFailure(
+              'Event kimliği başka bir Ajanda kaydında kullanılıyor.',
+            );
+          }
+          return;
+        }
+        final changed = await transaction.update(
+          'field_observations',
+          {
+            'archived_at': command.archive ? timestamp : null,
+            'updated_at': timestamp,
+            'revision': current.revision + 1,
+          },
+          where: 'id = ? AND revision = ?',
+          whereArgs: [command.id, current.revision],
+        );
+        if (changed != 1) {
+          throw const AgendaValidationFailure(
+            'Ajanda kaydı başka bir işlemde değişti; yeniden açın.',
+          );
+        }
+        await transaction.insert('observation_events', {
+          'id': command.eventId,
+          'observation_id': command.id,
+          'project_id': current.projectId,
+          'event_type': command.archive
+              ? 'agenda_log.archived'
+              : 'agenda_log.restored',
+          'occurred_at': timestamp,
+          'payload_json': jsonEncode({
+            'archived_at': command.archive ? timestamp : null,
+            'linked_reminders_unchanged': true,
+          }),
+        });
+      });
+    });
+    return getAgendaLogDetail(command.id);
+  }
+
+  @override
+  Future<AgendaLogDetail> attachAgendaPhoto(
+    AttachAgendaPhotoCommand command,
+  ) async {
+    validateUuid(command.logId, 'Log kimliği');
+    validateUuid(command.id, 'Fotoğraf kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    validateCanonicalTimestamp(command.capturedAt, 'Fotoğraf çekim zamanı');
+    if (command.expectedLogRevision < 1) {
+      throw const AgendaValidationFailure('Beklenen revision geçersizdir.');
+    }
+    final description = optionalTrimmed(
+      command.description,
+      'Fotoğraf açıklaması',
+      maxLength: 500,
+    );
+    final staged = await attachmentStore.stage(
+      logId: command.logId,
+      attachmentId: command.id,
+      originalFileName: command.originalFileName,
+      bytes: command.bytes,
+    );
+    final now = _readClockOnce();
+    final timestamp = CseTimeCodec.encodeUtc(now);
+    try {
+      await _withDatabase(now, (database) {
+        return database.transaction((transaction) async {
+          final current = await _requireAgendaLog(transaction, command.logId);
+          if (current.archivedAt != null) {
+            throw const AgendaValidationFailure(
+              'Arşivlenen kayda fotoğraf eklenemez.',
+            );
+          }
+          if (current.revision != command.expectedLogRevision) {
+            throw const AgendaValidationFailure(
+              'Ajanda kaydı başka bir işlemde değişti; yeniden açın.',
+            );
+          }
+          await transaction.insert('agenda_log_attachments', {
+            'id': command.id,
+            'observation_id': command.logId,
+            'project_id': current.projectId,
+            'attachment_type': 'site_photo',
+            'original_file_name': command.originalFileName.trim(),
+            'mime_type': staged.mimeType,
+            'byte_size': staged.byteSize,
+            'sha256': staged.sha256Value,
+            'relative_path': staged.relativePath,
+            'description': description,
+            'captured_at': command.capturedAt,
+            'revision': 1,
+            'created_at': timestamp,
+            'updated_at': timestamp,
+          });
+          final changed = await transaction.update(
+            'field_observations',
+            {'revision': current.revision + 1, 'updated_at': timestamp},
+            where: 'id = ? AND revision = ?',
+            whereArgs: [current.id, current.revision],
+          );
+          if (changed != 1) {
+            throw const AgendaValidationFailure(
+              'Ajanda kaydı başka bir işlemde değişti; yeniden açın.',
+            );
+          }
+          await transaction.insert('observation_events', {
+            'id': command.eventId,
+            'observation_id': current.id,
+            'project_id': current.projectId,
+            'event_type': 'agenda_log.photo_attached',
+            'occurred_at': timestamp,
+            'payload_json': jsonEncode({
+              'photo_id': command.id,
+              'mime_type': staged.mimeType,
+              'byte_size': staged.byteSize,
+              'sha256': staged.sha256Value,
+            }),
+          });
+        });
+      });
+    } on Object {
+      await attachmentStore.cleanup(staged.relativePath);
+      rethrow;
+    }
+    return getAgendaLogDetail(command.logId);
+  }
+
+  @override
+  Future<AgendaLogDetail> archiveAgendaPhoto(
+    ArchiveAgendaPhotoCommand command,
+  ) async {
+    validateUuid(command.logId, 'Log kimliği');
+    validateUuid(command.photoId, 'Fotoğraf kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    final now = _readClockOnce();
+    final timestamp = CseTimeCodec.encodeUtc(now);
+    await _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final current = await _requireAgendaLog(transaction, command.logId);
+        if (current.revision != command.expectedLogRevision) {
+          throw const AgendaValidationFailure(
+            'Ajanda kaydı başka bir işlemde değişti; yeniden açın.',
+          );
+        }
+        final rows = await transaction.query(
+          'agenda_log_attachments',
+          where: 'id = ? AND observation_id = ?',
+          whereArgs: [command.photoId, command.logId],
+          limit: 1,
+        );
+        if (rows.isEmpty) {
+          throw const AgendaValidationFailure('Fotoğraf bulunamadı.');
+        }
+        final photo = _agendaPhotoFromRow(rows.single);
+        if (photo.revision != command.expectedPhotoRevision) {
+          throw const AgendaValidationFailure(
+            'Fotoğraf başka bir işlemde değişti; yeniden açın.',
+          );
+        }
+        if (photo.archivedAt != null) return;
+        await transaction.update(
+          'agenda_log_attachments',
+          {
+            'archived_at': timestamp,
+            'updated_at': timestamp,
+            'revision': photo.revision + 1,
+          },
+          where: 'id = ? AND revision = ?',
+          whereArgs: [photo.id, photo.revision],
+        );
+        await transaction.update(
+          'field_observations',
+          {'revision': current.revision + 1, 'updated_at': timestamp},
+          where: 'id = ? AND revision = ?',
+          whereArgs: [current.id, current.revision],
+        );
+        await transaction.insert('observation_events', {
+          'id': command.eventId,
+          'observation_id': current.id,
+          'project_id': current.projectId,
+          'event_type': 'agenda_log.photo_archived',
+          'occurred_at': timestamp,
+          'payload_json': jsonEncode({'photo_id': photo.id}),
+        });
+      });
+    });
+    return getAgendaLogDetail(command.logId);
+  }
+
+  @override
+  Future<StoredAttachmentContent> readAgendaPhoto(String photoId) async {
+    validateUuid(photoId, 'Fotoğraf kimliği');
+    final now = _readClockOnce();
+    final photo = await _withDatabase(now, (database) async {
+      final rows = await database.query(
+        'agenda_log_attachments',
+        where: 'id = ? AND archived_at IS NULL',
+        whereArgs: [photoId],
+        limit: 1,
+      );
+      if (rows.isEmpty) {
+        throw const AgendaValidationFailure('Fotoğraf bulunamadı.');
+      }
+      return _agendaPhotoFromRow(rows.single);
+    });
+    return attachmentStore.read(
+      photo.relativePath,
+      photo.originalFileName,
+      photo.sha256,
+      photo.mimeType,
+    );
   }
 
   @override
   Future<AgendaLogDetail> getAgendaLogDetail(String logId) async {
     validateUuid(logId, 'Log kimliği');
     final now = _readClockOnce();
-    return _withDatabase(now, (database) async {
-      final logs = await database.rawQuery(
-        '''
-        SELECT o.*, p.name AS project_name
-        FROM field_observations o
-        JOIN projects p ON p.id = o.project_id
-        WHERE o.id = ? AND o.archived_at IS NULL
-        LIMIT 1
-      ''',
-        [logId],
-      );
-      if (logs.isEmpty) {
-        throw const AgendaValidationFailure('Ajanda kaydı bulunamadı.');
-      }
-      final reminders = await database.rawQuery(
-        '''
-        SELECT f.*, p.name AS project_name
-        FROM follow_up_items f
-        LEFT JOIN projects p ON p.id = f.project_id
-        WHERE f.observation_id = ?
-        ORDER BY f.created_at ASC, f.id ASC
-      ''',
-        [logId],
-      );
-      return AgendaLogDetail(
-        log: _logFromRow(logs.single),
-        reminders: reminders.map(_reminderFromRow).toList(growable: false),
-      );
-    });
+    final detail = await _withDatabase(
+      now,
+      (database) => _loadAgendaDetail(database, logId),
+    );
+    return _withAgendaPhotoIntegrity(detail);
   }
 
   @override
@@ -1321,6 +1735,85 @@ class SqliteAgendaApplication implements AgendaApplication {
     );
   }
 
+  Future<AgendaLog> _requireAgendaLog(
+    DatabaseExecutor database,
+    String logId,
+  ) async {
+    final rows = await database.rawQuery(
+      '''
+      SELECT o.*, p.name AS project_name
+      FROM field_observations o
+      JOIN projects p ON p.id = o.project_id
+      WHERE o.id = ? LIMIT 1
+      ''',
+      [logId],
+    );
+    if (rows.isEmpty) {
+      throw const AgendaValidationFailure('Ajanda kaydı bulunamadı.');
+    }
+    return _logFromRow(rows.single);
+  }
+
+  Future<AgendaLogDetail> _loadAgendaDetail(
+    DatabaseExecutor database,
+    String logId,
+  ) async {
+    final log = await _requireAgendaLog(database, logId);
+    final reminders = await database.rawQuery(
+      '''
+      SELECT f.*, p.name AS project_name
+      FROM follow_up_items f
+      LEFT JOIN projects p ON p.id = f.project_id
+      WHERE f.observation_id = ?
+      ORDER BY f.created_at ASC, f.id ASC
+      ''',
+      [logId],
+    );
+    final photos = await database.query(
+      'agenda_log_attachments',
+      where: 'observation_id = ? AND archived_at IS NULL',
+      whereArgs: [logId],
+      orderBy: 'created_at ASC, id ASC',
+    );
+    final events = await database.query(
+      'observation_events',
+      where: 'observation_id = ?',
+      whereArgs: [logId],
+      orderBy: 'occurred_at ASC, id ASC',
+    );
+    return AgendaLogDetail(
+      log: log,
+      reminders: reminders.map(_reminderFromRow).toList(growable: false),
+      photos: photos.map(_agendaPhotoFromRow).toList(growable: false),
+      events: events.map(_observationEventFromRow).toList(growable: false),
+    );
+  }
+
+  Future<AgendaLogDetail> _withAgendaPhotoIntegrity(
+    AgendaLogDetail detail,
+  ) async {
+    final photos = <AgendaLogPhoto>[];
+    for (final photo in detail.photos) {
+      AgendaAttachmentIntegrity integrity;
+      try {
+        integrity = await attachmentStore.inspect(
+          photo.relativePath,
+          photo.sha256,
+          photo.mimeType,
+        );
+      } on Object {
+        integrity = AgendaAttachmentIntegrity.missing;
+      }
+      photos.add(_agendaPhotoWithIntegrity(photo, integrity));
+    }
+    return AgendaLogDetail(
+      log: detail.log,
+      reminders: detail.reminders,
+      photos: List.unmodifiable(photos),
+      events: detail.events,
+    );
+  }
+
   DateTime _readClockOnce() {
     final value = clock();
     CseTimeCodec.encodeUtc(value);
@@ -1509,6 +2002,18 @@ class SqliteAgendaApplication implements AgendaApplication {
   }
 }
 
+Map<String, Object?> _agendaEventSnapshot(AgendaLog log) => {
+  'project_id': log.projectId,
+  'observed_at': log.observedAt,
+  'category': log.category.storageValue,
+  'description': log.description,
+  'location': log.location,
+  'notes': log.notes,
+};
+
+bool _mapsEqual(Map<String, Object?> first, Map<String, Object?> second) =>
+    jsonEncode(first) == jsonEncode(second);
+
 String _normalizeProjectName(String value) =>
     value.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
 
@@ -1544,11 +2049,15 @@ AgendaLog _logFromRow(Map<String, Object?> row) {
   final observedAt = row['observed_at']! as String;
   final createdAt = row['created_at']! as String;
   final updatedAt = row['updated_at']! as String;
+  final archivedAt = row['archived_at'] as String?;
   validateUuid(id, 'Log kimliği');
   validateUuid(projectId, 'Proje kimliği');
   validateCanonicalTimestamp(observedAt, 'Olay zamanı');
   validateCanonicalTimestamp(createdAt, 'Log oluşturma zamanı');
   validateCanonicalTimestamp(updatedAt, 'Log güncelleme zamanı');
+  if (archivedAt != null) {
+    validateCanonicalTimestamp(archivedAt, 'Log arşivleme zamanı');
+  }
   return AgendaLog(
     id: id,
     projectId: projectId,
@@ -1564,8 +2073,72 @@ AgendaLog _logFromRow(Map<String, Object?> row) {
     location: row['location'] as String?,
     notes: row['notes'] as String?,
     revision: row['revision']! as int,
+    archivedAt: archivedAt,
   );
 }
+
+AgendaLogPhoto _agendaPhotoFromRow(Map<String, Object?> row) {
+  final capturedAt = row['captured_at'] as String?;
+  final createdAt = row['created_at']! as String;
+  final updatedAt = row['updated_at']! as String;
+  final archivedAt = row['archived_at'] as String?;
+  if (capturedAt != null) {
+    validateCanonicalTimestamp(capturedAt, 'Fotoğraf çekim zamanı');
+  }
+  validateCanonicalTimestamp(createdAt, 'Fotoğraf oluşturma zamanı');
+  validateCanonicalTimestamp(updatedAt, 'Fotoğraf güncelleme zamanı');
+  if (archivedAt != null) {
+    validateCanonicalTimestamp(archivedAt, 'Fotoğraf arşivleme zamanı');
+  }
+  return AgendaLogPhoto(
+    id: row['id']! as String,
+    logId: row['observation_id']! as String,
+    projectId: row['project_id']! as String,
+    originalFileName: row['original_file_name']! as String,
+    mimeType: row['mime_type']! as String,
+    byteSize: row['byte_size']! as int,
+    sha256: row['sha256']! as String,
+    relativePath: row['relative_path']! as String,
+    description: row['description'] as String?,
+    capturedAt: capturedAt,
+    revision: row['revision']! as int,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+    archivedAt: archivedAt,
+    integrity: AgendaAttachmentIntegrity.ok,
+  );
+}
+
+AgendaLogPhoto _agendaPhotoWithIntegrity(
+  AgendaLogPhoto photo,
+  AgendaAttachmentIntegrity integrity,
+) => AgendaLogPhoto(
+  id: photo.id,
+  logId: photo.logId,
+  projectId: photo.projectId,
+  originalFileName: photo.originalFileName,
+  mimeType: photo.mimeType,
+  byteSize: photo.byteSize,
+  sha256: photo.sha256,
+  relativePath: photo.relativePath,
+  description: photo.description,
+  capturedAt: photo.capturedAt,
+  revision: photo.revision,
+  createdAt: photo.createdAt,
+  updatedAt: photo.updatedAt,
+  archivedAt: photo.archivedAt,
+  integrity: integrity,
+);
+
+AppendOnlyEvent _observationEventFromRow(Map<String, Object?> row) =>
+    AppendOnlyEvent(
+      id: row['id']! as String,
+      recordId: row['observation_id']! as String,
+      projectId: row['project_id']! as String,
+      eventType: row['event_type']! as String,
+      occurredAt: row['occurred_at']! as String,
+      payloadJson: row['payload_json']! as String,
+    );
 
 MobileReminder _reminderFromRow(Map<String, Object?> row) {
   final id = row['id']! as String;

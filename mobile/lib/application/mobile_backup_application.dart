@@ -1173,6 +1173,7 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
         'concrete_pours',
         'concrete_pour_events',
         'concrete_attachments',
+        'agenda_log_attachments',
       ]) {
         await current.database.rawQuery('SELECT count(*) FROM $table');
       }
@@ -1199,12 +1200,15 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
   }
 
   Future<List<Map<String, Object?>>> _activeAttachmentRows(Database database) =>
-      database.query(
-        'concrete_attachments',
-        columns: ['relative_path', 'byte_size', 'sha256'],
-        where: 'archived_at IS NULL',
-        orderBy: 'relative_path ASC',
-      );
+      database.rawQuery('''
+        SELECT relative_path, byte_size, sha256
+        FROM concrete_attachments
+        WHERE archived_at IS NULL
+        UNION ALL
+        SELECT relative_path, byte_size, sha256
+        FROM agenda_log_attachments
+        ORDER BY relative_path ASC
+      ''');
 
   Future<void> _requireAttachmentManifestMatchesDatabase(
     File databaseFile,

@@ -1,5 +1,29 @@
 # Changelog
 
+## Issue #196 - Ajanda ve Beton Saha Akışı
+
+- Mobil SQLite schema `6` → `7` atomik migration ile Ajanda fotoğraf tablosu,
+  archive yaşam döngüsü ve nullable/partial-unique mikser irsaliye numarası
+  eklendi; mevcut mobil veri, child FK grafiği ve event kimlikleri korundu.
+- Ajanda log edit/no-op/stale, geri alınabilir `Sil`→archive/restore, active/
+  archived filtre ve bağlı reminder'ı değiştirmeyen AppBar alarm ikonu uygulandı.
+- Log create/detail fotoğrafları JPEG/PNG sniff, boyut/hash, staging→atomic
+  finalize, DB failure cleanup, archive, zoom/pan viewer ve güvenli tamper tanısı
+  ile backup/restore kapsamına alındı.
+- Beton mikser düzenleme, boş bırakılabilir ve sonradan eklenebilir irsaliye,
+  exact truck'a çoklu `delivery_note_scan` ve JPEG/PNG/PDF viewer tamamlandı;
+  legacy kanıt türü okunmaya devam eder.
+- Hedef/dökülen/kalan/aşılan m³ aynı hesap motoruyla ekranda ve raporda canlı
+  gösterilir; hedef optimistic revision ve before/after event ile değiştirilebilir.
+- Manuel checklist/takipler için tek transaction'lı idempotent toplu tamamlama
+  eklendi; source-field laboratuvar/yapı denetim görevleri kapsam dışında tutuldu.
+- Ana Beton çıktısı embedded Türkçe fontlu PDF oldu; paylaş ve kullanıcı
+  kontrollü telefona kaydet akışları ayrıldı, iptal/hata staged dosya ve başarı
+  event'i bırakmaz.
+- `.csebackup` format `1`, Python/desktop schema ve Günlük Çıktı sözleşmeleri,
+  offline cihaz source-of-truth, broad izin/exact alarm yokluğu ve fiziksel
+  silmeme sınırı korundu.
+
 ## Issue #194 - Release 0.1 Saha Düzeltmeleri
 
 - Mobil SQLite schema `5` → `6` atomik migration ile mevcut Ajanda, reminder,

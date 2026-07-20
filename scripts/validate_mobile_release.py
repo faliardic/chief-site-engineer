@@ -15,6 +15,7 @@ from xml.etree import ElementTree
 
 
 ANDROID_NAMESPACE = "{http://schemas.android.com/apk/res/android}"
+TOOLS_NAMESPACE = "{http://schemas.android.com/tools}"
 ANDROID_PERMISSION_ALLOWLIST = {
     "android.permission.CAMERA",
     "android.permission.POST_NOTIFICATIONS",
@@ -25,8 +26,15 @@ FORBIDDEN_PRODUCTION_PERMISSIONS = {
     "android.permission.READ_EXTERNAL_STORAGE",
     "android.permission.READ_MEDIA_IMAGES",
     "android.permission.READ_MEDIA_VIDEO",
+    "android.permission.READ_MEDIA_AUDIO",
     "android.permission.SCHEDULE_EXACT_ALARM",
     "android.permission.USE_EXACT_ALARM",
+}
+REQUIRED_TRANSITIVE_PERMISSION_REMOVALS = {
+    "android.permission.READ_EXTERNAL_STORAGE",
+    "android.permission.READ_MEDIA_IMAGES",
+    "android.permission.READ_MEDIA_VIDEO",
+    "android.permission.READ_MEDIA_AUDIO",
 }
 FORBIDDEN_TRACKED_SECRET_SUFFIXES = {
     ".jks",
@@ -62,6 +70,7 @@ def _permissions(manifest: Path) -> tuple[set[str], ElementTree.Element]:
     permissions = {
         item.attrib[f"{ANDROID_NAMESPACE}name"]
         for item in root.findall("uses-permission")
+        if item.attrib.get(f"{TOOLS_NAMESPACE}node") != "remove"
     }
     return permissions, root
 
@@ -93,6 +102,11 @@ def validate_static(repository: Path) -> list[str]:
     mobile = repository / "mobile"
     manifest = mobile / "android/app/src/main/AndroidManifest.xml"
     permissions, manifest_root = _permissions(manifest)
+    removed_permissions = {
+        item.attrib[f"{ANDROID_NAMESPACE}name"]
+        for item in manifest_root.findall("uses-permission")
+        if item.attrib.get(f"{TOOLS_NAMESPACE}node") == "remove"
+    }
     require(
         permissions == ANDROID_PERMISSION_ALLOWLIST,
         f"main manifest permission allowlist mismatch: {sorted(permissions)}",
@@ -100,6 +114,10 @@ def validate_static(repository: Path) -> list[str]:
     require(
         not permissions.intersection(FORBIDDEN_PRODUCTION_PERMISSIONS),
         "main manifest contains a forbidden production permission",
+    )
+    require(
+        REQUIRED_TRANSITIVE_PERMISSION_REMOVALS <= removed_permissions,
+        "main manifest does not remove every transitive broad media permission",
     )
     application = manifest_root.find("application")
     require(application is not None, "Android application element is missing")

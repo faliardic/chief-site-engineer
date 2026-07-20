@@ -8,6 +8,8 @@ import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
+import 'package:chief_site_engineer/platform/attachment_gateway.dart';
+import 'package:chief_site_engineer/platform/capabilities.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -244,7 +246,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.byKey(const Key('open-source-agenda-log')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('detail-create-reminder')), findsOneWidget);
+    expect(find.byKey(const Key('detail-reminder-action')), findsOneWidget);
   });
 
   testWidgets('reminder text is suggested from log and remains editable', (
@@ -275,4 +277,97 @@ void main() {
     expect(fake.lastReminderCommand!.sourceLogId, logId);
     expect(fake.lastReminderCommand!.projectId, projectId);
   });
+
+  testWidgets(
+    'reminder is an accessible AppBar icon and Sil archives then restores',
+    (tester) async {
+      final fake = FakeAgendaApplication(projects: [project()], logs: [log()]);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: LogDetailPage(agenda: fake, logId: logId),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final reminderAction = find.byKey(const Key('detail-reminder-action'));
+      expect(reminderAction, findsOneWidget);
+      expect(tester.getSize(reminderAction).height, greaterThanOrEqualTo(44));
+      expect(find.bySemanticsLabel('Hatırlatıcı oluştur'), findsOneWidget);
+      expect(
+        find.widgetWithText(FilledButton, 'Hatırlatıcı oluştur'),
+        findsNothing,
+      );
+
+      await tester.tap(reminderAction);
+      await tester.pumpAndSettle();
+      expect(find.byType(ReminderFormPage), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.byKey(const Key('archive-agenda-log')));
+      await tester.tap(find.byKey(const Key('archive-agenda-log')));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Kayıt arşive taşınacak, geri getirilebilir'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('confirm-archive-log')));
+      await tester.pumpAndSettle();
+      expect(fake.logs.single.archivedAt, isNotNull);
+      expect(find.byKey(const Key('restore-agenda-log')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('restore-agenda-log')));
+      await tester.pumpAndSettle();
+      expect(fake.logs.single.archivedAt, isNull);
+      expect(find.byKey(const Key('archive-agenda-log')), findsOneWidget);
+    },
+  );
+
+  testWidgets('camera denial preserves pending log input and creates no row', (
+    tester,
+  ) async {
+    final fake = FakeAgendaApplication(projects: [project()]);
+    final attachments = SafeAttachmentPicker(
+      permissions: SafeCapabilityService(_DeniedPermission()),
+      picker: _UnexpectedPicker(),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LogFormPage(agenda: fake, attachments: attachments),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('log-description')),
+      'İzin reddedilse de korunacak saha kaydı',
+    );
+    await tester.ensureVisible(find.byKey(const Key('log-add-photo')));
+    await tester.tap(find.byKey(const Key('log-add-photo')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Kamera'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Fotoğraf eklenmedi'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextFormField>(find.byKey(const Key('log-description')))
+          .controller!
+          .text,
+      'İzin reddedilse de korunacak saha kaydı',
+    );
+    expect(fake.logs, isEmpty);
+    expect(fake.createLogCalls, 0);
+  });
+}
+
+class _DeniedPermission implements PermissionGateway {
+  @override
+  Future<CapabilityStatus> request(DeviceCapability capability) async =>
+      CapabilityStatus.denied;
+}
+
+class _UnexpectedPicker implements AttachmentPickerPort {
+  @override
+  Future<SelectedAttachment?> pick(AttachmentSource source) =>
+      throw StateError('permission denial must stop before picker');
 }

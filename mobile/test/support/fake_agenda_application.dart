@@ -85,6 +85,67 @@ class FakeAgendaApplication implements AgendaApplication {
   }
 
   @override
+  Future<AgendaLog> updateAgendaLog(UpdateAgendaLogCommand command) async {
+    final index = logs.indexWhere((item) => item.id == command.id);
+    final current = logs[index];
+    final project = projects.firstWhere((item) => item.id == command.projectId);
+    final updated = AgendaLog(
+      id: current.id,
+      projectId: command.projectId,
+      projectName: project.name,
+      observedAt: command.observedAt,
+      createdAt: current.createdAt,
+      updatedAt: '2026-07-19T08:01:00Z',
+      category: command.category,
+      description: command.description.trim(),
+      location: command.location?.trim(),
+      notes: command.notes?.trim(),
+      revision: current.revision + 1,
+      archivedAt: current.archivedAt,
+    );
+    logs = [...logs]..[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<AgendaLogDetail> mutateAgendaLogArchive(
+    MutateAgendaLogArchiveCommand command,
+  ) async {
+    final index = logs.indexWhere((item) => item.id == command.id);
+    final current = logs[index];
+    final updated = AgendaLog(
+      id: current.id,
+      projectId: current.projectId,
+      projectName: current.projectName,
+      observedAt: current.observedAt,
+      createdAt: current.createdAt,
+      updatedAt: '2026-07-19T08:01:00Z',
+      category: current.category,
+      description: current.description,
+      location: current.location,
+      notes: current.notes,
+      revision: current.revision + 1,
+      archivedAt: command.archive ? '2026-07-19T08:01:00Z' : null,
+    );
+    logs = [...logs]..[index] = updated;
+    return AgendaLogDetail(log: updated, reminders: reminders);
+  }
+
+  @override
+  Future<AgendaLogDetail> attachAgendaPhoto(
+    AttachAgendaPhotoCommand command,
+  ) async => getAgendaLogDetail(command.logId);
+
+  @override
+  Future<AgendaLogDetail> archiveAgendaPhoto(
+    ArchiveAgendaPhotoCommand command,
+  ) async => getAgendaLogDetail(command.logId);
+
+  @override
+  Future<StoredAttachmentContent> readAgendaPhoto(String photoId) =>
+      throw StateError('photo unavailable in fake');
+
+  @override
   Future<MobileReminder> createReminder(CreateReminderCommand command) async {
     createReminderCalls += 1;
     lastReminderCommand = command;

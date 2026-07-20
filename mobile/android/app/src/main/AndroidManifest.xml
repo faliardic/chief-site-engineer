@@ -1,7 +1,23 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- open_filex can open our app-private FileProvider URI without broad
+         storage/media access. Keep its transitive permissions out of the
+         final manifest and rely on one-shot URI grants instead. -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        tools:node="remove"/>
+    <uses-permission
+        android:name="android.permission.READ_MEDIA_IMAGES"
+        tools:node="remove"/>
+    <uses-permission
+        android:name="android.permission.READ_MEDIA_VIDEO"
+        tools:node="remove"/>
+    <uses-permission
+        android:name="android.permission.READ_MEDIA_AUDIO"
+        tools:node="remove"/>
     <application
         android:label="${appLabel}"
         android:name="${applicationName}"
