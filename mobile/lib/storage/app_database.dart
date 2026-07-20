@@ -25,7 +25,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 6;
+  static const schemaVersion = 7;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -1707,6 +1707,318 @@ class AppDatabase {
           'workforce_teams',
           'workforce_compliance_records',
           'workforce_ppe_assignments',
+        ]) {
+          await transaction.execute('''
+            CREATE TRIGGER ${table}_no_physical_delete
+            BEFORE DELETE ON $table
+            BEGIN
+              SELECT RAISE(ABORT, 'physical delete is not allowed');
+            END
+          ''');
+        }
+      },
+    ),
+    DatabaseMigration(
+      version: 7,
+      apply: (transaction) async {
+        await transaction.execute('''
+          CREATE TABLE agenda_log_attachments (
+            id TEXT PRIMARY KEY,
+            observation_id TEXT NOT NULL,
+            project_id TEXT NOT NULL,
+            attachment_type TEXT NOT NULL CHECK (
+              attachment_type = 'site_photo'
+            ),
+            original_file_name TEXT NOT NULL,
+            mime_type TEXT NOT NULL CHECK (
+              mime_type IN ('image/jpeg', 'image/png')
+            ),
+            byte_size INTEGER NOT NULL CHECK (byte_size > 0),
+            sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
+            relative_path TEXT NOT NULL UNIQUE,
+            description TEXT,
+            captured_at TEXT,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            archived_at TEXT,
+            UNIQUE (observation_id, sha256),
+            FOREIGN KEY (observation_id, project_id)
+              REFERENCES field_observations(id, project_id)
+          )
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_agenda_log_attachments_log
+          ON agenda_log_attachments(
+            observation_id, archived_at, created_at, id
+          )
+        ''');
+        await transaction.execute('''
+          CREATE TRIGGER agenda_log_attachments_no_physical_delete
+          BEFORE DELETE ON agenda_log_attachments
+          BEGIN
+            SELECT RAISE(ABORT, 'physical delete is not allowed');
+          END
+        ''');
+
+        // SQLite cannot remove the v5 automatic UNIQUE index in place. Rebuild
+        // the complete truck child graph inside this migration so an empty
+        // delivery-note value is truly nullable without weakening any FK.
+        for (final table in [
+          'concrete_trucks',
+          'concrete_sample_sets',
+          'concrete_follow_up_items',
+          'concrete_attachments',
+        ]) {
+          await transaction.execute('DROP TRIGGER ${table}_no_physical_delete');
+        }
+        for (final index in [
+          'ix_concrete_trucks_pour_sequence',
+          'ix_concrete_samples_pour',
+          'ix_concrete_followups_pour',
+          'ix_concrete_attachments_pour',
+        ]) {
+          await transaction.execute('DROP INDEX $index');
+        }
+        await transaction.execute(
+          'ALTER TABLE concrete_trucks RENAME TO concrete_trucks_v6',
+        );
+        await transaction.execute(
+          'ALTER TABLE concrete_sample_sets '
+          'RENAME TO concrete_sample_sets_v6',
+        );
+        await transaction.execute(
+          'ALTER TABLE concrete_follow_up_items '
+          'RENAME TO concrete_follow_up_items_v6',
+        );
+        await transaction.execute(
+          'ALTER TABLE concrete_attachments '
+          'RENAME TO concrete_attachments_v6',
+        );
+
+        await transaction.execute('''
+          CREATE TABLE concrete_trucks (
+            id TEXT PRIMARY KEY,
+            concrete_pour_id TEXT NOT NULL REFERENCES concrete_pours(id),
+            sequence_no INTEGER NOT NULL CHECK (sequence_no >= 1),
+            vehicle_plate TEXT NOT NULL,
+            delivery_note_number TEXT,
+            plant_snapshot TEXT,
+            batch_time TEXT,
+            arrived_at TEXT,
+            unloading_started_at TEXT,
+            unloading_ended_at TEXT,
+            volume_m3 REAL NOT NULL CHECK (volume_m3 > 0),
+            measured_slump REAL CHECK (
+              measured_slump IS NULL OR measured_slump >= 0
+            ),
+            concrete_temperature REAL,
+            result TEXT NOT NULL CHECK (result IN (
+              'received', 'held', 'returned', 'partial'
+            )),
+            reason TEXT,
+            note TEXT,
+            evidence_exception_reason TEXT,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (concrete_pour_id, sequence_no),
+            UNIQUE (id, concrete_pour_id),
+            CHECK (
+              delivery_note_number IS NULL
+              OR length(trim(delivery_note_number)) > 0
+            ),
+            CHECK (
+              result = 'received'
+              OR (reason IS NOT NULL AND length(trim(reason)) > 0)
+            ),
+            CHECK (
+              unloading_started_at IS NULL OR arrived_at IS NULL
+              OR unloading_started_at >= arrived_at
+            ),
+            CHECK (
+              unloading_ended_at IS NULL OR unloading_started_at IS NOT NULL
+            ),
+            CHECK (
+              unloading_ended_at IS NULL
+              OR unloading_ended_at >= unloading_started_at
+            )
+          )
+        ''');
+        await transaction.execute('''
+          CREATE UNIQUE INDEX ux_concrete_trucks_delivery_note
+          ON concrete_trucks(concrete_pour_id, delivery_note_number)
+          WHERE delivery_note_number IS NOT NULL
+        ''');
+        await transaction.execute('''
+          INSERT INTO concrete_trucks (
+            id, concrete_pour_id, sequence_no, vehicle_plate,
+            delivery_note_number, plant_snapshot, batch_time, arrived_at,
+            unloading_started_at, unloading_ended_at, volume_m3,
+            measured_slump, concrete_temperature, result, reason, note,
+            evidence_exception_reason, revision, created_at, updated_at
+          )
+          SELECT
+            id, concrete_pour_id, sequence_no, vehicle_plate,
+            nullif(trim(delivery_note_number), ''), plant_snapshot, batch_time,
+            arrived_at, unloading_started_at, unloading_ended_at, volume_m3,
+            measured_slump, concrete_temperature, result, reason, NULL,
+            evidence_exception_reason, revision, created_at, updated_at
+          FROM concrete_trucks_v6
+        ''');
+
+        await transaction.execute('''
+          CREATE TABLE concrete_sample_sets (
+            id TEXT PRIMARY KEY,
+            concrete_pour_id TEXT NOT NULL REFERENCES concrete_pours(id),
+            source_truck_id TEXT,
+            sample_code TEXT NOT NULL,
+            sample_count INTEGER NOT NULL CHECK (sample_count >= 0),
+            sample_labels_json TEXT NOT NULL,
+            sampled_at TEXT,
+            sampled_by TEXT,
+            laboratory_appointment_at TEXT,
+            delivered_at TEXT,
+            delivered_to TEXT,
+            expected_result_dates_json TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN (
+              'planned', 'sampled', 'delivered', 'waiting_result',
+              'completed', 'exception'
+            )),
+            note TEXT,
+            reason TEXT,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (concrete_pour_id, sample_code),
+            UNIQUE (id, concrete_pour_id),
+            FOREIGN KEY (source_truck_id, concrete_pour_id)
+              REFERENCES concrete_trucks(id, concrete_pour_id),
+            CHECK (
+              status NOT IN ('sampled', 'delivered', 'waiting_result',
+                'completed')
+              OR (sampled_at IS NOT NULL AND sample_count > 0)
+            ),
+            CHECK (
+              status NOT IN ('delivered', 'waiting_result', 'completed')
+              OR delivered_at IS NOT NULL
+            ),
+            CHECK (
+              status != 'exception'
+              OR (reason IS NOT NULL AND length(trim(reason)) > 0)
+            )
+          )
+        ''');
+        await transaction.execute('''
+          INSERT INTO concrete_sample_sets
+          SELECT * FROM concrete_sample_sets_v6
+        ''');
+
+        await transaction.execute('''
+          CREATE TABLE concrete_follow_up_items (
+            id TEXT PRIMARY KEY,
+            concrete_pour_id TEXT NOT NULL REFERENCES concrete_pours(id),
+            source_sample_set_id TEXT,
+            item_key TEXT NOT NULL,
+            label TEXT NOT NULL,
+            due_at TEXT,
+            status TEXT NOT NULL CHECK (status IN (
+              'pending', 'completed', 'exception'
+            )),
+            reminder_id TEXT UNIQUE REFERENCES follow_up_items(id),
+            note TEXT,
+            reason TEXT,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            completed_at TEXT,
+            UNIQUE (concrete_pour_id, item_key),
+            UNIQUE (id, concrete_pour_id),
+            FOREIGN KEY (source_sample_set_id, concrete_pour_id)
+              REFERENCES concrete_sample_sets(id, concrete_pour_id),
+            CHECK (
+              (status = 'pending' AND completed_at IS NULL)
+              OR (status IN ('completed', 'exception')
+                AND completed_at IS NOT NULL)
+            ),
+            CHECK (
+              status != 'exception'
+              OR (reason IS NOT NULL AND length(trim(reason)) > 0)
+            )
+          )
+        ''');
+        await transaction.execute('''
+          INSERT INTO concrete_follow_up_items
+          SELECT * FROM concrete_follow_up_items_v6
+        ''');
+
+        await transaction.execute('''
+          CREATE TABLE concrete_attachments (
+            id TEXT PRIMARY KEY,
+            concrete_pour_id TEXT NOT NULL REFERENCES concrete_pours(id),
+            truck_id TEXT,
+            sample_set_id TEXT,
+            check_item_id TEXT,
+            evidence_type TEXT NOT NULL CHECK (evidence_type IN (
+              'delivery_receipt_scan', 'delivery_note_scan', 'mixer_photo',
+              'site_photo', 'sample_photo',
+              'laboratory_delivery_document', 'result_document', 'other'
+            )),
+            original_file_name TEXT NOT NULL,
+            mime_type TEXT NOT NULL,
+            byte_size INTEGER NOT NULL CHECK (byte_size > 0),
+            sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
+            relative_path TEXT NOT NULL UNIQUE,
+            captured_at TEXT NOT NULL,
+            description TEXT,
+            created_at TEXT NOT NULL,
+            archived_at TEXT,
+            UNIQUE (concrete_pour_id, sha256),
+            FOREIGN KEY (truck_id, concrete_pour_id)
+              REFERENCES concrete_trucks(id, concrete_pour_id),
+            FOREIGN KEY (sample_set_id, concrete_pour_id)
+              REFERENCES concrete_sample_sets(id, concrete_pour_id),
+            FOREIGN KEY (check_item_id, concrete_pour_id)
+              REFERENCES concrete_check_items(id, concrete_pour_id),
+            CHECK (
+              (truck_id IS NOT NULL) + (sample_set_id IS NOT NULL)
+                + (check_item_id IS NOT NULL) <= 1
+            )
+          )
+        ''');
+        await transaction.execute('''
+          INSERT INTO concrete_attachments
+          SELECT * FROM concrete_attachments_v6
+        ''');
+
+        await transaction.execute('DROP TABLE concrete_attachments_v6');
+        await transaction.execute('DROP TABLE concrete_follow_up_items_v6');
+        await transaction.execute('DROP TABLE concrete_sample_sets_v6');
+        await transaction.execute('DROP TABLE concrete_trucks_v6');
+
+        await transaction.execute('''
+          CREATE INDEX ix_concrete_trucks_pour_sequence
+          ON concrete_trucks(concrete_pour_id, sequence_no, id)
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_concrete_samples_pour
+          ON concrete_sample_sets(concrete_pour_id, created_at, id)
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_concrete_followups_pour
+          ON concrete_follow_up_items(concrete_pour_id, status, due_at, id)
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_concrete_attachments_pour
+          ON concrete_attachments(
+            concrete_pour_id, archived_at, evidence_type, created_at, id
+          )
+        ''');
+        for (final table in [
+          'concrete_trucks',
+          'concrete_sample_sets',
+          'concrete_follow_up_items',
+          'concrete_attachments',
         ]) {
           await transaction.execute('''
             CREATE TRIGGER ${table}_no_physical_delete

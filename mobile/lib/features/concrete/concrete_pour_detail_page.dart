@@ -4,6 +4,7 @@ import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/concrete_models.dart';
+import 'package:chief_site_engineer/features/concrete/concrete_attachment_viewer_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:flutter/material.dart';
@@ -223,82 +224,178 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
     );
   }
 
-  Future<void> _addTruck() async {
+  Future<void> _editTruck([ConcreteTruck? current]) async {
     final detail = _detail!;
-    final plate = TextEditingController();
-    final note = TextEditingController();
-    final volume = TextEditingController();
-    final result = await showDialog<(String, String, double)?>(
+    final plate = TextEditingController(text: current?.vehiclePlate);
+    final deliveryNote = TextEditingController(
+      text: current?.deliveryNoteNumber,
+    );
+    final volume = TextEditingController(
+      text: current?.volumeM3.toStringAsFixed(2),
+    );
+    final note = TextEditingController(text: current?.note);
+    final reason = TextEditingController(text: current?.reason);
+    var truckResult = current?.result ?? ConcreteTruckResult.received;
+    var arrivedAt = current?.arrivedAt;
+    var unloadingStartedAt = current?.unloadingStartedAt;
+    var unloadingEndedAt = current?.unloadingEndedAt;
+    final result = await showDialog<_TruckDraft>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Mikser / irsaliye ekle'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: plate,
-                decoration: const InputDecoration(labelText: 'Plaka'),
-              ),
-              TextField(
-                controller: note,
-                decoration: const InputDecoration(
-                  labelText: 'İrsaliye numarası',
-                ),
-              ),
-              TextField(
-                controller: volume,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(labelText: 'Metraj (m³)'),
-              ),
-            ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(
+            current == null ? 'Mikser / irsaliye ekle' : 'Mikseri düzenle',
           ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: plate,
+                  decoration: const InputDecoration(labelText: 'Plaka'),
+                ),
+                TextField(
+                  controller: deliveryNote,
+                  decoration: const InputDecoration(
+                    labelText: 'İrsaliye numarası (opsiyonel)',
+                  ),
+                ),
+                TextField(
+                  controller: volume,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(labelText: 'Dökülen (m³)'),
+                ),
+                DropdownButtonFormField<ConcreteTruckResult>(
+                  initialValue: truckResult,
+                  decoration: const InputDecoration(labelText: 'Sonuç'),
+                  items: ConcreteTruckResult.values
+                      .map(
+                        (value) => DropdownMenuItem(
+                          value: value,
+                          child: Text(value.label),
+                        ),
+                      )
+                      .toList(growable: false),
+                  onChanged: (value) =>
+                      setDialogState(() => truckResult = value!),
+                ),
+                _TruckTimeTile(
+                  label: 'Geliş zamanı',
+                  value: arrivedAt,
+                  onChanged: (value) => setDialogState(() => arrivedAt = value),
+                ),
+                _TruckTimeTile(
+                  label: 'Boşaltma başlangıcı',
+                  value: unloadingStartedAt,
+                  onChanged: (value) =>
+                      setDialogState(() => unloadingStartedAt = value),
+                ),
+                _TruckTimeTile(
+                  label: 'Boşaltma bitişi',
+                  value: unloadingEndedAt,
+                  onChanged: (value) =>
+                      setDialogState(() => unloadingEndedAt = value),
+                ),
+                TextField(
+                  controller: note,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Mikser notu (opsiyonel)',
+                  ),
+                ),
+                if (truckResult != ConcreteTruckResult.received)
+                  TextField(
+                    controller: reason,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Sonuç nedeni',
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Vazgeç'),
+            ),
+            FilledButton(
+              key: const Key('save-concrete-truck'),
+              onPressed: () {
+                final parsed = double.tryParse(
+                  volume.text.replaceAll(',', '.'),
+                );
+                final hasRequiredReason =
+                    truckResult == ConcreteTruckResult.received ||
+                    reason.text.trim().isNotEmpty;
+                if (plate.text.trim().isNotEmpty &&
+                    parsed != null &&
+                    parsed > 0 &&
+                    hasRequiredReason) {
+                  Navigator.pop(
+                    context,
+                    _TruckDraft(
+                      plate: plate.text,
+                      deliveryNote: deliveryNote.text,
+                      volume: parsed,
+                      result: truckResult,
+                      arrivedAt: arrivedAt,
+                      unloadingStartedAt: unloadingStartedAt,
+                      unloadingEndedAt: unloadingEndedAt,
+                      note: note.text,
+                      reason: reason.text,
+                    ),
+                  );
+                }
+              },
+              child: Text(current == null ? 'Ekle' : 'Kaydet'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Vazgeç'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final parsed = double.tryParse(volume.text.replaceAll(',', '.'));
-              if (plate.text.trim().isNotEmpty &&
-                  note.text.trim().isNotEmpty &&
-                  parsed != null &&
-                  parsed > 0) {
-                Navigator.pop(context, (plate.text, note.text, parsed));
-              }
-            },
-            child: const Text('Ekle'),
-          ),
-        ],
       ),
     );
     plate.dispose();
-    note.dispose();
+    deliveryNote.dispose();
     volume.dispose();
+    note.dispose();
+    reason.dispose();
     if (result == null) return;
     await _run(
       () => widget.concrete.saveTruck(
         SaveConcreteTruckCommand(
-          id: RecordId.randomUuid(),
+          id: current?.id ?? RecordId.randomUuid(),
           pourId: detail.pour.id,
           eventId: RecordId.randomUuid(),
           expectedPourRevision: detail.pour.revision,
-          expectedTruckRevision: 0,
+          expectedTruckRevision: current?.revision ?? 0,
           sequenceNo:
+              current?.sequenceNo ??
               detail.trucks.fold(
-                0,
-                (max, item) => item.sequenceNo > max ? item.sequenceNo : max,
-              ) +
-              1,
-          vehiclePlate: result.$1,
-          deliveryNoteNumber: result.$2,
-          volumeM3: result.$3,
-          result: ConcreteTruckResult.received,
-          arrivedAt: CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
+                    0,
+                    (max, item) =>
+                        item.sequenceNo > max ? item.sequenceNo : max,
+                  ) +
+                  1,
+          vehiclePlate: result.plate,
+          deliveryNoteNumber: result.deliveryNote,
+          volumeM3: result.volume,
+          result: result.result,
+          arrivedAt:
+              result.arrivedAt ??
+              (current == null
+                  ? CseTimeCodec.encodeUtc(DateTime.now().toUtc())
+                  : null),
+          unloadingStartedAt: result.unloadingStartedAt,
+          unloadingEndedAt: result.unloadingEndedAt,
+          note: result.note,
+          reason: result.reason,
+          plantSnapshot: current?.plantSnapshot,
+          batchTime: current?.batchTime,
+          measuredSlump: current?.measuredSlump,
+          concreteTemperature: current?.concreteTemperature,
+          evidenceExceptionReason: current?.evidenceExceptionReason,
         ),
       ),
     );
@@ -424,7 +521,7 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
                 SimpleDialogOption(
                   onPressed: () => Navigator.pop(
                     context,
-                    ConcreteEvidenceType.deliveryReceiptScan,
+                    ConcreteEvidenceType.deliveryNoteScan,
                   ),
                   child: const Text('İrsaliye taraması'),
                 ),
@@ -439,6 +536,31 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
           ConcreteEvidenceType.mixerPhoto;
     } else if (sample != null) {
       type = ConcreteEvidenceType.samplePhoto;
+    }
+    if (!mounted) return;
+    if (type == ConcreteEvidenceType.deliveryNoteScan) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('İrsaliye belgesini kontrol et'),
+          content: Text(
+            '${selected.$2!.name}\n\nBelge okunaklıysa kullanın. Değilse '
+            'yeniden çekmek/seçmek için vazgeçin.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Yeniden seç'),
+            ),
+            FilledButton(
+              key: const Key('confirm-delivery-note-scan'),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Belgeyi kullan'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
     }
     final detail = _detail!;
     await _run(
@@ -518,6 +640,180 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
     return result;
   }
 
+  Future<void> _editTargetVolume() async {
+    final detail = _detail!;
+    final controller = TextEditingController(
+      text: detail.pour.plannedVolumeM3.toStringAsFixed(2),
+    );
+    final value = await showDialog<double>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hedef toplam m³'),
+        content: TextField(
+          key: const Key('target-volume-input'),
+          controller: controller,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(
+            labelText: 'Hedef toplam m³',
+            helperText:
+                'Dökülen: ${_formatM3(detail.metrics.actualDeliveredM3)} m³',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final parsed = double.tryParse(
+                controller.text.replaceAll(',', '.'),
+              );
+              if (parsed != null && parsed.isFinite && parsed > 0) {
+                Navigator.pop(context, parsed);
+              }
+            },
+            child: const Text('Devam'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (value == null) return;
+    if (!mounted) return;
+    if (value < detail.metrics.actualDeliveredM3) {
+      final accepted = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Hedef aşılacak'),
+          content: const Text(
+            'Dökülen hacim hedefi aşacak. Mikser hacimleri değiştirilmeyecek.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Vazgeç'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Hedefi güncelle'),
+            ),
+          ],
+        ),
+      );
+      if (accepted != true) return;
+    }
+    final pour = detail.pour;
+    await _run(
+      () => widget.concrete.updatePour(
+        UpdateConcretePourCommand(
+          id: pour.id,
+          eventId: RecordId.randomUuid(),
+          expectedRevision: pour.revision,
+          elementLocation: pour.elementLocation,
+          plannedAt: pour.plannedAt,
+          concreteClass: pour.concreteClass,
+          plannedVolumeM3: value,
+          blockName: pour.blockName,
+          floorName: pour.floorName,
+          axisName: pour.axisName,
+          targetSlump: pour.targetSlump,
+          orderedVolumeM3: pour.orderedVolumeM3,
+          plantName: pour.plantName,
+          plantBranch: pour.plantBranch,
+          plantContact: pour.plantContact,
+          plantAppointmentReference: pour.plantAppointmentReference,
+          pumpEquipment: pour.pumpEquipment,
+          laboratoryName: pour.laboratoryName,
+          laboratoryContact: pour.laboratoryContact,
+          laboratoryAppointment: pour.laboratoryAppointment,
+          inspectionNotifiedAt: pour.inspectionNotifiedAt,
+          inspectionNotifiedPerson: pour.inspectionNotifiedPerson,
+          generalNote: pour.generalNote,
+          sampleExceptionReason: pour.sampleExceptionReason,
+          varianceNote: pour.varianceNote,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _bulkComplete() async {
+    final detail = _detail!;
+    final manualChecks = detail.checks.where(
+      (item) =>
+          item.status == ConcreteCheckStatus.pending &&
+          item.itemKey != 'inspection_notified' &&
+          item.itemKey != 'laboratory_appointment',
+    );
+    final manualFollowUps = detail.followUps.where(
+      (item) =>
+          item.status == ConcreteFollowUpStatus.pending &&
+          item.itemKey != 'inspection_notification_task' &&
+          item.itemKey != 'laboratory_appointment_task',
+    );
+    final count = manualChecks.length + manualFollowUps.length;
+    if (count == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Toplu tamamlanacak manuel madde yok.')),
+      );
+      return;
+    }
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Tümünü tamamla'),
+        content: Text(
+          '$count manuel checklist/takip maddesi tek işlemde tamamlanacak. '
+          'Laboratuvar ve yapı denetim alan görevleri etkilenmeyecek.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            key: const Key('confirm-bulk-complete'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Tümünü tamamla'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true) return;
+    await _run(
+      () => widget.concrete.bulkComplete(
+        BulkCompleteConcreteCommand(
+          pourId: detail.pour.id,
+          eventId: RecordId.randomUuid(),
+          expectedPourRevision: detail.pour.revision,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _export({required bool share}) async {
+    final detail = _detail!;
+    final result = await widget.concrete.exportPackage(
+      ExportConcretePackageCommand(
+        pourId: detail.pour.id,
+        eventId: RecordId.randomUuid(),
+        expectedRevision: detail.pour.revision,
+      ),
+      share: share,
+      save: !share,
+    );
+    if (!mounted) return;
+    final message = result.outcome == ConcreteExportOutcome.cancelled
+        ? 'Kaydetme iptal edildi; export event’i oluşturulmadı.'
+        : share
+        ? 'PDF paylaşım akışına gönderildi.'
+        : 'PDF seçilen konuma kaydedildi.';
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading && _detail == null) {
@@ -557,9 +853,20 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
                 isThreeLine: true,
               ),
               ListTile(
-                title: const Text('Metraj'),
+                key: const Key('concrete-live-volume'),
+                title: const Text('Canlı metraj'),
                 subtitle: Text(
-                  'Plan ${pour.plannedVolumeM3.toStringAsFixed(2)} m³ • Gelen ${detail.metrics.actualDeliveredM3.toStringAsFixed(2)} m³ • Fark ${detail.metrics.varianceM3.toStringAsFixed(2)} m³',
+                  'Hedef: ${_formatM3(pour.plannedVolumeM3)} m³\n'
+                  'Dökülen: ${_formatM3(detail.metrics.actualDeliveredM3)} m³\n'
+                  '${detail.metrics.isTargetExceeded ? 'Aşılan' : 'Kalan'}: '
+                  '${_formatM3(detail.metrics.isTargetExceeded ? detail.metrics.excessM3 : detail.metrics.remainingM3)} m³',
+                ),
+                isThreeLine: true,
+                trailing: IconButton(
+                  key: const Key('edit-target-volume'),
+                  tooltip: 'Hedef hacmi değiştir',
+                  onPressed: _mutating ? null : _editTargetVolume,
+                  icon: const Icon(Icons.edit_outlined),
                 ),
               ),
               Wrap(
@@ -579,6 +886,15 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
             _section(
               'Döküm öncesi checklist • ${detail.metrics.pendingCheckCount} açık',
               [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.tonalIcon(
+                    key: const Key('bulk-complete-concrete'),
+                    onPressed: _mutating ? null : _bulkComplete,
+                    icon: const Icon(Icons.done_all),
+                    label: const Text('Tümünü tamamla'),
+                  ),
+                ),
                 for (final item in detail.checks)
                   ListTile(
                     title: Text('${item.sortOrder}. ${item.label}'),
@@ -601,7 +917,7 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: FilledButton.tonalIcon(
-                  onPressed: _mutating ? null : _addTruck,
+                  onPressed: _mutating ? null : () => _editTruck(),
                   icon: const Icon(Icons.add),
                   label: const Text('Mikser ekle'),
                 ),
@@ -614,11 +930,12 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
                     children: [
                       ListTile(
                         contentPadding: EdgeInsets.zero,
+                        onTap: _mutating ? null : () => _editTruck(item),
                         title: Text(
                           '#${item.sequenceNo} ${item.vehiclePlate} • ${item.volumeM3.toStringAsFixed(2)} m³',
                         ),
                         subtitle: Text(
-                          'İrsaliye ${item.deliveryNoteNumber} • ${item.result.label}\n'
+                          'İrsaliye ${item.deliveryNoteNumber ?? '—'} • ${item.result.label}\n'
                           '${detail.attachments.where((evidence) => evidence.truckId == item.id).length} kanıt bağlı'
                           '${item.evidenceExceptionReason == null ? '' : ' • açık istisna'}',
                         ),
@@ -632,7 +949,7 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
                             onPressed: () => _attach(
                               truck: item,
                               requestedType:
-                                  ConcreteEvidenceType.deliveryReceiptScan,
+                                  ConcreteEvidenceType.deliveryNoteScan,
                             ),
                             icon: const Icon(Icons.receipt_long_outlined),
                             label: const Text('İrsaliyeyi tara/fotoğrafla'),
@@ -677,6 +994,15 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
                     '${item.originalFileName}\n${item.integrity.label} • ${item.sha256.substring(0, 12)}…',
                   ),
                   isThreeLine: true,
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => ConcreteAttachmentViewerPage(
+                        concrete: widget.concrete,
+                        attachment: item,
+                      ),
+                    ),
+                  ),
                 ),
             ]),
             _section(
@@ -760,24 +1086,30 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
                   subtitle: Text(CseTimeCodec.formatIstanbul(event.occurredAt)),
                 ),
             ]),
-            FilledButton.icon(
-              onPressed: _mutating
-                  ? null
-                  : () async {
-                      final revision = _detail!.pour.revision;
-                      await _run(
-                        () => widget.concrete.exportPackage(
-                          ExportConcretePackageCommand(
-                            pourId: pour.id,
-                            eventId: RecordId.randomUuid(),
-                            expectedRevision: revision,
-                          ),
-                          share: true,
-                        ),
-                      );
-                    },
-              icon: const Icon(Icons.ios_share_outlined),
-              label: const Text('UTF-8 Beton paketi raporunu paylaş'),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    key: const Key('share-concrete-pdf'),
+                    onPressed: _mutating
+                        ? null
+                        : () => _run(() => _export(share: true)),
+                    icon: const Icon(Icons.ios_share_outlined),
+                    label: const Text('PDF paylaş'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: const Key('save-concrete-pdf'),
+                    onPressed: _mutating
+                        ? null
+                        : () => _run(() => _export(share: false)),
+                    icon: const Icon(Icons.save_alt_outlined),
+                    label: const Text('Telefona kaydet'),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 24),
           ],
@@ -841,3 +1173,89 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
 
 String _message(Object error, String fallback) =>
     error is AgendaValidationFailure ? error.message : fallback;
+
+String _formatM3(double value) => value.toStringAsFixed(2).replaceAll('.', ',');
+
+class _TruckDraft {
+  const _TruckDraft({
+    required this.plate,
+    required this.deliveryNote,
+    required this.volume,
+    required this.result,
+    required this.arrivedAt,
+    required this.unloadingStartedAt,
+    required this.unloadingEndedAt,
+    required this.note,
+    required this.reason,
+  });
+
+  final String plate;
+  final String deliveryNote;
+  final double volume;
+  final ConcreteTruckResult result;
+  final String? arrivedAt;
+  final String? unloadingStartedAt;
+  final String? unloadingEndedAt;
+  final String note;
+  final String reason;
+}
+
+class _TruckTimeTile extends StatelessWidget {
+  const _TruckTimeTile({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String? value;
+  final ValueChanged<String?> onChanged;
+
+  Future<void> _pick(BuildContext context) async {
+    final local = value == null
+        ? CseTimeCodec.toIstanbul(
+            CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
+          )
+        : CseTimeCodec.toIstanbul(value!);
+    final date = await showDatePicker(
+      context: context,
+      initialDate: DateTime(local.year, local.month, local.day),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (date == null || !context.mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: local.hour, minute: local.minute),
+    );
+    if (time == null) return;
+    onChanged(
+      CseTimeCodec.canonicalFromIstanbulComponents(
+        year: date.year,
+        month: date.month,
+        day: date.day,
+        hour: time.hour,
+        minute: time.minute,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(label),
+      subtitle: Text(
+        value == null ? 'Belirtilmedi' : CseTimeCodec.formatIstanbul(value!),
+      ),
+      onTap: () => _pick(context),
+      trailing: value == null
+          ? const Icon(Icons.schedule_outlined)
+          : IconButton(
+              tooltip: 'Zamanı temizle',
+              onPressed: () => onChanged(null),
+              icon: const Icon(Icons.clear),
+            ),
+    );
+  }
+}

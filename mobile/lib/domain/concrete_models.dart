@@ -94,6 +94,7 @@ enum ConcreteFollowUpStatus {
 
 enum ConcreteEvidenceType {
   deliveryReceiptScan('delivery_receipt_scan', 'İrsaliye taraması'),
+  deliveryNoteScan('delivery_note_scan', 'İrsaliye taraması'),
   mixerPhoto('mixer_photo', 'Mikser fotoğrafı'),
   sitePhoto('site_photo', 'Saha fotoğrafı'),
   samplePhoto('sample_photo', 'Numune fotoğrafı'),
@@ -265,6 +266,7 @@ class ConcreteTruck {
     required this.concreteTemperature,
     required this.result,
     required this.reason,
+    required this.note,
     required this.evidenceExceptionReason,
     required this.revision,
     required this.createdAt,
@@ -275,7 +277,7 @@ class ConcreteTruck {
   final String pourId;
   final int sequenceNo;
   final String vehiclePlate;
-  final String deliveryNoteNumber;
+  final String? deliveryNoteNumber;
   final String? plantSnapshot;
   final String? batchTime;
   final String? arrivedAt;
@@ -286,6 +288,7 @@ class ConcreteTruck {
   final double? concreteTemperature;
   final ConcreteTruckResult result;
   final String? reason;
+  final String? note;
   final String? evidenceExceptionReason;
   final int revision;
   final String createdAt;
@@ -456,6 +459,10 @@ class ConcreteMetrics {
   final int pendingCheckCount;
   final int missingEvidenceTruckCount;
   final int openFollowUpCount;
+
+  double get remainingM3 => -varianceM3;
+  double get excessM3 => varianceM3 > 0 ? varianceM3 : 0;
+  bool get isTargetExceeded => varianceM3 > 0;
 }
 
 class ConcretePourDetail {
@@ -639,7 +646,7 @@ class SaveConcreteTruckCommand {
     required this.expectedTruckRevision,
     required this.sequenceNo,
     required this.vehiclePlate,
-    required this.deliveryNoteNumber,
+    this.deliveryNoteNumber,
     required this.volumeM3,
     required this.result,
     this.plantSnapshot,
@@ -650,6 +657,7 @@ class SaveConcreteTruckCommand {
     this.measuredSlump,
     this.concreteTemperature,
     this.reason,
+    this.note,
     this.evidenceExceptionReason,
   });
 
@@ -660,7 +668,7 @@ class SaveConcreteTruckCommand {
   final int expectedTruckRevision;
   final int sequenceNo;
   final String vehiclePlate;
-  final String deliveryNoteNumber;
+  final String? deliveryNoteNumber;
   final double volumeM3;
   final ConcreteTruckResult result;
   final String? plantSnapshot;
@@ -671,6 +679,7 @@ class SaveConcreteTruckCommand {
   final double? measuredSlump;
   final double? concreteTemperature;
   final String? reason;
+  final String? note;
   final String? evidenceExceptionReason;
 }
 
@@ -784,14 +793,32 @@ class ExportConcretePackageCommand {
   final int expectedRevision;
 }
 
+class BulkCompleteConcreteCommand {
+  const BulkCompleteConcreteCommand({
+    required this.pourId,
+    required this.eventId,
+    required this.expectedPourRevision,
+  });
+
+  final String pourId;
+  final String eventId;
+  final int expectedPourRevision;
+}
+
+enum ConcreteExportAction { share, save }
+
+enum ConcreteExportOutcome { completed, cancelled }
+
 class ConcreteExportResult {
   const ConcreteExportResult({
     required this.absolutePath,
     required this.fileName,
     required this.humanSummary,
+    this.outcome = ConcreteExportOutcome.completed,
   });
 
   final String absolutePath;
   final String fileName;
   final String humanSummary;
+  final ConcreteExportOutcome outcome;
 }

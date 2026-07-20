@@ -14,6 +14,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const pourId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const truckId = 'ffffffff-ffff-4fff-8fff-fffffffffff1';
+const attachmentId = 'ffffffff-ffff-4fff-8fff-fffffffffff2';
 const project = MobileProject(
   id: projectId,
   name: 'Uzun Proje Adı',
@@ -115,19 +117,29 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.textContaining('Döküm öncesi checklist'), findsOneWidget);
-      expect(find.textContaining('Mikser / irsaliye'), findsOneWidget);
+      expect(find.textContaining('Hedef: 20,00 m³'), findsOneWidget);
+      expect(find.textContaining('Dökülen: 12,50 m³'), findsOneWidget);
+      expect(find.textContaining('Kalan: 7,50 m³'), findsOneWidget);
       for (final text in [
+        'Döküm öncesi checklist',
+        'Tümünü tamamla',
+        'Mikser / irsaliye',
         'Kanıtlar',
         'Numuneler',
         'Takipler / Hatırlatıcılar',
         'Zaman çizelgesi',
-        'UTF-8 Beton paketi raporunu paylaş',
+        'PDF paylaş',
+        'Telefona kaydet',
       ]) {
         final finder = find.textContaining(text);
         await tester.scrollUntilVisible(finder, 300);
         expect(finder, findsOneWidget);
       }
+      await tester.scrollUntilVisible(find.text('İrsaliye taraması'), -300);
+      await tester.tap(find.text('İrsaliye taraması'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('concrete-full-image')), findsOneWidget);
+      expect(find.byType(InteractiveViewer), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -178,10 +190,27 @@ class _FakeConcrete implements ConcreteApplication {
     AttachConcreteEvidenceCommand command,
   ) => throw UnimplementedError();
   @override
+  Future<ConcretePourDetail> bulkComplete(
+    BulkCompleteConcreteCommand command,
+  ) => throw UnimplementedError();
+  @override
   Future<ConcreteExportResult> exportPackage(
     ExportConcretePackageCommand command, {
     bool share = false,
+    bool save = false,
   }) => throw UnimplementedError();
+  @override
+  Future<StoredAttachmentContent> readAttachment(String attachmentId) =>
+      Future.value(
+        const StoredAttachmentContent(
+          fileName: 'irsaliye.jpg',
+          mimeType: 'image/jpeg',
+          bytes: [0xff, 0xd8, 0xff, 0xd9],
+        ),
+      );
+  @override
+  Future<void> openAttachment(String attachmentId) =>
+      throw UnimplementedError();
   @override
   Future<ConcretePourDetail> saveSampleSet(
     SaveConcreteSampleSetCommand command,
@@ -281,6 +310,45 @@ ConcretePourDetail _detail() {
     updatedAt: '2026-07-19T07:00:00Z',
     completedAt: null,
   );
+  const truck = ConcreteTruck(
+    id: truckId,
+    pourId: pourId,
+    sequenceNo: 1,
+    vehiclePlate: '34 CSE 196',
+    deliveryNoteNumber: null,
+    plantSnapshot: 'Güven Beton',
+    batchTime: null,
+    arrivedAt: '2026-07-19T09:10:00Z',
+    unloadingStartedAt: '2026-07-19T09:15:00Z',
+    unloadingEndedAt: '2026-07-19T09:30:00Z',
+    volumeM3: 12.5,
+    measuredSlump: null,
+    concreteTemperature: null,
+    result: ConcreteTruckResult.received,
+    reason: null,
+    note: 'İrsaliye numarası sonra girilecek.',
+    evidenceExceptionReason: null,
+    revision: 1,
+    createdAt: '2026-07-19T09:10:00Z',
+    updatedAt: '2026-07-19T09:10:00Z',
+  );
+  const attachment = ConcreteAttachment(
+    id: attachmentId,
+    pourId: pourId,
+    truckId: truckId,
+    sampleSetId: null,
+    checkItemId: null,
+    evidenceType: ConcreteEvidenceType.deliveryNoteScan,
+    originalFileName: 'irsaliye.jpg',
+    mimeType: 'image/jpeg',
+    byteSize: 4,
+    sha256: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    relativePath: 'concrete/pour/truck/irsaliye.jpg',
+    capturedAt: '2026-07-19T09:11:00Z',
+    description: 'İrsaliye taraması',
+    createdAt: '2026-07-19T09:11:00Z',
+    integrity: ConcreteAttachmentIntegrity.ok,
+  );
   const event = ConcretePourEvent(
     id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
     pourId: pourId,
@@ -292,17 +360,17 @@ ConcretePourDetail _detail() {
   return const ConcretePourDetail(
     pour: pour,
     checks: [check],
-    trucks: [],
+    trucks: [truck],
     sampleSets: [],
     followUps: [follow],
-    attachments: [],
+    attachments: [attachment],
     events: [event],
     linkedReminders: [],
     metrics: ConcreteMetrics(
-      actualDeliveredM3: 0,
-      varianceM3: -20,
-      variancePercent: -100,
-      receivedTruckCount: 0,
+      actualDeliveredM3: 12.5,
+      varianceM3: -7.5,
+      variancePercent: -37.5,
+      receivedTruckCount: 1,
       heldTruckCount: 0,
       returnedTruckCount: 0,
       partialTruckCount: 0,

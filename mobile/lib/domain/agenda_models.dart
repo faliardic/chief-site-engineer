@@ -173,6 +173,7 @@ class AgendaLog {
     required this.location,
     required this.notes,
     required this.revision,
+    this.archivedAt,
   });
 
   final String id;
@@ -186,6 +187,67 @@ class AgendaLog {
   final String? location;
   final String? notes;
   final int revision;
+  final String? archivedAt;
+}
+
+enum AgendaArchiveFilter { active, archived }
+
+enum AgendaAttachmentIntegrity {
+  ok('Dosya doğrulandı'),
+  missing('Dosya eksik'),
+  tampered('Dosya bütünlüğü bozuk'),
+  invalidMime('Dosya türü geçersiz');
+
+  const AgendaAttachmentIntegrity(this.label);
+  final String label;
+}
+
+class AgendaLogPhoto {
+  const AgendaLogPhoto({
+    required this.id,
+    required this.logId,
+    required this.projectId,
+    required this.originalFileName,
+    required this.mimeType,
+    required this.byteSize,
+    required this.sha256,
+    required this.relativePath,
+    required this.description,
+    required this.capturedAt,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.archivedAt,
+    required this.integrity,
+  });
+
+  final String id;
+  final String logId;
+  final String projectId;
+  final String originalFileName;
+  final String mimeType;
+  final int byteSize;
+  final String sha256;
+  final String relativePath;
+  final String? description;
+  final String? capturedAt;
+  final int revision;
+  final String createdAt;
+  final String updatedAt;
+  final String? archivedAt;
+  final AgendaAttachmentIntegrity integrity;
+}
+
+class StoredAttachmentContent {
+  const StoredAttachmentContent({
+    required this.fileName,
+    required this.mimeType,
+    required this.bytes,
+  });
+
+  final String fileName;
+  final String mimeType;
+  final List<int> bytes;
 }
 
 class MobileReminder {
@@ -275,10 +337,35 @@ class ReminderDetail {
 }
 
 class AgendaLogDetail {
-  const AgendaLogDetail({required this.log, required this.reminders});
+  const AgendaLogDetail({
+    required this.log,
+    required this.reminders,
+    this.photos = const [],
+    this.events = const [],
+  });
 
   final AgendaLog log;
   final List<MobileReminder> reminders;
+  final List<AgendaLogPhoto> photos;
+  final List<AppendOnlyEvent> events;
+}
+
+class AgendaPhotoDraft {
+  const AgendaPhotoDraft({
+    required this.id,
+    required this.eventId,
+    required this.originalFileName,
+    required this.bytes,
+    required this.capturedAt,
+    this.description,
+  });
+
+  final String id;
+  final String eventId;
+  final String originalFileName;
+  final List<int> bytes;
+  final String capturedAt;
+  final String? description;
 }
 
 class CreateProjectCommand {
@@ -298,6 +385,7 @@ class CreateAgendaLogCommand {
     required this.description,
     this.location,
     this.notes,
+    this.photos = const [],
   });
 
   final String id;
@@ -308,6 +396,83 @@ class CreateAgendaLogCommand {
   final String description;
   final String? location;
   final String? notes;
+  final List<AgendaPhotoDraft> photos;
+}
+
+class UpdateAgendaLogCommand {
+  const UpdateAgendaLogCommand({
+    required this.id,
+    required this.eventId,
+    required this.expectedRevision,
+    required this.projectId,
+    required this.observedAt,
+    required this.category,
+    required this.description,
+    this.location,
+    this.notes,
+  });
+
+  final String id;
+  final String eventId;
+  final int expectedRevision;
+  final String projectId;
+  final String observedAt;
+  final AgendaCategory category;
+  final String description;
+  final String? location;
+  final String? notes;
+}
+
+class MutateAgendaLogArchiveCommand {
+  const MutateAgendaLogArchiveCommand({
+    required this.id,
+    required this.eventId,
+    required this.expectedRevision,
+    required this.archive,
+  });
+
+  final String id;
+  final String eventId;
+  final int expectedRevision;
+  final bool archive;
+}
+
+class AttachAgendaPhotoCommand {
+  const AttachAgendaPhotoCommand({
+    required this.logId,
+    required this.id,
+    required this.eventId,
+    required this.expectedLogRevision,
+    required this.originalFileName,
+    required this.bytes,
+    required this.capturedAt,
+    this.description,
+  });
+
+  final String logId;
+  final String id;
+  final String eventId;
+  final int expectedLogRevision;
+  final String originalFileName;
+  final List<int> bytes;
+  final String capturedAt;
+  final String? description;
+}
+
+class ArchiveAgendaPhotoCommand {
+  const ArchiveAgendaPhotoCommand({
+    required this.logId,
+    required this.photoId,
+    required this.eventId,
+    required this.expectedLogRevision,
+    required this.expectedPhotoRevision,
+  });
+
+  final String logId;
+  final String photoId;
+  final String eventId;
+  final int expectedLogRevision;
+  final int expectedPhotoRevision;
 }
 
 class CreateReminderCommand {
@@ -392,12 +557,14 @@ class AgendaQuery {
     this.projectId,
     this.category,
     this.literalSearch = '',
+    this.archiveFilter = AgendaArchiveFilter.active,
   });
 
   final String istanbulDay;
   final String? projectId;
   final AgendaCategory? category;
   final String literalSearch;
+  final AgendaArchiveFilter archiveFilter;
 }
 
 class AppendOnlyEvent {

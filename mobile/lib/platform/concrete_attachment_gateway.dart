@@ -7,6 +7,7 @@ import 'package:chief_site_engineer/storage/app_directories.dart';
 import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:path/path.dart' as path;
 import 'package:permission_handler/permission_handler.dart';
 
@@ -42,8 +43,18 @@ abstract interface class ConcreteAttachmentStore {
 
   Future<ConcreteAttachmentIntegrity> inspect(
     String relativePath,
+    String expectedSha256, [
+    String? expectedMimeType,
+  ]);
+
+  Future<StoredAttachmentContent> read(
+    String relativePath,
+    String originalFileName,
     String expectedSha256,
+    String expectedMimeType,
   );
+
+  Future<void> open(String relativePath, String expectedMimeType);
 
   Future<void> cleanup(String relativePath);
 }
@@ -114,14 +125,58 @@ class DeviceConcreteAttachmentStore implements ConcreteAttachmentStore {
   @override
   Future<ConcreteAttachmentIntegrity> inspect(
     String relativePath,
-    String expectedSha256,
-  ) async {
+    String expectedSha256, [
+    String? expectedMimeType,
+  ]) async {
     final file = _resolve(relativePath);
     if (!await file.exists()) return ConcreteAttachmentIntegrity.missing;
-    final digest = sha256.convert(await file.readAsBytes()).toString();
-    return digest == expectedSha256
-        ? ConcreteAttachmentIntegrity.ok
-        : ConcreteAttachmentIntegrity.tampered;
+    final bytes = await file.readAsBytes();
+    final digest = sha256.convert(bytes).toString();
+    if (digest != expectedSha256) return ConcreteAttachmentIntegrity.tampered;
+    if (expectedMimeType != null) {
+      try {
+        if (_sniffMime(bytes) != expectedMimeType) {
+          return ConcreteAttachmentIntegrity.tampered;
+        }
+      } on ConcreteAttachmentFailure {
+        return ConcreteAttachmentIntegrity.tampered;
+      }
+    }
+    return ConcreteAttachmentIntegrity.ok;
+  }
+
+  @override
+  Future<StoredAttachmentContent> read(
+    String relativePath,
+    String originalFileName,
+    String expectedSha256,
+    String expectedMimeType,
+  ) async {
+    if (await inspect(relativePath, expectedSha256, expectedMimeType) !=
+        ConcreteAttachmentIntegrity.ok) {
+      throw const ConcreteAttachmentFailure('attachment_integrity_failed');
+    }
+    return StoredAttachmentContent(
+      fileName: path.basename(originalFileName),
+      mimeType: expectedMimeType,
+      bytes: await _resolve(relativePath).readAsBytes(),
+    );
+  }
+
+  @override
+  Future<void> open(String relativePath, String expectedMimeType) async {
+    final file = _resolve(relativePath);
+    if (!await file.exists()) {
+      throw const ConcreteAttachmentFailure('attachment_missing');
+    }
+    final bytes = await file.readAsBytes();
+    if (_sniffMime(bytes) != expectedMimeType) {
+      throw const ConcreteAttachmentFailure('attachment_mime_mismatch');
+    }
+    final result = await OpenFilex.open(file.path, type: expectedMimeType);
+    if (result.type != ResultType.done) {
+      throw ConcreteAttachmentFailure('viewer_${result.type.name}');
+    }
   }
 
   @override

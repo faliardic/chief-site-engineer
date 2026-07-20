@@ -6,6 +6,7 @@ import 'package:chief_site_engineer/application/restore_recovery_application.dar
 import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/platform/attendance_export_gateway.dart';
+import 'package:chief_site_engineer/platform/agenda_attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/capabilities.dart';
 import 'package:chief_site_engineer/platform/concrete_attachment_gateway.dart';
@@ -119,6 +120,7 @@ class AppBootstrap {
         clock: clock,
         notificationGateway: notificationGateway,
         coordinator: coordinator,
+        attachmentStore: DeviceAgendaAttachmentStore(directories: directories),
       );
       final attendance = SqliteAttendanceApplication(
         databasePath: directories.databaseFile,

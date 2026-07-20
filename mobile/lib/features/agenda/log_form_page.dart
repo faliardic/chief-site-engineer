@@ -2,12 +2,20 @@ import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:flutter/material.dart';
 
 class LogFormPage extends StatefulWidget {
-  const LogFormPage({required this.agenda, super.key});
+  const LogFormPage({
+    required this.agenda,
+    this.attachments,
+    this.existing,
+    super.key,
+  });
 
   final AgendaApplication agenda;
+  final SafeAttachmentPicker? attachments;
+  final AgendaLog? existing;
 
   @override
   State<LogFormPage> createState() => _LogFormPageState();
@@ -28,17 +36,26 @@ class _LogFormPageState extends State<LogFormPage> {
   bool _loadingProjects = true;
   bool _submitting = false;
   String? _error;
+  final List<(SelectedAttachment, String, String, String)> _pendingPhotos = [];
 
   @override
   void initState() {
     super.initState();
-    _recordId = RecordId.randomUuid();
+    _recordId = widget.existing?.id ?? RecordId.randomUuid();
     _eventId = RecordId.randomUuid();
+    final current = widget.existing;
     final nowLocal = CseTimeCodec.toIstanbul(
-      CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
+      current?.observedAt ?? CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
     );
     _date = DateTime(nowLocal.year, nowLocal.month, nowLocal.day);
     _time = TimeOfDay(hour: nowLocal.hour, minute: nowLocal.minute);
+    if (current != null) {
+      _projectId = current.projectId;
+      _category = current.category;
+      _description.text = current.description;
+      _location.text = current.location ?? '';
+      _notes.text = current.notes ?? '';
+    }
     _loadProjects();
   }
 
@@ -125,18 +142,44 @@ class _LogFormPageState extends State<LogFormPage> {
         hour: _time.hour,
         minute: _time.minute,
       );
-      final created = await widget.agenda.createAgendaLog(
-        CreateAgendaLogCommand(
-          id: _recordId,
-          eventId: _eventId,
-          projectId: _projectId!,
-          observedAt: observedAt,
-          category: _category,
-          description: _description.text,
-          location: _location.text,
-          notes: _notes.text,
-        ),
-      );
+      final existing = widget.existing;
+      final created = existing == null
+          ? await widget.agenda.createAgendaLog(
+              CreateAgendaLogCommand(
+                id: _recordId,
+                eventId: _eventId,
+                projectId: _projectId!,
+                observedAt: observedAt,
+                category: _category,
+                description: _description.text,
+                location: _location.text,
+                notes: _notes.text,
+                photos: _pendingPhotos
+                    .map(
+                      (item) => AgendaPhotoDraft(
+                        id: item.$2,
+                        eventId: item.$3,
+                        originalFileName: item.$1.name,
+                        bytes: item.$1.bytes,
+                        capturedAt: item.$4,
+                      ),
+                    )
+                    .toList(growable: false),
+              ),
+            )
+          : await widget.agenda.updateAgendaLog(
+              UpdateAgendaLogCommand(
+                id: existing.id,
+                eventId: _eventId,
+                expectedRevision: existing.revision,
+                projectId: _projectId!,
+                observedAt: observedAt,
+                category: _category,
+                description: _description.text,
+                location: _location.text,
+                notes: _notes.text,
+              ),
+            );
       if (!mounted) return;
       Navigator.pop(context, CseTimeCodec.istanbulDayKey(created.observedAt));
     } on AgendaValidationFailure catch (error) {
@@ -152,10 +195,63 @@ class _LogFormPageState extends State<LogFormPage> {
     }
   }
 
+  Future<void> _pickPhoto() async {
+    final picker = widget.attachments;
+    if (picker == null) return;
+    final source = await showModalBottomSheet<AttachmentSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Kamera'),
+              onTap: () => Navigator.pop(context, AttachmentSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Sistem fotoğraf seçici'),
+              onTap: () =>
+                  Navigator.pop(context, AttachmentSource.photoLibrary),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+    final result = await picker.pick(source);
+    if (!mounted) return;
+    if (result.$1 != AttachmentPickOutcome.selected || result.$2 == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Fotoğraf eklenmedi; form girdileri ve log kaydı korundu.',
+          ),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _pendingPhotos.add((
+        result.$2!,
+        RecordId.randomUuid(),
+        RecordId.randomUuid(),
+        CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
+      ));
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Yeni Ajanda logu')),
+      appBar: AppBar(
+        title: Text(
+          widget.existing == null
+              ? 'Yeni Ajanda logu'
+              : 'Ajanda logunu düzenle',
+        ),
+      ),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -278,6 +374,28 @@ class _LogFormPageState extends State<LogFormPage> {
                   ? 'Kısa açıklama zorunludur.'
                   : null,
             ),
+            if (widget.existing == null && widget.attachments != null) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const Key('log-add-photo'),
+                onPressed: _submitting ? null : _pickPhoto,
+                icon: const Icon(Icons.add_a_photo_outlined),
+                label: const Text('Fotoğraf ekle'),
+              ),
+              for (var index = 0; index < _pendingPhotos.length; index += 1)
+                ListTile(
+                  key: Key('pending-log-photo-$index'),
+                  leading: const Icon(Icons.photo_outlined),
+                  title: Text(_pendingPhotos[index].$1.name),
+                  subtitle: const Text('Log kaydıyla birlikte eklenecek'),
+                  trailing: IconButton(
+                    tooltip: 'Seçimden kaldır',
+                    onPressed: () =>
+                        setState(() => _pendingPhotos.removeAt(index)),
+                    icon: const Icon(Icons.close),
+                  ),
+                ),
+            ],
             TextFormField(
               key: const Key('log-location'),
               controller: _location,
@@ -311,7 +429,13 @@ class _LogFormPageState extends State<LogFormPage> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.save_outlined),
-                label: Text(_submitting ? 'Kaydediliyor…' : 'Logu kaydet'),
+                label: Text(
+                  _submitting
+                      ? 'Kaydediliyor…'
+                      : widget.existing == null
+                      ? 'Logu kaydet'
+                      : 'Değişiklikleri kaydet',
+                ),
               ),
             ),
           ],

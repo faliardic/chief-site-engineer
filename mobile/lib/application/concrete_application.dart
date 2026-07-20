@@ -30,9 +30,13 @@ abstract interface class ConcreteApplication {
   Future<ConcretePourDetail> attachEvidence(
     AttachConcreteEvidenceCommand command,
   );
+  Future<ConcretePourDetail> bulkComplete(BulkCompleteConcreteCommand command);
+  Future<StoredAttachmentContent> readAttachment(String attachmentId);
+  Future<void> openAttachment(String attachmentId);
   Future<ConcreteExportResult> exportPackage(
     ExportConcretePackageCommand command, {
     bool share = false,
+    bool save = false,
   });
 }
 
@@ -119,7 +123,7 @@ ConcreteTruck _truckFromRow(Map<String, Object?> row) => ConcreteTruck(
   pourId: row['concrete_pour_id']! as String,
   sequenceNo: row['sequence_no']! as int,
   vehiclePlate: row['vehicle_plate']! as String,
-  deliveryNoteNumber: row['delivery_note_number']! as String,
+  deliveryNoteNumber: row['delivery_note_number'] as String?,
   plantSnapshot: row['plant_snapshot'] as String?,
   batchTime: row['batch_time'] as String?,
   arrivedAt: row['arrived_at'] as String?,
@@ -130,6 +134,7 @@ ConcreteTruck _truckFromRow(Map<String, Object?> row) => ConcreteTruck(
   concreteTemperature: (row['concrete_temperature'] as num?)?.toDouble(),
   result: ConcreteTruckResult.fromStorage(row['result']! as String),
   reason: row['reason'] as String?,
+  note: row['note'] as String?,
   evidenceExceptionReason: row['evidence_exception_reason'] as String?,
   revision: row['revision']! as int,
   createdAt: row['created_at']! as String,
@@ -398,7 +403,8 @@ class SqliteConcreteApplication implements ConcreteApplication {
               AND (
                 NOT EXISTS (SELECT 1 FROM concrete_attachments a
                   WHERE a.truck_id = t.id AND a.archived_at IS NULL
-                    AND a.evidence_type = 'delivery_receipt_scan')
+                    AND a.evidence_type IN (
+                      'delivery_receipt_scan', 'delivery_note_scan'))
                 OR NOT EXISTS (SELECT 1 FROM concrete_attachments a
                   WHERE a.truck_id = t.id AND a.archived_at IS NULL
                     AND a.evidence_type = 'mixer_photo')
@@ -589,7 +595,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
             transaction,
             command.pourId,
             command.sequenceNo,
-            values['delivery_note_number']! as String,
+            values['delivery_note_number'] as String?,
           );
           await transaction.insert('concrete_trucks', {
             'id': command.id,
@@ -609,7 +615,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
             transaction,
             command.pourId,
             command.sequenceNo,
-            values['delivery_note_number']! as String,
+            values['delivery_note_number'] as String?,
             excludingId: command.id,
           );
           if (_truckMatches(truck, values)) {
@@ -629,19 +635,16 @@ class SqliteConcreteApplication implements ConcreteApplication {
           eventType = 'truck.updated';
         }
         await _advancePour(transaction, pour, timestamp);
+        final before = existing.isEmpty
+            ? null
+            : _truckEventSnapshot(_truckFromRow(existing.single));
         await _insertConcreteEvent(
           transaction,
           id: command.eventId,
           pourId: command.pourId,
           eventType: eventType,
           occurredAt: timestamp,
-          payload: {
-            'truck_id': command.id,
-            'sequence_no': command.sequenceNo,
-            'delivery_note_number': values['delivery_note_number'],
-            'volume_m3': command.volumeM3,
-            'result': command.result.storageValue,
-          },
+          payload: {'truck_id': command.id, 'before': before, 'after': values},
         );
         return _loadDetail(transaction, command.pourId);
       });
@@ -1778,6 +1781,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
       );
     }
     if ((command.evidenceType == ConcreteEvidenceType.deliveryReceiptScan ||
+            command.evidenceType == ConcreteEvidenceType.deliveryNoteScan ||
             command.evidenceType == ConcreteEvidenceType.mixerPhoto) &&
         command.truckId == null) {
       throw const AgendaValidationFailure(
@@ -1868,7 +1872,9 @@ class SqliteConcreteApplication implements ConcreteApplication {
           NOT EXISTS (
             SELECT 1 FROM concrete_attachments a
             WHERE a.truck_id = t.id AND a.archived_at IS NULL
-              AND a.evidence_type = 'delivery_receipt_scan'
+              AND a.evidence_type IN (
+                'delivery_receipt_scan', 'delivery_note_scan'
+              )
           ) OR NOT EXISTS (
             SELECT 1 FROM concrete_attachments a
             WHERE a.truck_id = t.id AND a.archived_at IS NULL
@@ -2153,7 +2159,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
       throw const AgendaValidationFailure('Mikser sırası en az 1 olmalıdır.');
     }
     requiredTrimmed(command.vehiclePlate, 'Mikser plakası', maxLength: 40);
-    requiredTrimmed(
+    optionalTrimmed(
       command.deliveryNoteNumber,
       'İrsaliye numarası',
       maxLength: 120,
@@ -2195,7 +2201,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
       'Mikser plakası',
       maxLength: 40,
     ).toUpperCase(),
-    'delivery_note_number': requiredTrimmed(
+    'delivery_note_number': optionalTrimmed(
       value.deliveryNoteNumber,
       'İrsaliye numarası',
       maxLength: 120,
@@ -2218,6 +2224,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
       'Mikser sonucu nedeni',
       maxLength: 1000,
     ),
+    'note': optionalTrimmed(value.note, 'Mikser notu', maxLength: 1000),
     'evidence_exception_reason': optionalTrimmed(
       value.evidenceExceptionReason,
       'Kanıt istisnası',
@@ -2354,18 +2361,19 @@ class SqliteConcreteApplication implements ConcreteApplication {
     DatabaseExecutor database,
     String pourId,
     int sequence,
-    String note, {
+    String? note, {
     String? excludingId,
   }) async {
+    final noteClause = note == null ? '' : ' OR delivery_note_number = ?';
     final rows = await database.query(
       'concrete_trucks',
       columns: ['id'],
       where: excludingId == null
-          ? 'concrete_pour_id = ? AND (sequence_no = ? OR delivery_note_number = ?)'
-          : 'concrete_pour_id = ? AND (sequence_no = ? OR delivery_note_number = ?) AND id != ?',
+          ? 'concrete_pour_id = ? AND (sequence_no = ?$noteClause)'
+          : 'concrete_pour_id = ? AND (sequence_no = ?$noteClause) AND id != ?',
       whereArgs: excludingId == null
-          ? [pourId, sequence, note]
-          : [pourId, sequence, note, excludingId],
+          ? [pourId, sequence, ?note]
+          : [pourId, sequence, ?note, excludingId],
       limit: 1,
     );
     if (rows.isNotEmpty) {
@@ -2414,8 +2422,27 @@ class SqliteConcreteApplication implements ConcreteApplication {
         'concrete_temperature': item.concreteTemperature,
         'result': item.result.storageValue,
         'reason': item.reason,
+        'note': item.note,
         'evidence_exception_reason': item.evidenceExceptionReason,
       });
+
+  Map<String, Object?> _truckEventSnapshot(ConcreteTruck item) => {
+    'sequence_no': item.sequenceNo,
+    'vehicle_plate': item.vehiclePlate,
+    'delivery_note_number': item.deliveryNoteNumber,
+    'plant_snapshot': item.plantSnapshot,
+    'batch_time': item.batchTime,
+    'arrived_at': item.arrivedAt,
+    'unloading_started_at': item.unloadingStartedAt,
+    'unloading_ended_at': item.unloadingEndedAt,
+    'volume_m3': item.volumeM3,
+    'measured_slump': item.measuredSlump,
+    'concrete_temperature': item.concreteTemperature,
+    'result': item.result.storageValue,
+    'reason': item.reason,
+    'note': item.note,
+    'evidence_exception_reason': item.evidenceExceptionReason,
+  };
 
   bool _sampleMatches(ConcreteSampleSet item, Map<String, Object?> values) =>
       _jsonEqual(values, {
@@ -2515,6 +2542,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
   Future<ConcreteExportResult> exportPackage(
     ExportConcretePackageCommand command, {
     bool share = false,
+    bool save = false,
   }) async {
     validateUuid(command.pourId, 'Beton paketi kimliği');
     validateUuid(command.eventId, 'Event kimliği');
@@ -2527,14 +2555,43 @@ class SqliteConcreteApplication implements ConcreteApplication {
     final detail = await _withAttachmentIntegrity(rawDetail);
     _requireRevision(detail.pour.revision, command.expectedRevision);
     final timestamp = CseTimeCodec.encodeUtc(operationTime);
+    if (share && save) {
+      throw const AgendaValidationFailure(
+        'Paylaş ve telefona kaydet işlemleri ayrı yürütülmelidir.',
+      );
+    }
     final safeCode = detail.pour.pourCode
         .replaceAll(RegExp(r'[^A-Za-z0-9_-]+'), '_')
         .replaceAll(RegExp(r'^_+|_+$'), '');
     final fileName =
-        'beton_paketi_${safeCode.isEmpty ? command.pourId : safeCode}_${timestamp.replaceAll(':', '').replaceAll('-', '')}.md';
-    final bytes = ConcretePackageReportFormatter.markdownBytes(detail);
+        'beton_paketi_${safeCode.isEmpty ? command.pourId : safeCode}_${timestamp.replaceAll(':', '').replaceAll('-', '')}.pdf';
+    final bytes = await exportGateway.renderPdf(detail, timestamp);
+    if (!ConcretePackageReportFormatter.isStructurallyValidPdf(bytes)) {
+      throw const AgendaValidationFailure(
+        'PDF raporu güvenli biçimde doğrulanamadı.',
+      );
+    }
     final absolutePath = await exportGateway.stage(fileName, bytes);
     try {
+      await exportGateway.verify(absolutePath);
+      if (share) {
+        await exportGateway.share(
+          absolutePath,
+          ConcretePackageReportFormatter.humanSummary(detail),
+        );
+      }
+      if (save) {
+        final saved = await exportGateway.save(fileName, absolutePath);
+        if (!saved) {
+          await exportGateway.cleanup(absolutePath);
+          return ConcreteExportResult(
+            absolutePath: absolutePath,
+            fileName: fileName,
+            humanSummary: ConcretePackageReportFormatter.humanSummary(detail),
+            outcome: ConcreteExportOutcome.cancelled,
+          );
+        }
+      }
       final now = CseTimeCodec.decodeCanonicalUtc(timestamp);
       await _withDatabase(now, (database) {
         return database.transaction((transaction) async {
@@ -2556,6 +2613,12 @@ class SqliteConcreteApplication implements ConcreteApplication {
                 'file_name': fileName,
                 'byte_size': bytes.length,
                 'attachment_count': detail.attachments.length,
+                'format': 'pdf',
+                'action': share
+                    ? 'share'
+                    : save
+                    ? 'save'
+                    : 'stage',
               },
             );
           }
@@ -2566,7 +2629,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
         fileName: fileName,
         humanSummary: ConcretePackageReportFormatter.humanSummary(detail),
       );
-      if (share) await exportGateway.share(absolutePath, result.humanSummary);
+      if (share || save) await exportGateway.cleanup(absolutePath);
       return result;
     } on Object {
       await exportGateway.cleanup(absolutePath);
@@ -2585,6 +2648,59 @@ class SqliteConcreteApplication implements ConcreteApplication {
     return _withAttachmentIntegrity(detail);
   }
 
+  @override
+  Future<StoredAttachmentContent> readAttachment(String attachmentId) async {
+    validateUuid(attachmentId, 'Kanıt kimliği');
+    final now = _readClockOnce();
+    final attachment = await _withDatabase(now, (database) async {
+      final rows = await database.query(
+        'concrete_attachments',
+        where: 'id = ? AND archived_at IS NULL',
+        whereArgs: [attachmentId],
+        limit: 1,
+      );
+      if (rows.isEmpty) {
+        throw const AgendaValidationFailure('Kanıt dosyası bulunamadı.');
+      }
+      return _attachmentFromRow(rows.single);
+    });
+    return attachmentStore.read(
+      attachment.relativePath,
+      attachment.originalFileName,
+      attachment.sha256,
+      attachment.mimeType,
+    );
+  }
+
+  @override
+  Future<void> openAttachment(String attachmentId) async {
+    validateUuid(attachmentId, 'Kanıt kimliği');
+    final now = _readClockOnce();
+    final attachment = await _withDatabase(now, (database) async {
+      final rows = await database.query(
+        'concrete_attachments',
+        where: 'id = ? AND archived_at IS NULL',
+        whereArgs: [attachmentId],
+        limit: 1,
+      );
+      if (rows.isEmpty) {
+        throw const AgendaValidationFailure('Kanıt dosyası bulunamadı.');
+      }
+      return _attachmentFromRow(rows.single);
+    });
+    if (await attachmentStore.inspect(
+          attachment.relativePath,
+          attachment.sha256,
+          attachment.mimeType,
+        ) !=
+        ConcreteAttachmentIntegrity.ok) {
+      throw const AgendaValidationFailure(
+        'Kanıt dosyasının bütünlüğü doğrulanamadı.',
+      );
+    }
+    await attachmentStore.open(attachment.relativePath, attachment.mimeType);
+  }
+
   Future<ConcretePourDetail> _withAttachmentIntegrity(
     ConcretePourDetail detail,
   ) async {
@@ -2595,6 +2711,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
         integrity = await attachmentStore.inspect(
           item.relativePath,
           item.sha256,
+          item.mimeType,
         );
       } on Object {
         integrity = ConcreteAttachmentIntegrity.missing;
@@ -2668,7 +2785,13 @@ class SqliteConcreteApplication implements ConcreteApplication {
           pourId: command.id,
           eventType: 'pour.details_updated',
           occurredAt: timestamp,
-          payload: values,
+          payload: {
+            ...values,
+            'before': currentValues,
+            'after': values,
+            'target_volume_changed':
+                current.plannedVolumeM3 != values['planned_volume_m3'],
+          },
         );
         await _syncFieldReminderTasks(
           transaction,
@@ -2798,6 +2921,133 @@ class SqliteConcreteApplication implements ConcreteApplication {
         return _loadDetail(transaction, command.pourId);
       });
     });
+  }
+
+  @override
+  Future<ConcretePourDetail> bulkComplete(
+    BulkCompleteConcreteCommand command,
+  ) async {
+    validateUuid(command.pourId, 'Beton paketi kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    _validateExpectedRevision(command.expectedPourRevision);
+    final now = _readClockOnce();
+    final timestamp = CseTimeCodec.encodeUtc(now);
+    final detail = await _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final pour = await _requirePour(transaction, command.pourId);
+        if (await _isIdempotentEvent(
+          transaction,
+          command.eventId,
+          command.pourId,
+        )) {
+          return _loadDetail(transaction, command.pourId);
+        }
+        _requireRevision(pour.revision, command.expectedPourRevision);
+        _requireMutable(pour);
+        final checks = (await transaction.query(
+          'concrete_check_items',
+          where:
+              "concrete_pour_id = ? AND status = 'pending' "
+              "AND item_key NOT IN ('inspection_notified', "
+              "'laboratory_appointment')",
+          whereArgs: [command.pourId],
+          orderBy: 'sort_order ASC, id ASC',
+        )).map(_checkFromRow).toList(growable: false);
+        final followUps = (await transaction.query(
+          'concrete_follow_up_items',
+          where:
+              "concrete_pour_id = ? AND status = 'pending' "
+              "AND item_key NOT IN ('inspection_notification_task', "
+              "'laboratory_appointment_task')",
+          whereArgs: [command.pourId],
+          orderBy: 'created_at ASC, id ASC',
+        )).map(_followUpFromRow).toList(growable: false);
+        if (checks.isEmpty && followUps.isEmpty) {
+          return _loadDetail(transaction, command.pourId);
+        }
+        var eventIndex = 0;
+        String nextEventId(String aggregateId) {
+          if (eventIndex++ == 0) return command.eventId;
+          return _stableUuid('bulk-complete:${command.eventId}:$aggregateId');
+        }
+
+        for (final check in checks) {
+          final changed = await transaction.update(
+            'concrete_check_items',
+            {
+              'status': ConcreteCheckStatus.completed.storageValue,
+              'reason': null,
+              'revision': check.revision + 1,
+              'updated_at': timestamp,
+            },
+            where: "id = ? AND revision = ? AND status = 'pending'",
+            whereArgs: [check.id, check.revision],
+          );
+          if (changed != 1) throw _staleFailure();
+          await _insertConcreteEvent(
+            transaction,
+            id: nextEventId(check.id),
+            pourId: command.pourId,
+            eventType: 'check.updated',
+            occurredAt: timestamp,
+            payload: {
+              'check_id': check.id,
+              'item_key': check.itemKey,
+              'status': ConcreteCheckStatus.completed.storageValue,
+              'bulk': true,
+            },
+          );
+        }
+        for (final followUp in followUps) {
+          final changed = await transaction.update(
+            'concrete_follow_up_items',
+            {
+              'status': ConcreteFollowUpStatus.completed.storageValue,
+              'due_at': null,
+              'reason': null,
+              'revision': followUp.revision + 1,
+              'updated_at': timestamp,
+              'completed_at': timestamp,
+            },
+            where: "id = ? AND revision = ? AND status = 'pending'",
+            whereArgs: [followUp.id, followUp.revision],
+          );
+          if (changed != 1) throw _staleFailure();
+          if (followUp.reminderId case final reminderId?) {
+            await _syncLinkedReminder(
+              transaction,
+              reminderId: reminderId,
+              eventId: _stableUuid(
+                'bulk-reminder:${command.eventId}:$reminderId',
+              ),
+              projectId: pour.projectId,
+              pourId: pour.id,
+              pending: false,
+              dueAt: null,
+              occurredAt: timestamp,
+              outcomeNote: 'Beton paketinde toplu tamamlandı.',
+            );
+          }
+          await _insertConcreteEvent(
+            transaction,
+            id: nextEventId(followUp.id),
+            pourId: command.pourId,
+            eventType: 'follow_up.linked',
+            occurredAt: timestamp,
+            payload: {
+              'follow_up_id': followUp.id,
+              'reminder_id': followUp.reminderId,
+              'status': ConcreteFollowUpStatus.completed.storageValue,
+              'bulk': true,
+            },
+          );
+        }
+        await _advancePour(transaction, pour, timestamp);
+        return _loadDetail(transaction, command.pourId);
+      });
+    });
+    await _safeReconcileNotifications();
+    return detail;
   }
 
   @override

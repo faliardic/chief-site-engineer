@@ -65,6 +65,7 @@ void main() {
       {'version': 4, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 5, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 6, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 7, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
   });
 
@@ -122,6 +123,7 @@ void main() {
         'concrete_sample_sets',
         'concrete_follow_up_items',
         'concrete_attachments',
+        'agenda_log_attachments',
         'concrete_pour_events',
         'subcontractors',
         'workforce_teams',
@@ -867,4 +869,263 @@ void main() {
       await upgraded.close();
     },
   );
+
+  test(
+    'schema 6 to 7 preserves agenda concrete truck child graph and nullable notes',
+    () async {
+      final versionSix = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+        migrations: AppDatabase.foundationMigrations.take(6).toList(),
+      );
+      await versionSix.open();
+      final db = versionSix.database;
+      const project = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+      const observation = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+      const pour = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+      const truck = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+      const sample = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+      const attachment = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+      const timestamp = '2026-07-19T08:00:00Z';
+      await db.insert('projects', {
+        'id': project,
+        'name': 'Schema 6 Projesi',
+        'created_at': timestamp,
+        'updated_at': timestamp,
+        'revision': 1,
+      });
+      await db.insert('field_observations', {
+        'id': observation,
+        'project_id': project,
+        'observed_at': timestamp,
+        'created_at': timestamp,
+        'updated_at': timestamp,
+        'category': 'concrete',
+        'description': 'Korunacak log',
+        'revision': 1,
+      });
+      await db.insert('concrete_pours', {
+        'id': pour,
+        'project_id': project,
+        'pour_code': 'BT-V6',
+        'element_location': 'A Blok',
+        'planned_at': timestamp,
+        'concrete_class': 'C30/37',
+        'planned_volume_m3': 12.5,
+        'status': 'draft',
+        'revision': 1,
+        'created_at': timestamp,
+        'updated_at': timestamp,
+      });
+      await db.insert('concrete_trucks', {
+        'id': truck,
+        'concrete_pour_id': pour,
+        'sequence_no': 1,
+        'vehicle_plate': '34 TEST 1',
+        'delivery_note_number': 'IRS-V6',
+        'volume_m3': 7.5,
+        'result': 'received',
+        'revision': 2,
+        'created_at': timestamp,
+        'updated_at': timestamp,
+      });
+      await db.insert('concrete_sample_sets', {
+        'id': sample,
+        'concrete_pour_id': pour,
+        'source_truck_id': truck,
+        'sample_code': 'N-V6',
+        'sample_count': 0,
+        'sample_labels_json': '[]',
+        'expected_result_dates_json': '[]',
+        'status': 'planned',
+        'revision': 1,
+        'created_at': timestamp,
+        'updated_at': timestamp,
+      });
+      await db.insert('concrete_attachments', {
+        'id': attachment,
+        'concrete_pour_id': pour,
+        'truck_id': truck,
+        'evidence_type': 'delivery_receipt_scan',
+        'original_file_name': 'irsaliye.jpg',
+        'mime_type': 'image/jpeg',
+        'byte_size': 4,
+        'sha256': 'a'.padLeft(64, 'a'),
+        'relative_path': 'concrete/$pour/$attachment.jpg',
+        'captured_at': timestamp,
+        'created_at': timestamp,
+      });
+      await versionSix.close();
+
+      final upgraded = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 9),
+      );
+      await upgraded.open();
+      expect(
+        sqflite.Sqflite.firstIntValue(
+          await upgraded.database.rawQuery('PRAGMA user_version'),
+        ),
+        7,
+      );
+      expect(
+        (await upgraded.database.query(
+          'field_observations',
+        )).single['description'],
+        'Korunacak log',
+      );
+      final preservedTruck = (await upgraded.database.query(
+        'concrete_trucks',
+        where: 'id = ?',
+        whereArgs: [truck],
+      )).single;
+      expect(preservedTruck['delivery_note_number'], 'IRS-V6');
+      expect(preservedTruck['revision'], 2);
+      expect(preservedTruck['note'], isNull);
+      expect(
+        (await upgraded.database.query(
+          'concrete_sample_sets',
+        )).single['source_truck_id'],
+        truck,
+      );
+      expect(
+        (await upgraded.database.query(
+          'concrete_attachments',
+        )).single['truck_id'],
+        truck,
+      );
+      final truckColumns = await upgraded.database.rawQuery(
+        'PRAGMA table_info(concrete_trucks)',
+      );
+      expect(
+        truckColumns.singleWhere(
+          (row) => row['name'] == 'delivery_note_number',
+        )['notnull'],
+        0,
+      );
+      for (final (id, sequence) in [
+        ('11111111-1111-4111-8111-111111111111', 2),
+        ('22222222-2222-4222-8222-222222222222', 3),
+      ]) {
+        await upgraded.database.insert('concrete_trucks', {
+          'id': id,
+          'concrete_pour_id': pour,
+          'sequence_no': sequence,
+          'vehicle_plate': '34 NULL $sequence',
+          'delivery_note_number': null,
+          'volume_m3': 1.0,
+          'result': 'received',
+          'revision': 1,
+          'created_at': timestamp,
+          'updated_at': timestamp,
+        });
+      }
+      await expectLater(
+        upgraded.database.insert('concrete_trucks', {
+          'id': '33333333-3333-4333-8333-333333333333',
+          'concrete_pour_id': pour,
+          'sequence_no': 4,
+          'vehicle_plate': '34 DUP',
+          'delivery_note_number': 'IRS-V6',
+          'volume_m3': 1.0,
+          'result': 'received',
+          'revision': 1,
+          'created_at': timestamp,
+          'updated_at': timestamp,
+        }),
+        throwsA(isA<DatabaseException>()),
+      );
+      await expectLater(
+        upgraded.database.delete(
+          'concrete_trucks',
+          where: 'id = ?',
+          whereArgs: ['11111111-1111-4111-8111-111111111111'],
+        ),
+        throwsA(isA<DatabaseException>()),
+      );
+      await expectLater(
+        upgraded.database.rawInsert(
+          '''
+          INSERT INTO agenda_log_attachments (
+            id, observation_id, project_id, attachment_type,
+            original_file_name, mime_type, byte_size, sha256, relative_path,
+            revision, created_at, updated_at
+          ) VALUES (?, ?, ?, 'site_photo', 'saha.jpg', 'image/jpeg', 4, ?, ?,
+            1, ?, ?)
+        ''',
+          [
+            '44444444-4444-4444-8444-444444444444',
+            observation,
+            project,
+            'b'.padLeft(64, 'b'),
+            'agenda/$observation/photo.jpg',
+            timestamp,
+            timestamp,
+          ],
+        ),
+        completes,
+      );
+      await expectLater(
+        upgraded.database.delete('agenda_log_attachments'),
+        throwsA(isA<DatabaseException>()),
+      );
+      expect(
+        await upgraded.database.rawQuery('PRAGMA foreign_key_check'),
+        isEmpty,
+      );
+      await upgraded.close();
+    },
+  );
+
+  test('failed schema 7 migration rolls back intact schema 6 data', () async {
+    final versionSix = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => firstClock,
+      migrations: AppDatabase.foundationMigrations.take(6).toList(),
+    );
+    await versionSix.open();
+    await versionSix.database.insert('projects', {
+      'id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'name': 'Rollback V6',
+      'created_at': '2026-07-19T08:00:00Z',
+      'updated_at': '2026-07-19T08:00:00Z',
+      'revision': 1,
+    });
+    await versionSix.close();
+    final failing = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => DateTime.utc(2026, 7, 19, 9),
+      migrations: [
+        ...AppDatabase.foundationMigrations.take(6),
+        DatabaseMigration(
+          version: 7,
+          apply: (transaction) async {
+            await transaction.execute('CREATE TABLE partial_v7 (id TEXT)');
+            throw StateError('forced schema 7 failure');
+          },
+        ),
+      ],
+    );
+    await expectLater(failing.open(), throwsA(isA<DatabaseOpenFailure>()));
+    final raw = await databaseFactoryFfi.openDatabase(
+      directories.databaseFile,
+      options: sqflite.OpenDatabaseOptions(singleInstance: false),
+    );
+    expect(
+      sqflite.Sqflite.firstIntValue(await raw.rawQuery('PRAGMA user_version')),
+      6,
+    );
+    expect((await raw.query('projects')).single['name'], 'Rollback V6');
+    expect(
+      await raw.rawQuery(
+        "SELECT name FROM sqlite_master WHERE name = 'partial_v7'",
+      ),
+      isEmpty,
+    );
+    await raw.close();
+  });
 }

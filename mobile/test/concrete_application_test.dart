@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -537,13 +538,34 @@ void main() {
       expect(truck.vehiclePlate, '34 ABC 123');
       expect(detail.metrics.actualDeliveredM3, 12.5);
 
+      await expectLater(
+        concrete.attachEvidence(
+          AttachConcreteEvidenceCommand(
+            id: _uuid(112),
+            pourId: pourId,
+            eventId: _uuid(113),
+            expectedPourRevision: detail.pour.revision,
+            evidenceType: ConcreteEvidenceType.deliveryNoteScan,
+            originalFileName: 'unlinked.jpg',
+            bytes: const [0xff, 0xd8, 0xff, 9],
+            capturedAt: '2026-07-19T08:00:30Z',
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      expect(
+        attachments.values,
+        isEmpty,
+        reason: 'Belge taraması kaynak validation tamamlanmadan stage edilmez.',
+      );
+
       detail = await concrete.attachEvidence(
         AttachConcreteEvidenceCommand(
           id: _uuid(52),
           pourId: pourId,
           eventId: _uuid(53),
           expectedPourRevision: detail.pour.revision,
-          evidenceType: ConcreteEvidenceType.deliveryReceiptScan,
+          evidenceType: ConcreteEvidenceType.deliveryNoteScan,
           originalFileName: 'receipt.jpg',
           bytes: const [0xff, 0xd8, 0xff, 1],
           capturedAt: '2026-07-19T08:01:00Z',
@@ -563,11 +585,39 @@ void main() {
           truckId: truck.id,
         ),
       );
+      detail = await concrete.attachEvidence(
+        AttachConcreteEvidenceCommand(
+          id: _uuid(98),
+          pourId: pourId,
+          eventId: _uuid(99),
+          expectedPourRevision: detail.pour.revision,
+          evidenceType: ConcreteEvidenceType.deliveryNoteScan,
+          originalFileName: 'receipt-second.jpg',
+          bytes: const [0xff, 0xd8, 0xff, 4],
+          capturedAt: '2026-07-19T08:02:30Z',
+          truckId: truck.id,
+        ),
+      );
       expect(detail.metrics.missingEvidenceTruckCount, 0);
       expect(
         detail.attachments.every((item) => item.truckId == truck.id),
         isTrue,
       );
+      expect(
+        detail.attachments
+            .where(
+              (item) =>
+                  item.evidenceType == ConcreteEvidenceType.deliveryNoteScan,
+            )
+            .map((item) => item.id),
+        [_uuid(52), _uuid(98)],
+      );
+      expect((await concrete.readAttachment(_uuid(52))).bytes, [
+        0xff,
+        0xd8,
+        0xff,
+        1,
+      ]);
 
       detail = await concrete.saveSampleSet(
         SaveConcreteSampleSetCommand(
@@ -614,8 +664,18 @@ void main() {
       );
       expect(
         attachments.values,
-        hasLength(2),
+        hasLength(3),
         reason: 'Kaynak validation staging öncesidir.',
+      );
+      final firstPath = detail.attachments
+          .firstWhere((item) => item.id == _uuid(52))
+          .relativePath;
+      attachments.values[firstPath] = const [0xff, 0xd8, 0xff, 9];
+      expect(
+        (await concrete.getPourDetail(
+          pourId,
+        )).attachments.firstWhere((item) => item.id == _uuid(52)).integrity,
+        ConcreteAttachmentIntegrity.tampered,
       );
     },
   );
@@ -859,58 +919,477 @@ void main() {
   );
 
   test(
-    'UTF-8 deterministic export is formula safe and event is post-success',
+    'nullable delivery notes truck edits and live remaining excess persist',
     () async {
-      var detail = await concrete.createPour(_createCommand(code: '=BT-001'));
+      var detail = await concrete.createPour(_createCommand());
       detail = await concrete.saveTruck(
         SaveConcreteTruckCommand(
-          id: _uuid(80),
+          id: _uuid(90),
           pourId: pourId,
-          eventId: _uuid(81),
+          eventId: _uuid(91),
           expectedPourRevision: detail.pour.revision,
           expectedTruckRevision: 0,
           sequenceNo: 1,
-          vehiclePlate: '+34',
-          deliveryNoteNumber: '=CMD',
-          volumeM3: 20,
+          vehiclePlate: '34 abc 1',
+          deliveryNoteNumber: null,
+          volumeM3: 12.5,
+          result: ConcreteTruckResult.received,
+          arrivedAt: '2026-07-19T08:00:00Z',
+        ),
+      );
+      detail = await concrete.saveTruck(
+        SaveConcreteTruckCommand(
+          id: _uuid(92),
+          pourId: pourId,
+          eventId: _uuid(93),
+          expectedPourRevision: detail.pour.revision,
+          expectedTruckRevision: 0,
+          sequenceNo: 2,
+          vehiclePlate: '34 abc 2',
+          deliveryNoteNumber: '   ',
+          volumeM3: 10,
+          result: ConcreteTruckResult.received,
+          arrivedAt: '2026-07-19T08:30:00Z',
+        ),
+      );
+      expect(detail.trucks.map((item) => item.deliveryNoteNumber), [
+        null,
+        null,
+      ]);
+      expect(detail.metrics.actualDeliveredM3, 22.5);
+      expect(detail.metrics.isTargetExceeded, isTrue);
+      expect(detail.metrics.excessM3, 2.5);
+      expect(detail.metrics.remainingM3, -2.5);
+
+      final first = detail.trucks.first;
+      detail = await concrete.saveTruck(
+        SaveConcreteTruckCommand(
+          id: first.id,
+          pourId: pourId,
+          eventId: _uuid(94),
+          expectedPourRevision: detail.pour.revision,
+          expectedTruckRevision: first.revision,
+          sequenceNo: first.sequenceNo,
+          vehiclePlate: '34 ABC 9',
+          deliveryNoteNumber: 'IRS-196',
+          volumeM3: 15,
+          result: ConcreteTruckResult.received,
+          arrivedAt: first.arrivedAt,
+          unloadingStartedAt: '2026-07-19T08:10:00Z',
+          unloadingEndedAt: '2026-07-19T08:20:00Z',
+          note: 'Pompa önünde 10 dk bekledi',
+        ),
+      );
+      final edited = detail.trucks.first;
+      expect(edited.deliveryNoteNumber, 'IRS-196');
+      expect(edited.note, 'Pompa önünde 10 dk bekledi');
+      expect(edited.revision, 2);
+      expect(detail.events.last.eventType, 'truck.updated');
+      final payload = jsonDecode(detail.events.last.payloadJson);
+      expect(payload['before']['delivery_note_number'], isNull);
+      expect(payload['after']['delivery_note_number'], 'IRS-196');
+
+      final eventCount = detail.events.length;
+      final pourRevision = detail.pour.revision;
+      final noOp = await concrete.saveTruck(
+        SaveConcreteTruckCommand(
+          id: edited.id,
+          pourId: pourId,
+          eventId: _uuid(95),
+          expectedPourRevision: pourRevision,
+          expectedTruckRevision: edited.revision,
+          sequenceNo: edited.sequenceNo,
+          vehiclePlate: edited.vehiclePlate,
+          deliveryNoteNumber: edited.deliveryNoteNumber,
+          volumeM3: edited.volumeM3,
+          result: edited.result,
+          arrivedAt: edited.arrivedAt,
+          unloadingStartedAt: edited.unloadingStartedAt,
+          unloadingEndedAt: edited.unloadingEndedAt,
+          note: edited.note,
+        ),
+      );
+      expect(noOp.pour.revision, pourRevision);
+      expect(noOp.events, hasLength(eventCount));
+      await expectLater(
+        concrete.saveTruck(
+          SaveConcreteTruckCommand(
+            id: edited.id,
+            pourId: pourId,
+            eventId: _uuid(96),
+            expectedPourRevision: pourRevision,
+            expectedTruckRevision: 1,
+            sequenceNo: edited.sequenceNo,
+            vehiclePlate: edited.vehiclePlate,
+            deliveryNoteNumber: edited.deliveryNoteNumber,
+            volumeM3: edited.volumeM3,
+            result: edited.result,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      await expectLater(
+        concrete.saveTruck(
+          SaveConcreteTruckCommand(
+            id: noOp.trucks.last.id,
+            pourId: pourId,
+            eventId: _uuid(97),
+            expectedPourRevision: pourRevision,
+            expectedTruckRevision: noOp.trucks.last.revision,
+            sequenceNo: noOp.trucks.last.sequenceNo,
+            vehiclePlate: noOp.trucks.last.vehiclePlate,
+            deliveryNoteNumber: 'IRS-196',
+            volumeM3: noOp.trucks.last.volumeM3,
+            result: noOp.trucks.last.result,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      final restarted = _application(
+        agenda: agenda,
+        attachments: attachments,
+        exports: exports,
+        directories: directories,
+        clock: () => now,
+      );
+      final persisted = await restarted.getPourDetail(pourId);
+      expect(persisted.trucks.first.note, 'Pompa önünde 10 dk bekledi');
+      expect(persisted.metrics.actualDeliveredM3, 25);
+    },
+  );
+
+  test(
+    'target update preserves trucks and reports deterministic remaining metric',
+    () async {
+      var detail = await concrete.createPour(_createCommand());
+      detail = await concrete.saveTruck(
+        SaveConcreteTruckCommand(
+          id: _uuid(100),
+          pourId: pourId,
+          eventId: _uuid(101),
+          expectedPourRevision: detail.pour.revision,
+          expectedTruckRevision: 0,
+          sequenceNo: 1,
+          vehiclePlate: '34 METRAJ',
+          volumeM3: 12.25,
           result: ConcreteTruckResult.received,
         ),
       );
-      final result = await concrete.exportPackage(
-        ExportConcretePackageCommand(
-          pourId: pourId,
-          eventId: _uuid(82),
+      final truckRevision = detail.trucks.single.revision;
+      final command = UpdateConcretePourCommand(
+        id: pourId,
+        eventId: _uuid(102),
+        expectedRevision: detail.pour.revision,
+        elementLocation: detail.pour.elementLocation,
+        plannedAt: detail.pour.plannedAt,
+        concreteClass: detail.pour.concreteClass,
+        plannedVolumeM3: 10,
+        plantName: detail.pour.plantName,
+        laboratoryName: detail.pour.laboratoryName,
+      );
+      detail = await concrete.updatePour(command);
+      expect(detail.metrics.actualDeliveredM3, 12.25);
+      expect(detail.metrics.excessM3, 2.25);
+      expect(detail.trucks.single.revision, truckRevision);
+      final payload = jsonDecode(detail.events.last.payloadJson);
+      expect(payload['before']['planned_volume_m3'], 20.0);
+      expect(payload['after']['planned_volume_m3'], 10.0);
+      expect(payload['target_volume_changed'], isTrue);
+      final noOp = await concrete.updatePour(
+        UpdateConcretePourCommand(
+          id: pourId,
+          eventId: _uuid(103),
           expectedRevision: detail.pour.revision,
+          elementLocation: detail.pour.elementLocation,
+          plannedAt: detail.pour.plannedAt,
+          concreteClass: detail.pour.concreteClass,
+          plannedVolumeM3: 10,
+          plantName: detail.pour.plantName,
+          laboratoryName: detail.pour.laboratoryName,
         ),
       );
-      expect(result.fileName, startsWith('beton_paketi_BT-001_'));
-      expect(exports.bytes!.take(3), [0xef, 0xbb, 0xbf]);
-      final refreshed = await concrete.getPourDetail(pourId);
-      expect(refreshed.events.last.eventType, 'report.exported');
-      expect(
-        ConcretePackageReportFormatter.truckCsv(refreshed),
-        contains("'=CMD"),
-      );
+      expect(noOp.pour.revision, detail.pour.revision);
+      expect(noOp.events.length, detail.events.length);
+    },
+  );
 
-      exports.failStage = true;
+  test(
+    'bulk complete is atomic idempotent and excludes source-field tasks',
+    () async {
+      final created = await concrete.createPour(_createCommand());
+      final command = BulkCompleteConcreteCommand(
+        pourId: pourId,
+        eventId: _uuid(110),
+        expectedPourRevision: created.pour.revision,
+      );
+      final completed = await concrete.bulkComplete(command);
+      expect(
+        completed.checks
+            .where(
+              (item) => {
+                'inspection_notified',
+                'laboratory_appointment',
+              }.contains(item.itemKey),
+            )
+            .every((item) => item.status == ConcreteCheckStatus.pending),
+        isTrue,
+      );
+      expect(
+        completed.checks
+            .where(
+              (item) => !{
+                'inspection_notified',
+                'laboratory_appointment',
+              }.contains(item.itemKey),
+            )
+            .every((item) => item.status == ConcreteCheckStatus.completed),
+        isTrue,
+      );
+      expect(
+        completed.followUps
+            .where(
+              (item) => {
+                'inspection_notification_task',
+                'laboratory_appointment_task',
+              }.contains(item.itemKey),
+            )
+            .every((item) => item.status == ConcreteFollowUpStatus.pending),
+        isTrue,
+      );
+      final manualReminderIds = completed.followUps
+          .where(
+            (item) => !{
+              'inspection_notification_task',
+              'laboratory_appointment_task',
+            }.contains(item.itemKey),
+          )
+          .map((item) => item.reminderId)
+          .toSet();
+      expect(
+        completed.linkedReminders
+            .where((item) => manualReminderIds.contains(item.id))
+            .every((item) => item.status == ReminderStatus.completed),
+        isTrue,
+      );
+      final eventCount = completed.events.length;
+      final retry = await concrete.bulkComplete(command);
+      expect(retry.events.length, eventCount);
+      expect(retry.pour.revision, completed.pour.revision);
+
+      final secondRoot = await Directory.systemTemp.createTemp(
+        'cse_concrete_bulk_rollback_',
+      );
+      addTearDown(() async {
+        if (await secondRoot.exists()) await secondRoot.delete(recursive: true);
+      });
+      final secondDirectories = AppDirectories.fromSupportRoot(
+        secondRoot,
+        AppEnvironment.debug,
+      );
+      await secondDirectories.ensureCreated();
+      final db = AppDatabase(
+        path: secondDirectories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => now,
+      );
+      await db.open();
+      await db.close();
+      final secondAgenda = SqliteAgendaApplication(
+        databasePath: secondDirectories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+      );
+      await secondAgenda.createProject(
+        const CreateProjectCommand(id: projectId, name: 'Rollback Projesi'),
+      );
+      final secondAttachments = _MemoryAttachmentStore();
+      final secondExports = _MemoryExportGateway();
+      final normal = _application(
+        agenda: secondAgenda,
+        attachments: secondAttachments,
+        exports: secondExports,
+        directories: secondDirectories,
+        clock: () => now,
+      );
+      final secondCreated = await normal.createPour(_createCommand());
+      final failing = _application(
+        agenda: secondAgenda,
+        attachments: secondAttachments,
+        exports: secondExports,
+        directories: secondDirectories,
+        clock: () => now,
+        beforeEvent: (_) async => throw StateError('forced bulk failure'),
+      );
       await expectLater(
-        concrete.exportPackage(
-          ExportConcretePackageCommand(
+        failing.bulkComplete(
+          BulkCompleteConcreteCommand(
             pourId: pourId,
-            eventId: _uuid(83),
-            expectedRevision: refreshed.pour.revision,
+            eventId: _uuid(111),
+            expectedPourRevision: secondCreated.pour.revision,
           ),
         ),
         throwsStateError,
       );
+      final rolledBack = await normal.getPourDetail(pourId);
+      expect(rolledBack.pour.revision, secondCreated.pour.revision);
       expect(
-        (await concrete.getPourDetail(
-          pourId,
-        )).events.where((item) => item.id == _uuid(83)),
-        isEmpty,
+        rolledBack.checks.every(
+          (item) => item.status == ConcreteCheckStatus.pending,
+        ),
+        isTrue,
+      );
+      expect(
+        rolledBack.followUps.every(
+          (item) => item.status == ConcreteFollowUpStatus.pending,
+        ),
+        isTrue,
       );
     },
   );
+
+  test('UTF-8 PDF export is formula safe and event is post-success', () async {
+    var detail = await concrete.createPour(_createCommand(code: '=BT-001'));
+    detail = await concrete.saveTruck(
+      SaveConcreteTruckCommand(
+        id: _uuid(80),
+        pourId: pourId,
+        eventId: _uuid(81),
+        expectedPourRevision: detail.pour.revision,
+        expectedTruckRevision: 0,
+        sequenceNo: 1,
+        vehiclePlate: '+34',
+        deliveryNoteNumber: '=CMD',
+        volumeM3: 20,
+        result: ConcreteTruckResult.received,
+      ),
+    );
+    final result = await concrete.exportPackage(
+      ExportConcretePackageCommand(
+        pourId: pourId,
+        eventId: _uuid(82),
+        expectedRevision: detail.pour.revision,
+      ),
+    );
+    expect(result.fileName, startsWith('beton_paketi_BT-001_'));
+    expect(result.fileName, endsWith('.pdf'));
+    expect(
+      ConcretePackageReportFormatter.isStructurallyValidPdf(exports.bytes!),
+      isTrue,
+    );
+    var refreshed = await concrete.getPourDetail(pourId);
+    expect(refreshed.events.last.eventType, 'report.exported');
+    expect(
+      ConcretePackageReportFormatter.truckCsv(refreshed),
+      contains("'=CMD"),
+    );
+
+    exports.cleaned = false;
+    final shared = await concrete.exportPackage(
+      ExportConcretePackageCommand(
+        pourId: pourId,
+        eventId: _uuid(87),
+        expectedRevision: refreshed.pour.revision,
+      ),
+      share: true,
+    );
+    expect(shared.outcome, ConcreteExportOutcome.completed);
+    expect(exports.shared, isTrue);
+    expect(exports.cleaned, isTrue);
+    refreshed = await concrete.getPourDetail(pourId);
+
+    exports.cleaned = false;
+    final saved = await concrete.exportPackage(
+      ExportConcretePackageCommand(
+        pourId: pourId,
+        eventId: _uuid(88),
+        expectedRevision: refreshed.pour.revision,
+      ),
+      save: true,
+    );
+    expect(saved.outcome, ConcreteExportOutcome.completed);
+    expect(exports.saved, isTrue);
+    expect(exports.cleaned, isTrue);
+    refreshed = await concrete.getPourDetail(pourId);
+
+    exports.saveResult = false;
+    final cancelled = await concrete.exportPackage(
+      ExportConcretePackageCommand(
+        pourId: pourId,
+        eventId: _uuid(84),
+        expectedRevision: refreshed.pour.revision,
+      ),
+      save: true,
+    );
+    expect(cancelled.outcome, ConcreteExportOutcome.cancelled);
+    expect(
+      (await concrete.getPourDetail(
+        pourId,
+      )).events.where((item) => item.id == _uuid(84)),
+      isEmpty,
+    );
+
+    exports.cleaned = false;
+    exports.failShare = true;
+    await expectLater(
+      concrete.exportPackage(
+        ExportConcretePackageCommand(
+          pourId: pourId,
+          eventId: _uuid(85),
+          expectedRevision: refreshed.pour.revision,
+        ),
+        share: true,
+      ),
+      throwsStateError,
+    );
+    expect(exports.cleaned, isTrue);
+    expect(
+      (await concrete.getPourDetail(
+        pourId,
+      )).events.where((item) => item.id == _uuid(85)),
+      isEmpty,
+    );
+    exports.failShare = false;
+
+    exports.cleaned = false;
+    exports.failSave = true;
+    await expectLater(
+      concrete.exportPackage(
+        ExportConcretePackageCommand(
+          pourId: pourId,
+          eventId: _uuid(86),
+          expectedRevision: refreshed.pour.revision,
+        ),
+        save: true,
+      ),
+      throwsStateError,
+    );
+    expect(exports.cleaned, isTrue);
+    expect(
+      (await concrete.getPourDetail(
+        pourId,
+      )).events.where((item) => item.id == _uuid(86)),
+      isEmpty,
+    );
+    exports.failSave = false;
+
+    exports.failStage = true;
+    await expectLater(
+      concrete.exportPackage(
+        ExportConcretePackageCommand(
+          pourId: pourId,
+          eventId: _uuid(83),
+          expectedRevision: refreshed.pour.revision,
+        ),
+      ),
+      throwsStateError,
+    );
+    expect(
+      (await concrete.getPourDetail(
+        pourId,
+      )).events.where((item) => item.id == _uuid(83)),
+      isEmpty,
+    );
+  });
 }
 
 SqliteConcreteApplication _application({
@@ -1066,14 +1545,30 @@ class _MemoryAttachmentStore implements ConcreteAttachmentStore {
   @override
   Future<ConcreteAttachmentIntegrity> inspect(
     String relativePath,
-    String expectedSha256,
-  ) async {
+    String expectedSha256, [
+    String? expectedMimeType,
+  ]) async {
     final bytes = values[relativePath];
     if (bytes == null) return ConcreteAttachmentIntegrity.missing;
     return sha256.convert(bytes).toString() == expectedSha256
         ? ConcreteAttachmentIntegrity.ok
         : ConcreteAttachmentIntegrity.tampered;
   }
+
+  @override
+  Future<StoredAttachmentContent> read(
+    String relativePath,
+    String originalFileName,
+    String expectedSha256,
+    String expectedMimeType,
+  ) async => StoredAttachmentContent(
+    fileName: originalFileName,
+    mimeType: expectedMimeType,
+    bytes: values[relativePath]!,
+  );
+
+  @override
+  Future<void> open(String relativePath, String expectedMimeType) async {}
 
   @override
   Future<StagedConcreteAttachment> stage({
@@ -1098,13 +1593,44 @@ class _MemoryExportGateway implements ConcreteExportGateway {
   bool failStage = false;
   bool cleaned = false;
   bool shared = false;
+  bool saved = false;
+  bool saveResult = true;
+  bool failShare = false;
+  bool failSave = false;
+
+  @override
+  Future<Uint8List> renderPdf(
+    ConcretePourDetail detail,
+    String generatedAt,
+  ) async {
+    final regular = await File('assets/fonts/Roboto-Regular.ttf').readAsBytes();
+    final bold = await File('assets/fonts/Roboto-Bold.ttf').readAsBytes();
+    return ConcretePackageReportFormatter.pdfBytes(
+      detail,
+      generatedAt: generatedAt,
+      regularFont: ByteData.sublistView(regular),
+      boldFont: ByteData.sublistView(bold),
+    );
+  }
 
   @override
   Future<void> cleanup(String absolutePath) async => cleaned = true;
 
   @override
-  Future<void> share(String absolutePath, String summary) async =>
-      shared = true;
+  Future<void> share(String absolutePath, String summary) async {
+    if (failShare) throw StateError('share failed');
+    shared = true;
+  }
+
+  @override
+  Future<bool> save(String fileName, String absolutePath) async {
+    if (failSave) throw StateError('save failed');
+    saved = true;
+    return saveResult;
+  }
+
+  @override
+  Future<void> verify(String absolutePath) async {}
 
   @override
   Future<String> stage(String fileName, Uint8List bytes) async {

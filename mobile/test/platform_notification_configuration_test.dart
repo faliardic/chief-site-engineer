@@ -15,11 +15,17 @@ void main() {
       expect(manifest, contains('ScheduledNotificationReceiver'));
       expect(manifest, contains('ScheduledNotificationBootReceiver'));
       expect(manifest, contains('android.permission.CAMERA'));
-      expect(manifest, isNot(contains('android.permission.READ_MEDIA_IMAGES')));
-      expect(
-        manifest,
-        isNot(contains('android.permission.READ_EXTERNAL_STORAGE')),
-      );
+      for (final permission in [
+        'android.permission.READ_EXTERNAL_STORAGE',
+        'android.permission.READ_MEDIA_IMAGES',
+        'android.permission.READ_MEDIA_VIDEO',
+        'android.permission.READ_MEDIA_AUDIO',
+      ]) {
+        expect(
+          manifest,
+          contains('android:name="$permission"\n        tools:node="remove"'),
+        );
+      }
       expect(manifest, isNot(contains('android.permission.INTERNET')));
       expect(manifest, isNot(contains('SCHEDULE_EXACT_ALARM')));
       expect(manifest, isNot(contains('USE_EXACT_ALARM')));
@@ -89,23 +95,29 @@ void main() {
       final pubspec = File('pubspec.yaml').readAsStringSync();
       final lock = File('pubspec.lock').readAsStringSync();
 
-      expect(schema, contains('static const schemaVersion = 6'));
+      expect(schema, contains('static const schemaVersion = 7'));
       expect(schema, contains('CREATE TABLE workforce_members'));
       expect(schema, contains('CREATE TABLE attendance_days'));
       expect(schema, contains('CREATE TABLE attendance_entries'));
       expect(schema, contains('CREATE TABLE attendance_events'));
       expect(schema, contains('CREATE TABLE concrete_pours'));
       expect(schema, contains('CREATE TABLE concrete_attachments'));
+      expect(schema, contains('CREATE TABLE agenda_log_attachments'));
       expect(pubspec, contains('share_plus: ^12.0.1'));
       expect(pubspec, contains('image_picker: ^1.2.1'));
       expect(pubspec, contains('file_picker: ^10.3.10'));
       expect(pubspec, contains('permission_handler: ^12.0.1'));
       expect(pubspec, contains('archive: ^4.0.9'));
       expect(pubspec, contains('cryptography: ^2.9.0'));
+      expect(pubspec, contains('open_filex: ^4.7.0'));
+      expect(pubspec, contains('pdf: ^3.11.3'));
+      expect(pubspec, contains('assets/fonts/Roboto-Regular.ttf'));
       expect(lock, contains('share_plus:'));
       expect(lock, contains('version: "12.0.2"'));
       expect(lock, contains('archive:'));
       expect(lock, contains('cryptography:'));
+      expect(lock, contains('open_filex:'));
+      expect(lock, contains('pdf:'));
     },
   );
 }

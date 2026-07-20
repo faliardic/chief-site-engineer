@@ -2986,3 +2986,36 @@
 - Mobil backup formatı `1` olarak kalır; restore allowlist mobil schema `1`–`6`
   olur. Python schema `4`, desktop Backup `1`, restore allowlist `(2, 3, 4)` ve
   Günlük Çıktı `1` değiştirilmez.
+
+## Issue 196 — Ajanda ve Beton Saha Akışı
+
+- Mobil schema `6 → 7` tek atomik migration'dır. Ajanda fotoğrafları exact
+  observation/project composite FK, relative path, MIME/size/SHA-256, revision
+  ve archive metadata'sı taşır; fiziksel delete trigger ile yasaktır.
+- Ajanda `Sil` recoverable archive'dır. Active/archive filtreleri aynı
+  `field_observations` source-of-truth'unu okur; restore aynı ID'yi kullanır.
+  Bağlı reminder hiçbir archive/edit mutation'ında sessizce değişmez.
+- Ajanda edit ve archive/restore immutable command + expected revision uygular.
+  Stale fail-closed, no-op eventsizdir; başarılı mutation mutable row ile
+  append-only event'i tek transaction'da yazar.
+- Fotoğraf dosyası içerik sniff → boyut → staging → SHA-256 doğrulama → atomic
+  finalize sırasındadır. DB/event rollback orphan dosyayı telafi edici cleanup
+  ile kaldırır; archive byte'ı fiziksel silmez.
+- Mikser irsaliye numarası nullable'dır. Partial unique index yalnız dolu
+  normalize değerleri döküm içinde tekil tutar; v6 child FK grafiği migration
+  transaction'ında exact kimliklerle yeniden kurulur.
+- `delivery_note_scan` yeni canonical irsaliye kanıt türüdür;
+  `delivery_receipt_scan` legacy kayıtları okunur ve eksik-kanıt hesabında eşdeğer
+  kabul edilir. Scan exact truck ID'ye bağlanır; cloud OCR eklenmez.
+- Beton canlı m³ read-model'i aktif received/partial truck hacminden türetilir.
+  Negatif kalan clamp edilmez, `Aşılan` gösterilir. UI ve PDF aynı metrics ve
+  iki ondalıklı Türkçe formatter'ı kullanır.
+- Toplu tamamlama yalnız manual pending check/follow-up'ları tek transaction'da
+  kapatır. Laboratuvar randevusu ve yapı denetim bildirimi source-field görevleri
+  dışarıda kalır; retry deterministik item event kimlikleriyle idempotenttir.
+- Beton kullanıcı ana raporu embedded açık lisanslı fontla PDF'dir. Share ve
+  kullanıcı kontrollü belge save ayrı mutation'dır; cancel/hata event üretmez,
+  staged dosya temizlenir. Broad storage izni eklenmez.
+- `.csebackup` formatı `1`, Python schema `4`, desktop Backup `1`, restore
+  allowlist `(2, 3, 4)` ve Günlük Çıktı `1` değişmez. Mobil restore staging
+  allowlist'i `1`–`7` olur ve arşivlenmiş Ajanda fotoğraf byte'larını da taşır.

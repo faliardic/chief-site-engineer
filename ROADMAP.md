@@ -41,6 +41,11 @@ hesap/cihaz bağımlı sonraki adımlardır.
 schema `6` taşeron → ekip → personel sicili, İSG/KKD görünürlüğü, Beton exact
 saha görevleri ve reminder `Yarın` UX'i uygulandı. Backup format `1`, inexact
 notification ve offline cihaz source-of-truth sınırı korundu.
+3I. [x] Release 0.1 saha düzeltmeleri II — Issue #196 ile schema `7`, Ajanda
+edit/archive/restore ve fotoğraf akışı, Beton PDF paylaş/kaydet, güvenli toplu
+tamamlama, mikser/irsaliye düzenleme-tarama-viewer ve canlı hedef/dökülen/
+kalan-aşılan metrajı uygulandı. Fiziksel silme, cloud OCR ve store submission
+eklenmedi.
 
 Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme
 programı Issue #127'dir. Issue #141 / PR #142 ve Issue #143 / PR #144
@@ -55,8 +60,33 @@ dilimini, Issue #183 / PR #184 mobil reminder yaşam döngüsü ve yerel
 notification dilimini, Issue #185 / PR #186 mobil günlük Puantajı, Issue #187 /
 PR #188 mobil Beton Paketi'ni, Issue #189 / PR #190 mobil tam yedek ve geri
 yüklemeyi merge etmiştir. Tek aktif production işi Issue #191 mobil release
-candidate hardening diliminden sonra Issue #194 saha düzeltmeleridir.
+candidate hardening ve Issue #194 saha düzeltmelerinden sonra Issue #196 Ajanda
+ve Beton saha akışı dilimidir.
 Açık faz Epic'leri aynı anda aktif production işleri değildir.
+
+## Issue 196 - Ajanda ve Beton Saha Akışı
+
+- [x] Mobil schema `6` → `7` atomik migration, v6 veri/FK/event korunumu ve
+  failure rollback/retry.
+- [x] Ajanda edit/no-op/stale, archive filter, recoverable `Sil`, restore ve
+  reminder yaşam döngüsünü değiştirmeyen append-only event'ler.
+- [x] AppBar alarm ikonu, tooltip/semantic/touch target ve bağlı reminder
+  duplicate koruması.
+- [x] Ajanda JPEG/PNG create/detail attachment; sniff, hash, atomic finalize,
+  cleanup, archive, zoom/pan, restart ve backup/restore.
+- [x] Beton UTF-8 PDF raporu; ayrı OS paylaş ve telefona kaydet, cancel/failure
+  cleanup ve yalnız başarı sonrası export event'i.
+- [x] Manual Beton checklist/takipleri için transaction-safe idempotent toplu
+  tamamlama; source-field görevleri hariç.
+- [x] Mikser edit/no-op/stale, nullable irsaliye, sonradan ekleme, exact truck'a
+  çoklu scan ve legacy attachment uyumluluğu.
+- [x] JPEG/PNG zoom/pan ve PDF güvenli viewer; missing/hash/MIME güvenli tanısı.
+- [x] Canlı hedef/dökülen/kalan/aşılan m³ ve optimistic hedef güncellemesi.
+- [x] Backup format `1` içinde schema `1`–`7` staging migration ve fotoğraf/
+  archive/event/scan/truck/target exact round-trip.
+- [ ] Attachment viewer ile PDF share/save gerçek cihaz kabulü Issue #193
+  checklist'iyle kullanıcı tarafından yürütülür.
+- [ ] Native iOS archive ve store submission hesap/cihaz bağımlı ayrı iştir.
 
 ## Issue 194 - Release 0.1 Saha Düzeltmeleri
 
