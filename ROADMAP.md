@@ -53,6 +53,10 @@ Backup format `1` ve mobil schema `7` değişmedi.
 3K. [x] Release 0.1 mikser dialog blocker — Issue #200 ile yeni/mevcut mikser
 modal controller'ları dialog State sahipliğine alındı; reverse transition,
 single mutation, retry draft ve belirsiz sonuç diagnostic sözleşmeleri uygulandı.
+3L. [x] Release 0.1 arka plan reminder teslimat blocker — Issue #202 ile
+Android inexact kök nedeni ölçüldü; dar exact özel erişim, native schedule
+doğrulaması, boot audit, gecikme/batarya/kanal tanısı ve kapalı uygulama kabul
+matrisi uygulandı. Foreground service, cloud push ve internet eklenmedi.
 
 Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme
 programı Issue #127'dir. Issue #141 / PR #142 ve Issue #143 / PR #144
@@ -70,7 +74,25 @@ yüklemeyi merge etmiştir. Tek aktif production işi Issue #191 mobil release
 candidate hardening ve Issue #194 saha düzeltmelerinden sonra Issue #196 Ajanda
 ve Beton saha akışı dilimi, Issue #198 stable backup import ve Issue #200 mikser
 dialog lifecycle blocker'ı ile sürer.
+Arka plan teslimat blocker'ı Issue #202 ile kapatılmıştır.
 Açık faz Epic'leri aynı anda aktif production işleri değildir.
+
+## Issue 202 - Arka Plan Hatırlatıcı Teslimat Güvenilirliği
+
+- [x] Android inexact alarm toleransının release blocker kök nedeni olarak
+  resmi platform sözleşmesi ve saha bulgusuyla kanıtlanması.
+- [x] Yalnız kullanıcı planlı reminder akışında `SCHEDULE_EXACT_ALARM`; no
+  `USE_EXACT_ALARM`, foreground service, internet veya cloud push.
+- [x] 15/30/60 dakika, yarın, günlük ensure ve ileri due saatlik tekrar native
+  exact ankrajları.
+- [x] Schedule sonrası pending doğrulama, duplicate/orphan cleanup ve permission/
+  channel/exact reddinde logical row koruması.
+- [x] Boot reschedule privacy-safe audit ve açılış/restore reconciliation.
+- [x] Reminder detayında teslimat, batarya optimizasyonu, app standby ve güvenli
+  kullanıcı ayar yönlendirmesi.
+- [x] Schema `7`, backup format `1`, notification source link ve append-only
+  event geçmişinin korunması.
+- [ ] Store submission ve gerçek signing ayrı kullanıcı/hesap işidir.
 
 ## Issue 200 - Mikser Dialog Lifecycle Güvenliği
 

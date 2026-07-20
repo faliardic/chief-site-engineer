@@ -1,7 +1,7 @@
 # Chief Site Engineer Mobile Privacy Policy
 
 **Version:** 0.1.0 release candidate
-**Last updated:** 19 July 2026
+**Last updated:** 20 July 2026
 
 Chief Site Engineer (CSE) is a single-owner, local-first construction field
 assistant. Agenda, reminders, attendance, concrete pour packages, selected
@@ -21,9 +21,13 @@ transmitted to or collected by the developer.
 - Camera access is requested only for a user-initiated evidence photo.
 - Photos and files are selected through system pickers; the app does not ask
   for broad media or storage access.
-- Notification permission is used only for local one-time reminders.
-- Boot completion is used to restore pending local reminder scheduling. The
-  app does not request exact-alarm permission.
+- Notification permission is used only for local user-scheduled one-time or
+  recurring reminders.
+- Boot completion is used to restore pending local reminder scheduling.
+- Android's user-managed exact-alarm special access is requested only to
+  deliver a user-specified local field reminder reliably while the app is
+  closed. The app does not use `USE_EXACT_ALARM`, a foreground service, cloud
+  push, or an internet dependency.
 
 Denying permission does not delete the underlying record.
 

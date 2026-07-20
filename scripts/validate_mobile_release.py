@@ -20,6 +20,7 @@ ANDROID_PERMISSION_ALLOWLIST = {
     "android.permission.CAMERA",
     "android.permission.POST_NOTIFICATIONS",
     "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.SCHEDULE_EXACT_ALARM",
 }
 FORBIDDEN_PRODUCTION_PERMISSIONS = {
     "android.permission.INTERNET",
@@ -27,8 +28,8 @@ FORBIDDEN_PRODUCTION_PERMISSIONS = {
     "android.permission.READ_MEDIA_IMAGES",
     "android.permission.READ_MEDIA_VIDEO",
     "android.permission.READ_MEDIA_AUDIO",
-    "android.permission.SCHEDULE_EXACT_ALARM",
     "android.permission.USE_EXACT_ALARM",
+    "android.permission.FOREGROUND_SERVICE",
 }
 REQUIRED_TRANSITIVE_PERMISSION_REMOVALS = {
     "android.permission.READ_EXTERNAL_STORAGE",
@@ -151,11 +152,15 @@ def validate_static(repository: Path) -> list[str]:
     )
     require(
         "AndroidScheduleMode.inexactAllowWhileIdle" in notification_source,
-        "reminders must use inexact scheduling",
+        "denied exact access must retain an explicit inexact fallback",
     )
     require(
-        "AndroidScheduleMode.exact" not in notification_source,
-        "exact alarm scheduling is forbidden",
+        "AndroidScheduleMode.exactAllowWhileIdle" in notification_source,
+        "user-scheduled reminders must use exact allow-while-idle delivery",
+    )
+    require(
+        "startForegroundService" not in notification_source,
+        "foreground reminder delivery is forbidden",
     )
 
     privacy_path = mobile / "ios/Runner/PrivacyInfo.xcprivacy"

@@ -5,6 +5,7 @@ import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/platform/capabilities.dart';
 import 'package:clock/clock.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as timezone_data;
 import 'package:timezone/timezone.dart' as timezone;
@@ -71,7 +72,58 @@ class SafeNotificationScheduler {
   }
 }
 
-enum NotificationPermissionState { granted, denied, unavailable }
+enum NotificationPermissionState {
+  granted,
+  denied,
+  channelDisabled,
+  exactAlarmDenied,
+  unavailable,
+}
+
+class ReminderPlatformDiagnostic {
+  const ReminderPlatformDiagnostic({
+    required this.permissionState,
+    required this.channelState,
+    required this.exactAlarmState,
+    required this.batteryOptimizationState,
+    required this.backgroundRestrictionState,
+    required this.standbyBucket,
+    required this.bootRescheduleState,
+    required this.bootRescheduledAtUtc,
+    required this.activeNotificationPostedAtUtc,
+  });
+
+  const ReminderPlatformDiagnostic.unavailable()
+    : permissionState = 'unavailable',
+      channelState = 'unavailable',
+      exactAlarmState = 'unavailable',
+      batteryOptimizationState = 'unavailable',
+      backgroundRestrictionState = 'unavailable',
+      standbyBucket = 'unavailable',
+      bootRescheduleState = 'unavailable',
+      bootRescheduledAtUtc = null,
+      activeNotificationPostedAtUtc = null;
+
+  final String permissionState;
+  final String channelState;
+  final String exactAlarmState;
+  final String batteryOptimizationState;
+  final String backgroundRestrictionState;
+  final String standbyBucket;
+  final String bootRescheduleState;
+  final String? bootRescheduledAtUtc;
+  final String? activeNotificationPostedAtUtc;
+}
+
+abstract interface class ReminderDeliveryControl {
+  Future<void> scheduleInexactFallback(ReminderNotificationRequest request);
+
+  Future<ReminderPlatformDiagnostic> deliveryDiagnostic(int platformId);
+
+  Future<void> openNotificationSettings();
+
+  Future<void> openBatteryOptimizationSettings();
+}
 
 class ReminderNotificationRequest {
   ReminderNotificationRequest({
@@ -179,9 +231,16 @@ class UnavailableReminderNotificationGateway
 }
 
 class FlutterReminderNotificationGateway
-    implements ReminderNotificationGateway {
-  FlutterReminderNotificationGateway({FlutterLocalNotificationsPlugin? plugin})
-    : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
+    implements ReminderNotificationGateway, ReminderDeliveryControl {
+  FlutterReminderNotificationGateway({
+    FlutterLocalNotificationsPlugin? plugin,
+    MethodChannel? deliveryChannel,
+  }) : _plugin = plugin ?? FlutterLocalNotificationsPlugin(),
+       _deliveryChannel =
+           deliveryChannel ??
+           const MethodChannel(
+             'com.faliardic.chiefsiteengineer/reminder_delivery',
+           );
 
   static const _payloadPrefix = 'reminder:';
   static const _channelId = 'cse_reminders';
@@ -191,6 +250,7 @@ class FlutterReminderNotificationGateway
   static const rollingRepeatOccurrenceCount = 24;
 
   final FlutterLocalNotificationsPlugin _plugin;
+  final MethodChannel _deliveryChannel;
   final StreamController<String> _taps = StreamController<String>.broadcast();
   bool _initialized = false;
   String? _initialTapReminderId;
@@ -247,14 +307,22 @@ class FlutterReminderNotificationGateway
   Future<NotificationPermissionState> permissionStatus() async {
     await initialize();
     if (defaultTargetPlatform == TargetPlatform.android) {
-      final enabled = await _plugin
+      final android = _plugin
           .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin
-          >()
-          ?.areNotificationsEnabled();
-      return enabled == true
-          ? NotificationPermissionState.granted
-          : NotificationPermissionState.denied;
+          >();
+      final enabled = await android?.areNotificationsEnabled();
+      if (enabled != true) return NotificationPermissionState.denied;
+      final channels = await android?.getNotificationChannels();
+      final channel = channels
+          ?.where((item) => item.id == _channelId)
+          .firstOrNull;
+      if (channel?.importance == Importance.none) {
+        return NotificationPermissionState.channelDisabled;
+      }
+      final exact = await android?.canScheduleExactNotifications();
+      if (exact != true) return NotificationPermissionState.exactAlarmDenied;
+      return NotificationPermissionState.granted;
     }
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       final options = await _plugin
@@ -274,14 +342,27 @@ class FlutterReminderNotificationGateway
   Future<NotificationPermissionState> requestPermission() async {
     await initialize();
     if (defaultTargetPlatform == TargetPlatform.android) {
-      final granted = await _plugin
+      final android = _plugin
           .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin
-          >()
-          ?.requestNotificationsPermission();
-      return granted == true
-          ? NotificationPermissionState.granted
-          : NotificationPermissionState.denied;
+          >();
+      final granted = await android?.requestNotificationsPermission();
+      if (granted != true) return NotificationPermissionState.denied;
+      final channels = await android?.getNotificationChannels();
+      final channel = channels
+          ?.where((item) => item.id == _channelId)
+          .firstOrNull;
+      if (channel?.importance == Importance.none) {
+        return NotificationPermissionState.channelDisabled;
+      }
+      final exact = await android?.canScheduleExactNotifications();
+      if (exact != true) {
+        final requested = await android?.requestExactAlarmsPermission();
+        if (requested != true) {
+          return NotificationPermissionState.exactAlarmDenied;
+        }
+      }
+      return NotificationPermissionState.granted;
     }
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       final granted = await _plugin
@@ -337,6 +418,20 @@ class FlutterReminderNotificationGateway
 
   @override
   Future<void> schedule(ReminderNotificationRequest request) async {
+    await _schedule(request, exact: true);
+  }
+
+  @override
+  Future<void> scheduleInexactFallback(
+    ReminderNotificationRequest request,
+  ) async {
+    await _schedule(request, exact: false);
+  }
+
+  Future<void> _schedule(
+    ReminderNotificationRequest request, {
+    required bool exact,
+  }) async {
     await initialize();
     final instant = CseTimeCodec.decodeCanonicalUtc(request.scheduledAtUtc);
     final details = const NotificationDetails(
@@ -356,14 +451,16 @@ class FlutterReminderNotificationGateway
         return;
       }
       await withClock(
-        Clock.fixed(instant.subtract(interval)),
+        Clock.fixed(instant),
         () => _plugin.periodicallyShowWithDuration(
           id: request.platformId,
           title: request.title,
           body: request.body,
           repeatDurationInterval: interval,
           notificationDetails: details,
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          androidScheduleMode: exact
+              ? AndroidScheduleMode.exactAllowWhileIdle
+              : AndroidScheduleMode.inexactAllowWhileIdle,
           payload: '$_payloadPrefix${request.reminderId}',
         ),
       );
@@ -375,7 +472,9 @@ class FlutterReminderNotificationGateway
       body: request.body,
       scheduledDate: timezone.TZDateTime.from(instant, timezone.local),
       notificationDetails: details,
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: exact
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle,
       payload: '$_payloadPrefix${request.reminderId}',
     );
   }
@@ -387,6 +486,60 @@ class FlutterReminderNotificationGateway
       await _cancelIosRollingGroup(platformId);
     }
     await _plugin.cancel(id: platformId);
+  }
+
+  @override
+  Future<ReminderPlatformDiagnostic> deliveryDiagnostic(int platformId) async {
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      final permission = await permissionStatus();
+      return ReminderPlatformDiagnostic(
+        permissionState: permission.name,
+        channelState: 'not_applicable',
+        exactAlarmState: 'not_applicable',
+        batteryOptimizationState: 'not_applicable',
+        backgroundRestrictionState: 'not_applicable',
+        standbyBucket: 'not_applicable',
+        bootRescheduleState: 'not_applicable',
+        bootRescheduledAtUtc: null,
+        activeNotificationPostedAtUtc: null,
+      );
+    }
+    try {
+      final raw = await _deliveryChannel.invokeMapMethod<String, Object?>(
+        'getPlatformStatus',
+        {'platformId': platformId},
+      );
+      if (raw == null) return const ReminderPlatformDiagnostic.unavailable();
+      return ReminderPlatformDiagnostic(
+        permissionState: raw['permissionState'] as String? ?? 'unavailable',
+        channelState: raw['channelState'] as String? ?? 'unavailable',
+        exactAlarmState: raw['exactAlarmState'] as String? ?? 'unavailable',
+        batteryOptimizationState:
+            raw['batteryOptimizationState'] as String? ?? 'unavailable',
+        backgroundRestrictionState:
+            raw['backgroundRestrictionState'] as String? ?? 'unavailable',
+        standbyBucket: raw['standbyBucket'] as String? ?? 'unavailable',
+        bootRescheduleState:
+            raw['bootRescheduleState'] as String? ?? 'unavailable',
+        bootRescheduledAtUtc: raw['bootRescheduledAtUtc'] as String?,
+        activeNotificationPostedAtUtc:
+            raw['activeNotificationPostedAtUtc'] as String?,
+      );
+    } on Object {
+      return const ReminderPlatformDiagnostic.unavailable();
+    }
+  }
+
+  @override
+  Future<void> openNotificationSettings() async {
+    await _deliveryChannel.invokeMethod<void>('openNotificationSettings');
+  }
+
+  @override
+  Future<void> openBatteryOptimizationSettings() async {
+    await _deliveryChannel.invokeMethod<void>(
+      'openBatteryOptimizationSettings',
+    );
   }
 
   Future<void> _scheduleIosRolling(

@@ -32,6 +32,7 @@ class ReminderDetailPage extends StatefulWidget {
 
 class _ReminderDetailPageState extends State<ReminderDetailPage> {
   ReminderDetail? _detail;
+  ReminderDeliveryDiagnostic? _deliveryDiagnostic;
   bool _loading = true;
   bool _mutating = false;
   String? _error;
@@ -51,9 +52,20 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
       final detail = await widget.agenda.getReminderLifecycleDetail(
         widget.reminderId,
       );
+      ReminderDeliveryDiagnostic? diagnostic;
+      final application = widget.agenda;
+      if (application is ReminderDeliveryApplication) {
+        try {
+          diagnostic = await (application as ReminderDeliveryApplication)
+              .getReminderDeliveryDiagnostic(widget.reminderId);
+        } on Object {
+          diagnostic = null;
+        }
+      }
       if (mounted) {
         setState(() {
           _detail = detail;
+          _deliveryDiagnostic = diagnostic;
           _loading = false;
         });
       }
@@ -63,6 +75,48 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
           _loading = false;
           _error = 'Hatırlatıcı güvenli biçimde okunamadı.';
         });
+      }
+    }
+  }
+
+  Future<void> _retryDelivery() async {
+    final application = widget.agenda;
+    if (_mutating || application is! ReminderDeliveryApplication) return;
+    setState(() {
+      _mutating = true;
+      _error = null;
+    });
+    try {
+      await (application as ReminderDeliveryApplication).retryReminderDelivery(
+        widget.reminderId,
+      );
+      await _reload();
+    } on Object {
+      if (mounted) {
+        setState(
+          () => _error =
+              'Bildirim teslimatı doğrulanamadı. Tanı bilgilerini kontrol edin.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _mutating = false);
+    }
+  }
+
+  Future<void> _openDeliverySettings({required bool battery}) async {
+    final application = widget.agenda;
+    if (application is! ReminderDeliveryApplication) return;
+    try {
+      if (battery) {
+        await (application as ReminderDeliveryApplication)
+            .openReminderBatteryOptimizationSettings();
+      } else {
+        await (application as ReminderDeliveryApplication)
+            .openReminderNotificationSettings();
+      }
+    } on Object {
+      if (mounted) {
+        setState(() => _error = 'Sistem ayarları güvenli biçimde açılamadı.');
       }
     }
   }
@@ -483,6 +537,16 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
               detail.notification.safeErrorCode!,
           ].join(' • '),
         ),
+        if (_deliveryDiagnostic case final diagnostic?) ...[
+          const SizedBox(height: 12),
+          _DeliveryDiagnosticCard(
+            diagnostic: diagnostic,
+            enabled: !_mutating,
+            onRetry: _retryDelivery,
+            onNotificationSettings: () => _openDeliverySettings(battery: false),
+            onBatterySettings: () => _openDeliverySettings(battery: true),
+          ),
+        ],
         _ReminderRow(label: 'Revision', value: '${reminder.revision}'),
         if (reminder.sourceLogId != null) ...[
           const SizedBox(height: 16),
@@ -645,6 +709,100 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
             subtitle: Text(CseTimeCodec.formatIstanbul(event.occurredAt)),
           ),
       ],
+    );
+  }
+}
+
+class _DeliveryDiagnosticCard extends StatelessWidget {
+  const _DeliveryDiagnosticCard({
+    required this.diagnostic,
+    required this.enabled,
+    required this.onRetry,
+    required this.onNotificationSettings,
+    required this.onBatterySettings,
+  });
+
+  final ReminderDeliveryDiagnostic diagnostic;
+  final bool enabled;
+  final VoidCallback onRetry;
+  final VoidCallback onNotificationSettings;
+  final VoidCallback onBatterySettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Card(
+      key: const Key('reminder-delivery-diagnostic'),
+      color: diagnostic.deliveryGuaranteed
+          ? colors.secondaryContainer
+          : colors.errorContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              diagnostic.deliveryGuaranteed
+                  ? 'Arka plan teslimatı native olarak doğrulandı'
+                  : 'Arka plan teslimatı garanti edilemiyor',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Kayıt ${diagnostic.safeReminderId} • '
+              '${diagnostic.scheduleKind} • '
+              '${diagnostic.delayClass.label}',
+            ),
+            Text(
+              'Native plan: '
+              '${diagnostic.nativeSchedulePresent ? 'var' : 'yok'} • '
+              'İzin: ${diagnostic.permissionState} • '
+              'Kanal: ${diagnostic.channelState} • '
+              'Exact: ${diagnostic.exactAlarmState}',
+            ),
+            Text(
+              'Batarya: ${diagnostic.batteryOptimizationState} • '
+              'Arka plan: ${diagnostic.backgroundRestrictionState} • '
+              'Standby: ${diagnostic.standbyBucket}',
+            ),
+            Text(
+              'Boot yeniden planlama: ${diagnostic.bootRescheduleState}'
+              '${diagnostic.bootRescheduledAt == null ? '' : ' • ${diagnostic.bootRescheduledAt}'}',
+            ),
+            const Text(
+              'Android Zorla durdur işlemi bildirimleri uygulama yeniden '
+              'açılana kadar engeller; normal kapatma veya son uygulamalardan '
+              'kaydırma aynı davranış değildir.',
+            ),
+            if (diagnostic.safeErrorCode case final code?) Text('Tanı: $code'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  key: const Key('retry-reminder-delivery'),
+                  onPressed: enabled ? onRetry : null,
+                  icon: const Icon(Icons.sync),
+                  label: const Text('Yeniden doğrula'),
+                ),
+                OutlinedButton.icon(
+                  key: const Key('open-notification-settings'),
+                  onPressed: enabled ? onNotificationSettings : null,
+                  icon: const Icon(Icons.notifications_outlined),
+                  label: const Text('Bildirim ayarları'),
+                ),
+                OutlinedButton.icon(
+                  key: const Key('open-battery-settings'),
+                  onPressed: enabled ? onBatterySettings : null,
+                  icon: const Icon(Icons.battery_saver_outlined),
+                  label: const Text('Batarya ayarları'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

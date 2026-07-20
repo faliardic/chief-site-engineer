@@ -80,6 +80,7 @@ try {
         }
         Invoke-Checked -Command $adb -Arguments @('-s', $AndroidDevice, 'install', '-r', '-g', $debugApk)
         & $adb -s $AndroidDevice shell pm grant com.faliardic.chiefsiteengineer.debug android.permission.POST_NOTIFICATIONS 2>$null
+        & $adb -s $AndroidDevice shell appops set com.faliardic.chiefsiteengineer.debug SCHEDULE_EXACT_ALARM allow 2>$null
         Invoke-Flutter -Arguments @('test', '--no-pub', 'integration_test\app_smoke_test.dart', '-d', $AndroidDevice)
         $gradle = Join-Path $mobileRoot 'android\gradlew.bat'
         if (Test-Path -LiteralPath $gradle) {
@@ -96,7 +97,7 @@ try {
         -not (Test-Path -LiteralPath $apksigner)) {
         throw 'Android build-tools 36.0.0 artifact validators were not found.'
     }
-    $sidecarApk = Join-Path $artifactRoot 'chief-site-engineer-0.1.0-issue200-sidecar-debug.apk'
+    $sidecarApk = Join-Path $artifactRoot 'chief-site-engineer-0.1.0-issue202-sidecar-debug.apk'
     Copy-Item -LiteralPath $temporarySidecarApk -Destination $sidecarApk -Force
     $sidecarPackage = (& $aapt2 dump packagename $sidecarApk 2>&1) -join "`n"
     if ($LASTEXITCODE -ne 0 -or $sidecarPackage.Trim() -ne 'com.faliardic.chiefsiteengineer.debug') {

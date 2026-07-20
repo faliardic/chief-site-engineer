@@ -56,10 +56,23 @@ abstract interface class AgendaApplication {
   Future<List<AppendOnlyEvent>> listReminderEvents(String reminderId);
 }
 
+abstract interface class ReminderDeliveryApplication {
+  Future<ReminderDeliveryDiagnostic> getReminderDeliveryDiagnostic(
+    String reminderId,
+  );
+
+  Future<void> retryReminderDelivery(String reminderId);
+
+  Future<void> openReminderNotificationSettings();
+
+  Future<void> openReminderBatteryOptimizationSettings();
+}
+
 typedef ReminderTransactionHook =
     Future<void> Function(Transaction transaction);
 
-class SqliteAgendaApplication implements AgendaApplication {
+class SqliteAgendaApplication
+    implements AgendaApplication, ReminderDeliveryApplication {
   SqliteAgendaApplication({
     required this.databasePath,
     required this.databaseFactory,
@@ -1034,6 +1047,86 @@ class SqliteAgendaApplication implements AgendaApplication {
   }
 
   @override
+  Future<ReminderDeliveryDiagnostic> getReminderDeliveryDiagnostic(
+    String reminderId,
+  ) async {
+    final detail = await getReminderLifecycleDetail(reminderId);
+    ReminderPlatformDiagnostic platform =
+        const ReminderPlatformDiagnostic.unavailable();
+    var nativePresent = false;
+    try {
+      final pending = await notificationGateway.pendingNotifications();
+      nativePresent = pending.any(
+        (item) =>
+            item.platformId == detail.notification.platformNotificationId &&
+            item.reminderId == reminderId &&
+            item.scheduleComplete,
+      );
+      final gateway = notificationGateway;
+      if (gateway is ReminderDeliveryControl) {
+        platform = await (gateway as ReminderDeliveryControl)
+            .deliveryDiagnostic(detail.notification.platformNotificationId);
+      }
+    } on Object {
+      nativePresent = false;
+    }
+    final dueAt = detail.reminder.nextAttentionAt;
+    final deliveredAt = _canonicalPlatformTime(
+      platform.activeNotificationPostedAtUtc,
+    );
+    return ReminderDeliveryDiagnostic(
+      safeReminderId: reminderId.substring(0, 8),
+      scheduleKind: detail.notification.repeatIntervalMinutes == 60
+          ? 'hourly'
+          : 'one_shot',
+      canonicalDueAt: dueAt,
+      nativeSchedulePresent: nativePresent,
+      lastReconciledAt: detail.notification.lastSyncedAt,
+      permissionState: platform.permissionState,
+      channelState: platform.channelState,
+      exactAlarmState: platform.exactAlarmState,
+      batteryOptimizationState: platform.batteryOptimizationState,
+      backgroundRestrictionState: platform.backgroundRestrictionState,
+      standbyBucket: platform.standbyBucket,
+      bootRescheduleState: platform.bootRescheduleState,
+      bootRescheduledAt: _canonicalPlatformTime(platform.bootRescheduledAtUtc),
+      deliveredAt: deliveredAt,
+      delayClass: _deliveryDelayClass(
+        dueAt: dueAt,
+        deliveredAt: deliveredAt,
+        nativePresent: nativePresent,
+      ),
+      safeErrorCode: detail.notification.safeErrorCode,
+    );
+  }
+
+  @override
+  Future<void> retryReminderDelivery(String reminderId) async {
+    validateUuid(reminderId, 'Hatırlatıcı kimliği');
+    await getReminderDetail(reminderId);
+    await reconcileNotifications(requestPermission: true);
+  }
+
+  @override
+  Future<void> openReminderNotificationSettings() async {
+    final gateway = notificationGateway;
+    if (gateway is! ReminderDeliveryControl) {
+      throw StateError('notification settings unavailable');
+    }
+    await (gateway as ReminderDeliveryControl).openNotificationSettings();
+  }
+
+  @override
+  Future<void> openReminderBatteryOptimizationSettings() async {
+    final gateway = notificationGateway;
+    if (gateway is! ReminderDeliveryControl) {
+      throw StateError('battery optimization settings unavailable');
+    }
+    await (gateway as ReminderDeliveryControl)
+        .openBatteryOptimizationSettings();
+  }
+
+  @override
   Future<MobileReminder> mutateReminder(MutateReminderCommand command) async {
     validateUuid(command.reminderId, 'Hatırlatıcı kimliği');
     validateUuid(command.eventId, 'Event kimliği');
@@ -1470,13 +1563,26 @@ class SqliteAgendaApplication implements AgendaApplication {
       return;
     }
     if (permission != NotificationPermissionState.granted) {
-      for (final item in work) {
+      if (permission == NotificationPermissionState.exactAlarmDenied) {
+        await _preserveInexactFallbacks(now, work, eligible);
+        return;
+      }
+      for (final item in work.where((item) => !eligible.contains(item))) {
         try {
           await notificationGateway.cancel(item.binding.platformNotificationId);
         } on Object {
-          // Reconciliation remains fail-safe; only fixed codes reach SQLite.
+          // A terminal reminder remains visible and a later retry cleans up.
         }
       }
+      final safeCode = switch (permission) {
+        NotificationPermissionState.denied => 'permission_denied',
+        NotificationPermissionState.channelDisabled =>
+          'notification_channel_disabled',
+        NotificationPermissionState.unavailable => 'platform_unavailable',
+        NotificationPermissionState.exactAlarmDenied =>
+          'exact_alarm_permission_required',
+        NotificationPermissionState.granted => null,
+      };
       await _writeBindingUpdates(
         now,
         work.map(
@@ -1484,15 +1590,13 @@ class SqliteAgendaApplication implements AgendaApplication {
             reminderId: item.reminder.id,
             scheduledFor: item.reminder.nextAttentionAt,
             state: eligible.contains(item)
-                ? permission == NotificationPermissionState.denied
+                ? permission == NotificationPermissionState.denied ||
+                          permission ==
+                              NotificationPermissionState.channelDisabled
                       ? NotificationSyncState.permissionDenied
                       : NotificationSyncState.unavailable
                 : NotificationSyncState.cancelled,
-            safeErrorCode: eligible.contains(item)
-                ? permission == NotificationPermissionState.denied
-                      ? 'permission_denied'
-                      : 'platform_unavailable'
-                : null,
+            safeErrorCode: eligible.contains(item) ? safeCode : null,
           ),
         ),
       );
@@ -1559,7 +1663,8 @@ class SqliteAgendaApplication implements AgendaApplication {
       final scheduledFor = reminder.nextAttentionAt!;
       final pendingIsCurrent =
           validPendingIds.contains(binding.platformNotificationId) &&
-          binding.scheduledFor == scheduledFor;
+          binding.scheduledFor == scheduledFor &&
+          binding.safeErrorCode == null;
       if (pendingIsCurrent) {
         updates.add(
           _BindingUpdate(
@@ -1582,6 +1687,16 @@ class SqliteAgendaApplication implements AgendaApplication {
             repeatIntervalMinutes: binding.repeatIntervalMinutes,
           ),
         );
+        final verified = await notificationGateway.pendingNotifications();
+        final nativeSchedulePresent = verified.any(
+          (pending) =>
+              pending.platformId == binding.platformNotificationId &&
+              pending.reminderId == reminder.id &&
+              pending.scheduleComplete,
+        );
+        if (!nativeSchedulePresent) {
+          throw StateError('native schedule missing after schedule');
+        }
         updates.add(
           _BindingUpdate(
             reminderId: reminder.id,
@@ -1595,7 +1710,7 @@ class SqliteAgendaApplication implements AgendaApplication {
             reminderId: reminder.id,
             scheduledFor: scheduledFor,
             state: NotificationSyncState.failed,
-            safeErrorCode: 'schedule_failed',
+            safeErrorCode: 'native_schedule_failed',
           ),
         );
       }
@@ -1633,6 +1748,94 @@ class SqliteAgendaApplication implements AgendaApplication {
           ),
         );
       }
+    }
+    await _writeBindingUpdates(now, updates);
+  }
+
+  Future<void> _preserveInexactFallbacks(
+    DateTime now,
+    List<_NotificationWorkItem> work,
+    List<_NotificationWorkItem> eligible,
+  ) async {
+    List<PendingReminderNotification> pending;
+    try {
+      pending = await notificationGateway.pendingNotifications();
+    } on Object {
+      pending = const [];
+    }
+    final eligibleByPlatformId = {
+      for (final item in eligible) item.binding.platformNotificationId: item,
+    };
+    final valid = <int>{};
+    for (final item in pending) {
+      final expected = eligibleByPlatformId[item.platformId];
+      if (expected != null &&
+          expected.reminder.id == item.reminderId &&
+          item.scheduleComplete &&
+          expected.binding.scheduledFor == expected.reminder.nextAttentionAt &&
+          valid.add(item.platformId)) {
+        continue;
+      }
+      try {
+        await notificationGateway.cancel(item.platformId);
+      } on Object {
+        // A later reconciliation retries privacy-safe orphan cleanup.
+      }
+    }
+    final updates = <_BindingUpdate>[];
+    for (final item in eligible) {
+      var safeCode = 'exact_alarm_permission_required';
+      if (!valid.contains(item.binding.platformNotificationId)) {
+        final gateway = notificationGateway;
+        try {
+          await notificationGateway.cancel(item.binding.platformNotificationId);
+          if (gateway is! ReminderDeliveryControl) {
+            throw StateError('fallback unavailable');
+          }
+          await (gateway as ReminderDeliveryControl).scheduleInexactFallback(
+            ReminderNotificationRequest(
+              platformId: item.binding.platformNotificationId,
+              reminderId: item.reminder.id,
+              title: item.reminder.title,
+              body: item.reminder.description ?? item.reminder.captureText,
+              scheduledAtUtc: item.reminder.nextAttentionAt!,
+              repeatIntervalMinutes: item.binding.repeatIntervalMinutes,
+            ),
+          );
+          final verified = await notificationGateway.pendingNotifications();
+          if (!verified.any(
+            (pending) =>
+                pending.platformId == item.binding.platformNotificationId &&
+                pending.reminderId == item.reminder.id &&
+                pending.scheduleComplete,
+          )) {
+            throw StateError('fallback schedule missing');
+          }
+        } on Object {
+          safeCode = 'exact_alarm_and_fallback_unavailable';
+        }
+      }
+      updates.add(
+        _BindingUpdate(
+          reminderId: item.reminder.id,
+          scheduledFor: item.reminder.nextAttentionAt,
+          state: NotificationSyncState.unavailable,
+          safeErrorCode: safeCode,
+        ),
+      );
+    }
+    for (final item in work.where((item) => !eligible.contains(item))) {
+      try {
+        await notificationGateway.cancel(item.binding.platformNotificationId);
+      } on Object {
+        // A later reconciliation retries terminal cleanup.
+      }
+      updates.add(
+        _BindingUpdate(
+          reminderId: item.reminder.id,
+          state: NotificationSyncState.cancelled,
+        ),
+      );
     }
     await _writeBindingUpdates(now, updates);
   }
@@ -2289,4 +2492,42 @@ class _BindingUpdate {
   final String? scheduledFor;
   final NotificationSyncState state;
   final String? safeErrorCode;
+}
+
+String? _canonicalPlatformTime(String? value) {
+  if (value == null) return null;
+  final parsed = DateTime.tryParse(value)?.toUtc();
+  if (parsed == null) return null;
+  return CseTimeCodec.encodeUtc(
+    DateTime.utc(
+      parsed.year,
+      parsed.month,
+      parsed.day,
+      parsed.hour,
+      parsed.minute,
+      parsed.second,
+    ),
+  );
+}
+
+ReminderDeliveryDelayClass _deliveryDelayClass({
+  required String? dueAt,
+  required String? deliveredAt,
+  required bool nativePresent,
+}) {
+  if (dueAt == null) return ReminderDeliveryDelayClass.deliveryUnknown;
+  final due = CseTimeCodec.decodeCanonicalUtc(dueAt);
+  if (deliveredAt != null) {
+    final delivered = CseTimeCodec.decodeCanonicalUtc(deliveredAt);
+    final delay = delivered.difference(due);
+    if (delay <= const Duration(minutes: 1)) {
+      return ReminderDeliveryDelayClass.onTime;
+    }
+    if (delay <= const Duration(minutes: 5)) {
+      return ReminderDeliveryDelayClass.delayed;
+    }
+    return ReminderDeliveryDelayClass.severelyDelayed;
+  }
+  if (nativePresent) return ReminderDeliveryDelayClass.pending;
+  return ReminderDeliveryDelayClass.nativeScheduleMissing;
 }

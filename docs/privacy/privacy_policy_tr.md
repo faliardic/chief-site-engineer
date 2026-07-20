@@ -1,7 +1,7 @@
 # Chief Site Engineer Mobil Gizlilik Politikası
 
 **Sürüm:** 0.1.0 release candidate
-**Son güncelleme:** 19 Temmuz 2026
+**Son güncelleme:** 20 Temmuz 2026
 
 Chief Site Engineer (CSE), tek kullanıcılı ve local-first bir şantiye saha
 asistanıdır. Ajanda, hatırlatıcı, puantaj, beton paketi, fotoğraf/dosya eki ve
@@ -21,10 +21,14 @@ iletilmez ve geliştirici tarafından toplanmaz.
 - Kamera yalnız kullanıcının başlattığı kanıt fotoğrafı çekimi için istenir.
 - Fotoğraf ve dosya seçimi sistem seçicileriyle tekil kullanıcı seçimine
   dayanır; geniş galeri/depolama izni istenmez.
-- Bildirim izni yalnız cihazdaki tek-seferlik hatırlatıcıları göstermek için
-  istenir.
+- Bildirim izni yalnız cihazdaki kullanıcı planlı tek-seferlik veya tekrarlayan
+  hatırlatıcıları göstermek için istenir.
 - Cihaz açılış bildirimi, bekleyen yerel hatırlatıcıların yeniden kurulması
-  içindir. Exact alarm izni kullanılmaz.
+  içindir.
+- Android'in kullanıcı tarafından yönetilen exact alarm özel erişimi, yalnız
+  kullanıcının belirlediği yerel saha hatırlatıcısını uygulama kapalıyken
+  güvenilir zamanda teslim etmek için istenir. `USE_EXACT_ALARM`, foreground
+  service, cloud push veya internet kullanılmaz.
 
 İzin reddi kaydı silmez; ilgili kamera, seçim veya bildirim işlemi kullanıcıya
 anlaşılır sonuçla kapanır.
