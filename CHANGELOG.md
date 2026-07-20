@@ -18,8 +18,12 @@
   alanla eşleşen kapanış/reopen ve kullanıcıdan kod istemeyen deterministik
   numune seti akışı eklendi.
 - Açık reminder kartlarına İstanbul takviminde `Yarın` işlemi eklendi; mevcut
-  saat korunur, saatsiz kayıt ertesi gün 09:00 olur ve periyodik bildirimin yeni
-  due zamanına kadar bastırılması reconciliation ile güvenceye alındı.
+  saat korunur, saatsiz kayıt ertesi gün 09:00 olur. Gelecekteki due zamanından
+  başlayan saatlik Beton bildirimi Android'de kalıcı inexact repeat anchor'ı,
+  iOS'ta 24 saatlik rolling platform planı olarak uygulama kapalıyken de sürer.
+- Completion/cancel bütün fiziksel tekrar kayıtlarını iptal eder; source reopen
+  aynı mantıksal reminder'ı yeniden planlar. Yeni logical reminder, exact-alarm
+  izni veya due anında uygulama/reconciliation bağımlılığı eklenmedi.
 - Backup format `1`, desktop Python schema/Backup/Günlük Çıktı sözleşmeleri,
   exact-alarm yokluğu, gerçek kullanıcı verisi ve store kapsamı değiştirilmedi.
 

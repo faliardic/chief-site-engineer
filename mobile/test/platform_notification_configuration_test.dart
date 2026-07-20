@@ -62,6 +62,8 @@ void main() {
       expect(gateway, contains('AndroidScheduleMode.inexactAllowWhileIdle'));
       expect(gateway, contains('periodicallyShowWithDuration'));
       expect(gateway, contains('repeatIntervalMinutes'));
+      expect(gateway, contains('Clock.fixed(instant.subtract(interval))'));
+      expect(gateway, contains('rollingRepeatOccurrenceCount = 24'));
       expect(project, contains('IPHONEOS_DEPLOYMENT_TARGET = 13.0'));
       expect(project, contains('com.faliardic.chiefsiteengineer'));
       expect(plist, contains('UIApplicationSceneManifest'));
@@ -75,6 +77,7 @@ void main() {
     final lock = File('pubspec.lock').readAsStringSync();
 
     expect(pubspec, contains('flutter_local_notifications: ^22.0.1'));
+    expect(pubspec, contains('clock: ^1.1.2'));
     expect(lock, contains('flutter_local_notifications:'));
     expect(lock, contains('version: "22.1.0"'));
   });

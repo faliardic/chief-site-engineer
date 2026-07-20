@@ -77,6 +77,23 @@ alan yeniden boşaltılırsa mevcut exact görev güvenli biçimde reopen edilir
 İkinci reminder üretilmez. Permission veya plugin hatası business reminder'ı
 geri almaz.
 
+Gelecekteki due ile saatlik tekrar platforma baştan kalıcı yazılır:
+
+- Android, periodic kaydın native `calledAt` anchor'ını `due - 60 dakika`
+  yapar. Plugin/native hesap ilk tetiklemeyi due anına, sonrakileri saatlik
+  aralığa koyar; reboot receiver ve plugin cache uygulama process'i yokken zinciri
+  sürdürür.
+- iOS, aynı logical reminder payload'ı altında due anından başlayan 24 adet
+  saatlik one-shot bildirimi rolling horizon olarak planlar. Fiziksel ID'ler
+  negative namespace'tedir; SQLite'taki positive binding ID ve reminder satırı
+  çoğaltılmaz.
+- Reconciliation iOS grubunu tek logical pending kayıt gibi okur. Eksik/duplicate
+  grup fail-closed iptal edilip ilk gelecek saatten yeniden kurulur. Platform
+  kapasitesi logical kayıt sayısıyla değil gerçek fiziksel slot maliyetiyle
+  hesaplanır.
+- Completion ve cancel tüm grubu iptal eder. Beton alanı temizlenerek yapılan
+  reopen aynı binding'i yeniden planlar; yeni reminder üretmez.
+
 Numune seti formu kullanıcıdan kod istemez. Application service sıralı ve
 deterministik `Numune seti N` etiketi üretir. Var olan set güncellenirken mevcut
 kod korunur.
@@ -92,9 +109,9 @@ Aktif veya overdue karttaki `Yarın`:
 - source observation ya da Beton kaydını değiştirmez;
 - double-tap sırasında tek mutation çalıştırır.
 
-Saatlik Beton notification'ı `Yarın` sonrasında yeni due zamanına kadar tek
-seferlik pending olarak tutulur. Due erişince reconciliation aynı binding'i
-60 dakikalık inexact tekrar olarak yeniden kurar. Exact-alarm izni kullanılmaz.
+Saatlik Beton notification'ı `Yarın` sonrasında yeni future due anından başlayan
+tam repeat sözleşmesiyle platforma hemen yazılır. Due anında uygulamanın açılması
+veya reconciliation çalışması gerekmez. Exact-alarm izni kullanılmaz.
 
 ## Backup ve doğrulama sınırı
 

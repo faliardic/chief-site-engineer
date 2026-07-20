@@ -132,25 +132,57 @@ değildir. UI busy anahtarı da aynı reminder ID'sine ikinci dokunuşu engeller
 ## Gerçek kod: saatlik inexact notification
 
 ```dart
-await plugin.periodicallyShowWithDuration(
-  request.notificationId,
-  'CSE Hatırlatıcı',
-  'Planlanan saha görevi zamanı geldi.',
-  RepeatInterval.hourly,
-  details,
-  androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-  payload: request.reminderId,
+await withClock(
+  Clock.fixed(instant.subtract(interval)),
+  () => plugin.periodicallyShowWithDuration(
+    id: request.platformId,
+    repeatDurationInterval: interval,
+    androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+    payload: 'reminder:${request.reminderId}',
+  ),
 );
 ```
 
-Bu çağrı platformun saatlik tekrar API'sini kullanır. `inexactAllowWhileIdle`,
-işletim sisteminin pil optimizasyonuna küçük zaman esnekliği bırakır; exact alarm
-izni istemez. Bildirim permission veya plugin hatası verirse hata güvenli code
-olarak binding'e yazılır fakat SQLite reminder silinmez.
+Android plugin'i ilk native tetiklemeyi `calledAt + interval` olarak hesaplar.
+Satır satır akış şöyledir:
 
-`Yarın` sonrasında eski periodic pending iptal edilir ve yeni due anına tek
-seferlik inexact bildirim konur. Due anı gelince reconciliation binding'deki
-`repeat_interval_minutes = 60` bilgisinden tekrar periodic teslimatı kurar.
+1. `instant`, SQLite binding'deki canonical UTC due anıdır.
+2. `interval`, bu Beton görevi için 60 dakikadır.
+3. `Clock.fixed(instant.subtract(interval))`, plugin'in native mesaja yazdığı
+   `calledAt` değerini due'dan tam bir interval öncesine sabitler.
+4. Native taraf `calledAt + interval` hesabıyla ilk alarmı due anına koyar.
+5. `inexactAllowWhileIdle` exact-alarm izni istemez; Android receiver her teslim
+   sonrasında sonraki saatlik alarmı platform cache'inden kurar.
+
+Bu kayıt uygulama process'i kapansa veya cihaz reboot etse de Android'in pending
+alarm/receiver sözleşmesinde kalır. Due anında Dart kodunun ya da reconciliation'ın
+çalışması gerekmez.
+
+iOS time-interval repeat API'si ayrı bir future başlangıç kabul etmediği için aynı
+çağrıyı kullanmak due'dan önce bildirim üretirdi. Bu nedenle iOS yolu şöyledir:
+
+```dart
+for (var slot = 0; slot < 24; slot += 1) {
+  await plugin.zonedSchedule(
+    id: rollingPlatformId(rootPlatformId, slot),
+    scheduledDate: firstOccurrence.add(interval * slot),
+    payload: 'reminder:$reminderId|rolling:$rootPlatformId:$slot:24',
+  );
+}
+```
+
+- Döngü tek SQLite reminder için 24 fiziksel platform occurrence'ı oluşturur.
+- `slot = 0` due, `slot = 1` due + 1 saat, `slot = 2` due + 2 saattir.
+- Fiziksel ID negative namespace'tedir; positive SQLite binding ID ile veya yeni
+  bir logical reminder satırıyla karışmaz.
+- Payload root ID, slot ve toplam sayıyı taşır. Pending okuması 24 kaydı tek
+  logical pending'e katlar; eksik grup `scheduleComplete = false` olur.
+- Schedule ortada hata verirse o çağrıda yazılan fiziksel ID'ler temizlenir.
+- Completion/cancel payload root'una ait bütün fiziksel kayıtları iptal eder.
+
+`pendingNotificationSlotCost(60)` iOS için `24`, normal tek seferlik bildirim için
+`1` döndürür. Böylece application service 60 pending sınırını logical reminder
+sayısıyla değil gerçekten kullanılacak platform slotuyla hesaplar.
 
 ## Test kodu neyi doğruluyor?
 
@@ -180,11 +212,28 @@ Widget testleri 320 px ekranda yerinde yeni taşeron/ekip, validation input
 korunumu, personel sekmeleri ve double-tap davranışını çalıştırır.
 
 Concrete testleri exact iki label, source/project linki, 60 dakikalık binding,
-alan tamamlama/reopen, duplicate üretmeme ve kodsuz numune sırasını doğrular.
+`Yarın` sonrası due/+1/+2 platform occurrence'ı, terminated-app kalıcılığı, alan
+tamamlama/reopen, cancel, duplicate üretmeme ve kodsuz numune sırasını doğrular.
 Reminder testleri yerel aynı saat/ertesi 09:00, UTC storage, source mutation
-yokluğu, event/revision, notification yeniden planlama ve refresh güvenliğini
+yokluğu, event/revision, eksik rolling grup onarımı ve refresh güvenliğini
 kanıtlar. Backup testi schema `1`–`6` staging migration ile v6 sicil bağlantısı
 ve geçmişini exact round-trip karşılaştırır.
+
+Platform testindeki temel kanıt şöyledir:
+
+```dart
+expect(arguments['calledAt'], due.subtract(oneHour).millisecondsSinceEpoch);
+expect(arguments['repeatIntervalMilliseconds'], 3600000);
+expect(iosCalls[0].scheduledDateTime, '2026-07-21T09:00:00');
+expect(iosCalls[1].scheduledDateTime, '2026-07-21T10:00:00');
+expect(iosCalls[2].scheduledDateTime, '2026-07-21T11:00:00');
+expect(await countRows('follow_up_items'), 8);
+```
+
+İlk iki assertion Android native mesajındaki future anchor ve saatlik aralığı
+kontrol eder. Sonraki üç assertion İstanbul saatinde due, +1 ve +2 saat iOS
+kayıtlarını doğrular. Son assertion platformda çok sayıda fiziksel kayıt olsa da
+SQLite'ta sekiz Beton follow-up'ından fazlasının oluşmadığını kanıtlar.
 
 ## Teknik karar tablosu
 
@@ -198,7 +247,9 @@ ve geçmişini exact round-trip karşılaştırır.
 | İSG/KKD | Kayıt/read-model, hukuki karar yok | Ürünün yetki sınırını aşmaz |
 | Proje yenileme | Commit sonrası signal + SQLite reload | Rollback UI'a sızmaz, restart kalıcıdır |
 | `Yarın` | İstanbul takvim hesabı → UTC | Kullanıcının yerel saat niyeti korunur |
-| Saatlik bildirim | Inexact periodic + reconciliation | Exact-alarm izni olmadan teslimat yenilenir |
+| Android saatlik bildirim | Future native anchor + inexact periodic | Due anında app/reconciliation gerekmez |
+| iOS saatlik bildirim | 24 fiziksel kaydı tek logical rolling grup say | Future başlangıç korunur, reminder çoğalmaz |
+| Platform kapasitesi | Fiziksel slot maliyeti | iOS pending sınırı sessizce aşılmaz |
 | Backup | Format 1 içinde schema allowlist 1–6 | Paket formatı gereksiz değişmez |
 
 ## Kod çalışma akışı
@@ -225,8 +276,12 @@ Reminder Yarın
   -> Istanbul sonraki takvim günü hesapla
   -> UTC due + revision + event yaz
   -> source kaydına dokunma
-  -> pending'i yeni due'ya inexact planla
-  -> due erişince gerekiyorsa saatlik periodic reconcile et
+  -> eski platform grubunu iptal et
+  -> Android: future due anchor'lı inexact periodic kaydı yaz
+  -> iOS: due, +1 ... +23 saat rolling kayıtlarını yaz
+  -> uygulama kapansa da platform due ve sonraki saatleri teslim eder
+  -> completion/cancel bütün fiziksel grubu temizler
+  -> Beton source reopen aynı logical binding'i yeniden planlar
 ```
 
 ## “Şunu şöyle yaptık ki...”
@@ -245,5 +300,11 @@ Reminder Yarın
   saati görürken storage sözleşmesi değişmesin.
 - Saatlik Beton bildirimini inexact periodic kurduk ki exact-alarm izni eklemeden
   saha hatırlatması devam etsin.
+- Future due bilgisini Android native anchor'ına ve iOS rolling horizon'a baştan
+  yazdık ki reminder'ın başlaması uygulamanın yeniden açılmasına bağlı kalmasın.
+- iOS fiziksel occurrence'larını negative ID ve root payload ile grupladık ki
+  platformda çok kayıt varken SQLite'ta duplicate logical reminder oluşmasın.
+- Completion/cancel sırasında root grubunu, reopen sırasında aynı binding'i
+  kullandık ki yarım bağlı veya ikinci bir Beton görevi kalmasın.
 - Permission/plugin hatasında reminder'ı koruduk ki teslim katmanı arızası iş
   kaydını kaybettirmesin.

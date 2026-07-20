@@ -524,6 +524,21 @@ void main() {
       final repaired = await agenda.getReminderLifecycleDetail(created.id);
       expect(repaired.notification.syncState, NotificationSyncState.scheduled);
 
+      notifications.pending
+        ..clear()
+        ..add(
+          PendingReminderNotification(
+            platformId: expectedId,
+            reminderId: created.id,
+            scheduleComplete: false,
+          ),
+        );
+      notifications.cancelled.clear();
+      notifications.scheduled.clear();
+      await agenda.reconcileNotifications();
+      expect(notifications.cancelled, contains(expectedId));
+      expect(notifications.scheduled.single.platformId, expectedId);
+
       final completed = await agenda.mutateReminder(
         MutateReminderCommand(
           reminderId: created.id,
@@ -672,6 +687,9 @@ class _FakeNotificationGateway implements ReminderNotificationGateway {
 
   @override
   int maximumPendingNotifications = 60;
+
+  @override
+  int pendingNotificationSlotCost(int? repeatIntervalMinutes) => 1;
 
   @override
   String? initialTapReminderId;

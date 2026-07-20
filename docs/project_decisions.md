@@ -2975,6 +2975,14 @@
   due yoksa ertesi gün 09:00'a taşır ve canonical UTC saklar. Row + event +
   notification binding tek mutation/reconciliation sözleşmesinde kalır; source
   observation veya Beton aggregate'i değiştirilmez.
+- Future due saatlik Beton bildirimi due anında reconciliation beklemez. Android
+  `due - interval` native periodic anchor + reboot cache, iOS aynı logical
+  reminder altında 24 one-shot rolling horizon kullanır. iOS fiziksel ID'leri
+  negative namespace'te kalır; completion/cancel grubu temizler, reopen aynı
+  binding'i yeniden kurar. Exact alarm ve duplicate logical reminder yoktur.
+- iOS pending kapasitesi logical reminder adediyle değil fiziksel slot maliyetiyle
+  hesaplanır. Eksik rolling grup current sayılmaz; reconciliation grubu tümden
+  iptal edip gelecek ilk occurrence'tan yeniden kurar.
 - Mobil backup formatı `1` olarak kalır; restore allowlist mobil schema `1`–`6`
   olur. Python schema `4`, desktop Backup `1`, restore allowlist `(2, 3, 4)` ve
   Günlük Çıktı `1` değiştirilmez.

@@ -54,3 +54,15 @@
   ignored release-gate alanında bırakılır.
 - Tek ordinary commit `Address mobile field feedback`; normal push; amend,
   rebase, force-push ve PR yoktur.
+
+## PR #195 merge blocker düzeltmesi
+
+- Mevcut PR'deki future due saatlik Beton tekrarının due anında app/reconciliation
+  beklemesi blocker kabul edildi.
+- Android future native periodic anchor, iOS rolling platform horizon,
+  completion/cancel/reopen grup yaşam döngüsü ve terminated-app kanıtı kapsamdır.
+- Exact alarm ve duplicate logical reminder yasaktır; schema/backup/export
+  formatları değişmez.
+- İlk commit amend edilmez. Ayrı ordinary fix commit mesajı
+  `Fix delayed hourly reminder scheduling` olur ve mevcut branch'e normal push
+  edilir; yeni PR açılmaz.

@@ -1552,6 +1552,10 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 
 `Inexact Periodic Notification`: İşletim sistemine yaklaşık aralıkla tekrar etmesi söylenen, pil optimizasyonuna zaman esnekliği bırakan ve exact-alarm izni gerektirmeyen yerel bildirimdir.
 
+`Delayed Periodic Anchor (Gecikmeli Periyodik Başlangıç)`: Tekrarlayan bildirimin aralığını korurken ilk native tetiklemeyi gelecekteki due anına bağlayan başlangıç referansıdır. Android'de `calledAt = due - interval` seçilerek ilk hesaplanan tekrar due anına denk getirilir.
+
+`Rolling Notification Horizon (Kayan Bildirim Ufku)`: Future başlangıçlı periyodik API bulunmayan platformda, tek logical reminder için due anından itibaren sınırlı sayıda fiziksel one-shot occurrence'ı önceden planlama yöntemidir. CSE iOS Beton görevi 24 saatlik ufuk kullanır; reconciliation eksik ufku gelecek occurrence'lardan yeniden kurar.
+
 `Deterministik Migration Kimliği`: Aynı legacy kaynak anahtarları için her retry çalışmasında aynı UUID'yi üreten, yarım migration sonrası duplicate bağlantı oluşmasını engelleyen kimliktir.
 
 `Process-Death Recovery`: Exception handler çalışmadan işletim sistemi process'i sonlandırdıktan sonra, bir sonraki bootstrap'ta kalıcı journal ve dosya durumundan eski ya da doğrulanmış yeni state'i güvenli biçimde kurma işlemidir.

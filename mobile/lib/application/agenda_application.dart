@@ -1106,7 +1106,20 @@ class SqliteAgendaApplication implements AgendaApplication {
       return;
     }
     final capacity = notificationGateway.maximumPendingNotifications;
-    final desired = eligible.take(capacity).toList(growable: false);
+    final desired = <_NotificationWorkItem>[];
+    final capacityLimited = <_NotificationWorkItem>[];
+    var usedSlots = 0;
+    for (final item in eligible) {
+      final slotCost = notificationGateway.pendingNotificationSlotCost(
+        item.binding.repeatIntervalMinutes,
+      );
+      if (slotCost < 1 || usedSlots + slotCost > capacity) {
+        capacityLimited.add(item);
+        continue;
+      }
+      desired.add(item);
+      usedSlots += slotCost;
+    }
     final desiredByPlatformId = {
       for (final item in desired) item.binding.platformNotificationId: item,
     };
@@ -1115,6 +1128,7 @@ class SqliteAgendaApplication implements AgendaApplication {
       final expected = desiredByPlatformId[item.platformId];
       if (expected != null &&
           expected.reminder.id == item.reminderId &&
+          item.scheduleComplete &&
           validPendingIds.add(item.platformId)) {
         continue;
       }
@@ -1151,15 +1165,7 @@ class SqliteAgendaApplication implements AgendaApplication {
             title: reminder.title,
             body: reminder.description ?? reminder.captureText,
             scheduledAtUtc: scheduledFor,
-            repeatIntervalMinutes:
-                binding.repeatIntervalMinutes != null &&
-                    !CseTimeCodec.decodeCanonicalUtc(scheduledFor).isAfter(
-                      now.add(
-                        Duration(minutes: binding.repeatIntervalMinutes! + 1),
-                      ),
-                    )
-                ? binding.repeatIntervalMinutes
-                : null,
+            repeatIntervalMinutes: binding.repeatIntervalMinutes,
           ),
         );
         updates.add(
@@ -1180,7 +1186,7 @@ class SqliteAgendaApplication implements AgendaApplication {
         );
       }
     }
-    for (final item in eligible.skip(capacity)) {
+    for (final item in capacityLimited) {
       try {
         await notificationGateway.cancel(item.binding.platformNotificationId);
       } on Object {

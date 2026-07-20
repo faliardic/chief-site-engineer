@@ -52,3 +52,18 @@
 - `reports/` okunmadı/değiştirilmedi; root `exports/` yalnız `.gitkeep` kaldı.
 - ZIP, Flutter cache/build, unsigned/signed AAB ve RC APK ignored/stage dışı kaldı.
 - Play Console/App Store Connect, PR, merge veya gerçek saha kabulü yapılmadı.
+
+## PR #195 merge blocker follow-up
+
+- Future due saatlik Beton tekrarı Android'de due anına bağlı native inexact
+  periodic kayıt, iOS'ta tek logical reminder'a bağlı 24 saatlik rolling platform
+  kayıt grubu olarak düzeltildi.
+- Due anında uygulamanın açılması veya reconciliation çalışması gerekmez.
+- `Yarın`, terminated-app, completion, cancel, source reopen, eksik rolling grup
+  onarımı ve duplicate logical reminder yokluğu executable testlerle kapsandı.
+- Exact alarm, schema, backup formatı ve desktop export sözleşmesi değişmedi.
+- Flutter analyze temiz; full suite `149 passed`, API 36 Android integration
+  `1 passed`, Python full suite `1002 passed, 7 skipped` tamamlandı.
+- Android ARM64 debug APK ve unsigned release AAB üretildi; merged manifest,
+  permission/no-exact-alarm, iOS privacy/static ve ARM64 native envanter kapıları
+  geçti. `compileall`, state JSON ve diff kontrolü temizdir.
