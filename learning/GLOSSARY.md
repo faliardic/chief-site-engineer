@@ -1474,6 +1474,14 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 
 `Application ID / Bundle ID`: Android veya iOS işletim sisteminin uygulamayı ve ona ait sandbox'ı benzersiz tanımak için kullandığı reverse-domain kimliğidir.
 
+`Entrypoint Marker (Giriş Noktası İşareti)`: Bir Flutter APK içinde hangi Dart `main()` hedefinin derlendiğini binary içerikten doğrulamak için kullanılan benzersiz ve gerçekten referans edilen sabittir. Issue #207 normal, background acceptance ve reboot acceptance hedeflerini ayrı marker'larla kanıtlar.
+
+`Artifact Provenance (Artifact Köken Kanıtı)`: Bir build çıktısının hangi kaynak, target, komut ve build anından geldiğini yeniden doğrulayabilme zinciridir. Dosya adı tek başına provenance değildir.
+
+`Stale Artifact (Bayat Build Çıktısı)`: Yeni build komutunun sonucu sanılarak kullanılan fakat önceki veya farklı target build'inden kalmış dosyadır. Clean, timestamp ve entrypoint marker kontrolleri birlikte engeller.
+
+`Sandbox Isolation (Sandbox İzolasyonu)`: Android application ID veya iOS bundle ID ayrımıyla iki uygulamanın SQLite, dosya ve ayar alanlarını işletim sistemi seviyesinde birbirinden ayırma yöntemidir.
+
 `Android App Bundle (AAB)`: Google Play'in cihaz mimarisi ve kaynaklarına uygun APK'lar üretmek için kullandığı Android yayın paketidir. Repository'ye signing key koymadan unsigned AAB build edilebilir.
 
 `Atomic Migration`: Schema değişiklikleri, migration geçmişi ve sürüm ilerlemesinin tek transaction içinde yazılması; herhangi bir hata olduğunda bütün adımların birlikte rollback edilmesidir.

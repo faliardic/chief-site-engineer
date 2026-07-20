@@ -3093,3 +3093,23 @@
   gecikme sınıfını gösterir. Ayar ekranları yalnız kullanıcı eylemiyle açılır.
 - Mobil schema `7`, backup format `1`, Python schema `4`, restore allowlist,
   Günlük Çıktı sürümü ve offline SQLite source-of-truth değişmez.
+
+## Issue 207 — Saha Sidecar Entrypoint Güvenliği
+
+- Normal saha sidecar source-of-truth giriş noktası yalnız `mobile/lib/main.dart`
+  dosyasıdır. Release gate clean sonrasında açık `--target lib/main.dart` kullanır.
+- Ortak Flutter `app-debug.apk` bir dağıtım artifact'i değildir. Yalnız aynı build
+  çağrısının başlangıç zamanından yeni olduğu ve normal Dart marker'ını içerdiği
+  kanıtlanırsa issue207 field sidecar adına kopyalanabilir.
+- Normal marker `CSE_ENTRYPOINT_NORMAL_LIB_MAIN_DART_V1`; background ve reboot
+  acceptance marker'ları farklıdır. Normal artifact'te sentetik marker görülmesi
+  fail-closed release gate hatasıdır.
+- Sentetik acceptance APK'ları normal `.debug` yerine `.acceptance` application
+  ID ile ayrı Android sandbox kullanır. Artifact adları background/reboot amacını
+  açıkça taşır ve field sidecar yolunu değiştiremez.
+- Sentetik harness `runApp` çağrısını bootstrap veya reminder mutation sonrasına
+  bırakmaz. Async hata güvenli UI'a dönüşür; sabit ID bulunduğunda farklı due ile
+  ikinci create mutation yapılmaz.
+- Fiziksel saha düzeltmesi uninstall veya data clear kullanmaz; yalnız aynı
+  `com.faliardic.chiefsiteengineer.debug` package üzerine `adb install -r`
+  uygulanır. Schema `7`, backup format `1` ve gerçek kullanıcı kayıtları okunmaz.

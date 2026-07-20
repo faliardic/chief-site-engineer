@@ -57,6 +57,10 @@ single mutation, retry draft ve belirsiz sonuç diagnostic sözleşmeleri uygula
 Android inexact kök nedeni ölçüldü; dar exact özel erişim, native schedule
 doğrulaması, boot audit, gecikme/batarya/kanal tanısı ve kapalı uygulama kabul
 matrisi uygulandı. Foreground service, cloud push ve internet eklenmedi.
+3M. [x] Release 0.1 saha sidecar startup blocker — Issue #207 ile normal
+`lib/main.dart` artifact'i clean build, binary entrypoint marker ve stale çıktı
+kontrolüne bağlandı; sentetik acceptance APK'ları ayrı ad/application ID ile
+izole edildi ve sabit ID tekrarında splash öncesi fail-safe UI sağlandı.
 
 Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme
 programı Issue #127'dir. Issue #141 / PR #142 ve Issue #143 / PR #144
@@ -75,7 +79,21 @@ candidate hardening ve Issue #194 saha düzeltmelerinden sonra Issue #196 Ajanda
 ve Beton saha akışı dilimi, Issue #198 stable backup import ve Issue #200 mikser
 dialog lifecycle blocker'ı ile sürer.
 Arka plan teslimat blocker'ı Issue #202 ile kapatılmıştır.
+Issue #202 artifact dağıtım/entrypoint blocker'ı Issue #207 ile kapatılmıştır.
 Açık faz Epic'leri aynı anda aktif production işleri değildir.
+
+## Issue 207 - Saha Sidecar Entrypoint Güvenliği
+
+- [x] Ortak `app-debug.apk` ve sentetik target karışma zincirinin marker/hash
+  kanıtıyla açıklanması.
+- [x] Normal field sidecar için clean + açık `--target lib/main.dart` üretimi.
+- [x] Build timestamp, normal marker ve sentetik marker yokluğu sonkoşulları.
+- [x] Background/reboot acceptance için ayrı artifact adı ve `.acceptance`
+  application ID/sandbox.
+- [x] Sentetik sabit ID tekrarında idempotent reuse ve runApp-first fail-safe UI.
+- [x] Aynı debug package üzerine yalnız `adb install -r`; uninstall/data clear yok.
+- [x] Schema `7`, backup format `1`, Ajanda/Puantaj/Beton veri sınırı korunur.
+- [ ] Store submission ve gerçek signing ayrı kullanıcı/hesap işidir.
 
 ## Issue 202 - Arka Plan Hatırlatıcı Teslimat Güvenilirliği
 

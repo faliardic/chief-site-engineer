@@ -4,12 +4,26 @@ import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:flutter/material.dart';
 
-Future<void> main() async {
+import 'support/synthetic_acceptance_harness.dart';
+
+const cseBackgroundAcceptanceEntrypointMarker =
+    'CSE_ENTRYPOINT_BACKGROUND_ACCEPTANCE_V1';
+
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  debugPrint(cseBackgroundAcceptanceEntrypointMarker);
+  runApp(
+    const SyntheticAcceptanceApp(
+      title: 'Issue 207 background acceptance',
+      runner: _prepareBackgroundAcceptance,
+    ),
+  );
+}
+
+Future<List<String>> _prepareBackgroundAcceptance() async {
   final result = await AppBootstrap.production().start();
   if (result is! BootstrapSuccess) {
-    runApp(const _AcceptanceApp(lines: ['bootstrap_failed']));
-    return;
+    return const ['bootstrap_failed'];
   }
   final agenda = result.agenda;
   final now = DateTime.now().toUtc();
@@ -32,60 +46,37 @@ Future<void> main() async {
     ),
   ];
   for (final item in cases) {
-    MobileReminder reminder;
-    try {
-      reminder = await agenda.getReminderDetail(item.reminderId);
-    } on AgendaValidationFailure {
-      final dueAt = CseTimeCodec.encodeUtc(
-        now.add(Duration(minutes: item.minutes)),
-      );
-      reminder = await agenda.createReminder(
-        CreateReminderCommand(
-          id: item.reminderId,
-          eventId: item.eventId,
-          title: 'Synthetic ${item.minutes} minute acceptance',
-          kind: ReminderKind.action,
-          schedule: ReminderScheduleKind.custom,
-          customAttentionAt: dueAt,
-        ),
-      );
-    }
+    final dueAt = CseTimeCodec.encodeUtc(
+      now.add(Duration(minutes: item.minutes)),
+    );
+    final resolution = await findOrCreateSyntheticReminder(
+      agenda: agenda,
+      command: CreateReminderCommand(
+        id: item.reminderId,
+        eventId: item.eventId,
+        title: 'Synthetic ${item.minutes} minute acceptance',
+        kind: ReminderKind.action,
+        schedule: ReminderScheduleKind.custom,
+        customAttentionAt: dueAt,
+      ),
+    );
+    final reminder = resolution.reminder;
     final detail = await agenda.getReminderLifecycleDetail(reminder.id);
     final diagnostic = await (agenda as ReminderDeliveryApplication)
         .getReminderDeliveryDiagnostic(reminder.id);
-    if (detail.notification.syncState != NotificationSyncState.scheduled ||
-        !diagnostic.nativeSchedulePresent) {
+    if (resolution.created &&
+        (detail.notification.syncState != NotificationSyncState.scheduled ||
+            !diagnostic.nativeSchedulePresent)) {
       throw StateError('synthetic native schedule verification failed');
     }
     final line =
         'minutes=${item.minutes} '
+        'record=${resolution.created ? 'created' : 'reused'} '
         'platformId=${detail.notification.platformNotificationId} '
         'dueAt=${reminder.nextAttentionAt}';
     lines.add(line);
     debugPrint('CSE_BACKGROUND_ACCEPTANCE $line');
   }
   await agenda.reconcileNotifications();
-  runApp(_AcceptanceApp(lines: lines));
-}
-
-class _AcceptanceApp extends StatelessWidget {
-  const _AcceptanceApp({required this.lines});
-
-  final List<String> lines;
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(title: const Text('Issue 202 synthetic acceptance')),
-        body: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            const Text('Native schedules verified. Safe to close the app.'),
-            for (final line in lines) SelectableText(line),
-          ],
-        ),
-      ),
-    );
-  }
+  return lines;
 }
