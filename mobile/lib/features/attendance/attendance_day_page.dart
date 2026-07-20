@@ -156,7 +156,7 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
     }
   }
 
-  Future<void> _markFull([String? team]) async {
+  Future<void> _markFull([String? teamId]) async {
     final detail = _detail;
     if (detail == null || _submitting) return;
     setState(() {
@@ -170,7 +170,7 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
           eventId: _bulkEventId,
           expectedRevision: detail.day.revision,
           entryIdsByMember: _entryIds,
-          teamName: team,
+          teamId: teamId,
         ),
       );
       _bulkEventId = RecordId.randomUuid();
@@ -184,15 +184,20 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
   }
 
   Future<void> _pickTeam() async {
-    final teams =
-        _members
-            .where((member) => member.isActive)
-            .map((member) => member.teamName)
-            .toSet()
-            .toList()
-          ..sort(
-            (left, right) => left.toLowerCase().compareTo(right.toLowerCase()),
-          );
+    final byId = <String, WorkforceMember>{};
+    for (final member in _members.where((item) => item.isActive)) {
+      byId.putIfAbsent(member.teamId ?? member.teamName, () => member);
+    }
+    final teams = byId.entries.toList()
+      ..sort((left, right) {
+        final subcontractor = (left.value.subcontractorName ?? '')
+            .toLowerCase()
+            .compareTo((right.value.subcontractorName ?? '').toLowerCase());
+        if (subcontractor != 0) return subcontractor;
+        return left.value.teamName.toLowerCase().compareTo(
+          right.value.teamName.toLowerCase(),
+        );
+      });
     if (teams.isEmpty) return;
     final selected = await showModalBottomSheet<String>(
       context: context,
@@ -209,10 +214,13 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
             ),
             ...teams.map(
               (team) => ListTile(
-                key: Key('mark-team-full-$team'),
-                title: Text(team),
+                key: Key('mark-team-full-${team.key}'),
+                title: Text(team.value.teamName),
+                subtitle: Text(
+                  team.value.subcontractorName ?? 'Tanımsız taşeron',
+                ),
                 minVerticalPadding: 12,
-                onTap: () => Navigator.pop(context, team),
+                onTap: () => Navigator.pop(context, team.key),
               ),
             ),
           ],
@@ -545,7 +553,9 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
     };
     final groups = <String, List<WorkforceMember>>{};
     for (final member in _members) {
-      groups.putIfAbsent(member.teamName, () => []).add(member);
+      groups
+          .putIfAbsent(member.teamId ?? member.teamName, () => [])
+          .add(member);
     }
     return groups.entries
         .expand((group) {
@@ -553,7 +563,8 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 12, 4, 4),
               child: Text(
-                group.key,
+                '${group.value.first.teamName} — '
+                '${group.value.first.subcontractorName ?? 'Tanımsız taşeron'}',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),

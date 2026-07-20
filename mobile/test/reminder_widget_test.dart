@@ -114,6 +114,34 @@ void main() {
     },
   );
 
+  testWidgets('Yarın quick action is guarded against double tap', (
+    tester,
+  ) async {
+    final completer = Completer<MobileReminder>();
+    final item = reminder();
+    final agenda = FakeAgendaApplication(reminders: [item])
+      ..mutateReminderCompleter = completer;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: RemindersPage(agenda: agenda)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final action = find.byKey(Key('reminder-tomorrow-${item.id}'));
+    expect(action, findsOneWidget);
+    await tester.tap(action);
+    await tester.pump();
+    await tester.tap(action);
+    await tester.pump();
+    expect(agenda.mutateReminderCalls, 1);
+    expect(
+      agenda.lastMutationCommand!.action,
+      ReminderMutationAction.snoozeTomorrowMorning,
+    );
+    completer.complete(item);
+    await tester.pumpAndSettle();
+  });
+
   testWidgets(
     'notification launch payload opens the matching reminder detail',
     (tester) async {

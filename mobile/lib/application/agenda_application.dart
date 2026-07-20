@@ -10,6 +10,8 @@ import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:sqflite/sqflite.dart';
 
 abstract interface class AgendaApplication {
+  Stream<void> get projectChanges;
+
   Future<List<MobileProject>> listProjects();
 
   Future<MobileProject> createProject(CreateProjectCommand command);
@@ -63,6 +65,11 @@ class SqliteAgendaApplication implements AgendaApplication {
   final MobileOperationCoordinator coordinator;
   final ReminderNotificationGateway notificationGateway;
   final ReminderTransactionHook? beforeReminderEventInsert;
+  final StreamController<void> _projectChanges =
+      StreamController<void>.broadcast();
+
+  @override
+  Stream<void> get projectChanges => _projectChanges.stream;
 
   @override
   String? get initialNotificationReminderId =>
@@ -90,7 +97,7 @@ class SqliteAgendaApplication implements AgendaApplication {
     final name = requiredTrimmed(command.name, 'Proje adı', maxLength: 160);
     final now = _readClockOnce();
     final createdAt = CseTimeCodec.encodeUtc(now);
-    return _withDatabase(now, (database) {
+    final result = await _withDatabase(now, (database) {
       return database.transaction((transaction) async {
         final existing = await transaction.query(
           'projects',
@@ -105,7 +112,21 @@ class SqliteAgendaApplication implements AgendaApplication {
               'Proje kimliği başka bir içerikle kullanılıyor.',
             );
           }
-          return project;
+          return (project: project, changed: false);
+        }
+        final activeProjects = await transaction.query(
+          'projects',
+          columns: ['id', 'name'],
+          where: 'archived_at IS NULL',
+        );
+        final normalizedName = _normalizeProjectName(name);
+        if (activeProjects.any(
+          (row) =>
+              _normalizeProjectName(row['name']! as String) == normalizedName,
+        )) {
+          throw const AgendaValidationFailure(
+            'Aynı adlı aktif proje zaten bulunuyor.',
+          );
         }
         await transaction.insert('projects', {
           'id': command.id,
@@ -114,15 +135,20 @@ class SqliteAgendaApplication implements AgendaApplication {
           'updated_at': createdAt,
           'revision': 1,
         });
-        return MobileProject(
-          id: command.id,
-          name: name,
-          createdAt: createdAt,
-          updatedAt: createdAt,
-          revision: 1,
+        return (
+          project: MobileProject(
+            id: command.id,
+            name: name,
+            createdAt: createdAt,
+            updatedAt: createdAt,
+            revision: 1,
+          ),
+          changed: true,
         );
       });
     });
+    if (result.changed) _projectChanges.add(null);
+    return result.project;
   }
 
   @override
@@ -880,7 +906,9 @@ class SqliteAgendaApplication implements AgendaApplication {
         values['status'] = current.kind == ReminderKind.waiting
             ? ReminderStatus.waiting.storageValue
             : ReminderStatus.active.storageValue;
-        values['next_attention_at'] = _tomorrowMorning(now);
+        values['next_attention_at'] = current.nextAttentionAt == null
+            ? _tomorrowMorning(now)
+            : _tomorrowAtSameLocalTime(current.nextAttentionAt!, now);
         return 'snoozed';
       case ReminderMutationAction.startWaiting:
         requireOpen();
@@ -969,7 +997,8 @@ class SqliteAgendaApplication implements AgendaApplication {
           b.scheduled_for AS binding_scheduled_for,
           b.sync_state,
           b.last_synced_at,
-          b.safe_error_code
+          b.safe_error_code,
+          b.repeat_interval_minutes
         FROM follow_up_items f
         LEFT JOIN projects p ON p.id = f.project_id
         JOIN reminder_notification_bindings b ON b.reminder_id = f.id
@@ -996,9 +1025,10 @@ class SqliteAgendaApplication implements AgendaApplication {
               (item.reminder.status == ReminderStatus.active ||
                   item.reminder.status == ReminderStatus.waiting) &&
               item.reminder.nextAttentionAt != null &&
-              CseTimeCodec.decodeCanonicalUtc(
-                item.reminder.nextAttentionAt!,
-              ).isAfter(now),
+              (CseTimeCodec.decodeCanonicalUtc(
+                    item.reminder.nextAttentionAt!,
+                  ).isAfter(now) ||
+                  item.binding.repeatIntervalMinutes != null),
         )
         .toList(growable: false);
     NotificationPermissionState permission;
@@ -1076,7 +1106,20 @@ class SqliteAgendaApplication implements AgendaApplication {
       return;
     }
     final capacity = notificationGateway.maximumPendingNotifications;
-    final desired = eligible.take(capacity).toList(growable: false);
+    final desired = <_NotificationWorkItem>[];
+    final capacityLimited = <_NotificationWorkItem>[];
+    var usedSlots = 0;
+    for (final item in eligible) {
+      final slotCost = notificationGateway.pendingNotificationSlotCost(
+        item.binding.repeatIntervalMinutes,
+      );
+      if (slotCost < 1 || usedSlots + slotCost > capacity) {
+        capacityLimited.add(item);
+        continue;
+      }
+      desired.add(item);
+      usedSlots += slotCost;
+    }
     final desiredByPlatformId = {
       for (final item in desired) item.binding.platformNotificationId: item,
     };
@@ -1085,6 +1128,7 @@ class SqliteAgendaApplication implements AgendaApplication {
       final expected = desiredByPlatformId[item.platformId];
       if (expected != null &&
           expected.reminder.id == item.reminderId &&
+          item.scheduleComplete &&
           validPendingIds.add(item.platformId)) {
         continue;
       }
@@ -1121,6 +1165,7 @@ class SqliteAgendaApplication implements AgendaApplication {
             title: reminder.title,
             body: reminder.description ?? reminder.captureText,
             scheduledAtUtc: scheduledFor,
+            repeatIntervalMinutes: binding.repeatIntervalMinutes,
           ),
         );
         updates.add(
@@ -1141,7 +1186,7 @@ class SqliteAgendaApplication implements AgendaApplication {
         );
       }
     }
-    for (final item in eligible.skip(capacity)) {
+    for (final item in capacityLimited) {
       try {
         await notificationGateway.cancel(item.binding.platformNotificationId);
       } on Object {
@@ -1391,6 +1436,19 @@ class SqliteAgendaApplication implements AgendaApplication {
     );
   }
 
+  String _tomorrowAtSameLocalTime(String currentValue, DateTime now) {
+    final currentLocal = CseTimeCodec.toIstanbul(currentValue);
+    final today = CseTimeCodec.istanbulDayKey(CseTimeCodec.encodeUtc(now));
+    final tomorrow = CseTimeCodec.shiftIstanbulDay(today, 1).split('-');
+    return CseTimeCodec.canonicalFromIstanbulComponents(
+      year: int.parse(tomorrow[0]),
+      month: int.parse(tomorrow[1]),
+      day: int.parse(tomorrow[2]),
+      hour: currentLocal.hour,
+      minute: currentLocal.minute,
+    );
+  }
+
   String _validatedFutureAttention(String value, DateTime now) {
     validateCanonicalTimestamp(value, 'Hatırlatıcı zamanı');
     if (!CseTimeCodec.decodeCanonicalUtc(value).isAfter(now)) {
@@ -1450,6 +1508,9 @@ class SqliteAgendaApplication implements AgendaApplication {
         reminder.conditionText == conditionText;
   }
 }
+
+String _normalizeProjectName(String value) =>
+    value.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
 
 class _ResolvedReminderSchedule {
   const _ResolvedReminderSchedule({
@@ -1618,6 +1679,7 @@ NotificationBinding _notificationBindingFromRow(Map<String, Object?> row) {
     syncState: NotificationSyncState.fromStorage(row['sync_state']! as String),
     lastSyncedAt: lastSyncedAt,
     safeErrorCode: row['safe_error_code'] as String?,
+    repeatIntervalMinutes: row['repeat_interval_minutes'] as int?,
   );
 }
 
@@ -1631,6 +1693,7 @@ NotificationBinding _notificationBindingFromJoinedRow(
     'sync_state': row['sync_state'],
     'last_synced_at': row['last_synced_at'],
     'safe_error_code': row['safe_error_code'],
+    'repeat_interval_minutes': row['repeat_interval_minutes'],
   });
 }
 

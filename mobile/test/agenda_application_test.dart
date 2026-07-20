@@ -131,6 +131,40 @@ void main() {
   );
 
   test(
+    'project catalog publishes live changes and rejects normalized duplicate',
+    () async {
+      final changed = agenda.projectChanges.first;
+      final project = await agenda.createProject(
+        const CreateProjectCommand(id: project2, name: '  Güney   Şantiyesi  '),
+      );
+      await changed;
+      expect(project.name, 'Güney   Şantiyesi');
+      expect(
+        (await agenda.listProjects()).map((item) => item.id),
+        contains(project2),
+      );
+      await expectLater(
+        agenda.createProject(
+          const CreateProjectCommand(
+            id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+            name: 'güney şantiyesi',
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      final restarted = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+      );
+      expect(
+        (await restarted.listProjects()).map((item) => item.id),
+        contains(project2),
+      );
+    },
+  );
+
+  test(
     'past log keeps observed and created times separate and filters literally',
     () async {
       await agenda.createProject(

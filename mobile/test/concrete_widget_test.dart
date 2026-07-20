@@ -207,6 +207,9 @@ class _FakeConcrete implements ConcreteApplication {
 
 class _FakeAgenda implements AgendaApplication {
   @override
+  Stream<void> get projectChanges => const Stream<void>.empty();
+
+  @override
   Future<List<MobileProject>> listProjects() async => const [project];
   @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

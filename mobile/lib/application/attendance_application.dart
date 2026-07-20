@@ -12,6 +12,47 @@ import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:sqflite/sqflite.dart';
 
 abstract interface class AttendanceApplication {
+  Future<List<Subcontractor>> listSubcontractors(
+    String projectId, {
+    bool includeArchived = false,
+  });
+
+  Future<Subcontractor> createSubcontractor(CreateSubcontractorCommand command);
+
+  Future<Subcontractor> updateSubcontractor(UpdateSubcontractorCommand command);
+
+  Future<Subcontractor> transitionSubcontractor(
+    TransitionSubcontractorCommand command,
+  );
+
+  Future<List<WorkforceTeam>> listTeams(
+    String projectId, {
+    String? subcontractorId,
+    bool includeArchived = false,
+  });
+
+  Future<WorkforceTeam> createTeam(CreateWorkforceTeamCommand command);
+
+  Future<WorkforceTeam> updateTeam(UpdateWorkforceTeamCommand command);
+
+  Future<WorkforceTeam> transitionTeam(TransitionWorkforceTeamCommand command);
+
+  Future<List<ActiveTeamCount>> listActiveTeamCounts(String projectId);
+
+  Future<WorkforcePersonDetail> getPersonDetail(String memberId);
+
+  Future<WorkforceComplianceRecord> saveComplianceRecord(
+    SaveComplianceRecordCommand command,
+  );
+
+  Future<WorkforceComplianceRecord> archiveComplianceRecord(
+    ArchiveComplianceRecordCommand command,
+  );
+
+  Future<WorkforcePpeAssignment> savePpeAssignment(
+    SavePpeAssignmentCommand command,
+  );
+
   Future<List<WorkforceMember>> listMembers(
     String projectId, {
     bool includeInactive = false,
@@ -77,6 +118,818 @@ class SqliteAttendanceApplication implements AttendanceApplication {
   final AttendanceTransactionHook? beforeAttendanceEventInsert;
 
   @override
+  Future<List<Subcontractor>> listSubcontractors(
+    String projectId, {
+    bool includeArchived = false,
+  }) async {
+    validateUuid(projectId, 'Proje kimliği');
+    final now = _readClockOnce();
+    return _withDatabase(now, (database) async {
+      final rows = await database.rawQuery(
+        '''
+        SELECT s.*,
+          (SELECT count(*) FROM workforce_teams t
+            WHERE t.subcontractor_id = s.id AND t.status = 'active')
+            AS active_team_count,
+          (SELECT count(*) FROM workforce_members m
+            WHERE m.subcontractor_id = s.id AND m.is_active = 1)
+            AS active_person_count
+        FROM subcontractors s
+        WHERE s.project_id = ?
+          ${includeArchived ? '' : "AND s.status = 'active'"}
+        ORDER BY s.name_normalized ASC, s.id ASC
+      ''',
+        [projectId],
+      );
+      return rows.map(_subcontractorFromRow).toList(growable: false);
+    });
+  }
+
+  @override
+  Future<Subcontractor> createSubcontractor(
+    CreateSubcontractorCommand command,
+  ) async {
+    validateUuid(command.id, 'Taşeron kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    validateUuid(command.projectId, 'Proje kimliği');
+    final name = requiredTrimmed(command.name, 'Taşeron adı', maxLength: 200);
+    final normalized = _normalizeRegistryName(name);
+    final contact = optionalTrimmed(
+      command.contactName,
+      'Yetkili adı',
+      maxLength: 200,
+    );
+    final phone = optionalTrimmed(command.phone, 'Telefon', maxLength: 80);
+    final note = optionalTrimmed(command.note, 'Not', maxLength: 1000);
+    final now = _readClockOnce();
+    final timestamp = CseTimeCodec.encodeUtc(now);
+    return _withDatabase(
+      now,
+      (database) => database.transaction((tx) async {
+        await _requireProject(tx, command.projectId);
+        final existing = await tx.query(
+          'subcontractors',
+          where: 'id = ?',
+          whereArgs: [command.id],
+          limit: 1,
+        );
+        if (existing.isNotEmpty) {
+          final value = await _loadSubcontractor(tx, command.id);
+          if (value.projectId != command.projectId ||
+              value.name != name ||
+              value.contactName != contact ||
+              value.phone != phone ||
+              value.note != note) {
+            throw const AgendaValidationFailure(
+              'Taşeron kimliği başka bir içerikle kullanılıyor.',
+            );
+          }
+          return value;
+        }
+        await tx.insert('subcontractors', {
+          'id': command.id,
+          'project_id': command.projectId,
+          'name': name,
+          'name_normalized': normalized,
+          'contact_name': contact,
+          'phone': phone,
+          'note': note,
+          'status': WorkforceRecordStatus.active.storageValue,
+          'revision': 1,
+          'created_at': timestamp,
+          'updated_at': timestamp,
+        });
+        await _insertWorkforceEvent(
+          tx,
+          id: command.eventId,
+          type: 'subcontractor',
+          aggregateId: command.id,
+          projectId: command.projectId,
+          eventType: 'subcontractor.created',
+          occurredAt: timestamp,
+          payload: {'name': name},
+        );
+        return _loadSubcontractor(tx, command.id);
+      }),
+    );
+  }
+
+  @override
+  Future<Subcontractor> updateSubcontractor(
+    UpdateSubcontractorCommand command,
+  ) async {
+    validateUuid(command.id, 'Taşeron kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    _validateExpectedRevision(command.expectedRevision);
+    final name = requiredTrimmed(command.name, 'Taşeron adı', maxLength: 200);
+    final contact = optionalTrimmed(
+      command.contactName,
+      'Yetkili adı',
+      maxLength: 200,
+    );
+    final phone = optionalTrimmed(command.phone, 'Telefon', maxLength: 80);
+    final note = optionalTrimmed(command.note, 'Not', maxLength: 1000);
+    final now = _readClockOnce();
+    final timestamp = CseTimeCodec.encodeUtc(now);
+    return _withDatabase(
+      now,
+      (database) => database.transaction((tx) async {
+        final current = await _loadSubcontractor(tx, command.id);
+        _requireRevision(current.revision, command.expectedRevision);
+        if (current.name == name &&
+            current.contactName == contact &&
+            current.phone == phone &&
+            current.note == note) {
+          return current;
+        }
+        final changed = await tx.update(
+          'subcontractors',
+          {
+            'name': name,
+            'name_normalized': _normalizeRegistryName(name),
+            'contact_name': contact,
+            'phone': phone,
+            'note': note,
+            'revision': current.revision + 1,
+            'updated_at': timestamp,
+          },
+          where: 'id = ? AND revision = ?',
+          whereArgs: [current.id, current.revision],
+        );
+        if (changed != 1) throw _staleFailure();
+        await _insertWorkforceEvent(
+          tx,
+          id: command.eventId,
+          type: 'subcontractor',
+          aggregateId: current.id,
+          projectId: current.projectId,
+          eventType: 'subcontractor.updated',
+          occurredAt: timestamp,
+          payload: {'name': name},
+        );
+        return _loadSubcontractor(tx, current.id);
+      }),
+    );
+  }
+
+  @override
+  Future<Subcontractor> transitionSubcontractor(
+    TransitionSubcontractorCommand command,
+  ) async {
+    validateUuid(command.id, 'Taşeron kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    _validateExpectedRevision(command.expectedRevision);
+    final now = _readClockOnce();
+    final timestamp = CseTimeCodec.encodeUtc(now);
+    return _withDatabase(
+      now,
+      (database) => database.transaction((tx) async {
+        final current = await _loadSubcontractor(tx, command.id);
+        _requireRevision(current.revision, command.expectedRevision);
+        if (current.isActive != command.archive) return current;
+        if (command.archive && current.activePersonCount > 0) {
+          throw const AgendaValidationFailure(
+            'Aktif personeli bulunan taşeron pasifleştirilemez. Önce personeli taşıyın veya pasifleştirin.',
+          );
+        }
+        final status = command.archive
+            ? WorkforceRecordStatus.archived
+            : WorkforceRecordStatus.active;
+        final changed = await tx.update(
+          'subcontractors',
+          {
+            'status': status.storageValue,
+            'archived_at': command.archive ? timestamp : null,
+            'revision': current.revision + 1,
+            'updated_at': timestamp,
+          },
+          where: 'id = ? AND revision = ?',
+          whereArgs: [current.id, current.revision],
+        );
+        if (changed != 1) throw _staleFailure();
+        await _insertWorkforceEvent(
+          tx,
+          id: command.eventId,
+          type: 'subcontractor',
+          aggregateId: current.id,
+          projectId: current.projectId,
+          eventType: command.archive
+              ? 'subcontractor.archived'
+              : 'subcontractor.reopened',
+          occurredAt: timestamp,
+          payload: const {},
+        );
+        return _loadSubcontractor(tx, current.id);
+      }),
+    );
+  }
+
+  @override
+  Future<List<WorkforceTeam>> listTeams(
+    String projectId, {
+    String? subcontractorId,
+    bool includeArchived = false,
+  }) async {
+    validateUuid(projectId, 'Proje kimliği');
+    if (subcontractorId != null) {
+      validateUuid(subcontractorId, 'Taşeron kimliği');
+    }
+    final now = _readClockOnce();
+    return _withDatabase(now, (database) async {
+      final where = <String>['t.project_id = ?'];
+      final args = <Object?>[projectId];
+      if (subcontractorId != null) {
+        where.add('t.subcontractor_id = ?');
+        args.add(subcontractorId);
+      }
+      if (!includeArchived) {
+        where.add("t.status = 'active'");
+        where.add("s.status = 'active'");
+      }
+      final rows = await database.rawQuery('''
+        SELECT t.*, s.name AS subcontractor_name,
+          (SELECT count(*) FROM workforce_members m
+            WHERE m.team_id = t.id AND m.is_active = 1)
+            AS active_person_count
+        FROM workforce_teams t
+        JOIN subcontractors s ON s.id = t.subcontractor_id
+        WHERE ${where.join(' AND ')}
+        ORDER BY s.name_normalized ASC, t.name_normalized ASC, t.id ASC
+      ''', args);
+      return rows.map(_teamFromRow).toList(growable: false);
+    });
+  }
+
+  @override
+  Future<WorkforceTeam> createTeam(CreateWorkforceTeamCommand command) async {
+    validateUuid(command.id, 'Ekip kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    validateUuid(command.projectId, 'Proje kimliği');
+    validateUuid(command.subcontractorId, 'Taşeron kimliği');
+    final name = requiredTrimmed(command.name, 'Ekip adı', maxLength: 200);
+    final lead = optionalTrimmed(
+      command.leadName,
+      'Ekip sorumlusu',
+      maxLength: 200,
+    );
+    final note = optionalTrimmed(command.note, 'Not', maxLength: 1000);
+    final now = _readClockOnce();
+    final timestamp = CseTimeCodec.encodeUtc(now);
+    return _withDatabase(
+      now,
+      (database) => database.transaction((tx) async {
+        final subcontractor = await _loadSubcontractor(
+          tx,
+          command.subcontractorId,
+        );
+        if (subcontractor.projectId != command.projectId ||
+            !subcontractor.isActive) {
+          throw const AgendaValidationFailure(
+            'Ekip yalnız aktif ve aynı projedeki taşerona bağlanabilir.',
+          );
+        }
+        final existing = await tx.query(
+          'workforce_teams',
+          where: 'id = ?',
+          whereArgs: [command.id],
+          limit: 1,
+        );
+        if (existing.isNotEmpty) {
+          final value = await _loadTeam(tx, command.id);
+          if (value.projectId != command.projectId ||
+              value.subcontractorId != command.subcontractorId ||
+              value.name != name ||
+              value.leadName != lead ||
+              value.note != note) {
+            throw const AgendaValidationFailure(
+              'Ekip kimliği başka bir içerikle kullanılıyor.',
+            );
+          }
+          return value;
+        }
+        await tx.insert('workforce_teams', {
+          'id': command.id,
+          'project_id': command.projectId,
+          'subcontractor_id': command.subcontractorId,
+          'name': name,
+          'name_normalized': _normalizeRegistryName(name),
+          'lead_name': lead,
+          'note': note,
+          'status': WorkforceRecordStatus.active.storageValue,
+          'revision': 1,
+          'created_at': timestamp,
+          'updated_at': timestamp,
+        });
+        await _insertWorkforceEvent(
+          tx,
+          id: command.eventId,
+          type: 'team',
+          aggregateId: command.id,
+          projectId: command.projectId,
+          eventType: 'team.created',
+          occurredAt: timestamp,
+          payload: {'subcontractor_id': command.subcontractorId, 'name': name},
+        );
+        return _loadTeam(tx, command.id);
+      }),
+    );
+  }
+
+  @override
+  Future<WorkforceTeam> updateTeam(UpdateWorkforceTeamCommand command) async {
+    validateUuid(command.id, 'Ekip kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    _validateExpectedRevision(command.expectedRevision);
+    final name = requiredTrimmed(command.name, 'Ekip adı', maxLength: 200);
+    final lead = optionalTrimmed(
+      command.leadName,
+      'Ekip sorumlusu',
+      maxLength: 200,
+    );
+    final note = optionalTrimmed(command.note, 'Not', maxLength: 1000);
+    final now = _readClockOnce();
+    final timestamp = CseTimeCodec.encodeUtc(now);
+    return _withDatabase(
+      now,
+      (database) => database.transaction((tx) async {
+        final current = await _loadTeam(tx, command.id);
+        _requireRevision(current.revision, command.expectedRevision);
+        if (current.name == name &&
+            current.leadName == lead &&
+            current.note == note) {
+          return current;
+        }
+        final changed = await tx.update(
+          'workforce_teams',
+          {
+            'name': name,
+            'name_normalized': _normalizeRegistryName(name),
+            'lead_name': lead,
+            'note': note,
+            'revision': current.revision + 1,
+            'updated_at': timestamp,
+          },
+          where: 'id = ? AND revision = ?',
+          whereArgs: [current.id, current.revision],
+        );
+        if (changed != 1) throw _staleFailure();
+        await tx.update(
+          'workforce_members',
+          {'team_name': name, 'updated_at': timestamp},
+          where: 'team_id = ?',
+          whereArgs: [current.id],
+        );
+        await _insertWorkforceEvent(
+          tx,
+          id: command.eventId,
+          type: 'team',
+          aggregateId: current.id,
+          projectId: current.projectId,
+          eventType: 'team.updated',
+          occurredAt: timestamp,
+          payload: {'name': name},
+        );
+        return _loadTeam(tx, current.id);
+      }),
+    );
+  }
+
+  @override
+  Future<WorkforceTeam> transitionTeam(
+    TransitionWorkforceTeamCommand command,
+  ) async {
+    validateUuid(command.id, 'Ekip kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    _validateExpectedRevision(command.expectedRevision);
+    final now = _readClockOnce();
+    final timestamp = CseTimeCodec.encodeUtc(now);
+    return _withDatabase(
+      now,
+      (database) => database.transaction((tx) async {
+        final current = await _loadTeam(tx, command.id);
+        _requireRevision(current.revision, command.expectedRevision);
+        if (current.isActive != command.archive) return current;
+        if (command.archive && current.activePersonCount > 0) {
+          throw const AgendaValidationFailure(
+            'Aktif personeli bulunan ekip pasifleştirilemez.',
+          );
+        }
+        if (!command.archive) {
+          final subcontractor = await _loadSubcontractor(
+            tx,
+            current.subcontractorId,
+          );
+          if (!subcontractor.isActive) {
+            throw const AgendaValidationFailure(
+              'Ekip yeniden açılmadan önce taşeron yeniden açılmalıdır.',
+            );
+          }
+        }
+        final changed = await tx.update(
+          'workforce_teams',
+          {
+            'status': command.archive ? 'archived' : 'active',
+            'archived_at': command.archive ? timestamp : null,
+            'revision': current.revision + 1,
+            'updated_at': timestamp,
+          },
+          where: 'id = ? AND revision = ?',
+          whereArgs: [current.id, current.revision],
+        );
+        if (changed != 1) throw _staleFailure();
+        await _insertWorkforceEvent(
+          tx,
+          id: command.eventId,
+          type: 'team',
+          aggregateId: current.id,
+          projectId: current.projectId,
+          eventType: command.archive ? 'team.archived' : 'team.reopened',
+          occurredAt: timestamp,
+          payload: const {},
+        );
+        return _loadTeam(tx, current.id);
+      }),
+    );
+  }
+
+  @override
+  Future<List<ActiveTeamCount>> listActiveTeamCounts(String projectId) async {
+    final teams = await listTeams(projectId);
+    return teams
+        .map(
+          (team) => ActiveTeamCount(
+            teamId: team.id,
+            teamName: team.name,
+            subcontractorName: team.subcontractorName,
+            activePersonCount: team.activePersonCount,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  @override
+  Future<WorkforcePersonDetail> getPersonDetail(String memberId) async {
+    validateUuid(memberId, 'Personel kimliği');
+    final now = _readClockOnce();
+    final today = CseTimeCodec.istanbulDayKey(CseTimeCodec.encodeUtc(now));
+    return _withDatabase(now, (database) async {
+      final memberRows = await database.rawQuery(
+        '''
+        SELECT m.*, s.name AS subcontractor_name,
+          t.name AS registry_team_name
+        FROM workforce_members m
+        JOIN subcontractors s ON s.id = m.subcontractor_id
+        JOIN workforce_teams t ON t.id = m.team_id
+        WHERE m.id = ? LIMIT 1
+      ''',
+        [memberId],
+      );
+      if (memberRows.isEmpty) {
+        throw const AgendaValidationFailure('Personel bulunamadı.');
+      }
+      final complianceRows = await database.query(
+        'workforce_compliance_records',
+        where: 'workforce_member_id = ? AND archived_at IS NULL',
+        whereArgs: [memberId],
+        orderBy: 'document_type ASC, expiry_date ASC, id ASC',
+      );
+      final ppeRows = await database.query(
+        'workforce_ppe_assignments',
+        where: 'workforce_member_id = ?',
+        whereArgs: [memberId],
+        orderBy: 'assigned_date DESC, created_at DESC, id ASC',
+      );
+      final compliance = complianceRows
+          .map((row) => _complianceFromRow(row, today))
+          .toList(growable: false);
+      final ppe = ppeRows.map(_ppeFromRow).toList(growable: false);
+      return WorkforcePersonDetail(
+        member: _memberFromRow(memberRows.single),
+        compliance: compliance,
+        ppeAssignments: ppe,
+        missingComplianceCount: compliance
+            .where((item) => item.readStatus == ComplianceReadStatus.missing)
+            .length,
+        validComplianceCount: compliance
+            .where((item) => item.readStatus == ComplianceReadStatus.valid)
+            .length,
+        expiringComplianceCount: compliance
+            .where((item) => item.readStatus == ComplianceReadStatus.expiring)
+            .length,
+        expiredComplianceCount: compliance
+            .where((item) => item.readStatus == ComplianceReadStatus.expired)
+            .length,
+        activePpeCount: ppe
+            .where((item) => item.status == PpeAssignmentStatus.assigned)
+            .fold(0, (sum, item) => sum + item.quantity),
+      );
+    });
+  }
+
+  @override
+  Future<WorkforceComplianceRecord> saveComplianceRecord(
+    SaveComplianceRecordCommand command,
+  ) async {
+    validateUuid(command.id, 'İSG kayıt kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    validateUuid(command.memberId, 'Personel kimliği');
+    if (command.expectedRevision < 0) {
+      throw const AgendaValidationFailure('Beklenen revision geçersizdir.');
+    }
+    final number = optionalTrimmed(
+      command.documentNumber,
+      'Belge numarası',
+      maxLength: 160,
+    );
+    final issued = _optionalLocalDate(command.issuedDate, 'Düzenlenme tarihi');
+    final expiry = _optionalLocalDate(command.expiryDate, 'Geçerlilik tarihi');
+    if (issued != null && expiry != null && expiry.compareTo(issued) < 0) {
+      throw const AgendaValidationFailure(
+        'Geçerlilik tarihi düzenlenme tarihinden önce olamaz.',
+      );
+    }
+    final note = optionalTrimmed(command.note, 'Not', maxLength: 1000);
+    final reason = optionalTrimmed(command.reason, 'Gerekçe', maxLength: 1000);
+    if ((command.sourceStatus == ComplianceSourceStatus.notApplicable ||
+            command.sourceStatus == ComplianceSourceStatus.exception) &&
+        reason == null) {
+      throw const AgendaValidationFailure(
+        'Uygulanamaz veya istisna kaydı için gerekçe zorunludur.',
+      );
+    }
+    final now = _readClockOnce();
+    final timestamp = CseTimeCodec.encodeUtc(now);
+    final today = CseTimeCodec.istanbulDayKey(timestamp);
+    return _withDatabase(
+      now,
+      (database) => database.transaction((tx) async {
+        final member = await _requireMember(tx, command.memberId);
+        final rows = await tx.query(
+          'workforce_compliance_records',
+          where: 'id = ?',
+          whereArgs: [command.id],
+          limit: 1,
+        );
+        final values = <String, Object?>{
+          'document_type': command.documentType.storageValue,
+          'document_number': number,
+          'issued_date': issued,
+          'expiry_date': expiry,
+          'source_status': command.sourceStatus.storageValue,
+          'note': note,
+          'reason': reason,
+        };
+        if (rows.isEmpty) {
+          if (command.expectedRevision != 0) throw _staleFailure();
+          await tx.insert('workforce_compliance_records', {
+            'id': command.id,
+            'workforce_member_id': command.memberId,
+            ...values,
+            'revision': 1,
+            'created_at': timestamp,
+            'updated_at': timestamp,
+          });
+          await _insertWorkforceEvent(
+            tx,
+            id: command.eventId,
+            type: 'compliance',
+            aggregateId: command.id,
+            projectId: member.projectId,
+            eventType: 'compliance.created',
+            occurredAt: timestamp,
+            payload: {'member_id': member.id},
+          );
+        } else {
+          final current = _complianceFromRow(rows.single, today);
+          if (current.memberId != command.memberId) {
+            throw const AgendaValidationFailure(
+              'İSG kayıt kimliği başka personele bağlıdır.',
+            );
+          }
+          _requireRevision(current.revision, command.expectedRevision);
+          if (_complianceMatches(current, values)) return current;
+          final changed = await tx.update(
+            'workforce_compliance_records',
+            {
+              ...values,
+              'revision': current.revision + 1,
+              'updated_at': timestamp,
+            },
+            where: 'id = ? AND revision = ?',
+            whereArgs: [current.id, current.revision],
+          );
+          if (changed != 1) throw _staleFailure();
+          await _insertWorkforceEvent(
+            tx,
+            id: command.eventId,
+            type: 'compliance',
+            aggregateId: command.id,
+            projectId: member.projectId,
+            eventType: 'compliance.updated',
+            occurredAt: timestamp,
+            payload: {'member_id': member.id},
+          );
+        }
+        final saved = await tx.query(
+          'workforce_compliance_records',
+          where: 'id = ?',
+          whereArgs: [command.id],
+          limit: 1,
+        );
+        return _complianceFromRow(saved.single, today);
+      }),
+    );
+  }
+
+  @override
+  Future<WorkforceComplianceRecord> archiveComplianceRecord(
+    ArchiveComplianceRecordCommand command,
+  ) async {
+    validateUuid(command.id, 'İSG kayıt kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    _validateExpectedRevision(command.expectedRevision);
+    final now = _readClockOnce();
+    final timestamp = CseTimeCodec.encodeUtc(now);
+    final today = CseTimeCodec.istanbulDayKey(timestamp);
+    return _withDatabase(
+      now,
+      (database) => database.transaction((tx) async {
+        final rows = await tx.query(
+          'workforce_compliance_records',
+          where: 'id = ?',
+          whereArgs: [command.id],
+          limit: 1,
+        );
+        if (rows.isEmpty) {
+          throw const AgendaValidationFailure('İSG kaydı bulunamadı.');
+        }
+        final current = _complianceFromRow(rows.single, today);
+        _requireRevision(current.revision, command.expectedRevision);
+        if (current.archivedAt != null) return current;
+        final member = await _requireMember(tx, current.memberId);
+        final changed = await tx.update(
+          'workforce_compliance_records',
+          {
+            'archived_at': timestamp,
+            'updated_at': timestamp,
+            'revision': current.revision + 1,
+          },
+          where: 'id = ? AND revision = ?',
+          whereArgs: [current.id, current.revision],
+        );
+        if (changed != 1) throw _staleFailure();
+        await _insertWorkforceEvent(
+          tx,
+          id: command.eventId,
+          type: 'compliance',
+          aggregateId: current.id,
+          projectId: member.projectId,
+          eventType: 'compliance.archived',
+          occurredAt: timestamp,
+          payload: {'member_id': member.id},
+        );
+        final saved = await tx.query(
+          'workforce_compliance_records',
+          where: 'id = ?',
+          whereArgs: [current.id],
+          limit: 1,
+        );
+        return _complianceFromRow(saved.single, today);
+      }),
+    );
+  }
+
+  @override
+  Future<WorkforcePpeAssignment> savePpeAssignment(
+    SavePpeAssignmentCommand command,
+  ) async {
+    validateUuid(command.id, 'KKD zimmet kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    validateUuid(command.memberId, 'Personel kimliği');
+    if (command.expectedRevision < 0 || command.quantity < 1) {
+      throw const AgendaValidationFailure(
+        'KKD adet veya revision geçersizdir.',
+      );
+    }
+    final ppeType = requiredTrimmed(
+      command.ppeType,
+      'KKD türü',
+      maxLength: 160,
+    );
+    final assigned = _requiredLocalDate(command.assignedDate, 'Zimmet tarihi');
+    final returned = _optionalLocalDate(command.returnedDate, 'İade tarihi');
+    if (command.status == PpeAssignmentStatus.returned && returned == null) {
+      throw const AgendaValidationFailure(
+        'İade edilen KKD için tarih zorunludur.',
+      );
+    }
+    final brand = optionalTrimmed(
+      command.brandModel,
+      'Marka/model',
+      maxLength: 200,
+    );
+    final size = optionalTrimmed(command.size, 'Beden', maxLength: 80);
+    final serial = optionalTrimmed(
+      command.serialTag,
+      'Seri/etiket',
+      maxLength: 160,
+    );
+    final note = optionalTrimmed(command.note, 'Not', maxLength: 1000);
+    final now = _readClockOnce();
+    final timestamp = CseTimeCodec.encodeUtc(now);
+    return _withDatabase(
+      now,
+      (database) => database.transaction((tx) async {
+        final member = await _requireMember(tx, command.memberId);
+        final rows = await tx.query(
+          'workforce_ppe_assignments',
+          where: 'id = ?',
+          whereArgs: [command.id],
+          limit: 1,
+        );
+        final values = <String, Object?>{
+          'ppe_type': ppeType,
+          'brand_model': brand,
+          'size': size,
+          'serial_tag': serial,
+          'quantity': command.quantity,
+          'assigned_date': assigned,
+          'status': command.status.storageValue,
+          'returned_date': returned,
+          'note': note,
+          'archived_at': command.status == PpeAssignmentStatus.archived
+              ? timestamp
+              : null,
+        };
+        if (rows.isEmpty) {
+          if (command.expectedRevision != 0) throw _staleFailure();
+          await tx.insert('workforce_ppe_assignments', {
+            'id': command.id,
+            'workforce_member_id': command.memberId,
+            ...values,
+            'revision': 1,
+            'created_at': timestamp,
+            'updated_at': timestamp,
+          });
+          await _insertWorkforceEvent(
+            tx,
+            id: command.eventId,
+            type: 'ppe',
+            aggregateId: command.id,
+            projectId: member.projectId,
+            eventType: 'ppe.created',
+            occurredAt: timestamp,
+            payload: {
+              'member_id': member.id,
+              'status': command.status.storageValue,
+            },
+          );
+        } else {
+          final current = _ppeFromRow(rows.single);
+          if (current.memberId != command.memberId) {
+            throw const AgendaValidationFailure(
+              'KKD zimmet kimliği başka personele bağlıdır.',
+            );
+          }
+          _requireRevision(current.revision, command.expectedRevision);
+          if (_ppeMatches(current, values)) return current;
+          final changed = await tx.update(
+            'workforce_ppe_assignments',
+            {
+              ...values,
+              'revision': current.revision + 1,
+              'updated_at': timestamp,
+            },
+            where: 'id = ? AND revision = ?',
+            whereArgs: [current.id, current.revision],
+          );
+          if (changed != 1) throw _staleFailure();
+          await _insertWorkforceEvent(
+            tx,
+            id: command.eventId,
+            type: 'ppe',
+            aggregateId: command.id,
+            projectId: member.projectId,
+            eventType: 'ppe.updated',
+            occurredAt: timestamp,
+            payload: {
+              'member_id': member.id,
+              'status': command.status.storageValue,
+            },
+          );
+        }
+        final saved = await tx.query(
+          'workforce_ppe_assignments',
+          where: 'id = ?',
+          whereArgs: [command.id],
+          limit: 1,
+        );
+        return _ppeFromRow(saved.single);
+      }),
+    );
+  }
+
+  @override
   Future<List<WorkforceMember>> listMembers(
     String projectId, {
     bool includeInactive = false,
@@ -84,15 +937,19 @@ class SqliteAttendanceApplication implements AttendanceApplication {
     validateUuid(projectId, 'Proje kimliği');
     final now = _readClockOnce();
     return _withDatabase(now, (database) async {
-      final rows = await database.query(
-        'workforce_members',
-        where: includeInactive
-            ? 'project_id = ?'
-            : 'project_id = ? AND is_active = 1',
-        whereArgs: [projectId],
-        orderBy:
-            'team_name COLLATE NOCASE ASC, '
-            'full_name COLLATE NOCASE ASC, id ASC',
+      final rows = await database.rawQuery(
+        '''
+        SELECT m.*, s.name AS subcontractor_name,
+          t.name AS registry_team_name
+        FROM workforce_members m
+        JOIN subcontractors s ON s.id = m.subcontractor_id
+        JOIN workforce_teams t ON t.id = m.team_id
+        WHERE m.project_id = ?
+          ${includeInactive ? '' : 'AND m.is_active = 1'}
+        ORDER BY s.name_normalized ASC, t.name_normalized ASC,
+          m.full_name COLLATE NOCASE ASC, m.id ASC
+      ''',
+        [projectId],
       );
       return rows.map(_memberFromRow).toList(growable: false);
     });
@@ -109,10 +966,10 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       'Personel adı',
       maxLength: 200,
     );
-    final teamName = requiredTrimmed(
+    final requestedTeamName = requiredTrimmed(
       command.teamName,
-      'Ekip/taşeron',
-      maxLength: 160,
+      'Ekip',
+      maxLength: 200,
     );
     final roleName = requiredTrimmed(
       command.roleName,
@@ -124,11 +981,24 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       'Personel kodu',
       maxLength: 80,
     );
+    final phone = optionalTrimmed(command.phone, 'Telefon', maxLength: 80);
+    final note = optionalTrimmed(command.note, 'Not', maxLength: 1000);
+    if (command.eventId != null) {
+      validateUuid(command.eventId!, 'Event kimliği');
+    }
     final now = _readClockOnce();
     final timestamp = CseTimeCodec.encodeUtc(now);
     return _withDatabase(now, (database) {
       return database.transaction((transaction) async {
         await _requireProject(transaction, command.projectId);
+        final registry = await _resolveRegistrySelection(
+          transaction,
+          projectId: command.projectId,
+          requestedTeamName: requestedTeamName,
+          subcontractorId: command.subcontractorId,
+          teamId: command.teamId,
+          timestamp: timestamp,
+        );
         final existing = await transaction.query(
           'workforce_members',
           where: 'id = ?',
@@ -139,9 +1009,12 @@ class SqliteAttendanceApplication implements AttendanceApplication {
           final member = _memberFromRow(existing.single);
           if (member.projectId != command.projectId ||
               member.fullName != fullName ||
-              member.teamName != teamName ||
+              member.teamId != registry.team.id ||
+              member.subcontractorId != registry.subcontractor.id ||
               member.roleName != roleName ||
-              member.personnelCode != personnelCode) {
+              member.personnelCode != personnelCode ||
+              member.phone != phone ||
+              member.note != note) {
             throw const AgendaValidationFailure(
               'Personel kimliği başka bir içerikle kullanılıyor.',
             );
@@ -157,21 +1030,44 @@ class SqliteAttendanceApplication implements AttendanceApplication {
           'id': command.id,
           'project_id': command.projectId,
           'full_name': fullName,
-          'team_name': teamName,
+          'team_name': registry.team.name,
           'role_name': roleName,
           'personnel_code': personnelCode,
+          'subcontractor_id': registry.subcontractor.id,
+          'team_id': registry.team.id,
+          'phone': phone,
+          'note': note,
           'is_active': 1,
           'revision': 1,
           'created_at': timestamp,
           'updated_at': timestamp,
         });
+        await _insertWorkforceEvent(
+          transaction,
+          id: command.eventId ?? _stableUuid('person-created:${command.id}'),
+          type: 'person',
+          aggregateId: command.id,
+          projectId: command.projectId,
+          eventType: 'person.created',
+          occurredAt: timestamp,
+          payload: {
+            'subcontractor_id': registry.subcontractor.id,
+            'team_id': registry.team.id,
+          },
+        );
         return _memberFromRow({
           'id': command.id,
           'project_id': command.projectId,
           'full_name': fullName,
-          'team_name': teamName,
+          'team_name': registry.team.name,
+          'registry_team_name': registry.team.name,
+          'subcontractor_id': registry.subcontractor.id,
+          'subcontractor_name': registry.subcontractor.name,
+          'team_id': registry.team.id,
           'role_name': roleName,
           'personnel_code': personnelCode,
+          'phone': phone,
+          'note': note,
           'is_active': 1,
           'revision': 1,
           'created_at': timestamp,
@@ -193,10 +1089,10 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       'Personel adı',
       maxLength: 200,
     );
-    final teamName = requiredTrimmed(
+    final requestedTeamName = requiredTrimmed(
       command.teamName,
-      'Ekip/taşeron',
-      maxLength: 160,
+      'Ekip',
+      maxLength: 200,
     );
     final roleName = requiredTrimmed(
       command.roleName,
@@ -208,15 +1104,31 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       'Personel kodu',
       maxLength: 80,
     );
+    final phone = optionalTrimmed(command.phone, 'Telefon', maxLength: 80);
+    final note = optionalTrimmed(command.note, 'Not', maxLength: 1000);
+    if (command.eventId != null) {
+      validateUuid(command.eventId!, 'Event kimliği');
+    }
     final now = _readClockOnce();
     return _withDatabase(now, (database) {
       return database.transaction((transaction) async {
         final member = await _requireMember(transaction, command.id);
         _requireRevision(member.revision, command.expectedRevision);
+        final registry = await _resolveRegistrySelection(
+          transaction,
+          projectId: member.projectId,
+          requestedTeamName: requestedTeamName,
+          subcontractorId: command.subcontractorId ?? member.subcontractorId,
+          teamId: command.teamId ?? member.teamId,
+          timestamp: CseTimeCodec.encodeUtc(now),
+        );
         if (member.fullName == fullName &&
-            member.teamName == teamName &&
+            member.teamId == registry.team.id &&
+            member.subcontractorId == registry.subcontractor.id &&
             member.roleName == roleName &&
-            member.personnelCode == personnelCode) {
+            member.personnelCode == personnelCode &&
+            member.phone == phone &&
+            member.note == note) {
           return member;
         }
         await _requireUniquePersonnelCode(
@@ -230,9 +1142,13 @@ class SqliteAttendanceApplication implements AttendanceApplication {
           'workforce_members',
           {
             'full_name': fullName,
-            'team_name': teamName,
+            'team_name': registry.team.name,
+            'subcontractor_id': registry.subcontractor.id,
+            'team_id': registry.team.id,
             'role_name': roleName,
             'personnel_code': personnelCode,
+            'phone': phone,
+            'note': note,
             'revision': member.revision + 1,
             'updated_at': timestamp,
           },
@@ -240,13 +1156,34 @@ class SqliteAttendanceApplication implements AttendanceApplication {
           whereArgs: [member.id, member.revision],
         );
         if (count != 1) throw _staleFailure();
+        await _insertWorkforceEvent(
+          transaction,
+          id:
+              command.eventId ??
+              _stableUuid('person-updated:${member.id}:${member.revision + 1}'),
+          type: 'person',
+          aggregateId: member.id,
+          projectId: member.projectId,
+          eventType: 'person.updated',
+          occurredAt: timestamp,
+          payload: {
+            'subcontractor_id': registry.subcontractor.id,
+            'team_id': registry.team.id,
+          },
+        );
         return _memberFromRow({
           'id': member.id,
           'project_id': member.projectId,
           'full_name': fullName,
-          'team_name': teamName,
+          'team_name': registry.team.name,
+          'registry_team_name': registry.team.name,
+          'subcontractor_id': registry.subcontractor.id,
+          'subcontractor_name': registry.subcontractor.name,
+          'team_id': registry.team.id,
           'role_name': roleName,
           'personnel_code': personnelCode,
+          'phone': phone,
+          'note': note,
           'is_active': member.isActive ? 1 : 0,
           'revision': member.revision + 1,
           'created_at': member.createdAt,
@@ -263,18 +1200,33 @@ class SqliteAttendanceApplication implements AttendanceApplication {
   ) async {
     validateUuid(command.id, 'Personel kimliği');
     _validateExpectedRevision(command.expectedRevision);
+    if (command.eventId != null) {
+      validateUuid(command.eventId!, 'Event kimliği');
+    }
     final now = _readClockOnce();
     return _withDatabase(now, (database) {
       return database.transaction((transaction) async {
         final member = await _requireMember(transaction, command.id);
         _requireRevision(member.revision, command.expectedRevision);
-        if (!member.isActive) return member;
+        if (member.isActive != command.archive) return member;
+        if (!command.archive) {
+          final subcontractor = await _loadSubcontractor(
+            transaction,
+            member.subcontractorId!,
+          );
+          final team = await _loadTeam(transaction, member.teamId!);
+          if (!subcontractor.isActive || !team.isActive) {
+            throw const AgendaValidationFailure(
+              'Personel yeniden açılmadan önce taşeron ve ekip yeniden açılmalıdır.',
+            );
+          }
+        }
         final timestamp = CseTimeCodec.encodeUtc(now);
         final count = await transaction.update(
           'workforce_members',
           {
-            'is_active': 0,
-            'archived_at': timestamp,
+            'is_active': command.archive ? 0 : 1,
+            'archived_at': command.archive ? timestamp : null,
             'updated_at': timestamp,
             'revision': member.revision + 1,
           },
@@ -282,6 +1234,21 @@ class SqliteAttendanceApplication implements AttendanceApplication {
           whereArgs: [member.id, member.revision],
         );
         if (count != 1) throw _staleFailure();
+        await _insertWorkforceEvent(
+          transaction,
+          id:
+              command.eventId ??
+              _stableUuid(
+                'person-${command.archive ? 'archived' : 'reopened'}:'
+                '${member.id}:${member.revision + 1}',
+              ),
+          type: 'person',
+          aggregateId: member.id,
+          projectId: member.projectId,
+          eventType: command.archive ? 'person.archived' : 'person.reopened',
+          occurredAt: timestamp,
+          payload: const {},
+        );
         return WorkforceMember(
           id: member.id,
           projectId: member.projectId,
@@ -289,11 +1256,16 @@ class SqliteAttendanceApplication implements AttendanceApplication {
           teamName: member.teamName,
           roleName: member.roleName,
           personnelCode: member.personnelCode,
-          isActive: false,
+          subcontractorId: member.subcontractorId,
+          subcontractorName: member.subcontractorName,
+          teamId: member.teamId,
+          phone: member.phone,
+          note: member.note,
+          isActive: !command.archive,
           revision: member.revision + 1,
           createdAt: member.createdAt,
           updatedAt: timestamp,
-          archivedAt: timestamp,
+          archivedAt: command.archive ? timestamp : null,
         );
       });
     });
@@ -530,10 +1502,15 @@ class SqliteAttendanceApplication implements AttendanceApplication {
     validateUuid(command.eventId, 'Event kimliği');
     _validateExpectedRevision(command.expectedRevision);
     final team = optionalTrimmed(command.teamName, 'Ekip/taşeron');
+    if (command.teamId != null) validateUuid(command.teamId!, 'Ekip kimliği');
     final detail = await getDayDetail(command.dayId);
     final members = await listMembers(detail.day.projectId);
     final selected = members
-        .where((member) => team == null || member.teamName == team)
+        .where(
+          (member) => command.teamId != null
+              ? member.teamId == command.teamId
+              : team == null || member.teamName == team,
+        )
         .toList(growable: false);
     if (selected.isEmpty) {
       throw const AgendaValidationFailure(
@@ -1427,12 +2404,16 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       '''
       SELECT
         e.*, m.full_name AS member_name, m.team_name, m.role_name,
-        m.personnel_code, m.is_active AS member_is_active
+        m.personnel_code, m.is_active AS member_is_active, m.team_id,
+        s.name AS subcontractor_name
       FROM attendance_entries e
       JOIN workforce_members m ON m.id = e.workforce_member_id
+      JOIN subcontractors s ON s.id = m.subcontractor_id
+      JOIN workforce_teams t ON t.id = m.team_id
       WHERE e.attendance_day_id = ? AND e.removed_at IS NULL
       ORDER BY
-        m.team_name COLLATE NOCASE ASC,
+        s.name_normalized ASC,
+        t.name_normalized ASC,
         m.full_name COLLATE NOCASE ASC,
         m.id ASC
       ''',
@@ -1459,7 +2440,7 @@ class SqliteAttendanceApplication implements AttendanceApplication {
     final totals = _calculateTotals(entries);
     final teams = <String, List<AttendanceEntry>>{};
     for (final entry in entries) {
-      teams.putIfAbsent(entry.teamName, () => []).add(entry);
+      teams.putIfAbsent(entry.teamId ?? entry.teamName, () => []).add(entry);
     }
     return AttendanceDayDetail(
       day: day,
@@ -1469,7 +2450,9 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       teamSummaries: teams.entries
           .map(
             (entry) => AttendanceTeamSummary(
-              teamName: entry.key,
+              teamName: entry.value.first.teamName,
+              teamId: entry.value.first.teamId,
+              subcontractorName: entry.value.first.subcontractorName,
               totals: _calculateTotals(entry.value),
             ),
           )
@@ -1479,6 +2462,237 @@ class SqliteAttendanceApplication implements AttendanceApplication {
           : _reminderFromRow(reminderRows.single),
     );
   }
+
+  Future<Subcontractor> _loadSubcontractor(
+    DatabaseExecutor database,
+    String id,
+  ) async {
+    final rows = await database.rawQuery(
+      '''
+      SELECT s.*,
+        (SELECT count(*) FROM workforce_teams t
+          WHERE t.subcontractor_id = s.id AND t.status = 'active')
+          AS active_team_count,
+        (SELECT count(*) FROM workforce_members m
+          WHERE m.subcontractor_id = s.id AND m.is_active = 1)
+          AS active_person_count
+      FROM subcontractors s WHERE s.id = ? LIMIT 1
+    ''',
+      [id],
+    );
+    if (rows.isEmpty) {
+      throw const AgendaValidationFailure('Taşeron bulunamadı.');
+    }
+    return _subcontractorFromRow(rows.single);
+  }
+
+  Future<WorkforceTeam> _loadTeam(DatabaseExecutor database, String id) async {
+    final rows = await database.rawQuery(
+      '''
+      SELECT t.*, s.name AS subcontractor_name,
+        (SELECT count(*) FROM workforce_members m
+          WHERE m.team_id = t.id AND m.is_active = 1)
+          AS active_person_count
+      FROM workforce_teams t
+      JOIN subcontractors s ON s.id = t.subcontractor_id
+      WHERE t.id = ? LIMIT 1
+    ''',
+      [id],
+    );
+    if (rows.isEmpty) {
+      throw const AgendaValidationFailure('Ekip bulunamadı.');
+    }
+    return _teamFromRow(rows.single);
+  }
+
+  Future<_RegistrySelection> _resolveRegistrySelection(
+    DatabaseExecutor database, {
+    required String projectId,
+    required String requestedTeamName,
+    required String? subcontractorId,
+    required String? teamId,
+    required String timestamp,
+  }) async {
+    if ((subcontractorId == null) != (teamId == null)) {
+      throw const AgendaValidationFailure(
+        'Taşeron ve ekip birlikte seçilmelidir.',
+      );
+    }
+    if (subcontractorId != null && teamId != null) {
+      validateUuid(subcontractorId, 'Taşeron kimliği');
+      validateUuid(teamId, 'Ekip kimliği');
+      final subcontractor = await _loadSubcontractor(database, subcontractorId);
+      final team = await _loadTeam(database, teamId);
+      if (subcontractor.projectId != projectId ||
+          team.projectId != projectId ||
+          team.subcontractorId != subcontractor.id ||
+          !subcontractor.isActive ||
+          !team.isActive) {
+        throw const AgendaValidationFailure(
+          'Personel yalnız aktif ve aynı projedeki taşeron/ekibe bağlanabilir.',
+        );
+      }
+      return _RegistrySelection(subcontractor, team);
+    }
+
+    // Schema v4 callers remain source compatible. Mobile UI never exposes this
+    // free-text compatibility path; it deterministically creates a legacy pair.
+    final normalized = _normalizeRegistryName(requestedTeamName);
+    final subcontractorStableId = _stableUuid(
+      'legacy-subcontractor:$projectId:$normalized',
+    );
+    final teamStableId = _stableUuid('legacy-team:$projectId:$normalized');
+    final subcontractorRows = await database.query(
+      'subcontractors',
+      columns: ['id'],
+      where: 'project_id = ? AND name_normalized = ?',
+      whereArgs: [projectId, normalized],
+      limit: 1,
+    );
+    final resolvedSubcontractorId = subcontractorRows.isEmpty
+        ? subcontractorStableId
+        : subcontractorRows.single['id']! as String;
+    if (subcontractorRows.isEmpty) {
+      await database.insert('subcontractors', {
+        'id': resolvedSubcontractorId,
+        'project_id': projectId,
+        'name': requestedTeamName,
+        'name_normalized': normalized,
+        'status': 'active',
+        'revision': 1,
+        'created_at': timestamp,
+        'updated_at': timestamp,
+      });
+      await _insertWorkforceEvent(
+        database,
+        id: _stableUuid(
+          'legacy-subcontractor-created:$resolvedSubcontractorId',
+        ),
+        type: 'subcontractor',
+        aggregateId: resolvedSubcontractorId,
+        projectId: projectId,
+        eventType: 'subcontractor.created',
+        occurredAt: timestamp,
+        payload: {'compatibility_path': true},
+      );
+    }
+    final teamRows = await database.query(
+      'workforce_teams',
+      columns: ['id'],
+      where: 'subcontractor_id = ? AND name_normalized = ?',
+      whereArgs: [resolvedSubcontractorId, normalized],
+      limit: 1,
+    );
+    final resolvedTeamId = teamRows.isEmpty
+        ? teamStableId
+        : teamRows.single['id']! as String;
+    if (teamRows.isEmpty) {
+      await database.insert('workforce_teams', {
+        'id': resolvedTeamId,
+        'project_id': projectId,
+        'subcontractor_id': resolvedSubcontractorId,
+        'name': requestedTeamName,
+        'name_normalized': normalized,
+        'status': 'active',
+        'revision': 1,
+        'created_at': timestamp,
+        'updated_at': timestamp,
+      });
+      await _insertWorkforceEvent(
+        database,
+        id: _stableUuid('legacy-team-created:$resolvedTeamId'),
+        type: 'team',
+        aggregateId: resolvedTeamId,
+        projectId: projectId,
+        eventType: 'team.created',
+        occurredAt: timestamp,
+        payload: {'compatibility_path': true},
+      );
+    }
+    return _RegistrySelection(
+      await _loadSubcontractor(database, resolvedSubcontractorId),
+      await _loadTeam(database, resolvedTeamId),
+    );
+  }
+
+  Future<void> _insertWorkforceEvent(
+    DatabaseExecutor database, {
+    required String id,
+    required String type,
+    required String aggregateId,
+    required String projectId,
+    required String eventType,
+    required String occurredAt,
+    required Map<String, Object?> payload,
+  }) async {
+    final sequenceRows = await database.rawQuery(
+      '''
+      SELECT coalesce(max(sequence), 0) + 1 AS value
+      FROM workforce_events
+      WHERE aggregate_type = ? AND aggregate_id = ?
+    ''',
+      [type, aggregateId],
+    );
+    await database.insert('workforce_events', {
+      'id': id,
+      'aggregate_type': type,
+      'aggregate_id': aggregateId,
+      'project_id': projectId,
+      'sequence': sequenceRows.single['value'],
+      'event_type': eventType,
+      'occurred_at': occurredAt,
+      'payload_json': jsonEncode(payload),
+    });
+  }
+
+  String _requiredLocalDate(String value, String field) {
+    final parsed = _optionalLocalDate(value, field);
+    if (parsed == null) throw AgendaValidationFailure('$field zorunludur.');
+    return parsed;
+  }
+
+  String? _optionalLocalDate(String? value, String field) {
+    final normalized = optionalTrimmed(value, field, maxLength: 10);
+    if (normalized == null) return null;
+    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(normalized)) {
+      throw AgendaValidationFailure('$field YYYY-AA-GG biçiminde olmalıdır.');
+    }
+    final parsed = DateTime.tryParse(normalized);
+    if (parsed == null ||
+        '${parsed.year.toString().padLeft(4, '0')}-'
+                '${parsed.month.toString().padLeft(2, '0')}-'
+                '${parsed.day.toString().padLeft(2, '0')}' !=
+            normalized) {
+      throw AgendaValidationFailure('$field geçersizdir.');
+    }
+    return normalized;
+  }
+
+  bool _complianceMatches(
+    WorkforceComplianceRecord current,
+    Map<String, Object?> values,
+  ) =>
+      current.documentType.storageValue == values['document_type'] &&
+      current.documentNumber == values['document_number'] &&
+      current.issuedDate == values['issued_date'] &&
+      current.expiryDate == values['expiry_date'] &&
+      current.sourceStatus.storageValue == values['source_status'] &&
+      current.note == values['note'] &&
+      current.reason == values['reason'];
+
+  bool _ppeMatches(
+    WorkforcePpeAssignment current,
+    Map<String, Object?> values,
+  ) =>
+      current.ppeType == values['ppe_type'] &&
+      current.brandModel == values['brand_model'] &&
+      current.size == values['size'] &&
+      current.serialTag == values['serial_tag'] &&
+      current.quantity == values['quantity'] &&
+      current.assignedDate == values['assigned_date'] &&
+      current.status.storageValue == values['status'] &&
+      current.returnedDate == values['returned_date'] &&
+      current.note == values['note'];
 
   Future<String> _requireProject(
     DatabaseExecutor database,
@@ -1501,11 +2715,16 @@ class SqliteAttendanceApplication implements AttendanceApplication {
     DatabaseExecutor database,
     String memberId,
   ) async {
-    final rows = await database.query(
-      'workforce_members',
-      where: 'id = ?',
-      whereArgs: [memberId],
-      limit: 1,
+    final rows = await database.rawQuery(
+      '''
+      SELECT m.*, s.name AS subcontractor_name,
+        t.name AS registry_team_name
+      FROM workforce_members m
+      JOIN subcontractors s ON s.id = m.subcontractor_id
+      JOIN workforce_teams t ON t.id = m.team_id
+      WHERE m.id = ? LIMIT 1
+    ''',
+      [memberId],
     );
     if (rows.isEmpty) {
       throw const AgendaValidationFailure('Personel bulunamadı.');
@@ -1730,12 +2949,46 @@ class SqliteAttendanceApplication implements AttendanceApplication {
   });
 }
 
+Subcontractor _subcontractorFromRow(Map<String, Object?> row) => Subcontractor(
+  id: row['id']! as String,
+  projectId: row['project_id']! as String,
+  name: requiredTrimmed(row['name']! as String, 'Taşeron adı'),
+  contactName: row['contact_name'] as String?,
+  phone: row['phone'] as String?,
+  note: row['note'] as String?,
+  status: WorkforceRecordStatus.fromStorage(row['status']! as String),
+  activeTeamCount: (row['active_team_count'] as int?) ?? 0,
+  activePersonCount: (row['active_person_count'] as int?) ?? 0,
+  revision: row['revision']! as int,
+  createdAt: row['created_at']! as String,
+  updatedAt: row['updated_at']! as String,
+  archivedAt: row['archived_at'] as String?,
+);
+
+WorkforceTeam _teamFromRow(Map<String, Object?> row) => WorkforceTeam(
+  id: row['id']! as String,
+  projectId: row['project_id']! as String,
+  subcontractorId: row['subcontractor_id']! as String,
+  subcontractorName: row['subcontractor_name']! as String,
+  name: requiredTrimmed(row['name']! as String, 'Ekip adı'),
+  leadName: row['lead_name'] as String?,
+  note: row['note'] as String?,
+  status: WorkforceRecordStatus.fromStorage(row['status']! as String),
+  activePersonCount: (row['active_person_count'] as int?) ?? 0,
+  revision: row['revision']! as int,
+  createdAt: row['created_at']! as String,
+  updatedAt: row['updated_at']! as String,
+  archivedAt: row['archived_at'] as String?,
+);
+
 WorkforceMember _memberFromRow(Map<String, Object?> row) {
   final id = row['id']! as String;
   final projectId = row['project_id']! as String;
   final createdAt = row['created_at']! as String;
   final updatedAt = row['updated_at']! as String;
   final archivedAt = row['archived_at'] as String?;
+  final subcontractorId = row['subcontractor_id'] as String?;
+  final teamId = row['team_id'] as String?;
   validateUuid(id, 'Personel kimliği');
   validateUuid(projectId, 'Proje kimliği');
   validateCanonicalTimestamp(createdAt, 'Personel oluşturma zamanı');
@@ -1743,13 +2996,25 @@ WorkforceMember _memberFromRow(Map<String, Object?> row) {
   if (archivedAt != null) {
     validateCanonicalTimestamp(archivedAt, 'Personel pasifleştirme zamanı');
   }
+  if (subcontractorId != null) {
+    validateUuid(subcontractorId, 'Taşeron kimliği');
+  }
+  if (teamId != null) validateUuid(teamId, 'Ekip kimliği');
   return WorkforceMember(
     id: id,
     projectId: projectId,
     fullName: requiredTrimmed(row['full_name']! as String, 'Personel adı'),
-    teamName: requiredTrimmed(row['team_name']! as String, 'Ekip/taşeron'),
+    teamName: requiredTrimmed(
+      (row['registry_team_name'] ?? row['team_name'])! as String,
+      'Ekip',
+    ),
     roleName: requiredTrimmed(row['role_name']! as String, 'Meslek/pozisyon'),
     personnelCode: row['personnel_code'] as String?,
+    subcontractorId: subcontractorId,
+    subcontractorName: row['subcontractor_name'] as String?,
+    teamId: teamId,
+    phone: row['phone'] as String?,
+    note: row['note'] as String?,
     isActive: row['is_active'] == 1,
     revision: row['revision']! as int,
     createdAt: createdAt,
@@ -1798,6 +3063,8 @@ AttendanceEntry _entryFromRow(Map<String, Object?> row) {
     memberId: row['workforce_member_id']! as String,
     memberName: row['member_name']! as String,
     teamName: row['team_name']! as String,
+    teamId: row['team_id'] as String?,
+    subcontractorName: row['subcontractor_name'] as String?,
     roleName: row['role_name']! as String,
     personnelCode: row['personnel_code'] as String?,
     memberIsActive: row['member_is_active'] == 1,
@@ -1808,6 +3075,67 @@ AttendanceEntry _entryFromRow(Map<String, Object?> row) {
     updatedAt: updatedAt,
   );
 }
+
+WorkforceComplianceRecord _complianceFromRow(
+  Map<String, Object?> row,
+  String today,
+) {
+  final source = ComplianceSourceStatus.fromStorage(
+    row['source_status']! as String,
+  );
+  final expiry = row['expiry_date'] as String?;
+  final readStatus = switch (source) {
+    ComplianceSourceStatus.missing => ComplianceReadStatus.missing,
+    ComplianceSourceStatus.notApplicable ||
+    ComplianceSourceStatus.exception => ComplianceReadStatus.exception,
+    ComplianceSourceStatus.valid =>
+      expiry == null
+          ? ComplianceReadStatus.valid
+          : expiry.compareTo(today) < 0
+          ? ComplianceReadStatus.expired
+          : DateTime.parse(expiry).difference(DateTime.parse(today)).inDays <=
+                30
+          ? ComplianceReadStatus.expiring
+          : ComplianceReadStatus.valid,
+  };
+  return WorkforceComplianceRecord(
+    id: row['id']! as String,
+    memberId: row['workforce_member_id']! as String,
+    documentType: ComplianceDocumentType.fromStorage(
+      row['document_type']! as String,
+    ),
+    documentNumber: row['document_number'] as String?,
+    issuedDate: row['issued_date'] as String?,
+    expiryDate: expiry,
+    sourceStatus: source,
+    readStatus: readStatus,
+    note: row['note'] as String?,
+    reason: row['reason'] as String?,
+    revision: row['revision']! as int,
+    createdAt: row['created_at']! as String,
+    updatedAt: row['updated_at']! as String,
+    archivedAt: row['archived_at'] as String?,
+  );
+}
+
+WorkforcePpeAssignment _ppeFromRow(Map<String, Object?> row) =>
+    WorkforcePpeAssignment(
+      id: row['id']! as String,
+      memberId: row['workforce_member_id']! as String,
+      ppeType: row['ppe_type']! as String,
+      brandModel: row['brand_model'] as String?,
+      size: row['size'] as String?,
+      serialTag: row['serial_tag'] as String?,
+      quantity: row['quantity']! as int,
+      assignedDate: row['assigned_date']! as String,
+      status: PpeAssignmentStatus.fromStorage(row['status']! as String),
+      returnedDate: row['returned_date'] as String?,
+      note: row['note'] as String?,
+      revision: row['revision']! as int,
+      createdAt: row['created_at']! as String,
+      updatedAt: row['updated_at']! as String,
+      archivedAt: row['archived_at'] as String?,
+    );
 
 AttendanceEvent _eventFromRow(Map<String, Object?> row) => AttendanceEvent(
   id: row['id']! as String,
@@ -1919,4 +3247,14 @@ String _stableUuid(String seed) {
   return '${value.substring(0, 8)}-${value.substring(8, 12)}-'
       '${value.substring(12, 16)}-${value.substring(16, 20)}-'
       '${value.substring(20)}';
+}
+
+String _normalizeRegistryName(String value) =>
+    value.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+
+class _RegistrySelection {
+  const _RegistrySelection(this.subcontractor, this.team);
+
+  final Subcontractor subcontractor;
+  final WorkforceTeam team;
 }

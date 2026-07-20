@@ -60,6 +60,10 @@ void main() {
       expect(gateway, contains('requestBadgePermission: false'));
       expect(gateway, contains('requestSoundPermission: false'));
       expect(gateway, contains('AndroidScheduleMode.inexactAllowWhileIdle'));
+      expect(gateway, contains('periodicallyShowWithDuration'));
+      expect(gateway, contains('repeatIntervalMinutes'));
+      expect(gateway, contains('Clock.fixed(instant.subtract(interval))'));
+      expect(gateway, contains('rollingRepeatOccurrenceCount = 24'));
       expect(project, contains('IPHONEOS_DEPLOYMENT_TARGET = 13.0'));
       expect(project, contains('com.faliardic.chiefsiteengineer'));
       expect(plist, contains('UIApplicationSceneManifest'));
@@ -73,6 +77,7 @@ void main() {
     final lock = File('pubspec.lock').readAsStringSync();
 
     expect(pubspec, contains('flutter_local_notifications: ^22.0.1'));
+    expect(pubspec, contains('clock: ^1.1.2'));
     expect(lock, contains('flutter_local_notifications:'));
     expect(lock, contains('version: "22.1.0"'));
   });
@@ -84,7 +89,7 @@ void main() {
       final pubspec = File('pubspec.yaml').readAsStringSync();
       final lock = File('pubspec.lock').readAsStringSync();
 
-      expect(schema, contains('static const schemaVersion = 5'));
+      expect(schema, contains('static const schemaVersion = 6'));
       expect(schema, contains('CREATE TABLE workforce_members'));
       expect(schema, contains('CREATE TABLE attendance_days'));
       expect(schema, contains('CREATE TABLE attendance_entries'));

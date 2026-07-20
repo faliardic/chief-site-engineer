@@ -1,57 +1,69 @@
-# Step 194 Result
+# Issue #194 Yerel Sonuç Kaydı
 
-## Outcome
-- Status: completed
-- Issue: #3
-- Pull request: #4, open draft
-- Branch: `step-194-cse-status-report`
-- Base commit: `51d6bc9283fab92bc303d0d96b6a17768d28979e`
-- Result commit: `9d98a898461722ba8871a38b7599bb328c11d78a`
+## Teslim
 
-## Work Completed
-- Added `scripts/cse_status.py`, a read-only local CSE status reporter.
-- Added focused tests in `tests/test_cse_status.py`.
-- Supported default text plus JSON output.
-- Supported parseable JSON-only output with `--format json`.
-- Supported explicit pytest execution with `--run-tests`.
-- Supported optional JSON file writing with overwrite protection through `--json-output` and `--overwrite`.
-- Kept default execution diagnostic-only and repository read-only.
+- Mobil SQLite schema `5 → 6`; deterministik legacy taşeron/ekip eşlemesi,
+  exact personel/Puantaj geçmişi korunumu ve atomik rollback/retry.
+- Optimistic taşeron → ekip → personel sicili, logical archive/reopen,
+  append-only workforce event, İSG belge read-model'i ve KKD zimmet geçmişi.
+- Ajanda ana ekranından proje oluşturma ve Ajanda/Hatırlatıcı/Puantaj/Beton
+  ekranlarında restart gerektirmeyen canlı proje kataloğu.
+- Beton için exact iki saatlik inexact saha görevi ve kullanıcıdan kod istemeyen
+  deterministik numune seti akışı.
+- Reminder kartında Europe/Istanbul takvim sözleşmeli `Yarın` işlemi.
+- Backup format `1` içinde mobil schema `1`–`6` staging migration ve schema `6`
+  sicil/bağlantı/event exact round-trip'i.
 
-## Files Changed
-- Added `scripts/cse_status.py`
-- Added `tests/test_cse_status.py`
-- Added `.cse/results/194_result.md`
-- Updated `.cse/state/project_state.json`
+## Yerel doğrulama
 
-## Verification
-- Focused tests: `python -m pytest tests/test_cse_status.py` -> `8 passed in 0.07s`
-- Full tests: `python -m pytest` -> `406 passed in 1.44s`
-- `git diff --check`: passed
-- New command without tests: `python scripts/cse_status.py` -> passed
-- New command with tests: `python scripts/cse_status.py --run-tests` -> passed; nested pytest reported `406 passed in 0.66s`
-- JSON parse validation: `python scripts/cse_status.py --format json | python -m json.tool > $null` -> passed
-- Changed-file scope: authorized files only
-- `exports/`: clean; contains only `.gitkeep`
-- ZIP status: no `*.zip` files found in the working tree
-- Ignored files after cache cleanup: none reported by `git status --ignored --short --untracked-files=all`
-- Production application code changed: no
-- Tests changed: yes, focused tests only
+- Flutter analyze: `No issues found`.
+- Flutter unit/widget suite: `147 passed`.
+- Android API 36 emülatör integration: `1 passed`; schema 6 sicili, İSG/KKD,
+  Puantaj, exact Beton görevleri, notification, restart ve backup/restore geçti.
+- Android debug ARM64 APK: üretildi ve emülatöre kuruldu.
+- Unsigned ARM64 release AAB: `20,211,483 byte`; native/manifest kapısı geçti.
+- Repository-dışı ephemeral PKCS12 ile signed AAB: `20,219,868 byte`; signer
+  doğrulandı, geçici keystore/parola finalde temp köküyle silindi.
+- Universal ephemeral RC APK: `20,520,886 byte`; signer, ARM64 ve
+  `zipalign -c -P 16 -v 4` doğrulandı.
+- RC APK SHA-256:
+  `8463783cc7c6a23e13bd166088449ade9c2889b348c299569eba401fd2ac8516`.
+- Android source/merged manifest: API 36, izin allowlist, no INTERNET/cleartext,
+  no broad storage/media ve no exact alarm kapıları geçti.
+- iOS privacy manifest, iPhone target, plugin privacy inventory ve statik proje
+  uyumluluğu geçti; native archive/store submission iddia edilmedi.
+- Schema 5→6 rollback/retry, deterministic case/space/boş legacy mapping,
+  personel ID/attendance entry-event korunumu ve restart kalıcılığı geçti.
+- Sicil duplicate/stale/no-op/archive/reopen/event; İSG tarih sınırları ve KKD
+  lifecycle; 320 px selector/registry/person tab ve input/double-tap testleri geçti.
+- Reminder aynı yerel saat/ertesi 09:00, canonical UTC, source mutation yokluğu,
+  event/revision ve periodic reconciliation testleri geçti.
+- Backup schema `1`–`6` migration, schema `6` full round-trip ve gelecek schema
+  fail-closed regresyonları geçti; format sürümü `1` kaldı.
+- Python full suite: `1002 passed, 7 skipped`.
+- `python -m compileall -q app scripts`, state JSON ve `git diff --check` geçti.
+- Exact changed-file allowlist, protected Python/web/desktop/release config diff,
+  exports, ignored ZIP/build/cache/RC ve changed-file secret taraması temiz.
 
-## Boundary Confirmation
-- Automatic staging, cleaning, committing, pushing, branch changing, or merging added: no
-- Default repository mutation added: no
-- Export output writing added by default: no
-- ZIP mutation added: no
-- Hard validation or automatic blocking added: no
-- Application-level `blocked` status added: no
-- API, GUI, database/repository application access, audit behavior, backup/restore, or migration behavior added: no
-- Existing production application behavior changed: no
+## Güvenlik sınırı
 
-## Git State
-- Commit: `9d98a898461722ba8871a38b7599bb328c11d78a`
-- Push: completed to `origin/step-194-cse-status-report`
-- Draft PR: #4 remains draft
-- Merge: not authorized
+- Gerçek kullanıcı verisi, gerçek `CSE_DATA_ROOT`, upload/signing key, Apple
+  sertifikası, provisioning profile veya secret kullanılmadı.
+- `reports/` okunmadı/değiştirilmedi; root `exports/` yalnız `.gitkeep` kaldı.
+- ZIP, Flutter cache/build, unsigned/signed AAB ve RC APK ignored/stage dışı kaldı.
+- Play Console/App Store Connect, PR, merge veya gerçek saha kabulü yapılmadı.
 
-## Recommended Next Action
-- ChatGPT review of draft PR #4, then merge only after explicit user approval.
+## PR #195 merge blocker follow-up
+
+- Future due saatlik Beton tekrarı Android'de due anına bağlı native inexact
+  periodic kayıt, iOS'ta tek logical reminder'a bağlı 24 saatlik rolling platform
+  kayıt grubu olarak düzeltildi.
+- Due anında uygulamanın açılması veya reconciliation çalışması gerekmez.
+- `Yarın`, terminated-app, completion, cancel, source reopen, eksik rolling grup
+  onarımı ve duplicate logical reminder yokluğu executable testlerle kapsandı.
+- Exact alarm, schema, backup formatı ve desktop export sözleşmesi değişmedi.
+- Flutter analyze temiz; full suite `149 passed`, API 36 Android integration
+  `1 passed`, Python full suite `1002 passed, 7 skipped` tamamlandı.
+- Android ARM64 debug APK ve unsigned release AAB üretildi; merged manifest,
+  permission/no-exact-alarm, iOS privacy/static ve ARM64 native envanter kapıları
+  geçti. `compileall`, state JSON ve diff kontrolü temizdir.

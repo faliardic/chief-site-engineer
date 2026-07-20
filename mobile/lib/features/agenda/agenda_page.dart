@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
@@ -24,6 +27,7 @@ class _AgendaPageState extends State<AgendaPage> {
   String _search = '';
   bool _loading = true;
   String? _error;
+  StreamSubscription<void>? _projectSubscription;
 
   @override
   void initState() {
@@ -31,7 +35,61 @@ class _AgendaPageState extends State<AgendaPage> {
     _selectedDay = CseTimeCodec.istanbulDayKey(
       CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
     );
+    _projectSubscription = widget.agenda.projectChanges.listen(
+      (_) => _reload(),
+    );
     _reload();
+  }
+
+  @override
+  void dispose() {
+    _projectSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _createProject() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Yeni proje'),
+        content: TextField(
+          key: const Key('agenda-project-name'),
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Proje adı'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            key: const Key('save-agenda-project'),
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Oluştur'),
+          ),
+        ],
+      ),
+    );
+    await Future<void>.delayed(kThemeAnimationDuration);
+    controller.dispose();
+    if (name == null) return;
+    try {
+      final project = await widget.agenda.createProject(
+        CreateProjectCommand(id: RecordId.randomUuid(), name: name),
+      );
+      if (!mounted) return;
+      setState(() => _projectId = project.id);
+      await _reload();
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error = error is AgendaValidationFailure
+            ? error.message
+            : 'Proje oluşturulamadı.',
+      );
+    }
   }
 
   Future<void> _reload() async {
@@ -129,6 +187,16 @@ class _AgendaPageState extends State<AgendaPage> {
           key: const Key('agenda-day-list'),
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
           children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                key: const Key('create-agenda-project'),
+                onPressed: _createProject,
+                icon: const Icon(Icons.create_new_folder_outlined),
+                label: const Text('Yeni proje'),
+              ),
+            ),
+            const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 8,

@@ -28,8 +28,16 @@ class FakeAgendaApplication implements AgendaApplication {
   CreateReminderCommand? lastReminderCommand;
   Object? createReminderFailure;
   Completer<MobileReminder>? createReminderCompleter;
+  Completer<MobileReminder>? mutateReminderCompleter;
   int createLogCalls = 0;
   int createReminderCalls = 0;
+  int mutateReminderCalls = 0;
+  MutateReminderCommand? lastMutationCommand;
+  final StreamController<void> _projectChanges =
+      StreamController<void>.broadcast();
+
+  @override
+  Stream<void> get projectChanges => _projectChanges.stream;
 
   @override
   Stream<String> get notificationTaps => notificationTapStream;
@@ -44,6 +52,7 @@ class FakeAgendaApplication implements AgendaApplication {
       revision: 1,
     );
     projects = [...projects, project];
+    _projectChanges.add(null);
     return project;
   }
 
@@ -175,6 +184,11 @@ class FakeAgendaApplication implements AgendaApplication {
 
   @override
   Future<MobileReminder> mutateReminder(MutateReminderCommand command) async {
+    mutateReminderCalls += 1;
+    lastMutationCommand = command;
+    if (mutateReminderCompleter case final completer?) {
+      return completer.future;
+    }
     final index = reminders.indexWhere((item) => item.id == command.reminderId);
     if (index < 0) throw StateError('missing reminder');
     final current = reminders[index];

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -8,6 +9,7 @@ import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/concrete_models.dart';
 import 'package:chief_site_engineer/platform/concrete_attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/concrete_export_gateway.dart';
+import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
 import 'package:crypto/crypto.dart';
@@ -26,6 +28,7 @@ void main() {
   late SqliteConcreteApplication concrete;
   late _MemoryAttachmentStore attachments;
   late _MemoryExportGateway exports;
+  late _DurableNotificationGateway notifications;
   var now = DateTime.utc(2026, 7, 19, 7);
 
   setUpAll(sqfliteFfiInit);
@@ -41,10 +44,12 @@ void main() {
     );
     await database.open();
     await database.close();
+    notifications = _DurableNotificationGateway();
     agenda = SqliteAgendaApplication(
       databasePath: directories.databaseFile,
       databaseFactory: databaseFactoryFfi,
       clock: () => now,
+      notificationGateway: notifications,
     );
     await agenda.createProject(
       const CreateProjectCommand(id: projectId, name: 'Şantiye A'),
@@ -116,6 +121,234 @@ void main() {
           'reminder_notification_bindings',
         ),
         8,
+      );
+    },
+  );
+
+  test(
+    'field tasks repeat hourly and completion or clearing closes and reopens',
+    () async {
+      var detail = await concrete.createPour(_createCommand());
+      var fieldTasks = detail.followUps
+          .where(
+            (item) =>
+                item.itemKey == 'inspection_notification_task' ||
+                item.itemKey == 'laboratory_appointment_task',
+          )
+          .toList(growable: false);
+      expect(
+        fieldTasks.map((item) => item.label),
+        containsAll([
+          'Laboratuvar randevusunu al/doğrula',
+          'Yapı denetime haber ver',
+        ]),
+      );
+      expect(
+        fieldTasks.every((item) => item.dueAt == '2026-07-19T08:00:00Z'),
+        isTrue,
+      );
+      final database = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      var bindings = await database.rawQuery(
+        '''
+        SELECT b.repeat_interval_minutes
+        FROM reminder_notification_bindings b
+        JOIN concrete_follow_up_items c ON c.reminder_id = b.reminder_id
+        WHERE c.concrete_pour_id = ?
+          AND c.item_key IN (
+            'inspection_notification_task', 'laboratory_appointment_task'
+          )
+        ORDER BY c.item_key ASC
+      ''',
+        [pourId],
+      );
+      expect(bindings.map((row) => row['repeat_interval_minutes']), [60, 60]);
+      await database.close();
+
+      final delayedTask = fieldTasks.first;
+      var delayedReminder = detail.linkedReminders.firstWhere(
+        (item) => item.id == delayedTask.reminderId,
+      );
+      delayedReminder = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: delayedReminder.id,
+          eventId: _uuid(169),
+          expectedRevision: delayedReminder.revision,
+          action: ReminderMutationAction.snoozeTomorrowMorning,
+        ),
+      );
+      expect(delayedReminder.nextAttentionAt, '2026-07-20T08:00:00Z');
+      final scheduleCallsBeforeTermination = notifications.scheduled.length;
+      notifications.simulateTerminatedApp();
+      expect(notifications.occurrencesFor(delayedReminder.id).take(3), [
+        DateTime.utc(2026, 7, 20, 8),
+        DateTime.utc(2026, 7, 20, 9),
+        DateTime.utc(2026, 7, 20, 10),
+      ]);
+      expect(
+        notifications.scheduled,
+        hasLength(scheduleCallsBeforeTermination),
+      );
+      expect(await _count(directories.databaseFile, 'follow_up_items'), 8);
+      notifications.resumeApp();
+
+      detail = await concrete.updatePour(
+        _updatePourCommand(
+          detail,
+          eventId: _uuid(170),
+          laboratoryAppointment: '2026-07-19T08:00:00Z',
+          inspectionNotifiedAt: '2026-07-19T07:30:00Z',
+        ),
+      );
+      fieldTasks = detail.followUps
+          .where((item) => item.itemKey.endsWith('_task'))
+          .toList(growable: false);
+      expect(
+        fieldTasks.every(
+          (item) =>
+              item.status == ConcreteFollowUpStatus.completed &&
+              item.dueAt == null,
+        ),
+        isTrue,
+      );
+      expect(
+        detail.linkedReminders
+            .where(
+              (item) => fieldTasks.any((task) => task.reminderId == item.id),
+            )
+            .every((item) => item.status == ReminderStatus.completed),
+        isTrue,
+      );
+      expect(
+        fieldTasks.every(
+          (item) => notifications.occurrencesFor(item.reminderId!).isEmpty,
+        ),
+        isTrue,
+      );
+
+      now = DateTime.utc(2026, 7, 19, 7, 10);
+      detail = await concrete.updatePour(
+        _updatePourCommand(detail, eventId: _uuid(171)),
+      );
+      fieldTasks = detail.followUps
+          .where((item) => item.itemKey.endsWith('_task'))
+          .toList(growable: false);
+      expect(
+        fieldTasks.every(
+          (item) =>
+              item.status == ConcreteFollowUpStatus.pending &&
+              item.dueAt == '2026-07-19T08:10:00Z',
+        ),
+        isTrue,
+      );
+      final reopenedDatabase = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      bindings = await reopenedDatabase.rawQuery(
+        '''
+        SELECT b.repeat_interval_minutes
+        FROM reminder_notification_bindings b
+        JOIN concrete_follow_up_items c ON c.reminder_id = b.reminder_id
+        WHERE c.concrete_pour_id = ? AND c.item_key LIKE '%_task'
+      ''',
+        [pourId],
+      );
+      await reopenedDatabase.close();
+      expect(bindings.map((row) => row['repeat_interval_minutes']), [60, 60]);
+      expect(
+        notifications.occurrencesFor(fieldTasks.first.reminderId!).take(3),
+        [
+          DateTime.utc(2026, 7, 19, 8, 10),
+          DateTime.utc(2026, 7, 19, 9, 10),
+          DateTime.utc(2026, 7, 19, 10, 10),
+        ],
+      );
+
+      final reminderToCancel = detail.linkedReminders.firstWhere(
+        (item) => item.id == fieldTasks.last.reminderId,
+      );
+      await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: reminderToCancel.id,
+          eventId: _uuid(172),
+          expectedRevision: reminderToCancel.revision,
+          action: ReminderMutationAction.cancel,
+        ),
+      );
+      expect(notifications.occurrencesFor(reminderToCancel.id), isEmpty);
+      expect(await _count(directories.databaseFile, 'follow_up_items'), 8);
+    },
+  );
+
+  test(
+    'sample sets need no manual code and keep generated identity on update',
+    () async {
+      var detail = await concrete.createPour(_createCommand());
+      detail = await concrete.saveSampleSet(
+        SaveConcreteSampleSetCommand(
+          id: _uuid(180),
+          pourId: pourId,
+          eventId: _uuid(181),
+          expectedPourRevision: detail.pour.revision,
+          expectedSampleRevision: 0,
+          sampleCount: 1,
+          sampleLabels: const ['Küp 1'],
+          sampledAt: '2026-07-19T07:00:00Z',
+          expectedResultDates: const [],
+          status: ConcreteSampleStatus.sampled,
+        ),
+      );
+      expect(detail.sampleSets.single.sampleCode, 'Numune seti 1');
+      final first = detail.sampleSets.single;
+      detail = await concrete.saveSampleSet(
+        SaveConcreteSampleSetCommand(
+          id: first.id,
+          pourId: pourId,
+          eventId: _uuid(182),
+          expectedPourRevision: detail.pour.revision,
+          expectedSampleRevision: first.revision,
+          sampleCount: 1,
+          sampleLabels: const ['Küp 1'],
+          sampledAt: '2026-07-19T07:00:00Z',
+          expectedResultDates: const [],
+          status: ConcreteSampleStatus.sampled,
+          note: 'Kod görünmeden güncellendi',
+        ),
+      );
+      expect(detail.sampleSets.single.sampleCode, 'Numune seti 1');
+      detail = await concrete.saveSampleSet(
+        SaveConcreteSampleSetCommand(
+          id: _uuid(183),
+          pourId: pourId,
+          eventId: _uuid(184),
+          expectedPourRevision: detail.pour.revision,
+          expectedSampleRevision: 0,
+          sampleCount: 1,
+          sampleLabels: const ['Küp 2'],
+          sampledAt: '2026-07-19T07:05:00Z',
+          expectedResultDates: const [],
+          status: ConcreteSampleStatus.sampled,
+        ),
+      );
+      expect(detail.sampleSets.map((item) => item.sampleCode), [
+        'Numune seti 1',
+        'Numune seti 2',
+      ]);
+      final restarted = _application(
+        agenda: agenda,
+        attachments: attachments,
+        exports: exports,
+        directories: directories,
+        clock: () => now,
+      );
+      expect(
+        (await restarted.getPourDetail(
+          pourId,
+        )).sampleSets.map((item) => item.sampleCode),
+        ['Numune seti 1', 'Numune seti 2'],
       );
     },
   );
@@ -697,6 +930,25 @@ SqliteConcreteApplication _application({
   beforeConcreteEventInsert: beforeEvent,
 );
 
+UpdateConcretePourCommand _updatePourCommand(
+  ConcretePourDetail detail, {
+  required String eventId,
+  String? laboratoryAppointment,
+  String? inspectionNotifiedAt,
+}) => UpdateConcretePourCommand(
+  id: detail.pour.id,
+  eventId: eventId,
+  expectedRevision: detail.pour.revision,
+  elementLocation: detail.pour.elementLocation,
+  plannedAt: detail.pour.plannedAt,
+  concreteClass: detail.pour.concreteClass,
+  plannedVolumeM3: detail.pour.plannedVolumeM3,
+  plantName: detail.pour.plantName,
+  laboratoryName: detail.pour.laboratoryName,
+  laboratoryAppointment: laboratoryAppointment,
+  inspectionNotifiedAt: inspectionNotifiedAt,
+);
+
 CreateConcretePourCommand _createCommand({
   double plannedVolume = 20,
   String code = 'BT-001',
@@ -728,6 +980,80 @@ Future<int> _count(String databasePath, String table) async {
   )!;
   await database.close();
   return value;
+}
+
+class _DurableNotificationGateway implements ReminderNotificationGateway {
+  final List<ReminderNotificationRequest> scheduled = [];
+  final List<PendingReminderNotification> pending = [];
+  final Map<String, List<DateTime>> _occurrences = {};
+  var _terminated = false;
+
+  @override
+  int get maximumPendingNotifications => 256;
+
+  @override
+  String? get initialTapReminderId => null;
+
+  @override
+  Stream<String> get notificationTaps => const Stream<String>.empty();
+
+  @override
+  int pendingNotificationSlotCost(int? repeatIntervalMinutes) => 1;
+
+  @override
+  Future<void> initialize() async {}
+
+  @override
+  Future<NotificationPermissionState> permissionStatus() async =>
+      NotificationPermissionState.granted;
+
+  @override
+  Future<NotificationPermissionState> requestPermission() async =>
+      NotificationPermissionState.granted;
+
+  @override
+  Future<List<PendingReminderNotification>> pendingNotifications() async =>
+      List.unmodifiable(pending);
+
+  @override
+  Future<void> schedule(ReminderNotificationRequest request) async {
+    if (_terminated) throw StateError('terminated app cannot schedule');
+    scheduled.add(request);
+    pending.removeWhere((item) => item.platformId == request.platformId);
+    pending.add(
+      PendingReminderNotification(
+        platformId: request.platformId,
+        reminderId: request.reminderId,
+      ),
+    );
+    final dueAt = DateTime.parse(request.scheduledAtUtc);
+    final count = request.repeatIntervalMinutes == null ? 1 : 24;
+    final interval = Duration(minutes: request.repeatIntervalMinutes ?? 0);
+    _occurrences[request.reminderId] = [
+      for (var index = 0; index < count; index += 1)
+        dueAt.add(interval * index),
+    ];
+  }
+
+  @override
+  Future<void> cancel(int platformId) async {
+    final reminderIds = pending
+        .where((item) => item.platformId == platformId)
+        .map((item) => item.reminderId)
+        .whereType<String>()
+        .toList(growable: false);
+    pending.removeWhere((item) => item.platformId == platformId);
+    for (final reminderId in reminderIds) {
+      _occurrences.remove(reminderId);
+    }
+  }
+
+  Iterable<DateTime> occurrencesFor(String reminderId) =>
+      List.unmodifiable(_occurrences[reminderId] ?? const <DateTime>[]);
+
+  void simulateTerminatedApp() => _terminated = true;
+
+  void resumeApp() => _terminated = false;
 }
 
 class _MemoryAttachmentStore implements ConcreteAttachmentStore {

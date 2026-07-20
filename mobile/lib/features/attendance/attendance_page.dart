@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/attendance_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
@@ -31,13 +33,24 @@ class _AttendancePageState extends State<AttendancePage> {
   late String _localDate;
   bool _loading = true;
   String? _error;
+  List<ActiveTeamCount> _teamCounts = const [];
+  StreamSubscription<void>? _projectSubscription;
 
   @override
   void initState() {
     super.initState();
     final now = DateTime.now().toUtc();
     _localDate = CseTimeCodec.istanbulDayKey(CseTimeCodec.encodeUtc(now));
+    _projectSubscription = widget.agenda.projectChanges.listen(
+      (_) => _loadProjects(),
+    );
     _loadProjects();
+  }
+
+  @override
+  void dispose() {
+    _projectSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadProjects() async {
@@ -52,7 +65,12 @@ class _AttendancePageState extends State<AttendancePage> {
       _project = _project == null
           ? projects.firstOrNull
           : projects.where((item) => item.id == _project!.id).firstOrNull;
-      if (_project != null) await _loadDay();
+      if (_project != null) {
+        await _loadDay();
+      } else {
+        _teamCounts = const [];
+        _detail = null;
+      }
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => _error = _message(error, 'Projeler açılamadı.'));
@@ -84,8 +102,14 @@ class _AttendancePageState extends State<AttendancePage> {
       );
       await widget.attendance.ensureRollingOccurrences();
       final detail = await widget.attendance.getDayDetail(day.id);
+      final teamCounts = await widget.attendance.listActiveTeamCounts(
+        project.id,
+      );
       if (!mounted) return;
-      setState(() => _detail = detail);
+      setState(() {
+        _detail = detail;
+        _teamCounts = teamCounts;
+      });
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => _error = _message(error, 'Puantaj günü açılamadı.'));
@@ -262,8 +286,27 @@ class _AttendancePageState extends State<AttendancePage> {
             ),
             onPressed: _openWorkforce,
             icon: const Icon(Icons.groups_outlined),
-            label: const Text('Personel yönetimi'),
+            label: const Text('Taşeronlar ve ekipler'),
           ),
+          if (_teamCounts.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Aktif ekipler',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            for (final team in _teamCounts)
+              Card(
+                key: Key('active-team-${team.teamId}'),
+                child: ListTile(
+                  dense: true,
+                  title: Text(
+                    '${team.teamName} — ${team.activePersonCount} kişi',
+                  ),
+                  subtitle: Text(team.subcontractorName),
+                ),
+              ),
+          ],
           const SizedBox(height: 6),
           OutlinedButton.icon(
             key: const Key('attendance-reminder-settings'),

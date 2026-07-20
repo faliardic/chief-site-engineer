@@ -1,5 +1,6 @@
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/attendance_application.dart';
+import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
@@ -21,6 +22,27 @@ class _RemindersPageState extends State<RemindersPage> {
   List<MobileReminder> _items = const [];
   bool _loading = true;
   String? _error;
+  final Set<String> _tomorrowBusy = {};
+
+  Future<void> _moveToTomorrow(MobileReminder reminder) async {
+    if (_tomorrowBusy.contains(reminder.id)) return;
+    setState(() => _tomorrowBusy.add(reminder.id));
+    try {
+      await widget.agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: reminder.id,
+          eventId: RecordId.randomUuid(),
+          expectedRevision: reminder.revision,
+          action: ReminderMutationAction.snoozeTomorrowMorning,
+        ),
+      );
+      await _reload();
+    } on Object {
+      if (mounted) setState(() => _error = 'Hatırlatıcı yarına taşınamadı.');
+    } finally {
+      if (mounted) setState(() => _tomorrowBusy.remove(reminder.id));
+    }
+  }
 
   @override
   void initState() {
@@ -160,7 +182,22 @@ class _RemindersPageState extends State<RemindersPage> {
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  trailing: reminder.isImportant
+                  trailing:
+                      (_group == ReminderViewGroup.now ||
+                              _group == ReminderViewGroup.overdue) &&
+                          (reminder.status == ReminderStatus.active ||
+                              reminder.status == ReminderStatus.waiting)
+                      ? SizedBox(
+                          width: 76,
+                          child: TextButton(
+                            key: Key('reminder-tomorrow-${reminder.id}'),
+                            onPressed: _tomorrowBusy.contains(reminder.id)
+                                ? null
+                                : () => _moveToTomorrow(reminder),
+                            child: const Text('Yarın'),
+                          ),
+                        )
+                      : reminder.isImportant
                       ? const Icon(Icons.priority_high_rounded)
                       : const Icon(Icons.chevron_right),
                   onTap: () async {
