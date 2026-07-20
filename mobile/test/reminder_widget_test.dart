@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:chief_site_engineer/app.dart';
+import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
@@ -108,11 +109,35 @@ void main() {
 
       expect(agenda.createReminderCalls, 1);
       final commandId = agenda.lastReminderCommand!.id;
-      completer.complete(reminder());
+      final completed = reminder();
+      agenda.reminders = [completed];
+      completer.complete(completed);
       await tester.pumpAndSettle();
       expect(agenda.lastReminderCommand!.id, commandId);
     },
   );
+
+  testWidgets('scheduled capture never hides native delivery failure', (
+    tester,
+  ) async {
+    final agenda = _UnverifiedCreationAgenda();
+    await tester.pumpWidget(
+      MaterialApp(home: ReminderFormPage(agenda: agenda)),
+    );
+    await tester.enterText(
+      find.byKey(const Key('reminder-title')),
+      'Teslimatı doğrulanacak kayıt',
+    );
+    await tester.tap(find.byKey(const Key('submit-reminder')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('reminder-delivery-warning')), findsOneWidget);
+    expect(find.text('Kayıt oluşturuldu'), findsOneWidget);
+    expect(agenda.createReminderCalls, 1);
+    await tester.tap(find.text('Anladım'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('Yarın quick action is guarded against double tap', (
     tester,
@@ -197,4 +222,116 @@ void main() {
     expect(find.byKey(const Key('start-waiting')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('delivery diagnostic exposes retry and user-opened settings', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final item = reminder();
+    final agenda = _DeliveryAgenda(item);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('reminder-delivery-diagnostic')),
+      findsOneWidget,
+    );
+    expect(find.text('Arka plan teslimatı garanti edilemiyor'), findsOneWidget);
+    expect(
+      find.textContaining('Android Zorla durdur işlemi'),
+      findsOneWidget,
+    );
+    final notificationSettings = find.byKey(
+      const Key('open-notification-settings'),
+    );
+    await tester.ensureVisible(notificationSettings);
+    await tester.tap(notificationSettings);
+    await tester.pump();
+    final batterySettings = find.byKey(const Key('open-battery-settings'));
+    await tester.ensureVisible(batterySettings);
+    await tester.tap(batterySettings);
+    await tester.pump();
+    final retry = find.byKey(const Key('retry-reminder-delivery'));
+    await tester.ensureVisible(retry);
+    await tester.tap(retry);
+    await tester.pumpAndSettle();
+
+    expect(agenda.notificationSettingsCalls, 1);
+    expect(agenda.batterySettingsCalls, 1);
+    expect(agenda.retryCalls, 1);
+    expect(tester.takeException(), isNull);
+  });
+}
+
+class _DeliveryAgenda extends FakeAgendaApplication
+    implements ReminderDeliveryApplication {
+  _DeliveryAgenda(MobileReminder reminder)
+    : super(reminders: [reminder], reminderDetail: reminder);
+
+  int retryCalls = 0;
+  int notificationSettingsCalls = 0;
+  int batterySettingsCalls = 0;
+
+  @override
+  Future<ReminderDeliveryDiagnostic> getReminderDeliveryDiagnostic(
+    String reminderId,
+  ) async => const ReminderDeliveryDiagnostic(
+    safeReminderId: 'cccccccc',
+    scheduleKind: 'one_shot',
+    canonicalDueAt: '2026-07-20T06:00:00Z',
+    nativeSchedulePresent: false,
+    lastReconciledAt: '2026-07-19T08:00:00Z',
+    permissionState: 'granted',
+    channelState: 'enabled',
+    exactAlarmState: 'denied',
+    batteryOptimizationState: 'optimized',
+    backgroundRestrictionState: 'allowed',
+    standbyBucket: 'rare',
+    bootRescheduleState: 'not_observed',
+    bootRescheduledAt: null,
+    deliveredAt: null,
+    delayClass: ReminderDeliveryDelayClass.nativeScheduleMissing,
+    safeErrorCode: 'exact_alarm_permission_required',
+  );
+
+  @override
+  Future<void> retryReminderDelivery(String reminderId) async {
+    retryCalls += 1;
+  }
+
+  @override
+  Future<void> openReminderNotificationSettings() async {
+    notificationSettingsCalls += 1;
+  }
+
+  @override
+  Future<void> openReminderBatteryOptimizationSettings() async {
+    batterySettingsCalls += 1;
+  }
+}
+
+class _UnverifiedCreationAgenda extends FakeAgendaApplication {
+  @override
+  Future<ReminderDetail> getReminderLifecycleDetail(String reminderId) async {
+    final detail = await super.getReminderLifecycleDetail(reminderId);
+    return ReminderDetail(
+      reminder: detail.reminder,
+      events: detail.events,
+      notification: NotificationBinding(
+        reminderId: reminderId,
+        platformNotificationId: 202,
+        scheduledFor: detail.reminder.nextAttentionAt,
+        syncState: NotificationSyncState.failed,
+        lastSyncedAt: detail.reminder.updatedAt,
+        safeErrorCode: 'native_schedule_failed',
+      ),
+    );
+  }
 }

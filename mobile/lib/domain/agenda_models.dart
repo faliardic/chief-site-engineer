@@ -324,6 +324,63 @@ class NotificationBinding {
   final int? repeatIntervalMinutes;
 }
 
+enum ReminderDeliveryDelayClass {
+  pending('Teslimat zamanı bekleniyor'),
+  onTime('Zamanında teslim edildi'),
+  delayed('Gecikmeli teslim edildi'),
+  severelyDelayed('Ciddi gecikmeyle teslim edildi'),
+  nativeScheduleMissing('Native plan bulunamadı'),
+  deliveryUnknown('Teslimat sonucu bilinmiyor');
+
+  const ReminderDeliveryDelayClass(this.label);
+
+  final String label;
+}
+
+class ReminderDeliveryDiagnostic {
+  const ReminderDeliveryDiagnostic({
+    required this.safeReminderId,
+    required this.scheduleKind,
+    required this.canonicalDueAt,
+    required this.nativeSchedulePresent,
+    required this.lastReconciledAt,
+    required this.permissionState,
+    required this.channelState,
+    required this.exactAlarmState,
+    required this.batteryOptimizationState,
+    required this.backgroundRestrictionState,
+    required this.standbyBucket,
+    required this.bootRescheduleState,
+    required this.bootRescheduledAt,
+    required this.deliveredAt,
+    required this.delayClass,
+    required this.safeErrorCode,
+  });
+
+  final String safeReminderId;
+  final String scheduleKind;
+  final String? canonicalDueAt;
+  final bool nativeSchedulePresent;
+  final String lastReconciledAt;
+  final String permissionState;
+  final String channelState;
+  final String exactAlarmState;
+  final String batteryOptimizationState;
+  final String backgroundRestrictionState;
+  final String standbyBucket;
+  final String bootRescheduleState;
+  final String? bootRescheduledAt;
+  final String? deliveredAt;
+  final ReminderDeliveryDelayClass delayClass;
+  final String? safeErrorCode;
+
+  bool get deliveryGuaranteed =>
+      (nativeSchedulePresent || deliveredAt != null) &&
+      permissionState == 'granted' &&
+      channelState != 'disabled' &&
+      exactAlarmState != 'denied';
+}
+
 class ReminderDetail {
   const ReminderDetail({
     required this.reminder,

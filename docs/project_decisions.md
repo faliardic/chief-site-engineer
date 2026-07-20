@@ -3067,3 +3067,29 @@
   tekrarlamama talimatı verir.
 - Mobil schema `7`, backup format `1`, restore journal, permission allowlist ve
   offline device-of-truth değişmez; ErrorWidget güvenlik sınırı kaldırılmaz.
+
+## Issue 202 — Arka Plan Hatırlatıcı Teslimat Güvenilirliği
+
+- Android'in resmi `setAndAllowWhileIdle` inexact toleransı ile 15/30/60 dakika
+  kapalı-uygulama saha gecikmesi birlikte kök neden kanıtıdır. Kullanıcı niyetli
+  reminder'lar `exactAllowWhileIdle` kullanır.
+- Android 12+ özel erişimi `SCHEDULE_EXACT_ALARM` ile kullanıcı tarafından
+  yönetilir ve yalnız kullanıcı planlı reminder/retry akışında istenir.
+  `USE_EXACT_ALARM`, foreground service, internet ve cloud push eklenmez.
+- Exact erişim reddinde logical reminder/event/binding korunur. Uygun platformda
+  inexact fallback kurulabilir fakat binding `unavailable` ve
+  `exact_alarm_permission_required` kalır; UI teslimat garantisi vermez.
+- Native schedule başarı ölçütü plugin çağrısının exception vermemesi değildir.
+  Pending platform ID, payload reminder ID ve rolling completeness schedule
+  sonrası yeniden okunup doğrulanmadan binding `scheduled` olamaz.
+- Android future saatlik repeat ankrajı plugin 22.1 native sözleşmesine göre
+  `calledAt = due` değeridir; eski `due - interval` yaklaşımı ilk trigger'ı bir
+  saat erken kurabildiği için kaldırılmıştır.
+- Boot receiver plugin pending cache'ini yeniden planlar ve yalnız
+  `completed/failed` ile UTC zamanını app-private audit'e yazar. Reminder
+  başlığı, açıklaması, proje, kişi ve not tanı/audit kapsamı dışındadır.
+- Reminder detay tanısı izin, kanal, exact erişim, native pending, batarya
+  optimizasyonu, background restriction, standby bucket, boot sonucu ve
+  gecikme sınıfını gösterir. Ayar ekranları yalnız kullanıcı eylemiyle açılır.
+- Mobil schema `7`, backup format `1`, Python schema `4`, restore allowlist,
+  Günlük Çıktı sürümü ve offline SQLite source-of-truth değişmez.

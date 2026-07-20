@@ -1552,7 +1552,7 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 
 `Inexact Periodic Notification`: İşletim sistemine yaklaşık aralıkla tekrar etmesi söylenen, pil optimizasyonuna zaman esnekliği bırakan ve exact-alarm izni gerektirmeyen yerel bildirimdir.
 
-`Delayed Periodic Anchor (Gecikmeli Periyodik Başlangıç)`: Tekrarlayan bildirimin aralığını korurken ilk native tetiklemeyi gelecekteki due anına bağlayan başlangıç referansıdır. Android'de `calledAt = due - interval` seçilerek ilk hesaplanan tekrar due anına denk getirilir.
+`Delayed Periodic Anchor (Gecikmeli Periyodik Başlangıç)`: Tekrarlayan bildirimin aralığını korurken ilk native tetiklemeyi gelecekteki due anına bağlayan başlangıç referansıdır. Plugin 22.1 native hesabı future `calledAt` değerini doğrudan ilk trigger kabul ettiği için Issue #202 ile `calledAt = due` kullanılır.
 
 `Rolling Notification Horizon (Kayan Bildirim Ufku)`: Future başlangıçlı periyodik API bulunmayan platformda, tek logical reminder için due anından itibaren sınırlı sayıda fiziksel one-shot occurrence'ı önceden planlama yöntemidir. CSE iOS Beton görevi 24 saatlik ufuk kullanır; reconciliation eksik ufku gelecek occurrence'lardan yeniden kurar.
 
@@ -1583,6 +1583,16 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Orphan Staging Reconciliation (Sahipsiz Staging Uzlaştırması)`: Process kill gibi cleanup callback'inin çalışmadığı durumdan sonra, bootstrap'ın yalnız doğrulanmış staging root içindeki yarım veya süre aşmış dosyaları güvenli kurallarla temizlemesidir.
 
 `Widget Lifecycle Ownership (Widget Yaşam Döngüsü Sahipliği)`: Controller, focus node veya animation gibi kaynağın onu kullanan `State` tarafından oluşturulup aynı `State.dispose()` içinde kapatılması kuralıdır. Issue #200 mikser dialogu parent sayfanın erken dispose yarışını bu sahiplikle kaldırır.
+
+`Postcondition Verification (Sonkoşul Doğrulaması)`: Bir komut hata vermedi diye başarı varsaymak yerine, komuttan sonra beklenen dış durumun gerçekten oluştuğunu ayrı bir okuma ile doğrulama desenidir. Issue #202 native notification schedule çağrısından sonra pending platform kaydını yeniden okuyarak kullanır.
+
+`Exact Alarm Special Access (Kesin Alarm Özel Erişimi)`: Android 12 ve sonrasında kullanıcının sistem ayarından yönettiği, kullanıcı niyetli kesin zamanlı alarmları kurma yetkisidir. Issue #202 broad `USE_EXACT_ALARM` yerine kullanıcı yönetimli `SCHEDULE_EXACT_ALARM` kullanır.
+
+`Degraded Fallback (Sınırlı Yedek Davranış)`: Asıl güvenilirlik garantisi sağlanamadığında veriyi kaybetmeden çalışan, fakat sınırlaması UI ve state içinde açıkça belirtilen yedek davranıştır. Exact erişim reddindeki inexact alarm bunun örneğidir.
+
+`App Standby Bucket (Uygulama Bekleme Kovası)`: Android'in uygulamayı kullanım sıklığına göre `active`, `working_set`, `frequent`, `rare` veya `restricted` gibi background çalışma sınıflarından birine yerleştirmesidir.
+
+`Boot Reschedule Audit (Açılışta Yeniden Planlama Denetimi)`: Cihaz reboot ettikten sonra pending native planların yeniden kurulma denemesini kullanıcı içeriği olmadan yalnız durum ve UTC zamanı ile kaydetme kanıtıdır.
 
 `Reverse Transition (Ters Geçiş Animasyonu)`: Dialog route kapatıldıktan sonra widget'ların ekrandan animasyonla ayrıldığı süredir. `showDialog` future'ı tamamlanmış olsa bile dialog widget ağacı bu süre boyunca render edilebilir.
 

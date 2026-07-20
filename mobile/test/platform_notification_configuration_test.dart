@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test(
-    'Android notification manifest uses reboot receivers without exact alarm',
+    'Android uses audited reboot reschedule and scoped exact alarm access',
     () {
       final manifest = File(
         'android/app/src/main/AndroidManifest.xml',
@@ -13,7 +13,7 @@ void main() {
       expect(manifest, contains('android.permission.POST_NOTIFICATIONS'));
       expect(manifest, contains('android.permission.RECEIVE_BOOT_COMPLETED'));
       expect(manifest, contains('ScheduledNotificationReceiver'));
-      expect(manifest, contains('ScheduledNotificationBootReceiver'));
+      expect(manifest, contains('CseReminderBootReceiver'));
       expect(manifest, contains('android.permission.CAMERA'));
       for (final permission in [
         'android.permission.READ_EXTERNAL_STORAGE',
@@ -27,8 +27,17 @@ void main() {
         );
       }
       expect(manifest, isNot(contains('android.permission.INTERNET')));
-      expect(manifest, isNot(contains('SCHEDULE_EXACT_ALARM')));
+      expect(manifest, contains('SCHEDULE_EXACT_ALARM'));
       expect(manifest, isNot(contains('USE_EXACT_ALARM')));
+      expect(manifest, isNot(contains('FOREGROUND_SERVICE')));
+      final receiver = File(
+        'android/app/src/main/java/com/dexterous/flutterlocalnotifications/'
+        'CseReminderBootReceiver.java',
+      ).readAsStringSync();
+      expect(receiver, contains('rescheduleNotifications(context)'));
+      expect(receiver, contains('cse_reminder_boot_audit'));
+      expect(receiver, isNot(contains('title')));
+      expect(receiver, isNot(contains('body')));
     },
   );
 
@@ -65,10 +74,11 @@ void main() {
       expect(gateway, contains('requestAlertPermission: false'));
       expect(gateway, contains('requestBadgePermission: false'));
       expect(gateway, contains('requestSoundPermission: false'));
+      expect(gateway, contains('AndroidScheduleMode.exactAllowWhileIdle'));
       expect(gateway, contains('AndroidScheduleMode.inexactAllowWhileIdle'));
       expect(gateway, contains('periodicallyShowWithDuration'));
       expect(gateway, contains('repeatIntervalMinutes'));
-      expect(gateway, contains('Clock.fixed(instant.subtract(interval))'));
+      expect(gateway, contains('Clock.fixed(instant)'));
       expect(gateway, contains('rollingRepeatOccurrenceCount = 24'));
       expect(project, contains('IPHONEOS_DEPLOYMENT_TARGET = 13.0'));
       expect(project, contains('com.faliardic.chiefsiteengineer'));

@@ -2,6 +2,9 @@
     xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- User-visible reminder alarms need the Android 12+ special access.
+         The app requests it only from an explicit reminder action. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.CAMERA"/>
     <!-- open_filex can open our app-private FileProvider URI without broad
          storage/media access. Keep its transitive permissions out of the
@@ -57,7 +60,7 @@
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
             android:exported="false" />
         <receiver
-            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:name="com.dexterous.flutterlocalnotifications.CseReminderBootReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>

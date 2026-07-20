@@ -55,36 +55,55 @@ void main() {
         .setMockMethodCallHandler(_channel, null);
   });
 
-  test(
-    'Android anchors inexact hourly repeat at the future due time',
-    () async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
-      FlutterLocalNotificationsPlatform.instance =
-          AndroidFlutterLocalNotificationsPlugin();
-      final gateway = FlutterReminderNotificationGateway();
-      final dueAt = DateTime.utc(2026, 7, 21, 6);
+  test('Android anchors exact hourly repeat at the future due time', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    FlutterLocalNotificationsPlatform.instance =
+        AndroidFlutterLocalNotificationsPlugin();
+    final gateway = FlutterReminderNotificationGateway();
+    final dueAt = DateTime.utc(2026, 7, 21, 6);
 
-      await withClock(
-        Clock.fixed(DateTime.utc(2026, 7, 20, 8)),
-        () => gateway.schedule(_request(dueAt)),
-      );
+    await withClock(
+      Clock.fixed(DateTime.utc(2026, 7, 20, 8)),
+      () => gateway.schedule(_request(dueAt)),
+    );
 
-      final periodic = calls.singleWhere(
-        (call) => call.method == 'periodicallyShowWithDuration',
-      );
-      final arguments = Map<String, Object?>.from(periodic.arguments as Map);
-      final platform = Map<String, Object?>.from(
-        arguments['platformSpecifics']! as Map,
-      );
-      expect(
-        arguments['calledAt'],
-        dueAt.subtract(const Duration(hours: 1)).millisecondsSinceEpoch,
-      );
-      expect(arguments['repeatIntervalMilliseconds'], 3600000);
-      expect(platform['scheduleMode'], 'inexactAllowWhileIdle');
-      expect(calls.where((call) => call.method == 'zonedSchedule'), isEmpty);
-    },
-  );
+    final periodic = calls.singleWhere(
+      (call) => call.method == 'periodicallyShowWithDuration',
+    );
+    final arguments = Map<String, Object?>.from(periodic.arguments as Map);
+    final platform = Map<String, Object?>.from(
+      arguments['platformSpecifics']! as Map,
+    );
+    expect(arguments['calledAt'], dueAt.millisecondsSinceEpoch);
+    expect(arguments['repeatIntervalMilliseconds'], 3600000);
+    expect(platform['scheduleMode'], 'exactAllowWhileIdle');
+    expect(calls.where((call) => call.method == 'zonedSchedule'), isEmpty);
+  });
+
+  test('Android degraded fallback is explicit and remains inexact', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    FlutterLocalNotificationsPlatform.instance =
+        AndroidFlutterLocalNotificationsPlugin();
+    final gateway = FlutterReminderNotificationGateway();
+    final dueAt = DateTime.utc(2026, 7, 21, 6);
+
+    await withClock(
+      Clock.fixed(DateTime.utc(2026, 7, 20, 8)),
+      () => gateway.scheduleInexactFallback(_request(dueAt)),
+    );
+
+    final periodic = calls.singleWhere(
+      (call) => call.method == 'periodicallyShowWithDuration',
+    );
+    final platform = Map<String, Object?>.from(
+      ((periodic.arguments as Map)['platformSpecifics'])! as Map,
+    );
+    expect(
+      (periodic.arguments as Map)['calledAt'],
+      dueAt.millisecondsSinceEpoch,
+    );
+    expect(platform['scheduleMode'], 'inexactAllowWhileIdle');
+  });
 
   test(
     'iOS persists due and next hours as one complete logical reminder',
@@ -146,6 +165,50 @@ void main() {
       );
     },
   );
+
+  test('Android 15 30 and 60 minute alarms use exact native anchors', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    FlutterLocalNotificationsPlatform.instance =
+        AndroidFlutterLocalNotificationsPlugin();
+    final gateway = FlutterReminderNotificationGateway();
+    final now = DateTime.utc(2026, 7, 20, 8);
+
+    await withClock(Clock.fixed(now), () async {
+      for (final minutes in [15, 30, 60]) {
+        await gateway.schedule(
+          ReminderNotificationRequest(
+            platformId: 12000 + minutes,
+            reminderId: _reminderId,
+            title: 'Kapalı uygulama testi',
+            body: '$minutes dakika',
+            scheduledAtUtc: CseTimeCodec.encodeUtc(
+              now.add(Duration(minutes: minutes)),
+            ),
+          ),
+        );
+      }
+    });
+
+    final oneShots = calls
+        .where((call) => call.method == 'zonedSchedule')
+        .toList(growable: false);
+    expect(oneShots, hasLength(3));
+    expect(
+      oneShots
+          .map(
+            (call) =>
+                ((call.arguments as Map)['platformSpecifics']
+                    as Map)['scheduleMode'],
+          )
+          .toSet(),
+      {'exactAllowWhileIdle'},
+    );
+    expect(oneShots.map(_scheduledLocal), [
+      '2026-07-20T11:15:00',
+      '2026-07-20T11:30:00',
+      '2026-07-20T12:00:00',
+    ]);
+  });
 }
 
 ReminderNotificationRequest _request(DateTime dueAt) =>

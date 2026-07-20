@@ -23,11 +23,13 @@ void main() {
       'android.permission.CAMERA',
       'android.permission.POST_NOTIFICATIONS',
       'android.permission.RECEIVE_BOOT_COMPLETED',
+      'android.permission.SCHEDULE_EXACT_ALARM',
     });
     expect(manifest, contains('android:allowBackup="false"'));
     expect(manifest, contains('android:usesCleartextTraffic="false"'));
     expect(RegExp('tools:node="remove"').allMatches(manifest), hasLength(4));
-    expect(manifest, isNot(contains('EXACT_ALARM')));
+    expect(manifest, isNot(contains('USE_EXACT_ALARM')));
+    expect(manifest, isNot(contains('FOREGROUND_SERVICE')));
     expect(manifest, isNot(contains('android.permission.INTERNET')));
   });
 

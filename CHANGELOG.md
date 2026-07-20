@@ -1,5 +1,26 @@
 # Changelog
 
+## Issue #202 - Arka Plan Hatırlatıcı Teslimat Güvenilirliği
+
+- Android native schedule kök nedeni `inexactAllowWhileIdle` toleransı olarak
+  doğrulandı; kullanıcı planlı saha reminder'ları dar
+  `SCHEDULE_EXACT_ALARM` özel erişimi ve `exactAllowWhileIdle` ile kuruldu.
+- `USE_EXACT_ALARM`, foreground service, cloud push ve internet bağımlılığı
+  eklenmedi; özel erişim reddinde logical reminder kaybolmadan açıkça işaretli
+  inexact fallback korunur.
+- Schedule çağrısından sonra plugin pending kaydı reminder/platform kimliğiyle
+  yeniden okunur; doğrulanmayan native plan artık `scheduled` yazılmaz.
+- İleri due saatlik tekrarının Android native ankrajı bir saat erken yerine
+  exact due anına düzeltildi; tek logical reminder ve platform tekrar planı
+  korunur.
+- Boot receiver pending planları yeniden kurarken yalnız zaman/durum içeren
+  privacy-safe audit bırakır; başlık, açıklama veya not kaydetmez.
+- Reminder detayına izin, kanal, exact erişim, batarya optimizasyonu, background
+  restriction, standby bucket, boot ve gecikme sınıfı tanısı ile kullanıcı
+  tetiklemeli ayar/retry işlemleri eklendi.
+- Mobil schema `7`, backup format `1`, offline source-of-truth, notification tap
+  deep-link ve reminder lifecycle/event sözleşmeleri değişmedi.
+
 ## Issue #200 - Mikser Dialog Lifecycle Güvenliği
 
 - Yeni ve mevcut mikser formu, bütün `TextEditingController` nesnelerini kendi

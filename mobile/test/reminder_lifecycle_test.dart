@@ -424,7 +424,7 @@ void main() {
       );
       final failedDetail = await agenda.getReminderLifecycleDetail(failed.id);
       expect(failedDetail.notification.syncState, NotificationSyncState.failed);
-      expect(failedDetail.notification.safeErrorCode, 'schedule_failed');
+      expect(failedDetail.notification.safeErrorCode, 'native_schedule_failed');
       expect(await _countRows(directories.databaseFile, 'follow_up_items'), 2);
     },
   );
@@ -483,6 +483,125 @@ void main() {
     expect(detail.reminder.status, ReminderStatus.active);
     expect(detail.notification.syncState, NotificationSyncState.unavailable);
     expect(detail.notification.safeErrorCode, 'platform_unavailable');
+  });
+
+  test(
+    'exact access denial keeps an explicit inexact fallback and retry upgrades it',
+    () async {
+      notifications.permission = NotificationPermissionState.exactAlarmDenied;
+      final reminder = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(31),
+          title: 'Exact erişim bekleyen kayıt',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.in15Minutes,
+        ),
+      );
+
+      var detail = await agenda.getReminderLifecycleDetail(reminder.id);
+      expect(detail.notification.syncState, NotificationSyncState.unavailable);
+      expect(
+        detail.notification.safeErrorCode,
+        'exact_alarm_permission_required',
+      );
+      expect(notifications.fallbackScheduled, hasLength(1));
+      expect(notifications.pending, hasLength(1));
+
+      notifications.permission = NotificationPermissionState.granted;
+      notifications.scheduled.clear();
+      await agenda.reconcileNotifications();
+      detail = await agenda.getReminderLifecycleDetail(reminder.id);
+      expect(detail.notification.syncState, NotificationSyncState.scheduled);
+      expect(detail.notification.safeErrorCode, isNull);
+      expect(notifications.scheduled, hasLength(1));
+      expect(notifications.pending, hasLength(1));
+    },
+  );
+
+  test(
+    'native schedule must be visible before binding says scheduled',
+    () async {
+      notifications.omitPendingAfterSchedule = true;
+      final reminder = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(32),
+          title: 'Native doğrulama',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.in1Hour,
+        ),
+      );
+
+      final detail = await agenda.getReminderLifecycleDetail(reminder.id);
+      expect(detail.reminder.status, ReminderStatus.active);
+      expect(detail.notification.syncState, NotificationSyncState.failed);
+      expect(detail.notification.safeErrorCode, 'native_schedule_failed');
+      expect(notifications.pending, isEmpty);
+    },
+  );
+
+  test('channel enable and restart reconcile once without duplicate', () async {
+    notifications.permission = NotificationPermissionState.channelDisabled;
+    final reminder = await agenda.createReminder(
+      CreateReminderCommand(
+        id: reminder1,
+        eventId: eventId(33),
+        title: 'Kanalı kapalı kayıt',
+        kind: ReminderKind.action,
+        schedule: ReminderScheduleKind.in1Hour,
+      ),
+    );
+    expect(
+      (await agenda.getReminderLifecycleDetail(
+        reminder.id,
+      )).notification.safeErrorCode,
+      'notification_channel_disabled',
+    );
+
+    notifications.permission = NotificationPermissionState.granted;
+    final restarted = SqliteAgendaApplication(
+      databasePath: directories.databaseFile,
+      databaseFactory: databaseFactoryFfi,
+      clock: () => now,
+      notificationGateway: notifications,
+    );
+    await restarted.reconcileNotifications();
+    expect(notifications.scheduled, hasLength(1));
+    await restarted.reconcileNotifications();
+    expect(notifications.scheduled, hasLength(1));
+    expect(notifications.pending, hasLength(1));
+  });
+
+  test('privacy-safe diagnostic exposes native and delay evidence', () async {
+    final reminder = await agenda.createReminder(
+      CreateReminderCommand(
+        id: reminder1,
+        eventId: eventId(34),
+        title: 'Gizli şantiye notu',
+        kind: ReminderKind.action,
+        schedule: ReminderScheduleKind.in15Minutes,
+      ),
+    );
+    notifications.diagnostic = const ReminderPlatformDiagnostic(
+      permissionState: 'granted',
+      channelState: 'enabled',
+      exactAlarmState: 'granted',
+      batteryOptimizationState: 'optimized',
+      backgroundRestrictionState: 'allowed',
+      standbyBucket: 'active',
+      bootRescheduleState: 'completed',
+      bootRescheduledAtUtc: '2026-07-19T08:05:00Z',
+      activeNotificationPostedAtUtc: '2026-07-19T08:17:00Z',
+    );
+
+    final diagnostic = await agenda.getReminderDeliveryDiagnostic(reminder.id);
+    expect(diagnostic.safeReminderId, 'cccccccc');
+    expect(diagnostic.scheduleKind, 'one_shot');
+    expect(diagnostic.nativeSchedulePresent, isTrue);
+    expect(diagnostic.delayClass, ReminderDeliveryDelayClass.delayed);
+    expect(diagnostic.bootRescheduleState, 'completed');
+    expect(diagnostic.toString(), isNot(contains('Gizli şantiye notu')));
   });
 
   test(
@@ -675,15 +794,20 @@ void main() {
   });
 }
 
-class _FakeNotificationGateway implements ReminderNotificationGateway {
+class _FakeNotificationGateway
+    implements ReminderNotificationGateway, ReminderDeliveryControl {
   NotificationPermissionState permission = NotificationPermissionState.granted;
   bool failSchedule = false;
   bool failInitialize = false;
+  bool omitPendingAfterSchedule = false;
   int requestCalls = 0;
   final List<ReminderNotificationRequest> scheduled = [];
+  final List<ReminderNotificationRequest> fallbackScheduled = [];
   final List<int> cancelled = [];
   final List<PendingReminderNotification> pending = [];
   final StreamController<String> taps = StreamController<String>.broadcast();
+  ReminderPlatformDiagnostic diagnostic =
+      const ReminderPlatformDiagnostic.unavailable();
 
   @override
   int maximumPendingNotifications = 60;
@@ -719,6 +843,7 @@ class _FakeNotificationGateway implements ReminderNotificationGateway {
   Future<void> schedule(ReminderNotificationRequest request) async {
     if (failSchedule) throw StateError('hidden plugin detail');
     scheduled.add(request);
+    if (omitPendingAfterSchedule) return;
     pending.removeWhere((item) => item.platformId == request.platformId);
     pending.add(
       PendingReminderNotification(
@@ -727,6 +852,30 @@ class _FakeNotificationGateway implements ReminderNotificationGateway {
       ),
     );
   }
+
+  @override
+  Future<void> scheduleInexactFallback(
+    ReminderNotificationRequest request,
+  ) async {
+    fallbackScheduled.add(request);
+    pending.removeWhere((item) => item.platformId == request.platformId);
+    pending.add(
+      PendingReminderNotification(
+        platformId: request.platformId,
+        reminderId: request.reminderId,
+      ),
+    );
+  }
+
+  @override
+  Future<ReminderPlatformDiagnostic> deliveryDiagnostic(int platformId) async =>
+      diagnostic;
+
+  @override
+  Future<void> openBatteryOptimizationSettings() async {}
+
+  @override
+  Future<void> openNotificationSettings() async {}
 
   @override
   Future<void> cancel(int platformId) async {

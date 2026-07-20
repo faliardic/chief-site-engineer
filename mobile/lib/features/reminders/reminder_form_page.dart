@@ -123,6 +123,39 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
           customAttentionAt: custom,
         ),
       );
+      var deliveryVerified = reminder.nextAttentionAt == null;
+      if (!deliveryVerified) {
+        try {
+          final detail = await widget.agenda.getReminderLifecycleDetail(
+            reminder.id,
+          );
+          deliveryVerified =
+              detail.notification.syncState == NotificationSyncState.scheduled;
+        } on Object {
+          deliveryVerified = false;
+        }
+      }
+      if (!deliveryVerified && mounted) {
+        setState(() => _submitting = false);
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            key: const Key('reminder-delivery-warning'),
+            title: const Text('Kayıt oluşturuldu'),
+            content: const Text(
+              'Hatırlatıcı kaydı korundu ancak arka plan bildirimi '
+              'doğrulanamadı. Kayıt detayındaki teslimat tanısını ve sistem '
+              'ayarlarını kontrol edin.',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Anladım'),
+              ),
+            ],
+          ),
+        );
+      }
       if (mounted) {
         Navigator.pop(context, reminder);
       }
