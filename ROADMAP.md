@@ -46,6 +46,10 @@ edit/archive/restore ve fotoğraf akışı, Beton PDF paylaş/kaydet, güvenli t
 tamamlama, mikser/irsaliye düzenleme-tarama-viewer ve canlı hedef/dökülen/
 kalan-aşılan metrajı uygulandı. Fiziksel silme, cloud OCR ve store submission
 eklenmedi.
+3J. [x] Release 0.1 backup picker blocker — Issue #198 ile provider cache yolu
+yerine app-private stable incoming import, stream/512 MiB/hash/atomic rename,
+retry-safe preflight/restore cleanup ve debug sidecar geçiş artifact'ı uygulandı.
+Backup format `1` ve mobil schema `7` değişmedi.
 
 Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme
 programı Issue #127'dir. Issue #141 / PR #142 ve Issue #143 / PR #144
@@ -61,8 +65,26 @@ notification dilimini, Issue #185 / PR #186 mobil günlük Puantajı, Issue #187
 PR #188 mobil Beton Paketi'ni, Issue #189 / PR #190 mobil tam yedek ve geri
 yüklemeyi merge etmiştir. Tek aktif production işi Issue #191 mobil release
 candidate hardening ve Issue #194 saha düzeltmelerinden sonra Issue #196 Ajanda
-ve Beton saha akışı dilimidir.
+ve Beton saha akışı diliminden sonra Issue #198 stable backup import blocker'ıdır.
 Açık faz Epic'leri aynı anda aktif production işleri değildir.
+
+## Issue 198 - Kalıcı Mobil Yedek İçe Aktarma
+
+- [x] `PickedBackupPackage` typed stable path/name/size/SHA/import ID sözleşmesi.
+- [x] Picker dönüşü içinde `withReadStream`, 512 MiB sınırı, exclusive `.part`,
+  flush, size/SHA doğrulama ve atomic rename.
+- [x] Yalnız incoming/internal backup root kabul eden preflight/restore ve her
+  aşamada yeniden size/SHA doğrulaması.
+- [x] Yeni seçim, cancel, wrong password retry, restore success/failure ve ekran
+  kapanışı cleanup yaşam döngüsü.
+- [x] Bootstrap orphan `.part` ve expired incoming reconciliation; root dışına
+  çıkmayan cleanup.
+- [x] API 36 provider-source-loss entegrasyonu, debug sidecar, unsigned AAB ve
+  ephemeral-signed production RC kapıları.
+- [ ] Gerçek kullanıcı backup SHA doğrulamalı sidecar preflight Issue #193 kabul
+  adımıdır; Codex gerçek backup'ı okumaz veya restore/uninstall yapmaz.
+- [ ] Native iOS archive ve store submission ayrı hesap/cihaz işidir.
+
 
 ## Issue 196 - Ajanda ve Beton Saha Akışı
 

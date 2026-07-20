@@ -16,6 +16,7 @@ import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
 import 'package:chief_site_engineer/storage/smoke_record.dart';
 import 'package:crypto/crypto.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart' show Sqflite;
@@ -40,7 +41,7 @@ void main() {
     );
     await directories.ensureCreated();
     await _bootstrapDatabase(directories);
-    gateway = _FakeFileGateway();
+    gateway = _FakeFileGateway(directories);
     notificationReconciliations = 0;
   });
 
@@ -64,12 +65,12 @@ void main() {
       ),
     );
     final preflight = await application.preflightBackup(
-      created.absolutePath,
+      created.package,
       _password,
     );
     final restored = await application.restoreBackup(
       RestoreMobileBackupCommand(
-        packagePath: created.absolutePath,
+        package: created.package,
         password: _password,
         expectedPackageSha256: preflight.packageSha256,
       ),
@@ -89,6 +90,140 @@ void main() {
     );
     await restarted.close();
   });
+
+  test(
+    'stable picker import survives source loss wrong password retry and restore',
+    () async {
+      final creator = _application(directories, gateway: gateway);
+      final created = await creator.createBackup(
+        const CreateMobileBackupCommand(
+          password: _password,
+          passwordConfirmation: _password,
+        ),
+      );
+      final pickerSource = File(created.absolutePath);
+      final sourceSize = await pickerSource.length();
+      final deviceGateway = DeviceMobileBackupFileGateway(
+        directories: directories,
+        picker: () async => PlatformFile(
+          name: 'gercek-cihaz-yedegi.csebackup',
+          size: sourceSize,
+          path: pickerSource.path,
+          readStream: pickerSource.openRead(),
+        ),
+        clock: () => DateTime.parse(_now),
+        importIdFactory: (_) => 'stable-picker-import',
+      );
+      final application = _application(directories, gateway: deviceGateway);
+
+      final imported = (await application.pickBackupPackage())!;
+      await pickerSource.delete();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      await expectLater(
+        application.preflightBackup(imported, 'yanlis-parola'),
+        _failureCode('wrong_password_or_tampered'),
+      );
+      expect(await File(imported.stablePath).exists(), isTrue);
+      final preflight = await application.preflightBackup(imported, _password);
+      await application.restoreBackup(
+        RestoreMobileBackupCommand(
+          package: preflight.package,
+          password: _password,
+          expectedPackageSha256: preflight.packageSha256,
+        ),
+      );
+
+      expect(await File(imported.stablePath).exists(), isFalse);
+      expect(await directories.incomingBackups.exists(), isFalse);
+    },
+  );
+
+  test(
+    'same package reselect cleans old import while picker cancel keeps current',
+    () async {
+      final selections = <PlatformFile?>[
+        PlatformFile(
+          name: 'same.csebackup',
+          size: 3,
+          readStream: Stream.value([1, 2, 3]),
+        ),
+        PlatformFile(
+          name: 'same.csebackup',
+          size: 3,
+          readStream: Stream.value([1, 2, 3]),
+        ),
+        null,
+      ];
+      final ids = ['replacement-first', 'replacement-second'];
+      final deviceGateway = DeviceMobileBackupFileGateway(
+        directories: directories,
+        picker: () async => selections.removeAt(0),
+        clock: () => DateTime.parse(_now),
+        importIdFactory: (_) => ids.removeAt(0),
+      );
+      final application = _application(directories, gateway: deviceGateway);
+
+      final first = (await application.pickBackupPackage())!;
+      final second = (await application.pickBackupPackage(first))!;
+      expect(await File(first.stablePath).exists(), isFalse);
+      expect(await File(second.stablePath).exists(), isTrue);
+
+      final cancelled = await application.pickBackupPackage(second);
+      expect(cancelled, isNull);
+      expect(await File(second.stablePath).exists(), isTrue);
+      await application.discardBackupPackage(second);
+    },
+  );
+
+  test(
+    'restore failure retains stable import and active SQLite truth',
+    () async {
+      final creator = _application(directories, gateway: gateway);
+      final created = await creator.createBackup(
+        const CreateMobileBackupCommand(
+          password: _password,
+          passwordConfirmation: _password,
+        ),
+      );
+      final source = File(created.absolutePath);
+      final deviceGateway = DeviceMobileBackupFileGateway(
+        directories: directories,
+        picker: () async => PlatformFile(
+          name: 'retry.csebackup',
+          size: created.summary.packageByteSize,
+          readStream: source.openRead(),
+        ),
+        clock: () => DateTime.parse(_now),
+        importIdFactory: (_) => 'restore-failure-retry',
+      );
+      final failing = _application(
+        directories,
+        gateway: deviceGateway,
+        hooks: MobileRestoreHooks(
+          beforeSwap: () async => throw StateError('injected restore failure'),
+        ),
+      );
+      final imported = (await failing.pickBackupPackage())!;
+      final preflight = await failing.preflightBackup(imported, _password);
+      final before = await _fixtureSnapshot(directories);
+
+      await expectLater(
+        failing.restoreBackup(
+          RestoreMobileBackupCommand(
+            package: preflight.package,
+            password: _password,
+            expectedPackageSha256: preflight.packageSha256,
+          ),
+        ),
+        throwsStateError,
+      );
+
+      expect(await File(imported.stablePath).exists(), isTrue);
+      expect(await _fixtureSnapshot(directories), before);
+      await failing.discardBackupPackage(imported);
+    },
+  );
 
   test('backup exclusive section blocks a real Agenda mutation', () async {
     final coordinator = MobileOperationCoordinator();
@@ -179,7 +314,7 @@ void main() {
       await attachment.writeAsBytes(changedAttachmentBytes, flush: true);
 
       final preflight = await application.preflightBackup(
-        created.absolutePath,
+        created.package,
         _password,
       );
       expect(preflight.manifest.attachments, hasLength(2));
@@ -193,7 +328,7 @@ void main() {
       );
       await application.restoreBackup(
         RestoreMobileBackupCommand(
-          packagePath: created.absolutePath,
+          package: created.package,
           password: _password,
           expectedPackageSha256: preflight.packageSha256,
         ),
@@ -219,7 +354,7 @@ void main() {
   );
 
   test(
-    'wrong password and encrypted package tampering are indistinguishable',
+    'wrong password stays generic and stable package tamper fails closed',
     () async {
       final application = _application(directories, gateway: gateway);
       final created = await application.createBackup(
@@ -230,7 +365,7 @@ void main() {
       );
 
       await expectLater(
-        application.preflightBackup(created.absolutePath, 'yanlis-parola'),
+        application.preflightBackup(created.package, 'yanlis-parola'),
         _failureCode('wrong_password_or_tampered'),
       );
       final package = File(created.absolutePath);
@@ -238,8 +373,8 @@ void main() {
       bytes[bytes.length - 1] ^= 0xff;
       await package.writeAsBytes(bytes, flush: true);
       await expectLater(
-        application.preflightBackup(created.absolutePath, _password),
-        _failureCode('wrong_password_or_tampered'),
+        application.preflightBackup(created.package, _password),
+        _failureCode('package_changed_after_import'),
       );
     },
   );
@@ -255,7 +390,7 @@ void main() {
         ),
       );
       final preflight = await application.preflightBackup(
-        created.absolutePath,
+        created.package,
         _password,
       );
       final package = File(created.absolutePath);
@@ -266,16 +401,41 @@ void main() {
       await expectLater(
         application.restoreBackup(
           RestoreMobileBackupCommand(
-            packagePath: created.absolutePath,
+            package: created.package,
             password: _password,
             expectedPackageSha256: preflight.packageSha256,
           ),
         ),
-        _failureCode('wrong_password_or_tampered'),
+        _failureCode('package_changed_after_import'),
       );
       expect(await _projectCount(directories), 0);
     },
   );
+
+  test('preflight refuses a package path outside approved app roots', () async {
+    final application = _application(directories, gateway: gateway);
+    final created = await application.createBackup(
+      const CreateMobileBackupCommand(
+        password: _password,
+        passwordConfirmation: _password,
+      ),
+    );
+    final outside = File(path.join(temporaryRoot.path, 'outside.csebackup'));
+    await File(created.absolutePath).copy(outside.path);
+    final unsafe = PickedBackupPackage(
+      stablePath: outside.path,
+      originalFileName: 'outside.csebackup',
+      byteSize: created.summary.packageByteSize,
+      sha256: created.packageSha256,
+      importOperationId: 'outside-import',
+    );
+
+    await expectLater(
+      application.preflightBackup(unsafe, _password),
+      _failureCode('unsafe_package_source'),
+    );
+    expect(await outside.exists(), isTrue);
+  });
 
   test(
     'post-swap failure rolls the prior database and attachments back',
@@ -307,14 +467,14 @@ void main() {
         ),
       );
       final preflight = await failing.preflightBackup(
-        created.absolutePath,
+        created.package,
         _password,
       );
 
       await expectLater(
         failing.restoreBackup(
           RestoreMobileBackupCommand(
-            packagePath: created.absolutePath,
+            package: created.package,
             password: _password,
             expectedPackageSha256: preflight.packageSha256,
           ),
@@ -368,15 +528,16 @@ void main() {
           await _testEncryptionCodec().encrypt(archive, _password),
           flush: true,
         );
+        final imported = await _stageIncomingPackage(directories, package);
         final application = _application(directories, gateway: gateway);
         final preflight = await application.preflightBackup(
-          package.path,
+          imported,
           _password,
         );
 
         await application.restoreBackup(
           RestoreMobileBackupCommand(
-            packagePath: package.path,
+            package: imported,
             password: _password,
             expectedPackageSha256: preflight.packageSha256,
           ),
@@ -430,17 +591,30 @@ void main() {
       await _testEncryptionCodec().encrypt(archive, _password),
       flush: true,
     );
+    final imported = await _stageIncomingPackage(directories, package);
 
     await expectLater(
       _application(
         directories,
         gateway: gateway,
-      ).preflightBackup(package.path, _password),
+      ).preflightBackup(imported, _password),
       _failureCode('unsupported_schema'),
     );
 
     expect(await _projectCount(directories), activeProjectCount);
-    expect(await directories.staging.list().toList(), isEmpty);
+    expect(await File(imported.stablePath).exists(), isTrue);
+    expect(
+      await directories.staging
+          .list()
+          .where(
+            (entity) =>
+                path.normalize(entity.path) !=
+                path.normalize(directories.incomingBackups.path),
+          )
+          .toList(),
+      isEmpty,
+      reason: 'Başarısız preflight yalnız stable incoming paketi korur.',
+    );
   });
 
   test('archive rejects traversal, absolute, duplicate and extra entries', () {
@@ -575,8 +749,12 @@ void main() {
       );
       await _writePackage(corruptPackage, [1, 2, 3, 4]);
       final application = _application(directories, gateway: gateway);
+      final importedCorrupt = await _stageIncomingPackage(
+        directories,
+        corruptPackage,
+      );
       await expectLater(
-        application.preflightBackup(corruptPackage.path, _password),
+        application.preflightBackup(importedCorrupt, _password),
         _failureCode('corrupt_database'),
       );
 
@@ -605,8 +783,12 @@ void main() {
         foreignKeyPackage,
         await brokenDatabase.readAsBytes(),
       );
+      final importedForeignKey = await _stageIncomingPackage(
+        directories,
+        foreignKeyPackage,
+      );
       await expectLater(
-        application.preflightBackup(foreignKeyPackage.path, _password),
+        application.preflightBackup(importedForeignKey, _password),
         _failureCode('foreign_key_violation'),
       );
     },
@@ -659,14 +841,14 @@ void main() {
         reconcile: () async => throw StateError('notification plugin failure'),
       );
       final preflight = await failing.preflightBackup(
-        created.absolutePath,
+        created.package,
         _password,
       );
 
       await expectLater(
         failing.restoreBackup(
           RestoreMobileBackupCommand(
-            packagePath: created.absolutePath,
+            package: created.package,
             password: _password,
             expectedPackageSha256: preflight.packageSha256,
           ),
@@ -724,6 +906,30 @@ void main() {
   );
 }
 
+var _stagedPackageSequence = 0;
+
+Future<PickedBackupPackage> _stageIncomingPackage(
+  AppDirectories directories,
+  File source,
+) async {
+  final bytes = await source.readAsBytes();
+  final digest = sha256.convert(bytes).toString();
+  final operationId =
+      'fixture-${_stagedPackageSequence++}-${digest.substring(0, 12)}';
+  await directories.incomingBackups.create(recursive: true);
+  final destination = File(
+    path.join(directories.incomingBackups.path, '$operationId.csebackup'),
+  );
+  await destination.writeAsBytes(bytes, flush: true);
+  return PickedBackupPackage(
+    stablePath: destination.path,
+    originalFileName: path.basename(source.path),
+    byteSize: bytes.length,
+    sha256: digest,
+    importOperationId: operationId,
+  );
+}
+
 Future<void> _writePackage(File destination, List<int> databaseBytes) async {
   final archive = const CseBackupArchiveCodec().encode(
     manifest: _manifest(databaseBytes, schemaVersion: 7),
@@ -738,7 +944,7 @@ Future<void> _writePackage(File destination, List<int> databaseBytes) async {
 
 SqliteMobileBackupApplication _application(
   AppDirectories directories, {
-  required _FakeFileGateway gateway,
+  required MobileBackupFileGateway gateway,
   Future<void> Function()? reconcile,
   MobileRestoreHooks hooks = const MobileRestoreHooks(),
   MobileOperationCoordinator? coordinator,
@@ -1289,11 +1495,32 @@ int _lastIndexOf(List<int> bytes, List<int> needle) {
 }
 
 class _FakeFileGateway implements MobileBackupFileGateway {
-  String? pickedPath;
+  _FakeFileGateway(this.directories);
+
+  final AppDirectories directories;
+  PickedBackupPackage? pickedPackage;
   String? sharedPath;
 
   @override
-  Future<String?> pickPackage() async => pickedPath;
+  Future<PickedBackupPackage?> pickPackage() async => pickedPackage;
+
+  @override
+  Future<void> cleanupPickedPackage(PickedBackupPackage package) async {
+    final incomingRoot = path.normalize(
+      path.absolute(directories.incomingBackups.path),
+    );
+    final candidate = path.normalize(path.absolute(package.stablePath));
+    if (path.dirname(candidate) != incomingRoot) return;
+    final file = File(candidate);
+    if (await file.exists()) await file.delete();
+    if (await directories.incomingBackups.exists() &&
+        await directories.incomingBackups.list().isEmpty) {
+      await directories.incomingBackups.delete();
+    }
+  }
+
+  @override
+  Future<void> reconcileIncomingPackages() async {}
 
   @override
   Future<void> sharePackage(String absolutePath) async {

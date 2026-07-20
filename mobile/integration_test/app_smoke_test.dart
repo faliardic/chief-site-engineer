@@ -1,16 +1,20 @@
 import 'dart:io';
 
 import 'package:chief_site_engineer/app.dart';
+import 'package:chief_site_engineer/application/mobile_backup_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/core/environment.dart';
+import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attendance_models.dart';
 import 'package:chief_site_engineer/domain/concrete_models.dart';
 import 'package:chief_site_engineer/domain/mobile_backup_models.dart';
+import 'package:chief_site_engineer/platform/mobile_backup_gateway.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
 import 'package:flutter/widgets.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:sqflite/sqflite.dart';
@@ -318,23 +322,47 @@ void main() {
         ),
       );
       expect(await File(createdBackup.absolutePath).exists(), isTrue);
+      final providerSource = File(createdBackup.absolutePath);
+      final importGateway = DeviceMobileBackupFileGateway(
+        directories: directories,
+        picker: () async => PlatformFile(
+          name: 'api36-file-provider.csebackup',
+          size: createdBackup.summary.packageByteSize,
+          path: providerSource.path,
+          readStream: providerSource.openRead(),
+        ),
+        clock: () => DateTime.now().toUtc(),
+        importIdFactory: (_) => 'api36-file-provider-import',
+      );
+      final stableBackup = SqliteMobileBackupApplication(
+        directories: directories,
+        databaseFactory: databaseFactory,
+        clock: () => DateTime.now().toUtc(),
+        coordinator: MobileOperationCoordinator(),
+        fileGateway: importGateway,
+        notificationReconciler: restartedSuccess.agenda.reconcileNotifications,
+      );
+      final importedBackup = (await stableBackup.pickBackupPackage())!;
+      await providerSource.delete();
+      expect(await File(importedBackup.stablePath).exists(), isTrue);
       await restartedSuccess.agenda.createProject(
         const CreateProjectCommand(
           id: '77777777-7777-4777-8777-777777777777',
           name: 'Yedek sonrası geçici proje',
         ),
       );
-      final backupPreflight = await backup.preflightBackup(
-        createdBackup.absolutePath,
+      final backupPreflight = await stableBackup.preflightBackup(
+        importedBackup,
         'android-integration-parola',
       );
-      await backup.restoreBackup(
+      await stableBackup.restoreBackup(
         RestoreMobileBackupCommand(
-          packagePath: createdBackup.absolutePath,
+          package: backupPreflight.package,
           password: 'android-integration-parola',
           expectedPackageSha256: backupPreflight.packageSha256,
         ),
       );
+      expect(await File(importedBackup.stablePath).exists(), isFalse);
       expect(
         (await restartedSuccess.agenda.listProjects()).map((item) => item.id),
         isNot(contains('77777777-7777-4777-8777-777777777777')),

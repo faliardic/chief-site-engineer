@@ -8,7 +8,7 @@ void main() {
     () {
       final manifest = File(
         'android/app/src/main/AndroidManifest.xml',
-      ).readAsStringSync();
+      ).readAsStringSync().replaceAll('\r\n', '\n');
 
       expect(manifest, contains('android.permission.POST_NOTIFICATIONS'));
       expect(manifest, contains('android.permission.RECEIVE_BOOT_COMPLETED'));
@@ -120,4 +120,27 @@ void main() {
       expect(lock, contains('pdf:'));
     },
   );
+
+  test('backup picker imports streams into app-private incoming storage', () {
+    final gateway = File(
+      'lib/platform/mobile_backup_gateway.dart',
+    ).readAsStringSync();
+    final application = File(
+      'lib/application/mobile_backup_application.dart',
+    ).readAsStringSync();
+    final directories = File(
+      'lib/storage/app_directories.dart',
+    ).readAsStringSync();
+
+    expect(gateway, contains('withReadStream: true'));
+    expect(gateway, contains('maximumPackageBytes = 512 * 1024 * 1024'));
+    expect(gateway, contains('await partial.create(exclusive: true)'));
+    expect(gateway, contains('await partial.rename(destination.path)'));
+    expect(application, contains('PickedBackupPackage package'));
+    expect(application, contains('_requireAllowedPackage(package)'));
+    expect(
+      directories,
+      contains("path.join(staging.path, 'incoming_backups')"),
+    );
+  });
 }

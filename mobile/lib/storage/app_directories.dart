@@ -61,6 +61,8 @@ class AppDirectories {
       path.join(state.path, 'mobile_backup_state.json');
   String get restoreJournalFile => path.join(root.path, 'restore_journal.json');
   String get restoreJournalNextFile => '$restoreJournalFile.next';
+  Directory get incomingBackups =>
+      Directory(path.join(staging.path, 'incoming_backups'));
 
   void validate() {
     final normalizedRoot = path.normalize(path.absolute(root.path));
@@ -70,6 +72,7 @@ class AppDirectories {
       exportsBackups,
       state,
       staging,
+      incomingBackups,
     ]) {
       final candidate = path.normalize(path.absolute(directory.path));
       if (!path.isWithin(normalizedRoot, candidate)) {

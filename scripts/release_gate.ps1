@@ -24,7 +24,9 @@ $androidSdk = if ($env:ANDROID_HOME) {
 $adb = Join-Path $androidSdk 'platform-tools\adb.exe'
 $zipalign = Join-Path $androidSdk 'build-tools\36.0.0\zipalign.exe'
 $apksigner = Join-Path $androidSdk 'build-tools\36.0.0\apksigner.bat'
+$aapt2 = Join-Path $androidSdk 'build-tools\36.0.0\aapt2.exe'
 $temporaryRoot = $null
+$temporarySidecarApk = $null
 $previousSigningFile = $env:CSE_KEY_PROPERTIES_FILE
 $previousSigningRequired = $env:CSE_REQUIRE_SIGNING
 
@@ -66,13 +68,18 @@ try {
     Invoke-Flutter -Arguments @('test', '--no-pub')
 
     Invoke-Flutter -Arguments @('build', 'apk', '--debug', '--target-platform', 'android-arm64')
+    $debugApk = Join-Path $mobileRoot 'build\app\outputs\flutter-apk\app-debug.apk'
+    if (-not (Test-Path -LiteralPath $debugApk)) {
+        throw 'Debug sidecar APK was not produced.'
+    }
+    $temporarySidecarApk = Join-Path ([IO.Path]::GetTempPath()) ("cse-sidecar-{0}.apk" -f [guid]::NewGuid().ToString('N'))
+    Copy-Item -LiteralPath $debugApk -Destination $temporarySidecarApk
     if (-not $SkipIntegration) {
         if (-not (Test-Path -LiteralPath $adb)) {
             throw 'Android adb was not found for the integration gate.'
         }
-        $debugApk = Join-Path $mobileRoot 'build\app\outputs\flutter-apk\app-debug.apk'
-        Invoke-Checked -Command $adb -Arguments @('install', '-r', '-g', $debugApk)
-        & $adb shell pm grant com.faliardic.chiefsiteengineer.debug android.permission.POST_NOTIFICATIONS 2>$null
+        Invoke-Checked -Command $adb -Arguments @('-s', $AndroidDevice, 'install', '-r', '-g', $debugApk)
+        & $adb -s $AndroidDevice shell pm grant com.faliardic.chiefsiteengineer.debug android.permission.POST_NOTIFICATIONS 2>$null
         Invoke-Flutter -Arguments @('test', '--no-pub', 'integration_test\app_smoke_test.dart', '-d', $AndroidDevice)
         $gradle = Join-Path $mobileRoot 'android\gradlew.bat'
         if (Test-Path -LiteralPath $gradle) {
@@ -84,6 +91,41 @@ try {
     }
 
     New-Item -ItemType Directory -Force -Path $artifactRoot | Out-Null
+    if (-not (Test-Path -LiteralPath $aapt2) -or
+        -not (Test-Path -LiteralPath $zipalign) -or
+        -not (Test-Path -LiteralPath $apksigner)) {
+        throw 'Android build-tools 36.0.0 artifact validators were not found.'
+    }
+    $sidecarApk = Join-Path $artifactRoot 'chief-site-engineer-0.1.0-issue198-sidecar-debug.apk'
+    Copy-Item -LiteralPath $temporarySidecarApk -Destination $sidecarApk -Force
+    $sidecarPackage = (& $aapt2 dump packagename $sidecarApk 2>&1) -join "`n"
+    if ($LASTEXITCODE -ne 0 -or $sidecarPackage.Trim() -ne 'com.faliardic.chiefsiteengineer.debug') {
+        throw 'Debug sidecar package identity verification failed.'
+    }
+    $sidecarPermissions = (& $aapt2 dump permissions $sidecarApk 2>&1) -join "`n"
+    if ($LASTEXITCODE -ne 0 -or
+        $sidecarPermissions -match 'READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|READ_MEDIA_IMAGES|READ_MEDIA_VIDEO|READ_MEDIA_AUDIO|MANAGE_EXTERNAL_STORAGE') {
+        throw 'Debug sidecar contains a forbidden broad storage/media permission.'
+    }
+    Push-Location $artifactRoot
+    try {
+        $sidecarName = [IO.Path]::GetFileName($sidecarApk)
+        Invoke-Checked -Command $zipalign -Arguments @('-c', '-P', '16', '-v', '4', $sidecarName)
+        Invoke-Checked -Command $apksigner -Arguments @('verify', '--verbose', $sidecarName)
+    } finally {
+        Pop-Location
+    }
+    Invoke-Checked -Command 'python' -Arguments @(
+        (Join-Path $repositoryRoot 'scripts\validate_mobile_release.py'),
+        '--apk', $sidecarApk
+    )
+    $sidecarChecksum = (Get-FileHash -LiteralPath $sidecarApk -Algorithm SHA256).Hash.ToLowerInvariant()
+    [IO.File]::WriteAllText(
+        (Join-Path $artifactRoot 'SIDECAR_SHA256.txt'),
+        "$sidecarChecksum  $([IO.Path]::GetFileName($sidecarApk))`n",
+        [Text.UTF8Encoding]::new($false)
+    )
+    Write-Output "Debug sidecar APK SHA256: $sidecarChecksum"
     $env:CSE_KEY_PROPERTIES_FILE = $null
     $env:CSE_REQUIRE_SIGNING = $null
     Invoke-Checked -Command 'python' -Arguments @(
@@ -216,5 +258,15 @@ try {
             throw 'Refusing to clean an unexpected release-gate directory.'
         }
         Remove-Item -LiteralPath $resolvedTemporaryRoot -Recurse -Force
+    }
+    if ($temporarySidecarApk -and (Test-Path -LiteralPath $temporarySidecarApk)) {
+        $resolvedSidecar = (Resolve-Path -LiteralPath $temporarySidecarApk).Path
+        $systemTemporaryRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
+        if (-not $resolvedSidecar.StartsWith($systemTemporaryRoot, [StringComparison]::OrdinalIgnoreCase) -or
+            -not ([IO.Path]::GetFileName($resolvedSidecar)).StartsWith('cse-sidecar-') -or
+            [IO.Path]::GetExtension($resolvedSidecar) -ne '.apk') {
+            throw 'Refusing to clean an unexpected sidecar temporary file.'
+        }
+        Remove-Item -LiteralPath $resolvedSidecar -Force
     }
 }

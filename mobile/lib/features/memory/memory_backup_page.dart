@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:chief_site_engineer/application/mobile_backup_application.dart';
 import 'package:chief_site_engineer/domain/mobile_backup_models.dart';
 import 'package:flutter/material.dart';
@@ -19,7 +21,7 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
   MobileBackupCreationResult? _created;
   MobileBackupSummary? _lastBackup;
   MobileBackupPreflight? _preflight;
-  String? _selectedPackage;
+  PickedBackupPackage? _selectedPackage;
   String? _backupMessage;
   String? _restoreMessage;
   bool _backupBusy = false;
@@ -34,6 +36,14 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
 
   @override
   void dispose() {
+    final selected = _selectedPackage;
+    if (selected != null) {
+      unawaited(
+        widget.backup.discardBackupPackage(selected).onError((_, _) {
+          // Bootstrap reconciliation retries app-private orphan cleanup.
+        }),
+      );
+    }
     _backupPassword.dispose();
     _backupPasswordConfirmation.dispose();
     _restorePassword.dispose();
@@ -102,7 +112,7 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
       _restoreMessage = null;
     });
     try {
-      final selected = await widget.backup.pickBackupPackage();
+      final selected = await widget.backup.pickBackupPackage(_selectedPackage);
       if (!mounted || selected == null) return;
       setState(() {
         _selectedPackage = selected;
@@ -185,7 +195,7 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
     try {
       final result = await widget.backup.restoreBackup(
         RestoreMobileBackupCommand(
-          packagePath: preflight.packagePath,
+          package: preflight.package,
           password: _restorePassword.text,
           expectedPackageSha256: preflight.packageSha256,
         ),
@@ -193,6 +203,7 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
       if (!mounted) return;
       _restorePassword.clear();
       setState(() {
+        _selectedPackage = null;
         _preflight = null;
         _replacementAcknowledged = false;
         _restoreMessage =
