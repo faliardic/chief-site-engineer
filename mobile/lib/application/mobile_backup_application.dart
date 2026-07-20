@@ -23,10 +23,14 @@ abstract interface class MobileBackupApplication {
 
   Future<void> shareBackup(String absolutePath);
 
-  Future<String?> pickBackupPackage();
+  Future<PickedBackupPackage?> pickBackupPackage([
+    PickedBackupPackage? currentPackage,
+  ]);
+
+  Future<void> discardBackupPackage(PickedBackupPackage package);
 
   Future<MobileBackupPreflight> preflightBackup(
-    String packagePath,
+    PickedBackupPackage package,
     String password,
   );
 
@@ -630,28 +634,45 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
       fileGateway.sharePackage(absolutePath);
 
   @override
-  Future<String?> pickBackupPackage() => fileGateway.pickPackage();
+  Future<PickedBackupPackage?> pickBackupPackage([
+    PickedBackupPackage? currentPackage,
+  ]) async {
+    final selected = await fileGateway.pickPackage();
+    if (selected == null) return null;
+    if (currentPackage != null &&
+        currentPackage.stablePath != selected.stablePath) {
+      try {
+        await fileGateway.cleanupPickedPackage(currentPackage);
+      } on Object {
+        await fileGateway.cleanupPickedPackage(selected);
+        rethrow;
+      }
+    }
+    return selected;
+  }
+
+  @override
+  Future<void> discardBackupPackage(PickedBackupPackage package) =>
+      fileGateway.cleanupPickedPackage(package);
 
   @override
   Future<MobileBackupPreflight> preflightBackup(
-    String packagePath,
+    PickedBackupPackage package,
     String password,
   ) {
     _validateExistingPassword(password);
     final operationTime = _readClockOnce();
     return coordinator.runExclusive(() async {
       final prepared = await _prepareIncoming(
-        packagePath: packagePath,
+        package: package,
         password: password,
         operationTime: operationTime,
         purpose: 'preflight',
       );
       try {
         return MobileBackupPreflight(
-          packagePath: prepared.packagePath,
-          packageSha256: prepared.packageSha256,
+          package: package,
           manifest: prepared.archive.manifest,
-          packageByteSize: prepared.packageByteSize,
           migratedSchemaVersion: AppDatabase.schemaVersion,
         );
       } finally {
@@ -674,7 +695,7 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
     final operationTime = _readClockOnce();
     return coordinator.runExclusive(() async {
       final prepared = await _prepareIncoming(
-        packagePath: command.packagePath,
+        package: command.package,
         password: command.password,
         operationTime: operationTime,
         purpose: 'restore',
@@ -692,10 +713,11 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
         filePrefix: 'safety_before_restore',
         recordSummary: false,
       );
+      late MobileRestoreResult result;
       try {
         await restoreHooks.beforeSwap?.call();
         await _activatePreparedRestore(prepared, operationTime);
-        return MobileRestoreResult(
+        result = MobileRestoreResult(
           restoredManifest: prepared.archive.manifest,
           safetyBackupPath: safety.absolutePath,
           activeSchemaVersion: AppDatabase.schemaVersion,
@@ -703,6 +725,12 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
       } finally {
         await _deleteStagingDirectory(prepared.root);
       }
+      try {
+        await fileGateway.cleanupPickedPackage(command.package);
+      } on Object {
+        // Restore is already complete. Bootstrap reconciliation retries cleanup.
+      }
+      return result;
     });
   }
 
@@ -884,12 +912,12 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
   }
 
   Future<_PreparedRestore> _prepareIncoming({
-    required String packagePath,
+    required PickedBackupPackage package,
     required String password,
     required DateTime operationTime,
     required String purpose,
   }) async {
-    final source = File(path.normalize(path.absolute(packagePath)));
+    final source = await _requireAllowedPackage(package);
     if (path.extension(source.path).toLowerCase() != '.csebackup' ||
         !await source.exists()) {
       throw const MobileBackupFailure(
@@ -898,14 +926,29 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
       );
     }
     final packageSize = await source.length();
-    if (packageSize <= 0 || packageSize > maximumPackageBytes) {
+    if (packageSize <= 0 ||
+        packageSize > maximumPackageBytes ||
+        packageSize != package.byteSize) {
       throw const MobileBackupFailure(
-        'oversize_package',
-        'Yedek paket boyutu güvenli sınırı aşıyor.',
+        'package_changed_after_import',
+        'Yedek güvenli alana alındıktan sonra değişti.',
+      );
+    }
+    final verifiedDigest = await _sha256File(source);
+    if (verifiedDigest != package.sha256) {
+      throw const MobileBackupFailure(
+        'package_changed_after_import',
+        'Yedek güvenli alana alındıktan sonra değişti.',
       );
     }
     final packageBytes = await source.readAsBytes();
     final packageDigest = hashes.sha256.convert(packageBytes).toString();
+    if (packageBytes.length != packageSize || packageDigest != package.sha256) {
+      throw const MobileBackupFailure(
+        'package_changed_after_import',
+        'Yedek güvenli alana alındıktan sonra değişti.',
+      );
+    }
     final archive = archiveCodec.decode(
       await encryptionCodec.decrypt(packageBytes, password),
     );
@@ -949,14 +992,91 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
         databaseFile: databaseFile,
         attachmentsRoot: attachmentsRoot,
         archive: archive,
-        packagePath: source.path,
         packageSha256: packageDigest,
-        packageByteSize: packageBytes.length,
       );
     } on Object {
       await _deleteStagingDirectory(root);
       rethrow;
     }
+  }
+
+  Future<File> _requireAllowedPackage(PickedBackupPackage package) async {
+    directories.validate();
+    if (package.byteSize <= 0 || package.byteSize > maximumPackageBytes) {
+      throw const MobileBackupFailure(
+        'oversize_package',
+        'Yedek paket boyutu güvenli sınırı aşıyor.',
+      );
+    }
+    if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(package.sha256) ||
+        !RegExp(
+          r'^[0-9A-Za-z][0-9A-Za-z_-]{0,127}$',
+        ).hasMatch(package.importOperationId) ||
+        !_isSafeBackupFileName(package.originalFileName)) {
+      throw const MobileBackupFailure(
+        'invalid_import_metadata',
+        'Yedek içe aktarma bilgisi geçersiz.',
+      );
+    }
+    final candidate = path.normalize(path.absolute(package.stablePath));
+    if (path.extension(candidate).toLowerCase() != '.csebackup') {
+      throw const MobileBackupFailure(
+        'unsafe_package_source',
+        'Yedek yalnız uygulamanın güvenli alanından okunabilir.',
+      );
+    }
+    final incomingRoot = path.normalize(
+      path.absolute(directories.incomingBackups.path),
+    );
+    final backupRoot = path.normalize(
+      path.absolute(directories.exportsBackups.path),
+    );
+    final isIncoming =
+        path.dirname(candidate) == incomingRoot &&
+        path.basename(candidate) == '${package.importOperationId}.csebackup';
+    final isInternalBackup =
+        path.dirname(candidate) == backupRoot &&
+        path.basename(candidate) == package.originalFileName;
+    if (!isIncoming && !isInternalBackup) {
+      throw const MobileBackupFailure(
+        'unsafe_package_source',
+        'Yedek yalnız uygulamanın güvenli alanından okunabilir.',
+      );
+    }
+    final source = File(candidate);
+    final type = await FileSystemEntity.type(candidate, followLinks: false);
+    if (type != FileSystemEntityType.file) {
+      throw const MobileBackupFailure(
+        'package_not_found',
+        'Seçilen yedek dosyası bulunamadı.',
+      );
+    }
+    final allowedRoot = Directory(isIncoming ? incomingRoot : backupRoot);
+    final resolvedRoot = path.normalize(
+      path.absolute(await allowedRoot.resolveSymbolicLinks()),
+    );
+    final resolvedSource = path.normalize(
+      path.absolute(await source.resolveSymbolicLinks()),
+    );
+    if (path.dirname(resolvedSource) != resolvedRoot) {
+      throw const MobileBackupFailure(
+        'unsafe_package_source',
+        'Yedek yalnız uygulamanın güvenli alanından okunabilir.',
+      );
+    }
+    return source;
+  }
+
+  Future<String> _sha256File(File source) async =>
+      (await hashes.sha256.bind(source.openRead()).first).toString();
+
+  bool _isSafeBackupFileName(String value) {
+    final trimmed = value.trim();
+    return trimmed.isNotEmpty &&
+        trimmed.length <= 255 &&
+        path.basename(trimmed) == trimmed &&
+        !RegExp(r'[\x00-\x1f\x7f/\\]').hasMatch(trimmed) &&
+        path.extension(trimmed).toLowerCase() == '.csebackup';
   }
 
   Future<void> _activatePreparedRestore(
@@ -1360,16 +1480,12 @@ class _PreparedRestore {
     required this.databaseFile,
     required this.attachmentsRoot,
     required this.archive,
-    required this.packagePath,
     required this.packageSha256,
-    required this.packageByteSize,
   });
 
   final Directory root;
   final File databaseFile;
   final Directory attachmentsRoot;
   final DecodedCseBackupArchive archive;
-  final String packagePath;
   final String packageSha256;
-  final int packageByteSize;
 }

@@ -90,8 +90,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      final backup = _FakeBackupApplication()
-        ..pickedPath = '/picked/input.csebackup';
+      final backup = _FakeBackupApplication()..pickedPackage = _pickedPackage;
       await tester.pumpWidget(
         MaterialApp(home: MemoryBackupPage(backup: backup)),
       );
@@ -138,6 +137,30 @@ void main() {
       expect(find.textContaining('Geri yükleme tamamlandı'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'picker cancel keeps current and dispose cleans abandoned import',
+    (tester) async {
+      final backup = _FakeBackupApplication()..pickedPackage = _pickedPackage;
+      await tester.pumpWidget(
+        MaterialApp(home: MemoryBackupPage(backup: backup)),
+      );
+
+      await tester.tap(find.byKey(const Key('pick-backup')));
+      await tester.pumpAndSettle();
+      expect(find.text('Bir .csebackup dosyası seçildi.'), findsOneWidget);
+
+      backup.pickedPackage = null;
+      await tester.tap(find.byKey(const Key('pick-backup')));
+      await tester.pumpAndSettle();
+      expect(find.text('Bir .csebackup dosyası seçildi.'), findsOneWidget);
+      expect(backup.discarded, isEmpty);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      expect(backup.discarded, [_pickedPackage]);
+    },
+  );
 }
 
 const _summary = MobileBackupSummary(
@@ -157,14 +180,23 @@ const _creationResult = MobileBackupCreationResult(
   summary: _summary,
 );
 
+const _pickedPackage = PickedBackupPackage(
+  stablePath: '/safe/incoming/import-1.csebackup',
+  originalFileName: 'input.csebackup',
+  byteSize: 4096,
+  sha256: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+  importOperationId: 'import-1',
+);
+
 class _FakeBackupApplication implements MobileBackupApplication {
   Object? createFailure;
   Completer<MobileBackupCreationResult>? createGate;
   int createCalls = 0;
   int preflightCalls = 0;
   int restoreCalls = 0;
-  String? pickedPath;
+  PickedBackupPackage? pickedPackage;
   String? sharedPath;
+  final discarded = <PickedBackupPackage>[];
 
   @override
   Future<MobileBackupCreationResult> createBackup(
@@ -179,20 +211,24 @@ class _FakeBackupApplication implements MobileBackupApplication {
   Future<MobileBackupSummary?> lastSuccessfulBackup() async => null;
 
   @override
-  Future<String?> pickBackupPackage() async => pickedPath;
+  Future<PickedBackupPackage?> pickBackupPackage([
+    PickedBackupPackage? currentPackage,
+  ]) async => pickedPackage;
+
+  @override
+  Future<void> discardBackupPackage(PickedBackupPackage package) async {
+    discarded.add(package);
+  }
 
   @override
   Future<MobileBackupPreflight> preflightBackup(
-    String packagePath,
+    PickedBackupPackage package,
     String password,
   ) async {
     preflightCalls += 1;
     return MobileBackupPreflight(
-      packagePath: packagePath,
-      packageSha256:
-          'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      package: package,
       manifest: _manifest,
-      packageByteSize: 4096,
       migratedSchemaVersion: 5,
     );
   }

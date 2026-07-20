@@ -3019,3 +3019,30 @@
 - `.csebackup` formatı `1`, Python schema `4`, desktop Backup `1`, restore
   allowlist `(2, 3, 4)` ve Günlük Çıktı `1` değişmez. Mobil restore staging
   allowlist'i `1`–`7` olur ve arşivlenmiş Ajanda fotoğraf byte'larını da taşır.
+
+## Issue 198 — Kalıcı Mobil Yedek İçe Aktarma
+
+- Picker provider/cache path'i hiçbir application veya UI state'inde source-of-
+  truth değildir. Seçim dönmeden paket app-private `incoming_backups` root'una
+  tamamen import edilir.
+- Import `withReadStream`, 512 MiB hard limit, exclusive `.part`, incremental
+  SHA-256, flush/close, tekrar size/hash kontrolü ve same-directory atomic rename
+  sırasını kullanır. Path fallback yalnız picker call içinde tüketilebilir.
+- `PickedBackupPackage` stable path, safe original basename, byte size, SHA-256
+  ve import operation ID taşır. Preflight ve restore aynı immutable package
+  metadata'sını kullanır.
+- Preflight/restore yalnız exact incoming final veya uygulamanın kendi
+  `exports_backups` direct-child dosyasını kabul eder. Regular-file ve resolved
+  root, size ve SHA her işlem öncesi tekrar doğrulanır.
+- Wrong password/preflight/restore failure incoming paketi retry için korur;
+  restore success temizler. Yeni seçim eskiyi temizler, picker cancel mevcut
+  seçimi korur, ekran kapanışı terk edilen seçimi best-effort temizler.
+- Bootstrap yalnız incoming direct-child orphan `.part` ve 24 saati aşmış final
+  paketleri temizler. Unknown ad, directory, symlink, belirsiz veya root dışı
+  path hiçbir zaman cleanup hedefi değildir.
+- Debug sidecar application ID `com.faliardic.chiefsiteengineer.debug` kalır ve
+  production RC ile yan yana kurulabilir. Sidecar preflight aktif veriyi
+  değiştirmez; otomatik restore/uninstall yoktur.
+- Mobil schema `7`, `.csebackup` format `1`, restore journal, schema `1`–`7`
+  allowlist, broad storage/media izin yokluğu ve offline device-of-truth
+  değişmez.

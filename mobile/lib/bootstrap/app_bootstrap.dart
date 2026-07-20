@@ -90,6 +90,10 @@ class AppBootstrap {
       if (directories.environment != environment) {
         throw const PathContractViolation('environment directory mismatch');
       }
+      final backupFileGateway = DeviceMobileBackupFileGateway(
+        directories: directories,
+        clock: clock,
+      );
       await directories.ensureRecoveryRootsCreated();
       try {
         await MobileRestoreRecoveryApplication(
@@ -99,6 +103,11 @@ class AppBootstrap {
         ).recoverBeforeBootstrap();
       } on RestoreRecoveryFailure {
         return const BootstrapFailure(code: 'restore_recovery_failed');
+      }
+      try {
+        await backupFileGateway.reconcileIncomingPackages();
+      } on Object {
+        // Incoming cleanup never blocks access to the active SQLite truth.
       }
       await directories.ensureCreated();
       database = AppDatabase(
@@ -161,7 +170,7 @@ class AppBootstrap {
         databaseFactory: databaseFactory,
         clock: clock,
         coordinator: coordinator,
-        fileGateway: DeviceMobileBackupFileGateway(directories: directories),
+        fileGateway: backupFileGateway,
         notificationReconciler: () async {
           // The restore already owns the application-wide coordinator. A fresh
           // reader reconciles the newly activated SQLite truth without nesting

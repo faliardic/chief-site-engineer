@@ -47,6 +47,13 @@ void main() {
         isTrue,
       );
       expect(
+        path.isWithin(
+          directories.staging.path,
+          directories.incomingBackups.path,
+        ),
+        isTrue,
+      );
+      expect(
         path.isWithin(directories.root.path, directories.restoreJournalFile),
         isTrue,
       );

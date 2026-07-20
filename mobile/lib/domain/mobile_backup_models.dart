@@ -126,14 +126,30 @@ class CreateMobileBackupCommand {
   final String passwordConfirmation;
 }
 
+class PickedBackupPackage {
+  const PickedBackupPackage({
+    required this.stablePath,
+    required this.originalFileName,
+    required this.byteSize,
+    required this.sha256,
+    required this.importOperationId,
+  });
+
+  final String stablePath;
+  final String originalFileName;
+  final int byteSize;
+  final String sha256;
+  final String importOperationId;
+}
+
 class RestoreMobileBackupCommand {
   const RestoreMobileBackupCommand({
-    required this.packagePath,
+    required this.package,
     required this.password,
     required this.expectedPackageSha256,
   });
 
-  final String packagePath;
+  final PickedBackupPackage package;
   final String password;
   final String expectedPackageSha256;
 }
@@ -209,22 +225,30 @@ class MobileBackupCreationResult {
   final String absolutePath;
   final String packageSha256;
   final MobileBackupSummary summary;
+
+  PickedBackupPackage get package => PickedBackupPackage(
+    stablePath: absolutePath,
+    originalFileName: summary.fileName,
+    byteSize: summary.packageByteSize,
+    sha256: packageSha256,
+    importOperationId: 'generated-${packageSha256.substring(0, 16)}',
+  );
 }
 
 class MobileBackupPreflight {
   const MobileBackupPreflight({
-    required this.packagePath,
-    required this.packageSha256,
+    required this.package,
     required this.manifest,
-    required this.packageByteSize,
     required this.migratedSchemaVersion,
   });
 
-  final String packagePath;
-  final String packageSha256;
+  final PickedBackupPackage package;
   final MobileBackupManifest manifest;
-  final int packageByteSize;
   final int migratedSchemaVersion;
+
+  String get packagePath => package.stablePath;
+  String get packageSha256 => package.sha256;
+  int get packageByteSize => package.byteSize;
 }
 
 class MobileRestoreResult {

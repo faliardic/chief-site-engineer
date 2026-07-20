@@ -1,5 +1,20 @@
 # Changelog
 
+## Issue #198 - Kalıcı Mobil Yedek İçe Aktarma
+
+- Android picker `.csebackup` sonucu, provider cache path'i state'e alınmadan
+  app-private `incoming_backups` alanına stream ile kopyalanır.
+- Güvenli ad, 512 MiB sınırı, exclusive `.part`, flush, iki aşamalı size/SHA-256
+  kontrolü ve aynı directory'de atomic rename uygulandı.
+- Preflight/restore typed stable package metadata kullanır; yalnız incoming veya
+  internal backup root kabul edilir ve her aşamada size/SHA yeniden doğrulanır.
+- Yeni seçim/eski seçim, cancel, wrong password retry, restore success/failure,
+  ekran kapanışı ve bootstrap orphan/expiry cleanup yaşam döngüsü tamamlandı.
+- API 36 entegrasyonuna provider-source kaybı sonrası stable preflight/restore
+  regresyonu; release gate'e yan yana kurulabilir debug sidecar artifact'ı eklendi.
+- Backup format `1`, mobil schema `7`, schema `1`–`7` restore, process-death
+  journal, minimum izinler ve offline device-of-truth sözleşmeleri korunur.
+
 ## Issue #196 - Ajanda ve Beton Saha Akışı
 
 - Mobil SQLite schema `6` → `7` atomik migration ile Ajanda fotoğraf tablosu,

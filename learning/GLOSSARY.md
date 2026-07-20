@@ -1575,3 +1575,9 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Partial Unique Index (Koşullu Tekil İndeks)`: Tekillik kuralını tablonun yalnız belirli koşulu sağlayan satırlarına uygulayan SQLite index'idir. CSE mikser irsaliyesinde yalnız dolu değerler tekildir; birden fazla `NULL` çatışmaz.
 
 `Storage Access Framework / SAF`: Android'de uygulamaya geniş depolama izni vermeden, kullanıcıya sistem belge seçici üzerinden hedef dosya/konum seçtiren platform sözleşmesidir. CSE Beton PDF kaydı kullanıcı kontrollü belge save akışını kullanır.
+
+`Stable Incoming Package (Kalıcı Gelen Paket)`: Dış dosya sağlayıcısının geçici yoluna bağlı kalmadan, picker dönüşü tamamlanmadan uygulamanın private staging köküne byte-identical kopyalanıp size, SHA-256 ve import operation ID ile tanımlanan yedek paketidir.
+
+`Incremental Hashing (Parçalı Hash Hesabı)`: Büyük dosyanın tamamını RAM'e almadan her stream chunk'ını sırayla hash converter'a verip final digest üretme yöntemidir. Issue #198 import sırasında aynı chunk hem diske hem SHA-256 hesabına gider.
+
+`Orphan Staging Reconciliation (Sahipsiz Staging Uzlaştırması)`: Process kill gibi cleanup callback'inin çalışmadığı durumdan sonra, bootstrap'ın yalnız doğrulanmış staging root içindeki yarım veya süre aşmış dosyaları güvenli kurallarla temizlemesidir.
