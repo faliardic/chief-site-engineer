@@ -96,7 +96,7 @@ try {
         -not (Test-Path -LiteralPath $apksigner)) {
         throw 'Android build-tools 36.0.0 artifact validators were not found.'
     }
-    $sidecarApk = Join-Path $artifactRoot 'chief-site-engineer-0.1.0-issue198-sidecar-debug.apk'
+    $sidecarApk = Join-Path $artifactRoot 'chief-site-engineer-0.1.0-issue200-sidecar-debug.apk'
     Copy-Item -LiteralPath $temporarySidecarApk -Destination $sidecarApk -Force
     $sidecarPackage = (& $aapt2 dump packagename $sidecarApk 2>&1) -join "`n"
     if ($LASTEXITCODE -ne 0 -or $sidecarPackage.Trim() -ne 'com.faliardic.chiefsiteengineer.debug') {

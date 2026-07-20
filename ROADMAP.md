@@ -50,6 +50,9 @@ eklenmedi.
 yerine app-private stable incoming import, stream/512 MiB/hash/atomic rename,
 retry-safe preflight/restore cleanup ve debug sidecar geçiş artifact'ı uygulandı.
 Backup format `1` ve mobil schema `7` değişmedi.
+3K. [x] Release 0.1 mikser dialog blocker — Issue #200 ile yeni/mevcut mikser
+modal controller'ları dialog State sahipliğine alındı; reverse transition,
+single mutation, retry draft ve belirsiz sonuç diagnostic sözleşmeleri uygulandı.
 
 Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme
 programı Issue #127'dir. Issue #141 / PR #142 ve Issue #143 / PR #144
@@ -65,8 +68,26 @@ notification dilimini, Issue #185 / PR #186 mobil günlük Puantajı, Issue #187
 PR #188 mobil Beton Paketi'ni, Issue #189 / PR #190 mobil tam yedek ve geri
 yüklemeyi merge etmiştir. Tek aktif production işi Issue #191 mobil release
 candidate hardening ve Issue #194 saha düzeltmelerinden sonra Issue #196 Ajanda
-ve Beton saha akışı diliminden sonra Issue #198 stable backup import blocker'ıdır.
+ve Beton saha akışı dilimi, Issue #198 stable backup import ve Issue #200 mikser
+dialog lifecycle blocker'ı ile sürer.
 Açık faz Epic'leri aynı anda aktif production işleri değildir.
+
+## Issue 200 - Mikser Dialog Lifecycle Güvenliği
+
+- [x] Yeni ve mevcut mikser için controller'ları yalnız dialog State'in yönettiği
+  `_TruckDialog` ve immutable `_TruckDraft` sonucu.
+- [x] Reverse animation boyunca FlutterError yokluğu; cancel sıfır, save tam bir
+  kez ve dialog-level double tap koruması.
+- [x] Null irsaliye, result/reason toggle, geliş/boşaltma zamanları, not, revision
+  ve canlı m³ UI reload regresyonları.
+- [x] Mutation failure sonrası aynı truck/event kimliğiyle açıkça yeniden
+  açılabilir immutable taslak.
+- [x] Beton/Ajanda modal controller audit'i ve State-owned ortak text dialogu.
+- [x] Belirsiz mutation sonucu için doğru global diagnostic metni.
+- [x] API 36 restore edilmiş mikser edit entegrasyonu ve yeni debug sidecar/
+  ephemeral production RC kapıları.
+- [ ] Gerçek kullanıcı backup/production uninstall/restore kabulü Issue #193
+  kapsamında kullanıcı tarafından yürütülür; Codex gerçek veriyi okumaz.
 
 ## Issue 198 - Kalıcı Mobil Yedek İçe Aktarma
 

@@ -3046,3 +3046,24 @@
 - Mobil schema `7`, `.csebackup` format `1`, restore journal, schema `1`–`7`
   allowlist, broad storage/media izin yokluğu ve offline device-of-truth
   değişmez.
+
+## Issue 200 — Mikser Dialog Lifecycle Güvenliği
+
+- Mikser controller sahipliği parent sayfada değildir. `_TruckDialog` kendi
+  controller'larını `initState()` içinde oluşturur ve yalnız State `dispose()`
+  çağrısında kapatır; parent yalnız immutable `_TruckDraft?` alır.
+- Dialog submit guard senkron `_closing` bayrağıdır. Aynı event-loop içindeki
+  ikinci submit, ikinci `Navigator.pop` veya ikinci DB mutation üretemez.
+- Save failure form girdisini kaybetmez. Draft ile truck ID ve event ID birlikte
+  saklanır; kullanıcı açıkça yeniden açtığında aynı logical mutation kimliği
+  kullanılır ve güncel detail/revision yeniden okunur.
+- Save success sonrası page read-model yeniden yüklenir; mikser notu ve revision
+  görünür. Mevcut transactional `truck.updated` before/after, no-op ve optimistic
+  stale kuralları application service'te değişmez.
+- Beton ve Ajanda modal text controller'ları ortak State-owned dialog standardını
+  kullanır. Reverse transition güvenliği zaman gecikmesi tahminine bağlı değildir.
+- Fatal framework diagnostic, DB commit sonucu bilinmiyorsa veri yazılmadığını
+  iddia etmez; uygulamayı yeniden açma, ilgili kaydı kontrol etme ve işlemi kör
+  tekrarlamama talimatı verir.
+- Mobil schema `7`, backup format `1`, restore journal, permission allowlist ve
+  offline device-of-truth değişmez; ErrorWidget güvenlik sınırı kaldırılmaz.

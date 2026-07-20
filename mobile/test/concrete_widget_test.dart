@@ -143,6 +143,183 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'legacy null irsaliyeli mikser edit reverse animation boyunca güvenlidir',
+    (tester) async {
+      final concrete = _FakeConcrete();
+      await _pumpDetail(tester, concrete);
+      await _openExistingTruck(tester);
+
+      final deliveryNote = tester.widget<TextField>(
+        find.byKey(const Key('concrete-truck-delivery-note')),
+      );
+      expect(deliveryNote.controller!.text, isEmpty);
+      await tester.enterText(
+        find.byKey(const Key('concrete-truck-plate')),
+        '34 CSE 200',
+      );
+      await tester.enterText(
+        find.byKey(const Key('concrete-truck-delivery-note')),
+        'IRS-200',
+      );
+      await tester.enterText(
+        find.byKey(const Key('concrete-truck-volume')),
+        '15,75',
+      );
+      await tester.enterText(
+        find.byKey(const Key('concrete-truck-note')),
+        'Lifecycle güvenli',
+      );
+
+      final save = find.byKey(const Key('save-concrete-truck'));
+      final saveCallback = tester.widget<FilledButton>(save).onPressed!;
+      saveCallback();
+      saveCallback();
+      await _pumpReverseTransition(tester);
+
+      expect(tester.takeException(), isNull);
+      expect(concrete.saveTruckCalls, 1);
+      expect(concrete.lastTruckCommand!.deliveryNoteNumber, 'IRS-200');
+      expect(concrete.lastTruckCommand!.arrivedAt, '2026-07-19T09:10:00Z');
+      expect(
+        concrete.lastTruckCommand!.unloadingStartedAt,
+        '2026-07-19T09:15:00Z',
+      );
+      expect(
+        concrete.lastTruckCommand!.unloadingEndedAt,
+        '2026-07-19T09:30:00Z',
+      );
+      expect(find.textContaining('#1 34 CSE 200 • 15.75 m³'), findsOneWidget);
+      expect(find.textContaining('Lifecycle güvenli'), findsOneWidget);
+      expect(find.textContaining('Revizyon 2'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'yeni mikser reason toggle ve double tap tek güvenli mutation üretir',
+    (tester) async {
+      final concrete = _FakeConcrete();
+      await _pumpDetail(tester, concrete);
+      await tester.scrollUntilVisible(find.text('Mikser ekle'), 300);
+      await tester.tap(find.text('Mikser ekle'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('concrete-truck-plate')),
+        '34 NEW 200',
+      );
+      await tester.enterText(
+        find.byKey(const Key('concrete-truck-volume')),
+        '7.25',
+      );
+      await tester.tap(find.byKey(const Key('concrete-truck-result')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bekletildi').last);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('concrete-truck-reason')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('concrete-truck-result')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Teslim alındı').last);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('concrete-truck-reason')), findsNothing);
+      await tester.tap(find.byKey(const Key('concrete-truck-result')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bekletildi').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('concrete-truck-reason')),
+        'Saha kontrolü bekleniyor',
+      );
+
+      final save = find.byKey(const Key('save-concrete-truck'));
+      final saveCallback = tester.widget<FilledButton>(save).onPressed!;
+      saveCallback();
+      saveCallback();
+      await _pumpReverseTransition(tester);
+
+      expect(tester.takeException(), isNull);
+      expect(concrete.saveTruckCalls, 1);
+      expect(concrete.lastTruckCommand!.result, ConcreteTruckResult.held);
+      expect(concrete.lastTruckCommand!.reason, 'Saha kontrolü bekleniyor');
+      expect(concrete.lastTruckCommand!.arrivedAt, isNotNull);
+      expect(find.textContaining('34 NEW 200 • 7.25 m³'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'mikser dialog cancel mutation çağırmaz ve lifecycle güvenlidir',
+    (tester) async {
+      final concrete = _FakeConcrete();
+      await _pumpDetail(tester, concrete);
+      await _openExistingTruck(tester);
+
+      await tester.tap(find.text('Vazgeç'));
+      await _pumpReverseTransition(tester);
+
+      expect(concrete.saveTruckCalls, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'save failure immutable mikser girdisini yeniden açılabilir tutar',
+    (tester) async {
+      final concrete = _FakeConcrete(failNextTruckSave: true);
+      await _pumpDetail(tester, concrete);
+      await _openExistingTruck(tester);
+      await tester.enterText(
+        find.byKey(const Key('concrete-truck-plate')),
+        '34 RETRY 200',
+      );
+      await tester.tap(find.byKey(const Key('save-concrete-truck')));
+      await _pumpReverseTransition(tester);
+
+      expect(concrete.saveTruckCalls, 1);
+      expect(
+        find.byKey(const Key('reopen-concrete-truck-draft')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('reopen-concrete-truck-draft')));
+      await tester.pumpAndSettle();
+      final plate = tester.widget<TextField>(
+        find.byKey(const Key('concrete-truck-plate')),
+      );
+      expect(plate.controller!.text, '34 RETRY 200');
+      await tester.tap(find.text('Vazgeç'));
+      await _pumpReverseTransition(tester);
+      expect(tester.takeException(), isNull);
+    },
+  );
+}
+
+Future<void> _pumpDetail(WidgetTester tester, _FakeConcrete concrete) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      home: ConcretePourDetailPage(
+        concrete: concrete,
+        agenda: _FakeAgenda(),
+        attachments: _picker(),
+        pourId: pourId,
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openExistingTruck(WidgetTester tester) async {
+  final truck = find.textContaining('#1 34 CSE 196');
+  await tester.scrollUntilVisible(truck, 300);
+  await tester.tap(truck);
+  await tester.pumpAndSettle();
+  expect(find.text('Mikseri düzenle'), findsOneWidget);
+}
+
+Future<void> _pumpReverseTransition(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 50));
+  await tester.pump(const Duration(milliseconds: 100));
+  await tester.pumpAndSettle();
 }
 
 SafeAttachmentPicker _picker() => SafeAttachmentPicker(
@@ -162,27 +339,33 @@ class _EmptyPicker implements AttachmentPickerPort {
 }
 
 class _FakeConcrete implements ConcreteApplication {
-  _FakeConcrete({this.delayCreate = false});
+  _FakeConcrete({this.delayCreate = false, this.failNextTruckSave = false});
   final bool delayCreate;
+  bool failNextTruckSave;
   final _completer = Completer<ConcretePourDetail>();
   int createCalls = 0;
+  int saveTruckCalls = 0;
+  SaveConcreteTruckCommand? lastTruckCommand;
+
+  ConcretePourDetail get _currentDetail => _detail(lastTruckCommand);
 
   void completeCreate() {
-    if (!_completer.isCompleted) _completer.complete(_detail());
+    if (!_completer.isCompleted) _completer.complete(_currentDetail);
   }
 
   @override
   Future<ConcretePourDetail> createPour(CreateConcretePourCommand command) {
     createCalls += 1;
-    return delayCreate ? _completer.future : Future.value(_detail());
+    return delayCreate ? _completer.future : Future.value(_currentDetail);
   }
 
   @override
-  Future<ConcretePourDetail> getPourDetail(String pourId) async => _detail();
+  Future<ConcretePourDetail> getPourDetail(String pourId) async =>
+      _currentDetail;
 
   @override
   Future<List<ConcretePour>> listPours(ConcretePourQuery query) async => [
-    _detail().pour,
+    _currentDetail.pour,
   ];
 
   @override
@@ -216,8 +399,18 @@ class _FakeConcrete implements ConcreteApplication {
     SaveConcreteSampleSetCommand command,
   ) => throw UnimplementedError();
   @override
-  Future<ConcretePourDetail> saveTruck(SaveConcreteTruckCommand command) =>
-      throw UnimplementedError();
+  Future<ConcretePourDetail> saveTruck(SaveConcreteTruckCommand command) async {
+    saveTruckCalls += 1;
+    if (failNextTruckSave) {
+      failNextTruckSave = false;
+      throw const AgendaValidationFailure(
+        'Mikser revision değişti; kaydı yeniden kontrol edin.',
+      );
+    }
+    lastTruckCommand = command;
+    return _currentDetail;
+  }
+
   @override
   Future<ConcretePourDetail> transitionPour(
     TransitionConcretePourCommand command,
@@ -244,8 +437,8 @@ class _FakeAgenda implements AgendaApplication {
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-ConcretePourDetail _detail() {
-  const pour = ConcretePour(
+ConcretePourDetail _detail([SaveConcreteTruckCommand? savedTruck]) {
+  final pour = ConcretePour(
     id: pourId,
     projectId: projectId,
     projectName: 'Uzun Proje Adı',
@@ -275,7 +468,7 @@ ConcretePourDetail _detail() {
     generalNote: null,
     sampleExceptionReason: null,
     varianceNote: null,
-    revision: 1,
+    revision: savedTruck == null ? 1 : 2,
     createdAt: '2026-07-19T07:00:00Z',
     updatedAt: '2026-07-19T07:00:00Z',
     closedAt: null,
@@ -332,6 +525,35 @@ ConcretePourDetail _detail() {
     createdAt: '2026-07-19T09:10:00Z',
     updatedAt: '2026-07-19T09:10:00Z',
   );
+  final savedTruckRecord = savedTruck == null
+      ? null
+      : ConcreteTruck(
+          id: savedTruck.id,
+          pourId: savedTruck.pourId,
+          sequenceNo: savedTruck.sequenceNo,
+          vehiclePlate: savedTruck.vehiclePlate,
+          deliveryNoteNumber: savedTruck.deliveryNoteNumber,
+          plantSnapshot: savedTruck.plantSnapshot,
+          batchTime: savedTruck.batchTime,
+          arrivedAt: savedTruck.arrivedAt,
+          unloadingStartedAt: savedTruck.unloadingStartedAt,
+          unloadingEndedAt: savedTruck.unloadingEndedAt,
+          volumeM3: savedTruck.volumeM3,
+          measuredSlump: savedTruck.measuredSlump,
+          concreteTemperature: savedTruck.concreteTemperature,
+          result: savedTruck.result,
+          reason: savedTruck.reason,
+          note: savedTruck.note,
+          evidenceExceptionReason: savedTruck.evidenceExceptionReason,
+          revision: savedTruck.expectedTruckRevision + 1,
+          createdAt: '2026-07-19T09:10:00Z',
+          updatedAt: '2026-07-20T13:00:00Z',
+        );
+  final trucks = savedTruckRecord == null
+      ? const [truck]
+      : savedTruckRecord.id == truck.id
+      ? [savedTruckRecord]
+      : [truck, savedTruckRecord];
   const attachment = ConcreteAttachment(
     id: attachmentId,
     pourId: pourId,
@@ -357,23 +579,35 @@ ConcretePourDetail _detail() {
     occurredAt: '2026-07-19T07:00:00Z',
     payloadJson: '{}',
   );
-  return const ConcretePourDetail(
+  final delivered = trucks.fold<double>(
+    0,
+    (total, item) => total + item.volumeM3,
+  );
+  return ConcretePourDetail(
     pour: pour,
-    checks: [check],
-    trucks: [truck],
-    sampleSets: [],
-    followUps: [follow],
-    attachments: [attachment],
-    events: [event],
-    linkedReminders: [],
+    checks: const [check],
+    trucks: trucks,
+    sampleSets: const [],
+    followUps: const [follow],
+    attachments: const [attachment],
+    events: const [event],
+    linkedReminders: const [],
     metrics: ConcreteMetrics(
-      actualDeliveredM3: 12.5,
-      varianceM3: -7.5,
-      variancePercent: -37.5,
-      receivedTruckCount: 1,
-      heldTruckCount: 0,
-      returnedTruckCount: 0,
-      partialTruckCount: 0,
+      actualDeliveredM3: delivered,
+      varianceM3: delivered - 20,
+      variancePercent: ((delivered - 20) / 20) * 100,
+      receivedTruckCount: trucks
+          .where((item) => item.result == ConcreteTruckResult.received)
+          .length,
+      heldTruckCount: trucks
+          .where((item) => item.result == ConcreteTruckResult.held)
+          .length,
+      returnedTruckCount: trucks
+          .where((item) => item.result == ConcreteTruckResult.returned)
+          .length,
+      partialTruckCount: trucks
+          .where((item) => item.result == ConcreteTruckResult.partial)
+          .length,
       firstTruckAt: null,
       lastTruckAt: null,
       pourDurationMinutes: null,

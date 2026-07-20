@@ -52,7 +52,9 @@ void main() {
       find.text('Uygulama güvenli biçimde başlatılamadı.'),
       findsOneWidget,
     );
-    expect(find.textContaining('Yeni kayıt yazılmadı.'), findsOneWidget);
+    expect(find.textContaining('İşlem sonucu doğrulanamadı.'), findsOneWidget);
+    expect(find.textContaining('ilgili kaydı kontrol edin'), findsOneWidget);
+    expect(find.textContaining('Yeni kayıt yazılmadı.'), findsNothing);
     expect(find.text('Tanı kodu: startup_failed'), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
   });

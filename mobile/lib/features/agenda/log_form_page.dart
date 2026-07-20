@@ -2,6 +2,7 @@ import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/features/owned_text_input_dialog.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:flutter/material.dart';
 
@@ -86,32 +87,17 @@ class _LogFormPageState extends State<LogFormPage> {
   }
 
   Future<void> _createProject() async {
-    final controller = TextEditingController();
     final projectId = RecordId.randomUuid();
     final name = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Yeni proje'),
-        content: TextField(
-          key: const Key('new-project-name'),
-          controller: controller,
-          autofocus: true,
-          maxLength: 160,
-          decoration: const InputDecoration(labelText: 'Proje adı'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Vazgeç'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Oluştur'),
-          ),
-        ],
+      builder: (context) => const OwnedTextInputDialog(
+        title: 'Yeni proje',
+        label: 'Proje adı',
+        confirmLabel: 'Oluştur',
+        inputKey: Key('new-project-name'),
+        maxLength: 160,
       ),
     );
-    controller.dispose();
     if (name == null || !mounted) return;
     try {
       final project = await widget.agenda.createProject(
