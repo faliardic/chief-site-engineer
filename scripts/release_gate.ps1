@@ -29,6 +29,7 @@ $temporaryRoot = $null
 $temporarySidecarApk = $null
 $previousSigningFile = $env:CSE_KEY_PROPERTIES_FILE
 $previousSigningRequired = $env:CSE_REQUIRE_SIGNING
+$previousAcceptanceHarness = $env:CSE_ACCEPTANCE_HARNESS
 
 function Invoke-Checked {
     param([string]$Command, [string[]]$Arguments)
@@ -62,16 +63,36 @@ function Resolve-JdkTool {
 }
 
 try {
+    $env:CSE_ACCEPTANCE_HARNESS = $null
     New-Item -ItemType Directory -Force -Path $artifactRoot | Out-Null
     Invoke-Flutter -Arguments @('pub', 'get')
     Invoke-Flutter -Arguments @('analyze')
     Invoke-Flutter -Arguments @('test', '--no-pub')
 
-    Invoke-Flutter -Arguments @('build', 'apk', '--debug', '--target-platform', 'android-arm64')
     $debugApk = Join-Path $mobileRoot 'build\app\outputs\flutter-apk\app-debug.apk'
+    Invoke-Flutter -Arguments @('clean')
+    Invoke-Flutter -Arguments @('pub', 'get')
+    if (Test-Path -LiteralPath $debugApk) {
+        throw 'Flutter clean left a stale app-debug.apk before the field sidecar build.'
+    }
+    $normalBuildStarted = [DateTime]::UtcNow.AddSeconds(-2)
+    Invoke-Flutter -Arguments @(
+        'build', 'apk', '--debug', '--target', 'lib\main.dart',
+        '--target-platform', 'android-arm64'
+    )
     if (-not (Test-Path -LiteralPath $debugApk)) {
         throw 'Debug sidecar APK was not produced.'
     }
+    if ((Get-Item -LiteralPath $debugApk).LastWriteTimeUtc -lt $normalBuildStarted) {
+        throw 'Debug sidecar APK predates the explicit lib/main.dart build.'
+    }
+    Invoke-Checked -Command 'python' -Arguments @(
+        (Join-Path $repositoryRoot 'scripts\verify_flutter_apk_entrypoint.py'),
+        '--apk', $debugApk,
+        '--expected-marker', 'CSE_ENTRYPOINT_NORMAL_LIB_MAIN_DART_V1',
+        '--forbidden-marker', 'CSE_ENTRYPOINT_BACKGROUND_ACCEPTANCE_V1',
+        '--forbidden-marker', 'CSE_ENTRYPOINT_REBOOT_ACCEPTANCE_V1'
+    )
     $temporarySidecarApk = Join-Path ([IO.Path]::GetTempPath()) ("cse-sidecar-{0}.apk" -f [guid]::NewGuid().ToString('N'))
     Copy-Item -LiteralPath $debugApk -Destination $temporarySidecarApk
     if (-not $SkipIntegration) {
@@ -97,8 +118,15 @@ try {
         -not (Test-Path -LiteralPath $apksigner)) {
         throw 'Android build-tools 36.0.0 artifact validators were not found.'
     }
-    $sidecarApk = Join-Path $artifactRoot 'chief-site-engineer-0.1.0-issue202-sidecar-debug.apk'
+    $sidecarApk = Join-Path $artifactRoot 'chief-site-engineer-0.1.0-issue207-field-sidecar-debug.apk'
     Copy-Item -LiteralPath $temporarySidecarApk -Destination $sidecarApk -Force
+    Invoke-Checked -Command 'python' -Arguments @(
+        (Join-Path $repositoryRoot 'scripts\verify_flutter_apk_entrypoint.py'),
+        '--apk', $sidecarApk,
+        '--expected-marker', 'CSE_ENTRYPOINT_NORMAL_LIB_MAIN_DART_V1',
+        '--forbidden-marker', 'CSE_ENTRYPOINT_BACKGROUND_ACCEPTANCE_V1',
+        '--forbidden-marker', 'CSE_ENTRYPOINT_REBOOT_ACCEPTANCE_V1'
+    )
     $sidecarPackage = (& $aapt2 dump packagename $sidecarApk 2>&1) -join "`n"
     if ($LASTEXITCODE -ne 0 -or $sidecarPackage.Trim() -ne 'com.faliardic.chiefsiteengineer.debug') {
         throw 'Debug sidecar package identity verification failed.'
@@ -251,6 +279,7 @@ try {
 } finally {
     $env:CSE_KEY_PROPERTIES_FILE = $previousSigningFile
     $env:CSE_REQUIRE_SIGNING = $previousSigningRequired
+    $env:CSE_ACCEPTANCE_HARNESS = $previousAcceptanceHarness
     if ($temporaryRoot -and (Test-Path -LiteralPath $temporaryRoot)) {
         $resolvedTemporaryRoot = (Resolve-Path -LiteralPath $temporaryRoot).Path
         $systemTemporaryRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())

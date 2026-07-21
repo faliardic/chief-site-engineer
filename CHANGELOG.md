@@ -1,5 +1,21 @@
 # Changelog
 
+## Issue #207 - Saha Sidecar Entrypoint Güvenliği
+
+- Saha sidecar üretimi clean build sonrasında açık `--target lib/main.dart`
+  sözleşmesine bağlandı; ortak `app-debug.apk` artık timestamp ve Dart binary
+  marker doğrulaması olmadan kopyalanamaz.
+- Normal sidecar, background acceptance ve reboot acceptance giriş noktaları
+  farklı marker ve artifact adlarıyla ayrıldı. Sentetik APK'lar ayrıca
+  `com.faliardic.chiefsiteengineer.acceptance` sandbox'ını kullanır.
+- Release gate, normal marker eksikse veya sentetik marker bulunursa fail-closed
+  durur. Sentetik build script'i normal saha sidecar hash'ini değiştiremez.
+- Sentetik harness UI'ı async bootstrap/mutation öncesinde açılır; sabit reminder
+  ID tekrarında mevcut kayıt yeniden kullanılır ve hata raw exception yerine
+  güvenli `acceptance_failed` sonucu gösterir.
+- Mobil schema `7`, backup format `1`, gerçek debug application ID'si ve mevcut
+  Ajanda/Puantaj/Beton verileri için `adb install -r` upgrade sınırı korundu.
+
 ## Issue #202 - Arka Plan Hatırlatıcı Teslimat Güvenilirliği
 
 - Android native schedule kök nedeni `inexactAllowWhileIdle` toleransı olarak

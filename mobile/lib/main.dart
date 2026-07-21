@@ -6,11 +6,14 @@ import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
+const cseNormalEntrypointMarker = 'CSE_ENTRYPOINT_NORMAL_LIB_MAIN_DART_V1';
+
 Future<void> main() async {
   final fatalErrors = ValueNotifier<String?>(null);
   await runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      debugPrint(cseNormalEntrypointMarker);
       CseTimeCodec.initialize();
       FlutterError.onError = (_) {
         fatalErrors.value = 'flutter_framework_error';

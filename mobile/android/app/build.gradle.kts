@@ -10,6 +10,7 @@ plugins {
 val repositoryRoot = rootProject.projectDir.parentFile.parentFile.canonicalFile
 val signingPropertiesPath = System.getenv("CSE_KEY_PROPERTIES_FILE")
 val requireReleaseSigning = System.getenv("CSE_REQUIRE_SIGNING") == "true"
+val acceptanceHarnessBuild = System.getenv("CSE_ACCEPTANCE_HARNESS") == "true"
 val signingPropertiesFile = signingPropertiesPath?.let(::File)?.canonicalFile
 val signingProperties = Properties()
 
@@ -77,9 +78,13 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".debug"
-            versionNameSuffix = "-debug"
-            manifestPlaceholders["appLabel"] = "Chief Site Engineer (Debug)"
+            applicationIdSuffix = if (acceptanceHarnessBuild) ".acceptance" else ".debug"
+            versionNameSuffix = if (acceptanceHarnessBuild) "-acceptance" else "-debug"
+            manifestPlaceholders["appLabel"] = if (acceptanceHarnessBuild) {
+                "CSE Synthetic Acceptance"
+            } else {
+                "Chief Site Engineer (Debug)"
+            }
         }
         release {
             manifestPlaceholders["appLabel"] = "Chief Site Engineer"

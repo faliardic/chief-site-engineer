@@ -17,7 +17,8 @@ void main() {
     expect(gradle, contains('compileSdk = 36'));
     expect(gradle, contains('targetSdk = 36'));
     expect(gradle, contains('ndkVersion = "28.2.13676358"'));
-    expect(gradle, contains('applicationIdSuffix = ".debug"'));
+    expect(gradle, contains('CSE_ACCEPTANCE_HARNESS'));
+    expect(gradle, contains('".acceptance" else ".debug"'));
     expect(gradle, contains('CSE_KEY_PROPERTIES_FILE'));
     expect(permissions, {
       'android.permission.CAMERA',
@@ -31,6 +32,33 @@ void main() {
     expect(manifest, isNot(contains('USE_EXACT_ALARM')));
     expect(manifest, isNot(contains('FOREGROUND_SERVICE')));
     expect(manifest, isNot(contains('android.permission.INTERNET')));
+  });
+
+  test('field sidecar and synthetic entrypoints are fail-closed isolated', () {
+    final mainSource = File('lib/main.dart').readAsStringSync();
+    final deliverySource = File(
+      'integration_test/background_delivery_sidecar_main.dart',
+    ).readAsStringSync();
+    final rebootSource = File(
+      'integration_test/background_reboot_sidecar_main.dart',
+    ).readAsStringSync();
+    final gate = File('../scripts/release_gate.ps1').readAsStringSync();
+    final acceptanceBuild = File(
+      '../scripts/build_mobile_acceptance_apks.ps1',
+    ).readAsStringSync();
+
+    expect(mainSource, contains('CSE_ENTRYPOINT_NORMAL_LIB_MAIN_DART_V1'));
+    expect(deliverySource, contains('CSE_ENTRYPOINT_BACKGROUND_ACCEPTANCE_V1'));
+    expect(rebootSource, contains('CSE_ENTRYPOINT_REBOOT_ACCEPTANCE_V1'));
+    expect(gate, contains("'--target', 'lib\\main.dart'"));
+    expect(gate, contains('verify_flutter_apk_entrypoint.py'));
+    expect(gate, contains('issue207-field-sidecar-debug.apk'));
+    expect(
+      acceptanceBuild,
+      contains('issue207-background-acceptance-debug.apk'),
+    );
+    expect(acceptanceBuild, contains('issue207-reboot-acceptance-debug.apk'));
+    expect(acceptanceBuild, contains('android-arm64,android-x64'));
   });
 
   test('iOS privacy manifest and archive target are statically wired', () {
