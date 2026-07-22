@@ -167,6 +167,31 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('Yarın is direct on now overdue and upcoming cards', (
+    tester,
+  ) async {
+    final item = reminder();
+    final agenda = FakeAgendaApplication(reminders: [item]);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: RemindersPage(agenda: agenda)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(Key('reminder-tomorrow-${item.id}')), findsOneWidget);
+    for (final group in [
+      ReminderViewGroup.overdue,
+      ReminderViewGroup.upcoming,
+    ]) {
+      await tester.tap(find.byKey(Key('reminder-group-${group.name}')));
+      await tester.pumpAndSettle();
+      final action = find.byKey(Key('reminder-tomorrow-${item.id}'));
+      expect(action, findsOneWidget);
+      expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
+    }
+  });
+
   testWidgets(
     'notification launch payload opens the matching reminder detail',
     (tester) async {
@@ -193,35 +218,118 @@ void main() {
       expect(find.byType(ReminderDetailPage), findsOneWidget);
       expect(find.byKey(const Key('reminder-detail')), findsOneWidget);
       expect(find.text('Mobil hızlı yakalama'), findsWidgets);
+      final tomorrow = find.byKey(const Key('snooze-tomorrow'));
+      await tester.scrollUntilVisible(
+        tomorrow,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(tomorrow);
+      await tester.pumpAndSettle();
+      expect(agenda.mutateReminderCalls, 1);
+      expect(
+        agenda.lastMutationCommand!.action,
+        ReminderMutationAction.snoozeTomorrowMorning,
+      );
     },
   );
 
-  testWidgets('lifecycle operations remain reachable with long Turkish text', (
+  testWidgets('detail Yarın blocks double tap and keeps failure visible', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(430, 760);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
     final item = reminder();
+    final completer = Completer<MobileReminder>();
     final agenda = FakeAgendaApplication(
       reminders: [item],
       reminderDetail: item,
-    );
+    )..mutateReminderCompleter = completer;
     await tester.pumpWidget(
       MaterialApp(
         home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
       ),
     );
     await tester.pumpAndSettle();
-    final complete = find.byKey(const Key('complete-reminder'));
-    expect(complete, findsOneWidget);
-    await tester.ensureVisible(complete);
-    expect(tester.getSize(complete).height, greaterThanOrEqualTo(44));
-    expect(find.byKey(const Key('schedule-reminder')), findsOneWidget);
-    expect(find.byKey(const Key('start-waiting')), findsOneWidget);
-    expect(tester.takeException(), isNull);
+    final tomorrow = find.byKey(const Key('snooze-tomorrow'));
+    await tester.scrollUntilVisible(
+      tomorrow,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(tomorrow);
+    await tester.pump();
+    await tester.tap(tomorrow, warnIfMissed: false);
+    await tester.pump();
+    expect(agenda.mutateReminderCalls, 1);
+    completer.complete(item);
+    await tester.pumpAndSettle();
+
+    agenda
+      ..mutateReminderCompleter = null
+      ..mutateReminderFailure = const AgendaValidationFailure(
+        'Hatırlatıcı başka bir işlemle değişti. Ekranı yenileyin.',
+      );
+    await tester.scrollUntilVisible(
+      tomorrow,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(tomorrow);
+    await tester.pumpAndSettle();
+    expect(agenda.mutateReminderCalls, 2);
+    final staleError = find.textContaining('başka bir işlemle değişti');
+    await tester.scrollUntilVisible(
+      staleError,
+      -300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(staleError, findsOneWidget);
+    expect(agenda.reminders.single.revision, item.revision);
   });
+
+  for (final configuration in [
+    (width: 320.0, brightness: Brightness.dark),
+    (width: 430.0, brightness: Brightness.light),
+  ]) {
+    testWidgets('lifecycle actions fit ${configuration.width.toInt()} px '
+        '${configuration.brightness.name} with large Turkish text', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(configuration.width, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final item = reminder();
+      final agenda = FakeAgendaApplication(
+        reminders: [item],
+        reminderDetail: item,
+      );
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+          child: MaterialApp(
+            theme: ThemeData(brightness: configuration.brightness),
+            home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final complete = find.byKey(const Key('complete-reminder'));
+      await tester.scrollUntilVisible(
+        complete,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(complete, findsOneWidget);
+      await tester.ensureVisible(complete);
+      expect(tester.getSize(complete).height, greaterThanOrEqualTo(44));
+      expect(find.byKey(const Key('schedule-reminder')), findsOneWidget);
+      expect(find.byKey(const Key('start-waiting')), findsOneWidget);
+      final tomorrow = find.byKey(const Key('snooze-tomorrow'));
+      await tester.ensureVisible(tomorrow);
+      expect(tester.getSize(tomorrow).height, greaterThanOrEqualTo(48));
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('delivery diagnostic exposes retry and user-opened settings', (
     tester,
@@ -239,15 +347,17 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const Key('reminder-delivery-diagnostic')),
-      findsOneWidget,
+    final diagnosticCard = find.byKey(
+      const Key('reminder-delivery-diagnostic'),
     );
+    await tester.scrollUntilVisible(
+      diagnosticCard,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(diagnosticCard, findsOneWidget);
     expect(find.text('Arka plan teslimatı garanti edilemiyor'), findsOneWidget);
-    expect(
-      find.textContaining('Android Zorla durdur işlemi'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Android Zorla durdur işlemi'), findsNothing);
     final notificationSettings = find.byKey(
       const Key('open-notification-settings'),
     );
@@ -268,12 +378,55 @@ void main() {
     expect(agenda.retryCalls, 1);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('past active reminder is overdue without critical diagnostic', (
+    tester,
+  ) async {
+    final item = reminder();
+    final agenda = _DeliveryAgenda(
+      item,
+      delayClass: ReminderDeliveryDelayClass.overdue,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('reminder-overdue-status')), findsOneWidget);
+    expect(find.text('Gecikti'), findsOneWidget);
+    expect(find.byKey(const Key('reminder-delivery-diagnostic')), findsNothing);
+    expect(find.byKey(const Key('complete-reminder')), findsOneWidget);
+    expect(find.byKey(const Key('snooze-tomorrow')), findsOneWidget);
+  });
+
+  testWidgets('terminal reminder never shows native-plan diagnostic', (
+    tester,
+  ) async {
+    final item = reminder(status: ReminderStatus.completed);
+    final agenda = _DeliveryAgenda(item);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('reopen-reminder')), findsOneWidget);
+    expect(find.byKey(const Key('reminder-overdue-status')), findsNothing);
+    expect(find.byKey(const Key('reminder-delivery-diagnostic')), findsNothing);
+  });
 }
 
 class _DeliveryAgenda extends FakeAgendaApplication
     implements ReminderDeliveryApplication {
-  _DeliveryAgenda(MobileReminder reminder)
-    : super(reminders: [reminder], reminderDetail: reminder);
+  _DeliveryAgenda(
+    MobileReminder reminder, {
+    this.delayClass = ReminderDeliveryDelayClass.nativeScheduleMissing,
+  }) : super(reminders: [reminder], reminderDetail: reminder);
+
+  final ReminderDeliveryDelayClass delayClass;
 
   int retryCalls = 0;
   int notificationSettingsCalls = 0;
@@ -282,7 +435,7 @@ class _DeliveryAgenda extends FakeAgendaApplication
   @override
   Future<ReminderDeliveryDiagnostic> getReminderDeliveryDiagnostic(
     String reminderId,
-  ) async => const ReminderDeliveryDiagnostic(
+  ) async => ReminderDeliveryDiagnostic(
     safeReminderId: 'cccccccc',
     scheduleKind: 'one_shot',
     canonicalDueAt: '2026-07-20T06:00:00Z',
@@ -297,7 +450,7 @@ class _DeliveryAgenda extends FakeAgendaApplication
     bootRescheduleState: 'not_observed',
     bootRescheduledAt: null,
     deliveredAt: null,
-    delayClass: ReminderDeliveryDelayClass.nativeScheduleMissing,
+    delayClass: delayClass,
     safeErrorCode: 'exact_alarm_permission_required',
   );
 

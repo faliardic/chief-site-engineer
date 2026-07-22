@@ -161,60 +161,76 @@ class _RemindersPageState extends State<RemindersPage> {
               ),
             )
           else
-            ..._items.map(
-              (reminder) => Card(
-                child: ListTile(
-                  key: Key('reminder-${reminder.id}'),
-                  minVerticalPadding: 12,
-                  title: Text(
-                    reminder.title,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    [
-                      reminder.kind.label,
-                      reminder.status.label,
-                      reminder.projectName ?? 'Kişisel',
-                      if (reminder.nextAttentionAt != null)
-                        CseTimeCodec.formatIstanbul(reminder.nextAttentionAt!),
-                    ].join(' • '),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing:
-                      (_group == ReminderViewGroup.now ||
-                              _group == ReminderViewGroup.overdue) &&
-                          (reminder.status == ReminderStatus.active ||
-                              reminder.status == ReminderStatus.waiting)
-                      ? SizedBox(
-                          width: 76,
-                          child: TextButton(
+            ..._items.map((reminder) {
+              final showTomorrow =
+                  (_group == ReminderViewGroup.now ||
+                      _group == ReminderViewGroup.overdue ||
+                      _group == ReminderViewGroup.upcoming) &&
+                  (reminder.status == ReminderStatus.active ||
+                      reminder.status == ReminderStatus.waiting);
+              return Card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ListTile(
+                      key: Key('reminder-${reminder.id}'),
+                      minVerticalPadding: 12,
+                      title: Text(
+                        reminder.title,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        [
+                          reminder.kind.label,
+                          reminder.status.label,
+                          reminder.projectName ?? 'Kişisel',
+                          if (reminder.nextAttentionAt != null)
+                            CseTimeCodec.formatIstanbul(
+                              reminder.nextAttentionAt!,
+                            ),
+                        ].join(' • '),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: reminder.isImportant
+                          ? const Icon(Icons.priority_high_rounded)
+                          : const Icon(Icons.chevron_right),
+                      onTap: () async {
+                        await Navigator.of(context).push<void>(
+                          MaterialPageRoute(
+                            builder: (_) => ReminderDetailPage(
+                              agenda: widget.agenda,
+                              attendance: widget.attendance,
+                              reminderId: reminder.id,
+                            ),
+                          ),
+                        );
+                        if (mounted) await _reload();
+                      },
+                    ),
+                    if (showTomorrow)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                          child: TextButton.icon(
                             key: Key('reminder-tomorrow-${reminder.id}'),
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(88, 48),
+                            ),
                             onPressed: _tomorrowBusy.contains(reminder.id)
                                 ? null
                                 : () => _moveToTomorrow(reminder),
-                            child: const Text('Yarın'),
+                            icon: const Icon(Icons.wb_sunny_outlined),
+                            label: const Text('Yarın'),
                           ),
-                        )
-                      : reminder.isImportant
-                      ? const Icon(Icons.priority_high_rounded)
-                      : const Icon(Icons.chevron_right),
-                  onTap: () async {
-                    await Navigator.of(context).push<void>(
-                      MaterialPageRoute(
-                        builder: (_) => ReminderDetailPage(
-                          agenda: widget.agenda,
-                          attendance: widget.attendance,
-                          reminderId: reminder.id,
                         ),
                       ),
-                    );
-                    if (mounted) await _reload();
-                  },
+                  ],
                 ),
-              ),
-            ),
+              );
+            }),
         ],
       ),
     );

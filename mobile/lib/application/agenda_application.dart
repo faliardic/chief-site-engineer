@@ -977,7 +977,10 @@ class SqliteAgendaApplication
           f.created_at ASC,
           f.id ASC
       ''', arguments);
-      return rows.map(_reminderFromRow).toList(growable: false);
+      final reminders = rows.map(_reminderFromRow).toList(growable: false);
+      return group == ReminderViewGroup.upcoming
+          ? _collapseUpcomingAttendanceReminders(reminders)
+          : reminders;
     });
   }
 
@@ -1050,6 +1053,7 @@ class SqliteAgendaApplication
   Future<ReminderDeliveryDiagnostic> getReminderDeliveryDiagnostic(
     String reminderId,
   ) async {
+    final now = _readClockOnce();
     final detail = await getReminderLifecycleDetail(reminderId);
     ReminderPlatformDiagnostic platform =
         const ReminderPlatformDiagnostic.unavailable();
@@ -1095,6 +1099,7 @@ class SqliteAgendaApplication
         dueAt: dueAt,
         deliveredAt: deliveredAt,
         nativePresent: nativePresent,
+        now: now,
       ),
       safeErrorCode: detail.notification.safeErrorCode,
     );
@@ -2514,6 +2519,7 @@ ReminderDeliveryDelayClass _deliveryDelayClass({
   required String? dueAt,
   required String? deliveredAt,
   required bool nativePresent,
+  required DateTime now,
 }) {
   if (dueAt == null) return ReminderDeliveryDelayClass.deliveryUnknown;
   final due = CseTimeCodec.decodeCanonicalUtc(dueAt);
@@ -2528,6 +2534,24 @@ ReminderDeliveryDelayClass _deliveryDelayClass({
     }
     return ReminderDeliveryDelayClass.severelyDelayed;
   }
+  if (!due.isAfter(now)) return ReminderDeliveryDelayClass.overdue;
   if (nativePresent) return ReminderDeliveryDelayClass.pending;
   return ReminderDeliveryDelayClass.nativeScheduleMissing;
+}
+
+List<MobileReminder> _collapseUpcomingAttendanceReminders(
+  List<MobileReminder> reminders,
+) {
+  final visible = <MobileReminder>[];
+  final attendanceProjects = <String>{};
+  for (final reminder in reminders) {
+    if (reminder.attendanceDayId == null || reminder.projectId == null) {
+      visible.add(reminder);
+      continue;
+    }
+    if (attendanceProjects.add(reminder.projectId!)) {
+      visible.add(reminder);
+    }
+  }
+  return List.unmodifiable(visible);
 }

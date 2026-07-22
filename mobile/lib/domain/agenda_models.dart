@@ -329,6 +329,7 @@ enum ReminderDeliveryDelayClass {
   onTime('Zamanında teslim edildi'),
   delayed('Gecikmeli teslim edildi'),
   severelyDelayed('Ciddi gecikmeyle teslim edildi'),
+  overdue('Gecikti'),
   nativeScheduleMissing('Native plan bulunamadı'),
   deliveryUnknown('Teslimat sonucu bilinmiyor');
 

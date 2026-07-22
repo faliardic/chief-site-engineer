@@ -3113,3 +3113,24 @@
 - Fiziksel saha düzeltmesi uninstall veya data clear kullanmaz; yalnız aynı
   `com.faliardic.chiefsiteengineer.debug` package üzerine `adb install -r`
   uygulanır. Schema `7`, backup format `1` ve gerçek kullanıcı kayıtları okunmaz.
+
+## Issue 212 — Reminder Pilot Kullanım Sözleşmesi
+
+- Günlük Puantajın 14 günlük occurrence/reminder zinciri fiziksel olarak korunur;
+  yalnız `Yaklaşanlar` read-model'i `attendanceDayId + projectId` sınırında due
+  sırasındaki ilk kaydı gösterir. Bağımsız reminder'lar gruplanmaz.
+- `Yarın` bütün gerekli kart/detail/deep-link yüzeylerinde aynı
+  `snoozeTomorrowMorning` mutation'ını kullanır. Due'nun İstanbul saat/dakikası
+  korunur; due yoksa yarın 09:00 seçilir.
+- Teslim edilmemiş aktif kayıtta geçmiş due önce `Gecikti` sınıfına girer ve
+  kritik native-plan kartı gösterilmez. Future native-plan eksikliği kritik,
+  terminal kayıt diagnostic'siz kalır.
+- Eylem sırası `Tamamla`, `Yarın`, kısa ertelemeler, `Yeni tarih`, ardından diğer
+  lifecycle eylemleri ve en sonda geçerli diagnostic olacak biçimde sabittir.
+- Mobil schema `7`, `.csebackup` format `1`, `.debug` application ID ve offline
+  device-of-truth değişmez. Fiziksel kabul uninstall/data clear kullanmaz; yalnız
+  doğrulanmış backup sonrasında `adb install -r` uygulanır.
+- Windows release/acceptance build'leri clean öncesinde yalnız yeniden
+  üretilebilir `mobile/build`, `.dart_tool` ve `ios/Flutter/ephemeral`
+  ağaçlarının read-only özniteliğini kaldırır; işlem başarısızsa eski artifact
+  ile devam etmek yerine fail-closed durur.

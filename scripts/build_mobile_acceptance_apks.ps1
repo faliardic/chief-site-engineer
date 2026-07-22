@@ -17,7 +17,7 @@ $androidSdk = if ($env:ANDROID_HOME) {
     Join-Path $env:LOCALAPPDATA 'Android\Sdk'
 }
 $aapt2 = Join-Path $androidSdk 'build-tools\36.0.0\aapt2.exe'
-$normalSidecar = Join-Path $artifactRoot 'chief-site-engineer-0.1.0-issue207-field-sidecar-debug.apk'
+$normalSidecar = Join-Path $artifactRoot 'chief-site-engineer-0.1.0-issue212-reminder-pilot-ux-debug.apk'
 $normalSidecarExisted = Test-Path -LiteralPath $normalSidecar
 $normalSidecarHash = if ($normalSidecarExisted) {
     (Get-FileHash -LiteralPath $normalSidecar -Algorithm SHA256).Hash
@@ -44,6 +44,21 @@ function Invoke-Flutter {
     }
 }
 
+function Clear-GeneratedReadOnlyAttributes {
+    $attrib = Join-Path $env:SystemRoot 'System32\attrib.exe'
+    foreach ($generatedRoot in @(
+        (Join-Path $mobileRoot 'build'),
+        (Join-Path $mobileRoot '.dart_tool'),
+        (Join-Path $mobileRoot 'ios\Flutter\ephemeral')
+    )) {
+        if (-not (Test-Path -LiteralPath $generatedRoot)) { continue }
+        Invoke-Checked -Command $attrib -Arguments @('-R', $generatedRoot)
+        Invoke-Checked -Command $attrib -Arguments @(
+            '-R', (Join-Path $generatedRoot '*'), '/S', '/D'
+        )
+    }
+}
+
 function Build-AcceptanceApk {
     param(
         [string]$Target,
@@ -53,6 +68,7 @@ function Build-AcceptanceApk {
     )
     $sharedOutput = Join-Path $mobileRoot 'build\app\outputs\flutter-apk\app-debug.apk'
     $started = [DateTime]::UtcNow.AddSeconds(-2)
+    Clear-GeneratedReadOnlyAttributes
     Invoke-Flutter -Arguments @(
         'build', 'apk', '--debug', '--target', $Target,
         '--target-platform', 'android-arm64,android-x64'
@@ -92,6 +108,7 @@ try {
         throw 'Android aapt2 36.0.0 was not found.'
     }
     $env:CSE_ACCEPTANCE_HARNESS = 'true'
+    Clear-GeneratedReadOnlyAttributes
     Invoke-Flutter -Arguments @('pub', 'get')
     Build-AcceptanceApk `
         -Target 'integration_test\background_delivery_sidecar_main.dart' `

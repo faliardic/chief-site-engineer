@@ -524,6 +524,13 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
             label: 'Sonraki dikkat zamanı',
             value: CseTimeCodec.formatIstanbul(reminder.nextAttentionAt!),
           ),
+        if (_deliveryDiagnostic?.delayClass ==
+            ReminderDeliveryDelayClass.overdue)
+          const _ReminderRow(
+            key: Key('reminder-overdue-status'),
+            label: 'Takip durumu',
+            value: 'Gecikti',
+          ),
         if (reminder.deadlineAt != null)
           _ReminderRow(
             label: 'Gerçek son tarih',
@@ -537,16 +544,6 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
               detail.notification.safeErrorCode!,
           ].join(' • '),
         ),
-        if (_deliveryDiagnostic case final diagnostic?) ...[
-          const SizedBox(height: 12),
-          _DeliveryDiagnosticCard(
-            diagnostic: diagnostic,
-            enabled: !_mutating,
-            onRetry: _retryDelivery,
-            onNotificationSettings: () => _openDeliverySettings(battery: false),
-            onBatterySettings: () => _openDeliverySettings(battery: true),
-          ),
-        ],
         _ReminderRow(label: 'Revision', value: '${reminder.revision}'),
         if (reminder.sourceLogId != null) ...[
           const SizedBox(height: 16),
@@ -615,18 +612,21 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _ActionButton(
-              key: const Key('edit-reminder'),
-              label: 'Düzenle',
-              icon: Icons.edit_outlined,
-              onPressed: _mutating ? null : _showEditDialog,
-            ),
             if (!terminal) ...[
               _ActionButton(
-                key: const Key('schedule-reminder'),
-                label: 'Planla',
-                icon: Icons.schedule,
-                onPressed: _mutating ? null : _showScheduleSheet,
+                key: const Key('complete-reminder'),
+                label: 'Tamamla',
+                icon: Icons.check_circle_outline,
+                onPressed: _mutating ? null : _showCompletionDialog,
+              ),
+              _ActionButton(
+                key: const Key('snooze-tomorrow'),
+                label: 'Yarın',
+                icon: Icons.wb_sunny_outlined,
+                onPressed: _mutating
+                    ? null
+                    : () =>
+                          _mutate(ReminderMutationAction.snoozeTomorrowMorning),
               ),
               _ActionButton(
                 key: const Key('snooze-15'),
@@ -645,14 +645,27 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
                     : () => _mutate(ReminderMutationAction.snooze1Hour),
               ),
               _ActionButton(
-                key: const Key('snooze-tomorrow'),
-                label: 'Yarın sabah',
-                icon: Icons.wb_sunny_outlined,
+                key: const Key('schedule-reminder'),
+                label: 'Yeni tarih',
+                icon: Icons.event_outlined,
+                onPressed: _mutating ? null : _showScheduleSheet,
+              ),
+            ] else
+              _ActionButton(
+                key: const Key('reopen-reminder'),
+                label: 'Yeniden aç',
+                icon: Icons.restart_alt,
                 onPressed: _mutating
                     ? null
-                    : () =>
-                          _mutate(ReminderMutationAction.snoozeTomorrowMorning),
+                    : () => _mutate(ReminderMutationAction.reopen),
               ),
+            _ActionButton(
+              key: const Key('edit-reminder'),
+              label: 'Düzenle',
+              icon: Icons.edit_outlined,
+              onPressed: _mutating ? null : _showEditDialog,
+            ),
+            if (!terminal) ...[
               _ActionButton(
                 key: const Key('start-waiting'),
                 label: 'Bekliyorum',
@@ -670,12 +683,6 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
                     : () => _mutate(ReminderMutationAction.moveToInbox),
               ),
               _ActionButton(
-                key: const Key('complete-reminder'),
-                label: 'Tamamla',
-                icon: Icons.check_circle_outline,
-                onPressed: _mutating ? null : _showCompletionDialog,
-              ),
-              _ActionButton(
                 key: const Key('cancel-reminder'),
                 label: 'İptal et',
                 icon: Icons.cancel_outlined,
@@ -683,17 +690,22 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
                     ? null
                     : () => _mutate(ReminderMutationAction.cancel),
               ),
-            ] else
-              _ActionButton(
-                key: const Key('reopen-reminder'),
-                label: 'Yeniden aç',
-                icon: Icons.restart_alt,
-                onPressed: _mutating
-                    ? null
-                    : () => _mutate(ReminderMutationAction.reopen),
-              ),
+            ],
           ],
         ),
+        if (_deliveryDiagnostic case final diagnostic?
+            when !terminal &&
+                diagnostic.delayClass !=
+                    ReminderDeliveryDelayClass.overdue) ...[
+          const SizedBox(height: 16),
+          _DeliveryDiagnosticCard(
+            diagnostic: diagnostic,
+            enabled: !_mutating,
+            onRetry: _retryDelivery,
+            onNotificationSettings: () => _openDeliverySettings(battery: false),
+            onBatterySettings: () => _openDeliverySettings(battery: true),
+          ),
+        ],
         const SizedBox(height: 24),
         Text(
           'Değişiklik geçmişi',
@@ -769,11 +781,6 @@ class _DeliveryDiagnosticCard extends StatelessWidget {
               'Boot yeniden planlama: ${diagnostic.bootRescheduleState}'
               '${diagnostic.bootRescheduledAt == null ? '' : ' • ${diagnostic.bootRescheduledAt}'}',
             ),
-            const Text(
-              'Android Zorla durdur işlemi bildirimleri uygulama yeniden '
-              'açılana kadar engeller; normal kapatma veya son uygulamalardan '
-              'kaydırma aynı davranış değildir.',
-            ),
             if (diagnostic.safeErrorCode case final code?) Text('Tanı: $code'),
             const SizedBox(height: 8),
             Wrap(
@@ -833,7 +840,7 @@ class _ActionButton extends StatelessWidget {
 }
 
 class _ReminderRow extends StatelessWidget {
-  const _ReminderRow({required this.label, required this.value});
+  const _ReminderRow({required this.label, required this.value, super.key});
 
   final String label;
   final String value;
