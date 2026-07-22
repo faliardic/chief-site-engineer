@@ -1,1306 +1,380 @@
-# Roadmap
+# CSE 2026.3 — Asistan-Öncelikli Ürün Yol Haritası
 
-## Güncel Ürün Sırası
+**Durum:** Kanonik ürün sırası  
+**Tarih:** 22 Temmuz 2026  
+**Ürün Epic'i:** #105  
+**Yürütme Epic'i:** #127  
+**Güncel saha backlog'u:** #203
 
-0. [x] Tek kullanıcılı kişisel saha asistanı yönünü kanonikleştir — Issue #103.
-1. [x] Saha Takibi transactional application service ve 7 günlük lazy backfill. Follow-up çekirdek dilimi Issue #109, waiting/terminal yaşam döngüsü Issue #111, observation link/conversion Issue #112 ve routine/backfill dilimi Issue #115 ile uygulandı.
-2. [x] Backup/restore compatibility ve resmî export izolasyonu — Issue #117 ile gerçek schema 2/3→4 restore, schema 4 tracking round-trip ve byte-identical resmî export regresyonları uygulandı.
-2A. [x] İlk test edilebilir PC Saha Takibi web yüzeyi — Issue #119 / PR #126 ile merge edildi. Bugün, Unutma Kutusu, hızlı yakalama, follow-up yaşam döngüsü, rutinler, occurrence işlemleri, restart kalıcılığı ve resmî export izolasyonu doğrulandı.
-3. [ ] Issue #127 uygulanabilir geliştirme programını bağımlılık sırasıyla yürüt.
-3A. [x] Release 0.1 mobil temel — Issue #180 ile Flutter Android/iOS kabuğu,
-cihaz-içi SQLite schema/migration/restart kalıcılığı, UTC/İstanbul sözleşmesi,
-yerel dizinler, güvenli platform portları ve Android build/emülatör smoke
-doğrulaması tamamlandı. Tam mobil özellik dilimleri ve store submission ayrı.
-3B. [x] Release 0.1 mobil Ajanda dilimi 1 — Issue #179 ile cihaz-içi günlük
-log, strict İstanbul zamanı, schema `2`, append-only event geçmişi, logdan
-bağlı reminder, Unutma Kutusu/Bugün/Yaklaşanlar ve çift yönlü deep-link
-uygulandı. Attachment ve native notification sonraki dar dilimlerde kalır.
-3C. [x] Release 0.1 mobil reminder yaşam döngüsü — Issue #183 ile bağımsız
-`+ Unutma`, schema `3`, optimistic lifecycle, sekiz görünüm, Android/iOS yerel
-notification, tap deep-link ve restart reconciliation uygulandı.
-3D. [x] Release 0.1 mobil günlük Puantaj — Issue #185 ile schema `4`, proje
-personeli, günlük attendance aggregate/lifecycle, ekip ve kişi-gün toplamları,
-14 günlük exact linked reminder ve güvenli CSV uygulandı. Ücret/bordro/SGK,
-Beton Paketi ve store submission sonraki dilimlerde kalır.
-3E. [x] Release 0.1 mobil Beton Paketi — Issue #187 ile schema `5`, döküm
-planlama/checklist, mikser-irsaliye kanıt zinciri, numune/laboratuvar takibi,
-kür/reminder yaşam döngüsü ve güvenli paket raporu uygulandı. Release hardening
-ve store submission ayrı dilimlerde kalır.
-3F. [x] Release 0.1 mobil tam yedek/geri yükleme — Issue #189 ile mobil SQLite
-ve aktif attachment'lar parola korumalı `.csebackup` format `1` paketine alındı;
-shared operation coordinator, salt-okunur preflight, safety backup, atomik tam
-değiştirme, rollback ve notification reconciliation uygulandı. Cloud backup,
-release hardening ve store submission ayrı dilimlerde kalır.
-3G. [x] Release 0.1 mobil RC hardening — Issue #191 ile Android API 36,
-16 KiB/ARM64 artefakt kapısı, minimum izinler, dış signing sözleşmesi, restore
-process-death journal, privacy/store beyan paketi, iOS privacy statik kapısı,
-release icon/splash ve tekrarlanabilir secretsız CI/Windows release gate'i
-tamamlandı. Gerçek signing, native iOS archive, saha kabulü ve store submission
-hesap/cihaz bağımlı sonraki adımlardır.
-3H. [x] Release 0.1 saha düzeltmeleri — Issue #194 ile canlı proje yenileme,
-schema `6` taşeron → ekip → personel sicili, İSG/KKD görünürlüğü, Beton exact
-saha görevleri ve reminder `Yarın` UX'i uygulandı. Backup format `1`, inexact
-notification ve offline cihaz source-of-truth sınırı korundu.
-3I. [x] Release 0.1 saha düzeltmeleri II — Issue #196 ile schema `7`, Ajanda
-edit/archive/restore ve fotoğraf akışı, Beton PDF paylaş/kaydet, güvenli toplu
-tamamlama, mikser/irsaliye düzenleme-tarama-viewer ve canlı hedef/dökülen/
-kalan-aşılan metrajı uygulandı. Fiziksel silme, cloud OCR ve store submission
-eklenmedi.
-3J. [x] Release 0.1 backup picker blocker — Issue #198 ile provider cache yolu
-yerine app-private stable incoming import, stream/512 MiB/hash/atomic rename,
-retry-safe preflight/restore cleanup ve debug sidecar geçiş artifact'ı uygulandı.
-Backup format `1` ve mobil schema `7` değişmedi.
-3K. [x] Release 0.1 mikser dialog blocker — Issue #200 ile yeni/mevcut mikser
-modal controller'ları dialog State sahipliğine alındı; reverse transition,
-single mutation, retry draft ve belirsiz sonuç diagnostic sözleşmeleri uygulandı.
-3L. [x] Release 0.1 arka plan reminder teslimat blocker — Issue #202 ile
-Android inexact kök nedeni ölçüldü; dar exact özel erişim, native schedule
-doğrulaması, boot audit, gecikme/batarya/kanal tanısı ve kapalı uygulama kabul
-matrisi uygulandı. Foreground service, cloud push ve internet eklenmedi.
-3M. [x] Release 0.1 saha sidecar startup blocker — Issue #207 ile normal
-`lib/main.dart` artifact'i clean build, binary entrypoint marker ve stale çıktı
-kontrolüne bağlandı; sentetik acceptance APK'ları ayrı ad/application ID ile
-izole edildi ve sabit ID tekrarında splash öncesi fail-safe UI sağlandı.
+## 1. Ürün kararı
 
-Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme
-programı Issue #127'dir. Issue #141 / PR #142 ve Issue #143 / PR #144
-repository/workflow truth işlerinden sonra Issue #145 / PR #146 Tek Hafıza ve
-kayıt kapsamı, Issue #147 / PR #159 `MemoryIndex / RecordRef` read-model,
-Issue #148 / PR #164 çıktı aileleri, Issue #165 / PR #166 legacy envanteri,
-Issue #167 / PR #168 saha kabul protokolü ve Issue #169 / PR #170 owner-only
-tehdit modeli merge edilmiştir. Issue #171 / PR #172 Faz 0 closure sonucunu
-`PASS` olarak merge etmiştir. Issue #173 / PR #174 zaman sözleşmesi ve
-migration preflight'ı merge edilmiştir. Issue #179 / PR #182 mobil Ajanda
-dilimini, Issue #183 / PR #184 mobil reminder yaşam döngüsü ve yerel
-notification dilimini, Issue #185 / PR #186 mobil günlük Puantajı, Issue #187 /
-PR #188 mobil Beton Paketi'ni, Issue #189 / PR #190 mobil tam yedek ve geri
-yüklemeyi merge etmiştir. Tek aktif production işi Issue #191 mobil release
-candidate hardening ve Issue #194 saha düzeltmelerinden sonra Issue #196 Ajanda
-ve Beton saha akışı dilimi, Issue #198 stable backup import ve Issue #200 mikser
-dialog lifecycle blocker'ı ile sürer.
-Arka plan teslimat blocker'ı Issue #202 ile kapatılmıştır.
-Issue #202 artifact dağıtım/entrypoint blocker'ı Issue #207 ile kapatılmıştır.
-Açık faz Epic'leri aynı anda aktif production işleri değildir.
+CSE bir şantiye ERP'si veya modül kataloğu değildir. Tek gerçek kullanıcısı
+şantiye şefidir.
 
-## Issue 207 - Saha Sidecar Entrypoint Güvenliği
-
-- [x] Ortak `app-debug.apk` ve sentetik target karışma zincirinin marker/hash
-  kanıtıyla açıklanması.
-- [x] Normal field sidecar için clean + açık `--target lib/main.dart` üretimi.
-- [x] Build timestamp, normal marker ve sentetik marker yokluğu sonkoşulları.
-- [x] Background/reboot acceptance için ayrı artifact adı ve `.acceptance`
-  application ID/sandbox.
-- [x] Sentetik sabit ID tekrarında idempotent reuse ve runApp-first fail-safe UI.
-- [x] Aynı debug package üzerine yalnız `adb install -r`; uninstall/data clear yok.
-- [x] Schema `7`, backup format `1`, Ajanda/Puantaj/Beton veri sınırı korunur.
-- [ ] Store submission ve gerçek signing ayrı kullanıcı/hesap işidir.
-
-## Issue 202 - Arka Plan Hatırlatıcı Teslimat Güvenilirliği
-
-- [x] Android inexact alarm toleransının release blocker kök nedeni olarak
-  resmi platform sözleşmesi ve saha bulgusuyla kanıtlanması.
-- [x] Yalnız kullanıcı planlı reminder akışında `SCHEDULE_EXACT_ALARM`; no
-  `USE_EXACT_ALARM`, foreground service, internet veya cloud push.
-- [x] 15/30/60 dakika, yarın, günlük ensure ve ileri due saatlik tekrar native
-  exact ankrajları.
-- [x] Schedule sonrası pending doğrulama, duplicate/orphan cleanup ve permission/
-  channel/exact reddinde logical row koruması.
-- [x] Boot reschedule privacy-safe audit ve açılış/restore reconciliation.
-- [x] Reminder detayında teslimat, batarya optimizasyonu, app standby ve güvenli
-  kullanıcı ayar yönlendirmesi.
-- [x] Schema `7`, backup format `1`, notification source link ve append-only
-  event geçmişinin korunması.
-- [ ] Store submission ve gerçek signing ayrı kullanıcı/hesap işidir.
-
-## Issue 200 - Mikser Dialog Lifecycle Güvenliği
-
-- [x] Yeni ve mevcut mikser için controller'ları yalnız dialog State'in yönettiği
-  `_TruckDialog` ve immutable `_TruckDraft` sonucu.
-- [x] Reverse animation boyunca FlutterError yokluğu; cancel sıfır, save tam bir
-  kez ve dialog-level double tap koruması.
-- [x] Null irsaliye, result/reason toggle, geliş/boşaltma zamanları, not, revision
-  ve canlı m³ UI reload regresyonları.
-- [x] Mutation failure sonrası aynı truck/event kimliğiyle açıkça yeniden
-  açılabilir immutable taslak.
-- [x] Beton/Ajanda modal controller audit'i ve State-owned ortak text dialogu.
-- [x] Belirsiz mutation sonucu için doğru global diagnostic metni.
-- [x] API 36 restore edilmiş mikser edit entegrasyonu ve yeni debug sidecar/
-  ephemeral production RC kapıları.
-- [ ] Gerçek kullanıcı backup/production uninstall/restore kabulü Issue #193
-  kapsamında kullanıcı tarafından yürütülür; Codex gerçek veriyi okumaz.
-
-## Issue 198 - Kalıcı Mobil Yedek İçe Aktarma
-
-- [x] `PickedBackupPackage` typed stable path/name/size/SHA/import ID sözleşmesi.
-- [x] Picker dönüşü içinde `withReadStream`, 512 MiB sınırı, exclusive `.part`,
-  flush, size/SHA doğrulama ve atomic rename.
-- [x] Yalnız incoming/internal backup root kabul eden preflight/restore ve her
-  aşamada yeniden size/SHA doğrulaması.
-- [x] Yeni seçim, cancel, wrong password retry, restore success/failure ve ekran
-  kapanışı cleanup yaşam döngüsü.
-- [x] Bootstrap orphan `.part` ve expired incoming reconciliation; root dışına
-  çıkmayan cleanup.
-- [x] API 36 provider-source-loss entegrasyonu, debug sidecar, unsigned AAB ve
-  ephemeral-signed production RC kapıları.
-- [ ] Gerçek kullanıcı backup SHA doğrulamalı sidecar preflight Issue #193 kabul
-  adımıdır; Codex gerçek backup'ı okumaz veya restore/uninstall yapmaz.
-- [ ] Native iOS archive ve store submission ayrı hesap/cihaz işidir.
-
-
-## Issue 196 - Ajanda ve Beton Saha Akışı
-
-- [x] Mobil schema `6` → `7` atomik migration, v6 veri/FK/event korunumu ve
-  failure rollback/retry.
-- [x] Ajanda edit/no-op/stale, archive filter, recoverable `Sil`, restore ve
-  reminder yaşam döngüsünü değiştirmeyen append-only event'ler.
-- [x] AppBar alarm ikonu, tooltip/semantic/touch target ve bağlı reminder
-  duplicate koruması.
-- [x] Ajanda JPEG/PNG create/detail attachment; sniff, hash, atomic finalize,
-  cleanup, archive, zoom/pan, restart ve backup/restore.
-- [x] Beton UTF-8 PDF raporu; ayrı OS paylaş ve telefona kaydet, cancel/failure
-  cleanup ve yalnız başarı sonrası export event'i.
-- [x] Manual Beton checklist/takipleri için transaction-safe idempotent toplu
-  tamamlama; source-field görevleri hariç.
-- [x] Mikser edit/no-op/stale, nullable irsaliye, sonradan ekleme, exact truck'a
-  çoklu scan ve legacy attachment uyumluluğu.
-- [x] JPEG/PNG zoom/pan ve PDF güvenli viewer; missing/hash/MIME güvenli tanısı.
-- [x] Canlı hedef/dökülen/kalan/aşılan m³ ve optimistic hedef güncellemesi.
-- [x] Backup format `1` içinde schema `1`–`7` staging migration ve fotoğraf/
-  archive/event/scan/truck/target exact round-trip.
-- [ ] Attachment viewer ile PDF share/save gerçek cihaz kabulü Issue #193
-  checklist'iyle kullanıcı tarafından yürütülür.
-- [ ] Native iOS archive ve store submission hesap/cihaz bağımlı ayrı iştir.
-
-## Issue 194 - Release 0.1 Saha Düzeltmeleri
-
-- [x] Mobil schema `5` → `6` atomik migration ve failure rollback/retry.
-- [x] Legacy ekiplerin deterministik taşeron/ekip eşlemesi; exact personel,
-  attendance entry ve event geçmişi korunumu.
-- [x] Taşeron/ekip/personel sicili, normalized unique ad, optimistic revision,
-  logical archive/reopen sırası ve append-only workforce event geçmişi.
-- [x] Puantaj personel seçicisinde taşeron → ekip hiyerarşisi ve yerinde yeni
-  kayıt akışları; exact team/person kimliğiyle günlük toplu işlemler.
-- [x] Personel Genel/Puantaj, İSG ve KKD görünümleri; belge tarih read-model'i,
-  zimmet/iadeli yaşam döngüsü ve hukuki karar üretmeyen güvenli açıklama.
-- [x] Ajanda ana ekranından proje oluşturma ve bütün açık mobil modüllerde canlı
-  proje katalog yenilemesi; boşluk/büyük-küçük harf normalize duplicate koruması.
-- [x] Beton için exact iki linked saha görevi, 60 dakikalık inexact notification,
-  alan tamamlama/reopen eşitlemesi ve kodsuz numune seti akışı.
-- [x] Reminder `Yarın`: yerel saati koruyan sonraki İstanbul günü, saatsiz kayıt
-  için 09:00, canonical UTC, optimistic event ve double-tap koruması.
-- [x] Backup format `1` içinde mobil schema `1`–`6` staging migration ve schema
-  `6` sicil/bağlantı/event round-trip'i.
-- [ ] Gerçek Android saha kabulü kullanıcı tarafından checklist ile yapılır.
-- [ ] Native iOS archive ve store submission hesap/cihaz bağımlı ayrı iştir.
-
-## Issue 191 - Mobil Release Candidate Hardening
-
-- [x] Android compile/target API `36`, Java 17, NDK ve ARM64 sabitlemesi.
-- [x] Merged manifest sensitive permission allowlist; broad media/storage,
-  INTERNET, cleartext ve exact-alarm yokluğu.
-- [x] Unsigned AAB ile repository-dışı ephemeral signed AAB/APK ayrımı,
-  signer, 16 KiB zipalign ve SHA-256 kapısı.
-- [x] Secretsız restore process-death journal ve bootstrap recovery.
-- [x] Mobil schema `1`–`5` fixture migration/data-event korunumu.
-- [x] Privacy policy, Play/Apple beyan matrisi, izin ve SDK envanteri.
-- [x] iOS privacy manifest, iPhone-only kimlik ve Xcode 26 blocker checklist'i.
-- [x] Proje mülkiyetinde Android/iOS release icon ve splash seti.
-- [x] Güvenli global hata UX'i, 320–430 px, büyük metin ve dark/light testleri.
-- [x] Secretsız workflow ve Windows tek-komut release gate'i.
-- [ ] Gerçek Android saha kabulü kullanıcı tarafından checklist ile yapılır.
-- [ ] Native iOS archive macOS, Xcode 26, Apple Developer ve dış signing ister.
-- [ ] Play Console/App Store Connect gönderimi ayrı, hesap-bağımlı iştir.
-
-## Issue 189 - Mobil Tam Yedek ve Geri Yükleme
-
-- [x] SQLite + aktif attachment'lar için `.csebackup` format `1` manifesti.
-- [x] PBKDF2-HMAC-SHA256 + AES-256-GCM authenticated parola koruması.
-- [x] Ajanda/Reminder/Puantaj/Beton/backup için tek shared operation coordinator.
-- [x] `VACUUM INTO`, integrity/FK ve attachment hash audit'li atomik backup.
-- [x] Traversal/absolute/duplicate/unsupported/oversize fail-closed preflight.
-- [x] Desteklenen eski mobil schema'yı yalnız staging'de migration.
-- [x] İki aşamalı kullanıcı onayı ve preflight sonrası package SHA token'ı.
-- [x] Otomatik safety backup, tam replace, smoke, notification reconcile, rollback.
-- [x] 320–430 px yüzey, input preservation, double-tap ve share/save.
-- [x] Android emülatörde gerçek backup/restore/restart/attachment akışı.
-- [ ] Native iOS archive macOS + Xcode + repository dışı signing gerektirir.
-- [ ] Cloud backup, release hardening ve store submission ayrı Issue'dur.
-
-## Issue 187 - Mobil Beton Döküm Paketi
-
-- [x] Mobil schema `4` → `5`; eski Ajanda/reminder/notification/Puantaj/event
-  verisi korunumu ve rollback.
-- [x] Döküm planı, on bir hazırlık kontrolü ve optimistic lifecycle.
-- [x] Mikser/irsaliye, kronolojik zamanlar, sonuçlar ve türetilen gerçek metraj.
-- [x] Kamera/galeri/dosya kanıtı, MIME/SHA-256, atomik finalize ve cleanup.
-- [x] Numune seti, laboratuvar teslim/sonuç reminder'ı ve çift yönlü deep-link.
-- [x] Kür, yüzey, kalıp, eksik kanıt ve sonuç follow-up kapanış kapıları.
-- [x] Bugün/yaklaşan/devam/takip/kapalı görünümü ve açık sayaçlar.
-- [x] UTF-8 Markdown + CSV/JSON-ready özet ve attachment manifest/hash.
-- [x] 320–430 px, platform permission failure ve Android integration kapsamı.
-- [ ] Native iOS build/archive macOS + Xcode + repository dışı signing gerektirir.
-- [ ] Release hardening ve store submission ayrı Issue'dur.
-
-## Issue 185 - Mobil Günlük Puantaj ve Personel
-
-- [x] Mobil schema `3` → `4` atomik migration; Ajanda/reminder/notification/event
-  verisi korunumu ve rollback testi.
-- [x] Proje bazlı personel ekleme, düzenleme, pasifleştirme ve geçmişte okuma.
-- [x] Tam/yarım gün, gelmedi, izinli, fazla mesai, kısa/genel not.
-- [x] Tümünü veya seçili ekibi tek aggregate mutation'ıyla tam gün işaretleme.
-- [x] Taslak, tamamlandı, çalışma yok, explicit reopen ve historical correction.
-- [x] Optimistic revision, idempotent/no-op ve append-only event sequence.
-- [x] Günlük/ekip toplamı, kişi-gün eşdeğeri ve fazla mesai toplamı.
-- [x] Çalışma günleri + İstanbul saati ve rolling 14-day idempotent ensure.
-- [x] Puantaj günü/reminder exact link, kapanış, reopen ve çift yönlü deep-link.
-- [x] UTF-8 CSV, formula injection koruması, atomik stage/failure cleanup ve özet.
-- [x] 320–430 px, 44 px touch target ve Android integration kapsamı.
-- [ ] Native iOS build/archive macOS + Xcode + repository dışı signing gerektirir.
-- [ ] Ücret/bordro/SGK/hakediş, Beton Paketi ve store submission ayrı Issue'dur.
-
-## Issue 183 - Mobil Reminder Yaşam Döngüsü ve Yerel Bildirimler
-
-- [x] Mobil schema `2` → `3` atomik rebuild ve v2 Ajanda/reminder/event korunumu.
-- [x] Standalone veya Ajanda-linked reminder invariant'ları ve collision-safe
-  platform notification ID binding'i.
-- [x] Bağımsız `+ Unutma`, yedi hızlı seçenek ve optional project/saha ayrıntısı.
-- [x] Expected revision, stale conflict, no-op ve row/event transaction sınırı.
-- [x] Update, schedule/reschedule, snooze, waiting, inbox, complete, cancel,
-  outcome ve reopen yaşam döngüsü.
-- [x] Sekiz deterministik read-model, 320–430 px ve 44 px touch target.
-- [x] Android/iOS timezone-aware local notification ve reminder tap deep-link.
-- [x] Permission/plugin failure halinde reminder korunumu ve safe sync state.
-- [x] Bootstrap reconciliation, duplicate/stale/orphan ve capacity yönetimi.
-- [x] Android reboot receiver + inexact schedule; exact-alarm izinleri yok.
-- [x] Gerçek Android pending create/restart/cancel integration, debug APK ve
-  unsigned release AAB.
-- [ ] Native iOS build/archive macOS + Xcode + repository dışı signing gerektirir.
-- [ ] Recurring routine, Beton Paketi ve store submission ayrı Issue'dur;
-  günlük Puantaj Issue #185 ile tamamlandı.
-
-## Issue 179 - Mobil Ajanda Logu ve Bağlı Hatırlatıcı
-
-- [x] Mobil schema `1` → `2` atomik migration ve eski smoke kaydı korunumu.
-- [x] Project, log, reminder ve iki append-only event tablosu.
-- [x] UTC storage / İstanbul gün sınırı, geçmiş log ve deterministic sıralama.
-- [x] Bugün/önceki/sonraki/tarih seçimi ile proje/tür/literal filtreler.
-- [x] Input-preserving log formu, tek clock okuması, double-tap ve retry koruması.
-- [x] Logdan inbox veya zamanlı action/waiting/recheck reminder oluşturma.
-- [x] Reminder row/source/schedule/event için tek transaction ve rollback.
-- [x] Ajanda–Hatırlatıcı çift yönlü detail navigation.
-- [x] 320 px uzun Türkçe metin ve minimum 44 px dokunma hedefi testi.
-- [x] Android restart/offline integration, debug APK ve release AAB build.
-- [x] Native notification Issue #183 ile tamamlandı; attachment/fotoğraf ayrı
-  sonraki Issue'dur.
-
-## Issue #127 Faz Haritası
-
-- [x] Issue #128 — Faz 0: repository truth, ADR'ler ve yürütme zemini.
-- [ ] Issue #129 — Faz 1: Güvenilir Hafıza yaşam döngüsü ve ortak kayıt görünümü.
-- [ ] Issue #130 — Faz 2: Tam Hafıza İndirme, doğrulama ve kurtarma standardı.
-- [ ] Issue #131 — Faz 3: mobil runtime, offline güvenilirlik ve gerçek saha pilotları.
-- [ ] Issue #132 — Faz 4: şantiye komuta merkezi, ortak timeline ve haftalık özet.
-- [ ] Issue #133 — Faz 5: doküman, rapor ve çizim merkezi.
-- [ ] Issue #134 — Faz 6: Şantiye İş Planı Lite ve iki haftalık lookahead.
-- [ ] Issue #135 — Faz 7: İş Paketi Motoru ve Beton İş Paketi.
-- [ ] Issue #136 — Faz 8: saha hesap araçları ve yönlendirmeli manuel metraj.
-- [ ] Issue #137 — Faz 9: PDF-first çizim destekli metraj ve doğrulama.
-- [ ] Issue #138 — Faz 10: haricî uygulama, cihaz paylaşımı ve güvenli içe aktarma bağlantıları.
-- [ ] Issue #139 — Faz 11: deterministik arama, semantik geri çağırma ve kaynaklı AI.
-- [ ] Issue #140 — Faz 12: owner-only güvenlik, bakım, güncelleme ve ürünleştirme.
-
-Issue #141–#169 arasındaki P0.01–P0.09 işleri merged kanıta sahiptir. Issue #171
-/ PR #172 bu kanıtları repository truth ile uzlaştırmış ve P0.10'u kapatmıştır.
-Sıradaki tek faz Issue #129'dur; P1.01 Issue #173 / PR #174 ile tamamlanmış,
-P1.02 Issue #175 ile başlamıştır.
-
-## Issue 180 - Release 0.1 Flutter Mobil Temel
-
-- [x] `mobile/` Flutter projesi ile Android ve iOS platform kabukları eklendi.
-- [x] `0.1.0+1`, uygulama adı ve release/debug application/bundle kimlikleri
-  sabitlendi.
-- [x] Başlangıç, Hatırlatıcı, Ajanda, Puantaj ve Beton Paketi ana navigasyonu
-  kuruldu; tamamlanmamış alanlar `Hazırlanıyor` gösteriyor.
-- [x] Application-support altında debug/release ayrılmış database, attachment,
-  export/backup ve temp/staging dizinleri doğrulanıyor.
-- [x] Mobil SQLite schema `1`, append-only migration geçmişi, atomik migration
-  ve restart smoke-record kalıcılığı uygulandı.
-- [x] Database/path hatası kullanıcıya teknik ayrıntı sızdırmadan fail-closed
-  gösteriliyor.
-- [x] Aware UTC seconds storage, offset normalization ve Europe/Istanbul sunumu
-  Python fixture'larıyla eşlendi; naive/invalid değer reddediliyor.
-- [x] Notification, camera/photo/file ve export platform portları izin reddinde
-  crash/mutation üretmiyor.
-- [x] Flutter analyze, unit/widget testleri ve Android emülatör integration
-  smoke testi geçti.
-- [x] Android debug APK ve unsigned release AAB üretildi; signing key/secret
-  repository'ye eklenmedi.
-- [x] iOS project, plist, iOS 13 deployment target, version/build ve bundle
-  kimlikleri statik doğrulandı.
-- [ ] Native iOS archive/TestFlight/App Store doğrulaması macOS + Xcode + Apple
-  Developer hesabı gerektirir ve Issue #180 ortamında açık platform blocker'ıdır.
-- [ ] Gerçek store submission, mobile Ajanda/Hatırlatıcı/Puantaj/Beton Paketi,
-  notification delivery, backup/restore hardening ve privacy metadata sonraki
-  ayrı Issue'lardır.
-
-## Issue 173 - Olay Zamanı Sözleşmesi ve Migration Preflight
-
-- [x] `observed_at` / `occurred_at`, `created_at` ve `updated_at` anlamları
-  ayrıldı.
-- [x] UTC seconds storage, explicit offset normalization ve
-  `Europe/Istanbul` presentation merkezileştirildi.
-- [x] Naive/invalid fail-closed, seconds/microseconds, past/future ve generic
-  DST davranışı executable testlerle sabitlendi.
-- [x] Observation, follow-up, routine, event, clock, SQLite, Backup/Restore,
-  Günlük Çıktı ve web call-site envanteri çıkarıldı.
-- [x] Yalnız explicit temp/test database kabul eden `mode=ro` + `query_only`
-  preflight eklendi.
-- [x] Schema 2/3/4 kolon, count, min/max, mapping, warning ve blocker report'u
-  veri-minimal JSON-ready sözleşmeyle doğrulandı.
-- [x] Database byte değişmezliği ve hassas içerik sızıntısı yokluğu test edildi.
-- [x] Schema, migration zinciri, Backup v1 ve Günlük Çıktı v1 değiştirilmedi.
-- [x] P1.02 geriye dönük observation create contract'ı Issue #175 ile
-  başlatıldı.
-
-## Issue 175 - Geriye Dönük Observation Create Contract
-
-- [x] Observation create girdisi frozen `CreateObservation` command nesnesine
-  taşındı.
-- [x] Optional explicit geçmiş `observed_at` strict canonical UTC seconds ve
-  `TimestampRole.EVENT_TIME` future policy ile doğrulandı.
-- [x] Omitted `observed_at` tek canonical clock değerini kullanıyor.
-- [x] Tek clock okuması observation `created_at/updated_at`, created event
-  `occurred_at` ve attachment metadata `created_at` alanlarına bağlandı.
-- [x] Created event payload'ında `observed_at` ile `created_at` açıkça ayrıldı.
-- [x] Invalid/future command staging, UUID tüketimi ve database/event
-  mutation'dan önce fail-closed duruyor.
-- [x] Existing finalize, event failure, commit failure, rollback ve
-  reconciliation davranışı korundu.
-- [x] Web, acceptance, CLI, Backup/Restore ve Günlük Çıktı geriye uyumluluğu
-  executable regresyonlarla korundu.
-- [x] Schema/migration/repository, yeni form/route, Ajanda UI, archive/scope,
-  MemoryIndex, mobile/offline/notification/security kapsamı başlatılmadı.
-
-## Faz 0 Kanonik ADR İndeksi
-
-- `docs/adr/ADR-0001-single-memory-and-record-scope.md` — Tek Hafıza ve
-  `private | project` kapsamı.
-- `docs/adr/ADR-0002-memory-index-record-ref-read-model.md` — source-of-truth,
-  projection, rebuild ve consumer sınırı.
-- `docs/adr/ADR-0003-backup-memory-download-project-package.md` — Backup,
-  Hafızayı İndir, Proje Paketi ve Günlük Çıktı ayrımı.
-- `docs/adr/ADR-0004-owner-only-security-and-data-ownership-threat-model.md` —
-  owner-only güvenlik, veri sahipliği, trust boundary ve stop kriterleri.
-
-Bu ADR'ler karar sözleşmesidir. Scope field, archive/unarchive, MemoryIndex,
-Hafıza UI, yeni artifact aileleri, app lock veya encryption uygulanmış değildir.
-
-## Issue 171 - Faz 0 Closure Doğrulaması
-
-- [x] P0.01–P0.09 için merged Issue/PR/commit zinciri doğrulandı.
-- [x] Dört ADR current kanonik yüzeylerden exact path ile erişilebilir yapıldı.
-- [x] Repository truth ile README, ROADMAP, protokoller, decisions ve state
-  drift'i yetkili allowlist içinde kapatıldı.
-- [x] Legacy removal gate, 7/30 günlük pilotun yürütülmediği sınır ve current
-  MVP security posture ayrı kanıtlandı.
-- [x] Schema `4`, restore `(2, 3, 4)`, Backup `1` ve Günlük Çıktı `1`
-  compatibility durumu kaydedildi.
-- [x] Çalışan production yüzeyi ile yalnız belgelenmiş gelecek kararları ayrıldı.
-- [x] Faz 0 closure sonucu kanıt matrisinden `PASS` olarak üretildi.
-- [x] Sıradaki tek dar aday Issue #129 / P1.01 olarak seçildi.
-- [x] Faz 1 Issue, branch veya implementation başlatılmadı.
-- [x] P0.10, Issue #171 / PR #172 merge'iyle Issue #128 üzerinde tamamlandı.
-
-## Issue 148 - Backup, Hafızayı İndir ve Proje Paketi Ayrım ADR'si
-
-- [x] Backup eksiksiz felaket kurtarma ve yalnız desteklenen format/schema için doğrulanmış Restore ailesi olarak sabitlendi; filtreli/kısmi Backup reddedildi.
-- [x] Hafızayı İndir bütün owner hafızasının iki scope, bütün türler, event geçmişi ve attachment inventory/dosyalarını taşıyan okunabilir kişisel arşivi olarak tanımlandı; Restore garantisi verilmedi.
-- [x] Proje Paketi yalnız seçilen tek projedeki source'tan yeniden doğrulanmış `scope=project` kayıtlar için paylaşılabilir teslim ailesi olarak sınırlandı.
-- [x] Project ID'nin tek başına yetmediği; scope, revision, archive, status, reference, attachment ve publication guard'larının fail-closed çalışacağı kaydedildi.
-- [x] Mevcut tarih/observation odaklı Günlük Çıktı v1'in daha geniş seçilmiş Proje Paketi'nden ayrı kaldığı ve private tracking byte-identical izolasyonunun değişmediği kesinleştirildi.
-- [x] `backup_format_version`, `memory_download_format_version`, `project_package_format_version` ve `daily_export_format_version` bağımsız namespace'leri kabul edildi; mevcut wire anahtarları değiştirilmedi.
-- [x] Manifest minimumları, deterministic entry sırası, uncompressed byte SHA-256/size, strict path/entry doğrulaması ve backward compatibility/fail-closed kuralları tanımlandı.
-- [x] Backup, Hafızayı İndir ve Proje Paketi verifier sorumlulukları ayrıldı; source mutation, repair veya scope/publication değişikliği yasaklandı.
-- [x] Future encryption yönü ve key recovery sorumluluğu aile bazında kaydedildi; implementation ayrı Issue'ya bırakıldı.
-- [x] Production kodu, test, schema, migration, persistence, UI, route, CLI, backup/export formatı ve gerçek kullanıcı verisi değiştirilmedi.
-
-## Issue 147 - MemoryIndex / RecordRef Read-Model ADR'si
-
-- [x] Source of truth domain aggregate + append-only event history olarak korundu; read-model source mutation ve sessiz repair yapamaz.
-- [x] Composite `(record_type, source_id)` anahtarı ve deterministic `record_ref_id` formatı kabul edildi.
-- [x] İlk type allowlist'i observation, follow-up ve routine occurrence ile sınırlandı.
-- [x] Ortak alan sözleşmesi; normalized status + `status_detail`, importance, archive/terminal, title/search text, deep link, source fingerprint ve projection version ile kesinleştirildi.
-- [x] Üç kaynak türü için occurred/created/updated zamanları, scope/project, status, önem, archive, title/search ve deep-link mapping'i kaydedildi.
-- [x] Transactional source+event+idempotent upsert ile explicit rebuild'i birleştiren hybrid strateji seçildi.
-- [x] Deterministic source-ID taraması, shadow generation, atomik aktivasyon ve başarısızlık/stale görünürlüğü tanımlandı.
-- [x] Hafıza, literal arama, timeline, dashboard, haftalık özet, Hafızayı İndir inventory ve diagnostic consumer sınırları çizildi.
-- [x] Private kayıtların project bağlantısından scope inference yapılmadan, resmî çıktılarda source üzerinden fail-closed yeniden doğrulanması zorunlu tutuldu.
-- [x] Production kodu, test, schema, migration, persistence, UI, backup/export formatı ve gerçek kullanıcı verisi değiştirilmedi.
-
-## Issue 145 - Tek Hafıza ve Kayıt Kapsamı ADR'si
-
-- [x] Kullanıcı için ayrı kişisel/resmî uygulama dünyaları yerine tek **Hafıza** deneyimi kararlaştırıldı.
-- [x] Kayıt türü, kapsam ve proje bağlantısı birbirinden ayrıldı.
-- [x] `private | project` erişim rolü değil resmî/proje çıktısı uygunluğu olarak tanımlandı.
-- [x] Mevcut observation `project`; follow-up, routine template ve routine occurrence `private` başlangıç/backfill mapping'i kesinleştirildi.
-- [x] Project atama, observation link'i, AI ve routine işleminin sessiz kapsam dönüşümü yapmayacağı kaydedildi.
-- [x] `private -> project` için açık kullanıcı işlemi, revision ve append-only event; `project -> private` için kayıt türüne ve publication/reference kanıtına bağlı fail-closed sınır seçildi.
-- [x] Backup bütün kapsamları; Hafızayı İndir bütün hafızayı; Proje Paketi/günlük/rapor yalnız ilgili `project` kapsamını taşıyacak şekilde ayrıldı.
-- [x] Private kaydın resmî/proje çıktısına doğrudan seçimi yasaklandı; önce denetlenebilir kapsam dönüşümü zorunlu tutuldu.
-- [x] Migration, geriye uyumluluk, güvenlik, terminoloji, reddedilen alternatifler ve executable acceptance matrisi `docs/adr/ADR-0001-single-memory-and-record-scope.md` içinde kaydedildi.
-- [x] Production kodu, test, schema, migration, template, CSS, backup ve daily export formatı değiştirilmedi.
-
-## Mobil Saha Pilotu Öncesi Minimum Kâğıdı Bırakma Kapsamı
-
-İlk gerçek saha pilotundan önce aynı mobil-first ürün diliminde:
-
-- `+ Yakala` / `+ Unutma`;
-- Bugün / Şimdi ilgilen / Geciken;
-- Dönüş bekliyorum / tekrar kontrol;
-- rutinler;
-- fotoğraf veya dosya ekleme;
-- minimum hızlı hesap şeridi;
-- günlük zaman çizelgesi ve düzenlenebilir taslak;
-- arama;
-- backup durumu/görünürlüğü.
-
-Gelişmiş hesap defteri ve immutable günlük yayınlama/revizyon zinciri, Issue #127 programındaki ilgili sonraki fazlarda kalır; minimum hesap ve günlük taslağı ise mobil saha pilotu öncesi bütünleşik ürün kabulinin parçasıdır.
-
-## Issue 169 - Owner-only Güvenlik ve Veri Sahipliği Tehdit Modeli
-
-- [x] Mevcut MVP; tek kullanıcı, Windows hesabı dayanaklı, loopback-default,
-  auth/app-lock/TLS/encryption içermeyen gerçek posture ile tanımlandı.
-- [x] SQLite/event, managed attachment, data root, artifact, scope, browser,
-  log, repository/release, pilot ve future MemoryIndex varlıkları CIA,
-  source-of-truth ve recovery yolu ile envanterlendi.
-- [x] Uygulama/SQLite, attachment, browser/local web, loopback/LAN/public,
-  Windows hesabı, removable disk, projection, scope/output, GitHub/update ve
-  pilot içerik sınırları on bir trust boundary olarak bağlandı.
-- [x] Yirmi bir threat scenario; on yedi zorunlu alan, likelihood/impact,
-  `low | medium | high | critical` severity ve safety override ile yazıldı.
-- [x] Critical/high riskler current control, açık gap, detection, immediate
-  response, future executable Issue anahtarı ve acceptance evidence ile eşlendi.
-- [x] Veri sahipliği, output confidentiality, plain Backup/Hafızayı İndir,
-  source-vs-projection ve uninstall/update veri koruma sözleşmeleri kaydedildi.
-- [x] Confirmed data loss/corruption, privacy leakage, public/LAN exposure,
-  verify/Restore, attachment ve release integrity failure stop kriteri oldu.
-- [x] App lock/session, encrypted artifact, secure LAN, diagnostics, logs,
-  signed update, supply chain ve recovery drill işleri Faz 12 kapılarına ayrıldı.
-- [x] Hiçbir auth, encryption, network control, security test veya production
-  davranışı uygulanmış gibi gösterilmedi; gerçek network exposure testi yapılmadı.
-
-## Issue 167 - Saha Kabul Metrikleri ve Pilot Protokolü
-
-- [x] Kayıt açma ve doğru kaydı geri bulma süreleri exact başlangıç/bitiş, median, nearest-rank p90, failure rate ve minimum sample ile tanımlandı.
-- [x] Veri kaybı, missed follow-up, attachment/hash, Backup verify, clean Restore, haricî araca dönüş, scope/privacy sızıntısı ve ölçüm bütünlüğü metrikleri bağlayıcı alan sözleşmesiyle yazıldı.
-- [x] Performance ölçümleri günlük sınırlı sample; safety/privacy/integrity olayları eksiksiz census olarak ayrıldı.
-- [x] Gün 0 preflight, 7 ardışık günlük ilk pilot ve 30 ardışık günlük doğrulama pilotu tekrarlanabilir adımlara bağlandı.
-- [x] Günlük ve summary şablonları source UUID, gerçek kayıt gövdesi, proje/kişi, attachment path/hash, screenshot ve ham mesaj toplamadan kullanılabilir hazırlandı.
-- [x] Suspected veri kaybı/privacy/integrity olayında stop; confirmed safety blocker'da yeni revalidation window ve owner restart kararı zorunlu tutuldu.
-- [x] 7 günlük `PASS_TO_30_DAY` ile 30 günlük Faz 1 gate'leri safety-first sırada tanımlandı; `INSUFFICIENT_EVIDENCE` PASS sayılmadı.
-- [x] Hedeflerin ilk kabul eşikleri olduğu, Issue #167'nin gerçek pilot yürütmediği ve sonraki executable 7 günlük pilotun ayrı Issue gerektirdiği kaydedildi.
-
-## Issue 165 - Legacy Model Envanteri ve Deprecation Planı
-
-- [x] Repository model, helper, repository, runtime, test, schema/format ve dokümantasyon yüzeyi kanıta dayalı tarandı.
-- [x] Her inventory satırı `Aktif çekirdek`, `Dönüştürülecek`, `Legacy / arşivlenecek` veya `Silme adayı` sınıfına bağlandı.
-- [x] `app/models.py` dosya olarak topluca etiketlenmedi; aktif `FieldObservationRecord` ile legacy prototip/helper kümeleri symbol/section seviyesinde ayrıldı.
-- [x] SQLite migration/restore, Backup v1, Günlük Çıktı v1, managed attachment, launcher/ops/acceptance yüzeyleri compatibility dahil aktif çekirdek kabul edildi.
-- [x] Observation/follow-up/routine source/application/web yüzeyleri, ADR-0001/0002 yönüne kontrollü taşınacak çalışan kaynaklar olarak `Dönüştürülecek` sınıfına alındı.
-- [x] Eski modeller, in-memory repository'ler, attachment helper'ları, record-ID/export/handover zincirleri ve tarihsel docs/learning kayıtları bağımlılıkları nedeniyle `Legacy / arşivlenecek` sınıfında tutuldu.
-- [x] Bütün olası gruplar en az bir runtime, test, fixture, compatibility, provenance veya eksik replacement kapısına takıldığı için doğrulanmış `Silme adayı` sayısı sıfır olarak kaydedildi.
-- [x] Deprecation terminolojisi ve executable sonraki Issue sırası belirlendi; fiziksel silme, rename, import taşıma veya test kaldırma yapılmadı.
-
-## Güncel Doğrulanmış Güvenli Nokta
-
-Issue #169, PR #170 ile merge edildi. `master` üzerindeki doğrulanmış merge commit'i:
+> CSE; şefin gördüğü, duyduğu, söylediği ve takip etmesi gereken her şeyi hızlıca
+> yakalayan, doğru bağlama yerleştiren, açık döngüleri izleyen, eksikleri önüne
+> getiren, büyük resmi gösteren ve geçmişi kaynaklarıyla geri çağıran local-first
+> kişisel saha asistanıdır.
 
 ```text
-3024ea45421593cfd03375b8594832ce27d684ab
+Yakala → Anla → Bağla → Takip et → Doğrula → Özetle → Hatırla
 ```
 
-Issue #169'un local full-suite kanıtı `983 passed, 7 skipped` sonucudur. Issue
-#171 bu commit'ten başlayan documentation/state-only closure işidir; merge
-edilene kadar current safe point'i ilerletmez.
+Yeni özellik ancak veri girişini azaltıyor, tekrar girişi önlüyor, doğru bağlamı
+kuruyor, açık döngüyü görünür kılıyor veya saha hâkimiyetini artırıyorsa alınır.
 
-## Tarihsel Roadmap Kaydı
+## 2. Başlangıç noktası
 
-Aşağıdaki uzun adım günlüğü proje karar geçmişidir. Eski “güncel”, “aktif” veya “henüz yok” ifadeleri yazıldıkları dönemin snapshot'ıdır; bugünkü repository durumunu belirlemez.
+Release 0.1 çekirdeğinde mobil runtime, Ajanda, Hatırlatıcı, Puantaj, taşeron–ekip–
+personel sicili, Beton Paketi, mikser/irsaliye/numune/laboratuvar, fotoğraf ve PDF,
+parola korumalı backup/restore ve Android release güvenliği uygulanmıştır.
+Tamamlanan ana dilimler: #179, #183, #185, #187, #189, #191, #194, #196,
+#198, #200, #202 ve #207.
 
-Adim 127'de README, ROADMAP, CHANGELOG, proje kararlari, ZIP repo politikasi, satir sonu tercihi, test sonucu ve diff kontrolu guvenli nokta icin guncellendi.
+Açık ilk kapı #193 gerçek cihaz saha kabulüdür. Ayrıntılı tamamlanma geçmişi
+Issue'larda, `CHANGELOG.md`, karar belgeleri ve `.cse/state` altında tutulur; bu
+dosya ileri ürün sırasını tanımlar.
 
-Adim 128'de `FileAttachmentRecord` required metadata validation guclendirildi.
-
-Adim 129-131 araliginda audit `target_record_id` hard validation eklenmeden once record ID envanteri, central record ID contract ve mapping helper planlari hazirlandi.
-
-Adim 132'de hard validation eklenmeden record ID constants ve bilgi donen target type mapping helperlari eklendi.
-
-Adim 133'te bu helper API'sinin validation fonksiyonu gibi kullanilmayacagi ve test ornek standardizasyonunun ayri adimlarla ilerleyecegi dokumante edildi.
-
-Adim 134'te record ID soft validation'in yalnizca diagnostic / uyari katmani olarak planlanacagi ve hard validation'a henuz gecilmeyecegi belgelendi.
-
-Adim 135'te record ID diagnostic helper'in dis kalite kontrol / raporlama katmani icin nasil tasarlanacagi planlandi; constructor veya hard validation kapisi olarak kullanilmayacagi netlestirildi.
-
-Adim 136'da `diagnose_record_id_for_target_type` helper'i eklendi; helper canonical, legacy, prefix disi ve helper giris hatasi durumlari icin diagnostic dict dondurur, fakat veri reddetmez.
-
-Podcast 022'de Adim 132-136 araligi NotebookLM icin ozetlendi; record ID mapping, helper API siniri, soft validation, diagnostic helper ve hard validation ertelemesi dokumante edildi.
-
-Adim 137'de `diagnose_record_id_for_target_type` helper'inin nerede kullanilabilecegi ve nerede kullanilmamasi gerektigi belgelendi; helper'in saf diagnostic fonksiyon olarak kalacagi ve hard validation'a baglanmayacagi netlestirildi.
-
-Adim 138'de tekil diagnostic helper'in ileride read-only toplu `build_record_id_diagnostic_report(...)` benzeri rapor helper'ina nasil donusebilecegi planlandi; kayit reddi, veri degisikligi, migration ve hard validation yine kapsam disinda tutuldu.
-
-Adim 139'da olasi diagnostic report helper icin API boundary, saf Python input yaklasimi, output sozlesmesi ve test example matrix planlandi; helper'in read-only ve hard validation disi kalacagi yinelendi.
-
-Adim 140'da `build_record_id_diagnostic_report(records)` helper'i read-only olarak eklendi; toplu diagnostic summary uretir, kayit reddetmez, veri degistirmez ve hard validation'a baglanmaz.
-
-Adim 141'de `build_record_id_diagnostic_report(records)` helper'inin usage boundary, edge case standartlari, severity yorumlama kurallari ve summary/count okuma sinirlari documentation-only olarak belgelendi.
-
-Adim 142'de diagnostic report ciktisinin ileride JSON-ready dict, Markdown summary, handover QC summary ve admin/debug gorunumlerine nasil ayrik format katmanlariyla sunulabilecegi planlandi; export helper implementasyonu yapilmadi.
-
-Adim 143'te `build_record_id_diagnostic_report(...)` ciktisinin ileride kayit reddetmeyen soft validation report layer icin nasil yorumlanabilecegi planlandi; soft validation helper implementasyonu yapilmadi.
-
-Podcast 023'te Adim 137-141 araligi NotebookLM icin ozetlendi; diagnostic helper usage boundary, diagnostic report helper plani, API boundary/test matrix, read-only report helper implementasyonu ve edge case standardization anlatildi.
-
-Adim 144'te olasi `build_record_id_soft_validation_report(...)` helper'i icin API boundary, diagnostic report dict input sozlesmesi, status seviyeleri ve test matrix documentation-only olarak planlandi.
-
-Adim 145'te `build_record_id_soft_validation_report(diagnostic_report)` helper'i read-only olarak eklendi; diagnostic report dict'i `pass` / `review` / `attention` soft validation report'a cevirir, `blocked` uretmez ve hard validation'a baglanmaz.
-
-Adim 146'da soft validation report helper'inin handover QC, audit QC ve export/backup oncesi yorumlama standardi documentation-only olarak belgelendi; helper davranisi degistirilmedi.
-
-Podcast 024'te Adim 142-146 araligi NotebookLM icin ozetlendi; export/format boundary, soft validation report layer, API boundary/test matrix, read-only helper implementasyonu ve handover QC yorumlama siniri anlatildi.
-
-Adim 147'de diagnostic report ve soft validation report ciktilarinin ileride Markdown, JSON-ready dict ve handover QC summary gibi sunum formatlarina nasil donusturulecegi documentation-only olarak planlandi; format helper implementasyonu yapilmadi.
-
-Adim 148'de diagnostic / soft validation format helper katmani icin API boundary, input/output sozlesmesi ve Markdown, JSON-ready dict, handover QC summary test matrix'i documentation-only olarak planlandi; format helper implementasyonu yapilmadi.
-
-Adim 149'da diagnostic / soft validation format helper katmani read-only olarak eklendi; JSON-ready dict ve Markdown string ciktisi uretir, dosya yazmaz, export yapmaz, blocked status uretmez ve hard validation'a baglanmaz.
-
-Adim 150'de Adim 149 format helper'larinin handover QC icinde nasil okunacagi, Markdown/JSON-ready dict kullanim sinirlari ve devir paketini otomatik bloke etmeyen yorum standardi documentation-only olarak belgelendi.
-
-Adim 151'de Adim 149 format helper ciktilarindan ileride JSON/Markdown dosya yazimi, export ve handover package uretimine gecmeden once export/file writing boundary documentation-only olarak belgelendi; helper davranislari degistirilmedi ve export implementasyonu yapilmadi.
-
-Podcast 025'te Adim 147-151 araligi NotebookLM icin ozetlendi; diagnostic / soft validation format helper plani, API boundary/test matrix, JSON-ready dict ve Markdown formatter implementasyonu, handover QC usage boundary ve export/file writing boundary anlatildi.
-
-Adim 152'de ileride eklenebilecek JSON/Markdown export helper'lari icin API boundary, path safety, overwrite policy, encoding/format beklentileri ve test matrix documentation-only olarak planlandi; export helper implementasyonu yapilmadi ve dosya uretilmedi.
-
-Adim 153'te path safety ve overwrite policy detayli olarak belgelendi; explicit output path, relative/absolute path davranisi, allowed output root, parent directory, path traversal, dosya adi/uzantisi, overwrite=False varsayilani, atomic write prensibi ve handover QC export sinirlari documentation-only olarak netlestirildi. Export helper implementasyonu, hard validation, `blocked` status ve Podcast 026 eklenmedi.
-
-Adim 154'te Adim 155 oncesi export helper test matrix finalization documentation-only olarak tamamlandi; JSON/Markdown export helper beklentileri, path safety, overwrite policy, parent directory, unsupported input, hata davranisi, ZIP/yedek/cache dislama, atomic write prensibi ve handover QC export senaryolari test basliklari netlestirildi. Export helper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status ve Podcast 026 eklenmedi.
-
-Adim 155'te hazir JSON-ready dict ve Markdown string ciktilarini explicit output path'e yazan `write_json_ready_dict_to_file(...)` ve `write_markdown_text_to_file(...)` helperlari eklendi; `.json` / `.md` uzanti siniri, UTF-8, deterministic JSON, `overwrite=False`, optional `allowed_root`, path traversal reddi, missing parent hata davranisi ve non-export area korumasi testlendi. Database/repository/API/GUI/CLI, backup/restore, audit event uretimi, hard validation, `blocked` status ve Podcast 026 eklenmedi.
-
-Adim 156'da Adim 155 file writing helper'larinin kullanim siniri documentation-only olarak belgelendi; JSON-ready dict ve Markdown akislarinda report -> formatter -> file writer ayrimi, `allowed_root`, explicit output path, `overwrite=False`, parent directory olusturmama, path traversal reddi, `exports/` kullanimi ve handover QC export senaryosu anlatildi. Yeni kod/test/export dosyasi, hard validation, `blocked` status ve Podcast 026 eklenmedi.
-
-Podcast 026'da Adim 152-156 araligi NotebookLM icin ozetlendi; export helper boundary, path safety, overwrite policy, test matrix, read-only file writing helper implementasyonu ve usage documentation anlatildi. Podcast 027 olusturulmadi.
-
-Adim 157'de Adim 155 read-only file writing helper'larinin error/result contract siniri documentation-only olarak planlandi; basarida mevcut `Path` donusunun ve hatada standart Python exception davranisinin korunacagi, gelecekte gerekiyorsa ayri result dict wrapper/helper dusunulebilecegi belgelendi. Result contract implementasyonu, yeni kod/test, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
-
-Adim 158'de Adim 157 result contract planinin ileride nasil uygulanabilecegi documentation-only olarak netlestirildi; mevcut exception tabanli helper davranisinin geriye uyumluluk icin korunmasi, result contract icin ayri wrapper/helper katmani, ortak JSON/Markdown result alanlari, path/input/overwrite/IO hata kodlari ve handover QC gorunurlugu belgelendi. Yeni kod/test, result contract implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
-
-Adim 159'da future export helper result contract implementasyonu oncesi test matrix documentation-only olarak planlandi; basari result alanlari, JSON/Markdown input testleri, path safety, overwrite policy, IO/permission, boundary regression ve handover QC test beklentileri netlestirildi. Yeni kod/test, result contract implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
-
-Adim 170'te export wrapper result contract verisini okuyan summary/report helper katmani eklendi. `build_export_result_summary(...)`, `build_export_result_report(...)` ve `format_export_result_summary_as_markdown(...)` helperlari dosya yazmadan, export helper cagirmadan ve path safety tekrar hesaplamadan mevcut result contract'lari okunabilir ozet ve rapora cevirir. Test kapsami 342'den 352'ye yukseldi; hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event ve export ciktisi eklenmedi.
-
-Adim 171'de Adim 170 helperlarinin kullanim siniri documentation-only olarak belgelendi. Tekil success/failure result contract yorumlama, coklu report toplama, Markdown metin uretimi, handover QC review yorumu ve admin/debug teknik detay ayrimi anlatildi. Kod/test degistirilmedi; export ciktisi, hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event, commit ve push eklenmedi.
-
-Adim 172'de export result summary/report helperlari icin edge case standardi documentation-only olarak belgelendi. Empty contract, missing/unknown status, missing path/message/detail, unsupported input, empty report list, mixed result list, duplicate path, non-string field ve Markdown fallback davranislari guvenli diagnostic/review yaklasimiyla standardize edildi. Kod/test degistirilmedi; export ciktisi, hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event, database/repository davranisi, commit ve push eklenmedi.
-
-Adim 173'te Adim 168-172 export result summary/report helper hatti sonrasi follow-up yonu documentation-only olarak planlandi. Mevcut `build_export_result_summary(...)`, `build_export_result_report(...)` ve `format_export_result_summary_as_markdown(...)` helper davranislari korunarak export result report Markdown formatter plani, JSON-ready formatter boundary, combined handover QC gorunumu, test example standardization, unsupported input handling documentation ve wrapper-summary/report iliskisi olasi takip basliklari olarak belgelendi. Adim 174 icin export result report formatter API boundary / test matrix plan onerildi; Adim 174 baslatilmadi. Kod/test/helper davranisi degisikligi, export ciktisi, hard validation, `blocked` status, backup/restore/API/GUI/CLI, Podcast 029, commit ve push eklenmedi.
-
-Adim 174'te future `format_export_result_report_as_markdown(report)` helper'i icin API boundary ve test matrix documentation-only olarak planlandi. Helper'in `build_export_result_report(...)` ciktisi olan dict'i input olarak alip presentation-safe Markdown string dondurmesi; dosya yazmamasi, export uretmemesi, database/repository erisimi yapmamasi, summary/report sonucunu yeniden hesaplamamasi, input mutate etmemesi ve hard validation veya `blocked` status uretmemesi belgelendi. Empty report, all-success, mixed success/failure, missing optional fields, unknown status, path visibility, error message visibility, input immutability, no recomputation, string output, no file writing, low-level `write_*` ve `try_write_*` davranisini koruma test basliklari planlandi. Adim 175 read-only export result report Markdown formatter implementation olarak onerildi; Adim 175 baslatilmadi. Kod/test/helper davranisi degisikligi, export ciktisi, backup/restore/API/GUI/CLI, Podcast 029, commit ve push eklenmedi.
-
-Adim 175'te `format_export_result_report_as_markdown(report)` helper'i read-only olarak eklendi. Helper `build_export_result_report(...)` ciktisi olan dict'i Markdown string'e cevirir; status, count, success/review gorunurlugu, path, error type, technical detail, next action ve overwrite bilgisini sunar. Summary/report sonucunu yeniden hesaplamaz, input'u mutate etmez, dosya yazmaz, export uretmez, hard validation veya `blocked` status uretmez. Existing `build_export_result_report(...)`, `build_export_result_summary(...)`, `format_export_result_summary_as_markdown(...)`, low-level `write_*` ve `try_write_*` wrapper davranislari korunur. Backup/restore/API/GUI/CLI, audit event, database/repository davranisi, export ciktisi, commit ve push eklenmedi.
-
-Adim 176'da `format_export_result_report_as_markdown(report)` helper'inin usage boundary ve edge case standardi documentation-only olarak belgelendi. Helper'in `build_export_result_report(...)` ciktisi olan dict'i presentation-safe Markdown string'e cevirdigi; dosya yazmadigi, export uretmedigi, input'u mutate etmedigi, report sonucunu yeniden hesaplamadigi ve summary/report/write helper davranislarini degistirmedigi netlestirildi. Success-only, failure-only, mixed report, empty item/count, missing/unknown field ve handover/export QC okuma sekli standardize edildi. Kod/test/helper davranisi, hard validation, `blocked` status, API/GUI/CLI, database/repository, audit, backup/restore, export ciktisi, commit ve push eklenmedi.
-
-Adim 177'de `format_export_result_report_as_markdown(report)` helper'i icin test/example standardi guclendirildi. Success-only, failure-only ve empty zero-count Markdown ornekleri; missing optional field fallback davranisi; additional/raw field presentation boundary ve `build_export_result_report(...)` contract regression testleri eklendi. Formatter davranisi genisletilmedi, `app/models.py` degistirilmedi, dosya yazma/export ciktisi/hard validation/`blocked` status/API/GUI/CLI/database-repository/audit/backup-restore eklenmedi.
-
-Adim 178'de `format_export_result_report_as_markdown(report)` helper'inin handover QC surecinde nasil okunacagi documentation-only olarak planlandi. Formatter ciktisinin devir kalite kontrolunde gorunurluk ve okunabilirlik sagladigi, fakat devir paketini otomatik onaylamadigi veya bloke etmedigi netlestirildi. Success-only, failure-only, mixed, empty/unknown/missing field raporlarin insan incelemesine nasil tasinacagi; export review checklist icindeki yeri; yeni santiye sefi gorunurlugu; eski santiye sefinin ozel alani ile resmi export/handover paketinin ayrimi ve future GUI/API/CLI entegrasyonlarinda formatter'in yalniz presentation layer olarak kalmasi belgelendi. Kod/test/helper davranisi, hard validation, `blocked` status, database/repository, audit, backup/restore, export ciktisi, commit ve push eklenmedi.
-
-Adim 179'da `format_export_result_report_as_markdown(report)` helper'i icin downstream integration boundary documentation-only olarak planlandi. Future GUI/API/CLI, handover QC ekrani ve export review akislari bu formatter'i yalniz read-only presentation layer olarak kullanabilir; ancak entegrasyon bu adimda eklenmedi. Downstream consumer'larin mevcut `build_export_result_report(...)` report dict contract'ina bagli kalmasi, formatter'a raw export writer gibi davranmamasi, report building/presentation/human review/validation/export writing/audit/persistence katmanlarini ayri tutmasi belgelendi. Success gorunurlugu otomatik resmi kabul, failure gorunurlugu otomatik bloklama degildir. Kod/test/helper davranisi, GUI/API/CLI, database/repository, audit, backup/restore, export ciktisi, hard validation, `blocked` status, commit ve push eklenmedi.
-
-Adim 180'de Adim 175-179 export result report formatter fazi documentation-only olarak kapatildi. `format_export_result_report_as_markdown(report)` helper'inin `build_export_result_report(...)` ciktisini read-only presentation-safe Markdown'a cevirdigi; dosya yazmadigi, export uretmedigi, input'u mutate etmedigi, report sonucunu yeniden hesaplamadigi ve build/summary/write/try_write helper davranislarini korudugu ozetlendi. Handover QC usage boundary, downstream integration boundary, success/failure/mixed/empty/missing/unknown field okuma standardi ve ara sonrasi guvenli baslangic kosullari belgelendi. Hard validation, `blocked` status, API/GUI/CLI, database/repository, audit, backup/restore, export ciktisi, kod/test/helper degisikligi, commit ve push eklenmedi. Adim 180 sonrasi yeni teknik adima baslanmamalidir.
-
-Podcast 029'da Adim 167-180 araligi NotebookLM icin ozetlendi; wrapper result contract integration boundary'den export result summary/report helper hattina, report formatter API boundary/implementation/usage/test example standardization'a, handover QC ve downstream integration boundary kararlarina ve Adim 180 faz kapanisina kadar olan hat anlatildi. Adim 181, yeni teknik faz, hard validation, `blocked` status, API/GUI/CLI implementation, database/repository erisimi, audit event, backup/restore ve export ciktisi kapsam disinda tutuldu.
-
-Adim 181'de export result summary/report/formatter hattinin handover QC surecinde read-only review checklist'e nasil donusebilecegi documentation-only olarak planlandi. `build_export_result_summary(...)`, `build_export_result_report(...)` ve `format_export_result_report_as_markdown(report)` ciktilarinin insan incelemesine nasil tasinabilecegi; success/failure/mixed/empty/missing/unknown field okumasi; yeni santiye sefi gorunurlugu; eski santiye sefinin ozel alani ile resmi handover/export paketi ayrimi ve checklist'in resmi kabul, otomatik bloklama, audit event, export generation veya hard validation olmadigi belgelendi. Kod/test/helper davranisi, API/GUI/CLI, database/repository, audit, backup/restore, export ciktisi, commit ve push eklenmedi.
-
-Adim 182'de export / handover QC review checklist icin API boundary ve future test matrix documentation-only olarak netlestirildi. Checklist'in read-only QC katmani oldugu, mevcut `build_export_result_summary(...)`, `build_export_result_report(...)` ve `format_export_result_report_as_markdown(report)` ciktilarini insan incelemesine tasiyabilecegi fakat karar verici, hard validation veya `blocked` uretici olmadigi belgelendi. Future test matrix success-only, failure-only, mixed, empty/zero-count, missing optional field, unknown/additional field, input immutability, no file write/export output ve no hard validation/no blocked regression basliklarini kapsayacak sekilde planlandi. Helper/API/GUI/CLI implementasyonu, database/repository, audit, backup/restore, export ciktisi, kod/test/helper davranisi, commit ve push eklenmedi.
-
-Adim 183'te gelecekte yazilabilecek export / handover QC review checklist helper'i icin implementation plan documentation-only olarak hazirlandi. Olasil `build_export_handover_qc_review_checklist(...)` helper adi, structured input contract, JSON-ready output contract, decision/blocking alanlarindan kacinma, success-only/failure-only/mixed/empty/missing/unknown senaryo beklentileri, input immutability, no side effect ve existing summary/report/formatter/write/try_write helper davranislarini koruma ilkeleri belgelendi. Helper implementasyonu, test, API/GUI/CLI, database/repository, audit, backup/restore, export ciktisi, hard validation, `blocked` status, commit ve push eklenmedi.
-
-Adim 184'te `build_export_handover_qc_review_checklist(summary, report)` helper'i read-only olarak eklendi. Helper mevcut `build_export_result_summary(...)` ve `build_export_result_report(...)` ciktilarini JSON-ready handover QC review checklist dict yapisina cevirir; `checklist_type`, gorunurluk `status`, `summary`, `items`, `review_notes`, `is_read_only`, `is_blocking` ve `requires_human_review` alanlarini dondurur. Success-only, failure-only, mixed, empty/zero-count, missing optional field, unknown/additional field, JSON-ready output, item list, input immutability, no file write/no exports output, no generated `blocked` status, no hard validation ve existing helper regression testleri eklendi. Helper input mutate etmez, dosya yazmaz, export uretmez, database/repository erisimi yapmaz, audit event uretmez, API/GUI/CLI veya backup/restore eklemez, devir paketini otomatik onaylamaz veya bloke etmez.
-
-Adim 185'te `build_export_handover_qc_review_checklist(summary, report)` helper'inin usage boundary ve edge case okuma standardi documentation-only olarak belgelendi. Helper'in `build_export_result_summary(...)` ve `build_export_result_report(...)` dict ciktilarini input olarak alip JSON-ready checklist dict dondurdugu; `checklist_type`, `status`, `summary`, `items`, `review_notes`, `is_read_only`, `is_blocking` ve `requires_human_review` alanlarinin handover QC gorunurlugu icin okunacagi netlestirildi. `is_read_only=True`, `is_blocking=False` ve `requires_human_review` otomatik onay, ret, bloklama, hard validation veya `blocked` status degildir. Success-only, failure-only, mixed, empty/zero-count, missing optional field ve unknown/additional field durumlari insan incelemesine destek olacak sekilde standardize edildi. Kod/test/helper davranisi, API/GUI/CLI, database/repository, audit, backup/restore, export ciktisi, hard validation, `blocked` status, commit ve push eklenmedi.
-
-Adim 186'da `build_export_handover_qc_review_checklist(summary, report)` helper'i icin test/example standardi guclendirildi. Top-level checklist contract, summary alan seti, item alan seti, `review_notes` aciklayici siniri, `requires_human_review` alaninin bloklama anlamina gelmemesi, `is_read_only=True`, `is_blocking=False`, generated `blocked` status uretilmemesi ve `format_export_result_summary_as_markdown(...)` regression davranisi testlerle sabitlendi. Helper davranisi genisletilmedi, `app/models.py` degistirilmedi, dosya yazma/export ciktisi/hard validation/`blocked` status/API/GUI/CLI/database-repository/audit/backup-restore eklenmedi.
-
-Adim 187'de `build_export_handover_qc_review_checklist(summary, report)` ciktisinin downstream formatter ve consumer siniri documentation-only olarak planlandi. Checklist output'unun JSON-ready dict olarak kalacagi, ileride Markdown formatter, handover QC ekrani, export review akisi veya GUI/API/CLI consumer tarafindan yalniz presentation/QC visibility icin okunabilecegi belgelendi. Downstream consumer'lar `is_read_only=True`, `is_blocking=False` ve `requires_human_review` alanlarinin non-blocking anlamini korumali; success gorunurlugunu resmi kabul, failure/mixed gorunurlugu otomatik ret veya bloklama olarak yorumlamamalidir. Formatter/API/GUI/CLI implementation, database/repository, audit, backup/restore, export ciktisi, hard validation, `blocked` status, kod/test/helper davranisi, commit ve push eklenmedi.
-
-Adim 188'de `build_export_handover_qc_review_checklist(summary, report)` ciktisinin ileride Markdown veya presentation formatter ile nasil okunabilir rapora donusturulebilecegi documentation-only olarak planlandi. Future formatter'in checklist JSON-ready dict input alip presentation-safe Markdown/string output dondurebilecegi; dosya yazmayacagi, export uretmeyecegi, input'u mutate etmeyecegi, checklist sonucunu yeniden hesaplamayacagi ve helper davranislarini degistirmeyecegi belgelendi. Success-only, failure-only, mixed, empty/zero-count, missing optional field, unknown/additional field, `review_notes`, `is_read_only=True`, `is_blocking=False` ve `requires_human_review` gorunum sinirlari standardize edildi. Formatter implementation, yeni test, API/GUI/CLI, database/repository, audit, backup/restore, export ciktisi, hard validation, `blocked` status, kod/helper davranisi, commit ve push eklenmedi.
-
-Adim 189'da future `format_export_handover_qc_review_checklist_as_markdown(checklist)` benzeri formatter icin API boundary ve test matrix documentation-only olarak netlestirildi. Formatter'in `build_export_handover_qc_review_checklist(summary, report)` ciktisi olan JSON-ready checklist dict'i input alip presentation-safe Markdown/string dondurmesi; dosya yazmamasi, export uretmemesi, input mutate etmemesi, checklist/summary/report sonucunu yeniden hesaplamamasi ve existing helper davranislarini degistirmemesi belgelendi. Future test matrix success-only, failure-only, mixed, empty/zero-count, missing optional field, unknown/additional field, unsupported input, string output, `is_read_only`, `is_blocking=False`, `requires_human_review`, `review_notes`, item okunabilirligi, no file write/export output, no generated `blocked`, no hard validation ve existing helper regression basliklarini kapsayacak sekilde planlandi. Formatter implementation, yeni test, API/GUI/CLI, database/repository, audit, backup/restore, export ciktisi, hard validation, `blocked` status, kod/helper davranisi, commit ve push eklenmedi.
-
-Adim 190'da `format_export_handover_qc_review_checklist_as_markdown(checklist)` helper'i read-only presentation formatter olarak eklendi. Helper `build_export_handover_qc_review_checklist(summary, report)` ciktisi olan JSON-ready checklist dict'i Markdown string'e cevirir; checklist type, status, summary count'lari, `is_read_only`, `is_blocking`, `requires_human_review`, review notes ve item listesini gorunur kilar. Dosya yazmaz, export uretmez, `exports/` altina cikti birakmaz, input'u mutate etmez, checklist/summary/report sonucunu yeniden hesaplamaz, hard validation veya generated `blocked` status uretmez, otomatik kabul/ret/bloklama yapmaz. Success-only, failure-only, mixed, empty/zero-count, missing optional field, unknown/additional field, unsupported input, no file write/export output, no hard validation ve existing helper regression testleri eklendi. API/GUI/CLI, database/repository, audit, backup/restore, commit ve push eklenmedi.
-
-Adim 191'de `format_export_handover_qc_review_checklist_as_markdown(checklist)` helper'i icin usage documentation, example standardization ve edge case yorumlama standardi documentation-only olarak belgelendi. Formatter'in `build_export_handover_qc_review_checklist(...)` JSON-ready checklist dict'ini presentation-safe Markdown string'e cevirdigi; dosya yazmadigi, export uretmedigi, database/repository erisimi yapmadigi, audit event uretmedigi, checklist/summary/report sonucunu yeniden hesaplamadigi ve input'u mutate etmedigi netlestirildi. `is_blocking` karar mekanizmasi degildir; `requires_human_review` yalniz insan inceleme sinyalidir ve hard validation, otomatik ret/bloklama veya generated `blocked` status anlamina gelmez. Success, failure, mixed, empty, missing field, unknown status ve unsupported input yorumlari handover QC review gorunurlugu icin standardize edildi. Kod/test/helper davranisi, export ciktisi, API/GUI/CLI, database/repository, audit, backup/restore, migration, commit ve push eklenmedi.
-
-Adim 192'de `format_export_handover_qc_review_checklist_as_markdown(checklist)` helper'i icin test examples ve regression boundary standardi documentation-only olarak belgelendi. Success, failure, mixed, empty, missing field, unknown status, unsupported input, no mutation, no file/export output, no hard validation, no generated `blocked` status ve existing helper regression orneklerinin hangi davranislari kilitledigi netlestirildi. Formatter'in checklist/summary/report'u yeniden hesaplamamasi, input dict'i mutate etmemesi, dosya yazmamasi, `exports/` altina cikti uretmemesi, `is_blocking` degerini otomatik karara donusturmemesi ve `requires_human_review` alanini yalniz insan inceleme sinyali olarak tutmasi regression boundary olarak kaydedildi. Bu adim yeni test eklemez; future kod/test adimi gerekirse ayri adim olmali ve Extra High reasoning onerilmelidir. Kod/test/helper davranisi, export ciktisi, API/GUI/CLI, database/repository, audit, backup/restore, migration, commit ve push eklenmedi.
-
-Adim 193'te GitHub-native ChatGPT/Codex handoff protokolu eklendi; `.cse/tasks/`, `.cse/results/`, `.cse/templates/`, `.cse/state/project_state.json` ve emergency/offline ZIP siniri repo-native olarak belgelendi.
-
-Adim 194'te read-only repository status komutu eklendi; branch, HEAD, diff check, exports, ZIP ve opsiyonel pytest durumunu raporlar, varsayilan davranista repo mutasyonu yapmaz.
-
-Adim 195'te explicit post-merge state finalization yolu eklendi; merged PR/issue state'i yalniz acik CLI metadata ile `.cse/state/project_state.json` icine yazilir, GitHub state otomatik tahmin edilmez.
-
-Adim 196'da `.github/workflows/pytest.yml` GitHub Actions workflow'u eklendi; PR-to-master ve push-to-master icin `git diff --check` ve `python -m pytest` kosacak sekilde tasarlandi.
-
-Adim 197'de Step 196 merge sonrasi state semantigi latest merged/finalized checkpoint olarak sabitlendi; GitHub runner'in account billing lock nedeniyle startup oncesinde calismamasi dissal CI execution constraint olarak kaydedildi.
-
-Adim 198'de ana proje dokumantasyonu Adim 197 guvenli noktasina gore yeniden senkronize edildi; CI workflow varligi, billing-lock runner siniri, required status checks durumu, 413 test sayisi ve podcast catch-up maddeleri factually kaydedildi.
-
-Adim 199'da Step 181-192 export/handover QC checklist ve Markdown formatter fazi documentation-only olarak kapatildi. `build_export_handover_qc_review_checklist(summary, report)` ve `format_export_handover_qc_review_checklist_as_markdown(checklist)` stable contract'lari, non-blocking semantics ve downstream consumer boundary'leri belgelendi; helper davranisi, test, workflow, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, ZIP ve export ciktisi eklenmedi.
-
-Adim 200'de future handover QC screen ve export review presentation consumer icin documentation-only input boundary, view-model contract, fallback display behavior ve regression/test matrix planlandi. Existing checklist helper ve Markdown formatter davranislari korunur; `is_read_only=True`, `is_blocking=False`, `requires_human_review` insan inceleme sinyali, no generated `blocked` status, no automatic acceptance/rejection/blocking ve official-transferable/private-non-transferable separation semantics tekrar sabitlenir. API/GUI/CLI implementation, persistence, audit, backup/restore, migration, hard validation, test/production/workflow degisikligi, ZIP ve export ciktisi eklenmez.
-
-Adim 201'de Podcast 030 documentation-only olarak hazirlandi ve yalniz Adim 196-200 araligini kapsadi. Not; minimal GitHub Actions `pytest` workflow'u, explicit merged-state finalization, billing lock'un external CI execution constraint olarak siniflandirilmasi, roadmap/current checkpoint resynchronization, handover QC checklist phase closure ve downstream presentation consumer contract/test matrix planini NotebookLM-friendly sekilde ozetler. Production code, tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, ZIP ve export ciktisi eklenmez.
-
-Adim 202'de future handover QC presentation view-model consumer'lari icin canonical examples ve wording standardization documentation-only olarak hazirlandi. Structured source of truth `build_export_handover_qc_review_checklist(summary, report)` ciktisi olarak korunur; optional Markdown yalniz presentation text olarak kalir ve structured truth olarak parse edilmez. Success-only, failure-only, mixed, empty/zero-count, missing optional fields, unknown status/additional fields ve unsupported input fallback ornekleri; status label, human-review indicator, empty state, missing-field fallback, unknown-status visibility ve item next-action wording'i standardize edilir. `is_read_only=True`, `is_blocking=False`, `requires_human_review` insan inceleme sinyali, no generated `blocked` status, no automatic acceptance/rejection/blocking ve official-transferable/private-non-transferable separation semantics korunur. Production code, tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, ZIP ve export ciktisi eklenmez.
-
-Adim 203'te Issue #21 uyarinca official local working copy protocol documentation-only olarak sabitlendi. `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer` proje dosyasi olusturma, duzenleme, verification, commit ve push icin primary working copy olarak kaydedilir; GitHub synchronized remote ve review surface olarak kalir. `.cse/README.md`, `.cse/templates/task_template.md` ve `.cse/templates/result_template.md` local-first flow, master sync evidence, local branch creation, physical local file existence, local/remote divergence, result reporting ve post-merge sync boundary icin guncellenir. Branch/pull oncesi local status inspection, fast-forward-only master sync, expected master SHA dogrulama, branch divergence, required local verification, exports cleanliness ve ignored ZIP untouched status raporlamasi standardize edilir. Production code, tests, workflow, required status checks, API/GUI/CLI, persistence, audit, backup/restore, migration, hard validation, generated `blocked` status, export output, ZIP mutasyonu, PR creation ve merge behavior eklenmez.
-
-Adim 211'de Podcast 032 documentation-only olarak hazirlandi ve yalniz Adim 206-210 araligini kapsadi. Not; canonical instruction authority, unified project source, FieldObservationRecord contract/model ve FieldObservationRepository baseline baslangicini NotebookLM-friendly sekilde ozetler. Step 211 PR #39 merge commit `26509f35abb0cb706d2a085715310358cf5d2421` ile latest merged/finalized safe point oldu; Podcast 032 latest completed podcast'e donustu ve sonraki dogal podcast araligi Steps 211-215 olarak kaydedildi.
-
-Adim 212'de `FieldObservationRepository` icin `list_by_project_id(project_id)` ve `list_by_status(status)` read-only filtreleri eklendi. Filtreler exact, case-sensitive, trim/normalize/validate etmeyen string karsilastirmasi yapar; insertion order korunur, eslesmeyen degerler `[]` dondurur, her cagri yeni liste uretir ve archived eslesen kayitlar da dahil edilir. Category/location/reported_to/date-time/text-search/active/archive-only/combined filtreler, lifecycle mutation, persistence, attachment integration, reporting/export, API/GUI/CLI, validation ve Step 213 kapsam disinda tutuldu.
-
-Adim 213'te `FieldObservationRepository.update_status(observation_id, new_status)` explicit status mutation davranisi eklendi. Method existing `find_by_id(...)` lookup'ini kullanir, missing id icin `None` dondurur, bulunan stored record'un yalniz `status` alanini degistirir ve ayni record nesnesini dondurur. `closed_at`, `reported_at`, notes, archive state veya baska alan otomatik degismez; status validation/enum/normalization, transition rule, close/reopen helper, persistence, attachment integration, API/GUI/CLI, audit/history/task/NCR/decision generation ve Step 214 eklenmedi.
-
-Adim 214'te `FieldObservationRepository.update_reporting(observation_id, reported_to, reported_at)` explicit reporting-context enrichment davranisi eklendi. Method existing `find_by_id(...)` lookup'ini kullanir, missing id icin `None` dondurur, bulunan stored record'un yalniz `reported_to` ve `reported_at` alanlarini degistirir ve ayni record nesnesini dondurur. Status otomatik `tracking` yapilmaz; current-time generation, contact lookup/normalization, other field updates, reporting history, audit/task/NCR/notification/decision generation, persistence, attachment integration, API/GUI/CLI ve Step 215 eklenmedi.
-
-Adim 215'te `FieldObservationRepository.list_by_location(location)` ve `FieldObservationRepository.list_by_category(category)` exact read-only filtreleri eklendi. Filtreler case-sensitive string equality kullanir, trim/normalize/parse/map/tokenize/validate yapmaz, insertion order'i korur, her cagri yeni liste dondurur, ayni stored record nesnelerini referansla verir ve archived matching kayitlari dislamaz. Structured location lookup, category constants/enums/vocabulary, combined query/filter object, broader filters, field updates, persistence, attachment integration, export/reporting, API/GUI/CLI, Podcast 033 ve Step 216 eklenmedi.
-
-Adim 216'da Steps 211-215 araligi icin Podcast 033 documentation/state artifact'i hazirlandi. Not; Podcast 032 kapanisi, project/status filtreleri, explicit status update, explicit reporting-context update ve location/category filtrelerini NotebookLM-friendly Turkce kaynak olarak ozetler. Bu adim product behavior, production code, executable tests, persistence, attachment integration, export/reporting consumers, API/GUI/CLI, Podcast 034 veya Step 217 eklemez.
-
-Adim 217'de mevcut `FileAttachmentRecord` metadata nesneleri icin minimal bellek ici `FileAttachmentRepository` baseline'i eklendi. Repository `add`, `list_all`, `count` ve `find_by_id` method'larini saglar; exact/case-sensitive duplicate `attachment_id` reddi yapar, insertion order'i korur, her `list_all()` cagrisi icin yeni liste dondurur ve stored metadata record nesnelerini kopyalamaz veya mutate etmez. Related-record filters, FieldObservation-specific attachment linking, physical file operations, persistence, validation, API/GUI/CLI, audit, Podcast 034 ve Step 218 eklenmedi.
-
-Adim 218'de mevcut `FileAttachmentRecord` metadata nesneleri icin `FileAttachmentRepository.list_by_related_record_type(...)` ve `FileAttachmentRepository.list_by_related_record_id(...)` read-only filtreleri eklendi. Filtreler exact, case-sensitive string equality kullanir, trim/normalize/parse/map/validate yapmaz, insertion order'i korur, her cagri yeni liste dondurur, ayni stored record nesnelerini referansla verir ve metadata'yi mutate etmez. Type ve id filtreleri bagimsizdir; combined type+id filter, FieldObservation-specific attachment lookup/linking, physical file operations, persistence, validation, API/GUI/CLI, audit, Podcast 034 ve Step 219 eklenmedi.
-
-Adim 219'da `FieldObservationRecord` ile mevcut `FileAttachmentRecord` metadata kayitlari arasindaki attachment linking contract documentation-only olarak tanimlandi. Bir attachment metadata kaydi yalniz ayni kayit uzerinde `related_record_type == "field_observation"` ve `related_record_id == FieldObservationRecord.observation_id` exact pair kosulu saglanirsa field observation attachment link'i sayilir. Cardinality, ownership, orphan/existence behavior, independent filter read-boundary riski, future `list_by_related_record(...)` ve `list_for_field_observation(...)` sinirlari ve future test matrix belgelendi. Production code, executable tests, combined filter implementation, convenience lookup, physical file operations, persistence, validation, API/GUI/CLI, audit, Podcast 034 ve Step 220 eklenmedi.
-
-Adim 220'de `FileAttachmentRepository.list_by_related_record(related_record_type, related_record_id)` exact combined filtresi eklendi. Method yalniz bellek ici `_records` listesini okur; ayni `FileAttachmentRecord` uzerinde hem `related_record_type` hem `related_record_id` exact, case-sensitive eslesirse record'u dondurur. Partial matches, unknown pairs ve empty repository icin `[]` dondurur; insertion order'i korur, her cagri yeni liste dondurur, stored record nesnelerini kopyalamaz/mutate etmez ve related record existence validation yapmaz. `list_for_field_observation(...)`, physical file operations, persistence, validation, API/GUI/CLI, audit, Podcast 034 ve Step 221 eklenmedi.
-
-Adim 221'de Steps 216-220 araligi icin Podcast 034 documentation/state artifact'i hazirlandi. Not; Podcast 033 kapanisi sonrasi FileAttachmentRepository baseline, independent related-record filters, Field Observation attachment linking contract ve exact combined related-record lookup hattini NotebookLM-friendly Turkce kaynak olarak ozetler. Bu adim production code, executable tests, repository behavior, FieldObservation-specific convenience lookup, automatic attachment creation/linking, referenced observation existence validation, physical file operations, persistence, API/GUI/CLI, export/report consumers, audit/workflow, Podcast 035 veya Step 222 eklemez.
-
-Adim 222'de future `FileAttachmentRepository.list_for_field_observation(observation_id)` helper'i icin API boundary ve future test matrix documentation-only olarak planlandi. Helper'in ileride uygulanirsa `list_by_related_record("field_observation", observation_id)` ile semantic equivalent kalmasi, tercihen existing combined helper'a delegation yapmasi, exact/case-sensitive davranisi korumasi, metadata veya `FieldObservationRecord` mutate etmemesi, `FieldObservationRepository` sorgulamamasi ve referenced observation existence validation yapmamasi belgelendi. Production code, executable tests, repository methods, model fields/behavior, constants/enums/validation, physical file operations, persistence, API/GUI/CLI, export/report consumers, audit/workflow, Podcast 035 ve Step 223 eklenmedi.
-
-Adim 223'te `FileAttachmentRepository.list_for_field_observation(observation_id)` helper'i eklendi. Method yalniz `return self.list_by_related_record("field_observation", observation_id)` delegasyonu yapar; ikinci bir `_records` filtreleme implementasyonu eklemez. Exact, case-sensitive, non-normalizing, validation-free, insertion-order preserving, new-list, same-object ve metadata non-mutation davranislari existing combined helper uzerinden korunur. Focused testler delegation, exact match, partial match rejection, case/whitespace sensitivity, empty/unknown results, new-list behavior, same-object returns, metadata non-mutation, count/order stability, missing observation existence non-validation, combined helper equivalence ve existing filter regression davranislarini dogrular. Model fields, constants/enums, hard validation, FieldObservationRepository methods, automatic attachment creation/linking, physical file operations, persistence, API/GUI/CLI, export/report consumers, audit/workflow, Podcast 035 ve Step 224 eklenmedi.
-
-Adim 160'da mevcut exception tabanli file-writing helper davranisini bozmadan future result contract wrapper API boundary documentation-only olarak planlandi; `write_*` helperlarin korunmasi, olasi `try_write_*` wrapper isimleri, result alanlari, error mapping, geriye uyumluluk ve handover QC gorunurlugu netlestirildi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
-
-Adim 161'de Adim 160 API boundary'sine bagli future result contract wrapper implementation plan documentation-only olarak netlestirildi; `try_write_json_ready_dict_to_file(...)` ve `try_write_markdown_text_to_file(...)` wrapper davranisi, basari/hata result sozlesmesi, error mapping, overwrite/path safety davranisi, geriye uyumluluk ve handover QC gorunurlugu belgelendi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
-
-Adim 162'de future `try_write_json_ready_dict_to_file(...)` ve `try_write_markdown_text_to_file(...)` wrapperlari icin test matrix finalization documentation-only olarak tamamlandi; basari, JSON/Markdown input, path safety, overwrite, error mapping, schema, regression boundary ve handover QC test beklentileri netlestirildi. Yeni kod/test, wrapper implementasyonu, JSON/Markdown export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
-
-Adim 163'te mevcut exception tabanli `write_json_ready_dict_to_file(...)` ve `write_markdown_text_to_file(...)` helperlari korunarak `try_write_json_ready_dict_to_file(...)` ve `try_write_markdown_text_to_file(...)` result contract wrapperlari eklendi. Wrapperlar basari/hata sonucunu sabit dict schema ile raporlar; path safety ve overwrite kararlarini mevcut helperlardan alir. JSON/Markdown export dosyasi, hard validation, `blocked` status, audit event, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
-
-Adim 164'te Adim 163 wrapperlarinin usage boundary'si documentation-only olarak belgelendi; `write_*` exception helperlari ile `try_*` result wrapperlari arasindaki fark, result contract alanlari, error code yorumlari, overwrite/allowed_root kullanimi ve handover QC yorumu netlestirildi. Kod/test degisikligi, export cikti dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve Podcast 027 eklenmedi.
-
-Podcast 027'de Adim 157-161 araligi NotebookLM icin ozetlendi; export helper error/result contract planlari, result dict yaklasimi, exception tabanli `write_*` helperlar ile future `try_*` wrapper katmani ayrimi, test matrix/API boundary/implementation plan hazirligi ve handover QC gorunurlugu anlatildi. Adim 162-164 kapsam disinda tutuldu; kod/test/export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event, commit veya push eklenmedi.
-
-Adim 165'te Adim 163 wrapper helperlarinin result contract kullanim ornekleri ve boundary/example standardi documentation-only olarak belgelendi; basarili JSON/Markdown yazimlari, invalid path, overwrite, missing parent, serialization, Markdown input, kullanici mesaji ve handover QC yorumlari aciklandi. Kod/test degisikligi, existing test matrix degisikligi, export cikti dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve audit event eklenmedi.
-
-Adim 166'da mevcut export helper result contract wrapper davranisi testlerle gorunur hale getirildi; JSON/Markdown success contract ornekleri, invalid path failure contract, input immutability ve dusuk seviye `write_*` helperlarin exception davranisini korudugu regression kapsami eklendi. Production kodu, helper davranisi, repo icinde export cikti dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI ve audit event eklenmedi.
-
-Podcast 028'de Adim 162-166 araligi NotebookLM icin ozetlendi; wrapper test matrix finalization, `try_write_*` result contract wrapper implementation, usage documentation, usage examples ve wrapper contract test gorunurlugu anlatildi. Adim 167-172 kapsam disinda tutuldu; kod/test/export dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event, commit veya push eklenmedi.
-
-Adim 167'de Adim 166 testleri sonrasi wrapper result contract davranisinin kullanim ve entegrasyon siniri documentation-only olarak belgelendi; handover QC, admin/debug, guvenli export ozeti ve kullanici mesajlari icin yorumlama siniri aciklandi. Kod/test degisikligi, GUI/API/CLI entegrasyonu, backup/restore, audit event, database/repository davranisi, hard validation, `blocked` status ve repo icinde export cikti dosyasi eklenmedi.
-
-Adim 168'de export helper wrapper result contract ciktisindan ileride okunabilir summary/report layer uretilmesi documentation-only olarak planlandi; olasi helper fikirleri, tartisma seviyesindeki summary alanlari, handover QC/admin-debug yorumlari ve future test matrix basliklari belgelendi. Kod/test degisikligi, helper davranisi degisikligi, export cikti dosyasi, hard validation, `blocked` status, backup/restore/API/GUI/CLI, audit event ve database/repository davranisi eklenmedi.
-
-Adim 169'da future export result summary/report layer icin API boundary ve test matrix documentation-only olarak netlestirildi; input'un yalniz wrapper result contract veya contract listesi olmasi, output'un JSON-ready dict/Markdown/Handover QC summary gibi raporlama amacli kalmasi ve no file writing/no hard validation/no blocked status sinirlari belgelendi. Kod/test degisikligi, helper davranisi degisikligi, export cikti dosyasi, backup/restore/API/GUI/CLI, audit event ve database/repository davranisi eklenmedi.
-
-Adim 101'de proje genel kalite, mimari tutarlilik, dokumantasyon butunlugu, test kapsami, roadmap uyumu ve sonraki 20 adim stratejisi acisindan denetlendi.
-
-Adım 101 dönemindeki tarihsel test snapshot'ı:
+## 3. Yeni öncelik sırası
 
 ```text
-471 passed
+Güvenilir saha sürümü
+→ Sürtünmesiz yakalama
+→ Açık döngü asistanı
+→ Bağlam ve büyük resim
+→ Uçtan uca saha paketleri
+→ Kalite/İSG/resmî süreç
+→ Doküman ve proje hafızası
+→ Kaynaklı AI
+→ Planlama ve öngörü
+→ Ürünleştirme
 ```
 
-Bu tarihsel noktada proje domain model, bellek içi repository, test, dokümantasyon, learning ve NotebookLM podcast notları çekirdeği seviyesindeydi. Sonraki Local Field MVP ve Saha Takibi çalışmaları bu durumu ilerletmiştir.
+AI dört kontrollü seviyede eklenir:
 
-Bu tarihsel kayıtta CI durumu:
+- **AI-1 Yakalama:** transkript, alan ve bağlam önerisi;
+- **AI-2 İşleme:** belge alanı, fotoğraf grubu ve kayıt eşleştirmesi;
+- **AI-3 Hafıza:** kaynaklı arama, soru-cevap ve rapor taslağı;
+- **AI-4 Öngörü:** eksik adım, risk ve anomali önerisi.
 
-- CI workflow var: `.github/workflows/pytest.yml`.
-- Workflow kodu `git diff --check` ve `python -m pytest` kosacak sekilde tanimli.
-- Otomatik GitHub Actions execution, account billing/runner-start kisiti nedeniyle manuel olarak devre disidir.
-- Yeni push sonrasinda Actions run olusmamasi beklenen davranistir; bu durum pytest failure veya workflow kodu hatasi olarak yorumlanmaz.
-- Required status checks devre disidir ve Step 205 bunlari etkinlestirmez.
+AI teknik kabul, resmî karar, imalat onayı veya sessiz kayıt kapatma yetkisi
+kazanmaz.
 
-## Adım 101 Döneminde Henüz Olmayan Üretim Özellikleri
+# 4. Fazlar
 
-Asagidaki ozellikler henuz eklenmedi:
+## Faz 0 — Release 0.1 gerçek saha kabulü
 
-- Database yok.
-- Gercek upload servisi yok.
-- API yok.
-- GUI yok.
-- Auth / kullanici / rol / yetki sistemi yok.
-- Deployment yok.
-- JSON veya SQLite persistence yok.
-- Gercek dosya kopyalama, silme veya tasima yok.
-- Thumbnail, preview, video oynatma veya streaming yok.
-
-Bu sinir bilincli olarak korunuyor. Once model, test, dokumantasyon ve karar hatti netlestiriliyor.
-
-## Tamamlanan Ana Fazlar - Adim 001-080
-
-### Faz 001-020 - Temel Santiye Model Cekirdegi
-
-- [x] Adim 001-004 - Repo disiplini, cekirdek modeller, gunluk saha kaydi ve basit bellek ici listeleme.
-- [x] Adim 005-010 - Beton dokum, yapi denetim, uygunsuzluk, ek dosya, malzeme ve toplanti/aksiyon modelleri.
-- [x] Adim 011-020 - RFI/submittal, gunluk rapor, proje tarafi, lokasyon, ekip, ekipman, tedarikci, saha notu, gorev adayi ve kontrol maddesi modelleri.
-
-### Faz 021-030 - Uygunsuzluk Adayi Sureci
-
-- [x] Adim 021-025 - Kontrol sonucu, uygunsuzluk adayi, degerlendirme, aksiyon ve takip ozeti modelleri.
-- [x] Adim 026 - Mevcut `AttachmentRecord` ile uygunsuzluk adayi ek dosya baglantisi.
-- [x] Adim 027-030 - Uygunsuzluk adayi surec gorunumu, durum gecmisi, sorumluluk/atama ve kapanis/sonuc modelleri.
-
-### Faz 031-040 - Kesin Uygunsuzluk / NCR Model Hatti
-
-- [x] Adim 031 - Adim 026-030 NotebookLM podcast notu.
-- [x] Adim 032 - Aday kayittan kesin uygunsuzluga donusum modeli.
-- [x] Adim 033-034 - `NonconformityRecord` degerlendirme ve alan revizyonu.
-- [x] Adim 035-040 - NCR surec gorunumu, durum gecmisi, sorumluluk, duzeltici faaliyet, dogrulama ve kapatma modelleri.
-
-### Faz 041-055 - NonconformityRepository Bellek Ici Davranislari
-
-- [x] Adim 041-045 - NCR repository baslangici, duplicate id kontrolu, status/sorumlu filtreleme ve durum ozeti.
-- [x] Adim 046-050 - Sorumlu ozeti, genel ozet, status/sorumlu guncelleme ve kayit var mi kontrolu.
-- [x] Adim 051-055 - Kayit sayisi, arsiv alani, aktif/arsiv filtreleri, archive ve restore davranislari.
-
-### Faz 056-060 - NCR Arsiv / Listeleme Tutarliligi
-
-- [x] Adim 056 - NCR arsiv ozeti.
-- [x] Adim 057-059 - Arsivlenmis, aktif ve tum kayit listeleme davranislari.
-- [x] Adim 060 - Arsiv, restore, listeleme ve ozet butunluk kontrolu.
-
-### Faz 061-070 - Arama / Filtreleme ve Dosya Eki Temeli
-
-- [x] Adim 061-063 - Podcast notu, NCR arsiv/listeleme kullanim ozeti ve arama plani.
-- [x] Adim 064-066 - Id, durum ve konuma gore NCR kayit bulma/filtreleme davranislari.
-- [x] Adim 067-070 - Dosya/video eki plani, `FileAttachmentRecord`, dosya tipi siniflandirmasi ve iliskili kayit baglantisi.
-
-### Faz 071-080 - FileAttachmentRecord Metadata ve Kapanis
-
-- [x] Adim 071 - Adim 061-070 NotebookLM podcast notu.
-- [x] Adim 072-075 - Dosya eki kullanim akisi, ornek senaryolar, saklama/adlandirma standardi ve arsiv guvenligi kararları.
-- [x] Adim 076-079 - `original_file_name`, `uploaded_by`, `uploaded_at` ve `notes` metadata netlestirmeleri.
-- [x] Adim 080 - File attachment metadata butunluk ozeti ve derin analiz oncesi kapanis.
-
-## Faz 081-090 - Duzeltme, Standart Kilitleme ve Dokumantasyon Esitleme
-
-- [x] Adim 081 - README guncellemesi: Adim 080 guvenli noktasi, 125 test, mevcut kapsam ve olmayan ozellikler.
-- [x] Adim 082 - ROADMAP guncellemesi: Adim 080 sonrasi gercek durum ve 081-100 faz plani.
-- [x] Adim 083 - Attachment model karari: `FileAttachmentRecord` ana model, `AttachmentRecord` legacy model.
-- [x] Adim 084 - `FileAttachmentRecord` alan sozlesmesi: model-level optional, service-level required ayrimi.
-- [x] Adim 085 - Canonical attachment path standardi: `attachments/{project_id}/{record_type}/{yyyy}/{mm}/{dd}/{record_id}/{safe_file_name}`.
-- [x] Adim 086 - `FileType` ve `AttachmentStatus` hafif enum hazirligi.
-- [x] Adim 087 - `FileAttachmentRecord` temel validation testleri ve minimal `ValueError` davranisi.
-- [x] Adim 088 - Canonical attachment path helper fonksiyonu.
-- [x] Adim 089 - Attachment metadata integrity kurallari ve missing/orphan scanner tasarim zemini.
-- [x] Adim 090 - Attachment integrity status sabitleri baslangici.
-
-Bu fazda hedef yeni urun ozelligi eklemek degil; mevcut dokumantasyon ve proje standartlarini kilitlemektir.
-
-## Faz 091-100 - Persistence, Upload, Integrity ve Operasyon Omurgasi
-
-- [x] Adim 091 - Attachment integrity result modeli baslangici.
-- [x] Adim 092 - Attachment integrity single-record check helper baslangici.
-- [x] Adim 093 - Attachment integrity report summary modeli.
-- [x] Adim 094 - Attachment integrity report modeli.
-- [x] Adim 095 - Attachment integrity report serializer baslangici.
-- [x] Adim 096 - Ana proje ilkeleri, veri silme onleme ve ozel alan izolasyon politika dokumanlari.
-- [x] Adim 097 - Adim 071-080 NotebookLM podcast notu.
-- [x] Adim 098 - Adim 081-090 NotebookLM podcast notu.
-- [x] Adim 099 - Adim 091-096 NotebookLM podcast notu.
-- [x] Adim 100 - Guvenli nokta final kalite kontrol ve push hazirligi.
-
-Bu fazda hedef, domain model ve dokumantasyon cekirdeginden kontrollu persistence, upload, integrity, audit ve CI omurgasina gecis icin kucuk ve testli adimlar atmaktir.
-
-## Faz 101-140 - Denetim, Attachment Integrity Export, Scanner, Audit Hazirligi ve ID Kararlari
-
-- [x] Adim 101 - Genel proje denetimi ve mimari saglik raporu.
-- [x] Adim 102 - README guncellik duzeltmesi: Adim 100 / 191 test ve yeni kapsam bilgisi.
-- [x] Adim 103 - Attachment integrity JSON string export helper.
-- [x] Adim 104 - Attachment integrity JSON file export tasarim dokumani.
-- [x] Adim 105 - Attachment integrity JSON file export helper ve testleri.
-- [x] Adim 106 - CSE urun vizyonu ve saha hafizasi stratejisi.
-- [x] Adim 107 - Scanner scope plani.
-- [x] Adim 108 - Scanner input modeli / plani.
-- [x] Adim 109 - Attachment scanner dry-run helper baslangici.
-- [x] Adim 110 - Scanner dry-run testleri / kullanim netlestirmesi.
-- [x] Adim 111 - Attachment integrity rapor kullanim ozeti.
-- [x] Adim 112 - Audit event model plani.
-- [x] Adim 113 - AuditEventRecord baslangic modeli.
-- [x] Adim 114 - Audit event validation testleri.
-- [x] Adim 115 - Audit event type sozlesmesi dokumantasyonu.
-- [x] Adim 116 - Audit event type validation veya sabit sozlesme implementasyonu.
-- [x] Adim 117 - Audit event target record iliski kurallari dokumantasyonu.
-- [x] Adim 118 - Audit event target record pair validation.
-- [x] Adim 119 - Audit event target record type sozlesmesi dokumantasyonu.
-- [x] Adim 120 - Audit event target record type sabitleri ve validation.
-- [x] Adim 121 - Audit event target record id format tasarimi.
-- [x] Adim 122 - Audit event target record id validation tasarimi.
-- [x] Adim 123 - Podcast 017: Adim 097-102 NotebookLM podcast notu.
-- [x] Podcast 018 - Adim 103-108 NotebookLM podcast notu.
-- [x] Podcast 019 - Adim 109-114 NotebookLM podcast notu.
-- [x] Podcast 020 - Adim 115-120 NotebookLM podcast notu.
-- [x] Adim 127 - Guvenli nokta kalite kontrol, dokumantasyon temizligi, ZIP repo politikasi ve LF satir sonu tercihi.
-- [x] Adim 128 - FileAttachmentRecord validation bosluklarini kapatma.
-- [x] Adim 129 - Record ID envanteri ve audit target_record_id validation risk analizi; dogrudan validation uygulanmadi.
-- [x] Adim 130 - Central record ID contract plan; dogrudan validation uygulanmadi.
-- [x] Adim 131 - Record ID constants and mapping helper plan; hard validation uygulanmadi.
-- [x] Podcast 021 - Adim 127-131 NotebookLM podcast notu.
-- [x] Adim 132 - Record ID constants and mapping helper implementation; hard validation uygulanmadi.
-- [x] Adim 133 - Record ID helper API boundary and test example standardization plan; hard validation uygulanmadi.
-- [x] Adim 134 - Record ID soft validation plan; hard validation uygulanmadi.
-- [x] Adim 135 - Record ID soft validation diagnostic helper implementation plan; hard validation uygulanmadi.
-- [x] Adim 136 - Record ID diagnostic helper implementation; veri reddetmeyen diagnostic katmani eklendi, hard validation uygulanmadi.
-- [x] Podcast 022 - Adim 132-136 NotebookLM podcast notu; record ID diagnostic hattinin neden hard validation'a baglanmadigi ozetlendi.
-- [x] Adim 137 - Record ID diagnostic helper usage boundary plan; helper'in dis QC/raporlama kullanimi ve constructor/hard validation disi siniri belgelendi.
-- [x] Adim 138 - Record ID diagnostic report helper plan; ilerideki read-only toplu diagnostic rapor helper'i planlandi, implementasyon yapilmadi.
-- [x] Adim 139 - Record ID diagnostic report API boundary and test matrix plan; input/output sozlesmesi ve test kategorileri belgelendi.
-- [x] Adim 140 - Read-only record ID diagnostic report helper implementation; toplu diagnostic rapor helper'i eklendi, hard validation uygulanmadi.
-
-Bu fazda hedef, Adim 101 denetim bulgularini kucuk ve test edilebilir parcalara bolerek once dokumantasyon guncelligini, sonra attachment integrity export/scanner hattini, ardindan audit ve private workspace modelleme zeminini guclendirmektir.
-
-## Faz 141-160 - Record ID Diagnostic Usage, Report Sinirlari ve Soft Validation Hazirligi
-
-- [x] Adim 141 - Record ID diagnostic report usage and edge case standardization; `build_record_id_diagnostic_report(records)` helper'inin read-only kullanim siniri, edge case davranislari, severity yorumlama kurallari ve summary/count okuma standardi belgelendi.
-- [x] Adim 142 - Diagnostic report export / format boundary plan; JSON-ready dict, Markdown summary, handover QC summary ve admin/debug gorunumleri icin format/export siniri belgelendi, implementasyon yapilmadi.
-- [x] Adim 143 - Soft validation report layer plan; diagnostic report ciktisinin pass/review/attention gibi kayit reddetmeyen yorum seviyeleriyle nasil kullanilabilecegi belgelendi, implementasyon yapilmadi.
-- [x] Podcast 023 - Adim 137-141 NotebookLM podcast notu; record ID diagnostic report hattinin read-only, edge-case-aware ve hard-validation-disinda kalma kararlarini ozetledi.
-- [x] Adim 144 - Soft validation report API boundary and test matrix plan; diagnostic report dict input, pass/review/attention status kurallari ve blocked disi test matrix planlandi.
-- [x] Adim 145 - Read-only soft validation report implementation; diagnostic report dict'i pass/review/attention soft validation report'a ceviren helper eklendi, blocked ve hard validation kapsam disinda tutuldu.
-- [x] Adim 146 - Soft validation report usage and handover QC interpretation; pass/review/attention anlamlari, handover QC yorumu ve blocked/hard-validation disi kullanim siniri belgelendi.
-- [x] Podcast 024 - Adim 142-146 NotebookLM podcast notu; diagnostic report export/format boundary, soft validation report helper ve handover QC yorumlama hatti ozetlendi.
-- [x] Adim 147 - Diagnostic / soft validation format helper plan; Markdown, JSON-ready dict ve handover QC summary icin read-only sunum katmani siniri belgelendi, implementasyon yapilmadi.
-- [x] Adim 148 - Diagnostic / soft validation format helper API boundary and test matrix plan; Markdown, JSON-ready dict ve handover QC summary icin input/output sozlesmesi ve test kategorileri belgelendi, implementasyon yapilmadi.
-- [x] Adim 149 - Read-only diagnostic / soft validation format helper implementation; JSON-ready dict ve Markdown string format helperlari eklendi, dosya uretimi ve hard validation eklenmedi.
-- [x] Adim 150 - Handover QC summary usage and format helper boundary; format helper ciktilarinin handover QC icinde gorunurluk amacli okunacagi, kayit reddi veya otomatik bloklama olmayacagi belgelendi.
-- [x] Adim 151 - Export file writing boundary plan; JSON/Markdown dosya yazimi, export ve handover package icin ayri risk katmani belgelendi, implementasyon yapilmadi.
-- [x] Podcast 025 - Adim 147-151 NotebookLM podcast notu.
-- [x] Adim 152 - Export helper API boundary and file writing safety plan; path safety, overwrite policy, encoding ve test matrix planlandi, implementasyon yapilmadi.
-- [x] Adim 153 - Path safety and overwrite policy detailed documentation; allowed output root, traversal riskleri, file name/extension sinirlari, parent directory, overwrite=False varsayilani, atomic write prensibi ve handover QC export sinirlari belgelendi, implementasyon yapilmadi.
-- [x] Adim 154 - Export helper test matrix finalization; JSON/Markdown export, path safety, overwrite, parent directory, unsupported input, hata davranisi, ZIP/cache dislama ve handover QC export test sinirlari belgelendi, implementasyon yapilmadi.
-- [x] Adim 155 - Read-only file writing helper implementation; JSON-ready dict ve Markdown string ciktisini guvenli explicit path'e yazan helperlar eklendi, path/overwrite/allowed-root testleriyle sinirlandi.
-- [x] Adim 156 - Export helper usage documentation; read-only file writing helper kullanim sinirlari, JSON/Markdown akis ornekleri, `allowed_root`, overwrite ve handover QC export siniri belgelendi, yeni kod/test/export dosyasi eklenmedi.
-- [x] Podcast 026 - Adim 152-156 NotebookLM podcast notu; export/file writing boundary'den usage documentation'a kadar guvenli dosya yazma hattini ozetledi.
-- [x] Adim 157 - Export helper error/result contract plan; mevcut `Path` donusu ve standart Python exception davranisi belgelendi, olasi future result dict alanlari planlandi, yeni kod/test/export dosyasi eklenmedi.
-- [x] Adim 158 - Export helper result contract implementation plan; future wrapper/helper katmani, ortak result alanlari, hata kodlari ve handover QC gorunurlugu documentation-only olarak planlandi, implementasyon yapilmadi.
-- [x] Adim 159 - Export helper result contract test matrix plan; basari, input, path safety, overwrite, IO, regression ve handover QC test beklentileri belgelendi, yeni kod/test/export dosyasi eklenmedi.
-- [x] Adim 160 - Export helper result contract API boundary / wrapper plan; mevcut `write_*` helperlari koruyan future `try_write_*` wrapper siniri ve error mapping belgelendi, implementasyon yapilmadi.
-- [x] Adim 161 - Export helper result contract wrapper implementation plan; future `try_write_*` wrapper davranisi, result sozlesmesi, error mapping, overwrite/path safety ve handover QC siniri belgelendi, implementasyon yapilmadi.
-- [x] Adim 162 - Export helper result contract wrapper test matrix finalization; future `try_write_*` wrapper testleri icin basari, input, path, overwrite, schema, regression ve handover QC beklentileri kesinlestirildi, implementasyon yapilmadi.
-- [x] Adim 163 - Export helper result contract wrapper implementation; `try_write_json_ready_dict_to_file(...)` ve `try_write_markdown_text_to_file(...)` wrapperlari, result schema, error mapping, overwrite/path safety testleri ve dokumantasyonu eklendi.
-- [x] Adim 164 - Export helper result contract wrapper usage documentation; `write_*` ve `try_*` kullanim ayrimi, result contract yorumlari, overwrite/allowed-root sinirlari ve handover QC gorunurlugu belgelendi, kod/test/export dosyasi eklenmedi.
-- [x] Podcast 027 - Adim 157-161 NotebookLM podcast notu; export helper error/result contract planlama hattini, future wrapper ayrimini ve handover QC gorunurlugunu ozetledi.
-- [x] Adim 165 - Export helper result contract wrapper usage examples; wrapper result contract ornekleri, boundary/example standardi ve future test example isimleri belgelendi, kod/test/export dosyasi eklenmedi.
-- [x] Adim 166 - Export helper result contract wrapper test implementation; mevcut wrapper success/failure contract davranisi ve dusuk seviye helper exception regression testleri eklendi.
-- [x] Adim 167 - Export helper result contract wrapper integration boundary; testlerle sabitlenen wrapper sonucunun handover QC/admin-debug/kullanici mesaji yorum siniri belgelendi.
-- [x] Adim 168 - Export helper result contract summary/report layer plan; wrapper result contract'tan ileride okunabilir ozet/rapor uretme siniri documentation-only olarak planlandi.
-- [x] Adim 169 - Export result summary/report layer API boundary and test matrix plan; input/output siniri ve future test matrix basliklari documentation-only olarak netlestirildi.
-- [x] Adim 170 - Export result summary/report helper implementation; wrapper result contract verisini okuyan read-only summary/report helperlari eklendi.
-- [x] Adim 171 - Export result summary/report helper usage documentation; helper kullanim siniri ve handover QC review yorumu documentation-only olarak belgelendi.
-- [x] Adim 172 - Export result summary/report helper edge case standardization; eksik/unknown/unsupported/mixed input durumlari icin safe review/summary standardi belgelendi.
-- [x] Podcast 028 - Adim 162-166 NotebookLM podcast notu; wrapper test matrix, implementation, usage, examples ve test gorunurlugu ozetlendi.
-- [x] Adim 173 - Export result summary/report follow-up plan; presentation-safe report formatter ve handover QC takip basliklari documentation-only olarak planlandi.
-- [x] Adim 174 - Export result report formatter API boundary and test matrix plan; future report Markdown formatter siniri ve test kategorileri documentation-only olarak planlandi.
-- [x] Adim 175 - Read-only export result report markdown formatter implementation; report dict ciktisini Markdown string'e ceviren read-only helper ve testleri eklendi.
-- [x] Adim 176 - Export result report markdown formatter usage and edge case standardization; formatter kullanim siniri ve QC okuma standardi documentation-only olarak belgelendi.
-- [x] Adim 177 - Export result report formatter test/example standardization; Markdown ornekleri ve formatter boundary regression testleri guclendirildi.
-- [x] Adim 178 - Export result report formatter handover QC usage plan; formatter ciktisinin handover review icindeki presentation-layer rolu belgelendi.
-- [x] Adim 179 - Export result report formatter downstream integration boundary plan; GUI/API/CLI ve review akislari icin presentation-layer entegrasyon siniri belgelendi.
-- [x] Adim 180 - Export result report formatter phase closure and next-step boundary; Adim 175-179 fazi documentation-only olarak kapatildi.
-- [x] Podcast 029 - Adim 167-180 NotebookLM podcast notu; wrapper result contract integration boundary'den report formatter phase closure'a kadar olan hat ozetlendi.
-- [x] Adim 181 - Export / handover QC review checklist plan; summary/report/formatter ciktilarinin read-only insan inceleme checklist'ine nasil tasinabilecegi belgelendi.
-- [x] Adim 182 - Export / handover QC review checklist boundary and test matrix plan; future checklist helper/API siniri ve test senaryolari documentation-only olarak netlestirildi.
-- [x] Adim 183 - Export / handover QC review checklist helper implementation plan; future helper adi, input/output contract ve test beklentileri documentation-only olarak planlandi.
-- [x] Adim 184 - Export / handover QC review checklist helper implementation; read-only JSON-ready checklist helper ve regression testleri eklendi.
-
-Bu fazda hedef, Adim 140'ta eklenen diagnostic report gorunurlugunu once dokumantasyon ve kullanim standardi ile sabitlemek; sonra rapor format sinirlari, handover QC kullanimi ve soft validation rapor katmanini hard validation'a gecmeden hazirlamaktir.
-
-## CSE Handoff / CI Checkpoint - Adim 193-197
-
-- [x] Adim 193 - GitHub-native ChatGPT/Codex handoff protocol; canonical `.cse/templates/`, task/result/state dosyalari ve ZIP dislama sinirlari netlesti.
-- [x] Adim 194 - Read-only CSE status command; git, diff, exports, ZIP ve opsiyonel pytest raporlama komutu eklendi.
-- [x] Adim 195 - Explicit post-merge state finalization; merged state yalniz acik CLI metadata ile final hale getiriliyor.
-- [x] Adim 196 - GitHub Actions `pytest` workflow; CI workflow var, fakat hosted runner billing lock nedeniyle henuz basarili GitHub `pytest` kosusu uretmedi.
-- [x] Adim 197 - Latest merged/finalized checkpoint semantics; Step 196 merge commit `947350ff9348f79965fec282c28e2fa858d7356a` guvenli nokta olarak kaydedildi ve billing lock dissal constraint olarak belgelendi.
-
-## Handover QC Checklist Phase Closure - Adim 181-192 / 199
-
-- [x] Adim 181-183 - Export / handover QC review checklist plan, boundary, test matrix ve implementation plan documentation-only olarak hazirlandi.
-- [x] Adim 184 - `build_export_handover_qc_review_checklist(summary, report)` read-only JSON-ready checklist helper olarak eklendi.
-- [x] Adim 185-189 - Checklist helper usage, test/example, downstream formatter/consumer boundary ve Markdown formatter API boundary documentation-only olarak netlestirildi.
-- [x] Adim 190 - `format_export_handover_qc_review_checklist_as_markdown(checklist)` read-only presentation formatter olarak eklendi.
-- [x] Adim 191-192 - Markdown formatter usage, edge case standardization, test example intent ve regression boundary documentation-only olarak sabitlendi.
-- [x] Adim 199 - Faz kapatildi; `is_read_only=True`, `is_blocking=False`, `requires_human_review` insan inceleme sinyali, no generated `blocked` status ve no automatic official acceptance/rejection/blocking semantics downstream boundary olarak kaydedildi.
-
-## Downstream Presentation Consumer Planning - Adim 200
-
-- [x] Adim 200 - Future handover QC screen / export review presentation consumer icin input boundary documentation-only olarak tanimlandi.
-- [x] Adim 200 - Required field, optional field, fallback display behavior, status visibility, item visibility, review notes ve human-review indicator contract'i implementation-free olarak planlandi.
-- [x] Adim 200 - Future regression/test matrix success-only, failure-only, mixed, empty/zero-count, missing required/optional fields, unknown/additional fields/statuses, unsupported input, immutability, no recomputation, no file/export output, no persistence/audit side effect, no hard validation, no generated `blocked`, no automatic acceptance/rejection/blocking ve private/non-transferable exclusion basliklarini kapsayacak sekilde kaydedildi.
-- [x] Adim 200 - Step 196-200 NotebookLM podcast note, Step 200 merge edildikten sonraki documentation follow-up olarak kaydedildi; bu adimda podcast notu olusturulmadi.
-
-## Podcast Documentation Follow-up - Adim 201
-
-- [x] Adim 201 - Podcast 030, yalniz Adim 196-200 araligini kapsayacak sekilde `docs/podcast_notes/030_adim_196_200_notebooklm_podcast_notu.md` dosyasinda hazirlandi.
-- [x] Adim 201 - Billing lock, GitHub-hosted runner startup oncesinde dissal CI execution constraint olarak anlatildi; pytest failure veya workflow-code defect olarak siniflandirilmaz.
-- [x] Adim 201 - `is_read_only=True`, `is_blocking=False`, `requires_human_review` human-review signal only, no generated `blocked` status ve no automatic acceptance/rejection/blocking semantics podcast notunda tekrar korundu.
-- [x] Adim 201 - Official-transferable ve private/non-transferable information ayrimi podcast notunda acik tutuldu.
-
-## Canonical Handover QC View-Model Wording - Adim 202
-
-- [x] Adim 202 - Future handover QC presentation view-model icin canonical examples ve wording standardization documentation-only olarak hazirlandi.
-- [x] Adim 202 - `build_export_handover_qc_review_checklist(summary, report)` structured source of truth olarak, optional Markdown ise presentation-only output olarak sabitlendi.
-- [x] Adim 202 - Success-only, failure-only, mixed, empty/zero-count, missing optional fields, unknown status/additional fields ve unsupported input fallback ornekleri standardize edildi.
-- [x] Adim 202 - Status label, human-review indicator, empty state, missing-field fallback, unknown-status visibility ve item next-action wording'i future consumer'lar icin belgelendi.
-- [x] Adim 202 - Official-transferable ve private/non-transferable information ayrimi her ornekte korundu.
-
-## Official Local Sync Protocol - Adim 203
-
-- [x] Adim 203 - Official local repository path `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer` primary working copy olarak kaydedildi.
-- [x] Adim 203 - Branch/pull oncesi local working tree inspection ve unexpected local changes icin stop-and-report kuralı belgelendi.
-- [x] Adim 203 - Fast-forward-only `master` synchronization, expected master SHA, branch creation, divergence, pytest, diff check, protected-path diff, exports ve ZIP reporting protocol'u belgelendi.
-- [x] Adim 203 - GitHub-only file creation'in completion sayilmayacagi; commit/push'un local repo uzerinden yapilacagi netlestirildi.
-- [x] Adim 203 - `.cse/README.md`, `.cse/templates/task_template.md` ve `.cse/templates/result_template.md` local-first protocol'u future steps icin canonical hale getirecek sekilde guncellendi.
-- [x] Adim 203 - Issue #21 kapsaminda Codex'in draft PR acmayacagi ve ChatGPT review/PR acma surecinin ayri kalacagi kaydedildi.
-
-## Handover QC Fixture Assertion Plan - Adim 204
-
-- [x] Adim 204 - Future handover QC presentation view-model icin fixture naming and assertion checklist plan documentation-only olarak hazirlandi.
-- [x] Adim 204 - Future fixture names success-only, failure-only, mixed, empty/zero-count, missing optional fields, unknown status/additional fields ve unsupported input fallback case'leri icin ayrildi.
-- [x] Adim 204 - Assertion checklist structured source of truth, optional Markdown display-only handling, status label, human-review indicator, read-only/non-blocking notice, fallback wording, transfer boundary, forbidden decision fields, no side effects, input immutability, no recomputation, no generated `blocked` status ve no automatic package decision behavior basliklarini kapsiyor.
-- [x] Adim 204 - Executable fixtures, executable tests, production code ve workflow degisikligi bu adimda eklenmedi; future conversion ayri explicit task gerektiriyor.
-
-## Canonical Project Instructions and Repository Truth Sync - Adim 205
-
-- [x] Adim 205 - `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`, local-only source'tan initially derived canonical dosya olarak tracked hale getirildi; Section 4 authority, Section 17 Step 204/205 truth ve GitHub-centered workflow intentionally adapted edildi.
-- [x] Adim 205 - Adaptation sonrasi equal SHA, equal line count veya full text equivalence iddiasi yapilmadi; local-only source byte/hash unchanged kaldi.
-- [x] Adim 205 - Kullanici `devam` dediginde ChatGPT GitHub state ve native actions'i yonetecek, Codex yalniz gerekli local project-file/test/commit-push/sync execution icin kullanilacak workflow kaydedildi.
-- [x] Adim 205 - README, machine-readable state, roadmap, changelog ve proje kararlari Step 204 merge commit `7e5a06ed3cb62399219f9ad66b6b2b8e6eca77a3` ile yeniden eslendi; PR #26 merge sonrasinda Step 205 guncel guvenli nokta oldu.
-- [x] Adim 205 - Workflow varligi, manuel disabled Actions durumu ve disabled required status checks ayri factual alanlar olarak kaydedildi.
-- [x] Adim 205 - CSE'nin tested domain/data/documentation core oldugu, field-ready application olmadigi ve eksik production capabilities acik tutuldu.
-- [x] Adim 205 - Reliable data backbone first, automation later, AI last ilkesi ve ilk field-MVP yonu korundu.
-
-## Step 206 - Podcast 031 and Instruction Authority Closure
-
-- [x] Adim 206 - Step 205 / PR #26 / Issue #25 / merge commit `92a15f2a55e6bfda42d50b8ef7dea651ff496f62` latest merged/finalized safe point olarak README, state, roadmap, changelog, decisions ve canonical Section 17 icinde eslendi.
-- [x] Adim 206 - `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` tek yetkili operasyon talimat kaynagi oldu; `CSE_GUNCEL_PROJE_TALIMATLARI.md` sadece ignored local mirror olarak tutuldu ve canonical metinle birebir eslendi.
-- [x] Adim 206 - Official workspace rule `Set-Location`, exact `git rev-parse --show-toplevel` check, wrong-root stop rule, no automatic `C:` clone/workspace ve GitHub Issue evidence exchange maddeleriyle sertlestirildi.
-- [x] Adim 206 - Podcast 031, yalniz Steps 201-205 araligini kapsayacak sekilde eklendi.
-- [x] Adim 206 - `docs/podcast_notes/README.md` stale Step 022 current-state metninden arindirilarak durable cadence ve factual Podcast 030/031 state ile guncellendi.
-- [x] Adim 206 - Desktop archive repository risk kaydi non-blocking unresolved local archive item olarak belgelendi; Desktop repository'ye dokunulmadi.
-
-## Step 207 - Unified Source and Codex Invocation Policy
-
-- [x] Adim 207 - `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md` approved merged source'tan tracked ust proje kaynagi olarak eklendi.
-- [x] Adim 207 - `docs/protocols/CSE_PROJECT_SOURCE_REGISTER.md` source set, erisim durumu, unavailable sources ve copied reference files icin kayit oldu.
-- [x] Adim 207 - `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md` yeni chat'in GitHub'dan ZIP/handoff yuklemeden devam etme kuralini kalici hale getirdi.
-- [x] Adim 207 - ChatGPT'nin Codex gerekip gerekmedigine karar vermesi, gerekirse `Codex çalışmalı` demesi ve nedenini aciklamasi protokole eklendi.
-- [x] Adim 207 - Codex-required / Codex-not-required kategorileri, batched execution, post-merge sync batching ve metadata churn avoidance kalici operasyon kuralina donustu.
-- [x] Adim 207 - Her Codex execution icin required source pre-read sirasi instructions, `.cse/README.md`, task template ve result template icinde kalici hale geldi.
-- [x] Adim 207 - Step 206 / PR #29 / Issue #28 / merge commit `3b05fae76766cedc8840eea6c0fc2f51440354e4` latest safe point olarak state ve ana dokumanlarda kaydedildi.
-
-## Step 208 - First Field MVP Observation Record Contract
-
-- [x] Adim 208 - `FieldObservationRecord` documentation-level future model contract'i tanimlandi.
-- [x] Adim 208 - Required future fields `observation_id`, `project_id`, `observed_at`, `location`, `category`, `description` olarak belirlendi.
-- [x] Adim 208 - `status` default `open` ve ilk vocabulary `open`, `tracking`, `closed` olarak kaydedildi.
-- [x] Adim 208 - Optional/deferred fields `reported_to`, `reported_at`, `created_by`, `closed_at`, `notes`, `is_archived` olarak belirlendi.
-- [x] Adim 208 - Existing model mapping ve gap analysis `SiteProject`, `SiteLocationRecord`, `ContactPersonRecord`, `SiteNoteRecord`, `TrackingRecord`, `FileAttachmentRecord`, `DailySiteLog`, `DailyReportRecord` icin yazildi.
-- [x] Adim 208 - Field-MVP implementation baslatilmadan Step 209'un review/merge sonrasi onerilen implementation adimi oldugu kaydedildi.
-
-## Step 209 - Minimal FieldObservationRecord Model
-
-- [x] Adim 209 - Minimal `FieldObservationRecord` dataclass'i mevcut model stiline uygun olarak eklendi.
-- [x] Adim 209 - Required fields ve default values Step 208 contract'iyle eslendi.
-- [x] Adim 209 - Focused tests minimal construction/default, optional/lifecycle field value holding ve documented status value holding davranisini dogruladi.
-- [x] Adim 209 - Validation, repository/persistence, attachment integration, export/reporting, API/GUI/CLI, audit ve additional Field-MVP model eklenmedi.
-
-## Step 210 - FieldObservationRepository Baseline
-
-- [x] Adim 210 - Minimal bellek ici `FieldObservationRepository` baseline'i mevcut repository stiline uygun olarak eklendi.
-- [x] Adim 210 - `add`, `list_all`, `count` ve `find_by_id` davranislari eklendi.
-- [x] Adim 210 - Duplicate `observation_id` `ValueError` ile reddedildi; farkli `observation_id` kabul edildi.
-- [x] Adim 210 - `list_all()` ic koleksiyonu degistirmeyen liste kopyasi dondurur.
-- [x] Adim 210 - Filters, lifecycle updates, archive/restore/delete/bulk ops, persistence, attachment linking, export/reporting, API/GUI/CLI, audit, validation ve Podcast 032 eklenmedi.
-
-## Step 211 - Podcast 032 for Steps 206-210
-
-- [x] Adim 211 - `docs/podcast_notes/032_adim_206_210_notebooklm_podcast_notu.md` dosyasi Steps 206-210 icin hazirlandi.
-- [x] Adim 211 - Podcast 032, protocol/source/workflow consolidation'dan ilk Field MVP contract/model/repository cekirdegine gecisi anlatti.
-- [x] Adim 211 - Repository truth Step 210 / PR #37 / Issue #36 / merge `c7dbd94076f9e23c928f27ea377a97debad6636b` safe point olacak sekilde guncellendi.
-- [x] Adim 211 - Production code, tests, workflow, persistence, attachment, filters, lifecycle, export/reporting, API/GUI/CLI, audit ve Step 212 baslatilmadi.
-
-## Step 212 - FieldObservationRepository Project/Status Filters
-
-- [x] Adim 212 - `list_by_project_id(project_id)` exact, case-sensitive project filtresi eklendi.
-- [x] Adim 212 - `list_by_status(status)` exact, case-sensitive status filtresi eklendi.
-- [x] Adim 212 - Donen filtered listelerin yeni liste oldugu, insertion order'in korundugu ve archived matching kayitlarin dahil edildigi test edildi.
-- [x] Adim 212 - Category/location/reported_to/date-time/text-search/active/archive-only/combined filters, lifecycle mutation, persistence, attachment integration, export/reporting, API/GUI/CLI, audit, validation ve Step 213 baslatilmadi.
-
-## Step 213 - FieldObservationRepository Status Update
-
-- [x] Adim 213 - `update_status(observation_id, new_status)` explicit status update method'u eklendi.
-- [x] Adim 213 - Missing id icin `None`, found id icin ayni stored record nesnesi donduruldu.
-- [x] Adim 213 - Status filtresinin update'i hemen yansittigi ve yeni/duplicate record olusmadigi test edildi.
-- [x] Adim 213 - Automatic timestamps, validation, enums, close/reopen workflow, other field updates, archive gating, persistence, attachment integration, API/GUI/CLI, audit ve Step 214 baslatilmadi.
-
-## Step 214 - FieldObservationRepository Reporting Update
-
-- [x] Adim 214 - `update_reporting(observation_id, reported_to, reported_at)` explicit reporting-context update method'u eklendi.
-- [x] Adim 214 - Missing id icin `None`, found id icin ayni stored record nesnesi donduruldu.
-- [x] Adim 214 - Yalniz `reported_to` ve `reported_at` alanlarinin degistigi; status, closed timestamp, notes, creator ve archive state'in korundugu test edildi.
-- [x] Adim 214 - Exact string preservation, archived record allowance ve stable count davranislari test edildi.
-- [x] Adim 214 - Automatic status change, timestamp generation, contact lookup/normalization, other field updates, persistence, attachment integration, API/GUI/CLI, audit ve Step 215 baslatilmadi.
-
-## Step 215 - FieldObservationRepository Location/Category Filters
-
-- [x] Adim 215 - `list_by_location(location)` exact, case-sensitive location filtresi eklendi.
-- [x] Adim 215 - `list_by_category(category)` exact, case-sensitive category filtresi eklendi.
-- [x] Adim 215 - Unknown, case-different ve whitespace-different degerlerin farkli sonuc verdigi test edildi.
-- [x] Adim 215 - Location, category, project ve status filtrelerinin birbirinden bagimsiz kaldigi test edildi.
-- [x] Adim 215 - Donen listelerin yeni liste oldugu, stored record nesnelerinin kopyalanmadigi/mutate edilmedigi ve archived matching kayitlarin dahil edildigi test edildi.
-- [x] Adim 215 - Structured location lookup, category normalization/constants/enums, combined query, broader filters/mutations, persistence, attachment integration, API/GUI/CLI, audit, Podcast 033 ve Step 216 baslatilmadi.
-
-## Step 216 - Podcast 033 for Steps 211-215
-
-- [x] Adim 216 - `docs/podcast_notes/033_adim_211_215_notebooklm_podcast_notu.md` dosyasi Steps 211-215 icin hazirlandi.
-- [x] Adim 216 - Podcast 033, Podcast 032 kapanisi -> project/status filtreleri -> explicit status update -> explicit reporting update -> location/category filtreleri hattini anlatti.
-- [x] Adim 216 - Step 212-215 davranislari automatic, validated veya persistent davranis gibi sunulmadi.
-- [x] Adim 216 - Repository truth Step 215 / PR #47 / Issue #46 / merge `7b3361087cdb51fe1e76caa6f2cd91ff005cdfe2` latest merged safe point olacak sekilde guncellendi.
-- [x] Adim 216 - Production code, executable tests, repository behavior, workflow, Podcast 034 ve Step 217 baslatilmadi.
-
-## Step 217 - FileAttachmentRepository Baseline
-
-- [x] Adim 217 - `FileAttachmentRepository` minimal bellek ici metadata repository olarak eklendi.
-- [x] Adim 217 - `add`, `list_all`, `count` ve `find_by_id` method'lari uygulandi.
-- [x] Adim 217 - Duplicate exact `attachment_id` `ValueError` ile reddedildi; case-different id degerleri distinct kaldi.
-- [x] Adim 217 - Insertion order, new-list behavior, same-object return ve metadata non-mutation davranislari test edildi.
-- [x] Adim 217 - `docs/217_file_attachment_repository_baseline.md` ve `learning/217_file_attachment_repository_baseline.md` olusturuldu.
-- [x] Adim 217 - Related-record filters, FieldObservation-specific attachment lookup/linking, physical file operations, persistence, validation/enums/constants, API/GUI/CLI, audit, Podcast 034 ve Step 218 baslatilmadi.
-
-## Step 218 - FileAttachmentRepository Related-Record Filters
-
-- [x] Adim 218 - `list_by_related_record_type(related_record_type)` exact, case-sensitive related-record type filtresi eklendi.
-- [x] Adim 218 - `list_by_related_record_id(related_record_id)` exact, case-sensitive related-record id filtresi eklendi.
-- [x] Adim 218 - Unknown, case-different ve whitespace-different degerlerin farkli sonuc verdigi test edildi.
-- [x] Adim 218 - Type ve id filtrelerinin birbirinden bagimsiz kaldigi test edildi.
-- [x] Adim 218 - Donen listelerin yeni liste oldugu, stored record nesnelerinin kopyalanmadigi/mutate edilmedigi ve repository sirasi/sayisinin korundugu test edildi.
-- [x] Adim 218 - `docs/218_file_attachment_repository_related_record_filters.md` ve `learning/218_file_attachment_repository_related_record_filters.md` olusturuldu.
-- [x] Adim 218 - Combined filter, FieldObservation-specific attachment lookup/linking, physical file operations, persistence, validation/enums/constants, API/GUI/CLI, audit, Podcast 034 ve Step 219 baslatilmadi.
-
-## Step 219 - Field Observation Attachment Linking Contract
-
-- [x] Adim 219 - Field Observation attachment relationship identity documentation-only olarak tanimlandi.
-- [x] Adim 219 - Exact pair kuralı `related_record_type == "field_observation"` ve `related_record_id == FieldObservationRecord.observation_id` olarak kaydedildi.
-- [x] Adim 219 - Cardinality, ownership ve orphan/existence behavior sinirlari belgelendi.
-- [x] Adim 219 - Bagimsiz Step 218 filtrelerinin safe combined relationship query olmadigi aciklandi.
-- [x] Adim 219 - Future `list_by_related_record(...)` ve `list_for_field_observation(...)` boundaries implement edilmeden dokumante edildi.
-- [x] Adim 219 - Future test matrix yazildi.
-- [x] Adim 219 - Production code, executable tests, combined filter implementation, convenience lookup, physical file operations, persistence, validation/enums/constants, API/GUI/CLI, audit, Podcast 034 ve Step 220 baslatilmadi.
-
-## Step 220 - FileAttachmentRepository Combined Related-Record Filter
-
-- [x] Adim 220 - `list_by_related_record(related_record_type, related_record_id)` exact combined filtresi eklendi.
-- [x] Adim 220 - Same id / different type ve same type / different id partial match durumlari dislandi.
-- [x] Adim 220 - Case-different ve whitespace-different type/id degerlerinin exact query ile eslesmedigi test edildi.
-- [x] Adim 220 - Empty repository, unknown pair, new-list behavior, same-object return, metadata non-mutation ve count/order stability test edildi.
-- [x] Adim 220 - Missing related-record existence repository tarafindan validate edilmedi.
-- [x] Adim 220 - Existing independent filters, baseline repository methods, `FieldObservationRepository` ve `NonconformityRepository` davranislari korundu.
-- [x] Adim 220 - `docs/220_file_attachment_repository_combined_related_record_filter.md` ve `learning/220_file_attachment_repository_combined_related_record_filter.md` olusturuldu.
-- [x] Adim 220 - `list_for_field_observation(...)`, physical file operations, persistence, validation/enums/constants, API/GUI/CLI, audit, Podcast 034 ve Step 221 baslatilmadi.
-
-## Step 221 - Podcast 034 for Steps 216-220
-
-- [x] Adim 221 - `docs/podcast_notes/034_adim_216_220_notebooklm_podcast_notu.md` dosyasi Steps 216-220 icin hazirlandi.
-- [x] Adim 221 - Podcast 034, observation repository maturity -> attachment metadata repository -> independent relationship lookups -> explicit observation-link contract -> exact combined relationship lookup hattini anlatti.
-- [x] Adim 221 - `FieldObservationRecord` ve `FileAttachmentRecord` iliskisinin attachment-owned metadata uzerinden exact, case-sensitive ve zero-to-many olarak okunacagi aciklandi.
-- [x] Adim 221 - Combined filter'in partial match reddetme nedeni ve `471 passed` test kaniti kaydedildi.
-- [x] Adim 221 - CSE'nin henuz field-ready veya production-ready application olmadigi, hala in-memory test-backed metadata core seviyesinde oldugu vurgulandi.
-- [x] Adim 221 - Production code, executable tests, repository behavior, workflow, Podcast 035 ve Step 222 baslatilmadi.
-
-## Step 222 - Field Observation Attachment Convenience Lookup Boundary
-
-- [x] Adim 222 - Future `list_for_field_observation(observation_id)` helper'i icin API boundary documentation-only olarak planlandi.
-- [x] Adim 222 - Helper'in `list_by_related_record("field_observation", observation_id)` ile semantic equivalent kalmasi gerektiği kaydedildi.
-- [x] Adim 222 - Future implementation icin existing combined helper'a delegation tercih edildi.
-- [x] Adim 222 - Exact, case-sensitive, non-normalizing ve validation-free davranis siniri korundu.
-- [x] Adim 222 - `FieldObservationRepository` lookup'i, referenced observation existence validation, metadata mutation ve `FieldObservationRecord` mutation kapsam disi tutuldu.
-- [x] Adim 222 - Future test matrix 15 baslikla belgelendi.
-- [x] Adim 222 - Production code, executable tests, repository behavior, workflow, Podcast 035 ve Step 223 baslatilmadi.
-
-## Step 223 - Field Observation Attachment Convenience Lookup
-
-- [x] Adim 223 - `FileAttachmentRepository.list_for_field_observation(observation_id)` helper'i eklendi.
-- [x] Adim 223 - Helper existing `list_by_related_record("field_observation", observation_id)` davranisina delegation yapar.
-- [x] Adim 223 - Ikinci `_records` filtering implementation'i eklenmedi.
-- [x] Adim 223 - Exact, case-sensitive, non-normalizing ve validation-free davranis combined helper uzerinden korundu.
-- [x] Adim 223 - Focused tests delegation, partial match rejection, case/whitespace sensitivity, new-list, same-object, non-mutation, missing existence non-validation ve existing filter regression davranislarini dogruladi.
-- [x] Adim 223 - Production scope yalniz `app/records.py` ve `tests/test_records.py` ile sinirli tutuldu; model, workflow, Podcast 035 ve Step 224 baslatilmadi.
-
-## Step 224 - Rolling NotebookLM Podcast Source Protocol
-
-- [x] Adim 224 - `NOTEBOOKLM_INSTRUCTIONS.md` kalici yorumlama ve Turkce podcast sozlesmesi olarak eklendi.
-- [x] Adim 224 - Stable `CSE_PODCAST_LATEST_SOURCE.md` yolu ve public raw GitHub URL'si tanimlandi.
-- [x] Adim 224 - Latest numbered podcast note, full note content, 001-223 cumulative step summaries, safe point, deferred scope ve metadata deterministic olarak birlestirildi.
-- [x] Adim 224 - `CSE_PODCAST_SOURCE_MANIFEST.json` latest podcast/range/path, rolling source, instruction, safe point ve summary count alanlariyla eklendi.
-- [x] Adim 224 - Malformed/duplicate/missing source failures, determinism, UTF-8, no historical mutation ve no side effects focused tests ile guvence altina alindi.
-- [x] Adim 224 - Focused generator testleri `15 passed`, tam yerel suite `494 passed` olarak dogrulandi.
-- [x] Adim 224 - Kalici Codex model/reasoning/secim-gerekcesi politikasi canonical talimat ve state'e eklendi.
-- [x] Adim 224 - Podcast 035, NotebookLM API/browser/upload/audio automation, ana urun behavior, workflow, ZIP ve exports mutation eklenmedi.
-
-## Step 225 - Podcast 035 Note Summary Contract
-
-- [x] Adim 225 - `035_adim_221_225_notebooklm_podcast_notu.md` mandatory 12-section structure ile olusturuldu.
-- [x] Adim 225 - Note Section 6 icinde Steps 001-220 tam bir kez, ascending order ve ayri heading'lerle tasindi.
-- [x] Adim 225 - Strict note validator previous-summary section boundary'sini bulur ve missing, duplicate, out-of-order veya section-disindaki headings'i reddeder.
-- [x] Adim 225 - Current-range steps previous-summary section icinde zorunlu tutulmadi; Podcast 034 legacy compatibility korundu.
-- [x] Adim 225 - Rolling source latest Podcast 035 / Steps 221-225 ve 224 cumulative canonical summary ile yenilendi.
-- [x] Adim 225 - Focused generator tests `24 passed`, full local suite `503 passed` olarak dogrulandi.
-- [x] Adim 225 - Main product code, workflow, NotebookLM automation, historical podcast, ZIP ve exports mutation eklenmedi; Step 226 baslatilmadi.
-
-## Step 225 Sonrası Tarihsel Çalışma Önerisi
-
-Bu öneri Step 225 dönemine aittir ve güncel ürün sırasını belirlemez. Transactional service, lazy backfill, backup/export güvenlik kapısı ve ilk test edilebilir PC web yüzeyi sonraki Issue'larla tamamlanmıştır; güncel sonraki ürün yönü üstteki listede yer alan mobil runtime ve veri sahipliği ADR'sidir.
-
-Podcast cadence notu: Podcast 030 Adim 196-200, Podcast 031 Adim 201-205, Podcast 032 Adim 206-210, Podcast 033 Adim 211-215, Podcast 034 Adim 216-220 ve Podcast 035 Adim 221-225 araligini kapsar. Sonraki dogal podcast araligi Steps 226-230 olur.
-
-## Issue 98 - Saha Takibi v0.1 Sözleşme Aşaması
-
-- [x] Mevcut schema v2, migration, repository, Unit of Work, backup/restore ve daily export sınırları incelendi.
-- [x] `FollowUpItem`, `RoutineTemplate` ve `RoutineOccurrence` alanları ve yaşam döngüleri kesinleştirildi.
-- [x] Hızlı create command’ında yalnız `capture_text` zorunlu; ilk title deterministic normalize edilmiş aynı metin; sonraki title düzenlemesi serbest olarak düzeltildi.
-- [x] Follow-up ve routine template projesi nullable yapıldı; projesiz kayıtların kişisel çalışma alanında kalması ve observation bağında project eşleşmesi kesinleştirildi.
-- [x] Zamanlanmamış açık kaydın yalnız `inbox` olacağı; `active/waiting` kaydın `next_attention_at` taşımak zorunda olduğu database/application sınırıyla kaydedildi.
-- [x] `now` domain kategorisinden çıkarıldı; `overdue/today/upcoming` yalnız planlı kayıtlar, “Şimdi ilgilen” ise overdue + zamanı gelmiş today + önemli inbox UI bileşimi olarak tanımlandı.
-- [x] `daily`, `weekdays`, `weekly`, `monthly` recurrence davranışı, Europe/Istanbul yerel tarih temeli ve UTC snapshot kararı kaydedildi.
-- [x] Aynı template+yerel tarih unique/idempotency kuralı ve bugün dahil yedi günlük sınırlı lazy backfill seçildi.
-- [x] Revision, no-op, deterministic aggregate sequence ve transactional event append sınırı tanımlandı.
-- [x] SQLite schema v3 migration planı; mevcut veri ve hard-delete yasağı korunarak yazıldı.
-- [x] Backup format v1’i koruma, schema v2 eski backup’ı yeni hedefte migrate etme ve tracking manifest count eklememe kararı verildi.
-- [x] Kişisel tracking verisinin günlük resmî observation export’una girmemesi ve byte-level regression sınırı tanımlandı.
-- [x] Puantaj iş günü kabul senaryosu restart, snooze, template edit, deactivation ve backup/restore durumlarıyla tamamlandı.
-- [x] Production domain kayıtları, hızlı capture normalization, saf recurrence ve görünüm sınıflandırmaları Issue #100 kapsamında executable testlerle uygulandı.
-- [x] SQLite schema v3 migration, domain-SQLite mapping, altı repository/event adapter'ı ve Unit of Work bağlantıları Issue #102 kapsamında uygulandı.
-- [x] Transactional service/backfill Issue #109, #111, #112 ve #115 ile uygulandı.
-- [x] Backup compatibility ve export exclusion Issue #117 ile executable testlerle doğrulandı.
-- [x] İlk test edilebilir PC UI Issue #119 branch'inde tamamlandı ve PR incelemesine hazırlandı.
-
-## Issue 100 - Saha Takibi Task 2/5 Domain ve Saf Recurrence
-
-- [x] `FollowUpItem`, `RoutineTemplate`, `RoutineOccurrence` ve üç event ailesi immutable domain kayıtları olarak eklendi.
-- [x] Yalnız `capture_text` alanını normalize edip ilk `title` değerini aynı metinden üreten saf hızlı yakalama sınırı eklendi.
-- [x] Nullable proje, observation için project zorunluluğu, açık/terminal status ve outcome/timestamp değişmezleri executable validation ile korundu.
-- [x] `daily`, `weekdays`, `weekly`, `monthly` yerel tarih eşleşmeleri ve bugün dahil yedi günlük sınırlı pencere saf fonksiyonlarla eklendi.
-- [x] `Europe/Istanbul` `ZoneInfo` dönüşümüyle yerel tarih/saat ve canonical UTC snapshot planı eklendi.
-- [x] Geçmiş uygun gün için `missed`, bugün için `open` saf occurrence planı eklendi; gelecek gün reddedildi.
-- [x] Follow-up `inbox/overdue/today/upcoming`, occurrence `overdue/today/upcoming` ve tekilleştirilmiş “Şimdi ilgilen” bileşimi eklendi; `now` domain kategorisi eklenmedi.
-- [x] Domain ve recurrence için kapsamlı focused executable test matrisi eklendi.
-- [x] SQLite schema v3, migration, repository ve Unit of Work bağlantıları Issue #102 kapsamında uygulandı.
-- [x] Transactional application service ve occurrence ensure/backfill orchestration Issue #109, #111, #112 ve #115 ile uygulandı.
-- [x] Backup/restore compatibility ve export exclusion Issue #117; ilk test edilebilir PC UI Issue #119 ile tamamlandı.
-
-## Issue 102 - Saha Takibi Task 3/5 SQLite v3 ve Persistence
-
-- [x] Schema version 3, v1/v2 zincirini değiştirmeyen tek immutable migration olarak eklendi.
-- [x] Follow-up, routine template, weekday relation, routine occurrence ve üç append-only event tablosu gerekli foreign key, CHECK, unique ve index kurallarıyla eklendi.
-- [x] Observation-project composite foreign key'i, nullable kişisel proje kayıtları ve `active/waiting + NULL next_attention_at` reddi database seviyesinde korundu.
-- [x] Üç aggregate ve üç event ailesi için açık domain-SQLite mapper'ları, repository port'ları ve SQLite adapter'ları eklendi.
-- [x] Event geçmişleri yalnız aggregate sequence ile deterministik okundu; duplicate sequence ve hard-delete/cascade davranışı reddedildi.
-- [x] Routine occurrence insert'i template + yerel tarih anahtarında idempotent primitive olarak eklendi.
-- [x] Altı tracking repository'si mevcut SQLite Unit of Work transaction'ına bağlandı; aggregate + event commit/rollback atomikliği kanıtlandı.
-- [x] Fresh v3 ile v2→v3 şema eşitliği ve mevcut project/observation/attachment/event satırlarının birebir korunması geçici database testleriyle doğrulandı.
-- [x] Transactional application service ve occurrence ensure/backfill orchestration Issue #109, #111, #112 ve #115 ile uygulandı.
-- [x] Backup compatibility ve export exclusion Issue #117; ilk test edilebilir PC UI Issue #119 ile tamamlandı.
-
-## Issue 103 - Kanonik Talimatlar v2 ve Repository Truth
-
-- [x] CSE, yalnız şantiye şefinin kullandığı local-first ve mobile-first kişisel saha asistanı olarak tanımlandı.
-- [x] Araç bakımından geniş, kullanıcı modeli bakımından tek sahipli ürün değişmezi Epic #105 ile kanonikleştirildi.
-- [x] Diğer kişi/firmalar kullanıcı değil kayıt referansı; multi-user/role/tenant/SaaS/kurumsal portal hedefleri kalıcı kapsam dışı yapıldı.
-- [x] Single-owner security; uygulama kilidi, güvenilen cihaz, şifreli backup, owner-only sync ve güvenli yerel ağ yönüyle ayrıştırıldı.
-- [x] Kalıcı ürün politikası, operasyon talimatı, aktif Issue kapsamı ve değişken GitHub repository durumu ayrı otorite yüzeylerine ayrıldı.
-- [x] Eski Step 224/225 current-state metinleri tarihsel bağlama çekildi.
-- [x] Local Field MVP kabiliyetleri ve PR #104 sonrası Saha Takibi durumu güncel kanıtla hizalandı.
-- [x] Mobil runtime/offline/bildirim pilot önüne; minimum hesap şeridi ve günlük zaman çizelgesi Kâğıdı Bırakma Sürümü içine alındı.
-- [x] Gelişmiş hesap defteri, immutable günlük yayın zinciri ve Canlı Proje Haritası pilotlar sonrasındaki ayrı fazlarda tutuldu.
-- [x] Legacy model envanteri/deprecation yönü gerçek sınıf adlarıyla yazıldı; fiziksel silme yetkisi verilmedi.
-- [x] Production Python, schema, migration, repository, UI ve test davranışı değiştirilmedi.
-
-## Issue 107 - Follow-up Mutation Event Vocabulary ve SQLite v4
-
-- [x] `FollowUpEventType` sonuna `details_updated`, `moved_to_inbox` ve `project_changed` anlamları eklendi; eski sıra ve değerler korundu.
-- [x] Gelecek `update_details`, `move_to_inbox` ve `set_project` mutation'larının minimum deterministic payload sözleşmesi yazıldı.
-- [x] Schema version 4, v1/v2/v3 statement içeriklerini değiştirmeyen tek immutable migration olarak eklendi.
-- [x] Yalnız `follow_up_events` tablosu aynı kolon/constraint/FK sözleşmesi ve genişletilmiş event CHECK list'iyle transaction içinde yeniden kuruldu.
-- [x] Mevcut event alanları ve `payload_json` metni birebir korundu; diğer tablolar, no-cascade ve append-only sequence davranışı değişmedi.
-- [x] Fresh v4/v3→v4 schema eşitliği, tam rollback, allowed/unknown türler, duplicate sequence, foreign key ve repository round-trip testleri eklendi.
-- [x] Mapping/repository API değişikliği gerekmedi; event update/delete/sequence allocator eklenmedi.
-- [x] `FollowUpApplicationService` çekirdek optimistic mutation/no-op ve atomik event üretimi Issue #109; waiting/terminal yaşam döngüsü Issue #111 ile uygulandı.
-- [x] Rutin application service ve yedi günlük idempotent lazy backfill Issue #115 ile uygulandı.
-- [x] Backup backward compatibility ve resmî export izolasyonu Issue #117 ile executable kabul testleriyle tamamlandı.
-
-## Issue 109 - FollowUpApplicationService Çekirdek Akışları
-
-- [x] Hızlı `+ Unutma` create yalnız capture text alır; canonical UUID/UTC teknik değerleri enjekte edilebilir ve ilk `follow_up.created` event'i aynı transaction'da yazılır.
-- [x] Get/list/history ile status/project/personal/observation filtreleri repository deterministic sırasını koruyarak compose edilir.
-- [x] Inbox/overdue/today/upcoming ve “Şimdi ilgilen” görünümleri mevcut domain helper'ları ve `Europe/Istanbul` gün sınırıyla hesaplanır.
-- [x] Ayrıntı update allowlist'i immutable capture/status/project/attention/outcome/created alanlarını korur ve exact alfabetik `changed_fields` event'i üretir.
-- [x] İlk planlama ve yeniden planlama `scheduled/rescheduled`; planı kaldırma `moved_to_inbox`; proje değişimi `project_changed` event'ini doğru nullable payload ile üretir.
-- [x] Stale revision, gerçek no-op, event failure ve commit failure sınırları aggregate/event geçmişinde yarım yazı bırakmadan test edildi.
-- [x] Repository portlarına sequence/update/delete API'si, schema v5/migration, web/UI, backup/export değişikliği eklenmedi.
-- [x] Waiting, complete, cancel ve reopen follow-up yaşam döngüleri Issue #111 ile uygulandı.
-- [x] Observation bağlama/dönüştürme Issue #112 ile uygulandı.
-- [x] Routine application service ile yedi günlük idempotent lazy backfill Issue #115 ile uygulandı.
-
-## Issue 111 - Follow-up Bekleme ve Terminal Yaşam Döngüleri
-
-- [x] `MarkWaiting` ve `CompleteFollowUp` immutable command değerleri canonical UTC ve optional text normalizasyonuyla eklendi.
-- [x] Inbox/active → waiting geçişi; exact waiting no-op, farklı ikinci bekleme reddi ve nullable kişi/koşul payload'ı uygulandı.
-- [x] Bütün açık durumlardan `completed/not_required` completion ve cancelled outcome'lu cancel geçişleri uygulandı.
-- [x] Completed/cancelled kaydın dikkat anına göre inbox/active yeniden açılması ve bütün terminal alanlarının temizlenmesi uygulandı.
-- [x] Dört mutation için revision, önceki durum/zaman/sonuç ve yeni değerleri taşıyan append-only event payload'ları eklendi.
-- [x] UUID validation, event insert ve commit hatalarında aggregate/event'in birlikte rollback edilmesi focused testlerle doğrulandı.
-- [x] Deadline, capture, proje/observation ve diğer ayrıntı koruması; stale-before-no-op ve clock/UUID tüketmeyen exact no-op doğrulandı.
-- [x] Schema v4, migration, mapper, repository/UoW portu, observation/routine, web/UI ve backup/export sınırları değiştirilmedi.
-
-## Issue 112 - Follow-up Observation Bağlantısı ve Dönüşüm
-
-- [x] Var olan observation'a açık/terminal follow-up link'i, lifecycle alanlarını değiştirmeden uygulandı.
-- [x] Observation project source-of-truth; null project adoption, same project koruması ve different project rejection ile uygulandı.
-- [x] Same observation exact no-op ve different existing observation rejection sınırları eklendi.
-- [x] Açık inbox/active/waiting kaydın `completed + converted_to_observation` sonucuyla atomik dönüşümü uygulandı.
-- [x] Conversion attention'ı temizler, deadline/capture/detail alanlarını korur ve yalnız converted event üretir.
-- [x] Exact converted retry no-op; diğer completed outcome ve cancelled conversion reddi uygulandı.
-- [x] UUID validation, event insert ve commit hatalarında link/conversion aggregate-event rollback'i test edildi.
-- [x] Otomatik observation creation, persistence/schema, observation service, routine/backfill, web/UI ve backup/export kapsamına girilmedi.
-
-## Issue 119 - İlk Test Edilebilir PC Saha Takibi Arayüzü
-
-- [x] `/` başlangıcı `/today` görünümüne yönlendirildi; üst navigasyonda Bugün, Unutma Kutusu, Rutinler ve Gözlemler görünür hale getirildi.
-- [x] Observation, follow-up ve routine application service'leri aynı `cse.sqlite3` dosyasına bağlandı; schema sürümü `4` kaldı.
-- [x] Bugün görünümü Şimdi ilgilen, Gecikenler, Bugün ve Bugünkü rutinler bölümlerini Europe/Istanbul kullanıcı zamanı ile sunuyor.
-- [x] Tek alanlı `+ Unutma` formu normalize edilmiş capture text, PRG redirect, HTML escaping ve immutable ilk yakalama kanıtıyla uygulandı.
-- [x] Follow-up detail; ayrıntı, proje, planlama, bekleme, inbox, complete, cancel ve reopen işlemlerini revision korumasıyla sunuyor.
-- [x] Rutin list/create/detail/deactivate ile occurrence snooze/close/reopen işlemleri server-rendered formlarla sunuluyor.
-- [x] Aynı `/today` yenilemesinin duplicate occurrence/event üretmediği ve restart sonrasında revision/history'nin aynı SQLite'tan okunduğu doğrulandı.
-- [x] Mevcut observation, backup ve resmî günlük export akışları korundu; follow-up capture text'i ve routine başlığı resmî export'a sızmadı.
-- [x] Web paketi `17 passed`, ilgili regresyonlar `56 passed`, full suite `983 passed, 7 skipped` olarak doğrulandı.
-- [x] `SCHEMA_VERSION == 4`; domain/application/persistence/operations protected path diff'i boş; gerçek `CSE_DATA_ROOT` kullanılmadı.
-- [x] PC web sürümü PR incelemesine hazırlandı; merge claim, PR oluşturma, mobile/PWA/offline/sync/notification/auth kapsamı eklenmedi.
+**Amaç:** Mevcut çekirdeğin gerçek telefonda güvenilirliğini kanıtlamak.
+
+- Ajanda, Hatırlatıcı, Puantaj ve Beton birlikte kullanılır.
+- Kapalı uygulama reminder teslimi doğrulanır.
+- Backup, dışa çıkarma, preflight ve restore yürütülür.
+- Fotoğraf, irsaliye, kayıt, restart ve güncelleme bütünlüğü doğrulanır.
+- Mevcut kritik Beton/mikser sürtünmeleri bakım hattında çözülür.
+
+**Kapı:** En az 7 ardışık gerçek gün; veri kaybı `0`; sessiz kritik notification
+başarısızlığı `0`; restore farkı `0`; açık kritik blocker `0`.
+
+---
+
+## Faz 1 — Release 0.2: Sürtünmesiz Evrensel Yakalama
+
+**Amaç:** Her saha olayını 5–15 saniyede kayda dönüştürmek.
+
+Uygulamanın her yerinden tek işlem:
+
+```text
++ Kaydet → Yaz | Konuş | Fotoğraf | Belge | Dosya | Hazır işlem
+```
+
+- Kullanıcı önce modül seçmez; CSE kayıt türünü önerir.
+- Ortak `CaptureDraft` ve düzenlenebilir onay kartı kullanılır.
+- Proje, blok/kat/mahal, imalat, kişi/firma ve termin etiketleri önerilir.
+- Aktif proje/mahal bağlamı geçici olarak kilitlenebilir.
+- Eksik/düşük güvenli kayıtlar **Asistan Gelen Kutusu**na düşer.
+- Ajanda ve Hatırlatıcı aynı işlemde oluşturulabilir.
+- Sesli giriş kullanıcı onayıyla çalışır; ham ses varsayılan saklanmaz.
+- Çevrim dışı taslak, restart ve Paylaş menüsü desteklenir.
+
+**AI:** AI-1.  
+**Kapı:** Sık kayıtların `%80`i `+ Kaydet`; ortanca süre `≤10 sn`; ilk zorunlu
+alan `≤3`; çevrim dışı taslak kaybı `0`; tekrar veri girişi yok.
+
+---
+
+## Faz 2 — Release 0.3: Açık Döngü ve Takip Asistanı
+
+**Amaç:** Şefin neyi yapacağını, kimden ne beklediğini ve kim ne söz verdiğini
+zihninde taşımaması.
+
+Ortak türler:
+
+- Yapacağım;
+- Başkasına verdim;
+- Kimden ne bekliyorum;
+- Söz/taahhüt;
+- Kontrol edeceğim;
+- Onay/cevap/belge bekliyor;
+- Tekrarlanan rutin.
+
+Özellikler:
+
+- **Beklediklerim:** kişi, konu, bekleme başlangıcı, son görüşme, sonraki takip,
+  etkilenen iş;
+- **Taahhütler:** sözü veren, termin, durum ve takip geçmişi;
+- delegasyon, yeniden kontrol ve isteğe bağlı kapanış kanıtı;
+- kaynaklı **Sabah Brifingi**;
+- eksik soruları ve günlük rapor taslağıyla **Akşam Kapanışı**;
+- birleştirilmiş kritik/işlem/takip/özet bildirimleri;
+- `Ara`, `Mesaj hazırla`, `Tamamla`, `Ertele`, `Kaydı aç` eylemleri.
+
+**AI:** AI-1 + kural motoru.  
+**Kapı:** Her açık döngünün takip tarihi veya terminal durumu vardır; sabah özet
+`≤30 sn`; akşam kapanışı `≤3 dk`; ayrı takip listesine ihtiyaç yok.
+
+---
+
+## Faz 3 — Release 0.4: Bağlam Omurgası ve Büyük Resim
+
+**Amaç:** Ana ekranda ikon listesi değil, güncel saha durumu ve sıradaki doğru
+hareketi göstermek.
+
+```text
+Proje → Bölge/Blok → Kat/Kesim → Mahal/Aks → İmalat/İş Paketi
+```
+
+Kişi, taşeron, ekip, malzeme, ekipman, belge/revizyon, görev ve kanıt ortak
+referanslardır. Puantaj, görev, İSG ve paketler aynı kimlikleri kullanır.
+
+Ana ekran:
+
+1. kaynaklı Saha Brifingi;
+2. Kritik, Bugün, Geciken, Beklenen, Hazır değil şeridi;
+3. ilk sürümde Blok/Kat × İmalat **Saha Nabzı** matrisi;
+4. aktif Beton gibi operasyonlar için canlı kart;
+5. etkiye göre **Şimdi Ne Yapmalıyım** listesi;
+6. proje, malzeme, ekip, ekipman, önceki iş, kalite ve İSG için 7–14 günlük hazırlık;
+7. günlük zaman çizgisi.
+
+İlk çözüm BIM değildir. Matris ana yüzeydir; plan üzerine işaretleme ve lineer
+görünüm sonraki iterasyondur.
+
+**AI:** açıklanabilir kural tabanlı sıralama + metinleştirme.  
+**Kapı:** Saha `≤30 sn` içinde anlaşılır; her kart kaynağa gider; dashboard için
+ayrı veri girilmez; yaklaşan eksikler önceden görünür.
+
+---
+
+## Faz 4 — Release 0.5: İş Paketi Motoru ve İlk Dikeyler
+
+**Amaç:** Gerçek saha işlerini parçalamadan uçtan uca yürütmek.
+
+```text
+Planla → Hazırla → Uygula → Doğrula → Kapat
+```
+
+Her paket mahal, zaman, ekip, bağımlılık, kontrol, kanıt, açık sorun, gerçekleşen
+miktar, insan doğrulaması ve kapanış raporu taşır.
+
+### Beton Paketi v2
+
+- hazırlık ve eksik kontrolü;
+- aynı plakanın farklı gelişleri dahil mikser yaşam döngüsü;
+- irsaliye ve canlı hedef/dökülen/kalan/aşılan metraj;
+- EBİS, numune, laboratuvar ve yapı denetim;
+- versiyonlu numune önerisi ve gerekçeli override;
+- kür, sonuç, eksik belge, rapor ve canlı ana ekran kartı.
+
+### Malzeme Teslimatı ve İrsaliye
+
+- beklenen sevkiyat, tedarikçi, malzeme, miktar ve araç;
+- irsaliye tarama;
+- kabul/şartlı kabul/red;
+- eksik/hasar, fotoğraf, sertifika ve test raporu;
+- depo/mahal ve iş paketi bağlantısı.
+
+### Numune ve Laboratuvar
+
+- beton, donatı ve malzeme numunesi;
+- etiket, laboratuvara teslim, sonuç bekleme ve sonuç belgesi;
+- çap bazlı ayarlanabilir donatı numune önerisi;
+- resmî onay üretmeyen override/event geçmişi.
+
+### Kontrol ve Uygunsuzluk
+
+- fotoğrafla hızlı kayıt, sorumlu, termin ve yeniden kontrol;
+- önce/sonra ve kapanış kanıtı;
+- tekrarlanan sorun görünümü.
+
+**AI:** AI-2 + kural motoru.  
+**Kapı:** Gerçek Beton ve malzeme teslimatı uçtan uca kapanır; irsaliye tekrar
+girilmez; eksik kanıt görünür; AI kabul/ret vermez; günlük rapor otomatik beslenir.
+
+---
+
+## Faz 5 — Release 0.6: Kalite, İSG ve Resmî Süreç
+
+**Kalite:** kontrol listesi, test/muayene, kontrol talebi, uygunsuzluk, düzeltici
+faaliyet, yeniden kontrol, numune/sonuç ve kapanış raporu.
+
+**İSG:** tehlike, eksik durum, ramak kala, kaza, iş izni, iskele/yüksekte çalışma,
+belge süreleri, eğitim, KKD ve düzeltici faaliyet.
+
+**Resmî süreç:** ruhsat, yer teslimi, yapı denetim, sözleşme, izin, abonelik,
+sigorta, gerekli evrak, süre sonu, beklenen kişi ve sonraki takip.
+
+**AI:** AI-2; belge türü/tarih çıkarma, benzer sorun gruplama ve yalnız inceleme
+öneren fotoğraf sinyali. Yapısal veya İSG kabul kararı vermez.  
+**Kapı:** Kapanışta kanıt zinciri; süreler önceden görünür; kritik İSG ana ekranda
+önceliklidir.
+
+---
+
+## Faz 6 — Release 0.7: Doküman ve Proje Hafızası
+
+- doküman kimliği, disiplin, revizyon ve yayın tarihi;
+- güncel/eski/iptal durumu ve exact iş paketi bağlantısı;
+- PDF önizleme ve çevrim dışı favori;
+- proje, mahal, imalat, kişi ve paketle bağlı fotoğraf;
+- önce/sonra ve fotoğraf işaretleme;
+- **Saha Turu:** seri fotoğraf/sesli not ve tek doğrulama;
+- Türkçe tam metin arama ve bağlam filtreleri;
+- doğrulanmış Hafıza paketiyle PC'de salt-okunur görünüm.
+
+İki yönlü senkron öncesinde telefon source-of-truth kalır.
+
+**Kapı:** Bilinen kayıtların `%90`ı `≤5 sn`; yanlış revizyon görünür; fotoğraf
+bağı kopmaz; PC telefon verisini değiştirmez.
+
+---
+
+## Faz 7 — Release 0.8: Kaynaklı AI Saha Asistanı
+
+Doğal dil örnekleri:
+
+- “Ali Usta'ya verdiğim açık işler?”
+- “Sonucu gelmeyen numuneler?”
+- “Yarınki Betonun eksikleri?”
+- “B Blok üçüncü kattaki son uygunsuzluklar?”
+- “Bugünkü raporu hazırla.”
+
+Her cevap kayıt, belge/revizyon, fotoğraf, tarih ve güven seviyesi gösterir.
+Kaynak yoksa “doğrulanmış kayıt bulamadım” denir.
+
+Yardımcılar:
+
+- sabah/akşam özetleri ve günlük/haftalık rapor;
+- toplantı tutanağı, karar, görev ve taahhüt önerisi;
+- kalite/İSG özeti ve iletişim taslağı;
+- kural tabanlı eksik adım kontrolü.
+
+AI teknik kabul vermez, uygunsuzluk kapatmaz, tutar/miktar onaylamaz, resmî
+mesaj göndermez, termin/sorumluyu sessiz değiştirmez. Mutasyonlar kullanıcı onayı,
+geri alma ve event kaydı taşır.
+
+**Kapı:** Kaynak gerektiren cevaplarda `%100` kaynak; kaynaksız kesin iddia `0`;
+düşük güven görünür; deterministik arama AI olmadan çalışır.
+
+---
+
+## Faz 8 — Release 0.9: Planlama ve İş Cephesi Hazırlığı
+
+- iş programı içe aktarma;
+- günlük plan ve 2–6 haftalık look-ahead;
+- bağımlılık ve kısıt listesi;
+- proje, malzeme, ekip, ekipman, mahal, önceki iş, kalite ve İSG hazırlığı;
+- kaynak çakışması, plan/gerçekleşen, gecikme nedeni ve tahmin.
+
+**AI-4:** Yeterli veri sonrası süre, darboğaz, malzeme, taşeron ve uygunsuzluk
+riski. Her öneri veri, gerekçe, güven ve hareket gösterir.  
+**Kapı:** Gerçek iki haftalık plan CSE'de yürür; hazırlıksız işler en az 48 saat
+önce görünür; plan değişikliği geçmişi korunur.
+
+---
+
+## Faz 9 — Release 1.0: Operasyon Genişlemesi ve Ürünleştirme
+
+- araç/makine/kiralık ekipman sicili, bakım, arıza, belge ve boşta kalma;
+- hafif ihtiyaç–teklif–sipariş–teslim ve saha harcaması;
+- güvenlik incelemesi sonrası süreli dış görev/fotoğraf bağlantıları;
+- Hafıza paketi → PC salt-okunur → tek yönlü transfer → kanıtlı dar senkron;
+- uygulama kilidi, şifreli backup, güvenli güncelleme, recovery drill;
+- performans, depolama, pil, signing ve store submission.
+
+Tam muhasebe, cari, çek/senet, bordro, tenant ve multi-user eklenmez.
+
+**Kapı:** 30 günlük ana kullanım; veri kaybı `0`; kritik güvenlik blocker `0`;
+recovery `PASS`; günlük rapor `≤3 dk`; haricî not/hatırlatıcıya dönüş düşük.
+
+# 5. Zorunlu yatay kurallar
+
+- Her faz migration, backup/restore, event, revision, hash ve archive testlerinden geçer.
+- Yeni saha özelliği internetsiz temel akışı tamamlamadan kapanmaz.
+- Kayıt süresi, dokunma, vazgeçme ve tekrar giriş içerik toplamadan ölçülür.
+- En az 44 px hedef, tek el, güneş, büyük metin, açık hata ve geri alma korunur.
+- Önemli değişikliklerde kim, ne zaman, önceki/yeni değer ve dayanak görünürdür.
+- Aynı anda yalnız bir production implementation Issue'su aktif olur.
+
+# 6. Backlog yerleşimi
+
+**Hemen:** #193 kabulü; Beton/mikser kritik bakımı; #127 ve karar belgelerini
+bu sırayla hizalama.
+
+**Faz 1:** Ajanda/Unutma sesli giriş, Ajanda'ya da yaz, hızlı süreler, not ihtiyacı
+ve Asistan Gelen Kutusu.
+
+**Faz 3:** canlı Beton kartı, büyük resim, kişi/taşeron/ekip bağlamı ve arşiv.
+
+**Faz 4:** malzeme teslimatı, irsaliye, EBİS, Beton/donatı numunesi ve öneri kuralı.
+
+**Faz 6–7:** PC salt-okunur hafıza, arama, kaynaklı soru-cevap, belge/fotoğraf AI.
+
+**Ertelenen uzmanlık:** tam iki yönlü senkron, PDF metraj, DWG viewer, gelişmiş
+hesap, ileri maliyet, BIM/DWG düzenleme ve görselden otomatik teknik karar.
+
+# 7. Release 0.1 sonrası ilk Issue kuyruğu
+
+1. Universal Capture contract and mobile shell;
+2. Voice capture and Assistant Inbox;
+3. Open Loop model;
+4. Morning Briefing and Evening Close;
+5. Context hierarchy and Big Picture read-model;
+6. Big Picture Home v1;
+7. Material Delivery vertical;
+8. Sample and Laboratory vertical;
+9. General Work Package engine.
+
+# 8. Nihai navigasyon
+
+```text
+Bugün | Saha | + Kaydet | Takip | Asistan
+```
+
+Malzeme, kalite, İSG, evrak ve ekipman ayrı ana ikon yığını oluşturmaz; ilgili iş
+paketi, Saha, arama, Asistan veya ikincil `Tüm araçlar` alanından açılır.
+
+# 9. Başarı ölçütleri
+
+| Ölçüt | Hedef |
+|---|---:|
+| Hızlı kayıt ortancası | `≤10 sn` |
+| Evrensel Yakalama oranı | `≥%80` |
+| Sabah saha hâkimiyeti | `≤30 sn` |
+| Bilinen kaydı bulma | `≤5 sn` |
+| Günlük rapor | `≤3 dk` |
+| Takip tarihi/terminal durumu olan açık döngü | `%100` |
+| Sessiz AI mutasyonu | `0` |
+| Kaynaksız AI proje iddiası | `0` |
+| Pilot veri kaybı | `0` |
+
+# 10. Kesin kapsam dışı
+
+- tam muhasebe veya şirket ERP'si;
+- çok kullanıcılı tenant/SaaS;
+- bordro, cari ve çek/senet;
+- resmî onay veya teknik kabul motoru;
+- BIM/DWG düzenleyici;
+- kullanıcı yerine karar veren otonom AI.
+
+Başarı modül sayısıyla değil, şefin daha az zihinsel yükle daha hızlı, eksiksiz ve
+kanıtlı saha yönetimi yapmasıyla ölçülür.
