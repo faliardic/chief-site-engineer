@@ -934,6 +934,8 @@ class SqliteAgendaApplication
     final now = _readClockOnce();
     final today = CseTimeCodec.istanbulDayKey(CseTimeCodec.encodeUtc(now));
     final bounds = CseTimeCodec.istanbulDayBounds(today);
+    final tomorrow = CseTimeCodec.shiftIstanbulDay(today, 1);
+    final tomorrowBounds = CseTimeCodec.istanbulDayBounds(tomorrow);
     final nowValue = CseTimeCodec.encodeUtc(now);
     final (where, arguments) = switch (group) {
       ReminderViewGroup.now => (
@@ -948,6 +950,11 @@ class SqliteAgendaApplication
         "f.status IN ('active', 'waiting') AND "
             'f.next_attention_at >= ? AND f.next_attention_at < ?',
         <Object?>[bounds.start, bounds.endExclusive],
+      ),
+      ReminderViewGroup.tomorrow => (
+        "f.status IN ('active', 'waiting') AND "
+            'f.next_attention_at >= ? AND f.next_attention_at < ?',
+        <Object?>[tomorrowBounds.start, tomorrowBounds.endExclusive],
       ),
       ReminderViewGroup.waiting => ("f.status = 'waiting'", <Object?>[]),
       ReminderViewGroup.recheck => (
@@ -978,8 +985,9 @@ class SqliteAgendaApplication
           f.id ASC
       ''', arguments);
       final reminders = rows.map(_reminderFromRow).toList(growable: false);
-      return group == ReminderViewGroup.upcoming
-          ? _collapseUpcomingAttendanceReminders(reminders)
+      return group == ReminderViewGroup.upcoming ||
+              group == ReminderViewGroup.tomorrow
+          ? _collapseAttendanceRemindersByProject(reminders)
           : reminders;
     });
   }
@@ -2539,7 +2547,7 @@ ReminderDeliveryDelayClass _deliveryDelayClass({
   return ReminderDeliveryDelayClass.nativeScheduleMissing;
 }
 
-List<MobileReminder> _collapseUpcomingAttendanceReminders(
+List<MobileReminder> _collapseAttendanceRemindersByProject(
   List<MobileReminder> reminders,
 ) {
   final visible = <MobileReminder>[];

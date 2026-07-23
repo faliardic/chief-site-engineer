@@ -3134,3 +3134,20 @@
   üretilebilir `mobile/build`, `.dart_tool` ve `ios/Flutter/ephemeral`
   ağaçlarının read-only özniteliğini kaldırır; işlem başarısızsa eski artifact
   ile devam etmek yerine fail-closed durur.
+
+## Issue 214 — Yarın Hatırlatıcı Görünümü
+
+- `Yarın`, ayrı `ReminderViewGroup` read-model'idir; application saati bir kez
+  okunup Europe/Istanbul bugün anahtarı `+1` kaydırılır ve yarının yerel
+  `[00:00, sonraki 00:00)` sınırları kanonik UTC SQL parametresi olur.
+- Yalnız `active | waiting` ve due değeri aralıkta olan kayıtlar seçilir. UTC
+  tarih parçası, terminal durum, due-null veya “şimdi + 24 saat” yaklaşımı filtre
+  kararı vermez.
+- Issue #212 Puantaj tekilleştirme helper'ı `Yaklaşanlar` ve `Yarın` arasında
+  paylaşılır; source reminder/link/event satırları değişmez.
+- Yarın filtresi salt-okunurdur. Bu gruptaki kart hızlı `Yarın` mutation'ını
+  göstermez; detail ve Şimdi/Gecikenler/Yaklaşanlar eylemleri korunur.
+- Filtre ChoiceChip'leri `Wrap` içinde minimum 48 px yüksekliktedir. Boş durumda
+  yalnız sade kullanıcı mesajı gösterilir, notification diagnostic'i yoktur.
+- Mobil schema `7`, `.csebackup` format `1`, exact alarm/boot reconciliation,
+  `.debug` application ID ve offline SQLite source-of-truth değişmez.

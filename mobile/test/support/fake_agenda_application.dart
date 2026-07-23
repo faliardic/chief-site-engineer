@@ -28,6 +28,7 @@ class FakeAgendaApplication implements AgendaApplication {
   CreateReminderCommand? lastReminderCommand;
   Object? createReminderFailure;
   Object? mutateReminderFailure;
+  ReminderViewGroup? lastReminderGroup;
   Completer<MobileReminder>? createReminderCompleter;
   Completer<MobileReminder>? mutateReminderCompleter;
   int createLogCalls = 0;
@@ -241,8 +242,10 @@ class FakeAgendaApplication implements AgendaApplication {
       const [];
 
   @override
-  Future<List<MobileReminder>> listReminders(ReminderViewGroup group) async =>
-      reminders;
+  Future<List<MobileReminder>> listReminders(ReminderViewGroup group) async {
+    lastReminderGroup = group;
+    return reminders;
+  }
 
   @override
   Future<MobileReminder> mutateReminder(MutateReminderCommand command) async {

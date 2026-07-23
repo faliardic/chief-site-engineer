@@ -380,6 +380,120 @@ void main() {
     },
   );
 
+  test(
+    'tomorrow view uses Istanbul half-open bounds and open statuses only',
+    () async {
+      now = DateTime.utc(2026, 7, 22, 19);
+      String reminderId(int value) =>
+          'cccccccc-cccc-4ccc-8ccc-${value.toString().padLeft(12, '0')}';
+
+      Future<MobileReminder> createAt(int value, String dueAt) =>
+          agenda.createReminder(
+            CreateReminderCommand(
+              id: reminderId(value),
+              eventId: eventId(100 + value),
+              projectId: project1,
+              title: 'Sınır kaydı $value',
+              kind: ReminderKind.action,
+              schedule: ReminderScheduleKind.custom,
+              customAttentionAt: dueAt,
+            ),
+          );
+
+      final overdue = await createAt(1, '2026-07-22T19:30:00Z');
+      final today2359 = await createAt(2, '2026-07-22T20:59:00Z');
+      final tomorrow0000 = await createAt(3, '2026-07-22T21:00:00Z');
+      final utcDateDiffers = await createAt(4, '2026-07-22T21:30:00Z');
+      var waiting = await createAt(5, '2026-07-22T22:00:00Z');
+      final tomorrow2359 = await createAt(6, '2026-07-23T20:59:00Z');
+      final dayAfter0000 = await createAt(7, '2026-07-23T21:00:00Z');
+      var completed = await createAt(8, '2026-07-23T08:00:00Z');
+      var cancelled = await createAt(9, '2026-07-23T09:00:00Z');
+      final inbox = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminderId(10),
+          eventId: eventId(110),
+          projectId: project1,
+          title: 'Due değeri olmayan kayıt',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.inbox,
+        ),
+      );
+      waiting = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: waiting.id,
+          eventId: eventId(111),
+          expectedRevision: waiting.revision,
+          action: ReminderMutationAction.startWaiting,
+          customAttentionAt: waiting.nextAttentionAt,
+        ),
+      );
+      completed = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: completed.id,
+          eventId: eventId(112),
+          expectedRevision: completed.revision,
+          action: ReminderMutationAction.complete,
+        ),
+      );
+      cancelled = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: cancelled.id,
+          eventId: eventId(113),
+          expectedRevision: cancelled.revision,
+          action: ReminderMutationAction.cancel,
+        ),
+      );
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      await raw.update(
+        'follow_up_items',
+        {'next_attention_at': '2026-07-23T08:00:00Z'},
+        where: 'id = ?',
+        whereArgs: [completed.id],
+      );
+      await raw.update(
+        'follow_up_items',
+        {'next_attention_at': '2026-07-23T09:00:00Z'},
+        where: 'id = ?',
+        whereArgs: [cancelled.id],
+      );
+      await raw.close();
+
+      now = DateTime.utc(2026, 7, 22, 20, 30);
+      final tomorrow = await agenda.listReminders(ReminderViewGroup.tomorrow);
+
+      expect(tomorrow.map((item) => item.id), [
+        tomorrow0000.id,
+        utcDateDiffers.id,
+        waiting.id,
+        tomorrow2359.id,
+      ]);
+      expect(tomorrow.map((item) => item.status), [
+        ReminderStatus.active,
+        ReminderStatus.active,
+        ReminderStatus.waiting,
+        ReminderStatus.active,
+      ]);
+      final excluded = {
+        overdue.id,
+        today2359.id,
+        dayAfter0000.id,
+        completed.id,
+        cancelled.id,
+        inbox.id,
+      };
+      expect(tomorrow.every((item) => !excluded.contains(item.id)), isTrue);
+      expect(
+        (await agenda.getReminderDetail(tomorrow0000.id)).revision,
+        tomorrow0000.revision,
+      );
+      expect(await agenda.listReminderEvents(tomorrow0000.id), hasLength(1));
+    },
+  );
+
   test('source project mismatch fails before reminder insert', () async {
     await agenda.createProject(
       const CreateProjectCommand(id: project2, name: 'Başka Proje'),

@@ -1609,3 +1609,7 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Read-Model Deduplication (Okuma Modeli Tekilleştirmesi)`: Kalıcı kaynak kayıtlarını silmeden veya birleştirmeden, belirli bir ekran/rapor projeksiyonunda aynı iş zincirinin yalnız bir temsilcisini gösterme yöntemidir. Issue #212 Yaklaşanlar ekranında proje başına en erken ileri Puantajı gösterirken 14 günlük fiziksel zinciri korur.
 
 `Business-State Precedence (İş Durumu Önceliği)`: Teknik altyapı belirtisini kullanıcıya göstermeden önce kaydın zaman ve yaşam döngüsü anlamını sınıflandırma kuralıdır. Issue #212 teslim edilmemiş geçmiş due kaydını native plan eksikliği yerine önce `Gecikti` olarak sunar.
+
+`Half-Open Time Interval (Yarı Açık Zaman Aralığı)`: Başlangıcı dahil, bitişi hariç `[start, end)` zaman aralığıdır. Issue #214 yerel yarın 00:00 kaydını dahil ederken sonraki gün 00:00 kaydını dışlayarak günler arasında çakışma üretmez.
+
+`Local Calendar Projection (Yerel Takvim Projection'ı)`: Kanonik UTC saklanan kayıtları UTC tarih parçasıyla değil, kullanıcının belirlenmiş timezone'ındaki takvim günü sınırlarıyla seçen read-model'dir. Issue #214 için timezone `Europe/Istanbul`dur.

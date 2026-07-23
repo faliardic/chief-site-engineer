@@ -811,6 +811,105 @@ void main() {
     },
   );
 
+  test(
+    'tomorrow keeps earliest attendance per project and independent reminders',
+    () async {
+      await agenda.createProject(
+        const CreateProjectCommand(id: project2, name: 'Şantiye B'),
+      );
+      await attendance.saveReminderSetting(
+        const SaveAttendanceReminderSettingCommand(
+          projectId: project1,
+          expectedRevision: 0,
+          isEnabled: true,
+          localTime: '17:00',
+          selectedWeekdays: {1, 2, 3, 4, 5, 6, 7},
+        ),
+      );
+      await attendance.saveReminderSetting(
+        const SaveAttendanceReminderSettingCommand(
+          projectId: project2,
+          expectedRevision: 0,
+          isEnabled: true,
+          localTime: '18:00',
+          selectedWeekdays: {1, 2, 3, 4, 5, 6, 7},
+        ),
+      );
+      final independent = await agenda.createReminder(
+        const CreateReminderCommand(
+          id: '99999999-9999-4999-8999-999999999998',
+          eventId: '88888888-8888-4888-8888-888888888887',
+          projectId: project1,
+          title: 'Bağımsız yarın kontrolü',
+          kind: ReminderKind.recheck,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-20T10:00:00Z',
+        ),
+      );
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      final extraProject1 = await raw.rawQuery(
+        '''
+        SELECT f.id, f.attendance_day_id
+        FROM follow_up_items f
+        WHERE f.project_id = ?
+          AND f.attendance_day_id IS NOT NULL
+          AND f.next_attention_at > '2026-07-20T14:00:00Z'
+        ORDER BY f.next_attention_at ASC, f.id ASC
+        LIMIT 1
+        ''',
+        [project1],
+      );
+      final extraReminderId = extraProject1.single['id']! as String;
+      final extraDayId = extraProject1.single['attendance_day_id']! as String;
+      await raw.update(
+        'follow_up_items',
+        {'next_attention_at': '2026-07-20T15:30:00Z'},
+        where: 'id = ?',
+        whereArgs: [extraReminderId],
+      );
+      await raw.update(
+        'attendance_day_reminder_links',
+        {'due_at': '2026-07-20T15:30:00Z'},
+        where: 'attendance_day_id = ?',
+        whereArgs: [extraDayId],
+      );
+      final physicalTomorrowAttendance = Sqflite.firstIntValue(
+        await raw.rawQuery('''
+          SELECT COUNT(*)
+          FROM follow_up_items
+          WHERE attendance_day_id IS NOT NULL
+            AND next_attention_at >= '2026-07-19T21:00:00Z'
+            AND next_attention_at < '2026-07-20T21:00:00Z'
+          '''),
+      );
+      await raw.close();
+
+      final tomorrow = await agenda.listReminders(ReminderViewGroup.tomorrow);
+      final attendanceItems = tomorrow
+          .where((item) => item.attendanceDayId != null)
+          .toList(growable: false);
+
+      expect(physicalTomorrowAttendance, 3);
+      expect(tomorrow, hasLength(3));
+      expect(attendanceItems, hasLength(2));
+      expect(attendanceItems.map((item) => item.projectId).toSet(), {
+        project1,
+        project2,
+      });
+      expect(
+        attendanceItems
+            .singleWhere((item) => item.projectId == project1)
+            .nextAttentionAt,
+        '2026-07-20T14:00:00Z',
+      );
+      expect(tomorrow.map((item) => item.id), contains(independent.id));
+      expect(await _count(directories.databaseFile, 'follow_up_items'), 29);
+    },
+  );
+
   test('transaction hook failure leaves no partial day or event', () async {
     final failing = SqliteAttendanceApplication(
       databasePath: directories.databaseFile,

@@ -1,5 +1,21 @@
 # Changelog
 
+## Issue #214 - Yarın Hatırlatıcı Görünümü
+
+- Hatırlatıcı üst filtrelerine ayrı `Yarın` görünümü eklendi; yalnız
+  Europe/Istanbul yerel yarın gününün `[00:00, sonraki 00:00)` aralığındaki
+  aktif/bekleyen due kayıtlar gösterilir.
+- UTC tarihi yerel tarihten farklı olan kayıtlar doğru güne alınır; bugün,
+  geçmiş, yarından sonrası, terminal ve due-null kayıtlar dışlanır.
+- Yarın Puantajları fiziksel zincir korunarak proje başına en erken occurrence
+  biçiminde tekilleştirilir; farklı projeler ve bağımsız reminder'lar korunur.
+- Yarın filtresindeki kartta hızlı `Yarın` mutation'ı gizlendi; detail ile Şimdi,
+  Gecikenler ve Yaklaşanlar eylemleri değişmedi.
+- Filtreler 48 px minimum hedefle `Wrap` düzeninde; 320 px dark ve 430 px light,
+  büyük metin ve detail navigation regresyonları eklendi.
+- Schema `7`, backup format `1`, notification motoru, offline source-of-truth ve
+  yalnız `adb install -r` saha upgrade sınırı değişmedi.
+
 ## Issue #212 - Reminder Pilot Kullanım Sözleşmesi
 
 - `Yaklaşanlar`, 14 günlük fiziksel Puantaj/reminder zincirini korurken aynı
