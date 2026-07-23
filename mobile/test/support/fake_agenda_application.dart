@@ -27,6 +27,7 @@ class FakeAgendaApplication implements AgendaApplication {
   CreateAgendaLogCommand? lastLogCommand;
   CreateReminderCommand? lastReminderCommand;
   Object? createReminderFailure;
+  Object? mutateReminderFailure;
   Completer<MobileReminder>? createReminderCompleter;
   Completer<MobileReminder>? mutateReminderCompleter;
   int createLogCalls = 0;
@@ -247,6 +248,7 @@ class FakeAgendaApplication implements AgendaApplication {
   Future<MobileReminder> mutateReminder(MutateReminderCommand command) async {
     mutateReminderCalls += 1;
     lastMutationCommand = command;
+    if (mutateReminderFailure case final failure?) throw failure;
     if (mutateReminderCompleter case final completer?) {
       return completer.future;
     }

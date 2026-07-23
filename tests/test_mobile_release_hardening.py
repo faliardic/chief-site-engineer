@@ -26,9 +26,10 @@ def test_release_gate_keeps_debug_sidecar_and_production_rc_distinct() -> None:
         encoding="utf-8"
     )
 
-    assert "chief-site-engineer-0.1.0-issue207-field-sidecar-debug.apk" in gate
+    assert "chief-site-engineer-0.1.0-issue212-reminder-pilot-ux-debug.apk" in gate
     assert "'--target', 'lib\\main.dart'" in gate
     assert "CSE_ENTRYPOINT_NORMAL_LIB_MAIN_DART_V1" in gate
+    assert "Clear-GeneratedReadOnlyAttributes" in gate
     assert "Flutter clean left a stale app-debug.apk" in gate
     assert "SCHEDULE_EXACT_ALARM allow" in gate
     assert "com.faliardic.chiefsiteengineer.debug" in gate
@@ -50,7 +51,8 @@ def test_synthetic_acceptance_artifacts_are_isolated_from_field_sidecar() -> Non
     assert "issue207-background-acceptance-debug.apk" in script
     assert "issue207-reboot-acceptance-debug.apk" in script
     assert "android-arm64,android-x64" in script
-    assert "issue207-field-sidecar-debug.apk" in script
+    assert "Clear-GeneratedReadOnlyAttributes" in script
+    assert "issue212-reminder-pilot-ux-debug.apk" in script
     assert "changed the normal field sidecar artifact" in script
 
 

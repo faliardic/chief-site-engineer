@@ -203,6 +203,41 @@ void main() {
   );
 
   test(
+    'tomorrow is a no-op when the reminder already has that local time',
+    () async {
+      final scheduled = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(914),
+          title: 'Zaten yarın aynı saat',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-20T12:45:00Z',
+        ),
+      );
+      final eventCount = (await agenda.listReminderEvents(scheduled.id)).length;
+      final nativeScheduleCount = notifications.scheduled.length;
+
+      final unchanged = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: scheduled.id,
+          eventId: eventId(915),
+          expectedRevision: scheduled.revision,
+          action: ReminderMutationAction.snoozeTomorrowMorning,
+        ),
+      );
+
+      expect(unchanged.revision, scheduled.revision);
+      expect(unchanged.nextAttentionAt, scheduled.nextAttentionAt);
+      expect(
+        await agenda.listReminderEvents(scheduled.id),
+        hasLength(eventCount),
+      );
+      expect(notifications.scheduled, hasLength(nativeScheduleCount));
+    },
+  );
+
+  test(
     'full lifecycle uses optimistic revision append-only events and no-op',
     () async {
       var reminder = await agenda.createReminder(
@@ -378,8 +413,7 @@ void main() {
           reminderId: created.id,
           eventId: eventId(2),
           expectedRevision: 1,
-          action: ReminderMutationAction.schedule,
-          schedule: ReminderScheduleKind.in1Hour,
+          action: ReminderMutationAction.snoozeTomorrowMorning,
         ),
       ),
       throwsA(anything),
@@ -538,6 +572,41 @@ void main() {
       expect(detail.notification.syncState, NotificationSyncState.failed);
       expect(detail.notification.safeErrorCode, 'native_schedule_failed');
       expect(notifications.pending, isEmpty);
+      final diagnostic = await agenda.getReminderDeliveryDiagnostic(
+        reminder.id,
+      );
+      expect(
+        diagnostic.delayClass,
+        ReminderDeliveryDelayClass.nativeScheduleMissing,
+      );
+    },
+  );
+
+  test(
+    'past active due is overdue without a native-plan failure class',
+    () async {
+      final reminder = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(35),
+          title: 'Geçmiş aktif reminder',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.in15Minutes,
+        ),
+      );
+      notifications.pending.clear();
+      now = now.add(const Duration(hours: 1));
+
+      final diagnostic = await agenda.getReminderDeliveryDiagnostic(
+        reminder.id,
+      );
+
+      expect(diagnostic.nativeSchedulePresent, isFalse);
+      expect(diagnostic.delayClass, ReminderDeliveryDelayClass.overdue);
+      expect(
+        diagnostic.delayClass,
+        isNot(ReminderDeliveryDelayClass.nativeScheduleMissing),
+      );
     },
   );
 

@@ -62,14 +62,31 @@ function Resolve-JdkTool {
     throw "$Name was not found in PATH, JAVA_HOME, or Android Studio JBR."
 }
 
+function Clear-GeneratedReadOnlyAttributes {
+    $attrib = Join-Path $env:SystemRoot 'System32\attrib.exe'
+    foreach ($generatedRoot in @(
+        (Join-Path $mobileRoot 'build'),
+        (Join-Path $mobileRoot '.dart_tool'),
+        (Join-Path $mobileRoot 'ios\Flutter\ephemeral')
+    )) {
+        if (-not (Test-Path -LiteralPath $generatedRoot)) { continue }
+        Invoke-Checked -Command $attrib -Arguments @('-R', $generatedRoot)
+        Invoke-Checked -Command $attrib -Arguments @(
+            '-R', (Join-Path $generatedRoot '*'), '/S', '/D'
+        )
+    }
+}
+
 try {
     $env:CSE_ACCEPTANCE_HARNESS = $null
     New-Item -ItemType Directory -Force -Path $artifactRoot | Out-Null
+    Clear-GeneratedReadOnlyAttributes
     Invoke-Flutter -Arguments @('pub', 'get')
     Invoke-Flutter -Arguments @('analyze')
     Invoke-Flutter -Arguments @('test', '--no-pub')
 
     $debugApk = Join-Path $mobileRoot 'build\app\outputs\flutter-apk\app-debug.apk'
+    Clear-GeneratedReadOnlyAttributes
     Invoke-Flutter -Arguments @('clean')
     Invoke-Flutter -Arguments @('pub', 'get')
     if (Test-Path -LiteralPath $debugApk) {
@@ -108,6 +125,7 @@ try {
             Push-Location (Join-Path $mobileRoot 'android')
             try { & $gradle --stop | Out-Null } finally { Pop-Location }
         }
+        Clear-GeneratedReadOnlyAttributes
         Invoke-Flutter -Arguments @('clean')
         Invoke-Flutter -Arguments @('pub', 'get')
     }
@@ -118,7 +136,7 @@ try {
         -not (Test-Path -LiteralPath $apksigner)) {
         throw 'Android build-tools 36.0.0 artifact validators were not found.'
     }
-    $sidecarApk = Join-Path $artifactRoot 'chief-site-engineer-0.1.0-issue207-field-sidecar-debug.apk'
+    $sidecarApk = Join-Path $artifactRoot 'chief-site-engineer-0.1.0-issue212-reminder-pilot-ux-debug.apk'
     Copy-Item -LiteralPath $temporarySidecarApk -Destination $sidecarApk -Force
     Invoke-Checked -Command 'python' -Arguments @(
         (Join-Path $repositoryRoot 'scripts\verify_flutter_apk_entrypoint.py'),

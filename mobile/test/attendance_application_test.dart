@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/attendance_application.dart';
 import 'package:chief_site_engineer/core/environment.dart';
+import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attendance_models.dart';
 import 'package:chief_site_engineer/platform/attendance_export_gateway.dart';
@@ -14,6 +15,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const project1 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+const project2 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
 const member1 = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
 const member2 = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
 const member3 = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3';
@@ -674,6 +676,12 @@ void main() {
         14,
       );
       expect(await _count(directories.databaseFile, 'follow_up_items'), 14);
+      final firstUpcoming = await agenda.listReminders(
+        ReminderViewGroup.upcoming,
+      );
+      expect(firstUpcoming, hasLength(1));
+      expect(firstUpcoming.single.projectId, project1);
+      expect(firstUpcoming.single.attendanceDayId, isNotNull);
 
       final raw = await databaseFactoryFfi.openDatabase(
         directories.databaseFile,
@@ -721,6 +729,85 @@ void main() {
         detail.linkedReminder!.id,
       );
       expect(reminderDetail.attendanceDayId, detail.day.id);
+
+      final firstFuture = firstUpcoming.single;
+      var firstFutureDay = await attendance.getDayDetail(
+        firstFuture.attendanceDayId!,
+      );
+      firstFutureDay = await attendance.transitionDay(
+        TransitionAttendanceDayCommand(
+          dayId: firstFutureDay.day.id,
+          dayEventId: 'ffffffff-ffff-4fff-8fff-fffffffffff3',
+          reminderEventId: 'ffffffff-ffff-4fff-8fff-fffffffffff4',
+          expectedRevision: firstFutureDay.day.revision,
+          transition: AttendanceTransition.complete,
+        ),
+      );
+      expect(firstFutureDay.linkedReminder!.status, ReminderStatus.completed);
+      final nextUpcoming = await agenda.listReminders(
+        ReminderViewGroup.upcoming,
+      );
+      expect(nextUpcoming, hasLength(1));
+      expect(nextUpcoming.single.id, isNot(firstFuture.id));
+      expect(
+        CseTimeCodec.decodeCanonicalUtc(
+          nextUpcoming.single.nextAttentionAt!,
+        ).isAfter(
+          CseTimeCodec.decodeCanonicalUtc(firstFuture.nextAttentionAt!),
+        ),
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'upcoming keeps one attendance per project and all independent reminders',
+    () async {
+      await agenda.createProject(
+        const CreateProjectCommand(id: project2, name: 'Şantiye B'),
+      );
+      await attendance.saveReminderSetting(
+        const SaveAttendanceReminderSettingCommand(
+          projectId: project1,
+          expectedRevision: 0,
+          isEnabled: true,
+          localTime: '17:00',
+          selectedWeekdays: {1, 2, 3, 4, 5, 6, 7},
+        ),
+      );
+      await attendance.saveReminderSetting(
+        const SaveAttendanceReminderSettingCommand(
+          projectId: project2,
+          expectedRevision: 0,
+          isEnabled: true,
+          localTime: '18:00',
+          selectedWeekdays: {1, 2, 3, 4, 5, 6, 7},
+        ),
+      );
+      final independent = await agenda.createReminder(
+        const CreateReminderCommand(
+          id: '99999999-9999-4999-8999-999999999999',
+          eventId: '88888888-8888-4888-8888-888888888888',
+          projectId: project1,
+          title: 'Bağımsız yaklaşan kontrol',
+          kind: ReminderKind.recheck,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-20T10:00:00Z',
+        ),
+      );
+
+      final upcoming = await agenda.listReminders(ReminderViewGroup.upcoming);
+      final attendanceItems = upcoming
+          .where((item) => item.attendanceDayId != null)
+          .toList(growable: false);
+      expect(upcoming, hasLength(3));
+      expect(attendanceItems, hasLength(2));
+      expect(attendanceItems.map((item) => item.projectId).toSet(), {
+        project1,
+        project2,
+      });
+      expect(upcoming.map((item) => item.id), contains(independent.id));
+      expect(await _count(directories.databaseFile, 'follow_up_items'), 29);
     },
   );
 

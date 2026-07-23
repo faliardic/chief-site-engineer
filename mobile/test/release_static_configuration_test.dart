@@ -52,7 +52,7 @@ void main() {
     expect(rebootSource, contains('CSE_ENTRYPOINT_REBOOT_ACCEPTANCE_V1'));
     expect(gate, contains("'--target', 'lib\\main.dart'"));
     expect(gate, contains('verify_flutter_apk_entrypoint.py'));
-    expect(gate, contains('issue207-field-sidecar-debug.apk'));
+    expect(gate, contains('issue212-reminder-pilot-ux-debug.apk'));
     expect(
       acceptanceBuild,
       contains('issue207-background-acceptance-debug.apk'),

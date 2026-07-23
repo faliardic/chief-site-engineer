@@ -1605,3 +1605,7 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Reverse Transition (Ters Geçiş Animasyonu)`: Dialog route kapatıldıktan sonra widget'ların ekrandan animasyonla ayrıldığı süredir. `showDialog` future'ı tamamlanmış olsa bile dialog widget ağacı bu süre boyunca render edilebilir.
 
 `Commit Outcome Uncertainty (Commit Sonucu Belirsizliği)`: Framework veya process hatası mutation ile aynı zaman aralığında oluştuğunda DB işleminin hiç çalışmadığı mı, tamamlandığı mı kesin kanıtlanamayan durumdur. Güvenli UI kayıt kontrolü ister ve kör retry önermez.
+
+`Read-Model Deduplication (Okuma Modeli Tekilleştirmesi)`: Kalıcı kaynak kayıtlarını silmeden veya birleştirmeden, belirli bir ekran/rapor projeksiyonunda aynı iş zincirinin yalnız bir temsilcisini gösterme yöntemidir. Issue #212 Yaklaşanlar ekranında proje başına en erken ileri Puantajı gösterirken 14 günlük fiziksel zinciri korur.
+
+`Business-State Precedence (İş Durumu Önceliği)`: Teknik altyapı belirtisini kullanıcıya göstermeden önce kaydın zaman ve yaşam döngüsü anlamını sınıflandırma kuralıdır. Issue #212 teslim edilmemiş geçmiş due kaydını native plan eksikliği yerine önce `Gecikti` olarak sunar.

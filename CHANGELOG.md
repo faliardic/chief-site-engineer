@@ -1,5 +1,24 @@
 # Changelog
 
+## Issue #212 - Reminder Pilot Kullanım Sözleşmesi
+
+- `Yaklaşanlar`, 14 günlük fiziksel Puantaj/reminder zincirini korurken aynı
+  proje için yalnız en erken ileri Puantajı gösteren read-model tekilleştirmesi
+  kullanır; farklı projeler ve bağımsız reminder'lar korunur.
+- Doğrudan `Yarın` eylemi reminder detayı, Şimdi ilgilen, Gecikenler, uygun
+  Yaklaşanlar kartı ve notification deep-link detayında görünür. Var olan due'nun
+  İstanbul saati korunur; due yoksa yarın 09:00 kullanılır.
+- Geçmiş due aktif reminder `Gecikti` olarak gösterilir ve kritik native-plan
+  eksikliği kartı çıkarılmaz. Future native-plan eksikliği kritik kalır;
+  terminal kayıtta diagnostic kartı yoktur.
+- Çift dokunuş, stale/no-op, transaction rollback, native reconciliation,
+  restart/boot/backup sınırları ve responsive koyu tema regresyonları eklendi.
+- Windows saha build kapıları, yalnız yeniden üretilebilir Flutter çıktı
+  ağaçlarındaki read-only özniteliğini clean öncesinde düzelterek eski artifact
+  kullanımını fail-closed biçimde önler.
+- Mobil schema `7`, backup format `1`, `.debug` application ID, offline
+  source-of-truth ve yalnız `adb install -r` saha upgrade sınırı değişmedi.
+
 ## Issue #207 - Saha Sidecar Entrypoint Güvenliği
 
 - Saha sidecar üretimi clean build sonrasında açık `--target lib/main.dart`
