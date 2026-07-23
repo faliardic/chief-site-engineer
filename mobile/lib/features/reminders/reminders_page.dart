@@ -75,6 +75,7 @@ class _RemindersPageState extends State<RemindersPage> {
     ReminderViewGroup.now => 'Şimdi ilgilen',
     ReminderViewGroup.overdue => 'Gecikenler',
     ReminderViewGroup.today => 'Bugün',
+    ReminderViewGroup.tomorrow => 'Yarın',
     ReminderViewGroup.waiting => 'Bekliyorum',
     ReminderViewGroup.recheck => 'Tekrar kontrol',
     ReminderViewGroup.upcoming => 'Yaklaşanlar',
@@ -120,14 +121,17 @@ class _RemindersPageState extends State<RemindersPage> {
             runSpacing: 8,
             children: ReminderViewGroup.values
                 .map(
-                  (group) => ChoiceChip(
-                    key: Key('reminder-group-${group.name}'),
-                    label: Text(_label(group)),
-                    selected: _group == group,
-                    onSelected: (_) {
-                      setState(() => _group = group);
-                      _reload();
-                    },
+                  (group) => ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 48),
+                    child: ChoiceChip(
+                      key: Key('reminder-group-${group.name}'),
+                      label: Text(_label(group)),
+                      selected: _group == group,
+                      onSelected: (_) {
+                        setState(() => _group = group);
+                        _reload();
+                      },
+                    ),
                   ),
                 )
                 .toList(),
@@ -155,7 +159,12 @@ class _RemindersPageState extends State<RemindersPage> {
                   children: [
                     const Icon(Icons.notifications_none_rounded, size: 44),
                     const SizedBox(height: 8),
-                    Text('${_label(_group)} boş.', textAlign: TextAlign.center),
+                    Text(
+                      _group == ReminderViewGroup.tomorrow
+                          ? 'Yarın için planlanmış hatırlatıcı yok.'
+                          : '${_label(_group)} boş.',
+                      textAlign: TextAlign.center,
+                    ),
                   ],
                 ),
               ),

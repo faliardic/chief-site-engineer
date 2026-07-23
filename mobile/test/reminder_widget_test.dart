@@ -180,7 +180,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(Key('reminder-tomorrow-${item.id}')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('reminder-group-tomorrow')));
+    await tester.pumpAndSettle();
+    expect(agenda.lastReminderGroup, ReminderViewGroup.tomorrow);
+    expect(find.byKey(Key('reminder-tomorrow-${item.id}')), findsNothing);
     for (final group in [
+      ReminderViewGroup.now,
       ReminderViewGroup.overdue,
       ReminderViewGroup.upcoming,
     ]) {
@@ -191,6 +196,75 @@ void main() {
       expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
     }
   });
+
+  testWidgets('Yarın filter has dedicated empty state without diagnostics', (
+    tester,
+  ) async {
+    final agenda = FakeAgendaApplication();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: RemindersPage(agenda: agenda)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('reminder-group-tomorrow')));
+    await tester.pumpAndSettle();
+
+    expect(agenda.lastReminderGroup, ReminderViewGroup.tomorrow);
+    expect(find.text('Yarın için planlanmış hatırlatıcı yok.'), findsOneWidget);
+    expect(find.byKey(const Key('reminder-delivery-diagnostic')), findsNothing);
+  });
+
+  for (final configuration in [
+    (width: 320.0, brightness: Brightness.dark),
+    (width: 430.0, brightness: Brightness.light),
+  ]) {
+    testWidgets('Yarın filter fits ${configuration.width.toInt()} px '
+        '${configuration.brightness.name} and opens detail', (tester) async {
+      tester.view.physicalSize = Size(configuration.width, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final item = reminder();
+      final agenda = FakeAgendaApplication(
+        reminders: [item],
+        reminderDetail: item,
+      );
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+          child: MaterialApp(
+            theme: ThemeData(brightness: configuration.brightness),
+            home: Scaffold(body: RemindersPage(agenda: agenda)),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final tomorrowGroup = find.byKey(const Key('reminder-group-tomorrow'));
+      expect(tomorrowGroup, findsOneWidget);
+      expect(tester.getSize(tomorrowGroup).height, greaterThanOrEqualTo(48));
+      await tester.tap(tomorrowGroup);
+      await tester.pumpAndSettle();
+      expect(agenda.lastReminderGroup, ReminderViewGroup.tomorrow);
+      expect(find.byKey(Key('reminder-tomorrow-${item.id}')), findsNothing);
+
+      final reminderCard = find.byKey(Key('reminder-${item.id}'));
+      await tester.ensureVisible(reminderCard);
+      await tester.tap(reminderCard);
+      await tester.pumpAndSettle();
+      expect(find.byType(ReminderDetailPage), findsOneWidget);
+      final detailTomorrow = find.byKey(const Key('snooze-tomorrow'));
+      await tester.scrollUntilVisible(
+        detailTomorrow,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(detailTomorrow, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets(
     'notification launch payload opens the matching reminder detail',
