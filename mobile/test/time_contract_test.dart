@@ -92,4 +92,23 @@ void main() {
     expect(CseTimeCodec.shiftIstanbulDay('2026-07-19', -1), '2026-07-18');
     expect(CseTimeCodec.shiftIstanbulDay('2026-07-19', 1), '2026-07-20');
   });
+
+  test('all-day codec validates and formats calendar boundaries', () {
+    expect(CseTimeCodec.validateIstanbulDay('2026-12-31'), '2026-12-31');
+    expect(CseTimeCodec.formatIstanbulDay('2027-01-01'), '01.01.2027');
+    expect(CseTimeCodec.shiftIstanbulDay('2026-12-31', 1), '2027-01-01');
+    expect(CseTimeCodec.shiftIstanbulDay('2028-02-28', 1), '2028-02-29');
+    for (final value in [
+      '2026-2-03',
+      '2026-02-30',
+      '2026-13-01',
+      ' 2026-07-19',
+    ]) {
+      expect(
+        () => CseTimeCodec.validateIstanbulDay(value),
+        throwsA(isA<TimeContractViolation>()),
+        reason: value,
+      );
+    }
+  });
 }

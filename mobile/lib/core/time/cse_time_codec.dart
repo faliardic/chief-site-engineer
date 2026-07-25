@@ -203,6 +203,17 @@ class CseTimeCodec {
     return '${_four(local.year)}-${_two(local.month)}-${_two(local.day)}';
   }
 
+  static String validateIstanbulDay(String value) {
+    _parseDay(value);
+    return value;
+  }
+
+  static String formatIstanbulDay(String dayKey) {
+    final components = _parseDay(dayKey);
+    return '${_two(components.$3)}.${_two(components.$2)}.'
+        '${_four(components.$1)}';
+  }
+
   static String istanbulTimeLabel(String canonicalUtc) {
     final local = toIstanbul(canonicalUtc);
     return '${_two(local.hour)}:${_two(local.minute)}';

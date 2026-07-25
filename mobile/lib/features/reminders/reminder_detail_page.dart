@@ -54,7 +54,8 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
       );
       ReminderDeliveryDiagnostic? diagnostic;
       final application = widget.agenda;
-      if (application is ReminderDeliveryApplication) {
+      if (detail.reminder.nextAttentionAt != null &&
+          application is ReminderDeliveryApplication) {
         try {
           diagnostic = await (application as ReminderDeliveryApplication)
               .getReminderDeliveryDiagnostic(widget.reminderId);
@@ -524,6 +525,14 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
             label: 'Sonraki dikkat zamanı',
             value: CseTimeCodec.formatIstanbul(reminder.nextAttentionAt!),
           ),
+        if (reminder.allDayLocalDate != null)
+          _ReminderRow(
+            key: const Key('reminder-all-day-value'),
+            label: 'Takvim günü',
+            value:
+                '${CseTimeCodec.formatIstanbulDay(reminder.allDayLocalDate!)}'
+                ' • Tam gün',
+          ),
         if (_deliveryDiagnostic?.delayClass ==
             ReminderDeliveryDelayClass.overdue)
           const _ReminderRow(
@@ -538,11 +547,13 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
           ),
         _ReminderRow(
           label: 'Bildirim',
-          value: [
-            detail.notification.syncState.label,
-            if (detail.notification.safeErrorCode != null)
-              detail.notification.safeErrorCode!,
-          ].join(' • '),
+          value: reminder.allDayLocalDate != null
+              ? 'Tam gün kayıt için saatli native bildirim kurulmaz'
+              : [
+                  detail.notification.syncState.label,
+                  if (detail.notification.safeErrorCode != null)
+                    detail.notification.safeErrorCode!,
+                ].join(' • '),
         ),
         _ReminderRow(label: 'Revision', value: '${reminder.revision}'),
         if (reminder.sourceLogId != null) ...[
@@ -667,14 +678,6 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
             ),
             if (!terminal) ...[
               _ActionButton(
-                key: const Key('start-waiting'),
-                label: 'Bekliyorum',
-                icon: Icons.hourglass_top,
-                onPressed: _mutating
-                    ? null
-                    : () => _mutate(ReminderMutationAction.startWaiting),
-              ),
-              _ActionButton(
                 key: const Key('move-inbox'),
                 label: 'Unutma Kutusu',
                 icon: Icons.inbox_outlined,
@@ -695,6 +698,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
         ),
         if (_deliveryDiagnostic case final diagnostic?
             when !terminal &&
+                reminder.allDayLocalDate == null &&
                 diagnostic.delayClass !=
                     ReminderDeliveryDelayClass.overdue) ...[
           const SizedBox(height: 16),

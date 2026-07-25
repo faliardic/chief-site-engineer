@@ -31,6 +31,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   ReminderScheduleKind _schedule = ReminderScheduleKind.in15Minutes;
   late DateTime _customDate;
   TimeOfDay _customTime = const TimeOfDay(hour: 9, minute: 0);
+  bool _allDay = false;
   bool _isImportant = false;
   bool _hasDeadline = false;
   late DateTime _deadlineDate;
@@ -84,7 +85,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
       _error = null;
     });
     try {
-      final custom = _schedule == ReminderScheduleKind.custom
+      final custom = _schedule == ReminderScheduleKind.custom && !_allDay
           ? CseTimeCodec.canonicalFromIstanbulComponents(
               year: _customDate.year,
               month: _customDate.month,
@@ -111,9 +112,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
           captureText: _title.text,
           title: _title.text,
           description: _description.text,
-          kind: _schedule == ReminderScheduleKind.waiting
-              ? ReminderKind.waiting
-              : _kind,
+          kind: _kind,
           schedule: _schedule,
           location: _location.text,
           relatedPerson: _relatedPerson.text,
@@ -121,6 +120,11 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
           deadlineAt: deadline,
           conditionText: _condition.text,
           customAttentionAt: custom,
+          allDayLocalDate: _allDay
+              ? '${_customDate.year.toString().padLeft(4, '0')}-'
+                    '${_customDate.month.toString().padLeft(2, '0')}-'
+                    '${_customDate.day.toString().padLeft(2, '0')}'
+              : null,
         ),
       );
       var deliveryVerified = reminder.nextAttentionAt == null;
@@ -174,6 +178,17 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  void _selectAllDay(int dayDelta) {
+    final local = CseTimeCodec.toIstanbul(
+      CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
+    );
+    setState(() {
+      _customDate = DateTime(local.year, local.month, local.day + dayDelta);
+      _schedule = ReminderScheduleKind.custom;
+      _allDay = true;
+    });
   }
 
   @override
@@ -280,12 +295,48 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
                   .toList(),
               onChanged: (value) => setState(() {
                 _schedule = value!;
-                if (_schedule == ReminderScheduleKind.waiting) {
-                  _kind = ReminderKind.waiting;
+                _allDay = false;
+              }),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  key: const Key('reminder-today'),
+                  onPressed: () => _selectAllDay(0),
+                  icon: const Icon(Icons.today_outlined),
+                  label: const Text('Bugün'),
+                ),
+                OutlinedButton.icon(
+                  key: const Key('reminder-all-day-tomorrow'),
+                  onPressed: () => _selectAllDay(1),
+                  icon: const Icon(Icons.event_outlined),
+                  label: const Text('Yarın • Tam gün'),
+                ),
+              ],
+            ),
+            SwitchListTile(
+              key: const Key('reminder-all-day'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Tam gün'),
+              subtitle: const Text(
+                'Saatli bildirim kurulmaz; seçilen gün Bugün’de görünür.',
+              ),
+              value: _allDay,
+              onChanged: (value) => setState(() {
+                _allDay = value;
+                if (value) {
+                  final local = CseTimeCodec.toIstanbul(
+                    CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
+                  );
+                  _customDate = DateTime(local.year, local.month, local.day);
+                  _schedule = ReminderScheduleKind.custom;
                 }
               }),
             ),
-            if (_schedule == ReminderScheduleKind.custom) ...[
+            if (_schedule == ReminderScheduleKind.custom || _allDay) ...[
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
@@ -308,18 +359,19 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
                       '${_customDate.month.toString().padLeft(2, '0')}.${_customDate.year}',
                     ),
                   ),
-                  OutlinedButton.icon(
-                    key: const Key('reminder-custom-time'),
-                    onPressed: () async {
-                      final value = await showTimePicker(
-                        context: context,
-                        initialTime: _customTime,
-                      );
-                      if (value != null) setState(() => _customTime = value);
-                    },
-                    icon: const Icon(Icons.schedule),
-                    label: Text(_customTime.format(context)),
-                  ),
+                  if (!_allDay)
+                    OutlinedButton.icon(
+                      key: const Key('reminder-custom-time'),
+                      onPressed: () async {
+                        final value = await showTimePicker(
+                          context: context,
+                          initialTime: _customTime,
+                        );
+                        if (value != null) setState(() => _customTime = value);
+                      },
+                      icon: const Icon(Icons.schedule),
+                      label: Text(_customTime.format(context)),
+                    ),
                 ],
               ),
             ],

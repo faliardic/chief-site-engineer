@@ -281,7 +281,7 @@ void main() {
   );
 
   test(
-    'inbox action waiting recheck and multiple reminders preserve source',
+    'inbox timed all-day recheck and multiple reminders preserve source',
     () async {
       now = DateTime.utc(2026, 7, 19, 8);
       final source = await createLog(
@@ -314,9 +314,10 @@ void main() {
           eventId: eventId(13),
           projectId: project1,
           sourceLogId: log1,
-          title: 'Bir saat dönüş bekle',
-          kind: ReminderKind.waiting,
-          schedule: ReminderScheduleKind.in1Hour,
+          title: 'Bugün tam gün kontrol',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          allDayLocalDate: '2026-07-19',
         ),
         CreateReminderCommand(
           id: reminder4,
@@ -356,7 +357,9 @@ void main() {
       expect(created[0].status, ReminderStatus.inbox);
       expect(created[0].nextAttentionAt, isNull);
       expect(created[1].nextAttentionAt, '2026-07-19T08:15:00Z');
-      expect(created[2].status, ReminderStatus.waiting);
+      expect(created[2].status, ReminderStatus.active);
+      expect(created[2].nextAttentionAt, isNull);
+      expect(created[2].allDayLocalDate, '2026-07-19');
       expect(created[3].kind, ReminderKind.recheck);
       expect(created[5].nextAttentionAt, '2026-07-19T15:00:00Z');
       expect(created.every((item) => item.sourceLogId == log1), isTrue);
@@ -404,7 +407,17 @@ void main() {
       final today2359 = await createAt(2, '2026-07-22T20:59:00Z');
       final tomorrow0000 = await createAt(3, '2026-07-22T21:00:00Z');
       final utcDateDiffers = await createAt(4, '2026-07-22T21:30:00Z');
-      var waiting = await createAt(5, '2026-07-22T22:00:00Z');
+      final allDayTomorrow = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminderId(5),
+          eventId: eventId(105),
+          projectId: project1,
+          title: 'Yarın tam gün',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          allDayLocalDate: '2026-07-23',
+        ),
+      );
       final tomorrow2359 = await createAt(6, '2026-07-23T20:59:00Z');
       final dayAfter0000 = await createAt(7, '2026-07-23T21:00:00Z');
       var completed = await createAt(8, '2026-07-23T08:00:00Z');
@@ -417,15 +430,6 @@ void main() {
           title: 'Due değeri olmayan kayıt',
           kind: ReminderKind.action,
           schedule: ReminderScheduleKind.inbox,
-        ),
-      );
-      waiting = await agenda.mutateReminder(
-        MutateReminderCommand(
-          reminderId: waiting.id,
-          eventId: eventId(111),
-          expectedRevision: waiting.revision,
-          action: ReminderMutationAction.startWaiting,
-          customAttentionAt: waiting.nextAttentionAt,
         ),
       );
       completed = await agenda.mutateReminder(
@@ -468,13 +472,13 @@ void main() {
       expect(tomorrow.map((item) => item.id), [
         tomorrow0000.id,
         utcDateDiffers.id,
-        waiting.id,
         tomorrow2359.id,
+        allDayTomorrow.id,
       ]);
       expect(tomorrow.map((item) => item.status), [
         ReminderStatus.active,
         ReminderStatus.active,
-        ReminderStatus.waiting,
+        ReminderStatus.active,
         ReminderStatus.active,
       ]);
       final excluded = {

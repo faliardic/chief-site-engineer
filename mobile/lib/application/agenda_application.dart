@@ -858,6 +858,7 @@ class SqliteAgendaApplication
           'related_person': relatedPerson,
           'is_important': command.isImportant ? 1 : 0,
           'next_attention_at': schedule.nextAttentionAt,
+          'all_day_local_date': schedule.allDayLocalDate,
           'deadline_at': command.deadlineAt,
           'condition_text': conditionText,
           'revision': 1,
@@ -876,6 +877,7 @@ class SqliteAgendaApplication
           'payload_json': jsonEncode({
             'item_type': command.kind.storageValue,
             'next_attention_at': schedule.nextAttentionAt,
+            'all_day_local_date': schedule.allDayLocalDate,
             'source_observation_id': command.sourceLogId,
             'status': schedule.status.storageValue,
           }),
@@ -910,6 +912,7 @@ class SqliteAgendaApplication
           relatedPerson: relatedPerson,
           isImportant: command.isImportant,
           nextAttentionAt: schedule.nextAttentionAt,
+          allDayLocalDate: schedule.allDayLocalDate,
           deadlineAt: command.deadlineAt,
           conditionText: conditionText,
           outcomeType: null,
@@ -939,31 +942,40 @@ class SqliteAgendaApplication
     final nowValue = CseTimeCodec.encodeUtc(now);
     final (where, arguments) = switch (group) {
       ReminderViewGroup.now => (
-        "f.status IN ('active', 'waiting') AND f.next_attention_at <= ?",
+        "f.status = 'active' AND f.next_attention_at <= ?",
         <Object?>[nowValue],
       ),
       ReminderViewGroup.overdue => (
-        "f.status IN ('active', 'waiting') AND f.next_attention_at < ?",
-        <Object?>[bounds.start],
+        "f.status = 'active' AND ("
+            '(f.next_attention_at IS NOT NULL AND f.next_attention_at < ?) '
+            'OR (f.all_day_local_date IS NOT NULL '
+            'AND f.all_day_local_date < ?))',
+        <Object?>[bounds.start, today],
       ),
       ReminderViewGroup.today => (
-        "f.status IN ('active', 'waiting') AND "
-            'f.next_attention_at >= ? AND f.next_attention_at < ?',
-        <Object?>[bounds.start, bounds.endExclusive],
+        "f.status = 'active' AND ("
+            '(f.next_attention_at >= ? AND f.next_attention_at < ?) '
+            'OR f.all_day_local_date = ?)',
+        <Object?>[bounds.start, bounds.endExclusive, today],
       ),
       ReminderViewGroup.tomorrow => (
-        "f.status IN ('active', 'waiting') AND "
-            'f.next_attention_at >= ? AND f.next_attention_at < ?',
-        <Object?>[tomorrowBounds.start, tomorrowBounds.endExclusive],
+        "f.status = 'active' AND ("
+            '(f.next_attention_at >= ? AND f.next_attention_at < ?) '
+            'OR f.all_day_local_date = ?)',
+        <Object?>[
+          tomorrowBounds.start,
+          tomorrowBounds.endExclusive,
+          tomorrow,
+        ],
       ),
-      ReminderViewGroup.waiting => ("f.status = 'waiting'", <Object?>[]),
       ReminderViewGroup.recheck => (
-        "f.status IN ('active', 'waiting') AND f.item_type = 'recheck'",
+        "f.status = 'active' AND f.item_type = 'recheck'",
         <Object?>[],
       ),
       ReminderViewGroup.upcoming => (
-        "f.status IN ('active', 'waiting') AND f.next_attention_at >= ?",
-        <Object?>[bounds.endExclusive],
+        "f.status = 'active' AND ("
+            'f.next_attention_at >= ? OR f.all_day_local_date > ?)',
+        <Object?>[bounds.endExclusive, today],
       ),
       ReminderViewGroup.inbox => ('f.status = ?', <Object?>['inbox']),
       ReminderViewGroup.history => (
@@ -980,6 +992,7 @@ class SqliteAgendaApplication
         ORDER BY
           CASE WHEN f.next_attention_at IS NULL THEN 1 ELSE 0 END,
           f.next_attention_at ASC,
+          f.all_day_local_date ASC,
           f.is_important DESC,
           f.created_at ASC,
           f.id ASC
@@ -1178,6 +1191,7 @@ class SqliteAgendaApplication
           'related_person': current.relatedPerson,
           'is_important': current.isImportant ? 1 : 0,
           'next_attention_at': current.nextAttentionAt,
+          'all_day_local_date': current.allDayLocalDate,
           'deadline_at': current.deadlineAt,
           'condition_text': current.conditionText,
           'outcome_type': current.outcomeType?.storageValue,
@@ -1249,6 +1263,7 @@ class SqliteAgendaApplication
           'occurred_at': updatedAt,
           'payload_json': jsonEncode({
             'next_attention_at': values['next_attention_at'],
+            'all_day_local_date': values['all_day_local_date'],
             'outcome_type': values['outcome_type'],
             'revision': nextRevision,
             'status': values['status'],
@@ -1272,8 +1287,7 @@ class SqliteAgendaApplication
         ReminderMutationAction.schedule ||
         ReminderMutationAction.snooze15Minutes ||
         ReminderMutationAction.snooze1Hour ||
-        ReminderMutationAction.snoozeTomorrowMorning ||
-        ReminderMutationAction.startWaiting => true,
+        ReminderMutationAction.snoozeTomorrowMorning => true,
         _ => false,
       };
       await _reconcileNotificationsAt(now, requestPermission: shouldRequest);
@@ -1393,60 +1407,64 @@ class SqliteAgendaApplication
         final resolved = _resolveScheduleValues(
           scheduleKind,
           command.customAttentionAt,
-          current.kind,
+          command.allDayLocalDate,
           now,
         );
         values['status'] = resolved.status.storageValue;
         values['next_attention_at'] = resolved.nextAttentionAt;
+        values['all_day_local_date'] = resolved.allDayLocalDate;
         values['completed_at'] = null;
         values['cancelled_at'] = null;
         values['outcome_type'] = null;
         values['outcome_note'] = null;
-        return current.nextAttentionAt == null ? 'scheduled' : 'rescheduled';
+        return current.nextAttentionAt == null &&
+                current.allDayLocalDate == null
+            ? 'scheduled'
+            : 'rescheduled';
       case ReminderMutationAction.snooze15Minutes:
         requireOpen();
-        values['status'] = current.kind == ReminderKind.waiting
-            ? ReminderStatus.waiting.storageValue
-            : ReminderStatus.active.storageValue;
+        values['status'] = ReminderStatus.active.storageValue;
         values['next_attention_at'] = CseTimeCodec.encodeUtc(
           now.add(const Duration(minutes: 15)),
         );
+        values['all_day_local_date'] = null;
         return 'snoozed';
       case ReminderMutationAction.snooze1Hour:
         requireOpen();
-        values['status'] = current.kind == ReminderKind.waiting
-            ? ReminderStatus.waiting.storageValue
-            : ReminderStatus.active.storageValue;
+        values['status'] = ReminderStatus.active.storageValue;
         values['next_attention_at'] = CseTimeCodec.encodeUtc(
           now.add(const Duration(hours: 1)),
         );
+        values['all_day_local_date'] = null;
         return 'snoozed';
       case ReminderMutationAction.snoozeTomorrowMorning:
         requireOpen();
-        values['status'] = current.kind == ReminderKind.waiting
-            ? ReminderStatus.waiting.storageValue
-            : ReminderStatus.active.storageValue;
-        values['next_attention_at'] = current.nextAttentionAt == null
-            ? _tomorrowMorning(now)
-            : _tomorrowAtSameLocalTime(current.nextAttentionAt!, now);
+        values['status'] = ReminderStatus.active.storageValue;
+        if (current.allDayLocalDate != null) {
+          final today = CseTimeCodec.istanbulDayKey(
+            CseTimeCodec.encodeUtc(now),
+          );
+          values['next_attention_at'] = null;
+          values['all_day_local_date'] = CseTimeCodec.shiftIstanbulDay(
+            today,
+            1,
+          );
+        } else {
+          values['next_attention_at'] = current.nextAttentionAt == null
+              ? _tomorrowMorning(now)
+              : _tomorrowAtSameLocalTime(current.nextAttentionAt!, now);
+          values['all_day_local_date'] = null;
+        }
         return 'snoozed';
-      case ReminderMutationAction.startWaiting:
-        requireOpen();
-        values['item_type'] = ReminderKind.waiting.storageValue;
-        values['status'] = ReminderStatus.waiting.storageValue;
-        values['next_attention_at'] = command.customAttentionAt == null
-            ? _tomorrowMorning(now)
-            : _validatedFutureAttention(command.customAttentionAt!, now);
-        return 'waiting_started';
       case ReminderMutationAction.moveToInbox:
         requireOpen();
         values['status'] = ReminderStatus.inbox.storageValue;
         values['next_attention_at'] = null;
+        values['all_day_local_date'] = null;
         return 'moved_to_inbox';
       case ReminderMutationAction.complete:
         requireOpen();
         values['status'] = ReminderStatus.completed.storageValue;
-        values['next_attention_at'] = null;
         values['completed_at'] = nowValue;
         values['cancelled_at'] = null;
         values['outcome_type'] =
@@ -1459,7 +1477,6 @@ class SqliteAgendaApplication
       case ReminderMutationAction.cancel:
         requireOpen();
         values['status'] = ReminderStatus.cancelled.storageValue;
-        values['next_attention_at'] = null;
         values['completed_at'] = null;
         values['cancelled_at'] = nowValue;
         values['outcome_type'] =
@@ -1474,8 +1491,10 @@ class SqliteAgendaApplication
             current.status != ReminderStatus.cancelled) {
           return 'reopened';
         }
-        values['status'] = ReminderStatus.inbox.storageValue;
-        values['next_attention_at'] = null;
+        values['status'] =
+            current.nextAttentionAt == null && current.allDayLocalDate == null
+            ? ReminderStatus.inbox.storageValue
+            : ReminderStatus.active.storageValue;
         values['completed_at'] = null;
         values['cancelled_at'] = null;
         values['outcome_type'] = null;
@@ -1497,6 +1516,7 @@ class SqliteAgendaApplication
         values['related_person'] == current.relatedPerson &&
         values['is_important'] == (current.isImportant ? 1 : 0) &&
         values['next_attention_at'] == current.nextAttentionAt &&
+        values['all_day_local_date'] == current.allDayLocalDate &&
         values['deadline_at'] == current.deadlineAt &&
         values['condition_text'] == current.conditionText &&
         values['outcome_type'] == current.outcomeType?.storageValue &&
@@ -1542,8 +1562,7 @@ class SqliteAgendaApplication
     final eligible = work
         .where(
           (item) =>
-              (item.reminder.status == ReminderStatus.active ||
-                  item.reminder.status == ReminderStatus.waiting) &&
+              item.reminder.status == ReminderStatus.active &&
               item.reminder.nextAttentionAt != null &&
               (CseTimeCodec.decodeCanonicalUtc(
                     item.reminder.nextAttentionAt!,
@@ -2066,16 +2085,48 @@ class SqliteAgendaApplication
   ) => _resolveScheduleValues(
     command.schedule,
     command.customAttentionAt,
-    command.kind,
+    command.allDayLocalDate,
     now,
   );
 
   _ResolvedReminderSchedule _resolveScheduleValues(
     ReminderScheduleKind schedule,
     String? customAttentionAt,
-    ReminderKind kind,
+    String? allDayLocalDate,
     DateTime now,
   ) {
+    if (allDayLocalDate != null) {
+      if (customAttentionAt != null) {
+        throw const AgendaValidationFailure(
+          'Tam gün kayıtta saatli hatırlatma zamanı verilmemelidir.',
+        );
+      }
+      if (schedule == ReminderScheduleKind.inbox ||
+          schedule == ReminderScheduleKind.in15Minutes ||
+          schedule == ReminderScheduleKind.in1Hour) {
+        throw const AgendaValidationFailure(
+          'Tam gün kayıt için bir takvim günü seçilmelidir.',
+        );
+      }
+      try {
+        CseTimeCodec.validateIstanbulDay(allDayLocalDate);
+      } on TimeContractViolation {
+        throw const AgendaValidationFailure(
+          'Tam gün tarihi geçerli bir Europe/Istanbul günü olmalıdır.',
+        );
+      }
+      final today = CseTimeCodec.istanbulDayKey(CseTimeCodec.encodeUtc(now));
+      if (allDayLocalDate.compareTo(today) < 0) {
+        throw const AgendaValidationFailure(
+          'Tam gün tarihi bugün veya gelecekte olmalıdır.',
+        );
+      }
+      return _ResolvedReminderSchedule(
+        status: ReminderStatus.active,
+        nextAttentionAt: null,
+        allDayLocalDate: allDayLocalDate,
+      );
+    }
     String? nextAttentionAt;
     switch (schedule) {
       case ReminderScheduleKind.inbox:
@@ -2103,8 +2154,6 @@ class SqliteAgendaApplication
         );
       case ReminderScheduleKind.tomorrowMorning:
         nextAttentionAt = _tomorrowMorning(now);
-      case ReminderScheduleKind.waiting:
-        nextAttentionAt = _tomorrowMorning(now);
       case ReminderScheduleKind.custom:
         final custom = customAttentionAt;
         if (custom == null) {
@@ -2123,13 +2172,11 @@ class SqliteAgendaApplication
     }
     final status = nextAttentionAt == null
         ? ReminderStatus.inbox
-        : schedule == ReminderScheduleKind.waiting ||
-              kind == ReminderKind.waiting
-        ? ReminderStatus.waiting
         : ReminderStatus.active;
     return _ResolvedReminderSchedule(
       status: status,
       nextAttentionAt: nextAttentionAt,
+      allDayLocalDate: null,
     );
   }
 
@@ -2156,16 +2203,6 @@ class SqliteAgendaApplication
       hour: currentLocal.hour,
       minute: currentLocal.minute,
     );
-  }
-
-  String _validatedFutureAttention(String value, DateTime now) {
-    validateCanonicalTimestamp(value, 'Hatırlatıcı zamanı');
-    if (!CseTimeCodec.decodeCanonicalUtc(value).isAfter(now)) {
-      throw const AgendaValidationFailure(
-        'Hatırlatıcı zamanı gelecekte olmalıdır.',
-      );
-    }
-    return value;
   }
 
   bool _sameLogCommand(
@@ -2197,7 +2234,7 @@ class SqliteAgendaApplication
     final originalSchedule = _resolveScheduleValues(
       command.schedule,
       command.customAttentionAt,
-      command.kind,
+      command.allDayLocalDate,
       CseTimeCodec.decodeCanonicalUtc(reminder.createdAt),
     );
     return reminder.projectId == command.projectId &&
@@ -2213,6 +2250,7 @@ class SqliteAgendaApplication
         reminder.relatedPerson == relatedPerson &&
         reminder.isImportant == command.isImportant &&
         reminder.nextAttentionAt == originalSchedule.nextAttentionAt &&
+        reminder.allDayLocalDate == originalSchedule.allDayLocalDate &&
         reminder.deadlineAt == command.deadlineAt &&
         reminder.conditionText == conditionText;
   }
@@ -2237,10 +2275,12 @@ class _ResolvedReminderSchedule {
   const _ResolvedReminderSchedule({
     required this.status,
     required this.nextAttentionAt,
+    required this.allDayLocalDate,
   });
 
   final ReminderStatus status;
   final String? nextAttentionAt;
+  final String? allDayLocalDate;
 }
 
 MobileProject _projectFromRow(Map<String, Object?> row) {
@@ -2365,6 +2405,7 @@ MobileReminder _reminderFromRow(Map<String, Object?> row) {
   final createdAt = row['created_at']! as String;
   final updatedAt = row['updated_at']! as String;
   final nextAttentionAt = row['next_attention_at'] as String?;
+  final allDayLocalDate = row['all_day_local_date'] as String?;
   final deadlineAt = row['deadline_at'] as String?;
   final completedAt = row['completed_at'] as String?;
   final cancelledAt = row['cancelled_at'] as String?;
@@ -2381,6 +2422,15 @@ MobileReminder _reminderFromRow(Map<String, Object?> row) {
   validateCanonicalTimestamp(updatedAt, 'Hatırlatıcı güncelleme zamanı');
   if (nextAttentionAt != null) {
     validateCanonicalTimestamp(nextAttentionAt, 'Hatırlatıcı zamanı');
+  }
+  if (allDayLocalDate != null) {
+    try {
+      CseTimeCodec.validateIstanbulDay(allDayLocalDate);
+    } on TimeContractViolation {
+      throw const AgendaValidationFailure(
+        'Tam gün tarihi geçerli bir Europe/Istanbul günü olmalıdır.',
+      );
+    }
   }
   if (deadlineAt != null) {
     validateCanonicalTimestamp(deadlineAt, 'Gerçek son tarih');
@@ -2413,6 +2463,7 @@ MobileReminder _reminderFromRow(Map<String, Object?> row) {
     relatedPerson: row['related_person'] as String?,
     isImportant: row['is_important'] == 1,
     nextAttentionAt: nextAttentionAt,
+    allDayLocalDate: allDayLocalDate,
     deadlineAt: deadlineAt,
     conditionText: row['condition_text'] as String?,
     outcomeType: outcomeValue == null

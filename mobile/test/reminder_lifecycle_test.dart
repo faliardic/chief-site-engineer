@@ -238,6 +238,101 @@ void main() {
   );
 
   test(
+    'all-day reminders use local dates without native timed notifications',
+    () async {
+      now = DateTime.utc(2026, 12, 31, 20, 30);
+      var today = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(920),
+          title: 'Yıl sonu tam gün',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          allDayLocalDate: '2026-12-31',
+        ),
+      );
+      final tomorrow = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder2,
+          eventId: eventId(921),
+          title: 'Yeni yıl tam gün',
+          kind: ReminderKind.recheck,
+          schedule: ReminderScheduleKind.custom,
+          allDayLocalDate: '2027-01-01',
+        ),
+      );
+
+      expect(today.status, ReminderStatus.active);
+      expect(today.nextAttentionAt, isNull);
+      expect(today.allDayLocalDate, '2026-12-31');
+      expect(tomorrow.allDayLocalDate, '2027-01-01');
+      expect(notifications.scheduled, isEmpty);
+      expect(
+        (await agenda.listReminders(ReminderViewGroup.today)).single.id,
+        today.id,
+      );
+      expect(
+        (await agenda.listReminders(ReminderViewGroup.tomorrow)).single.id,
+        tomorrow.id,
+      );
+      final binding = await agenda.getReminderLifecycleDetail(today.id);
+      expect(binding.notification.scheduledFor, isNull);
+      expect(
+        binding.notification.syncState,
+        NotificationSyncState.cancelled,
+      );
+
+      today = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: today.id,
+          eventId: eventId(922),
+          expectedRevision: today.revision,
+          action: ReminderMutationAction.complete,
+        ),
+      );
+      expect(today.status, ReminderStatus.completed);
+      expect(today.allDayLocalDate, '2026-12-31');
+      expect(today.nextAttentionAt, isNull);
+      today = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: today.id,
+          eventId: eventId(923),
+          expectedRevision: today.revision,
+          action: ReminderMutationAction.reopen,
+        ),
+      );
+      expect(today.status, ReminderStatus.active);
+      expect(today.allDayLocalDate, '2026-12-31');
+      today = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: today.id,
+          eventId: eventId(924),
+          expectedRevision: today.revision,
+          action: ReminderMutationAction.cancel,
+        ),
+      );
+      expect(today.status, ReminderStatus.cancelled);
+      expect(today.allDayLocalDate, '2026-12-31');
+      expect(notifications.scheduled, isEmpty);
+
+      await expectLater(
+        agenda.createReminder(
+          CreateReminderCommand(
+            id: reminder3,
+            eventId: eventId(925),
+            title: 'Çelişkili schedule',
+            kind: ReminderKind.action,
+            schedule: ReminderScheduleKind.custom,
+            customAttentionAt: '2027-01-01T06:00:00Z',
+            allDayLocalDate: '2027-01-01',
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+    },
+  );
+
+  test(
     'full lifecycle uses optimistic revision append-only events and no-op',
     () async {
       var reminder = await agenda.createReminder(
@@ -297,22 +392,13 @@ void main() {
           reminderId: reminder.id,
           eventId: eventId(6),
           expectedRevision: reminder.revision,
-          action: ReminderMutationAction.startWaiting,
-        ),
-      );
-      expect(reminder.status, ReminderStatus.waiting);
-      reminder = await agenda.mutateReminder(
-        MutateReminderCommand(
-          reminderId: reminder.id,
-          eventId: eventId(7),
-          expectedRevision: reminder.revision,
           action: ReminderMutationAction.moveToInbox,
         ),
       );
       reminder = await agenda.mutateReminder(
         MutateReminderCommand(
           reminderId: reminder.id,
-          eventId: eventId(8),
+          eventId: eventId(7),
           expectedRevision: reminder.revision,
           action: ReminderMutationAction.complete,
           outcomeType: ReminderOutcomeType.noLongerNeeded,
@@ -324,7 +410,7 @@ void main() {
       reminder = await agenda.mutateReminder(
         MutateReminderCommand(
           reminderId: reminder.id,
-          eventId: eventId(9),
+          eventId: eventId(8),
           expectedRevision: reminder.revision,
           action: ReminderMutationAction.reopen,
         ),
@@ -333,7 +419,7 @@ void main() {
       final noOp = await agenda.mutateReminder(
         MutateReminderCommand(
           reminderId: reminder.id,
-          eventId: eventId(10),
+          eventId: eventId(9),
           expectedRevision: reminder.revision,
           action: ReminderMutationAction.reopen,
         ),
@@ -342,7 +428,7 @@ void main() {
       reminder = await agenda.mutateReminder(
         MutateReminderCommand(
           reminderId: reminder.id,
-          eventId: eventId(11),
+          eventId: eventId(10),
           expectedRevision: reminder.revision,
           action: ReminderMutationAction.cancel,
           outcomeNote: 'İş kapsamdan çıktı',
@@ -360,7 +446,6 @@ void main() {
         'scheduled',
         'rescheduled',
         'snoozed',
-        'waiting_started',
         'moved_to_inbox',
         'completed',
         'reopened',
@@ -378,7 +463,7 @@ void main() {
         agenda.mutateReminder(
           MutateReminderCommand(
             reminderId: reminder.id,
-            eventId: eventId(12),
+            eventId: eventId(11),
             expectedRevision: 1,
             action: ReminderMutationAction.reopen,
           ),
@@ -834,7 +919,6 @@ void main() {
       ReminderScheduleKind.in15Minutes,
       ReminderScheduleKind.in1Hour,
       ReminderScheduleKind.tomorrowMorning,
-      ReminderScheduleKind.waiting,
     ];
     for (var index = 0; index < schedules.length; index += 1) {
       await agenda.createReminder(
@@ -842,9 +926,7 @@ void main() {
           id: 'eeeeeeee-eeee-4eee-8eee-${index.toString().padLeft(12, '0')}',
           eventId: eventId(100 + index),
           title: 'Sıralı $index',
-          kind: schedules[index] == ReminderScheduleKind.waiting
-              ? ReminderKind.waiting
-              : index == 3
+          kind: index == 3
               ? ReminderKind.recheck
               : ReminderKind.action,
           schedule: schedules[index],
@@ -854,11 +936,10 @@ void main() {
     }
     expect(await agenda.listReminders(ReminderViewGroup.inbox), hasLength(1));
     expect(await agenda.listReminders(ReminderViewGroup.today), hasLength(2));
-    expect(await agenda.listReminders(ReminderViewGroup.waiting), hasLength(1));
     expect(await agenda.listReminders(ReminderViewGroup.recheck), hasLength(1));
     expect(
       await agenda.listReminders(ReminderViewGroup.upcoming),
-      hasLength(2),
+      hasLength(1),
     );
   });
 }
