@@ -14,7 +14,10 @@ import 'support/fake_agenda_application.dart';
 
 const reminderId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
-MobileReminder reminder({ReminderStatus status = ReminderStatus.active}) =>
+MobileReminder reminder({
+  ReminderStatus status = ReminderStatus.active,
+  String? allDayLocalDate,
+}) =>
     MobileReminder(
       id: reminderId,
       projectId: null,
@@ -24,9 +27,11 @@ MobileReminder reminder({ReminderStatus status = ReminderStatus.active}) =>
       title: 'Mobil hızlı yakalama',
       kind: ReminderKind.action,
       status: status,
-      nextAttentionAt: status == ReminderStatus.inbox
+      nextAttentionAt:
+          status == ReminderStatus.inbox || allDayLocalDate != null
           ? null
           : '2026-07-20T06:00:00Z',
+      allDayLocalDate: allDayLocalDate,
       createdAt: '2026-07-19T08:00:00Z',
       updatedAt: '2026-07-19T08:00:00Z',
       revision: 1,
@@ -61,6 +66,51 @@ void main() {
     expect(tester.getSize(submit).height, greaterThanOrEqualTo(44));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'form exposes quick Bugün and true Tam gün without waiting or fake time',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final agenda = FakeAgendaApplication();
+      await tester.pumpWidget(
+        MaterialApp(home: ReminderFormPage(agenda: agenda)),
+      );
+      expect(find.text('Bekliyorum'), findsNothing);
+      expect(find.byKey(const Key('reminder-today')), findsOneWidget);
+      expect(find.byKey(const Key('reminder-all-day')), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const Key('reminder-title')),
+        'Bugün tam gün saha turu',
+      );
+      await tester.tap(find.byKey(const Key('reminder-today')));
+      await tester.pump();
+      expect(
+        tester.widget<SwitchListTile>(
+          find.byKey(const Key('reminder-all-day')),
+        ).value,
+        isTrue,
+      );
+      expect(find.byKey(const Key('reminder-custom-date')), findsOneWidget);
+      expect(find.byKey(const Key('reminder-custom-time')), findsNothing);
+
+      final submit = find.byKey(const Key('submit-reminder'));
+      await tester.scrollUntilVisible(
+        submit,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(submit);
+      await tester.pumpAndSettle();
+
+      expect(agenda.lastReminderCommand!.allDayLocalDate, isNotNull);
+      expect(agenda.lastReminderCommand!.customAttentionAt, isNull);
+      expect(agenda.lastReminderCommand!.kind, ReminderKind.action);
+    },
+  );
 
   testWidgets(
     'quick capture preserves input on validation/application failure',
@@ -397,7 +447,7 @@ void main() {
       await tester.ensureVisible(complete);
       expect(tester.getSize(complete).height, greaterThanOrEqualTo(44));
       expect(find.byKey(const Key('schedule-reminder')), findsOneWidget);
-      expect(find.byKey(const Key('start-waiting')), findsOneWidget);
+      expect(find.byKey(const Key('start-waiting')), findsNothing);
       final tomorrow = find.byKey(const Key('snooze-tomorrow'));
       await tester.ensureVisible(tomorrow);
       expect(tester.getSize(tomorrow).height, greaterThanOrEqualTo(48));
@@ -489,6 +539,27 @@ void main() {
 
     expect(find.byKey(const Key('reopen-reminder')), findsOneWidget);
     expect(find.byKey(const Key('reminder-overdue-status')), findsNothing);
+    expect(find.byKey(const Key('reminder-delivery-diagnostic')), findsNothing);
+  });
+
+  testWidgets('all-day detail shows local day without delivery diagnostic', (
+    tester,
+  ) async {
+    final item = reminder(allDayLocalDate: '2026-07-20');
+    final agenda = _DeliveryAgenda(item);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('reminder-all-day-value')), findsOneWidget);
+    expect(find.text('20.07.2026 • Tam gün'), findsOneWidget);
+    expect(
+      find.text('Tam gün kayıt için saatli native bildirim kurulmaz'),
+      findsOneWidget,
+    );
     expect(find.byKey(const Key('reminder-delivery-diagnostic')), findsNothing);
   });
 }

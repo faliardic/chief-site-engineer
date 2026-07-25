@@ -34,7 +34,6 @@ enum AgendaCategory {
 
 enum ReminderKind {
   action('action', 'Aksiyon'),
-  waiting('waiting', 'Bekliyorum'),
   recheck('recheck', 'Tekrar kontrol');
 
   const ReminderKind(this.storageValue, this.label);
@@ -52,7 +51,6 @@ enum ReminderKind {
 enum ReminderStatus {
   inbox('inbox', 'Unutma Kutusu'),
   active('active', 'Aktif'),
-  waiting('waiting', 'Bekliyor'),
   completed('completed', 'Tamamlandı'),
   cancelled('cancelled', 'İptal edildi');
 
@@ -75,7 +73,6 @@ enum ReminderScheduleKind {
   in1Hour('1 saat'),
   todayEnd('Bugün çıkmadan'),
   tomorrowMorning('Yarın sabah'),
-  waiting('Bekliyorum'),
   custom('Özel tarih/saat');
 
   const ReminderScheduleKind(this.label);
@@ -88,7 +85,6 @@ enum ReminderViewGroup {
   overdue,
   today,
   tomorrow,
-  waiting,
   recheck,
   upcoming,
   inbox,
@@ -118,7 +114,6 @@ enum ReminderMutationAction {
   snooze15Minutes,
   snooze1Hour,
   snoozeTomorrowMorning,
-  startWaiting,
   moveToInbox,
   complete,
   cancel,
@@ -268,6 +263,7 @@ class MobileReminder {
     this.relatedPerson,
     this.isImportant = false,
     required this.nextAttentionAt,
+    this.allDayLocalDate,
     this.deadlineAt,
     this.conditionText,
     this.outcomeType,
@@ -294,6 +290,7 @@ class MobileReminder {
   final String? relatedPerson;
   final bool isImportant;
   final String? nextAttentionAt;
+  final String? allDayLocalDate;
   final String? deadlineAt;
   final ReminderOutcomeType? outcomeType;
   final String? outcomeNote;
@@ -551,6 +548,7 @@ class CreateReminderCommand {
     this.deadlineAt,
     this.conditionText,
     this.customAttentionAt,
+    this.allDayLocalDate,
   });
 
   final String id;
@@ -568,6 +566,7 @@ class CreateReminderCommand {
   final String? deadlineAt;
   final String? conditionText;
   final String? customAttentionAt;
+  final String? allDayLocalDate;
 }
 
 class MutateReminderCommand {
@@ -587,6 +586,7 @@ class MutateReminderCommand {
     this.conditionText,
     this.schedule,
     this.customAttentionAt,
+    this.allDayLocalDate,
     this.outcomeType,
     this.outcomeNote,
   });
@@ -606,6 +606,7 @@ class MutateReminderCommand {
   final String? conditionText;
   final ReminderScheduleKind? schedule;
   final String? customAttentionAt;
+  final String? allDayLocalDate;
   final ReminderOutcomeType? outcomeType;
   final String? outcomeNote;
 }

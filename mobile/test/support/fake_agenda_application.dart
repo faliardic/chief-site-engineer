@@ -166,15 +166,16 @@ class FakeAgendaApplication implements AgendaApplication {
       kind: command.kind,
       status: command.schedule == ReminderScheduleKind.inbox
           ? ReminderStatus.inbox
-          : command.kind == ReminderKind.waiting
-          ? ReminderStatus.waiting
           : ReminderStatus.active,
       location: command.location?.trim(),
       relatedPerson: command.relatedPerson?.trim(),
       isImportant: command.isImportant,
-      nextAttentionAt: command.schedule == ReminderScheduleKind.inbox
+      nextAttentionAt:
+          command.schedule == ReminderScheduleKind.inbox ||
+              command.allDayLocalDate != null
           ? null
           : command.customAttentionAt ?? '2026-07-19T09:00:00Z',
+      allDayLocalDate: command.allDayLocalDate,
       deadlineAt: command.deadlineAt,
       conditionText: command.conditionText?.trim(),
       outcomeType: null,
@@ -264,11 +265,22 @@ class FakeAgendaApplication implements AgendaApplication {
     final status = switch (command.action) {
       ReminderMutationAction.complete => ReminderStatus.completed,
       ReminderMutationAction.cancel => ReminderStatus.cancelled,
-      ReminderMutationAction.reopen ||
       ReminderMutationAction.moveToInbox => ReminderStatus.inbox,
-      ReminderMutationAction.startWaiting => ReminderStatus.waiting,
+      ReminderMutationAction.reopen =>
+        current.nextAttentionAt == null && current.allDayLocalDate == null
+            ? ReminderStatus.inbox
+            : ReminderStatus.active,
       _ => current.status,
     };
+    final clearsSchedule =
+        command.action == ReminderMutationAction.moveToInbox;
+    final scheduledAllDay =
+        command.action == ReminderMutationAction.schedule
+        ? command.allDayLocalDate
+        : current.allDayLocalDate;
+    final scheduledAt = command.action == ReminderMutationAction.schedule
+        ? command.customAttentionAt
+        : current.nextAttentionAt;
     final updated = MobileReminder(
       id: current.id,
       projectId: current.projectId,
@@ -284,12 +296,8 @@ class FakeAgendaApplication implements AgendaApplication {
       location: current.location,
       relatedPerson: current.relatedPerson,
       isImportant: command.isImportant ?? current.isImportant,
-      nextAttentionAt:
-          status == ReminderStatus.inbox ||
-              status == ReminderStatus.completed ||
-              status == ReminderStatus.cancelled
-          ? null
-          : current.nextAttentionAt,
+      nextAttentionAt: clearsSchedule ? null : scheduledAt,
+      allDayLocalDate: clearsSchedule ? null : scheduledAllDay,
       deadlineAt: current.deadlineAt,
       conditionText: current.conditionText,
       outcomeType: command.outcomeType,

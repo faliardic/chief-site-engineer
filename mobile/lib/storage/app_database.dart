@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -25,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 7;
+  static const schemaVersion = 8;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2019,6 +2021,397 @@ class AppDatabase {
           'concrete_sample_sets',
           'concrete_follow_up_items',
           'concrete_attachments',
+        ]) {
+          await transaction.execute('''
+            CREATE TRIGGER ${table}_no_physical_delete
+            BEFORE DELETE ON $table
+            BEGIN
+              SELECT RAISE(ABORT, 'physical delete is not allowed');
+            END
+          ''');
+        }
+      },
+    ),
+    DatabaseMigration(
+      version: 8,
+      apply: (transaction) async {
+        for (final trigger in [
+          'follow_up_events_append_only_update',
+          'follow_up_events_append_only_delete',
+          'follow_up_items_no_physical_delete',
+          'attendance_day_reminder_links_no_physical_delete',
+          'concrete_follow_up_items_no_physical_delete',
+        ]) {
+          await transaction.execute('DROP TRIGGER IF EXISTS $trigger');
+        }
+        for (final index in [
+          'ix_follow_ups_attention_v5',
+          'ix_follow_ups_observation_v5',
+          'ix_follow_ups_attendance_v5',
+          'ix_follow_ups_concrete_v5',
+          'ix_notification_bindings_schedule_v5',
+        ]) {
+          await transaction.execute('DROP INDEX IF EXISTS $index');
+        }
+
+        await transaction.execute(
+          'ALTER TABLE attendance_day_reminder_links '
+          'RENAME TO attendance_day_reminder_links_v7',
+        );
+        await transaction.execute(
+          'ALTER TABLE concrete_follow_up_items '
+          'RENAME TO concrete_follow_up_items_v7',
+        );
+        await transaction.execute(
+          'ALTER TABLE reminder_notification_bindings '
+          'RENAME TO reminder_notification_bindings_v7',
+        );
+        await transaction.execute(
+          'ALTER TABLE follow_up_events RENAME TO follow_up_events_v7',
+        );
+        await transaction.execute(
+          'ALTER TABLE follow_up_items RENAME TO follow_up_items_v7',
+        );
+
+        await transaction.execute('''
+          CREATE TABLE follow_up_items (
+            id TEXT PRIMARY KEY,
+            capture_text TEXT NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT,
+            item_type TEXT NOT NULL CHECK (
+              item_type IN ('action', 'recheck')
+            ),
+            status TEXT NOT NULL CHECK (
+              status IN ('inbox', 'active', 'completed', 'cancelled')
+            ),
+            project_id TEXT REFERENCES projects(id),
+            observation_id TEXT,
+            attendance_day_id TEXT,
+            concrete_pour_id TEXT,
+            location TEXT,
+            related_person TEXT,
+            is_important INTEGER NOT NULL DEFAULT 0 CHECK (
+              is_important IN (0, 1)
+            ),
+            next_attention_at TEXT,
+            all_day_local_date TEXT,
+            deadline_at TEXT,
+            condition_text TEXT,
+            outcome_type TEXT CHECK (
+              outcome_type IS NULL OR outcome_type IN (
+                'completed', 'no_longer_needed'
+              )
+            ),
+            outcome_note TEXT,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            completed_at TEXT,
+            cancelled_at TEXT,
+            FOREIGN KEY (observation_id, project_id)
+              REFERENCES field_observations(id, project_id),
+            FOREIGN KEY (attendance_day_id, project_id)
+              REFERENCES attendance_days(id, project_id),
+            FOREIGN KEY (concrete_pour_id, project_id)
+              REFERENCES concrete_pours(id, project_id),
+            CHECK (
+              (observation_id IS NOT NULL) + (attendance_day_id IS NOT NULL)
+                + (concrete_pour_id IS NOT NULL) <= 1
+            ),
+            CHECK (
+              (observation_id IS NULL AND attendance_day_id IS NULL
+                AND concrete_pour_id IS NULL)
+              OR project_id IS NOT NULL
+            ),
+            CHECK (
+              next_attention_at IS NULL OR all_day_local_date IS NULL
+            ),
+            CHECK (
+              all_day_local_date IS NULL
+              OR all_day_local_date GLOB
+                '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+            ),
+            CHECK (
+              (status = 'inbox' AND next_attention_at IS NULL
+                AND all_day_local_date IS NULL)
+              OR (status = 'active' AND (
+                (next_attention_at IS NOT NULL
+                  AND all_day_local_date IS NULL)
+                OR (next_attention_at IS NULL
+                  AND all_day_local_date IS NOT NULL)
+              ))
+              OR status IN ('completed', 'cancelled')
+            ),
+            CHECK (
+              (status = 'completed' AND completed_at IS NOT NULL
+                AND cancelled_at IS NULL AND outcome_type IS NOT NULL)
+              OR (status = 'cancelled' AND cancelled_at IS NOT NULL
+                AND completed_at IS NULL AND outcome_type IS NOT NULL)
+              OR (status IN ('inbox', 'active')
+                AND completed_at IS NULL AND cancelled_at IS NULL
+                AND outcome_type IS NULL AND outcome_note IS NULL)
+            )
+          )
+        ''');
+        await transaction.execute('''
+          INSERT INTO follow_up_items (
+            id, capture_text, title, description, item_type, status,
+            project_id, observation_id, attendance_day_id, concrete_pour_id,
+            location, related_person, is_important, next_attention_at,
+            all_day_local_date, deadline_at, condition_text, outcome_type,
+            outcome_note, revision, created_at, updated_at, completed_at,
+            cancelled_at
+          )
+          SELECT
+            id, capture_text, title, description,
+            CASE WHEN item_type = 'waiting' THEN 'action' ELSE item_type END,
+            CASE WHEN status = 'waiting' THEN 'active' ELSE status END,
+            project_id, observation_id, attendance_day_id, concrete_pour_id,
+            location, related_person, is_important, next_attention_at,
+            NULL, deadline_at, condition_text, outcome_type, outcome_note,
+            revision, created_at, updated_at, completed_at, cancelled_at
+          FROM follow_up_items_v7
+        ''');
+
+        await transaction.execute('''
+          CREATE TABLE follow_up_events (
+            id TEXT PRIMARY KEY,
+            follow_up_id TEXT NOT NULL REFERENCES follow_up_items(id),
+            sequence INTEGER NOT NULL CHECK (sequence >= 1),
+            project_id TEXT REFERENCES projects(id),
+            source_observation_id TEXT,
+            source_attendance_day_id TEXT,
+            source_concrete_pour_id TEXT,
+            event_type TEXT NOT NULL CHECK (event_type IN (
+              'created', 'scheduled', 'rescheduled', 'details_updated',
+              'waiting_started', 'legacy_waiting_normalized', 'snoozed',
+              'completed', 'cancelled', 'reopened', 'moved_to_inbox',
+              'notification_scheduled', 'notification_cancelled'
+            )),
+            occurred_at TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            FOREIGN KEY (source_observation_id, project_id)
+              REFERENCES field_observations(id, project_id),
+            FOREIGN KEY (source_attendance_day_id, project_id)
+              REFERENCES attendance_days(id, project_id),
+            FOREIGN KEY (source_concrete_pour_id, project_id)
+              REFERENCES concrete_pours(id, project_id),
+            UNIQUE (follow_up_id, sequence),
+            CHECK (
+              (source_observation_id IS NOT NULL)
+                + (source_attendance_day_id IS NOT NULL)
+                + (source_concrete_pour_id IS NOT NULL) <= 1
+            ),
+            CHECK (
+              (source_observation_id IS NULL
+                AND source_attendance_day_id IS NULL
+                AND source_concrete_pour_id IS NULL)
+              OR project_id IS NOT NULL
+            )
+          )
+        ''');
+        await transaction.execute('''
+          INSERT INTO follow_up_events (
+            id, follow_up_id, sequence, project_id,
+            source_observation_id, source_attendance_day_id,
+            source_concrete_pour_id, event_type, occurred_at, payload_json
+          )
+          SELECT
+            id, follow_up_id, sequence, project_id,
+            source_observation_id, source_attendance_day_id,
+            source_concrete_pour_id, event_type, occurred_at, payload_json
+          FROM follow_up_events_v7
+        ''');
+
+        final legacyWaiting = await transaction.query(
+          'follow_up_items_v7',
+          where: "item_type = 'waiting' OR status = 'waiting'",
+          orderBy: 'id ASC',
+        );
+        for (final row in legacyWaiting) {
+          final reminderId = row['id']! as String;
+          final sequence = Sqflite.firstIntValue(
+            await transaction.rawQuery(
+              '''
+              SELECT COALESCE(MAX(sequence), 0) + 1
+              FROM follow_up_events
+              WHERE follow_up_id = ?
+              ''',
+              [reminderId],
+            ),
+          )!;
+          await transaction.insert('follow_up_events', {
+            'id': _migrationStableUuid(
+              'schema8-legacy-waiting-normalized:$reminderId',
+            ),
+            'follow_up_id': reminderId,
+            'sequence': sequence,
+            'project_id': row['project_id'],
+            'source_observation_id': row['observation_id'],
+            'source_attendance_day_id': row['attendance_day_id'],
+            'source_concrete_pour_id': row['concrete_pour_id'],
+            'event_type': 'legacy_waiting_normalized',
+            'occurred_at': row['updated_at'],
+            'payload_json': jsonEncode({
+              'from_item_type': row['item_type'],
+              'from_status': row['status'],
+              'next_attention_at': row['next_attention_at'],
+              'to_item_type': row['item_type'] == 'waiting'
+                  ? 'action'
+                  : row['item_type'],
+              'to_status': row['status'] == 'waiting'
+                  ? 'active'
+                  : row['status'],
+            }),
+          });
+        }
+
+        await transaction.execute('''
+          CREATE TABLE reminder_notification_bindings (
+            reminder_id TEXT PRIMARY KEY REFERENCES follow_up_items(id),
+            platform_notification_id INTEGER NOT NULL UNIQUE CHECK (
+              platform_notification_id BETWEEN 1 AND 2147483647
+            ),
+            scheduled_for TEXT,
+            sync_state TEXT NOT NULL CHECK (sync_state IN (
+              'scheduled', 'permission_denied', 'unavailable',
+              'failed', 'cancelled'
+            )),
+            last_synced_at TEXT NOT NULL,
+            safe_error_code TEXT,
+            repeat_interval_minutes INTEGER CHECK (
+              repeat_interval_minutes IS NULL
+              OR repeat_interval_minutes = 60
+            )
+          )
+        ''');
+        await transaction.execute('''
+          INSERT INTO reminder_notification_bindings (
+            reminder_id, platform_notification_id, scheduled_for,
+            sync_state, last_synced_at, safe_error_code,
+            repeat_interval_minutes
+          )
+          SELECT
+            reminder_id, platform_notification_id, scheduled_for,
+            sync_state, last_synced_at, safe_error_code,
+            repeat_interval_minutes
+          FROM reminder_notification_bindings_v7
+        ''');
+
+        await transaction.execute('''
+          CREATE TABLE attendance_day_reminder_links (
+            attendance_day_id TEXT PRIMARY KEY REFERENCES attendance_days(id),
+            reminder_id TEXT NOT NULL UNIQUE REFERENCES follow_up_items(id),
+            due_at TEXT NOT NULL,
+            created_at TEXT NOT NULL
+          )
+        ''');
+        await transaction.execute('''
+          INSERT INTO attendance_day_reminder_links (
+            attendance_day_id, reminder_id, due_at, created_at
+          )
+          SELECT attendance_day_id, reminder_id, due_at, created_at
+          FROM attendance_day_reminder_links_v7
+        ''');
+
+        await transaction.execute('''
+          CREATE TABLE concrete_follow_up_items (
+            id TEXT PRIMARY KEY,
+            concrete_pour_id TEXT NOT NULL REFERENCES concrete_pours(id),
+            source_sample_set_id TEXT,
+            item_key TEXT NOT NULL,
+            label TEXT NOT NULL,
+            due_at TEXT,
+            status TEXT NOT NULL CHECK (status IN (
+              'pending', 'completed', 'exception'
+            )),
+            reminder_id TEXT UNIQUE REFERENCES follow_up_items(id),
+            note TEXT,
+            reason TEXT,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            completed_at TEXT,
+            UNIQUE (concrete_pour_id, item_key),
+            UNIQUE (id, concrete_pour_id),
+            FOREIGN KEY (source_sample_set_id, concrete_pour_id)
+              REFERENCES concrete_sample_sets(id, concrete_pour_id),
+            CHECK (
+              (status = 'pending' AND completed_at IS NULL)
+              OR (status IN ('completed', 'exception')
+                AND completed_at IS NOT NULL)
+            ),
+            CHECK (
+              status != 'exception'
+              OR (reason IS NOT NULL AND length(trim(reason)) > 0)
+            )
+          )
+        ''');
+        await transaction.execute('''
+          INSERT INTO concrete_follow_up_items (
+            id, concrete_pour_id, source_sample_set_id, item_key, label,
+            due_at, status, reminder_id, note, reason, revision, created_at,
+            updated_at, completed_at
+          )
+          SELECT
+            id, concrete_pour_id, source_sample_set_id, item_key, label,
+            due_at, status, reminder_id, note, reason, revision, created_at,
+            updated_at, completed_at
+          FROM concrete_follow_up_items_v7
+        ''');
+
+        await transaction.execute(
+          'DROP TABLE attendance_day_reminder_links_v7',
+        );
+        await transaction.execute('DROP TABLE concrete_follow_up_items_v7');
+        await transaction.execute(
+          'DROP TABLE reminder_notification_bindings_v7',
+        );
+        await transaction.execute('DROP TABLE follow_up_events_v7');
+        await transaction.execute('DROP TABLE follow_up_items_v7');
+
+        await transaction.execute('''
+          CREATE INDEX ix_follow_ups_attention_v8
+          ON follow_up_items(
+            status, all_day_local_date, next_attention_at,
+            is_important, created_at, id
+          )
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_follow_ups_observation_v8
+          ON follow_up_items(observation_id, created_at, id)
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_follow_ups_attendance_v8
+          ON follow_up_items(attendance_day_id, created_at, id)
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_follow_ups_concrete_v8
+          ON follow_up_items(concrete_pour_id, created_at, id)
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_notification_bindings_schedule_v8
+          ON reminder_notification_bindings(sync_state, scheduled_for)
+        ''');
+        await transaction.execute('''
+          CREATE TRIGGER follow_up_events_append_only_update
+          BEFORE UPDATE ON follow_up_events
+          BEGIN
+            SELECT RAISE(ABORT, 'append-only event history');
+          END
+        ''');
+        await transaction.execute('''
+          CREATE TRIGGER follow_up_events_append_only_delete
+          BEFORE DELETE ON follow_up_events
+          BEGIN
+            SELECT RAISE(ABORT, 'append-only event history');
+          END
+        ''');
+        for (final table in [
+          'follow_up_items',
+          'attendance_day_reminder_links',
+          'concrete_follow_up_items',
         ]) {
           await transaction.execute('''
             CREATE TRIGGER ${table}_no_physical_delete

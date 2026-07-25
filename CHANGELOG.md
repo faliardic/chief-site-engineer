@@ -1,5 +1,25 @@
 # Changelog
 
+## Issue #221 - Reminder Bugün, Tam Gün ve Legacy Bekliyorum Sözleşmesi
+
+- Mobil SQLite schema `7` → `8` atomik migration ile reminder schedule
+  sözleşmesine `all_day_local_date` eklendi. Timed kayıt yalnız
+  `next_attention_at`, tam gün kayıt yalnız Europe/Istanbul `YYYY-MM-DD`,
+  inbox kayıt ise ikisini de boş taşır.
+- Reminder domain, form, filtre ve mutation yüzeylerinden `Bekliyorum`
+  kaldırıldı. Legacy `item_type/status = waiting` kayıtları kaynak bağları,
+  schedule, notification binding, revision ve event geçmişi korunarak
+  `action/active` durumuna normalize edilir.
+- Legacy dönüşüm için deterministik `legacy_waiting_normalized` event'i eklenir;
+  restart veya eski backup restore zinciri duplicate migration event'i üretmez.
+- Formda tek dokunuşlu `Bugün` ve gerçek `Tam gün` seçimi eklendi. Tam gün
+  açıkken saat alanı gösterilmez ve yapay saatli native notification kurulmaz.
+- Timed notification scheduling/reconciliation davranışı korundu. Tamamlama ve
+  iptal schedule geçmişini artık silmez; yeniden açma mevcut schedule varsa
+  `active`, yoksa `inbox` durumuna döner.
+- Backup formatı `1` değişmedi; schema `1–7` paketlerinin schema `8` restore
+  uyumluluğu ve schema `8` all-day round-trip testlerle doğrulandı.
+
 ## Issue #220 - Roadmap 2026.3.1 Saha Geri Bildirimleri IV Hizalaması
 
 - Kanonik roadmap tarihi 25 Temmuz 2026 ve güvenli başlangıç noktası

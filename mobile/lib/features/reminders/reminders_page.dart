@@ -76,7 +76,6 @@ class _RemindersPageState extends State<RemindersPage> {
     ReminderViewGroup.overdue => 'Gecikenler',
     ReminderViewGroup.today => 'Bugün',
     ReminderViewGroup.tomorrow => 'Yarın',
-    ReminderViewGroup.waiting => 'Bekliyorum',
     ReminderViewGroup.recheck => 'Tekrar kontrol',
     ReminderViewGroup.upcoming => 'Yaklaşanlar',
     ReminderViewGroup.inbox => 'Unutma Kutusu',
@@ -175,8 +174,7 @@ class _RemindersPageState extends State<RemindersPage> {
                   (_group == ReminderViewGroup.now ||
                       _group == ReminderViewGroup.overdue ||
                       _group == ReminderViewGroup.upcoming) &&
-                  (reminder.status == ReminderStatus.active ||
-                      reminder.status == ReminderStatus.waiting);
+                  reminder.status == ReminderStatus.active;
               return Card(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -198,6 +196,9 @@ class _RemindersPageState extends State<RemindersPage> {
                             CseTimeCodec.formatIstanbul(
                               reminder.nextAttentionAt!,
                             ),
+                          if (reminder.allDayLocalDate != null)
+                            '${CseTimeCodec.formatIstanbulDay(reminder.allDayLocalDate!)}'
+                                ' • Tam gün',
                         ].join(' • '),
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,

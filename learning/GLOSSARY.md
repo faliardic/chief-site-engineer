@@ -1486,6 +1486,8 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 
 `Atomic Migration`: Schema değişiklikleri, migration geçmişi ve sürüm ilerlemesinin tek transaction içinde yazılması; herhangi bir hata olduğunda bütün adımların birlikte rollback edilmesidir.
 
+`All-Day Reminder (Tam Gün Hatırlatıcı)`: Gerçek bir saat taşımadan yalnız Europe/Istanbul yerel takvim günü (`YYYY-MM-DD`) ile saklanan reminder'dır. Timed timestamp ile aynı anda bulunmaz ve ilk sürümde yapay saatli native notification üretmez.
+
 `Fail-Closed Bootstrap`: Uygulamanın database, path veya schema hazırlığı doğrulanamazsa normal çalışma ekranını açmaması, yeni kayıt yazmaması ve güvenli hata durumu göstermesidir.
 
 `Platform Port`: Dart application kodunun camera, notification, file picker veya share gibi native davranışlardan ihtiyaç duyduğu küçük arayüzdür; somut plugin bu arayüzün arkasında kalır.

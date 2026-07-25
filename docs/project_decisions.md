@@ -3180,3 +3180,32 @@
   başlık/bağlantı/Issue referansı, `git diff --check` ve production diff boşluğu
   yeterlidir; full suite, analyze, artifact, release gate, backup/restore ve
   fiziksel cihaz çalıştırılmaz.
+
+## Issue 221 — Reminder Bugün, Tam Gün ve Legacy Waiting Normalizasyonu
+
+- Mobil reminder schedule üç ayrık biçim taşır: inbox için iki schedule alanı
+  da `NULL`; timed için yalnız canonical UTC `next_attention_at`; tam gün için
+  yalnız Europe/Istanbul `all_day_local_date`. Tam gün, uydurma 09:00/18:00/
+  23:59 timestamp'i ile temsil edilmez.
+- Reminder `item_type` yalnız `action | recheck`, açık status yalnız
+  `inbox | active` olur. `waiting` enum, form, filtre ve mutation API'sinden
+  kaldırılır; Open Loop `Beklediklerim` bu schema içinde modellenmez.
+- Schema `7 → 8` tek transaction'dır. Legacy kind/status waiting varyantları
+  `action/active` olur; schedule, project/Ajanda/Puantaj/Beton kaynak bağları,
+  importance, description, notification binding, revision ve mevcut event
+  geçmişi korunur.
+- Her dönüştürülen legacy reminder için kaynak kimliğinden türetilen
+  deterministik tek `legacy_waiting_normalized` event'i, mevcut maksimum
+  sequence'in sonuna eklenir. Tarihsel `waiting_started` event'i silinmez;
+  production application yeni waiting event'i üretemez.
+- Terminal reminder schedule bilgisini kaybetmez. Reopen, schedule varsa
+  `active`, yoksa `inbox` olur. Notification reconciliation yalnız
+  `status = active` ve gerçek `next_attention_at` taşıyan timed kayıtları native
+  planlar; all-day binding `cancelled` kalır.
+- `.csebackup` format `1` korunur. Schema `1–7` backup'ları restore sırasında
+  schema `8` olur; daha yeni bilinmeyen schema fail-closed reddedilir.
+- Validation class `persistence`tır. Schema migration/rollback, FK ve event
+  bütünlüğü, schema `1–7` restore matrisi, all-day backup round-trip, reminder
+  lifecycle/application/widget testleri ve `flutter analyze` yeterlidir.
+  Android release gate, AAB/signing, reboot/background acceptance, production
+  RC ve gerçek cihaz restore bu Issue'da çalıştırılmaz.
