@@ -1,10 +1,12 @@
-# CSE 2026.3 — Asistan-Öncelikli Ürün Yol Haritası
+# CSE 2026.3.1 — Asistan-Öncelikli Ürün Yol Haritası
 
 **Durum:** Kanonik ürün sırası  
-**Tarih:** 22 Temmuz 2026  
+**Tarih:** 25 Temmuz 2026
 **Ürün Epic'i:** #105  
 **Yürütme Epic'i:** #127  
-**Güncel saha backlog'u:** #203
+**Güncel saha backlog'u:** #219
+**Önceki saha backlog'u:** #203
+**Açık Release 0.1 pilotu:** #193
 
 ## 1. Ürün kararı
 
@@ -29,16 +31,24 @@ Release 0.1 çekirdeğinde mobil runtime, Ajanda, Hatırlatıcı, Puantaj, taşe
 personel sicili, Beton Paketi, mikser/irsaliye/numune/laboratuvar, fotoğraf ve PDF,
 parola korumalı backup/restore ve Android release güvenliği uygulanmıştır.
 Tamamlanan ana dilimler: #179, #183, #185, #187, #189, #191, #194, #196,
-#198, #200, #202 ve #207.
+#198, #200, #202, #207, #212 ve #214.
 
-Açık ilk kapı #193 gerçek cihaz saha kabulüdür. Ayrıntılı tamamlanma geçmişi
-Issue'larda, `CHANGELOG.md`, karar belgeleri ve `.cse/state` altında tutulur; bu
-dosya ileri ürün sırasını tanımlar.
+Bu sürümün güvenli dokümantasyon başlangıç noktası
+`d4ccc480570a971cf014ddbe00122ec6132cad01` commit'idir. Bu noktada PR #217'nin
+minimum yeterli doğrulama protokolü ve PR #218'in `Yarın` görünümü `master`
+üzerindedir.
+
+Açık ilk kapı #193 gerçek cihaz saha kabulüdür. Gün 0 PASS kanıtı geçerlidir;
+Issue #193 kapanmış sayılmaz ve yedi günlük pilot sürer. Pilot ile Release 0.1.1
+günlük güvenilirlik/sadeleştirme sırası ayrı iş akışlarıdır. Ayrıntılı tamamlanma
+geçmişi Issue'larda, `CHANGELOG.md` ve karar belgelerinde tutulur; bu dosya ileri
+ürün sırasını tanımlar.
 
 ## 3. Yeni öncelik sırası
 
 ```text
 Güvenilir saha sürümü
+→ Günlük güvenilirlik ve sadeleştirme
 → Sürtünmesiz yakalama
 → Açık döngü asistanı
 → Bağlam ve büyük resim
@@ -74,6 +84,64 @@ kazanmaz.
 
 **Kapı:** En az 7 ardışık gerçek gün; veri kaybı `0`; sessiz kritik notification
 başarısızlığı `0`; restore farkı `0`; açık kritik blocker `0`.
+
+---
+
+## Faz 0.1 — Release 0.1.1: Günlük Güvenilirlik / Sadeleştirme
+
+**Amaç:** Universal Capture'a geçmeden önce günlük kullanım sürtünmelerini,
+yanlış gün/saat anlamlarını, geri alınamaz kullanıcı işlemlerini ve kaynak
+bağlantısı kopukluklarını dar child Issue'larla kapatmak.
+
+Kanonik uygulama sırası:
+
+1. **Reminder scheduling contract:** hızlı `Bugün`, sahte saat olmayan gerçek
+   `Tam gün` ve reminder içindeki legacy `Bekliyorum` tür/schedule/status/filtre
+   yüzeyinin kayıpsız kaldırılması. Gelecekteki `Beklediklerim`, reminder durumu
+   değil Faz 2 Open Loop kaydıdır.
+2. **Birleşik ve sade Bugün:** gecikenler, saatli bugün ve tam gün işleri tek ana
+   yüzeyde gösterilir; kullanıcı önce filtre seçmek zorunda kalmaz. Saatsiz
+   bugünkü işler için ayarlanabilir varsayılan gecikme eşiği `18:00` olur;
+   yanlış `Bugün`/`Yarın` etiketleri giderilir.
+3. **Reminder geri dönüşüm kutusu:** silme, geri yüklenebilir archive/trash'tır;
+   notification binding güvenle kaldırılır ve restore sırasında yeniden
+   üretilebilir. İlk sürümde otomatik hard-delete yoktur.
+4. **Ajanda → reminder kaynak attachment görünürlüğü:** kaynak Ajanda fotoğrafı
+   veya dosyası reminder detayında görünür; geniş attachment refactor'ı
+   başlamadan dar read-model bağı düzeltilir.
+5. **Beton sınıfı ve döküm zaman çizgisi:** proje kataloğundan beton sınıfı,
+   `Planlandı → Devam ediyor → Tamamlandı`, gerçek başlat/bitir zamanı ve tek
+   bağlı Ajanda logu aynı Beton source-of-truth kaydından yürür.
+6. **Beton kelime önerisi/deep-link:** `beton`, `betonaj` gibi sinyaller yalnız
+   kullanıcıya öneri ve `Beton paketine git` bağlantısı üretir; otomatik Beton
+   kaydı, paket veya teknik karar üretmez.
+7. **Ortak attachment v2:** fotoğraf, video, ses ve dosya için tek fiziksel
+   attachment + çoklu kayıt bağlantısı; çoklu seçim, managed storage,
+   hash/MIME/boyut ve backup/restore uyumluluğu.
+8. **Proje fotoğraf/video albümü:** proje, tarih, kategori ve kaynak kayıt
+   bağlantısıyla medya görünümü; kaynak dosya ikinci kez kopyalanmaz.
+9. **Taşeron/personel/Puantaj UX:** #204 ile aynı kimlik omurgasında
+   taşeron → personel seçimi, inline yeni kişi, adres ve OSGB/sigorta uyarısı.
+10. **İstenecek Malzemeler:** malzeme, miktar/birim, ihtiyaç tarihi, öncelik,
+    açıklama ve `İhtiyaç var → İstendi → Geldi/İptal` durumu; tam satın alma
+    sistemi değildir.
+11. **Kaynaklı AI prompt export:** önce günlük, sonra hafta/ay/yıl için
+    deterministik ve kaynak bağlantılı metin; gömülü AI çağrısı, otomatik
+    gönderim veya sessiz kayıt mutasyonu yoktur.
+12. **Mini hesap makinesi:** temel işlemler ve kullanıcının onayladığı sayısal
+    alana kontrollü sonuç aktarımı; ileri mühendislik hesapları ayrı dikeydir.
+13. **Hava durumu uyarıları:** haricî servis, proje konumu, cache/offline
+    fallback, kullanıcı eşiği ve bildirim tercihi tasarımı sonrasına ertelenir;
+    her hava değişimi notification üretmez.
+
+**Kapı:** Blok 1–12 ayrı, dar ve doğrulanmış child Issue'larla tamamlanmadan Faz 1
+production implementation'ı başlamaz. Blok 13 kanonik sırada korunur fakat
+haricî servis/eşik tasarımı nedeniyle ertelenmiş iştir ve gömülü AI, tam ERP,
+otomatik hard-delete, otomatik Beton creation veya duplicate attachment için
+erken yetki vermez.
+
+İlk production child #221 Reminder scheduling contract'tır. Bu roadmap branch'i
+Blok 1 veya sonraki production davranışını uygulamaz.
 
 ---
 
@@ -317,25 +385,67 @@ recovery `PASS`; günlük rapor `≤3 dk`; haricî not/hatırlatıcıya dönüş
 
 # 6. Backlog yerleşimi
 
-**Hemen:** #193 kabulü; Beton/mikser kritik bakımı; #127 ve karar belgelerini
-bu sırayla hizalama.
+### Hemen
 
-**Faz 1:** Ajanda/Unutma sesli giriş, Ajanda'ya da yaz, hızlı süreler, not ihtiyacı
-ve Asistan Gelen Kutusu.
+- #193 Release 0.1 pilotu açık kalır ve mevcut Gün 0 kanıtıyla devam eder.
+- #220 roadmap hizalamasından sonra ilk production child #221 Reminder scheduling
+  contract'tır.
+- Ardından birleşik Bugün, reminder trash/restore, Ajanda → reminder attachment
+  görünürlüğü, Beton sınıfı/zaman çizgisi ve Beton keyword önerisi yürür.
 
-**Faz 3:** canlı Beton kartı, büyük resim, kişi/taşeron/ekip bağlamı ve arşiv.
+### Sonraki kontrollü sıra
 
-**Faz 4:** malzeme teslimatı, irsaliye, EBİS, Beton/donatı numunesi ve öneri kuralı.
+- Ortak attachment v2 ve proje fotoğraf/video albümü.
+- #204 ile taşeron/personel/Puantaj UX.
+- İstenecek Malzemeler, kaynaklı AI prompt export ve mini hesap makinesi.
+- Bu kapılardan sonra Faz 1 Universal Capture, Voice Capture/Assistant Inbox ve
+  Faz 2 Open Loop sırası korunur.
 
-**Faz 6–7:** PC salt-okunur hafıza, arama, kaynaklı soru-cevap, belge/fotoğraf AI.
+### Ertelenen
 
-**Ertelenen uzmanlık:** tam iki yönlü senkron, PDF metraj, DWG viewer, gelişmiş
-hesap, ileri maliyet, BIM/DWG düzenleme ve görselden otomatik teknik karar.
+- Hava durumu servisi ve proaktif uyarılar; önce konum, cache/offline fallback,
+  eşik ve kullanıcı bildirim tercihleri tasarlanır.
+- Gömülü/doğrudan AI servis çağrısı; ilk adım yalnız kaynaklı prompt export'tur.
+- Tam satın alma/ERP, gelişmiş video işleme ve otomatik medya analizi.
+- Güvenli, salt-okunur gömülü DWG/Office/proje dokümanı viewer nihai ürün
+  hedefidir; iki yönlü PC sync, PDF metraj ve ileri mühendislik hesaplarıyla
+  birlikte ertelenmiştir.
+
+### Kapsam dışı / yapılmaması gerekenler
+
+- Reminder içinde legacy `Bekliyorum` durumunu yeniden canlandırmak; gelecekteki
+  `Beklediklerim` Open Loop modelinde ayrı kavramdır.
+- Kullanıcıya görünmeden otomatik hard-delete, otomatik kayıt kapatma veya sessiz
+  veri mutasyonu.
+- Beton kelimesinden otomatik Beton paketi/kaydı veya teknik karar üretmek.
+- Aynı fiziksel attachment'ı Ajanda, reminder, Beton veya albüm için çoğaltmak.
+- Kaynaksız AI raporu, kullanıcı onayı olmadan AI mutasyonu veya embedded AI'yı
+  erken eklemek.
+- Tam ERP, multi-user/tenant/SaaS, BIM/DWG/Office düzenleme, authoring ve teknik
+  karar motoru.
 
 # 7. Release 0.1 sonrası ilk Issue kuyruğu
 
+Release 0.1.1 günlük güvenilirlik/sadeleştirme kuyruğu:
+
+1. #221 Reminder scheduling contract;
+2. birleşik ve sade Bugün görünümü;
+3. reminder recoverable trash/restore;
+4. Ajanda → reminder kaynak attachment görünürlüğü;
+5. Beton sınıfı, başlat/bitir ve tek bağlı Ajanda logu;
+6. Beton keyword önerisi/deep-link;
+7. ortak attachment v2 ve çoklu medya/dosya;
+8. proje fotoğraf/video albümü;
+9. #204 taşeron/personel/Puantaj UX;
+10. İstenecek Malzemeler;
+11. kaynaklı AI prompt export;
+12. mini hesap makinesi;
+13. hava durumu uyarıları — haricî servis/eşik tasarımı nedeniyle ertelenmiş.
+
+Günlük güvenilirlik kapısından sonraki mevcut ürün sırası:
+
 1. Universal Capture contract and mobile shell;
-2. Voice capture and Assistant Inbox;
+2. Voice Capture and Assistant Inbox;
 3. Open Loop model;
 4. Morning Briefing and Evening Close;
 5. Context hierarchy and Big Picture read-model;
@@ -373,8 +483,11 @@ paketi, Saha, arama, Asistan veya ikincil `Tüm araçlar` alanından açılır.
 - çok kullanıcılı tenant/SaaS;
 - bordro, cari ve çek/senet;
 - resmî onay veya teknik kabul motoru;
-- BIM/DWG düzenleyici;
-- kullanıcı yerine karar veren otonom AI.
+- BIM/DWG/Office düzenleme, authoring ve teknik karar motoru;
+- otomatik iki yönlü PC senkronu;
+- otomatik hard-delete veya Beton kelimesinden otomatik kayıt/paket;
+- aynı fiziksel attachment'ın modüller arasında kopyalanması;
+- kullanıcı yerine karar veren, kaynak göstermeyen veya sessiz mutasyon yapan AI.
 
 Başarı modül sayısıyla değil, şefin daha az zihinsel yükle daha hızlı, eksiksiz ve
 kanıtlı saha yönetimi yapmasıyla ölçülür.
