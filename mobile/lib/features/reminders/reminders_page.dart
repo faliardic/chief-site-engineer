@@ -35,6 +35,7 @@ class _RemindersPageState extends State<RemindersPage> {
   bool _loading = true;
   String? _error;
   final Set<String> _tomorrowBusy = {};
+  final Set<String> _restoreBusy = {};
 
   Future<void> _moveToTomorrow(MobileReminder reminder) async {
     if (_tomorrowBusy.contains(reminder.id)) return;
@@ -53,6 +54,26 @@ class _RemindersPageState extends State<RemindersPage> {
       if (mounted) setState(() => _error = 'Hatırlatıcı yarına taşınamadı.');
     } finally {
       if (mounted) setState(() => _tomorrowBusy.remove(reminder.id));
+    }
+  }
+
+  Future<void> _restoreFromTrash(MobileReminder reminder) async {
+    if (_restoreBusy.contains(reminder.id)) return;
+    setState(() => _restoreBusy.add(reminder.id));
+    try {
+      await widget.agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: reminder.id,
+          eventId: RecordId.randomUuid(),
+          expectedRevision: reminder.revision,
+          action: ReminderMutationAction.restoreFromTrash,
+        ),
+      );
+      await _reload();
+    } on Object {
+      if (mounted) setState(() => _error = 'Hatırlatıcı geri yüklenemedi.');
+    } finally {
+      if (mounted) setState(() => _restoreBusy.remove(reminder.id));
     }
   }
 
@@ -110,6 +131,7 @@ class _RemindersPageState extends State<RemindersPage> {
     ReminderViewGroup.upcoming => 'Yaklaşanlar',
     ReminderViewGroup.inbox => 'Unutma Kutusu',
     ReminderViewGroup.history => 'Geçmiş',
+    ReminderViewGroup.trash => 'Geri Dönüşüm Kutusu',
   };
 
   Future<void> _selectPrimary(_ReminderPrimaryView view) async {
@@ -137,6 +159,7 @@ class _RemindersPageState extends State<RemindersPage> {
               ReminderViewGroup.inbox,
               ReminderViewGroup.recheck,
               ReminderViewGroup.history,
+              ReminderViewGroup.trash,
             ])
               ListTile(
                 key: Key('reminder-other-${group.name}'),
@@ -173,6 +196,7 @@ class _RemindersPageState extends State<RemindersPage> {
     ReminderViewGroup.inbox => Icons.inbox_outlined,
     ReminderViewGroup.recheck => Icons.fact_check_outlined,
     ReminderViewGroup.history => Icons.history_outlined,
+    ReminderViewGroup.trash => Icons.delete_outline,
     _ => Icons.more_horiz,
   };
 
@@ -272,6 +296,9 @@ class _RemindersPageState extends State<RemindersPage> {
                 showTomorrow:
                     _primaryView == _ReminderPrimaryView.other &&
                     _otherGroup == ReminderViewGroup.upcoming,
+                showRestore:
+                    _primaryView == _ReminderPrimaryView.other &&
+                    _otherGroup == ReminderViewGroup.trash,
               ),
             ),
         ],
@@ -376,9 +403,7 @@ class _RemindersPageState extends State<RemindersPage> {
       style: TextButton.styleFrom(minimumSize: const Size(44, 48)),
       onPressed: _openInbox,
       icon: const Icon(Icons.inbox_outlined),
-      label: Text(
-        'Unutma Kutusunda ${_todayOverview.inboxCount} kayıt var',
-      ),
+      label: Text('Unutma Kutusunda ${_todayOverview.inboxCount} kayıt var'),
     );
   }
 
@@ -401,6 +426,7 @@ class _RemindersPageState extends State<RemindersPage> {
     MobileReminder reminder, {
     _ReminderTodaySection? section,
     required bool showTomorrow,
+    bool showRestore = false,
   }) {
     return Card(
       child: Column(
@@ -418,10 +444,13 @@ class _RemindersPageState extends State<RemindersPage> {
               [
                 reminder.kind.label,
                 reminder.status.label,
-                reminder.projectName ?? 'Kişisel',
+                _sourceLabel(reminder),
                 _scheduleLabel(reminder, section),
+                if (showRestore && reminder.trashedAt != null)
+                  'Taşındı: '
+                      '${CseTimeCodec.formatIstanbul(reminder.trashedAt!)}',
               ].join(' • '),
-              maxLines: 3,
+              maxLines: showRestore ? 5 : 3,
               overflow: TextOverflow.ellipsis,
             ),
             trailing: reminder.isImportant
@@ -447,9 +476,7 @@ class _RemindersPageState extends State<RemindersPage> {
                 padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                 child: TextButton.icon(
                   key: Key('reminder-tomorrow-${reminder.id}'),
-                  style: TextButton.styleFrom(
-                    minimumSize: const Size(88, 48),
-                  ),
+                  style: TextButton.styleFrom(minimumSize: const Size(88, 48)),
                   onPressed: _tomorrowBusy.contains(reminder.id)
                       ? null
                       : () => _moveToTomorrow(reminder),
@@ -458,9 +485,33 @@ class _RemindersPageState extends State<RemindersPage> {
                 ),
               ),
             ),
+          if (showRestore)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                child: TextButton.icon(
+                  key: Key('restore-reminder-${reminder.id}'),
+                  style: TextButton.styleFrom(minimumSize: const Size(112, 48)),
+                  onPressed: _restoreBusy.contains(reminder.id)
+                      ? null
+                      : () => _restoreFromTrash(reminder),
+                  icon: const Icon(Icons.restore_from_trash_outlined),
+                  label: const Text('Geri yükle'),
+                ),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  String _sourceLabel(MobileReminder reminder) {
+    final project = reminder.projectName ?? 'Kişisel';
+    if (reminder.sourceLogId != null) return '$project • Ajanda';
+    if (reminder.attendanceDayId != null) return '$project • Puantaj';
+    if (reminder.concretePourId != null) return '$project • Beton';
+    return project;
   }
 
   String _scheduleLabel(

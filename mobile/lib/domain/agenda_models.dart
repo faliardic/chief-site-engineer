@@ -89,6 +89,7 @@ enum ReminderViewGroup {
   upcoming,
   inbox,
   history,
+  trash,
 }
 
 enum ReminderOutcomeType {
@@ -118,6 +119,8 @@ enum ReminderMutationAction {
   complete,
   cancel,
   reopen,
+  moveToTrash,
+  restoreFromTrash,
 }
 
 enum NotificationSyncState {
@@ -272,6 +275,7 @@ class MobileReminder {
     required this.updatedAt,
     this.completedAt,
     this.cancelledAt,
+    this.trashedAt,
     required this.revision,
   });
 
@@ -299,6 +303,7 @@ class MobileReminder {
   final String updatedAt;
   final String? completedAt;
   final String? cancelledAt;
+  final String? trashedAt;
   final int revision;
 }
 

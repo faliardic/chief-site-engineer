@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:chief_site_engineer/application/agenda_application.dart';
@@ -277,10 +278,7 @@ void main() {
       );
       final binding = await agenda.getReminderLifecycleDetail(today.id);
       expect(binding.notification.scheduledFor, isNull);
-      expect(
-        binding.notification.syncState,
-        NotificationSyncState.cancelled,
-      );
+      expect(binding.notification.syncState, NotificationSyncState.cancelled);
 
       today = await agenda.mutateReminder(
         MutateReminderCommand(
@@ -926,9 +924,7 @@ void main() {
           id: 'eeeeeeee-eeee-4eee-8eee-${index.toString().padLeft(12, '0')}',
           eventId: eventId(100 + index),
           title: 'Sıralı $index',
-          kind: index == 3
-              ? ReminderKind.recheck
-              : ReminderKind.action,
+          kind: index == 3 ? ReminderKind.recheck : ReminderKind.action,
           schedule: schedules[index],
           isImportant: index == 2,
         ),
@@ -942,12 +938,329 @@ void main() {
       hasLength(1),
     );
   });
+
+  test(
+    'trash and restore preserve linked timed lifecycle binding and audit',
+    () async {
+      await createProjectAndLog();
+      final sourceBefore = await agenda.getAgendaLogDetail(logId);
+      final created = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(201),
+          projectId: projectId,
+          sourceLogId: logId,
+          title: 'Bağlı gelecekteki kontrol',
+          kind: ReminderKind.recheck,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-19T10:00:00Z',
+          deadlineAt: '2026-07-20T10:00:00Z',
+          conditionText: 'Beton öncesi',
+        ),
+      );
+      final bindingBefore = await agenda.getReminderLifecycleDetail(created.id);
+      now = DateTime.utc(2026, 7, 19, 8, 5);
+      final trashed = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: created.id,
+          eventId: eventId(202),
+          expectedRevision: created.revision,
+          action: ReminderMutationAction.moveToTrash,
+        ),
+      );
+
+      expect(trashed.trashedAt, '2026-07-19T08:05:00Z');
+      expect(trashed.status, created.status);
+      expect(trashed.kind, created.kind);
+      expect(trashed.nextAttentionAt, created.nextAttentionAt);
+      expect(trashed.deadlineAt, created.deadlineAt);
+      expect(trashed.conditionText, created.conditionText);
+      expect(trashed.sourceLogId, logId);
+      expect(trashed.revision, created.revision + 1);
+      expect(await agenda.listReminders(ReminderViewGroup.today), isEmpty);
+      expect((await agenda.getReminderTodayOverview()).timedToday, isEmpty);
+      expect(
+        (await agenda.listReminders(ReminderViewGroup.trash)).single.id,
+        created.id,
+      );
+      expect((await agenda.getAgendaLogDetail(logId)).reminders, isEmpty);
+      final trashedDetail = await agenda.getReminderLifecycleDetail(created.id);
+      expect(
+        trashedDetail.notification.platformNotificationId,
+        bindingBefore.notification.platformNotificationId,
+      );
+      expect(trashedDetail.notification.scheduledFor, isNull);
+      expect(
+        trashedDetail.notification.syncState,
+        NotificationSyncState.cancelled,
+      );
+      final businessEventsBeforeNoOp = trashedDetail.events
+          .where((item) => !item.eventType.startsWith('notification_'))
+          .toList();
+      expect(businessEventsBeforeNoOp.last.eventType, 'trashed');
+      final trashPayload =
+          jsonDecode(businessEventsBeforeNoOp.last.payloadJson)
+              as Map<String, dynamic>;
+      expect(trashPayload['revision'], trashed.revision);
+      expect(trashPayload['status'], created.status.storageValue);
+      expect(trashPayload['next_attention_at'], created.nextAttentionAt);
+      expect(trashPayload['source_observation_id'], logId);
+
+      final duplicate = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: trashed.id,
+          eventId: eventId(203),
+          expectedRevision: trashed.revision,
+          action: ReminderMutationAction.moveToTrash,
+        ),
+      );
+      expect(duplicate.revision, trashed.revision);
+      expect(
+        (await agenda.listReminderEvents(
+          trashed.id,
+        )).where((item) => item.eventType == 'trashed'),
+        hasLength(1),
+      );
+      await expectLater(
+        agenda.mutateReminder(
+          MutateReminderCommand(
+            reminderId: trashed.id,
+            eventId: eventId(204),
+            expectedRevision: created.revision,
+            action: ReminderMutationAction.restoreFromTrash,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      expect((await agenda.getReminderDetail(trashed.id)).trashedAt, isNotNull);
+
+      now = DateTime.utc(2026, 7, 19, 8, 10);
+      final restored = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: trashed.id,
+          eventId: eventId(205),
+          expectedRevision: trashed.revision,
+          action: ReminderMutationAction.restoreFromTrash,
+        ),
+      );
+      expect(restored.trashedAt, isNull);
+      expect(restored.status, created.status);
+      expect(restored.nextAttentionAt, created.nextAttentionAt);
+      expect(restored.deadlineAt, created.deadlineAt);
+      expect(restored.sourceLogId, logId);
+      expect(restored.revision, trashed.revision + 1);
+      expect(await agenda.listReminders(ReminderViewGroup.trash), isEmpty);
+      expect(
+        (await agenda.getAgendaLogDetail(logId)).reminders.single.id,
+        created.id,
+      );
+      final sourceAfter = await agenda.getAgendaLogDetail(logId);
+      expect(sourceAfter.log.revision, sourceBefore.log.revision);
+      expect(sourceAfter.log.updatedAt, sourceBefore.log.updatedAt);
+      final restoredDetail = await agenda.getReminderLifecycleDetail(
+        restored.id,
+      );
+      expect(
+        restoredDetail.notification.platformNotificationId,
+        bindingBefore.notification.platformNotificationId,
+      );
+      expect(
+        restoredDetail.notification.syncState,
+        NotificationSyncState.scheduled,
+      );
+      expect(
+        restoredDetail.events.where(
+          (item) => item.eventType == 'restored_from_trash',
+        ),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'trash ordering and restore preserve all-day inbox and terminal records',
+    () async {
+      final allDay = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(301),
+          title: 'Tam gün',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          allDayLocalDate: '2026-07-19',
+        ),
+      );
+      final overdue = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder2,
+          eventId: eventId(302),
+          title: 'Gecikmiş saatli',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-19T08:30:00Z',
+        ),
+      );
+      final inbox = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder3,
+          eventId: eventId(303),
+          title: 'Plansız',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.inbox,
+        ),
+      );
+      var completed = await agenda.createReminder(
+        CreateReminderCommand(
+          id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc4',
+          eventId: eventId(304),
+          title: 'Tamamlanan',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.inbox,
+        ),
+      );
+      completed = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: completed.id,
+          eventId: eventId(305),
+          expectedRevision: completed.revision,
+          action: ReminderMutationAction.complete,
+          outcomeNote: 'Korunacak sonuç',
+        ),
+      );
+      var cancelled = await agenda.createReminder(
+        CreateReminderCommand(
+          id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc5',
+          eventId: eventId(306),
+          title: 'İptal edilen',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.inbox,
+        ),
+      );
+      cancelled = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: cancelled.id,
+          eventId: eventId(307),
+          expectedRevision: cancelled.revision,
+          action: ReminderMutationAction.cancel,
+          outcomeNote: 'Korunacak iptal sonucu',
+        ),
+      );
+      final originals = {
+        for (final item in [allDay, overdue, inbox, completed, cancelled])
+          item.id: item,
+      };
+      final trashed = <MobileReminder>[];
+      var index = 0;
+      for (final item in originals.values) {
+        now = DateTime.utc(2026, 7, 19, 10, index);
+        trashed.add(
+          await agenda.mutateReminder(
+            MutateReminderCommand(
+              reminderId: item.id,
+              eventId: eventId(320 + index),
+              expectedRevision: item.revision,
+              action: ReminderMutationAction.moveToTrash,
+            ),
+          ),
+        );
+        index += 1;
+      }
+
+      expect((await agenda.getReminderTodayOverview()).isEmpty, isTrue);
+      expect((await agenda.getReminderTodayOverview()).inboxCount, 0);
+      for (final group in ReminderViewGroup.values.where(
+        (group) => group != ReminderViewGroup.trash,
+      )) {
+        expect(await agenda.listReminders(group), isEmpty);
+      }
+      final trash = await agenda.listReminders(ReminderViewGroup.trash);
+      expect(
+        trash.map((item) => item.id),
+        trashed.reversed.map((item) => item.id),
+      );
+
+      final scheduledBeforeRestore = notifications.scheduled.length;
+      index = 0;
+      for (final item in trash) {
+        final original = originals[item.id]!;
+        now = DateTime.utc(2026, 7, 19, 11, index);
+        final restored = await agenda.mutateReminder(
+          MutateReminderCommand(
+            reminderId: item.id,
+            eventId: eventId(340 + index),
+            expectedRevision: item.revision,
+            action: ReminderMutationAction.restoreFromTrash,
+          ),
+        );
+        expect(restored.status, original.status);
+        expect(restored.nextAttentionAt, original.nextAttentionAt);
+        expect(restored.allDayLocalDate, original.allDayLocalDate);
+        expect(restored.outcomeType, original.outcomeType);
+        expect(restored.outcomeNote, original.outcomeNote);
+        expect(restored.completedAt, original.completedAt);
+        expect(restored.cancelledAt, original.cancelledAt);
+        index += 1;
+      }
+      expect(
+        notifications.scheduled,
+        hasLength(scheduledBeforeRestore),
+        reason:
+            'all-day, overdue, inbox and terminal restore fake alarm kurmaz',
+      );
+      expect(await agenda.listReminders(ReminderViewGroup.trash), isEmpty);
+      expect(await agenda.listReminders(ReminderViewGroup.inbox), hasLength(1));
+      expect(
+        await agenda.listReminders(ReminderViewGroup.history),
+        hasLength(2),
+      );
+    },
+  );
+
+  test(
+    'notification cancel failure keeps trashed persistence authoritative',
+    () async {
+      final created = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(401),
+          title: 'Cancel hatası',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.in1Hour,
+        ),
+      );
+      notifications.failCancel = true;
+      now = DateTime.utc(2026, 7, 19, 8, 5);
+      final trashed = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: created.id,
+          eventId: eventId(402),
+          expectedRevision: created.revision,
+          action: ReminderMutationAction.moveToTrash,
+        ),
+      );
+
+      expect(trashed.trashedAt, isNotNull);
+      expect(
+        (await agenda.listReminders(ReminderViewGroup.trash)).single.id,
+        created.id,
+      );
+      final detail = await agenda.getReminderLifecycleDetail(created.id);
+      expect(detail.notification.scheduledFor, isNull);
+      expect(detail.notification.syncState, NotificationSyncState.failed);
+      expect(detail.notification.safeErrorCode, 'cancel_failed');
+      expect(
+        detail.events.where((item) => item.eventType == 'trashed'),
+        hasLength(1),
+      );
+    },
+  );
 }
 
 class _FakeNotificationGateway
     implements ReminderNotificationGateway, ReminderDeliveryControl {
   NotificationPermissionState permission = NotificationPermissionState.granted;
   bool failSchedule = false;
+  bool failCancel = false;
   bool failInitialize = false;
   bool omitPendingAfterSchedule = false;
   int requestCalls = 0;
@@ -1029,6 +1342,7 @@ class _FakeNotificationGateway
 
   @override
   Future<void> cancel(int platformId) async {
+    if (failCancel) throw StateError('hidden cancel failure');
     cancelled.add(platformId);
     pending.removeWhere((item) => item.platformId == platformId);
   }

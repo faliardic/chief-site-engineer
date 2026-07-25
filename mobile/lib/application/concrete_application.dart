@@ -252,6 +252,7 @@ MobileReminder _reminderFromRow(Map<String, Object?> row) {
     relatedPerson: row['related_person'] as String?,
     isImportant: row['is_important'] == 1,
     nextAttentionAt: row['next_attention_at'] as String?,
+    allDayLocalDate: row['all_day_local_date'] as String?,
     deadlineAt: row['deadline_at'] as String?,
     conditionText: row['condition_text'] as String?,
     outcomeType: outcome == null
@@ -262,6 +263,7 @@ MobileReminder _reminderFromRow(Map<String, Object?> row) {
     updatedAt: row['updated_at']! as String,
     completedAt: row['completed_at'] as String?,
     cancelledAt: row['cancelled_at'] as String?,
+    trashedAt: row['trashed_at'] as String?,
     revision: row['revision']! as int,
   );
 }
@@ -1397,6 +1399,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
       throw const AgendaValidationFailure('Bağlı hatırlatıcı bulunamadı.');
     }
     final row = rows.single;
+    if (row['trashed_at'] != null) return;
     final currentStatus = ReminderStatus.fromStorage(row['status']! as String);
     final targetStatus = pending
         ? (dueAt == null ? ReminderStatus.inbox : ReminderStatus.active)
@@ -1513,7 +1516,8 @@ class SqliteConcreteApplication implements ConcreteApplication {
       'follow_up_items',
       columns: ['id'],
       where:
-          "concrete_pour_id = ? AND status NOT IN ('completed', 'cancelled')",
+          "concrete_pour_id = ? AND trashed_at IS NULL "
+          "AND status NOT IN ('completed', 'cancelled')",
       whereArgs: [pourId],
     );
     for (final row in rows) {
@@ -1547,6 +1551,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
       JOIN follow_up_items f ON f.id = c.reminder_id
       WHERE c.concrete_pour_id = ? AND c.status = 'pending'
         AND f.status IN ('completed', 'cancelled')
+        AND f.trashed_at IS NULL
       ''',
       [pourId],
     );
@@ -1614,7 +1619,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
       SELECT f.*, p.name AS project_name
       FROM follow_up_items f
       JOIN projects p ON p.id = f.project_id
-      WHERE f.concrete_pour_id = ?
+      WHERE f.concrete_pour_id = ? AND f.trashed_at IS NULL
       ORDER BY f.created_at ASC, f.id ASC
       ''',
       [pourId],

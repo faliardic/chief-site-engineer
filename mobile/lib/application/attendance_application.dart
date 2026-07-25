@@ -2172,12 +2172,14 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       JOIN attendance_day_reminder_links l ON l.attendance_day_id = d.id
       JOIN follow_up_items f ON f.id = l.reminder_id
       WHERE d.project_id = ? AND d.local_date = ? AND d.status = 'draft'
+        AND f.trashed_at IS NULL
       LIMIT 1
       ''',
       [projectId, localDate],
     );
     if (rows.isEmpty) return;
     final reminder = _reminderFromRow(rows.single);
+    if (reminder.trashedAt != null) return;
     if (reminder.status == ReminderStatus.completed ||
         reminder.status == ReminderStatus.cancelled) {
       return;
@@ -2229,6 +2231,7 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       );
     }
     final reminder = _reminderFromRow(rows.single);
+    if (reminder.trashedAt != null) return;
     if (reminder.status == ReminderStatus.completed ||
         reminder.status == ReminderStatus.cancelled) {
       return;
@@ -2281,6 +2284,7 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       );
     }
     final reminder = _reminderFromRow(rows.single);
+    if (reminder.trashedAt != null) return;
     final unchanged =
         reminder.status == ReminderStatus.active &&
         reminder.nextAttentionAt == dueAt;
@@ -2431,7 +2435,7 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       SELECT f.*, p.name AS project_name
       FROM follow_up_items f
       LEFT JOIN projects p ON p.id = f.project_id
-      WHERE f.attendance_day_id = ?
+      WHERE f.attendance_day_id = ? AND f.trashed_at IS NULL
       ORDER BY f.created_at ASC, f.id ASC
       LIMIT 1
       ''',
@@ -3211,6 +3215,7 @@ MobileReminder _reminderFromRow(Map<String, Object?> row) {
     relatedPerson: row['related_person'] as String?,
     isImportant: row['is_important'] == 1,
     nextAttentionAt: row['next_attention_at'] as String?,
+    allDayLocalDate: row['all_day_local_date'] as String?,
     deadlineAt: row['deadline_at'] as String?,
     conditionText: row['condition_text'] as String?,
     outcomeType: outcome == null
@@ -3221,6 +3226,7 @@ MobileReminder _reminderFromRow(Map<String, Object?> row) {
     updatedAt: row['updated_at']! as String,
     completedAt: row['completed_at'] as String?,
     cancelledAt: row['cancelled_at'] as String?,
+    trashedAt: row['trashed_at'] as String?,
     revision: row['revision']! as int,
   );
 }

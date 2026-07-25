@@ -39,6 +39,7 @@ ReminderTodayOverview buildReminderTodayOverview(
   final allDayCutoffReached = localNow.hour >= 18;
   final unique = <String, MobileReminder>{};
   for (final reminder in reminders) {
+    if (reminder.trashedAt != null) continue;
     unique.putIfAbsent(reminder.id, () => reminder);
   }
 
@@ -100,9 +101,7 @@ int _compareOverdueReminders(MobileReminder left, MobileReminder right) {
 }
 
 int _compareTimedReminders(MobileReminder left, MobileReminder right) {
-  final scheduleOrder = left.nextAttentionAt!.compareTo(
-    right.nextAttentionAt!,
-  );
+  final scheduleOrder = left.nextAttentionAt!.compareTo(right.nextAttentionAt!);
   if (scheduleOrder != 0) return scheduleOrder;
   return _compareImportanceCreatedAndId(left, right);
 }
@@ -110,10 +109,7 @@ int _compareTimedReminders(MobileReminder left, MobileReminder right) {
 int _compareAllDayReminders(MobileReminder left, MobileReminder right) =>
     _compareImportanceCreatedAndId(left, right);
 
-int _compareImportanceCreatedAndId(
-  MobileReminder left,
-  MobileReminder right,
-) {
+int _compareImportanceCreatedAndId(MobileReminder left, MobileReminder right) {
   final importanceOrder = (right.isImportant ? 1 : 0).compareTo(
     left.isImportant ? 1 : 0,
   );
@@ -1041,6 +1037,7 @@ class SqliteAgendaApplication
           updatedAt: createdAt,
           completedAt: null,
           cancelledAt: null,
+          trashedAt: null,
           revision: 1,
         );
       });
@@ -1064,14 +1061,17 @@ class SqliteAgendaApplication
         SELECT f.*, p.name AS project_name
         FROM follow_up_items f
         LEFT JOIN projects p ON p.id = f.project_id
-        WHERE f.status = 'inbox'
-          OR (
-            f.status = 'active'
-            AND (
-              (f.next_attention_at IS NOT NULL
-                AND f.next_attention_at < ?)
-              OR (f.all_day_local_date IS NOT NULL
-                AND f.all_day_local_date <= ?)
+        WHERE f.trashed_at IS NULL
+          AND (
+            f.status = 'inbox'
+            OR (
+              f.status = 'active'
+              AND (
+                (f.next_attention_at IS NOT NULL
+                  AND f.next_attention_at < ?)
+                OR (f.all_day_local_date IS NOT NULL
+                  AND f.all_day_local_date <= ?)
+              )
             )
           )
         ORDER BY f.id ASC
@@ -1115,11 +1115,7 @@ class SqliteAgendaApplication
         "f.status = 'active' AND ("
             '(f.next_attention_at >= ? AND f.next_attention_at < ?) '
             'OR f.all_day_local_date = ?)',
-        <Object?>[
-          tomorrowBounds.start,
-          tomorrowBounds.endExclusive,
-          tomorrow,
-        ],
+        <Object?>[tomorrowBounds.start, tomorrowBounds.endExclusive, tomorrow],
       ),
       ReminderViewGroup.recheck => (
         "f.status = 'active' AND f.item_type = 'recheck'",
@@ -1135,20 +1131,28 @@ class SqliteAgendaApplication
         "f.status IN ('completed', 'cancelled')",
         <Object?>[],
       ),
+      ReminderViewGroup.trash => ('f.trashed_at IS NOT NULL', <Object?>[]),
     };
     return _withDatabase(now, (database) async {
+      final visibilityWhere = group == ReminderViewGroup.trash
+          ? where
+          : 'f.trashed_at IS NULL AND ($where)';
+      final orderBy = group == ReminderViewGroup.trash
+          ? 'f.trashed_at DESC, f.updated_at DESC, f.id ASC'
+          : '''
+            CASE WHEN f.next_attention_at IS NULL THEN 1 ELSE 0 END,
+            f.next_attention_at ASC,
+            f.all_day_local_date ASC,
+            f.is_important DESC,
+            f.created_at ASC,
+            f.id ASC
+            ''';
       final rows = await database.rawQuery('''
         SELECT f.*, p.name AS project_name
         FROM follow_up_items f
         LEFT JOIN projects p ON p.id = f.project_id
-        WHERE $where
-        ORDER BY
-          CASE WHEN f.next_attention_at IS NULL THEN 1 ELSE 0 END,
-          f.next_attention_at ASC,
-          f.all_day_local_date ASC,
-          f.is_important DESC,
-          f.created_at ASC,
-          f.id ASC
+        WHERE $visibilityWhere
+        ORDER BY $orderBy
       ''', arguments);
       final reminders = rows.map(_reminderFromRow).toList(growable: false);
       return group == ReminderViewGroup.upcoming ||
@@ -1351,6 +1355,7 @@ class SqliteAgendaApplication
           'outcome_note': current.outcomeNote,
           'completed_at': current.completedAt,
           'cancelled_at': current.cancelledAt,
+          'trashed_at': current.trashedAt,
         };
         final eventType = _applyReminderMutation(
           values: values,
@@ -1417,9 +1422,14 @@ class SqliteAgendaApplication
           'payload_json': jsonEncode({
             'next_attention_at': values['next_attention_at'],
             'all_day_local_date': values['all_day_local_date'],
+            'trashed_at': values['trashed_at'],
+            if (eventType == 'restored_from_trash') 'restored_at': updatedAt,
             'outcome_type': values['outcome_type'],
             'revision': nextRevision,
             'status': values['status'],
+            'source_observation_id': current.sourceLogId,
+            'source_attendance_day_id': current.attendanceDayId,
+            'source_concrete_pour_id': current.concretePourId,
           }),
         });
         final refreshed = await transaction.rawQuery(
@@ -1441,6 +1451,13 @@ class SqliteAgendaApplication
         ReminderMutationAction.snooze15Minutes ||
         ReminderMutationAction.snooze1Hour ||
         ReminderMutationAction.snoozeTomorrowMorning => true,
+        ReminderMutationAction.restoreFromTrash
+            when result.reminder.status == ReminderStatus.active &&
+                result.reminder.nextAttentionAt != null &&
+                CseTimeCodec.decodeCanonicalUtc(
+                  result.reminder.nextAttentionAt!,
+                ).isAfter(now) =>
+          true,
         _ => false,
       };
       await _reconcileNotificationsAt(now, requestPermission: shouldRequest);
@@ -1511,6 +1528,14 @@ class SqliteAgendaApplication
           'Terminal hatırlatıcı önce yeniden açılmalıdır.',
         );
       }
+    }
+
+    if (current.trashedAt != null &&
+        command.action != ReminderMutationAction.restoreFromTrash &&
+        command.action != ReminderMutationAction.moveToTrash) {
+      throw const AgendaValidationFailure(
+        'Geri dönüşüm kutusundaki kayıt önce geri yüklenmelidir.',
+      );
     }
 
     switch (command.action) {
@@ -1653,6 +1678,14 @@ class SqliteAgendaApplication
         values['outcome_type'] = null;
         values['outcome_note'] = null;
         return 'reopened';
+      case ReminderMutationAction.moveToTrash:
+        if (current.trashedAt != null) return 'trashed';
+        values['trashed_at'] = nowValue;
+        return 'trashed';
+      case ReminderMutationAction.restoreFromTrash:
+        if (current.trashedAt == null) return 'restored_from_trash';
+        values['trashed_at'] = null;
+        return 'restored_from_trash';
     }
   }
 
@@ -1675,7 +1708,8 @@ class SqliteAgendaApplication
         values['outcome_type'] == current.outcomeType?.storageValue &&
         values['outcome_note'] == current.outcomeNote &&
         values['completed_at'] == current.completedAt &&
-        values['cancelled_at'] == current.cancelledAt;
+        values['cancelled_at'] == current.cancelledAt &&
+        values['trashed_at'] == current.trashedAt;
   }
 
   Future<void> _reconcileNotificationsAt(
@@ -1715,6 +1749,7 @@ class SqliteAgendaApplication
     final eligible = work
         .where(
           (item) =>
+              item.reminder.trashedAt == null &&
               item.reminder.status == ReminderStatus.active &&
               item.reminder.nextAttentionAt != null &&
               (CseTimeCodec.decodeCanonicalUtc(
@@ -1735,7 +1770,9 @@ class SqliteAgendaApplication
         work.map(
           (item) => _BindingUpdate(
             reminderId: item.reminder.id,
-            scheduledFor: item.reminder.nextAttentionAt,
+            scheduledFor: eligible.contains(item)
+                ? item.reminder.nextAttentionAt
+                : null,
             state: eligible.contains(item)
                 ? NotificationSyncState.unavailable
                 : NotificationSyncState.cancelled,
@@ -1773,7 +1810,9 @@ class SqliteAgendaApplication
         work.map(
           (item) => _BindingUpdate(
             reminderId: item.reminder.id,
-            scheduledFor: item.reminder.nextAttentionAt,
+            scheduledFor: eligible.contains(item)
+                ? item.reminder.nextAttentionAt
+                : null,
             state: eligible.contains(item)
                 ? permission == NotificationPermissionState.denied ||
                           permission ==
@@ -1796,7 +1835,9 @@ class SqliteAgendaApplication
         work.map(
           (item) => _BindingUpdate(
             reminderId: item.reminder.id,
-            scheduledFor: item.reminder.nextAttentionAt,
+            scheduledFor: eligible.contains(item)
+                ? item.reminder.nextAttentionAt
+                : null,
             state: eligible.contains(item)
                 ? NotificationSyncState.failed
                 : NotificationSyncState.cancelled,
@@ -2039,7 +2080,8 @@ class SqliteAgendaApplication
             '''
             SELECT
               b.sync_state, b.scheduled_for,
-              f.project_id, f.observation_id, f.attendance_day_id
+              f.project_id, f.observation_id, f.attendance_day_id,
+              f.concrete_pour_id
             FROM reminder_notification_bindings b
             JOIN follow_up_items f ON f.id = b.reminder_id
             WHERE b.reminder_id = ?
@@ -2086,6 +2128,7 @@ class SqliteAgendaApplication
             'project_id': previous['project_id'],
             'source_observation_id': previous['observation_id'],
             'source_attendance_day_id': previous['attendance_day_id'],
+            'source_concrete_pour_id': previous['concrete_pour_id'],
             'event_type': eventType,
             'occurred_at': syncedAt,
             'payload_json': jsonEncode({'scheduled_for': update.scheduledFor}),
@@ -2152,7 +2195,7 @@ class SqliteAgendaApplication
       SELECT f.*, p.name AS project_name
       FROM follow_up_items f
       LEFT JOIN projects p ON p.id = f.project_id
-      WHERE f.observation_id = ?
+      WHERE f.observation_id = ? AND f.trashed_at IS NULL
       ORDER BY f.created_at ASC, f.id ASC
       ''',
       [logId],
@@ -2562,6 +2605,7 @@ MobileReminder _reminderFromRow(Map<String, Object?> row) {
   final deadlineAt = row['deadline_at'] as String?;
   final completedAt = row['completed_at'] as String?;
   final cancelledAt = row['cancelled_at'] as String?;
+  final trashedAt = row['trashed_at'] as String?;
   validateUuid(id, 'Hatırlatıcı kimliği');
   if (projectId != null) validateUuid(projectId, 'Proje kimliği');
   if (sourceLogId != null) validateUuid(sourceLogId, 'Kaynak log kimliği');
@@ -2593,6 +2637,9 @@ MobileReminder _reminderFromRow(Map<String, Object?> row) {
   }
   if (cancelledAt != null) {
     validateCanonicalTimestamp(cancelledAt, 'İptal zamanı');
+  }
+  if (trashedAt != null) {
+    validateCanonicalTimestamp(trashedAt, 'Geri dönüşüm kutusu zamanı');
   }
   final outcomeValue = row['outcome_type'] as String?;
   return MobileReminder(
@@ -2627,6 +2674,7 @@ MobileReminder _reminderFromRow(Map<String, Object?> row) {
     updatedAt: updatedAt,
     completedAt: completedAt,
     cancelledAt: cancelledAt,
+    trashedAt: trashedAt,
     revision: row['revision']! as int,
   );
 }

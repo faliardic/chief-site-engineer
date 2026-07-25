@@ -1,5 +1,23 @@
 # Changelog
 
+## Issue #227 - Hatırlatıcı Geri Dönüşüm Kutusu
+
+- Mobil SQLite schema `8` → `9` atomik migration ile reminder aggregate'ine
+  nullable canonical UTC `trashed_at` alanı eklendi.
+- `Sil`, fiziksel delete veya terminal status üretmeden kaydı Geri Dönüşüm
+  Kutusu'na taşır; `Geri yükle` aynı status, schedule, outcome ve source
+  bağlantılarıyla kaydı normal görünümüne döndürür.
+- `trashed` ve `restored_from_trash` append-only event'leri optimistic revision,
+  stale-write rollback ve duplicate no-op sözleşmesine bağlandı.
+- Trash kayıtlar Bugün/Yarın/Yaklaşanlar/Unutma Kutusu/Tekrar kontrol/Geçmiş ve
+  source reminder listelerinden dışlandı; `Diğer` menüsüne deterministik Geri
+  Dönüşüm Kutusu görünümü eklendi.
+- Trash sırasında native notification iptal edilir ve binding kimliği korunur.
+  Restore yalnız gelecekteki aktif timed kaydı yeniden planlar; overdue,
+  all-day, inbox ve terminal kayıt için yapay alarm kurulmaz.
+- Backup formatı `1` değişmedi; schema `1–8` paketlerinin schema `9` restore
+  uyumluluğu ve schema 9 trash/event round-trip testlerle doğrulandı.
+
 ## Issue #225 - Birleşik ve Sade Bugün Görünümü
 
 - Hatırlatıcı sekmesinin varsayılanı `Bugün` oldu; aktif kayıtlar aynı scroll
