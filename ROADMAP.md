@@ -407,8 +407,9 @@ recovery `PASS`; günlük rapor `≤3 dk`; haricî not/hatırlatıcıya dönüş
   eşik ve kullanıcı bildirim tercihleri tasarlanır.
 - Gömülü/doğrudan AI servis çağrısı; ilk adım yalnız kaynaklı prompt export'tur.
 - Tam satın alma/ERP, gelişmiş video işleme ve otomatik medya analizi.
-- DWG/Office gömülü viewer, iki yönlü PC sync, PDF metraj ve ileri mühendislik
-  hesapları.
+- Güvenli, salt-okunur gömülü DWG/Office/proje dokümanı viewer nihai ürün
+  hedefidir; iki yönlü PC sync, PDF metraj ve ileri mühendislik hesaplarıyla
+  birlikte ertelenmiştir.
 
 ### Kapsam dışı / yapılmaması gerekenler
 
@@ -420,8 +421,8 @@ recovery `PASS`; günlük rapor `≤3 dk`; haricî not/hatırlatıcıya dönüş
 - Aynı fiziksel attachment'ı Ajanda, reminder, Beton veya albüm için çoğaltmak.
 - Kaynaksız AI raporu, kullanıcı onayı olmadan AI mutasyonu veya embedded AI'yı
   erken eklemek.
-- Tam ERP, multi-user/tenant/SaaS, DWG/Office düzenleme ve ileri mühendislik karar
-  motoru.
+- Tam ERP, multi-user/tenant/SaaS, BIM/DWG/Office düzenleme, authoring ve teknik
+  karar motoru.
 
 # 7. Release 0.1 sonrası ilk Issue kuyruğu
 
@@ -482,7 +483,7 @@ paketi, Saha, arama, Asistan veya ikincil `Tüm araçlar` alanından açılır.
 - çok kullanıcılı tenant/SaaS;
 - bordro, cari ve çek/senet;
 - resmî onay veya teknik kabul motoru;
-- BIM/DWG ve Office düzenleyici veya gömülü viewer;
+- BIM/DWG/Office düzenleme, authoring ve teknik karar motoru;
 - otomatik iki yönlü PC senkronu;
 - otomatik hard-delete veya Beton kelimesinden otomatik kayıt/paket;
 - aynı fiziksel attachment'ın modüller arasında kopyalanması;

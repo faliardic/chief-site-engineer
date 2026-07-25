@@ -241,12 +241,34 @@ otomatik gönderim veya sessiz veri mutasyonu yoktur.
 |---|---|---|
 | Hemen | Günlük güvenilirlik ve mevcut saha akışını doğrudan düzelten dar işler | #221, birleşik Bugün, trash/restore |
 | Sonraki kontrollü sıra | Daha geniş persistence veya yeni yüzey gerektiren fakat kabul edilmiş işler | attachment v2, albüm, #204 UX, prompt export |
-| Ertelenen | Ön koşul tasarımı veya haricî bağımlılığı henüz tamamlanmamış işler | hava servisi, embedded AI, iki yönlü PC sync |
-| Kapsam dışı | Ürün ilkelerine aykırı veya bu ürünün hedefi olmayan işler | full ERP, auto hard-delete, duplicate attachment, otonom teknik karar |
+| Ertelenen | Ön koşul tasarımı veya haricî bağımlılığı henüz tamamlanmamış işler | hava servisi, güvenli salt-okunur DWG/Office/proje dokümanı viewer, iki yönlü PC sync |
+| Kapsam dışı | Ürün ilkelerine aykırı veya bu ürünün hedefi olmayan işler | full ERP, BIM/DWG/Office authoring, auto hard-delete, duplicate attachment, otonom teknik karar |
 
 “Ertelenen” ile “kapsam dışı” aynı şey değildir. Ertelenen iş doğru ön koşullar
 sağlanınca yeniden değerlendirilebilir. Kapsam dışı karar ise bu ürün yönünde
 yapılmaması gereken davranışı tanımlar.
+
+## Viewer ile authoring ayrımını nasıl yaptık?
+
+İki kavram aynı değildir:
+
+```text
+Güvenli, salt-okunur gömülü viewer
+    = DWG, Office ve proje dokümanını uygulamadan çıkmadan görüntülemek
+    = nihai ürün hedefi
+    = şimdilik ertelenmiş
+
+BIM/DWG/Office authoring
+    = dosyayı veya modeli oluşturmak, düzenlemek ya da yeniden yazmak
+    = teknik karar üretmek
+    = kesin kapsam dışı
+```
+
+**Authoring**, bir dokümanı yalnız görüntülemekten farklı olarak içeriğini
+oluşturma veya değiştirme işlemidir. Viewer salt-okunur kaldığı için authoring
+yetkisi taşımaz. Böylece proje dokümanını CSE içinde güvenle görme hedefi
+korunurken CSE'nin CAD/Office düzenleyiciye veya teknik karar motoruna dönüşmesi
+engellenir.
 
 ## Hangi dosyada ne yaptık?
 
@@ -355,6 +377,8 @@ Yeniden kullanılan kanıt:
 | Beton keyword | Öneri/deep-link | Yanlış otomatik kayıt ve teknik karar üretmez |
 | AI ilk adımı | Kaynaklı prompt export | Kullanıcı kontrolünü ve kaynak izini korur |
 | Hava durumu | Ertelenmiş | Haricî servis, offline ve eşik sözleşmesi henüz tasarlanmadı |
+| Doküman viewer | Güvenli, salt-okunur ve gömülü; ertelenmiş nihai hedef | Uygulamadan çıkmadan proje dokümanı görüntüleme hedefini korur |
+| BIM/DWG/Office authoring | Kapsam dışı | CSE'yi düzenleyiciye veya teknik karar motoruna dönüştürmez |
 | Validation | `docs` | Yalnız dokümantasyon sırası değişti |
 | Glossary | Değişmedi | Yeni kalıcı teknik terim yok |
 

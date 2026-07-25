@@ -15,6 +15,9 @@
   tek fiziksel attachment, Beton önerisi ve kaynaklı AI sınırlarıyla yazıldı.
 - Universal Capture, Voice Capture/Assistant Inbox ve Open Loop sırası korundu;
   fakat Release 0.1.1 günlük güvenilirlik kapılarının arkasına alındı.
+- Güvenli, salt-okunur gömülü DWG/Office/proje dokümanı viewer ertelenmiş nihai
+  ürün hedefi olarak korundu; BIM/DWG/Office düzenleme, authoring ve teknik karar
+  motoru kesin kapsam dışında tutuldu.
 - Bu değişiklik yalnız docs/governance kapsamındadır; production kodu, schema,
   migration, backup formatı, notification motoru, artifact ve kullanıcı verisi
   değişmedi.

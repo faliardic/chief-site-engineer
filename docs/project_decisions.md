@@ -3172,8 +3172,10 @@
 - Beton keyword yalnız öneri/deep-link üretir. İlk AI adımı kaynaklı prompt
   export'tur; otomatik Beton creation, embedded AI ve sessiz mutasyon yoktur.
 - Hava durumu, haricî servis/eşik/offline tasarımı sonrasına ertelenir.
-  DWG/Office viewer, iki yönlü PC sync, tam ERP ve ileri mühendislik hesapları
-  ertelenmiş veya kapsam dışıdır.
+  Güvenli, salt-okunur gömülü DWG/Office/proje dokümanı viewer nihai ürün
+  hedefidir fakat ertelenmiştir. İki yönlü PC sync ve ileri mühendislik
+  hesapları da ertelenir; BIM/DWG/Office düzenleme, authoring ve teknik karar
+  motoru kesin kapsam dışıdır.
 - Validation class `docs` olarak sabittir. Exact allowlist, Markdown
   başlık/bağlantı/Issue referansı, `git diff --check` ve production diff boşluğu
   yeterlidir; full suite, analyze, artifact, release gate, backup/restore ve

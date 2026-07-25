@@ -136,7 +136,8 @@ başlatmaz.
 - Embedded/doğrudan AI.
 - Tam satın alma/ERP.
 - Gelişmiş video işleme ve otomatik medya analizi.
-- DWG/Office gömülü viewer.
+- Nihai ürün hedefi olan güvenli, salt-okunur gömülü DWG/Office/proje dokümanı
+  viewer.
 - İki yönlü PC sync.
 - PDF metraj ve ileri mühendislik hesapları.
 
@@ -148,6 +149,7 @@ başlatmaz.
 - Duplicate fiziksel attachment.
 - Kaynaksız AI raporu veya kullanıcı onayı olmadan veri mutasyonu.
 - Full ERP, multi-user/tenant/SaaS veya teknik kabul motoru.
+- BIM/DWG/Office düzenleme, authoring veya teknik karar motoru.
 
 ## Faz geçişi
 
