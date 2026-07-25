@@ -1615,3 +1615,5 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Half-Open Time Interval (Yarı Açık Zaman Aralığı)`: Başlangıcı dahil, bitişi hariç `[start, end)` zaman aralığıdır. Issue #214 yerel yarın 00:00 kaydını dahil ederken sonraki gün 00:00 kaydını dışlayarak günler arasında çakışma üretmez.
 
 `Local Calendar Projection (Yerel Takvim Projection'ı)`: Kanonik UTC saklanan kayıtları UTC tarih parçasıyla değil, kullanıcının belirlenmiş timezone'ındaki takvim günü sınırlarıyla seçen read-model'dir. Issue #214 için timezone `Europe/Istanbul`dur.
+
+`Unified Today Read-Model (Birleşik Bugün Okuma Modeli)`: Aktif reminder'ları tek `asOfUtc` referansıyla Gecikenler, Saatli bugün ve Tam gün bölümlerine ayıran, inbox sayısını ayrıca taşıyan, logical reminder kimliğini tekilleştiren ve kalıcı kaydı değiştirmeyen application projeksiyonudur.

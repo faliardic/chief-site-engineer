@@ -498,6 +498,185 @@ void main() {
     },
   );
 
+  test(
+    'unified Today uses Istanbul 18:00 cutoff and deterministic sections',
+    () async {
+      String id(int value) =>
+          'dddddddd-dddd-4ddd-8ddd-${value.toString().padLeft(12, '0')}';
+
+      now = DateTime.utc(2026, 12, 30, 6);
+      Future<MobileReminder> createTimed(
+        int value,
+        String dueAt, {
+        bool important = false,
+      }) => agenda.createReminder(
+        CreateReminderCommand(
+          id: id(value),
+          eventId: eventId(200 + value),
+          projectId: project1,
+          title: 'Saatli $value',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: dueAt,
+          isImportant: important,
+        ),
+      );
+      Future<MobileReminder> createAllDay(
+        int value,
+        String day, {
+        bool important = false,
+      }) => agenda.createReminder(
+        CreateReminderCommand(
+          id: id(value),
+          eventId: eventId(200 + value),
+          projectId: project1,
+          title: 'Tam gün $value',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          allDayLocalDate: day,
+          isImportant: important,
+        ),
+      );
+
+      final pastAllDay = await createAllDay(1, '2026-12-30');
+      final overdueTimed = await createTimed(2, '2026-12-31T14:00:00Z');
+      final laterTimed = await createTimed(3, '2026-12-31T16:00:00Z');
+      final importantTimed = await createTimed(
+        4,
+        '2026-12-31T16:00:00Z',
+        important: true,
+      );
+      final todayAllDay = await createAllDay(5, '2026-12-31');
+      final importantAllDay = await createAllDay(
+        6,
+        '2026-12-31',
+        important: true,
+      );
+      final tomorrowTimed = await createTimed(7, '2026-12-31T21:30:00Z');
+      final tomorrowAllDay = await createAllDay(8, '2027-01-01');
+      final inbox = await agenda.createReminder(
+        CreateReminderCommand(
+          id: id(9),
+          eventId: eventId(209),
+          projectId: project1,
+          title: 'Plansız',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.inbox,
+        ),
+      );
+      var completed = await createTimed(10, '2026-12-31T16:30:00Z');
+      completed = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: completed.id,
+          eventId: eventId(310),
+          expectedRevision: completed.revision,
+          action: ReminderMutationAction.complete,
+        ),
+      );
+      var cancelled = await createTimed(11, '2026-12-31T17:00:00Z');
+      cancelled = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: cancelled.id,
+          eventId: eventId(311),
+          expectedRevision: cancelled.revision,
+          action: ReminderMutationAction.cancel,
+        ),
+      );
+
+      now = DateTime.utc(2026, 12, 31, 14, 59, 59);
+      final beforeCutoff = await agenda.getReminderTodayOverview();
+      expect(beforeCutoff.istanbulDay, '2026-12-31');
+      expect(beforeCutoff.overdue.map((item) => item.id), [
+        pastAllDay.id,
+        overdueTimed.id,
+      ]);
+      expect(beforeCutoff.timedToday.map((item) => item.id), [
+        importantTimed.id,
+        laterTimed.id,
+      ]);
+      expect(beforeCutoff.allDayToday.map((item) => item.id), [
+        importantAllDay.id,
+        todayAllDay.id,
+      ]);
+      expect(beforeCutoff.inboxCount, 1);
+      final visibleIds = [
+        ...beforeCutoff.overdue,
+        ...beforeCutoff.timedToday,
+        ...beforeCutoff.allDayToday,
+      ].map((item) => item.id).toList();
+      expect(visibleIds.toSet(), hasLength(visibleIds.length));
+      expect(visibleIds, isNot(contains(tomorrowTimed.id)));
+      expect(visibleIds, isNot(contains(tomorrowAllDay.id)));
+      expect(visibleIds, isNot(contains(inbox.id)));
+      expect(visibleIds, isNot(contains(completed.id)));
+      expect(visibleIds, isNot(contains(cancelled.id)));
+
+      now = DateTime.utc(2026, 12, 31, 15);
+      final atCutoff = await agenda.getReminderTodayOverview();
+      expect(
+        atCutoff.overdue.map((item) => item.id),
+        containsAll([todayAllDay.id, importantAllDay.id]),
+      );
+      expect(atCutoff.allDayToday, isEmpty);
+      expect(
+        (await agenda.listReminders(ReminderViewGroup.tomorrow))
+            .map((item) => item.id),
+        containsAll([tomorrowTimed.id, tomorrowAllDay.id]),
+      );
+    },
+  );
+
+  test('Today classifier deduplicates Puantaj and Beton source reminders', () {
+    MobileReminder sourceReminder({
+      required String id,
+      String? attendanceDayId,
+      String? concretePourId,
+      String? nextAttentionAt,
+      String? allDayLocalDate,
+    }) => MobileReminder(
+      id: id,
+      projectId: project1,
+      projectName: 'Kuzey Şantiyesi',
+      sourceLogId: null,
+      attendanceDayId: attendanceDayId,
+      concretePourId: concretePourId,
+      title: 'Kaynak reminder',
+      kind: ReminderKind.action,
+      status: ReminderStatus.active,
+      nextAttentionAt: nextAttentionAt,
+      allDayLocalDate: allDayLocalDate,
+      createdAt: '2026-12-30T06:00:00Z',
+      updatedAt: '2026-12-30T06:00:00Z',
+      revision: 1,
+    );
+
+    final attendance = sourceReminder(
+      id: reminder1,
+      attendanceDayId: log1,
+      nextAttentionAt: '2026-12-31T16:00:00Z',
+    );
+    final concrete = sourceReminder(
+      id: reminder2,
+      concretePourId: log2,
+      allDayLocalDate: '2026-12-31',
+    );
+    final overview = buildReminderTodayOverview(
+      [attendance, attendance, concrete, concrete],
+      asOfUtc: DateTime.utc(2026, 12, 31, 14),
+    );
+
+    expect(overview.timedToday.single.id, attendance.id);
+    expect(overview.timedToday.single.attendanceDayId, log1);
+    expect(overview.allDayToday.single.id, concrete.id);
+    expect(overview.allDayToday.single.concretePourId, log2);
+    expect(
+      [...overview.timedToday, ...overview.allDayToday]
+          .map((item) => item.id)
+          .toSet(),
+      hasLength(2),
+    );
+  });
+
   test('source project mismatch fails before reminder insert', () async {
     await agenda.createProject(
       const CreateProjectCommand(id: project2, name: 'Başka Proje'),

@@ -3209,3 +3209,23 @@
   lifecycle/application/widget testleri ve `flutter analyze` yeterlidir.
   Android release gate, AAB/signing, reboot/background acceptance, production
   RC ve gerçek cihaz restore bu Issue'da çalıştırılmaz.
+
+## Issue 225 — Birleşik Bugün Reminder Read-Modeli
+
+- Hatırlatıcı ana yüzeyinin varsayılanı `Bugün`dür. Ana filtre sayısı
+  `Bugün | Yarın | Diğer` ile sınırlıdır; Yaklaşanlar, Unutma Kutusu, Tekrar
+  kontrol ve Geçmiş `Diğer` menüsünden açılır.
+- Bugün read-modeli tek `asOfUtc` okuması ve kanonik `CseTimeCodec` üzerinden
+  `overdue | timedToday | allDayToday | inboxCount` üretir. UI kendi
+  DateTime karşılaştırmasını yapmaz.
+- Aktif timed kayıt `next_attention_at < asOfUtc` olduğunda gecikmiştir.
+  Geçmiş yerel gün all-day her saatte; bugünkü all-day ise Europe/Istanbul
+  18:00:00 ve sonrasında gecikmiştir.
+- Sınıflandırma reminder kimliğini önce tekilleştirir. Böylece kaynak
+  Puantaj/Beton olsa da aynı logical reminder iki bölümde veya iki kart olarak
+  gösterilmez.
+- Saatli bugün en erken saat, sonra importance/created/id; tam gün importance,
+  created/id; geciken logical schedule, importance, created/id sırasındadır.
+- Bu karar yalnız application read-model ve presentation katmanıdır. Schema 8,
+  backup format 1, notification gateway, platform kodu ve project-level 18:00
+  ayarı değişmez.

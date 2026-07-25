@@ -10,6 +10,119 @@ import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:sqflite/sqflite.dart';
 
+class ReminderTodayOverview {
+  const ReminderTodayOverview({
+    required this.istanbulDay,
+    required this.overdue,
+    required this.timedToday,
+    required this.allDayToday,
+    required this.inboxCount,
+  });
+
+  final String istanbulDay;
+  final List<MobileReminder> overdue;
+  final List<MobileReminder> timedToday;
+  final List<MobileReminder> allDayToday;
+  final int inboxCount;
+
+  bool get isEmpty =>
+      overdue.isEmpty && timedToday.isEmpty && allDayToday.isEmpty;
+}
+
+ReminderTodayOverview buildReminderTodayOverview(
+  Iterable<MobileReminder> reminders, {
+  required DateTime asOfUtc,
+}) {
+  final asOf = CseTimeCodec.encodeUtc(asOfUtc);
+  final today = CseTimeCodec.istanbulDayKey(asOf);
+  final localNow = CseTimeCodec.toIstanbul(asOf);
+  final allDayCutoffReached = localNow.hour >= 18;
+  final unique = <String, MobileReminder>{};
+  for (final reminder in reminders) {
+    unique.putIfAbsent(reminder.id, () => reminder);
+  }
+
+  final overdue = <MobileReminder>[];
+  final timedToday = <MobileReminder>[];
+  final allDayToday = <MobileReminder>[];
+  var inboxCount = 0;
+  for (final reminder in unique.values) {
+    if (reminder.status == ReminderStatus.inbox) {
+      inboxCount += 1;
+      continue;
+    }
+    if (reminder.status != ReminderStatus.active) continue;
+
+    final nextAttentionAt = reminder.nextAttentionAt;
+    if (nextAttentionAt != null) {
+      final due = CseTimeCodec.decodeCanonicalUtc(nextAttentionAt);
+      if (due.isBefore(asOfUtc)) {
+        overdue.add(reminder);
+      } else if (CseTimeCodec.istanbulDayKey(nextAttentionAt) == today) {
+        timedToday.add(reminder);
+      }
+      continue;
+    }
+
+    final allDayLocalDate = reminder.allDayLocalDate;
+    if (allDayLocalDate == null) continue;
+    CseTimeCodec.validateIstanbulDay(allDayLocalDate);
+    if (allDayLocalDate.compareTo(today) < 0 ||
+        (allDayLocalDate == today && allDayCutoffReached)) {
+      overdue.add(reminder);
+    } else if (allDayLocalDate == today) {
+      allDayToday.add(reminder);
+    }
+  }
+
+  overdue.sort(_compareOverdueReminders);
+  timedToday.sort(_compareTimedReminders);
+  allDayToday.sort(_compareAllDayReminders);
+  return ReminderTodayOverview(
+    istanbulDay: today,
+    overdue: List.unmodifiable(overdue),
+    timedToday: List.unmodifiable(timedToday),
+    allDayToday: List.unmodifiable(allDayToday),
+    inboxCount: inboxCount,
+  );
+}
+
+int _compareOverdueReminders(MobileReminder left, MobileReminder right) {
+  final leftKey =
+      left.nextAttentionAt ??
+      CseTimeCodec.istanbulDayBounds(left.allDayLocalDate!).start;
+  final rightKey =
+      right.nextAttentionAt ??
+      CseTimeCodec.istanbulDayBounds(right.allDayLocalDate!).start;
+  final scheduleOrder = leftKey.compareTo(rightKey);
+  if (scheduleOrder != 0) return scheduleOrder;
+  return _compareImportanceCreatedAndId(left, right);
+}
+
+int _compareTimedReminders(MobileReminder left, MobileReminder right) {
+  final scheduleOrder = left.nextAttentionAt!.compareTo(
+    right.nextAttentionAt!,
+  );
+  if (scheduleOrder != 0) return scheduleOrder;
+  return _compareImportanceCreatedAndId(left, right);
+}
+
+int _compareAllDayReminders(MobileReminder left, MobileReminder right) =>
+    _compareImportanceCreatedAndId(left, right);
+
+int _compareImportanceCreatedAndId(
+  MobileReminder left,
+  MobileReminder right,
+) {
+  final importanceOrder = (right.isImportant ? 1 : 0).compareTo(
+    left.isImportant ? 1 : 0,
+  );
+  if (importanceOrder != 0) return importanceOrder;
+  final createdOrder = left.createdAt.compareTo(right.createdAt);
+  if (createdOrder != 0) return createdOrder;
+  return left.id.compareTo(right.id);
+}
+
 abstract interface class AgendaApplication {
   Stream<void> get projectChanges;
 
@@ -56,6 +169,10 @@ abstract interface class AgendaApplication {
   Future<List<AppendOnlyEvent>> listReminderEvents(String reminderId);
 }
 
+abstract interface class ReminderTodayApplication {
+  Future<ReminderTodayOverview> getReminderTodayOverview();
+}
+
 abstract interface class ReminderDeliveryApplication {
   Future<ReminderDeliveryDiagnostic> getReminderDeliveryDiagnostic(
     String reminderId,
@@ -72,7 +189,10 @@ typedef ReminderTransactionHook =
     Future<void> Function(Transaction transaction);
 
 class SqliteAgendaApplication
-    implements AgendaApplication, ReminderDeliveryApplication {
+    implements
+        AgendaApplication,
+        ReminderTodayApplication,
+        ReminderDeliveryApplication {
   SqliteAgendaApplication({
     required this.databasePath,
     required this.databaseFactory,
@@ -930,6 +1050,39 @@ class SqliteAgendaApplication
       requestPermission: schedule.nextAttentionAt != null,
     );
     return reminder;
+  }
+
+  @override
+  Future<ReminderTodayOverview> getReminderTodayOverview() async {
+    final now = _readClockOnce();
+    final nowValue = CseTimeCodec.encodeUtc(now);
+    final today = CseTimeCodec.istanbulDayKey(nowValue);
+    final bounds = CseTimeCodec.istanbulDayBounds(today);
+    return _withDatabase(now, (database) async {
+      final rows = await database.rawQuery(
+        '''
+        SELECT f.*, p.name AS project_name
+        FROM follow_up_items f
+        LEFT JOIN projects p ON p.id = f.project_id
+        WHERE f.status = 'inbox'
+          OR (
+            f.status = 'active'
+            AND (
+              (f.next_attention_at IS NOT NULL
+                AND f.next_attention_at < ?)
+              OR (f.all_day_local_date IS NOT NULL
+                AND f.all_day_local_date <= ?)
+            )
+          )
+        ORDER BY f.id ASC
+        ''',
+        [bounds.endExclusive, today],
+      );
+      return buildReminderTodayOverview(
+        rows.map(_reminderFromRow),
+        asOfUtc: now,
+      );
+    });
   }
 
   @override
