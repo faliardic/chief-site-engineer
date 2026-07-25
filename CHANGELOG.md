@@ -1,5 +1,24 @@
 # Changelog
 
+## Issue #220 - Roadmap 2026.3.1 Saha Geri Bildirimleri IV Hizalaması
+
+- Kanonik roadmap tarihi 25 Temmuz 2026 ve güvenli başlangıç noktası
+  `d4ccc480570a971cf014ddbe00122ec6132cad01` olarak güncellendi.
+- Açık #193 Release 0.1 pilotu ile yeni Release 0.1.1 günlük
+  güvenilirlik/sadeleştirme işi birbirinden ayrıldı; Gün 0 PASS kanıtı korunurken
+  pilotun kapanmadığı açıkça kaydedildi.
+- Faz 0 ile Faz 1 arasına #219 yorumundaki düzeltilmiş sırayı izleyen 13 blok
+  eklendi. İlk production child #221 Reminder scheduling contract olarak
+  kanonikleştirildi.
+- `Hemen`, `Sonraki kontrollü sıra`, `Ertelenen` ve `Kapsam dışı` ayrımı;
+  reminder `Bekliyorum`, gerçek `Tam gün`, birleşik Bugün, recoverable trash,
+  tek fiziksel attachment, Beton önerisi ve kaynaklı AI sınırlarıyla yazıldı.
+- Universal Capture, Voice Capture/Assistant Inbox ve Open Loop sırası korundu;
+  fakat Release 0.1.1 günlük güvenilirlik kapılarının arkasına alındı.
+- Bu değişiklik yalnız docs/governance kapsamındadır; production kodu, schema,
+  migration, backup formatı, notification motoru, artifact ve kullanıcı verisi
+  değişmedi.
+
 ## Issue #214 - Yarın Hatırlatıcı Görünümü
 
 - Hatırlatıcı üst filtrelerine ayrı `Yarın` görünümü eklendi; yalnız

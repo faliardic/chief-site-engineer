@@ -3151,3 +3151,30 @@
   yalnız sade kullanıcı mesajı gösterilir, notification diagnostic'i yoktur.
 - Mobil schema `7`, `.csebackup` format `1`, exact alarm/boot reconciliation,
   `.debug` application ID ve offline SQLite source-of-truth değişmez.
+
+## Issue 220 — Roadmap 2026.3.1 Günlük Güvenilirlik Sırası
+
+- #193 Release 0.1 gerçek cihaz pilotu açık kalır; Release 0.1.1 günlük
+  güvenilirlik/sadeleştirme işleri pilotu kapatmaz veya tamamlanmış göstermez.
+- Universal Capture production implementation'ından önce #219 yorumundaki
+  düzeltilmiş sıra uygulanır: reminder scheduling, birleşik Bugün,
+  trash/restore, Ajanda kaynak attachment görünürlüğü, Beton sınıfı/zaman
+  çizgisi, Beton keyword önerisi, attachment v2, albüm, #204 Puantaj UX,
+  İstenecek Malzemeler, prompt export, mini hesap makinesi ve ertelenmiş hava
+  uyarıları.
+- İlk production child #221'dir. Bu docs-only branch Blok 1 veya sonraki
+  production davranışını başlatmaz.
+- Reminder içindeki legacy `Bekliyorum` kaldırılır; gelecekteki `Beklediklerim`
+  Open Loop modelinde ayrı kayıt türüdür. `Tam gün`, sahte saat ile temsil
+  edilmez.
+- Silme ilk aşamada recoverable archive/trash'tır; otomatik hard-delete yoktur.
+  Attachment tek fiziksel dosya + çoklu kayıt bağlantısı ilkesini izler.
+- Beton keyword yalnız öneri/deep-link üretir. İlk AI adımı kaynaklı prompt
+  export'tur; otomatik Beton creation, embedded AI ve sessiz mutasyon yoktur.
+- Hava durumu, haricî servis/eşik/offline tasarımı sonrasına ertelenir.
+  DWG/Office viewer, iki yönlü PC sync, tam ERP ve ileri mühendislik hesapları
+  ertelenmiş veya kapsam dışıdır.
+- Validation class `docs` olarak sabittir. Exact allowlist, Markdown
+  başlık/bağlantı/Issue referansı, `git diff --check` ve production diff boşluğu
+  yeterlidir; full suite, analyze, artifact, release gate, backup/restore ve
+  fiziksel cihaz çalıştırılmaz.
