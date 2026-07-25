@@ -1,5 +1,20 @@
 # Changelog
 
+## Issue #225 - Birleşik ve Sade Bugün Görünümü
+
+- Hatırlatıcı sekmesinin varsayılanı `Bugün` oldu; aktif kayıtlar aynı scroll
+  yüzeyinde `Gecikenler`, `Saatli bugün` ve `Tam gün` bölümlerine ayrılır.
+- Europe/Istanbul yerel saatinde bugünkü all-day kayıtlar 17:59:59'a kadar
+  `Tam gün`, 18:00:00 ve sonrasında `Gecikenler` bölümünde gösterilir.
+- Ana filtreler `Bugün | Yarın | Diğer` olarak sadeleştirildi. Yaklaşanlar,
+  Unutma Kutusu, Tekrar kontrol ve Geçmiş görünümleri `Diğer` menüsünde
+  erişilebilir kalır.
+- Kartların Bugün/Yarın/Gecikti etiketleri yerel takvim gününden türetilir;
+  reminder kimliği bazında tekilleştirme aynı kartın iki bölümde görünmesini
+  engeller.
+- Schema 8, backup format 1, notification gateway ve platform davranışı
+  değiştirilmedi.
+
 ## Issue #221 - Reminder Bugün, Tam Gün ve Legacy Bekliyorum Sözleşmesi
 
 - Mobil SQLite schema `7` → `8` atomik migration ile reminder schedule

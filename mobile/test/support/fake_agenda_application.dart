@@ -3,20 +3,25 @@ import 'dart:async';
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 
-class FakeAgendaApplication implements AgendaApplication {
+class FakeAgendaApplication
+    implements AgendaApplication, ReminderTodayApplication {
   FakeAgendaApplication({
     this.projects = const [],
     this.logs = const [],
     this.reminders = const [],
+    this.todayOverview,
     this.logDetail,
     this.reminderDetail,
     this.initialNotificationReminderId,
     this.notificationTapStream = const Stream<String>.empty(),
-  });
+    DateTime? asOfUtc,
+  }) : asOfUtc = asOfUtc ?? DateTime.utc(2026, 7, 20, 5);
 
   List<MobileProject> projects;
   List<AgendaLog> logs;
   List<MobileReminder> reminders;
+  ReminderTodayOverview? todayOverview;
+  final DateTime asOfUtc;
   AgendaLogDetail? logDetail;
   MobileReminder? reminderDetail;
   @override
@@ -33,6 +38,7 @@ class FakeAgendaApplication implements AgendaApplication {
   Completer<MobileReminder>? mutateReminderCompleter;
   int createLogCalls = 0;
   int createReminderCalls = 0;
+  int todayOverviewCalls = 0;
   int mutateReminderCalls = 0;
   MutateReminderCommand? lastMutationCommand;
   final StreamController<void> _projectChanges =
@@ -237,6 +243,13 @@ class FakeAgendaApplication implements AgendaApplication {
 
   @override
   Future<List<MobileProject>> listProjects() async => projects;
+
+  @override
+  Future<ReminderTodayOverview> getReminderTodayOverview() async {
+    todayOverviewCalls += 1;
+    return todayOverview ??
+        buildReminderTodayOverview(reminders, asOfUtc: asOfUtc);
+  }
 
   @override
   Future<List<AppendOnlyEvent>> listReminderEvents(String reminderId) async =>

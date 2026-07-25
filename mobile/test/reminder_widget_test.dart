@@ -14,23 +14,31 @@ import 'support/fake_agenda_application.dart';
 
 const reminderId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
+String widgetReminderId(int value) =>
+    'dddddddd-dddd-4ddd-8ddd-${value.toString().padLeft(12, '0')}';
+
 MobileReminder reminder({
+  String id = reminderId,
+  String title = 'Mobil hızlı yakalama',
   ReminderStatus status = ReminderStatus.active,
+  String? nextAttentionAt,
   String? allDayLocalDate,
+  bool isImportant = false,
 }) =>
     MobileReminder(
-      id: reminderId,
+      id: id,
       projectId: null,
       projectName: null,
       sourceLogId: null,
-      captureText: 'Mobil hızlı yakalama',
-      title: 'Mobil hızlı yakalama',
+      captureText: title,
+      title: title,
       kind: ReminderKind.action,
       status: status,
+      isImportant: isImportant,
       nextAttentionAt:
           status == ReminderStatus.inbox || allDayLocalDate != null
           ? null
-          : '2026-07-20T06:00:00Z',
+          : nextAttentionAt ?? '2026-07-20T06:00:00Z',
       allDayLocalDate: allDayLocalDate,
       createdAt: '2026-07-19T08:00:00Z',
       updatedAt: '2026-07-19T08:00:00Z',
@@ -111,6 +119,144 @@ void main() {
       expect(agenda.lastReminderCommand!.kind, ReminderKind.action);
     },
   );
+
+  testWidgets(
+    'Today is default and renders overdue timed and all-day sections once',
+    (tester) async {
+      final overdue = reminder(
+        id: widgetReminderId(1),
+        title: 'Geciken kontrol',
+        nextAttentionAt: '2026-07-20T04:00:00Z',
+      );
+      final timed = reminder(
+        id: widgetReminderId(2),
+        title: 'Saatli kontrol',
+        nextAttentionAt: '2026-07-20T06:00:00Z',
+      );
+      final allDay = reminder(
+        id: widgetReminderId(3),
+        title: 'Tam gün kontrol',
+        allDayLocalDate: '2026-07-20',
+      );
+      final agenda = FakeAgendaApplication(
+        reminders: [overdue, timed, allDay],
+        todayOverview: ReminderTodayOverview(
+          istanbulDay: '2026-07-20',
+          overdue: [overdue],
+          timedToday: [timed],
+          allDayToday: [allDay],
+          inboxCount: 0,
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: Scaffold(body: RemindersPage(agenda: agenda))),
+      );
+      await tester.pumpAndSettle();
+
+      expect(agenda.todayOverviewCalls, 1);
+      expect(find.byType(ChoiceChip), findsNWidgets(3));
+      expect(
+        tester.widget<ChoiceChip>(
+          find.byKey(const Key('reminder-primary-today')),
+        ).selected,
+        isTrue,
+      );
+      expect(find.byKey(const Key('reminder-section-overdue')), findsOneWidget);
+      expect(
+        find.byKey(const Key('reminder-section-timed-today')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('reminder-section-all-day')), findsOneWidget);
+      expect(find.byKey(Key('reminder-${overdue.id}')), findsOneWidget);
+      expect(find.byKey(Key('reminder-${timed.id}')), findsOneWidget);
+      expect(find.byKey(Key('reminder-${allDay.id}')), findsOneWidget);
+      expect(
+        find.textContaining('Gecikti • 20.07.2026 07:00:00'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Bugün • 09:00'), findsOneWidget);
+      expect(find.textContaining('Yarın •'), findsNothing);
+      expect(
+        find.byKey(Key('reminder-tomorrow-${allDay.id}')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('Today hides empty sections and uses one simple empty state', (
+    tester,
+  ) async {
+    final agenda = FakeAgendaApplication(
+      todayOverview: const ReminderTodayOverview(
+        istanbulDay: '2026-07-20',
+        overdue: [],
+        timedToday: [],
+        allDayToday: [],
+        inboxCount: 0,
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: RemindersPage(agenda: agenda))),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('reminder-today-empty')), findsOneWidget);
+    expect(find.text('Bugün için açık hatırlatıcı yok.'), findsOneWidget);
+    expect(find.byKey(const Key('reminder-section-overdue')), findsNothing);
+    expect(
+      find.byKey(const Key('reminder-section-timed-today')),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('reminder-section-all-day')), findsNothing);
+  });
+
+  testWidgets('Other menu keeps secondary views and inbox count reachable', (
+    tester,
+  ) async {
+    final agenda = FakeAgendaApplication(
+      todayOverview: const ReminderTodayOverview(
+        istanbulDay: '2026-07-20',
+        overdue: [],
+        timedToday: [],
+        allDayToday: [],
+        inboxCount: 3,
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: RemindersPage(agenda: agenda))),
+    );
+    await tester.pumpAndSettle();
+
+    final inboxAction = find.byKey(const Key('reminder-inbox-count'));
+    expect(inboxAction, findsOneWidget);
+    expect(tester.getSize(inboxAction).height, greaterThanOrEqualTo(44));
+    await tester.tap(inboxAction);
+    await tester.pumpAndSettle();
+    expect(agenda.lastReminderGroup, ReminderViewGroup.inbox);
+    expect(find.text('Unutma Kutusu'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('reminder-primary-other')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('reminder-other-menu')), findsOneWidget);
+    for (final group in [
+      ReminderViewGroup.upcoming,
+      ReminderViewGroup.inbox,
+      ReminderViewGroup.recheck,
+      ReminderViewGroup.history,
+    ]) {
+      expect(
+        find.byKey(Key('reminder-other-${group.name}')),
+        findsOneWidget,
+      );
+    }
+    await tester.tap(
+      find.byKey(const Key('reminder-other-upcoming')),
+    );
+    await tester.pumpAndSettle();
+    expect(agenda.lastReminderGroup, ReminderViewGroup.upcoming);
+    expect(find.text('Yaklaşanlar'), findsOneWidget);
+  });
 
   testWidgets(
     'quick capture preserves input on validation/application failure',
@@ -217,7 +363,7 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('Yarın is direct on now overdue and upcoming cards', (
+  testWidgets('Yarın is direct on Today and Upcoming but hidden on Tomorrow', (
     tester,
   ) async {
     final item = reminder();
@@ -230,21 +376,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(Key('reminder-tomorrow-${item.id}')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('reminder-group-tomorrow')));
+    await tester.tap(find.byKey(const Key('reminder-primary-tomorrow')));
     await tester.pumpAndSettle();
     expect(agenda.lastReminderGroup, ReminderViewGroup.tomorrow);
     expect(find.byKey(Key('reminder-tomorrow-${item.id}')), findsNothing);
-    for (final group in [
-      ReminderViewGroup.now,
-      ReminderViewGroup.overdue,
-      ReminderViewGroup.upcoming,
-    ]) {
-      await tester.tap(find.byKey(Key('reminder-group-${group.name}')));
-      await tester.pumpAndSettle();
-      final action = find.byKey(Key('reminder-tomorrow-${item.id}'));
-      expect(action, findsOneWidget);
-      expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
-    }
+    await tester.tap(find.byKey(const Key('reminder-primary-other')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('reminder-other-upcoming')));
+    await tester.pumpAndSettle();
+    final action = find.byKey(Key('reminder-tomorrow-${item.id}'));
+    expect(action, findsOneWidget);
+    expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
   });
 
   testWidgets('Yarın filter has dedicated empty state without diagnostics', (
@@ -258,7 +400,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('reminder-group-tomorrow')));
+    await tester.tap(find.byKey(const Key('reminder-primary-tomorrow')));
     await tester.pumpAndSettle();
 
     expect(agenda.lastReminderGroup, ReminderViewGroup.tomorrow);
@@ -292,7 +434,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final tomorrowGroup = find.byKey(const Key('reminder-group-tomorrow'));
+      final tomorrowGroup = find.byKey(
+        const Key('reminder-primary-tomorrow'),
+      );
       expect(tomorrowGroup, findsOneWidget);
       expect(tester.getSize(tomorrowGroup).height, greaterThanOrEqualTo(48));
       await tester.tap(tomorrowGroup);
