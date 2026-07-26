@@ -5,6 +5,7 @@ import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/concrete_models.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
+import 'package:chief_site_engineer/features/concrete/concrete_destination_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_form_page.dart';
@@ -39,6 +40,42 @@ const concreteClass = ProjectConcreteClass(
 );
 
 void main() {
+  testWidgets(
+    'Ajanda destination aynı proje ve İstanbul gününde Bugün grubunu açar',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final concrete = _FakeConcrete();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+            child: ConcreteDestinationPage(
+              concrete: concrete,
+              agenda: _FakeAgenda(),
+              attachments: _picker(),
+              initialProjectId: projectId,
+              initialIstanbulDay: '2026-07-18',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Beton paketleri'), findsOneWidget);
+      expect(find.byKey(const Key('concrete-project-filter')), findsOneWidget);
+      expect(find.byKey(const Key('concrete-day-filter')), findsOneWidget);
+      expect(find.text('2026-07-18'), findsOneWidget);
+      expect(concrete.lastListQuery?.projectId, projectId);
+      expect(concrete.lastListQuery?.istanbulDay, '2026-07-18');
+      expect(concrete.lastListQuery?.group, ConcretePourGroup.today);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets(
     'Beton listesi 320 px ekranda filtreleri ve oluşturmayı gösterir',
     (tester) async {
@@ -191,9 +228,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     tester
-        .widget<TextButton>(
-          find.byKey(const Key('add-concrete-class')),
-        )
+        .widget<TextButton>(find.byKey(const Key('add-concrete-class')))
         .onPressed!();
     await tester.pumpAndSettle();
     await tester.enterText(
@@ -248,9 +283,7 @@ void main() {
       expect(find.byKey(const Key('concrete-actual-end')), findsOneWidget);
       expect(find.textContaining('30 dk'), findsOneWidget);
       tester
-          .widget<OutlinedButton>(
-            find.byKey(const Key('open-managed-agenda')),
-          )
+          .widget<OutlinedButton>(find.byKey(const Key('open-managed-agenda')))
           .onPressed!();
       await tester.pumpAndSettle();
       expect(find.byType(LogDetailPage), findsOneWidget);
@@ -297,50 +330,46 @@ void main() {
         concrete.lastTransitionCommand!.targetStatus,
         ConcretePourStatus.pouring,
       );
-      expect(
-        concrete._currentDetail.pour.actualStartedAt,
-        firstStartedAt,
-      );
+      expect(concrete._currentDetail.pour.actualStartedAt, firstStartedAt);
       expect(find.byKey(const Key('resume-concrete-pour')), findsNothing);
       expect(find.byKey(const Key('finish-concrete-pour')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
 
-  testWidgets(
-    'historical reopened pour with an end never offers resume',
-    (tester) async {
-      tester.view.physicalSize = const Size(320, 900);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final concrete = _FakeConcrete(
-        started: true,
-        ended: true,
-        status: ConcretePourStatus.draft,
-        agendaLinked: true,
-      );
-      await tester.pumpWidget(
-        MaterialApp(
-          home: MediaQuery(
-            data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
-            child: ConcretePourDetailPage(
-              concrete: concrete,
-              agenda: _FakeAgenda(),
-              attachments: _picker(),
-              pourId: pourId,
-            ),
+  testWidgets('historical reopened pour with an end never offers resume', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final concrete = _FakeConcrete(
+      started: true,
+      ended: true,
+      status: ConcretePourStatus.draft,
+      agendaLinked: true,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+          child: ConcretePourDetailPage(
+            concrete: concrete,
+            agenda: _FakeAgenda(),
+            attachments: _picker(),
+            pourId: pourId,
           ),
         ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Tamamlandı'), findsOneWidget);
-      expect(find.byKey(const Key('resume-concrete-pour')), findsNothing);
-      expect(find.byKey(const Key('start-concrete-pour')), findsNothing);
-      expect(find.byKey(const Key('finish-concrete-pour')), findsNothing);
-      expect(tester.takeException(), isNull);
-    },
-  );
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Tamamlandı'), findsOneWidget);
+    expect(find.byKey(const Key('resume-concrete-pour')), findsNothing);
+    expect(find.byKey(const Key('start-concrete-pour')), findsNothing);
+    expect(find.byKey(const Key('finish-concrete-pour')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'legacy null irsaliyeli mikser edit reverse animation boyunca güvenlidir',
@@ -571,6 +600,7 @@ class _FakeConcrete implements ConcreteApplication {
   CreateProjectConcreteClassCommand? lastCreateClassCommand;
   SaveConcreteTruckCommand? lastTruckCommand;
   TransitionConcretePourCommand? lastTransitionCommand;
+  ConcretePourQuery? lastListQuery;
 
   ConcretePourDetail get _currentDetail => _detail(
     lastTruckCommand,
@@ -638,9 +668,10 @@ class _FakeConcrete implements ConcreteApplication {
       _currentDetail;
 
   @override
-  Future<List<ConcretePour>> listPours(ConcretePourQuery query) async => [
-    _currentDetail.pour,
-  ];
+  Future<List<ConcretePour>> listPours(ConcretePourQuery query) async {
+    lastListQuery = query;
+    return [_currentDetail.pour];
+  }
 
   @override
   Future<ConcretePourDetail> attachEvidence(
@@ -699,6 +730,7 @@ class _FakeConcrete implements ConcreteApplication {
     }
     return _currentDetail;
   }
+
   @override
   Future<ConcretePourDetail> repairManagedAgenda(
     RepairConcreteAgendaCommand command,

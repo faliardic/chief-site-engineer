@@ -5,9 +5,11 @@ import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/domain/concrete_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
+import 'package:chief_site_engineer/features/concrete/concrete_destination_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
@@ -45,6 +47,22 @@ void main() {
         'Uzun Türkçe açıklama: döşeme donatısının bindirme boyları ve pas payları kontrol edildi.',
     location: 'A Blok 12. Kat Kuzey Cephesi',
     notes: 'Ayrıntılı saha notu.',
+    revision: 1,
+  );
+
+  AgendaLog concreteSignalLog({
+    AgendaCategory category = AgendaCategory.inspection,
+  }) => AgendaLog(
+    id: logId,
+    projectId: projectId,
+    projectName: 'Çok Uzun Kuzey Şantiyesi Proje Adı',
+    observedAt: '2026-07-19T07:30:00Z',
+    createdAt: '2026-07-19T08:00:00Z',
+    updatedAt: '2026-07-19T08:00:00Z',
+    category: category,
+    description: 'Yarın beton dökülecek.',
+    location: 'A Blok 12. Kat Kuzey Cephesi',
+    notes: 'Pompa erişimi ayrıca kontrol edilecek.',
     revision: 1,
   );
 
@@ -216,6 +234,327 @@ void main() {
     },
   );
 
+  testWidgets(
+    'Beton suggestion can be ignored and fail-soft save keeps text and category',
+    (tester) async {
+      final fake = FakeAgendaApplication(projects: [project()]);
+      await tester.pumpWidget(MaterialApp(home: LogFormPage(agenda: fake)));
+      await tester.pumpAndSettle();
+
+      const description = 'Yarın beton dökülecek.';
+      await tester.enterText(
+        find.byKey(const Key('log-description')),
+        description,
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('agenda-concrete-form-suggestion')),
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
+
+      expect(
+        find.text('Bu kayıt Beton işiyle ilgili görünüyor.'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('agenda-concrete-form-open')), findsNothing);
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const Key('log-description')))
+            .controller!
+            .text,
+        description,
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('submit-log')),
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(find.byKey(const Key('submit-log')));
+      await tester.pumpAndSettle();
+
+      expect(fake.createLogCalls, 1);
+      expect(fake.lastLogCommand?.description, description);
+      expect(fake.lastLogCommand?.category, AgendaCategory.generalNote);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'form deep-link preserves the exact draft and creates no records',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 820);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final fake = FakeAgendaApplication(projects: [project()]);
+      final concrete = _RecordingConcrete();
+      final attachments = SafeAttachmentPicker(
+        permissions: SafeCapabilityService(_GrantedPermission()),
+        picker: _SelectedPicker(),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+            child: LogFormPage(
+              agenda: fake,
+              attachments: attachments,
+              concrete: concrete,
+              concreteAttachments: attachments,
+              initialProjectId: projectId,
+              initialIstanbulDay: '2026-07-19',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final formListView = find.descendant(
+        of: find.byType(LogFormPage),
+        matching: find.byType(ListView),
+      );
+      expect(formListView, findsOneWidget);
+      final formScrollable = find
+          .descendant(
+            of: formListView,
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      expect(formScrollable, findsOneWidget);
+
+      const description = 'Beton dökümü yarın başlayacak.';
+      const location = 'B Blok temel';
+      const notes = 'Betonaj öncesi pompa yolu açık tutulacak.';
+      await tester.enterText(
+        find.byKey(const Key('log-description')),
+        description,
+      );
+      final categoryField = find.byType(
+        DropdownButtonFormField<AgendaCategory>,
+      );
+      expect(
+        tester.state<FormFieldState<AgendaCategory>>(categoryField).value,
+        AgendaCategory.generalNote,
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('agenda-concrete-form-suggestion')),
+        300,
+        scrollable: formScrollable,
+      );
+      expect(
+        tester
+            .getSize(find.byKey(const Key('agenda-concrete-select-category')))
+            .height,
+        greaterThanOrEqualTo(44),
+      );
+      expect(
+        tester
+            .getSize(find.byKey(const Key('agenda-concrete-form-open')))
+            .height,
+        greaterThanOrEqualTo(44),
+      );
+      await tester.tap(
+        find.byKey(const Key('agenda-concrete-select-category')),
+      );
+      await tester.pump();
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('log-category')),
+        -300,
+        scrollable: formScrollable,
+      );
+      expect(
+        tester.state<FormFieldState<AgendaCategory>>(categoryField).value,
+        AgendaCategory.concrete,
+      );
+      expect(fake.createLogCalls, 0);
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('log-location')),
+        -300,
+        scrollable: formScrollable,
+      );
+      await tester.enterText(find.byKey(const Key('log-location')), location);
+      await tester.enterText(find.byKey(const Key('log-notes')), notes);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('log-add-photo')),
+        -300,
+        scrollable: formScrollable,
+      );
+      await tester.tap(find.byKey(const Key('log-add-photo')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sistem fotoğraf seçici'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('pending-log-photo-0')), findsOneWidget);
+
+      final openConcreteAction = find.byKey(
+        const Key('agenda-concrete-form-open'),
+      );
+      await tester.scrollUntilVisible(
+        openConcreteAction,
+        300,
+        scrollable: formScrollable,
+      );
+      await Scrollable.ensureVisible(
+        tester.element(openConcreteAction),
+        alignment: 0.5,
+        duration: Duration.zero,
+      );
+      await tester.pumpAndSettle();
+      expect(openConcreteAction, findsOneWidget);
+      expect(openConcreteAction.hitTestable(), findsOneWidget);
+      await tester.tap(openConcreteAction);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ConcreteDestinationPage), findsOneWidget);
+      expect(concrete.lastListQuery?.projectId, projectId);
+      expect(concrete.lastListQuery?.istanbulDay, '2026-07-19');
+      expect(concrete.lastListQuery?.group, ConcretePourGroup.today);
+      expect(fake.createLogCalls, 0);
+      expect(concrete.createPourCalls, 0);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('log-category')),
+        -300,
+        scrollable: formScrollable,
+      );
+      expect(
+        tester.state<FormFieldState<AgendaCategory>>(categoryField).value,
+        AgendaCategory.concrete,
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('log-description')),
+        300,
+        scrollable: formScrollable,
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('log-description')), findsOneWidget);
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const Key('log-description')))
+            .controller!
+            .text,
+        description,
+      );
+      final locationField = find.byKey(const Key('log-location'));
+      await tester.scrollUntilVisible(
+        locationField,
+        200,
+        scrollable: formScrollable,
+      );
+      await tester.pumpAndSettle();
+      expect(locationField, findsOneWidget);
+      expect(
+        tester.widget<TextFormField>(locationField).controller!.text,
+        location,
+      );
+      final notesField = find.byKey(const Key('log-notes'));
+      await tester.scrollUntilVisible(
+        notesField,
+        200,
+        scrollable: formScrollable,
+      );
+      await tester.pumpAndSettle();
+      expect(notesField, findsOneWidget);
+      expect(
+        tester.widget<TextFormField>(notesField).controller!.text,
+        notes,
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('pending-log-photo-0')),
+        -300,
+        scrollable: formScrollable,
+      );
+      expect(find.byKey(const Key('pending-log-photo-0')), findsOneWidget);
+      final dateButton = find.byKey(const Key('log-date'));
+      await tester.scrollUntilVisible(
+        dateButton,
+        -300,
+        scrollable: formScrollable,
+      );
+      await tester.pumpAndSettle();
+      expect(dateButton, findsOneWidget);
+      expect(
+        find.descendant(
+          of: dateButton,
+          matching: find.text('19.07.2026'),
+        ),
+        findsOneWidget,
+      );
+      expect(fake.createLogCalls, 0);
+      expect(concrete.createPourCalls, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'unmanaged signal detail is fail-soft without Concrete dependencies',
+    (tester) async {
+      final signalLog = concreteSignalLog();
+      final fake = FakeAgendaApplication(
+        projects: [project()],
+        logs: [signalLog],
+        logDetail: AgendaLogDetail(log: signalLog, reminders: const []),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: LogDetailPage(agenda: fake, logId: logId),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Bu kayıt Beton işiyle ilgili olabilir.'),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('agenda-concrete-detail-open')),
+        findsNothing,
+      );
+      expect(find.text(signalLog.description), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'unmanaged detail deep-links with the log project and Istanbul day',
+    (tester) async {
+      final signalLog = concreteSignalLog();
+      final fake = FakeAgendaApplication(
+        projects: [project()],
+        logs: [signalLog],
+        logDetail: AgendaLogDetail(log: signalLog, reminders: const []),
+      );
+      final concrete = _RecordingConcrete();
+      final attachments = SafeAttachmentPicker(
+        permissions: SafeCapabilityService(_GrantedPermission()),
+        picker: _SelectedPicker(),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: LogDetailPage(
+            agenda: fake,
+            concrete: concrete,
+            concreteAttachments: attachments,
+            logId: logId,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final openAction = find.byKey(const Key('agenda-concrete-detail-open'));
+      expect(tester.getSize(openAction).height, greaterThanOrEqualTo(44));
+      await tester.tap(openAction);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ConcreteDestinationPage), findsOneWidget);
+      expect(concrete.lastListQuery?.projectId, projectId);
+      expect(concrete.lastListQuery?.istanbulDay, '2026-07-19');
+      expect(concrete.lastListQuery?.group, ConcretePourGroup.today);
+      expect(concrete.createPourCalls, 0);
+    },
+  );
+
   testWidgets('log and reminder details provide bidirectional navigation', (
     tester,
   ) async {
@@ -334,7 +673,7 @@ void main() {
     'managed concrete Agenda detail is read-only and deep-links to package',
     (tester) async {
       final managed = AgendaLogDetail(
-        log: log(),
+        log: concreteSignalLog(category: AgendaCategory.concrete),
         reminders: const [],
         managedConcretePourId: pourId,
       );
@@ -359,9 +698,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(find.text('Beton paketi tarafından yönetiliyor'), findsOneWidget);
       expect(
-        find.text('Beton paketi tarafından yönetiliyor'),
-        findsOneWidget,
+        find.byKey(const Key('agenda-concrete-detail-suggestion')),
+        findsNothing,
       );
       expect(find.byKey(const Key('edit-agenda-log')), findsNothing);
       expect(find.byKey(const Key('archive-agenda-log')), findsNothing);
@@ -415,6 +755,22 @@ class _DeniedPermission implements PermissionGateway {
       CapabilityStatus.denied;
 }
 
+class _GrantedPermission implements PermissionGateway {
+  @override
+  Future<CapabilityStatus> request(DeviceCapability capability) async =>
+      CapabilityStatus.granted;
+}
+
+class _SelectedPicker implements AttachmentPickerPort {
+  @override
+  Future<SelectedAttachment?> pick(AttachmentSource source) async =>
+      SelectedAttachment(
+        name: 'beton-hazirlik.jpg',
+        bytes: const [0xff, 0xd8, 0xff, 0xd9],
+        source: source,
+      );
+}
+
 class _UnexpectedPicker implements AttachmentPickerPort {
   @override
   Future<SelectedAttachment?> pick(AttachmentSource source) =>
@@ -422,6 +778,28 @@ class _UnexpectedPicker implements AttachmentPickerPort {
 }
 
 class _NoopConcrete implements ConcreteApplication {
+  @override
+  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _RecordingConcrete implements ConcreteApplication {
+  ConcretePourQuery? lastListQuery;
+  int createPourCalls = 0;
+
+  @override
+  Future<List<ConcretePour>> listPours(ConcretePourQuery query) async {
+    lastListQuery = query;
+    return const [];
+  }
+
+  @override
+  Future<ConcretePourDetail> createPour(
+    CreateConcretePourCommand command,
+  ) async {
+    createPourCalls += 1;
+    throw StateError('Deep-link must not create a Concrete package.');
+  }
+
   @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
