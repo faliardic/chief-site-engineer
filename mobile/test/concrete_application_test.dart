@@ -357,7 +357,7 @@ void main() {
   });
 
   test(
-    'cancel and reopen preserve real timestamps and one managed Agenda log',
+    'cancel reopen resume and finish preserve one managed Agenda timeline',
     () async {
       var detail = await concrete.createPour(_createCommand());
       detail = await concrete.transitionPour(
@@ -438,13 +438,99 @@ void main() {
       expect(detail.pour.actualEndedAt, isNull);
       expect(detail.agendaLogId, managedAgendaId);
       expect(await _count(directories.databaseFile, 'field_observations'), 1);
-      final source = await agenda.getAgendaLogDetail(managedAgendaId!);
+      var source = await agenda.getAgendaLogDetail(managedAgendaId!);
       expect(
         source.events.map((item) => item.eventType),
         [
           'concrete_pour.started',
           'concrete_pour.cancelled',
           'concrete_pour.reopened',
+        ],
+      );
+
+      await expectLater(
+        concrete.transitionPour(
+          TransitionConcretePourCommand(
+            pourId: pourId,
+            eventId: _uuid(394),
+            expectedRevision: detail.pour.revision - 1,
+            targetStatus: ConcretePourStatus.pouring,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      final resume = TransitionConcretePourCommand(
+        pourId: pourId,
+        eventId: _uuid(395),
+        expectedRevision: detail.pour.revision,
+        targetStatus: ConcretePourStatus.pouring,
+      );
+      detail = await concrete.transitionPour(resume);
+      expect(detail.pour.status, ConcretePourStatus.pouring);
+      expect(detail.pour.actualStartedAt, startedAt);
+      expect(detail.pour.actualEndedAt, isNull);
+      expect(detail.agendaLogId, managedAgendaId);
+      expect(await _count(directories.databaseFile, 'field_observations'), 1);
+      expect(
+        detail.events.where((item) => item.id == resume.eventId),
+        hasLength(1),
+      );
+      source = await agenda.getAgendaLogDetail(managedAgendaId);
+      expect(
+        source.events.map((item) => item.eventType),
+        [
+          'concrete_pour.started',
+          'concrete_pour.cancelled',
+          'concrete_pour.reopened',
+        ],
+      );
+
+      final retried = await concrete.transitionPour(resume);
+      expect(retried.pour.actualStartedAt, startedAt);
+      expect(retried.agendaLogId, managedAgendaId);
+      expect(
+        retried.events.where((item) => item.id == resume.eventId),
+        hasLength(1),
+      );
+      expect(await _count(directories.databaseFile, 'field_observations'), 1);
+      source = await agenda.getAgendaLogDetail(managedAgendaId);
+      expect(source.events, hasLength(3));
+
+      detail = await concrete.saveTruck(
+        SaveConcreteTruckCommand(
+          id: _uuid(396),
+          pourId: pourId,
+          eventId: _uuid(397),
+          expectedPourRevision: retried.pour.revision,
+          expectedTruckRevision: 0,
+          sequenceNo: 1,
+          vehiclePlate: '34 CSE 236',
+          volumeM3: 20,
+          result: ConcreteTruckResult.received,
+        ),
+      );
+      now = DateTime.utc(2026, 7, 19, 10);
+      detail = await concrete.transitionPour(
+        TransitionConcretePourCommand(
+          pourId: pourId,
+          eventId: _uuid(398),
+          expectedRevision: detail.pour.revision,
+          targetStatus: ConcretePourStatus.poured,
+        ),
+      );
+      expect(detail.pour.status, ConcretePourStatus.poured);
+      expect(detail.pour.actualStartedAt, startedAt);
+      expect(detail.pour.actualEndedAt, '2026-07-19T10:00:00Z');
+      expect(detail.agendaLogId, managedAgendaId);
+      expect(await _count(directories.databaseFile, 'field_observations'), 1);
+      source = await agenda.getAgendaLogDetail(managedAgendaId);
+      expect(
+        source.events.map((item) => item.eventType),
+        [
+          'concrete_pour.started',
+          'concrete_pour.cancelled',
+          'concrete_pour.reopened',
+          'concrete_pour.completed',
         ],
       );
     },

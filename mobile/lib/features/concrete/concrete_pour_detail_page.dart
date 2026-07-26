@@ -724,6 +724,18 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
                 ),
               if (pour.actualStartedAt != null &&
                   pour.actualEndedAt == null &&
+                  (pour.status == ConcretePourStatus.draft ||
+                      pour.status == ConcretePourStatus.prepared))
+                FilledButton.icon(
+                  key: const Key('resume-concrete-pour'),
+                  onPressed: _mutating
+                      ? null
+                      : () => _transition(ConcretePourStatus.pouring),
+                  icon: const Icon(Icons.play_arrow),
+                  label: const Text('Döküme devam et'),
+                ),
+              if (pour.actualStartedAt != null &&
+                  pour.actualEndedAt == null &&
                   pour.status == ConcretePourStatus.pouring)
                 FilledButton.icon(
                   key: const Key('finish-concrete-pour'),

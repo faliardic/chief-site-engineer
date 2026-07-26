@@ -259,6 +259,90 @@ void main() {
   );
 
   testWidgets(
+    'reopened started draft resumes without replacing its first timestamp',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final concrete = _FakeConcrete(
+        started: true,
+        status: ConcretePourStatus.draft,
+        agendaLinked: true,
+      );
+      final firstStartedAt = concrete._currentDetail.pour.actualStartedAt;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+            child: ConcretePourDetailPage(
+              concrete: concrete,
+              agenda: _FakeAgenda(),
+              attachments: _picker(),
+              pourId: pourId,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Devam ediyor'), findsOneWidget);
+      expect(find.byKey(const Key('start-concrete-pour')), findsNothing);
+      final resume = find.byKey(const Key('resume-concrete-pour'));
+      expect(resume, findsOneWidget);
+      expect(tester.getSize(resume).height, greaterThanOrEqualTo(44));
+
+      await tester.tap(resume);
+      await tester.pumpAndSettle();
+      expect(
+        concrete.lastTransitionCommand!.targetStatus,
+        ConcretePourStatus.pouring,
+      );
+      expect(
+        concrete._currentDetail.pour.actualStartedAt,
+        firstStartedAt,
+      );
+      expect(find.byKey(const Key('resume-concrete-pour')), findsNothing);
+      expect(find.byKey(const Key('finish-concrete-pour')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'historical reopened pour with an end never offers resume',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final concrete = _FakeConcrete(
+        started: true,
+        ended: true,
+        status: ConcretePourStatus.draft,
+        agendaLinked: true,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+            child: ConcretePourDetailPage(
+              concrete: concrete,
+              agenda: _FakeAgenda(),
+              attachments: _picker(),
+              pourId: pourId,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Tamamlandı'), findsOneWidget);
+      expect(find.byKey(const Key('resume-concrete-pour')), findsNothing);
+      expect(find.byKey(const Key('start-concrete-pour')), findsNothing);
+      expect(find.byKey(const Key('finish-concrete-pour')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'legacy null irsaliyeli mikser edit reverse animation boyunca güvenlidir',
     (tester) async {
       final concrete = _FakeConcrete();
@@ -462,12 +546,22 @@ class _FakeConcrete implements ConcreteApplication {
   _FakeConcrete({
     this.delayCreate = false,
     this.failNextTruckSave = false,
+    this.started = false,
+    this.ended = false,
+    ConcretePourStatus? status,
     this.agendaLinked = false,
-  });
+  }) : status =
+           status ??
+           (ended
+               ? ConcretePourStatus.poured
+               : started
+               ? ConcretePourStatus.pouring
+               : ConcretePourStatus.draft);
   final bool delayCreate;
   bool failNextTruckSave;
-  bool started = false;
-  bool ended = false;
+  bool started;
+  bool ended;
+  ConcretePourStatus status;
   final bool agendaLinked;
   final _completer = Completer<ConcretePourDetail>();
   int createCalls = 0;
@@ -476,11 +570,13 @@ class _FakeConcrete implements ConcreteApplication {
   CreateConcretePourCommand? lastCreateCommand;
   CreateProjectConcreteClassCommand? lastCreateClassCommand;
   SaveConcreteTruckCommand? lastTruckCommand;
+  TransitionConcretePourCommand? lastTransitionCommand;
 
   ConcretePourDetail get _currentDetail => _detail(
     lastTruckCommand,
     started: started,
     ended: ended,
+    status: status,
     agendaLinked: agendaLinked,
   );
 
@@ -593,8 +689,14 @@ class _FakeConcrete implements ConcreteApplication {
   Future<ConcretePourDetail> transitionPour(
     TransitionConcretePourCommand command,
   ) async {
-    if (command.targetStatus == ConcretePourStatus.pouring) started = true;
-    if (command.targetStatus == ConcretePourStatus.poured) ended = true;
+    lastTransitionCommand = command;
+    status = command.targetStatus;
+    if (command.targetStatus == ConcretePourStatus.pouring) {
+      started = true;
+    }
+    if (command.targetStatus == ConcretePourStatus.poured) {
+      ended = true;
+    }
     return _currentDetail;
   }
   @override
@@ -648,6 +750,7 @@ ConcretePourDetail _detail(
   SaveConcreteTruckCommand? savedTruck, {
   bool started = false,
   bool ended = false,
+  ConcretePourStatus? status,
   bool agendaLinked = false,
 }) {
   final pour = ConcretePour(
@@ -676,11 +779,13 @@ ConcretePourDetail _detail(
     laboratoryAppointment: null,
     inspectionNotifiedAt: null,
     inspectionNotifiedPerson: null,
-    status: ended
-        ? ConcretePourStatus.poured
-        : started
-        ? ConcretePourStatus.pouring
-        : ConcretePourStatus.draft,
+    status:
+        status ??
+        (ended
+            ? ConcretePourStatus.poured
+            : started
+            ? ConcretePourStatus.pouring
+            : ConcretePourStatus.draft),
     generalNote: null,
     sampleExceptionReason: null,
     varianceNote: null,
