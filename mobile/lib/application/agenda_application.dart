@@ -169,6 +169,12 @@ abstract interface class ReminderTodayApplication {
   Future<ReminderTodayOverview> getReminderTodayOverview();
 }
 
+abstract interface class ReminderSourceAgendaMediaApplication {
+  Future<ReminderSourceAgendaMedia> getReminderSourceAgendaMedia(
+    String sourceLogId,
+  );
+}
+
 abstract interface class ReminderDeliveryApplication {
   Future<ReminderDeliveryDiagnostic> getReminderDeliveryDiagnostic(
     String reminderId,
@@ -188,6 +194,7 @@ class SqliteAgendaApplication
     implements
         AgendaApplication,
         ReminderTodayApplication,
+        ReminderSourceAgendaMediaApplication,
         ReminderDeliveryApplication {
   SqliteAgendaApplication({
     required this.databasePath,
@@ -863,6 +870,45 @@ class SqliteAgendaApplication
       (database) => _loadAgendaDetail(database, logId),
     );
     return _withAgendaPhotoIntegrity(detail);
+  }
+
+  @override
+  Future<ReminderSourceAgendaMedia> getReminderSourceAgendaMedia(
+    String sourceLogId,
+  ) async {
+    validateUuid(sourceLogId, 'Kaynak log kimliği');
+    final now = _readClockOnce();
+    try {
+      final raw = await _withDatabase(now, (database) async {
+        final sourceRows = await database.query(
+          'field_observations',
+          columns: ['archived_at'],
+          where: 'id = ?',
+          whereArgs: [sourceLogId],
+          limit: 1,
+        );
+        if (sourceRows.isEmpty) {
+          throw const AgendaValidationFailure('Ajanda kaydı bulunamadı.');
+        }
+        final photos = await database.query(
+          'agenda_log_attachments',
+          where: 'observation_id = ? AND archived_at IS NULL',
+          whereArgs: [sourceLogId],
+          orderBy: 'created_at ASC, id ASC',
+        );
+        return (
+          sourceLogArchivedAt: sourceRows.single['archived_at'] as String?,
+          photos: photos.map(_agendaPhotoFromRow).toList(growable: false),
+        );
+      });
+      return ReminderSourceAgendaMedia.loaded(
+        sourceLogId: sourceLogId,
+        sourceLogArchivedAt: raw.sourceLogArchivedAt,
+        photos: await _inspectAgendaPhotos(raw.photos),
+      );
+    } on Object {
+      return ReminderSourceAgendaMedia.unavailable(sourceLogId: sourceLogId);
+    }
   }
 
   @override
@@ -2230,8 +2276,20 @@ class SqliteAgendaApplication
   Future<AgendaLogDetail> _withAgendaPhotoIntegrity(
     AgendaLogDetail detail,
   ) async {
+    final photos = await _inspectAgendaPhotos(detail.photos);
+    return AgendaLogDetail(
+      log: detail.log,
+      reminders: detail.reminders,
+      photos: photos,
+      events: detail.events,
+    );
+  }
+
+  Future<List<AgendaLogPhoto>> _inspectAgendaPhotos(
+    Iterable<AgendaLogPhoto> values,
+  ) async {
     final photos = <AgendaLogPhoto>[];
-    for (final photo in detail.photos) {
+    for (final photo in values) {
       AgendaAttachmentIntegrity integrity;
       try {
         integrity = await attachmentStore.inspect(
@@ -2244,12 +2302,7 @@ class SqliteAgendaApplication
       }
       photos.add(_agendaPhotoWithIntegrity(photo, integrity));
     }
-    return AgendaLogDetail(
-      log: detail.log,
-      reminders: detail.reminders,
-      photos: List.unmodifiable(photos),
-      events: detail.events,
-    );
+    return List.unmodifiable(photos);
   }
 
   DateTime _readClockOnce() {

@@ -1,5 +1,21 @@
 # Changelog
 
+## Issue #230 - Reminder Detayında Kaynak Ajanda Fotoğrafları
+
+- `sourceLogId` taşıyan reminder detayına salt-okunur `Kaynak Ajanda
+  fotoğrafları` bölümü eklendi.
+- Aktif Ajanda fotoğrafları `created_at, id` sırasıyla; thumbnail, dosya adı,
+  integrity, boyut ve varsa açıklamayla gösterilir. Duplicate photo ID ilk
+  kayıt korunarak tekilleştirilir.
+- Fotoğraf açma mevcut `AgendaPhotoViewerPage`, `readAgendaPhoto` ve attachment
+  integrity yolunu yeniden kullanır. `missing`, `tampered` ve `invalidMime`
+  kayıtlar gizlenmez; güvenli diagnostic ile açılır.
+- Kaynak medya okuma hatası reminder ana detayını düşürmez. Arşivli kaynak
+  logdaki aktif fotoğraflar ve trash reminder kaynak fotoğrafları salt-okunur
+  kalır.
+- Schema 9, backup format 1, attachment store ve Android/iOS platform kodu
+  değiştirilmedi; reminder içine attachment metadata veya byte kopyalanmadı.
+
 ## Issue #227 - Hatırlatıcı Geri Dönüşüm Kutusu
 
 - Mobil SQLite schema `8` → `9` atomik migration ile reminder aggregate'ine

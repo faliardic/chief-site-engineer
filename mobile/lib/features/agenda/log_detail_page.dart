@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
@@ -377,7 +375,7 @@ class _LogDetailPageState extends State<LogDetailPage> {
                 minVerticalPadding: 10,
                 leading: SizedBox.square(
                   dimension: 56,
-                  child: _AgendaPhotoThumbnail(
+                  child: AgendaPhotoThumbnail(
                     agenda: widget.agenda,
                     photo: photo,
                   ),
@@ -451,49 +449,6 @@ class _LogDetailPageState extends State<LogDetailPage> {
             ),
           ),
       ],
-    );
-  }
-}
-
-class _AgendaPhotoThumbnail extends StatefulWidget {
-  const _AgendaPhotoThumbnail({required this.agenda, required this.photo});
-
-  final AgendaApplication agenda;
-  final AgendaLogPhoto photo;
-
-  @override
-  State<_AgendaPhotoThumbnail> createState() => _AgendaPhotoThumbnailState();
-}
-
-class _AgendaPhotoThumbnailState extends State<_AgendaPhotoThumbnail> {
-  late final Future<StoredAttachmentContent> _content;
-
-  @override
-  void initState() {
-    super.initState();
-    _content = widget.agenda.readAgendaPhoto(widget.photo.id);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<StoredAttachmentContent>(
-      future: _content,
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const ColoredBox(
-            color: Colors.black12,
-            child: Icon(Icons.photo_outlined),
-          );
-        }
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(6),
-          child: Image.memory(
-            Uint8List.fromList(snapshot.requireData.bytes),
-            fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => const Icon(Icons.broken_image_outlined),
-          ),
-        );
-      },
     );
   }
 }

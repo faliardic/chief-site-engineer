@@ -1,5 +1,24 @@
 # Proje Kararlari
 
+## Issue 230 — Reminder Kaynak Ajanda Fotoğrafları
+
+- Reminder kaynak medyası ayrı, salt-okunur
+  `ReminderSourceAgendaMediaApplication` capability'siyle okunur; UI SQLite'a
+  doğrudan erişmez ve attachment byte/metadata'sı reminder state'ine kalıcı
+  olarak kopyalanmaz.
+- Kaynak read-model aktif fotoğrafları `created_at, id` sırasıyla verir ve
+  duplicate photo ID'yi ilk kayıt korunarak tekilleştirir. Arşivli source log
+  okunabilir; arşivli fotoğraf gösterilmez.
+- Thumbnail ve tam ekran açma mevcut `readAgendaPhoto` ile
+  `AgendaPhotoViewerPage` yolunu paylaşır. Integrity kontrolü bypass edilmez;
+  `missing`, `tampered` ve `invalidMime` kayıtlar güvenli diagnostic ile görünür
+  kalır.
+- Kaynak DB/attachment okuma hatası reminder ana detayını düşürmez ve kişisel
+  path/hata içeriği UI'a taşınmaz.
+- Schema 9, backup format 1, attachment store, platform kodu ve source
+  revision/event geçmişi değişmez. Reminder detayından attachment mutation'ı
+  eklenmez.
+
 ## Issue 171 - Faz 0 Closure ve Faz 1 Geçiş Kararları
 
 - Faz 0 closure sonucu `PASS`tır. Bu karar P0.01–P0.09 merged kanıtı, current

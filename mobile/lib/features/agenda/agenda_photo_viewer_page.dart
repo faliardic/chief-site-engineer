@@ -4,6 +4,62 @@ import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:flutter/material.dart';
 
+class AgendaPhotoThumbnail extends StatefulWidget {
+  const AgendaPhotoThumbnail({
+    required this.agenda,
+    required this.photo,
+    super.key,
+  });
+
+  final AgendaApplication agenda;
+  final AgendaLogPhoto photo;
+
+  @override
+  State<AgendaPhotoThumbnail> createState() => _AgendaPhotoThumbnailState();
+}
+
+class _AgendaPhotoThumbnailState extends State<AgendaPhotoThumbnail> {
+  late Future<StoredAttachmentContent> _content;
+
+  @override
+  void initState() {
+    super.initState();
+    _content = widget.agenda.readAgendaPhoto(widget.photo.id);
+  }
+
+  @override
+  void didUpdateWidget(covariant AgendaPhotoThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.agenda != widget.agenda ||
+        oldWidget.photo.id != widget.photo.id) {
+      _content = widget.agenda.readAgendaPhoto(widget.photo.id);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<StoredAttachmentContent>(
+      future: _content,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const ColoredBox(
+            color: Colors.black12,
+            child: Icon(Icons.photo_outlined),
+          );
+        }
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: Image.memory(
+            Uint8List.fromList(snapshot.requireData.bytes),
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => const Icon(Icons.broken_image_outlined),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class AgendaPhotoViewerPage extends StatelessWidget {
   const AgendaPhotoViewerPage({
     required this.agenda,

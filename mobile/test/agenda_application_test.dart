@@ -1046,6 +1046,196 @@ void main() {
   );
 
   test(
+    'reminder source media is ordered read-only across archive and trash',
+    () async {
+      var log = await agenda.createAgendaLog(
+        CreateAgendaLogCommand(
+          id: log1,
+          eventId: eventId(90),
+          projectId: project1,
+          observedAt: '2026-07-19T07:00:00Z',
+          category: AgendaCategory.generalNote,
+          description: 'Kaynak fotoğraflı log',
+          photos: [
+            AgendaPhotoDraft(
+              id: log3,
+              eventId: eventId(91),
+              originalFileName: 'ikinci.jpg',
+              bytes: const [0xff, 0xd8, 0xff, 2],
+              capturedAt: '2026-07-19T07:02:00Z',
+            ),
+            AgendaPhotoDraft(
+              id: log2,
+              eventId: eventId(92),
+              originalFileName: 'birinci.jpg',
+              bytes: const [0xff, 0xd8, 0xff, 1],
+              capturedAt: '2026-07-19T07:01:00Z',
+              description: 'Kaynak açıklaması',
+            ),
+          ],
+        ),
+      );
+      var reminder = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(93),
+          projectId: project1,
+          sourceLogId: log1,
+          title: 'Kaynak fotoğrafları kontrol et',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.inbox,
+        ),
+      );
+
+      var media = await agenda.getReminderSourceAgendaMedia(log1);
+      expect(media.isAvailable, isTrue);
+      expect(media.sourceLogArchivedAt, isNull);
+      expect(media.photos.map((item) => item.id), [log2, log3]);
+      expect(media.photos.first.description, 'Kaynak açıklaması');
+      expect(
+        media.photos.map((item) => item.integrity),
+        everyElement(AgendaAttachmentIntegrity.ok),
+      );
+
+      final detailBeforeArchive = await agenda.getAgendaLogDetail(log1);
+      await agenda.archiveAgendaPhoto(
+        ArchiveAgendaPhotoCommand(
+          logId: log1,
+          photoId: log2,
+          eventId: eventId(94),
+          expectedLogRevision: detailBeforeArchive.log.revision,
+          expectedPhotoRevision: detailBeforeArchive.photos.first.revision,
+        ),
+      );
+      media = await agenda.getReminderSourceAgendaMedia(log1);
+      expect(media.photos.map((item) => item.id), [log3]);
+
+      log = (await agenda.mutateAgendaLogArchive(
+        MutateAgendaLogArchiveCommand(
+          id: log1,
+          eventId: eventId(95),
+          expectedRevision: log.revision + 1,
+          archive: true,
+        ),
+      )).log;
+      media = await agenda.getReminderSourceAgendaMedia(log1);
+      expect(media.sourceLogArchivedAt, log.archivedAt);
+      expect(media.photos.map((item) => item.id), [log3]);
+
+      reminder = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: reminder.id,
+          eventId: eventId(96),
+          expectedRevision: reminder.revision,
+          action: ReminderMutationAction.moveToTrash,
+        ),
+      );
+      expect(reminder.trashedAt, isNotNull);
+      final sourceBeforeRead = await agenda.getAgendaLogDetail(log1);
+      final eventsBeforeRead = await agenda.listObservationEvents(log1);
+      media = await agenda.getReminderSourceAgendaMedia(log1);
+      final sourceAfterRead = await agenda.getAgendaLogDetail(log1);
+      final eventsAfterRead = await agenda.listObservationEvents(log1);
+      expect(media.photos.map((item) => item.id), [log3]);
+      expect(sourceAfterRead.log.revision, sourceBeforeRead.log.revision);
+      expect(sourceAfterRead.log.updatedAt, sourceBeforeRead.log.updatedAt);
+      expect(eventsAfterRead.length, eventsBeforeRead.length);
+
+      await createLog(
+        id: log4,
+        event: 97,
+        observedAt: '2026-07-19T08:00:00Z',
+        description: 'Fotoğrafsız kaynak',
+      );
+      expect((await agenda.getReminderSourceAgendaMedia(log4)).photos, isEmpty);
+      final unavailable = await agenda.getReminderSourceAgendaMedia(reminder6);
+      expect(unavailable.isAvailable, isFalse);
+      expect(unavailable.photos, isEmpty);
+      expect(unavailable.safeErrorCode, 'source_agenda_media_unavailable');
+    },
+  );
+
+  test(
+    'source media preserves every integrity state and deduplicates photo ids',
+    () async {
+      await agenda.createAgendaLog(
+        CreateAgendaLogCommand(
+          id: log1,
+          eventId: eventId(100),
+          projectId: project1,
+          observedAt: '2026-07-19T07:00:00Z',
+          category: AgendaCategory.generalNote,
+          description: 'Integrity matrisi',
+          photos: [
+            AgendaPhotoDraft(
+              id: log2,
+              eventId: eventId(101),
+              originalFileName: 'ok.jpg',
+              bytes: const [0xff, 0xd8, 0xff, 1],
+              capturedAt: '2026-07-19T07:01:00Z',
+            ),
+            AgendaPhotoDraft(
+              id: log3,
+              eventId: eventId(102),
+              originalFileName: 'missing.jpg',
+              bytes: const [0xff, 0xd8, 0xff, 2],
+              capturedAt: '2026-07-19T07:02:00Z',
+            ),
+            AgendaPhotoDraft(
+              id: log4,
+              eventId: eventId(103),
+              originalFileName: 'tampered.jpg',
+              bytes: const [0xff, 0xd8, 0xff, 3],
+              capturedAt: '2026-07-19T07:03:00Z',
+            ),
+            AgendaPhotoDraft(
+              id: reminder1,
+              eventId: eventId(104),
+              originalFileName: 'invalid-mime.jpg',
+              bytes: const [0xff, 0xd8, 0xff, 4],
+              capturedAt: '2026-07-19T07:04:00Z',
+            ),
+          ],
+        ),
+      );
+      final controlled = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        attachmentStore: _IntegrityAgendaAttachmentStore({
+          log2: AgendaAttachmentIntegrity.ok,
+          log3: AgendaAttachmentIntegrity.missing,
+          log4: AgendaAttachmentIntegrity.tampered,
+          reminder1: AgendaAttachmentIntegrity.invalidMime,
+        }),
+      );
+
+      final media = await controlled.getReminderSourceAgendaMedia(log1);
+
+      expect(media.isAvailable, isTrue);
+      expect(media.photos.map((item) => item.id), [
+        log2,
+        log3,
+        log4,
+        reminder1,
+      ]);
+      expect(media.photos.map((item) => item.integrity), [
+        AgendaAttachmentIntegrity.ok,
+        AgendaAttachmentIntegrity.missing,
+        AgendaAttachmentIntegrity.tampered,
+        AgendaAttachmentIntegrity.invalidMime,
+      ]);
+      final duplicated = ReminderSourceAgendaMedia.loaded(
+        sourceLogId: log1,
+        sourceLogArchivedAt: null,
+        photos: [media.photos.first, media.photos.first],
+      );
+      expect(duplicated.photos, hasLength(1));
+      expect(duplicated.photos.single.id, log2);
+    },
+  );
+
+  test(
     'foreign keys and append-only histories are enforced by SQLite',
     () async {
       await createLog(id: log1, event: 1, observedAt: '2026-07-19T07:00:00Z');
@@ -1116,4 +1306,41 @@ Future<int> _countRows(String path, String table) async {
   );
   await raw.close();
   return count ?? 0;
+}
+
+class _IntegrityAgendaAttachmentStore implements AgendaAttachmentStore {
+  const _IntegrityAgendaAttachmentStore(this.values);
+
+  final Map<String, AgendaAttachmentIntegrity> values;
+
+  @override
+  Future<void> cleanup(String relativePath) async {}
+
+  @override
+  Future<AgendaAttachmentIntegrity> inspect(
+    String relativePath,
+    String expectedSha256,
+    String expectedMimeType,
+  ) async {
+    for (final entry in values.entries) {
+      if (relativePath.contains(entry.key)) return entry.value;
+    }
+    return AgendaAttachmentIntegrity.missing;
+  }
+
+  @override
+  Future<StoredAttachmentContent> read(
+    String relativePath,
+    String originalFileName,
+    String expectedSha256,
+    String expectedMimeType,
+  ) => throw const AgendaAttachmentFailure('test_read_unavailable');
+
+  @override
+  Future<StagedAgendaPhoto> stage({
+    required String logId,
+    required String attachmentId,
+    required String originalFileName,
+    required List<int> bytes,
+  }) => throw const AgendaAttachmentFailure('test_stage_unavailable');
 }
