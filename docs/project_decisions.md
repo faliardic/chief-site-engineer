@@ -3229,3 +3229,28 @@
 - Bu karar yalnız application read-model ve presentation katmanıdır. Schema 8,
   backup format 1, notification gateway, platform kodu ve project-level 18:00
   ayarı değişmez.
+
+## Issue 227 — Reminder Trash/Restore Yaşam Döngüsü
+
+- Trash, reminder status'u değildir. `inbox | active | completed | cancelled`
+  aynen korunur; görünürlük nullable canonical UTC `trashed_at` ile belirlenir.
+- `Sil` fiziksel `DELETE`, `cancelled` veya `completed` üretmez. Gerçek mutation
+  olarak revision/updated time artırır ve append-only `trashed` event'i yazar.
+  Restore yalnız `trashed_at = NULL` yapıp `restored_from_trash` event'i ekler.
+- Trash durumundayken başka lifecycle mutation'ı reddedilir. Aynı trash/restore
+  komutunun tekrarı no-op'tur; stale revision ana kayıt ve event history'yi
+  değiştirmeden fail-closed durur.
+- Normal reminder read-model ve source detay listeleri yalnız
+  `trashed_at IS NULL` kayıtları gösterir. Trash listesi `trashed_at DESC`,
+  `updated_at DESC`, `id ASC` sırasındadır.
+- Ajanda/Puantaj/Beton source ve link kayıtları trash ile değişmez. Source
+  otomasyonları trash reminder'ın korunmuş status/schedule/outcome değerlerini
+  sessizce değiştirmez.
+- Notification binding/platform ID aggregate kimliği olarak korunur. Trash
+  reconcile native planı iptal edip `scheduled_for = NULL` yazar; gateway
+  hatası persistence kararını geri almaz. Restore yalnız active, timed ve
+  gelecekteki schedule için planlama yapar.
+- Mobil schema `9`, backup format `1`dir. Schema `1–8` restore migration zinciri
+  korunur; schema 9 trash/event geçmişini eksiksiz round-trip taşır.
+- Kalıcı silme, retention, attachment byte temizliği ve source cascade ayrı
+  gelecekteki politika/Issue olmadan eklenmez.

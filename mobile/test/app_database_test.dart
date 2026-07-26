@@ -67,6 +67,7 @@ void main() {
       {'version': 6, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 7, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 8, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 9, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
   });
 
@@ -969,7 +970,7 @@ void main() {
         sqflite.Sqflite.firstIntValue(
           await upgraded.database.rawQuery('PRAGMA user_version'),
         ),
-        8,
+        AppDatabase.schemaVersion,
       );
       expect(
         (await upgraded.database.query(
@@ -1176,7 +1177,8 @@ void main() {
           'cancelled_at': status == 'cancelled' ? timestamp : null,
         });
         await db.insert('follow_up_events', {
-          'id': 'eeeeeeee-eeee-4eee-8eee-'
+          'id':
+              'eeeeeeee-eeee-4eee-8eee-'
               '${platformId.toString().padLeft(12, '0')}',
           'follow_up_id': id,
           'sequence': 1,
@@ -1276,7 +1278,7 @@ void main() {
         sqflite.Sqflite.firstIntValue(
           await upgraded.database.rawQuery('PRAGMA user_version'),
         ),
-        8,
+        AppDatabase.schemaVersion,
       );
       final rows = await upgraded.database.query(
         'follow_up_items',
@@ -1297,7 +1299,9 @@ void main() {
         'action',
       );
       expect(
-        rows.singleWhere((row) => row['id'] == kindWaiting)['attendance_day_id'],
+        rows.singleWhere(
+          (row) => row['id'] == kindWaiting,
+        )['attendance_day_id'],
         attendance,
       );
       expect(
@@ -1305,7 +1309,9 @@ void main() {
         'active',
       );
       expect(
-        rows.singleWhere((row) => row['id'] == statusWaiting)['concrete_pour_id'],
+        rows.singleWhere(
+          (row) => row['id'] == statusWaiting,
+        )['concrete_pour_id'],
         pour,
       );
       final binding = (await upgraded.database.query(
@@ -1384,6 +1390,345 @@ void main() {
     },
   );
 
+  test('empty schema 8 migrates atomically to schema 9', () async {
+    final versionEight = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => firstClock,
+      migrations: AppDatabase.foundationMigrations.take(8).toList(),
+    );
+    await versionEight.open();
+    await versionEight.close();
+
+    final upgraded = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => DateTime.utc(2026, 7, 20, 9),
+    );
+    await upgraded.open();
+    expect(
+      sqflite.Sqflite.firstIntValue(
+        await upgraded.database.rawQuery('PRAGMA user_version'),
+      ),
+      9,
+    );
+    expect(
+      (await upgraded.database.rawQuery(
+        'PRAGMA table_info(follow_up_items)',
+      )).map((row) => row['name']),
+      contains('trashed_at'),
+    );
+    expect(
+      await upgraded.database.rawQuery('PRAGMA foreign_key_check'),
+      isEmpty,
+    );
+    await upgraded.close();
+  });
+
+  test(
+    'schema 8 to 9 preserves reminder variants sources bindings and history',
+    () async {
+      final versionEight = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+        migrations: AppDatabase.foundationMigrations.take(8).toList(),
+      );
+      await versionEight.open();
+      final db = versionEight.database;
+      const project = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+      const observation = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+      const attendance = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+      const pour = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+      const timestamp = '2026-07-20T08:00:00Z';
+      const due = '2026-07-21T06:00:00Z';
+      await db.insert('projects', {
+        'id': project,
+        'name': 'Schema 9 Projesi',
+        'created_at': timestamp,
+        'updated_at': timestamp,
+        'revision': 1,
+      });
+      await db.insert('field_observations', {
+        'id': observation,
+        'project_id': project,
+        'observed_at': timestamp,
+        'created_at': timestamp,
+        'updated_at': timestamp,
+        'category': 'inspection',
+        'description': 'Korunan Ajanda kaynağı',
+        'revision': 1,
+      });
+      await db.insert('attendance_days', {
+        'id': attendance,
+        'project_id': project,
+        'local_date': '2026-07-20',
+        'status': 'draft',
+        'revision': 1,
+        'created_at': timestamp,
+        'updated_at': timestamp,
+      });
+      await db.insert('concrete_pours', {
+        'id': pour,
+        'project_id': project,
+        'pour_code': 'BT-V9',
+        'element_location': 'A Blok',
+        'planned_at': due,
+        'concrete_class': 'C30/37',
+        'planned_volume_m3': 8.0,
+        'status': 'draft',
+        'revision': 1,
+        'created_at': timestamp,
+        'updated_at': timestamp,
+      });
+
+      Future<void> insertReminder({
+        required String id,
+        required int platformId,
+        required String status,
+        String? nextAttentionAt,
+        String? allDayLocalDate,
+        String? sourceObservation,
+        String? sourceAttendance,
+        String? sourceConcrete,
+      }) async {
+        final terminal = status == 'completed' || status == 'cancelled';
+        await db.insert('follow_up_items', {
+          'id': id,
+          'capture_text': 'Schema 9 $id',
+          'title': 'Schema 9 $id',
+          'item_type': 'action',
+          'status': status,
+          'project_id':
+              sourceObservation != null ||
+                  sourceAttendance != null ||
+                  sourceConcrete != null
+              ? project
+              : null,
+          'observation_id': sourceObservation,
+          'attendance_day_id': sourceAttendance,
+          'concrete_pour_id': sourceConcrete,
+          'is_important': 0,
+          'next_attention_at': nextAttentionAt,
+          'all_day_local_date': allDayLocalDate,
+          'outcome_type': status == 'completed'
+              ? 'completed'
+              : status == 'cancelled'
+              ? 'no_longer_needed'
+              : null,
+          'revision': 3,
+          'created_at': timestamp,
+          'updated_at': timestamp,
+          'completed_at': status == 'completed' ? timestamp : null,
+          'cancelled_at': status == 'cancelled' ? timestamp : null,
+        });
+        await db.insert('follow_up_events', {
+          'id':
+              'eeeeeeee-eeee-4eee-8eee-'
+              '${platformId.toString().padLeft(12, '0')}',
+          'follow_up_id': id,
+          'sequence': 1,
+          'project_id':
+              sourceObservation != null ||
+                  sourceAttendance != null ||
+                  sourceConcrete != null
+              ? project
+              : null,
+          'source_observation_id': sourceObservation,
+          'source_attendance_day_id': sourceAttendance,
+          'source_concrete_pour_id': sourceConcrete,
+          'event_type': 'created',
+          'occurred_at': timestamp,
+          'payload_json': '{}',
+        });
+        await db.insert('reminder_notification_bindings', {
+          'reminder_id': id,
+          'platform_notification_id': platformId,
+          'scheduled_for': terminal ? null : nextAttentionAt,
+          'sync_state': nextAttentionAt == null || terminal
+              ? 'cancelled'
+              : 'scheduled',
+          'last_synced_at': timestamp,
+        });
+      }
+
+      await insertReminder(
+        id: '11111111-1111-4111-8111-111111111111',
+        platformId: 201,
+        status: 'active',
+        nextAttentionAt: due,
+        sourceObservation: observation,
+      );
+      await insertReminder(
+        id: '22222222-2222-4222-8222-222222222222',
+        platformId: 202,
+        status: 'active',
+        allDayLocalDate: '2026-07-21',
+        sourceAttendance: attendance,
+      );
+      await insertReminder(
+        id: '33333333-3333-4333-8333-333333333333',
+        platformId: 203,
+        status: 'inbox',
+        sourceConcrete: pour,
+      );
+      await insertReminder(
+        id: '44444444-4444-4444-8444-444444444444',
+        platformId: 204,
+        status: 'completed',
+      );
+      await insertReminder(
+        id: '55555555-5555-4555-8555-555555555555',
+        platformId: 205,
+        status: 'cancelled',
+      );
+      await versionEight.close();
+
+      final upgraded = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 20, 9),
+      );
+      await upgraded.open();
+      final rows = await upgraded.database.query(
+        'follow_up_items',
+        orderBy: 'id ASC',
+      );
+      expect(rows, hasLength(5));
+      expect(rows.every((row) => row['trashed_at'] == null), isTrue);
+      expect(rows.map((row) => row['status']), [
+        'active',
+        'active',
+        'inbox',
+        'completed',
+        'cancelled',
+      ]);
+      expect(rows[0]['observation_id'], observation);
+      expect(rows[1]['attendance_day_id'], attendance);
+      expect(rows[2]['concrete_pour_id'], pour);
+      expect(
+        (await upgraded.database.query(
+          'reminder_notification_bindings',
+          orderBy: 'platform_notification_id ASC',
+        )).map((row) => row['platform_notification_id']),
+        [201, 202, 203, 204, 205],
+      );
+      expect(await upgraded.database.query('follow_up_events'), hasLength(5));
+      expect(
+        await upgraded.database.rawQuery('PRAGMA foreign_key_check'),
+        isEmpty,
+      );
+      await upgraded.database.update(
+        'follow_up_items',
+        {'trashed_at': '2026-07-20T09:00:00Z'},
+        where: 'id = ?',
+        whereArgs: [rows.first['id']],
+      );
+      await expectLater(
+        upgraded.database.update(
+          'follow_up_items',
+          {'trashed_at': '2026-07-20 09:00:00'},
+          where: 'id = ?',
+          whereArgs: [rows[1]['id']],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await upgraded.database.insert('follow_up_events', {
+        'id': 'ffffffff-ffff-4fff-8fff-fffffffffff1',
+        'follow_up_id': rows.first['id'],
+        'sequence': 2,
+        'project_id': project,
+        'source_observation_id': observation,
+        'event_type': 'trashed',
+        'occurred_at': '2026-07-20T09:00:00Z',
+        'payload_json': '{}',
+      });
+      await upgraded.database.insert('follow_up_events', {
+        'id': 'ffffffff-ffff-4fff-8fff-fffffffffff2',
+        'follow_up_id': rows.first['id'],
+        'sequence': 3,
+        'project_id': project,
+        'source_observation_id': observation,
+        'event_type': 'restored_from_trash',
+        'occurred_at': '2026-07-20T09:01:00Z',
+        'payload_json': '{}',
+      });
+      await expectLater(
+        upgraded.database.delete(
+          'follow_up_items',
+          where: 'id = ?',
+          whereArgs: [rows.first['id']],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await upgraded.close();
+    },
+  );
+
+  test('failed schema 9 migration rolls back intact schema 8 data', () async {
+    final versionEight = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => firstClock,
+      migrations: AppDatabase.foundationMigrations.take(8).toList(),
+    );
+    await versionEight.open();
+    await versionEight.database.insert('follow_up_items', {
+      'id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'capture_text': 'Rollback schema 9',
+      'title': 'Rollback schema 9',
+      'item_type': 'action',
+      'status': 'inbox',
+      'is_important': 0,
+      'revision': 1,
+      'created_at': '2026-07-20T08:00:00Z',
+      'updated_at': '2026-07-20T08:00:00Z',
+    });
+    await versionEight.close();
+
+    final failing = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => DateTime.utc(2026, 7, 20, 9),
+      migrations: [
+        ...AppDatabase.foundationMigrations.take(8),
+        DatabaseMigration(
+          version: 9,
+          apply: (transaction) async {
+            await AppDatabase.foundationMigrations[8].apply(transaction);
+            throw StateError('forced schema 9 failure');
+          },
+        ),
+      ],
+    );
+    await expectLater(failing.open(), throwsA(isA<DatabaseOpenFailure>()));
+    final raw = await databaseFactoryFfi.openDatabase(
+      directories.databaseFile,
+      options: sqflite.OpenDatabaseOptions(singleInstance: false),
+    );
+    expect(
+      sqflite.Sqflite.firstIntValue(await raw.rawQuery('PRAGMA user_version')),
+      8,
+    );
+    expect(
+      (await raw.query('follow_up_items')).single['title'],
+      'Rollback schema 9',
+    );
+    expect(
+      (await raw.rawQuery(
+        'PRAGMA table_info(follow_up_items)',
+      )).where((row) => row['name'] == 'trashed_at'),
+      isEmpty,
+    );
+    expect(
+      await raw.rawQuery(
+        "SELECT name FROM sqlite_master WHERE name = 'follow_up_events_v8'",
+      ),
+      isEmpty,
+    );
+    await raw.close();
+  });
+
   test('failed schema 7 migration rolls back intact schema 6 data', () async {
     final versionSix = AppDatabase(
       path: directories.databaseFile,
@@ -1434,81 +1779,87 @@ void main() {
     await raw.close();
   });
 
-  test('failed schema 8 migration rolls back intact schema 7 waiting data', () async {
-    final versionSeven = AppDatabase(
-      path: directories.databaseFile,
-      factory: databaseFactoryFfi,
-      clock: () => firstClock,
-      migrations: AppDatabase.foundationMigrations.take(7).toList(),
-    );
-    await versionSeven.open();
-    await versionSeven.database.insert('follow_up_items', {
-      'id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-      'capture_text': 'Rollback waiting',
-      'title': 'Rollback waiting',
-      'item_type': 'waiting',
-      'status': 'waiting',
-      'is_important': 0,
-      'next_attention_at': '2026-07-20T06:00:00Z',
-      'revision': 3,
-      'created_at': '2026-07-19T08:00:00Z',
-      'updated_at': '2026-07-19T08:00:00Z',
-    });
-    await versionSeven.database.insert('follow_up_events', {
-      'id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-      'follow_up_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-      'sequence': 1,
-      'event_type': 'created',
-      'occurred_at': '2026-07-19T08:00:00Z',
-      'payload_json': '{}',
-    });
-    await versionSeven.database.insert('reminder_notification_bindings', {
-      'reminder_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-      'platform_notification_id': 501,
-      'scheduled_for': '2026-07-20T06:00:00Z',
-      'sync_state': 'scheduled',
-      'last_synced_at': '2026-07-19T08:00:00Z',
-    });
-    await versionSeven.close();
+  test(
+    'failed schema 8 migration rolls back intact schema 7 waiting data',
+    () async {
+      final versionSeven = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+        migrations: AppDatabase.foundationMigrations.take(7).toList(),
+      );
+      await versionSeven.open();
+      await versionSeven.database.insert('follow_up_items', {
+        'id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'capture_text': 'Rollback waiting',
+        'title': 'Rollback waiting',
+        'item_type': 'waiting',
+        'status': 'waiting',
+        'is_important': 0,
+        'next_attention_at': '2026-07-20T06:00:00Z',
+        'revision': 3,
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await versionSeven.database.insert('follow_up_events', {
+        'id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        'follow_up_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'sequence': 1,
+        'event_type': 'created',
+        'occurred_at': '2026-07-19T08:00:00Z',
+        'payload_json': '{}',
+      });
+      await versionSeven.database.insert('reminder_notification_bindings', {
+        'reminder_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'platform_notification_id': 501,
+        'scheduled_for': '2026-07-20T06:00:00Z',
+        'sync_state': 'scheduled',
+        'last_synced_at': '2026-07-19T08:00:00Z',
+      });
+      await versionSeven.close();
 
-    final failing = AppDatabase(
-      path: directories.databaseFile,
-      factory: databaseFactoryFfi,
-      clock: () => DateTime.utc(2026, 7, 19, 9),
-      migrations: [
-        ...AppDatabase.foundationMigrations.take(7),
-        DatabaseMigration(
-          version: 8,
-          apply: (transaction) async {
-            await AppDatabase.foundationMigrations[7].apply(transaction);
-            throw StateError('forced schema 8 failure');
-          },
+      final failing = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 9),
+        migrations: [
+          ...AppDatabase.foundationMigrations.take(7),
+          DatabaseMigration(
+            version: 8,
+            apply: (transaction) async {
+              await AppDatabase.foundationMigrations[7].apply(transaction);
+              throw StateError('forced schema 8 failure');
+            },
+          ),
+        ],
+      );
+      await expectLater(failing.open(), throwsA(isA<DatabaseOpenFailure>()));
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: sqflite.OpenDatabaseOptions(singleInstance: false),
+      );
+      expect(
+        sqflite.Sqflite.firstIntValue(
+          await raw.rawQuery('PRAGMA user_version'),
         ),
-      ],
-    );
-    await expectLater(failing.open(), throwsA(isA<DatabaseOpenFailure>()));
-    final raw = await databaseFactoryFfi.openDatabase(
-      directories.databaseFile,
-      options: sqflite.OpenDatabaseOptions(singleInstance: false),
-    );
-    expect(
-      sqflite.Sqflite.firstIntValue(await raw.rawQuery('PRAGMA user_version')),
-      7,
-    );
-    final waiting = (await raw.query('follow_up_items')).single;
-    expect(waiting['item_type'], 'waiting');
-    expect(waiting['status'], 'waiting');
-    expect(
-      (await raw.rawQuery('PRAGMA table_info(follow_up_items)'))
-          .where((row) => row['name'] == 'all_day_local_date'),
-      isEmpty,
-    );
-    expect(
-      await raw.rawQuery(
-        "SELECT name FROM sqlite_master WHERE name LIKE '%_v7'",
-      ),
-      isEmpty,
-    );
-    await raw.close();
-  });
+        7,
+      );
+      final waiting = (await raw.query('follow_up_items')).single;
+      expect(waiting['item_type'], 'waiting');
+      expect(waiting['status'], 'waiting');
+      expect(
+        (await raw.rawQuery(
+          'PRAGMA table_info(follow_up_items)',
+        )).where((row) => row['name'] == 'all_day_local_date'),
+        isEmpty,
+      );
+      expect(
+        await raw.rawQuery(
+          "SELECT name FROM sqlite_master WHERE name LIKE '%_v7'",
+        ),
+        isEmpty,
+      );
+      await raw.close();
+    },
+  );
 }

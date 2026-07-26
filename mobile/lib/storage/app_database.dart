@@ -27,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 8;
+  static const schemaVersion = 9;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2421,6 +2421,99 @@ class AppDatabase {
             END
           ''');
         }
+      },
+    ),
+    DatabaseMigration(
+      version: 9,
+      apply: (transaction) async {
+        await transaction.execute('''
+          ALTER TABLE follow_up_items
+          ADD COLUMN trashed_at TEXT CHECK (
+            trashed_at IS NULL
+            OR (
+              length(trashed_at) = 20
+              AND trashed_at GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+            )
+          )
+        ''');
+        await transaction.execute(
+          'DROP TRIGGER follow_up_events_append_only_update',
+        );
+        await transaction.execute(
+          'DROP TRIGGER follow_up_events_append_only_delete',
+        );
+        await transaction.execute(
+          'ALTER TABLE follow_up_events RENAME TO follow_up_events_v8',
+        );
+        await transaction.execute('''
+          CREATE TABLE follow_up_events (
+            id TEXT PRIMARY KEY,
+            follow_up_id TEXT NOT NULL REFERENCES follow_up_items(id),
+            sequence INTEGER NOT NULL CHECK (sequence >= 1),
+            project_id TEXT REFERENCES projects(id),
+            source_observation_id TEXT,
+            source_attendance_day_id TEXT,
+            source_concrete_pour_id TEXT,
+            event_type TEXT NOT NULL CHECK (event_type IN (
+              'created', 'scheduled', 'rescheduled', 'details_updated',
+              'waiting_started', 'legacy_waiting_normalized', 'snoozed',
+              'completed', 'cancelled', 'reopened', 'moved_to_inbox',
+              'trashed', 'restored_from_trash',
+              'notification_scheduled', 'notification_cancelled'
+            )),
+            occurred_at TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            FOREIGN KEY (source_observation_id, project_id)
+              REFERENCES field_observations(id, project_id),
+            FOREIGN KEY (source_attendance_day_id, project_id)
+              REFERENCES attendance_days(id, project_id),
+            FOREIGN KEY (source_concrete_pour_id, project_id)
+              REFERENCES concrete_pours(id, project_id),
+            UNIQUE (follow_up_id, sequence),
+            CHECK (
+              (source_observation_id IS NOT NULL)
+                + (source_attendance_day_id IS NOT NULL)
+                + (source_concrete_pour_id IS NOT NULL) <= 1
+            ),
+            CHECK (
+              (source_observation_id IS NULL
+                AND source_attendance_day_id IS NULL
+                AND source_concrete_pour_id IS NULL)
+              OR project_id IS NOT NULL
+            )
+          )
+        ''');
+        await transaction.execute('''
+          INSERT INTO follow_up_events (
+            id, follow_up_id, sequence, project_id,
+            source_observation_id, source_attendance_day_id,
+            source_concrete_pour_id, event_type, occurred_at, payload_json
+          )
+          SELECT
+            id, follow_up_id, sequence, project_id,
+            source_observation_id, source_attendance_day_id,
+            source_concrete_pour_id, event_type, occurred_at, payload_json
+          FROM follow_up_events_v8
+        ''');
+        await transaction.execute('DROP TABLE follow_up_events_v8');
+        await transaction.execute('''
+          CREATE INDEX ix_follow_ups_trash_v9
+          ON follow_up_items(trashed_at DESC, updated_at DESC, id ASC)
+        ''');
+        await transaction.execute('''
+          CREATE TRIGGER follow_up_events_append_only_update
+          BEFORE UPDATE ON follow_up_events
+          BEGIN
+            SELECT RAISE(ABORT, 'append-only event history');
+          END
+        ''');
+        await transaction.execute('''
+          CREATE TRIGGER follow_up_events_append_only_delete
+          BEFORE DELETE ON follow_up_events
+          BEGIN
+            SELECT RAISE(ABORT, 'append-only event history');
+          END
+        ''');
       },
     ),
   ];

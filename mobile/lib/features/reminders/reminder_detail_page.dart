@@ -175,6 +175,34 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
     }
   }
 
+  Future<void> _showTrashConfirmation() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hatırlatıcı silinsin mi?'),
+        content: const Text(
+          'Kayıt normal listelerden kaldırılır. Bağlı Ajanda, Puantaj veya '
+          'Beton kaydı silinmez. Hatırlatıcı Geri Dönüşüm Kutusu’ndan geri '
+          'getirilebilir.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            key: const Key('confirm-trash-reminder'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _mutate(ReminderMutationAction.moveToTrash);
+    }
+  }
+
   Future<void> _showScheduleSheet() async {
     final choice = await showModalBottomSheet<ReminderScheduleKind>(
       context: context,
@@ -477,6 +505,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
     final terminal =
         reminder.status == ReminderStatus.completed ||
         reminder.status == ReminderStatus.cancelled;
+    final trashed = reminder.trashedAt != null;
     return ListView(
       key: const Key('reminder-detail'),
       padding: const EdgeInsets.all(16),
@@ -556,6 +585,12 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
                 ].join(' • '),
         ),
         _ReminderRow(label: 'Revision', value: '${reminder.revision}'),
+        if (reminder.trashedAt != null)
+          _ReminderRow(
+            key: const Key('reminder-trashed-at'),
+            label: 'Geri dönüşüm kutusuna taşındı',
+            value: CseTimeCodec.formatIstanbul(reminder.trashedAt!),
+          ),
         if (reminder.sourceLogId != null) ...[
           const SizedBox(height: 16),
           SizedBox(
@@ -623,81 +658,100 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            if (!terminal) ...[
+            if (trashed)
               _ActionButton(
-                key: const Key('complete-reminder'),
-                label: 'Tamamla',
-                icon: Icons.check_circle_outline,
-                onPressed: _mutating ? null : _showCompletionDialog,
-              ),
-              _ActionButton(
-                key: const Key('snooze-tomorrow'),
-                label: 'Yarın',
-                icon: Icons.wb_sunny_outlined,
+                key: const Key('restore-reminder'),
+                label: 'Geri yükle',
+                icon: Icons.restore_from_trash_outlined,
                 onPressed: _mutating
                     ? null
-                    : () =>
-                          _mutate(ReminderMutationAction.snoozeTomorrowMorning),
+                    : () => _mutate(ReminderMutationAction.restoreFromTrash),
+              )
+            else ...[
+              if (!terminal) ...[
+                _ActionButton(
+                  key: const Key('complete-reminder'),
+                  label: 'Tamamla',
+                  icon: Icons.check_circle_outline,
+                  onPressed: _mutating ? null : _showCompletionDialog,
+                ),
+                _ActionButton(
+                  key: const Key('snooze-tomorrow'),
+                  label: 'Yarın',
+                  icon: Icons.wb_sunny_outlined,
+                  onPressed: _mutating
+                      ? null
+                      : () => _mutate(
+                          ReminderMutationAction.snoozeTomorrowMorning,
+                        ),
+                ),
+                _ActionButton(
+                  key: const Key('snooze-15'),
+                  label: '15 dk ertele',
+                  icon: Icons.snooze,
+                  onPressed: _mutating
+                      ? null
+                      : () => _mutate(ReminderMutationAction.snooze15Minutes),
+                ),
+                _ActionButton(
+                  key: const Key('snooze-1h'),
+                  label: '1 saat ertele',
+                  icon: Icons.more_time,
+                  onPressed: _mutating
+                      ? null
+                      : () => _mutate(ReminderMutationAction.snooze1Hour),
+                ),
+                _ActionButton(
+                  key: const Key('schedule-reminder'),
+                  label: 'Yeni tarih',
+                  icon: Icons.event_outlined,
+                  onPressed: _mutating ? null : _showScheduleSheet,
+                ),
+              ] else
+                _ActionButton(
+                  key: const Key('reopen-reminder'),
+                  label: 'Yeniden aç',
+                  icon: Icons.restart_alt,
+                  onPressed: _mutating
+                      ? null
+                      : () => _mutate(ReminderMutationAction.reopen),
+                ),
+              _ActionButton(
+                key: const Key('edit-reminder'),
+                label: 'Düzenle',
+                icon: Icons.edit_outlined,
+                onPressed: _mutating ? null : _showEditDialog,
               ),
               _ActionButton(
-                key: const Key('snooze-15'),
-                label: '15 dk ertele',
-                icon: Icons.snooze,
-                onPressed: _mutating
-                    ? null
-                    : () => _mutate(ReminderMutationAction.snooze15Minutes),
+                key: const Key('trash-reminder'),
+                label: 'Sil',
+                icon: Icons.delete_outline,
+                onPressed: _mutating ? null : _showTrashConfirmation,
               ),
-              _ActionButton(
-                key: const Key('snooze-1h'),
-                label: '1 saat ertele',
-                icon: Icons.more_time,
-                onPressed: _mutating
-                    ? null
-                    : () => _mutate(ReminderMutationAction.snooze1Hour),
-              ),
-              _ActionButton(
-                key: const Key('schedule-reminder'),
-                label: 'Yeni tarih',
-                icon: Icons.event_outlined,
-                onPressed: _mutating ? null : _showScheduleSheet,
-              ),
-            ] else
-              _ActionButton(
-                key: const Key('reopen-reminder'),
-                label: 'Yeniden aç',
-                icon: Icons.restart_alt,
-                onPressed: _mutating
-                    ? null
-                    : () => _mutate(ReminderMutationAction.reopen),
-              ),
-            _ActionButton(
-              key: const Key('edit-reminder'),
-              label: 'Düzenle',
-              icon: Icons.edit_outlined,
-              onPressed: _mutating ? null : _showEditDialog,
-            ),
-            if (!terminal) ...[
-              _ActionButton(
-                key: const Key('move-inbox'),
-                label: 'Unutma Kutusu',
-                icon: Icons.inbox_outlined,
-                onPressed: _mutating
-                    ? null
-                    : () => _mutate(ReminderMutationAction.moveToInbox),
-              ),
-              _ActionButton(
-                key: const Key('cancel-reminder'),
-                label: 'İptal et',
-                icon: Icons.cancel_outlined,
-                onPressed: _mutating
-                    ? null
-                    : () => _mutate(ReminderMutationAction.cancel),
-              ),
+              if (!terminal) ...[
+                _ActionButton(
+                  key: const Key('move-inbox'),
+                  label: 'Unutma Kutusu',
+                  icon: Icons.inbox_outlined,
+                  onPressed: _mutating
+                      ? null
+                      : () => _mutate(ReminderMutationAction.moveToInbox),
+                ),
+                _ActionButton(
+                  key: const Key('cancel-reminder'),
+                  label: 'İptal et',
+                  icon: Icons.cancel_outlined,
+                  onPressed: _mutating
+                      ? null
+                      : () => _mutate(ReminderMutationAction.cancel),
+                ),
+              ],
             ],
           ],
         ),
         if (_deliveryDiagnostic case final diagnostic?
             when !terminal &&
+                !trashed &&
                 reminder.allDayLocalDate == null &&
                 diagnostic.delayClass !=
                     ReminderDeliveryDelayClass.overdue) ...[

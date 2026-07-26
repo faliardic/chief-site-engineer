@@ -1617,3 +1617,5 @@ Bu dosya, proje boyunca kullanilan teknik terimlerin sade Turkce aciklamalarini 
 `Local Calendar Projection (Yerel Takvim Projection'ı)`: Kanonik UTC saklanan kayıtları UTC tarih parçasıyla değil, kullanıcının belirlenmiş timezone'ındaki takvim günü sınırlarıyla seçen read-model'dir. Issue #214 için timezone `Europe/Istanbul`dur.
 
 `Unified Today Read-Model (Birleşik Bugün Okuma Modeli)`: Aktif reminder'ları tek `asOfUtc` referansıyla Gecikenler, Saatli bugün ve Tam gün bölümlerine ayıran, inbox sayısını ayrıca taşıyan, logical reminder kimliğini tekilleştiren ve kalıcı kaydı değiştirmeyen application projeksiyonudur.
+
+`Reminder Trash Visibility (Hatırlatıcı Geri Dönüşüm Görünürlüğü)`: Reminder'ın status, schedule, outcome ve source bağlantılarını değiştirmeden nullable canonical UTC `trashed_at` alanıyla normal read-model'lerden gizlenmesi; restore sırasında aynı aggregate kimliğiyle görünür hâle getirilmesidir. Fiziksel delete veya terminal lifecycle status'u değildir.

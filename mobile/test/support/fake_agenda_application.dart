@@ -205,7 +205,9 @@ class FakeAgendaApplication
     final log = logs.firstWhere((item) => item.id == logId);
     return AgendaLogDetail(
       log: log,
-      reminders: reminders.where((item) => item.sourceLogId == logId).toList(),
+      reminders: reminders
+          .where((item) => item.sourceLogId == logId && item.trashedAt == null)
+          .toList(),
     );
   }
 
@@ -224,8 +226,11 @@ class FakeAgendaApplication
       notification: NotificationBinding(
         reminderId: reminder.id,
         platformNotificationId: 1,
-        scheduledFor: reminder.nextAttentionAt,
-        syncState: reminder.nextAttentionAt == null
+        scheduledFor: reminder.trashedAt == null
+            ? reminder.nextAttentionAt
+            : null,
+        syncState:
+            reminder.nextAttentionAt == null || reminder.trashedAt != null
             ? NotificationSyncState.cancelled
             : NotificationSyncState.scheduled,
         lastSyncedAt: reminder.updatedAt,
@@ -258,7 +263,13 @@ class FakeAgendaApplication
   @override
   Future<List<MobileReminder>> listReminders(ReminderViewGroup group) async {
     lastReminderGroup = group;
-    return reminders;
+    return reminders
+        .where(
+          (item) => group == ReminderViewGroup.trash
+              ? item.trashedAt != null
+              : item.trashedAt == null,
+        )
+        .toList();
   }
 
   @override
@@ -285,15 +296,31 @@ class FakeAgendaApplication
             : ReminderStatus.active,
       _ => current.status,
     };
-    final clearsSchedule =
-        command.action == ReminderMutationAction.moveToInbox;
-    final scheduledAllDay =
-        command.action == ReminderMutationAction.schedule
+    final clearsSchedule = command.action == ReminderMutationAction.moveToInbox;
+    final scheduledAllDay = command.action == ReminderMutationAction.schedule
         ? command.allDayLocalDate
         : current.allDayLocalDate;
     final scheduledAt = command.action == ReminderMutationAction.schedule
         ? command.customAttentionAt
         : current.nextAttentionAt;
+    final trashedAt = switch (command.action) {
+      ReminderMutationAction.moveToTrash => '2026-07-19T08:01:00Z',
+      ReminderMutationAction.restoreFromTrash => null,
+      _ => current.trashedAt,
+    };
+    final outcomeType = switch (command.action) {
+      ReminderMutationAction.complete =>
+        command.outcomeType ?? ReminderOutcomeType.completed,
+      ReminderMutationAction.cancel => ReminderOutcomeType.noLongerNeeded,
+      ReminderMutationAction.reopen => null,
+      _ => current.outcomeType,
+    };
+    final outcomeNote = switch (command.action) {
+      ReminderMutationAction.complete ||
+      ReminderMutationAction.cancel => command.outcomeNote,
+      ReminderMutationAction.reopen => null,
+      _ => current.outcomeNote,
+    };
     final updated = MobileReminder(
       id: current.id,
       projectId: current.projectId,
@@ -313,16 +340,21 @@ class FakeAgendaApplication
       allDayLocalDate: clearsSchedule ? null : scheduledAllDay,
       deadlineAt: current.deadlineAt,
       conditionText: current.conditionText,
-      outcomeType: command.outcomeType,
-      outcomeNote: command.outcomeNote,
+      outcomeType: outcomeType,
+      outcomeNote: outcomeNote,
       createdAt: current.createdAt,
       updatedAt: '2026-07-19T08:01:00Z',
-      completedAt: status == ReminderStatus.completed
-          ? '2026-07-19T08:01:00Z'
-          : null,
-      cancelledAt: status == ReminderStatus.cancelled
-          ? '2026-07-19T08:01:00Z'
-          : null,
+      completedAt: switch (command.action) {
+        ReminderMutationAction.complete => '2026-07-19T08:01:00Z',
+        ReminderMutationAction.reopen => null,
+        _ => current.completedAt,
+      },
+      cancelledAt: switch (command.action) {
+        ReminderMutationAction.cancel => '2026-07-19T08:01:00Z',
+        ReminderMutationAction.reopen => null,
+        _ => current.cancelledAt,
+      },
+      trashedAt: trashedAt,
       revision: current.revision + 1,
     );
     reminders = [...reminders]..[index] = updated;

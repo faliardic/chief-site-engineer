@@ -105,7 +105,9 @@ Kanonik uygulama sırası:
    yanlış `Bugün`/`Yarın` etiketleri giderilir.
 3. **Reminder geri dönüşüm kutusu:** silme, geri yüklenebilir archive/trash'tır;
    notification binding güvenle kaldırılır ve restore sırasında yeniden
-   üretilebilir. İlk sürümde otomatik hard-delete yoktur.
+   üretilebilir. Issue #227 ile schema 9, append-only trash/restore event'leri
+   ve `Diğer > Geri Dönüşüm Kutusu` yüzeyi uygulanmıştır. İlk sürümde otomatik
+   hard-delete yoktur.
 4. **Ajanda → reminder kaynak attachment görünürlüğü:** kaynak Ajanda fotoğrafı
    veya dosyası reminder detayında görünür; geniş attachment refactor'ı
    başlamadan dar read-model bağı düzeltilir.
@@ -390,8 +392,10 @@ recovery `PASS`; günlük rapor `≤3 dk`; haricî not/hatırlatıcıya dönüş
 - #193 Release 0.1 pilotu açık kalır ve mevcut Gün 0 kanıtıyla devam eder.
 - #220 roadmap hizalamasından sonra ilk production child #221 Reminder scheduling
   contract'tır.
-- Ardından birleşik Bugün, reminder trash/restore, Ajanda → reminder attachment
-  görünürlüğü, Beton sınıfı/zaman çizgisi ve Beton keyword önerisi yürür.
+- Birleşik Bugün #225 ile, reminder trash/restore #227 ile tamamlanmıştır.
+  Sıradaki production bloğu Ajanda → reminder kaynak attachment
+  görünürlüğüdür; Beton sınıfı/zaman çizgisi veya Beton keyword önerisi henüz
+  başlamaz.
 
 ### Sonraki kontrollü sıra
 
@@ -429,9 +433,9 @@ recovery `PASS`; günlük rapor `≤3 dk`; haricî not/hatırlatıcıya dönüş
 Release 0.1.1 günlük güvenilirlik/sadeleştirme kuyruğu:
 
 1. #221 Reminder scheduling contract;
-2. birleşik ve sade Bugün görünümü;
-3. reminder recoverable trash/restore;
-4. Ajanda → reminder kaynak attachment görünürlüğü;
+2. birleşik ve sade Bugün görünümü — Issue #225 ile tamamlandı;
+3. reminder recoverable trash/restore — Issue #227 ile tamamlandı;
+4. sıradaki blok: Ajanda → reminder kaynak attachment görünürlüğü;
 5. Beton sınıfı, başlat/bitir ve tek bağlı Ajanda logu;
 6. Beton keyword önerisi/deep-link;
 7. ortak attachment v2 ve çoklu medya/dosya;

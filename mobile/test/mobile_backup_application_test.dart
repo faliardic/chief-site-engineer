@@ -91,64 +91,85 @@ void main() {
     await restarted.close();
   });
 
-  test('format 1 backup preserves schema 8 all-day reminder semantics', () async {
-    final agenda = SqliteAgendaApplication(
-      databasePath: directories.databaseFile,
-      databaseFactory: databaseFactoryFfi,
-      clock: () => DateTime.parse(_now),
-      notificationGateway: const UnavailableReminderNotificationGateway(),
-    );
-    final reminder = await agenda.createReminder(
-      const CreateReminderCommand(
-        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        eventId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-        title: 'Tam gün backup kaydı',
-        kind: ReminderKind.action,
-        schedule: ReminderScheduleKind.custom,
-        allDayLocalDate: '2026-07-20',
-      ),
-    );
-    expect(reminder.nextAttentionAt, isNull);
+  test(
+    'format 1 backup round-trips schema 9 trashed all-day reminder and audit',
+    () async {
+      final agenda = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => DateTime.parse(_now),
+        notificationGateway: const UnavailableReminderNotificationGateway(),
+      );
+      final reminder = await agenda.createReminder(
+        const CreateReminderCommand(
+          id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          eventId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          title: 'Tam gün backup kaydı',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          allDayLocalDate: '2026-07-20',
+        ),
+      );
+      expect(reminder.nextAttentionAt, isNull);
+      final trashed = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: reminder.id,
+          eventId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+          expectedRevision: reminder.revision,
+          action: ReminderMutationAction.moveToTrash,
+        ),
+      );
+      expect(trashed.trashedAt, isNotNull);
 
-    final application = _application(directories, gateway: gateway);
-    final created = await application.createBackup(
-      const CreateMobileBackupCommand(
-        password: _password,
-        passwordConfirmation: _password,
-      ),
-    );
-    final preflight = await application.preflightBackup(
-      created.package,
-      _password,
-    );
-    await application.restoreBackup(
-      RestoreMobileBackupCommand(
-        package: created.package,
-        password: _password,
-        expectedPackageSha256: preflight.packageSha256,
-      ),
-    );
+      final application = _application(directories, gateway: gateway);
+      final created = await application.createBackup(
+        const CreateMobileBackupCommand(
+          password: _password,
+          passwordConfirmation: _password,
+        ),
+      );
+      final preflight = await application.preflightBackup(
+        created.package,
+        _password,
+      );
+      await application.restoreBackup(
+        RestoreMobileBackupCommand(
+          package: created.package,
+          password: _password,
+          expectedPackageSha256: preflight.packageSha256,
+        ),
+      );
 
-    final restored = await _openRaw(directories);
-    final row = (await restored.query(
-      'follow_up_items',
-      where: 'id = ?',
-      whereArgs: [reminder.id],
-    )).single;
-    expect(preflight.manifest.formatVersion, 1);
-    expect(preflight.migratedSchemaVersion, 8);
-    expect(row['status'], 'active');
-    expect(row['next_attention_at'], isNull);
-    expect(row['all_day_local_date'], '2026-07-20');
-    final binding = (await restored.query(
-      'reminder_notification_bindings',
-      where: 'reminder_id = ?',
-      whereArgs: [reminder.id],
-    )).single;
-    expect(binding['scheduled_for'], isNull);
-    expect(binding['sync_state'], 'cancelled');
-    await restored.close();
-  });
+      final restored = await _openRaw(directories);
+      final row = (await restored.query(
+        'follow_up_items',
+        where: 'id = ?',
+        whereArgs: [reminder.id],
+      )).single;
+      expect(preflight.manifest.formatVersion, 1);
+      expect(preflight.migratedSchemaVersion, 9);
+      expect(row['status'], 'active');
+      expect(row['next_attention_at'], isNull);
+      expect(row['all_day_local_date'], '2026-07-20');
+      expect(row['trashed_at'], trashed.trashedAt);
+      final binding = (await restored.query(
+        'reminder_notification_bindings',
+        where: 'reminder_id = ?',
+        whereArgs: [reminder.id],
+      )).single;
+      expect(binding['scheduled_for'], isNull);
+      expect(binding['sync_state'], 'cancelled');
+      expect(
+        await restored.query(
+          'follow_up_events',
+          where: "follow_up_id = ? AND event_type = 'trashed'",
+          whereArgs: [reminder.id],
+        ),
+        hasLength(1),
+      );
+      await restored.close();
+    },
+  );
 
   test(
     'stable picker import survives source loss wrong password retry and restore',
@@ -550,9 +571,9 @@ void main() {
     },
   );
 
-  for (final schemaVersion in [1, 2, 3, 4, 5, 6, 7]) {
+  for (final schemaVersion in [1, 2, 3, 4, 5, 6, 7, 8]) {
     test(
-      'schema v$schemaVersion package migrates to v8 without count loss',
+      'schema v$schemaVersion package migrates to v9 without count loss',
       () async {
         final oldRoot = await Directory.systemTemp.createTemp(
           'cse_schema${schemaVersion}_',
@@ -603,7 +624,7 @@ void main() {
         );
 
         expect(preflight.manifest.mobileSchemaVersion, schemaVersion);
-        expect(preflight.migratedSchemaVersion, 8);
+        expect(preflight.migratedSchemaVersion, 9);
         final counts = await _tableCounts(directories);
         final hasAgenda = schemaVersion >= 2 ? 1 : 0;
         final hasAttendance = schemaVersion >= 4 ? 1 : 0;
@@ -655,6 +676,18 @@ void main() {
           expect(binding['scheduled_for'], '2026-07-20T06:00:00Z');
           await restored.close();
         }
+        if (schemaVersion == 8) {
+          final restored = await _openRaw(directories);
+          expect(
+            (await restored.query(
+              'follow_up_items',
+              where: 'id = ?',
+              whereArgs: ['legacy-reminder'],
+            )).single['trashed_at'],
+            isNull,
+          );
+          await restored.close();
+        }
         expect(await directories.staging.list().toList(), isEmpty);
       },
     );
@@ -672,7 +705,7 @@ void main() {
     });
     final databaseBytes = await File(directories.databaseFile).readAsBytes();
     final archive = const CseBackupArchiveCodec().encode(
-      manifest: _manifest(databaseBytes, schemaVersion: 9),
+      manifest: _manifest(databaseBytes, schemaVersion: 10),
       databaseBytes: databaseBytes,
       attachments: const {},
     );
