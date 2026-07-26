@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
@@ -11,10 +12,18 @@ import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:flutter/material.dart';
 
 class AgendaPage extends StatefulWidget {
-  const AgendaPage({required this.agenda, this.attachments, super.key});
+  const AgendaPage({
+    required this.agenda,
+    this.attachments,
+    this.concrete,
+    this.concreteAttachments,
+    super.key,
+  });
 
   final AgendaApplication agenda;
   final SafeAttachmentPicker? attachments;
+  final ConcreteApplication? concrete;
+  final SafeAttachmentPicker? concreteAttachments;
 
   @override
   State<AgendaPage> createState() => _AgendaPageState();
@@ -153,6 +162,8 @@ class _AgendaPageState extends State<AgendaPage> {
         builder: (_) => LogDetailPage(
           agenda: widget.agenda,
           attachments: widget.attachments,
+          concrete: widget.concrete,
+          concreteAttachments: widget.concreteAttachments,
           logId: log.id,
         ),
       ),

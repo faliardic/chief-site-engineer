@@ -535,6 +535,7 @@ class SqliteAgendaApplication
     return _withDatabase(now, (database) {
       return database.transaction((transaction) async {
         final current = await _requireAgendaLog(transaction, command.id);
+        await _requireAgendaNotManagedByConcrete(transaction, command.id);
         if (current.archivedAt != null) {
           throw const AgendaValidationFailure(
             'Arşivlenen kayıt geri getirilmeden düzenlenemez.',
@@ -632,6 +633,7 @@ class SqliteAgendaApplication
     await _withDatabase(now, (database) {
       return database.transaction((transaction) async {
         final current = await _requireAgendaLog(transaction, command.id);
+        await _requireAgendaNotManagedByConcrete(transaction, command.id);
         if (current.revision != command.expectedRevision) {
           throw const AgendaValidationFailure(
             'Ajanda kaydı başka bir işlemde değişti; yeniden açın.',
@@ -2265,11 +2267,21 @@ class SqliteAgendaApplication
       whereArgs: [logId],
       orderBy: 'occurred_at ASC, id ASC',
     );
+    final managedLinks = await database.query(
+      'concrete_pour_context_links',
+      columns: ['concrete_pour_id'],
+      where: 'agenda_log_id = ?',
+      whereArgs: [logId],
+      limit: 1,
+    );
     return AgendaLogDetail(
       log: log,
       reminders: reminders.map(_reminderFromRow).toList(growable: false),
       photos: photos.map(_agendaPhotoFromRow).toList(growable: false),
       events: events.map(_observationEventFromRow).toList(growable: false),
+      managedConcretePourId: managedLinks.isEmpty
+          ? null
+          : managedLinks.single['concrete_pour_id']! as String,
     );
   }
 
@@ -2282,7 +2294,27 @@ class SqliteAgendaApplication
       reminders: detail.reminders,
       photos: photos,
       events: detail.events,
+      managedConcretePourId: detail.managedConcretePourId,
     );
+  }
+
+  Future<void> _requireAgendaNotManagedByConcrete(
+    DatabaseExecutor database,
+    String logId,
+  ) async {
+    final links = await database.query(
+      'concrete_pour_context_links',
+      columns: ['concrete_pour_id'],
+      where: 'agenda_log_id = ?',
+      whereArgs: [logId],
+      limit: 1,
+    );
+    if (links.isNotEmpty) {
+      throw const AgendaValidationFailure(
+        'Bu Ajanda kaydı Beton paketi tarafından yönetiliyor; '
+        'ana kayıt Beton paketinden değiştirilmelidir.',
+      );
+    }
   }
 
   Future<List<AgendaLogPhoto>> _inspectAgendaPhotos(

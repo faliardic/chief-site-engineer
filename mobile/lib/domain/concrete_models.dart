@@ -127,6 +127,41 @@ enum ConcreteAttachmentIntegrity {
 
 enum ConcretePourGroup { today, upcoming, inProgress, followUp, closed }
 
+enum ConcretePourStage {
+  planned('Planlandı'),
+  inProgress('Devam ediyor'),
+  completed('Tamamlandı');
+
+  const ConcretePourStage(this.label);
+  final String label;
+}
+
+class ProjectConcreteClass {
+  const ProjectConcreteClass({
+    required this.id,
+    required this.projectId,
+    required this.displayName,
+    required this.normalizedName,
+    required this.defaultTargetSlump,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.archivedAt,
+  });
+
+  final String id;
+  final String projectId;
+  final String displayName;
+  final String normalizedName;
+  final String? defaultTargetSlump;
+  final int revision;
+  final String createdAt;
+  final String updatedAt;
+  final String? archivedAt;
+
+  bool get isArchived => archivedAt != null;
+}
+
 class ConcretePourQuery {
   const ConcretePourQuery({
     required this.group,
@@ -219,6 +254,12 @@ class ConcretePour {
   final int pendingCheckCount;
   final int missingEvidenceTruckCount;
   final int openFollowUpCount;
+
+  ConcretePourStage get stage => actualEndedAt != null
+      ? ConcretePourStage.completed
+      : actualStartedAt != null
+      ? ConcretePourStage.inProgress
+      : ConcretePourStage.planned;
 }
 
 class ConcreteCheckItem {
@@ -468,6 +509,8 @@ class ConcreteMetrics {
 class ConcretePourDetail {
   const ConcretePourDetail({
     required this.pour,
+    required this.concreteClassId,
+    required this.agendaLogId,
     required this.checks,
     required this.trucks,
     required this.sampleSets,
@@ -479,6 +522,8 @@ class ConcretePourDetail {
   });
 
   final ConcretePour pour;
+  final String concreteClassId;
+  final String? agendaLogId;
   final List<ConcreteCheckItem> checks;
   final List<ConcreteTruck> trucks;
   final List<ConcreteSampleSet> sampleSets;
@@ -497,7 +542,7 @@ class CreateConcretePourCommand {
     required this.pourCode,
     required this.elementLocation,
     required this.plannedAt,
-    required this.concreteClass,
+    required this.concreteClassId,
     required this.plannedVolumeM3,
     this.blockName,
     this.floorName,
@@ -523,7 +568,7 @@ class CreateConcretePourCommand {
   final String pourCode;
   final String elementLocation;
   final String plannedAt;
-  final String concreteClass;
+  final String concreteClassId;
   final double plannedVolumeM3;
   final String? blockName;
   final String? floorName;
@@ -541,6 +586,48 @@ class CreateConcretePourCommand {
   final String? inspectionNotifiedAt;
   final String? inspectionNotifiedPerson;
   final String? generalNote;
+}
+
+class CreateProjectConcreteClassCommand {
+  const CreateProjectConcreteClassCommand({
+    required this.id,
+    required this.eventId,
+    required this.projectId,
+    required this.displayName,
+    this.defaultTargetSlump,
+  });
+
+  final String id;
+  final String eventId;
+  final String projectId;
+  final String displayName;
+  final String? defaultTargetSlump;
+}
+
+class MutateProjectConcreteClassArchiveCommand {
+  const MutateProjectConcreteClassArchiveCommand({
+    required this.id,
+    required this.eventId,
+    required this.expectedRevision,
+    required this.archive,
+  });
+
+  final String id;
+  final String eventId;
+  final int expectedRevision;
+  final bool archive;
+}
+
+class RepairConcreteAgendaCommand {
+  const RepairConcreteAgendaCommand({
+    required this.pourId,
+    required this.eventId,
+    required this.expectedRevision,
+  });
+
+  final String pourId;
+  final String eventId;
+  final int expectedRevision;
 }
 
 class UpdateConcretePourCommand {

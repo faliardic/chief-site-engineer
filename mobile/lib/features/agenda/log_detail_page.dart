@@ -1,9 +1,11 @@
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_photo_viewer_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
+import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
@@ -14,12 +16,16 @@ class LogDetailPage extends StatefulWidget {
     required this.agenda,
     required this.logId,
     this.attachments,
+    this.concrete,
+    this.concreteAttachments,
     super.key,
   });
 
   final AgendaApplication agenda;
   final String logId;
   final SafeAttachmentPicker? attachments;
+  final ConcreteApplication? concrete;
+  final SafeAttachmentPicker? concreteAttachments;
 
   @override
   State<LogDetailPage> createState() => _LogDetailPageState();
@@ -58,6 +64,23 @@ class _LogDetailPageState extends State<LogDetailPage> {
         ),
       );
     }
+    if (mounted) setState(_reload);
+  }
+
+  Future<void> _openManagedConcrete(String pourId) async {
+    final concrete = widget.concrete;
+    final attachments = widget.concreteAttachments;
+    if (concrete == null || attachments == null) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ConcretePourDetailPage(
+          concrete: concrete,
+          agenda: widget.agenda,
+          attachments: attachments,
+          pourId: pourId,
+        ),
+      ),
+    );
     if (mounted) setState(_reload);
   }
 
@@ -225,7 +248,7 @@ class _LogDetailPageState extends State<LogDetailPage> {
           appBar: AppBar(
             title: const Text('Ajanda kaydı'),
             actions: [
-              if (detail != null)
+              if (detail != null && detail.managedConcretePourId == null)
                 Semantics(
                   button: true,
                   label: 'Hatırlatıcı oluştur',
@@ -293,6 +316,27 @@ class _LogDetailPageState extends State<LogDetailPage> {
               subtitle: Text('Bağlı hatırlatıcılar değiştirilmedi.'),
             ),
           ),
+        if (detail.managedConcretePourId case final pourId?)
+          Card(
+            key: const Key('managed-concrete-agenda'),
+            child: ListTile(
+              leading: const Icon(Icons.lock_outline),
+              title: const Text('Beton paketi tarafından yönetiliyor'),
+              subtitle: const Text(
+                'Ana metin ve arşiv durumu Beton paketinden yönetilir.',
+              ),
+              trailing:
+                  widget.concrete != null &&
+                      widget.concreteAttachments != null
+                  ? const Icon(Icons.chevron_right)
+                  : null,
+              onTap:
+                  widget.concrete != null &&
+                      widget.concreteAttachments != null
+                  ? () => _openManagedConcrete(pourId)
+                  : null,
+            ),
+          ),
         Text(
           log.category.label,
           style: Theme.of(context).textTheme.headlineSmall,
@@ -314,33 +358,34 @@ class _LogDetailPageState extends State<LogDetailPage> {
         if (log.notes != null)
           _DetailRow(label: 'Ayrıntılı not', value: log.notes!),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            if (log.archivedAt == null)
-              OutlinedButton.icon(
-                key: const Key('edit-agenda-log'),
-                onPressed: _mutating ? null : () => _edit(log),
-                icon: const Icon(Icons.edit_outlined),
-                label: const Text('Düzenle'),
+        if (detail.managedConcretePourId == null)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (log.archivedAt == null)
+                OutlinedButton.icon(
+                  key: const Key('edit-agenda-log'),
+                  onPressed: _mutating ? null : () => _edit(log),
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Düzenle'),
+                ),
+              FilledButton.tonalIcon(
+                key: Key(
+                  log.archivedAt == null
+                      ? 'archive-agenda-log'
+                      : 'restore-agenda-log',
+                ),
+                onPressed: _mutating ? null : () => _mutateArchive(log),
+                icon: Icon(
+                  log.archivedAt == null
+                      ? Icons.delete_outline
+                      : Icons.restore_outlined,
+                ),
+                label: Text(log.archivedAt == null ? 'Sil' : 'Geri getir'),
               ),
-            FilledButton.tonalIcon(
-              key: Key(
-                log.archivedAt == null
-                    ? 'archive-agenda-log'
-                    : 'restore-agenda-log',
-              ),
-              onPressed: _mutating ? null : () => _mutateArchive(log),
-              icon: Icon(
-                log.archivedAt == null
-                    ? Icons.delete_outline
-                    : Icons.restore_outlined,
-              ),
-              label: Text(log.archivedAt == null ? 'Sil' : 'Geri getir'),
-            ),
-          ],
-        ),
+            ],
+          ),
         const SizedBox(height: 24),
         Row(
           children: [

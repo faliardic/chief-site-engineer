@@ -3,6 +3,7 @@ import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/concrete_models.dart';
+import 'package:chief_site_engineer/features/owned_text_input_dialog.dart';
 import 'package:flutter/material.dart';
 
 class ConcretePourFormPage extends StatefulWidget {
@@ -25,7 +26,6 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
   final _form = GlobalKey<FormState>();
   final _code = TextEditingController();
   final _location = TextEditingController();
-  final _className = TextEditingController();
   final _volume = TextEditingController();
   final _block = TextEditingController();
   final _floor = TextEditingController();
@@ -43,6 +43,9 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
   late DateTime _planned;
   DateTime? _laboratoryAppointment;
   DateTime? _inspectionNotifiedAt;
+  List<ProjectConcreteClass> _classes = const [];
+  ProjectConcreteClass? _selectedClass;
+  bool _loadingClasses = true;
   bool _saving = false;
   String? _error;
 
@@ -51,6 +54,7 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
     super.initState();
     _project = widget.initialProject ?? widget.projects.first;
     _planned = DateTime.now().add(const Duration(hours: 1));
+    _loadClasses();
   }
 
   @override
@@ -58,7 +62,6 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
     for (final controller in [
       _code,
       _location,
-      _className,
       _volume,
       _block,
       _floor,
@@ -74,6 +77,78 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
       controller.dispose();
     }
     super.dispose();
+  }
+
+  Future<void> _loadClasses() async {
+    setState(() => _loadingClasses = true);
+    try {
+      final values = await widget.concrete.listConcreteClasses(_project.id);
+      if (!mounted) return;
+      setState(() {
+        _classes = values;
+        if (_selectedClass?.projectId != _project.id ||
+            !values.any((item) => item.id == _selectedClass?.id)) {
+          _selectedClass = null;
+        }
+        _loadingClasses = false;
+      });
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadingClasses = false;
+        _error = error is AgendaValidationFailure
+            ? error.message
+            : 'Beton sınıfları yüklenemedi.';
+      });
+    }
+  }
+
+  Future<void> _changeProject(MobileProject value) async {
+    setState(() {
+      _project = value;
+      _selectedClass = null;
+      _classes = const [];
+    });
+    await _loadClasses();
+  }
+
+  Future<void> _addClass() async {
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => const OwnedTextInputDialog(
+        title: 'Yeni Beton sınıfı',
+        label: 'Sınıf adı',
+        confirmLabel: 'Ekle',
+        inputKey: Key('new-concrete-class-name'),
+        confirmKey: Key('save-concrete-class'),
+      ),
+    );
+    if (name == null) return;
+    try {
+      final value = await widget.concrete.createConcreteClass(
+        CreateProjectConcreteClassCommand(
+          id: RecordId.randomUuid(),
+          eventId: RecordId.randomUuid(),
+          projectId: _project.id,
+          displayName: name,
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _classes = [..._classes, value]
+          ..sort((left, right) =>
+              left.normalizedName.compareTo(right.normalizedName));
+        _selectedClass = value;
+        _slump.text = value.defaultTargetSlump ?? '';
+      });
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error = error is AgendaValidationFailure
+            ? error.message
+            : 'Beton sınıfı eklenemedi.',
+      );
+    }
   }
 
   Future<void> _pickPlanned() async {
@@ -102,6 +177,8 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
 
   Future<void> _save() async {
     if (_saving || !_form.currentState!.validate()) return;
+    final selectedClass = _selectedClass;
+    if (selectedClass == null) return;
     setState(() {
       _saving = true;
       _error = null;
@@ -124,7 +201,7 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
               : _code.text,
           elementLocation: _location.text,
           plannedAt: canonical,
-          concreteClass: _className.text,
+          concreteClassId: selectedClass.id,
           plannedVolumeM3: double.parse(_volume.text.replaceAll(',', '.')),
           blockName: _block.text,
           floorName: _floor.text,
@@ -178,7 +255,9 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
                     .toList(),
                 onChanged: _saving
                     ? null
-                    : (value) => setState(() => _project = value!),
+                    : (value) {
+                        if (value != null) _changeProject(value);
+                      },
               ),
               const SizedBox(height: 12),
               _field(_code, 'Döküm kodu (boşsa otomatik üretilir)'),
@@ -192,7 +271,49 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
                 trailing: const Icon(Icons.edit_calendar_outlined),
                 onTap: _saving ? null : _pickPlanned,
               ),
-              _field(_className, 'Beton sınıfı', required: true),
+              DropdownButtonFormField<ProjectConcreteClass>(
+                key: const Key('concrete-class-selector'),
+                initialValue: _selectedClass,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: 'Beton sınıfı',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: _loadingClasses
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : null,
+                ),
+                items: _classes
+                    .map(
+                      (item) => DropdownMenuItem(
+                        value: item,
+                        child: Text(
+                          item.displayName,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
+                    .toList(growable: false),
+                onChanged: _saving || _loadingClasses
+                    ? null
+                    : (value) => setState(() {
+                        _selectedClass = value;
+                        _slump.text = value?.defaultTargetSlump ?? '';
+                      }),
+                validator: (value) =>
+                    value == null ? 'Beton sınıfı zorunludur.' : null,
+              ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: const Key('add-concrete-class'),
+                  onPressed: _saving ? null : _addClass,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Yeni sınıf ekle'),
+                ),
+              ),
               _field(
                 _volume,
                 'Planlanan metraj (m³)',

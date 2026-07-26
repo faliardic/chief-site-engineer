@@ -27,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 9;
+  static const schemaVersion = 10;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2514,6 +2514,208 @@ class AppDatabase {
             SELECT RAISE(ABORT, 'append-only event history');
           END
         ''');
+      },
+    ),
+    DatabaseMigration(
+      version: 10,
+      apply: (transaction) async {
+        await transaction.execute('''
+          CREATE TABLE project_concrete_classes (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES projects(id),
+            display_name TEXT NOT NULL,
+            normalized_name TEXT NOT NULL,
+            default_target_slump TEXT,
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            archived_at TEXT,
+            UNIQUE (project_id, normalized_name),
+            UNIQUE (id, project_id)
+          )
+        ''');
+        await transaction.execute('''
+          CREATE TABLE project_concrete_class_events (
+            id TEXT PRIMARY KEY,
+            concrete_class_id TEXT NOT NULL
+              REFERENCES project_concrete_classes(id),
+            sequence INTEGER NOT NULL CHECK (sequence >= 1),
+            event_type TEXT NOT NULL CHECK (event_type IN (
+              'class.created', 'class.migrated', 'class.archived',
+              'class.restored'
+            )),
+            occurred_at TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            UNIQUE (concrete_class_id, sequence)
+          )
+        ''');
+        await transaction.execute('''
+          CREATE TABLE concrete_pour_context_links (
+            concrete_pour_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            concrete_class_id TEXT NOT NULL,
+            agenda_log_id TEXT UNIQUE,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (concrete_pour_id, project_id)
+              REFERENCES concrete_pours(id, project_id),
+            FOREIGN KEY (concrete_class_id, project_id)
+              REFERENCES project_concrete_classes(id, project_id),
+            FOREIGN KEY (agenda_log_id, project_id)
+              REFERENCES field_observations(id, project_id)
+          )
+        ''');
+
+        final legacyPours = await transaction.query(
+          'concrete_pours',
+          orderBy: 'project_id ASC, created_at ASC, id ASC',
+        );
+        final classesByProjectAndName = <String, String>{};
+        for (final row in legacyPours) {
+          final pourId = row['id']! as String;
+          final projectId = row['project_id']! as String;
+          final snapshot = row['concrete_class']! as String;
+          final displayName = snapshot.trim().replaceAll(
+            RegExp(r'\s+'),
+            ' ',
+          );
+          if (displayName.isEmpty) {
+            throw StateError(
+              'legacy concrete class is empty for pour $pourId',
+            );
+          }
+          final normalizedName = displayName.toLowerCase();
+          final lookupKey = '$projectId\u0000$normalizedName';
+          final concreteClassId = classesByProjectAndName.putIfAbsent(
+            lookupKey,
+            () => _migrationStableUuid(
+              'legacy-concrete-class:$projectId:$normalizedName',
+            ),
+          );
+          final existingClass = await transaction.query(
+            'project_concrete_classes',
+            columns: ['id'],
+            where: 'id = ?',
+            whereArgs: [concreteClassId],
+            limit: 1,
+          );
+          if (existingClass.isEmpty) {
+            final createdAt = row['created_at']! as String;
+            final updatedAt = row['updated_at']! as String;
+            await transaction.insert('project_concrete_classes', {
+              'id': concreteClassId,
+              'project_id': projectId,
+              'display_name': displayName,
+              'normalized_name': normalizedName,
+              'default_target_slump': row['target_slump'],
+              'revision': 1,
+              'created_at': createdAt,
+              'updated_at': updatedAt,
+            });
+            await transaction.insert('project_concrete_class_events', {
+              'id': _migrationStableUuid(
+                'legacy-concrete-class-event:$concreteClassId',
+              ),
+              'concrete_class_id': concreteClassId,
+              'sequence': 1,
+              'event_type': 'class.migrated',
+              'occurred_at': updatedAt,
+              'payload_json': jsonEncode({
+                'normalized_name': normalizedName,
+                'source': 'legacy_concrete_class_snapshot',
+              }),
+            });
+          }
+          await transaction.insert('concrete_pour_context_links', {
+            'concrete_pour_id': pourId,
+            'project_id': projectId,
+            'concrete_class_id': concreteClassId,
+            'created_at': row['created_at'],
+            'updated_at': row['updated_at'],
+          });
+        }
+
+        await transaction.execute(
+          'DROP TRIGGER concrete_pour_events_append_only_update',
+        );
+        await transaction.execute(
+          'DROP TRIGGER concrete_pour_events_append_only_delete',
+        );
+        await transaction.execute(
+          'ALTER TABLE concrete_pour_events '
+          'RENAME TO concrete_pour_events_v9',
+        );
+        await transaction.execute('''
+          CREATE TABLE concrete_pour_events (
+            id TEXT PRIMARY KEY,
+            concrete_pour_id TEXT NOT NULL REFERENCES concrete_pours(id),
+            sequence INTEGER NOT NULL CHECK (sequence >= 1),
+            event_type TEXT NOT NULL CHECK (event_type IN (
+              'pour.created', 'pour.details_updated', 'check.updated',
+              'pour.prepared', 'pour.started', 'truck.added',
+              'truck.updated', 'evidence.attached', 'sample_set.added',
+              'sample_set.updated', 'follow_up.linked', 'pour.finished',
+              'pour.follow_up_started', 'pour.closed', 'pour.cancelled',
+              'pour.reopened', 'agenda.linked', 'report.exported'
+            )),
+            occurred_at TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            UNIQUE (concrete_pour_id, sequence)
+          )
+        ''');
+        await transaction.execute('''
+          INSERT INTO concrete_pour_events (
+            id, concrete_pour_id, sequence, event_type, occurred_at,
+            payload_json
+          )
+          SELECT
+            id, concrete_pour_id, sequence, event_type, occurred_at,
+            payload_json
+          FROM concrete_pour_events_v9
+        ''');
+        await transaction.execute('DROP TABLE concrete_pour_events_v9');
+
+        await transaction.execute('''
+          CREATE INDEX ix_project_concrete_classes_active
+          ON project_concrete_classes(
+            project_id, archived_at, normalized_name, id
+          )
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_concrete_pour_context_agenda
+          ON concrete_pour_context_links(agenda_log_id, concrete_pour_id)
+        ''');
+        for (final table in [
+          'project_concrete_class_events',
+          'concrete_pour_events',
+        ]) {
+          await transaction.execute('''
+            CREATE TRIGGER ${table}_append_only_update
+            BEFORE UPDATE ON $table
+            BEGIN
+              SELECT RAISE(ABORT, 'append-only event history');
+            END
+          ''');
+          await transaction.execute('''
+            CREATE TRIGGER ${table}_append_only_delete
+            BEFORE DELETE ON $table
+            BEGIN
+              SELECT RAISE(ABORT, 'append-only event history');
+            END
+          ''');
+        }
+        for (final table in [
+          'project_concrete_classes',
+          'concrete_pour_context_links',
+        ]) {
+          await transaction.execute('''
+            CREATE TRIGGER ${table}_no_physical_delete
+            BEFORE DELETE ON $table
+            BEGIN
+              SELECT RAISE(ABORT, 'physical delete is not allowed');
+            END
+          ''');
+        }
       },
     ),
   ];

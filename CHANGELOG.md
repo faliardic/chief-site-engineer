@@ -1,5 +1,27 @@
 # Changelog
 
+## Issue #234 - Beton Sınıfı Kataloğu ve Döküm Zaman Çizgisi
+
+- Mobil SQLite schema `9` → `10` atomik migration ile proje bazlı Beton sınıfı
+  kataloğu, append-only katalog event'leri ve composite FK'li paket
+  sınıfı/Ajanda bağlamı eklendi. Legacy sınıf snapshot'ları proje ve normalize
+  ad sınırında deterministik seed edilip eski paketlere bağlandı.
+- Yeni Beton paketi formunda serbest sınıf metni yerine aktif proje kataloğu
+  seçimi ve dar `Yeni sınıf ekle` akışı kullanılır. Varsayılan slump ön değerdir;
+  paket `concrete_class` metni değişmez tarihsel snapshot olarak korunur.
+- Beton detayına `Planlandı → Devam ediyor → Tamamlandı` görünümü ile
+  `Dökümü başlat` ve `Dökümü bitir` ana eylemleri eklendi. İlk gerçek başlangıç
+  ve bitiş UTC zamanları idempotenttir; mevcut checklist, mikser, takip ve
+  kapanış validation'ları korunur.
+- İlk başarılı başlangıç aynı transaction içinde tek yönetilen Ajanda
+  row/event/link kaydı oluşturur; bitiş aynı kaydı süre, gerçek metraj ve mikser
+  sayısıyla günceller. Ajanda tarafındaki bağımsız ana metin edit/arşiv
+  engellenir ve iki yönlü deep-link sağlanır.
+- Başlamış legacy paket için idempotent Ajanda onarımı vardır. İptal/reopen
+  gerçek zamanları silmez; başlamadan iptal Ajanda kaydı üretmez.
+- Backup formatı `1` korunarak schema `1–9` restore hedefi schema `10` oldu;
+  schema 10 katalog, link, timestamp ve event verileri round-trip korunur.
+
 ## Issue #230 - Reminder Detayında Kaynak Ajanda Fotoğrafları
 
 - `sourceLogId` taşıyan reminder detayına salt-okunur `Kaynak Ajanda

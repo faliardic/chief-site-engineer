@@ -213,6 +213,15 @@ void main() {
           nextDayStart,
         ).add(const Duration(hours: 9)),
       );
+      const concreteClassId = '55555555-5555-4555-8555-555555555554';
+      await firstSuccess.concrete!.createConcreteClass(
+        const CreateProjectConcreteClassCommand(
+          id: concreteClassId,
+          eventId: 'eeeeeeee-eeee-4eee-8eee-000000000019',
+          projectId: '11111111-1111-4111-8111-111111111111',
+          displayName: 'C30/37',
+        ),
+      );
       var concrete = await firstSuccess.concrete!.createPour(
         CreateConcretePourCommand(
           id: '55555555-5555-4555-8555-555555555555',
@@ -221,7 +230,7 @@ void main() {
           pourCode: 'EMU-BT-01',
           elementLocation: 'Emülatör KOLON A1',
           plannedAt: plannedPourAt,
-          concreteClass: 'C30/37',
+          concreteClassId: concreteClassId,
           plannedVolumeM3: 20,
         ),
       );

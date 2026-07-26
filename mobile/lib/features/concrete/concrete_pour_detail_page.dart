@@ -4,6 +4,7 @@ import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/concrete_models.dart';
+import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_attachment_viewer_page.dart';
 import 'package:chief_site_engineer/features/owned_text_input_dialog.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
@@ -181,6 +182,34 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _repairAgenda() async {
+    final detail = _detail!;
+    await _run(
+      () => widget.concrete.repairManagedAgenda(
+        RepairConcreteAgendaCommand(
+          pourId: detail.pour.id,
+          eventId: RecordId.randomUuid(),
+          expectedRevision: detail.pour.revision,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openAgenda(String agendaLogId) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => LogDetailPage(
+          agenda: widget.agenda,
+          concrete: widget.concrete,
+          concreteAttachments: widget.attachments,
+          attachments: widget.attachments,
+          logId: agendaLogId,
+        ),
+      ),
+    );
+    if (mounted) await _reload();
   }
 
   Future<void> _editTruck([ConcreteTruck? current, _TruckRetry? retry]) async {
@@ -660,6 +689,67 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
                 error,
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
+            _section('Döküm ilerlemesi', [
+              _ConcreteStageTimeline(
+                current: pour.stage,
+                cancelled: pour.status == ConcretePourStatus.cancelled,
+              ),
+              if (pour.actualStartedAt case final startedAt?)
+                ListTile(
+                  key: const Key('concrete-actual-start'),
+                  leading: const Icon(Icons.play_circle_outline),
+                  title: const Text('Gerçek başlangıç'),
+                  subtitle: Text(CseTimeCodec.formatIstanbul(startedAt)),
+                ),
+              if (pour.actualEndedAt case final endedAt?)
+                ListTile(
+                  key: const Key('concrete-actual-end'),
+                  leading: const Icon(Icons.stop_circle_outlined),
+                  title: const Text('Gerçek bitiş'),
+                  subtitle: Text(
+                    '${CseTimeCodec.formatIstanbul(endedAt)}'
+                    '${detail.metrics.pourDurationMinutes == null ? '' : ' • ${detail.metrics.pourDurationMinutes} dk'}',
+                  ),
+                ),
+              if (pour.actualStartedAt == null &&
+                  pour.status != ConcretePourStatus.closed &&
+                  pour.status != ConcretePourStatus.cancelled)
+                FilledButton.icon(
+                  key: const Key('start-concrete-pour'),
+                  onPressed: _mutating
+                      ? null
+                      : () => _transition(ConcretePourStatus.pouring),
+                  icon: const Icon(Icons.play_arrow),
+                  label: const Text('Dökümü başlat'),
+                ),
+              if (pour.actualStartedAt != null &&
+                  pour.actualEndedAt == null &&
+                  pour.status == ConcretePourStatus.pouring)
+                FilledButton.icon(
+                  key: const Key('finish-concrete-pour'),
+                  onPressed: _mutating
+                      ? null
+                      : () => _transition(ConcretePourStatus.poured),
+                  icon: const Icon(Icons.stop),
+                  label: const Text('Dökümü bitir'),
+                ),
+              if (detail.agendaLogId case final agendaLogId?)
+                OutlinedButton.icon(
+                  key: const Key('open-managed-agenda'),
+                  onPressed: _mutating
+                      ? null
+                      : () => _openAgenda(agendaLogId),
+                  icon: const Icon(Icons.event_note_outlined),
+                  label: const Text('Bağlı Ajanda kaydını aç'),
+                )
+              else if (pour.actualStartedAt != null)
+                OutlinedButton.icon(
+                  key: const Key('repair-managed-agenda'),
+                  onPressed: _mutating ? null : _repairAgenda,
+                  icon: const Icon(Icons.build_circle_outlined),
+                  label: const Text('Ajanda kaydını oluştur'),
+                ),
+            ]),
             _section('Özet', [
               ListTile(
                 title: Text(pour.elementLocation),
@@ -909,7 +999,9 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
               for (final event in detail.events.reversed)
                 ListTile(
                   dense: true,
-                  title: Text('${event.sequence}. ${event.eventType}'),
+                  title: Text(
+                    '${event.sequence}. ${_eventLabel(event.eventType)}',
+                  ),
                   subtitle: Text(CseTimeCodec.formatIstanbul(event.occurredAt)),
                 ),
             ]),
@@ -952,14 +1044,10 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
         ConcretePourStatus.cancelled,
       ],
       ConcretePourStatus.prepared => [
-        ConcretePourStatus.pouring,
         ConcretePourStatus.draft,
         ConcretePourStatus.cancelled,
       ],
-      ConcretePourStatus.pouring => [
-        ConcretePourStatus.poured,
-        ConcretePourStatus.cancelled,
-      ],
+      ConcretePourStatus.pouring => [ConcretePourStatus.cancelled],
       ConcretePourStatus.poured => [
         ConcretePourStatus.followUp,
         ConcretePourStatus.closed,
@@ -1002,6 +1090,89 @@ String _message(Object error, String fallback) =>
     error is AgendaValidationFailure ? error.message : fallback;
 
 String _formatM3(double value) => value.toStringAsFixed(2).replaceAll('.', ',');
+
+String _eventLabel(String value) => switch (value) {
+  'pour.created' => 'Paket oluşturuldu',
+  'pour.prepared' => 'Döküm hazırlığı tamamlandı',
+  'pour.started' => 'Döküm başladı',
+  'pour.finished' => 'Döküm bitti',
+  'pour.cancelled' => 'Paket iptal edildi',
+  'pour.reopened' => 'Paket yeniden açıldı',
+  'agenda.linked' => 'Yönetilen Ajanda kaydı bağlandı',
+  'pour.closed' => 'Paket kapatıldı',
+  'pour.follow_up_started' => 'Takip süreci başladı',
+  'pour.details_updated' => 'Paket bilgileri güncellendi',
+  'check.updated' => 'Checklist güncellendi',
+  'truck.added' => 'Mikser eklendi',
+  'truck.updated' => 'Mikser güncellendi',
+  'evidence.attached' => 'Kanıt eklendi',
+  'sample_set.added' => 'Numune seti eklendi',
+  'sample_set.updated' => 'Numune seti güncellendi',
+  'follow_up.linked' => 'Takip kaydı güncellendi',
+  'report.exported' => 'Rapor dışa aktarıldı',
+  _ => value,
+};
+
+class _ConcreteStageTimeline extends StatelessWidget {
+  const _ConcreteStageTimeline({
+    required this.current,
+    required this.cancelled,
+  });
+
+  final ConcretePourStage current;
+  final bool cancelled;
+
+  @override
+  Widget build(BuildContext context) {
+    final currentIndex = ConcretePourStage.values.indexOf(current);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          key: const Key('concrete-stage-timeline'),
+          children: [
+            for (var index = 0; index < ConcretePourStage.values.length; index += 1)
+              Expanded(
+                child: Semantics(
+                  selected: index == currentIndex,
+                  label: ConcretePourStage.values[index].label,
+                  child: Container(
+                    constraints: const BoxConstraints(minHeight: 44),
+                    margin: EdgeInsets.only(
+                      right: index == ConcretePourStage.values.length - 1
+                          ? 0
+                          : 6,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: index <= currentIndex
+                          ? Theme.of(context).colorScheme.primaryContainer
+                          : Theme.of(context).colorScheme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      ConcretePourStage.values[index].label,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        if (cancelled)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text('İptal edildi • gerçek zaman geçmişi korunuyor.'),
+          ),
+      ],
+    );
+  }
+}
 
 class _FieldNotificationDraft {
   const _FieldNotificationDraft({

@@ -287,6 +287,8 @@ class _MobileShellState extends State<MobileShell> {
             AgendaPage(
               agenda: widget.bootstrap.agenda,
               attachments: widget.bootstrap.concreteAttachments,
+              concrete: widget.bootstrap.concrete,
+              concreteAttachments: widget.bootstrap.concreteAttachments,
             ),
             if (widget.bootstrap.attendance case final attendance?)
               AttendancePage(

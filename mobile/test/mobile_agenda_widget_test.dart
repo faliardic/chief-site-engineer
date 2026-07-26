@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:chief_site_engineer/app.dart';
+import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
+import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/capabilities.dart';
@@ -18,6 +20,7 @@ import 'support/fake_agenda_application.dart';
 const projectId = '11111111-1111-4111-8111-111111111111';
 const logId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
 const reminderId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
+const pourId = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1';
 
 void main() {
   setUpAll(CseTimeCodec.initialize);
@@ -327,6 +330,48 @@ void main() {
     },
   );
 
+  testWidgets(
+    'managed concrete Agenda detail is read-only and deep-links to package',
+    (tester) async {
+      final managed = AgendaLogDetail(
+        log: log(),
+        reminders: const [],
+        managedConcretePourId: pourId,
+      );
+      final fake = FakeAgendaApplication(
+        projects: [project()],
+        logs: [log()],
+        logDetail: managed,
+      );
+      final attachments = SafeAttachmentPicker(
+        permissions: SafeCapabilityService(_DeniedPermission()),
+        picker: _UnexpectedPicker(),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: LogDetailPage(
+            agenda: fake,
+            concrete: _NoopConcrete(),
+            concreteAttachments: attachments,
+            logId: logId,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Beton paketi tarafından yönetiliyor'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('edit-agenda-log')), findsNothing);
+      expect(find.byKey(const Key('archive-agenda-log')), findsNothing);
+      expect(find.byKey(const Key('detail-reminder-action')), findsNothing);
+      await tester.tap(find.byKey(const Key('managed-concrete-agenda')));
+      await tester.pumpAndSettle();
+      expect(find.byType(ConcretePourDetailPage), findsOneWidget);
+    },
+  );
+
   testWidgets('camera denial preserves pending log input and creates no row', (
     tester,
   ) async {
@@ -374,4 +419,9 @@ class _UnexpectedPicker implements AttachmentPickerPort {
   @override
   Future<SelectedAttachment?> pick(AttachmentSource source) =>
       throw StateError('permission denial must stop before picker');
+}
+
+class _NoopConcrete implements ConcreteApplication {
+  @override
+  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

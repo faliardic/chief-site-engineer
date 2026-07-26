@@ -92,7 +92,7 @@ void main() {
   });
 
   test(
-    'format 1 backup round-trips schema 9 trashed all-day reminder and audit',
+    'format 1 backup round-trips schema 10 trashed all-day reminder and audit',
     () async {
       final agenda = SqliteAgendaApplication(
         databasePath: directories.databaseFile,
@@ -147,7 +147,7 @@ void main() {
         whereArgs: [reminder.id],
       )).single;
       expect(preflight.manifest.formatVersion, 1);
-      expect(preflight.migratedSchemaVersion, 9);
+      expect(preflight.migratedSchemaVersion, 10);
       expect(row['status'], 'active');
       expect(row['next_attention_at'], isNull);
       expect(row['all_day_local_date'], '2026-07-20');
@@ -571,9 +571,9 @@ void main() {
     },
   );
 
-  for (final schemaVersion in [1, 2, 3, 4, 5, 6, 7, 8]) {
+  for (final schemaVersion in [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
     test(
-      'schema v$schemaVersion package migrates to v9 without count loss',
+      'schema v$schemaVersion package migrates to v10 without count loss',
       () async {
         final oldRoot = await Directory.systemTemp.createTemp(
           'cse_schema${schemaVersion}_',
@@ -624,7 +624,7 @@ void main() {
         );
 
         expect(preflight.manifest.mobileSchemaVersion, schemaVersion);
-        expect(preflight.migratedSchemaVersion, 9);
+        expect(preflight.migratedSchemaVersion, 10);
         final counts = await _tableCounts(directories);
         final hasAgenda = schemaVersion >= 2 ? 1 : 0;
         final hasAttendance = schemaVersion >= 4 ? 1 : 0;
@@ -646,6 +646,9 @@ void main() {
         expect(counts['attendance_entries'], hasAttendance);
         expect(counts['attendance_events'], hasAttendance);
         expect(counts['concrete_pours'], 0);
+        expect(counts['project_concrete_classes'], 0);
+        expect(counts['project_concrete_class_events'], 0);
+        expect(counts['concrete_pour_context_links'], 0);
         expect(counts['concrete_pour_events'], 0);
         expect(counts['concrete_attachments'], 0);
         if (schemaVersion == 7) {
@@ -705,7 +708,7 @@ void main() {
     });
     final databaseBytes = await File(directories.databaseFile).readAsBytes();
     final archive = const CseBackupArchiveCodec().encode(
-      manifest: _manifest(databaseBytes, schemaVersion: 10),
+      manifest: _manifest(databaseBytes, schemaVersion: 11),
       databaseBytes: databaseBytes,
       attachments: const {},
     );
@@ -1303,6 +1306,24 @@ Future<void> _seedFullFixture(
       'occurred_at': _now,
       'payload_json': '{}',
     });
+    await tx.insert('project_concrete_classes', {
+      'id': 'concrete-class-1',
+      'project_id': 'project-1',
+      'display_name': 'C30/37',
+      'normalized_name': 'c30/37',
+      'default_target_slump': 'S3',
+      'revision': 1,
+      'created_at': _now,
+      'updated_at': _now,
+    });
+    await tx.insert('project_concrete_class_events', {
+      'id': 'concrete-class-event-1',
+      'concrete_class_id': 'concrete-class-1',
+      'sequence': 1,
+      'event_type': 'class.created',
+      'occurred_at': _now,
+      'payload_json': '{}',
+    });
     await tx.insert('concrete_pours', {
       'id': 'pour-1',
       'project_id': 'project-1',
@@ -1313,6 +1334,13 @@ Future<void> _seedFullFixture(
       'planned_volume_m3': 25.0,
       'status': 'draft',
       'revision': 1,
+      'created_at': _now,
+      'updated_at': _now,
+    });
+    await tx.insert('concrete_pour_context_links', {
+      'concrete_pour_id': 'pour-1',
+      'project_id': 'project-1',
+      'concrete_class_id': 'concrete-class-1',
       'created_at': _now,
       'updated_at': _now,
     });
@@ -1523,6 +1551,9 @@ Future<Map<String, int>> _tableCounts(AppDirectories directories) async {
     'attendance_entries',
     'attendance_events',
     'concrete_pours',
+    'project_concrete_classes',
+    'project_concrete_class_events',
+    'concrete_pour_context_links',
     'concrete_pour_events',
     'concrete_attachments',
     'agenda_log_attachments',
@@ -1557,6 +1588,9 @@ Future<Map<String, Object?>> _fixtureSnapshot(
     'attendance_entries',
     'attendance_events',
     'concrete_pours',
+    'project_concrete_classes',
+    'project_concrete_class_events',
+    'concrete_pour_context_links',
     'concrete_pour_events',
     'concrete_attachments',
     'agenda_log_attachments',
