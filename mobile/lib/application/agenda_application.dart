@@ -1747,16 +1747,7 @@ class SqliteAgendaApplication
     });
     if (work.isEmpty) return;
     final eligible = work
-        .where(
-          (item) =>
-              item.reminder.trashedAt == null &&
-              item.reminder.status == ReminderStatus.active &&
-              item.reminder.nextAttentionAt != null &&
-              (CseTimeCodec.decodeCanonicalUtc(
-                    item.reminder.nextAttentionAt!,
-                  ).isAfter(now) ||
-                  item.binding.repeatIntervalMinutes != null),
-        )
+        .where((item) => _isNotificationEligible(item, now))
         .toList(growable: false);
     NotificationPermissionState permission;
     try {
@@ -1976,6 +1967,22 @@ class SqliteAgendaApplication
       }
     }
     await _writeBindingUpdates(now, updates);
+  }
+
+  bool _isNotificationEligible(_NotificationWorkItem item, DateTime now) {
+    final reminder = item.reminder;
+    if (reminder.trashedAt != null ||
+        reminder.status != ReminderStatus.active ||
+        reminder.nextAttentionAt == null) {
+      return false;
+    }
+    final dueAt = CseTimeCodec.decodeCanonicalUtc(reminder.nextAttentionAt!);
+    if (dueAt.isAfter(now)) return true;
+
+    // Trash cancellation clears scheduledFor. An overdue repeat may keep an
+    // existing native chain, but a cancelled chain must not restart later.
+    return item.binding.repeatIntervalMinutes != null &&
+        item.binding.scheduledFor != null;
   }
 
   Future<void> _preserveInexactFallbacks(

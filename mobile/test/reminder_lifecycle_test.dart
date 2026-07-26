@@ -69,6 +69,23 @@ void main() {
     );
   }
 
+  Future<void> setRepeatInterval(String reminderId, int minutes) async {
+    final database = await databaseFactoryFfi.openDatabase(
+      directories.databaseFile,
+      options: OpenDatabaseOptions(singleInstance: false),
+    );
+    try {
+      await database.update(
+        'reminder_notification_bindings',
+        {'repeat_interval_minutes': minutes},
+        where: 'reminder_id = ?',
+        whereArgs: [reminderId],
+      );
+    } finally {
+      await database.close();
+    }
+  }
+
   test(
     'minimum standalone inbox capture is idempotent with one clock read',
     () async {
@@ -1073,6 +1090,175 @@ void main() {
           (item) => item.eventType == 'restored_from_trash',
         ),
         hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'overdue repeat stays cancelled after trash restore and every reconcile',
+    () async {
+      now = DateTime.utc(2026, 7, 18, 8);
+      final created = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(210),
+          title: 'Gecikmiş saatlik tekrar',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-18T08:15:00Z',
+        ),
+      );
+      await setRepeatInterval(created.id, 60);
+      final originalBinding = await agenda.getReminderLifecycleDetail(
+        created.id,
+      );
+      final platformId = originalBinding.notification.platformNotificationId;
+      now = DateTime.utc(2026, 7, 19, 9);
+
+      final trashed = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: created.id,
+          eventId: eventId(211),
+          expectedRevision: created.revision,
+          action: ReminderMutationAction.moveToTrash,
+        ),
+      );
+      final afterTrash = await agenda.getReminderLifecycleDetail(created.id);
+      expect(afterTrash.notification.platformNotificationId, platformId);
+      expect(afterTrash.notification.repeatIntervalMinutes, 60);
+      expect(afterTrash.notification.scheduledFor, isNull);
+      expect(
+        afterTrash.notification.syncState,
+        NotificationSyncState.cancelled,
+      );
+      final nativeScheduleCount = notifications.scheduled.length;
+
+      now = DateTime.utc(2026, 7, 19, 9, 5);
+      final restored = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: trashed.id,
+          eventId: eventId(212),
+          expectedRevision: trashed.revision,
+          action: ReminderMutationAction.restoreFromTrash,
+        ),
+      );
+      expect(notifications.scheduled, hasLength(nativeScheduleCount));
+      expect(
+        (await agenda.listReminders(ReminderViewGroup.overdue)).single.id,
+        restored.id,
+      );
+
+      await agenda.reconcileNotifications();
+      expect(notifications.scheduled, hasLength(nativeScheduleCount));
+
+      final reopened = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        notificationGateway: notifications,
+      );
+      await reopened.reconcileNotifications();
+      expect(notifications.scheduled, hasLength(nativeScheduleCount));
+
+      final finalBinding = await reopened.getReminderLifecycleDetail(
+        restored.id,
+      );
+      expect(finalBinding.notification.platformNotificationId, platformId);
+      expect(finalBinding.notification.repeatIntervalMinutes, 60);
+      expect(finalBinding.notification.scheduledFor, isNull);
+      expect(
+        finalBinding.notification.syncState,
+        NotificationSyncState.cancelled,
+      );
+    },
+  );
+
+  test(
+    'future repeat restore schedules with the same binding identity',
+    () async {
+      final created = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(220),
+          title: 'Gelecekteki saatlik tekrar',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-19T10:00:00Z',
+        ),
+      );
+      await setRepeatInterval(created.id, 60);
+      final originalBinding = await agenda.getReminderLifecycleDetail(
+        created.id,
+      );
+      final platformId = originalBinding.notification.platformNotificationId;
+      now = DateTime.utc(2026, 7, 19, 8, 5);
+      final trashed = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: created.id,
+          eventId: eventId(221),
+          expectedRevision: created.revision,
+          action: ReminderMutationAction.moveToTrash,
+        ),
+      );
+      notifications.scheduled.clear();
+
+      now = DateTime.utc(2026, 7, 19, 8, 10);
+      await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: trashed.id,
+          eventId: eventId(222),
+          expectedRevision: trashed.revision,
+          action: ReminderMutationAction.restoreFromTrash,
+        ),
+      );
+
+      expect(notifications.scheduled, hasLength(1));
+      expect(notifications.scheduled.single.platformId, platformId);
+      expect(notifications.scheduled.single.repeatIntervalMinutes, 60);
+      final restoredBinding = await agenda.getReminderLifecycleDetail(
+        created.id,
+      );
+      expect(restoredBinding.notification.platformNotificationId, platformId);
+      expect(restoredBinding.notification.repeatIntervalMinutes, 60);
+      expect(
+        restoredBinding.notification.syncState,
+        NotificationSyncState.scheduled,
+      );
+    },
+  );
+
+  test(
+    'existing overdue repeat without trash keeps normal reconciliation',
+    () async {
+      final created = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(230),
+          title: 'Mevcut saatlik tekrar',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-19T08:15:00Z',
+        ),
+      );
+      await setRepeatInterval(created.id, 60);
+      final originalBinding = await agenda.getReminderLifecycleDetail(
+        created.id,
+      );
+      final platformId = originalBinding.notification.platformNotificationId;
+      notifications.pending.clear();
+      notifications.scheduled.clear();
+      now = DateTime.utc(2026, 7, 19, 9);
+
+      await agenda.reconcileNotifications();
+
+      expect(notifications.scheduled, hasLength(1));
+      expect(notifications.scheduled.single.platformId, platformId);
+      expect(notifications.scheduled.single.repeatIntervalMinutes, 60);
+      final reconciled = await agenda.getReminderLifecycleDetail(created.id);
+      expect(reconciled.notification.repeatIntervalMinutes, 60);
+      expect(
+        reconciled.notification.syncState,
+        NotificationSyncState.scheduled,
       );
     },
   );
