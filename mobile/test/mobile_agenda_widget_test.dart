@@ -265,7 +265,11 @@ void main() {
       find.byKey(const Key('reminder-title')),
       'Kullanıcının değiştirdiği reminder metni',
     );
-    await tester.ensureVisible(find.byKey(const Key('submit-reminder')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('submit-reminder')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.byKey(const Key('submit-reminder')));
     await tester.pumpAndSettle();
 
