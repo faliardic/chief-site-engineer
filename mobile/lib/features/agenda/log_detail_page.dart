@@ -3,8 +3,11 @@ import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/features/agenda/agenda_concrete_signal.dart';
+import 'package:chief_site_engineer/features/agenda/agenda_concrete_suggestion_card.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_photo_viewer_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
+import 'package:chief_site_engineer/features/concrete/concrete_destination_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
@@ -84,12 +87,31 @@ class _LogDetailPageState extends State<LogDetailPage> {
     if (mounted) setState(_reload);
   }
 
+  Future<void> _openConcreteList(AgendaLog log) async {
+    final concrete = widget.concrete;
+    final attachments = widget.concreteAttachments;
+    if (concrete == null || attachments == null) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ConcreteDestinationPage(
+          concrete: concrete,
+          agenda: widget.agenda,
+          attachments: attachments,
+          initialProjectId: log.projectId,
+          initialIstanbulDay: CseTimeCodec.istanbulDayKey(log.observedAt),
+        ),
+      ),
+    );
+  }
+
   Future<void> _edit(AgendaLog log) async {
     final result = await Navigator.of(context).push<String>(
       MaterialPageRoute(
         builder: (_) => LogFormPage(
           agenda: widget.agenda,
           attachments: widget.attachments,
+          concrete: widget.concrete,
+          concreteAttachments: widget.concreteAttachments,
           existing: log,
         ),
       ),
@@ -326,16 +348,29 @@ class _LogDetailPageState extends State<LogDetailPage> {
                 'Ana metin ve arşiv durumu Beton paketinden yönetilir.',
               ),
               trailing:
-                  widget.concrete != null &&
-                      widget.concreteAttachments != null
+                  widget.concrete != null && widget.concreteAttachments != null
                   ? const Icon(Icons.chevron_right)
                   : null,
               onTap:
-                  widget.concrete != null &&
-                      widget.concreteAttachments != null
+                  widget.concrete != null && widget.concreteAttachments != null
                   ? () => _openManagedConcrete(pourId)
                   : null,
             ),
+          ),
+        if (detail.managedConcretePourId == null &&
+            AgendaConcreteSignalDetector.hasSignal(
+              description: log.description,
+              notes: log.notes,
+              category: log.category,
+            ))
+          AgendaConcreteSuggestionCard(
+            key: const Key('agenda-concrete-detail-suggestion'),
+            message: 'Bu kayıt Beton işiyle ilgili olabilir.',
+            onOpenConcrete:
+                widget.concrete != null && widget.concreteAttachments != null
+                ? () => _openConcreteList(log)
+                : null,
+            openConcreteKey: const Key('agenda-concrete-detail-open'),
           ),
         Text(
           log.category.label,

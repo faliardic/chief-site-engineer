@@ -147,8 +147,14 @@ class _AgendaPageState extends State<AgendaPage> {
   Future<void> _openCreateLog() async {
     final day = await Navigator.of(context).push<String>(
       MaterialPageRoute(
-        builder: (_) =>
-            LogFormPage(agenda: widget.agenda, attachments: widget.attachments),
+        builder: (_) => LogFormPage(
+          agenda: widget.agenda,
+          attachments: widget.attachments,
+          concrete: widget.concrete,
+          concreteAttachments: widget.concreteAttachments,
+          initialProjectId: _projectId,
+          initialIstanbulDay: _selectedDay,
+        ),
       ),
     );
     if (day == null || !mounted) return;

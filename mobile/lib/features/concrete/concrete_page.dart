@@ -15,12 +15,16 @@ class ConcretePage extends StatefulWidget {
     required this.concrete,
     required this.agenda,
     required this.attachments,
+    this.initialProjectId,
+    this.initialIstanbulDay,
     super.key,
   });
 
   final ConcreteApplication concrete;
   final AgendaApplication agenda;
   final SafeAttachmentPicker attachments;
+  final String? initialProjectId;
+  final String? initialIstanbulDay;
 
   @override
   State<ConcretePage> createState() => _ConcretePageState();
@@ -40,9 +44,7 @@ class _ConcretePageState extends State<ConcretePage> {
   @override
   void initState() {
     super.initState();
-    _day = CseTimeCodec.istanbulDayKey(
-      CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
-    );
+    _day = _safeInitialDay(widget.initialIstanbulDay);
     _projectSubscription = widget.agenda.projectChanges.listen(
       (_) => _loadProjects(),
     );
@@ -60,6 +62,10 @@ class _ConcretePageState extends State<ConcretePage> {
     setState(() => _loading = true);
     try {
       _projects = await widget.agenda.listProjects();
+      final preferredProjectId = _project?.id ?? widget.initialProjectId;
+      _project = _projects
+          .where((project) => project.id == preferredProjectId)
+          .firstOrNull;
       _project ??= _projects.firstOrNull;
       await _reload();
     } on Object catch (error) {
@@ -155,6 +161,7 @@ class _ConcretePageState extends State<ConcretePage> {
             children: [
               Expanded(
                 child: DropdownButtonFormField<MobileProject>(
+                  key: const Key('concrete-project-filter'),
                   initialValue: _project,
                   isExpanded: true,
                   decoration: const InputDecoration(
@@ -179,10 +186,11 @@ class _ConcretePageState extends State<ConcretePage> {
                 ),
               ),
               const SizedBox(width: 8),
-              IconButton.filledTonal(
-                tooltip: 'Tarih seç',
+              OutlinedButton.icon(
+                key: const Key('concrete-day-filter'),
                 onPressed: _pickDate,
                 icon: const Icon(Icons.calendar_today_outlined),
+                label: Text(_day),
               ),
             ],
           ),
@@ -204,6 +212,7 @@ class _ConcretePageState extends State<ConcretePage> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: SegmentedButton<ConcretePourGroup>(
+              key: const Key('concrete-group-filter'),
               segments: const [
                 ButtonSegment(
                   value: ConcretePourGroup.today,
@@ -286,3 +295,14 @@ class _ConcretePageState extends State<ConcretePage> {
 
 String _message(Object error, String fallback) =>
     error is AgendaValidationFailure ? error.message : fallback;
+
+String _safeInitialDay(String? value) {
+  if (value != null &&
+      RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value) &&
+      DateTime.tryParse(value) != null) {
+    return value;
+  }
+  return CseTimeCodec.istanbulDayKey(
+    CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
+  );
+}

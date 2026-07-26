@@ -1,7 +1,11 @@
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/features/agenda/agenda_concrete_signal.dart';
+import 'package:chief_site_engineer/features/agenda/agenda_concrete_suggestion_card.dart';
+import 'package:chief_site_engineer/features/concrete/concrete_destination_page.dart';
 import 'package:chief_site_engineer/features/owned_text_input_dialog.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:flutter/material.dart';
@@ -10,13 +14,21 @@ class LogFormPage extends StatefulWidget {
   const LogFormPage({
     required this.agenda,
     this.attachments,
+    this.concrete,
+    this.concreteAttachments,
     this.existing,
+    this.initialProjectId,
+    this.initialIstanbulDay,
     super.key,
   });
 
   final AgendaApplication agenda;
   final SafeAttachmentPicker? attachments;
+  final ConcreteApplication? concrete;
+  final SafeAttachmentPicker? concreteAttachments;
   final AgendaLog? existing;
+  final String? initialProjectId;
+  final String? initialIstanbulDay;
 
   @override
   State<LogFormPage> createState() => _LogFormPageState();
@@ -24,6 +36,7 @@ class LogFormPage extends StatefulWidget {
 
 class _LogFormPageState extends State<LogFormPage> {
   final _formKey = GlobalKey<FormState>();
+  final _categoryFieldKey = GlobalKey<FormFieldState<AgendaCategory>>();
   final _description = TextEditingController();
   final _location = TextEditingController();
   final _notes = TextEditingController();
@@ -48,24 +61,76 @@ class _LogFormPageState extends State<LogFormPage> {
     final nowLocal = CseTimeCodec.toIstanbul(
       current?.observedAt ?? CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
     );
-    _date = DateTime(nowLocal.year, nowLocal.month, nowLocal.day);
+    final initialDay = current == null
+        ? DateTime.tryParse(widget.initialIstanbulDay ?? '')
+        : null;
+    _date = initialDay == null
+        ? DateTime(nowLocal.year, nowLocal.month, nowLocal.day)
+        : DateTime(initialDay.year, initialDay.month, initialDay.day);
     _time = TimeOfDay(hour: nowLocal.hour, minute: nowLocal.minute);
+    _projectId = current?.projectId ?? widget.initialProjectId;
     if (current != null) {
-      _projectId = current.projectId;
       _category = current.category;
       _description.text = current.description;
       _location.text = current.location ?? '';
       _notes.text = current.notes ?? '';
     }
+    _description.addListener(_onSignalInputChanged);
+    _notes.addListener(_onSignalInputChanged);
     _loadProjects();
   }
 
   @override
   void dispose() {
+    _description.removeListener(_onSignalInputChanged);
+    _notes.removeListener(_onSignalInputChanged);
     _description.dispose();
     _location.dispose();
     _notes.dispose();
     super.dispose();
+  }
+
+  bool get _hasConcreteSignal => AgendaConcreteSignalDetector.hasSignal(
+    description: _description.text,
+    notes: _notes.text,
+    category: _category,
+  );
+
+  String get _selectedIstanbulDay =>
+      '${_date.year.toString().padLeft(4, '0')}-'
+      '${_date.month.toString().padLeft(2, '0')}-'
+      '${_date.day.toString().padLeft(2, '0')}';
+
+  bool get _canOpenConcrete =>
+      widget.concrete != null &&
+      widget.concreteAttachments != null &&
+      _projectId != null;
+
+  void _onSignalInputChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _selectConcreteCategory() {
+    _categoryFieldKey.currentState?.didChange(AgendaCategory.concrete);
+    setState(() => _category = AgendaCategory.concrete);
+  }
+
+  Future<void> _openConcrete() async {
+    final concrete = widget.concrete;
+    final attachments = widget.concreteAttachments;
+    final projectId = _projectId;
+    if (concrete == null || attachments == null || projectId == null) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ConcreteDestinationPage(
+          concrete: concrete,
+          agenda: widget.agenda,
+          attachments: attachments,
+          initialProjectId: projectId,
+          initialIstanbulDay: _selectedIstanbulDay,
+        ),
+      ),
+    );
   }
 
   Future<void> _loadProjects() async {
@@ -327,23 +392,26 @@ class _LogFormPageState extends State<LogFormPage> {
               ],
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<AgendaCategory>(
+            KeyedSubtree(
               key: const Key('log-category'),
-              initialValue: _category,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Kayıt türü',
-                border: OutlineInputBorder(),
+              child: DropdownButtonFormField<AgendaCategory>(
+                key: _categoryFieldKey,
+                initialValue: _category,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Kayıt türü',
+                  border: OutlineInputBorder(),
+                ),
+                items: AgendaCategory.values
+                    .map(
+                      (category) => DropdownMenuItem(
+                        value: category,
+                        child: Text(category.label),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) => setState(() => _category = value!),
               ),
-              items: AgendaCategory.values
-                  .map(
-                    (category) => DropdownMenuItem(
-                      value: category,
-                      child: Text(category.label),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) => setState(() => _category = value!),
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -403,6 +471,19 @@ class _LogFormPageState extends State<LogFormPage> {
                 border: OutlineInputBorder(),
               ),
             ),
+            if (widget.existing == null && _hasConcreteSignal) ...[
+              const SizedBox(height: 12),
+              AgendaConcreteSuggestionCard(
+                key: const Key('agenda-concrete-form-suggestion'),
+                message: 'Bu kayıt Beton işiyle ilgili görünüyor.',
+                onSelectConcreteCategory: _category == AgendaCategory.concrete
+                    ? null
+                    : _selectConcreteCategory,
+                onOpenConcrete: _canOpenConcrete ? _openConcrete : null,
+                selectCategoryKey: const Key('agenda-concrete-select-category'),
+                openConcreteKey: const Key('agenda-concrete-form-open'),
+              ),
+            ],
             const SizedBox(height: 16),
             SizedBox(
               height: 52,
