@@ -237,6 +237,49 @@ class AgendaLogPhoto {
   final AgendaAttachmentIntegrity integrity;
 }
 
+class ReminderSourceAgendaMedia {
+  ReminderSourceAgendaMedia._({
+    required this.sourceLogId,
+    required this.sourceLogArchivedAt,
+    required this.photos,
+    required this.safeErrorCode,
+  });
+
+  factory ReminderSourceAgendaMedia.loaded({
+    required String sourceLogId,
+    required String? sourceLogArchivedAt,
+    required Iterable<AgendaLogPhoto> photos,
+  }) {
+    final uniquePhotos = <String, AgendaLogPhoto>{};
+    for (final photo in photos) {
+      uniquePhotos.putIfAbsent(photo.id, () => photo);
+    }
+    return ReminderSourceAgendaMedia._(
+      sourceLogId: sourceLogId,
+      sourceLogArchivedAt: sourceLogArchivedAt,
+      photos: List.unmodifiable(uniquePhotos.values),
+      safeErrorCode: null,
+    );
+  }
+
+  factory ReminderSourceAgendaMedia.unavailable({
+    required String sourceLogId,
+    String safeErrorCode = 'source_agenda_media_unavailable',
+  }) => ReminderSourceAgendaMedia._(
+    sourceLogId: sourceLogId,
+    sourceLogArchivedAt: null,
+    photos: const [],
+    safeErrorCode: safeErrorCode,
+  );
+
+  final String sourceLogId;
+  final String? sourceLogArchivedAt;
+  final List<AgendaLogPhoto> photos;
+  final String? safeErrorCode;
+
+  bool get isAvailable => safeErrorCode == null;
+}
+
 class StoredAttachmentContent {
   const StoredAttachmentContent({
     required this.fileName,

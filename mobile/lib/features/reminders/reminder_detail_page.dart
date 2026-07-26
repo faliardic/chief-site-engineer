@@ -4,6 +4,7 @@ import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/features/agenda/agenda_photo_viewer_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_day_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
@@ -33,6 +34,7 @@ class ReminderDetailPage extends StatefulWidget {
 class _ReminderDetailPageState extends State<ReminderDetailPage> {
   ReminderDetail? _detail;
   ReminderDeliveryDiagnostic? _deliveryDiagnostic;
+  Future<ReminderSourceAgendaMedia>? _sourceAgendaMedia;
   bool _loading = true;
   bool _mutating = false;
   String? _error;
@@ -47,6 +49,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
     setState(() {
       _loading = true;
       _error = null;
+      _sourceAgendaMedia = null;
     });
     try {
       final detail = await widget.agenda.getReminderLifecycleDetail(
@@ -64,9 +67,13 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
         }
       }
       if (mounted) {
+        final sourceLogId = detail.reminder.sourceLogId;
         setState(() {
           _detail = detail;
           _deliveryDiagnostic = diagnostic;
+          _sourceAgendaMedia = sourceLogId == null
+              ? null
+              : _loadSourceAgendaMedia(sourceLogId);
           _loading = false;
         });
       }
@@ -77,6 +84,21 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
           _error = 'Hatırlatıcı güvenli biçimde okunamadı.';
         });
       }
+    }
+  }
+
+  Future<ReminderSourceAgendaMedia> _loadSourceAgendaMedia(
+    String sourceLogId,
+  ) async {
+    final application = widget.agenda;
+    if (application is! ReminderSourceAgendaMediaApplication) {
+      return ReminderSourceAgendaMedia.unavailable(sourceLogId: sourceLogId);
+    }
+    try {
+      return await (application as ReminderSourceAgendaMediaApplication)
+          .getReminderSourceAgendaMedia(sourceLogId);
+    } on Object {
+      return ReminderSourceAgendaMedia.unavailable(sourceLogId: sourceLogId);
     }
   }
 
@@ -593,6 +615,11 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
           ),
         if (reminder.sourceLogId != null) ...[
           const SizedBox(height: 16),
+          _ReminderSourceAgendaPhotos(
+            agenda: widget.agenda,
+            media: _sourceAgendaMedia!,
+          ),
+          const SizedBox(height: 12),
           SizedBox(
             height: 52,
             child: FilledButton.tonalIcon(
@@ -779,6 +806,100 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
             subtitle: Text(CseTimeCodec.formatIstanbul(event.occurredAt)),
           ),
       ],
+    );
+  }
+}
+
+class _ReminderSourceAgendaPhotos extends StatelessWidget {
+  const _ReminderSourceAgendaPhotos({
+    required this.agenda,
+    required this.media,
+  });
+
+  final AgendaApplication agenda;
+  final Future<ReminderSourceAgendaMedia> media;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<ReminderSourceAgendaMedia>(
+      future: media,
+      builder: (context, snapshot) {
+        final value = snapshot.data;
+        return Column(
+          key: const Key('reminder-source-agenda-photos'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Kaynak Ajanda fotoğrafları',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            if (snapshot.connectionState != ConnectionState.done)
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: LinearProgressIndicator(),
+                ),
+              )
+            else if (value == null || !value.isAvailable)
+              Card(
+                color: Theme.of(context).colorScheme.errorContainer,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'Kaynak Ajanda fotoğrafları güvenli biçimde yüklenemedi.\n'
+                    'Tanı: ${value?.safeErrorCode ?? 'source_agenda_media_unavailable'}',
+                    key: const Key('reminder-source-agenda-photos-error'),
+                  ),
+                ),
+              )
+            else if (value.photos.isEmpty)
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text('Kaynak Ajanda kaydında aktif fotoğraf yok.'),
+                ),
+              )
+            else
+              for (final photo in value.photos)
+                Card(
+                  child: ListTile(
+                    key: Key('reminder-source-agenda-photo-${photo.id}'),
+                    minVerticalPadding: 10,
+                    leading: SizedBox.square(
+                      dimension: 56,
+                      child: AgendaPhotoThumbnail(
+                        key: Key(
+                          'reminder-source-agenda-thumbnail-${photo.id}',
+                        ),
+                        agenda: agenda,
+                        photo: photo,
+                      ),
+                    ),
+                    title: Text(
+                      photo.originalFileName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      [
+                        '${photo.integrity.label} • ${photo.byteSize} byte',
+                        if (photo.description?.trim().isNotEmpty ?? false)
+                          photo.description!.trim(),
+                      ].join('\n'),
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            AgendaPhotoViewerPage(agenda: agenda, photo: photo),
+                      ),
+                    ),
+                  ),
+                ),
+          ],
+        );
+      },
     );
   }
 }

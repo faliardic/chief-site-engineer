@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:chief_site_engineer/app.dart';
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/features/agenda/agenda_photo_viewer_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
@@ -47,6 +49,39 @@ MobileReminder reminder({
   trashedAt: trashedAt,
   revision: 1,
 );
+
+AgendaLogPhoto sourcePhoto({
+  required String id,
+  required String fileName,
+  AgendaAttachmentIntegrity integrity = AgendaAttachmentIntegrity.ok,
+  String? description,
+}) => AgendaLogPhoto(
+  id: id,
+  logId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  projectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  originalFileName: fileName,
+  mimeType: 'image/png',
+  byteSize: 68,
+  sha256: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+  relativePath: 'agenda/source/$id.png',
+  description: description,
+  capturedAt: '2026-07-20T06:00:00Z',
+  revision: 1,
+  createdAt: '2026-07-20T06:00:00Z',
+  updatedAt: '2026-07-20T06:00:00Z',
+  archivedAt: null,
+  integrity: integrity,
+);
+
+StoredAttachmentContent sourcePhotoContent(String fileName) =>
+    StoredAttachmentContent(
+      fileName: fileName,
+      mimeType: 'image/png',
+      bytes: base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk'
+        '+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      ),
+    );
 
 void main() {
   testWidgets('+ Unutma is usable at 320 px with 44 px targets', (
@@ -384,9 +419,21 @@ void main() {
       projectName: 'Şantiye A',
       sourceLogId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
     );
+    final photo = sourcePhoto(
+      id: widgetReminderId(90),
+      fileName: 'trash-kaynak.png',
+    );
     final agenda = FakeAgendaApplication(
       reminders: [item],
       reminderDetail: item,
+      sourceAgendaMedia: ReminderSourceAgendaMedia.loaded(
+        sourceLogId: item.sourceLogId!,
+        sourceLogArchivedAt: null,
+        photos: [photo],
+      ),
+      agendaPhotoContents: {
+        photo.id: sourcePhotoContent(photo.originalFileName),
+      },
     );
     await tester.pumpWidget(
       MaterialApp(
@@ -395,10 +442,227 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.text('Kaynak Ajanda fotoğrafları'), findsOneWidget);
+    expect(
+      find.byKey(Key('reminder-source-agenda-photo-${photo.id}')),
+      findsOneWidget,
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('open-source-agenda-log')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.byKey(const Key('open-source-agenda-log')), findsOneWidget);
     expect(find.byKey(const Key('restore-reminder')), findsOneWidget);
     expect(find.byKey(const Key('trash-reminder')), findsNothing);
+    expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'source Agenda photos show metadata once and open the existing viewer',
+    (tester) async {
+      final item = reminder(
+        projectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        projectName: 'Şantiye A',
+        sourceLogId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      );
+      final photo = sourcePhoto(
+        id: widgetReminderId(91),
+        fileName: 'donati-kontrol.png',
+        description: 'Bindirme boyu kanıtı',
+      );
+      final agenda = FakeAgendaApplication(
+        reminders: [item],
+        reminderDetail: item,
+        sourceAgendaMedia: ReminderSourceAgendaMedia.loaded(
+          sourceLogId: item.sourceLogId!,
+          sourceLogArchivedAt: null,
+          photos: [photo, photo],
+        ),
+        agendaPhotoContents: {
+          photo.id: sourcePhotoContent(photo.originalFileName),
+        },
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReminderDetailPage(agenda: agenda, reminderId: item.id),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final tile = find.byKey(Key('reminder-source-agenda-photo-${photo.id}'));
+      await tester.scrollUntilVisible(
+        tile,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(agenda.sourceAgendaMediaCalls, 1);
+      expect(find.text('Kaynak Ajanda fotoğrafları'), findsOneWidget);
+      expect(find.text(photo.originalFileName), findsOneWidget);
+      expect(find.textContaining('Dosya doğrulandı • 68 byte'), findsOneWidget);
+      expect(find.textContaining('Bindirme boyu kanıtı'), findsOneWidget);
+      expect(tile, findsOneWidget);
+      expect(find.byKey(const Key('detail-add-agenda-photo')), findsNothing);
+      expect(tester.getSize(tile).height, greaterThanOrEqualTo(44));
+
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AgendaPhotoViewerPage), findsOneWidget);
+      expect(find.byKey(const Key('agenda-full-photo')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'missing tampered and invalid MIME photos stay visible with diagnostics',
+    (tester) async {
+      final item = reminder(
+        projectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        projectName: 'Şantiye A',
+        sourceLogId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      );
+      final photos = [
+        sourcePhoto(
+          id: widgetReminderId(92),
+          fileName: 'eksik.png',
+          integrity: AgendaAttachmentIntegrity.missing,
+        ),
+        sourcePhoto(
+          id: widgetReminderId(93),
+          fileName: 'bozuk.png',
+          integrity: AgendaAttachmentIntegrity.tampered,
+        ),
+        sourcePhoto(
+          id: widgetReminderId(94),
+          fileName: 'gecersiz.png',
+          integrity: AgendaAttachmentIntegrity.invalidMime,
+        ),
+      ];
+      final agenda = FakeAgendaApplication(
+        reminders: [item],
+        reminderDetail: item,
+        sourceAgendaMedia: ReminderSourceAgendaMedia.loaded(
+          sourceLogId: item.sourceLogId!,
+          sourceLogArchivedAt: null,
+          photos: photos,
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReminderDetailPage(agenda: agenda, reminderId: item.id),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      for (final photo in photos) {
+        final tile = find.byKey(
+          Key('reminder-source-agenda-photo-${photo.id}'),
+        );
+        expect(tile, findsOneWidget);
+        await tester.ensureVisible(tile);
+        await tester.tap(tile);
+        await tester.pumpAndSettle();
+        expect(find.byType(AgendaPhotoViewerPage), findsOneWidget);
+        expect(
+          find.textContaining('Tanı: ${photo.integrity.name}'),
+          findsOneWidget,
+        );
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+      }
+      expect(find.byKey(const Key('reminder-detail')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'source media failure keeps reminder content and safe diagnostic visible',
+    (tester) async {
+      final item = reminder(
+        title: 'Ana detay görünür kalır',
+        projectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        projectName: 'Şantiye A',
+        sourceLogId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      );
+      final agenda = FakeAgendaApplication(
+        reminders: [item],
+        reminderDetail: item,
+        sourceAgendaMediaFailure: StateError('private database path'),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReminderDetailPage(agenda: agenda, reminderId: item.id),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ana detay görünür kalır'), findsOneWidget);
+      expect(
+        find.byKey(const Key('reminder-source-agenda-photos-error')),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('source_agenda_media_unavailable'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('private database path'), findsNothing);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('open-source-agenda-log')),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.byKey(const Key('open-source-agenda-log')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'source photo section is controlled for empty and absent source',
+    (tester) async {
+      final linked = reminder(
+        projectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        projectName: 'Şantiye A',
+        sourceLogId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      );
+      final linkedAgenda = FakeAgendaApplication(
+        reminders: [linked],
+        reminderDetail: linked,
+        sourceAgendaMedia: ReminderSourceAgendaMedia.loaded(
+          sourceLogId: linked.sourceLogId!,
+          sourceLogArchivedAt: null,
+          photos: const [],
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReminderDetailPage(agenda: linkedAgenda, reminderId: linked.id),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Kaynak Ajanda kaydında aktif fotoğraf yok.'),
+        findsOneWidget,
+      );
+
+      final standalone = reminder(id: widgetReminderId(95));
+      final standaloneAgenda = FakeAgendaApplication(
+        reminders: [standalone],
+        reminderDetail: standalone,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReminderDetailPage(
+            key: const ValueKey('standalone-reminder-detail'),
+            agenda: standaloneAgenda,
+            reminderId: standalone.id,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Kaynak Ajanda fotoğrafları'), findsNothing);
+      expect(standaloneAgenda.sourceAgendaMediaCalls, 0);
+    },
+  );
 
   testWidgets(
     'quick capture preserves input on validation/application failure',

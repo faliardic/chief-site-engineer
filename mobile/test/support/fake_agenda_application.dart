@@ -4,7 +4,10 @@ import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 
 class FakeAgendaApplication
-    implements AgendaApplication, ReminderTodayApplication {
+    implements
+        AgendaApplication,
+        ReminderTodayApplication,
+        ReminderSourceAgendaMediaApplication {
   FakeAgendaApplication({
     this.projects = const [],
     this.logs = const [],
@@ -12,6 +15,9 @@ class FakeAgendaApplication
     this.todayOverview,
     this.logDetail,
     this.reminderDetail,
+    this.sourceAgendaMedia,
+    this.sourceAgendaMediaFailure,
+    this.agendaPhotoContents = const {},
     this.initialNotificationReminderId,
     this.notificationTapStream = const Stream<String>.empty(),
     DateTime? asOfUtc,
@@ -24,6 +30,9 @@ class FakeAgendaApplication
   final DateTime asOfUtc;
   AgendaLogDetail? logDetail;
   MobileReminder? reminderDetail;
+  ReminderSourceAgendaMedia? sourceAgendaMedia;
+  Object? sourceAgendaMediaFailure;
+  final Map<String, StoredAttachmentContent> agendaPhotoContents;
   @override
   final String? initialNotificationReminderId;
   final Stream<String> notificationTapStream;
@@ -39,6 +48,7 @@ class FakeAgendaApplication
   int createLogCalls = 0;
   int createReminderCalls = 0;
   int todayOverviewCalls = 0;
+  int sourceAgendaMediaCalls = 0;
   int mutateReminderCalls = 0;
   MutateReminderCommand? lastMutationCommand;
   final StreamController<void> _projectChanges =
@@ -150,8 +160,11 @@ class FakeAgendaApplication
   ) async => getAgendaLogDetail(command.logId);
 
   @override
-  Future<StoredAttachmentContent> readAgendaPhoto(String photoId) =>
-      throw StateError('photo unavailable in fake');
+  Future<StoredAttachmentContent> readAgendaPhoto(String photoId) async {
+    final content = agendaPhotoContents[photoId];
+    if (content == null) throw StateError('photo unavailable in fake');
+    return content;
+  }
 
   @override
   Future<MobileReminder> createReminder(CreateReminderCommand command) async {
@@ -209,6 +222,24 @@ class FakeAgendaApplication
           .where((item) => item.sourceLogId == logId && item.trashedAt == null)
           .toList(),
     );
+  }
+
+  @override
+  Future<ReminderSourceAgendaMedia> getReminderSourceAgendaMedia(
+    String sourceLogId,
+  ) async {
+    sourceAgendaMediaCalls += 1;
+    if (sourceAgendaMediaFailure case final failure?) throw failure;
+    if (sourceAgendaMedia case final value?) return value;
+    final detail = logDetail;
+    if (detail != null && detail.log.id == sourceLogId) {
+      return ReminderSourceAgendaMedia.loaded(
+        sourceLogId: sourceLogId,
+        sourceLogArchivedAt: detail.log.archivedAt,
+        photos: detail.photos,
+      );
+    }
+    return ReminderSourceAgendaMedia.unavailable(sourceLogId: sourceLogId);
   }
 
   @override

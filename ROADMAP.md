@@ -31,7 +31,7 @@ Release 0.1 çekirdeğinde mobil runtime, Ajanda, Hatırlatıcı, Puantaj, taşe
 personel sicili, Beton Paketi, mikser/irsaliye/numune/laboratuvar, fotoğraf ve PDF,
 parola korumalı backup/restore ve Android release güvenliği uygulanmıştır.
 Tamamlanan ana dilimler: #179, #183, #185, #187, #189, #191, #194, #196,
-#198, #200, #202, #207, #212 ve #214.
+#198, #200, #202, #207, #212, #214, #221, #225, #227 ve #230.
 
 Bu sürümün güvenli dokümantasyon başlangıç noktası
 `d4ccc480570a971cf014ddbe00122ec6132cad01` commit'idir. Bu noktada PR #217'nin
@@ -108,9 +108,9 @@ Kanonik uygulama sırası:
    üretilebilir. Issue #227 ile schema 9, append-only trash/restore event'leri
    ve `Diğer > Geri Dönüşüm Kutusu` yüzeyi uygulanmıştır. İlk sürümde otomatik
    hard-delete yoktur.
-4. **Ajanda → reminder kaynak attachment görünürlüğü:** kaynak Ajanda fotoğrafı
-   veya dosyası reminder detayında görünür; geniş attachment refactor'ı
-   başlamadan dar read-model bağı düzeltilir.
+4. **Ajanda → reminder kaynak attachment görünürlüğü:** Issue #230 ile kaynak
+   Ajanda fotoğrafları reminder detayında salt-okunur görünür; mevcut integrity
+   kontrolü ve viewer korunur. Geniş attachment refactor'ı başlatılmamıştır.
 5. **Beton sınıfı ve döküm zaman çizgisi:** proje kataloğundan beton sınıfı,
    `Planlandı → Devam ediyor → Tamamlandı`, gerçek başlat/bitir zamanı ve tek
    bağlı Ajanda logu aynı Beton source-of-truth kaydından yürür.
@@ -142,8 +142,9 @@ haricî servis/eşik tasarımı nedeniyle ertelenmiş iştir ve gömülü AI, ta
 otomatik hard-delete, otomatik Beton creation veya duplicate attachment için
 erken yetki vermez.
 
-İlk production child #221 Reminder scheduling contract'tır. Bu roadmap branch'i
-Blok 1 veya sonraki production davranışını uygulamaz.
+Blok 1–4 Issue #221, #225, #227 ve #230 ile tamamlanmıştır. Sıradaki production
+child Blok 5, **Beton sınıfı ve döküm zaman çizgisi**dir; Blok 6 veya ortak
+attachment v2 bu sıra atlanarak başlatılmaz.
 
 ---
 
