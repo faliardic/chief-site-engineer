@@ -68,6 +68,7 @@ void main() {
       {'version': 7, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 8, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 9, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 10, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
   });
 
@@ -120,6 +121,9 @@ void main() {
         'attendance_reminder_settings',
         'attendance_day_reminder_links',
         'concrete_pours',
+        'project_concrete_classes',
+        'project_concrete_class_events',
+        'concrete_pour_context_links',
         'concrete_check_items',
         'concrete_trucks',
         'concrete_sample_sets',
@@ -1390,7 +1394,7 @@ void main() {
     },
   );
 
-  test('empty schema 8 migrates atomically to schema 9', () async {
+  test('empty schema 8 migrates atomically through schema 10', () async {
     final versionEight = AppDatabase(
       path: directories.databaseFile,
       factory: databaseFactoryFfi,
@@ -1410,7 +1414,7 @@ void main() {
       sqflite.Sqflite.firstIntValue(
         await upgraded.database.rawQuery('PRAGMA user_version'),
       ),
-      9,
+      AppDatabase.schemaVersion,
     );
     expect(
       (await upgraded.database.rawQuery(
@@ -1420,6 +1424,10 @@ void main() {
     );
     expect(
       await upgraded.database.rawQuery('PRAGMA foreign_key_check'),
+      isEmpty,
+    );
+    expect(
+      await upgraded.database.query('project_concrete_classes'),
       isEmpty,
     );
     await upgraded.close();
@@ -1664,6 +1672,238 @@ void main() {
       await upgraded.close();
     },
   );
+
+  test(
+    'schema 9 to 10 seeds project concrete classes and links legacy snapshots',
+    () async {
+      final versionNine = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+        migrations: AppDatabase.foundationMigrations.take(9).toList(),
+      );
+      await versionNine.open();
+      final db = versionNine.database;
+      const projectA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+      const projectB = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+      const pourA1 = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
+      const pourA2 = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
+      const pourB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3';
+      const timestamp = '2026-07-20T08:00:00Z';
+      for (final value in const [(projectA, 'Proje A'), (projectB, 'Proje B')]) {
+        await db.insert('projects', {
+          'id': value.$1,
+          'name': value.$2,
+          'created_at': timestamp,
+          'updated_at': timestamp,
+          'revision': 1,
+        });
+      }
+      for (final value in const [
+        (pourA1, projectA, 'BT-A1', ' C30/37 ', null, null),
+        (
+          pourA2,
+          projectA,
+          'BT-A2',
+          'c30/37',
+          '2026-07-20T08:10:00Z',
+          '2026-07-20T08:40:00Z',
+        ),
+        (pourB, projectB, 'BT-B1', 'C30/37', null, null),
+      ]) {
+        await db.insert('concrete_pours', {
+          'id': value.$1,
+          'project_id': value.$2,
+          'pour_code': value.$3,
+          'element_location': 'Temel',
+          'planned_at': '2026-07-20T09:00:00Z',
+          'actual_started_at': value.$5,
+          'actual_ended_at': value.$6,
+          'concrete_class': value.$4,
+          'target_slump': value.$1 == pourA1 ? 'S3' : null,
+          'planned_volume_m3': 20.0,
+          'status': value.$6 != null
+              ? 'poured'
+              : value.$5 != null
+              ? 'pouring'
+              : 'draft',
+          'revision': 1,
+          'created_at': timestamp,
+          'updated_at': timestamp,
+        });
+      }
+      await db.insert('concrete_trucks', {
+        'id': 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1',
+        'concrete_pour_id': pourA2,
+        'sequence_no': 1,
+        'vehicle_plate': '34 CSE 234',
+        'volume_m3': 8.0,
+        'result': 'received',
+        'revision': 1,
+        'created_at': timestamp,
+        'updated_at': timestamp,
+      });
+      await db.insert('concrete_pour_events', {
+        'id': 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1',
+        'concrete_pour_id': pourA2,
+        'sequence': 1,
+        'event_type': 'pour.started',
+        'occurred_at': '2026-07-20T08:10:00Z',
+        'payload_json': '{}',
+      });
+      await versionNine.close();
+
+      final upgraded = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 20, 10),
+      );
+      await upgraded.open();
+      final classes = await upgraded.database.query(
+        'project_concrete_classes',
+        orderBy: 'project_id ASC',
+      );
+      final links = await upgraded.database.query(
+        'concrete_pour_context_links',
+        orderBy: 'concrete_pour_id ASC',
+      );
+      final pours = await upgraded.database.query(
+        'concrete_pours',
+        orderBy: 'id ASC',
+      );
+      expect(classes, hasLength(2));
+      expect(classes.map((row) => row['normalized_name']), [
+        'c30/37',
+        'c30/37',
+      ]);
+      expect(classes.first['default_target_slump'], 'S3');
+      expect(links, hasLength(3));
+      expect(links[0]['concrete_class_id'], links[1]['concrete_class_id']);
+      expect(links[2]['concrete_class_id'], isNot(links[0]['concrete_class_id']));
+      expect(pours.map((row) => row['concrete_class']), [
+        ' C30/37 ',
+        'c30/37',
+        'C30/37',
+      ]);
+      expect(pours[1]['actual_started_at'], '2026-07-20T08:10:00Z');
+      expect(pours[1]['actual_ended_at'], '2026-07-20T08:40:00Z');
+      expect(await upgraded.database.query('concrete_trucks'), hasLength(1));
+      expect(
+        (await upgraded.database.query('concrete_pour_events')).single['id'],
+        'dddddddd-dddd-4ddd-8ddd-ddddddddddd1',
+      );
+      expect(
+        await upgraded.database.rawQuery('PRAGMA foreign_key_check'),
+        isEmpty,
+      );
+      const managedAgendaId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1';
+      await upgraded.database.insert('field_observations', {
+        'id': managedAgendaId,
+        'project_id': projectA,
+        'observed_at': timestamp,
+        'created_at': timestamp,
+        'updated_at': timestamp,
+        'category': 'concrete',
+        'description': 'Managed legacy concrete projection',
+        'revision': 1,
+      });
+      await upgraded.database.update(
+        'concrete_pour_context_links',
+        {'agenda_log_id': managedAgendaId},
+        where: 'concrete_pour_id = ?',
+        whereArgs: [pourA1],
+      );
+      await expectLater(
+        upgraded.database.update(
+          'concrete_pour_context_links',
+          {'agenda_log_id': managedAgendaId},
+          where: 'concrete_pour_id = ?',
+          whereArgs: [pourA2],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        upgraded.database.update(
+          'concrete_pour_context_links',
+          {'concrete_class_id': classes.last['id']},
+          where: 'concrete_pour_id = ?',
+          whereArgs: [pourA1],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        upgraded.database.delete(
+          'project_concrete_classes',
+          where: 'id = ?',
+          whereArgs: [classes.first['id']],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        upgraded.database.update(
+          'project_concrete_class_events',
+          {'payload_json': '{"changed":true}'},
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await upgraded.close();
+    },
+  );
+
+  test('schema 10 migration rolls back on an invalid legacy class', () async {
+    final versionNine = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => firstClock,
+      migrations: AppDatabase.foundationMigrations.take(9).toList(),
+    );
+    await versionNine.open();
+    await versionNine.database.insert('projects', {
+      'id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'name': 'Rollback V10',
+      'created_at': '2026-07-20T08:00:00Z',
+      'updated_at': '2026-07-20T08:00:00Z',
+      'revision': 1,
+    });
+    await versionNine.database.insert('concrete_pours', {
+      'id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      'project_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'pour_code': 'BT-BAD',
+      'element_location': 'Temel',
+      'planned_at': '2026-07-20T09:00:00Z',
+      'concrete_class': '   ',
+      'planned_volume_m3': 5.0,
+      'status': 'draft',
+      'revision': 1,
+      'created_at': '2026-07-20T08:00:00Z',
+      'updated_at': '2026-07-20T08:00:00Z',
+    });
+    await versionNine.close();
+
+    final upgraded = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: () => DateTime.utc(2026, 7, 20, 10),
+    );
+    await expectLater(upgraded.open(), throwsA(isA<DatabaseOpenFailure>()));
+    final raw = await databaseFactoryFfi.openDatabase(
+      directories.databaseFile,
+      options: sqflite.OpenDatabaseOptions(singleInstance: false),
+    );
+    expect(
+      sqflite.Sqflite.firstIntValue(await raw.rawQuery('PRAGMA user_version')),
+      9,
+    );
+    expect(
+      await raw.rawQuery(
+        "SELECT name FROM sqlite_master "
+        "WHERE name = 'project_concrete_classes'",
+      ),
+      isEmpty,
+    );
+    expect((await raw.query('concrete_pours')).single['concrete_class'], '   ');
+    await raw.close();
+  });
 
   test('failed schema 9 migration rolls back intact schema 8 data', () async {
     final versionEight = AppDatabase(

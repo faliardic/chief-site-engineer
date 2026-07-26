@@ -21,6 +21,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
 const pourId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
 const createEventId = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1';
+const concreteClassId = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1';
 
 void main() {
   late Directory root;
@@ -35,6 +36,7 @@ void main() {
   setUpAll(sqfliteFfiInit);
 
   setUp(() async {
+    now = DateTime.utc(2026, 7, 19, 7);
     root = await Directory.systemTemp.createTemp('cse_concrete_');
     directories = AppDirectories.fromSupportRoot(root, AppEnvironment.debug);
     await directories.ensureCreated();
@@ -63,6 +65,15 @@ void main() {
       exports: exports,
       directories: directories,
       clock: () => now,
+    );
+    await concrete.createConcreteClass(
+      const CreateProjectConcreteClassCommand(
+        id: concreteClassId,
+        eventId: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd2',
+        projectId: projectId,
+        displayName: 'C30/37',
+        defaultTargetSlump: 'S3',
+      ),
     );
   });
 
@@ -122,6 +133,485 @@ void main() {
           'reminder_notification_bindings',
         ),
         8,
+      );
+    },
+  );
+
+  test(
+    'concrete class catalog is project scoped audited and snapshot safe',
+    () async {
+      final classes = await concrete.listConcreteClasses(projectId);
+      expect(classes.single.displayName, 'C30/37');
+      expect(classes.single.defaultTargetSlump, 'S3');
+      await expectLater(
+        concrete.createConcreteClass(
+          const CreateProjectConcreteClassCommand(
+            id: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd3',
+            eventId: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd4',
+            projectId: projectId,
+            displayName: '  c30/37  ',
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+
+      const otherProjectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+      await agenda.createProject(
+        const CreateProjectCommand(id: otherProjectId, name: 'Şantiye B'),
+      );
+      final other = await concrete.createConcreteClass(
+        const CreateProjectConcreteClassCommand(
+          id: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd5',
+          eventId: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd6',
+          projectId: otherProjectId,
+          displayName: 'C30/37',
+        ),
+      );
+      expect(other.projectId, otherProjectId);
+
+      final created = await concrete.createPour(_createCommand());
+      expect(created.concreteClassId, concreteClassId);
+      expect(created.pour.concreteClass, 'C30/37');
+      expect(created.pour.targetSlump, 'S3');
+      final archived = await concrete.mutateConcreteClassArchive(
+        MutateProjectConcreteClassArchiveCommand(
+          id: classes.single.id,
+          eventId: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd7',
+          expectedRevision: classes.single.revision,
+          archive: true,
+        ),
+      );
+      expect(archived.isArchived, isTrue);
+      expect(await concrete.listConcreteClasses(projectId), isEmpty);
+      expect(
+        (await concrete.getPourDetail(pourId)).pour.concreteClass,
+        'C30/37',
+      );
+      await expectLater(
+        concrete.createPour(
+          const CreateConcretePourCommand(
+            id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2',
+            eventId: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2',
+            projectId: projectId,
+            pourCode: 'BT-ARCHIVED',
+            elementLocation: 'Temel',
+            plannedAt: '2026-07-19T10:00:00Z',
+            concreteClassId: concreteClassId,
+            plannedVolumeM3: 5,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      final restored = await concrete.mutateConcreteClassArchive(
+        MutateProjectConcreteClassArchiveCommand(
+          id: archived.id,
+          eventId: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd8',
+          expectedRevision: archived.revision,
+          archive: false,
+        ),
+      );
+      expect(restored.isArchived, isFalse);
+      final database = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      expect(
+        await database.query(
+          'project_concrete_class_events',
+          where: 'concrete_class_id = ?',
+          whereArgs: [concreteClassId],
+        ),
+        hasLength(3),
+      );
+      await database.close();
+    },
+  );
+
+  test(
+    'start and finish atomically maintain one managed Agenda projection',
+    () async {
+      var detail = await concrete.createPour(_createCommand());
+      detail = await _completeRequiredChecks(concrete, detail, 300);
+      final reminderCount = detail.linkedReminders.length;
+      final start = TransitionConcretePourCommand(
+        pourId: pourId,
+        eventId: _uuid(320),
+        expectedRevision: detail.pour.revision,
+        targetStatus: ConcretePourStatus.pouring,
+      );
+      detail = await concrete.transitionPour(start);
+      expect(detail.pour.status, ConcretePourStatus.pouring);
+      expect(detail.pour.actualStartedAt, '2026-07-19T07:00:00Z');
+      expect(detail.pour.actualEndedAt, isNull);
+      expect(detail.agendaLogId, isNotNull);
+      expect(detail.linkedReminders, hasLength(reminderCount));
+      final agendaLogId = detail.agendaLogId!;
+      var agendaDetail = await agenda.getAgendaLogDetail(agendaLogId);
+      expect(agendaDetail.managedConcretePourId, pourId);
+      expect(agendaDetail.log.category, AgendaCategory.concrete);
+      expect(agendaDetail.log.observedAt, detail.pour.actualStartedAt);
+      expect(agendaDetail.log.description, contains('BT-001'));
+      expect(agendaDetail.log.description, contains('C30/37'));
+      expect(agendaDetail.events.single.eventType, 'concrete_pour.started');
+
+      final retriedStart = await concrete.transitionPour(start);
+      expect(retriedStart.pour.actualStartedAt, detail.pour.actualStartedAt);
+      expect(await _count(directories.databaseFile, 'field_observations'), 1);
+      await expectLater(
+        agenda.updateAgendaLog(
+          UpdateAgendaLogCommand(
+            id: agendaLogId,
+            eventId: _uuid(321),
+            expectedRevision: agendaDetail.log.revision,
+            projectId: projectId,
+            observedAt: agendaDetail.log.observedAt,
+            category: AgendaCategory.concrete,
+            description: 'Bağımsız gerçeklik',
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      await expectLater(
+        agenda.mutateAgendaLogArchive(
+          MutateAgendaLogArchiveCommand(
+            id: agendaLogId,
+            eventId: _uuid(322),
+            expectedRevision: agendaDetail.log.revision,
+            archive: true,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+
+      detail = await concrete.saveTruck(
+        SaveConcreteTruckCommand(
+          id: _uuid(323),
+          pourId: pourId,
+          eventId: _uuid(324),
+          expectedPourRevision: detail.pour.revision,
+          expectedTruckRevision: 0,
+          sequenceNo: 1,
+          vehiclePlate: '34 CSE 234',
+          volumeM3: 18.5,
+          result: ConcreteTruckResult.received,
+        ),
+      );
+      now = DateTime.utc(2026, 7, 19, 8);
+      final finish = TransitionConcretePourCommand(
+        pourId: pourId,
+        eventId: _uuid(325),
+        expectedRevision: detail.pour.revision,
+        targetStatus: ConcretePourStatus.poured,
+      );
+      detail = await concrete.transitionPour(finish);
+      expect(detail.pour.actualEndedAt, '2026-07-19T08:00:00Z');
+      expect(detail.metrics.pourDurationMinutes, 60);
+      expect(detail.pour.status, ConcretePourStatus.poured);
+      expect(detail.metrics.openFollowUpCount, greaterThan(0));
+      final retriedFinish = await concrete.transitionPour(finish);
+      expect(retriedFinish.pour.actualEndedAt, detail.pour.actualEndedAt);
+      expect(retriedFinish.agendaLogId, agendaLogId);
+      expect(await _count(directories.databaseFile, 'field_observations'), 1);
+      agendaDetail = await agenda.getAgendaLogDetail(agendaLogId);
+      expect(agendaDetail.log.description, contains('Gerçek 18.50 m³'));
+      expect(agendaDetail.log.description, contains('1 mikser'));
+      expect(agendaDetail.log.description, contains('Süre 60 dk'));
+      expect(
+        agendaDetail.events.map((item) => item.eventType),
+        ['concrete_pour.started', 'concrete_pour.completed'],
+      );
+    },
+  );
+
+  test('Agenda write failure rolls the whole start transaction back', () async {
+    var detail = await concrete.createPour(_createCommand());
+    detail = await _completeRequiredChecks(concrete, detail, 340);
+    final failing = _application(
+      agenda: agenda,
+      attachments: attachments,
+      exports: exports,
+      directories: directories,
+      clock: () => now,
+      beforeAgenda: (_) async => throw StateError('agenda write failed'),
+    );
+    await expectLater(
+      failing.transitionPour(
+        TransitionConcretePourCommand(
+          pourId: pourId,
+          eventId: _uuid(360),
+          expectedRevision: detail.pour.revision,
+          targetStatus: ConcretePourStatus.pouring,
+        ),
+      ),
+      throwsStateError,
+    );
+    final preserved = await concrete.getPourDetail(pourId);
+    expect(preserved.pour.status, ConcretePourStatus.draft);
+    expect(preserved.pour.actualStartedAt, isNull);
+    expect(preserved.agendaLogId, isNull);
+    expect(await _count(directories.databaseFile, 'field_observations'), 0);
+    expect(
+      preserved.events.where((item) => item.id == _uuid(360)),
+      isEmpty,
+    );
+  });
+
+  test(
+    'cancel reopen resume and finish preserve one managed Agenda timeline',
+    () async {
+      var detail = await concrete.createPour(_createCommand());
+      detail = await concrete.transitionPour(
+        TransitionConcretePourCommand(
+          pourId: pourId,
+          eventId: _uuid(370),
+          expectedRevision: detail.pour.revision,
+          targetStatus: ConcretePourStatus.cancelled,
+          reason: 'Döküm başlamadan iptal',
+        ),
+      );
+      expect(detail.pour.actualStartedAt, isNull);
+      expect(detail.pour.actualEndedAt, isNull);
+      expect(detail.agendaLogId, isNull);
+      expect(await _count(directories.databaseFile, 'field_observations'), 0);
+
+      detail = await concrete.transitionPour(
+        TransitionConcretePourCommand(
+          pourId: pourId,
+          eventId: _uuid(371),
+          expectedRevision: detail.pour.revision,
+          targetStatus: ConcretePourStatus.draft,
+          reason: 'Plan yeniden açıldı',
+        ),
+      );
+      detail = await _completeRequiredChecks(concrete, detail, 372);
+      await expectLater(
+        concrete.transitionPour(
+          TransitionConcretePourCommand(
+            pourId: pourId,
+            eventId: _uuid(390),
+            expectedRevision: detail.pour.revision - 1,
+            targetStatus: ConcretePourStatus.pouring,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      expect(
+        (await concrete.getPourDetail(pourId)).agendaLogId,
+        isNull,
+      );
+
+      detail = await concrete.transitionPour(
+        TransitionConcretePourCommand(
+          pourId: pourId,
+          eventId: _uuid(391),
+          expectedRevision: detail.pour.revision,
+          targetStatus: ConcretePourStatus.pouring,
+        ),
+      );
+      final startedAt = detail.pour.actualStartedAt;
+      final managedAgendaId = detail.agendaLogId;
+      now = DateTime.utc(2026, 7, 19, 8);
+      detail = await concrete.transitionPour(
+        TransitionConcretePourCommand(
+          pourId: pourId,
+          eventId: _uuid(392),
+          expectedRevision: detail.pour.revision,
+          targetStatus: ConcretePourStatus.cancelled,
+          reason: 'Pompa arızası',
+        ),
+      );
+      expect(detail.pour.actualStartedAt, startedAt);
+      expect(detail.pour.actualEndedAt, isNull);
+      expect(detail.agendaLogId, managedAgendaId);
+
+      now = DateTime.utc(2026, 7, 19, 9);
+      detail = await concrete.transitionPour(
+        TransitionConcretePourCommand(
+          pourId: pourId,
+          eventId: _uuid(393),
+          expectedRevision: detail.pour.revision,
+          targetStatus: ConcretePourStatus.draft,
+          reason: 'Pompa değiştirildi',
+        ),
+      );
+      expect(detail.pour.actualStartedAt, startedAt);
+      expect(detail.pour.actualEndedAt, isNull);
+      expect(detail.agendaLogId, managedAgendaId);
+      expect(await _count(directories.databaseFile, 'field_observations'), 1);
+      var source = await agenda.getAgendaLogDetail(managedAgendaId!);
+      expect(
+        source.events.map((item) => item.eventType),
+        [
+          'concrete_pour.started',
+          'concrete_pour.cancelled',
+          'concrete_pour.reopened',
+        ],
+      );
+
+      await expectLater(
+        concrete.transitionPour(
+          TransitionConcretePourCommand(
+            pourId: pourId,
+            eventId: _uuid(394),
+            expectedRevision: detail.pour.revision - 1,
+            targetStatus: ConcretePourStatus.pouring,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      final resume = TransitionConcretePourCommand(
+        pourId: pourId,
+        eventId: _uuid(395),
+        expectedRevision: detail.pour.revision,
+        targetStatus: ConcretePourStatus.pouring,
+      );
+      detail = await concrete.transitionPour(resume);
+      expect(detail.pour.status, ConcretePourStatus.pouring);
+      expect(detail.pour.actualStartedAt, startedAt);
+      expect(detail.pour.actualEndedAt, isNull);
+      expect(detail.agendaLogId, managedAgendaId);
+      expect(await _count(directories.databaseFile, 'field_observations'), 1);
+      expect(
+        detail.events.where((item) => item.id == resume.eventId),
+        hasLength(1),
+      );
+      source = await agenda.getAgendaLogDetail(managedAgendaId);
+      expect(
+        source.events.map((item) => item.eventType),
+        [
+          'concrete_pour.started',
+          'concrete_pour.cancelled',
+          'concrete_pour.reopened',
+        ],
+      );
+
+      final retried = await concrete.transitionPour(resume);
+      expect(retried.pour.actualStartedAt, startedAt);
+      expect(retried.agendaLogId, managedAgendaId);
+      expect(
+        retried.events.where((item) => item.id == resume.eventId),
+        hasLength(1),
+      );
+      expect(await _count(directories.databaseFile, 'field_observations'), 1);
+      source = await agenda.getAgendaLogDetail(managedAgendaId);
+      expect(source.events, hasLength(3));
+
+      detail = await concrete.saveTruck(
+        SaveConcreteTruckCommand(
+          id: _uuid(396),
+          pourId: pourId,
+          eventId: _uuid(397),
+          expectedPourRevision: retried.pour.revision,
+          expectedTruckRevision: 0,
+          sequenceNo: 1,
+          vehiclePlate: '34 CSE 236',
+          volumeM3: 20,
+          result: ConcreteTruckResult.received,
+        ),
+      );
+      now = DateTime.utc(2026, 7, 19, 10);
+      detail = await concrete.transitionPour(
+        TransitionConcretePourCommand(
+          pourId: pourId,
+          eventId: _uuid(398),
+          expectedRevision: detail.pour.revision,
+          targetStatus: ConcretePourStatus.poured,
+        ),
+      );
+      expect(detail.pour.status, ConcretePourStatus.poured);
+      expect(detail.pour.actualStartedAt, startedAt);
+      expect(detail.pour.actualEndedAt, '2026-07-19T10:00:00Z');
+      expect(detail.agendaLogId, managedAgendaId);
+      expect(await _count(directories.databaseFile, 'field_observations'), 1);
+      source = await agenda.getAgendaLogDetail(managedAgendaId);
+      expect(
+        source.events.map((item) => item.eventType),
+        [
+          'concrete_pour.started',
+          'concrete_pour.cancelled',
+          'concrete_pour.reopened',
+          'concrete_pour.completed',
+        ],
+      );
+    },
+  );
+
+  test('finish without a truck rolls back status timestamp and Agenda', () async {
+    var detail = await concrete.createPour(_createCommand());
+    detail = await _completeRequiredChecks(concrete, detail, 400);
+    detail = await concrete.transitionPour(
+      TransitionConcretePourCommand(
+        pourId: pourId,
+        eventId: _uuid(420),
+        expectedRevision: detail.pour.revision,
+        targetStatus: ConcretePourStatus.pouring,
+      ),
+    );
+    final revision = detail.pour.revision;
+    final managedAgendaId = detail.agendaLogId!;
+    now = DateTime.utc(2026, 7, 19, 8);
+    await expectLater(
+      concrete.transitionPour(
+        TransitionConcretePourCommand(
+          pourId: pourId,
+          eventId: _uuid(421),
+          expectedRevision: revision,
+          targetStatus: ConcretePourStatus.poured,
+        ),
+      ),
+      throwsA(isA<AgendaValidationFailure>()),
+    );
+    detail = await concrete.getPourDetail(pourId);
+    expect(detail.pour.status, ConcretePourStatus.pouring);
+    expect(detail.pour.revision, revision);
+    expect(detail.pour.actualEndedAt, isNull);
+    expect(detail.agendaLogId, managedAgendaId);
+    final source = await agenda.getAgendaLogDetail(managedAgendaId);
+    expect(
+      source.events.map((item) => item.eventType),
+      ['concrete_pour.started'],
+    );
+  });
+
+  test(
+    'legacy completed pour repairs one Agenda log idempotently',
+    () async {
+      var detail = await concrete.createPour(_createCommand());
+      final database = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      await database.update(
+        'concrete_pours',
+        {
+          'status': 'poured',
+          'actual_started_at': '2026-07-19T06:00:00Z',
+          'actual_ended_at': '2026-07-19T06:45:00Z',
+          'revision': detail.pour.revision + 1,
+          'updated_at': '2026-07-19T06:45:00Z',
+        },
+        where: 'id = ?',
+        whereArgs: [pourId],
+      );
+      await database.close();
+      detail = await concrete.getPourDetail(pourId);
+      expect(detail.agendaLogId, isNull);
+      final repair = RepairConcreteAgendaCommand(
+        pourId: pourId,
+        eventId: _uuid(380),
+        expectedRevision: detail.pour.revision,
+      );
+      final repaired = await concrete.repairManagedAgenda(repair);
+      final retried = await concrete.repairManagedAgenda(repair);
+      expect(repaired.agendaLogId, isNotNull);
+      expect(retried.agendaLogId, repaired.agendaLogId);
+      expect(await _count(directories.databaseFile, 'field_observations'), 1);
+      final source = await agenda.getAgendaLogDetail(repaired.agendaLogId!);
+      expect(source.log.observedAt, '2026-07-19T06:00:00Z');
+      expect(source.log.description, contains('Süre 45 dk'));
+      expect(
+        source.events.map((item) => item.eventType),
+        ['concrete_pour.started', 'concrete_pour.completed'],
       );
     },
   );
@@ -1211,6 +1701,15 @@ void main() {
         directories: secondDirectories,
         clock: () => now,
       );
+      await normal.createConcreteClass(
+        const CreateProjectConcreteClassCommand(
+          id: concreteClassId,
+          eventId: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd2',
+          projectId: projectId,
+          displayName: 'C30/37',
+          defaultTargetSlump: 'S3',
+        ),
+      );
       final secondCreated = await normal.createPour(_createCommand());
       final failing = _application(
         agenda: secondAgenda,
@@ -1399,6 +1898,7 @@ SqliteConcreteApplication _application({
   required AppDirectories directories,
   required DateTime Function() clock,
   ConcreteTransactionHook? beforeEvent,
+  ConcreteTransactionHook? beforeAgenda,
 }) => SqliteConcreteApplication(
   databasePath: directories.databaseFile,
   databaseFactory: databaseFactoryFfi,
@@ -1407,6 +1907,7 @@ SqliteConcreteApplication _application({
   attachmentStore: attachments,
   exportGateway: exports,
   beforeConcreteEventInsert: beforeEvent,
+  beforeManagedAgendaWrite: beforeAgenda,
 );
 
 UpdateConcretePourCommand _updatePourCommand(
@@ -1438,11 +1939,33 @@ CreateConcretePourCommand _createCommand({
   pourCode: code,
   elementLocation: 'KOLON A1',
   plannedAt: '2026-07-19T09:00:00Z',
-  concreteClass: 'C30/37',
+  concreteClassId: concreteClassId,
   plannedVolumeM3: plannedVolume,
   plantName: 'Güven Beton',
   laboratoryName: 'Saha Lab',
 );
+
+Future<ConcretePourDetail> _completeRequiredChecks(
+  ConcreteApplication concrete,
+  ConcretePourDetail detail,
+  int eventSeed,
+) async {
+  var current = detail;
+  for (var index = 0; index < current.checks.length; index += 1) {
+    final check = current.checks[index];
+    current = await concrete.updateCheck(
+      UpdateConcreteCheckCommand(
+        pourId: current.pour.id,
+        checkId: check.id,
+        eventId: _uuid(eventSeed + index),
+        expectedPourRevision: current.pour.revision,
+        expectedCheckRevision: check.revision,
+        status: ConcreteCheckStatus.completed,
+      ),
+    );
+  }
+  return current;
+}
 
 String _uuid(int value) {
   final suffix = value.toString().padLeft(12, '0');

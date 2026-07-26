@@ -111,9 +111,10 @@ Kanonik uygulama sırası:
 4. **Ajanda → reminder kaynak attachment görünürlüğü:** Issue #230 ile kaynak
    Ajanda fotoğrafları reminder detayında salt-okunur görünür; mevcut integrity
    kontrolü ve viewer korunur. Geniş attachment refactor'ı başlatılmamıştır.
-5. **Beton sınıfı ve döküm zaman çizgisi:** proje kataloğundan beton sınıfı,
-   `Planlandı → Devam ediyor → Tamamlandı`, gerçek başlat/bitir zamanı ve tek
-   bağlı Ajanda logu aynı Beton source-of-truth kaydından yürür.
+5. **Beton sınıfı ve döküm zaman çizgisi:** Issue #234 ile proje kataloğundan
+   Beton sınıfı, `Planlandı → Devam ediyor → Tamamlandı`, gerçek başlat/bitir
+   zamanı ve tek bağlı yönetilen Ajanda logu aynı Beton source-of-truth
+   kaydından yürür.
 6. **Beton kelime önerisi/deep-link:** `beton`, `betonaj` gibi sinyaller yalnız
    kullanıcıya öneri ve `Beton paketine git` bağlantısı üretir; otomatik Beton
    kaydı, paket veya teknik karar üretmez.
@@ -142,9 +143,9 @@ haricî servis/eşik tasarımı nedeniyle ertelenmiş iştir ve gömülü AI, ta
 otomatik hard-delete, otomatik Beton creation veya duplicate attachment için
 erken yetki vermez.
 
-Blok 1–4 Issue #221, #225, #227 ve #230 ile tamamlanmıştır. Sıradaki production
-child Blok 5, **Beton sınıfı ve döküm zaman çizgisi**dir; Blok 6 veya ortak
-attachment v2 bu sıra atlanarak başlatılmaz.
+Blok 1–5 Issue #221, #225, #227, #230 ve #234 ile tamamlanmıştır. Sıradaki
+production child Blok 6, **Beton kelime önerisi/deep-link**tir; ortak attachment
+v2 bu sıra atlanarak başlatılmaz.
 
 ---
 
@@ -393,10 +394,9 @@ recovery `PASS`; günlük rapor `≤3 dk`; haricî not/hatırlatıcıya dönüş
 - #193 Release 0.1 pilotu açık kalır ve mevcut Gün 0 kanıtıyla devam eder.
 - #220 roadmap hizalamasından sonra ilk production child #221 Reminder scheduling
   contract'tır.
-- Birleşik Bugün #225 ile, reminder trash/restore #227 ile tamamlanmıştır.
-  Sıradaki production bloğu Ajanda → reminder kaynak attachment
-  görünürlüğüdür; Beton sınıfı/zaman çizgisi veya Beton keyword önerisi henüz
-  başlamaz.
+- Birleşik Bugün #225 ile, reminder trash/restore #227 ile, Ajanda → reminder
+  kaynak fotoğraf görünürlüğü #230 ile ve Beton sınıfı/zaman çizgisi #234 ile
+  tamamlanmıştır. Sıradaki production bloğu Beton keyword önerisi/deep-link'tir.
 
 ### Sonraki kontrollü sıra
 
@@ -436,9 +436,10 @@ Release 0.1.1 günlük güvenilirlik/sadeleştirme kuyruğu:
 1. #221 Reminder scheduling contract;
 2. birleşik ve sade Bugün görünümü — Issue #225 ile tamamlandı;
 3. reminder recoverable trash/restore — Issue #227 ile tamamlandı;
-4. sıradaki blok: Ajanda → reminder kaynak attachment görünürlüğü;
-5. Beton sınıfı, başlat/bitir ve tek bağlı Ajanda logu;
-6. Beton keyword önerisi/deep-link;
+4. Ajanda → reminder kaynak attachment görünürlüğü — Issue #230 ile tamamlandı;
+5. Beton sınıfı, başlat/bitir ve tek bağlı Ajanda logu — Issue #234 ile
+   tamamlandı;
+6. sıradaki blok: Beton keyword önerisi/deep-link;
 7. ortak attachment v2 ve çoklu medya/dosya;
 8. proje fotoğraf/video albümü;
 9. #204 taşeron/personel/Puantaj UX;

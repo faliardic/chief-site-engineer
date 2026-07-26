@@ -12,6 +12,16 @@ import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:sqflite/sqflite.dart';
 
 abstract interface class ConcreteApplication {
+  Future<List<ProjectConcreteClass>> listConcreteClasses(
+    String projectId, {
+    bool includeArchived = false,
+  });
+  Future<ProjectConcreteClass> createConcreteClass(
+    CreateProjectConcreteClassCommand command,
+  );
+  Future<ProjectConcreteClass> mutateConcreteClassArchive(
+    MutateProjectConcreteClassArchiveCommand command,
+  );
   Future<List<ConcretePour>> listPours(ConcretePourQuery query);
   Future<ConcretePourDetail> createPour(CreateConcretePourCommand command);
   Future<ConcretePourDetail> getPourDetail(String pourId);
@@ -19,6 +29,9 @@ abstract interface class ConcreteApplication {
   Future<ConcretePourDetail> updateCheck(UpdateConcreteCheckCommand command);
   Future<ConcretePourDetail> transitionPour(
     TransitionConcretePourCommand command,
+  );
+  Future<ConcretePourDetail> repairManagedAgenda(
+    RepairConcreteAgendaCommand command,
   );
   Future<ConcretePourDetail> saveTruck(SaveConcreteTruckCommand command);
   Future<ConcretePourDetail> saveSampleSet(
@@ -38,6 +51,26 @@ abstract interface class ConcreteApplication {
     bool share = false,
     bool save = false,
   });
+}
+
+ProjectConcreteClass _concreteClassFromRow(Map<String, Object?> row) {
+  final createdAt = row['created_at']! as String;
+  final updatedAt = row['updated_at']! as String;
+  final archivedAt = row['archived_at'] as String?;
+  for (final value in [createdAt, updatedAt, archivedAt]) {
+    if (value != null) validateCanonicalTimestamp(value, 'Beton sınıfı zamanı');
+  }
+  return ProjectConcreteClass(
+    id: row['id']! as String,
+    projectId: row['project_id']! as String,
+    displayName: row['display_name']! as String,
+    normalizedName: row['normalized_name']! as String,
+    defaultTargetSlump: row['default_target_slump'] as String?,
+    revision: row['revision']! as int,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+    archivedAt: archivedAt,
+  );
 }
 
 ConcretePour _pourFromRow(Map<String, Object?> row) {
@@ -302,6 +335,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
     MobileOperationCoordinator? coordinator,
     ConcreteExportGateway? exportGateway,
     this.beforeConcreteEventInsert,
+    this.beforeManagedAgendaWrite,
   }) : coordinator = coordinator ?? MobileOperationCoordinator(),
        exportGateway =
            exportGateway ?? const UnavailableConcreteExportGateway();
@@ -314,6 +348,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
   final MobileOperationCoordinator coordinator;
   final ConcreteExportGateway exportGateway;
   final ConcreteTransactionHook? beforeConcreteEventInsert;
+  final ConcreteTransactionHook? beforeManagedAgendaWrite;
 
   static const _checkDefinitions = <(String, String, bool)>[
     ('plant_appointment', 'Santral randevusu alındı', true),
@@ -343,6 +378,166 @@ class SqliteConcreteApplication implements ConcreteApplication {
     ('form_removal_note', 'Kalıp alma notu', null),
     ('missing_evidence', 'Eksik kanıtları tamamla', null),
   ];
+
+  @override
+  Future<List<ProjectConcreteClass>> listConcreteClasses(
+    String projectId, {
+    bool includeArchived = false,
+  }) async {
+    validateUuid(projectId, 'Proje kimliği');
+    final now = _readClockOnce();
+    return _withDatabase(now, (database) async {
+      await _requireProject(database, projectId);
+      final rows = await database.query(
+        'project_concrete_classes',
+        where: includeArchived
+            ? 'project_id = ?'
+            : 'project_id = ? AND archived_at IS NULL',
+        whereArgs: [projectId],
+        orderBy: 'normalized_name ASC, id ASC',
+      );
+      return rows.map(_concreteClassFromRow).toList(growable: false);
+    });
+  }
+
+  @override
+  Future<ProjectConcreteClass> createConcreteClass(
+    CreateProjectConcreteClassCommand command,
+  ) async {
+    validateUuid(command.id, 'Beton sınıfı kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    validateUuid(command.projectId, 'Proje kimliği');
+    final displayName = requiredTrimmed(
+      command.displayName,
+      'Beton sınıfı',
+      maxLength: 80,
+    ).replaceAll(RegExp(r'\s+'), ' ');
+    final normalizedName = displayName.toLowerCase();
+    final defaultTargetSlump = optionalTrimmed(
+      command.defaultTargetSlump,
+      'Varsayılan hedef slump',
+      maxLength: 80,
+    );
+    final now = _readClockOnce();
+    final timestamp = CseTimeCodec.encodeUtc(now);
+    return _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        await _requireProject(transaction, command.projectId);
+        final byId = await transaction.query(
+          'project_concrete_classes',
+          where: 'id = ?',
+          whereArgs: [command.id],
+          limit: 1,
+        );
+        if (byId.isNotEmpty) {
+          final current = _concreteClassFromRow(byId.single);
+          if (current.projectId != command.projectId ||
+              current.normalizedName != normalizedName ||
+              current.defaultTargetSlump != defaultTargetSlump) {
+            throw const AgendaValidationFailure(
+              'Beton sınıfı kimliği başka içerikle kullanılıyor.',
+            );
+          }
+          return current;
+        }
+        final duplicate = await transaction.query(
+          'project_concrete_classes',
+          columns: ['id'],
+          where: 'project_id = ? AND normalized_name = ?',
+          whereArgs: [command.projectId, normalizedName],
+          limit: 1,
+        );
+        if (duplicate.isNotEmpty) {
+          throw const AgendaValidationFailure(
+            'Bu Beton sınıfı projede zaten bulunuyor.',
+          );
+        }
+        await transaction.insert('project_concrete_classes', {
+          'id': command.id,
+          'project_id': command.projectId,
+          'display_name': displayName,
+          'normalized_name': normalizedName,
+          'default_target_slump': defaultTargetSlump,
+          'revision': 1,
+          'created_at': timestamp,
+          'updated_at': timestamp,
+        });
+        await transaction.insert('project_concrete_class_events', {
+          'id': command.eventId,
+          'concrete_class_id': command.id,
+          'sequence': 1,
+          'event_type': 'class.created',
+          'occurred_at': timestamp,
+          'payload_json': jsonEncode({
+            'project_id': command.projectId,
+            'display_name': displayName,
+            'default_target_slump': defaultTargetSlump,
+          }),
+        });
+        return _requireConcreteClass(transaction, command.id);
+      });
+    });
+  }
+
+  @override
+  Future<ProjectConcreteClass> mutateConcreteClassArchive(
+    MutateProjectConcreteClassArchiveCommand command,
+  ) async {
+    validateUuid(command.id, 'Beton sınıfı kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    _validateExpectedRevision(command.expectedRevision);
+    final now = _readClockOnce();
+    final timestamp = CseTimeCodec.encodeUtc(now);
+    return _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        var current = await _requireConcreteClass(transaction, command.id);
+        final priorEvent = await transaction.query(
+          'project_concrete_class_events',
+          where: 'id = ? AND concrete_class_id = ?',
+          whereArgs: [command.eventId, command.id],
+          limit: 1,
+        );
+        if (priorEvent.isNotEmpty) return current;
+        _requireRevision(current.revision, command.expectedRevision);
+        final alreadyTarget = command.archive
+            ? current.archivedAt != null
+            : current.archivedAt == null;
+        if (alreadyTarget) return current;
+        final changed = await transaction.update(
+          'project_concrete_classes',
+          {
+            'archived_at': command.archive ? timestamp : null,
+            'updated_at': timestamp,
+            'revision': current.revision + 1,
+          },
+          where: 'id = ? AND revision = ?',
+          whereArgs: [current.id, current.revision],
+        );
+        if (changed != 1) throw _staleFailure();
+        final sequence = Sqflite.firstIntValue(
+          await transaction.rawQuery(
+            'SELECT coalesce(max(sequence), 0) + 1 '
+            'FROM project_concrete_class_events WHERE concrete_class_id = ?',
+            [current.id],
+          ),
+        )!;
+        await transaction.insert('project_concrete_class_events', {
+          'id': command.eventId,
+          'concrete_class_id': current.id,
+          'sequence': sequence,
+          'event_type': command.archive
+              ? 'class.archived'
+              : 'class.restored',
+          'occurred_at': timestamp,
+          'payload_json': jsonEncode({
+            'archived_at': command.archive ? timestamp : null,
+          }),
+        });
+        current = await _requireConcreteClass(transaction, command.id);
+        return current;
+      });
+    });
+  }
 
   @override
   Future<List<ConcretePour>> listPours(ConcretePourQuery query) async {
@@ -434,6 +629,14 @@ class SqliteConcreteApplication implements ConcreteApplication {
           transaction,
           normalized.projectId,
         );
+        final selectedClass = await _requireConcreteClass(
+          transaction,
+          normalized.concreteClassId,
+          projectId: normalized.projectId,
+          activeOnly: true,
+        );
+        final targetSlump =
+            normalized.targetSlump ?? selectedClass.defaultTargetSlump;
         final existing = await transaction.query(
           'concrete_pours',
           where: 'id = ?',
@@ -441,16 +644,17 @@ class SqliteConcreteApplication implements ConcreteApplication {
           limit: 1,
         );
         if (existing.isNotEmpty) {
-          final value = _pourFromRow({
-            ...existing.single,
-            'project_name': projectName,
-          });
-          if (!_sameCreate(value, normalized)) {
+          final detail = await _loadDetail(transaction, normalized.id);
+          if (!_sameCreate(
+            detail.pour,
+            normalized,
+            concreteClassId: detail.concreteClassId,
+          )) {
             throw const AgendaValidationFailure(
               'Beton paketi kimliği başka içerikle kullanılıyor.',
             );
           }
-          return _loadDetail(transaction, normalized.id);
+          return detail;
         }
         final duplicate = await transaction.query(
           'concrete_pours',
@@ -473,8 +677,8 @@ class SqliteConcreteApplication implements ConcreteApplication {
           'floor_name': normalized.floorName,
           'axis_name': normalized.axisName,
           'planned_at': normalized.plannedAt,
-          'concrete_class': normalized.concreteClass,
-          'target_slump': normalized.targetSlump,
+          'concrete_class': selectedClass.displayName,
+          'target_slump': targetSlump,
           'planned_volume_m3': normalized.plannedVolumeM3,
           'ordered_volume_m3': normalized.orderedVolumeM3,
           'plant_name': normalized.plantName,
@@ -490,6 +694,13 @@ class SqliteConcreteApplication implements ConcreteApplication {
           'status': ConcretePourStatus.draft.storageValue,
           'general_note': normalized.generalNote,
           'revision': 1,
+          'created_at': timestamp,
+          'updated_at': timestamp,
+        });
+        await transaction.insert('concrete_pour_context_links', {
+          'concrete_pour_id': normalized.id,
+          'project_id': normalized.projectId,
+          'concrete_class_id': selectedClass.id,
           'created_at': timestamp,
           'updated_at': timestamp,
         });
@@ -520,6 +731,8 @@ class SqliteConcreteApplication implements ConcreteApplication {
             'project_id': normalized.projectId,
             'pour_code': normalized.pourCode,
             'planned_at': normalized.plannedAt,
+            'concrete_class_id': selectedClass.id,
+            'concrete_class_snapshot': selectedClass.displayName,
           },
         );
         for (final definition in _followUpDefinitions) {
@@ -1026,6 +1239,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
     final allowed = switch (pour.status) {
       ConcretePourStatus.draft => {
         ConcretePourStatus.prepared,
+        ConcretePourStatus.pouring,
         ConcretePourStatus.cancelled,
       },
       ConcretePourStatus.prepared => {
@@ -1062,7 +1276,8 @@ class SqliteConcreteApplication implements ConcreteApplication {
     if (target == ConcretePourStatus.draft && reason == null) {
       throw const AgendaValidationFailure('Yeniden açma nedeni zorunludur.');
     }
-    if (target == ConcretePourStatus.prepared) {
+    if (target == ConcretePourStatus.prepared ||
+        target == ConcretePourStatus.pouring) {
       final rows = await database.rawQuery(
         '''
         SELECT count(*) AS value FROM concrete_check_items
@@ -1072,7 +1287,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
       );
       if ((rows.single['value']! as int) > 0) {
         throw const AgendaValidationFailure(
-          'Hazır geçişi için zorunlu checklist kalemleri tamamlanmalıdır.',
+          'Dökümü başlatmak için zorunlu checklist kalemleri tamamlanmalıdır.',
         );
       }
     }
@@ -1578,6 +1793,19 @@ class SqliteConcreteApplication implements ConcreteApplication {
     String pourId,
   ) async {
     final pour = await _requirePour(database, pourId);
+    final contextRows = await database.query(
+      'concrete_pour_context_links',
+      columns: ['concrete_class_id', 'agenda_log_id'],
+      where: 'concrete_pour_id = ? AND project_id = ?',
+      whereArgs: [pourId, pour.projectId],
+      limit: 1,
+    );
+    if (contextRows.isEmpty) {
+      throw const AgendaValidationFailure(
+        'Beton paketi sınıf bağlantısı bulunamadı.',
+      );
+    }
+    final context = contextRows.single;
     final checks = (await database.query(
       'concrete_check_items',
       where: 'concrete_pour_id = ?',
@@ -1655,6 +1883,8 @@ class SqliteConcreteApplication implements ConcreteApplication {
     }
     return ConcretePourDetail(
       pour: pour,
+      concreteClassId: context['concrete_class_id']! as String,
+      agendaLogId: context['agenda_log_id'] as String?,
       checks: checks,
       trucks: trucks,
       sampleSets: samples,
@@ -1732,6 +1962,33 @@ class SqliteConcreteApplication implements ConcreteApplication {
       throw const AgendaValidationFailure('Seçilen proje bulunamadı.');
     }
     return rows.single['name']! as String;
+  }
+
+  Future<ProjectConcreteClass> _requireConcreteClass(
+    DatabaseExecutor database,
+    String concreteClassId, {
+    String? projectId,
+    bool activeOnly = false,
+  }) async {
+    final where = <String>['id = ?'];
+    final args = <Object?>[concreteClassId];
+    if (projectId != null) {
+      where.add('project_id = ?');
+      args.add(projectId);
+    }
+    if (activeOnly) where.add('archived_at IS NULL');
+    final rows = await database.query(
+      'project_concrete_classes',
+      where: where.join(' AND '),
+      whereArgs: args,
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      throw const AgendaValidationFailure(
+        'Seçilen aktif Beton sınıfı bu projede bulunamadı.',
+      );
+    }
+    return _concreteClassFromRow(rows.single);
   }
 
   Future<void> _requireSource(
@@ -1826,6 +2083,199 @@ class SqliteConcreteApplication implements ConcreteApplication {
       'occurred_at': occurredAt,
       'payload_json': jsonEncode(payload),
     });
+  }
+
+  Future<String> _ensureManagedAgenda(
+    Transaction transaction, {
+    required ConcretePour pour,
+    required String startedAt,
+    required String occurredAt,
+    required String concreteEventId,
+  }) async {
+    final links = await transaction.query(
+      'concrete_pour_context_links',
+      columns: ['agenda_log_id'],
+      where: 'concrete_pour_id = ? AND project_id = ?',
+      whereArgs: [pour.id, pour.projectId],
+      limit: 1,
+    );
+    if (links.isEmpty) {
+      throw const AgendaValidationFailure(
+        'Beton paketi bağlam bağlantısı bulunamadı.',
+      );
+    }
+    if (links.single['agenda_log_id'] case final String existing) {
+      return existing;
+    }
+    await beforeManagedAgendaWrite?.call(transaction);
+    final agendaLogId = _stableUuid('concrete-managed-agenda:${pour.id}');
+    final summary = await _managedAgendaSummary(
+      transaction,
+      pour: pour,
+      startedAt: startedAt,
+    );
+    await transaction.insert('field_observations', {
+      'id': agendaLogId,
+      'project_id': pour.projectId,
+      'observed_at': startedAt,
+      'created_at': occurredAt,
+      'updated_at': occurredAt,
+      'category': AgendaCategory.concrete.storageValue,
+      'description': summary.description,
+      'location': pour.elementLocation,
+      'notes': summary.notes,
+      'revision': 1,
+    });
+    await transaction.insert('observation_events', {
+      'id': _stableUuid('concrete-managed-agenda-started:${pour.id}'),
+      'observation_id': agendaLogId,
+      'project_id': pour.projectId,
+      'event_type': 'concrete_pour.started',
+      'occurred_at': startedAt,
+      'payload_json': jsonEncode({
+        'concrete_pour_id': pour.id,
+        'actual_started_at': startedAt,
+        'managed_by': 'concrete_pour',
+      }),
+    });
+    final changed = await transaction.update(
+      'concrete_pour_context_links',
+      {'agenda_log_id': agendaLogId, 'updated_at': occurredAt},
+      where:
+          'concrete_pour_id = ? AND project_id = ? AND agenda_log_id IS NULL',
+      whereArgs: [pour.id, pour.projectId],
+    );
+    if (changed != 1) {
+      throw const AgendaValidationFailure(
+        'Beton–Ajanda bağlantısı güvenli biçimde kurulamadı.',
+      );
+    }
+    await _insertConcreteEvent(
+      transaction,
+      id: concreteEventId,
+      pourId: pour.id,
+      eventType: 'agenda.linked',
+      occurredAt: occurredAt,
+      payload: {'agenda_log_id': agendaLogId, 'managed': true},
+    );
+    return agendaLogId;
+  }
+
+  Future<void> _syncManagedAgenda(
+    Transaction transaction, {
+    required ConcretePour pour,
+    required String agendaLogId,
+    required String startedAt,
+    required String? endedAt,
+    required String occurredAt,
+    required String eventId,
+    required String eventType,
+    required Map<String, Object?> eventPayload,
+    String? statusNote,
+  }) async {
+    await beforeManagedAgendaWrite?.call(transaction);
+    final rows = await transaction.query(
+      'field_observations',
+      where: 'id = ? AND project_id = ?',
+      whereArgs: [agendaLogId, pour.projectId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      throw const AgendaValidationFailure(
+        'Yönetilen Ajanda kaydı bulunamadı.',
+      );
+    }
+    final summary = await _managedAgendaSummary(
+      transaction,
+      pour: pour,
+      startedAt: startedAt,
+      endedAt: endedAt,
+      statusNote: statusNote,
+    );
+    final revision = rows.single['revision']! as int;
+    final changed = await transaction.update(
+      'field_observations',
+      {
+        'observed_at': startedAt,
+        'description': summary.description,
+        'location': pour.elementLocation,
+        'notes': summary.notes,
+        'updated_at': occurredAt,
+        'revision': revision + 1,
+      },
+      where: 'id = ? AND project_id = ? AND revision = ?',
+      whereArgs: [agendaLogId, pour.projectId, revision],
+    );
+    if (changed != 1) {
+      throw const AgendaValidationFailure(
+        'Yönetilen Ajanda kaydı başka bir işlemle değişti.',
+      );
+    }
+    await transaction.insert('observation_events', {
+      'id': eventId,
+      'observation_id': agendaLogId,
+      'project_id': pour.projectId,
+      'event_type': eventType,
+      'occurred_at': occurredAt,
+      'payload_json': jsonEncode({
+        'concrete_pour_id': pour.id,
+        'managed_by': 'concrete_pour',
+        ...eventPayload,
+      }),
+    });
+    await transaction.update(
+      'concrete_pour_context_links',
+      {'updated_at': occurredAt},
+      where: 'concrete_pour_id = ? AND agenda_log_id = ?',
+      whereArgs: [pour.id, agendaLogId],
+    );
+  }
+
+  Future<({String description, String notes})> _managedAgendaSummary(
+    DatabaseExecutor database, {
+    required ConcretePour pour,
+    required String startedAt,
+    String? endedAt,
+    String? statusNote,
+  }) async {
+    final rows = await database.rawQuery(
+      '''
+      SELECT
+        coalesce(sum(CASE WHEN result IN ('received', 'partial')
+          THEN volume_m3 ELSE 0 END), 0.0) AS actual_volume,
+        count(*) AS truck_count
+      FROM concrete_trucks
+      WHERE concrete_pour_id = ?
+      ''',
+      [pour.id],
+    );
+    final actualVolume = (rows.single['actual_volume']! as num).toDouble();
+    final truckCount = rows.single['truck_count']! as int;
+    final parts = <String>[
+      pour.pourCode,
+      pour.elementLocation,
+      pour.concreteClass,
+      'Planlanan ${pour.plannedVolumeM3.toStringAsFixed(2)} m³',
+    ];
+    if (endedAt != null) {
+      final duration = CseTimeCodec.decodeCanonicalUtc(
+        endedAt,
+      ).difference(CseTimeCodec.decodeCanonicalUtc(startedAt)).inMinutes;
+      parts.addAll([
+        'Gerçek ${actualVolume.toStringAsFixed(2)} m³',
+        '$truckCount mikser',
+        'Süre $duration dk',
+      ]);
+    }
+    if (statusNote != null) parts.add(statusNote);
+    final notes = <String>[
+      'Beton paketi tarafından yönetiliyor.',
+      if (pour.generalNote?.trim().isNotEmpty ?? false)
+        'Genel not: ${pour.generalNote!.trim()}',
+      if (pour.varianceNote?.trim().isNotEmpty ?? false)
+        'Metraj farkı notu: ${pour.varianceNote!.trim()}',
+    ].join('\n');
+    return (description: parts.join(' • '), notes: notes);
   }
 
   Future<bool> _isIdempotentEvent(
@@ -1947,9 +2397,9 @@ class SqliteConcreteApplication implements ConcreteApplication {
     validateUuid(command.id, 'Beton paketi kimliği');
     validateUuid(command.eventId, 'Event kimliği');
     validateUuid(command.projectId, 'Proje kimliği');
+    validateUuid(command.concreteClassId, 'Beton sınıfı kimliği');
     requiredTrimmed(command.pourCode, 'Döküm kodu', maxLength: 80);
     requiredTrimmed(command.elementLocation, 'Mahal/eleman', maxLength: 240);
-    requiredTrimmed(command.concreteClass, 'Beton sınıfı', maxLength: 80);
     validateCanonicalTimestamp(command.plannedAt, 'Planlanan döküm zamanı');
     _validateVolume(command.plannedVolumeM3, 'Planlanan metraj');
     if (command.orderedVolumeM3 != null) {
@@ -2007,11 +2457,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
       maxLength: 240,
     ),
     plannedAt: value.plannedAt,
-    concreteClass: requiredTrimmed(
-      value.concreteClass,
-      'Beton sınıfı',
-      maxLength: 80,
-    ),
+    concreteClassId: value.concreteClassId,
     plannedVolumeM3: value.plannedVolumeM3,
     blockName: optionalTrimmed(value.blockName, 'Blok', maxLength: 80),
     floorName: optionalTrimmed(value.floorName, 'Kat', maxLength: 80),
@@ -2077,11 +2523,6 @@ class SqliteConcreteApplication implements ConcreteApplication {
     'floor_name': optionalTrimmed(value.floorName, 'Kat', maxLength: 80),
     'axis_name': optionalTrimmed(value.axisName, 'Aks', maxLength: 120),
     'planned_at': value.plannedAt,
-    'concrete_class': requiredTrimmed(
-      value.concreteClass,
-      'Beton sınıfı',
-      maxLength: 80,
-    ),
     'target_slump': optionalTrimmed(
       value.targetSlump,
       'Hedef slump',
@@ -2144,12 +2585,16 @@ class SqliteConcreteApplication implements ConcreteApplication {
     ),
   };
 
-  bool _sameCreate(ConcretePour current, CreateConcretePourCommand value) =>
+  bool _sameCreate(
+    ConcretePour current,
+    CreateConcretePourCommand value, {
+    required String concreteClassId,
+  }) =>
       current.projectId == value.projectId &&
       current.pourCode == value.pourCode &&
       current.elementLocation == value.elementLocation &&
       current.plannedAt == value.plannedAt &&
-      current.concreteClass == value.concreteClass &&
+      concreteClassId == value.concreteClassId &&
       current.plannedVolumeM3 == value.plannedVolumeM3;
 
   void _validateTruck(SaveConcreteTruckCommand command) {
@@ -2725,6 +3170,8 @@ class SqliteConcreteApplication implements ConcreteApplication {
     }
     return ConcretePourDetail(
       pour: detail.pour,
+      concreteClassId: detail.concreteClassId,
+      agendaLogId: detail.agendaLogId,
       checks: detail.checks,
       trucks: detail.trucks,
       sampleSets: detail.sampleSets,
@@ -2748,6 +3195,16 @@ class SqliteConcreteApplication implements ConcreteApplication {
         final current = await _requirePour(transaction, command.id);
         _requireRevision(current.revision, command.expectedRevision);
         _requireMutable(current);
+        if (requiredTrimmed(
+              command.concreteClass,
+              'Beton sınıfı',
+              maxLength: 80,
+            ) !=
+            current.concreteClass) {
+          throw const AgendaValidationFailure(
+            'Paket Beton sınıfı snapshot değeri sonradan değiştirilemez.',
+          );
+        }
         if (await _isIdempotentEvent(
           transaction,
           command.eventId,
@@ -2762,7 +3219,6 @@ class SqliteConcreteApplication implements ConcreteApplication {
           'floor_name': current.floorName,
           'axis_name': current.axisName,
           'planned_at': current.plannedAt,
-          'concrete_class': current.concreteClass,
           'target_slump': current.targetSlump,
           'planned_volume_m3': current.plannedVolumeM3,
           'ordered_volume_m3': current.orderedVolumeM3,
@@ -3072,7 +3528,6 @@ class SqliteConcreteApplication implements ConcreteApplication {
     final detail = await _withDatabase(now, (database) {
       return database.transaction((transaction) async {
         final pour = await _requirePour(transaction, command.pourId);
-        _requireRevision(pour.revision, command.expectedRevision);
         if (await _isIdempotentEvent(
           transaction,
           command.eventId,
@@ -3080,6 +3535,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
         )) {
           return _loadDetail(transaction, command.pourId);
         }
+        _requireRevision(pour.revision, command.expectedRevision);
         if (pour.status == command.targetStatus) {
           return _loadDetail(transaction, command.pourId);
         }
@@ -3101,6 +3557,16 @@ class SqliteConcreteApplication implements ConcreteApplication {
             values['actual_started_at'] = pour.actualStartedAt ?? timestamp;
           case ConcretePourStatus.poured:
             eventType = 'pour.finished';
+            if (pour.actualStartedAt == null) {
+              throw const AgendaValidationFailure(
+                'Döküm başlamadan bitirilemez.',
+              );
+            }
+            if (timestamp.compareTo(pour.actualStartedAt!) < 0) {
+              throw const AgendaValidationFailure(
+                'Döküm bitişi başlangıçtan önce olamaz.',
+              );
+            }
             values['actual_ended_at'] = pour.actualEndedAt ?? timestamp;
           case ConcretePourStatus.followUp:
             eventType = 'pour.follow_up_started';
@@ -3130,6 +3596,92 @@ class SqliteConcreteApplication implements ConcreteApplication {
             'reason': reason,
           },
         );
+        if (command.targetStatus == ConcretePourStatus.pouring) {
+          final startedAt = pour.actualStartedAt ?? timestamp;
+          await _ensureManagedAgenda(
+            transaction,
+            pour: pour,
+            startedAt: startedAt,
+            occurredAt: timestamp,
+            concreteEventId: _stableUuid(
+              'concrete-agenda-linked:${pour.id}',
+            ),
+          );
+        } else if (command.targetStatus == ConcretePourStatus.poured) {
+          final startedAt = pour.actualStartedAt!;
+          final agendaLogId = await _ensureManagedAgenda(
+            transaction,
+            pour: pour,
+            startedAt: startedAt,
+            occurredAt: timestamp,
+            concreteEventId: _stableUuid(
+              'concrete-agenda-linked:${pour.id}',
+            ),
+          );
+          final endedAt = pour.actualEndedAt ?? timestamp;
+          await _syncManagedAgenda(
+            transaction,
+            pour: pour,
+            agendaLogId: agendaLogId,
+            startedAt: startedAt,
+            endedAt: endedAt,
+            occurredAt: timestamp,
+            eventId: _stableUuid(
+              'concrete-managed-agenda-completed:${pour.id}',
+            ),
+            eventType: 'concrete_pour.completed',
+            eventPayload: {'actual_ended_at': endedAt},
+          );
+        } else if (command.targetStatus == ConcretePourStatus.cancelled &&
+            pour.actualStartedAt != null) {
+          final agendaLogId = await _ensureManagedAgenda(
+            transaction,
+            pour: pour,
+            startedAt: pour.actualStartedAt!,
+            occurredAt: timestamp,
+            concreteEventId: _stableUuid(
+              'concrete-agenda-linked:${pour.id}',
+            ),
+          );
+          await _syncManagedAgenda(
+            transaction,
+            pour: pour,
+            agendaLogId: agendaLogId,
+            startedAt: pour.actualStartedAt!,
+            endedAt: pour.actualEndedAt,
+            occurredAt: timestamp,
+            eventId: _stableUuid(
+              'concrete-managed-agenda-cancelled:${command.eventId}',
+            ),
+            eventType: 'concrete_pour.cancelled',
+            eventPayload: {'reason': reason},
+            statusNote: 'İptal edildi: $reason',
+          );
+        } else if (command.targetStatus == ConcretePourStatus.draft &&
+            pour.actualStartedAt != null) {
+          final agendaLogId = await _ensureManagedAgenda(
+            transaction,
+            pour: pour,
+            startedAt: pour.actualStartedAt!,
+            occurredAt: timestamp,
+            concreteEventId: _stableUuid(
+              'concrete-agenda-linked:${pour.id}',
+            ),
+          );
+          await _syncManagedAgenda(
+            transaction,
+            pour: pour,
+            agendaLogId: agendaLogId,
+            startedAt: pour.actualStartedAt!,
+            endedAt: pour.actualEndedAt,
+            occurredAt: timestamp,
+            eventId: _stableUuid(
+              'concrete-managed-agenda-reopened:${command.eventId}',
+            ),
+            eventType: 'concrete_pour.reopened',
+            eventPayload: {'reason': reason},
+          );
+        }
         if (command.targetStatus == ConcretePourStatus.closed ||
             command.targetStatus == ConcretePourStatus.cancelled) {
           await _completeAllLinkedReminders(
@@ -3152,5 +3704,68 @@ class SqliteConcreteApplication implements ConcreteApplication {
     });
     await _safeReconcileNotifications();
     return detail;
+  }
+
+  @override
+  Future<ConcretePourDetail> repairManagedAgenda(
+    RepairConcreteAgendaCommand command,
+  ) async {
+    validateUuid(command.pourId, 'Beton paketi kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    _validateExpectedRevision(command.expectedRevision);
+    final now = _readClockOnce();
+    final timestamp = CseTimeCodec.encodeUtc(now);
+    return _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final pour = await _requirePour(transaction, command.pourId);
+        if (await _isIdempotentEvent(
+          transaction,
+          command.eventId,
+          command.pourId,
+        )) {
+          return _loadDetail(transaction, command.pourId);
+        }
+        _requireRevision(pour.revision, command.expectedRevision);
+        if (pour.actualStartedAt == null) {
+          throw const AgendaValidationFailure(
+            'Başlamamış Beton paketi için Ajanda onarımı gerekmez.',
+          );
+        }
+        final link = await transaction.query(
+          'concrete_pour_context_links',
+          columns: ['agenda_log_id'],
+          where: 'concrete_pour_id = ?',
+          whereArgs: [pour.id],
+          limit: 1,
+        );
+        if (link.single['agenda_log_id'] != null) {
+          return _loadDetail(transaction, command.pourId);
+        }
+        await _advancePour(transaction, pour, timestamp);
+        final agendaLogId = await _ensureManagedAgenda(
+          transaction,
+          pour: pour,
+          startedAt: pour.actualStartedAt!,
+          occurredAt: timestamp,
+          concreteEventId: command.eventId,
+        );
+        if (pour.actualEndedAt != null) {
+          await _syncManagedAgenda(
+            transaction,
+            pour: pour,
+            agendaLogId: agendaLogId,
+            startedAt: pour.actualStartedAt!,
+            endedAt: pour.actualEndedAt,
+            occurredAt: timestamp,
+            eventId: _stableUuid(
+              'concrete-managed-agenda-completed:${pour.id}',
+            ),
+            eventType: 'concrete_pour.completed',
+            eventPayload: {'actual_ended_at': pour.actualEndedAt},
+          );
+        }
+        return _loadDetail(transaction, command.pourId);
+      });
+    });
   }
 }

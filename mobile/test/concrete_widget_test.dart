@@ -4,6 +4,7 @@ import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/concrete_models.dart';
+import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_form_page.dart';
@@ -16,12 +17,25 @@ const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const pourId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const truckId = 'ffffffff-ffff-4fff-8fff-fffffffffff1';
 const attachmentId = 'ffffffff-ffff-4fff-8fff-fffffffffff2';
+const concreteClassId = 'ffffffff-ffff-4fff-8fff-fffffffffff3';
+const agendaLogId = 'ffffffff-ffff-4fff-8fff-fffffffffff4';
 const project = MobileProject(
   id: projectId,
   name: 'Uzun Proje Adı',
   createdAt: '2026-07-19T07:00:00Z',
   updatedAt: '2026-07-19T07:00:00Z',
   revision: 1,
+);
+const concreteClass = ProjectConcreteClass(
+  id: concreteClassId,
+  projectId: projectId,
+  displayName: 'C30/37',
+  normalizedName: 'c30/37',
+  defaultTargetSlump: 'S3',
+  revision: 1,
+  createdAt: '2026-07-19T07:00:00Z',
+  updatedAt: '2026-07-19T07:00:00Z',
+  archivedAt: null,
 );
 
 void main() {
@@ -44,6 +58,7 @@ void main() {
           ),
         ),
       );
+      await tester.pumpAndSettle();
       await tester.pumpAndSettle();
       expect(find.text('Yeni döküm'), findsOneWidget);
       expect(find.textContaining('BT-001'), findsOneWidget);
@@ -71,32 +86,42 @@ void main() {
         ),
         'BT-187',
       );
-      await tester.tap(find.text('Beton paketini oluştur'));
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Beton paketini oluştur'),
+          )
+          .onPressed!();
       await tester.pump();
       expect(find.text('BT-187'), findsOneWidget);
       expect(find.text('Mahal / eleman zorunludur.'), findsOneWidget);
 
+      await tester.scrollUntilVisible(
+        find.widgetWithText(TextFormField, 'Mahal / eleman'),
+        -300,
+        scrollable: find.byType(Scrollable).last,
+      );
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Mahal / eleman'),
         'KOLON A1',
       );
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Beton sınıfı'),
-        'C30/37',
-      );
+      await tester.tap(find.byKey(const Key('concrete-class-selector')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('C30/37').last);
+      await tester.pumpAndSettle();
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Planlanan metraj (m³)'),
         '20',
       );
-      final save = find.text('Beton paketini oluştur');
       tester.testTextInput.hide();
       await tester.pump();
-      await tester.drag(find.byType(ListView), const Offset(0, -500));
-      await tester.pump();
-      await tester.tap(save);
-      await tester.tap(save);
+      final saveButton = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Beton paketini oluştur'),
+      );
+      saveButton.onPressed!();
+      saveButton.onPressed!();
       await tester.pump();
       expect(concrete.createCalls, 1);
+      expect(concrete.lastCreateCommand!.targetSlump, 'S3');
       concrete.completeCreate();
       await tester.pumpAndSettle();
     },
@@ -135,11 +160,184 @@ void main() {
         await tester.scrollUntilVisible(finder, 300);
         expect(finder, findsOneWidget);
       }
-      await tester.scrollUntilVisible(find.text('İrsaliye taraması'), -300);
-      await tester.tap(find.text('İrsaliye taraması'));
+      await tester.scrollUntilVisible(
+        find.text('İrsaliye taraması'),
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      final attachmentTile = find.ancestor(
+        of: find.text('İrsaliye taraması'),
+        matching: find.byType(ListTile),
+      );
+      tester.widget<ListTile>(attachmentTile).onTap!();
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('concrete-full-image')), findsOneWidget);
       expect(find.byType(InteractiveViewer), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('form içinden yeni proje Beton sınıfı eklenip seçilir', (
+    tester,
+  ) async {
+    final concrete = _FakeConcrete();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ConcretePourFormPage(
+          concrete: concrete,
+          projects: const [project],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    tester
+        .widget<TextButton>(
+          find.byKey(const Key('add-concrete-class')),
+        )
+        .onPressed!();
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('new-concrete-class-name')),
+      'C35/45',
+    );
+    await tester.tap(find.byKey(const Key('save-concrete-class')));
+    await tester.pumpAndSettle();
+    expect(concrete.createClassCalls, 1);
+    expect(concrete.lastCreateClassCommand!.projectId, projectId);
+    expect(concrete.lastCreateClassCommand!.displayName, 'C35/45');
+    expect(find.text('C35/45'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'three-stage timeline drives start finish and Agenda deep-link safely',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final concrete = _FakeConcrete(agendaLinked: true);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+            child: ConcretePourDetailPage(
+              concrete: concrete,
+              agenda: _FakeAgenda(),
+              attachments: _picker(),
+              pourId: pourId,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Planlandı'), findsOneWidget);
+      final start = find.byKey(const Key('start-concrete-pour'));
+      expect(tester.getSize(start).height, greaterThanOrEqualTo(44));
+      await tester.tap(start);
+      await tester.pumpAndSettle();
+      expect(find.text('Devam ediyor'), findsOneWidget);
+      expect(find.byKey(const Key('start-concrete-pour')), findsNothing);
+      expect(find.byKey(const Key('finish-concrete-pour')), findsOneWidget);
+      expect(find.byKey(const Key('concrete-actual-start')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('finish-concrete-pour')));
+      await tester.pumpAndSettle();
+      expect(find.text('Tamamlandı'), findsOneWidget);
+      expect(find.byKey(const Key('finish-concrete-pour')), findsNothing);
+      expect(find.byKey(const Key('concrete-actual-end')), findsOneWidget);
+      expect(find.textContaining('30 dk'), findsOneWidget);
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const Key('open-managed-agenda')),
+          )
+          .onPressed!();
+      await tester.pumpAndSettle();
+      expect(find.byType(LogDetailPage), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'reopened started draft resumes without replacing its first timestamp',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final concrete = _FakeConcrete(
+        started: true,
+        status: ConcretePourStatus.draft,
+        agendaLinked: true,
+      );
+      final firstStartedAt = concrete._currentDetail.pour.actualStartedAt;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+            child: ConcretePourDetailPage(
+              concrete: concrete,
+              agenda: _FakeAgenda(),
+              attachments: _picker(),
+              pourId: pourId,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Devam ediyor'), findsOneWidget);
+      expect(find.byKey(const Key('start-concrete-pour')), findsNothing);
+      final resume = find.byKey(const Key('resume-concrete-pour'));
+      expect(resume, findsOneWidget);
+      expect(tester.getSize(resume).height, greaterThanOrEqualTo(44));
+
+      await tester.tap(resume);
+      await tester.pumpAndSettle();
+      expect(
+        concrete.lastTransitionCommand!.targetStatus,
+        ConcretePourStatus.pouring,
+      );
+      expect(
+        concrete._currentDetail.pour.actualStartedAt,
+        firstStartedAt,
+      );
+      expect(find.byKey(const Key('resume-concrete-pour')), findsNothing);
+      expect(find.byKey(const Key('finish-concrete-pour')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'historical reopened pour with an end never offers resume',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final concrete = _FakeConcrete(
+        started: true,
+        ended: true,
+        status: ConcretePourStatus.draft,
+        agendaLinked: true,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+            child: ConcretePourDetailPage(
+              concrete: concrete,
+              agenda: _FakeAgenda(),
+              attachments: _picker(),
+              pourId: pourId,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Tamamlandı'), findsOneWidget);
+      expect(find.byKey(const Key('resume-concrete-pour')), findsNothing);
+      expect(find.byKey(const Key('start-concrete-pour')), findsNothing);
+      expect(find.byKey(const Key('finish-concrete-pour')), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -309,7 +507,13 @@ Future<void> _pumpDetail(WidgetTester tester, _FakeConcrete concrete) async {
 
 Future<void> _openExistingTruck(WidgetTester tester) async {
   final truck = find.textContaining('#1 34 CSE 196');
-  await tester.scrollUntilVisible(truck, 300);
+  await tester.scrollUntilVisible(
+    truck,
+    300,
+    scrollable: find.byType(Scrollable).last,
+  );
+  await tester.ensureVisible(truck);
+  await tester.pump();
   await tester.tap(truck);
   await tester.pumpAndSettle();
   expect(find.text('Mikseri düzenle'), findsOneWidget);
@@ -339,15 +543,42 @@ class _EmptyPicker implements AttachmentPickerPort {
 }
 
 class _FakeConcrete implements ConcreteApplication {
-  _FakeConcrete({this.delayCreate = false, this.failNextTruckSave = false});
+  _FakeConcrete({
+    this.delayCreate = false,
+    this.failNextTruckSave = false,
+    this.started = false,
+    this.ended = false,
+    ConcretePourStatus? status,
+    this.agendaLinked = false,
+  }) : status =
+           status ??
+           (ended
+               ? ConcretePourStatus.poured
+               : started
+               ? ConcretePourStatus.pouring
+               : ConcretePourStatus.draft);
   final bool delayCreate;
   bool failNextTruckSave;
+  bool started;
+  bool ended;
+  ConcretePourStatus status;
+  final bool agendaLinked;
   final _completer = Completer<ConcretePourDetail>();
   int createCalls = 0;
+  int createClassCalls = 0;
   int saveTruckCalls = 0;
+  CreateConcretePourCommand? lastCreateCommand;
+  CreateProjectConcreteClassCommand? lastCreateClassCommand;
   SaveConcreteTruckCommand? lastTruckCommand;
+  TransitionConcretePourCommand? lastTransitionCommand;
 
-  ConcretePourDetail get _currentDetail => _detail(lastTruckCommand);
+  ConcretePourDetail get _currentDetail => _detail(
+    lastTruckCommand,
+    started: started,
+    ended: ended,
+    status: status,
+    agendaLinked: agendaLinked,
+  );
 
   void completeCreate() {
     if (!_completer.isCompleted) _completer.complete(_currentDetail);
@@ -356,8 +587,51 @@ class _FakeConcrete implements ConcreteApplication {
   @override
   Future<ConcretePourDetail> createPour(CreateConcretePourCommand command) {
     createCalls += 1;
+    lastCreateCommand = command;
     return delayCreate ? _completer.future : Future.value(_currentDetail);
   }
+
+  @override
+  Future<List<ProjectConcreteClass>> listConcreteClasses(
+    String projectId, {
+    bool includeArchived = false,
+  }) async => [
+    ProjectConcreteClass(
+      id: concreteClass.id,
+      projectId: projectId,
+      displayName: concreteClass.displayName,
+      normalizedName: concreteClass.normalizedName,
+      defaultTargetSlump: concreteClass.defaultTargetSlump,
+      revision: concreteClass.revision,
+      createdAt: concreteClass.createdAt,
+      updatedAt: concreteClass.updatedAt,
+      archivedAt: null,
+    ),
+  ];
+
+  @override
+  Future<ProjectConcreteClass> createConcreteClass(
+    CreateProjectConcreteClassCommand command,
+  ) async {
+    createClassCalls += 1;
+    lastCreateClassCommand = command;
+    return ProjectConcreteClass(
+      id: command.id,
+      projectId: command.projectId,
+      displayName: command.displayName,
+      normalizedName: command.displayName.toLowerCase(),
+      defaultTargetSlump: command.defaultTargetSlump,
+      revision: 1,
+      createdAt: '2026-07-19T07:00:00Z',
+      updatedAt: '2026-07-19T07:00:00Z',
+      archivedAt: null,
+    );
+  }
+
+  @override
+  Future<ProjectConcreteClass> mutateConcreteClassArchive(
+    MutateProjectConcreteClassArchiveCommand command,
+  ) => throw UnimplementedError();
 
   @override
   Future<ConcretePourDetail> getPourDetail(String pourId) async =>
@@ -414,6 +688,20 @@ class _FakeConcrete implements ConcreteApplication {
   @override
   Future<ConcretePourDetail> transitionPour(
     TransitionConcretePourCommand command,
+  ) async {
+    lastTransitionCommand = command;
+    status = command.targetStatus;
+    if (command.targetStatus == ConcretePourStatus.pouring) {
+      started = true;
+    }
+    if (command.targetStatus == ConcretePourStatus.poured) {
+      ended = true;
+    }
+    return _currentDetail;
+  }
+  @override
+  Future<ConcretePourDetail> repairManagedAgenda(
+    RepairConcreteAgendaCommand command,
   ) => throw UnimplementedError();
   @override
   Future<ConcretePourDetail> updateCheck(UpdateConcreteCheckCommand command) =>
@@ -433,11 +721,38 @@ class _FakeAgenda implements AgendaApplication {
 
   @override
   Future<List<MobileProject>> listProjects() async => const [project];
+
+  @override
+  Future<AgendaLogDetail> getAgendaLogDetail(String logId) async =>
+      AgendaLogDetail(
+        log: AgendaLog(
+          id: logId,
+          projectId: projectId,
+          projectName: project.name,
+          observedAt: '2026-07-19T09:00:00Z',
+          createdAt: '2026-07-19T09:00:00Z',
+          updatedAt: '2026-07-19T09:00:00Z',
+          category: AgendaCategory.concrete,
+          description: 'BT-001 • KOLON A1 • C30/37',
+          location: 'KOLON A1',
+          notes: 'Beton paketi tarafından yönetiliyor.',
+          revision: 1,
+        ),
+        reminders: const [],
+        managedConcretePourId: pourId,
+      );
+
   @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-ConcretePourDetail _detail([SaveConcreteTruckCommand? savedTruck]) {
+ConcretePourDetail _detail(
+  SaveConcreteTruckCommand? savedTruck, {
+  bool started = false,
+  bool ended = false,
+  ConcretePourStatus? status,
+  bool agendaLinked = false,
+}) {
   final pour = ConcretePour(
     id: pourId,
     projectId: projectId,
@@ -448,8 +763,8 @@ ConcretePourDetail _detail([SaveConcreteTruckCommand? savedTruck]) {
     floorName: '1',
     axisName: 'A/1',
     plannedAt: '2026-07-19T09:00:00Z',
-    actualStartedAt: null,
-    actualEndedAt: null,
+    actualStartedAt: started ? '2026-07-19T09:00:00Z' : null,
+    actualEndedAt: ended ? '2026-07-19T09:30:00Z' : null,
     concreteClass: 'C30/37',
     targetSlump: null,
     plannedVolumeM3: 20,
@@ -464,7 +779,13 @@ ConcretePourDetail _detail([SaveConcreteTruckCommand? savedTruck]) {
     laboratoryAppointment: null,
     inspectionNotifiedAt: null,
     inspectionNotifiedPerson: null,
-    status: ConcretePourStatus.draft,
+    status:
+        status ??
+        (ended
+            ? ConcretePourStatus.poured
+            : started
+            ? ConcretePourStatus.pouring
+            : ConcretePourStatus.draft),
     generalNote: null,
     sampleExceptionReason: null,
     varianceNote: null,
@@ -585,6 +906,8 @@ ConcretePourDetail _detail([SaveConcreteTruckCommand? savedTruck]) {
   );
   return ConcretePourDetail(
     pour: pour,
+    concreteClassId: concreteClassId,
+    agendaLogId: agendaLinked ? agendaLogId : null,
     checks: const [check],
     trucks: trucks,
     sampleSets: const [],
@@ -610,7 +933,7 @@ ConcretePourDetail _detail([SaveConcreteTruckCommand? savedTruck]) {
           .length,
       firstTruckAt: null,
       lastTruckAt: null,
-      pourDurationMinutes: null,
+      pourDurationMinutes: ended ? 30 : null,
       sampleSetCount: 0,
       sampleCount: 0,
       pendingCheckCount: 1,

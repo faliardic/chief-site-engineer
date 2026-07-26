@@ -446,12 +446,14 @@ class AgendaLogDetail {
     required this.reminders,
     this.photos = const [],
     this.events = const [],
+    this.managedConcretePourId,
   });
 
   final AgendaLog log;
   final List<MobileReminder> reminders;
   final List<AgendaLogPhoto> photos;
   final List<AppendOnlyEvent> events;
+  final String? managedConcretePourId;
 }
 
 class AgendaPhotoDraft {

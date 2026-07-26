@@ -3273,3 +3273,36 @@
   korunur; schema 9 trash/event geçmişini eksiksiz round-trip taşır.
 - Kalıcı silme, retention, attachment byte temizliği ve source cascade ayrı
   gelecekteki politika/Issue olmadan eklenmez.
+
+## Issue 234 — Beton Sınıfı ve Yönetilen Ajanda Projeksiyonu
+
+- Mobil schema `10`, paket snapshot'ını değiştirmeden proje Beton sınıfı
+  kataloğunu ve paket bağlamını ayrı tablolarda tutar. Paket–sınıf ve
+  paket–Ajanda ilişkileri `project_id` composite FK sınırındadır; aynı Ajanda
+  kaydı yalnız bir Beton paketine bağlanabilir.
+- Legacy `concrete_class` değerleri trim, ardışık boşluk ve case normalizasyonu
+  ile proje bazında deterministik seed edilir. Snapshot metni aynen korunur;
+  whitespace-empty legacy değer migration'ı sessiz düzeltmek yerine atomik
+  olarak fail-closed durdurur.
+- Katalog archive/restore optimistic revision ve append-only event üretir.
+  Arşivli sınıf yeni pakette seçilemez; eski paket snapshot ve sınıf bağlantısı
+  değişmez. Fiziksel silme yoktur.
+- Kullanıcı lifecycle'ı timestamp'lerden türeyen `Planlandı → Devam ediyor →
+  Tamamlandı` projection'ıdır; ayrıntılı Beton status enum'u checklist, takip ve
+  kapanış kuralları için korunur.
+- `Dökümü başlat`, draft veya prepared pakette aynı zorunlu checklist
+  validation'ını uygular; ilk `actual_started_at` değerini korur. `Dökümü
+  bitir`, en az bir mikser ister ve ilk `actual_ended_at` değerini korur;
+  follow-up veya closed durumuna otomatik geçmez.
+- İlk başarılı başlangıç Beton update/event, Ajanda row/event ve linki tek
+  SQLite transaction'da oluşturur. Bitiş aynı Ajanda kaydını günceller; ikinci
+  log veya Ajanda kaynaklı ek reminder üretmez.
+- Yönetilen Ajanda kaydı Beton aggregate'inin saha günlüğü projeksiyonudur.
+  Ajanda application bağımsız ana metin editini ve archive/restore mutation'ını
+  reddeder; UI bunu açıkça gösterip kaynak Beton paketine döner.
+- Başlamış legacy paketin eksik Ajanda bağlantısı gerçek başlangıç/bitiş
+  zamanlarıyla idempotent onarılır. İptal ve reopen gerçek timestamp geçmişini
+  silmez; sahte bitiş üretilmez.
+- `.csebackup` format `1` değişmez. Schema `1–9` paketleri schema `10`a
+  migrate edilir; schema 10 katalog, bağ, gerçek zaman ve append-only geçmişi
+  round-trip taşır.
