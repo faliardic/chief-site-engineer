@@ -321,6 +321,12 @@ class FakeAgendaApplication
       ReminderMutationAction.complete => ReminderStatus.completed,
       ReminderMutationAction.cancel => ReminderStatus.cancelled,
       ReminderMutationAction.moveToInbox => ReminderStatus.inbox,
+      ReminderMutationAction.schedule ||
+      ReminderMutationAction.snooze15Minutes ||
+      ReminderMutationAction.snooze1Hour ||
+      ReminderMutationAction.snooze2Hours ||
+      ReminderMutationAction.snooze3Hours ||
+      ReminderMutationAction.snoozeTomorrowMorning => ReminderStatus.active,
       ReminderMutationAction.reopen =>
         current.nextAttentionAt == null && current.allDayLocalDate == null
             ? ReminderStatus.inbox
@@ -328,12 +334,28 @@ class FakeAgendaApplication
       _ => current.status,
     };
     final clearsSchedule = command.action == ReminderMutationAction.moveToInbox;
-    final scheduledAllDay = command.action == ReminderMutationAction.schedule
-        ? command.allDayLocalDate
-        : current.allDayLocalDate;
-    final scheduledAt = command.action == ReminderMutationAction.schedule
-        ? command.customAttentionAt
-        : current.nextAttentionAt;
+    final scheduledAllDay = switch (command.action) {
+      ReminderMutationAction.schedule => command.allDayLocalDate,
+      ReminderMutationAction.snooze15Minutes ||
+      ReminderMutationAction.snooze1Hour ||
+      ReminderMutationAction.snooze2Hours ||
+      ReminderMutationAction.snooze3Hours => null,
+      _ => current.allDayLocalDate,
+    };
+    final scheduledAt = switch (command.action) {
+      ReminderMutationAction.schedule =>
+        command.customAttentionAt ?? current.nextAttentionAt,
+      ReminderMutationAction.snooze15Minutes =>
+        asOfUtc.add(const Duration(minutes: 15)).toIso8601String(),
+      ReminderMutationAction.snooze1Hour =>
+        asOfUtc.add(const Duration(hours: 1)).toIso8601String(),
+      ReminderMutationAction.snooze2Hours =>
+        asOfUtc.add(const Duration(hours: 2)).toIso8601String(),
+      ReminderMutationAction.snooze3Hours =>
+        asOfUtc.add(const Duration(hours: 3)).toIso8601String(),
+      ReminderMutationAction.snoozeTomorrowMorning => '2026-07-21T06:00:00Z',
+      _ => current.nextAttentionAt,
+    };
     final trashedAt = switch (command.action) {
       ReminderMutationAction.moveToTrash => '2026-07-19T08:01:00Z',
       ReminderMutationAction.restoreFromTrash => null,

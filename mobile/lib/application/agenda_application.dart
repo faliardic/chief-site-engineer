@@ -1498,6 +1498,8 @@ class SqliteAgendaApplication
         ReminderMutationAction.schedule ||
         ReminderMutationAction.snooze15Minutes ||
         ReminderMutationAction.snooze1Hour ||
+        ReminderMutationAction.snooze2Hours ||
+        ReminderMutationAction.snooze3Hours ||
         ReminderMutationAction.snoozeTomorrowMorning => true,
         ReminderMutationAction.restoreFromTrash
             when result.reminder.status == ReminderStatus.active &&
@@ -1660,6 +1662,22 @@ class SqliteAgendaApplication
         values['status'] = ReminderStatus.active.storageValue;
         values['next_attention_at'] = CseTimeCodec.encodeUtc(
           now.add(const Duration(hours: 1)),
+        );
+        values['all_day_local_date'] = null;
+        return 'snoozed';
+      case ReminderMutationAction.snooze2Hours:
+        requireOpen();
+        values['status'] = ReminderStatus.active.storageValue;
+        values['next_attention_at'] = CseTimeCodec.encodeUtc(
+          now.add(const Duration(hours: 2)),
+        );
+        values['all_day_local_date'] = null;
+        return 'snoozed';
+      case ReminderMutationAction.snooze3Hours:
+        requireOpen();
+        values['status'] = ReminderStatus.active.storageValue;
+        values['next_attention_at'] = CseTimeCodec.encodeUtc(
+          now.add(const Duration(hours: 3)),
         );
         values['all_day_local_date'] = null;
         return 'snoozed';
@@ -2391,7 +2409,9 @@ class SqliteAgendaApplication
       }
       if (schedule == ReminderScheduleKind.inbox ||
           schedule == ReminderScheduleKind.in15Minutes ||
-          schedule == ReminderScheduleKind.in1Hour) {
+          schedule == ReminderScheduleKind.in1Hour ||
+          schedule == ReminderScheduleKind.in2Hours ||
+          schedule == ReminderScheduleKind.in3Hours) {
         throw const AgendaValidationFailure(
           'Tam gün kayıt için bir takvim günü seçilmelidir.',
         );
@@ -2430,6 +2450,14 @@ class SqliteAgendaApplication
       case ReminderScheduleKind.in1Hour:
         nextAttentionAt = CseTimeCodec.encodeUtc(
           now.add(const Duration(hours: 1)),
+        );
+      case ReminderScheduleKind.in2Hours:
+        nextAttentionAt = CseTimeCodec.encodeUtc(
+          now.add(const Duration(hours: 2)),
+        );
+      case ReminderScheduleKind.in3Hours:
+        nextAttentionAt = CseTimeCodec.encodeUtc(
+          now.add(const Duration(hours: 3)),
         );
       case ReminderScheduleKind.todayEnd:
         final local = CseTimeCodec.toIstanbul(CseTimeCodec.encodeUtc(now));

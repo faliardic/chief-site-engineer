@@ -158,6 +158,54 @@ void main() {
     },
   );
 
+  for (final schedule in [
+    ReminderScheduleKind.in2Hours,
+    ReminderScheduleKind.in3Hours,
+  ]) {
+    testWidgets(
+      'form selects ${schedule.label} at 320 px with large dark text',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final agenda = FakeAgendaApplication();
+        await tester.pumpWidget(
+          MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+            child: MaterialApp(
+              theme: ThemeData(brightness: Brightness.dark),
+              home: ReminderFormPage(agenda: agenda),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('reminder-schedule')));
+        await tester.pumpAndSettle();
+        final option = find.text(schedule.label).last;
+        expect(option, findsOneWidget);
+        await tester.tap(option);
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const Key('reminder-title')),
+          '${schedule.label} sonra kontrol',
+        );
+        final submit = find.byKey(const Key('submit-reminder'));
+        await tester.scrollUntilVisible(
+          submit,
+          300,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.tap(submit);
+        await tester.pumpAndSettle();
+
+        expect(agenda.lastReminderCommand!.schedule, schedule);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets(
     'Today is default and renders overdue timed and all-day sections once',
     (tester) async {
@@ -741,7 +789,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Yarın quick action is guarded against double tap', (
+  testWidgets('Yarına ertele quick action is guarded against double tap', (
     tester,
   ) async {
     final completer = Completer<MobileReminder>();
@@ -756,6 +804,7 @@ void main() {
     await tester.pumpAndSettle();
     final action = find.byKey(Key('reminder-tomorrow-${item.id}'));
     expect(action, findsOneWidget);
+    expect(find.text('Yarına ertele'), findsOneWidget);
     await tester.tap(action);
     await tester.pump();
     await tester.tap(action);
@@ -769,11 +818,49 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('Yarın is direct on Today and Upcoming but hidden on Tomorrow', (
+  testWidgets(
+    'Yarına ertele moves Today card to Tomorrow and stays on Upcoming',
+    (tester) async {
+      final item = reminder();
+      final agenda = FakeAgendaApplication(reminders: [item]);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: RemindersPage(agenda: agenda)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final todayAction = find.byKey(Key('reminder-tomorrow-${item.id}'));
+      expect(todayAction, findsOneWidget);
+      expect(find.text('Yarına ertele'), findsOneWidget);
+      expect(find.text('Yarın'), findsOneWidget);
+      await tester.tap(todayAction);
+      await tester.pumpAndSettle();
+      expect(agenda.reminders.single.nextAttentionAt, '2026-07-21T06:00:00Z');
+      expect(find.byKey(Key('reminder-${item.id}')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('reminder-primary-tomorrow')));
+      await tester.pumpAndSettle();
+      expect(agenda.lastReminderGroup, ReminderViewGroup.tomorrow);
+      expect(find.byKey(Key('reminder-${item.id}')), findsOneWidget);
+      expect(find.byKey(Key('reminder-tomorrow-${item.id}')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('reminder-primary-other')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('reminder-other-upcoming')));
+      await tester.pumpAndSettle();
+      final upcomingAction = find.byKey(Key('reminder-tomorrow-${item.id}'));
+      expect(upcomingAction, findsOneWidget);
+      expect(tester.getSize(upcomingAction).height, greaterThanOrEqualTo(48));
+    },
+  );
+
+  testWidgets('Yarına ertele card failure uses the standard message', (
     tester,
   ) async {
     final item = reminder();
-    final agenda = FakeAgendaApplication(reminders: [item]);
+    final agenda = FakeAgendaApplication(reminders: [item])
+      ..mutateReminderFailure = StateError('forced failure');
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(body: RemindersPage(agenda: agenda)),
@@ -781,18 +868,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(Key('reminder-tomorrow-${item.id}')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('reminder-primary-tomorrow')));
+    await tester.tap(find.byKey(Key('reminder-tomorrow-${item.id}')));
     await tester.pumpAndSettle();
-    expect(agenda.lastReminderGroup, ReminderViewGroup.tomorrow);
-    expect(find.byKey(Key('reminder-tomorrow-${item.id}')), findsNothing);
-    await tester.tap(find.byKey(const Key('reminder-primary-other')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('reminder-other-upcoming')));
-    await tester.pumpAndSettle();
-    final action = find.byKey(Key('reminder-tomorrow-${item.id}'));
-    expect(action, findsOneWidget);
-    expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
+
+    expect(find.text('Hatırlatıcı yarına ertelenemedi.'), findsOneWidget);
+    expect(agenda.reminders.single.revision, item.revision);
   });
 
   testWidgets('Yarın filter has dedicated empty state without diagnostics', (
@@ -906,21 +986,74 @@ void main() {
     },
   );
 
-  testWidgets('detail Yarın blocks double tap and keeps failure visible', (
+  testWidgets(
+    'detail Yarına ertele blocks double tap and keeps stale visible',
+    (tester) async {
+      final item = reminder();
+      final completer = Completer<MobileReminder>();
+      final agenda = FakeAgendaApplication(
+        reminders: [item],
+        reminderDetail: item,
+      )..mutateReminderCompleter = completer;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final tomorrow = find.byKey(const Key('snooze-tomorrow'));
+      await tester.scrollUntilVisible(
+        tomorrow,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(tomorrow);
+      await tester.pump();
+      await tester.tap(tomorrow, warnIfMissed: false);
+      await tester.pump();
+      expect(agenda.mutateReminderCalls, 1);
+      completer.complete(item);
+      await tester.pumpAndSettle();
+
+      agenda
+        ..mutateReminderCompleter = null
+        ..mutateReminderFailure = const AgendaValidationFailure(
+          'Hatırlatıcı başka bir işlemle değişti. Ekranı yenileyin.',
+        );
+      await tester.scrollUntilVisible(
+        tomorrow,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(tomorrow);
+      await tester.pumpAndSettle();
+      expect(agenda.mutateReminderCalls, 2);
+      final staleError = find.textContaining('başka bir işlemle değişti');
+      await tester.scrollUntilVisible(
+        staleError,
+        -300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(staleError, findsOneWidget);
+      expect(agenda.reminders.single.revision, item.revision);
+    },
+  );
+
+  testWidgets('detail Yarına ertele failure uses the standard message', (
     tester,
   ) async {
     final item = reminder();
-    final completer = Completer<MobileReminder>();
     final agenda = FakeAgendaApplication(
       reminders: [item],
       reminderDetail: item,
-    )..mutateReminderCompleter = completer;
+    )..mutateReminderFailure = StateError('forced failure');
     await tester.pumpWidget(
       MaterialApp(
         home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
       ),
     );
     await tester.pumpAndSettle();
+
     final tomorrow = find.byKey(const Key('snooze-tomorrow'));
     await tester.scrollUntilVisible(
       tomorrow,
@@ -928,35 +1061,103 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     await tester.tap(tomorrow);
-    await tester.pump();
-    await tester.tap(tomorrow, warnIfMissed: false);
-    await tester.pump();
-    expect(agenda.mutateReminderCalls, 1);
-    completer.complete(item);
     await tester.pumpAndSettle();
-
-    agenda
-      ..mutateReminderCompleter = null
-      ..mutateReminderFailure = const AgendaValidationFailure(
-        'Hatırlatıcı başka bir işlemle değişti. Ekranı yenileyin.',
-      );
-    await tester.scrollUntilVisible(
-      tomorrow,
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(tomorrow);
+    tester
+        .state<ScrollableState>(find.byType(Scrollable).first)
+        .position
+        .jumpTo(0);
     await tester.pumpAndSettle();
-    expect(agenda.mutateReminderCalls, 2);
-    final staleError = find.textContaining('başka bir işlemle değişti');
-    await tester.scrollUntilVisible(
-      staleError,
-      -300,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(staleError, findsOneWidget);
+    expect(find.text('Hatırlatıcı yarına ertelenemedi.'), findsOneWidget);
     expect(agenda.reminders.single.revision, item.revision);
   });
+
+  for (final quickAction in [
+    (
+      key: 'snooze-2h',
+      label: '2 saat ertele',
+      action: ReminderMutationAction.snooze2Hours,
+    ),
+    (
+      key: 'snooze-3h',
+      label: '3 saat ertele',
+      action: ReminderMutationAction.snooze3Hours,
+    ),
+  ]) {
+    testWidgets('${quickAction.label} is selectable and double-tap safe', (
+      tester,
+    ) async {
+      final item = reminder();
+      final completer = Completer<MobileReminder>();
+      final agenda = FakeAgendaApplication(
+        reminders: [item],
+        reminderDetail: item,
+      )..mutateReminderCompleter = completer;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final action = find.byKey(Key(quickAction.key));
+      await tester.scrollUntilVisible(
+        action,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(action, findsOneWidget);
+      expect(find.text(quickAction.label), findsOneWidget);
+      await tester.tap(action);
+      await tester.pump();
+      await tester.tap(action, warnIfMissed: false);
+      await tester.pump();
+
+      expect(agenda.mutateReminderCalls, 1);
+      expect(agenda.lastMutationCommand!.action, quickAction.action);
+      completer.complete(item);
+      await tester.pumpAndSettle();
+    });
+  }
+
+  for (final schedule in [
+    ReminderScheduleKind.in2Hours,
+    ReminderScheduleKind.in3Hours,
+  ]) {
+    testWidgets('detail planning sheet selects ${schedule.label}', (
+      tester,
+    ) async {
+      final item = reminder();
+      final agenda = FakeAgendaApplication(
+        reminders: [item],
+        reminderDetail: item,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final scheduleButton = find.byKey(const Key('schedule-reminder'));
+      await tester.scrollUntilVisible(
+        scheduleButton,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(scheduleButton);
+      await tester.pumpAndSettle();
+      final option = find.text(schedule.label);
+      expect(option, findsOneWidget);
+      await tester.tap(option);
+      await tester.pumpAndSettle();
+
+      expect(
+        agenda.lastMutationCommand!.action,
+        ReminderMutationAction.schedule,
+      );
+      expect(agenda.lastMutationCommand!.schedule, schedule);
+    });
+  }
 
   for (final configuration in [
     (width: 320.0, brightness: Brightness.dark),
@@ -1006,7 +1207,7 @@ void main() {
   testWidgets('delivery diagnostic exposes retry and user-opened settings', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(800, 900);
+    tester.view.physicalSize = const Size(800, 1200);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -1033,15 +1234,27 @@ void main() {
     final notificationSettings = find.byKey(
       const Key('open-notification-settings'),
     );
-    await tester.ensureVisible(notificationSettings);
+    await tester.scrollUntilVisible(
+      notificationSettings,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(notificationSettings);
     await tester.pump();
     final batterySettings = find.byKey(const Key('open-battery-settings'));
-    await tester.ensureVisible(batterySettings);
+    await tester.scrollUntilVisible(
+      batterySettings,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(batterySettings);
     await tester.pump();
     final retry = find.byKey(const Key('retry-reminder-delivery'));
-    await tester.ensureVisible(retry);
+    await tester.scrollUntilVisible(
+      retry,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(retry);
     await tester.pumpAndSettle();
 

@@ -71,6 +71,8 @@ enum ReminderScheduleKind {
   inbox('Sadece Unutma Kutusu'),
   in15Minutes('15 dakika'),
   in1Hour('1 saat'),
+  in2Hours('2 saat'),
+  in3Hours('3 saat'),
   todayEnd('Bugün çıkmadan'),
   tomorrowMorning('Yarın sabah'),
   custom('Özel tarih/saat');
@@ -114,6 +116,8 @@ enum ReminderMutationAction {
   schedule,
   snooze15Minutes,
   snooze1Hour,
+  snooze2Hours,
+  snooze3Hours,
   snoozeTomorrowMorning,
   moveToInbox,
   complete,
