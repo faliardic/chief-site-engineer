@@ -159,6 +159,214 @@ void main() {
   );
 
   test(
+    '2 and 3 hour schedule kinds produce exact UTC due and bindings',
+    () async {
+      final cases = [
+        (
+          id: reminder1,
+          event: eventId(901),
+          schedule: ReminderScheduleKind.in2Hours,
+          expectedDue: '2026-07-19T10:00:00Z',
+        ),
+        (
+          id: reminder2,
+          event: eventId(902),
+          schedule: ReminderScheduleKind.in3Hours,
+          expectedDue: '2026-07-19T11:00:00Z',
+        ),
+      ];
+
+      for (final item in cases) {
+        final created = await agenda.createReminder(
+          CreateReminderCommand(
+            id: item.id,
+            eventId: item.event,
+            title: '${item.schedule.label} sonra kontrol',
+            kind: ReminderKind.action,
+            schedule: item.schedule,
+          ),
+        );
+        final detail = await agenda.getReminderLifecycleDetail(created.id);
+
+        expect(created.status, ReminderStatus.active);
+        expect(created.nextAttentionAt, item.expectedDue);
+        expect(detail.notification.scheduledFor, item.expectedDue);
+        expect(detail.notification.syncState, NotificationSyncState.scheduled);
+      }
+    },
+  );
+
+  test('2 and 3 hour snoozes are exact, idempotent and stale-safe', () async {
+    final twoHourInbox = await agenda.createReminder(
+      CreateReminderCommand(
+        id: reminder1,
+        eventId: eventId(903),
+        title: 'İki saat ertele',
+        kind: ReminderKind.action,
+        schedule: ReminderScheduleKind.inbox,
+      ),
+    );
+    final snoozedTwoHours = await agenda.mutateReminder(
+      MutateReminderCommand(
+        reminderId: twoHourInbox.id,
+        eventId: eventId(904),
+        expectedRevision: twoHourInbox.revision,
+        action: ReminderMutationAction.snooze2Hours,
+      ),
+    );
+
+    expect(snoozedTwoHours.status, ReminderStatus.active);
+    expect(snoozedTwoHours.nextAttentionAt, '2026-07-19T10:00:00Z');
+    final twoHourDetail = await agenda.getReminderLifecycleDetail(
+      snoozedTwoHours.id,
+    );
+    expect(
+      twoHourDetail.notification.scheduledFor,
+      snoozedTwoHours.nextAttentionAt,
+    );
+    expect(
+      twoHourDetail.notification.syncState,
+      NotificationSyncState.scheduled,
+    );
+    expect(
+      twoHourDetail.events.where((event) => event.eventType == 'snoozed'),
+      hasLength(1),
+    );
+
+    final retry = await agenda.mutateReminder(
+      MutateReminderCommand(
+        reminderId: snoozedTwoHours.id,
+        eventId: eventId(904),
+        expectedRevision: snoozedTwoHours.revision,
+        action: ReminderMutationAction.snooze2Hours,
+      ),
+    );
+    expect(retry.revision, snoozedTwoHours.revision);
+    expect(retry.nextAttentionAt, snoozedTwoHours.nextAttentionAt);
+    expect(
+      (await agenda.listReminderEvents(
+        retry.id,
+      )).where((event) => event.eventType == 'snoozed'),
+      hasLength(1),
+    );
+
+    await expectLater(
+      agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: snoozedTwoHours.id,
+          eventId: eventId(905),
+          expectedRevision: twoHourInbox.revision,
+          action: ReminderMutationAction.snooze3Hours,
+        ),
+      ),
+      throwsA(isA<AgendaValidationFailure>()),
+    );
+    expect(
+      (await agenda.getReminderDetail(snoozedTwoHours.id)).nextAttentionAt,
+      snoozedTwoHours.nextAttentionAt,
+    );
+
+    final threeHourInbox = await agenda.createReminder(
+      CreateReminderCommand(
+        id: reminder2,
+        eventId: eventId(906),
+        title: 'Üç saat ertele',
+        kind: ReminderKind.action,
+        schedule: ReminderScheduleKind.inbox,
+      ),
+    );
+    final snoozedThreeHours = await agenda.mutateReminder(
+      MutateReminderCommand(
+        reminderId: threeHourInbox.id,
+        eventId: eventId(907),
+        expectedRevision: threeHourInbox.revision,
+        action: ReminderMutationAction.snooze3Hours,
+      ),
+    );
+    final threeHourDetail = await agenda.getReminderLifecycleDetail(
+      snoozedThreeHours.id,
+    );
+
+    expect(snoozedThreeHours.nextAttentionAt, '2026-07-19T11:00:00Z');
+    expect(
+      threeHourDetail.notification.scheduledFor,
+      snoozedThreeHours.nextAttentionAt,
+    );
+    expect(
+      threeHourDetail.events.where((event) => event.eventType == 'snoozed'),
+      hasLength(1),
+    );
+  });
+
+  test('2 and 3 hour snoozes reject terminal and trashed reminders', () async {
+    var terminal = await agenda.createReminder(
+      CreateReminderCommand(
+        id: reminder1,
+        eventId: eventId(908),
+        title: 'Tamamlanan kayıt',
+        kind: ReminderKind.action,
+        schedule: ReminderScheduleKind.in2Hours,
+      ),
+    );
+    terminal = await agenda.mutateReminder(
+      MutateReminderCommand(
+        reminderId: terminal.id,
+        eventId: eventId(909),
+        expectedRevision: terminal.revision,
+        action: ReminderMutationAction.complete,
+      ),
+    );
+    await expectLater(
+      agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: terminal.id,
+          eventId: eventId(910),
+          expectedRevision: terminal.revision,
+          action: ReminderMutationAction.snooze2Hours,
+        ),
+      ),
+      throwsA(isA<AgendaValidationFailure>()),
+    );
+    expect(
+      (await agenda.getReminderDetail(terminal.id)).revision,
+      terminal.revision,
+    );
+
+    var trashed = await agenda.createReminder(
+      CreateReminderCommand(
+        id: reminder2,
+        eventId: eventId(911),
+        title: 'Silinen kayıt',
+        kind: ReminderKind.action,
+        schedule: ReminderScheduleKind.in3Hours,
+      ),
+    );
+    trashed = await agenda.mutateReminder(
+      MutateReminderCommand(
+        reminderId: trashed.id,
+        eventId: eventId(912),
+        expectedRevision: trashed.revision,
+        action: ReminderMutationAction.moveToTrash,
+      ),
+    );
+    await expectLater(
+      agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: trashed.id,
+          eventId: eventId(913),
+          expectedRevision: trashed.revision,
+          action: ReminderMutationAction.snooze3Hours,
+        ),
+      ),
+      throwsA(isA<AgendaValidationFailure>()),
+    );
+    expect(
+      (await agenda.getReminderDetail(trashed.id)).revision,
+      trashed.revision,
+    );
+  });
+
+  test(
     'tomorrow keeps local clock or uses 09:00 and preserves source',
     () async {
       await createProjectAndLog();
@@ -488,41 +696,44 @@ void main() {
     },
   );
 
-  test('lifecycle event failure rolls back row and event together', () async {
-    final created = await agenda.createReminder(
-      CreateReminderCommand(
-        id: reminder1,
-        eventId: eventId(1),
-        title: 'Rollback',
-        kind: ReminderKind.action,
-        schedule: ReminderScheduleKind.inbox,
-      ),
-    );
-    final failing = SqliteAgendaApplication(
-      databasePath: directories.databaseFile,
-      databaseFactory: databaseFactoryFfi,
-      clock: () => now,
-      notificationGateway: notifications,
-      beforeReminderEventInsert: (_) async {
-        throw StateError('forced event failure');
-      },
-    );
-    await expectLater(
-      failing.mutateReminder(
-        MutateReminderCommand(
-          reminderId: created.id,
-          eventId: eventId(2),
-          expectedRevision: 1,
-          action: ReminderMutationAction.snoozeTomorrowMorning,
+  test(
+    '3 hour snooze event failure rolls back row and event together',
+    () async {
+      final created = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(1),
+          title: 'Rollback',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.inbox,
         ),
-      ),
-      throwsA(anything),
-    );
-    final persisted = await agenda.getReminderDetail(created.id);
-    expect(persisted.status, ReminderStatus.inbox);
-    expect(persisted.revision, 1);
-    expect((await agenda.listReminderEvents(created.id)).length, 1);
-  });
+      );
+      final failing = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        notificationGateway: notifications,
+        beforeReminderEventInsert: (_) async {
+          throw StateError('forced event failure');
+        },
+      );
+      await expectLater(
+        failing.mutateReminder(
+          MutateReminderCommand(
+            reminderId: created.id,
+            eventId: eventId(2),
+            expectedRevision: 1,
+            action: ReminderMutationAction.snooze3Hours,
+          ),
+        ),
+        throwsA(anything),
+      );
+      final persisted = await agenda.getReminderDetail(created.id);
+      expect(persisted.status, ReminderStatus.inbox);
+      expect(persisted.revision, 1);
+      expect((await agenda.listReminderEvents(created.id)).length, 1);
+    },
+  );
 
   test(
     'permission denial and plugin failure never lose reminder rows',
@@ -553,10 +764,11 @@ void main() {
           eventId: eventId(2),
           title: 'Plugin hatası',
           kind: ReminderKind.action,
-          schedule: ReminderScheduleKind.in1Hour,
+          schedule: ReminderScheduleKind.in3Hours,
         ),
       );
       final failedDetail = await agenda.getReminderLifecycleDetail(failed.id);
+      expect(failed.nextAttentionAt, '2026-07-19T11:00:00Z');
       expect(failedDetail.notification.syncState, NotificationSyncState.failed);
       expect(failedDetail.notification.safeErrorCode, 'native_schedule_failed');
       expect(await _countRows(directories.databaseFile, 'follow_up_items'), 2);

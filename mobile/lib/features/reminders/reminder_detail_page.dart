@@ -190,7 +190,11 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
       if (mounted) setState(() => _error = error.message);
     } on Object {
       if (mounted) {
-        setState(() => _error = 'İşlem güvenli biçimde tamamlanamadı.');
+        setState(
+          () => _error = action == ReminderMutationAction.snoozeTomorrowMorning
+              ? 'Hatırlatıcı yarına ertelenemedi.'
+              : 'İşlem güvenli biçimde tamamlanamadı.',
+        );
       }
     } finally {
       if (mounted) setState(() => _mutating = false);
@@ -236,6 +240,8 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
             for (final schedule in [
               ReminderScheduleKind.in15Minutes,
               ReminderScheduleKind.in1Hour,
+              ReminderScheduleKind.in2Hours,
+              ReminderScheduleKind.in3Hours,
               ReminderScheduleKind.tomorrowMorning,
               ReminderScheduleKind.custom,
             ])
@@ -704,7 +710,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
                 ),
                 _ActionButton(
                   key: const Key('snooze-tomorrow'),
-                  label: 'Yarın',
+                  label: 'Yarına ertele',
                   icon: Icons.wb_sunny_outlined,
                   onPressed: _mutating
                       ? null
@@ -727,6 +733,22 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
                   onPressed: _mutating
                       ? null
                       : () => _mutate(ReminderMutationAction.snooze1Hour),
+                ),
+                _ActionButton(
+                  key: const Key('snooze-2h'),
+                  label: '2 saat ertele',
+                  icon: Icons.more_time,
+                  onPressed: _mutating
+                      ? null
+                      : () => _mutate(ReminderMutationAction.snooze2Hours),
+                ),
+                _ActionButton(
+                  key: const Key('snooze-3h'),
+                  label: '3 saat ertele',
+                  icon: Icons.more_time,
+                  onPressed: _mutating
+                      ? null
+                      : () => _mutate(ReminderMutationAction.snooze3Hours),
                 ),
                 _ActionButton(
                   key: const Key('schedule-reminder'),

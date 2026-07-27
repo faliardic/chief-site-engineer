@@ -51,7 +51,9 @@ class _RemindersPageState extends State<RemindersPage> {
       );
       await _reload();
     } on Object {
-      if (mounted) setState(() => _error = 'Hatırlatıcı yarına taşınamadı.');
+      if (mounted) {
+        setState(() => _error = 'Hatırlatıcı yarına ertelenemedi.');
+      }
     } finally {
       if (mounted) setState(() => _tomorrowBusy.remove(reminder.id));
     }
@@ -481,7 +483,7 @@ class _RemindersPageState extends State<RemindersPage> {
                       ? null
                       : () => _moveToTomorrow(reminder),
                   icon: const Icon(Icons.wb_sunny_outlined),
-                  label: const Text('Yarın'),
+                  label: const Text('Yarına ertele'),
                 ),
               ),
             ),
