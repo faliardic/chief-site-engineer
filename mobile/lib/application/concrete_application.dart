@@ -361,8 +361,12 @@ class SqliteConcreteApplication implements ConcreteApplication {
       'Gömülü eleman ve rezervasyonlar kontrol edildi',
       true,
     ),
-    ('inspection_notified', 'Yapı denetim bilgilendirildi', true),
-    ('laboratory_appointment', 'Laboratuvar randevusu alındı', true),
+    (concreteInspectionNotifiedCheckKey, 'Yapı denetim bilgilendirildi', true),
+    (
+      concreteLaboratoryAppointmentCheckKey,
+      'Laboratuvar randevusu alındı',
+      true,
+    ),
     ('pump_equipment_ready', 'Pompa ve ekipman hazır', true),
     ('access_route_ready', 'Erişim ve mikser güzergâhı hazır', true),
     ('safety_ready', 'İş güvenliği tedbirleri hazır', true),
@@ -525,9 +529,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
           'id': command.eventId,
           'concrete_class_id': current.id,
           'sequence': sequence,
-          'event_type': command.archive
-              ? 'class.archived'
-              : 'class.restored',
+          'event_type': command.archive ? 'class.archived' : 'class.restored',
           'occurred_at': timestamp,
           'payload_json': jsonEncode({
             'archived_at': command.archive ? timestamp : null,
@@ -588,7 +590,8 @@ class SqliteConcreteApplication implements ConcreteApplication {
       final rows = await database.rawQuery('''
         SELECT c.*, p.name AS project_name,
           (SELECT count(*) FROM concrete_check_items x
-            WHERE x.concrete_pour_id = c.id AND x.status = 'pending')
+            WHERE x.concrete_pour_id = c.id AND x.is_required = 1
+              AND x.status = 'pending')
             AS pending_check_count,
           (SELECT count(*) FROM concrete_follow_up_items x
             WHERE x.concrete_pour_id = c.id AND x.status = 'pending')
@@ -1278,16 +1281,17 @@ class SqliteConcreteApplication implements ConcreteApplication {
     }
     if (target == ConcretePourStatus.prepared ||
         target == ConcretePourStatus.pouring) {
-      final rows = await database.rawQuery(
-        '''
-        SELECT count(*) AS value FROM concrete_check_items
-        WHERE concrete_pour_id = ? AND is_required = 1 AND status = 'pending'
-        ''',
-        [pour.id],
-      );
-      if ((rows.single['value']! as int) > 0) {
-        throw const AgendaValidationFailure(
-          'Dökümü başlatmak için zorunlu checklist kalemleri tamamlanmalıdır.',
+      final checks = (await database.query(
+        'concrete_check_items',
+        where: 'concrete_pour_id = ?',
+        whereArgs: [pour.id],
+        orderBy: 'sort_order ASC, id ASC',
+      )).map(_checkFromRow);
+      final blockers = pendingRequiredConcreteChecks(checks);
+      if (blockers.isNotEmpty) {
+        throw AgendaValidationFailure(
+          'Dökümü başlatmak için açık zorunlu kalemler: '
+          '${blockers.map((item) => item.label).join(', ')}.',
         );
       }
     }
@@ -1474,6 +1478,20 @@ class SqliteConcreteApplication implements ConcreteApplication {
     required bool inspectionComplete,
     required String occurredAt,
   }) async {
+    await _syncFieldCheckItem(
+      database,
+      pourId: pourId,
+      itemKey: concreteLaboratoryAppointmentCheckKey,
+      complete: laboratoryComplete,
+      occurredAt: occurredAt,
+    );
+    await _syncFieldCheckItem(
+      database,
+      pourId: pourId,
+      itemKey: concreteInspectionNotifiedCheckKey,
+      complete: inspectionComplete,
+      occurredAt: occurredAt,
+    );
     await _syncFieldReminderTask(
       database,
       pourId: pourId,
@@ -1489,6 +1507,61 @@ class SqliteConcreteApplication implements ConcreteApplication {
       itemKey: 'inspection_notification_task',
       complete: inspectionComplete,
       occurredAt: occurredAt,
+    );
+  }
+
+  Future<void> _syncFieldCheckItem(
+    DatabaseExecutor database, {
+    required String pourId,
+    required String itemKey,
+    required bool complete,
+    required String occurredAt,
+  }) async {
+    final rows = await database.query(
+      'concrete_check_items',
+      where: 'concrete_pour_id = ? AND item_key = ?',
+      whereArgs: [pourId, itemKey],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      throw const AgendaValidationFailure(
+        'Alanla yönetilen checklist kalemi bulunamadı.',
+      );
+    }
+    final check = _checkFromRow(rows.single);
+    final targetStatus = complete
+        ? ConcreteCheckStatus.completed
+        : ConcreteCheckStatus.pending;
+    if (check.status == targetStatus) return;
+    final nextRevision = check.revision + 1;
+    final changed = await database.update(
+      'concrete_check_items',
+      {
+        'status': targetStatus.storageValue,
+        'reason': null,
+        'revision': nextRevision,
+        'updated_at': occurredAt,
+      },
+      where: 'id = ? AND revision = ?',
+      whereArgs: [check.id, check.revision],
+    );
+    if (changed != 1) throw _staleFailure();
+    await _insertConcreteEvent(
+      database,
+      id: _stableUuid(
+        'field-check-${complete ? 'completed' : 'reopened'}:'
+        '${check.id}:$nextRevision',
+      ),
+      pourId: pourId,
+      eventType: 'check.updated',
+      occurredAt: occurredAt,
+      payload: {
+        'check_id': check.id,
+        'item_key': check.itemKey,
+        'status': targetStatus.storageValue,
+        'automatic': true,
+        'source_field': true,
+      },
     );
   }
 
@@ -1915,9 +1988,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
         pourDurationMinutes: duration,
         sampleSetCount: samples.length,
         sampleCount: samples.fold(0, (sum, item) => sum + item.sampleCount),
-        pendingCheckCount: checks
-            .where((item) => item.status == ConcreteCheckStatus.pending)
-            .length,
+        pendingCheckCount: pendingRequiredConcreteChecks(checks).length,
         missingEvidenceTruckCount: await _missingEvidenceTruckCount(
           database,
           pourId,
@@ -2181,9 +2252,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
       limit: 1,
     );
     if (rows.isEmpty) {
-      throw const AgendaValidationFailure(
-        'Yönetilen Ajanda kaydı bulunamadı.',
-      );
+      throw const AgendaValidationFailure('Yönetilen Ajanda kaydı bulunamadı.');
     }
     final summary = await _managedAgendaSummary(
       transaction,
@@ -3193,8 +3262,6 @@ class SqliteConcreteApplication implements ConcreteApplication {
     final detail = await _withDatabase(now, (database) {
       return database.transaction((transaction) async {
         final current = await _requirePour(transaction, command.id);
-        _requireRevision(current.revision, command.expectedRevision);
-        _requireMutable(current);
         if (requiredTrimmed(
               command.concreteClass,
               'Beton sınıfı',
@@ -3212,6 +3279,8 @@ class SqliteConcreteApplication implements ConcreteApplication {
         )) {
           return _loadDetail(transaction, command.id);
         }
+        _requireRevision(current.revision, command.expectedRevision);
+        _requireMutable(current);
         final values = _normalizedUpdate(command);
         final currentValues = <String, Object?>{
           'element_location': current.elementLocation,
@@ -3237,6 +3306,20 @@ class SqliteConcreteApplication implements ConcreteApplication {
           'variance_note': current.varianceNote,
         };
         if (_jsonEqual(currentValues, values)) {
+          await _syncFieldReminderTasks(
+            transaction,
+            pourId: current.id,
+            projectId: current.projectId,
+            laboratoryComplete:
+                ((values['laboratory_appointment'] as String?)?.isNotEmpty ??
+                false),
+            inspectionComplete:
+                values['inspection_notified_at'] != null ||
+                ((values['inspection_notified_person'] as String?)
+                        ?.isNotEmpty ??
+                    false),
+            occurredAt: timestamp,
+          );
           return _loadDetail(transaction, command.id);
         }
         await _advancePour(transaction, current, timestamp, values);
@@ -3347,6 +3430,12 @@ class SqliteConcreteApplication implements ConcreteApplication {
         )) {
           return _loadDetail(transaction, command.pourId);
         }
+        if (check.isSystemOwned) {
+          throw const AgendaValidationFailure(
+            'Laboratuvar ve yapı denetim checklist kalemleri yalnız ilgili '
+            'Beton alanlarından güncellenebilir.',
+          );
+        }
         if (check.status == command.status &&
             check.note == note &&
             check.reason == reason) {
@@ -3407,13 +3496,11 @@ class SqliteConcreteApplication implements ConcreteApplication {
         _requireMutable(pour);
         final checks = (await transaction.query(
           'concrete_check_items',
-          where:
-              "concrete_pour_id = ? AND status = 'pending' "
-              "AND item_key NOT IN ('inspection_notified', "
-              "'laboratory_appointment')",
+          where: "concrete_pour_id = ? AND status = 'pending'",
           whereArgs: [command.pourId],
           orderBy: 'sort_order ASC, id ASC',
-        )).map(_checkFromRow).toList(growable: false);
+        )).map(_checkFromRow);
+        final manualChecks = pendingManualConcreteChecks(checks);
         final followUps = (await transaction.query(
           'concrete_follow_up_items',
           where:
@@ -3423,7 +3510,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
           whereArgs: [command.pourId],
           orderBy: 'created_at ASC, id ASC',
         )).map(_followUpFromRow).toList(growable: false);
-        if (checks.isEmpty && followUps.isEmpty) {
+        if (manualChecks.isEmpty && followUps.isEmpty) {
           return _loadDetail(transaction, command.pourId);
         }
         var eventIndex = 0;
@@ -3432,7 +3519,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
           return _stableUuid('bulk-complete:${command.eventId}:$aggregateId');
         }
 
-        for (final check in checks) {
+        for (final check in manualChecks) {
           final changed = await transaction.update(
             'concrete_check_items',
             {
@@ -3603,9 +3690,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
             pour: pour,
             startedAt: startedAt,
             occurredAt: timestamp,
-            concreteEventId: _stableUuid(
-              'concrete-agenda-linked:${pour.id}',
-            ),
+            concreteEventId: _stableUuid('concrete-agenda-linked:${pour.id}'),
           );
         } else if (command.targetStatus == ConcretePourStatus.poured) {
           final startedAt = pour.actualStartedAt!;
@@ -3614,9 +3699,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
             pour: pour,
             startedAt: startedAt,
             occurredAt: timestamp,
-            concreteEventId: _stableUuid(
-              'concrete-agenda-linked:${pour.id}',
-            ),
+            concreteEventId: _stableUuid('concrete-agenda-linked:${pour.id}'),
           );
           final endedAt = pour.actualEndedAt ?? timestamp;
           await _syncManagedAgenda(
@@ -3639,9 +3722,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
             pour: pour,
             startedAt: pour.actualStartedAt!,
             occurredAt: timestamp,
-            concreteEventId: _stableUuid(
-              'concrete-agenda-linked:${pour.id}',
-            ),
+            concreteEventId: _stableUuid('concrete-agenda-linked:${pour.id}'),
           );
           await _syncManagedAgenda(
             transaction,
@@ -3664,9 +3745,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
             pour: pour,
             startedAt: pour.actualStartedAt!,
             occurredAt: timestamp,
-            concreteEventId: _stableUuid(
-              'concrete-agenda-linked:${pour.id}',
-            ),
+            concreteEventId: _stableUuid('concrete-agenda-linked:${pour.id}'),
           );
           await _syncManagedAgenda(
             transaction,

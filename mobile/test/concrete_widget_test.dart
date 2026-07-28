@@ -184,7 +184,7 @@ void main() {
       expect(find.textContaining('Kalan: 7,50 m³'), findsOneWidget);
       for (final text in [
         'Döküm öncesi checklist',
-        'Tümünü tamamla',
+        'Manuel maddeleri tamamla',
         'Mikser / irsaliye',
         'Kanıtlar',
         'Numuneler',
@@ -251,7 +251,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      final concrete = _FakeConcrete(agendaLinked: true);
+      final concrete = _FakeConcrete(agendaLinked: true, checklistReady: true);
       await tester.pumpWidget(
         MaterialApp(
           home: MediaQuery(
@@ -302,6 +302,7 @@ void main() {
         started: true,
         status: ConcretePourStatus.draft,
         agendaLinked: true,
+        checklistReady: true,
       );
       final firstStartedAt = concrete._currentDetail.pour.actualStartedAt;
       await tester.pumpWidget(
@@ -518,6 +519,135 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'synthetic checklist shows exact blockers then reloads zero and starts',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final concrete = _FakeConcrete(
+        delayBulkComplete: true,
+        delayFieldUpdate: true,
+        agendaLinked: true,
+      );
+
+      Widget page() => MaterialApp(
+        theme: ThemeData.dark(),
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+          child: ConcretePourDetailPage(
+            concrete: concrete,
+            agenda: _FakeAgenda(),
+            attachments: _picker(),
+            pourId: pourId,
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(page());
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('start-concrete-pour')));
+      await tester.pumpAndSettle();
+      for (final blocker in [
+        'Döküm mahali hazır',
+        'Yapı denetim bilgilendirildi',
+        'Laboratuvar randevusu alındı',
+      ]) {
+        expect(find.textContaining(blocker), findsWidgets);
+      }
+
+      final threeOpen = find.text('Döküm öncesi checklist • 3 açık');
+      await tester.scrollUntilVisible(
+        threeOpen,
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(threeOpen, findsOneWidget);
+      await tester.tap(find.byKey(const Key('bulk-complete-concrete')));
+      await tester.pumpAndSettle();
+      expect(find.text('Manuel maddeleri tamamla'), findsNWidgets(3));
+      expect(
+        find.textContaining(
+          'Laboratuvar randevusu ve yapı denetim bildirimi ayrıca',
+        ),
+        findsOneWidget,
+      );
+
+      final confirm = tester
+          .widget<FilledButton>(find.byKey(const Key('confirm-bulk-complete')))
+          .onPressed!;
+      confirm();
+      confirm();
+      await tester.pump();
+      expect(concrete.bulkCompleteCalls, 1);
+      expect(find.text('Döküm öncesi checklist • 3 açık'), findsOneWidget);
+
+      concrete.completeBulk();
+      await tester.pumpAndSettle();
+      expect(find.text('Döküm öncesi checklist • 2 açık'), findsOneWidget);
+      for (final action in [
+        'Laboratuvar randevusunu güncelle',
+        'Yapı denetime bildirimi güncelle',
+      ]) {
+        final finder = find.text(action);
+        await tester.scrollUntilVisible(
+          finder,
+          200,
+          scrollable: find.byType(Scrollable).last,
+        );
+        expect(finder, findsOneWidget);
+      }
+
+      await tester.tap(find.text('Laboratuvar randevusunu güncelle'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('laboratory-appointment-complete')),
+      );
+      await tester.tap(
+        find.byKey(const Key('inspection-notification-complete')),
+      );
+      final save = tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Kaydet'))
+          .onPressed!;
+      save();
+      save();
+      await tester.pump();
+      expect(concrete.fieldUpdateCalls, 1);
+      expect(find.text('Döküm öncesi checklist • 2 açık'), findsOneWidget);
+
+      concrete.completeFieldUpdate();
+      await tester.pumpAndSettle();
+      expect(find.text('Döküm öncesi checklist • 0 açık'), findsOneWidget);
+
+      final start = find.byKey(const Key('start-concrete-pour'));
+      await tester.scrollUntilVisible(
+        start,
+        -300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.ensureVisible(start);
+      await tester.pumpAndSettle();
+      await tester.tap(start);
+      await tester.pumpAndSettle();
+      final finish = find.byKey(const Key('finish-concrete-pour'));
+      expect(finish, findsOneWidget);
+      await tester.ensureVisible(finish);
+      await tester.pumpAndSettle();
+      await tester.tap(finish);
+      await tester.pumpAndSettle();
+      expect(find.text('Tamamlandı'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      await tester.pumpWidget(page());
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('concrete-actual-end')), findsOneWidget);
+      expect(concrete._currentDetail.pendingRequiredCheckCount, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 Future<void> _pumpDetail(WidgetTester tester, _FakeConcrete concrete) async {
@@ -575,11 +705,17 @@ class _FakeConcrete implements ConcreteApplication {
   _FakeConcrete({
     this.delayCreate = false,
     this.failNextTruckSave = false,
+    this.delayBulkComplete = false,
+    this.delayFieldUpdate = false,
     this.started = false,
     this.ended = false,
+    bool checklistReady = false,
     ConcretePourStatus? status,
     this.agendaLinked = false,
-  }) : status =
+  }) : manualCompleted = checklistReady,
+       laboratoryComplete = checklistReady,
+       inspectionComplete = checklistReady,
+       status =
            status ??
            (ended
                ? ConcretePourStatus.poured
@@ -587,15 +723,25 @@ class _FakeConcrete implements ConcreteApplication {
                ? ConcretePourStatus.pouring
                : ConcretePourStatus.draft);
   final bool delayCreate;
+  final bool delayBulkComplete;
+  final bool delayFieldUpdate;
   bool failNextTruckSave;
   bool started;
   bool ended;
+  bool manualCompleted;
+  bool laboratoryComplete;
+  bool inspectionComplete;
   ConcretePourStatus status;
   final bool agendaLinked;
   final _completer = Completer<ConcretePourDetail>();
+  Completer<void>? _bulkCompleter;
+  Completer<void>? _fieldCompleter;
+  int revision = 1;
   int createCalls = 0;
   int createClassCalls = 0;
   int saveTruckCalls = 0;
+  int bulkCompleteCalls = 0;
+  int fieldUpdateCalls = 0;
   CreateConcretePourCommand? lastCreateCommand;
   CreateProjectConcreteClassCommand? lastCreateClassCommand;
   SaveConcreteTruckCommand? lastTruckCommand;
@@ -608,11 +754,19 @@ class _FakeConcrete implements ConcreteApplication {
     ended: ended,
     status: status,
     agendaLinked: agendaLinked,
+    revision: revision,
+    manualCompleted: manualCompleted,
+    laboratoryComplete: laboratoryComplete,
+    inspectionComplete: inspectionComplete,
   );
 
   void completeCreate() {
     if (!_completer.isCompleted) _completer.complete(_currentDetail);
   }
+
+  void completeBulk() => _bulkCompleter?.complete();
+
+  void completeFieldUpdate() => _fieldCompleter?.complete();
 
   @override
   Future<ConcretePourDetail> createPour(CreateConcretePourCommand command) {
@@ -680,7 +834,17 @@ class _FakeConcrete implements ConcreteApplication {
   @override
   Future<ConcretePourDetail> bulkComplete(
     BulkCompleteConcreteCommand command,
-  ) => throw UnimplementedError();
+  ) async {
+    bulkCompleteCalls += 1;
+    if (delayBulkComplete) {
+      _bulkCompleter ??= Completer<void>();
+      await _bulkCompleter!.future;
+    }
+    manualCompleted = true;
+    revision += 1;
+    return _currentDetail;
+  }
+
   @override
   Future<ConcreteExportResult> exportPackage(
     ExportConcretePackageCommand command, {
@@ -721,6 +885,14 @@ class _FakeConcrete implements ConcreteApplication {
     TransitionConcretePourCommand command,
   ) async {
     lastTransitionCommand = command;
+    if ((command.targetStatus == ConcretePourStatus.prepared ||
+            command.targetStatus == ConcretePourStatus.pouring) &&
+        _currentDetail.pendingRequiredChecks.isNotEmpty) {
+      throw AgendaValidationFailure(
+        'Dökümü başlatmak için açık zorunlu kalemler: '
+        '${_currentDetail.pendingRequiredChecks.map((item) => item.label).join(', ')}.',
+      );
+    }
     status = command.targetStatus;
     if (command.targetStatus == ConcretePourStatus.pouring) {
       started = true;
@@ -728,6 +900,7 @@ class _FakeConcrete implements ConcreteApplication {
     if (command.targetStatus == ConcretePourStatus.poured) {
       ended = true;
     }
+    revision += 1;
     return _currentDetail;
   }
 
@@ -743,8 +916,22 @@ class _FakeConcrete implements ConcreteApplication {
     UpdateConcreteFollowUpCommand command,
   ) => throw UnimplementedError();
   @override
-  Future<ConcretePourDetail> updatePour(UpdateConcretePourCommand command) =>
-      throw UnimplementedError();
+  Future<ConcretePourDetail> updatePour(
+    UpdateConcretePourCommand command,
+  ) async {
+    fieldUpdateCalls += 1;
+    if (delayFieldUpdate) {
+      _fieldCompleter ??= Completer<void>();
+      await _fieldCompleter!.future;
+    }
+    laboratoryComplete =
+        command.laboratoryAppointment?.trim().isNotEmpty ?? false;
+    inspectionComplete =
+        command.inspectionNotifiedAt != null ||
+        (command.inspectionNotifiedPerson?.trim().isNotEmpty ?? false);
+    revision += 1;
+    return _currentDetail;
+  }
 }
 
 class _FakeAgenda implements AgendaApplication {
@@ -784,6 +971,10 @@ ConcretePourDetail _detail(
   bool ended = false,
   ConcretePourStatus? status,
   bool agendaLinked = false,
+  int revision = 1,
+  bool manualCompleted = false,
+  bool laboratoryComplete = false,
+  bool inspectionComplete = false,
 }) {
   final pour = ConcretePour(
     id: pourId,
@@ -808,8 +999,8 @@ ConcretePourDetail _detail(
     pumpEquipment: null,
     laboratoryName: null,
     laboratoryContact: null,
-    laboratoryAppointment: null,
-    inspectionNotifiedAt: null,
+    laboratoryAppointment: laboratoryComplete ? '2026-07-19T08:00:00Z' : null,
+    inspectionNotifiedAt: inspectionComplete ? '2026-07-19T07:30:00Z' : null,
     inspectionNotifiedPerson: null,
     status:
         status ??
@@ -821,40 +1012,76 @@ ConcretePourDetail _detail(
     generalNote: null,
     sampleExceptionReason: null,
     varianceNote: null,
-    revision: savedTruck == null ? 1 : 2,
+    revision: savedTruck == null ? revision : revision + 1,
     createdAt: '2026-07-19T07:00:00Z',
     updatedAt: '2026-07-19T07:00:00Z',
     closedAt: null,
     cancelledAt: null,
   );
-  const check = ConcreteCheckItem(
-    id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
-    pourId: pourId,
-    itemKey: 'location_ready',
-    label: 'Döküm mahali hazır',
-    sortOrder: 1,
-    isRequired: true,
-    status: ConcreteCheckStatus.pending,
-    note: null,
-    reason: null,
-    revision: 1,
-    updatedAt: '2026-07-19T07:00:00Z',
-  );
-  const follow = ConcreteFollowUp(
+  final checks = [
+    ConcreteCheckItem(
+      id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1',
+      pourId: pourId,
+      itemKey: 'location_ready',
+      label: 'Döküm mahali hazır',
+      sortOrder: 1,
+      isRequired: true,
+      status: manualCompleted
+          ? ConcreteCheckStatus.completed
+          : ConcreteCheckStatus.pending,
+      note: null,
+      reason: null,
+      revision: manualCompleted ? 2 : 1,
+      updatedAt: '2026-07-19T07:00:00Z',
+    ),
+    ConcreteCheckItem(
+      id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2',
+      pourId: pourId,
+      itemKey: concreteInspectionNotifiedCheckKey,
+      label: 'Yapı denetim bilgilendirildi',
+      sortOrder: 2,
+      isRequired: true,
+      status: inspectionComplete
+          ? ConcreteCheckStatus.completed
+          : ConcreteCheckStatus.pending,
+      note: null,
+      reason: null,
+      revision: inspectionComplete ? 2 : 1,
+      updatedAt: '2026-07-19T07:00:00Z',
+    ),
+    ConcreteCheckItem(
+      id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc3',
+      pourId: pourId,
+      itemKey: concreteLaboratoryAppointmentCheckKey,
+      label: 'Laboratuvar randevusu alındı',
+      sortOrder: 3,
+      isRequired: true,
+      status: laboratoryComplete
+          ? ConcreteCheckStatus.completed
+          : ConcreteCheckStatus.pending,
+      note: null,
+      reason: null,
+      revision: laboratoryComplete ? 2 : 1,
+      updatedAt: '2026-07-19T07:00:00Z',
+    ),
+  ];
+  final follow = ConcreteFollowUp(
     id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
     pourId: pourId,
     sourceSampleSetId: null,
     itemKey: 'curing_start',
     label: 'Kür başlangıcı',
     dueAt: '2026-07-19T11:00:00Z',
-    status: ConcreteFollowUpStatus.pending,
+    status: manualCompleted
+        ? ConcreteFollowUpStatus.completed
+        : ConcreteFollowUpStatus.pending,
     reminderId: null,
     note: null,
     reason: null,
-    revision: 1,
+    revision: manualCompleted ? 2 : 1,
     createdAt: '2026-07-19T07:00:00Z',
     updatedAt: '2026-07-19T07:00:00Z',
-    completedAt: null,
+    completedAt: manualCompleted ? '2026-07-19T07:00:00Z' : null,
   );
   const truck = ConcreteTruck(
     id: truckId,
@@ -940,10 +1167,10 @@ ConcretePourDetail _detail(
     pour: pour,
     concreteClassId: concreteClassId,
     agendaLogId: agendaLinked ? agendaLogId : null,
-    checks: const [check],
+    checks: checks,
     trucks: trucks,
     sampleSets: const [],
-    followUps: const [follow],
+    followUps: [follow],
     attachments: const [attachment],
     events: const [event],
     linkedReminders: const [],
@@ -968,7 +1195,7 @@ ConcretePourDetail _detail(
       pourDurationMinutes: ended ? 30 : null,
       sampleSetCount: 0,
       sampleCount: 0,
-      pendingCheckCount: 1,
+      pendingCheckCount: pendingRequiredConcreteChecks(checks).length,
       missingEvidenceTruckCount: 0,
       openFollowUpCount: 1,
     ),

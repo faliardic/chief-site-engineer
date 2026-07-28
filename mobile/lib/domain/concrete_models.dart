@@ -288,7 +288,34 @@ class ConcreteCheckItem {
   final String? reason;
   final int revision;
   final String updatedAt;
+
+  bool get isSystemOwned => concreteSystemOwnedCheckItemKeys.contains(itemKey);
+
+  bool get isManual => !isSystemOwned;
+
+  bool get isPendingRequired =>
+      isRequired && status == ConcreteCheckStatus.pending;
 }
+
+const concreteInspectionNotifiedCheckKey = 'inspection_notified';
+const concreteLaboratoryAppointmentCheckKey = 'laboratory_appointment';
+
+const concreteSystemOwnedCheckItemKeys = <String>{
+  concreteInspectionNotifiedCheckKey,
+  concreteLaboratoryAppointmentCheckKey,
+};
+
+List<ConcreteCheckItem> pendingRequiredConcreteChecks(
+  Iterable<ConcreteCheckItem> checks,
+) => checks.where((item) => item.isPendingRequired).toList(growable: false);
+
+List<ConcreteCheckItem> pendingManualConcreteChecks(
+  Iterable<ConcreteCheckItem> checks,
+) => checks
+    .where(
+      (item) => item.isManual && item.status == ConcreteCheckStatus.pending,
+    )
+    .toList(growable: false);
 
 class ConcreteTruck {
   const ConcreteTruck({
@@ -532,6 +559,11 @@ class ConcretePourDetail {
   final List<ConcretePourEvent> events;
   final List<MobileReminder> linkedReminders;
   final ConcreteMetrics metrics;
+
+  List<ConcreteCheckItem> get pendingRequiredChecks =>
+      pendingRequiredConcreteChecks(checks);
+
+  int get pendingRequiredCheckCount => pendingRequiredChecks.length;
 }
 
 class CreateConcretePourCommand {
