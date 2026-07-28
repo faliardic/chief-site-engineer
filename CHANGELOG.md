@@ -1,5 +1,26 @@
 # Changelog
 
+## Issue #254 - İzole Fiziksel Smoke Acceptance Harness
+
+- Mevcut Flutter `integration_test` ve sentetik background/reboot acceptance
+  altyapısı genişletilerek Issue #252 akışı için ayrı
+  `CSE_ENTRYPOINT_ISSUE252_SMOKE_ACCEPTANCE_V1` hedefi eklendi.
+- Yeni hedef yalnız `com.faliardic.chiefsiteengineer.acceptance` applicationId
+  ve run-ID bazlı boş sentetik support root kullanır; production `.debug`
+  sandbox'ı, kaydı ve UI'ı okunmaz veya değiştirilmez.
+- İki process fazı `Bugün | Yarın | Diğer`, `2 saat`, `3 saat`,
+  `Yarına ertele`, iki/üç saat snooze, restart kalıcılığı ve sentetik kaydın
+  Geri Dönüşüm Kutusu'na taşınmasını gerçek production UI/application katmanı
+  üzerinden doğrular.
+- Normal launcher/field artifact yeni acceptance marker'ını; bütün sentetik
+  artifact'lar normal ve birbirlerine ait marker'ları fail-closed reddeder.
+- Fiziksel runner production `.debug` package için yalnız applicationId, code
+  path, install/version metadata, data-directory metadata inode'ları ve process
+  kimliğinin pre/post eşitliğini doğrular; kullanıcı kayıt count/içeriğini
+  okumaz.
+- Schema `10`, backup format `1`, notification sözleşmesi, Android platform
+  kodu ve production davranışı değişmedi.
+
 ## Issue #234 - Beton Sınıfı Kataloğu ve Döküm Zaman Çizgisi
 
 - Mobil SQLite schema `9` → `10` atomik migration ile proje bazlı Beton sınıfı

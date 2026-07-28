@@ -44,7 +44,7 @@ Tamamlanan günlük güvenilirlik dilimleri:
 Güncel güvenli `master`:
 
 ```text
-5eeb192d56b834df8c6e44d0d2fd80b0194251b5
+defeab25f4a940c43f07e42faa3fa3fd2ef905de
 ```
 
 Bu noktada mobil schema `10`, backup formatı `1`, Flutter full suite `260 PASS`,
@@ -148,15 +148,17 @@ girişini ve kaynak bağlantısı kopukluklarını dar child Issue'larla kapatma
    gerçek zamanlar ve tek bağlı Ajanda logu.
 6. **Beton kelime önerisi/deep-link — tamamlandı:** deterministik öneri ve Beton
    paketine bağlantı; otomatik kayıt veya teknik karar yok.
-
-### Sıradaki kanonik bloklar
-
-7. **Hatırlatıcı hızlı eylem netliği**
+7. **Hatırlatıcı hızlı eylem netliği — tamamlandı**
    - Kart eylemi `Yarın` yerine `Yarına ertele` olarak gösterilir.
    - Üstteki `Yarın` görünüm filtresi değişmez.
    - `15 dakika`, `1 saat`, `2 saat`, `3 saat`, `Yarına ertele` ve özel tarih/saat
      seçenekleri tutarlı yüzeylerde sunulur.
    - Schema ve backup formatı değişmez.
+   - Issue #254 ile yalnız `.acceptance` sandbox'ında çalışan fiziksel smoke
+     harness; iki/üç saat davranışı, restart kalıcılığı ve recoverable cleanup
+     için tekrar kullanılabilir kapı sağlar.
+
+### Sıradaki kanonik bloklar
 
 8. **Ajanda–Hatırlatıcı kontrollü metin senkronu**
    - Ajandadan oluşturulan yeni Hatırlatıcı başlangıçta kaynak metne bağlıdır.

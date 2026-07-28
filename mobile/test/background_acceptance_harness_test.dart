@@ -1,6 +1,11 @@
+import 'dart:io';
+
+import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/storage/app_directories.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../integration_test/support/issue252_smoke_acceptance.dart';
 import '../integration_test/support/synthetic_acceptance_harness.dart';
 import 'support/fake_agenda_application.dart';
 
@@ -47,6 +52,90 @@ void main() {
 
     expect(resolution.created, isTrue);
     expect(agenda.createReminderCalls, 1);
+  });
+
+  test('Issue 252 run identity and synthetic title are fail-closed', () {
+    expect(
+      issue252SmokeTitle('20260727153045'),
+      'ISSUE252-SMOKE-20260727153045',
+    );
+    expect(
+      () => issue252SmokeTitle('../production'),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
+  test('Issue 252 due windows use operation time instead of prior due', () {
+    final started = DateTime.utc(2026, 7, 27, 12);
+    final finished = started.add(const Duration(seconds: 2));
+
+    expect(
+      isDueWithinOperationWindow(
+        dueAt: '2026-07-27T15:00:01.000Z',
+        operationStartedAt: started,
+        operationFinishedAt: finished,
+        offset: const Duration(hours: 3),
+      ),
+      isTrue,
+    );
+    expect(
+      isDueWithinOperationWindow(
+        dueAt: '2026-07-27T17:00:00.000Z',
+        operationStartedAt: started,
+        operationFinishedAt: finished,
+        offset: const Duration(hours: 3),
+      ),
+      isFalse,
+    );
+  });
+
+  test('Issue 252 restart state preserves exact synthetic identity', () async {
+    final temporaryRoot = await Directory.systemTemp.createTemp(
+      'cse_issue254_helper_',
+    );
+    addTearDown(() async {
+      if (await temporaryRoot.exists()) {
+        await temporaryRoot.delete(recursive: true);
+      }
+    });
+    final directories = AppDirectories.fromSupportRoot(
+      temporaryRoot,
+      AppEnvironment.debug,
+    );
+    final stateFile = issue252SmokeStateFile(directories);
+    const state = Issue252SmokeState(
+      runId: '20260727153045',
+      reminderId: reminderId,
+      title: 'ISSUE252-SMOKE-20260727153045',
+      finalDueAt: '2026-07-27T15:00:01.000Z',
+    );
+
+    await writeIssue252SmokeState(stateFile, state);
+    final restored = await readIssue252SmokeState(
+      stateFile,
+      expectedRunId: state.runId,
+    );
+
+    expect(restored.reminderId, state.reminderId);
+    expect(restored.title, state.title);
+    expect(restored.finalDueAt, state.finalDueAt);
+  });
+
+  test('Issue 252 synthetic reminder lookup rejects ambiguity', () {
+    final reminder = _reminder(nextAttentionAt: '2026-07-20T08:15:00Z');
+    expect(
+      requireUniqueSyntheticReminder([
+        reminder,
+      ], title: 'Synthetic 15 minute acceptance'),
+      same(reminder),
+    );
+    expect(
+      () => requireUniqueSyntheticReminder([
+        reminder,
+        reminder,
+      ], title: 'Synthetic 15 minute acceptance'),
+      throwsStateError,
+    );
   });
 }
 

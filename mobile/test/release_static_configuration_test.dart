@@ -42,23 +42,61 @@ void main() {
     final rebootSource = File(
       'integration_test/background_reboot_sidecar_main.dart',
     ).readAsStringSync();
+    final physicalSmokeSource = File(
+      'integration_test/issue252_physical_smoke_test.dart',
+    ).readAsStringSync();
+    final physicalSmokeSupport = File(
+      'integration_test/support/issue252_smoke_acceptance.dart',
+    ).readAsStringSync();
     final gate = File('../scripts/release_gate.ps1').readAsStringSync();
     final acceptanceBuild = File(
       '../scripts/build_mobile_acceptance_apks.ps1',
+    ).readAsStringSync();
+    final physicalSmokeRunner = File(
+      '../scripts/run_issue252_physical_smoke_acceptance.ps1',
     ).readAsStringSync();
 
     expect(mainSource, contains('CSE_ENTRYPOINT_NORMAL_LIB_MAIN_DART_V1'));
     expect(deliverySource, contains('CSE_ENTRYPOINT_BACKGROUND_ACCEPTANCE_V1'));
     expect(rebootSource, contains('CSE_ENTRYPOINT_REBOOT_ACCEPTANCE_V1'));
+    expect(
+      physicalSmokeSource,
+      contains('CSE_ENTRYPOINT_ISSUE252_SMOKE_ACCEPTANCE_V1'),
+    );
+    expect(physicalSmokeSource, contains('CSE_ISSUE254_RUN_ID'));
+    expect(physicalSmokeSupport, contains('Directory.systemTemp.path'));
     expect(gate, contains("'--target', 'lib\\main.dart'"));
     expect(gate, contains('verify_flutter_apk_entrypoint.py'));
     expect(gate, contains('issue212-reminder-pilot-ux-debug.apk'));
+    expect(
+      'CSE_ENTRYPOINT_ISSUE252_SMOKE_ACCEPTANCE_V1'.allMatches(gate),
+      hasLength(2),
+    );
     expect(
       acceptanceBuild,
       contains('issue207-background-acceptance-debug.apk'),
     );
     expect(acceptanceBuild, contains('issue207-reboot-acceptance-debug.apk'));
+    expect(
+      acceptanceBuild,
+      contains('issue254-physical-smoke-acceptance-debug.apk'),
+    );
     expect(acceptanceBuild, contains('android-arm64,android-x64'));
+    expect(
+      physicalSmokeRunner,
+      contains('com.faliardic.chiefsiteengineer.acceptance'),
+    );
+    expect(
+      physicalSmokeRunner,
+      contains('com.faliardic.chiefsiteengineer.debug'),
+    );
+    expect(physicalSmokeRunner, contains("'am', 'kill', \$acceptancePackage"));
+    expect(physicalSmokeRunner, isNot(contains('force-stop')));
+    expect(physicalSmokeRunner, isNot(contains("'uninstall'")));
+    expect(physicalSmokeRunner, isNot(contains("'pm', 'clear'")));
+    expect(physicalSmokeRunner, contains('ceDataInode'));
+    expect(physicalSmokeRunner, contains('deDataInode'));
+    expect(physicalSmokeRunner, contains('processId'));
   });
 
   test('iOS privacy manifest and archive target are statically wired', () {

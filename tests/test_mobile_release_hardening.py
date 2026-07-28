@@ -29,7 +29,7 @@ def test_release_gate_keeps_debug_sidecar_and_production_rc_distinct() -> None:
     assert "chief-site-engineer-0.1.0-issue212-reminder-pilot-ux-debug.apk" in gate
     assert "'--target', 'lib\\main.dart'" in gate
     assert "CSE_ENTRYPOINT_NORMAL_LIB_MAIN_DART_V1" in gate
-    assert "Clear-GeneratedReadOnlyAttributes" in gate
+    assert gate.count("Clear-GeneratedReadOnlyAttributes") >= 6
     assert "Flutter clean left a stale app-debug.apk" in gate
     assert "SCHEDULE_EXACT_ALARM allow" in gate
     assert "com.faliardic.chiefsiteengineer.debug" in gate
@@ -50,10 +50,35 @@ def test_synthetic_acceptance_artifacts_are_isolated_from_field_sidecar() -> Non
     assert '".acceptance"' in gradle
     assert "issue207-background-acceptance-debug.apk" in script
     assert "issue207-reboot-acceptance-debug.apk" in script
+    assert "issue254-physical-smoke-acceptance-debug.apk" in script
+    assert "CSE_ENTRYPOINT_ISSUE252_SMOKE_ACCEPTANCE_V1" in script
     assert "android-arm64,android-x64" in script
     assert "Clear-GeneratedReadOnlyAttributes" in script
     assert "issue212-reminder-pilot-ux-debug.apk" in script
     assert "changed the normal field sidecar artifact" in script
+
+
+def test_issue252_physical_smoke_runner_is_acceptance_only() -> None:
+    script = (
+        REPOSITORY_ROOT
+        / "scripts"
+        / "run_issue252_physical_smoke_acceptance.ps1"
+    ).read_text(encoding="utf-8")
+    gate = (REPOSITORY_ROOT / "scripts" / "release_gate.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert "com.faliardic.chiefsiteengineer.acceptance" in script
+    assert "com.faliardic.chiefsiteengineer.debug" in script
+    assert "CSE_ENTRYPOINT_ISSUE252_SMOKE_ACCEPTANCE_V1" in script
+    assert "'am', 'kill', $acceptancePackage" in script
+    assert "force-stop" not in script
+    assert "'uninstall'" not in script
+    assert "'pm', 'clear'" not in script
+    assert "ceDataInode" in script
+    assert "deDataInode" in script
+    assert "processId" in script
+    assert gate.count("CSE_ENTRYPOINT_ISSUE252_SMOKE_ACCEPTANCE_V1") == 2
 
 
 def test_flutter_apk_entrypoint_verifier_fails_closed(tmp_path: Path) -> None:

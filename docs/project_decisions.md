@@ -1,5 +1,31 @@
 # Proje Kararlari
 
+## Issue 254 — İzole Fiziksel Smoke Acceptance
+
+- Issue #252 fiziksel smoke'u ikinci bir E2E framework kurmaz; mevcut Flutter
+  `integration_test`, `CSE_ACCEPTANCE_HARNESS`, APK marker verifier ve sentetik
+  artifact builder zincirini genişletir.
+- Physical-smoke entrypoint'i yalnız
+  `CSE_ENTRYPOINT_ISSUE252_SMOKE_ACCEPTANCE_V1` marker'ını taşır. Normal field
+  APK bu marker'ı; background, reboot ve physical-smoke APK'ları normal ve
+  birbirlerinin marker'larını fail-closed reddeder.
+- Acceptance applicationId
+  `com.faliardic.chiefsiteengineer.acceptance` olarak sabittir. Her koşu package
+  cache altında yalnız 14 haneli run ID'den türetilen yeni support root kullanır;
+  kök önceden varsa ilk faz başlamaz.
+- Restart kabulü aynı test binary'sinin iki process çalışmasıdır. İlk faz
+  sentetik state mührünü yalnız bütün UI/mutation assertion'ları geçince yazar;
+  ikinci faz reminder kimliği, active status ve canonical due değerini birebir
+  okuyup yalnız bu kaydı recoverable trash'e taşır.
+- `2 saat` ve `3 saat` doğruluğu eski due'ya göre değil, mutation çağrısının
+  başlangıç/bitiş penceresine göre ölçülür. Canonical saniye kırpması için yalnız
+  bir saniyelik sınır toleransı vardır.
+- Production `.debug` izolasyon kanıtı kayıt veya dosya içeriği okumaz.
+  ApplicationId, APK code path, version/install metadata, `dataDir`,
+  `ceDataInode`, `deDataInode` ve PID pre/post aynı olmalıdır.
+- Normal launcher, field APK, release artifact, schema, backup, notification ve
+  Android platform sözleşmeleri değişmez.
+
 ## Issue 230 — Reminder Kaynak Ajanda Fotoğrafları
 
 - Reminder kaynak medyası ayrı, salt-okunur

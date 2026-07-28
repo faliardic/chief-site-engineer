@@ -63,7 +63,7 @@ function Build-AcceptanceApk {
     param(
         [string]$Target,
         [string]$ExpectedMarker,
-        [string]$ForbiddenMarker,
+        [string[]]$ForbiddenMarkers,
         [string]$OutputName
     )
     $sharedOutput = Join-Path $mobileRoot 'build\app\outputs\flutter-apk\app-debug.apk'
@@ -77,13 +77,16 @@ function Build-AcceptanceApk {
         (Get-Item -LiteralPath $sharedOutput).LastWriteTimeUtc -lt $started) {
         throw "Acceptance APK was not freshly produced for target $Target."
     }
-    Invoke-Checked -Command 'python' -Arguments @(
+    $verificationArguments = @(
         (Join-Path $repositoryRoot 'scripts\verify_flutter_apk_entrypoint.py'),
         '--apk', $sharedOutput,
         '--expected-marker', $ExpectedMarker,
-        '--forbidden-marker', 'CSE_ENTRYPOINT_NORMAL_LIB_MAIN_DART_V1',
-        '--forbidden-marker', $ForbiddenMarker
+        '--forbidden-marker', 'CSE_ENTRYPOINT_NORMAL_LIB_MAIN_DART_V1'
     )
+    foreach ($marker in $ForbiddenMarkers) {
+        $verificationArguments += @('--forbidden-marker', $marker)
+    }
+    Invoke-Checked -Command 'python' -Arguments $verificationArguments
     $package = (& $aapt2 dump packagename $sharedOutput 2>&1) -join "`n"
     if ($LASTEXITCODE -ne 0 -or
         $package.Trim() -ne 'com.faliardic.chiefsiteengineer.acceptance') {
@@ -92,13 +95,16 @@ function Build-AcceptanceApk {
     New-Item -ItemType Directory -Force -Path $artifactRoot | Out-Null
     $destination = Join-Path $artifactRoot $OutputName
     Copy-Item -LiteralPath $sharedOutput -Destination $destination -Force
-    Invoke-Checked -Command 'python' -Arguments @(
+    $artifactVerificationArguments = @(
         (Join-Path $repositoryRoot 'scripts\verify_flutter_apk_entrypoint.py'),
         '--apk', $destination,
         '--expected-marker', $ExpectedMarker,
-        '--forbidden-marker', 'CSE_ENTRYPOINT_NORMAL_LIB_MAIN_DART_V1',
-        '--forbidden-marker', $ForbiddenMarker
+        '--forbidden-marker', 'CSE_ENTRYPOINT_NORMAL_LIB_MAIN_DART_V1'
     )
+    foreach ($marker in $ForbiddenMarkers) {
+        $artifactVerificationArguments += @('--forbidden-marker', $marker)
+    }
+    Invoke-Checked -Command 'python' -Arguments $artifactVerificationArguments
     $checksum = (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash.ToLowerInvariant()
     Write-Output "$OutputName SHA256: $checksum"
 }
@@ -113,13 +119,27 @@ try {
     Build-AcceptanceApk `
         -Target 'integration_test\background_delivery_sidecar_main.dart' `
         -ExpectedMarker 'CSE_ENTRYPOINT_BACKGROUND_ACCEPTANCE_V1' `
-        -ForbiddenMarker 'CSE_ENTRYPOINT_REBOOT_ACCEPTANCE_V1' `
+        -ForbiddenMarkers @(
+            'CSE_ENTRYPOINT_REBOOT_ACCEPTANCE_V1',
+            'CSE_ENTRYPOINT_ISSUE252_SMOKE_ACCEPTANCE_V1'
+        ) `
         -OutputName 'chief-site-engineer-0.1.0-issue207-background-acceptance-debug.apk'
     Build-AcceptanceApk `
         -Target 'integration_test\background_reboot_sidecar_main.dart' `
         -ExpectedMarker 'CSE_ENTRYPOINT_REBOOT_ACCEPTANCE_V1' `
-        -ForbiddenMarker 'CSE_ENTRYPOINT_BACKGROUND_ACCEPTANCE_V1' `
+        -ForbiddenMarkers @(
+            'CSE_ENTRYPOINT_BACKGROUND_ACCEPTANCE_V1',
+            'CSE_ENTRYPOINT_ISSUE252_SMOKE_ACCEPTANCE_V1'
+        ) `
         -OutputName 'chief-site-engineer-0.1.0-issue207-reboot-acceptance-debug.apk'
+    Build-AcceptanceApk `
+        -Target 'integration_test\issue252_physical_smoke_test.dart' `
+        -ExpectedMarker 'CSE_ENTRYPOINT_ISSUE252_SMOKE_ACCEPTANCE_V1' `
+        -ForbiddenMarkers @(
+            'CSE_ENTRYPOINT_BACKGROUND_ACCEPTANCE_V1',
+            'CSE_ENTRYPOINT_REBOOT_ACCEPTANCE_V1'
+        ) `
+        -OutputName 'chief-site-engineer-0.1.0-issue254-physical-smoke-acceptance-debug.apk'
 
     if ($normalSidecarExisted) {
         $currentHash = (Get-FileHash -LiteralPath $normalSidecar -Algorithm SHA256).Hash
