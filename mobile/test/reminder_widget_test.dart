@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/fake_agenda_application.dart';
+import 'support/fake_attendance_application.dart';
 
 const reminderId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
@@ -30,11 +31,13 @@ MobileReminder reminder({
   String? projectId,
   String? projectName,
   String? sourceLogId,
+  String? attendanceDayId,
 }) => MobileReminder(
   id: id,
   projectId: projectId,
   projectName: projectName,
   sourceLogId: sourceLogId,
+  attendanceDayId: attendanceDayId,
   captureText: title,
   title: title,
   kind: ReminderKind.action,
@@ -819,7 +822,7 @@ void main() {
   });
 
   testWidgets(
-    'Yarına ertele moves Today card to Tomorrow and stays on Upcoming',
+    'Yarına ertele moves Today card to Tomorrow and then stays hidden',
     (tester) async {
       final item = reminder();
       final agenda = FakeAgendaApplication(reminders: [item]);
@@ -850,8 +853,103 @@ void main() {
       await tester.tap(find.byKey(const Key('reminder-other-upcoming')));
       await tester.pumpAndSettle();
       final upcomingAction = find.byKey(Key('reminder-tomorrow-${item.id}'));
-      expect(upcomingAction, findsOneWidget);
-      expect(tester.getSize(upcomingAction).height, greaterThanOrEqualTo(48));
+      expect(upcomingAction, findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Today and overdue cards show tomorrow while future stays hidden',
+    (tester) async {
+      final today = reminder(
+        id: widgetReminderId(101),
+        title: 'Sentetik bugün',
+        nextAttentionAt: '2026-07-20T06:00:00Z',
+      );
+      final overdue = reminder(
+        id: widgetReminderId(102),
+        title: 'Sentetik geciken',
+        nextAttentionAt: '2026-07-20T04:00:00Z',
+      );
+      final future = reminder(
+        id: widgetReminderId(103),
+        title: 'Sentetik gelecek',
+        nextAttentionAt: '2026-07-22T06:00:00Z',
+      );
+      final agenda = FakeAgendaApplication(reminders: [today, overdue, future]);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: RemindersPage(agenda: agenda)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(Key('reminder-tomorrow-${today.id}')), findsOneWidget);
+      expect(
+        find.byKey(Key('reminder-tomorrow-${overdue.id}')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('reminder-primary-other')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('reminder-other-upcoming')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(Key('reminder-${future.id}')), findsOneWidget);
+      expect(find.byKey(Key('reminder-tomorrow-${future.id}')), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Puantaj card and detail hide tomorrow and source action still opens',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final item = reminder(
+        id: widgetReminderId(104),
+        title: 'Sentetik Puantaj hatırlatıcısı',
+        nextAttentionAt: '2026-07-20T06:00:00Z',
+        projectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        projectName: 'Sentetik proje',
+        attendanceDayId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      );
+      final agenda = FakeAgendaApplication(
+        reminders: [item],
+        reminderDetail: item,
+      );
+      final attendance = FakeAttendanceApplication();
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+          child: MaterialApp(
+            theme: ThemeData(brightness: Brightness.dark),
+            home: Scaffold(
+              body: RemindersPage(agenda: agenda, attendance: attendance),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(Key('reminder-${item.id}')), findsOneWidget);
+      expect(find.byKey(Key('reminder-tomorrow-${item.id}')), findsNothing);
+      await tester.tap(find.byKey(Key('reminder-${item.id}')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('snooze-tomorrow')), findsNothing);
+      final source = find.byKey(const Key('open-source-attendance-day'));
+      await tester.scrollUntilVisible(
+        source,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(source, findsOneWidget);
+      await tester.tap(source);
+      await tester.pumpAndSettle();
+      expect(
+        tester.state<NavigatorState>(find.byType(Navigator)).canPop(),
+        isTrue,
+      );
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -904,7 +1002,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      final item = reminder();
+      final item = reminder(nextAttentionAt: '2026-07-21T06:00:00Z');
       final agenda = FakeAgendaApplication(
         reminders: [item],
         reminderDetail: item,
@@ -934,12 +1032,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ReminderDetailPage), findsOneWidget);
       final detailTomorrow = find.byKey(const Key('snooze-tomorrow'));
-      await tester.scrollUntilVisible(
-        detailTomorrow,
-        300,
-        scrollable: find.byType(Scrollable).first,
-      );
-      expect(detailTomorrow, findsOneWidget);
+      expect(detailTomorrow, findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
@@ -997,7 +1090,11 @@ void main() {
       )..mutateReminderCompleter = completer;
       await tester.pumpWidget(
         MaterialApp(
-          home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+          home: ReminderDetailPage(
+            agenda: agenda,
+            reminderId: reminderId,
+            istanbulToday: '2026-07-20',
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -1049,7 +1146,11 @@ void main() {
     )..mutateReminderFailure = StateError('forced failure');
     await tester.pumpWidget(
       MaterialApp(
-        home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+        home: ReminderDetailPage(
+          agenda: agenda,
+          reminderId: reminderId,
+          istanbulToday: '2026-07-20',
+        ),
       ),
     );
     await tester.pumpAndSettle();

@@ -354,6 +354,34 @@ class MobileReminder {
   final int revision;
 }
 
+bool isReminderEligibleForTomorrowSnooze(
+  MobileReminder reminder, {
+  required String istanbulToday,
+}) {
+  if (reminder.status != ReminderStatus.active ||
+      reminder.trashedAt != null ||
+      reminder.attendanceDayId != null) {
+    return false;
+  }
+  final timedAt = reminder.nextAttentionAt;
+  final allDayDate = reminder.allDayLocalDate;
+  if ((timedAt == null) == (allDayDate == null)) {
+    return false;
+  }
+  try {
+    CseTimeCodec.validateIstanbulDay(istanbulToday);
+    final dueDay = timedAt == null
+        ? allDayDate!
+        : CseTimeCodec.istanbulDayKey(timedAt);
+    if (allDayDate != null) {
+      CseTimeCodec.validateIstanbulDay(allDayDate);
+    }
+    return dueDay.compareTo(istanbulToday) <= 0;
+  } on TimeContractViolation {
+    return false;
+  }
+}
+
 class NotificationBinding {
   const NotificationBinding({
     required this.reminderId,

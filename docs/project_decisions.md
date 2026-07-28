@@ -1,5 +1,25 @@
 # Proje Kararlari
 
+## Issue 262 — Hatırlatıcı Yarına Ertele Uygunluğu
+
+- `Yarına ertele` kart, detay ve direct application mutation için
+  `isReminderEligibleForTomorrowSnooze` adlı tek domain helper'ından karar alır.
+- Uygunluk Europe/Istanbul yerel günündedir. Timed reminder
+  `next_attention_at` UTC değerinden yerel güne çevrilir; all-day reminder
+  `all_day_local_date` değerini kullanır.
+- Yalnız `active`, trash olmayan, `attendanceDayId == null` ve due yerel günü
+  bugün veya geçmiş olan reminder uygundur. Yarın/gelecek, terminal, trash,
+  Puantaj kaynaklı ve plansız reminder fail-closed reddedilir.
+- Puantaj dışındaki source bağlantıları varsayımla yasaklanmaz. Ajanda veya Beton
+  kaynağının schedule ownership'i ayrı açık sözleşme olmadan değiştirilmez.
+- Uygun olmayan mutation row/revision/event/notification binding üzerinde
+  değişiklik yapmaz. Uygun mutation aynı transaction/event ve mevcut
+  notification reconciliation yolunu kullanır.
+- `snoozeTomorrowMorning` aynı event ID retry'si mevcut sonucu döndürür ve
+  duplicate event üretmez; yeni event ID ile stale revision fail-closed kalır.
+- Schema `10`, backup formatı `1`, Puantaj recurrence/occurrence motoru ve
+  notification platform sözleşmeleri değişmez.
+
 ## Issue 260 — Beton Checklist Source-of-Truth
 
 - Açık zorunlu checklist sayısı saklanan ayrı bir sayaç değildir. Current

@@ -465,13 +465,20 @@ class _RemindersPageState extends State<RemindersPage> {
                     agenda: widget.agenda,
                     attendance: widget.attendance,
                     reminderId: reminder.id,
+                    istanbulToday: _todayOverview.istanbulDay.isEmpty
+                        ? null
+                        : _todayOverview.istanbulDay,
                   ),
                 ),
               );
               if (mounted) await _reload();
             },
           ),
-          if (showTomorrow && reminder.status == ReminderStatus.active)
+          if (showTomorrow &&
+              isReminderEligibleForTomorrowSnooze(
+                reminder,
+                istanbulToday: _todayOverview.istanbulDay,
+              ))
             Align(
               alignment: Alignment.centerRight,
               child: Padding(

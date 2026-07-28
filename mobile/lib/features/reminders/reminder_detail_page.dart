@@ -18,6 +18,7 @@ class ReminderDetailPage extends StatefulWidget {
     this.attendance,
     this.concrete,
     this.concreteAttachments,
+    this.istanbulToday,
     super.key,
   });
 
@@ -26,6 +27,7 @@ class ReminderDetailPage extends StatefulWidget {
   final AttendanceApplication? attendance;
   final ConcreteApplication? concrete;
   final SafeAttachmentPicker? concreteAttachments;
+  final String? istanbulToday;
 
   @override
   State<ReminderDetailPage> createState() => _ReminderDetailPageState();
@@ -534,6 +536,15 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
         reminder.status == ReminderStatus.completed ||
         reminder.status == ReminderStatus.cancelled;
     final trashed = reminder.trashedAt != null;
+    final istanbulToday =
+        widget.istanbulToday ??
+        CseTimeCodec.istanbulDayKey(
+          CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
+        );
+    final tomorrowEligible = isReminderEligibleForTomorrowSnooze(
+      reminder,
+      istanbulToday: istanbulToday,
+    );
     return ListView(
       key: const Key('reminder-detail'),
       padding: const EdgeInsets.all(16),
@@ -708,16 +719,17 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
                   icon: Icons.check_circle_outline,
                   onPressed: _mutating ? null : _showCompletionDialog,
                 ),
-                _ActionButton(
-                  key: const Key('snooze-tomorrow'),
-                  label: 'Yarına ertele',
-                  icon: Icons.wb_sunny_outlined,
-                  onPressed: _mutating
-                      ? null
-                      : () => _mutate(
-                          ReminderMutationAction.snoozeTomorrowMorning,
-                        ),
-                ),
+                if (tomorrowEligible)
+                  _ActionButton(
+                    key: const Key('snooze-tomorrow'),
+                    label: 'Yarına ertele',
+                    icon: Icons.wb_sunny_outlined,
+                    onPressed: _mutating
+                        ? null
+                        : () => _mutate(
+                            ReminderMutationAction.snoozeTomorrowMorning,
+                          ),
+                  ),
                 _ActionButton(
                   key: const Key('snooze-15'),
                   label: '15 dk ertele',

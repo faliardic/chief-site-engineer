@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 
 class FakeAgendaApplication
@@ -317,6 +318,13 @@ class FakeAgendaApplication
     if (current.revision != command.expectedRevision) {
       throw const AgendaValidationFailure('stale revision');
     }
+    final today = CseTimeCodec.istanbulDayKey(CseTimeCodec.encodeUtc(asOfUtc));
+    if (command.action == ReminderMutationAction.snoozeTomorrowMorning &&
+        !isReminderEligibleForTomorrowSnooze(current, istanbulToday: today)) {
+      throw const AgendaValidationFailure(
+        'Bu hatırlatıcı yarına ertelenemez. Tarihi veya kaynak akışı kontrol edin.',
+      );
+    }
     final status = switch (command.action) {
       ReminderMutationAction.complete => ReminderStatus.completed,
       ReminderMutationAction.cancel => ReminderStatus.cancelled,
@@ -340,6 +348,9 @@ class FakeAgendaApplication
       ReminderMutationAction.snooze1Hour ||
       ReminderMutationAction.snooze2Hours ||
       ReminderMutationAction.snooze3Hours => null,
+      ReminderMutationAction.snoozeTomorrowMorning
+          when current.allDayLocalDate != null =>
+        CseTimeCodec.shiftIstanbulDay(today, 1),
       _ => current.allDayLocalDate,
     };
     final scheduledAt = switch (command.action) {
@@ -353,7 +364,13 @@ class FakeAgendaApplication
         asOfUtc.add(const Duration(hours: 2)).toIso8601String(),
       ReminderMutationAction.snooze3Hours =>
         asOfUtc.add(const Duration(hours: 3)).toIso8601String(),
-      ReminderMutationAction.snoozeTomorrowMorning => '2026-07-21T06:00:00Z',
+      ReminderMutationAction.snoozeTomorrowMorning
+          when current.allDayLocalDate != null =>
+        null,
+      ReminderMutationAction.snoozeTomorrowMorning => _tomorrowAtSameLocalTime(
+        current.nextAttentionAt!,
+        today,
+      ),
       _ => current.nextAttentionAt,
     };
     final trashedAt = switch (command.action) {
@@ -379,6 +396,8 @@ class FakeAgendaApplication
       projectId: current.projectId,
       projectName: current.projectName,
       sourceLogId: current.sourceLogId,
+      attendanceDayId: current.attendanceDayId,
+      concretePourId: current.concretePourId,
       captureText: current.captureText,
       title: command.title?.trim() ?? current.title,
       description: command.action == ReminderMutationAction.updateDetails
@@ -413,6 +432,19 @@ class FakeAgendaApplication
     reminders = [...reminders]..[index] = updated;
     reminderDetail = updated;
     return updated;
+  }
+
+  String _tomorrowAtSameLocalTime(String currentValue, String today) {
+    final currentLocal = CseTimeCodec.toIstanbul(currentValue);
+    final tomorrow = CseTimeCodec.shiftIstanbulDay(today, 1).split('-');
+    return CseTimeCodec.canonicalFromIstanbulComponents(
+      year: int.parse(tomorrow[0]),
+      month: int.parse(tomorrow[1]),
+      day: int.parse(tomorrow[2]),
+      hour: currentLocal.hour,
+      minute: currentLocal.minute,
+      second: currentLocal.second,
+    );
   }
 
   @override

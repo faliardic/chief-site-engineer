@@ -20,6 +20,29 @@ const reminder3 = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc3';
 String eventId(int value) =>
     'dddddddd-dddd-4ddd-8ddd-${value.toString().padLeft(12, '0')}';
 
+MobileReminder eligibilityReminder({
+  ReminderStatus status = ReminderStatus.active,
+  String? nextAttentionAt,
+  String? allDayLocalDate,
+  String? attendanceDayId,
+  String? trashedAt,
+}) => MobileReminder(
+  id: reminder1,
+  projectId: null,
+  projectName: null,
+  sourceLogId: null,
+  attendanceDayId: attendanceDayId,
+  title: 'Sentetik uygunluk kaydı',
+  kind: ReminderKind.action,
+  status: status,
+  nextAttentionAt: nextAttentionAt,
+  allDayLocalDate: allDayLocalDate,
+  createdAt: '2026-07-19T07:00:00Z',
+  updatedAt: '2026-07-19T07:00:00Z',
+  trashedAt: trashedAt,
+  revision: 1,
+);
+
 void main() {
   late Directory temporaryRoot;
   late AppDirectories directories;
@@ -367,7 +390,7 @@ void main() {
   });
 
   test(
-    'tomorrow keeps local clock or uses 09:00 and preserves source',
+    'tomorrow keeps local clock, rejects inbox, and preserves source',
     () async {
       await createProjectAndLog();
       final sourceBefore = await agenda.getAgendaLogDetail(logId);
@@ -406,7 +429,7 @@ void main() {
       expect(sourceAfter.log.revision, sourceBefore.log.revision);
       expect(sourceAfter.log.updatedAt, sourceBefore.log.updatedAt);
 
-      var inbox = await agenda.createReminder(
+      final inbox = await agenda.createReminder(
         CreateReminderCommand(
           id: reminder2,
           eventId: eventId(912),
@@ -415,21 +438,26 @@ void main() {
           schedule: ReminderScheduleKind.inbox,
         ),
       );
-      inbox = await agenda.mutateReminder(
-        MutateReminderCommand(
-          reminderId: inbox.id,
-          eventId: eventId(913),
-          expectedRevision: inbox.revision,
-          action: ReminderMutationAction.snoozeTomorrowMorning,
+      await expectLater(
+        agenda.mutateReminder(
+          MutateReminderCommand(
+            reminderId: inbox.id,
+            eventId: eventId(913),
+            expectedRevision: inbox.revision,
+            action: ReminderMutationAction.snoozeTomorrowMorning,
+          ),
         ),
+        throwsA(isA<AgendaValidationFailure>()),
       );
-      expect(inbox.status, ReminderStatus.active);
-      expect(inbox.nextAttentionAt, '2026-07-20T06:00:00Z');
+      final unchangedInbox = await agenda.getReminderDetail(inbox.id);
+      expect(unchangedInbox.status, ReminderStatus.inbox);
+      expect(unchangedInbox.nextAttentionAt, isNull);
+      expect(unchangedInbox.revision, inbox.revision);
     },
   );
 
   test(
-    'tomorrow is a no-op when the reminder already has that local time',
+    'tomorrow direct mutation rejects an already-tomorrow reminder unchanged',
     () async {
       final scheduled = await agenda.createReminder(
         CreateReminderCommand(
@@ -444,15 +472,19 @@ void main() {
       final eventCount = (await agenda.listReminderEvents(scheduled.id)).length;
       final nativeScheduleCount = notifications.scheduled.length;
 
-      final unchanged = await agenda.mutateReminder(
-        MutateReminderCommand(
-          reminderId: scheduled.id,
-          eventId: eventId(915),
-          expectedRevision: scheduled.revision,
-          action: ReminderMutationAction.snoozeTomorrowMorning,
+      await expectLater(
+        agenda.mutateReminder(
+          MutateReminderCommand(
+            reminderId: scheduled.id,
+            eventId: eventId(915),
+            expectedRevision: scheduled.revision,
+            action: ReminderMutationAction.snoozeTomorrowMorning,
+          ),
         ),
+        throwsA(isA<AgendaValidationFailure>()),
       );
 
+      final unchanged = await agenda.getReminderDetail(scheduled.id);
       expect(unchanged.revision, scheduled.revision);
       expect(unchanged.nextAttentionAt, scheduled.nextAttentionAt);
       expect(
@@ -460,6 +492,290 @@ void main() {
         hasLength(eventCount),
       );
       expect(notifications.scheduled, hasLength(nativeScheduleCount));
+    },
+  );
+
+  test('tomorrow eligibility helper separates the six synthetic cases', () {
+    const today = '2026-07-19';
+    final cases = <({MobileReminder reminder, bool expected, String label})>[
+      (
+        reminder: eligibilityReminder(nextAttentionAt: '2026-07-19T12:00:00Z'),
+        expected: true,
+        label: 'timed today',
+      ),
+      (
+        reminder: eligibilityReminder(nextAttentionAt: '2026-07-19T06:00:00Z'),
+        expected: true,
+        label: 'timed overdue',
+      ),
+      (
+        reminder: eligibilityReminder(nextAttentionAt: '2026-07-20T06:00:00Z'),
+        expected: false,
+        label: 'timed tomorrow',
+      ),
+      (
+        reminder: eligibilityReminder(nextAttentionAt: '2026-07-21T06:00:00Z'),
+        expected: false,
+        label: 'timed future',
+      ),
+      (
+        reminder: eligibilityReminder(
+          nextAttentionAt: '2026-07-19T12:00:00Z',
+          attendanceDayId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        ),
+        expected: false,
+        label: 'attendance linked today',
+      ),
+      (
+        reminder: eligibilityReminder(nextAttentionAt: '2026-07-19T21:30:00Z'),
+        expected: false,
+        label: 'UTC date today but Istanbul day tomorrow',
+      ),
+    ];
+
+    for (final item in cases) {
+      expect(
+        isReminderEligibleForTomorrowSnooze(
+          item.reminder,
+          istanbulToday: today,
+        ),
+        item.expected,
+        reason: item.label,
+      );
+    }
+  });
+
+  test(
+    'tomorrow eligibility covers all-day, terminal, trash and unscheduled',
+    () {
+      const today = '2026-07-19';
+      expect(
+        isReminderEligibleForTomorrowSnooze(
+          eligibilityReminder(allDayLocalDate: today),
+          istanbulToday: today,
+        ),
+        isTrue,
+      );
+      expect(
+        isReminderEligibleForTomorrowSnooze(
+          eligibilityReminder(allDayLocalDate: '2026-07-20'),
+          istanbulToday: today,
+        ),
+        isFalse,
+      );
+      expect(
+        isReminderEligibleForTomorrowSnooze(
+          eligibilityReminder(
+            status: ReminderStatus.completed,
+            nextAttentionAt: '2026-07-19T12:00:00Z',
+          ),
+          istanbulToday: today,
+        ),
+        isFalse,
+      );
+      expect(
+        isReminderEligibleForTomorrowSnooze(
+          eligibilityReminder(
+            nextAttentionAt: '2026-07-19T12:00:00Z',
+            trashedAt: '2026-07-19T08:00:00Z',
+          ),
+          istanbulToday: today,
+        ),
+        isFalse,
+      );
+      expect(
+        isReminderEligibleForTomorrowSnooze(
+          eligibilityReminder(status: ReminderStatus.inbox),
+          istanbulToday: today,
+        ),
+        isFalse,
+      );
+    },
+  );
+
+  test(
+    'ineligible future and attendance mutations preserve row event and binding',
+    () async {
+      final future = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(916),
+          title: 'Sentetik gelecek kayıt',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-21T12:45:00Z',
+        ),
+      );
+      final futureBefore = await agenda.getReminderLifecycleDetail(future.id);
+      final futureNativeCount = notifications.scheduled.length;
+      await expectLater(
+        agenda.mutateReminder(
+          MutateReminderCommand(
+            reminderId: future.id,
+            eventId: eventId(917),
+            expectedRevision: future.revision,
+            action: ReminderMutationAction.snoozeTomorrowMorning,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      final futureAfter = await agenda.getReminderLifecycleDetail(future.id);
+      expect(futureAfter.reminder.revision, futureBefore.reminder.revision);
+      expect(
+        futureAfter.reminder.nextAttentionAt,
+        futureBefore.reminder.nextAttentionAt,
+      );
+      expect(futureAfter.events, hasLength(futureBefore.events.length));
+      expect(
+        futureAfter.notification.scheduledFor,
+        futureBefore.notification.scheduledFor,
+      );
+      expect(
+        futureAfter.notification.syncState,
+        futureBefore.notification.syncState,
+      );
+      expect(notifications.scheduled, hasLength(futureNativeCount));
+
+      await agenda.createProject(
+        const CreateProjectCommand(
+          id: projectId,
+          name: 'Sentetik Puantaj projesi',
+        ),
+      );
+      final attendanceBase = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder2,
+          eventId: eventId(918),
+          projectId: projectId,
+          title: 'Sentetik Puantaj kaydı',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-19T12:45:00Z',
+        ),
+      );
+      final database = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      await database.update(
+        'follow_up_items',
+        {'attendance_day_id': 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'},
+        where: 'id = ?',
+        whereArgs: [attendanceBase.id],
+      );
+      await database.close();
+      final attendanceBefore = await agenda.getReminderLifecycleDetail(
+        attendanceBase.id,
+      );
+      final attendanceNativeCount = notifications.scheduled.length;
+      await expectLater(
+        agenda.mutateReminder(
+          MutateReminderCommand(
+            reminderId: attendanceBase.id,
+            eventId: eventId(919),
+            expectedRevision: attendanceBefore.reminder.revision,
+            action: ReminderMutationAction.snoozeTomorrowMorning,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      final attendanceAfter = await agenda.getReminderLifecycleDetail(
+        attendanceBase.id,
+      );
+      expect(
+        attendanceAfter.reminder.revision,
+        attendanceBefore.reminder.revision,
+      );
+      expect(
+        attendanceAfter.reminder.nextAttentionAt,
+        attendanceBefore.reminder.nextAttentionAt,
+      );
+      expect(attendanceAfter.events, hasLength(attendanceBefore.events.length));
+      expect(
+        attendanceAfter.notification.scheduledFor,
+        attendanceBefore.notification.scheduledFor,
+      );
+      expect(notifications.scheduled, hasLength(attendanceNativeCount));
+    },
+  );
+
+  test(
+    'eligible timed and all-day tomorrow mutations persist and retry idempotently',
+    () async {
+      final timed = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(930),
+          title: 'Sentetik bugün saatli',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-19T12:45:00Z',
+        ),
+      );
+      final timedCommand = MutateReminderCommand(
+        reminderId: timed.id,
+        eventId: eventId(931),
+        expectedRevision: timed.revision,
+        action: ReminderMutationAction.snoozeTomorrowMorning,
+      );
+      final snoozed = await agenda.mutateReminder(timedCommand);
+      expect(snoozed.nextAttentionAt, '2026-07-20T12:45:00Z');
+      final retried = await agenda.mutateReminder(timedCommand);
+      expect(retried.revision, snoozed.revision);
+      expect(retried.nextAttentionAt, snoozed.nextAttentionAt);
+      expect(
+        (await agenda.listReminderEvents(
+          timed.id,
+        )).where((event) => event.eventType == 'snoozed'),
+        hasLength(1),
+      );
+      await expectLater(
+        agenda.mutateReminder(
+          MutateReminderCommand(
+            reminderId: timed.id,
+            eventId: eventId(932),
+            expectedRevision: timed.revision,
+            action: ReminderMutationAction.snoozeTomorrowMorning,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+
+      final allDay = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder2,
+          eventId: eventId(933),
+          title: 'Sentetik bugün tam gün',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          allDayLocalDate: '2026-07-19',
+        ),
+      );
+      final allDaySnoozed = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: allDay.id,
+          eventId: eventId(934),
+          expectedRevision: allDay.revision,
+          action: ReminderMutationAction.snoozeTomorrowMorning,
+        ),
+      );
+      expect(allDaySnoozed.nextAttentionAt, isNull);
+      expect(allDaySnoozed.allDayLocalDate, '2026-07-20');
+
+      final reopenedAgenda = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        notificationGateway: notifications,
+      );
+      expect(
+        (await reopenedAgenda.getReminderDetail(timed.id)).nextAttentionAt,
+        snoozed.nextAttentionAt,
+      );
+      expect(
+        (await reopenedAgenda.getReminderDetail(allDay.id)).allDayLocalDate,
+        allDaySnoozed.allDayLocalDate,
+      );
     },
   );
 
