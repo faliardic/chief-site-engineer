@@ -8,7 +8,7 @@
 **Önceki saha backlog'u:** #203  
 **Açık Release 0.1 pilotu:** #193  
 **Güncel RC / günlük saha testi:** #245  
-**Aktif doğrulama zinciri:** #257 → #254 / #256
+**Aktif doğrulama zinciri:** #260 field smoke; #257 → #254 / #256 BLOCKED
 
 ## 1. Ürün kararı
 
@@ -41,18 +41,22 @@ Tamamlanan günlük güvenilirlik dilimleri:
 - #230 — Hatırlatıcıda kaynak Ajanda fotoğrafları;
 - #234 — Beton sınıfı kataloğu ve döküm zaman çizgisi;
 - #237 — Ajanda Beton sinyali, öneri ve Beton paketine deep-link;
-- #252 / PR #253 — `Yarına ertele`, `2 saat` ve `3 saat` hızlı eylemleri.
+- #252 / PR #253 — `Yarına ertele`, `2 saat` ve `3 saat` hızlı eylemleri;
+- #260 — Beton checklist source-of-truth ve döküm başlatma hotfix'i; merge
+  öncesi normal field APK fiziksel smoke kapısı açıktır.
 
 Güncel güvenli `master`:
 
 ```text
-defeab25f4a940c43f07e42faa3fa3fd2ef905de
+7a90a201a31dec06d94df763bac18760a4c0d69c
 ```
 
-Bu noktada mobil schema `10`, backup formatı `1`, Flutter full suite `271 PASS`,
-Flutter analyze temiz ve son geçerli merged Python full suite `1005 passed,
-7 skipped` durumundadır. Issue #252 için imza uyumlu `adb install -r`
-replace-upgrade veri alanı korunarak tamamlanmıştır.
+Bu noktada mobil schema `10`, backup formatı `1` ve son geçerli merged Python
+full suite `1005 passed, 7 skipped` durumundadır. Issue #260 branch'inde
+focused Beton application `24 PASS`, focused Beton widget `13 PASS`, Flutter
+full suite `275 PASS` ve Flutter analyze temizdir. Bu branch kanıtı merge
+edilene kadar GitHub `master` gerçeğinin yerine geçmez. Issue #252 için imza
+uyumlu `adb install -r` replace-upgrade veri alanı korunarak tamamlanmıştır.
 
 Fiziksel cihaz smoke otomasyonu için #254 üzerinde izole acceptance harness,
 #256 üzerinde atomik build-root rotasyonu ve #257 üzerinde doğrulanmış acceptance

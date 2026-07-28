@@ -1,5 +1,21 @@
 # Changelog
 
+## Issue #260 - Beton Checklist Source-of-Truth ve Döküm Başlatma
+
+- Beton checklist başlığındaki açık sayı, current required checklist satırlarından
+  deterministik hesaplanır; `Dökümü başlat` validation'ı aynı blocker kümesini
+  ve exact kalem adlarını kullanır.
+- `inspection_notified` ve `laboratory_appointment` system-owned kalemlerdir.
+  Manuel güncelleme ve bulk action bu iki kalemi tamamlayamaz; yalnız ilgili
+  Beton alanı set edildiğinde tamamlanır, alan temizlendiğinde tekrar açılır.
+- `Tümünü tamamla` dili `Manuel maddeleri tamamla` olarak netleştirildi.
+  Laboratuvar ve yapı denetim gereksinimi onay dialog'unda korunur; iki pending
+  sistem kalemi mevcut ortak alan akışına bağlanan exact eylemler gösterir.
+- Alan, checklist, follow-up, reminder ve event senkronu aynı transaction içinde
+  kalır. Stale revision ve event failure rollback, aynı event ID retry,
+  otomatik fresh detail ve restart kalıcılığı sentetik testlerle doğrulandı.
+- Mobil schema `10` ve backup formatı `1` değişmedi; migration eklenmedi.
+
 ## Issue #234 - Beton Sınıfı Kataloğu ve Döküm Zaman Çizgisi
 
 - Mobil SQLite schema `9` → `10` atomik migration ile proje bazlı Beton sınıfı

@@ -316,10 +316,10 @@ void main() {
       expect(agendaDetail.log.description, contains('Gerçek 18.50 m³'));
       expect(agendaDetail.log.description, contains('1 mikser'));
       expect(agendaDetail.log.description, contains('Süre 60 dk'));
-      expect(
-        agendaDetail.events.map((item) => item.eventType),
-        ['concrete_pour.started', 'concrete_pour.completed'],
-      );
+      expect(agendaDetail.events.map((item) => item.eventType), [
+        'concrete_pour.started',
+        'concrete_pour.completed',
+      ]);
     },
   );
 
@@ -350,10 +350,7 @@ void main() {
     expect(preserved.pour.actualStartedAt, isNull);
     expect(preserved.agendaLogId, isNull);
     expect(await _count(directories.databaseFile, 'field_observations'), 0);
-    expect(
-      preserved.events.where((item) => item.id == _uuid(360)),
-      isEmpty,
-    );
+    expect(preserved.events.where((item) => item.id == _uuid(360)), isEmpty);
   });
 
   test(
@@ -395,10 +392,7 @@ void main() {
         ),
         throwsA(isA<AgendaValidationFailure>()),
       );
-      expect(
-        (await concrete.getPourDetail(pourId)).agendaLogId,
-        isNull,
-      );
+      expect((await concrete.getPourDetail(pourId)).agendaLogId, isNull);
 
       detail = await concrete.transitionPour(
         TransitionConcretePourCommand(
@@ -439,14 +433,11 @@ void main() {
       expect(detail.agendaLogId, managedAgendaId);
       expect(await _count(directories.databaseFile, 'field_observations'), 1);
       var source = await agenda.getAgendaLogDetail(managedAgendaId!);
-      expect(
-        source.events.map((item) => item.eventType),
-        [
-          'concrete_pour.started',
-          'concrete_pour.cancelled',
-          'concrete_pour.reopened',
-        ],
-      );
+      expect(source.events.map((item) => item.eventType), [
+        'concrete_pour.started',
+        'concrete_pour.cancelled',
+        'concrete_pour.reopened',
+      ]);
 
       await expectLater(
         concrete.transitionPour(
@@ -476,14 +467,11 @@ void main() {
         hasLength(1),
       );
       source = await agenda.getAgendaLogDetail(managedAgendaId);
-      expect(
-        source.events.map((item) => item.eventType),
-        [
-          'concrete_pour.started',
-          'concrete_pour.cancelled',
-          'concrete_pour.reopened',
-        ],
-      );
+      expect(source.events.map((item) => item.eventType), [
+        'concrete_pour.started',
+        'concrete_pour.cancelled',
+        'concrete_pour.reopened',
+      ]);
 
       final retried = await concrete.transitionPour(resume);
       expect(retried.pour.actualStartedAt, startedAt);
@@ -524,97 +512,93 @@ void main() {
       expect(detail.agendaLogId, managedAgendaId);
       expect(await _count(directories.databaseFile, 'field_observations'), 1);
       source = await agenda.getAgendaLogDetail(managedAgendaId);
-      expect(
-        source.events.map((item) => item.eventType),
-        [
-          'concrete_pour.started',
-          'concrete_pour.cancelled',
-          'concrete_pour.reopened',
-          'concrete_pour.completed',
-        ],
-      );
+      expect(source.events.map((item) => item.eventType), [
+        'concrete_pour.started',
+        'concrete_pour.cancelled',
+        'concrete_pour.reopened',
+        'concrete_pour.completed',
+      ]);
     },
   );
-
-  test('finish without a truck rolls back status timestamp and Agenda', () async {
-    var detail = await concrete.createPour(_createCommand());
-    detail = await _completeRequiredChecks(concrete, detail, 400);
-    detail = await concrete.transitionPour(
-      TransitionConcretePourCommand(
-        pourId: pourId,
-        eventId: _uuid(420),
-        expectedRevision: detail.pour.revision,
-        targetStatus: ConcretePourStatus.pouring,
-      ),
-    );
-    final revision = detail.pour.revision;
-    final managedAgendaId = detail.agendaLogId!;
-    now = DateTime.utc(2026, 7, 19, 8);
-    await expectLater(
-      concrete.transitionPour(
-        TransitionConcretePourCommand(
-          pourId: pourId,
-          eventId: _uuid(421),
-          expectedRevision: revision,
-          targetStatus: ConcretePourStatus.poured,
-        ),
-      ),
-      throwsA(isA<AgendaValidationFailure>()),
-    );
-    detail = await concrete.getPourDetail(pourId);
-    expect(detail.pour.status, ConcretePourStatus.pouring);
-    expect(detail.pour.revision, revision);
-    expect(detail.pour.actualEndedAt, isNull);
-    expect(detail.agendaLogId, managedAgendaId);
-    final source = await agenda.getAgendaLogDetail(managedAgendaId);
-    expect(
-      source.events.map((item) => item.eventType),
-      ['concrete_pour.started'],
-    );
-  });
 
   test(
-    'legacy completed pour repairs one Agenda log idempotently',
+    'finish without a truck rolls back status timestamp and Agenda',
     () async {
       var detail = await concrete.createPour(_createCommand());
-      final database = await databaseFactoryFfi.openDatabase(
-        directories.databaseFile,
-        options: OpenDatabaseOptions(singleInstance: false),
+      detail = await _completeRequiredChecks(concrete, detail, 400);
+      detail = await concrete.transitionPour(
+        TransitionConcretePourCommand(
+          pourId: pourId,
+          eventId: _uuid(420),
+          expectedRevision: detail.pour.revision,
+          targetStatus: ConcretePourStatus.pouring,
+        ),
       );
-      await database.update(
-        'concrete_pours',
-        {
-          'status': 'poured',
-          'actual_started_at': '2026-07-19T06:00:00Z',
-          'actual_ended_at': '2026-07-19T06:45:00Z',
-          'revision': detail.pour.revision + 1,
-          'updated_at': '2026-07-19T06:45:00Z',
-        },
-        where: 'id = ?',
-        whereArgs: [pourId],
+      final revision = detail.pour.revision;
+      final managedAgendaId = detail.agendaLogId!;
+      now = DateTime.utc(2026, 7, 19, 8);
+      await expectLater(
+        concrete.transitionPour(
+          TransitionConcretePourCommand(
+            pourId: pourId,
+            eventId: _uuid(421),
+            expectedRevision: revision,
+            targetStatus: ConcretePourStatus.poured,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
       );
-      await database.close();
       detail = await concrete.getPourDetail(pourId);
-      expect(detail.agendaLogId, isNull);
-      final repair = RepairConcreteAgendaCommand(
-        pourId: pourId,
-        eventId: _uuid(380),
-        expectedRevision: detail.pour.revision,
-      );
-      final repaired = await concrete.repairManagedAgenda(repair);
-      final retried = await concrete.repairManagedAgenda(repair);
-      expect(repaired.agendaLogId, isNotNull);
-      expect(retried.agendaLogId, repaired.agendaLogId);
-      expect(await _count(directories.databaseFile, 'field_observations'), 1);
-      final source = await agenda.getAgendaLogDetail(repaired.agendaLogId!);
-      expect(source.log.observedAt, '2026-07-19T06:00:00Z');
-      expect(source.log.description, contains('Süre 45 dk'));
-      expect(
-        source.events.map((item) => item.eventType),
-        ['concrete_pour.started', 'concrete_pour.completed'],
-      );
+      expect(detail.pour.status, ConcretePourStatus.pouring);
+      expect(detail.pour.revision, revision);
+      expect(detail.pour.actualEndedAt, isNull);
+      expect(detail.agendaLogId, managedAgendaId);
+      final source = await agenda.getAgendaLogDetail(managedAgendaId);
+      expect(source.events.map((item) => item.eventType), [
+        'concrete_pour.started',
+      ]);
     },
   );
+
+  test('legacy completed pour repairs one Agenda log idempotently', () async {
+    var detail = await concrete.createPour(_createCommand());
+    final database = await databaseFactoryFfi.openDatabase(
+      directories.databaseFile,
+      options: OpenDatabaseOptions(singleInstance: false),
+    );
+    await database.update(
+      'concrete_pours',
+      {
+        'status': 'poured',
+        'actual_started_at': '2026-07-19T06:00:00Z',
+        'actual_ended_at': '2026-07-19T06:45:00Z',
+        'revision': detail.pour.revision + 1,
+        'updated_at': '2026-07-19T06:45:00Z',
+      },
+      where: 'id = ?',
+      whereArgs: [pourId],
+    );
+    await database.close();
+    detail = await concrete.getPourDetail(pourId);
+    expect(detail.agendaLogId, isNull);
+    final repair = RepairConcreteAgendaCommand(
+      pourId: pourId,
+      eventId: _uuid(380),
+      expectedRevision: detail.pour.revision,
+    );
+    final repaired = await concrete.repairManagedAgenda(repair);
+    final retried = await concrete.repairManagedAgenda(repair);
+    expect(repaired.agendaLogId, isNotNull);
+    expect(retried.agendaLogId, repaired.agendaLogId);
+    expect(await _count(directories.databaseFile, 'field_observations'), 1);
+    final source = await agenda.getAgendaLogDetail(repaired.agendaLogId!);
+    expect(source.log.observedAt, '2026-07-19T06:00:00Z');
+    expect(source.log.description, contains('Süre 45 dk'));
+    expect(source.events.map((item) => item.eventType), [
+      'concrete_pour.started',
+      'concrete_pour.completed',
+    ]);
+  });
 
   test(
     'field tasks repeat hourly and completion or clearing closes and reopens',
@@ -718,6 +702,12 @@ void main() {
         ),
         isTrue,
       );
+      expect(
+        detail.checks
+            .where((item) => item.isSystemOwned)
+            .every((item) => item.status == ConcreteCheckStatus.completed),
+        isTrue,
+      );
 
       now = DateTime.utc(2026, 7, 19, 7, 10);
       detail = await concrete.updatePour(
@@ -732,6 +722,12 @@ void main() {
               item.status == ConcreteFollowUpStatus.pending &&
               item.dueAt == '2026-07-19T08:10:00Z',
         ),
+        isTrue,
+      );
+      expect(
+        detail.checks
+            .where((item) => item.isSystemOwned)
+            .every((item) => item.status == ConcreteCheckStatus.pending),
         isTrue,
       );
       final reopenedDatabase = await databaseFactoryFfi.openDatabase(
@@ -964,8 +960,33 @@ void main() {
         ),
         throwsA(isA<AgendaValidationFailure>()),
       );
-      for (var index = 0; index < detail.checks.length; index += 1) {
-        final item = detail.checks[index];
+      final systemCheck = detail.checks.firstWhere(
+        (item) => item.isSystemOwned,
+      );
+      await expectLater(
+        concrete.updateCheck(
+          UpdateConcreteCheckCommand(
+            pourId: pourId,
+            checkId: systemCheck.id,
+            eventId: _uuid(19),
+            expectedPourRevision: detail.pour.revision,
+            expectedCheckRevision: systemCheck.revision,
+            status: ConcreteCheckStatus.completed,
+          ),
+        ),
+        throwsA(
+          isA<AgendaValidationFailure>().having(
+            (error) => error.message,
+            'message',
+            contains('yalnız ilgili Beton alanlarından'),
+          ),
+        ),
+      );
+      final manualChecks = detail.checks
+          .where((item) => item.isManual)
+          .toList(growable: false);
+      for (var index = 0; index < manualChecks.length; index += 1) {
+        final item = manualChecks[index];
         detail = await concrete.updateCheck(
           UpdateConcreteCheckCommand(
             pourId: pourId,
@@ -980,6 +1001,14 @@ void main() {
           ),
         );
       }
+      detail = await concrete.updatePour(
+        _updatePourCommand(
+          detail,
+          eventId: _uuid(39),
+          laboratoryAppointment: '2026-07-19T08:00:00Z',
+          inspectionNotifiedAt: '2026-07-19T07:30:00Z',
+        ),
+      );
       final prepared = await concrete.transitionPour(
         TransitionConcretePourCommand(
           pourId: pourId,
@@ -1281,19 +1310,7 @@ void main() {
     'full pour follow-up close and reasoned reopen is append-only',
     () async {
       var detail = await concrete.createPour(_createCommand());
-      for (var index = 0; index < detail.checks.length; index += 1) {
-        final check = detail.checks[index];
-        detail = await concrete.updateCheck(
-          UpdateConcreteCheckCommand(
-            pourId: pourId,
-            checkId: check.id,
-            eventId: _uuid(100 + index),
-            expectedPourRevision: detail.pour.revision,
-            expectedCheckRevision: check.revision,
-            status: ConcreteCheckStatus.completed,
-          ),
-        );
-      }
+      detail = await _completeRequiredChecks(concrete, detail, 100);
       detail = await concrete.transitionPour(
         TransitionConcretePourCommand(
           pourId: pourId,
@@ -1344,6 +1361,9 @@ void main() {
           plannedVolumeM3: detail.pour.plannedVolumeM3,
           plantName: detail.pour.plantName,
           laboratoryName: detail.pour.laboratoryName,
+          laboratoryAppointment: detail.pour.laboratoryAppointment,
+          inspectionNotifiedAt: detail.pour.inspectionNotifiedAt,
+          inspectionNotifiedPerson: detail.pour.inspectionNotifiedPerson,
           sampleExceptionReason: 'Bu özel dökümde numune uygulanmadı.',
         ),
       );
@@ -1746,6 +1766,182 @@ void main() {
     },
   );
 
+  test(
+    'synthetic checklist uses exact field blockers then reaches zero and starts',
+    () async {
+      var detail = await concrete.createPour(_createCommand());
+      detail = await concrete.bulkComplete(
+        BulkCompleteConcreteCommand(
+          pourId: pourId,
+          eventId: _uuid(500),
+          expectedPourRevision: detail.pour.revision,
+        ),
+      );
+
+      final pendingLabels = detail.checks
+          .where(
+            (item) =>
+                item.isRequired && item.status == ConcreteCheckStatus.pending,
+          )
+          .map((item) => item.label)
+          .toList(growable: false);
+      expect(detail.metrics.pendingCheckCount, 2);
+      expect(pendingLabels, [
+        'Yapı denetim bilgilendirildi',
+        'Laboratuvar randevusu alındı',
+      ]);
+      await expectLater(
+        concrete.transitionPour(
+          TransitionConcretePourCommand(
+            pourId: pourId,
+            eventId: _uuid(501),
+            expectedRevision: detail.pour.revision,
+            targetStatus: ConcretePourStatus.pouring,
+          ),
+        ),
+        throwsA(
+          isA<AgendaValidationFailure>()
+              .having(
+                (error) => error.message,
+                'message',
+                contains('Yapı denetim bilgilendirildi'),
+              )
+              .having(
+                (error) => error.message,
+                'message',
+                contains('Laboratuvar randevusu alındı'),
+              ),
+        ),
+      );
+
+      final fieldCommand = _updatePourCommand(
+        detail,
+        eventId: _uuid(502),
+        laboratoryAppointment: '2026-07-19T08:00:00Z',
+        inspectionNotifiedAt: '2026-07-19T07:30:00Z',
+      );
+      detail = await concrete.updatePour(fieldCommand);
+      expect(detail.metrics.pendingCheckCount, 0);
+      expect(
+        detail.checks
+            .where(
+              (item) => {
+                'inspection_notified',
+                'laboratory_appointment',
+              }.contains(item.itemKey),
+            )
+            .every((item) => item.status == ConcreteCheckStatus.completed),
+        isTrue,
+      );
+      final eventCount = detail.events.length;
+      final retriedFieldUpdate = await concrete.updatePour(fieldCommand);
+      expect(retriedFieldUpdate.events, hasLength(eventCount));
+      expect(retriedFieldUpdate.pour.revision, detail.pour.revision);
+
+      detail = await concrete.transitionPour(
+        TransitionConcretePourCommand(
+          pourId: pourId,
+          eventId: _uuid(503),
+          expectedRevision: detail.pour.revision,
+          targetStatus: ConcretePourStatus.pouring,
+        ),
+      );
+      expect(detail.pour.status, ConcretePourStatus.pouring);
+
+      final restarted = _application(
+        agenda: agenda,
+        attachments: attachments,
+        exports: exports,
+        directories: directories,
+        clock: () => now,
+      );
+      final persisted = await restarted.getPourDetail(pourId);
+      expect(persisted.metrics.pendingCheckCount, 0);
+      expect(persisted.pour.status, ConcretePourStatus.pouring);
+    },
+  );
+
+  test(
+    'field-derived checklist event failure rolls back source and both checks',
+    () async {
+      final created = await concrete.createPour(_createCommand());
+      var eventCalls = 0;
+      final failing = _application(
+        agenda: agenda,
+        attachments: attachments,
+        exports: exports,
+        directories: directories,
+        clock: () => now,
+        beforeEvent: (_) async {
+          eventCalls += 1;
+          if (eventCalls == 2) {
+            throw StateError('forced derived checklist event failure');
+          }
+        },
+      );
+
+      await expectLater(
+        failing.updatePour(
+          _updatePourCommand(
+            created,
+            eventId: _uuid(504),
+            laboratoryAppointment: '2026-07-19T08:00:00Z',
+            inspectionNotifiedAt: '2026-07-19T07:30:00Z',
+          ),
+        ),
+        throwsStateError,
+      );
+
+      final rolledBack = await concrete.getPourDetail(pourId);
+      expect(rolledBack.pour.revision, created.pour.revision);
+      expect(rolledBack.pour.laboratoryAppointment, isNull);
+      expect(rolledBack.pour.inspectionNotifiedAt, isNull);
+      expect(
+        rolledBack.checks
+            .where((item) => item.isSystemOwned)
+            .every((item) => item.status == ConcreteCheckStatus.pending),
+        isTrue,
+      );
+      expect(rolledBack.events.where((item) => item.id == _uuid(504)), isEmpty);
+    },
+  );
+
+  test('stale bulk completion leaves every remaining item unchanged', () async {
+    final created = await concrete.createPour(_createCommand());
+    final firstManual = created.checks.firstWhere((item) => item.isManual);
+    final advanced = await concrete.updateCheck(
+      UpdateConcreteCheckCommand(
+        pourId: pourId,
+        checkId: firstManual.id,
+        eventId: _uuid(505),
+        expectedPourRevision: created.pour.revision,
+        expectedCheckRevision: firstManual.revision,
+        status: ConcreteCheckStatus.completed,
+      ),
+    );
+    final beforeStatuses = {
+      for (final item in advanced.checks) item.id: item.status,
+    };
+
+    await expectLater(
+      concrete.bulkComplete(
+        BulkCompleteConcreteCommand(
+          pourId: pourId,
+          eventId: _uuid(506),
+          expectedPourRevision: created.pour.revision,
+        ),
+      ),
+      throwsA(isA<AgendaValidationFailure>()),
+    );
+
+    final rolledBack = await concrete.getPourDetail(pourId);
+    expect(rolledBack.pour.revision, advanced.pour.revision);
+    expect({
+      for (final item in rolledBack.checks) item.id: item.status,
+    }, beforeStatuses);
+    expect(rolledBack.events.where((item) => item.id == _uuid(506)), isEmpty);
+  });
+
   test('UTF-8 PDF export is formula safe and event is post-success', () async {
     var detail = await concrete.createPour(_createCommand(code: '=BT-001'));
     detail = await concrete.saveTruck(
@@ -1951,8 +2147,11 @@ Future<ConcretePourDetail> _completeRequiredChecks(
   int eventSeed,
 ) async {
   var current = detail;
-  for (var index = 0; index < current.checks.length; index += 1) {
-    final check = current.checks[index];
+  final manualChecks = current.checks
+      .where((item) => item.isManual)
+      .toList(growable: false);
+  for (var index = 0; index < manualChecks.length; index += 1) {
+    final check = manualChecks[index];
     current = await concrete.updateCheck(
       UpdateConcreteCheckCommand(
         pourId: current.pour.id,
@@ -1964,7 +2163,14 @@ Future<ConcretePourDetail> _completeRequiredChecks(
       ),
     );
   }
-  return current;
+  return concrete.updatePour(
+    _updatePourCommand(
+      current,
+      eventId: _uuid(eventSeed + 100),
+      laboratoryAppointment: '2026-07-19T08:00:00Z',
+      inspectionNotifiedAt: '2026-07-19T07:30:00Z',
+    ),
+  );
 }
 
 String _uuid(int value) {

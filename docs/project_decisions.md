@@ -1,5 +1,24 @@
 # Proje Kararlari
 
+## Issue 260 — Beton Checklist Source-of-Truth
+
+- Açık zorunlu checklist sayısı saklanan ayrı bir sayaç değildir. Current
+  `ConcreteCheckItem` satırlarında `isRequired && status == pending` kuralıyla
+  üretilen domain read-model hem detay başlığının hem transition validation'ın
+  source-of-truth'udur.
+- `inspection_notified` ve `laboratory_appointment` system-owned kalemlerdir.
+  Bulk veya `updateCheck` ile tamamlanamaz; yalnız Beton paketindeki kaynak
+  alanların current değeriyle aynı transaction içinde set/clear senkronu yapılır.
+- Alan-türetilmiş checklist değişikliği optimistic revision ve append-only
+  `check.updated` event'i üretir. Event insert veya reminder/follow-up sync
+  hatası source alan güncellemesiyle birlikte rollback olur; deterministic event
+  ID aynı işlemin retry'ında duplicate history üretmez.
+- UI, manuel bulk kapsamını açıkça adlandırır ve pending system-owned kalemleri
+  mevcut ortak laboratuvar/yapı denetim dialog'una exact eylemlerle yönlendirir.
+  Mutation dönüşü fresh detail reload edilir; ayrıca refresh gerektirilmez.
+- Schema `10`, backup formatı `1`, migration, Android package/signing ve Beton
+  kapanış validation'ları değiştirilmez.
+
 ## Issue 230 — Reminder Kaynak Ajanda Fotoğrafları
 
 - Reminder kaynak medyası ayrı, salt-okunur

@@ -585,12 +585,7 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
 
   Future<void> _bulkComplete() async {
     final detail = _detail!;
-    final manualChecks = detail.checks.where(
-      (item) =>
-          item.status == ConcreteCheckStatus.pending &&
-          item.itemKey != 'inspection_notified' &&
-          item.itemKey != 'laboratory_appointment',
-    );
+    final manualChecks = pendingManualConcreteChecks(detail.checks);
     final manualFollowUps = detail.followUps.where(
       (item) =>
           item.status == ConcreteFollowUpStatus.pending &&
@@ -604,23 +599,33 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
       );
       return;
     }
+    var closingDialog = false;
     final accepted = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Tümünü tamamla'),
+        title: const Text('Manuel maddeleri tamamla'),
         content: Text(
           '$count manuel checklist/takip maddesi tek işlemde tamamlanacak. '
-          'Laboratuvar ve yapı denetim alan görevleri etkilenmeyecek.',
+          'Laboratuvar randevusu ve yapı denetim bildirimi ayrıca ilgili '
+          'Beton alanlarından tamamlanmalıdır; bu işlem onları tamamlamaz.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () {
+              if (closingDialog) return;
+              closingDialog = true;
+              Navigator.pop(context, false);
+            },
             child: const Text('Vazgeç'),
           ),
           FilledButton(
             key: const Key('confirm-bulk-complete'),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Tümünü tamamla'),
+            onPressed: () {
+              if (closingDialog) return;
+              closingDialog = true;
+              Navigator.pop(context, true);
+            },
+            child: const Text('Manuel maddeleri tamamla'),
           ),
         ],
       ),
@@ -748,9 +753,7 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
               if (detail.agendaLogId case final agendaLogId?)
                 OutlinedButton.icon(
                   key: const Key('open-managed-agenda'),
-                  onPressed: _mutating
-                      ? null
-                      : () => _openAgenda(agendaLogId),
+                  onPressed: _mutating ? null : () => _openAgenda(agendaLogId),
                   icon: const Icon(Icons.event_note_outlined),
                   label: const Text('Bağlı Ajanda kaydını aç'),
                 )
@@ -802,7 +805,8 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
               ),
             ]),
             _section(
-              'Döküm öncesi checklist • ${detail.metrics.pendingCheckCount} açık',
+              'Döküm öncesi checklist • '
+              '${detail.pendingRequiredCheckCount} açık',
               [
                 Align(
                   alignment: Alignment.centerLeft,
@@ -810,25 +814,53 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
                     key: const Key('bulk-complete-concrete'),
                     onPressed: _mutating ? null : _bulkComplete,
                     icon: const Icon(Icons.done_all),
-                    label: const Text('Tümünü tamamla'),
+                    label: const Text('Manuel maddeleri tamamla'),
                   ),
                 ),
-                for (final item in detail.checks)
+                for (final item in detail.checks) ...[
                   ListTile(
                     title: Text('${item.sortOrder}. ${item.label}'),
                     subtitle: Text(item.reason ?? item.status.label),
-                    trailing: PopupMenuButton<ConcreteCheckStatus>(
-                      onSelected: (value) => _updateCheck(item, value),
-                      itemBuilder: (_) => ConcreteCheckStatus.values
-                          .map(
-                            (value) => PopupMenuItem(
-                              value: value,
-                              child: Text(value.label),
-                            ),
+                    trailing: item.isSystemOwned
+                        ? Icon(
+                            item.status == ConcreteCheckStatus.pending
+                                ? Icons.lock_outline
+                                : Icons.check_circle_outline,
                           )
-                          .toList(),
-                    ),
+                        : PopupMenuButton<ConcreteCheckStatus>(
+                            onSelected: (value) => _updateCheck(item, value),
+                            itemBuilder: (_) => ConcreteCheckStatus.values
+                                .map(
+                                  (value) => PopupMenuItem(
+                                    value: value,
+                                    child: Text(value.label),
+                                  ),
+                                )
+                                .toList(),
+                          ),
                   ),
+                  if (item.isSystemOwned && item.isPendingRequired)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(
+                          left: 16,
+                          right: 16,
+                          bottom: 8,
+                        ),
+                        child: OutlinedButton(
+                          key: Key('update-${item.itemKey}'),
+                          onPressed: _mutating ? null : _editFieldNotifications,
+                          child: Text(
+                            item.itemKey ==
+                                    concreteLaboratoryAppointmentCheckKey
+                                ? 'Laboratuvar randevusunu güncelle'
+                                : 'Yapı denetime bildirimi güncelle',
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ],
             ),
             _section('Mikser / irsaliye • ${detail.trucks.length}', [
@@ -1143,7 +1175,11 @@ class _ConcreteStageTimeline extends StatelessWidget {
         Row(
           key: const Key('concrete-stage-timeline'),
           children: [
-            for (var index = 0; index < ConcretePourStage.values.length; index += 1)
+            for (
+              var index = 0;
+              index < ConcretePourStage.values.length;
+              index += 1
+            )
               Expanded(
                 child: Semantics(
                   selected: index == currentIndex,
