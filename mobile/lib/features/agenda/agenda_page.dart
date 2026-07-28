@@ -30,6 +30,8 @@ class AgendaPage extends StatefulWidget {
 }
 
 class _AgendaPageState extends State<AgendaPage> {
+  final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
   late String _selectedDay;
   List<MobileProject> _projects = const [];
   List<AgendaLog> _logs = const [];
@@ -40,6 +42,8 @@ class _AgendaPageState extends State<AgendaPage> {
   bool _loading = true;
   String? _error;
   StreamSubscription<void>? _projectSubscription;
+  bool _detailNavigationBusy = false;
+  bool _preservingDetailReload = false;
 
   @override
   void initState() {
@@ -56,6 +60,8 @@ class _AgendaPageState extends State<AgendaPage> {
   @override
   void dispose() {
     _projectSubscription?.cancel();
+    _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -88,10 +94,11 @@ class _AgendaPageState extends State<AgendaPage> {
     }
   }
 
-  Future<void> _reload() async {
+  Future<void> _reload({double? restoreOffset}) async {
     setState(() {
       _loading = true;
       _error = null;
+      _preservingDetailReload = restoreOffset != null;
     });
     try {
       final projects = await widget.agenda.listProjects();
@@ -109,14 +116,17 @@ class _AgendaPageState extends State<AgendaPage> {
         _projects = projects;
         _logs = logs;
         _loading = false;
+        _preservingDetailReload = false;
       });
     } on Object {
       if (!mounted) return;
       setState(() {
         _loading = false;
+        _preservingDetailReload = false;
         _error = 'Ajanda kayıtları güvenli biçimde okunamadı.';
       });
     }
+    _restoreScrollOffset(restoreOffset);
   }
 
   void _moveDay(int delta) {
@@ -163,18 +173,42 @@ class _AgendaPageState extends State<AgendaPage> {
   }
 
   Future<void> _openDetail(AgendaLog log) async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => LogDetailPage(
-          agenda: widget.agenda,
-          attachments: widget.attachments,
-          concrete: widget.concrete,
-          concreteAttachments: widget.concreteAttachments,
-          logId: log.id,
+    if (_detailNavigationBusy) return;
+    final restoreOffset = _currentScrollOffset;
+    _detailNavigationBusy = true;
+    try {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => LogDetailPage(
+            agenda: widget.agenda,
+            attachments: widget.attachments,
+            concrete: widget.concrete,
+            concreteAttachments: widget.concreteAttachments,
+            logId: log.id,
+          ),
         ),
-      ),
-    );
-    if (mounted) await _reload();
+      );
+      if (mounted) await _reload(restoreOffset: restoreOffset);
+    } finally {
+      _detailNavigationBusy = false;
+    }
+  }
+
+  double? get _currentScrollOffset =>
+      _scrollController.hasClients ? _scrollController.offset : null;
+
+  void _restoreScrollOffset(double? requestedOffset) {
+    if (requestedOffset == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      final position = _scrollController.position;
+      final target = requestedOffset
+          .clamp(position.minScrollExtent, position.maxScrollExtent)
+          .toDouble();
+      if ((position.pixels - target).abs() > 0.5) {
+        _scrollController.jumpTo(target);
+      }
+    });
   }
 
   @override
@@ -184,6 +218,7 @@ class _AgendaPageState extends State<AgendaPage> {
         onRefresh: _reload,
         child: ListView(
           key: const Key('agenda-day-list'),
+          controller: _scrollController,
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
           children: [
             Align(
@@ -313,6 +348,7 @@ class _AgendaPageState extends State<AgendaPage> {
             const SizedBox(height: 8),
             TextField(
               key: const Key('agenda-literal-search'),
+              controller: _searchController,
               decoration: InputDecoration(
                 labelText: 'Literal ara',
                 hintText: 'Açıklama, mahal, not veya proje',
@@ -328,7 +364,7 @@ class _AgendaPageState extends State<AgendaPage> {
               onSubmitted: (_) => _reload(),
             ),
             const SizedBox(height: 12),
-            if (_loading)
+            if (_loading && !_preservingDetailReload)
               const Center(
                 child: Padding(
                   padding: EdgeInsets.all(24),
