@@ -26,6 +26,7 @@ class AttendancePage extends StatefulWidget {
 }
 
 class _AttendancePageState extends State<AttendancePage> {
+  final ScrollController _scrollController = ScrollController();
   final Map<String, _EnsureIds> _ensureIds = {};
   List<MobileProject> _projects = const [];
   MobileProject? _project;
@@ -35,6 +36,7 @@ class _AttendancePageState extends State<AttendancePage> {
   String? _error;
   List<ActiveTeamCount> _teamCounts = const [];
   StreamSubscription<void>? _projectSubscription;
+  bool _detailNavigationBusy = false;
 
   @override
   void initState() {
@@ -50,6 +52,7 @@ class _AttendancePageState extends State<AttendancePage> {
   @override
   void dispose() {
     _projectSubscription?.cancel();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -79,7 +82,7 @@ class _AttendancePageState extends State<AttendancePage> {
     }
   }
 
-  Future<void> _loadDay() async {
+  Future<void> _loadDay({double? restoreOffset}) async {
     final project = _project;
     if (project == null) return;
     setState(() {
@@ -116,6 +119,7 @@ class _AttendancePageState extends State<AttendancePage> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+    _restoreScrollOffset(restoreOffset);
   }
 
   Future<void> _shiftDay(int delta) async {
@@ -156,43 +160,78 @@ class _AttendancePageState extends State<AttendancePage> {
 
   Future<void> _openDay() async {
     final detail = _detail;
-    if (detail == null) return;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => AttendanceDayPage(
-          attendance: widget.attendance,
-          agenda: widget.agenda,
-          dayId: detail.day.id,
+    if (detail == null || _detailNavigationBusy) return;
+    final restoreOffset = _currentScrollOffset;
+    _detailNavigationBusy = true;
+    try {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => AttendanceDayPage(
+            attendance: widget.attendance,
+            agenda: widget.agenda,
+            dayId: detail.day.id,
+          ),
         ),
-      ),
-    );
-    await _loadDay();
+      );
+      if (mounted) await _loadDay(restoreOffset: restoreOffset);
+    } finally {
+      _detailNavigationBusy = false;
+    }
   }
 
   Future<void> _openWorkforce() async {
     final project = _project;
-    if (project == null) return;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) =>
-            WorkforcePage(attendance: widget.attendance, project: project),
-      ),
-    );
-    await _loadDay();
+    if (project == null || _detailNavigationBusy) return;
+    final restoreOffset = _currentScrollOffset;
+    _detailNavigationBusy = true;
+    try {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) =>
+              WorkforcePage(attendance: widget.attendance, project: project),
+        ),
+      );
+      if (mounted) await _loadDay(restoreOffset: restoreOffset);
+    } finally {
+      _detailNavigationBusy = false;
+    }
   }
 
   Future<void> _openSettings() async {
     final project = _project;
-    if (project == null) return;
-    await Navigator.of(context).push<AttendanceReminderSetting>(
-      MaterialPageRoute(
-        builder: (_) => AttendanceSettingsPage(
-          attendance: widget.attendance,
-          project: project,
+    if (project == null || _detailNavigationBusy) return;
+    final restoreOffset = _currentScrollOffset;
+    _detailNavigationBusy = true;
+    try {
+      await Navigator.of(context).push<AttendanceReminderSetting>(
+        MaterialPageRoute(
+          builder: (_) => AttendanceSettingsPage(
+            attendance: widget.attendance,
+            project: project,
+          ),
         ),
-      ),
-    );
-    await _loadDay();
+      );
+      if (mounted) await _loadDay(restoreOffset: restoreOffset);
+    } finally {
+      _detailNavigationBusy = false;
+    }
+  }
+
+  double? get _currentScrollOffset =>
+      _scrollController.hasClients ? _scrollController.offset : null;
+
+  void _restoreScrollOffset(double? requestedOffset) {
+    if (requestedOffset == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      final position = _scrollController.position;
+      final target = requestedOffset
+          .clamp(position.minScrollExtent, position.maxScrollExtent)
+          .toDouble();
+      if ((position.pixels - target).abs() > 0.5) {
+        _scrollController.jumpTo(target);
+      }
+    });
   }
 
   @override
@@ -200,6 +239,7 @@ class _AttendancePageState extends State<AttendancePage> {
     final detail = _detail;
     return ListView(
       key: const Key('attendance-page'),
+      controller: _scrollController,
       padding: const EdgeInsets.all(12),
       children: [
         if (_projects.isEmpty && !_loading)

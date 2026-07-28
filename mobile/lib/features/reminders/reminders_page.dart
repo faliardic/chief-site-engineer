@@ -22,6 +22,7 @@ class RemindersPage extends StatefulWidget {
 }
 
 class _RemindersPageState extends State<RemindersPage> {
+  final ScrollController _scrollController = ScrollController();
   _ReminderPrimaryView _primaryView = _ReminderPrimaryView.today;
   ReminderViewGroup _otherGroup = ReminderViewGroup.upcoming;
   ReminderTodayOverview _todayOverview = const ReminderTodayOverview(
@@ -36,6 +37,8 @@ class _RemindersPageState extends State<RemindersPage> {
   String? _error;
   final Set<String> _tomorrowBusy = {};
   final Set<String> _restoreBusy = {};
+  bool _detailNavigationBusy = false;
+  bool _preservingDetailReload = false;
 
   Future<void> _moveToTomorrow(MobileReminder reminder) async {
     if (_tomorrowBusy.contains(reminder.id)) return;
@@ -85,10 +88,17 @@ class _RemindersPageState extends State<RemindersPage> {
     _reload();
   }
 
-  Future<void> _reload() async {
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _reload({double? restoreOffset}) async {
     setState(() {
       _loading = true;
       _error = null;
+      _preservingDetailReload = restoreOffset != null;
     });
     try {
       if (_primaryView == _ReminderPrimaryView.today) {
@@ -103,6 +113,7 @@ class _RemindersPageState extends State<RemindersPage> {
           _todayOverview = overview;
           _items = const [];
           _loading = false;
+          _preservingDetailReload = false;
         });
       } else {
         final group = _primaryView == _ReminderPrimaryView.tomorrow
@@ -113,14 +124,57 @@ class _RemindersPageState extends State<RemindersPage> {
         setState(() {
           _items = items;
           _loading = false;
+          _preservingDetailReload = false;
         });
       }
     } on Object {
       if (!mounted) return;
       setState(() {
         _loading = false;
+        _preservingDetailReload = false;
         _error = 'Hatırlatıcılar güvenli biçimde okunamadı.';
       });
+    }
+    _restoreScrollOffset(restoreOffset);
+  }
+
+  double? get _currentScrollOffset =>
+      _scrollController.hasClients ? _scrollController.offset : null;
+
+  void _restoreScrollOffset(double? requestedOffset) {
+    if (requestedOffset == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      final position = _scrollController.position;
+      final target = requestedOffset
+          .clamp(position.minScrollExtent, position.maxScrollExtent)
+          .toDouble();
+      if ((position.pixels - target).abs() > 0.5) {
+        _scrollController.jumpTo(target);
+      }
+    });
+  }
+
+  Future<void> _openDetail(MobileReminder reminder) async {
+    if (_detailNavigationBusy) return;
+    final restoreOffset = _currentScrollOffset;
+    _detailNavigationBusy = true;
+    try {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => ReminderDetailPage(
+            agenda: widget.agenda,
+            attendance: widget.attendance,
+            reminderId: reminder.id,
+            istanbulToday: _todayOverview.istanbulDay.isEmpty
+                ? null
+                : _todayOverview.istanbulDay,
+          ),
+        ),
+      );
+      if (mounted) await _reload(restoreOffset: restoreOffset);
+    } finally {
+      _detailNavigationBusy = false;
     }
   }
 
@@ -208,6 +262,7 @@ class _RemindersPageState extends State<RemindersPage> {
       onRefresh: _reload,
       child: ListView(
         key: const Key('reminder-list'),
+        controller: _scrollController,
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 88),
         children: [
           SizedBox(
@@ -269,7 +324,7 @@ class _RemindersPageState extends State<RemindersPage> {
             ),
           ],
           const SizedBox(height: 12),
-          if (_loading)
+          if (_loading && !_preservingDetailReload)
             const Center(
               child: Padding(
                 padding: EdgeInsets.all(24),
@@ -458,21 +513,7 @@ class _RemindersPageState extends State<RemindersPage> {
             trailing: reminder.isImportant
                 ? const Icon(Icons.priority_high_rounded)
                 : const Icon(Icons.chevron_right),
-            onTap: () async {
-              await Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => ReminderDetailPage(
-                    agenda: widget.agenda,
-                    attendance: widget.attendance,
-                    reminderId: reminder.id,
-                    istanbulToday: _todayOverview.istanbulDay.isEmpty
-                        ? null
-                        : _todayOverview.istanbulDay,
-                  ),
-                ),
-              );
-              if (mounted) await _reload();
-            },
+            onTap: () => _openDetail(reminder),
           ),
           if (showTomorrow &&
               isReminderEligibleForTomorrowSnooze(

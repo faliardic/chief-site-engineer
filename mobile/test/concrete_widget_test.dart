@@ -105,6 +105,118 @@ void main() {
   );
 
   testWidgets(
+    'Beton detail return keeps project group search and scroll with fresh card',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 760);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final pours = List.generate(24, _navigationPour);
+      final concrete = _FakeConcrete(navigationPours: pours);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ConcretePage(
+              concrete: concrete,
+              agenda: _FakeAgenda(),
+              attachments: _picker(),
+              initialProjectId: projectId,
+              initialIstanbulDay: '2026-07-19',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'CSE264 arama');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dökümde'));
+      await tester.pumpAndSettle();
+
+      final target = pours[18];
+      final targetFinder = find.textContaining(target.pourCode);
+      await tester.scrollUntilVisible(
+        targetFinder,
+        420,
+        scrollable: _concreteScrollableFinder(),
+      );
+      final before = _concreteScrollOffset(tester);
+      expect(before, greaterThan(300));
+
+      await tester.tap(targetFinder);
+      await tester.pumpAndSettle();
+      concrete.navigationPours = [
+        for (var index = 0; index < pours.length; index++)
+          index == 18
+              ? _navigationPour(index, pourCode: 'CSE264-GUNCEL')
+              : pours[index],
+      ];
+      final delayedReload = Completer<List<ConcretePour>>();
+      concrete.delayedListReload = delayedReload;
+      await tester.pageBack();
+      await tester.pump(const Duration(milliseconds: 350));
+      delayedReload.complete(concrete.navigationPours!);
+      await tester.pumpAndSettle();
+
+      expect(_concreteScrollOffset(tester), closeTo(before, 4));
+      expect(concrete.lastListQuery?.projectId, projectId);
+      expect(concrete.lastListQuery?.group, ConcretePourGroup.inProgress);
+      expect(concrete.lastListQuery?.istanbulDay, '2026-07-19');
+      expect(concrete.lastListQuery?.literalSearch, 'CSE264 arama');
+      expect(find.textContaining('CSE264-GUNCEL'), findsOneWidget);
+      tester
+          .state<ScrollableState>(_concreteScrollableFinder())
+          .position
+          .jumpTo(0);
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<EditableText>(find.byType(EditableText)).controller.text,
+        'CSE264 arama',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Beton detail double tap opens one route and controller disposes',
+    (tester) async {
+      final concrete = _FakeConcrete(navigationPours: [_navigationPour(18)]);
+      final observer = _ConcretePushCountingObserver();
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorObservers: [observer],
+          home: Scaffold(
+            body: ConcretePage(
+              concrete: concrete,
+              agenda: _FakeAgenda(),
+              attachments: _picker(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      observer.pushes = 0;
+      final card = find.textContaining('CSE264-BT-018');
+
+      final onTap = tester
+          .widget<ListTile>(
+            find.ancestor(of: card, matching: find.byType(ListTile)),
+          )
+          .onTap!;
+      onTap();
+      onTap();
+      await tester.pumpAndSettle();
+
+      expect(observer.pushes, 1);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'oluşturma formu validation girdisini korur ve çift dokunma tek komuttur',
     (tester) async {
       final concrete = _FakeConcrete(delayCreate: true);
@@ -685,6 +797,69 @@ Future<void> _pumpReverseTransition(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+double _concreteScrollOffset(WidgetTester tester) {
+  return tester
+      .state<ScrollableState>(_concreteScrollableFinder())
+      .position
+      .pixels;
+}
+
+Finder _concreteScrollableFinder() => find
+    .descendant(
+      of: find.byKey(const Key('concrete-page')),
+      matching: find.byType(Scrollable),
+    )
+    .first;
+
+ConcretePour _navigationPour(int index, {String? pourCode}) => ConcretePour(
+  id: index == 18
+      ? pourId
+      : 'bbbbbbbb-bbbb-4bbb-8bbb-${(index + 100).toString().padLeft(12, '0')}',
+  projectId: projectId,
+  projectName: project.name,
+  pourCode: pourCode ?? 'CSE264-BT-${index.toString().padLeft(3, '0')}',
+  elementLocation: 'CSE264 mahal ${index + 1}',
+  blockName: 'A',
+  floorName: '${index + 1}',
+  axisName: 'A/${index + 1}',
+  plannedAt: '2026-07-19T09:00:00Z',
+  actualStartedAt: null,
+  actualEndedAt: null,
+  concreteClass: 'C30/37',
+  targetSlump: null,
+  plannedVolumeM3: 20,
+  orderedVolumeM3: null,
+  plantName: null,
+  plantBranch: null,
+  plantContact: null,
+  plantAppointmentReference: null,
+  pumpEquipment: null,
+  laboratoryName: null,
+  laboratoryContact: null,
+  laboratoryAppointment: null,
+  inspectionNotifiedAt: null,
+  inspectionNotifiedPerson: null,
+  status: ConcretePourStatus.draft,
+  generalNote: null,
+  sampleExceptionReason: null,
+  varianceNote: null,
+  revision: 1,
+  createdAt: '2026-07-19T07:00:00Z',
+  updatedAt: '2026-07-19T07:00:00Z',
+  closedAt: null,
+  cancelledAt: null,
+);
+
+class _ConcretePushCountingObserver extends NavigatorObserver {
+  int pushes = 0;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    pushes += 1;
+    super.didPush(route, previousRoute);
+  }
+}
+
 SafeAttachmentPicker _picker() => SafeAttachmentPicker(
   permissions: SafeCapabilityService(_GrantedPermission()),
   picker: _EmptyPicker(),
@@ -709,6 +884,7 @@ class _FakeConcrete implements ConcreteApplication {
     this.delayFieldUpdate = false,
     this.started = false,
     this.ended = false,
+    this.navigationPours,
     bool checklistReady = false,
     ConcretePourStatus? status,
     this.agendaLinked = false,
@@ -733,6 +909,8 @@ class _FakeConcrete implements ConcreteApplication {
   bool inspectionComplete;
   ConcretePourStatus status;
   final bool agendaLinked;
+  List<ConcretePour>? navigationPours;
+  Completer<List<ConcretePour>>? delayedListReload;
   final _completer = Completer<ConcretePourDetail>();
   Completer<void>? _bulkCompleter;
   Completer<void>? _fieldCompleter;
@@ -824,7 +1002,12 @@ class _FakeConcrete implements ConcreteApplication {
   @override
   Future<List<ConcretePour>> listPours(ConcretePourQuery query) async {
     lastListQuery = query;
-    return [_currentDetail.pour];
+    final delayed = delayedListReload;
+    if (delayed != null) {
+      delayedListReload = null;
+      return delayed.future;
+    }
+    return navigationPours ?? [_currentDetail.pour];
   }
 
   @override

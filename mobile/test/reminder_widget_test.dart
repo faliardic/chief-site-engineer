@@ -1424,6 +1424,180 @@ void main() {
     );
     expect(find.byKey(const Key('reminder-delivery-diagnostic')), findsNothing);
   });
+
+  testWidgets(
+    'Hatırlatıcı detail return keeps Diğer subview and scroll after async reload',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 760);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final reminders = List.generate(
+        24,
+        (index) => reminder(
+          id: widgetReminderId(index + 200),
+          title: 'CSE264 yaklaşan sentetik kayıt $index',
+          nextAttentionAt: '2026-07-22T06:00:00Z',
+        ),
+      );
+      final agenda = _DelayedReminderAgenda(reminders);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: RemindersPage(agenda: agenda)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('reminder-primary-other')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('reminder-other-upcoming')));
+      await tester.pumpAndSettle();
+
+      final target = reminders[18];
+      final targetFinder = find.byKey(Key('reminder-${target.id}'));
+      await tester.scrollUntilVisible(
+        targetFinder,
+        420,
+        scrollable: _reminderScrollableFinder(),
+      );
+      final before = _reminderScrollOffset(tester);
+      expect(before, greaterThan(300));
+
+      await tester.tap(targetFinder);
+      await tester.pumpAndSettle();
+      agenda.reminders = [
+        for (var index = 0; index < reminders.length; index++)
+          index == 18
+              ? reminder(
+                  id: target.id,
+                  title: 'CSE264 güncel Hatırlatıcı başlığı',
+                  nextAttentionAt: target.nextAttentionAt,
+                )
+              : reminders[index],
+      ];
+      final delayedReload = Completer<List<MobileReminder>>();
+      agenda.delayedReminderReload = delayedReload;
+      await tester.binding.handlePopRoute();
+      await tester.pump(const Duration(milliseconds: 350));
+      delayedReload.complete(agenda.reminders);
+      await tester.pumpAndSettle();
+
+      expect(_reminderScrollOffset(tester), closeTo(before, 4));
+      expect(agenda.lastReminderGroup, ReminderViewGroup.upcoming);
+      expect(find.text('CSE264 güncel Hatırlatıcı başlığı'), findsOneWidget);
+      _reminderScrollable(tester).position.jumpTo(0);
+      await tester.pumpAndSettle();
+      expect(find.text('Yaklaşanlar'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Hatırlatıcı detail removal clamps offset and duplicate tap opens one route',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 760);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final reminders = List.generate(
+        20,
+        (index) => reminder(
+          id: widgetReminderId(index + 300),
+          title: 'CSE264 clamp sentetik kayıt $index',
+          nextAttentionAt: '2026-07-22T06:00:00Z',
+        ),
+      );
+      final agenda = _DelayedReminderAgenda(reminders);
+      final observer = _ReminderPushCountingObserver();
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorObservers: [observer],
+          home: Scaffold(body: RemindersPage(agenda: agenda)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('reminder-primary-other')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('reminder-other-upcoming')));
+      await tester.pumpAndSettle();
+      final target = reminders[17];
+      final targetFinder = find.byKey(Key('reminder-${target.id}'));
+      await tester.scrollUntilVisible(
+        targetFinder,
+        420,
+        scrollable: _reminderScrollableFinder(),
+      );
+      observer.pushes = 0;
+
+      final onTap = tester.widget<ListTile>(targetFinder).onTap!;
+      onTap();
+      onTap();
+      await tester.pumpAndSettle();
+      expect(observer.pushes, 1);
+
+      agenda.reminders = reminders.take(2).toList();
+      final delayedReload = Completer<List<MobileReminder>>();
+      agenda.delayedReminderReload = delayedReload;
+      await tester.pageBack();
+      await tester.pump(const Duration(milliseconds: 350));
+      delayedReload.complete(agenda.reminders);
+      await tester.pumpAndSettle();
+
+      final scrollable = _reminderScrollable(tester);
+      expect(
+        scrollable.position.pixels,
+        inInclusiveRange(
+          scrollable.position.minScrollExtent,
+          scrollable.position.maxScrollExtent,
+        ),
+      );
+      expect(find.byKey(Key('reminder-${target.id}')), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+}
+
+ScrollableState _reminderScrollable(WidgetTester tester) {
+  return tester.state<ScrollableState>(_reminderScrollableFinder());
+}
+
+Finder _reminderScrollableFinder() => find
+    .descendant(
+      of: find.byKey(const Key('reminder-list')),
+      matching: find.byType(Scrollable),
+    )
+    .first;
+
+double _reminderScrollOffset(WidgetTester tester) =>
+    _reminderScrollable(tester).position.pixels;
+
+class _DelayedReminderAgenda extends FakeAgendaApplication {
+  _DelayedReminderAgenda(List<MobileReminder> reminders)
+    : super(reminders: reminders);
+
+  Completer<List<MobileReminder>>? delayedReminderReload;
+
+  @override
+  Future<List<MobileReminder>> listReminders(ReminderViewGroup group) async {
+    lastReminderGroup = group;
+    final delayed = delayedReminderReload;
+    if (delayed != null) {
+      delayedReminderReload = null;
+      return delayed.future;
+    }
+    return super.listReminders(group);
+  }
+}
+
+class _ReminderPushCountingObserver extends NavigatorObserver {
+  int pushes = 0;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    pushes += 1;
+    super.didPush(route, previousRoute);
+  }
 }
 
 class _DeliveryAgenda extends FakeAgendaApplication

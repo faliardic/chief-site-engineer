@@ -31,6 +31,7 @@ class ConcretePage extends StatefulWidget {
 }
 
 class _ConcretePageState extends State<ConcretePage> {
+  final ScrollController _scrollController = ScrollController();
   final _search = TextEditingController();
   List<MobileProject> _projects = const [];
   List<ConcretePour> _pours = const [];
@@ -40,6 +41,7 @@ class _ConcretePageState extends State<ConcretePage> {
   bool _loading = true;
   String? _error;
   StreamSubscription<void>? _projectSubscription;
+  bool _detailNavigationBusy = false;
 
   @override
   void initState() {
@@ -54,6 +56,7 @@ class _ConcretePageState extends State<ConcretePage> {
   @override
   void dispose() {
     _projectSubscription?.cancel();
+    _scrollController.dispose();
     _search.dispose();
     super.dispose();
   }
@@ -77,7 +80,7 @@ class _ConcretePageState extends State<ConcretePage> {
     }
   }
 
-  Future<void> _reload() async {
+  Future<void> _reload({double? restoreOffset}) async {
     setState(() {
       _loading = true;
       _error = null;
@@ -99,6 +102,7 @@ class _ConcretePageState extends State<ConcretePage> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+    _restoreScrollOffset(restoreOffset);
   }
 
   Future<void> _pickDate() async {
@@ -136,17 +140,41 @@ class _ConcretePageState extends State<ConcretePage> {
   }
 
   Future<void> _open(String id) async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => ConcretePourDetailPage(
-          concrete: widget.concrete,
-          agenda: widget.agenda,
-          attachments: widget.attachments,
-          pourId: id,
+    if (_detailNavigationBusy) return;
+    final restoreOffset = _currentScrollOffset;
+    _detailNavigationBusy = true;
+    try {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => ConcretePourDetailPage(
+            concrete: widget.concrete,
+            agenda: widget.agenda,
+            attachments: widget.attachments,
+            pourId: id,
+          ),
         ),
-      ),
-    );
-    await _reload();
+      );
+      if (mounted) await _reload(restoreOffset: restoreOffset);
+    } finally {
+      _detailNavigationBusy = false;
+    }
+  }
+
+  double? get _currentScrollOffset =>
+      _scrollController.hasClients ? _scrollController.offset : null;
+
+  void _restoreScrollOffset(double? requestedOffset) {
+    if (requestedOffset == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      final position = _scrollController.position;
+      final target = requestedOffset
+          .clamp(position.minScrollExtent, position.maxScrollExtent)
+          .toDouble();
+      if ((position.pixels - target).abs() > 0.5) {
+        _scrollController.jumpTo(target);
+      }
+    });
   }
 
   @override
@@ -155,6 +183,7 @@ class _ConcretePageState extends State<ConcretePage> {
       onRefresh: _reload,
       child: ListView(
         key: const Key('concrete-page'),
+        controller: _scrollController,
         padding: const EdgeInsets.all(16),
         children: [
           Row(
@@ -270,6 +299,7 @@ class _ConcretePageState extends State<ConcretePage> {
             ),
           for (final pour in _pours)
             Card(
+              key: Key('concrete-pour-${pour.id}'),
               child: ListTile(
                 minVerticalPadding: 12,
                 leading: const Icon(Icons.foundation_outlined),

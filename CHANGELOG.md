@@ -1,5 +1,20 @@
 # Changelog
 
+## Issue #264 - Detay Dönüşünde Liste Bağlamı
+
+- Ajanda, Hatırlatıcı, Beton ve Puantaj listeleri aynı canlı route instance'ında
+  detail push/pop sonrasında scroll bölgesiyle mevcut gün, proje, filtre,
+  görünüm ve arama bağlamını korur.
+- Async reload son geçerli content'i gereksiz yere sıfırlamaz; fresh data
+  render edildikten sonra offset yeni extent içine güvenli biçimde clamp edilir.
+- Detail mutation sonrası güncel kart eski bağlamda görünür; archive/trash ile
+  gruptan çıkan kayıt overscroll veya exception üretmez.
+- Route-local navigation guard hızlı çift dokunmada duplicate detail push'ını
+  engeller. Ayrı liste instance'ları state paylaşmaz; controller'lar dispose
+  edilir.
+- Direct deep-link davranışı, schema `10` ve backup formatı `1` korunmuş;
+  migration, preference tablosu veya router rewrite eklenmemiştir.
+
 ## Issue #262 - Hatırlatıcı Yarına Ertele Uygunluğu
 
 - `Yarına ertele` uygunluğu kart, detay ve application mutation için aynı

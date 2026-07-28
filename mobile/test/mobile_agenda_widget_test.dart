@@ -314,10 +314,7 @@ void main() {
       );
       expect(formListView, findsOneWidget);
       final formScrollable = find
-          .descendant(
-            of: formListView,
-            matching: find.byType(Scrollable),
-          )
+          .descendant(of: formListView, matching: find.byType(Scrollable))
           .first;
       expect(formScrollable, findsOneWidget);
 
@@ -456,10 +453,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(notesField, findsOneWidget);
-      expect(
-        tester.widget<TextFormField>(notesField).controller!.text,
-        notes,
-      );
+      expect(tester.widget<TextFormField>(notesField).controller!.text, notes);
       await tester.scrollUntilVisible(
         find.byKey(const Key('pending-log-photo-0')),
         -300,
@@ -475,10 +469,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(dateButton, findsOneWidget);
       expect(
-        find.descendant(
-          of: dateButton,
-          matching: find.text('19.07.2026'),
-        ),
+        find.descendant(of: dateButton, matching: find.text('19.07.2026')),
         findsOneWidget,
       );
       expect(fake.createLogCalls, 0);
@@ -712,6 +703,180 @@ void main() {
     },
   );
 
+  testWidgets(
+    'Ajanda detail return keeps route-local filters search and scroll after reload',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 760);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final logs = List.generate(24, _navigationLog);
+      final fake = _DelayedAgendaApplication(projects: [project()], logs: logs);
+      await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('next-day')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('agenda-project-filter')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(project().name).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('agenda-category-filter')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AgendaCategory.inspection.label).last);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('agenda-literal-search')),
+        'CSE264 arama',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+
+      final target = logs[18];
+      final targetFinder = find.byKey(Key('agenda-log-${target.id}'));
+      await tester.scrollUntilVisible(
+        targetFinder,
+        420,
+        scrollable: _scrollableFor(find.byKey(const Key('agenda-day-list'))),
+      );
+      final before = _scrollOffset(tester, const Key('agenda-day-list'));
+      expect(before, greaterThan(300));
+
+      await tester.tap(targetFinder);
+      await tester.pumpAndSettle();
+      fake.logs = [
+        for (var index = 0; index < logs.length; index++)
+          index == 18
+              ? _navigationLog(
+                  index,
+                  description: 'CSE264 güncel Ajanda açıklaması',
+                )
+              : logs[index],
+      ];
+      final delayedReload = Completer<List<AgendaLog>>();
+      fake.delayedAgendaReload = delayedReload;
+      await tester.pageBack();
+      await tester.pump(const Duration(milliseconds: 350));
+      delayedReload.complete(fake.logs);
+      await tester.pumpAndSettle();
+
+      final after = _scrollOffset(tester, const Key('agenda-day-list'));
+      expect(after, closeTo(before, 4));
+      expect(fake.lastAgendaQuery?.projectId, projectId);
+      expect(fake.lastAgendaQuery?.category, AgendaCategory.inspection);
+      expect(fake.lastAgendaQuery?.literalSearch, 'CSE264 arama');
+      expect(find.text('CSE264 güncel Ajanda açıklaması'), findsOneWidget);
+      tester
+          .state<ScrollableState>(
+            _scrollableFor(find.byKey(const Key('agenda-day-list'))),
+          )
+          .position
+          .jumpTo(0);
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<EditableText>(find.byType(EditableText)).controller.text,
+        'CSE264 arama',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Ajanda detail navigation blocks duplicate tap and disposes safely',
+    (tester) async {
+      final observer = _PushCountingObserver();
+      final fake = FakeAgendaApplication(
+        projects: [project()],
+        logs: [_navigationLog(0)],
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorObservers: [observer],
+          home: AgendaPage(agenda: fake),
+        ),
+      );
+      await tester.pumpAndSettle();
+      observer.pushes = 0;
+      final card = find.byKey(Key('agenda-log-${fake.logs.single.id}'));
+
+      final onTap = tester
+          .widget<InkWell>(
+            find.descendant(of: card, matching: find.byType(InkWell)),
+          )
+          .onTap!;
+      onTap();
+      onTap();
+      await tester.pumpAndSettle();
+
+      expect(observer.pushes, 1);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('two Ajanda route instances keep isolated scroll state', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final logs = List.generate(18, _navigationLog);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: [
+              Expanded(
+                child: KeyedSubtree(
+                  key: const Key('agenda-instance-one'),
+                  child: AgendaPage(
+                    agenda: FakeAgendaApplication(
+                      projects: [project()],
+                      logs: logs,
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: KeyedSubtree(
+                  key: const Key('agenda-instance-two'),
+                  child: AgendaPage(
+                    agenda: FakeAgendaApplication(
+                      projects: [project()],
+                      logs: logs,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final firstList = find.descendant(
+      of: find.byKey(const Key('agenda-instance-one')),
+      matching: find.byKey(const Key('agenda-day-list')),
+    );
+
+    await tester.drag(firstList, const Offset(0, -520));
+    await tester.pumpAndSettle();
+
+    expect(
+      _scrollOffsetWithin(tester, const Key('agenda-instance-one')),
+      greaterThan(200),
+    );
+    expect(
+      _scrollOffsetWithin(tester, const Key('agenda-instance-two')),
+      closeTo(0, 0.1),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('camera denial preserves pending log input and creates no row', (
     tester,
   ) async {
@@ -747,6 +912,65 @@ void main() {
     expect(fake.logs, isEmpty);
     expect(fake.createLogCalls, 0);
   });
+}
+
+double _scrollOffset(WidgetTester tester, Key listKey) {
+  final scrollable = _scrollableFor(find.byKey(listKey));
+  return tester.state<ScrollableState>(scrollable).position.pixels;
+}
+
+Finder _scrollableFor(Finder list) =>
+    find.descendant(of: list, matching: find.byType(Scrollable)).first;
+
+double _scrollOffsetWithin(WidgetTester tester, Key instanceKey) {
+  final list = find.descendant(
+    of: find.byKey(instanceKey),
+    matching: find.byKey(const Key('agenda-day-list')),
+  );
+  final scrollable = _scrollableFor(list);
+  return tester.state<ScrollableState>(scrollable).position.pixels;
+}
+
+AgendaLog _navigationLog(int index, {String? description}) => AgendaLog(
+  id: 'aaaaaaaa-aaaa-4aaa-8aaa-${(index + 100).toString().padLeft(12, '0')}',
+  projectId: projectId,
+  projectName: 'Çok Uzun Kuzey Şantiyesi Proje Adı',
+  observedAt: '2026-07-19T07:30:00Z',
+  createdAt: '2026-07-19T08:00:00Z',
+  updatedAt: '2026-07-19T08:00:00Z',
+  category: AgendaCategory.inspection,
+  description: description ?? 'CSE264 Ajanda sentetik kayıt $index',
+  location: 'CSE264 kat ${index + 1}',
+  notes: 'CSE264 route-local fixture',
+  revision: 1,
+);
+
+class _DelayedAgendaApplication extends FakeAgendaApplication {
+  _DelayedAgendaApplication({required super.projects, required super.logs});
+
+  Completer<List<AgendaLog>>? delayedAgendaReload;
+  AgendaQuery? lastAgendaQuery;
+
+  @override
+  Future<List<AgendaLog>> listAgenda(AgendaQuery query) async {
+    lastAgendaQuery = query;
+    final delayed = delayedAgendaReload;
+    if (delayed != null) {
+      delayedAgendaReload = null;
+      return delayed.future;
+    }
+    return super.listAgenda(query);
+  }
+}
+
+class _PushCountingObserver extends NavigatorObserver {
+  int pushes = 0;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    pushes += 1;
+    super.didPush(route, previousRoute);
+  }
 }
 
 class _DeniedPermission implements PermissionGateway {

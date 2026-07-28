@@ -412,6 +412,166 @@ void main() {
     expect(find.byKey(const Key('attendance-day-detail')), findsOneWidget);
     expect(find.text('Günlük Puantaj'), findsOneWidget);
   });
+
+  testWidgets(
+    'Puantaj day detail return keeps project day and scroll after async reload',
+    (tester) async {
+      await _setPhoneSize(tester, const Size(320, 760));
+      final attendance = _DelayedAttendanceApplication(
+        detail: _detail(),
+        teamCounts: List.generate(
+          24,
+          (index) => ActiveTeamCount(
+            teamId:
+                'eeeeeeee-eeee-4eee-8eee-${(index + 100).toString().padLeft(12, '0')}',
+            teamName: 'CSE264 sentetik ekip $index',
+            subcontractorName: 'CSE264 sentetik taşeron',
+            activePersonCount: index + 1,
+          ),
+        ),
+      );
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(1.5)),
+          child: MaterialApp(
+            theme: ThemeData(brightness: Brightness.dark),
+            home: Scaffold(
+              body: AttendancePage(
+                attendance: attendance,
+                agenda: FakeAgendaApplication(projects: [_project()]),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('attendance-previous-day')));
+      await tester.pumpAndSettle();
+      final selectedDay = tester
+          .widget<Text>(
+            find.descendant(
+              of: find.byKey(const Key('attendance-date-picker')),
+              matching: find.byType(Text),
+            ),
+          )
+          .data;
+
+      final detailCard = find.byKey(const Key('open-attendance-day'));
+      await tester.scrollUntilVisible(
+        detailCard,
+        420,
+        scrollable: _attendanceScrollableFinder(),
+      );
+      final before = _attendanceScrollOffset(tester);
+      expect(before, greaterThan(300));
+
+      await tester.tap(detailCard);
+      await tester.pumpAndSettle();
+      attendance.detail = _completedDetail();
+      final delayedReload = Completer<AttendanceDayDetail>();
+      attendance.delayedDetailReload = delayedReload;
+      await tester.pageBack();
+      await tester.pump(const Duration(milliseconds: 350));
+      delayedReload.complete(attendance.detail!);
+      await tester.pumpAndSettle();
+
+      expect(_attendanceScrollOffset(tester), closeTo(before, 4));
+      expect(find.text(AttendanceDayStatus.completed.label), findsOneWidget);
+      expect(find.text('CSE264 sentetik ekip 23 — 24 kişi'), findsOneWidget);
+      tester
+          .state<ScrollableState>(_attendanceScrollableFinder())
+          .position
+          .jumpTo(0);
+      await tester.pumpAndSettle();
+      expect(find.text(selectedDay!), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Puantaj detail double tap opens one route and controller disposes',
+    (tester) async {
+      final attendance = _DelayedAttendanceApplication(
+        detail: _detail(),
+        teamCounts: const [],
+      );
+      final observer = _AttendancePushCountingObserver();
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorObservers: [observer],
+          home: Scaffold(
+            body: AttendancePage(
+              attendance: attendance,
+              agenda: FakeAgendaApplication(projects: [_project()]),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      observer.pushes = 0;
+      final detailCard = find.byKey(const Key('open-attendance-day'));
+
+      final onTap = tester.widget<InkWell>(detailCard).onTap!;
+      onTap();
+      onTap();
+      await tester.pumpAndSettle();
+
+      expect(observer.pushes, 1);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+}
+
+double _attendanceScrollOffset(WidgetTester tester) {
+  return tester
+      .state<ScrollableState>(_attendanceScrollableFinder())
+      .position
+      .pixels;
+}
+
+Finder _attendanceScrollableFinder() => find
+    .descendant(
+      of: find.byKey(const Key('attendance-page')),
+      matching: find.byType(Scrollable),
+    )
+    .first;
+
+class _DelayedAttendanceApplication extends FakeAttendanceApplication {
+  _DelayedAttendanceApplication({
+    required super.detail,
+    required this.teamCounts,
+  });
+
+  final List<ActiveTeamCount> teamCounts;
+  Completer<AttendanceDayDetail>? delayedDetailReload;
+
+  @override
+  Future<AttendanceDayDetail> getDayDetail(String dayId) {
+    final delayed = delayedDetailReload;
+    if (delayed != null) {
+      delayedDetailReload = null;
+      return delayed.future;
+    }
+    return super.getDayDetail(dayId);
+  }
+
+  @override
+  Future<List<ActiveTeamCount>> listActiveTeamCounts(String projectId) async =>
+      teamCounts;
+}
+
+class _AttendancePushCountingObserver extends NavigatorObserver {
+  int pushes = 0;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    pushes += 1;
+    super.didPush(route, previousRoute);
+  }
 }
 
 Future<void> _setPhoneSize(WidgetTester tester, Size size) async {
@@ -465,3 +625,26 @@ AttendanceDayDetail _detail({MobileReminder? linkedReminder}) =>
       teamSummaries: const [],
       linkedReminder: linkedReminder,
     );
+
+AttendanceDayDetail _completedDetail() {
+  final current = _detail();
+  return AttendanceDayDetail(
+    day: AttendanceDay(
+      id: current.day.id,
+      projectId: current.day.projectId,
+      projectName: current.day.projectName,
+      localDate: current.day.localDate,
+      status: AttendanceDayStatus.completed,
+      generalNote: current.day.generalNote,
+      revision: current.day.revision + 1,
+      createdAt: current.day.createdAt,
+      updatedAt: '2026-07-19T09:00:00Z',
+      completedAt: '2026-07-19T09:00:00Z',
+    ),
+    entries: current.entries,
+    events: current.events,
+    totals: current.totals,
+    teamSummaries: current.teamSummaries,
+    linkedReminder: current.linkedReminder,
+  );
+}
