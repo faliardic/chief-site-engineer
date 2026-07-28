@@ -8,7 +8,8 @@
 **Önceki saha backlog'u:** #203  
 **Açık Release 0.1 pilotu:** #193  
 **Güncel RC / günlük saha testi:** #245  
-**Aktif doğrulama zinciri:** #260 field smoke; #257 → #254 / #256 BLOCKED
+**Aktif günlük hotfix:** #262 reminder tarih/source uygunluğu
+**Bloklu yatay kabul zinciri:** #257 → #254 / #256, Draft PR #259
 
 ## 1. Ürün kararı
 
@@ -42,21 +43,20 @@ Tamamlanan günlük güvenilirlik dilimleri:
 - #234 — Beton sınıfı kataloğu ve döküm zaman çizgisi;
 - #237 — Ajanda Beton sinyali, öneri ve Beton paketine deep-link;
 - #252 / PR #253 — `Yarına ertele`, `2 saat` ve `3 saat` hızlı eylemleri;
-- #260 — Beton checklist source-of-truth ve döküm başlatma hotfix'i; merge
-  öncesi normal field APK fiziksel smoke kapısı açıktır.
+- #260 / PR #261 — Beton checklist source-of-truth ve döküm başlatma hotfix'i.
 
 Güncel güvenli `master`:
 
 ```text
-7a90a201a31dec06d94df763bac18760a4c0d69c
+6b64ed29e15d0f839e10fb4ff0b7bbe739a0fd8a
 ```
 
 Bu noktada mobil schema `10`, backup formatı `1` ve son geçerli merged Python
-full suite `1005 passed, 7 skipped` durumundadır. Issue #260 branch'inde
+full suite `1005 passed, 7 skipped` durumundadır. Issue #260 / PR #261 ile
 focused Beton application `24 PASS`, focused Beton widget `13 PASS`, Flutter
-full suite `275 PASS` ve Flutter analyze temizdir. Bu branch kanıtı merge
-edilene kadar GitHub `master` gerçeğinin yerine geçmez. Issue #252 için imza
-uyumlu `adb install -r` replace-upgrade veri alanı korunarak tamamlanmıştır.
+full suite `275 PASS`, Flutter analyze ve normal field APK sentetik Beton smoke
+kanıtları merge edilmiştir. Issue #252 için imza uyumlu `adb install -r`
+replace-upgrade veri alanı korunarak tamamlanmıştır.
 
 Fiziksel cihaz smoke otomasyonu için #254 üzerinde izole acceptance harness,
 #256 üzerinde atomik build-root rotasyonu ve #257 üzerinde doğrulanmış acceptance
@@ -182,7 +182,7 @@ saha araçlarını dar child Issue'larla kapatmak.
 
 ### Günlük Saha Hotfix Dalgası
 
-8. **Beton checklist source-of-truth ve döküm başlatma blocker'ı — P1**
+8. **Beton checklist source-of-truth ve döküm başlatma blocker'ı — tamamlandı**
    - `Tümünü tamamla` atomik çalışır; kısmi checklist sonucu bırakmaz.
    - Açık/tamamlanan sayacı yalnız kaynak checklist item durumlarından hesaplanır.
    - Zorunlu kalemler tamamlanınca açık sayı aynı ekranda `0` olur ve
@@ -191,7 +191,7 @@ saha araçlarını dar child Issue'larla kapatmak.
    - `Dökümü başlat → Dökümü bitir` ana akışı gerçek cihazda doğrulanır.
    - Stale revision veya event failure bütün transaction'ı geri alır.
 
-9. **Hatırlatıcı kaynak/tarih duyarlı eylem uygunluğu — P2**
+9. **Hatırlatıcı kaynak/tarih duyarlı eylem uygunluğu — P2 / Issue #262**
    - `Yarına ertele` yalnız gecikmiş veya bugün tarihli uygun aktif kayıtta görünür.
    - Zaten yarın veya daha ileri tarihli kayıtta gösterilmez.
    - Puantaj tarafından yönetilen occurrence/reminder üzerinde generic

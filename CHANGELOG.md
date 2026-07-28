@@ -1,5 +1,21 @@
 # Changelog
 
+## Issue #262 - Hatırlatıcı Yarına Ertele Uygunluğu
+
+- `Yarına ertele` uygunluğu kart, detay ve application mutation için aynı
+  deterministik domain helper'ına bağlandı.
+- Europe/Istanbul yerel gününe göre gecikmiş ve bugün tarihli bağımsız aktif
+  reminder uygundur; yarın/gelecek, Puantaj kaynaklı, terminal, trash ve plansız
+  reminder fail-closed uygun değildir.
+- Uygun olmayan direct mutation row, revision, append-only event ve notification
+  binding'i değiştirmeden reddedilir. Aynı event ID retry duplicate event
+  üretmez; farklı stale event çağrısı mevcut optimistic revision hatasını korur.
+- Saatli uygun kayıtta yerel saat, all-day kayıtta yerel yarın günü ve mevcut
+  notification reconciliation yolu korunur.
+- Puantaj kartı ve detayında generic eylem gizlenirken mevcut kaynak Puantaj
+  gününe dönüş yolu korunur.
+- Mobil schema `10` ve backup formatı `1` değişmedi; migration eklenmedi.
+
 ## Issue #260 - Beton Checklist Source-of-Truth ve Döküm Başlatma
 
 - Beton checklist başlığındaki açık sayı, current required checklist satırlarından

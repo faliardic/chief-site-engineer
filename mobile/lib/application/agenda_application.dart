@@ -1381,6 +1381,25 @@ class SqliteAgendaApplication
           throw const AgendaValidationFailure('Hatırlatıcı bulunamadı.');
         }
         final current = _reminderFromRow(rows.single);
+        if (command.action == ReminderMutationAction.snoozeTomorrowMorning) {
+          final priorEvents = await transaction.query(
+            'follow_up_events',
+            columns: ['follow_up_id', 'event_type'],
+            where: 'id = ?',
+            whereArgs: [command.eventId],
+            limit: 1,
+          );
+          if (priorEvents.isNotEmpty) {
+            final prior = priorEvents.single;
+            if (prior['follow_up_id'] == current.id &&
+                prior['event_type'] == 'snoozed') {
+              return (reminder: current, changed: false);
+            }
+            throw const AgendaValidationFailure(
+              'Event kimliği başka bir hatırlatıcı işlemi için kullanılmış.',
+            );
+          }
+        }
         if (current.revision != command.expectedRevision) {
           throw const AgendaValidationFailure(
             'Hatırlatıcı başka bir işlemle değişti. Ekranı yenileyin.',
@@ -1571,6 +1590,14 @@ class SqliteAgendaApplication
     required DateTime now,
   }) {
     final nowValue = CseTimeCodec.encodeUtc(now);
+    if (command.action == ReminderMutationAction.snoozeTomorrowMorning) {
+      final today = CseTimeCodec.istanbulDayKey(nowValue);
+      if (!isReminderEligibleForTomorrowSnooze(current, istanbulToday: today)) {
+        throw const AgendaValidationFailure(
+          'Bu hatırlatıcı yarına ertelenemez. Tarihi veya kaynak akışı kontrol edin.',
+        );
+      }
+    }
     void requireOpen() {
       if (current.status == ReminderStatus.completed ||
           current.status == ReminderStatus.cancelled) {
