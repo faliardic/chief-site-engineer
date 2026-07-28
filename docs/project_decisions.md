@@ -3358,3 +3358,22 @@
   deep-link sahte liste geçmişi oluşturmaz.
 - Cold restart/process-death pixel restoration, schema, backup ve genel router
   bu kararın kapsamı dışındadır.
+
+## Issue 266 — Tek ürün dili root Flutter locale'inde sabitlenir
+
+- CSE'nin mevcut tek ürün dili Türkçedir. Root `MaterialApp`, yalnız
+  `Locale('tr')` ve canonical Material/Widgets/Cupertino delegate setini
+  kullanır; cihaz locale'i yerleşik kullanıcı eylemlerini İngilizceye
+  çeviremez.
+- `flutter_localizations` Flutter SDK dependency'sidir. Üçüncü taraf
+  localization paketi, ARB kataloğu, çoklu dil veya dil seçici eklenmez.
+- Puantaj `draft` bir lifecycle durumudur; ana kullanıcı eyleminin adı değildir.
+  Görünür eylem `Kaydet` olur fakat `save-attendance-draft` key'i, command,
+  event ID, revision, rollback, idempotency ve submitting guard korunur.
+- Seçim toolbar eylemleri bağlama göre gösterilir. Editable alanda uygun Türkçe
+  eylemler görünür; read-only alanda `Kes` ve `Yapıştır` zorla gösterilmez.
+- Test platform davranışı global debug override ile değil route-local theme ile
+  kurulur. Dar ekran görünürlüğü exact route scrollable ve semantic key
+  üzerinden doğrulanır.
+- Schema `10`, backup formatı `1`, persisted zaman/sayı codec'leri ve
+  notification/persistence sözleşmeleri bu kararın kapsamı dışındadır.

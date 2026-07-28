@@ -60,6 +60,126 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'Kaydet saves the Puantaj roster while draft lifecycle stays open',
+    (tester) async {
+      await _setPhoneSize(tester, const Size(390, 820));
+      final attendance = FakeAttendanceApplication(
+        members: [_member()],
+        detail: _detail(),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AttendanceDayPage(
+            attendance: attendance,
+            agenda: FakeAgendaApplication(projects: [_project()]),
+            dayId: dayId,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('save-attendance-draft')),
+        240,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const Key('attendance-day-detail')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Kaydet'), findsOneWidget);
+      expect(find.text('Taslak kaydet'), findsNothing);
+      await tester.tap(find.byKey(const Key('save-attendance-draft')));
+      await tester.pumpAndSettle();
+
+      expect(attendance.saveCalls, 1);
+      expect(attendance.lastRosterCommand!.expectedRevision, 1);
+      expect(attendance.lastRosterCommand!.eventId, isNotEmpty);
+      expect(attendance.detail!.day.status, AttendanceDayStatus.draft);
+      expect(find.byKey(const Key('complete-attendance-day')), findsOneWidget);
+      expect(find.text('Günü tamamla'), findsOneWidget);
+    },
+  );
+
+  testWidgets('Puantaj save failure uses explicit Turkish user language', (
+    tester,
+  ) async {
+    await _setPhoneSize(tester, const Size(390, 820));
+    final attendance = FakeAttendanceApplication(
+      members: [_member()],
+      detail: _detail(),
+    )..saveFailure = StateError('synthetic failure');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AttendanceDayPage(
+          attendance: attendance,
+          agenda: FakeAgendaApplication(projects: [_project()]),
+          dayId: dayId,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('save-attendance-draft')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Puantaj kaydedilemedi.'), findsOneWidget);
+    expect(find.textContaining('Taslak kaydedilemedi'), findsNothing);
+    expect(attendance.detail!.day.status, AttendanceDayStatus.draft);
+  });
+
+  testWidgets(
+    'Kaydet action fits 320 px large text dark theme without overflow',
+    (tester) async {
+      await _setPhoneSize(tester, const Size(320, 820));
+      final attendance = FakeAttendanceApplication(
+        members: [_member()],
+        detail: _detail(),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(brightness: Brightness.dark),
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+            child: AttendanceDayPage(
+              attendance: attendance,
+              agenda: FakeAgendaApplication(projects: [_project()]),
+              dayId: dayId,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final detailRoot = find.byKey(const Key('attendance-day-detail'));
+      final detailScrollable = find
+          .descendant(of: detailRoot, matching: find.byType(Scrollable))
+          .first;
+      final saveAction = find.byKey(const Key('save-attendance-draft'));
+      await tester.scrollUntilVisible(
+        saveAction,
+        240,
+        scrollable: detailScrollable,
+        maxScrolls: 10,
+      );
+      await tester.pumpAndSettle();
+
+      expect(saveAction, findsOneWidget);
+      expect(
+        find.descendant(of: saveAction, matching: find.text('Kaydet')),
+        findsOneWidget,
+      );
+      expect(find.text('Taslak kaydet'), findsNothing);
+      expect(find.byKey(const Key('complete-attendance-day')), findsOneWidget);
+      expect(find.text('Günü tamamla'), findsOneWidget);
+      expect(find.text('Çalışma yok'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('validation preserves Puantaj inputs and double tap is bounded', (
     tester,
   ) async {

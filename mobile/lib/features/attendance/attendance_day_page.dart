@@ -150,7 +150,7 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
       await _load();
     } on Object catch (error) {
       if (!mounted) return;
-      setState(() => _error = _message(error, 'Taslak kaydedilemedi.'));
+      setState(() => _error = _message(error, 'Puantaj kaydedilemedi.'));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -346,7 +346,7 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
       await _load();
     } on Object catch (error) {
       if (!mounted) return;
-      setState(() => _error = _message(error, 'Entry kaldırılamadı.'));
+      setState(() => _error = _message(error, 'Puantaj kaydı kaldırılamadı.'));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -447,7 +447,7 @@ class _AttendanceDayPageState extends State<AttendanceDayPage> {
                       ),
                       onPressed: _submitting ? null : _save,
                       icon: const Icon(Icons.save_outlined),
-                      label: const Text('Taslak kaydet'),
+                      label: const Text('Kaydet'),
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -617,7 +617,7 @@ class _DayHeader extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text('${detail.day.localDate} • ${detail.day.status.label}'),
-            Text('Revision ${detail.day.revision}'),
+            Text('Revizyon ${detail.day.revision}'),
             if (detail.day.generalNote != null) ...[
               const SizedBox(height: 4),
               Text(detail.day.generalNote!),

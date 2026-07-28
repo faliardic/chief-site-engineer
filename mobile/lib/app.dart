@@ -11,9 +11,18 @@ import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 class CseApp extends StatelessWidget {
   const CseApp({required this.bootstrap, this.fatalErrors, super.key});
+
+  static const locale = Locale('tr');
+  static const supportedLocales = <Locale>[locale];
+  static const localizationsDelegates = <LocalizationsDelegate<dynamic>>[
+    GlobalMaterialLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+  ];
 
   final Future<BootstrapResult> bootstrap;
   final ValueListenable<String?>? fatalErrors;
@@ -35,6 +44,9 @@ class CseApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Chief Site Engineer',
+      locale: locale,
+      supportedLocales: supportedLocales,
+      localizationsDelegates: localizationsDelegates,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: seed),
         materialTapTargetSize: MaterialTapTargetSize.padded,
@@ -352,7 +364,7 @@ class _HomePage extends StatelessWidget {
         Card(
           child: ListTile(
             leading: const Icon(Icons.offline_bolt_outlined),
-            title: const Text('Offline temel hazır'),
+            title: const Text('Çevrim dışı temel hazır'),
             subtitle: Text(
               'Cihaz-içi SQLite • ${bootstrap.environmentLabel} ortamı',
             ),
@@ -362,7 +374,9 @@ class _HomePage extends StatelessWidget {
           child: ListTile(
             leading: Icon(Icons.lock_outline_rounded),
             title: Text('Veri sınırı'),
-            subtitle: Text('Cloud sync ve kullanıcı hesabı bu sürümde yoktur.'),
+            subtitle: Text(
+              'Bulut eşitleme ve kullanıcı hesabı bu sürümde yoktur.',
+            ),
           ),
         ),
         if (bootstrap.backup case final backup?)

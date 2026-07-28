@@ -8,7 +8,7 @@
 **Önceki saha backlog'u:** #203  
 **Açık Release 0.1 pilotu:** #193  
 **Güncel RC / günlük saha testi:** #245  
-**Aktif günlük hotfix:** #264 detay dönüşünde liste bağlamı
+**Aktif günlük hotfix:** #266 Türkçe kullanıcı dili ve Puantaj `Kaydet` eylemi
 **Bloklu yatay kabul zinciri:** #257 → #254 / #256, Draft PR #259
 
 ## 1. Ürün kararı
@@ -45,12 +45,16 @@ Tamamlanan günlük güvenilirlik dilimleri:
 - #252 / PR #253 — `Yarına ertele`, `2 saat` ve `3 saat` hızlı eylemleri;
 - #260 / PR #261 — Beton checklist source-of-truth ve döküm başlatma hotfix'i;
 - #262 / PR #263 — reminder tarih/source uygunluğu;
-- #264 — dört ana listede detail dönüşü route-local state korunumu.
+- #264 / PR #265 — dört ana listede detail dönüşü route-local state korunumu.
+
+Issue #266 branch'inde Türkçe Material/Widgets/Cupertino locale sözleşmesi,
+Puantaj `Kaydet` dili ve seçim toolbar kabulü source/test/build/fiziksel cihaz
+kapılarını geçmiştir. Merge edilene kadar current safe point sayılmaz.
 
 Güncel güvenli `master`:
 
 ```text
-5212ff97e80e8c6bc5daa95e97b37841f9f17edf
+dec0a23c8a8effd5944a6fc62aacc4c8bb1a1d9e
 ```
 
 Bu noktada mobil schema `10`, backup formatı `1` ve son geçerli merged Python
