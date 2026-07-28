@@ -1,5 +1,21 @@
 # Changelog
 
+## Issue #266 - Türkçe Kullanıcı Dili ve Puantaj `Kaydet`
+
+- Kök `MaterialApp`, yalnız Türkçe locale ile canonical Material, Widgets ve
+  Cupertino localization delegate'lerini kullanır; cihaz dili İngilizce olsa
+  da yerleşik kullanıcı eylemleri Türkçe kalır.
+- Puantaj ana eylemi `Taslak kaydet` yerine `Kaydet` gösterir. Mevcut
+  `save-attendance-draft` key'i ve mutation korunur; kayıt sonrası lifecycle
+  `draft` kalır ve `Günü tamamla` ayrı eylemdir.
+- `Revision`, `Entry`, `Offline` ve `Cloud sync` karışık kullanıcı metinleri
+  dar doğrulanmış envanter içinde doğal Türkçeye çevrildi.
+- Editable ve read-only seçim toolbar davranışı, Türkçe date/time picker,
+  320 px büyük metin/koyu tema ve double-tap guard sentetik testlerle
+  doğrulandı.
+- Mobil schema `10`, backup formatı `1` ve persisted zaman/sayı sözleşmeleri
+  değişmedi; migration eklenmedi.
+
 ## Issue #264 - Detay Dönüşünde Liste Bağlamı
 
 - Ajanda, Hatırlatıcı, Beton ve Puantaj listeleri aynı canlı route instance'ında
