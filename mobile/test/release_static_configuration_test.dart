@@ -5,6 +5,27 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'Turkish Flutter SDK localization dependency and root config are exact',
+    () {
+      final pubspec = File('pubspec.yaml').readAsStringSync();
+      final app = File('lib/app.dart').readAsStringSync();
+
+      expect(pubspec, contains('flutter_localizations:\n    sdk: flutter'));
+      expect(app, contains("static const locale = Locale('tr');"));
+      expect(
+        app,
+        contains('static const supportedLocales = <Locale>[locale];'),
+      );
+      expect(app, contains('GlobalMaterialLocalizations.delegate'));
+      expect(app, contains('GlobalWidgetsLocalizations.delegate'));
+      expect(app, contains('GlobalCupertinoLocalizations.delegate'));
+      expect(app, isNot(contains("Locale('en")));
+      expect(pubspec, isNot(contains('easy_localization')));
+      expect(pubspec, isNot(contains('intl_utils')));
+    },
+  );
+
   test('Android release identity API and permission contract is exact', () {
     final gradle = File('android/app/build.gradle.kts').readAsStringSync();
     final manifest = File(

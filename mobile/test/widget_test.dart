@@ -1,11 +1,217 @@
 import 'package:chief_site_engineer/app.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'support/fake_agenda_application.dart';
 
 void main() {
+  testWidgets(
+    'CseApp forces Turkish Material Widgets and Cupertino localizations',
+    (tester) async {
+      tester.binding.platformDispatcher.localeTestValue = const Locale(
+        'en',
+        'US',
+      );
+      addTearDown(tester.binding.platformDispatcher.clearLocaleTestValue);
+      await tester.pumpWidget(
+        CseApp(
+          bootstrap: Future<BootstrapResult>.value(
+            BootstrapSuccess(
+              environmentLabel: 'Geliştirme',
+              smokeRecordId: 'localization-baseline',
+              smokeRecordCreatedAt: '2026-07-28T08:00:00Z',
+              agenda: FakeAgendaApplication(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+      expect(app.locale, CseApp.locale);
+      expect(app.supportedLocales, CseApp.supportedLocales);
+      expect(app.localizationsDelegates, CseApp.localizationsDelegates);
+      expect(
+        app.localizationsDelegates,
+        contains(GlobalMaterialLocalizations.delegate),
+      );
+      expect(
+        app.localizationsDelegates,
+        contains(GlobalWidgetsLocalizations.delegate),
+      );
+      expect(
+        app.localizationsDelegates,
+        contains(GlobalCupertinoLocalizations.delegate),
+      );
+
+      final context = tester.element(find.byType(BootstrapGate));
+      final material = MaterialLocalizations.of(context);
+      expect(Localizations.localeOf(context), const Locale('tr'));
+      expect(material.copyButtonLabel, 'Kopyala');
+      expect(material.pasteButtonLabel, 'Yapıştır');
+      expect(material.cutButtonLabel, 'Kes');
+      expect(material.selectAllButtonLabel, 'Tümünü seç');
+      expect(WidgetsLocalizations.of(context).textDirection, TextDirection.ltr);
+      final cupertino = CupertinoLocalizations.of(context);
+      expect(cupertino.copyButtonLabel, 'Kopyala');
+      expect(cupertino.pasteButtonLabel, 'Yapıştır');
+      expect(cupertino.cutButtonLabel, 'Kes');
+      expect(cupertino.selectAllButtonLabel, 'Tümünü Seç');
+      expect(find.text('Çevrim dışı temel hazır'), findsOneWidget);
+      expect(
+        find.textContaining('Bulut eşitleme ve kullanıcı hesabı'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Offline temel hazır'), findsNothing);
+      expect(find.textContaining('Cloud sync'), findsNothing);
+    },
+  );
+
+  testWidgets('editable TextField selection toolbar actions are Turkish', (
+    tester,
+  ) async {
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async => switch (call.method) {
+        'Clipboard.hasStrings' => <String, Object>{'value': true},
+        'Clipboard.getData' => <String, Object>{'text': 'CSE266 SENTETİK PANO'},
+        _ => null,
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    final controller = TextEditingController(
+      text: 'CSE266 sentetik seçim metni',
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      _localizedTestApp(
+        Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 600,
+              child: TextField(
+                key: const Key('editable-localization-fixture'),
+                controller: controller,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.longPress(
+      find.byKey(const Key('editable-localization-fixture')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Kopyala'), findsOneWidget);
+    expect(find.text('Yapıştır'), findsOneWidget);
+    expect(find.text('Kes'), findsOneWidget);
+    expect(find.text('Tümünü seç'), findsOneWidget);
+    expect(debugDefaultTargetPlatformOverride, isNull);
+    expect(tester.binding.hasScheduledFrame, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('read-only TextField hides cut and paste actions', (
+    tester,
+  ) async {
+    final controller = TextEditingController(
+      text: 'CSE266 salt okunur sentetik metin',
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      _localizedTestApp(
+        Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 600,
+              child: TextField(
+                key: const Key('readonly-localization-fixture'),
+                controller: controller,
+                readOnly: true,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.longPress(
+      find.byKey(const Key('readonly-localization-fixture')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Kopyala'), findsOneWidget);
+    expect(find.text('Tümünü seç'), findsOneWidget);
+    expect(find.text('Kes'), findsNothing);
+    expect(find.text('Yapıştır'), findsNothing);
+    expect(debugDefaultTargetPlatformOverride, isNull);
+    expect(tester.binding.hasScheduledFrame, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('date and time pickers expose Turkish actions', (tester) async {
+    await tester.pumpWidget(
+      _localizedTestApp(
+        Builder(
+          builder: (context) => Scaffold(
+            body: Column(
+              children: [
+                TextButton(
+                  key: const Key('open-localized-date-picker'),
+                  onPressed: () => showDatePicker(
+                    context: context,
+                    initialDate: DateTime(2026, 7, 28),
+                    firstDate: DateTime(2026),
+                    lastDate: DateTime(2027),
+                  ),
+                  child: const Text('Tarih fixture'),
+                ),
+                TextButton(
+                  key: const Key('open-localized-time-picker'),
+                  onPressed: () => showTimePicker(
+                    context: context,
+                    initialTime: const TimeOfDay(hour: 8, minute: 30),
+                  ),
+                  child: const Text('Saat fixture'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('open-localized-date-picker')));
+    await tester.pumpAndSettle();
+    expect(find.text('Tarih seçin'), findsOneWidget);
+    expect(find.text('İptal'), findsOneWidget);
+    expect(find.text('Tamam'), findsOneWidget);
+    await tester.tap(find.text('İptal'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('open-localized-time-picker')));
+    await tester.pumpAndSettle();
+    expect(find.text('Saat seçin'), findsOneWidget);
+    expect(find.text('İptal'), findsOneWidget);
+    expect(find.text('Tamam'), findsOneWidget);
+    expect(find.textContaining('08'), findsWidgets);
+    await tester.tap(find.text('İptal'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('mobile shell exposes all release 0.1 navigation entries', (
     tester,
   ) async {
@@ -77,6 +283,30 @@ void main() {
     expect(find.textContaining('StackTrace'), findsNothing);
   });
 
+  for (final brightness in Brightness.values) {
+    testWidgets('CseApp fatal screen opens in ${brightness.name} theme', (
+      tester,
+    ) async {
+      tester.binding.platformDispatcher.platformBrightnessTestValue =
+          brightness;
+      addTearDown(
+        tester.binding.platformDispatcher.clearPlatformBrightnessTestValue,
+      );
+      await tester.pumpWidget(
+        CseApp(
+          bootstrap: Future<BootstrapResult>.value(BootstrapFailure()),
+          fatalErrors: ValueNotifier<String?>('synthetic_fatal'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final context = tester.element(find.byType(SafeDiagnosticPanel));
+      expect(Theme.of(context).brightness, brightness);
+      expect(find.text('Tanı kodu: synthetic_fatal'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final width in [320.0, 430.0]) {
     testWidgets(
       'safe diagnostic fits ${width.toInt()} px with large Turkish text',
@@ -104,3 +334,11 @@ void main() {
     );
   }
 }
+
+Widget _localizedTestApp(Widget home) => MaterialApp(
+  locale: CseApp.locale,
+  supportedLocales: CseApp.supportedLocales,
+  localizationsDelegates: CseApp.localizationsDelegates,
+  theme: ThemeData(platform: TargetPlatform.android),
+  home: home,
+);
