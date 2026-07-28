@@ -2,11 +2,11 @@
 
 ## Durum
 
-`BLOCKED` — production source, focused testler, full Flutter, analyze ve static
-scope kapıları PASS; fiziksel cihaz `device` durumunda doğrulandı, ancak normal
-field APK build'i Windows dosya kilidi nedeniyle tamamlanamadı. Bu nedenle
-install ve sentetik cihaz smoke'u başlatılmadı. Bütün kapılar PASS olmadığı için
-commit, push ve Draft PR oluşturulmadı.
+`PASS` — checkpoint source revision değiştirilmeden disposable detached
+worktree içinde tek normal field APK build'i tamamlandı. Exact artifact
+provenance, applicationId ve kurulu field package ile signing uyumu
+doğrulandı; veri koruyan replace-install ve yalnız sentetik fiziksel cihaz
+smoke'u PASS oldu. Mevcut Draft PR #263 merge-ready yapılmadı.
 
 ## Repository
 
@@ -16,6 +16,8 @@ commit, push ve Draft PR oluşturulmadı.
 - Master divergence: `0 0`
 - Branch: `codex/issue-262-reminder-tomorrow-action-eligibility`
 - Branch başlangıç SHA: `6b64ed29e15d0f839e10fb4ff0b7bbe739a0fd8a`
+- Validation checkpoint SHA:
+  `5be1e0fe2d5ec6f2a440063e2397c3cf8892eac9`
 - Draft PR #259 head SHA `7cce5de803ce4ea6b043b49499988c615ce923e8`
   branch ancestry'sinde değildir (`merge-base --is-ancestor` exit `1`).
 
@@ -29,6 +31,9 @@ commit, push ve Draft PR oluşturulmadı.
   doğrulamak.
 - Aynı full Flutter ve analyze kapısı source revision üzerinde yalnız birer kez
   çalıştırıldı.
+- Son izinli validation run'ı source/test değişikliği yapmadan disposable
+  detached worktree içinde yürütüldü; korunan focused/full/analyze testleri
+  yeniden çalıştırılmadı.
 
 ## Kök neden kanıtı
 
@@ -78,53 +83,70 @@ ve Puantaj kaynaklı kartlar generic eylemi gösterebiliyordu.
 - Backup codec diff: `0`; `CseBackupCodec.formatVersion = 1`.
 - Migration eklenmedi.
 
-## Fiziksel cihaz ve build blocker'ı
+## Disposable build ve artifact provenance
 
-İlk cihaz kontrolü:
+- Detached validation worktree:
+  `C:\Users\Fatih\AppData\Local\Temp\cse262-validation-20260728-190939`
+- Detached HEAD:
+  `5be1e0fe2d5ec6f2a440063e2397c3cf8892eac9`
+- PR #259 ancestry: yok.
+- Dependency hazırlığı sonrası tracked status: temiz.
+- Build run ID: `cse262-build-20260728T161139941Z`
+- Build başlangıç UTC: `2026-07-28T16:11:39.9555936+00:00`
+- Build bitiş UTC: `2026-07-28T16:13:28.3977893+00:00`
+- Tek build komutu:
+  `flutter build apk --debug --target lib\main.dart --no-pub`
+- Build sonucu: `PASS`; retry, clean, rotation veya ikinci build yapılmadı.
+- Exact APK:
+  `C:\Users\Fatih\AppData\Local\Temp\cse262-validation-20260728-190939\mobile\build\app\outputs\flutter-apk\app-debug.apk`
+- File length: `168842318`
+- Last-write UTC: `2026-07-28T16:13:24.5365252Z`
+- SHA-256:
+  `6F415D8D382CA357C60C23CFB52A900CF735B730314E75C6921EA81027CAB3AE`
+- Artifact current invocation sonrasında üretildi: `PASS`.
+- applicationId: `com.faliardic.chiefsiteengineer.debug`
+- Launchable activity:
+  `com.faliardic.chiefsiteengineer.MainActivity`
+- APK signing SHA-256:
+  `329f42b542af8576367279b59fb2802dfd545253b2906f7ba2ac12c7c6d5c869`
+- Kurulu field package signing SHA-256 aynı: `PASS`.
+- Version code uyumu: APK `1`, kurulu package `1`.
+- Build sonrası disposable tracked status ve `git diff --check`: `PASS`.
+- Ana worktree içindeki `mobile/build` ve alt dizinlerine dokunulmadı.
 
-```text
-adb devices -l
-```
+## Veri koruyan install ve fiziksel cihaz smoke
 
-Sonuç:
+- Cihaz serial: `R5CY21WKZFX`
+- Install öncesi ve smoke sonrası cihaz durumu: exact `device`.
+- Install:
+  `adb install -r -g <exact-disposable-worktree-apk>` — `Success`.
+- Installed package last-update:
+  `2026-07-28 19:18:48`.
+- Uninstall: `0`
+- Clear-data: `0`
+- Downgrade: `0`
+- Gerçek kullanıcı verisi dışa aktarma: `0`
 
-```text
-List of devices attached
-R5CY21WKZFX  device  product:pa3qxxx model:SM_S938B device:pa3q transport_id:2
-```
+Yalnız `CSE262SMOKE-20260728T192024` prefix'li sentetik kayıtlarla doğrulandı:
 
-`R5CY21WKZFX` fiziksel cihazı `device` durumunda doğrulandı.
+1. Bugün tarihli bağımsız reminder'da `Yarına ertele` görünür: `PASS`.
+2. Yarın tarihli bağımsız reminder'da `Yarına ertele` görünmez: `PASS`.
+3. Puantaj bağlantılı sentetik reminder'da `Yarına ertele` görünmez ve
+   `Puantajı aç` kaynak eylemi korunur: `PASS`.
+4. Uygun bugün reminder'ında `Yarına ertele` çalıştı; kayıt
+   `Yarın • Tam gün` durumuna taşındı ve görünür lifecycle hata sayısı `0`
+   kaldı: `PASS`.
+5. Normal ana ekran/yeniden aç akışından sonra ertelenen ve başlangıçtan yarın
+   olan kayıtlar `Yarın • Tam gün` olarak korundu; yarın görünümündeki
+   `Yarına ertele` sayısı `0`: `PASS`.
+6. Yeniden açılış sonrası Puantaj bağlantılı kayıtta `Yarına ertele` sayısı `0`
+   ve `Puantajı aç` sayısı `1`: `PASS`.
 
-İlk build komutu Flutter/Gradle aşamasına ulaşmadan komut taşıyıcısının stdout
-borusunu kapatması nedeniyle sonlandı. Aktif build süreci bulunmadığı ve mevcut
-`app-debug.apk` dosyasının eski `2026-07-28T13:39:21.0269661Z` last-write
-değerini koruduğu doğrulandı.
-
-Aynı source revision üzerindeki kontrollü `--no-pub` build çağrısı Gradle
-`assembleDebug` içinde şu doğrulanmış Windows dosya kilidinde durdu:
-
-```text
-Execution failed for task ':app:cleanMergeDebugAssets'.
-Unable to delete directory:
-mobile/build/app/intermediates/assets/debug/mergeDebugAssets
-```
-
-Yeni APK üretilmedi. Retry bütçesi gereği yeni build-root, clean, rotation veya
-ikinci build correction başlatılmadı.
-
-Bu nedenle:
-
-- normal field APK build'i PASS olmadı;
-- ADB install yapılmadı;
-- uninstall, clear-data veya downgrade yapılmadı;
-- sentetik bugün/yarın/Puantaj reminder cihaz smoke'u yapılmadı;
-- gerçek kullanıcı reminder veya Puantaj kaydı açılmadı, okunmadı ya da
-  değiştirilmedi.
-
-Kalan tek adım: Windows `mobile/build/.../mergeDebugAssets` kilidi güvenilir
-biçimde dış ortamda giderildikten ve yeni build correction için açık yetki
-verildikten sonra source diff'i değiştirmeden normal field APK build, veri
-koruyan install ve yalnız sentetik reminder smoke'unu tamamlamak.
+Bu run'da oluşan iki bağımsız ve iki Puantaj occurrence reminder'ı mevcut
+Geri Dönüşüm Kutusu akışıyla taşındı ve exact sentetik başlık/tarihlerle
+doğrulandı. Sentetik Puantaj reminder ayarı yeni occurrence üretmemesi için
+kapatıldı. Hard-delete yapılmadı. Gerçek kullanıcı reminder/Puantaj mutation
+sayısı `0` oldu.
 
 ## Değişen exact dosyalar
 
@@ -153,10 +175,10 @@ listesiyle yeniden çalıştırıldı ve protected changed-path sayısı `0` bul
 
 ## GitHub durumu
 
-- Commit: oluşturulmadı.
-- Push: yapılmadı.
-- Draft PR: açılmadı.
+- Checkpoint commit:
+  `5be1e0fe2d5ec6f2a440063e2397c3cf8892eac9`
+- Completion commit: bu evidence güncellemesinden sonra oluşturulacak.
+- Push: completion commit sonrasında normal push yapılacak.
+- Draft PR: mevcut #263 kullanılacak.
 - Merge: yapılmadı.
-- Remaining blocker: Windows
-  `mobile/build/app/intermediates/assets/debug/mergeDebugAssets` dosya kilidi ve
-  build retry bütçesinin tükenmiş olması.
+- Issue #262: açık bırakılacak.
