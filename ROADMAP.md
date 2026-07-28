@@ -8,7 +8,7 @@
 **Önceki saha backlog'u:** #203  
 **Açık Release 0.1 pilotu:** #193  
 **Güncel RC / günlük saha testi:** #245  
-**Aktif günlük hotfix:** #262 reminder tarih/source uygunluğu
+**Aktif günlük hotfix:** #264 detay dönüşünde liste bağlamı
 **Bloklu yatay kabul zinciri:** #257 → #254 / #256, Draft PR #259
 
 ## 1. Ürün kararı
@@ -43,12 +43,14 @@ Tamamlanan günlük güvenilirlik dilimleri:
 - #234 — Beton sınıfı kataloğu ve döküm zaman çizgisi;
 - #237 — Ajanda Beton sinyali, öneri ve Beton paketine deep-link;
 - #252 / PR #253 — `Yarına ertele`, `2 saat` ve `3 saat` hızlı eylemleri;
-- #260 / PR #261 — Beton checklist source-of-truth ve döküm başlatma hotfix'i.
+- #260 / PR #261 — Beton checklist source-of-truth ve döküm başlatma hotfix'i;
+- #262 / PR #263 — reminder tarih/source uygunluğu;
+- #264 — dört ana listede detail dönüşü route-local state korunumu.
 
 Güncel güvenli `master`:
 
 ```text
-6b64ed29e15d0f839e10fb4ff0b7bbe739a0fd8a
+5212ff97e80e8c6bc5daa95e97b37841f9f17edf
 ```
 
 Bu noktada mobil schema `10`, backup formatı `1` ve son geçerli merged Python

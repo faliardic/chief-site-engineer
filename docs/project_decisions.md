@@ -3345,3 +3345,16 @@
 - `.csebackup` format `1` değişmez. Schema `1–9` paketleri schema `10`a
   migrate edilir; schema 10 katalog, bağ, gerçek zaman ve append-only geçmişi
   round-trip taşır.
+
+## Issue 264 — Liste state'i route-local tutulur
+
+- Ajanda, Hatırlatıcı, Beton ve Puantaj scroll controller/state sahipliği canlı
+  liste route'undadır; global mutable singleton veya random key kullanılmaz.
+- Detail push öncesi offset snapshot alınır. Async fresh reload sonrası restore,
+  layout tamamlandığında güncel scroll extent içine clamp edilerek yapılır.
+- Reload sırasında son geçerli content korunur; geçici boş extent kullanıcıyı
+  listenin başına düşürmez.
+- Hızlı iki dokunma route-local guard ile tek detail push üretir. Direct
+  deep-link sahte liste geçmişi oluşturmaz.
+- Cold restart/process-death pixel restoration, schema, backup ve genel router
+  bu kararın kapsamı dışındadır.
