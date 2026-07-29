@@ -92,6 +92,43 @@ void main() {
   }
 
   test(
+    'Issue 268 baseline: default AgendaQuery returns newest log first',
+    () async {
+      await createLog(
+        id: log1,
+        event: 1,
+        observedAt: '2026-07-19T06:00:00Z',
+        description: 'Erken kayıt',
+      );
+      await createLog(
+        id: log2,
+        event: 2,
+        observedAt: '2026-07-19T09:00:00Z',
+        description: 'Geç kayıt',
+      );
+
+      final logs = await agenda.listAgenda(
+        const AgendaQuery(istanbulDay: '2026-07-19'),
+      );
+
+      expect(logs.map((item) => item.id), [log2, log1]);
+    },
+  );
+
+  test('Agenda sort contract is typed and exposes exact Turkish labels', () {
+    expect(AgendaSortOrder.values, [
+      AgendaSortOrder.newestFirst,
+      AgendaSortOrder.oldestFirst,
+    ]);
+    expect(AgendaSortOrder.newestFirst.label, 'En yeni üstte');
+    expect(AgendaSortOrder.oldestFirst.label, 'En eski üstte');
+    expect(
+      const AgendaQuery(istanbulDay: '2026-07-19').sortOrder,
+      AgendaSortOrder.newestFirst,
+    );
+  });
+
+  test(
     'Istanbul day bounds and deterministic tie-break ordering are exact',
     () async {
       now = DateTime.utc(2026, 7, 21, 8);
@@ -126,9 +163,205 @@ void main() {
       final july20 = await agenda.listAgenda(
         const AgendaQuery(istanbulDay: '2026-07-20'),
       );
+      final july19Oldest = await agenda.listAgenda(
+        const AgendaQuery(
+          istanbulDay: '2026-07-19',
+          sortOrder: AgendaSortOrder.oldestFirst,
+        ),
+      );
 
-      expect(july19.map((item) => item.id), [log3, log1, log2]);
+      expect(july19.map((item) => item.id), [log2, log1, log3]);
+      expect(july19Oldest.map((item) => item.id), [log3, log1, log2]);
       expect(july20.map((item) => item.id), [log4]);
+    },
+  );
+
+  test(
+    'created and id tie-breaks are deterministic and updates do not reorder',
+    () async {
+      const observedAt = '2026-07-19T07:30:00Z';
+      now = DateTime.utc(2026, 7, 20, 8);
+      final first = await createLog(
+        id: log1,
+        event: 1,
+        observedAt: observedAt,
+        description: 'İlk oluşturulan',
+      );
+      now = DateTime.utc(2026, 7, 20, 9);
+      await createLog(
+        id: log2,
+        event: 2,
+        observedAt: observedAt,
+        description: 'Sonra oluşturulan',
+      );
+      now = DateTime.utc(2026, 7, 20, 10);
+      await createLog(
+        id: log3,
+        event: 3,
+        observedAt: observedAt,
+        description: 'Aynı created_at küçük id',
+      );
+      await createLog(
+        id: log4,
+        event: 4,
+        observedAt: observedAt,
+        description: 'Aynı created_at büyük id',
+      );
+
+      expect(
+        (await agenda.listAgenda(
+          const AgendaQuery(istanbulDay: '2026-07-19'),
+        )).map((item) => item.id),
+        [log4, log3, log2, log1],
+      );
+      expect(
+        (await agenda.listAgenda(
+          const AgendaQuery(
+            istanbulDay: '2026-07-19',
+            sortOrder: AgendaSortOrder.oldestFirst,
+          ),
+        )).map((item) => item.id),
+        [log1, log2, log3, log4],
+      );
+
+      now = DateTime.utc(2026, 7, 20, 11);
+      await agenda.updateAgendaLog(
+        UpdateAgendaLogCommand(
+          id: first.id,
+          eventId: eventId(10),
+          expectedRevision: first.revision,
+          projectId: first.projectId,
+          observedAt: first.observedAt,
+          category: first.category,
+          description: 'Updated_at değişti ama sıra değişmedi',
+          location: first.location,
+          notes: first.notes,
+        ),
+      );
+      expect(
+        (await agenda.listAgenda(
+          const AgendaQuery(istanbulDay: '2026-07-19'),
+        )).map((item) => item.id),
+        [log4, log3, log2, log1],
+      );
+
+      await agenda.mutateAgendaLogArchive(
+        MutateAgendaLogArchiveCommand(
+          id: log3,
+          eventId: eventId(11),
+          expectedRevision: 1,
+          archive: true,
+        ),
+      );
+      await agenda.mutateAgendaLogArchive(
+        MutateAgendaLogArchiveCommand(
+          id: log4,
+          eventId: eventId(12),
+          expectedRevision: 1,
+          archive: true,
+        ),
+      );
+      expect(
+        (await agenda.listAgenda(
+          const AgendaQuery(istanbulDay: '2026-07-19'),
+        )).map((item) => item.id),
+        [log2, log1],
+      );
+      expect(
+        (await agenda.listAgenda(
+          const AgendaQuery(
+            istanbulDay: '2026-07-19',
+            archiveFilter: AgendaArchiveFilter.archived,
+          ),
+        )).map((item) => item.id),
+        [log4, log3],
+      );
+      expect(
+        (await agenda.listAgenda(
+          const AgendaQuery(
+            istanbulDay: '2026-07-19',
+            archiveFilter: AgendaArchiveFilter.archived,
+            sortOrder: AgendaSortOrder.oldestFirst,
+          ),
+        )).map((item) => item.id),
+        [log3, log4],
+      );
+    },
+  );
+
+  test(
+    'Agenda sort composes with filters and empty or single results',
+    () async {
+      expect(
+        await agenda.listAgenda(
+          const AgendaQuery(istanbulDay: '2026-07-19'),
+        ),
+        isEmpty,
+      );
+      await createLog(
+        id: log1,
+        event: 1,
+        observedAt: '2026-07-19T06:00:00Z',
+        category: AgendaCategory.inspection,
+        description: 'CSE268 literal erken',
+      );
+      expect(
+        (await agenda.listAgenda(
+          const AgendaQuery(istanbulDay: '2026-07-19'),
+        )).single.id,
+        log1,
+      );
+      await agenda.createProject(
+        const CreateProjectCommand(id: project2, name: 'Güney Şantiyesi'),
+      );
+      await createLog(
+        id: log2,
+        event: 2,
+        projectId: project2,
+        observedAt: '2026-07-19T07:00:00Z',
+        category: AgendaCategory.delivery,
+        description: 'CSE268 literal diğer proje',
+      );
+      await createLog(
+        id: log3,
+        event: 3,
+        observedAt: '2026-07-19T08:00:00Z',
+        category: AgendaCategory.inspection,
+        description: 'CSE268 literal geç',
+      );
+
+      expect(
+        (await agenda.listAgenda(
+          const AgendaQuery(
+            istanbulDay: '2026-07-19',
+            projectId: project1,
+            category: AgendaCategory.inspection,
+            literalSearch: 'CSE268 literal',
+          ),
+        )).map((item) => item.id),
+        [log3, log1],
+      );
+      expect(
+        (await agenda.listAgenda(
+          const AgendaQuery(
+            istanbulDay: '2026-07-19',
+            projectId: project1,
+            category: AgendaCategory.inspection,
+            literalSearch: 'CSE268 literal',
+            sortOrder: AgendaSortOrder.oldestFirst,
+          ),
+        )).map((item) => item.id),
+        [log1, log3],
+      );
+      expect(
+        await agenda.listAgenda(
+          const AgendaQuery(
+            istanbulDay: '2026-07-19',
+            literalSearch: 'olmayan exact metin',
+          ),
+        ),
+        isEmpty,
+      );
     },
   );
 

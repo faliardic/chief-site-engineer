@@ -338,6 +338,12 @@ class SqliteAgendaApplication
       ''');
       arguments.add(search);
     }
+    final orderBy = switch (query.sortOrder) {
+      AgendaSortOrder.newestFirst =>
+        'o.observed_at DESC, o.created_at DESC, o.id DESC',
+      AgendaSortOrder.oldestFirst =>
+        'o.observed_at ASC, o.created_at ASC, o.id ASC',
+    };
     final now = _readClockOnce();
     return _withDatabase(now, (database) async {
       final rows = await database.rawQuery('''
@@ -345,7 +351,7 @@ class SqliteAgendaApplication
         FROM field_observations o
         JOIN projects p ON p.id = o.project_id
         WHERE ${where.join(' AND ')}
-        ORDER BY o.observed_at ASC, o.created_at ASC, o.id ASC
+        ORDER BY $orderBy
       ''', arguments);
       return rows.map(_logFromRow).toList(growable: false);
     });

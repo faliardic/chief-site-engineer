@@ -51,7 +51,9 @@ class FakeAgendaApplication
   int todayOverviewCalls = 0;
   int sourceAgendaMediaCalls = 0;
   int mutateReminderCalls = 0;
+  int listAgendaCalls = 0;
   MutateReminderCommand? lastMutationCommand;
+  AgendaQuery? lastAgendaQuery;
   final StreamController<void> _projectChanges =
       StreamController<void>.broadcast();
 
@@ -272,7 +274,15 @@ class FakeAgendaApplication
   }
 
   @override
-  Future<List<AgendaLog>> listAgenda(AgendaQuery query) async => logs;
+  Future<List<AgendaLog>> listAgenda(AgendaQuery query) async {
+    listAgendaCalls += 1;
+    lastAgendaQuery = query;
+    final result = [...logs];
+    result.sort(
+      (left, right) => _compareAgendaLogs(left, right, query.sortOrder),
+    );
+    return List.unmodifiable(result);
+  }
 
   @override
   Future<List<AppendOnlyEvent>> listObservationEvents(String logId) async =>
@@ -449,4 +459,21 @@ class FakeAgendaApplication
 
   @override
   Future<void> reconcileNotifications({bool requestPermission = false}) async {}
+}
+
+int _compareAgendaLogs(
+  AgendaLog left,
+  AgendaLog right,
+  AgendaSortOrder sortOrder,
+) {
+  var comparison = left.observedAt.compareTo(right.observedAt);
+  if (comparison == 0) {
+    comparison = left.createdAt.compareTo(right.createdAt);
+  }
+  if (comparison == 0) {
+    comparison = left.id.compareTo(right.id);
+  }
+  return sortOrder == AgendaSortOrder.newestFirst
+      ? -comparison
+      : comparison;
 }

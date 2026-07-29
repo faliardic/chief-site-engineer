@@ -9,9 +9,15 @@ void main() {
     'Turkish Flutter SDK localization dependency and root config are exact',
     () {
       final pubspec = File('pubspec.yaml').readAsStringSync();
+      final normalizedPubspec = pubspec
+          .replaceAll('\r\n', '\n')
+          .replaceAll('\r', '\n');
       final app = File('lib/app.dart').readAsStringSync();
 
-      expect(pubspec, contains('flutter_localizations:\n    sdk: flutter'));
+      expect(
+        normalizedPubspec,
+        contains('flutter_localizations:\n    sdk: flutter'),
+      );
       expect(app, contains("static const locale = Locale('tr');"));
       expect(
         app,

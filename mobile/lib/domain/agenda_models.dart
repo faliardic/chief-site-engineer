@@ -195,6 +195,15 @@ class AgendaLog {
 
 enum AgendaArchiveFilter { active, archived }
 
+enum AgendaSortOrder {
+  newestFirst('En yeni üstte'),
+  oldestFirst('En eski üstte');
+
+  const AgendaSortOrder(this.label);
+
+  final String label;
+}
+
 enum AgendaAttachmentIntegrity {
   ok('Dosya doğrulandı'),
   missing('Dosya eksik'),
@@ -700,6 +709,7 @@ class AgendaQuery {
     this.category,
     this.literalSearch = '',
     this.archiveFilter = AgendaArchiveFilter.active,
+    this.sortOrder = AgendaSortOrder.newestFirst,
   });
 
   final String istanbulDay;
@@ -707,6 +717,7 @@ class AgendaQuery {
   final AgendaCategory? category;
   final String literalSearch;
   final AgendaArchiveFilter archiveFilter;
+  final AgendaSortOrder sortOrder;
 }
 
 class AppendOnlyEvent {
