@@ -1,5 +1,19 @@
 # Changelog
 
+## Issue #272 - Hatırlatıcı Bildirim İzolasyonu
+
+- Native pending listesinde artık görünmeyen fakat source reminder'ı aktif olan
+  teslim edilmiş gecikmiş tek-seferlik notification korunur; başka reminder
+  mutation'ı bu notification'ı terminal kabul edip iptal etmez.
+- Reconciliation, schedulable, korunacak delivered one-time ve terminal
+  disposition'larını ayırır. Preserve edilen kayıt yeniden planlanmaz, kapasite
+  tüketmez ve binding churn üretmez.
+- Complete, cancel, trash, restart, snooze, permission/channel, exact-alarm
+  fallback, pending-query failure, capacity ve deep-link matrisi hedefli
+  notification ID izolasyonuyla doğrulandı.
+- Mobil schema `10`, backup formatı `1`, migration `0` korundu; gateway, native
+  Android ve storage değiştirilmedi.
+
 ## Issue #268 - Deterministik Ajanda Sıralaması
 
 - Ajanda sorgusu varsayılan `En yeni üstte` ve seçilebilir `En eski üstte`

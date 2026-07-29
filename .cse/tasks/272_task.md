@@ -202,3 +202,52 @@ Bütün kapılar PASS olursa:
 olmak üzere tam iki ordinary commit, normal push ve `Related to #272` ile başlayan `Preserve unrelated reminder notifications` başlıklı tek Draft PR yetkilidir.
 
 Force-push, amend, Ready, merge, Issue close ve branch delete yetkili değildir.
+
+## Checkpoint, artifact ve fiziksel kabul sonucu
+
+- Source/test checkpoint commit'i: `c42c17e347a1a934900ff41cc7a6e46e8825ec66`
+  (`Fix reminder notification isolation`).
+- Checkpoint öncesi PR #259 head'i
+  `7cce5de803ce4ea6b043b49499988c615ce923e8` idi ve checkpoint ancestry'sinde
+  değildi; PR #259'a dokunulmadı.
+- Build worktree:
+  `C:\Users\Fatih\AppData\Local\Temp\cse272-build-validation-20260729160718528-0a024ca5`
+- `flutter pub get`: `1`; lockfile diff: `0`.
+- Debug APK build invocation: tam `1`; sonuç: PASS; retry/clean/build-root
+  rotasyonu/process kill: `0`.
+- APK:
+  `mobile\build\app\outputs\flutter-apk\app-debug.apk`, boyut
+  `170517418` byte, SHA-256
+  `d9e3c15981ded35faf1863c364b438d34c18d0fb58b200ed902be68d447d1a9a`.
+- Package: `com.faliardic.chiefsiteengineer.debug`; version:
+  `1` / `0.1.0-debug`; min/target SDK: `24/36`; signer SHA-256:
+  `329f42b542af8576367279b59fb2802dfd545253b2906f7ba2ac12c7c6d5c869`.
+- Build süresi: `91.815` saniye. Flutter'ın file_picker/share_plus üzerinden
+  verdiği gelecekteki Kotlin Gradle Plugin geçiş uyarısı ürün hatası değildir ve
+  bu Issue'nun altyapı kapsamı dışında bırakıldı.
+- Exact cihaz: `R5CY21WKZFX` / SM-S938B / Android SDK 36.
+- Yükleme yalnız `adb install -r -g` ile ve exact artifact kullanılarak PASS;
+  uninstall, data clear, downgrade ve force-stop: `0`.
+- Sentetik prefix: `CSE272SMOKE-20260729T1612`.
+- A/B/C timed one-time bildirimleri birlikte teslim edildi. B tamamlanınca B
+  kayboldu, A/C korundu; uygulama geri açılışındaki bootstrap reconcile
+  sonrasında A/C yine korundu.
+- C notification tap'i doğru C detayını açtı; yanlış deep-link: `0`.
+- A'nın `1 saat ertele` eylemi yalnız A'yı geleceğe planladı ve C kaydının
+  aktif/gecikmiş durumunu değiştirmedi. C `İptal et` yalnız C'yi terminal yaptı.
+- İlk notification-shade koordinat dokunuşu hedefe değmedi ve hiçbir uygulama
+  açmadı; aynı ekrandaki sentetik C semantic bounds'u ile tek düzeltme yapıldı.
+- Test sonunda A, B ve C yalnız geri alınabilir `Sil` UI akışıyla Geri Dönüşüm
+  Kutusu'na taşındı. Aktif sentetik notification/alarm: `0`; hard delete ve
+  gerçek kullanıcı kaydı okuma/değiştirme: `0`.
+- Fiziksel kabul: PASS.
+
+## Bütçe gerçekleşmesi
+
+- Primary run: `1`.
+- Baseline test-code correction: `1`; source-validation test-expectation
+  correction zinciri: izinli tek correction run içinde tamamlandı.
+- Build invocation/retry: `1/0`.
+- Aynı production source revision'ında full gate tekrar edilmedi.
+- Başlangıçtan fiziksel kabul ve kapanışa kadar çalışma 60 dakikalık hard stop
+  içinde tutuldu.

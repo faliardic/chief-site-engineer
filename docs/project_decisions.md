@@ -1,5 +1,22 @@
 # Proje Kararlari
 
+## Issue 272 — Delivered One-Time Notification İzolasyonu
+
+- Native pending listesinde bulunmamak tek başına terminal kanıtı değildir.
+  Source reminder aktif, trash olmayan, due, one-time ve önceki schedule
+  binding'ine sahipse delivered notification preserve edilir.
+- Reconciliation disposition'ı `schedulable`, `preserveDeliveredOneTime` ve
+  `terminal` olarak application katmanında ayrılır. Gateway veya Android native
+  API'sine yeni displayed-notification sorgusu eklenmez.
+- Preserve edilen kayıt cancel/reschedule edilmez, binding'i güncellenmez ve
+  kapasite tüketmez. Permission, channel, exact-alarm ve pending-query failure
+  dalları aynı korumayı sürdürür.
+- Terminal cleanup yalnız kendi stable platform notification ID'sini hedefler.
+  Orphan ve mismatched pending payload cleanup'ı, UUID deep-link'i, optimistic
+  revision ve append-only event sözleşmeleri korunur.
+- Schema `10`, backup formatı `1`, migration, storage, package/signing ve native
+  notification configuration değişmez.
+
 ## Issue 262 — Hatırlatıcı Yarına Ertele Uygunluğu
 
 - `Yarına ertele` kart, detay ve direct application mutation için
