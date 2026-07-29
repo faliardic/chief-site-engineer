@@ -218,11 +218,16 @@ saha araçlarını dar child Issue'larla kapatmak.
       ve `Tümünü seç` dilini kullanır.
     - Mevcut saha ekranlarındaki karışık kullanıcı dili dar envanterle temizlenir.
 
-12. **Ajanda sıralama seçeneği — P2**
-    - `Eskiden yeniye | Yeniden eskiye` görünüm seçimi sağlanır.
-    - Son kullanıcı seçimi hatırlanır.
-    - Storage zamanı, source event sırası ve kayıt kimliği değiştirilmez.
-    - Günlük çıktı kullandığı sıralamayı açıkça belirtir.
+12. **Ajanda sıralama seçeneği — tamamlandı**
+    - Yeni route varsayılanı `En yeni üstte`; kullanıcı `En eski üstte`
+      seçebilir.
+    - Seçim route-local kalır ve detay dönüşünde gün, proje, tür, aktif/arşiv,
+      literal arama ve scroll bağlamıyla birlikte korunur.
+    - Sıra `observed_at`, `created_at`, `id` alanlarıyla application query
+      katmanında deterministiktir; `updated_at` ve client-side `reverse()`
+      kullanılmaz.
+    - Cold restart tercihi ve günlük çıktı sıralaması bu dar Issue'nun kapsamı
+      dışındadır.
 
 Hotfix Blokları 8–12, yeni P3 özelliğe geçmeden önce ayrı dar Issue'larla
 uygulanır. Günlük raporda yeni P0/P1 bulunursa bu dalganın da önüne geçer.

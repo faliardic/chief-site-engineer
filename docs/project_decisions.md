@@ -3377,3 +3377,21 @@
   üzerinden doğrulanır.
 - Schema `10`, backup formatı `1`, persisted zaman/sayı codec'leri ve
   notification/persistence sözleşmeleri bu kararın kapsamı dışındadır.
+
+## Issue 268 — Ajanda sırası application query sözleşmesidir
+
+- Ajanda yeni route varsayılanı `AgendaSortOrder.newestFirst` olur; kullanıcı
+  `oldestFirst` seçebilir. Kullanıcı etiketleri `En yeni üstte` ve
+  `En eski üstte`dir.
+- Her iki yön `observed_at`, `created_at`, `id` alanlarının aynı yöndeki
+  üç seviyeli SQL sırasıdır. Serbest SQL yönü veya UI `reverse()` kullanılmaz.
+- `updated_at` sıralamaya katılmaz; içerik güncellemesi kaydın saha olay
+  zamanındaki konumunu değiştirmez.
+- Sort gün, aktif/arşiv, proje, tür ve literal arama ile aynı `AgendaQuery`
+  içinde taşınır. Detail reload ve route dönüşü canlı route-local state'i
+  korur.
+- Sort cold restart preference'ı değildir. Schema `10`, backup formatı `1`,
+  günlük çıktı ve persistence sözleşmeleri değiştirilmez.
+- Static localization dependency testi yalnız CRLF/LF satır sonlarını
+  normalize eder; dependency adı, indent ve `sdk: flutter` exact contract'ı
+  korunur.

@@ -1,5 +1,19 @@
 # Changelog
 
+## Issue #268 - Deterministik Ajanda Sıralaması
+
+- Ajanda sorgusu varsayılan `En yeni üstte` ve seçilebilir `En eski üstte`
+  davranışını typed `AgendaSortOrder` sözleşmesiyle taşır.
+- Application query sırası `observed_at`, `created_at`, `id` alanlarıyla üç
+  seviyeli ve deterministiktir; `updated_at` sıralamaya katılmaz ve UI
+  client-side liste tersine çevirmez.
+- Route-local seçim gün, aktif/arşiv, proje, tür ve literal arama filtreleriyle
+  birlikte korunur. Detay mutation'ı kaydı olay zamanından bağımsız taşımaz.
+- Windows disposable worktree satır sonlarına duyarlı localization dependency
+  testi CRLF/LF bağımsızlaştırıldı; exact dependency ve indent sözleşmesi
+  değişmedi.
+- Mobil schema `10`, backup formatı `1` korundu; migration eklenmedi.
+
 ## Issue #266 - Türkçe Kullanıcı Dili ve Puantaj `Kaydet`
 
 - Kök `MaterialApp`, yalnız Türkçe locale ile canonical Material, Widgets ve
