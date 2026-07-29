@@ -863,6 +863,190 @@ void main() {
   );
 
   testWidgets(
+    'Agenda search app bar detail return preserves text without focus',
+    (tester) async {
+      tester.view.physicalSize = const Size(430, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final logs = List.generate(18, _navigationLog);
+      final fake = FakeAgendaApplication(projects: [project()], logs: logs);
+      await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
+      await tester.pumpAndSettle();
+
+      await _enterAgendaSearch(tester, fake, 'CSE275 app bar');
+      final searchEditable = tester.widget<EditableText>(
+        _agendaSearchEditable(),
+      );
+      final searchFocusNode = searchEditable.focusNode;
+      final searchController = searchEditable.controller;
+      expect(searchFocusNode.hasFocus, isTrue);
+      expect(tester.testTextInput.isVisible, isTrue);
+      expect(searchController.text, 'CSE275 app bar');
+      final target = find.byKey(Key('agenda-log-${logs.last.id}'));
+      await tester.ensureVisible(target);
+      await tester.pumpAndSettle();
+      expect(searchFocusNode.hasFocus, isTrue);
+
+      await tester.tap(target);
+      await tester.pumpAndSettle();
+      expect(find.byType(LogDetailPage), findsOneWidget);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+
+      final restoredOffset = _scrollOffset(
+        tester,
+        const Key('agenda-day-list'),
+      );
+      final restoredFocus = searchFocusNode.hasFocus;
+      final restoredKeyboard = tester.testTextInput.isVisible;
+      expect(searchController.text, 'CSE275 app bar');
+      expect(fake.lastAgendaQuery?.literalSearch, 'CSE275 app bar');
+      expect(restoredOffset, greaterThan(0));
+      expect(restoredKeyboard, isFalse);
+      expect(restoredFocus, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Agenda search system back preserves text without restoring focus',
+    (tester) async {
+      tester.view.physicalSize = const Size(430, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final logs = List.generate(18, _navigationLog);
+      final fake = FakeAgendaApplication(projects: [project()], logs: logs);
+      await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
+      await tester.pumpAndSettle();
+
+      await _enterAgendaSearch(tester, fake, 'CSE275 system back');
+      final target = find.byKey(Key('agenda-log-${logs.last.id}'));
+      await tester.ensureVisible(target);
+      await tester.pumpAndSettle();
+      await tester.tap(target);
+      await tester.pumpAndSettle();
+      expect(find.byType(LogDetailPage), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      final restoredOffset = _scrollOffset(
+        tester,
+        const Key('agenda-day-list'),
+      );
+      final restoredFocus = _agendaSearchHasFocus(tester);
+      final restoredKeyboard = tester.testTextInput.isVisible;
+      expect(fake.lastAgendaQuery?.literalSearch, 'CSE275 system back');
+      expect(restoredOffset, greaterThan(0));
+      expect(restoredKeyboard, isFalse);
+      await _expectAgendaSearchTextAfterReveal(tester, 'CSE275 system back');
+      expect(restoredFocus, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Agenda user scroll dismisses search focus without text or query churn',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 760);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final fake = FakeAgendaApplication(
+        projects: [project()],
+        logs: List.generate(30, _navigationLog),
+      );
+      await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
+      await tester.pumpAndSettle();
+
+      await _enterAgendaSearch(tester, fake, 'CSE275 drag');
+      final searchEditable = tester.widget<EditableText>(
+        _agendaSearchEditable(),
+      );
+      final searchFocusNode = searchEditable.focusNode;
+      final searchController = searchEditable.controller;
+      expect(searchFocusNode.hasFocus, isTrue);
+      expect(tester.testTextInput.isVisible, isTrue);
+      expect(searchController.text, 'CSE275 drag');
+      final callsBeforeDrag = fake.listAgendaCalls;
+      await tester.drag(
+        find.byKey(const Key('agenda-literal-search')),
+        const Offset(0, -100),
+      );
+      await tester.pumpAndSettle();
+
+      final offsetAfterDrag = _scrollOffset(
+        tester,
+        const Key('agenda-day-list'),
+      );
+      final focusAfterDrag = searchFocusNode.hasFocus;
+      final keyboardAfterDrag = tester.testTextInput.isVisible;
+      expect(offsetAfterDrag, greaterThan(0));
+      expect(fake.lastAgendaQuery?.literalSearch, 'CSE275 drag');
+      expect(fake.listAgendaCalls, callsBeforeDrag);
+      expect(searchController.text, 'CSE275 drag');
+      expect(focusAfterDrag, isFalse);
+      expect(keyboardAfterDrag, isFalse);
+      expect(
+        tester.widget<RefreshIndicator>(find.byType(RefreshIndicator)).onRefresh,
+        isNotNull,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Agenda drag fling and direction change never create search focus',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 760);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final fake = FakeAgendaApplication(
+        projects: [project()],
+        logs: List.generate(34, _navigationLog),
+      );
+      await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
+      await tester.pumpAndSettle();
+      final list = find.byKey(const Key('agenda-day-list'));
+      final callsBeforeScroll = fake.listAgendaCalls;
+
+      await tester.drag(list, const Offset(0, -360));
+      await tester.pumpAndSettle();
+      expect(_agendaSearchHasFocus(tester), isFalse);
+      expect(tester.testTextInput.isVisible, isFalse);
+
+      await tester.fling(list, const Offset(0, -420), 1600);
+      await tester.pump(const Duration(milliseconds: 80));
+      await tester.pumpAndSettle();
+      expect(_agendaSearchHasFocus(tester), isFalse);
+
+      final gesture = await tester.startGesture(tester.getCenter(list));
+      await gesture.moveBy(const Offset(0, -180));
+      await gesture.moveBy(const Offset(0, 110));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      final offsetAfterGestures = _scrollOffset(
+        tester,
+        const Key('agenda-day-list'),
+      );
+      _expectAgendaSearchFocusAndKeyboard(
+        tester,
+        hasFocus: false,
+        keyboardVisible: false,
+      );
+      expect(offsetAfterGestures, greaterThan(0));
+      expect(fake.lastAgendaQuery?.literalSearch, '');
+      expect(fake.listAgendaCalls, callsBeforeScroll);
+      await _expectAgendaSearchTextAfterReveal(tester, '');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'Ajanda detail return keeps route-local filters search and scroll after reload',
     (tester) async {
       tester.view.physicalSize = const Size(390, 760);
@@ -911,8 +1095,14 @@ void main() {
         find.byKey(const Key('agenda-literal-search')),
         'CSE264 arama',
       );
-      await tester.testTextInput.receiveAction(TextInputAction.search);
+      tester
+          .widget<TextField>(
+            find.byKey(const Key('agenda-literal-search')),
+          )
+          .onSubmitted!('CSE264 arama');
       await tester.pumpAndSettle();
+      expect(_agendaSearchHasFocus(tester), isTrue);
+      expect(tester.testTextInput.isVisible, isTrue);
 
       final target = logs[18];
       final list = find.byKey(const Key('agenda-day-list'));
@@ -968,6 +1158,8 @@ void main() {
         tester.widget<EditableText>(find.byType(EditableText)).controller.text,
         'CSE264 arama',
       );
+      expect(_agendaSearchHasFocus(tester), isFalse);
+      expect(tester.testTextInput.isVisible, isFalse);
       expect(tester.takeException(), isNull);
     },
   );
@@ -1047,6 +1239,19 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    final firstSearch = _agendaSearchEditable(
+      within: find.byKey(const Key('agenda-instance-one')),
+    );
+    final secondSearch = _agendaSearchEditable(
+      within: find.byKey(const Key('agenda-instance-two')),
+    );
+    expect(
+      identical(
+        tester.widget<EditableText>(firstSearch).focusNode,
+        tester.widget<EditableText>(secondSearch).focusNode,
+      ),
+      isFalse,
+    );
     final firstList = find.descendant(
       of: find.byKey(const Key('agenda-instance-one')),
       matching: find.byKey(const Key('agenda-day-list')),
@@ -1126,6 +1331,71 @@ void main() {
     expect(fake.logs, isEmpty);
     expect(fake.createLogCalls, 0);
   });
+}
+
+Finder _agendaSearchEditable({Finder? within}) {
+  final field = within == null
+      ? find.byKey(const Key('agenda-literal-search'))
+      : find.descendant(
+          of: within,
+          matching: find.byKey(const Key('agenda-literal-search')),
+        );
+  return find.descendant(of: field, matching: find.byType(EditableText));
+}
+
+bool _agendaSearchHasFocus(WidgetTester tester, {Finder? within}) {
+  final matches = _agendaSearchEditable(
+    within: within,
+  ).evaluate().toList(growable: false);
+  expect(
+    matches.length,
+    lessThanOrEqualTo(1),
+    reason: 'Expected at most one exact Agenda search EditableText.',
+  );
+  if (matches.isEmpty) return false;
+  final widget = matches.single.widget;
+  expect(widget, isA<EditableText>());
+  return (widget as EditableText).focusNode.hasFocus;
+}
+
+Future<void> _enterAgendaSearch(
+  WidgetTester tester,
+  FakeAgendaApplication fake,
+  String text,
+) async {
+  final field = find.byKey(const Key('agenda-literal-search'));
+  await tester.ensureVisible(field);
+  await tester.pumpAndSettle();
+  await tester.tap(field);
+  await tester.pump();
+  await tester.enterText(field, text);
+  tester.widget<TextField>(field).onSubmitted!(text);
+  await tester.pumpAndSettle();
+  expect(fake.lastAgendaQuery?.literalSearch, text);
+}
+
+void _expectAgendaSearchFocusAndKeyboard(
+  WidgetTester tester, {
+  required bool hasFocus,
+  required bool keyboardVisible,
+}) {
+  expect(_agendaSearchHasFocus(tester), hasFocus);
+  expect(tester.testTextInput.isVisible, keyboardVisible);
+}
+
+Future<void> _expectAgendaSearchTextAfterReveal(
+  WidgetTester tester,
+  String text,
+) async {
+  final list = find.byKey(const Key('agenda-day-list'));
+  final position = tester
+      .state<ScrollableState>(_scrollableFor(list))
+      .position;
+  position.jumpTo(position.minScrollExtent);
+  await tester.pumpAndSettle();
+  final editable = _agendaSearchEditable();
+  expect(editable, findsOneWidget);
+  expect(tester.widget<EditableText>(editable).controller.text, text);
 }
 
 double _scrollOffset(WidgetTester tester, Key listKey) {
