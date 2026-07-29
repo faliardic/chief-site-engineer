@@ -9,8 +9,9 @@
 **Açık Release 0.1 pilotu:** #193  
 **Güncel RC / günlük saha testi:** #245  
 **Roadmap senkronizasyonu:** #270\
-**Son tamamlanan production işi:** #268 / PR #269 — Ajanda deterministik sıralama\
-**Sıradaki production işi:** D29.1 / Issue #272 — bağımsız Hatırlatıcı bildirim yaşam döngüsü\
+**Son merge edilen production işi:** #268 / PR #269 — Ajanda deterministik sıralama\
+**Aktif production işi:** D29.1 / Issue #272 — doğrulandı, Draft PR yayını bekliyor\
+**Sıradaki production işi:** D29.2 — yalnız #272 merge sonrasında\
 **Bloklu yatay kabul zinciri:** #257 → #254 / #256, Draft PR #259
 
 ## 1. Ürün kararı
@@ -54,13 +55,15 @@ Tamamlanan günlük güvenilirlik dilimleri:
 Güncel güvenli `master`:
 
 ```text
-438f0222f1a82c9dfa7ab53550d2b151daadaf18
+b113f0d2bf964a51d2cf3f195a5a1ec038ad234c
 ```
 
-Bu noktada static configuration `5 PASS`, focused Agenda `42 PASS`, combined
-focused `47 PASS`, Flutter full suite `308 PASS` ve Flutter analyze `PASS`
-kanıtları merge edilmiştir. Mobil schema `10`, backup formatı `1`, migration `0`
-ve son geçerli merged Python full suite `1005 passed, 7 skipped` durumundadır.
+Bu master noktası #270 roadmap conflict-safe finalization belgelerini taşır.
+Son merge edilen production kanıtı #268 / PR #269'dur: static configuration
+`5 PASS`, focused Agenda `42 PASS`, combined focused `47 PASS`, Flutter full
+suite `308 PASS` ve Flutter analyze `PASS`. Mobil schema `10`, backup formatı
+`1`, migration `0` ve son geçerli merged Python full suite
+`1005 passed, 7 skipped` durumundadır.
 
 Issue #268 / PR #269 tamamlanmıştır. Ajanda sıralama sözleşmesinde yeni route
 varsayılanı `En yeni üstte`; kullanıcı `En eski üstte` seçebilir. Application
@@ -241,6 +244,8 @@ tek production işidir; diğer başlıklar ayrı ve dar child Issue'lara bölün
 
 #### D29.1 — Hatırlatıcı bildirim izolasyonu — P1 / Issue #272
 
+- **Durum:** Application düzeltmesi, source validation, exact debug artifact ve
+  fiziksel cihaz smoke PASS; merge edilmemiş Draft PR yayını bekliyor.
 - Bir Hatırlatıcı tamamlandığında yalnız kendi platform bildirimi kapanır.
 - Diğer aktif ve görünür Hatırlatıcı bildirimleri korunur.
 - Tek kayıt eyleminde genel `cancelAll` veya eşdeğer toplu iptal kullanılmaz.
@@ -484,8 +489,9 @@ child Issue'larla tamamlanmadan Faz 1 production implementation'ı başlamaz. Bl
 26 kanonik sırada korunur fakat haricî servis/eşik tasarımı nedeniyle ertelenmiş
 iştir. Saha İpuçları hard gate değildir.
 
-Sıradaki tek production işi **D29.1 / Issue #272**'dir. #257 → #254/#256 yatay
-kabul zinciri Draft PR #259 içinde bloklu kalır ve #272 kapsamına taşınmaz.
+Aktif tek production işi **D29.1 / Issue #272**'dir. Doğrulanan değişiklik merge
+edilmeden D29.2 başlamaz. #257 → #254/#256 yatay kabul zinciri Draft PR #259
+içinde bloklu kalır ve #272 kapsamına taşınmaz.
 
 ---
 
@@ -780,9 +786,10 @@ recovery `PASS`; günlük rapor `≤3 dk`; haricî not/hatırlatıcıya dönüş
 ### Hemen
 
 1. #193 ve #245 saha kabulünü günlük raporlarla sürdür.
-2. D29.1 / Issue #272 Hatırlatıcı bildirim izolasyonunu sıradaki tek production
-   işi olarak çöz.
-3. D29.2 Ajanda arama odağı/klavye izolasyonunu ayrı P2 hotfix olarak çöz.
+2. D29.1 / Issue #272 Hatırlatıcı bildirim izolasyonunun Draft PR review/merge
+   kararını tamamla.
+3. D29.2 Ajanda arama odağı/klavye izolasyonuna yalnız #272 merge sonrasında ayrı
+   P2 hotfix olarak başla.
 4. D29.3 Hatırlatıcı zaman/düzenleme sürtünmelerini küçük, test edilebilir child
    Issue'lara böl.
 5. #257 → #254/#256 ve Draft PR #259 bloklu kalır; fiziksel smoke kanıtı olmadan
