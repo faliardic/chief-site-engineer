@@ -109,6 +109,55 @@ void main() {
     }
   }
 
+  Future<List<MobileReminder>> createDeliveredTriplet(int eventBase) async {
+    final reminders = <MobileReminder>[];
+    for (final item in [
+      (id: reminder1, title: 'Teslim edilen A'),
+      (id: reminder2, title: 'Teslim edilen B'),
+      (id: reminder3, title: 'Teslim edilen C'),
+    ].indexed) {
+      reminders.add(
+        await agenda.createReminder(
+          CreateReminderCommand(
+            id: item.$2.id,
+            eventId: eventId(eventBase + item.$1),
+            title: item.$2.title,
+            kind: ReminderKind.action,
+            schedule: ReminderScheduleKind.in15Minutes,
+          ),
+        ),
+      );
+    }
+    expect(notifications.pending, hasLength(3));
+    notifications.deliverAll();
+    expect(notifications.pending, isEmpty);
+    expect(notifications.displayed, hasLength(3));
+    notifications.cancelled.clear();
+    notifications.scheduled.clear();
+    now = now.add(const Duration(minutes: 20));
+    return reminders;
+  }
+
+  Object notificationSnapshot(ReminderDetail detail) => (
+    platformId: detail.notification.platformNotificationId,
+    scheduledFor: detail.notification.scheduledFor,
+    syncState: detail.notification.syncState,
+    lastSyncedAt: detail.notification.lastSyncedAt,
+    safeErrorCode: detail.notification.safeErrorCode,
+    repeatIntervalMinutes: detail.notification.repeatIntervalMinutes,
+  );
+
+  List<Object> eventSnapshot(ReminderDetail detail) => detail.events
+      .map<Object>(
+        (event) => (
+          id: event.id,
+          type: event.eventType,
+          occurredAt: event.occurredAt,
+          payload: event.payloadJson,
+        ),
+      )
+      .toList(growable: false);
+
   test(
     'minimum standalone inbox capture is idempotent with one clock read',
     () async {
@@ -1238,6 +1287,383 @@ void main() {
     },
   );
 
+  test(
+    'completing one delivered one-time reminder preserves the other two',
+    () async {
+      final reminders = <MobileReminder>[];
+      for (final item in [
+        (id: reminder1, event: eventId(501), title: 'Teslim edilen A'),
+        (id: reminder2, event: eventId(502), title: 'Teslim edilen B'),
+        (id: reminder3, event: eventId(503), title: 'Teslim edilen C'),
+      ]) {
+        reminders.add(
+          await agenda.createReminder(
+            CreateReminderCommand(
+              id: item.id,
+              eventId: item.event,
+              title: item.title,
+              kind: ReminderKind.action,
+              schedule: ReminderScheduleKind.in15Minutes,
+            ),
+          ),
+        );
+      }
+      final before = {
+        for (final reminder in reminders)
+          reminder.id: await agenda.getReminderLifecycleDetail(reminder.id),
+      };
+      expect(notifications.pending, hasLength(3));
+      notifications.deliverAll();
+      expect(notifications.pending, isEmpty);
+      expect(notifications.displayed, hasLength(3));
+      notifications.cancelled.clear();
+      now = now.add(const Duration(minutes: 20));
+
+      final completed = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: reminders[1].id,
+          eventId: eventId(504),
+          expectedRevision: reminders[1].revision,
+          action: ReminderMutationAction.complete,
+        ),
+      );
+
+      final middlePlatformId =
+          before[reminder2]!.notification.platformNotificationId;
+      expect(notifications.cancelled, [middlePlatformId]);
+      expect(
+        notifications.displayed.map((item) => item.reminderId),
+        [reminder1, reminder3],
+      );
+      expect(completed.status, ReminderStatus.completed);
+      expect(
+        (await agenda.listReminderEvents(reminder2)).where(
+          (event) => event.eventType == 'completed',
+        ),
+        hasLength(1),
+      );
+      final middleAfter = await agenda.getReminderLifecycleDetail(reminder2);
+      expect(
+        middleAfter.notification.syncState,
+        NotificationSyncState.cancelled,
+      );
+      for (final id in [reminder1, reminder3]) {
+        final original = before[id]!;
+        final preserved = await agenda.getReminderLifecycleDetail(id);
+        expect(preserved.reminder.revision, original.reminder.revision);
+        expect(eventSnapshot(preserved), eventSnapshot(original));
+        expect(notificationSnapshot(preserved), notificationSnapshot(original));
+      }
+    },
+  );
+
+  for (final mutationCase in [
+    (
+      name: 'cancelling',
+      action: ReminderMutationAction.cancel,
+      terminalStatus: ReminderStatus.cancelled,
+    ),
+    (
+      name: 'trashing',
+      action: ReminderMutationAction.moveToTrash,
+      terminalStatus: ReminderStatus.active,
+    ),
+  ]) {
+    test(
+      '${mutationCase.name} one delivered reminder preserves its peers',
+      () async {
+        final reminders = await createDeliveredTriplet(520);
+        final before = {
+          for (final reminder in reminders)
+            reminder.id: await agenda.getReminderLifecycleDetail(reminder.id),
+        };
+
+        final mutated = await agenda.mutateReminder(
+          MutateReminderCommand(
+            reminderId: reminders[1].id,
+            eventId: eventId(523),
+            expectedRevision: reminders[1].revision,
+            action: mutationCase.action,
+          ),
+        );
+
+        expect(notifications.cancelled, [
+          before[reminder2]!.notification.platformNotificationId,
+        ]);
+        expect(
+          notifications.displayed.map((item) => item.reminderId),
+          [reminder1, reminder3],
+        );
+        expect(mutated.status, mutationCase.terminalStatus);
+        if (mutationCase.action == ReminderMutationAction.moveToTrash) {
+          expect(mutated.trashedAt, isNotNull);
+        }
+        for (final id in [reminder1, reminder3]) {
+          final original = before[id]!;
+          final preserved = await agenda.getReminderLifecycleDetail(id);
+          expect(preserved.reminder.revision, original.reminder.revision);
+          expect(eventSnapshot(preserved), eventSnapshot(original));
+          expect(
+            notificationSnapshot(preserved),
+            notificationSnapshot(original),
+          );
+        }
+      },
+    );
+  }
+
+  test(
+    'explicit and restarted reconcile preserve delivered one-time reminders',
+    () async {
+      final reminders = await createDeliveredTriplet(540);
+      final before = {
+        for (final reminder in reminders)
+          reminder.id: await agenda.getReminderLifecycleDetail(reminder.id),
+      };
+
+      await agenda.reconcileNotifications();
+      final restarted = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        notificationGateway: notifications,
+      );
+      await restarted.reconcileNotifications();
+
+      expect(notifications.cancelled, isEmpty);
+      expect(
+        notifications.displayed.map((item) => item.reminderId),
+        [reminder1, reminder2, reminder3],
+      );
+      for (final id in [reminder1, reminder2, reminder3]) {
+        final preserved = await restarted.getReminderLifecycleDetail(id);
+        expect(
+          notificationSnapshot(preserved),
+          notificationSnapshot(before[id]!),
+        );
+        expect(eventSnapshot(preserved), eventSnapshot(before[id]!));
+      }
+    },
+  );
+
+  test(
+    'retry, peer snooze and later peer cancel target only their own ids',
+    () async {
+      final reminders = await createDeliveredTriplet(560);
+      final bindingIds = {
+        for (final reminder in reminders)
+          reminder.id: (await agenda.getReminderLifecycleDetail(
+            reminder.id,
+          )).notification.platformNotificationId,
+      };
+      final completeCommand = MutateReminderCommand(
+        reminderId: reminder2,
+        eventId: eventId(563),
+        expectedRevision: reminders[1].revision,
+        action: ReminderMutationAction.complete,
+      );
+      final completed = await agenda.mutateReminder(completeCommand);
+      expect(completed.status, ReminderStatus.completed);
+      expect(notifications.cancelled, [bindingIds[reminder2]]);
+      notifications.cancelled.clear();
+
+      await expectLater(
+        agenda.mutateReminder(completeCommand),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      expect(notifications.cancelled, isEmpty);
+      expect(
+        (await agenda.listReminderEvents(reminder2)).where(
+          (event) => event.eventType == 'completed',
+        ),
+        hasLength(1),
+      );
+
+      final first = await agenda.getReminderDetail(reminder1);
+      await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: reminder1,
+          eventId: eventId(564),
+          expectedRevision: first.revision,
+          action: ReminderMutationAction.snooze1Hour,
+        ),
+      );
+      expect(notifications.cancelled, [bindingIds[reminder1]]);
+      expect(
+        notifications.displayed.map((item) => item.reminderId),
+        [reminder3],
+      );
+      expect(notifications.pending.single.reminderId, reminder1);
+      notifications.cancelled.clear();
+
+      final third = await agenda.getReminderDetail(reminder3);
+      await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: reminder3,
+          eventId: eventId(565),
+          expectedRevision: third.revision,
+          action: ReminderMutationAction.cancel,
+        ),
+      );
+      expect(notifications.cancelled, [bindingIds[reminder3]]);
+      expect(notifications.displayed, isEmpty);
+      expect(notifications.pending.single.reminderId, reminder1);
+    },
+  );
+
+  for (final failureCase in [
+    'initialize',
+    'permission',
+    'exact-alarm',
+    'pending-query',
+  ]) {
+    test(
+      '$failureCase failure branch never mutates delivered one-time state',
+      () async {
+        final reminder = (await createDeliveredTriplet(580)).first;
+        final before = await agenda.getReminderLifecycleDetail(reminder.id);
+        switch (failureCase) {
+          case 'initialize':
+            notifications.failInitialize = true;
+          case 'permission':
+            notifications.permission = NotificationPermissionState.denied;
+          case 'exact-alarm':
+            notifications.permission =
+                NotificationPermissionState.exactAlarmDenied;
+          case 'pending-query':
+            notifications.failPendingQuery = true;
+        }
+
+        await agenda.reconcileNotifications();
+
+        final after = await agenda.getReminderLifecycleDetail(reminder.id);
+        expect(notifications.cancelled, isEmpty);
+        expect(notificationSnapshot(after), notificationSnapshot(before));
+        expect(eventSnapshot(after), eventSnapshot(before));
+        expect(
+          notifications.displayed.map((item) => item.reminderId),
+          [reminder1, reminder2, reminder3],
+        );
+      },
+    );
+  }
+
+  test(
+    'delivered one-time reminders do not consume future schedule capacity',
+    () async {
+      notifications.maximumPendingNotifications = 1;
+      final delivered = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(600),
+          title: 'Teslim edilmiş kapasite dışı kayıt',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.in15Minutes,
+        ),
+      );
+      notifications.deliverAll();
+      now = now.add(const Duration(minutes: 20));
+      notifications.cancelled.clear();
+      notifications.scheduled.clear();
+
+      final future = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder2,
+          eventId: eventId(601),
+          title: 'Kapasiteyi kullanan gelecek kayıt',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.in15Minutes,
+        ),
+      );
+
+      final futureBinding = await agenda.getReminderLifecycleDetail(future.id);
+      expect(notifications.cancelled, [
+        futureBinding.notification.platformNotificationId,
+      ]);
+      expect(
+        notifications.cancelled,
+        isNot(contains(
+          (await agenda.getReminderLifecycleDetail(
+            delivered.id,
+          )).notification.platformNotificationId,
+        )),
+      );
+      expect(notifications.displayed.single.reminderId, delivered.id);
+      expect(notifications.pending.single.reminderId, future.id);
+      expect(
+        futureBinding.notification.syncState,
+        NotificationSyncState.scheduled,
+      );
+    },
+  );
+
+  test(
+    'matching overdue pending entry is preserved without binding churn',
+    () async {
+      final created = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(610),
+          title: 'Teslimi gecikmiş native pending',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.in15Minutes,
+        ),
+      );
+      final before = await agenda.getReminderLifecycleDetail(created.id);
+      now = now.add(const Duration(minutes: 20));
+      notifications.cancelled.clear();
+      notifications.scheduled.clear();
+
+      await agenda.reconcileNotifications();
+
+      final after = await agenda.getReminderLifecycleDetail(created.id);
+      expect(notifications.cancelled, isEmpty);
+      expect(notifications.scheduled, isEmpty);
+      expect(notifications.pending.single.reminderId, created.id);
+      expect(notificationSnapshot(after), notificationSnapshot(before));
+      expect(eventSnapshot(after), eventSnapshot(before));
+    },
+  );
+
+  test(
+    'cancel failure on the target still preserves delivered peers',
+    () async {
+      final reminders = await createDeliveredTriplet(620);
+      final peerBefore = {
+        for (final id in [reminder1, reminder3])
+          id: await agenda.getReminderLifecycleDetail(id),
+      };
+      notifications.failCancel = true;
+
+      final completed = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: reminder2,
+          eventId: eventId(623),
+          expectedRevision: reminders[1].revision,
+          action: ReminderMutationAction.complete,
+        ),
+      );
+
+      expect(completed.status, ReminderStatus.completed);
+      final target = await agenda.getReminderLifecycleDetail(reminder2);
+      expect(target.notification.syncState, NotificationSyncState.failed);
+      expect(target.notification.safeErrorCode, 'cancel_failed');
+      expect(notifications.cancelled, isEmpty);
+      expect(
+        notifications.displayed.map((item) => item.reminderId),
+        [reminder1, reminder2, reminder3],
+      );
+      for (final id in [reminder1, reminder3]) {
+        final after = await agenda.getReminderLifecycleDetail(id);
+        expect(
+          notificationSnapshot(after),
+          notificationSnapshot(peerBefore[id]!),
+        );
+        expect(eventSnapshot(after), eventSnapshot(peerBefore[id]!));
+      }
+    },
+  );
+
   test('channel enable and restart reconcile once without duplicate', () async {
     notifications.permission = NotificationPermissionState.channelDisabled;
     final reminder = await agenda.createReminder(
@@ -1976,12 +2402,14 @@ class _FakeNotificationGateway
   bool failSchedule = false;
   bool failCancel = false;
   bool failInitialize = false;
+  bool failPendingQuery = false;
   bool omitPendingAfterSchedule = false;
   int requestCalls = 0;
   final List<ReminderNotificationRequest> scheduled = [];
   final List<ReminderNotificationRequest> fallbackScheduled = [];
   final List<int> cancelled = [];
   final List<PendingReminderNotification> pending = [];
+  final List<PendingReminderNotification> displayed = [];
   final StreamController<String> taps = StreamController<String>.broadcast();
   ReminderPlatformDiagnostic diagnostic =
       const ReminderPlatformDiagnostic.unavailable();
@@ -2013,8 +2441,10 @@ class _FakeNotificationGateway
   }
 
   @override
-  Future<List<PendingReminderNotification>> pendingNotifications() async =>
-      List.unmodifiable(pending);
+  Future<List<PendingReminderNotification>> pendingNotifications() async {
+    if (failPendingQuery) throw StateError('hidden pending query failure');
+    return List.unmodifiable(pending);
+  }
 
   @override
   Future<void> schedule(ReminderNotificationRequest request) async {
@@ -2059,6 +2489,18 @@ class _FakeNotificationGateway
     if (failCancel) throw StateError('hidden cancel failure');
     cancelled.add(platformId);
     pending.removeWhere((item) => item.platformId == platformId);
+    displayed.removeWhere((item) => item.platformId == platformId);
+  }
+
+  void deliverAll() {
+    displayed
+      ..removeWhere(
+        (displayedItem) => pending.any(
+          (pendingItem) => pendingItem.platformId == displayedItem.platformId,
+        ),
+      )
+      ..addAll(pending);
+    pending.clear();
   }
 
   Future<void> close() => taps.close();
