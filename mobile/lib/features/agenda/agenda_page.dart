@@ -39,6 +39,7 @@ class _AgendaPageState extends State<AgendaPage> {
   AgendaCategory? _category;
   String _search = '';
   AgendaArchiveFilter _archiveFilter = AgendaArchiveFilter.active;
+  AgendaSortOrder _sortOrder = AgendaSortOrder.newestFirst;
   bool _loading = true;
   String? _error;
   StreamSubscription<void>? _projectSubscription;
@@ -109,6 +110,7 @@ class _AgendaPageState extends State<AgendaPage> {
           category: _category,
           literalSearch: _search,
           archiveFilter: _archiveFilter,
+          sortOrder: _sortOrder,
         ),
       );
       if (!mounted) return;
@@ -211,6 +213,19 @@ class _AgendaPageState extends State<AgendaPage> {
     });
   }
 
+  Future<void> _changeSortOrder(AgendaSortOrder? value) async {
+    if (value == null || value == _sortOrder) return;
+    setState(() => _sortOrder = value);
+    await _reload();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      final position = _scrollController.position;
+      if ((position.pixels - position.minScrollExtent).abs() > 0.5) {
+        _scrollController.jumpTo(position.minScrollExtent);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -295,6 +310,25 @@ class _AgendaPageState extends State<AgendaPage> {
                 setState(() => _archiveFilter = values.single);
                 _reload();
               },
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<AgendaSortOrder>(
+              key: const Key('agenda-sort-order'),
+              initialValue: _sortOrder,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Sıralama',
+                border: OutlineInputBorder(),
+              ),
+              items: AgendaSortOrder.values
+                  .map(
+                    (order) => DropdownMenuItem(
+                      value: order,
+                      child: Text(order.label),
+                    ),
+                  )
+                  .toList(growable: false),
+              onChanged: (value) => unawaited(_changeSortOrder(value)),
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String?>(

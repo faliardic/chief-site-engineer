@@ -80,6 +80,159 @@ void main() {
     revision: 1,
   );
 
+  testWidgets(
+    'Issue 268 baseline: Ajanda exposes newest-first sort control',
+    (tester) async {
+      final fake = FakeAgendaApplication(projects: [project()], logs: [log()]);
+
+      await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('agenda-sort-order')), findsOneWidget);
+      expect(find.text('En yeni üstte'), findsOneWidget);
+    },
+  );
+
+  testWidgets('Ajanda changes deterministic card order in both directions', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final early = _sortLog(
+      1,
+      observedAt: '2026-07-19T06:00:00Z',
+      description: 'CSE268 erken',
+    );
+    final middle = _sortLog(
+      2,
+      observedAt: '2026-07-19T07:30:00Z',
+      description: 'CSE268 orta',
+    );
+    final latest = _sortLog(
+      3,
+      observedAt: '2026-07-19T09:00:00Z',
+      description: 'CSE268 en geç',
+    );
+    final fake = FakeAgendaApplication(
+      projects: [project()],
+      logs: [middle, early, latest],
+    );
+
+    await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
+    await tester.pumpAndSettle();
+
+    expect(fake.lastAgendaQuery?.sortOrder, AgendaSortOrder.newestFirst);
+    expect(
+      tester.getTopLeft(find.byKey(Key('agenda-log-${latest.id}'))).dy,
+      lessThan(
+        tester.getTopLeft(find.byKey(Key('agenda-log-${middle.id}'))).dy,
+      ),
+    );
+    expect(
+      tester.getTopLeft(find.byKey(Key('agenda-log-${middle.id}'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(Key('agenda-log-${early.id}'))).dy),
+    );
+
+    await tester.tap(find.byKey(const Key('agenda-sort-order')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('En eski üstte').last);
+    await tester.pumpAndSettle();
+
+    expect(fake.lastAgendaQuery?.sortOrder, AgendaSortOrder.oldestFirst);
+    expect(
+      tester.getTopLeft(find.byKey(Key('agenda-log-${early.id}'))).dy,
+      lessThan(
+        tester.getTopLeft(find.byKey(Key('agenda-log-${middle.id}'))).dy,
+      ),
+    );
+    expect(
+      tester.getTopLeft(find.byKey(Key('agenda-log-${middle.id}'))).dy,
+      lessThan(
+        tester.getTopLeft(find.byKey(Key('agenda-log-${latest.id}'))).dy,
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('agenda-sort-order')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('En yeni üstte').last);
+    await tester.pumpAndSettle();
+
+    expect(fake.lastAgendaQuery?.sortOrder, AgendaSortOrder.newestFirst);
+    expect(
+      tester.getTopLeft(find.byKey(Key('agenda-log-${latest.id}'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(Key('agenda-log-${early.id}'))).dy),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('sort change reloads and safely resets a long list scroll', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final fake = FakeAgendaApplication(
+      projects: [project()],
+      logs: List.generate(30, _navigationLog),
+    );
+
+    await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
+    await tester.pumpAndSettle();
+    final changeSort = tester
+        .widget<DropdownButtonFormField<AgendaSortOrder>>(
+          find.byKey(const Key('agenda-sort-order')),
+        )
+        .onChanged!;
+    await tester.drag(
+      find.byKey(const Key('agenda-day-list')),
+      const Offset(0, -1400),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      _scrollOffset(tester, const Key('agenda-day-list')),
+      greaterThan(500),
+    );
+
+    changeSort(AgendaSortOrder.oldestFirst);
+    await tester.pumpAndSettle();
+
+    expect(fake.lastAgendaQuery?.sortOrder, AgendaSortOrder.oldestFirst);
+    expect(_scrollOffset(tester, const Key('agenda-day-list')), closeTo(0, 0.1));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Agenda sort control is safe at 320 px large text dark theme', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(brightness: Brightness.dark),
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+          child: AgendaPage(
+            agenda: FakeAgendaApplication(
+              projects: [project()],
+              logs: [log()],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('agenda-sort-order')), findsOneWidget);
+    expect(find.text('En yeni üstte'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Ajanda main action creates and selects a live project', (
     tester,
   ) async {
@@ -126,6 +279,12 @@ void main() {
       expect(find.byKey(const Key('agenda-project-filter')), findsOneWidget);
       expect(find.byKey(const Key('agenda-category-filter')), findsOneWidget);
       expect(find.byKey(const Key('agenda-literal-search')), findsOneWidget);
+      expect(find.byKey(const Key('agenda-sort-order')), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('agenda-log-$logId')),
+        240,
+        scrollable: _scrollableFor(find.byKey(const Key('agenda-day-list'))),
+      );
       expect(find.textContaining('Uzun Türkçe açıklama'), findsOneWidget);
       expect(
         tester.getSize(find.byKey(const Key('create-agenda-log'))).height,
@@ -715,15 +874,38 @@ void main() {
       await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
       await tester.pumpAndSettle();
 
+      expect(fake.lastAgendaQuery?.sortOrder, AgendaSortOrder.newestFirst);
+      await tester.tap(find.text('Arşivlenenler'));
+      await tester.pumpAndSettle();
+      expect(
+        fake.lastAgendaQuery?.archiveFilter,
+        AgendaArchiveFilter.archived,
+      );
+      expect(fake.lastAgendaQuery?.sortOrder, AgendaSortOrder.newestFirst);
       await tester.tap(find.byKey(const Key('next-day')));
+      await tester.pumpAndSettle();
+      expect(fake.lastAgendaQuery?.sortOrder, AgendaSortOrder.newestFirst);
+      await tester.ensureVisible(
+        find.byKey(const Key('agenda-project-filter')),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('agenda-project-filter')));
       await tester.pumpAndSettle();
       await tester.tap(find.text(project().name).last);
       await tester.pumpAndSettle();
+      expect(fake.lastAgendaQuery?.sortOrder, AgendaSortOrder.newestFirst);
+      await tester.ensureVisible(
+        find.byKey(const Key('agenda-category-filter')),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('agenda-category-filter')));
       await tester.pumpAndSettle();
       await tester.tap(find.text(AgendaCategory.inspection.label).last);
+      await tester.pumpAndSettle();
+      expect(fake.lastAgendaQuery?.sortOrder, AgendaSortOrder.newestFirst);
+      await tester.ensureVisible(
+        find.byKey(const Key('agenda-literal-search')),
+      );
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const Key('agenda-literal-search')),
@@ -733,12 +915,19 @@ void main() {
       await tester.pumpAndSettle();
 
       final target = logs[18];
+      final list = find.byKey(const Key('agenda-day-list'));
+      final scrollable = find
+          .descendant(of: list, matching: find.byType(Scrollable))
+          .first;
       final targetFinder = find.byKey(Key('agenda-log-${target.id}'));
-      await tester.scrollUntilVisible(
-        targetFinder,
-        420,
-        scrollable: _scrollableFor(find.byKey(const Key('agenda-day-list'))),
-      );
+      for (var attempt = 0; attempt < 12; attempt++) {
+        if (targetFinder.evaluate().isNotEmpty) break;
+        await tester.drag(scrollable, const Offset(0, -420));
+        await tester.pumpAndSettle();
+      }
+      expect(targetFinder, findsOneWidget);
+      await tester.ensureVisible(targetFinder);
+      await tester.pumpAndSettle();
       final before = _scrollOffset(tester, const Key('agenda-day-list'));
       expect(before, greaterThan(300));
 
@@ -757,7 +946,7 @@ void main() {
       fake.delayedAgendaReload = delayedReload;
       await tester.pageBack();
       await tester.pump(const Duration(milliseconds: 350));
-      delayedReload.complete(fake.logs);
+      delayedReload.complete(fake.logs.reversed.toList(growable: false));
       await tester.pumpAndSettle();
 
       final after = _scrollOffset(tester, const Key('agenda-day-list'));
@@ -765,7 +954,9 @@ void main() {
       expect(fake.lastAgendaQuery?.projectId, projectId);
       expect(fake.lastAgendaQuery?.category, AgendaCategory.inspection);
       expect(fake.lastAgendaQuery?.literalSearch, 'CSE264 arama');
+      expect(fake.lastAgendaQuery?.sortOrder, AgendaSortOrder.newestFirst);
       expect(find.text('CSE264 güncel Ajanda açıklaması'), findsOneWidget);
+      expect(targetFinder, findsOneWidget);
       tester
           .state<ScrollableState>(
             _scrollableFor(find.byKey(const Key('agenda-day-list'))),
@@ -825,6 +1016,14 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final logs = List.generate(18, _navigationLog);
+    final firstFake = FakeAgendaApplication(
+      projects: [project()],
+      logs: logs,
+    );
+    final secondFake = FakeAgendaApplication(
+      projects: [project()],
+      logs: logs,
+    );
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -833,23 +1032,13 @@ void main() {
               Expanded(
                 child: KeyedSubtree(
                   key: const Key('agenda-instance-one'),
-                  child: AgendaPage(
-                    agenda: FakeAgendaApplication(
-                      projects: [project()],
-                      logs: logs,
-                    ),
-                  ),
+                  child: AgendaPage(agenda: firstFake),
                 ),
               ),
               Expanded(
                 child: KeyedSubtree(
                   key: const Key('agenda-instance-two'),
-                  child: AgendaPage(
-                    agenda: FakeAgendaApplication(
-                      projects: [project()],
-                      logs: logs,
-                    ),
-                  ),
+                  child: AgendaPage(agenda: secondFake),
                 ),
               ),
             ],
@@ -861,6 +1050,31 @@ void main() {
     final firstList = find.descendant(
       of: find.byKey(const Key('agenda-instance-one')),
       matching: find.byKey(const Key('agenda-day-list')),
+    );
+    final firstSort = find.descendant(
+      of: find.byKey(const Key('agenda-instance-one')),
+      matching: find.byKey(const Key('agenda-sort-order')),
+    );
+    await tester.tap(firstSort);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('En eski üstte').last);
+    await tester.pumpAndSettle();
+
+    expect(firstFake.lastAgendaQuery?.sortOrder, AgendaSortOrder.oldestFirst);
+    expect(secondFake.lastAgendaQuery?.sortOrder, AgendaSortOrder.newestFirst);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('agenda-instance-one')),
+        matching: find.text('En eski üstte'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('agenda-instance-two')),
+        matching: find.text('En yeni üstte'),
+      ),
+      findsOneWidget,
     );
 
     await tester.drag(firstList, const Offset(0, -520));
@@ -945,11 +1159,29 @@ AgendaLog _navigationLog(int index, {String? description}) => AgendaLog(
   revision: 1,
 );
 
+AgendaLog _sortLog(
+  int index, {
+  required String observedAt,
+  required String description,
+  String createdAt = '2026-07-19T10:00:00Z',
+}) => AgendaLog(
+  id: 'aaaaaaaa-aaaa-4aaa-8aaa-${(index + 200).toString().padLeft(12, '0')}',
+  projectId: projectId,
+  projectName: 'Çok Uzun Kuzey Şantiyesi Proje Adı',
+  observedAt: observedAt,
+  createdAt: createdAt,
+  updatedAt: createdAt,
+  category: AgendaCategory.inspection,
+  description: description,
+  location: 'CSE268 sentetik mahal',
+  notes: 'CSE268 sort fixture',
+  revision: 1,
+);
+
 class _DelayedAgendaApplication extends FakeAgendaApplication {
   _DelayedAgendaApplication({required super.projects, required super.logs});
 
   Completer<List<AgendaLog>>? delayedAgendaReload;
-  AgendaQuery? lastAgendaQuery;
 
   @override
   Future<List<AgendaLog>> listAgenda(AgendaQuery query) async {
