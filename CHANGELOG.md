@@ -1,5 +1,20 @@
 # Changelog
 
+## Issue #277 - Hatırlatıcı Exact Hızlı Planlama Zamanları
+
+- `Yarın sabah` ve timed `Yarın 08:00` eylemi Europe/Istanbul ertesi gün
+  `08:00` değerini üretir; eski hatırlatıcı saati korunmaz.
+- Detay planlama listesine her zaman sonraki pazartesi `08:00`ı seçen
+  `Hafta başına ertele` eklendi.
+- Form ve detail sheet exact yerel tarih/saat preview'sini gösterir. Preview ile
+  application resolver sonucu gün sınırında uyuşmazsa mutation fail-closed
+  reddedilir.
+- Create/reschedule/snooze canonical row, append-only event ve notification
+  binding değerleri tablet wide smoke ve cold relaunch ile doğrulandı.
+  All-day davranışı korundu; cleanup active `0`, geri alınabilir `3/3`.
+- Tablet PASS fiziksel tamamlanma kapısıdır; telefon promotion yapılmadı.
+  Schema `10`, backup formatı `1`, migration `0` korundu.
+
 ## Issue #275 - Ajanda Arama Odağı ve Klavye İzolasyonu
 
 - Ajanda literal arama metni ve sorgusu route-local korunurken detail

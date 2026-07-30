@@ -9,9 +9,9 @@
 **Açık Release 0.1 pilotu:** #193  
 **Güncel RC / günlük saha testi:** #245  
 **Roadmap senkronizasyonu:** #270\
-**Son merge edilen production işi:** #272 / PR #274 — Hatırlatıcı bildirim izolasyonu\
-**Aktif production işi:** D29.2 / Issue #275 — tablet kabulü PASS, Draft PR yayını\
-**Sıradaki production işi:** D29.3 — yalnız #275 merge sonrasında\
+**Son merge edilen production işi:** #275 / PR #276 — Ajanda arama odağı ve klavye izolasyonu\
+**Aktif production işi:** D29.3 / Issue #277 — tablet kabulü PASS, Draft PR yayını\
+**Sıradaki production işi:** D29.3'ün diğer maddeleri — yalnız ayrı Issue ve #277 merge sonrasında\
 **Bloklu yatay kabul zinciri:** #257 → #254 / #256, Draft PR #259
 
 ## 1. Ürün kararı
@@ -51,27 +51,31 @@ Tamamlanan günlük güvenilirlik dilimleri:
 - #264 / PR #265 — dört ana listede detail dönüşü route-local state korunumu;
 - #266 / PR #267 — Türkçe kullanıcı dili, Puantaj `Kaydet` eylemi ve seçim toolbar'ı;
 - #268 / PR #269 — Ajanda deterministik sıralama;
-- #272 / PR #274 — Hatırlatıcı bildirim izolasyonu.
+- #272 / PR #274 — Hatırlatıcı bildirim izolasyonu;
+- #275 / PR #276 — Ajanda arama odağı ve klavye izolasyonu.
 
 Güncel güvenli `master`:
 
 ```text
-52d610ce7e8ff28905b52f10b75626885070a0e9
+d510a2eac0ed75d2390da103363956101114aff5
 ```
 
-Bu master noktası #272 / PR #274 notification izolasyonu düzeltmesini taşır.
-Son merge edilen production kanıtı: focused reminder lifecycle `44/44 PASS`,
-related delayed-hourly `4/4 PASS`, background/reboot/static configuration
-`14/14 PASS`, Flutter full suite `320/320 PASS` ve Flutter analyze `0 issue`.
-Mobil schema `10`, backup formatı `1`, migration `0` ve son geçerli merged
-Python full suite `1005 passed, 7 skipped` durumundadır.
+Bu master noktası #275 / PR #276 Ajanda arama odağı ve klavye izolasyonu
+düzeltmesini taşır. Son merge edilen production kanıtı: corrected baseline
+`20/20 PASS`, focused Agenda widget `24/24 PASS`, Agenda application
+`22/22 PASS`, Flutter full suite `324/324 PASS`, Flutter analyze `0 issue` ve
+Samsung `SM-X610` tablet wide smoke PASS. Mobil schema `10`, backup formatı
+`1`, migration `0` ve son geçerli merged Python full suite
+`1005 passed, 7 skipped` durumundadır.
 
-Issue #275 uygulaması ve doğrulaması branch üzerinde tamamlanmıştır. Ajanda
-arama text/query state'i korunurken detail dönüşünde focus/IME geri gelmez;
-drag, fling ve yön değiştirme kendiliğinden arama odağı üretmez. Samsung
-`SM-X610` tablet wide smoke PASS'tir. Kullanıcı tableti bu Issue'nun fiziksel
-tamamlanma kapısı olarak seçmiş; telefon promotion'ı ayrı talebe kadar
-ertelemiştir. Schema, migration ve backup formatı değişmemiştir.
+Issue #277 uygulaması ve doğrulaması branch üzerinde tamamlanmıştır.
+`Yarın sabah`, timed `Yarın 08:00` ve sonraki pazartesi kısayolları exact
+Europe/Istanbul `08:00` sözleşmesini kullanır. UI preview, canonical
+persistence/event/binding, native plan, all-day korunumu ve cold relaunch
+Samsung `SM-X610` tablet wide smoke ile PASS'tir. Kullanıcı tablet PASS'i bu
+Issue'nun fiziksel tamamlanma kapısı olarak seçmiş; telefon promotion ve
+D29.3'ün diğer maddeleri bu Issue dışında bırakılmıştır. Schema, migration ve
+backup formatı değişmemiştir.
 
 Fiziksel cihaz smoke otomasyonu için #254 üzerinde izole acceptance harness,
 #256 üzerinde atomik build-root rotasyonu ve #257 üzerinde doğrulanmış acceptance
