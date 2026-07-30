@@ -1,5 +1,21 @@
 # Changelog
 
+## Issue #280 - README ve NotebookLM Güncel Durum Senkronizasyonu
+
+- Kök ve mobil README; merged safe point Issue #277 / PR #278 /
+  `c72f6bc55fc658996a546d9833b85a2614b99327`, mobil schema `10`, backup
+  formatı `1` ve güncel Flutter ürün sınırıyla hizalandı.
+- Küçük canonical state; Issue #279'u
+  `paused_for_readme_notebooklm_sync`, PR #259'u açık/Draft/conflicting ve
+  birleşmemiş olarak ayrı tutar. Hiçbiri merged ürün davranışı sayılmaz.
+- Podcast 036 ile legacy Adım 001–225 döneminden gerçek CHANGELOG Issue
+  bölümlerine dayanan Issue #227–#277 dönemine geçildi. Aralıktaki eksik Issue
+  numaraları uydurulmaz.
+- NotebookLM generator ve manifesti `adim` ile `issue` range türlerini
+  deterministik ve geriye uyumlu üretir. Stable public source yolu değişmedi.
+- Bu çalışma documentation/developer-tooling/test kapsamındadır; production
+  davranışı, mobil schema, migration, backup ve cihaz paketi değişmedi.
+
 ## Issue #277 - Hatırlatıcı Exact Hızlı Planlama Zamanları
 
 - `Yarın sabah` ve timed `Yarın 08:00` eylemi Europe/Istanbul ertesi gün
@@ -119,6 +135,25 @@
   kalır. Stale revision ve event failure rollback, aynı event ID retry,
   otomatik fresh detail ve restart kalıcılığı sentetik testlerle doğrulandı.
 - Mobil schema `10` ve backup formatı `1` değişmedi; migration eklenmedi.
+
+## Issue #252 - Hatırlatıcı Hızlı Eylem Ayrımı
+
+- Reminder kartındaki ertesi gün eylemi `Yarına ertele` olarak netleştirildi;
+  `2 saat ertele` ve `3 saat ertele` bağımsız hızlı eylemler olarak eklendi.
+- İki ve üç saatlik mutation'lar mevcut canonical UTC, optimistic revision,
+  append-only event ve notification reconciliation sözleşmesini yeniden
+  kullanır.
+- Schema, migration, backup formatı ve native bildirim altyapısı değişmedi.
+
+## Issue #237 - Ajanda Beton Sinyali ve Deep-Link
+
+- Ajanda açıklama, not ve kategori metnindeki dar beton/betonaj sinyalleri
+  deterministik ve offline algılanarak kullanıcıya öneri gösterilir.
+- Öneri otomatik Beton paketi, reminder, mutation veya saha kararı üretmez;
+  kullanıcıyı aynı proje/gün bağlamıyla Beton oluşturma akışına götürür ve
+  form taslağını korur.
+- Yönetilen Beton Ajanda kayıtları exact kaynak bağlantısını taşır ve generic
+  öneri göstermez. Mobil schema `10` ve backup formatı `1` değişmedi.
 
 ## Issue #234 - Beton Sınıfı Kataloğu ve Döküm Zaman Çizgisi
 
