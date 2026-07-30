@@ -531,7 +531,11 @@ class _RemindersPageState extends State<RemindersPage> {
                       ? null
                       : () => _moveToTomorrow(reminder),
                   icon: const Icon(Icons.wb_sunny_outlined),
-                  label: const Text('Yarına ertele'),
+                  label: Text(
+                    reminder.allDayLocalDate == null
+                        ? 'Yarın 08:00'
+                        : 'Yarına ertele',
+                  ),
                 ),
               ),
             ),

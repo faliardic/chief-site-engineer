@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
@@ -268,6 +269,169 @@ void main() {
     },
   );
 
+  test(
+    'tomorrow morning create resolves next Istanbul day at exact 08:00',
+    () async {
+      now = DateTime.utc(2026, 7, 30, 2);
+
+      final created = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(940),
+          title: 'Yarın sabah exact saat',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.tomorrowMorning,
+        ),
+      );
+
+      expect(created.nextAttentionAt, '2026-07-31T05:00:00Z');
+      expect(
+        notifications.scheduled.single.scheduledAtUtc,
+        created.nextAttentionAt,
+      );
+      final lifecycle = await agenda.getReminderLifecycleDetail(created.id);
+      expect(lifecycle.notification.scheduledFor, created.nextAttentionAt);
+    },
+  );
+
+  test('exact quick schedule resolvers cover calendar boundaries', () {
+    final tomorrowCases = <(DateTime, String)>[
+      (DateTime.utc(2026, 7, 30, 2), '2026-07-31T05:00:00Z'),
+      (DateTime.utc(2026, 7, 30, 20, 59), '2026-07-31T05:00:00Z'),
+      (DateTime.utc(2026, 1, 31, 9), '2026-02-01T05:00:00Z'),
+      (DateTime.utc(2026, 12, 31, 9), '2027-01-01T05:00:00Z'),
+      (DateTime.utc(2028, 2, 28, 9), '2028-02-29T05:00:00Z'),
+    ];
+    for (final (instant, expected) in tomorrowCases) {
+      expect(resolveReminderTomorrowMorningAt(instant), expected);
+    }
+
+    final nextWeekCases = <(DateTime, String)>[
+      (DateTime.utc(2026, 7, 28, 9), '2026-08-03T05:00:00Z'),
+      (DateTime.utc(2026, 8, 2, 9), '2026-08-03T05:00:00Z'),
+      (DateTime.utc(2026, 7, 27, 9), '2026-08-03T05:00:00Z'),
+    ];
+    for (final (instant, expected) in nextWeekCases) {
+      final resolved = resolveReminderNextWeekStartAt(instant);
+      final local = CseTimeCodec.toIstanbul(resolved);
+      expect(resolved, expected);
+      expect(local.weekday, DateTime.monday);
+      expect((local.hour, local.minute), (8, 0));
+      expect(
+        CseTimeCodec.decodeCanonicalUtc(resolved).isAfter(instant),
+        isTrue,
+      );
+    }
+  });
+
+  test(
+    'week-start create and reschedule share exact time and reject stale preview',
+    () async {
+      now = DateTime.utc(2026, 7, 28, 9);
+      final expected = '2026-08-03T05:00:00Z';
+      final created = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(943),
+          title: 'Hafta başı oluştur',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.nextWeekStart,
+          customAttentionAt: expected,
+        ),
+      );
+      expect(created.nextAttentionAt, expected);
+      expect(notifications.scheduled.single.scheduledAtUtc, expected);
+      expect(
+        (await agenda.getReminderLifecycleDetail(
+          created.id,
+        )).notification.scheduledFor,
+        expected,
+      );
+
+      var rescheduled = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder2,
+          eventId: eventId(944),
+          title: 'Hafta başına yeniden planla',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.in15Minutes,
+        ),
+      );
+      rescheduled = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: rescheduled.id,
+          eventId: eventId(945),
+          expectedRevision: rescheduled.revision,
+          action: ReminderMutationAction.schedule,
+          schedule: ReminderScheduleKind.nextWeekStart,
+          customAttentionAt: expected,
+        ),
+      );
+      expect(rescheduled.nextAttentionAt, expected);
+      expect(notifications.scheduled.last.scheduledAtUtc, expected);
+      final events = await agenda.listReminderEvents(rescheduled.id);
+      final businessEvent = events.lastWhere(
+        (event) => !event.eventType.startsWith('notification_'),
+      );
+      final payload =
+          jsonDecode(businessEvent.payloadJson) as Map<String, Object?>;
+      expect(payload['next_attention_at'], expected);
+
+      await expectLater(
+        agenda.createReminder(
+          CreateReminderCommand(
+            id: reminder3,
+            eventId: eventId(946),
+            title: 'Eski önizleme reddedilir',
+            kind: ReminderKind.action,
+            schedule: ReminderScheduleKind.nextWeekStart,
+            customAttentionAt: '2026-08-10T05:00:00Z',
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+    },
+  );
+
+  test(
+    'timed tomorrow snooze replaces the prior local clock with exact 08:00',
+    () async {
+      now = DateTime.utc(2026, 7, 30, 2);
+      final created = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(941),
+          title: 'Farklı saatten yarın sabaha',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-30T11:30:00Z',
+        ),
+      );
+
+      final snoozed = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: created.id,
+          eventId: eventId(942),
+          expectedRevision: created.revision,
+          action: ReminderMutationAction.snoozeTomorrowMorning,
+        ),
+      );
+
+      expect(snoozed.nextAttentionAt, '2026-07-31T05:00:00Z');
+      expect(
+        notifications.scheduled.last.scheduledAtUtc,
+        snoozed.nextAttentionAt,
+      );
+      final events = await agenda.listReminderEvents(created.id);
+      final businessEvent = events.lastWhere(
+        (event) => !event.eventType.startsWith('notification_'),
+      );
+      final payload =
+          jsonDecode(businessEvent.payloadJson) as Map<String, Object?>;
+      expect(payload['next_attention_at'], snoozed.nextAttentionAt);
+    },
+  );
+
   test('2 and 3 hour snoozes are exact, idempotent and stale-safe', () async {
     final twoHourInbox = await agenda.createReminder(
       CreateReminderCommand(
@@ -439,7 +603,7 @@ void main() {
   });
 
   test(
-    'tomorrow keeps local clock, rejects inbox, and preserves source',
+    'tomorrow uses exact 08:00, rejects inbox, and preserves source',
     () async {
       await createProjectAndLog();
       final sourceBefore = await agenda.getAgendaLogDetail(logId);
@@ -463,11 +627,11 @@ void main() {
           action: ReminderMutationAction.snoozeTomorrowMorning,
         ),
       );
-      expect(scheduled.nextAttentionAt, '2026-07-20T12:45:00Z');
+      expect(scheduled.nextAttentionAt, '2026-07-20T05:00:00Z');
       expect(scheduled.revision, 2);
       expect(
         notifications.scheduled.last.scheduledAtUtc,
-        '2026-07-20T12:45:00Z',
+        '2026-07-20T05:00:00Z',
       );
       final lifecycle = await agenda.getReminderLifecycleDetail(scheduled.id);
       expect(
@@ -768,7 +932,7 @@ void main() {
         action: ReminderMutationAction.snoozeTomorrowMorning,
       );
       final snoozed = await agenda.mutateReminder(timedCommand);
-      expect(snoozed.nextAttentionAt, '2026-07-20T12:45:00Z');
+      expect(snoozed.nextAttentionAt, '2026-07-20T05:00:00Z');
       final retried = await agenda.mutateReminder(timedCommand);
       expect(retried.revision, snoozed.revision);
       expect(retried.nextAttentionAt, snoozed.nextAttentionAt);
@@ -1331,15 +1495,15 @@ void main() {
       final middlePlatformId =
           before[reminder2]!.notification.platformNotificationId;
       expect(notifications.cancelled, [middlePlatformId]);
-      expect(
-        notifications.displayed.map((item) => item.reminderId),
-        [reminder1, reminder3],
-      );
+      expect(notifications.displayed.map((item) => item.reminderId), [
+        reminder1,
+        reminder3,
+      ]);
       expect(completed.status, ReminderStatus.completed);
       expect(
-        (await agenda.listReminderEvents(reminder2)).where(
-          (event) => event.eventType == 'completed',
-        ),
+        (await agenda.listReminderEvents(
+          reminder2,
+        )).where((event) => event.eventType == 'completed'),
         hasLength(1),
       );
       final middleAfter = await agenda.getReminderLifecycleDetail(reminder2);
@@ -1390,10 +1554,10 @@ void main() {
         expect(notifications.cancelled, [
           before[reminder2]!.notification.platformNotificationId,
         ]);
-        expect(
-          notifications.displayed.map((item) => item.reminderId),
-          [reminder1, reminder3],
-        );
+        expect(notifications.displayed.map((item) => item.reminderId), [
+          reminder1,
+          reminder3,
+        ]);
         expect(mutated.status, mutationCase.terminalStatus);
         if (mutationCase.action == ReminderMutationAction.moveToTrash) {
           expect(mutated.trashedAt, isNotNull);
@@ -1431,10 +1595,11 @@ void main() {
       await restarted.reconcileNotifications();
 
       expect(notifications.cancelled, isEmpty);
-      expect(
-        notifications.displayed.map((item) => item.reminderId),
-        [reminder1, reminder2, reminder3],
-      );
+      expect(notifications.displayed.map((item) => item.reminderId), [
+        reminder1,
+        reminder2,
+        reminder3,
+      ]);
       for (final id in [reminder1, reminder2, reminder3]) {
         final preserved = await restarted.getReminderLifecycleDetail(id);
         expect(
@@ -1473,9 +1638,9 @@ void main() {
       );
       expect(notifications.cancelled, isEmpty);
       expect(
-        (await agenda.listReminderEvents(reminder2)).where(
-          (event) => event.eventType == 'completed',
-        ),
+        (await agenda.listReminderEvents(
+          reminder2,
+        )).where((event) => event.eventType == 'completed'),
         hasLength(1),
       );
 
@@ -1489,10 +1654,9 @@ void main() {
         ),
       );
       expect(notifications.cancelled, [bindingIds[reminder1]]);
-      expect(
-        notifications.displayed.map((item) => item.reminderId),
-        [reminder3],
-      );
+      expect(notifications.displayed.map((item) => item.reminderId), [
+        reminder3,
+      ]);
       expect(notifications.pending.single.reminderId, reminder1);
       notifications.cancelled.clear();
 
@@ -1540,10 +1704,11 @@ void main() {
         expect(notifications.cancelled, isEmpty);
         expect(notificationSnapshot(after), notificationSnapshot(before));
         expect(eventSnapshot(after), eventSnapshot(before));
-        expect(
-          notifications.displayed.map((item) => item.reminderId),
-          [reminder1, reminder2, reminder3],
-        );
+        expect(notifications.displayed.map((item) => item.reminderId), [
+          reminder1,
+          reminder2,
+          reminder3,
+        ]);
       },
     );
   }
@@ -1582,11 +1747,13 @@ void main() {
       ]);
       expect(
         notifications.cancelled,
-        isNot(contains(
-          (await agenda.getReminderLifecycleDetail(
-            delivered.id,
-          )).notification.platformNotificationId,
-        )),
+        isNot(
+          contains(
+            (await agenda.getReminderLifecycleDetail(
+              delivered.id,
+            )).notification.platformNotificationId,
+          ),
+        ),
       );
       expect(notifications.displayed.single.reminderId, delivered.id);
       expect(notifications.pending.single.reminderId, future.id);
@@ -1649,10 +1816,11 @@ void main() {
       expect(target.notification.syncState, NotificationSyncState.failed);
       expect(target.notification.safeErrorCode, 'cancel_failed');
       expect(notifications.cancelled, isEmpty);
-      expect(
-        notifications.displayed.map((item) => item.reminderId),
-        [reminder1, reminder2, reminder3],
-      );
+      expect(notifications.displayed.map((item) => item.reminderId), [
+        reminder1,
+        reminder2,
+        reminder3,
+      ]);
       for (final id in [reminder1, reminder3]) {
         final after = await agenda.getReminderLifecycleDetail(id);
         expect(

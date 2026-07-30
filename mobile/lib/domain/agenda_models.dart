@@ -75,11 +75,60 @@ enum ReminderScheduleKind {
   in3Hours('3 saat'),
   todayEnd('Bugün çıkmadan'),
   tomorrowMorning('Yarın sabah'),
+  nextWeekStart('Hafta başına ertele'),
   custom('Özel tarih/saat');
 
   const ReminderScheduleKind(this.label);
 
   final String label;
+}
+
+String resolveReminderTomorrowMorningAt(DateTime nowUtc) {
+  final today = CseTimeCodec.istanbulDayKey(CseTimeCodec.encodeUtc(nowUtc));
+  final tomorrow = CseTimeCodec.shiftIstanbulDay(today, 1).split('-');
+  return CseTimeCodec.canonicalFromIstanbulComponents(
+    year: int.parse(tomorrow[0]),
+    month: int.parse(tomorrow[1]),
+    day: int.parse(tomorrow[2]),
+    hour: 8,
+    minute: 0,
+  );
+}
+
+String resolveReminderNextWeekStartAt(DateTime nowUtc) {
+  final nowValue = CseTimeCodec.encodeUtc(nowUtc);
+  final local = CseTimeCodec.toIstanbul(nowValue);
+  final today = CseTimeCodec.istanbulDayKey(nowValue);
+  final nextMonday = CseTimeCodec.shiftIstanbulDay(
+    today,
+    8 - local.weekday,
+  ).split('-');
+  return CseTimeCodec.canonicalFromIstanbulComponents(
+    year: int.parse(nextMonday[0]),
+    month: int.parse(nextMonday[1]),
+    day: int.parse(nextMonday[2]),
+    hour: 8,
+    minute: 0,
+  );
+}
+
+String? resolveReminderExactQuickScheduleAt(
+  ReminderScheduleKind schedule,
+  DateTime nowUtc,
+) => switch (schedule) {
+  ReminderScheduleKind.tomorrowMorning => resolveReminderTomorrowMorningAt(
+    nowUtc,
+  ),
+  ReminderScheduleKind.nextWeekStart => resolveReminderNextWeekStartAt(nowUtc),
+  _ => null,
+};
+
+String formatReminderExactSchedule(String canonicalUtc) {
+  final local = CseTimeCodec.toIstanbul(canonicalUtc);
+  final day = CseTimeCodec.istanbulDayKey(canonicalUtc);
+  return '${CseTimeCodec.formatIstanbulDay(day)} '
+      '${local.hour.toString().padLeft(2, '0')}:'
+      '${local.minute.toString().padLeft(2, '0')}';
 }
 
 enum ReminderViewGroup {

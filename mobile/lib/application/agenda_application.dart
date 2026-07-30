@@ -1727,9 +1727,7 @@ class SqliteAgendaApplication
             1,
           );
         } else {
-          values['next_attention_at'] = current.nextAttentionAt == null
-              ? _tomorrowMorning(now)
-              : _tomorrowAtSameLocalTime(current.nextAttentionAt!, now);
+          values['next_attention_at'] = resolveReminderTomorrowMorningAt(now);
           values['all_day_local_date'] = null;
         }
         return 'snoozed';
@@ -1850,8 +1848,7 @@ class SqliteAgendaApplication
     };
     final eligible = work
         .where(
-          (item) =>
-              dispositions[item] == _NotificationDisposition.schedulable,
+          (item) => dispositions[item] == _NotificationDisposition.schedulable,
         )
         .toList(growable: false);
     final preservedDeliveredOneTime = work
@@ -1875,25 +1872,22 @@ class SqliteAgendaApplication
           ? await notificationGateway.requestPermission()
           : await notificationGateway.permissionStatus();
     } on Object {
-      await _writeBindingUpdates(
-        now,
-        [
-          ...eligible.map(
-            (item) => _BindingUpdate(
-              reminderId: item.reminder.id,
-              scheduledFor: item.reminder.nextAttentionAt,
-              state: NotificationSyncState.unavailable,
-              safeErrorCode: 'plugin_unavailable',
-            ),
+      await _writeBindingUpdates(now, [
+        ...eligible.map(
+          (item) => _BindingUpdate(
+            reminderId: item.reminder.id,
+            scheduledFor: item.reminder.nextAttentionAt,
+            state: NotificationSyncState.unavailable,
+            safeErrorCode: 'plugin_unavailable',
           ),
-          ...terminalToClean.map(
-            (item) => _BindingUpdate(
-              reminderId: item.reminder.id,
-              state: NotificationSyncState.cancelled,
-            ),
+        ),
+        ...terminalToClean.map(
+          (item) => _BindingUpdate(
+            reminderId: item.reminder.id,
+            state: NotificationSyncState.cancelled,
           ),
-        ],
-      );
+        ),
+      ]);
       return;
     }
     if (permission != NotificationPermissionState.granted) {
@@ -1922,54 +1916,48 @@ class SqliteAgendaApplication
           'exact_alarm_permission_required',
         NotificationPermissionState.granted => null,
       };
-      await _writeBindingUpdates(
-        now,
-        [
-          ...eligible.map(
-            (item) => _BindingUpdate(
-              reminderId: item.reminder.id,
-              scheduledFor: item.reminder.nextAttentionAt,
-              state:
-                  permission == NotificationPermissionState.denied ||
-                      permission == NotificationPermissionState.channelDisabled
-                  ? NotificationSyncState.permissionDenied
-                  : NotificationSyncState.unavailable,
-              safeErrorCode: safeCode,
-            ),
+      await _writeBindingUpdates(now, [
+        ...eligible.map(
+          (item) => _BindingUpdate(
+            reminderId: item.reminder.id,
+            scheduledFor: item.reminder.nextAttentionAt,
+            state:
+                permission == NotificationPermissionState.denied ||
+                    permission == NotificationPermissionState.channelDisabled
+                ? NotificationSyncState.permissionDenied
+                : NotificationSyncState.unavailable,
+            safeErrorCode: safeCode,
           ),
-          ...terminalToClean.map(
-            (item) => _BindingUpdate(
-              reminderId: item.reminder.id,
-              state: NotificationSyncState.cancelled,
-            ),
+        ),
+        ...terminalToClean.map(
+          (item) => _BindingUpdate(
+            reminderId: item.reminder.id,
+            state: NotificationSyncState.cancelled,
           ),
-        ],
-      );
+        ),
+      ]);
       return;
     }
     List<PendingReminderNotification> pending;
     try {
       pending = await notificationGateway.pendingNotifications();
     } on Object {
-      await _writeBindingUpdates(
-        now,
-        [
-          ...eligible.map(
-            (item) => _BindingUpdate(
-              reminderId: item.reminder.id,
-              scheduledFor: item.reminder.nextAttentionAt,
-              state: NotificationSyncState.failed,
-              safeErrorCode: 'pending_query_failed',
-            ),
+      await _writeBindingUpdates(now, [
+        ...eligible.map(
+          (item) => _BindingUpdate(
+            reminderId: item.reminder.id,
+            scheduledFor: item.reminder.nextAttentionAt,
+            state: NotificationSyncState.failed,
+            safeErrorCode: 'pending_query_failed',
           ),
-          ...terminalToClean.map(
-            (item) => _BindingUpdate(
-              reminderId: item.reminder.id,
-              state: NotificationSyncState.cancelled,
-            ),
+        ),
+        ...terminalToClean.map(
+          (item) => _BindingUpdate(
+            reminderId: item.reminder.id,
+            state: NotificationSyncState.cancelled,
           ),
-        ],
-      );
+        ),
+      ]);
       return;
     }
     final capacity = notificationGateway.maximumPendingNotifications;
@@ -2571,7 +2559,11 @@ class SqliteAgendaApplication
           minute: 0,
         );
       case ReminderScheduleKind.tomorrowMorning:
-        nextAttentionAt = _tomorrowMorning(now);
+        nextAttentionAt = resolveReminderTomorrowMorningAt(now);
+        _validateExactQuickSchedulePreview(customAttentionAt, nextAttentionAt);
+      case ReminderScheduleKind.nextWeekStart:
+        nextAttentionAt = resolveReminderNextWeekStartAt(now);
+        _validateExactQuickSchedulePreview(customAttentionAt, nextAttentionAt);
       case ReminderScheduleKind.custom:
         final custom = customAttentionAt;
         if (custom == null) {
@@ -2598,29 +2590,20 @@ class SqliteAgendaApplication
     );
   }
 
-  String _tomorrowMorning(DateTime now) {
-    final today = CseTimeCodec.istanbulDayKey(CseTimeCodec.encodeUtc(now));
-    final tomorrow = CseTimeCodec.shiftIstanbulDay(today, 1).split('-');
-    return CseTimeCodec.canonicalFromIstanbulComponents(
-      year: int.parse(tomorrow[0]),
-      month: int.parse(tomorrow[1]),
-      day: int.parse(tomorrow[2]),
-      hour: 9,
-      minute: 0,
+  void _validateExactQuickSchedulePreview(
+    String? previewAttentionAt,
+    String resolvedAttentionAt,
+  ) {
+    if (previewAttentionAt == null) return;
+    validateCanonicalTimestamp(
+      previewAttentionAt,
+      'Gösterilen hızlı planlama zamanı',
     );
-  }
-
-  String _tomorrowAtSameLocalTime(String currentValue, DateTime now) {
-    final currentLocal = CseTimeCodec.toIstanbul(currentValue);
-    final today = CseTimeCodec.istanbulDayKey(CseTimeCodec.encodeUtc(now));
-    final tomorrow = CseTimeCodec.shiftIstanbulDay(today, 1).split('-');
-    return CseTimeCodec.canonicalFromIstanbulComponents(
-      year: int.parse(tomorrow[0]),
-      month: int.parse(tomorrow[1]),
-      day: int.parse(tomorrow[2]),
-      hour: currentLocal.hour,
-      minute: currentLocal.minute,
-    );
+    if (previewAttentionAt != resolvedAttentionAt) {
+      throw const AgendaValidationFailure(
+        'Gösterilen hızlı planlama zamanı artık geçerli değil. Yeniden seçin.',
+      );
+    }
   }
 
   bool _sameLogCommand(

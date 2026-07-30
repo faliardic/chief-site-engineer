@@ -196,7 +196,12 @@ class FakeAgendaApplication
           command.schedule == ReminderScheduleKind.inbox ||
               command.allDayLocalDate != null
           ? null
-          : command.customAttentionAt ?? '2026-07-19T09:00:00Z',
+          : command.customAttentionAt ??
+                resolveReminderExactQuickScheduleAt(
+                  command.schedule,
+                  asOfUtc,
+                ) ??
+                '2026-07-19T09:00:00Z',
       allDayLocalDate: command.allDayLocalDate,
       deadlineAt: command.deadlineAt,
       conditionText: command.conditionText?.trim(),
@@ -365,7 +370,14 @@ class FakeAgendaApplication
     };
     final scheduledAt = switch (command.action) {
       ReminderMutationAction.schedule =>
-        command.customAttentionAt ?? current.nextAttentionAt,
+        command.customAttentionAt ??
+            (command.schedule == null
+                ? null
+                : resolveReminderExactQuickScheduleAt(
+                    command.schedule!,
+                    asOfUtc,
+                  )) ??
+            current.nextAttentionAt,
       ReminderMutationAction.snooze15Minutes =>
         asOfUtc.add(const Duration(minutes: 15)).toIso8601String(),
       ReminderMutationAction.snooze1Hour =>
@@ -377,10 +389,8 @@ class FakeAgendaApplication
       ReminderMutationAction.snoozeTomorrowMorning
           when current.allDayLocalDate != null =>
         null,
-      ReminderMutationAction.snoozeTomorrowMorning => _tomorrowAtSameLocalTime(
-        current.nextAttentionAt!,
-        today,
-      ),
+      ReminderMutationAction.snoozeTomorrowMorning =>
+        resolveReminderTomorrowMorningAt(asOfUtc),
       _ => current.nextAttentionAt,
     };
     final trashedAt = switch (command.action) {
@@ -444,19 +454,6 @@ class FakeAgendaApplication
     return updated;
   }
 
-  String _tomorrowAtSameLocalTime(String currentValue, String today) {
-    final currentLocal = CseTimeCodec.toIstanbul(currentValue);
-    final tomorrow = CseTimeCodec.shiftIstanbulDay(today, 1).split('-');
-    return CseTimeCodec.canonicalFromIstanbulComponents(
-      year: int.parse(tomorrow[0]),
-      month: int.parse(tomorrow[1]),
-      day: int.parse(tomorrow[2]),
-      hour: currentLocal.hour,
-      minute: currentLocal.minute,
-      second: currentLocal.second,
-    );
-  }
-
   @override
   Future<void> reconcileNotifications({bool requestPermission = false}) async {}
 }
@@ -473,7 +470,5 @@ int _compareAgendaLogs(
   if (comparison == 0) {
     comparison = left.id.compareTo(right.id);
   }
-  return sortOrder == AgendaSortOrder.newestFirst
-      ? -comparison
-      : comparison;
+  return sortOrder == AgendaSortOrder.newestFirst ? -comparison : comparison;
 }

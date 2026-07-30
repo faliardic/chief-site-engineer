@@ -1,5 +1,26 @@
 # Proje Kararlari
 
+## Issue 277 — Hatırlatıcı Exact Hızlı Planlama Zamanları
+
+- `Yarın sabah` ve timed `Yarın 08:00`, operation anına göre
+  Europe/Istanbul ertesi gün yerel `08:00` değeridir. Timed snooze mevcut
+  hatırlatıcı saatini kopyalamaz.
+- `Hafta başına ertele`, içinde bulunulan günü değil her zaman sonraki
+  pazartesi yerel `08:00` değerini seçer; pazartesi günü sonuç `+7 gün`dür.
+- Domain katmanındaki saf resolver source-of-truth'tur. Form preview'si,
+  detail schedule sheet, create, reschedule ve timed snooze aynı resolver
+  ailesini kullanır.
+- UI seçim anındaki canonical preview'yi command'a taşır. Application,
+  operation anında değeri yeniden çözer; eşleşmiyorsa sessiz fallback yerine
+  fail-closed validation döndürür.
+- All-day `Yarına ertele` ayrı dalda yerel günü bir artırır;
+  `next_attention_at` ve saatli notification binding'i oluşturmaz.
+- Canonical reminder row, append-only event payload ve notification binding
+  aynı exact timestamp'i taşır. Schema `10`, backup formatı `1`, migration,
+  storage DDL, gateway ve Android native sözleşmeleri değişmez.
+- Tablet-only PASS bu Issue'nun fiziksel tamamlanma kapısıdır. Telefon
+  promotion ve D29.3'ün diğer maddeleri kapsam dışıdır.
+
 ## Issue 272 — Delivered One-Time Notification İzolasyonu
 
 - Native pending listesinde bulunmamak tek başına terminal kanıtı değildir.

@@ -4,6 +4,7 @@ import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 
 class ReminderFormPage extends StatefulWidget {
@@ -29,6 +30,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   String? _projectId;
   ReminderKind _kind = ReminderKind.action;
   ReminderScheduleKind _schedule = ReminderScheduleKind.in15Minutes;
+  String? _quickSchedulePreviewAt;
   late DateTime _customDate;
   TimeOfDay _customTime = const TimeOfDay(hour: 9, minute: 0);
   bool _allDay = false;
@@ -48,7 +50,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
     _recordId = RecordId.randomUuid();
     _eventId = RecordId.randomUuid();
     final local = CseTimeCodec.toIstanbul(
-      CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
+      CseTimeCodec.encodeUtc(clock.now().toUtc()),
     );
     _customDate = DateTime(local.year, local.month, local.day + 1);
     _deadlineDate = _customDate;
@@ -85,14 +87,16 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
       _error = null;
     });
     try {
-      final custom = _schedule == ReminderScheduleKind.custom && !_allDay
-          ? CseTimeCodec.canonicalFromIstanbulComponents(
-              year: _customDate.year,
-              month: _customDate.month,
-              day: _customDate.day,
-              hour: _customTime.hour,
-              minute: _customTime.minute,
-            )
+      final custom = !_allDay
+          ? _schedule == ReminderScheduleKind.custom
+                ? CseTimeCodec.canonicalFromIstanbulComponents(
+                    year: _customDate.year,
+                    month: _customDate.month,
+                    day: _customDate.day,
+                    hour: _customTime.hour,
+                    minute: _customTime.minute,
+                  )
+                : _quickSchedulePreviewAt
           : null;
       final deadline = _hasDeadline
           ? CseTimeCodec.canonicalFromIstanbulComponents(
@@ -182,12 +186,25 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
 
   void _selectAllDay(int dayDelta) {
     final local = CseTimeCodec.toIstanbul(
-      CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
+      CseTimeCodec.encodeUtc(clock.now().toUtc()),
     );
     setState(() {
       _customDate = DateTime(local.year, local.month, local.day + dayDelta);
       _schedule = ReminderScheduleKind.custom;
+      _quickSchedulePreviewAt = null;
       _allDay = true;
+    });
+  }
+
+  void _selectSchedule(ReminderScheduleKind schedule) {
+    final nowUtc = clock.now().toUtc();
+    setState(() {
+      _schedule = schedule;
+      _quickSchedulePreviewAt = resolveReminderExactQuickScheduleAt(
+        schedule,
+        nowUtc,
+      );
+      _allDay = false;
     });
   }
 
@@ -293,11 +310,16 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
                     ),
                   )
                   .toList(),
-              onChanged: (value) => setState(() {
-                _schedule = value!;
-                _allDay = false;
-              }),
+              onChanged: (value) => _selectSchedule(value!),
             ),
+            if (_quickSchedulePreviewAt case final preview?) ...[
+              const SizedBox(height: 8),
+              Text(
+                '${_schedule.label} — '
+                '${formatReminderExactSchedule(preview)}',
+                key: const Key('reminder-schedule-preview'),
+              ),
+            ],
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -329,10 +351,11 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
                 _allDay = value;
                 if (value) {
                   final local = CseTimeCodec.toIstanbul(
-                    CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
+                    CseTimeCodec.encodeUtc(clock.now().toUtc()),
                   );
                   _customDate = DateTime(local.year, local.month, local.day);
                   _schedule = ReminderScheduleKind.custom;
+                  _quickSchedulePreviewAt = null;
                 }
               }),
             ),
