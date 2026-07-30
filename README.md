@@ -1,299 +1,175 @@
 # CHIEF SITE ENGINEER
 
-CHIEF SITE ENGINEER (CSE), yalnız şantiye şefi tarafından kullanılan; not, takip, hatırlatıcı, hesap, fotoğraf, belge, günlük, arama ve proje hafızasını tek güvenilir akışta birleştiren local-first ve mobile-first **kişisel saha asistanı**dır.
+CHIEF SITE ENGINEER (CSE), şantiye şefinin dağınık saha bilgisini hızlı kayıt,
+kanıt, takip, arşiv ve devir düzenine taşıyan offline-first mobil uygulamadır.
+Güncel ürün Flutter ile geliştirilir; cihaz-içi SQLite ve uygulamaya özel yerel
+dosya alanını kullanır.
+
+Python/Flask çekirdeği repository içinde tarihsel ürün omurgası, sözleşme
+referansı ve geliştirici araçları için korunur. Mobil runtime bir Python/Flask
+sunucusuna bağlanmaz.
+
+## Güncel güvenli nokta
+
+Son birleşmiş ve tamamlanmış safe point:
+
+| Alan | Değer |
+| --- | --- |
+| Issue | `#277` |
+| Pull Request | `#278` |
+| Merge commit | `c72f6bc55fc658996a546d9833b85a2614b99327` |
+| Mobil sürüm | `0.1.0+1` |
+| SQLite schema | `10` |
+| `.csebackup` formatı | `1` |
+| Canonical timezone | `Europe/Istanbul` |
+| Android compile/target SDK | `36 / 36` |
+
+Issue #277 kanıtı focused lifecycle `48/48`, focused widget `46/46`, Beton
+regression `1/1`, full Flutter `333/333`, `flutter analyze` `0` ve Samsung
+`SM-X610` tablet wide smoke PASS sonucudur. Bu dar Issue için kullanıcı tablet
+PASS'i fiziksel tamamlanma kapısı seçti; telefon promotion yapılmadı.
+
+Bu kanıt test edilmiş merged davranışı gösterir. CSE henüz field-ready,
+production-ready veya store-released ilan edilmiş değildir.
+
+## Birleşmiş mobil yetenekler
+
+### Ajanda
+
+- Proje, gün, tür, aktif/arşiv, literal arama ve deterministik yeni/eski
+  sıralama.
+- Geçmiş saha zamanı, kaynak fotoğrafları ve güvenli attachment integrity yolu.
+- Beton sinyalinden kullanıcı kontrollü öneri ve aynı proje/gün bağlamıyla
+  Beton oluşturma deep-link'i; otomatik saha kararı veya paket üretimi yoktur.
+- Detail dönüşünde route-local filtre, arama ve scroll bağlamı korunur; arama
+  odağı ve klavye yalnız kullanıcı niyetiyle etkinleşir.
+
+### Hatırlatıcı
+
+- Ajanda, Puantaj ve Beton kaynak bağları; standalone reminder desteği.
+- Schedule/reschedule, waiting, inbox, complete/cancel, reopen, çöp/geri
+  yükleme ve append-only lifecycle geçmişi.
+- `Yarına ertele`, iki/üç saat, ertesi gün `08:00` ve sonraki pazartesi `08:00`
+  hızlı planlama davranışları.
+- Source-of-truth SQLite ile Android/iOS pending notification reconciliation;
+  bir reminder mutation'ının ilgisiz reminder bildirimini silmemesi için
+  izolasyon.
+- Reminder detayında kaynak Ajanda fotoğraflarının salt-okunur görünümü.
+
+### Puantaj
+
+- Proje personeli, ekip/taşeron, tam/yarım gün, gelmedi/izin, fazla mesai ve
+  notlar.
+- Taslak, tamamlandı, çalışma yok ve explicit reopen yaşam döngüsü.
+- Gün/ekip toplamları, CSV paylaşımı ve kaynağa bağlı çalışma günü
+  hatırlatıcıları.
+
+### Beton
+
+- Proje bazlı Beton sınıfı kataloğu ve legacy değerler için deterministik
+  schema `10` migration'ı.
+- Paket oluşturma; planlanan/gerçek zaman çizgisi; required checklist,
+  mikser/irsaliye, numune, takip ve kapanış blocker'ları.
+- System-owned checklist kalemleri, optimistic revision, append-only event ve
+  transaction içinde yönetilen Ajanda projeksiyonu.
+- JPEG/PNG/HEIC/PDF kanıtı için MIME sniff, boyut/hash kontrolü, atomik staging
+  ve orphan cleanup.
+- İnsan-okunabilir paket raporu, CSV/JSON-ready özet ve attachment manifesti.
+
+### Hafıza ve yedekleme
+
+- Mobil SQLite ve aktif kanıtları tek `.csebackup` format `1` paketine alan
+  şifreli backup.
+- PBKDF2-HMAC-SHA256 anahtar türetme, AES-256-GCM authenticated encryption,
+  hash/size/integrity kontrolleri ve atomik finalize.
+- Restore preflight, traversal/symlink/extra-entry reddi, desteklenen eski
+  schema'ların yalnız staging'de schema `10`a migration'ı, safety backup,
+  journal ve fail-closed rollback.
+- Secret, parola, absolute kullanıcı yolu ve signing materyali state ya da
+  manifest içine yazılmaz.
+
+## Uygulanan ve uygulanmayan iş sınırı
+
+| Durum | Kayıt | Ürün gerçeği |
+| --- | --- | --- |
+| Birleşmiş safe point | Issue `#277`, PR `#278` | Uygulanmış ve doğrulanmış |
+| Aktif, duraklatılmış | Issue `#279` | README/NotebookLM senkronu için paused; birleşmemiş davranış uygulanmış sayılmaz |
+| Açık Draft altyapı | PR `#259` | Conflicting; physical smoke acceptance harness birleşmiş değildir |
+| Açık pilot/release işleri | Issues `#245`, `#254`, `#256`, `#257` | Plan/altyapı kaydı; merged ürün özelliği değildir |
+
+Issue #279 dalındaki fail-closed widget blocker'ı, bu safe point'in ve README'de
+anlatılan birleşmiş davranışın parçası değildir. PR #259 da ayrı bir Draft
+altyapı çalışmasıdır; mobil ürün capability'si gibi sunulmaz.
+
+## Repository yapısı
 
 ```text
-Araç bakımından geniş
-Kullanıcı modeli bakımından tek sahipli
+mobile/                 Flutter Android/iOS uygulaması
+src/                    Python/Flask tarihsel çekirdek ve destek kodu
+tests/                  Python doğrulama suite'i
+scripts/                Deterministik geliştirici ve release araçları
+docs/                   Protokoller, kararlar, podcast ve öğrenim belgeleri
+.cse/state/             Küçük canonical proje durumu
+.cse/tasks/             Issue yürütme sözleşmeleri
+.cse/results/           Issue doğrulama ve tamamlama kanıtları
 ```
 
-Ana çalışma döngüsü:
+## Geliştirici başlangıcı
 
-```text
-Yakala -> İşle -> Takip et -> Doğrula -> Günlüğe al
-```
-
-CSE büyük inşaat yönetim platformlarının küçültülmüş kopyası veya kurumsal ortak çalışma platformu değildir. Uygulamaya yalnız şantiye şefi girer. Şirket, taşeron, işveren, yapı denetim ve diğer kişiler sistem kullanıcısı değil; kişi, firma, bildirilen taraf, sorumlu taraf veya belge kaynağı gibi kayıt referanslarıdır.
-
-Ürün filtresi şudur:
-
-> Bu özellik şantiye şefinin sahada unutmamasını, kanıtlamasını, takip etmesini, raporlamasını veya daha sonra geri çağırmasını kolaylaştırıyor mu?
-
-## Mobil uygulama
-
-`mobile/` altında Flutter/Dart tabanlı Android ve iOS uygulaması bulunur.
-Telefon ilk mobil sürümde ana veri cihazıdır; günlük kullanım bilgisayar,
-Flask sunucusu, LAN veya internet gerektirmez. Issue #180 runtime temelini,
-Issue #179 ilk gerçek Ajanda dilimini, Issue #183 bağımsız reminder yaşam
-döngüsü ve yerel notification teslimini, Issue #185 ise günlük Puantaj ve proje
-personeli iş akışını, Issue #187 ise döküm planından kapanış raporuna mobil
-Beton Paketi'ni, Issue #189 ise parola korumalı tam mobil yedek ve atomik geri
-yüklemeyi, Issue #191 ise API 36/16 KiB, minimum izin, privacy, process-death
-recovery ve secretsız release candidate kapılarını sağlar.
-
-Mobil temel şunları içerir:
-
-- Android ve iOS platform projeleri;
-- Başlangıç, Hatırlatıcı, Ajanda, Puantaj ve Beton Paketi navigasyon kabuğu;
-- Ajanda'da İstanbul gün sınırı, gün navigasyonu, proje/tür/literal filtreler,
-  geçmiş log oluşturma, detay ve boş gün görünümü;
-- logdan project/source bağlantılı Unutma Kutusu veya zamanlı hatırlatıcı;
-- bağımsız `+ Unutma`, sekiz reminder görünümü, tam tek-seferlik yaşam döngüsü,
-  revision conflict ve append-only event geçmişi;
-- Android/iOS timezone-aware yerel bildirim, tap deep-link ve bootstrap pending
-  reconciliation;
-- proje personeli, günlük Puantaj, ekip/kişi-gün/fazla mesai toplamları ve
-  linked Puantaj reminder yaşam döngüsü;
-- UTF-8/formula-safe günlük Puantaj CSV'si ve insan-okunabilir özet;
-- döküm checklist'i, mikser/irsaliye kanıtları, numune/laboratuvar ve kür takibi;
-- UTF-8/formula-safe Beton Paketi raporu ve SHA-256 kanıt manifesti;
-- bütün mobil SQLite ve aktif kanıt dosyaları için authenticated `.csebackup`;
-- salt-okunur preflight, otomatik safety backup, tam replace ve rollback;
-- cihaz-içi SQLite schema `5`, sürümlü ve atomik migration geçmişi;
-- restart sonrasında korunan smoke kayıt;
-- UTC seconds storage ve `Europe/Istanbul` sunumu;
-- debug/release için ayrı application identity ve veri kökü;
-- attachment, notification, permission ve export için güvenli platform portları;
-- Ajanda/Reminder/Puantaj/Beton/backup için ortak işlem koordinatörü;
-- API 36, ARM64/16 KiB, merged manifest ve privacy manifest release kapıları;
-- restore process-death journal ve bootstrap öncesi fail-closed recovery;
-- Türkçe/İngilizce privacy ile Play/Apple beyan kanıt paketi.
-
-Bu dilim genel PackageTemplate motorunun veya otomatik beton kabul/red kararının
-tamamlandığı anlamına gelmez. Cloud sync, kullanıcı hesabı,
-push/server notification ve masaüstü verisinin otomatik taşınması yoktur. Mobil
-geliştirme ve build komutları
-[`mobile/README.md`](mobile/README.md) içindedir.
-
-## Normal kullanım
-
-Windows'ta repository kökündeki `CSE_Baslat.cmd` dosyasına çift tıklayın. Başlatıcı:
-
-- veriyi varsayılan olarak `%LOCALAPPDATA%\ChiefSiteEngineer\data` altında tutar;
-- logları `%LOCALAPPDATA%\ChiefSiteEngineer\logs` altında tutar;
-- uygun bir local port seçer ve hazır olduğunda tarayıcıyı açar;
-- mevcut veri kökünü sessizce taşımaz veya silmez.
-
-Belirli bir veri köküyle çalıştırmak için:
+Python doğrulaması:
 
 ```powershell
-CSE_Baslat.cmd --data-root C:\mevcut-cse-data
+python -m pytest
 ```
 
-Geliştirici çalıştırması:
+NotebookLM rolling source:
 
 ```powershell
-python -m pip install -r requirements.txt
-python -m app.web --data-root C:\cse-data
+python -m pytest tests/test_notebooklm_podcast_source.py
+python scripts/build_notebooklm_podcast_source.py
 ```
 
-Uygulama varsayılan olarak yalnız `127.0.0.1` loopback adresinde açılır. Loopback dışı kullanım açık `--allow-network` seçimi gerektirir; mevcut MVP authentication, authorization veya TLS içermediği için public internet üzerinde yayınlanmamalıdır.
-
-## Merge edilmiş güncel kabiliyetler
-
-Bu branch'in başladığı son doğrulanmış `master` güvenli noktası:
-
-```text
-Issue #185
-PR #186
-merge commit 2ee2faf4c02889b35a6392f9359e11b5cc8b4b55
-```
-
-Son production kabiliyet dilimi Issue #119 / PR #126 ile merge edilmiştir.
-Issue #141–#169 arasındaki Faz 0 işleri repository truth, ADR, envanter, pilot
-protokolü ve güvenlik modeli üretmiş; production davranışını değiştirmemiştir.
-
-Local Field MVP bugün şunları sağlar:
-
-- SQLite persistence ve sürümlü migration runner;
-- managed attachment store, güvenli path üretimi ve bütünlük doğrulaması;
-- local Flask web akışı;
-- proje oluşturma;
-- saha gözlemi oluşturma, listeleme, arama, ayrıntı görüntüleme ve revision kontrollü güncelleme;
-- gözlem durum ve bildirim bilgilerinin güncellenmesi;
-- revision conflict koruması;
-- günlük Markdown/CSV/JSON export paketi;
-- SQLite snapshot tabanlı backup, backup doğrulama ve yalnız yeni hedefe izole restore;
-- Windows tek tık launcher;
-- Saha Takibi v0.1 domain kayıtları ve saf `Europe/Istanbul` recurrence hesapları;
-- SQLite schema 4 içinde Saha Takibi repository ve append-only event persistence altyapısı;
-- Saha Takibi transactional application service'leri ve yedi günlük idempotent lazy backfill;
-- schema 2/3 backup'larını schema 4'e güvenli restore etme ve schema 4 tracking round-trip doğrulaması;
-- kişisel follow-up/routine verisini resmî günlük export'tan ayrı tutan executable izolasyon regresyonu;
-- `/today` başlangıç ekranı ile Şimdi ilgilen, Gecikenler, Bugün ve Bugünkü rutinler görünümleri;
-- hızlı `+ Unutma`, Unutma Kutusu ve follow-up ayrıntı/yaşam döngüsü işlemleri;
-- rutin oluşturma, listeleme, ayrıntı, pasifleştirme ve occurrence sonuçlandırma/erteleme/yeniden açma yüzeyleri;
-- restart sonrasında aynı SQLite verisi, revision ve append-only event geçmişi kalıcılığı.
-
-İlk test edilebilir PC Saha Takibi yüzeyi merge edilmiştir. Bağlayıcı yürütme
-programı GitHub Issue #127, faz backlog'u Issue #128–#140'tır. Faz 0 closure
-Issue #171 / PR #172 ile merge edilmiştir. Faz 1'in ilk dar production işi
-Issue #173 olay zamanı sözleşmesi ve salt-okunur migration preflight'ı, Issue
-#175 ise geriye dönük observation create sözleşmesini tamamlamıştır. Issue #180
-/ PR #181 mobil runtime temelini, Issue #179 / PR #182 mobil Ajanda günlük logu
-ve logdan bağlı hatırlatıcı dilimini, Issue #183 / PR #184 bağımsız hızlı
-reminder, tam yaşam döngüsü ve Android/iOS yerel notification teslimini, Issue
-#185 / PR #186 proje personeli ve günlük Puantajı, Issue #187 / PR #188 Beton
-döküm planı, mikser/irsaliye kanıtı, numune, kür/reminder ve kapanış raporunu
-merge etmiştir. Issue #189 / PR #190 parola korumalı tam mobil yedek, güvenli
-preflight, safety backup ve atomik geri yüklemeyi merge etmiştir. Issue #191
-branch'inde mobil release candidate hardening uygulanmıştır; recurring routine,
-cloud sync, uygulama kilidi, gerçek saha kabulü ve store submission henüz
-tamamlanmamıştır.
-
-## Saha Takibi v0.1
-
-Merge edilmiş Saha Takibi çekirdeğinin bağlayıcı davranışları
-[Saha Takibi v0.1 sözleşmesinde](docs/field_tracking_v0_1_contract.md) korunur.
-Güncel sıradaki ürün işi Issue #173 ile Faz 1 / P1.01'dir.
-
-Kullanıcı yüzeyi:
-
-```text
-Saha Takibi
-+ Unutma
-```
-
-Hızlı yakalamada kullanıcıdan alınan tek zorunlu içerik `Ne unutulmamalı?` metnidir; hedef ortanca yakalama süresi 8 saniyenin altındadır.
-
-Değişmez sınırlar:
-
-- açık konu ya sonuçlandırılır ya da ne zaman yeniden görüneceği bellidir;
-- `next_attention_at` gerçek `deadline_at` ile aynı değildir;
-- bildirimi kapatmak işi tamamlamaz;
-- kişisel takip ile resmî saha gözlemi ayrıdır;
-- projeye bağlamak kişisel takibi otomatik resmî yapmaz;
-- resmî gözleme dönüşüm açık kullanıcı işlemidir;
-- hard delete yoktur;
-- geçmiş rutin gerçekleşmeleri template değişikliğiyle yeniden yazılmaz.
-
-Bugünkü local MVP'de uygulama kilidi veya şifreli veri katmanı bulunmadığı için “kişisel” tanımı başka cihaz/işletim sistemi kullanıcılarına karşı cryptographic privacy iddiası değildir. Ayrım bir erişim rolü değil, çıktı kapsamıdır:
-
-```text
-Kişisel çalışma verisi
--> resmî export/devir dışında
-
-Proje/resmî kayıt
--> açık kullanıcı işlemiyle günlük, rapor veya devir çıktısına alınabilir
-```
-
-Tek kullanıcı kararı güvenliği kaldırmaz. Uzun vadeli güvenlik yönü; uygulama kilidi ve mümkünse cihaz biyometrisi, güvenilen cihazlar, şifreli backup, owner-only telefon-PC senkronizasyonu, güvenli yerel ağ erişimi ve veri sahibinin açık export/devir işlemidir. Public internet, kurumsal identity provider, role-based access veya tenant mimarisi ürün hedefi değildir.
-
-## Operasyon komutları
-
-Günlük export:
+Flutter geliştirme:
 
 ```powershell
-python -m app.ops export-daily --data-root C:\cse-data --date 2026-07-15 --output C:\exports\daily.zip
+cd mobile
+flutter pub get
+flutter analyze
+flutter test
+flutter build apk --debug
 ```
 
-Backup ve doğrulama:
+Bu komutların tamamı her dar Issue için otomatik zorunlu değildir. Current
+Issue sözleşmesi ve
+`docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`, değişen riske
+uygun minimum yeterli doğrulamayı belirler.
 
-```powershell
-python -m app.ops backup --data-root C:\cse-data --output C:\backups\field.csebackup.zip
-python -m app.ops verify-backup --archive C:\backups\field.csebackup.zip
-```
+## Android ve iOS sınırı
 
-İzole restore:
+Android release kimliği `com.faliardic.chiefsiteengineer`, debug kimliği
+`com.faliardic.chiefsiteengineer.debug`dır. Android uygulaması camera,
+notification, reboot ve user-managed exact alarm erişimini kendi dar
+sözleşmeleri için kullanır; broad storage/media ve `INTERNET` izni merged
+manifestte yoktur.
 
-```powershell
-python -m app.ops restore --archive C:\backups\field.csebackup.zip --target-root C:\cse-restored
-python -m app.web --data-root C:\cse-restored
-```
+iOS project/scheme ve kimlikler tracked durumdadır; gerçek archive/TestFlight
+yalnız macOS, Xcode, Apple Developer hesabı ve repository dışında tutulan
+signing materyaliyle üretilebilir.
 
-Ayrıntılı kullanım için [Local Field MVP operasyon belgesine](docs/operations/local_field_mvp_v0.1.md) bakın.
+Release/signing ayrıntıları:
+[`docs/release/mobile_identity_signing_and_rc.md`](docs/release/mobile_identity_signing_and_rc.md).
 
-## Kurulum ve test
+## Dokümantasyon ve podcast
 
-Python 3.12 veya daha yeni bir sürüm önerilir.
+- Güncel roadmap: [`ROADMAP.md`](ROADMAP.md)
+- Değişiklik geçmişi: [`CHANGELOG.md`](CHANGELOG.md)
+- Teknik kararlar: [`docs/project_decisions.md`](docs/project_decisions.md)
+- Mobil ayrıntılar: [`mobile/README.md`](mobile/README.md)
+- Podcast protokolü:
+  [`docs/podcast_notes/README.md`](docs/podcast_notes/README.md)
+- Stable NotebookLM source:
+  [`docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md`](docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md)
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-python -m pytest -rs
-```
-
-Issue #171 closure baseline'ında doğrulanan full-suite sonucu:
-
-```text
-983 passed, 7 skipped
-```
-
-Yedi skip, Windows ortamında symlink oluşturma ayrıcalığı bulunmayan mevcut güvenlik testleridir.
-
-## Faz 0 kanonik karar belgeleri
-
-Faz 0'ın dört ADR'si ayrı sorumluluk taşır ve hiçbiri tek başına production
-implementation kanıtı değildir:
-
-- [ADR-0001 — Tek Hafıza ve kayıt kapsamı](docs/adr/ADR-0001-single-memory-and-record-scope.md)
-- [ADR-0002 — MemoryIndex / RecordRef read-model](docs/adr/ADR-0002-memory-index-record-ref-read-model.md)
-- [ADR-0003 — Backup, Hafızayı İndir ve Proje Paketi ayrımı](docs/adr/ADR-0003-backup-memory-download-project-package.md)
-- [ADR-0004 — Owner-only güvenlik ve veri sahipliği tehdit modeli](docs/adr/ADR-0004-owner-only-security-and-data-ownership-threat-model.md)
-
-Faz 0 merged kanıtı, current production ayrımı ve Faz 1 kapısı
-[closure doğrulamasında](docs/171_phase_0_closure_validation.md) birlikte
-gösterilir.
-
-## Zaman sözleşmesi ve migration preflight
-
-Issue #173 ile yeni kalıcı timestamp üretimi timezone-aware UTC
-`YYYY-MM-DDTHH:MM:SSZ`, kullanıcı sunumu ise `Europe/Istanbul` olarak
-merkezileştirilmiştir. `observed_at` / `occurred_at` olay anı, `created_at` ilk
-kalıcı giriş ve `updated_at` son başarılı mutation anlamındadır. Naive değer
-sessizce UTC sayılmaz.
-
-Migration preflight yalnız koddan açıkça verilen `temporary` veya `test` SQLite
-dosyasını `mode=ro` + `query_only` ile inceler. Schema 2/3/4 timestamp
-kolonlarının count/min/max/mapping/warning/blocker bilgisini JSON-ready ve
-veri-minimal raporlar; migration veya row rewrite yapmaz. Aktif data root için
-otomatik keşif ya da kullanıcı komutu eklenmemiştir. Ayrıntılar
-[Issue #173 sözleşmesindedir](docs/173_time_contract_and_migration_preflight.md).
-
-## Bilinçli sınırlar
-
-Mevcut uygulama:
-
-- local ve tek kullanıcı odaklıdır;
-- public internet için uygun değildir;
-- mobil özellik dilimlerini, cloud sync veya owner-only cihaz senkronizasyonunu içermez;
-- background notification delivery içermez; yalnız güvenli zamanlama portu vardır;
-- uygulama kilidi, authentication, authorization veya TLS içermez;
-- gerçek saha pilotu ve kabulü tamamlanmadığı için field-ready veya production-ready olarak tanımlanmaz.
-
-`local-first`, `Windows-first` demek değildir. Verinin şantiye şefine ait olduğu ve kendi cihazlarında çalıştığı anlamına gelir. Mobil runtime, offline davranış, notification ve owner-only telefon-PC senkronizasyonu; çok kullanıcılı auth veya cloud collaboration ile aynı uzak hedef değildir.
-
-## Uygulanabilir geliştirme programı
-
-Bağlayıcı ürün Epic'i #105, Saha Takibi Epic'i #97 ve uygulanabilir yürütme programı Issue #127'dir. Faz backlog'u bağımlılık sırasıyla şöyledir:
-
-- Issue #128 — Faz 0: repository truth, ADR'ler ve yürütme zemini;
-- Issue #129 — Faz 1: Güvenilir Hafıza yaşam döngüsü ve ortak kayıt görünümü;
-- Issue #130 — Faz 2: Tam Hafıza İndirme, doğrulama ve kurtarma standardı;
-- Issue #131 — Faz 3: mobil runtime, offline güvenilirlik ve gerçek saha pilotları;
-- Issue #132 — Faz 4: şantiye komuta merkezi, ortak timeline ve haftalık özet;
-- Issue #133 — Faz 5: doküman, rapor ve çizim merkezi;
-- Issue #134 — Faz 6: Şantiye İş Planı Lite ve iki haftalık lookahead;
-- Issue #135 — Faz 7: İş Paketi Motoru ve Beton İş Paketi;
-- Issue #136 — Faz 8: saha hesap araçları ve yönlendirmeli manuel metraj;
-- Issue #137 — Faz 9: PDF-first çizim destekli metraj ve doğrulama;
-- Issue #138 — Faz 10: haricî uygulama, cihaz paylaşımı ve güvenli içe aktarma bağlantıları;
-- Issue #139 — Faz 11: deterministik arama, semantik geri çağırma ve kaynaklı AI;
-- Issue #140 — Faz 12: owner-only güvenlik, bakım, güncelleme ve ürünleştirme.
-
-Bu backlog'un açık olması bütün fazların aynı anda aktif olduğu anlamına gelmez.
-Aynı anda yalnız bir production implementation görevi yürütülür. Faz 0 Issue
-#171 / PR #172 ile kapanmış, Issue #173 Faz 1 P1.01 olarak başlamıştır. Bu iş
-`scope`, archive/unarchive, `MemoryIndex`, Hafıza UI, schema migration veya yeni
-artifact ailesi uygulamaz.
-
-## Kaynak otoritesi
-
-- Kalıcı ürün yönü: `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
-- Git/GitHub/Codex güvenliği: `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
-- Aktif görev kapsamı: current GitHub Issue
-- Değişken repository durumu: GitHub `master`, PR, Issue ve branch kanıtı
-- Yerel factual mirror: `.cse/state/project_state.json`
-
-README, ROADMAP, eski ZIP, handoff veya `.cse/state`, güncel GitHub kanıtıyla çelişirse GitHub repository gerçeğinin yerine geçmez.
+Podcast 036, legacy Adım 001–225 döneminden Issue tabanlı döneme geçer ve
+Issue #227–#277 arasındaki gerçek CHANGELOG bölümlerini kapsar. Eksik Issue
+numaraları tamamlanmış iş gibi uydurulmaz.

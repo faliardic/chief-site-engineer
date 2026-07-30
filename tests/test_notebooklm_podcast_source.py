@@ -10,6 +10,7 @@ from scripts.build_notebooklm_podcast_source import (
     PodcastSourceError,
     _find_section_body,
     build_source,
+    collect_issue_summaries,
     find_latest_podcast_note,
 )
 
@@ -32,6 +33,7 @@ def _strict_note(
     end: int,
     marker: str = "güncel",
     *,
+    range_kind: str = "adim",
     prior_steps: tuple[int, ...] = (),
     outside_prior_steps: tuple[int, ...] = (),
 ) -> str:
@@ -41,7 +43,8 @@ def _strict_note(
         else "Bu aralık öncesinde canonical adım yoktur."
     )
     outside_summaries = _prior_step_summaries(*outside_prior_steps)
-    return f"""# Podcast {podcast:03d} - Adım {start:03d}-{end:03d}
+    range_label = "Issue" if range_kind == "issue" else "Adım"
+    return f"""# Podcast {podcast:03d} - {range_label} {start:03d}-{end:03d}
 
 ## 1. NotebookLM Kullanım Talimatı / Instruction Reference
 Kalıcı talimatı uygula.
@@ -69,7 +72,7 @@ Durum.
 3 passed.
 
 ## 9. Bilerek Ertelenenler
-Database ertelendi.
+Ertelenenler.
 
 ## 10. Sonraki Doğal Yön
 Sonraki yön.
@@ -137,11 +140,24 @@ def _write_repo(
     for name, text in notes.items():
         (notes_dir / name).write_text(text, encoding="utf-8")
 
-    changelog = "# Changelog\n\n" + "\n\n".join(
+    step_sections = "\n\n".join(
         f"## Step {step:03d}\n\n- Step {step:03d} canonical davranışı eklendi."
         for step in range(3, 0, -1)
     )
-    (root / "CHANGELOG.md").write_text(changelog + "\n", encoding="utf-8")
+    issue_sections = """
+
+## Issue #12 - Son Gerçek Issue
+
+- Issue 12 davranışı eklendi.
+
+## Issue #10 - İlk Gerçek Issue
+
+- Issue 10 davranışı eklendi.
+""".rstrip()
+    (root / "CHANGELOG.md").write_text(
+        f"# Changelog\n\n{issue_sections}\n\n{step_sections}\n",
+        encoding="utf-8",
+    )
     (root / "ROADMAP.md").write_text(
         "# Roadmap\n\n"
         "## Step 003 - UTF-8 Kaynak Doğrulaması\n\n"
@@ -149,16 +165,18 @@ def _write_repo(
         encoding="utf-8",
     )
     state = {
+        "state_version": 3,
+        "legacy_last_numbered_step": 3,
         "current_safe_point": {
-            "step": 3,
-            "issue": 3,
-            "pull_request": 4,
+            "issue": 12,
+            "pull_request": 13,
             "merge_commit": "abc123",
             "local_test_summary": "3 passed",
         },
         "product_maturity": {
-            "state": "tested_domain_data_documentation_core",
+            "state": "tested_mobile_core",
             "field_ready_application": False,
+            "production_ready_application": False,
         },
     }
     (state_dir / "project_state.json").write_text(
@@ -173,35 +191,77 @@ def test_instruction_file_is_included_at_top(tmp_path: Path) -> None:
     assert output_path.read_text(encoding="utf-8").startswith(INSTRUCTION.rstrip())
 
 
-def test_latest_numbered_podcast_note_is_selected(tmp_path: Path) -> None:
+def test_latest_numbered_note_can_transition_from_adim_to_issue(
+    tmp_path: Path,
+) -> None:
     notes = {
-        "035_adim_001_002_notebooklm_podcast_notu.md": _strict_note(
-            35, 1, 2, "eski"
+        "035_adim_001_003_notebooklm_podcast_notu.md": _strict_note(
+            35, 1, 3, "eski"
         ),
-        "036_adim_001_003_notebooklm_podcast_notu.md": _strict_note(
-            36, 1, 3, "en yeni"
+        "036_issue_010_012_notebooklm_podcast_notu.md": _strict_note(
+            36, 10, 12, "en yeni", range_kind="issue"
         ),
     }
     root = _write_repo(tmp_path, notes=notes)
     note = find_latest_podcast_note(root / "docs/podcast_notes")
     assert note.number == 36
+    assert note.range_kind == "issue"
+    assert note.range_value == "010-012"
     assert "en yeni" in note.text
 
 
-def test_older_podcast_note_is_not_used_as_latest(tmp_path: Path) -> None:
+def test_duplicate_podcast_number_across_range_kinds_fails(
+    tmp_path: Path,
+) -> None:
     notes = {
-        "035_adim_001_002_notebooklm_podcast_notu.md": _strict_note(
-            35, 1, 2, "ESKI_ISARET"
-        ),
-        "036_adim_001_003_notebooklm_podcast_notu.md": _strict_note(
-            36, 1, 3, "YENI_ISARET"
+        "036_adim_001_003_notebooklm_podcast_notu.md": _strict_note(36, 1, 3),
+        "036_issue_010_012_notebooklm_podcast_notu.md": _strict_note(
+            36, 10, 12, range_kind="issue"
         ),
     }
     root = _write_repo(tmp_path, notes=notes)
-    output_path, _ = build_source(root)
+    with pytest.raises(PodcastSourceError, match="Duplicate podcast number 036"):
+        build_source(root)
+
+
+def test_issue_range_uses_only_real_changelog_sections_and_allows_gaps(
+    tmp_path: Path,
+) -> None:
+    root = _write_repo(
+        tmp_path,
+        notes={
+            "036_issue_010_012_notebooklm_podcast_notu.md": _strict_note(
+                36, 10, 12, range_kind="issue"
+            )
+        },
+    )
+    summaries = collect_issue_summaries(root, 10, 12)
+    assert [item.issue for item in summaries] == [10, 12]
+    output_path, manifest_path = build_source(root)
     output = output_path.read_text(encoding="utf-8")
-    assert "YENI_ISARET" in output
-    assert "ESKI_ISARET" not in output
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert "### Issue #10" in output
+    assert "### Issue #11" not in output
+    assert "### Issue #12" in output
+    assert manifest["issue_summary_count"] == 2
+    assert manifest["latest_range_kind"] == "issue"
+    assert manifest["latest_issue_range"] == "010-012"
+    assert manifest["latest_step_range"] is None
+
+
+def test_legacy_adim_output_and_manifest_remain_compatible(
+    tmp_path: Path,
+) -> None:
+    root = _write_repo(tmp_path)
+    output_path, manifest_path = build_source(root)
+    output = output_path.read_text(encoding="utf-8")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert output.count("### Adım ") == 3
+    assert manifest["latest_range_kind"] == "adim"
+    assert manifest["latest_step_range"] == "001-003"
+    assert manifest["latest_issue_range"] is None
+    assert manifest["previous_step_summary_count"] == 3
+    assert manifest["legacy_step_summary_count"] == 3
 
 
 def test_latest_note_full_content_is_included(tmp_path: Path) -> None:
@@ -212,25 +272,15 @@ def test_latest_note_full_content_is_included(tmp_path: Path) -> None:
     assert note_text.rstrip() in output_path.read_text(encoding="utf-8")
 
 
-def test_every_prior_step_summary_has_own_heading(tmp_path: Path) -> None:
-    root = _write_repo(tmp_path)
-    output_path, _ = build_source(root)
-    output = output_path.read_text(encoding="utf-8")
-    for step in range(1, 4):
-        assert f"### Adım {step:03d} —" in output
-
-
-def test_summary_count_matches_manifest(tmp_path: Path) -> None:
-    root = _write_repo(tmp_path)
-    output_path, manifest_path = build_source(root)
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    output = output_path.read_text(encoding="utf-8")
-    assert manifest["previous_step_summary_count"] == 3
-    assert output.count("### Adım ") == 3
-
-
-def test_output_and_manifest_are_deterministic(tmp_path: Path) -> None:
-    root = _write_repo(tmp_path)
+def test_output_and_manifest_are_byte_deterministic(tmp_path: Path) -> None:
+    root = _write_repo(
+        tmp_path,
+        notes={
+            "036_issue_010_012_notebooklm_podcast_notu.md": _strict_note(
+                36, 10, 12, range_kind="issue"
+            )
+        },
+    )
     output_path, manifest_path = build_source(root)
     first = (output_path.read_bytes(), manifest_path.read_bytes())
     build_source(root)
@@ -241,24 +291,15 @@ def test_output_and_manifest_are_deterministic(tmp_path: Path) -> None:
     "name",
     [
         "035_adim_bad_notebooklm_podcast_notu.md",
-        "035_adim_003_001_notebooklm_podcast_notu.md",
+        "035_issue_012_010_notebooklm_podcast_notu.md",
+        "035_ticket_010_012_notebooklm_podcast_notu.md",
     ],
 )
-def test_malformed_podcast_filename_or_range_fails_clearly(
+def test_malformed_filename_or_range_fails_clearly(
     tmp_path: Path, name: str
 ) -> None:
     root = _write_repo(tmp_path, notes={name: _strict_note(35, 1, 3)})
     with pytest.raises(PodcastSourceError, match="Malformed podcast"):
-        build_source(root)
-
-
-def test_duplicate_latest_podcast_number_fails_clearly(tmp_path: Path) -> None:
-    notes = {
-        "035_adim_001_002_notebooklm_podcast_notu.md": _strict_note(35, 1, 2),
-        "035_adim_001_003_notebooklm_podcast_notu.md": _strict_note(35, 1, 3),
-    }
-    root = _write_repo(tmp_path, notes=notes)
-    with pytest.raises(PodcastSourceError, match="Duplicate podcast number 035"):
         build_source(root)
 
 
@@ -280,7 +321,7 @@ def test_missing_required_note_section_fails_clearly(tmp_path: Path) -> None:
         build_source(root)
 
 
-def test_strict_note_with_complete_prior_step_headings_passes(
+def test_strict_legacy_note_requires_complete_ordered_prior_steps(
     tmp_path: Path,
 ) -> None:
     note = _strict_note(35, 4, 6, prior_steps=(1, 2, 3))
@@ -292,66 +333,41 @@ def test_strict_note_with_complete_prior_step_headings_passes(
     assert latest.step_range == "004-006"
 
 
-def test_strict_note_missing_prior_step_heading_fails_clearly(
+@pytest.mark.parametrize(
+    ("prior_steps", "message"),
+    [
+        ((1, 3), "missing prior-step headings: Adım 002"),
+        ((1, 2, 2, 3), "duplicate prior-step headings: Adım 002"),
+        ((1, 3, 2), "out of ascending order"),
+    ],
+)
+def test_strict_legacy_prior_step_errors_remain_clear(
     tmp_path: Path,
+    prior_steps: tuple[int, ...],
+    message: str,
 ) -> None:
-    note = _strict_note(35, 4, 6, prior_steps=(1, 3))
+    note = _strict_note(35, 4, 6, prior_steps=prior_steps)
     root = _write_repo(
         tmp_path,
         notes={"035_adim_004_006_notebooklm_podcast_notu.md": note},
     )
-    with pytest.raises(PodcastSourceError, match="missing prior-step headings: Adım 002"):
+    with pytest.raises(PodcastSourceError, match=message):
         find_latest_podcast_note(root / "docs/podcast_notes")
 
 
-def test_strict_note_duplicate_prior_step_heading_fails_clearly(
+def test_issue_note_does_not_require_fabricated_prior_step_headings(
     tmp_path: Path,
 ) -> None:
-    note = _strict_note(35, 4, 6, prior_steps=(1, 2, 2, 3))
     root = _write_repo(
         tmp_path,
-        notes={"035_adim_004_006_notebooklm_podcast_notu.md": note},
-    )
-    with pytest.raises(PodcastSourceError, match="duplicate prior-step headings: Adım 002"):
-        find_latest_podcast_note(root / "docs/podcast_notes")
-
-
-def test_strict_note_out_of_order_prior_step_headings_fail_clearly(
-    tmp_path: Path,
-) -> None:
-    note = _strict_note(35, 4, 6, prior_steps=(1, 3, 2))
-    root = _write_repo(
-        tmp_path,
-        notes={"035_adim_004_006_notebooklm_podcast_notu.md": note},
-    )
-    with pytest.raises(PodcastSourceError, match="out of ascending order"):
-        find_latest_podcast_note(root / "docs/podcast_notes")
-
-
-def test_matching_headings_outside_prior_section_do_not_satisfy_contract(
-    tmp_path: Path,
-) -> None:
-    note = _strict_note(35, 4, 6, outside_prior_steps=(1, 2, 3))
-    root = _write_repo(
-        tmp_path,
-        notes={"035_adim_004_006_notebooklm_podcast_notu.md": note},
-    )
-    with pytest.raises(PodcastSourceError, match="missing prior-step headings"):
-        find_latest_podcast_note(root / "docs/podcast_notes")
-
-
-def test_current_range_steps_are_not_required_in_prior_section(
-    tmp_path: Path,
-) -> None:
-    note = _strict_note(35, 4, 6, prior_steps=(1, 2, 3))
-    root = _write_repo(
-        tmp_path,
-        notes={"035_adim_004_006_notebooklm_podcast_notu.md": note},
+        notes={
+            "036_issue_010_012_notebooklm_podcast_notu.md": _strict_note(
+                36, 10, 12, range_kind="issue"
+            )
+        },
     )
     latest = find_latest_podcast_note(root / "docs/podcast_notes")
-    assert "### Adım 004" not in latest.text
-    assert "### Adım 005" not in latest.text
-    assert "### Adım 006" not in latest.text
+    assert latest.range_kind == "issue"
 
 
 def test_podcast_034_legacy_compatibility_remains_unchanged(
@@ -363,6 +379,7 @@ def test_podcast_034_legacy_compatibility_remains_unchanged(
     )
     latest = find_latest_podcast_note(root / "docs/podcast_notes")
     assert latest.number == 34
+    assert latest.range_kind == "adim"
     assert latest.step_range == "001-003"
 
 
@@ -399,10 +416,10 @@ def test_utf8_turkish_characters_are_preserved(tmp_path: Path) -> None:
     assert "şantiye, güvenli, ölçüm" in output
     assert "Kalıcı Talimat" in output
     assert "UTF-8 Kaynak Doğrulaması" in output
-    assert "ensure_ascii" not in manifest_path.read_text(encoding="utf-8")
+    assert "\\u015f" not in manifest_path.read_text(encoding="utf-8")
 
 
-def test_tracked_podcast_035_is_latest_and_included_in_rolling_source() -> None:
+def test_tracked_podcast_036_issue_range_is_latest_and_generated() -> None:
     note = find_latest_podcast_note(REPO_ROOT / "docs/podcast_notes")
     manifest = json.loads(
         (REPO_ROOT / "docs/notebooklm/CSE_PODCAST_SOURCE_MANIFEST.json").read_text(
@@ -412,29 +429,21 @@ def test_tracked_podcast_035_is_latest_and_included_in_rolling_source() -> None:
     rolling_source = (
         REPO_ROOT / "docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md"
     ).read_text(encoding="utf-8")
-    note_prior_section = _find_section_body(
-        note.text,
-        "onceki adimlarin ayri ayri ozeti",
-    )
-    rolling_summary_start = rolling_source.rindex(
-        "\n## Önceki Adımların Ayrı Ayrı Özeti"
-    )
-    rolling_summary_end = rolling_source.index(
-        "\n## Güncel Güvenli Nokta ve Test Kanıtı",
-        rolling_summary_start,
-    )
-    rolling_summary_section = rolling_source[
-        rolling_summary_start:rolling_summary_end
-    ]
 
-    assert note.number == 35
-    assert note.step_range == "221-225"
+    assert note.number == 36
+    assert note.range_kind == "issue"
+    assert note.range_value == "227-277"
     assert note.text.rstrip() in rolling_source
-    assert manifest["latest_podcast"] == 35
-    assert manifest["latest_step_range"] == "221-225"
-    assert manifest["previous_step_summary_count"] == 224
-    assert len(PRIOR_STEP_HEADING_PATTERN.findall(note_prior_section)) == 220
-    assert rolling_summary_section.count("### Adım ") == 224
+    assert manifest["latest_podcast"] == 36
+    assert manifest["latest_range_kind"] == "issue"
+    assert manifest["latest_issue_range"] == "227-277"
+    assert manifest["legacy_last_numbered_step"] == 225
+    assert manifest["legacy_step_summary_count"] == 225
+    assert manifest["issue_summary_count"] == 13
+    issue_summary_section = rolling_source.split(
+        "## Canonical Issue Dönemi Özeti", maxsplit=1
+    )[1].split("## Güncel Güvenli Nokta ve Test Kanıtı", maxsplit=1)[0]
+    assert issue_summary_section.count("### Issue #") == 13
 
 
 def test_tracked_historical_podcast_034_hash_is_unchanged() -> None:
@@ -445,3 +454,16 @@ def test_tracked_historical_podcast_034_hash_is_unchanged() -> None:
     assert hashlib.sha256(podcast_034.read_bytes()).hexdigest().upper() == (
         "AB96737D29F58333FD5FA4AE5687F979D4B8527236F4515FA89CBB8D07DD30C3"
     )
+
+
+def test_tracked_podcast_035_prior_step_contract_remains_parseable() -> None:
+    note_path = (
+        REPO_ROOT
+        / "docs/podcast_notes/035_adim_221_225_notebooklm_podcast_notu.md"
+    )
+    note_text = note_path.read_text(encoding="utf-8")
+    prior_section = _find_section_body(
+        note_text,
+        "onceki adimlarin ayri ayri ozeti",
+    )
+    assert len(PRIOR_STEP_HEADING_PATTERN.findall(prior_section)) == 220

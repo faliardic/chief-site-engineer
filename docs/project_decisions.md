@@ -3453,3 +3453,21 @@
 - Bu karar schema `10`, backup formatı `1`, migration `0`, persistence,
   application query, notification, Android native ve genel router
   sözleşmelerini değiştirmez.
+
+## Issue 280 — Podcast geçmişi legacy adım ve canonical Issue dönemlerini ayırır
+
+- Legacy numaralı geliştirme dönemi Adım `001–225` ile kapanır. Podcast
+  `001–035` tarihsel kayıttır ve yeni current-state senkronunda değiştirilmez.
+- Podcast `036` ile dosya range türü `issue` olur. Issue aralığı kesintisiz adım
+  geçmişi değildir; generator yalnız `CHANGELOG.md` içindeki gerçek
+  `## Issue #NNN - ...` bölümlerini toplar ve eksik numaraları uydurmaz.
+- Aynı podcast numarası `adim` ve `issue` dosyalarında birlikte kullanılamaz.
+  Legacy `adim` strict önceki-başlık kontrolü geriye uyumlu korunur; `issue`
+  notuna sahte kesintisiz önceki adım zorunluluğu uygulanmaz.
+- Canonical state küçük ve insan-okunabilir tutulur. Merged safe point, paused
+  aktif iş ve blocked Draft PR ayrı alanlardır; birleşmemiş davranış merged
+  capability gibi sunulmaz.
+- Stable NotebookLM public source yolu değişmez. Source ve manifest ağ
+  erişimsiz, UTF-8 ve byte-for-byte deterministik üretilir.
+- Bu karar production davranışı, mobil schema `10`, backup formatı `1`,
+  migration, native platform ve cihaz paketini değiştirmez.
