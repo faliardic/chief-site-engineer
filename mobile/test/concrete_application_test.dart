@@ -654,13 +654,13 @@ void main() {
           action: ReminderMutationAction.snoozeTomorrowMorning,
         ),
       );
-      expect(delayedReminder.nextAttentionAt, '2026-07-20T08:00:00Z');
+      expect(delayedReminder.nextAttentionAt, '2026-07-20T05:00:00Z');
       final scheduleCallsBeforeTermination = notifications.scheduled.length;
       notifications.simulateTerminatedApp();
       expect(notifications.occurrencesFor(delayedReminder.id).take(3), [
-        DateTime.utc(2026, 7, 20, 8),
-        DateTime.utc(2026, 7, 20, 9),
-        DateTime.utc(2026, 7, 20, 10),
+        DateTime.utc(2026, 7, 20, 5),
+        DateTime.utc(2026, 7, 20, 6),
+        DateTime.utc(2026, 7, 20, 7),
       ]);
       expect(
         notifications.scheduled,

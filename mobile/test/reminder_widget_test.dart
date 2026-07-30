@@ -9,6 +9,7 @@ import 'package:chief_site_engineer/features/agenda/agenda_photo_viewer_page.dar
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -207,6 +208,96 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  }
+
+  testWidgets(
+    'detail planning sheet exposes week-start scheduling before selection',
+    (tester) async {
+      final item = reminder();
+      final agenda = FakeAgendaApplication(
+        reminders: [item],
+        reminderDetail: item,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final scheduleButton = find.byKey(const Key('schedule-reminder'));
+      await tester.scrollUntilVisible(
+        scheduleButton,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(scheduleButton);
+      await tester.pumpAndSettle();
+
+      final weekStart = find.byKey(
+        const Key('reminder-schedule-option-nextWeekStart'),
+      );
+      await tester.scrollUntilVisible(
+        weekStart,
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(weekStart, findsOneWidget);
+    },
+  );
+
+  for (final scheduleCase in [
+    (
+      schedule: ReminderScheduleKind.tomorrowMorning,
+      preview: 'Yarın sabah — 31.07.2026 08:00',
+      expectedUtc: '2026-07-31T05:00:00Z',
+    ),
+    (
+      schedule: ReminderScheduleKind.nextWeekStart,
+      preview: 'Hafta başına ertele — 03.08.2026 08:00',
+      expectedUtc: '2026-08-03T05:00:00Z',
+    ),
+  ]) {
+    testWidgets('form previews and submits ${scheduleCase.schedule.label}', (
+      tester,
+    ) async {
+      await withClock(Clock.fixed(DateTime.utc(2026, 7, 30, 2)), () async {
+        final agenda = FakeAgendaApplication();
+        await tester.pumpWidget(
+          MaterialApp(home: ReminderFormPage(agenda: agenda)),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('reminder-schedule')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(scheduleCase.schedule.label).last);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('reminder-schedule-preview')),
+          findsOneWidget,
+        );
+        expect(find.text(scheduleCase.preview), findsOneWidget);
+
+        await tester.enterText(
+          find.byKey(const Key('reminder-title')),
+          scheduleCase.schedule.label,
+        );
+        final submit = find.byKey(const Key('submit-reminder'));
+        await tester.scrollUntilVisible(
+          submit,
+          300,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.tap(submit);
+        await tester.pumpAndSettle();
+
+        expect(agenda.lastReminderCommand!.schedule, scheduleCase.schedule);
+        expect(
+          agenda.lastReminderCommand!.customAttentionAt,
+          scheduleCase.expectedUtc,
+        );
+      });
+    });
   }
 
   testWidgets(
@@ -792,7 +883,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Yarına ertele quick action is guarded against double tap', (
+  testWidgets('Yarın 08:00 quick action is guarded against double tap', (
     tester,
   ) async {
     final completer = Completer<MobileReminder>();
@@ -807,7 +898,7 @@ void main() {
     await tester.pumpAndSettle();
     final action = find.byKey(Key('reminder-tomorrow-${item.id}'));
     expect(action, findsOneWidget);
-    expect(find.text('Yarına ertele'), findsOneWidget);
+    expect(find.text('Yarın 08:00'), findsOneWidget);
     await tester.tap(action);
     await tester.pump();
     await tester.tap(action);
@@ -822,7 +913,7 @@ void main() {
   });
 
   testWidgets(
-    'Yarına ertele moves Today card to Tomorrow and then stays hidden',
+    'Yarın 08:00 moves Today card to Tomorrow and then stays hidden',
     (tester) async {
       final item = reminder();
       final agenda = FakeAgendaApplication(reminders: [item]);
@@ -835,11 +926,11 @@ void main() {
 
       final todayAction = find.byKey(Key('reminder-tomorrow-${item.id}'));
       expect(todayAction, findsOneWidget);
-      expect(find.text('Yarına ertele'), findsOneWidget);
+      expect(find.text('Yarın 08:00'), findsOneWidget);
       expect(find.text('Yarın'), findsOneWidget);
       await tester.tap(todayAction);
       await tester.pumpAndSettle();
-      expect(agenda.reminders.single.nextAttentionAt, '2026-07-21T06:00:00Z');
+      expect(agenda.reminders.single.nextAttentionAt, '2026-07-21T05:00:00Z');
       expect(find.byKey(Key('reminder-${item.id}')), findsNothing);
 
       await tester.tap(find.byKey(const Key('reminder-primary-tomorrow')));
@@ -856,6 +947,28 @@ void main() {
       expect(upcomingAction, findsNothing);
     },
   );
+
+  testWidgets('all-day card retains Yarına ertele and advances one day', (
+    tester,
+  ) async {
+    final item = reminder(allDayLocalDate: '2026-07-20');
+    final agenda = FakeAgendaApplication(reminders: [item]);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: RemindersPage(agenda: agenda)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final action = find.byKey(Key('reminder-tomorrow-${item.id}'));
+    expect(action, findsOneWidget);
+    expect(find.text('Yarına ertele'), findsOneWidget);
+    await tester.tap(action);
+    await tester.pumpAndSettle();
+
+    expect(agenda.reminders.single.allDayLocalDate, '2026-07-21');
+    expect(agenda.reminders.single.nextAttentionAt, isNull);
+  });
 
   testWidgets(
     'Today and overdue cards show tomorrow while future stays hidden',
@@ -1259,6 +1372,67 @@ void main() {
       expect(agenda.lastMutationCommand!.schedule, schedule);
     });
   }
+
+  testWidgets('detail sheet previews and submits exact quick schedules', (
+    tester,
+  ) async {
+    await withClock(Clock.fixed(DateTime.utc(2026, 7, 27, 9)), () async {
+      final item = reminder();
+      final agenda = FakeAgendaApplication(
+        reminders: [item],
+        reminderDetail: item,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final scheduleButton = find.byKey(const Key('schedule-reminder'));
+      await tester.scrollUntilVisible(
+        scheduleButton,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(scheduleButton);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('reminder-schedule-preview-tomorrowMorning')),
+        findsOneWidget,
+      );
+      expect(find.text('28.07.2026 08:00'), findsOneWidget);
+      final weekStart = find.byKey(
+        const Key('reminder-schedule-option-nextWeekStart'),
+      );
+      await tester.scrollUntilVisible(
+        weekStart,
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(
+        find.byKey(const Key('reminder-schedule-preview-nextWeekStart')),
+        findsOneWidget,
+      );
+      expect(find.text('03.08.2026 08:00'), findsOneWidget);
+
+      await tester.tap(weekStart);
+      await tester.pumpAndSettle();
+      expect(
+        agenda.lastMutationCommand!.action,
+        ReminderMutationAction.schedule,
+      );
+      expect(
+        agenda.lastMutationCommand!.schedule,
+        ReminderScheduleKind.nextWeekStart,
+      );
+      expect(
+        agenda.lastMutationCommand!.customAttentionAt,
+        '2026-08-03T05:00:00Z',
+      );
+    });
+  });
 
   for (final configuration in [
     (width: 320.0, brightness: Brightness.dark),

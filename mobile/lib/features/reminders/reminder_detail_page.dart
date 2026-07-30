@@ -9,6 +9,7 @@ import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_day_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 
 class ReminderDetailPage extends StatefulWidget {
@@ -232,6 +233,17 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
   }
 
   Future<void> _showScheduleSheet() async {
+    final scheduleNowUtc = clock.now().toUtc();
+    final quickPreviews = {
+      for (final schedule in [
+        ReminderScheduleKind.tomorrowMorning,
+        ReminderScheduleKind.nextWeekStart,
+      ])
+        schedule: resolveReminderExactQuickScheduleAt(
+          schedule,
+          scheduleNowUtc,
+        )!,
+    };
     final choice = await showModalBottomSheet<ReminderScheduleKind>(
       context: context,
       showDragHandle: true,
@@ -239,19 +251,28 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
         child: ListView(
           shrinkWrap: true,
           children: [
-            for (final schedule in [
+            ...[
               ReminderScheduleKind.in15Minutes,
               ReminderScheduleKind.in1Hour,
               ReminderScheduleKind.in2Hours,
               ReminderScheduleKind.in3Hours,
               ReminderScheduleKind.tomorrowMorning,
+              ReminderScheduleKind.nextWeekStart,
               ReminderScheduleKind.custom,
-            ])
-              ListTile(
+            ].map(
+              (schedule) => ListTile(
+                key: Key('reminder-schedule-option-${schedule.name}'),
                 minVerticalPadding: 12,
                 title: Text(schedule.label),
+                subtitle: quickPreviews[schedule] == null
+                    ? null
+                    : Text(
+                        formatReminderExactSchedule(quickPreviews[schedule]!),
+                        key: Key('reminder-schedule-preview-${schedule.name}'),
+                      ),
                 onTap: () => Navigator.pop(context, schedule),
               ),
+            ),
           ],
         ),
       ),
@@ -260,7 +281,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
     String? custom;
     if (choice == ReminderScheduleKind.custom) {
       final now = CseTimeCodec.toIstanbul(
-        CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
+        CseTimeCodec.encodeUtc(clock.now().toUtc()),
       );
       final date = await showDatePicker(
         context: context,
@@ -281,6 +302,8 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
         hour: time.hour,
         minute: time.minute,
       );
+    } else {
+      custom = quickPreviews[choice];
     }
     await _mutate(
       ReminderMutationAction.schedule,
@@ -360,7 +383,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
     final deadlineLocal = CseTimeCodec.toIstanbul(
       reminder.deadlineAt ??
           CseTimeCodec.encodeUtc(
-            DateTime.now().toUtc().add(const Duration(days: 1)),
+            clock.now().toUtc().add(const Duration(days: 1)),
           ),
     );
     var deadlineDate = DateTime(
@@ -539,7 +562,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
     final istanbulToday =
         widget.istanbulToday ??
         CseTimeCodec.istanbulDayKey(
-          CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
+          CseTimeCodec.encodeUtc(clock.now().toUtc()),
         );
     final tomorrowEligible = isReminderEligibleForTomorrowSnooze(
       reminder,
@@ -722,7 +745,9 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
                 if (tomorrowEligible)
                   _ActionButton(
                     key: const Key('snooze-tomorrow'),
-                    label: 'Yarına ertele',
+                    label: reminder.allDayLocalDate == null
+                        ? 'Yarın 08:00'
+                        : 'Yarına ertele',
                     icon: Icons.wb_sunny_outlined,
                     onPressed: _mutating
                         ? null
