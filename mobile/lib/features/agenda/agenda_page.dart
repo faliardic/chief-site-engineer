@@ -32,6 +32,7 @@ class AgendaPage extends StatefulWidget {
 class _AgendaPageState extends State<AgendaPage> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   late String _selectedDay;
   List<MobileProject> _projects = const [];
   List<AgendaLog> _logs = const [];
@@ -63,6 +64,7 @@ class _AgendaPageState extends State<AgendaPage> {
     _projectSubscription?.cancel();
     _scrollController.dispose();
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -177,6 +179,7 @@ class _AgendaPageState extends State<AgendaPage> {
   Future<void> _openDetail(AgendaLog log) async {
     if (_detailNavigationBusy) return;
     final restoreOffset = _currentScrollOffset;
+    _searchFocusNode.unfocus();
     _detailNavigationBusy = true;
     try {
       await Navigator.of(context).push<void>(
@@ -234,6 +237,7 @@ class _AgendaPageState extends State<AgendaPage> {
         child: ListView(
           key: const Key('agenda-day-list'),
           controller: _scrollController,
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
           children: [
             Align(
@@ -383,6 +387,7 @@ class _AgendaPageState extends State<AgendaPage> {
             TextField(
               key: const Key('agenda-literal-search'),
               controller: _searchController,
+              focusNode: _searchFocusNode,
               decoration: InputDecoration(
                 labelText: 'Literal ara',
                 hintText: 'Açıklama, mahal, not veya proje',
@@ -396,6 +401,7 @@ class _AgendaPageState extends State<AgendaPage> {
               textInputAction: TextInputAction.search,
               onChanged: (value) => _search = value,
               onSubmitted: (_) => _reload(),
+              onTapOutside: (_) => _searchFocusNode.unfocus(),
             ),
             const SizedBox(height: 12),
             if (_loading && !_preservingDetailReload)
