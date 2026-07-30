@@ -1,5 +1,19 @@
 # Changelog
 
+## Issue #275 - Ajanda Arama Odağı ve Klavye İzolasyonu
+
+- Ajanda literal arama metni ve sorgusu route-local korunurken detail
+  dönüşünde focus, caret ve klavye kendiliğinden geri yüklenmez.
+- Detail push öncesi exact search `FocusNode` unfocus edilir; alan dışı tap ve
+  kullanıcı drag'i klavyeyi kapatır. Odaksız drag, fling, momentum ve yön
+  değiştirme arama odağı oluşturmaz.
+- App-bar/system back, detail mutation, uzun liste scroll'u ve filtre/sıralama
+  bağlamı dört hedefli widget regresyonu ve Samsung `SM-X610` tablet wide
+  smoke ile doğrulandı.
+- Tablet PASS fiziksel tamamlanma kapısı olarak kabul edildi; telefon promotion
+  ertelendi ve çalıştırılmadı. Schema `10`, backup formatı `1`, migration `0`
+  korundu.
+
 ## Issue #272 - Hatırlatıcı Bildirim İzolasyonu
 
 - Native pending listesinde artık görünmeyen fakat source reminder'ı aktif olan

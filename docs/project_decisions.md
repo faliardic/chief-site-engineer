@@ -3412,3 +3412,23 @@
 - Static localization dependency testi yalnız CRLF/LF satır sonlarını
   normalize eder; dependency adı, indent ve `sdk: flutter` exact contract'ı
   korunur.
+
+## Issue 275 — Ajanda arama odağı route-local ve kullanıcı niyetine bağlıdır
+
+- Arama text/controller state'i ile focus/caret/IME state'i ayrı
+  sözleşmelerdir. Text ve literal query canlı route içinde korunabilir; focus
+  ve IME yalnız explicit kullanıcı search tap'iyle etkinleşir.
+- `AgendaPage`, exact search alanına ait route-local `FocusNode`u oluşturur ve
+  controller ile birlikte dispose eder. Global singleton, autofocus toggle,
+  random key veya kalıcı preference kullanılmaz.
+- Detail push öncesi search node unfocus edilir. Fresh reload, filtre/sort ve
+  scroll offset restore korunur; dönüşte focus/caret/IME restore edilmez.
+- Liste `ScrollViewKeyboardDismissBehavior.onDrag` uygular; arama alanında
+  başlayan gerçek drag text/query churn üretmeden klavyeyi kapatır. Odaksız
+  drag, fling, momentum ve yön değiştirme focus oluşturmaz.
+- Fiziksel kabul için Samsung `SM-X610` tablet PASS'i kullanıcı tarafından
+  Issue #275 tamamlanma kapısı seçilmiştir. Telefon promotion ayrı talebe kadar
+  ertelenmiş ve yapılmamıştır.
+- Bu karar schema `10`, backup formatı `1`, migration `0`, persistence,
+  application query, notification, Android native ve genel router
+  sözleşmelerini değiştirmez.

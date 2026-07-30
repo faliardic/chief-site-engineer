@@ -414,3 +414,372 @@ D29.3 Issue oluşturma yetkili değildir.
   bu task bu sözleşmelere dokunmamıştır.
 - Release AAB, ARM64/16 KiB, backup/restore ve Python suite bilinçli olarak
   çalıştırılmadı; `narrow-ui` değişen sözleşmesi bunları etkilememektedir.
+
+## Checkpoint, debug artifact ve cihaz discovery
+
+- Ordinary checkpoint commit:
+  `48dcae00a89798aba2c1274b5d964e8229448a0a`
+  (`Fix Agenda search focus isolation`).
+- Checkpoint dosyaları exact üçlüdür:
+  `.cse/tasks/275_task.md`,
+  `mobile/lib/features/agenda/agenda_page.dart`,
+  `mobile/test/mobile_agenda_widget_test.dart`.
+- Checkpoint öncesi staged allowlist exact `3/3`; `git diff --cached --check`
+  PASS; push yapılmadı.
+- Build worktree:
+  `C:\Users\Fatih\AppData\Local\Temp\cse275-build-20260729193428608-b05c811c`
+- Build worktree HEAD:
+  `48dcae00a89798aba2c1274b5d964e8229448a0a`.
+- Build worktree `flutter pub get`: invocation `1`, PASS; lockfile diff `0`.
+- Debug APK build invocation/retry: `1/0`.
+- Build command:
+  `flutter build apk --debug --target lib\main.dart --no-pub`.
+- Build başlangıç/bitiş UTC:
+  `2026-07-29T16:34:49.2203445Z` /
+  `2026-07-29T16:37:11.9420756Z`.
+- Artifact:
+  `C:\Users\Fatih\AppData\Local\Temp\cse275-build-20260729193428608-b05c811c\mobile\build\app\outputs\flutter-apk\app-debug.apk`
+- Artifact length: `170517302` bytes.
+- Artifact last-write UTC: `2026-07-29T16:37:08.9238632Z`.
+- Artifact SHA-256:
+  `B0CE311E17C045C9B5580F0BB0D70AA33759697FCEA4640D962294E0E48E8190`.
+- Package/version:
+  `com.faliardic.chiefsiteengineer.debug`,
+  versionCode `1`, versionName `0.1.0-debug`.
+- Launchable activity:
+  `com.faliardic.chiefsiteengineer.MainActivity`.
+- SDK min/target: `24` / `36`.
+- APK signature: v2 PASS, signer count `1`, DN
+  `C=US, O=Android, CN=Android Debug`, certificate SHA-256
+  `329f42b542af8576367279b59fb2802dfd545253b2906f7ba2ac12c7c6d5c869`.
+- Exact `adb devices -l` discovery çalıştırıldı; ADB daemon başlatıldı ancak
+  bağlı cihaz listesi boş döndü.
+- Tablet serial/model/form-factor kaydedilemedi:
+  `TABLET_REGISTRATION_PENDING`.
+- Tablet PASS olmadığı için telefon discovery dışındaki hiçbir cihaz komutu,
+  install, smoke, gerçek kayıt işlemi, completion commit, push veya Draft PR
+  çalıştırılmadı.
+- Uninstall / clear-data / downgrade / hard-delete:
+  `0 / 0 / 0 / 0`.
+- Artifact ve build worktree sonraki aynı-task cihaz kabulü için korunur;
+  yeniden build yapılmaz.
+
+## Tablet registration resume — 2026-07-29
+
+- GitHub devam yetkisi:
+  `https://github.com/faliardic/chief-site-engineer/issues/275#issuecomment-5120794990`
+- Resume preflight UTC: `2026-07-29T16:45:19.9109109Z`.
+- Current branch:
+  `codex/issue-275-agenda-search-focus-isolation`.
+- Current HEAD:
+  `48dcae00a89798aba2c1274b5d964e8229448a0a`.
+- Staged path: `0`.
+- Unstaged tracked path yalnız `.cse/tasks/275_task.md`.
+- Exact base ile checkpoint arasındaki cumulative tracked path:
+  `.cse/tasks/275_task.md`,
+  `mobile/lib/features/agenda/agenda_page.dart`,
+  `mobile/test/mobile_agenda_widget_test.dart`; unexpected tracked path `0`.
+- Build worktree HEAD:
+  `48dcae00a89798aba2c1274b5d964e8229448a0a`; tracked status temiz.
+- Dondurulmuş artifact tekrar doğrulandı:
+  `C:\Users\Fatih\AppData\Local\Temp\cse275-build-20260729193428608-b05c811c\mobile\build\app\outputs\flutter-apk\app-debug.apk`.
+- Artifact length:
+  `170517302` bytes.
+- Artifact SHA-256:
+  `B0CE311E17C045C9B5580F0BB0D70AA33759697FCEA4640D962294E0E48E8190`.
+- Exact `adb devices -l` discovery çıktısı yalnız
+  `List of devices attached` başlığını içerdi; bağlı cihaz satırı `0`.
+- Tablet serial/model/manufacturer/Android/API/size/density/form-factor
+  doğrulanamadı. Fail-closed durum:
+  `TABLET_REGISTRATION_PENDING / ADB_DEVICE_NOT_DETECTED`.
+- Package compatibility, install ve tablet wide smoke başlatılmadı.
+- Telefon discovery/promotion, completion commit, push ve Draft PR
+  başlatılmadı.
+- Gerçek kullanıcı kaydı açma/değiştirme: `0`.
+- Uninstall / clear-data / downgrade / hard-delete:
+  `0 / 0 / 0 / 0`.
+- Build invocation/retry değişmedi: `1 / 0`; yeniden build yapılmadı.
+
+## Tablet registration ve kısmi wide smoke — 2026-07-29
+
+- Resume evidence UTC: `2026-07-29T17:00:41.9369124Z`.
+- Resume preflight yeniden PASS:
+  branch `codex/issue-275-agenda-search-focus-isolation`,
+  HEAD `48dcae00a89798aba2c1274b5d964e8229448a0a`,
+  staged path `0`, cumulative unexpected tracked path `0`,
+  `git diff --check` PASS.
+- Frozen APK kurulum öncesi yeniden doğrulandı:
+  SHA-256
+  `B0CE311E17C045C9B5580F0BB0D70AA33759697FCEA4640D962294E0E48E8190`,
+  length `170517302`.
+- Exact discovery tablet serial:
+  `R52W90JFN1M`.
+- Manufacturer/model:
+  `samsung` / `SM-X610`.
+- Product device/characteristic/emulator:
+  `gts9fepwifi` / `tablet` / `ro.kernel.qemu=0`.
+- Android/API:
+  `16` / `36`.
+- Physical size:
+  `1600x2560`.
+- Density:
+  physical `340 dpi`, override/effective `300 dpi`.
+- Window configuration:
+  `sw853dp`, `w1365dp`, `h853dp`, `xlrg`;
+  tablet form-factor kapısı PASS.
+- Tablet package ilk kontrolde owner user `0` üzerinde kurulu değildi.
+  Default package sorgusunun Samsung kullanıcı kapsamı
+  `SecurityException` sonucu explicit `--user 0` ile bir kez daraltıldı;
+  current user `0` ve package absent doğrulandı.
+- Exact install:
+  `adb -s R52W90JFN1M install -r -g <frozen-apk>`;
+  `Performing Streamed Install` / `Success`.
+- Installed package:
+  `com.faliardic.chiefsiteengineer.debug`,
+  versionCode `1`, versionName `0.1.0-debug`,
+  min/target SDK `24/36`, user `0` installed/enabled.
+- Launch:
+  exact package/activity cold start PASS.
+- Synthetic prefix:
+  `CSE275TABLET-20260729T1952`.
+- Isolated project:
+  `CSE275TABLET-20260729T1952-PROJECT`.
+- UI üzerinden `16` sentetik Agenda logu oluşturuldu:
+  ITEM01–ITEM06 `FOCUSKEY`, ITEM07–ITEM16 `OTHER`.
+  Aynı anda yalnız üç kartın görünmesi gerçek scroll üreten uzun listeyi
+  doğruladı.
+
+### Tablet wide smoke matrix
+
+1. Exact package/activity launch: PASS.
+2. İzole sentetik proje + uzun Agenda listesi: PASS.
+3. `Literal ara` explicit tap, field focus, IME ve typing:
+   PASS (`FOCUSKEY`, focus `true`, `mInputShown=true`).
+4. Literal search query/result:
+   PASS; görünür sonuçların tamamı `FOCUSKEY`, `OTHER` görünür sonuç `0`.
+5. Search focus `true` iken sentetik detail açma:
+   PASS. Açık IME kart alanını kapladığı için Android back yalnız IME'yi
+   gizledi; field focus `true` kaldı ve exact ITEM06 kartı açıldı.
+6. App-bar back:
+   PASS. Text/query, ITEM06 first-visible context, project filter ve
+   `En yeni üstte` sort korundu; focus `false`, IME kapalı.
+7. Android system back:
+   PASS. Text/query ve ITEM06 first-visible context korundu;
+   focus `false`, IME kapalı.
+8. Detail mutation + return:
+   PASS. Yalnız sentetik ITEM06,
+   `CSE275TABLET-20260729T1952-ITEM06-FOCUSKEY-MUTATED`
+   olarak UI üzerinden güncellendi; fresh detail/list içeriği, query ve
+   focus/IME izolasyonu doğrulandı.
+9. Search odaksız fast drag, fling/momentum ve yön değiştirme:
+   PASS. IME açılmadı, query değişmedi; offstage dönüşünde search
+   `false` / `FOCUSKEY`.
+10. Search alanı üzerinde başlayan gerçek scroll:
+    PASS. Search offstage oldu, IME açılmadı; tapsiz geri dönüşte
+    focus `false`, text `FOCUSKEY`.
+11. Search odaklı list drag:
+    `MANUAL_VERIFICATION_PENDING`.
+    İlk otomasyon denemesinde search önceki momentum nedeniyle offstage kaldı
+    ve focus/IME precondition başlamadı. Exact tek retry search field'i
+    materialize edemedi; ürün assertion'ına ulaşılmadı.
+12. Sort + project/category/archive filter değişimleri:
+    `MANUAL_VERIFICATION_PENDING`.
+13. Detail-return offset/no crash/overflow/duplicate navigation:
+    PARTIAL PASS. İki back yolu first-visible ITEM06 bağlamını korudu ve
+    crash/overflow/duplicate navigation gözlenmedi; ayrıca non-zero offset
+    kullanıcı ekranında doğrulanacak.
+14. Normal close/reopen ve sentetik persistence:
+    `MANUAL_VERIFICATION_PENDING`.
+
+- İlk UI evidence parser denemesi `uiautomator` dump sonu mesajını XML'e dahil
+  etti; dar parser correction ile sonraki kanıtlar okundu.
+- Daha sonraki focused-drag precondition iki otomasyon denemesinde
+  materialize edilemedi. Minimum validation protokolü gereği yeni koordinat,
+  regex veya UI otomasyonu başlatılmadı.
+- Fail-closed durum:
+  `TABLET_SMOKE_MANUAL_VERIFICATION_PENDING / UI_AUTOMATION_LIMIT_REACHED`.
+- Sentetik cleanup:
+  continuation için aktif bırakıldı; archive/trash cleanup henüz yapılmadı,
+  hard delete `0`.
+- Gerçek kullanıcı kaydı açma/değiştirme:
+  `0`.
+- Uninstall / clear-data / downgrade / hard-delete:
+  `0 / 0 / 0 / 0`.
+- Telefon discovery/promotion, completion commit, push ve Draft PR
+  başlatılmadı.
+- Build invocation/retry:
+  `1 / 0`; yeniden build yapılmadı.
+
+## Tam otomatik tablet wide smoke continuation — 2026-07-29
+
+- Son yetki yorumu:
+  `https://github.com/faliardic/chief-site-engineer/issues/275#issuecomment-5121308000`.
+- Manuel tablet işlemi istenmedi veya kullanılmadı. Kalan matris yalnız exact
+  `R52W90JFN1M` serial'ı, UIAutomator hierarchy, current node bounds,
+  `dumpsys input_method/window/activity` ve ADB input eylemleriyle yürütüldü.
+- Telefon promotion başlatılmadı.
+
+### Frozen preflight
+
+- Branch:
+  `codex/issue-275-agenda-search-focus-isolation`.
+- HEAD:
+  `48dcae00a89798aba2c1274b5d964e8229448a0a`.
+- Staged path:
+  `0`.
+- Unstaged tracked path:
+  yalnız `.cse/tasks/275_task.md`.
+- Exact base ile checkpoint arasındaki cumulative path:
+  `.cse/tasks/275_task.md`,
+  `mobile/lib/features/agenda/agenda_page.dart`,
+  `mobile/test/mobile_agenda_widget_test.dart`; unexpected path `0`.
+- `git diff --check`:
+  PASS.
+- Build worktree HEAD:
+  `48dcae00a89798aba2c1274b5d964e8229448a0a`; tracked status temiz.
+- Frozen APK length/SHA-256:
+  `170517302` /
+  `B0CE311E17C045C9B5580F0BB0D70AA33759697FCEA4640D962294E0E48E8190`.
+- Tablet discovery:
+  `R52W90JFN1M device`, Samsung `SM-X610`, `sw853dp`.
+
+### Kalan otomatik smoke matrisi
+
+1. Exact `Literal ara` alanı hierarchy bounds
+   `[23,859][2538,964]` üzerinden tap edildi ve text yeniden exact
+   `FOCUSKEY` girildi:
+   UI tree `focused=true`, `dumpsys input_method`
+   `mImeWindowVis=3 / mInputShown=true`; PASS.
+2. Klavye açıkken exact ITEM06 kart bounds
+   `[23,986][2538,1189]` içinden, Samsung floating IME touch region
+   `(1167,524)-(1979,1168)` dışında türetilen
+   `652,1088 -> 652,668 / 700 ms` kullanıcı drag'i üretildi; PASS.
+3. Drag sonrasında search tree'de exact `FOCUSKEY`, `focused=false`,
+   `mImeWindowVis=0 / mInputShown=false`; görünür sonuçlar yalnız
+   ITEM06–ITEM02 `FOCUSKEY`, `OTHER` sonucu `0`; PASS.
+4. Sort:
+   `En yeni üstte -> En eski üstte`; first-visible sonuç
+   ITEM06'dan ITEM01'e değişti.
+5. Project:
+   sentetik proje `-> Tüm projeler ->`
+   `CSE275TABLET-20260729T1952-PROJECT`.
+6. Tür:
+   `Tüm türler -> Genel not`.
+7. Aktif/arşiv:
+   `Arşivlenenler` görünümünde sentetik sonuç `0` ve
+   `Bu günde Ajanda kaydı yok.`; `Aktif` dönüşünde ITEM01–ITEM03 tekrar
+   görünür. Bütün sort/project/type/active-archive eylemlerinden sonra
+   `FOCUSKEY` korundu, search `focused=false`, IME kapalı; PASS.
+8. Belirgin non-zero offset:
+   görünür kart bounds seti ITEM01–ITEM03'ten ITEM01–ITEM05'e ve search
+   bounds `[23,285][2538,390]` konumuna değişti. Exact ITEM03 açıldı.
+9. ITEM03 app-bar back ve system back dönüşlerinin search/card
+   hierarchy fingerprint'i ayrı ayrı pre-open değeriyle birebir aynı:
+   `C8BCFB0BCC754E51DE81F0019ED89AC8A9A9E126FF59A94CDA94169357C1DC06`.
+   Query `FOCUSKEY`, ITEM01–ITEM05 identity/bounds, focus false, IME kapalı
+   kaldı; activity task size `1`; PASS.
+10. Lifecycle:
+    `am force-stop com.faliardic.chiefsiteengineer.debug` ve normal
+    package/activity launch. `LaunchState: COLD`, status `ok`,
+    total time `3128 ms`; uninstall veya clear-data yok; PASS.
+11. Restart persistence:
+    sentetik proje filter option olarak yeniden bulundu ve seçildi.
+    Exact common-prefix search
+    `CSE275TABLET-20260729T1952-ITEM` altında overlapping bounded scroll
+    envanteri ITEM01–ITEM16 exact unique ID setini `16/16` buldu; PASS.
+12. Reversible cleanup:
+    detail `Sil` akışının dialog metni
+    `Kayıt arşive taşınacak, geri getirilebilir.` ve confirm eylemi
+    `Arşive taşı` olarak doğrulandı. Her kayıtta mutation sonrası
+    `Geri getir` kontrolü ve aktif sorgudan çıkış doğrulandı.
+13. Cleanup sonucu:
+    ITEM01–ITEM16 tamamı geri alınabilir arşive taşındı. Aktif common-prefix
+    sorgusu `0` kart + empty-state `1`; Arşivlenenler common-prefix
+    overlapping scroll envanteri exact ITEM01–ITEM16 unique setini
+    `16/16` buldu. Sentetik proje kayıt envanteri için korundu.
+
+### Otomasyon bütçesi ve güvenlik
+
+- İlk focus denemesinde bounds string aritmetiği ekran dışı koordinat üretti;
+  cihaz state'i değişmedi ve exact integer correction ile tek kontrollü retry
+  PASS oldu.
+- Project-return selector, restart sonrası Ajanda navigation değişkeni ve
+  archive inventory interpolation hataları cihaz eylemi başlamadan durdu;
+  her biri tek dar correction ile PASS oldu.
+- Dört kayıtlık ilk cleanup batch'i araç timeout'una ulaşınca yeniden
+  çalıştırılmadı. Salt-okunur UI tree recovery ITEM06/05/04/02'nin
+  arşivlendiğini doğruladı; kalan kayıtlar üçlü bounded batch'lerle
+  tamamlandı.
+- Yeniden build/test/analyze:
+  `0 / 0 / 0`.
+- Gerçek kullanıcı kaydı açma/değiştirme:
+  `0`.
+- Uninstall / clear-data / downgrade / hard-delete:
+  `0 / 0 / 0 / 0`.
+- Phone promotion, completion commit, push, Draft PR:
+  `0 / 0 / 0 / 0`.
+- Tablet sonucu:
+  `PASS`.
+- Sonraki durum:
+  `PHONE_PROMOTION_PENDING`; bu aşamada telefon promotion yetkili değildi ve
+  başlatılmadı.
+
+`Tablet automated wide smoke: PASS; cleanup: 16/16 sentetik kayıt geri alınabilir arşive taşındı; aktif 0, arşiv 16; sentetik proje korundu.`
+
+## Tablet-only tamamlanma ve Draft PR yetkisi — 2026-07-30
+
+- Yetki yorumu:
+  `https://github.com/faliardic/chief-site-engineer/issues/275#issuecomment-5125519401`.
+- Önceki `PHONE_PROMOTION_PENDING` durumu bu yetkiyle supersede edilmiştir.
+  Kullanıcı tableti geliştirme/fiziksel kabul cihazı seçmiş ve mevcut tablet
+  PASS'i Issue #275 tamamlanma kapısı olarak kabul etmiştir.
+- Telefon promotion ayrı talebe kadar ertelenmiştir. Telefon install/smoke
+  yapılmayacak ve telefon PASS iddiası üretilmeyecektir.
+- Kabul edilen tablet:
+  `R52W90JFN1M` / Samsung `SM-X610` / `sw853dp`.
+- Kabul edilen tablet sonucu:
+  automated wide smoke PASS; `16/16` sentetik kayıt geri alınabilir arşivde,
+  aktif `0`, arşiv `16`, sentetik proje korunmuş; gerçek kullanıcı mutation'ı
+  `0`; uninstall/data clear/downgrade/hard-delete `0/0/0/0`.
+- Kabul edilen source/artifact:
+  checkpoint `48dcae00a89798aba2c1274b5d964e8229448a0a`;
+  APK SHA-256
+  `B0CE311E17C045C9B5580F0BB0D70AA33759697FCEA4640D962294E0E48E8190`;
+  build/retry `1/0`.
+- Kabul edilen validation:
+  focused widget `24/24`, Agenda application `22/22`, full Flutter `324/324`,
+  analyze `0 issue`.
+- Completion sırasında yeni Flutter/Python test, analyze, build, APK/AAB, ADB,
+  tablet veya telefon adımı çalıştırılmayacaktır; mevcut kanıt yeniden
+  kullanılacaktır.
+- Completion cumulative allowlist exact `9/9`:
+  `.cse/tasks/275_task.md`,
+  `mobile/lib/features/agenda/agenda_page.dart`,
+  `mobile/test/mobile_agenda_widget_test.dart`,
+  `.cse/results/275_result.md`,
+  `CHANGELOG.md`,
+  `ROADMAP.md`,
+  `docs/275_agenda_search_focus_keyboard_isolation.md`,
+  `docs/project_decisions.md`,
+  `learning/275_agenda_search_focus_keyboard_isolation.md`.
+- Yalnız final doc/scope kontrolleri, exact completion commit, normal push ve
+  tek Draft PR yetkilidir. Ready, merge, Issue close, branch delete ve D29.3
+  yetkili değildir.
+
+### Completion pre-commit kontrolleri
+
+- Cumulative allowlist:
+  `9/9` PASS; unexpected path `0`.
+- Production/test scope:
+  `1/1` (`agenda_page.dart`) /
+  `1/1` (`mobile_agenda_widget_test.dart`).
+- `git diff --check`:
+  PASS.
+- Markdown code-fence/conflict-marker:
+  `7/7` PASS.
+- Schema `10` ve backup formatı `1` merged kanıttan yeniden kullanıldı;
+  migration `0`, protected-path mutation `0`.
+- Staged path:
+  kontrol öncesi `0`.
+- Yeni test/analyze/build/APK/AAB/ADB/tablet/telefon çalıştırma:
+  `0`.

@@ -1,7 +1,7 @@
 # CSE 2026.3.4 — Asistan-Öncelikli Ürün Yol Haritası
 
 **Durum:** Kanonik ürün sırası  
-**Tarih:** 29 Temmuz 2026\
+**Tarih:** 30 Temmuz 2026\
 **Ürün Epic'i:** #105  
 **Yürütme Epic'i:** #127  
 **Güncel saha backlog'u:** #219  
@@ -9,9 +9,9 @@
 **Açık Release 0.1 pilotu:** #193  
 **Güncel RC / günlük saha testi:** #245  
 **Roadmap senkronizasyonu:** #270\
-**Son merge edilen production işi:** #268 / PR #269 — Ajanda deterministik sıralama\
-**Aktif production işi:** D29.1 / Issue #272 — doğrulandı, Draft PR yayını bekliyor\
-**Sıradaki production işi:** D29.2 — yalnız #272 merge sonrasında\
+**Son merge edilen production işi:** #272 / PR #274 — Hatırlatıcı bildirim izolasyonu\
+**Aktif production işi:** D29.2 / Issue #275 — tablet kabulü PASS, Draft PR yayını\
+**Sıradaki production işi:** D29.3 — yalnız #275 merge sonrasında\
 **Bloklu yatay kabul zinciri:** #257 → #254 / #256, Draft PR #259
 
 ## 1. Ürün kararı
@@ -50,26 +50,28 @@ Tamamlanan günlük güvenilirlik dilimleri:
 - #262 / PR #263 — Hatırlatıcı tarih/source uygunluğu;
 - #264 / PR #265 — dört ana listede detail dönüşü route-local state korunumu;
 - #266 / PR #267 — Türkçe kullanıcı dili, Puantaj `Kaydet` eylemi ve seçim toolbar'ı;
-- #268 / PR #269 — Ajanda deterministik sıralama.
+- #268 / PR #269 — Ajanda deterministik sıralama;
+- #272 / PR #274 — Hatırlatıcı bildirim izolasyonu.
 
 Güncel güvenli `master`:
 
 ```text
-b113f0d2bf964a51d2cf3f195a5a1ec038ad234c
+52d610ce7e8ff28905b52f10b75626885070a0e9
 ```
 
-Bu master noktası #270 roadmap conflict-safe finalization belgelerini taşır.
-Son merge edilen production kanıtı #268 / PR #269'dur: static configuration
-`5 PASS`, focused Agenda `42 PASS`, combined focused `47 PASS`, Flutter full
-suite `308 PASS` ve Flutter analyze `PASS`. Mobil schema `10`, backup formatı
-`1`, migration `0` ve son geçerli merged Python full suite
-`1005 passed, 7 skipped` durumundadır.
+Bu master noktası #272 / PR #274 notification izolasyonu düzeltmesini taşır.
+Son merge edilen production kanıtı: focused reminder lifecycle `44/44 PASS`,
+related delayed-hourly `4/4 PASS`, background/reboot/static configuration
+`14/14 PASS`, Flutter full suite `320/320 PASS` ve Flutter analyze `0 issue`.
+Mobil schema `10`, backup formatı `1`, migration `0` ve son geçerli merged
+Python full suite `1005 passed, 7 skipped` durumundadır.
 
-Issue #268 / PR #269 tamamlanmıştır. Ajanda sıralama sözleşmesinde yeni route
-varsayılanı `En yeni üstte`; kullanıcı `En eski üstte` seçebilir. Application
-query sırası `observed_at`, `created_at`, `id` alanlarıyla deterministiktir;
-`updated_at` sıralamaya girmez. Filtre, arama, sort ve detail dönüşü route-local
-korunur. Schema, migration ve backup formatı değişmemiştir.
+Issue #275 uygulaması ve doğrulaması branch üzerinde tamamlanmıştır. Ajanda
+arama text/query state'i korunurken detail dönüşünde focus/IME geri gelmez;
+drag, fling ve yön değiştirme kendiliğinden arama odağı üretmez. Samsung
+`SM-X610` tablet wide smoke PASS'tir. Kullanıcı tableti bu Issue'nun fiziksel
+tamamlanma kapısı olarak seçmiş; telefon promotion'ı ayrı talebe kadar
+ertelemiştir. Schema, migration ve backup formatı değişmemiştir.
 
 Fiziksel cihaz smoke otomasyonu için #254 üzerinde izole acceptance harness,
 #256 üzerinde atomik build-root rotasyonu ve #257 üzerinde doğrulanmış acceptance
@@ -239,13 +241,12 @@ P2/P3 işlerin önüne geçer.
 
 ### 29 Temmuz 2026 günlük saha dalgası
 
-Bu dalga mevcut Blok 13–26 numaralarını değiştirmez. D29.1 / Issue #272 sıradaki
+Bu dalga mevcut Blok 13–26 numaralarını değiştirmez. D29.2 / Issue #275 aktif
 tek production işidir; diğer başlıklar ayrı ve dar child Issue'lara bölünür.
 
 #### D29.1 — Hatırlatıcı bildirim izolasyonu — P1 / Issue #272
 
-- **Durum:** Application düzeltmesi, source validation, exact debug artifact ve
-  fiziksel cihaz smoke PASS; merge edilmemiş Draft PR yayını bekliyor.
+- **Durum:** Tamamlandı ve #272 / PR #274 ile `master`a merge edildi.
 - Bir Hatırlatıcı tamamlandığında yalnız kendi platform bildirimi kapanır.
 - Diğer aktif ve görünür Hatırlatıcı bildirimleri korunur.
 - Tek kayıt eyleminde genel `cancelAll` veya eşdeğer toplu iptal kullanılmaz.
@@ -262,6 +263,9 @@ geçilmez.
 
 #### D29.2 — Ajanda arama odağı ve klavye izolasyonu — P2
 
+- **Durum:** Dar UI düzeltmesi, focused/full doğrulama ve Samsung `SM-X610`
+  tablet automated wide smoke PASS; Draft PR incelemesi bekliyor. Telefon
+  promotion kullanıcı tarafından ayrı talebe kadar ertelendi ve yapılmadı.
 - Detaydan geri dönmek klavyeyi kendiliğinden açamaz.
 - Arama metni route-local korunabilir; odak, imleç ve klavye kullanıcı açıkça
   arama alanına dokunmadıkça geri gelmez.
@@ -269,7 +273,8 @@ geçilmez.
 - Scroll gesture ile search tap gesture birbirinden ayrılır.
 - Uzun liste, küçük ekran, büyük metin ve detail mutation sonrası dönüş test edilir.
 
-**Kapı:** Kullanıcı açıkça aramaya dokunmadan klavye açılması `0`.
+**Kapı:** Kullanıcı açıkça aramaya dokunmadan klavye açılması `0`. Tablet PASS
+bu Issue'nun yetkili fiziksel tamamlanma kapısıdır.
 
 #### D29.3 — Hatırlatıcı zaman ve düzenleme sürtünmesi — P2
 
