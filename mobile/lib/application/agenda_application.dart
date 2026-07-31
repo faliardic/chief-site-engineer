@@ -1387,6 +1387,39 @@ class SqliteAgendaApplication
           throw const AgendaValidationFailure('Hatırlatıcı bulunamadı.');
         }
         final current = _reminderFromRow(rows.single);
+        if (command.expectedEarlierFromAttentionAt != null) {
+          final priorEvents = await transaction.query(
+            'follow_up_events',
+            columns: ['follow_up_id', 'event_type', 'payload_json'],
+            where: 'id = ?',
+            whereArgs: [command.eventId],
+            limit: 1,
+          );
+          if (priorEvents.isNotEmpty) {
+            final prior = priorEvents.single;
+            Object? decodedPayload;
+            try {
+              decodedPayload = jsonDecode(prior['payload_json']! as String);
+            } on FormatException {
+              decodedPayload = null;
+            }
+            final payload = decodedPayload is Map<String, dynamic>
+                ? decodedPayload
+                : null;
+            if (prior['follow_up_id'] == current.id &&
+                prior['event_type'] == 'rescheduled' &&
+                payload?['earlier_from_attention_at'] ==
+                    command.expectedEarlierFromAttentionAt &&
+                payload?['next_attention_at'] == command.customAttentionAt &&
+                payload?['confirmed_past_attention_at'] ==
+                    command.confirmedPastAttentionAt) {
+              return (reminder: current, changed: false);
+            }
+            throw const AgendaValidationFailure(
+              'Event kimliği başka bir hatırlatıcı işlemi için kullanılmış.',
+            );
+          }
+        }
         if (command.action == ReminderMutationAction.snoozeTomorrowMorning) {
           final priorEvents = await transaction.query(
             'follow_up_events',
@@ -1496,6 +1529,11 @@ class SqliteAgendaApplication
             'next_attention_at': values['next_attention_at'],
             'all_day_local_date': values['all_day_local_date'],
             'trashed_at': values['trashed_at'],
+            if (command.expectedEarlierFromAttentionAt != null)
+              'earlier_from_attention_at':
+                  command.expectedEarlierFromAttentionAt,
+            if (command.expectedEarlierFromAttentionAt != null)
+              'confirmed_past_attention_at': command.confirmedPastAttentionAt,
             if (eventType == 'restored_from_trash') 'restored_at': updatedAt,
             'outcome_type': values['outcome_type'],
             'revision': nextRevision,
@@ -1519,22 +1557,26 @@ class SqliteAgendaApplication
       });
     });
     if (result.changed) {
-      final shouldRequest = switch (command.action) {
-        ReminderMutationAction.schedule ||
-        ReminderMutationAction.snooze15Minutes ||
-        ReminderMutationAction.snooze1Hour ||
-        ReminderMutationAction.snooze2Hours ||
-        ReminderMutationAction.snooze3Hours ||
-        ReminderMutationAction.snoozeTomorrowMorning => true,
-        ReminderMutationAction.restoreFromTrash
-            when result.reminder.status == ReminderStatus.active &&
-                result.reminder.nextAttentionAt != null &&
+      final shouldRequest = command.action == ReminderMutationAction.schedule
+          ? result.reminder.nextAttentionAt != null &&
                 CseTimeCodec.decodeCanonicalUtc(
                   result.reminder.nextAttentionAt!,
-                ).isAfter(now) =>
-          true,
-        _ => false,
-      };
+                ).isAfter(now)
+          : switch (command.action) {
+              ReminderMutationAction.snooze15Minutes ||
+              ReminderMutationAction.snooze1Hour ||
+              ReminderMutationAction.snooze2Hours ||
+              ReminderMutationAction.snooze3Hours ||
+              ReminderMutationAction.snoozeTomorrowMorning => true,
+              ReminderMutationAction.restoreFromTrash
+                  when result.reminder.status == ReminderStatus.active &&
+                      result.reminder.nextAttentionAt != null &&
+                      CseTimeCodec.decodeCanonicalUtc(
+                        result.reminder.nextAttentionAt!,
+                      ).isAfter(now) =>
+                true,
+              _ => false,
+            };
       await _reconcileNotificationsAt(now, requestPermission: shouldRequest);
     }
     return result.reminder;
@@ -1596,6 +1638,13 @@ class SqliteAgendaApplication
     required DateTime now,
   }) {
     final nowValue = CseTimeCodec.encodeUtc(now);
+    if (command.action != ReminderMutationAction.schedule &&
+        (command.expectedEarlierFromAttentionAt != null ||
+            command.confirmedPastAttentionAt != null)) {
+      throw const AgendaValidationFailure(
+        'Erkene alma intent’i yalnız planlama işleminde kullanılabilir.',
+      );
+    }
     if (command.action == ReminderMutationAction.snoozeTomorrowMorning) {
       final today = CseTimeCodec.istanbulDayKey(nowValue);
       if (!isReminderEligibleForTomorrowSnooze(current, istanbulToday: today)) {
@@ -1658,6 +1707,19 @@ class SqliteAgendaApplication
         return 'details_updated';
       case ReminderMutationAction.schedule:
         requireOpen();
+        if (command.expectedEarlierFromAttentionAt != null) {
+          return _applyQuickEarlierSchedule(
+            values: values,
+            current: current,
+            command: command,
+            now: now,
+          );
+        }
+        if (command.confirmedPastAttentionAt != null) {
+          throw const AgendaValidationFailure(
+            'Geçmiş zaman onayı yalnız doğrulanmış erkene alma intent’iyle kullanılabilir.',
+          );
+        }
         final scheduleKind = command.schedule;
         if (scheduleKind == null ||
             scheduleKind == ReminderScheduleKind.inbox) {
@@ -1784,6 +1846,67 @@ class SqliteAgendaApplication
         values['trashed_at'] = null;
         return 'restored_from_trash';
     }
+  }
+
+  String _applyQuickEarlierSchedule({
+    required Map<String, Object?> values,
+    required MobileReminder current,
+    required MutateReminderCommand command,
+    required DateTime now,
+  }) {
+    final earlierFrom = command.expectedEarlierFromAttentionAt!;
+    final selectedAt = command.customAttentionAt;
+    if (command.schedule != ReminderScheduleKind.custom ||
+        selectedAt == null ||
+        command.allDayLocalDate != null ||
+        !isReminderEligibleForQuickEarlier(current)) {
+      throw const AgendaValidationFailure(
+        'Bu hatırlatıcı hızlı biçimde erkene alınamaz.',
+      );
+    }
+    validateCanonicalTimestamp(earlierFrom, 'Mevcut hatırlatıcı zamanı');
+    validateCanonicalTimestamp(selectedAt, 'Yeni hatırlatıcı zamanı');
+    if (current.nextAttentionAt != earlierFrom) {
+      throw const AgendaValidationFailure(
+        'Gösterilen mevcut zaman artık geçerli değil. Ekranı yenileyin.',
+      );
+    }
+    final currentAt = CseTimeCodec.decodeCanonicalUtc(earlierFrom);
+    final candidateAt = CseTimeCodec.decodeCanonicalUtc(selectedAt);
+    if (!candidateAt.isBefore(currentAt)) {
+      throw const AgendaValidationFailure(
+        'Yeni zaman mevcut zamandan daha erken olmalıdır.',
+      );
+    }
+    final confirmedPast = command.confirmedPastAttentionAt;
+    if (confirmedPast != null) {
+      validateCanonicalTimestamp(confirmedPast, 'Onaylanan geçmiş zaman');
+      if (confirmedPast != selectedAt) {
+        throw const AgendaValidationFailure(
+          'Geçmiş zaman onayı seçilen exact zamanla eşleşmiyor.',
+        );
+      }
+    }
+    if (!candidateAt.isAfter(now)) {
+      if (confirmedPast != selectedAt) {
+        throw ReminderPastAttentionConfirmationRequired(
+          earlierFromAttentionAt: earlierFrom,
+          selectedAttentionAt: selectedAt,
+        );
+      }
+    } else if (confirmedPast != null) {
+      throw const AgendaValidationFailure(
+        'Gelecek zaman için geçmiş zaman onayı kullanılamaz.',
+      );
+    }
+    values['status'] = ReminderStatus.active.storageValue;
+    values['next_attention_at'] = selectedAt;
+    values['all_day_local_date'] = null;
+    values['completed_at'] = null;
+    values['cancelled_at'] = null;
+    values['outcome_type'] = null;
+    values['outcome_note'] = null;
+    return 'rescheduled';
   }
 
   bool _sameReminderValues(
@@ -1983,6 +2106,7 @@ class SqliteAgendaApplication
         item.binding.platformNotificationId: item,
     };
     final validPendingIds = <int>{};
+    final cancelledPendingIds = <int>{};
     for (final item in pending) {
       final expected = desiredByPlatformId[item.platformId];
       if (expected != null &&
@@ -1999,6 +2123,7 @@ class SqliteAgendaApplication
       }
       try {
         await notificationGateway.cancel(item.platformId);
+        cancelledPendingIds.add(item.platformId);
       } on Object {
         // A later bootstrap retries orphan cleanup.
       }
@@ -2079,7 +2204,11 @@ class SqliteAgendaApplication
     }
     for (final item in terminalToClean) {
       try {
-        await notificationGateway.cancel(item.binding.platformNotificationId);
+        if (!cancelledPendingIds.contains(
+          item.binding.platformNotificationId,
+        )) {
+          await notificationGateway.cancel(item.binding.platformNotificationId);
+        }
         updates.add(
           _BindingUpdate(
             reminderId: item.reminder.id,
@@ -2115,11 +2244,11 @@ class SqliteAgendaApplication
     // Trash cancellation clears scheduledFor. An overdue repeat may keep an
     // existing native chain, but a cancelled chain must not restart later.
     if (item.binding.repeatIntervalMinutes != null) {
-      return item.binding.scheduledFor != null
+      return item.binding.scheduledFor == reminder.nextAttentionAt
           ? _NotificationDisposition.schedulable
           : _NotificationDisposition.terminal;
     }
-    return item.binding.scheduledFor != null
+    return item.binding.scheduledFor == reminder.nextAttentionAt
         ? _NotificationDisposition.preserveDeliveredOneTime
         : _NotificationDisposition.terminal;
   }
@@ -2150,6 +2279,7 @@ class SqliteAgendaApplication
         item.binding.platformNotificationId: item,
     };
     final valid = <int>{};
+    final cancelledPendingIds = <int>{};
     for (final item in pending) {
       final expected = eligibleByPlatformId[item.platformId];
       if (expected != null &&
@@ -2167,6 +2297,7 @@ class SqliteAgendaApplication
       }
       try {
         await notificationGateway.cancel(item.platformId);
+        cancelledPendingIds.add(item.platformId);
       } on Object {
         // A later reconciliation retries privacy-safe orphan cleanup.
       }
@@ -2215,7 +2346,11 @@ class SqliteAgendaApplication
     }
     for (final item in terminalToClean) {
       try {
-        await notificationGateway.cancel(item.binding.platformNotificationId);
+        if (!cancelledPendingIds.contains(
+          item.binding.platformNotificationId,
+        )) {
+          await notificationGateway.cancel(item.binding.platformNotificationId);
+        }
       } on Object {
         // A later reconciliation retries terminal cleanup.
       }

@@ -161,6 +161,10 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
     bool? isImportant,
     String? deadlineAt,
     String? conditionText,
+    String? expectedEarlierFromAttentionAt,
+    String? confirmedPastAttentionAt,
+    String? eventId,
+    bool exposePastConfirmation = false,
   }) async {
     if (_mutating || _detail == null) return;
     setState(() {
@@ -171,7 +175,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
       await widget.agenda.mutateReminder(
         MutateReminderCommand(
           reminderId: widget.reminderId,
-          eventId: RecordId.randomUuid(),
+          eventId: eventId ?? RecordId.randomUuid(),
           expectedRevision: _detail!.reminder.revision,
           action: action,
           title: title,
@@ -184,11 +188,16 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
           conditionText: conditionText,
           schedule: schedule,
           customAttentionAt: customAttentionAt,
+          expectedEarlierFromAttentionAt: expectedEarlierFromAttentionAt,
+          confirmedPastAttentionAt: confirmedPastAttentionAt,
           outcomeType: outcomeType,
           outcomeNote: outcomeNote,
         ),
       );
       await _reload();
+    } on ReminderPastAttentionConfirmationRequired catch (error) {
+      if (exposePastConfirmation) rethrow;
+      if (mounted) setState(() => _error = error.message);
     } on AgendaValidationFailure catch (error) {
       if (mounted) setState(() => _error = error.message);
     } on Object {
@@ -310,6 +319,178 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
       schedule: choice,
       customAttentionAt: custom,
     );
+  }
+
+  Future<void> _showEarlierFlow() async {
+    final current = _detail?.reminder;
+    if (_mutating ||
+        current == null ||
+        !isReminderEligibleForQuickEarlier(current)) {
+      return;
+    }
+    final earlierFrom = current.nextAttentionAt!;
+    final currentLocal = CseTimeCodec.toIstanbul(earlierFrom);
+    final date = await showDatePicker(
+      context: context,
+      initialDate: DateTime(
+        currentLocal.year,
+        currentLocal.month,
+        currentLocal.day,
+      ),
+      firstDate: DateTime(currentLocal.year - 10),
+      lastDate: DateTime(currentLocal.year + 10),
+      helpText: 'Yeni tarihi seçin',
+      cancelText: 'Vazgeç',
+      confirmText: 'İleri',
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(
+        hour: currentLocal.hour,
+        minute: currentLocal.minute,
+      ),
+      helpText: 'Yeni saati seçin',
+      cancelText: 'Vazgeç',
+      confirmText: 'Tamam',
+      builder: (context, child) {
+        final media = MediaQuery.of(context);
+        return MediaQuery(
+          data: media.copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        );
+      },
+    );
+    if (time == null || !mounted) return;
+    final selectedAt = CseTimeCodec.canonicalFromIstanbulComponents(
+      year: date.year,
+      month: date.month,
+      day: date.day,
+      hour: time.hour,
+      minute: time.minute,
+    );
+    if (!CseTimeCodec.decodeCanonicalUtc(
+      selectedAt,
+    ).isBefore(CseTimeCodec.decodeCanonicalUtc(earlierFrom))) {
+      final openSchedule = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Daha erken bir zaman seçin'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                formatReminderExactSchedule(earlierFrom),
+                key: const Key('reminder-earlier-current-time'),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                formatReminderExactSchedule(selectedAt),
+                key: const Key('reminder-earlier-selected-time'),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Yeni zaman mevcut zamandan daha erken olmalıdır. '
+                'Daha sonraki bir zaman için Planla akışını kullanın.',
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Vazgeç'),
+            ),
+            FilledButton(
+              key: const Key('open-schedule-from-earlier'),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Planla'),
+            ),
+          ],
+        ),
+      );
+      if (openSchedule == true && mounted) await _showScheduleSheet();
+      return;
+    }
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hatırlatıcı erkene alınsın mı?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Mevcut zaman'),
+            Text(
+              formatReminderExactSchedule(earlierFrom),
+              key: const Key('reminder-earlier-current-time'),
+            ),
+            const SizedBox(height: 8),
+            const Text('Yeni zaman'),
+            Text(
+              formatReminderExactSchedule(selectedAt),
+              key: const Key('reminder-earlier-selected-time'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            key: const Key('confirm-earlier-reminder'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Erkene al'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true || !mounted) return;
+    final eventId = RecordId.randomUuid();
+    try {
+      await _mutate(
+        ReminderMutationAction.schedule,
+        schedule: ReminderScheduleKind.custom,
+        customAttentionAt: selectedAt,
+        expectedEarlierFromAttentionAt: earlierFrom,
+        eventId: eventId,
+        exposePastConfirmation: true,
+      );
+    } on ReminderPastAttentionConfirmationRequired {
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Geçmiş zamanı açıkça onaylayın'),
+          content: Text(
+            '${formatReminderExactSchedule(selectedAt)} işlem anında geçmişte '
+            'kalıyor. Hatırlatıcı aktif ve gecikmiş olarak kaydedilecek; '
+            'gelecek native bildirimi kurulmayacak.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Vazgeç'),
+            ),
+            FilledButton(
+              key: const Key('confirm-past-earlier-reminder'),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Geçmiş zamana al'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      await _mutate(
+        ReminderMutationAction.schedule,
+        schedule: ReminderScheduleKind.custom,
+        customAttentionAt: selectedAt,
+        expectedEarlierFromAttentionAt: earlierFrom,
+        confirmedPastAttentionAt: selectedAt,
+        eventId: eventId,
+      );
+    }
   }
 
   Future<void> _showCompletionDialog() async {
@@ -568,6 +749,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
       reminder,
       istanbulToday: istanbulToday,
     );
+    final earlierEligible = isReminderEligibleForQuickEarlier(reminder);
     return ListView(
       key: const Key('reminder-detail'),
       padding: const EdgeInsets.all(16),
@@ -787,6 +969,13 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
                       ? null
                       : () => _mutate(ReminderMutationAction.snooze3Hours),
                 ),
+                if (earlierEligible)
+                  _ActionButton(
+                    key: const Key('earlier-reminder'),
+                    label: 'Erkene al',
+                    icon: Icons.history_toggle_off,
+                    onPressed: _mutating ? null : _showEarlierFlow,
+                  ),
                 _ActionButton(
                   key: const Key('schedule-reminder'),
                   label: 'Yeni tarih',
