@@ -1387,6 +1387,13 @@ class SqliteAgendaApplication
           throw const AgendaValidationFailure('Hatırlatıcı bulunamadı.');
         }
         final current = _reminderFromRow(rows.single);
+        if (command.action == ReminderMutationAction.schedule &&
+            command.allDayLocalDate != null &&
+            current.attendanceDayId != null) {
+          throw const AgendaValidationFailure(
+            'Puantaj tarafından yönetilen hatırlatıcı doğrudan tam gün planlanamaz.',
+          );
+        }
         if (command.expectedEarlierFromAttentionAt != null) {
           final priorEvents = await transaction.query(
             'follow_up_events',
@@ -1432,6 +1439,44 @@ class SqliteAgendaApplication
             final prior = priorEvents.single;
             if (prior['follow_up_id'] == current.id &&
                 prior['event_type'] == 'snoozed') {
+              return (reminder: current, changed: false);
+            }
+            throw const AgendaValidationFailure(
+              'Event kimliği başka bir hatırlatıcı işlemi için kullanılmış.',
+            );
+          }
+        }
+        if (command.action == ReminderMutationAction.schedule &&
+            command.expectedEarlierFromAttentionAt == null &&
+            command.allDayLocalDate != null) {
+          final priorEvents = await transaction.query(
+            'follow_up_events',
+            columns: ['follow_up_id', 'event_type', 'payload_json'],
+            where: 'id = ?',
+            whereArgs: [command.eventId],
+            limit: 1,
+          );
+          if (priorEvents.isNotEmpty) {
+            final prior = priorEvents.single;
+            Object? decodedPayload;
+            try {
+              decodedPayload = jsonDecode(prior['payload_json']! as String);
+            } on FormatException {
+              decodedPayload = null;
+            }
+            final payload = decodedPayload is Map<String, dynamic>
+                ? decodedPayload
+                : null;
+            if (prior['follow_up_id'] == current.id &&
+                (prior['event_type'] == 'scheduled' ||
+                    prior['event_type'] == 'rescheduled') &&
+                payload?['next_attention_at'] == null &&
+                payload?['all_day_local_date'] == command.allDayLocalDate &&
+                payload?['status'] == ReminderStatus.active.storageValue &&
+                payload?['revision'] == current.revision &&
+                current.status == ReminderStatus.active &&
+                current.nextAttentionAt == null &&
+                current.allDayLocalDate == command.allDayLocalDate) {
               return (reminder: current, changed: false);
             }
             throw const AgendaValidationFailure(

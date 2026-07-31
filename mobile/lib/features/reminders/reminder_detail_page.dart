@@ -40,6 +40,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
   Future<ReminderSourceAgendaMedia>? _sourceAgendaMedia;
   bool _loading = true;
   bool _mutating = false;
+  bool _scheduleFlowOpen = false;
   String? _error;
 
   @override
@@ -151,6 +152,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
     ReminderMutationAction action, {
     ReminderScheduleKind? schedule,
     String? customAttentionAt,
+    String? allDayLocalDate,
     ReminderOutcomeType? outcomeType,
     String? outcomeNote,
     String? title,
@@ -188,6 +190,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
           conditionText: conditionText,
           schedule: schedule,
           customAttentionAt: customAttentionAt,
+          allDayLocalDate: allDayLocalDate,
           expectedEarlierFromAttentionAt: expectedEarlierFromAttentionAt,
           confirmedPastAttentionAt: confirmedPastAttentionAt,
           outcomeType: outcomeType,
@@ -242,6 +245,17 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
   }
 
   Future<void> _showScheduleSheet() async {
+    final current = _detail?.reminder;
+    if (_mutating || _scheduleFlowOpen || current == null) return;
+    setState(() => _scheduleFlowOpen = true);
+    try {
+      await _runScheduleSheet(current);
+    } finally {
+      if (mounted) setState(() => _scheduleFlowOpen = false);
+    }
+  }
+
+  Future<void> _runScheduleSheet(MobileReminder current) async {
     final scheduleNowUtc = clock.now().toUtc();
     final quickPreviews = {
       for (final schedule in [
@@ -253,42 +267,124 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
           scheduleNowUtc,
         )!,
     };
-    final choice = await showModalBottomSheet<ReminderScheduleKind>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            ...[
-              ReminderScheduleKind.in15Minutes,
-              ReminderScheduleKind.in1Hour,
-              ReminderScheduleKind.in2Hours,
-              ReminderScheduleKind.in3Hours,
-              ReminderScheduleKind.tomorrowMorning,
-              ReminderScheduleKind.nextWeekStart,
-              ReminderScheduleKind.custom,
-            ].map(
-              (schedule) => ListTile(
-                key: Key('reminder-schedule-option-${schedule.name}'),
-                minVerticalPadding: 12,
-                title: Text(schedule.label),
-                subtitle: quickPreviews[schedule] == null
-                    ? null
-                    : Text(
-                        formatReminderExactSchedule(quickPreviews[schedule]!),
-                        key: Key('reminder-schedule-preview-${schedule.name}'),
+    final choice =
+        await showModalBottomSheet<
+          ({bool allDay, ReminderScheduleKind? schedule})
+        >(
+          context: context,
+          isScrollControlled: true,
+          showDragHandle: true,
+          builder: (sheetContext) => SafeArea(
+            child: FractionallySizedBox(
+              heightFactor: 0.90,
+              child: ListView(
+                primary: false,
+                children: [
+                  ...[
+                    ReminderScheduleKind.in15Minutes,
+                    ReminderScheduleKind.in1Hour,
+                    ReminderScheduleKind.in2Hours,
+                    ReminderScheduleKind.in3Hours,
+                    ReminderScheduleKind.tomorrowMorning,
+                    ReminderScheduleKind.nextWeekStart,
+                    ReminderScheduleKind.custom,
+                  ].map(
+                    (schedule) => ListTile(
+                      key: Key('reminder-schedule-option-${schedule.name}'),
+                      minVerticalPadding: 12,
+                      title: Text(schedule.label),
+                      subtitle: quickPreviews[schedule] == null
+                          ? null
+                          : Text(
+                              formatReminderExactSchedule(
+                                quickPreviews[schedule]!,
+                              ),
+                              key: Key(
+                                'reminder-schedule-preview-${schedule.name}',
+                              ),
+                            ),
+                      onTap: () => Navigator.pop(sheetContext, (
+                        allDay: false,
+                        schedule: schedule,
+                      )),
+                    ),
+                  ),
+                  if (current.attendanceDayId == null)
+                    ListTile(
+                      key: const Key('reminder-schedule-option-allDay'),
+                      minVerticalPadding: 12,
+                      title: const Text('Tam gün'),
+                      subtitle: const Text(
+                        'Saat seçmeden bir takvim günü planla',
                       ),
-                onTap: () => Navigator.pop(context, schedule),
+                      onTap: () => Navigator.pop(
+                        sheetContext,
+                        (allDay: true, schedule: null),
+                      ),
+                    ),
+                ],
               ),
+            ),
+          ),
+        );
+    if (choice == null || !mounted) return;
+    if (choice.allDay) {
+      final initialDate = _allDayInitialDate(current);
+      final today = _dateFromDayKey(_istanbulToday());
+      final date = await showDatePicker(
+        context: context,
+        initialDate: initialDate,
+        firstDate: DateTime(
+          initialDate.year < today.year
+              ? initialDate.year - 10
+              : today.year - 10,
+        ),
+        lastDate: DateTime(
+          initialDate.year > today.year
+              ? initialDate.year + 10
+              : today.year + 10,
+          12,
+          31,
+        ),
+        currentDate: today,
+        helpText: 'Tam gün tarihini seçin',
+        cancelText: 'Vazgeç',
+        confirmText: 'İleri',
+      );
+      if (date == null || !mounted) return;
+      final allDayLocalDate = _dayKey(date);
+      final accepted = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Tam gün planlansın mı?'),
+          content: Text(
+            '${CseTimeCodec.formatIstanbulDay(allDayLocalDate)} • Tam gün',
+            key: const Key('reminder-all-day-schedule-preview'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Vazgeç'),
+            ),
+            FilledButton(
+              key: const Key('confirm-reminder-all-day-schedule'),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Tam gün planla'),
             ),
           ],
         ),
-      ),
-    );
-    if (choice == null || !mounted) return;
+      );
+      if (accepted != true || !mounted) return;
+      await _mutate(
+        ReminderMutationAction.schedule,
+        schedule: ReminderScheduleKind.custom,
+        allDayLocalDate: allDayLocalDate,
+      );
+      return;
+    }
+    final schedule = choice.schedule!;
     String? custom;
-    if (choice == ReminderScheduleKind.custom) {
+    if (schedule == ReminderScheduleKind.custom) {
       final now = CseTimeCodec.toIstanbul(
         CseTimeCodec.encodeUtc(clock.now().toUtc()),
       );
@@ -312,14 +408,40 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
         minute: time.minute,
       );
     } else {
-      custom = quickPreviews[choice];
+      custom = quickPreviews[schedule];
     }
     await _mutate(
       ReminderMutationAction.schedule,
-      schedule: choice,
+      schedule: schedule,
       customAttentionAt: custom,
     );
   }
+
+  DateTime _allDayInitialDate(MobileReminder reminder) {
+    if (reminder.allDayLocalDate case final allDay?) {
+      return _dateFromDayKey(allDay);
+    }
+    if (reminder.nextAttentionAt case final timed?) {
+      final local = CseTimeCodec.toIstanbul(timed);
+      return DateTime(local.year, local.month, local.day);
+    }
+    return _dateFromDayKey(_istanbulToday());
+  }
+
+  String _istanbulToday() =>
+      widget.istanbulToday ??
+      CseTimeCodec.istanbulDayKey(CseTimeCodec.encodeUtc(clock.now().toUtc()));
+
+  static DateTime _dateFromDayKey(String value) {
+    CseTimeCodec.validateIstanbulDay(value);
+    final parts = value.split('-').map(int.parse).toList(growable: false);
+    return DateTime(parts[0], parts[1], parts[2]);
+  }
+
+  static String _dayKey(DateTime value) =>
+      '${value.year.toString().padLeft(4, '0')}-'
+      '${value.month.toString().padLeft(2, '0')}-'
+      '${value.day.toString().padLeft(2, '0')}';
 
   Future<void> _showEarlierFlow() async {
     final current = _detail?.reminder;
@@ -980,7 +1102,9 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
                   key: const Key('schedule-reminder'),
                   label: 'Yeni tarih',
                   icon: Icons.event_outlined,
-                  onPressed: _mutating ? null : _showScheduleSheet,
+                  onPressed: _mutating || _scheduleFlowOpen
+                      ? null
+                      : _showScheduleSheet,
                 ),
               ] else
                 _ActionButton(
