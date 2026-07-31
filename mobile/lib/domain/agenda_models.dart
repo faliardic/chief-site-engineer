@@ -10,6 +10,19 @@ class AgendaValidationFailure implements Exception {
   String toString() => message;
 }
 
+class ReminderPastAttentionConfirmationRequired
+    extends AgendaValidationFailure {
+  const ReminderPastAttentionConfirmationRequired({
+    required this.earlierFromAttentionAt,
+    required this.selectedAttentionAt,
+  }) : super(
+         'Seçilen zaman işlem anında geçmişte kalıyor; kaydetmek için açık onay gereklidir.',
+       );
+
+  final String earlierFromAttentionAt;
+  final String selectedAttentionAt;
+}
+
 enum AgendaCategory {
   generalNote('general_note', 'Genel not'),
   manufacturing('manufacturing', 'İmalat'),
@@ -440,6 +453,22 @@ bool isReminderEligibleForTomorrowSnooze(
   }
 }
 
+bool isReminderEligibleForQuickEarlier(MobileReminder reminder) {
+  if (reminder.status != ReminderStatus.active ||
+      reminder.trashedAt != null ||
+      reminder.attendanceDayId != null ||
+      reminder.allDayLocalDate != null ||
+      reminder.nextAttentionAt == null) {
+    return false;
+  }
+  try {
+    CseTimeCodec.decodeCanonicalUtc(reminder.nextAttentionAt!);
+    return true;
+  } on TimeContractViolation {
+    return false;
+  }
+}
+
 class NotificationBinding {
   const NotificationBinding({
     required this.reminderId,
@@ -727,6 +756,8 @@ class MutateReminderCommand {
     this.schedule,
     this.customAttentionAt,
     this.allDayLocalDate,
+    this.expectedEarlierFromAttentionAt,
+    this.confirmedPastAttentionAt,
     this.outcomeType,
     this.outcomeNote,
   });
@@ -747,6 +778,8 @@ class MutateReminderCommand {
   final ReminderScheduleKind? schedule;
   final String? customAttentionAt;
   final String? allDayLocalDate;
+  final String? expectedEarlierFromAttentionAt;
+  final String? confirmedPastAttentionAt;
   final ReminderOutcomeType? outcomeType;
   final String? outcomeNote;
 }

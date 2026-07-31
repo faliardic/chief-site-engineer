@@ -1,18 +1,18 @@
 # CSE 2026.3.4 — Asistan-Öncelikli Ürün Yol Haritası
 
 **Durum:** Kanonik ürün sırası  
-**Tarih:** 30 Temmuz 2026\
+**Tarih:** 31 Temmuz 2026\
 **Ürün Epic'i:** #105  
 **Yürütme Epic'i:** #127  
 **Güncel saha backlog'u:** #219  
 **Önceki saha backlog'u:** #203  
 **Açık Release 0.1 pilotu:** #193  
 **Güncel RC / günlük saha testi:** #245  
-**Roadmap senkronizasyonu:** #270\
+**Roadmap senkronizasyonu:** #280 / PR #281\
 **Son merge edilen production işi:** #277 / PR #278 — exact reminder hızlı planlama zamanları\
-**Aktif production işi:** Issue #279 — README/NotebookLM senkronu için duraklatıldı; birleşmemiş\
-**Aktif dokümantasyon işi:** Issue #280 — README ve NotebookLM current-state senkronizasyonu\
-**Sıradaki production işi:** #279 yalnız ayrı devam talimatı ve kendi fail-closed kapılarıyla\
+**Son merge edilen dokümantasyon işi:** #280 / PR #281 — README ve NotebookLM current-state senkronizasyonu\
+**Aktif production işi:** Issue #279 — implementation ve tablet-only completion PASS; Draft PR aşamasında\
+**Sıradaki production işi:** #279 merge/closure sonrasında ayrı GitHub yetkisiyle seçilecek\
 **Bloklu yatay kabul zinciri:** #257 → #254 / #256, Draft PR #259
 
 ## 1. Ürün kararı
@@ -54,27 +54,32 @@ Tamamlanan günlük güvenilirlik dilimleri:
 - #268 / PR #269 — Ajanda deterministik sıralama;
 - #272 / PR #274 — Hatırlatıcı bildirim izolasyonu;
 - #275 / PR #276 — Ajanda arama odağı ve klavye izolasyonu;
-- #277 / PR #278 — ertesi gün ve hafta başı exact `08:00` hızlı planlama.
+- #277 / PR #278 — ertesi gün ve hafta başı exact `08:00` hızlı planlama;
+- #279 — Hatırlatıcı detayında güvenli `Erkene al` ve açık geçmiş-zaman onayı;
+  implementation ve tablet-only completion PASS, henüz merge edilmedi.
 
 Güncel güvenli `master`:
 
 ```text
-c72f6bc55fc658996a546d9833b85a2614b99327
+86d39b85e388e3ab44b985c63544f0fc5a1f8d5c
 ```
 
-Bu master noktası #277 / PR #278 exact reminder hızlı planlama davranışını
-taşır. `Yarın sabah` ve timed `Yarın 08:00` ertesi Europe/Istanbul günü
-`08:00`; `Hafta başına ertele` sonraki pazartesi `08:00` üretir. Son merged
-kanıt focused lifecycle `48/48`, focused widget `46/46`, Beton regression
+Bu master noktası #277 / PR #278 exact reminder hızlı planlama davranışını ve
+#280 / PR #281 README/NotebookLM current-state senkronizasyonunu taşır.
+`Yarın sabah` ve timed `Yarın 08:00` ertesi Europe/Istanbul günü `08:00`;
+`Hafta başına ertele` sonraki pazartesi `08:00` üretir. Son merged production
+kanıtı focused lifecycle `48/48`, focused widget `46/46`, Beton regression
 `1/1`, Flutter full suite `333/333`, Flutter analyze `0` ve Samsung `SM-X610`
-tablet wide smoke PASS'tir. Kullanıcı tablet PASS'i bu Issue'nun fiziksel
-tamamlanma kapısı seçmiş; telefon promotion yapılmamıştır. Mobil schema `10`,
-backup formatı `1` ve migration `0` korunmuştur.
+tablet wide smoke PASS'tir. Mobil schema `10`, backup formatı `1` ve migration
+`0` korunmuştur.
 
-Issue #279 birleşmemiş aktif iştir ve README/NotebookLM senkronizasyonu için
-duraklatılmıştır. Dalındaki fail-closed widget blocker'ı merged safe point'i
-değiştirmez; full/analyze/build/tablet kapıları çalıştırılmamıştır. Issue #280
-yalnız dokümantasyon, state ve deterministic NotebookLM tooling kapsamındadır.
+Issue #279 birleşmemiş aktif production işidir. `Erkene al`, same/later
+rejection ve ayrı geçmiş-zaman onayı implementation'ı tamamlanmış; rebase
+sonrası focused lifecycle `52/52`, focused widget `51/51`, full Flutter
+`342/342`, analyze ve exact allowlist kapıları PASS olmuştur. Rebase öncesi
+Samsung `SM-X610` tablet kabulü, production/test blob eşitliği `6/6`
+kanıtlandığı için yeniden kullanılmıştır. Yeni build/install/tablet smoke ve
+telefon promotion yapılmamıştır.
 
 Fiziksel cihaz smoke otomasyonu için #254 üzerinde izole acceptance harness,
 #256 üzerinde atomik build-root rotasyonu ve #257 üzerinde doğrulanmış acceptance
@@ -281,11 +286,16 @@ bu Issue'nun yetkili fiziksel tamamlanma kapısıdır.
 
 #### D29.3 — Hatırlatıcı zaman ve düzenleme sürtünmesi — P2
 
-- `Yarın sabah` exact ertesi yerel gün `08:00` anlamına gelir.
+- `Yarın sabah` exact ertesi yerel gün `08:00` anlamına gelir. #277 / PR #278
+  ile tamamlandı.
 - `Hafta başına ertele` exact sonraki pazartesi `08:00` anlamına gelir.
-- Uygulanacak kesin tarih ve saat işlemden önce gösterilir.
-- Hatırlatıcı, tam forma girmeden güvenli biçimde erkene alınabilir.
-- Geçmiş zamana düşen seçim açık onay olmadan kaydedilmez.
+  #277 / PR #278 ile tamamlandı.
+- Uygulanacak kesin tarih ve saat işlemden önce gösterilir. #279 ile
+  implementation ve tablet-only completion PASS.
+- Hatırlatıcı, tam forma girmeden güvenli biçimde erkene alınabilir. #279 ile
+  implementation ve tablet-only completion PASS.
+- Geçmiş zamana düşen seçim açık onay olmadan kaydedilmez. #279 ile
+  implementation ve tablet-only completion PASS.
 - Düzenleme ekranında `Tam gün` seçeneği bulunur.
 - Tam gün kayıtları ilgili gün içinde saatli kayıtların üstünde gösterilir;
   gecikmiş/kritik bölüm sessizce aşağı itilmez.

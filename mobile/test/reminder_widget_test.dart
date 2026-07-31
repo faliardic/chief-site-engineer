@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:chief_site_engineer/app.dart';
 import 'package:chief_site_engineer/application/agenda_application.dart';
@@ -86,6 +87,47 @@ StoredAttachmentContent sourcePhotoContent(String fileName) =>
         '+A8AAQUBAScY42YAAAAASUVORK5CYII=',
       ),
     );
+
+Future<void> chooseEarlierLocalTime(
+  WidgetTester tester, {
+  required int hour,
+}) async {
+  Future<void> tapDial({
+    required int value,
+    required int divisions,
+    required bool inner,
+  }) async {
+    final dial = find.byWidgetPredicate(
+      (widget) =>
+          widget is CustomPaint &&
+          widget.painter?.runtimeType.toString() == '_DialPainter',
+    );
+    expect(dial, findsOneWidget);
+    final center = tester.getCenter(dial);
+    final dialRadius = tester.getSize(dial).shortestSide / 2;
+    final targetRadius = dialRadius * (inner ? 0.6 : 0.8);
+    final angle = value * math.pi * 2 / divisions;
+    await tester.tapAt(
+      center.translate(
+        math.sin(angle) * targetRadius,
+        -math.cos(angle) * targetRadius,
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  await tester.tap(find.text('İleri'));
+  await tester.pumpAndSettle();
+  expect(find.byType(TimePickerDialog), findsOneWidget);
+  await tapDial(
+    value: hour % TimeOfDay.hoursPerPeriod,
+    divisions: TimeOfDay.hoursPerPeriod,
+    inner: hour >= TimeOfDay.hoursPerPeriod,
+  );
+  await tapDial(value: 0, divisions: 12, inner: false);
+  await tester.tap(find.text('Tamam'));
+  await tester.pumpAndSettle();
+}
 
 void main() {
   testWidgets('+ Unutma is usable at 320 px with 44 px targets', (
@@ -627,7 +669,11 @@ void main() {
       );
       await tester.pumpWidget(
         MaterialApp(
-          home: ReminderDetailPage(agenda: agenda, reminderId: item.id),
+          home: ReminderDetailPage(
+            key: UniqueKey(),
+            agenda: agenda,
+            reminderId: item.id,
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -1248,6 +1294,277 @@ void main() {
       expect(agenda.reminders.single.revision, item.revision);
     },
   );
+
+  testWidgets('Erkene al is visible only for eligible active timed reminder', (
+    tester,
+  ) async {
+    Future<void> pumpDetail(MobileReminder item) async {
+      final agenda = FakeAgendaApplication(
+        reminders: [item],
+        reminderDetail: item,
+        asOfUtc: DateTime.utc(2026, 7, 19, 8),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          key: UniqueKey(),
+          home: ReminderDetailPage(
+            key: UniqueKey(),
+            agenda: agenda,
+            reminderId: item.id,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    await pumpDetail(reminder(nextAttentionAt: '2026-07-19T12:00:00Z'));
+    final earlier = find.byKey(const Key('earlier-reminder'));
+    expect(earlier, findsOneWidget);
+    await tester.scrollUntilVisible(
+      earlier,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Erkene al'), findsOneWidget);
+
+    for (final item in [
+      reminder(allDayLocalDate: '2026-07-19'),
+      reminder(status: ReminderStatus.inbox),
+      reminder(status: ReminderStatus.completed),
+      reminder(trashedAt: '2026-07-19T08:00:00Z'),
+      reminder(
+        nextAttentionAt: '2026-07-19T12:00:00Z',
+        attendanceDayId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      ),
+    ]) {
+      await pumpDetail(item);
+      expect(find.byKey(const Key('earlier-reminder')), findsNothing);
+    }
+  });
+
+  testWidgets(
+    'Erkene al shows exact old-new values and submits future earlier once',
+    (tester) async {
+      await withClock(Clock.fixed(DateTime.utc(2026, 7, 19, 8)), () async {
+        final item = reminder(nextAttentionAt: '2026-07-19T12:00:00Z');
+        final updatedItem = reminder(
+          nextAttentionAt: '2026-07-19T11:00:00Z',
+        );
+        final mutationCompleter = Completer<MobileReminder>();
+        final agenda = FakeAgendaApplication(
+          reminders: [item],
+          reminderDetail: item,
+          asOfUtc: DateTime.utc(2026, 7, 19, 8),
+        )..mutateReminderCompleter = mutationCompleter;
+        await tester.pumpWidget(
+          MediaQuery(
+            data: const MediaQueryData(alwaysUse24HourFormat: true),
+            child: MaterialApp(
+              home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final earlier = find.byKey(const Key('earlier-reminder'));
+        expect(earlier, findsOneWidget);
+        await tester.scrollUntilVisible(
+          earlier,
+          300,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.tap(earlier);
+        await tester.pumpAndSettle();
+        expect(find.byType(DatePickerDialog), findsOneWidget);
+        await chooseEarlierLocalTime(tester, hour: 14);
+
+        expect(
+          find.byKey(const Key('reminder-earlier-current-time')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('reminder-earlier-selected-time')),
+          findsOneWidget,
+        );
+        expect(find.text('19.07.2026 15:00'), findsOneWidget);
+        expect(find.text('19.07.2026 14:00'), findsOneWidget);
+        final confirm = find.byKey(const Key('confirm-earlier-reminder'));
+        await tester.tap(confirm);
+        await tester.pump();
+        await tester.tap(confirm, warnIfMissed: false);
+
+        expect(agenda.mutateReminderCalls, 1);
+        agenda
+          ..reminders = [updatedItem]
+          ..reminderDetail = updatedItem;
+        mutationCompleter.complete(updatedItem);
+        await tester.pumpAndSettle();
+        expect(
+          agenda.lastMutationCommand!.action,
+          ReminderMutationAction.schedule,
+        );
+        expect(
+          agenda.lastMutationCommand!.schedule,
+          ReminderScheduleKind.custom,
+        );
+        expect(
+          agenda.lastMutationCommand!.customAttentionAt,
+          '2026-07-19T11:00:00Z',
+        );
+      });
+    },
+  );
+
+  testWidgets(
+    'past earlier selection requires second explicit confirmation and cancel is safe',
+    (tester) async {
+      await withClock(Clock.fixed(DateTime.utc(2026, 7, 19, 8)), () async {
+        final item = reminder(nextAttentionAt: '2026-07-19T12:00:00Z');
+        final agenda = FakeAgendaApplication(
+          reminders: [item],
+          reminderDetail: item,
+          asOfUtc: DateTime.utc(2026, 7, 19, 8),
+        );
+        await tester.pumpWidget(
+          MediaQuery(
+            data: const MediaQueryData(alwaysUse24HourFormat: true),
+            child: MaterialApp(
+              home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final earlier = find.byKey(const Key('earlier-reminder'));
+        expect(earlier, findsOneWidget);
+        await tester.scrollUntilVisible(
+          earlier,
+          300,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.tap(earlier);
+        await tester.pumpAndSettle();
+        await chooseEarlierLocalTime(tester, hour: 10);
+        await tester.tap(find.byKey(const Key('confirm-earlier-reminder')));
+        await tester.pumpAndSettle();
+
+        expect(agenda.mutateReminderCalls, 1);
+        expect(
+          find.byKey(const Key('confirm-past-earlier-reminder')),
+          findsOneWidget,
+        );
+        expect(find.textContaining('geçmişte kalıyor'), findsOneWidget);
+        await tester.tap(find.text('Vazgeç'));
+        await tester.pumpAndSettle();
+        expect(agenda.mutateReminderCalls, 1);
+        expect(agenda.reminders.single.revision, item.revision);
+
+        await tester.scrollUntilVisible(
+          earlier,
+          300,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.tap(earlier);
+        await tester.pumpAndSettle();
+        await chooseEarlierLocalTime(tester, hour: 10);
+        await tester.tap(find.byKey(const Key('confirm-earlier-reminder')));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const Key('confirm-past-earlier-reminder')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(agenda.mutateReminderCalls, 3);
+        expect(
+          agenda.lastMutationCommand!.customAttentionAt,
+          '2026-07-19T07:00:00Z',
+        );
+        expect(agenda.reminders.single.nextAttentionAt, '2026-07-19T07:00:00Z');
+        expect(agenda.reminders.single.revision, item.revision + 1);
+      });
+    },
+  );
+
+  testWidgets(
+    'same or later earlier selection offers Planla without mutation',
+    (tester) async {
+      await withClock(Clock.fixed(DateTime.utc(2026, 7, 19, 8)), () async {
+        final item = reminder(nextAttentionAt: '2026-07-19T12:00:00Z');
+        final agenda = FakeAgendaApplication(
+          reminders: [item],
+          reminderDetail: item,
+          asOfUtc: DateTime.utc(2026, 7, 19, 8),
+        );
+        await tester.pumpWidget(
+          MediaQuery(
+            data: const MediaQueryData(alwaysUse24HourFormat: true),
+            child: MaterialApp(
+              home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final earlier = find.byKey(const Key('earlier-reminder'));
+        expect(earlier, findsOneWidget);
+        await tester.scrollUntilVisible(
+          earlier,
+          300,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.tap(earlier);
+        await tester.pumpAndSettle();
+        await chooseEarlierLocalTime(tester, hour: 15);
+
+        expect(agenda.mutateReminderCalls, 0);
+        expect(
+          find.textContaining('mevcut zamandan daha erken'),
+          findsOneWidget,
+        );
+        final plan = find.byKey(const Key('open-schedule-from-earlier'));
+        expect(plan, findsOneWidget);
+        await tester.tap(plan);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('reminder-schedule-option-in15Minutes')),
+          findsOneWidget,
+        );
+        expect(agenda.mutateReminderCalls, 0);
+      });
+    },
+  );
+
+  testWidgets('earlier date picker cancellation leaves reminder untouched', (
+    tester,
+  ) async {
+    final item = reminder(nextAttentionAt: '2026-07-19T12:00:00Z');
+    final agenda = FakeAgendaApplication(
+      reminders: [item],
+      reminderDetail: item,
+      asOfUtc: DateTime.utc(2026, 7, 19, 8),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final earlier = find.byKey(const Key('earlier-reminder'));
+    expect(earlier, findsOneWidget);
+    await tester.scrollUntilVisible(
+      earlier,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(earlier);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Vazgeç'));
+    await tester.pumpAndSettle();
+
+    expect(agenda.mutateReminderCalls, 0);
+    expect(agenda.reminders.single.revision, item.revision);
+  });
 
   testWidgets('detail Yarına ertele failure uses the standard message', (
     tester,

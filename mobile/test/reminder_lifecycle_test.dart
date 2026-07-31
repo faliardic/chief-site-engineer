@@ -44,6 +44,35 @@ MobileReminder eligibilityReminder({
   revision: 1,
 );
 
+MutateReminderCommand quickEarlierCommand({
+  required String reminderId,
+  required String eventId,
+  required int expectedRevision,
+  required String expectedFrom,
+  required String selectedAt,
+  bool confirmPast = false,
+}) {
+  try {
+    return Function.apply(
+          MutateReminderCommand.new,
+          const [],
+          <Symbol, dynamic>{
+            #reminderId: reminderId,
+            #eventId: eventId,
+            #expectedRevision: expectedRevision,
+            #action: ReminderMutationAction.schedule,
+            #schedule: ReminderScheduleKind.custom,
+            #customAttentionAt: selectedAt,
+            #expectedEarlierFromAttentionAt: expectedFrom,
+            if (confirmPast) #confirmedPastAttentionAt: selectedAt,
+          },
+        )
+        as MutateReminderCommand;
+  } on NoSuchMethodError {
+    fail('Quick-earlier command contract is missing.');
+  }
+}
+
 void main() {
   late Directory temporaryRoot;
   late AppDirectories directories;
@@ -291,6 +320,337 @@ void main() {
       );
       final lifecycle = await agenda.getReminderLifecycleDetail(created.id);
       expect(lifecycle.notification.scheduledFor, created.nextAttentionAt);
+    },
+  );
+
+  test(
+    'quick earlier future selection updates one row event and binding exactly',
+    () async {
+      final created = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(960),
+          title: 'Gelecekte erkene alınacak',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-19T12:00:00Z',
+        ),
+      );
+      final scheduledBefore = notifications.scheduled.length;
+
+      final earlier = await agenda.mutateReminder(
+        quickEarlierCommand(
+          reminderId: created.id,
+          eventId: eventId(961),
+          expectedRevision: created.revision,
+          expectedFrom: created.nextAttentionAt!,
+          selectedAt: '2026-07-19T10:00:00Z',
+        ),
+      );
+
+      expect(earlier.nextAttentionAt, '2026-07-19T10:00:00Z');
+      expect(earlier.revision, created.revision + 1);
+      expect(notifications.scheduled, hasLength(scheduledBefore + 1));
+      expect(
+        notifications.scheduled.last.scheduledAtUtc,
+        earlier.nextAttentionAt,
+      );
+      final detail = await agenda.getReminderLifecycleDetail(created.id);
+      expect(detail.notification.scheduledFor, earlier.nextAttentionAt);
+      expect(detail.notification.syncState, NotificationSyncState.scheduled);
+      final businessEvent = detail.events.lastWhere(
+        (event) => !event.eventType.startsWith('notification_'),
+      );
+      expect(businessEvent.eventType, 'rescheduled');
+      final payload =
+          jsonDecode(businessEvent.payloadJson) as Map<String, Object?>;
+      expect(payload['earlier_from_attention_at'], created.nextAttentionAt);
+      expect(payload['next_attention_at'], earlier.nextAttentionAt);
+      expect(payload['confirmed_past_attention_at'], isNull);
+    },
+  );
+
+  test(
+    'quick earlier rejects same later all-day and attendance unchanged',
+    () async {
+      final timed = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(962),
+          title: 'Erkene alma guard',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-19T12:00:00Z',
+        ),
+      );
+      final timedBefore = await agenda.getReminderLifecycleDetail(timed.id);
+      final scheduledBefore = notifications.scheduled.length;
+
+      for (final selectedAt in [
+        timed.nextAttentionAt!,
+        '2026-07-19T13:00:00Z',
+      ]) {
+        await expectLater(
+          agenda.mutateReminder(
+            quickEarlierCommand(
+              reminderId: timed.id,
+              eventId: eventId(selectedAt == timed.nextAttentionAt ? 963 : 964),
+              expectedRevision: timed.revision,
+              expectedFrom: timed.nextAttentionAt!,
+              selectedAt: selectedAt,
+            ),
+          ),
+          throwsA(isA<AgendaValidationFailure>()),
+        );
+      }
+      var timedAfter = await agenda.getReminderLifecycleDetail(timed.id);
+      expect(timedAfter.reminder.revision, timedBefore.reminder.revision);
+      expect(timedAfter.events, hasLength(timedBefore.events.length));
+      expect(
+        timedAfter.notification.scheduledFor,
+        timedBefore.notification.scheduledFor,
+      );
+      expect(notifications.scheduled, hasLength(scheduledBefore));
+
+      final allDay = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder2,
+          eventId: eventId(965),
+          title: 'Tam gün guard',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          allDayLocalDate: '2026-07-19',
+        ),
+      );
+      await expectLater(
+        agenda.mutateReminder(
+          quickEarlierCommand(
+            reminderId: allDay.id,
+            eventId: eventId(966),
+            expectedRevision: allDay.revision,
+            expectedFrom: '2026-07-19T12:00:00Z',
+            selectedAt: '2026-07-19T10:00:00Z',
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      expect(
+        (await agenda.getReminderDetail(allDay.id)).revision,
+        allDay.revision,
+      );
+
+      await agenda.createProject(
+        const CreateProjectCommand(id: projectId, name: 'Puantaj guard'),
+      );
+      final attendance = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder3,
+          eventId: eventId(967),
+          projectId: projectId,
+          title: 'Puantaj managed guard',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-19T12:00:00Z',
+        ),
+      );
+      final database = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      try {
+        await database.update(
+          'follow_up_items',
+          {'attendance_day_id': 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'},
+          where: 'id = ?',
+          whereArgs: [attendance.id],
+        );
+      } finally {
+        await database.close();
+      }
+      final attendanceBefore = await agenda.getReminderLifecycleDetail(
+        attendance.id,
+      );
+      await expectLater(
+        agenda.mutateReminder(
+          quickEarlierCommand(
+            reminderId: attendance.id,
+            eventId: eventId(968),
+            expectedRevision: attendanceBefore.reminder.revision,
+            expectedFrom: attendanceBefore.reminder.nextAttentionAt!,
+            selectedAt: '2026-07-19T10:00:00Z',
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      final attendanceAfter = await agenda.getReminderLifecycleDetail(
+        attendance.id,
+      );
+      expect(
+        attendanceAfter.reminder.revision,
+        attendanceBefore.reminder.revision,
+      );
+      expect(attendanceAfter.events, hasLength(attendanceBefore.events.length));
+      expect(
+        attendanceAfter.notification.scheduledFor,
+        attendanceBefore.notification.scheduledFor,
+      );
+
+      timedAfter = await agenda.getReminderLifecycleDetail(timed.id);
+      expect(timedAfter.reminder.nextAttentionAt, timed.nextAttentionAt);
+    },
+  );
+
+  test(
+    'quick earlier past time requires exact confirmation and retry is idempotent',
+    () async {
+      final created = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(969),
+          title: 'Geçmiş onay guard',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-19T12:00:00Z',
+        ),
+      );
+      final before = await agenda.getReminderLifecycleDetail(created.id);
+      final scheduledBefore = notifications.scheduled.length;
+      final cancelledBefore = notifications.cancelled.length;
+      const pastAt = '2026-07-19T07:30:00Z';
+
+      await expectLater(
+        agenda.mutateReminder(
+          quickEarlierCommand(
+            reminderId: created.id,
+            eventId: eventId(970),
+            expectedRevision: created.revision,
+            expectedFrom: created.nextAttentionAt!,
+            selectedAt: pastAt,
+          ),
+        ),
+        throwsA(
+          isA<AgendaValidationFailure>().having(
+            (error) => error.message,
+            'message',
+            contains('açık onay'),
+          ),
+        ),
+      );
+      var unchanged = await agenda.getReminderLifecycleDetail(created.id);
+      expect(unchanged.reminder.revision, before.reminder.revision);
+      expect(unchanged.events, hasLength(before.events.length));
+      expect(
+        unchanged.notification.scheduledFor,
+        before.notification.scheduledFor,
+      );
+      expect(notifications.scheduled, hasLength(scheduledBefore));
+      expect(notifications.cancelled, hasLength(cancelledBefore));
+
+      final confirmedCommand = quickEarlierCommand(
+        reminderId: created.id,
+        eventId: eventId(971),
+        expectedRevision: created.revision,
+        expectedFrom: created.nextAttentionAt!,
+        selectedAt: pastAt,
+        confirmPast: true,
+      );
+      final confirmed = await agenda.mutateReminder(confirmedCommand);
+      expect(confirmed.nextAttentionAt, pastAt);
+      expect(confirmed.status, ReminderStatus.active);
+      expect(confirmed.revision, created.revision + 1);
+      expect(notifications.scheduled, hasLength(scheduledBefore));
+      expect(notifications.cancelled, hasLength(cancelledBefore + 1));
+      expect(notifications.pending, isEmpty);
+
+      final confirmedDetail = await agenda.getReminderLifecycleDetail(
+        created.id,
+      );
+      expect(confirmedDetail.notification.scheduledFor, isNull);
+      expect(
+        confirmedDetail.notification.syncState,
+        NotificationSyncState.cancelled,
+      );
+      final businessEvent = confirmedDetail.events.lastWhere(
+        (event) => !event.eventType.startsWith('notification_'),
+      );
+      expect(businessEvent.eventType, 'rescheduled');
+      final payload =
+          jsonDecode(businessEvent.payloadJson) as Map<String, Object?>;
+      expect(payload['earlier_from_attention_at'], created.nextAttentionAt);
+      expect(payload['confirmed_past_attention_at'], pastAt);
+
+      final eventsBeforeRetry = confirmedDetail.events.length;
+      final retried = await agenda.mutateReminder(confirmedCommand);
+      expect(retried.revision, confirmed.revision);
+      expect(retried.nextAttentionAt, confirmed.nextAttentionAt);
+      expect(
+        (await agenda.listReminderEvents(created.id)),
+        hasLength(eventsBeforeRetry),
+      );
+      expect(notifications.cancelled, hasLength(cancelledBefore + 1));
+
+      await expectLater(
+        agenda.mutateReminder(
+          quickEarlierCommand(
+            reminderId: created.id,
+            eventId: eventId(972),
+            expectedRevision: created.revision,
+            expectedFrom: pastAt,
+            selectedAt: '2026-07-19T07:00:00Z',
+            confirmPast: true,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      unchanged = await agenda.getReminderLifecycleDetail(created.id);
+      expect(unchanged.reminder.revision, confirmed.revision);
+      expect(unchanged.reminder.nextAttentionAt, pastAt);
+      expect(unchanged.events, hasLength(eventsBeforeRetry));
+    },
+  );
+
+  test(
+    'quick earlier event failure rolls back row and event together',
+    () async {
+      final created = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(973),
+          title: 'Erkene alma rollback',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-19T12:00:00Z',
+        ),
+      );
+      final before = await agenda.getReminderLifecycleDetail(created.id);
+      final failing = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        notificationGateway: notifications,
+        beforeReminderEventInsert: (_) async {
+          throw StateError('forced earlier event failure');
+        },
+      );
+
+      await expectLater(
+        failing.mutateReminder(
+          quickEarlierCommand(
+            reminderId: created.id,
+            eventId: eventId(974),
+            expectedRevision: created.revision,
+            expectedFrom: created.nextAttentionAt!,
+            selectedAt: '2026-07-19T10:00:00Z',
+          ),
+        ),
+        throwsA(anything),
+      );
+
+      final after = await agenda.getReminderLifecycleDetail(created.id);
+      expect(after.reminder.revision, before.reminder.revision);
+      expect(after.reminder.nextAttentionAt, before.reminder.nextAttentionAt);
+      expect(after.events, hasLength(before.events.length));
+      expect(after.notification.scheduledFor, before.notification.scheduledFor);
     },
   );
 

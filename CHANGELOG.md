@@ -1,5 +1,27 @@
 # Changelog
 
+## Issue #279 - Hatırlatıcı Hızlı Erkene Alma ve Geçmiş Zaman Onayı
+
+- Aktif ve saatli Hatırlatıcı detayına, exact eski → yeni yerel tarih/saat
+  önizlemesi taşıyan dar `Erkene al` akışı eklendi.
+- Aynı veya daha geç seçim mutation yapmadan `Planla` akışına yönlendirir.
+  Geçmişe düşen seçim ayrı açık onay olmadan row, revision, append-only event
+  veya notification binding değiştirmez.
+- Açık geçmiş-zaman intent'i application/domain katmanında doğrulanır; başarılı
+  mutation revision/event zincirini bir kez ilerletir ve geçmiş timestamp için
+  native future notification kurmaz. Picker iptali, double tap, stale revision
+  ve event failure yolları fail-closed kalır.
+- All-day, inbox, terminal/trash ve Puantaj-managed kayıtların uygunluk guard'ı
+  korundu. Focused lifecycle `52/52`, focused widget `51/51`, full Flutter
+  `342/342` PASS ve analyze temizdir.
+- Samsung `SM-X610` tablet future-earlier, same/later, geçmiş onayı,
+  persistence/event/binding, all-day, cold relaunch ve recoverable cleanup
+  kabulü PASS'tir. Attendance-managed guard executable kanıt ikamesiyle kabul
+  edildi; gerçek kullanıcı kaydı açılmadı veya değiştirilmedi.
+- Docs-only master entegrasyonu sonrası production/test blob eşitliği `6/6`
+  doğrulandı; yeni build/install/tablet smoke ve telefon promotion yapılmadı.
+  Schema `10`, backup formatı `1`, migration `0` korundu.
+
 ## Issue #280 - README ve NotebookLM Güncel Durum Senkronizasyonu
 
 - Kök ve mobil README; merged safe point Issue #277 / PR #278 /

@@ -333,6 +333,43 @@ class FakeAgendaApplication
     if (current.revision != command.expectedRevision) {
       throw const AgendaValidationFailure('stale revision');
     }
+    if (command.action != ReminderMutationAction.schedule &&
+        (command.expectedEarlierFromAttentionAt != null ||
+            command.confirmedPastAttentionAt != null)) {
+      throw const AgendaValidationFailure('invalid earlier intent');
+    }
+    if (command.expectedEarlierFromAttentionAt case final earlierFrom?) {
+      final selectedAt = command.customAttentionAt;
+      if (command.schedule != ReminderScheduleKind.custom ||
+          selectedAt == null ||
+          command.allDayLocalDate != null ||
+          !isReminderEligibleForQuickEarlier(current) ||
+          current.nextAttentionAt != earlierFrom) {
+        throw const AgendaValidationFailure('invalid quick earlier reminder');
+      }
+      final candidate = CseTimeCodec.decodeCanonicalUtc(selectedAt);
+      if (!candidate.isBefore(CseTimeCodec.decodeCanonicalUtc(earlierFrom))) {
+        throw const AgendaValidationFailure(
+          'Yeni zaman mevcut zamandan daha erken olmalıdır.',
+        );
+      }
+      final confirmedPast = command.confirmedPastAttentionAt;
+      if (confirmedPast != null && confirmedPast != selectedAt) {
+        throw const AgendaValidationFailure('invalid past confirmation');
+      }
+      if (!candidate.isAfter(asOfUtc)) {
+        if (confirmedPast != selectedAt) {
+          throw ReminderPastAttentionConfirmationRequired(
+            earlierFromAttentionAt: earlierFrom,
+            selectedAttentionAt: selectedAt,
+          );
+        }
+      } else if (confirmedPast != null) {
+        throw const AgendaValidationFailure('unexpected past confirmation');
+      }
+    } else if (command.confirmedPastAttentionAt != null) {
+      throw const AgendaValidationFailure('missing quick earlier intent');
+    }
     final today = CseTimeCodec.istanbulDayKey(CseTimeCodec.encodeUtc(asOfUtc));
     if (command.action == ReminderMutationAction.snoozeTomorrowMorning &&
         !isReminderEligibleForTomorrowSnooze(current, istanbulToday: today)) {
