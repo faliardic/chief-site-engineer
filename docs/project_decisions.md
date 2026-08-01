@@ -3471,3 +3471,40 @@
   erişimsiz, UTF-8 ve byte-for-byte deterministik üretilir.
 - Bu karar production davranışı, mobil schema `10`, backup formatı `1`,
   migration, native platform ve cihaz paketini değiştirmez.
+
+## Issue 285 — Orchestrator önce güvenlik oracle'ını kurar
+
+- CSE Development Orchestrator'ın ilk amacı otomatik kod üretmek değil; mevcut
+  scope, approval, provenance, evidence reuse, retry ve fail-closed kurallarını
+  makine tarafından doğrulanabilir hâle getirmektir.
+- Run admission operational truth sırası local Git; local/cached/live master;
+  current Issue ve latest-valid authorization; task/result; repository dışı
+  append-only event store; finalized `.cse/state` snapshot; docs iddialarıdır.
+  Bu sıra bilgi-türü bazlı kanonik kaynak rollerini değiştirmez.
+- `.cse/state/project_state.json` açık branch veya current authorization
+  otoritesi değildir; yalnız merged/finalized snapshot'tır. Açık iş Issue,
+  yorum, branch, task ve result ile temsil edilir.
+- `PREFLIGHT_BLOCKED`, `BLOCKED` ve `FAILED` yalnız Orchestrator process
+  durumlarıdır. Ürün kaydı veya Fatih adına resmî blocked kararı üretmez.
+- Approval repository, Issue/comment hash, branch/base/head/tree, scope,
+  capability, action, allowlist, target, budget, expiry ve nonce'a bağlı tek
+  kullanımlık fingerprint'tir. Orchestrator approval oluşturamaz veya
+  genişletemez.
+- Code, Device ve Publish ayrı capability/process sınırlarıdır. Profile geçişi
+  yeni observation, approval ve budget admission gerektirir; ambient yetki
+  devredilmez.
+- Runtime state `%LOCALAPPDATA%\CSE-Orchestrator\` altında repository dışında
+  tutulur. Raw gerçek kullanıcı içeriği, broad UI/log/DB verisi ve secret
+  plaintext event, manifest, log veya evidence içinde tutulmaz.
+- `scripts/cse_status.py` mevcut diagnosis/finalize envanteridir fakat broad
+  ignored/untracked/ZIP/export taraması nedeniyle O1 observer olarak doğrudan
+  çalıştırılmaz. O1 tracked-only read ile explicit state write sorumluluklarını
+  ayırır.
+- O0–O4 deterministik oracle katmanıdır. OpenAI API ilk kez O9'da ayrı secret,
+  network, cost ve nondeterminism kararıyla değerlendirilebilir.
+- Issue #284 yalnız sanitized comment/state/hash/budget/provenance sequence'i
+  olarak O4 replay fixture kaynağıdır; gerçek kullanıcı veya cihaz içeriği
+  fixture'a alınmaz.
+- Bu karar docs/governance kapsamındadır; production/mobile/test/workflow,
+  schema, migration, backup, build, device, commit, publish ve release
+  davranışı eklemez.

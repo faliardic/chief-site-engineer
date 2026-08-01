@@ -1,5 +1,26 @@
 # Changelog
 
+## Issue #285 - CSE Development Orchestrator O0 Temeli
+
+- CSE geliştirme disiplininin otomasyondan önce doğrulanabilmesi için
+  Orchestrator architecture, state machine, security boundary, approval model
+  ve O0–O10 MVP planı belgelendi.
+- Operational truth; local Git, local/cached/live master, current Issue ve
+  latest-valid authorization, task/result, append-only event store, finalized
+  `.cse/state` snapshot ve docs iddiaları olarak sıralandı. Bilgi-türü bazlı
+  kanonik kaynak rolleri korundu.
+- `SAFE_READ`den `RELEASE`e approval seviyeleri, one-time fingerprint,
+  Code/Device/Publish capability isolation, standart blocker kodları ve
+  machine-readable retry/correction/invocation/time budget alanları tanımlandı.
+- Runtime state `%LOCALAPPDATA%\CSE-Orchestrator\` altında repository dışı
+  tasarlandı. Secret plaintext, gerçek kullanıcı verisi, broad UI/log/DB
+  içeriği ve protected/ignored alan taraması yasaklandı.
+- O1 read-only observer minimumu ve Issue #284'ün sanitized O4 replay yaklaşımı
+  belirlendi. OpenAI API O9'dan önce kullanılmayacak.
+- Değişiklik yalnız docs/governance kapsamındadır. Production, mobile, test,
+  workflow, schema, migration, backup ve cihaz davranışı değişmedi; API key,
+  runtime implementation, commit, push veya PR oluşturulmadı.
+
 ## Issue #279 - Hatırlatıcı Hızlı Erkene Alma ve Geçmiş Zaman Onayı
 
 - Aktif ve saatli Hatırlatıcı detayına, exact eski → yeni yerel tarih/saat

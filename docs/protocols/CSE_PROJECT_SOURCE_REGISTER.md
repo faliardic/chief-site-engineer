@@ -1,8 +1,8 @@
 # CSE Project Source Register
 
 **Belge turu:** Proje kaynak kaydi
-**Guncelleme adimi:** Issue #215
-**Guncelleme tarihi:** 2026-07-23
+**Guncelleme adimi:** Issue #285
+**Guncelleme tarihi:** 2026-08-01
 
 Bu dosya, CHIEF SITE ENGINEER icin kalici proje kaynaklarini, destekleyici kaynaklari ve erisim durumunu kaydeder. Kaynak dosya yoksa veya bu Codex ortaminda erisilebilir degilse icerik uydurulmaz.
 
@@ -15,6 +15,11 @@ Bu dosya, CHIEF SITE ENGINEER icin kalici proje kaynaklarini, destekleyici kayna
 | `CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md` | `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md` | Binding addendum for validation class, evidence reuse, retry/time budgets, gate breadth, scope control and stop rules | Available; created by Issue #215 |
 | `AGENTS.md` | `AGENTS.md` | Repository-root Codex pre-read and concise enforcement of minimum sufficient validation | Available; expanded by Issue #215 |
 | `CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md` | `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md` | GitHub-native fresh-chat bootstrap, continuation rule and mandatory validation-protocol pre-read | Updated by Issue #215 |
+| `CSE_ORCHESTRATOR_ARCHITECTURE.md` | `docs/orchestrator/CSE_ORCHESTRATOR_ARCHITECTURE.md` | Orchestrator component boundaries, operational truth, runtime-state and local/CI responsibility contract | O0 canonical design source; no runtime implementation |
+| `CSE_ORCHESTRATOR_STATE_MACHINE.md` | `docs/orchestrator/CSE_ORCHESTRATOR_STATE_MACHINE.md` | Run states, transitions, invariants, blockers, budgets and append-only event contract | O0 canonical design source; executable engine deferred |
+| `CSE_ORCHESTRATOR_SECURITY_BOUNDARY.md` | `docs/orchestrator/CSE_ORCHESTRATOR_SECURITY_BOUNDARY.md` | User-data, secret, capability, network and fail-closed security boundaries | O0 canonical design source; security implementation deferred |
+| `CSE_ORCHESTRATOR_APPROVAL_MODEL.md` | `docs/orchestrator/CSE_ORCHESTRATOR_APPROVAL_MODEL.md` | Approval levels, latest-valid authorization and one-time fingerprint contract | O0 canonical design source; machine-readable verifier deferred |
+| `CSE_ORCHESTRATOR_MVP_PLAN.md` | `docs/orchestrator/CSE_ORCHESTRATOR_MVP_PLAN.md` | O0-O10 delivery sequence and per-phase admission boundaries | O0 canonical program source; does not replace product roadmap |
 
 ## Authority and conflict rules
 
@@ -24,6 +29,8 @@ Bu dosya, CHIEF SITE ENGINEER icin kalici proje kaynaklarini, destekleyici kayna
 - `AGENTS.md` is the repository-level automatic Codex entry point and requires reading the full canonical documents.
 - A current Issue may narrow the validation plan but cannot silently weaken data-safety rules.
 - A current Issue cannot expand a narrow feature into release/toolchain work without explicit scope and validation-class change.
+- Orchestrator sources govern development-run observation, approval, state and capability contracts; they do not override permanent product purpose, Git/Codex safety or minimum-validation protocols.
+- `.cse/state/project_state.json` remains a published/finalized snapshot and cannot override current Git/GitHub/Issue evidence.
 
 ## Original Project Sources
 
