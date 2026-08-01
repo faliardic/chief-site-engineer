@@ -57,6 +57,10 @@ Policy engine observer çıktısını aşağıdaki sözleşmelerle değerlendiri
 
 Policy engine karar üretir fakat eylem çalıştırmaz. Çıktısı `allow`, `deny` veya
 `awaiting_approval` sınıfı ve gerekçeli state transition önerisidir.
+`awaiting_approval`; `pending_action`, `required_approval_level`,
+`resume_state`, source fingerprint ve action fingerprint bağlarını taşır.
+Geçerli Codex `CODE_CHANGE`/`CORRECTION` action'ı `CODEX_AUTHORIZED`, diğer
+mutable veya maliyetli action'lar ise `ACTION_AUTHORIZED` gate'ine yönelir.
 
 ### 3.3 Append-only event store
 
@@ -85,6 +89,11 @@ Approval verifier current Issue'daki yetkiyi parse eder; comment ID, canonical
 payload hash, source fingerprint, action, capability, budget, expiry ve nonce
 bağını doğrular. Yetkiyi kendi kendine oluşturamaz veya genişletemez.
 
+Verifier yalnız authorization gate'ini açar; checkpoint commit, build, device
+ve publish result state'lerini doğrudan üretmez. Her action önce
+`AWAITING_APPROVAL`dan doğru specialized veya generic authorized state'e
+geçmelidir.
+
 O0 ilk docs koşusu geçiş dönemi insan-okur yorumuyla yetkilidir. Future
 machine-readable schema O1 ve sonraki fazlarda uygulanır.
 
@@ -93,6 +102,13 @@ machine-readable schema O1 ve sonraki fazlarda uygulanır.
 Capability runner gelecekte yalnız policy engine tarafından kabul edilmiş tek
 profile ve exact action fingerprint'i çalıştırabilir. Her profile ayrı process,
 environment, readable-path ve writable-path sınırı gerekir.
+
+Action başlamadan hemen önce approval consumption, budget admission ve
+invocation provenance tek append-only admission event'inde birlikte
+kaydedilir. `CODEX_AUTHORIZED` yalnız Codex action'larını;
+`ACTION_AUTHORIZED` ise Codex dışındaki exact mutable/maliyetli action'ı kabul
+eder. Bir result state'e geçiş ancak bounded action sonucu doğrulandıktan sonra
+mümkündür.
 
 O0'da runner implementation'ı yoktur.
 

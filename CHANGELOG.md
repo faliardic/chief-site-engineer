@@ -12,14 +12,25 @@
 - `SAFE_READ`den `RELEASE`e approval seviyeleri, one-time fingerprint,
   Code/Device/Publish capability isolation, standart blocker kodları ve
   machine-readable retry/correction/invocation/time budget alanları tanımlandı.
+- Review correction'ında `AWAITING_APPROVAL`; pending action, gerekli approval
+  seviyesi, resume state ve source/action fingerprint bağlarıyla kesinleştirildi.
+  `CODEX_AUTHORIZED` yalnız Codex code/correction action'larına ayrıldı;
+  checkpoint commit, build, device ve publish için ayrı `ACTION_AUTHORIZED`
+  gate'i ve admission consumption/budget/provenance bağı tanımlandı.
 - Runtime state `%LOCALAPPDATA%\CSE-Orchestrator\` altında repository dışı
   tasarlandı. Secret plaintext, gerçek kullanıcı verisi, broad UI/log/DB
   içeriği ve protected/ignored alan taraması yasaklandı.
 - O1 read-only observer minimumu ve Issue #284'ün sanitized O4 replay yaklaşımı
   belirlendi. OpenAI API O9'dan önce kullanılmayacak.
-- Değişiklik yalnız docs/governance kapsamındadır. Production, mobile, test,
-  workflow, schema, migration, backup ve cihaz davranışı değişmedi; API key,
-  runtime implementation, commit, push veya PR oluşturulmadı.
+- İlk docs run'ı yalnız docs/governance kapsamını hazırladı; production, mobile,
+  test, workflow, schema, migration, backup ve cihaz davranışı değişmedi.
+- Foundation checkpoint'i
+  `64b8cb2998cd2e4d77aca2c1e90f20c18d113293` commit'iyle oluşturuldu, remote
+  branch normal yayımlandı ve `master` hedefli Draft PR `#286` open durumda
+  açıldı.
+- Merge, Issue close ve branch delete yapılmadı. API, secret, runtime
+  implementation, build ve device işlemi yapılmadı. Current review correction
+  ayrı ordinary follow-up commit ve publish approval'ı bekler.
 
 ## Issue #279 - Hatırlatıcı Hızlı Erkene Alma ve Geçmiş Zaman Onayı
 

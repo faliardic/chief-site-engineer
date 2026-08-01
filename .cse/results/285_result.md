@@ -2,22 +2,32 @@
 
 ## Outcome
 
-- Status: `completed_docs_uncommitted`
+- Status: `published_draft_under_review`
 - Official local path:
   `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer`
 - Branch: `docs/issue-285-cse-orchestrator-o0-foundation`
 - Base branch: `master`
-- Exact base/HEAD: `eb85f0a2ea0901f0074887fe999e74b6ab4aed0f`
+- Foundation commit/local and remote HEAD:
+  `64b8cb2998cd2e4d77aca2c1e90f20c18d113293`
+- Foundation parent/base: `eb85f0a2ea0901f0074887fe999e74b6ab4aed0f`
 - Issue #284 frozen branch pointer:
   `b0e9cf247afa6bac5d38684dbc626a11fdf45663`
-- Result commit: `not created; not authorized in this run`
-- Remote branch: `not created`
-- Push/PR/merge: `0/0/0`
+- Remote branch: `published`
+- Draft PR: `#286`, `open`, `Draft`
+- Merge / Issue close / branch delete: `0/0/0`
+- API / secret / runtime implementation / build / device: `0/0/0/0/0`
+
+İlk O0 docs run'ı değişiklikleri unstaged ve uncommitted bırakarak tamamlandı.
+Foundation commit ve publish daha sonra ayrı yetkilerle yapıldı. Current PR
+review correction'ı ise ayrı ordinary follow-up commit/push approval'ı bekler.
 
 ## Authority
 
 - GitHub Issue: `#285`
-- Exact execution comment: `5152282818`
+- Primary docs execution comment: `5152282818`
+- Checkpoint commit comment: `5152498910`
+- Publish completion evidence comment: `5152555341`
+- Current correction comment: `5152609332`
 - Validation class: `docs`
 - Codex reasoning: `Extra High`
 
@@ -32,9 +42,10 @@
 - `docs/protocols/CSE_PROJECT_SOURCE_REGISTER.md`: read before authorized edit.
 - `README.md`, `ROADMAP.md`, `docs/project_decisions.md`: read.
 - `.cse/state/project_state.json`: read; matched `master`; not changed.
-- GitHub Issue #285 and all comments: read; comment count `1`.
-- Related #105, #127, #215 and #284 evidence: read/revalidated; no new comment
-  drift from the preceding O0 research evidence.
+- GitHub Issue #285 and all comments: read; current comment count `5`; latest
+  comment `5152609332` is the exact one-time `CORRECTION` authority.
+- Related #105, #127, #215 and #284 evidence: read/revalidated; Issue #284
+  frozen pointer remains unchanged.
 
 ## Changes
 
@@ -60,12 +71,23 @@
 
 - None.
 
+### Current review correction
+
+- Publication evidence was aligned with foundation commit
+  `64b8cb2998cd2e4d77aca2c1e90f20c18d113293` and open Draft PR `#286`.
+- State transitions now route Codex code/correction actions through
+  `CODEX_AUTHORIZED` and non-Codex mutable/costly actions through
+  `ACTION_AUTHORIZED` after `AWAITING_APPROVAL`.
+- Checkpoint commit, build, device and publish can no longer appear as silent
+  direct actions.
+
 ## Delivered Contracts
 
 - Operational truth and source-conflict behavior.
 - Observer, policy engine, event store, approval verifier, capability runner and
   evidence assembler boundaries.
-- Required states, transitions, invariants, blockers and budget fields.
+- Required states, approval-gated transitions, invariants, blockers and budget
+  fields.
 - `SAFE_READ` through `RELEASE` approvals and one-time fingerprint model.
 - Code, Device and Publish capability isolation.
 - Repository-external runtime-state and secret/user-data boundary.
@@ -77,6 +99,7 @@
 ## Scope Verification
 
 - Exact cumulative allowlist: `12/12` paths only.
+- Current correction changed-file subset: `5/6` authorized correction paths.
 - Required O0 docs/task/result present: `yes`.
 - Production code changed: `no`.
 - Mobile source changed: `no`.
@@ -88,6 +111,8 @@
 - Orchestrator implementation started: `no`.
 
 ## Minimum Sufficient Docs Validation
+
+### Primary O0 run
 
 - Scoped changed/untracked allowlist subset: `PASS`.
 - Mandatory file existence: `PASS`.
@@ -111,6 +136,19 @@ Validation note:
   olduğunu doğruladı. Source/docs correction uygulanmadı; yalnız başarısız
   whitespace/heading aşaması doğru scoped input ile tekrarlandı ve PASS oldu.
 
+### Current review correction
+
+- Changed-file allowlist subset: `PASS` (`5/6`).
+- `git diff --check`: `PASS`.
+- Trailing whitespace and final newline: `PASS`.
+- Markdown heading hierarchy and code-fence balance: `PASS`.
+- Repository-local links: `PASS`.
+- Conflict markers: `0`.
+- Checkpoint/build/device/publish approval-gate content: `PASS`.
+- Foundation commit/Draft PR publication evidence consistency: `PASS`.
+- Production/mobile/test/workflow/protocol/script/`.cse/state` diff: `0`.
+- Staging: `empty`.
+
 ## Broad Gates Not Run
 
 - Flutter test/analyze: not allowed and no mobile contract changed.
@@ -132,14 +170,18 @@ Validation note:
 ## Budget and Stop Compliance
 
 - Primary docs run: `1/1`.
-- Correction: `0/1`.
+- Current correction: `1/1`.
+- Retry: `0/0`.
 - Second scope/solution expansion: `0/0`.
-- Elapsed: target `25 dakika` içinde.
-- Hard stop `45 dakika`: not reached.
-- Stage/commit/push/PR/GitHub mutation: `0/0/0/0/0`.
+- Current correction target: `15 dakika`; hard stop `25 dakika` not reached.
+- Current correction stage/commit/push/PR/GitHub mutation: `0/0/0/0/0`.
+- Historical foundation commit/push/Draft PR: `1/1/1`; merge: `0`.
 
 ## Remaining Work
 
-- Docs changes are intentionally unstaged and uncommitted.
-- An ordinary local commit requires a separate `CHECKPOINT_COMMIT` approval.
-- Push, Draft PR, merge and release each remain separately unauthorized.
+- Foundation commit is published in open Draft PR `#286`.
+- Current review correction is intentionally unstaged and uncommitted.
+- An ordinary follow-up commit requires a separate `CHECKPOINT_COMMIT`
+  approval; a later push requires separate publish authority.
+- Ready, merge, Issue close, branch delete and release remain separately
+  unauthorized.

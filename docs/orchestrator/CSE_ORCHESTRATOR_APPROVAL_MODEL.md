@@ -68,6 +68,9 @@ O1/O2 için önerilen asgari payload:
   "head_sha": "eb85f0a2ea0901f0074887fe999e74b6ab4aed0f",
   "tree_sha": "sha1:example",
   "action": "prepare-o0-docs",
+  "pending_action": "prepare-o0-docs",
+  "required_approval_level": "CODE_CHANGE",
+  "resume_state": "SCOPE_VALIDATED",
   "read_allowlist": ["tracked:authorized-sources"],
   "write_allowlist": ["issue:exact-paths"],
   "budgets": {
@@ -125,9 +128,14 @@ alabilir.
 
 ## 8. Consumption
 
-- Approval action admission'ında tüketilir; sonuç beklenirken ikinci action
-  başlatılamaz.
-- Admission event'i ve budget artışı aynı logical transition'da tutulur.
+- `AWAITING_APPROVAL` yalnız beklenen action, gerekli seviye, resume state ve
+  fingerprint bağlarını tutar; approval parse edildi diye tüketim oluşmaz.
+- `CODE_CHANGE` ve `CORRECTION` yalnız `CODEX_AUTHORIZED`a; Codex dışındaki
+  mutable/maliyetli seviyeler yalnız `ACTION_AUTHORIZED`a geçebilir.
+- Approval action başlamadan hemen önce admission'da tüketilir; sonuç
+  beklenirken ikinci action başlatılamaz.
+- Admission event'i approval consumption, budget artışı ve invocation
+  provenance'ı aynı logical transition'da birlikte tutar.
 - Tool wrapper action'ı gerçekten başlatmadıysa consumption kararı provenance
   ile verilir, tahmin edilmez.
 - Tek approval aynı command için kör retry izni vermez.
@@ -193,11 +201,19 @@ store değildir.
 Profile geçişleri implicit değildir:
 
 ```text
-Code → CHECKPOINT_COMMIT → Build → Device → Publish → Merge → Release
+validated state
+→ AWAITING_APPROVAL [pending action + required level + resume state + fingerprints]
+→ CODEX_AUTHORIZED [yalnız CODE_CHANGE veya CORRECTION]
+  veya ACTION_AUTHORIZED [Codex dışı mutable/maliyetli action]
+→ action admission [consumption + budget + provenance]
+→ doğrulanmış bounded result state
 ```
 
-Her ok yeni approval, source fingerprint ve budget admission gerektirir. Bir
-profile'ın ambient credentials'ı sonraki profile taşınmaz.
+Checkpoint commit, build, device ve publish aşamalarının her biri önce ayrı
+`AWAITING_APPROVAL` kaydı, sonra `ACTION_AUTHORIZED` gate'i ister. Action
+sonucundan sonraki profile geçiş yeni approval, source/action fingerprint ve
+budget admission gerektirir. Bir profile'ın ambient credentials'ı sonraki
+profile taşınmaz; `PUBLISH` de merge veya release izni vermez.
 
 ## 13. Kalıcı insan kontrolü
 
