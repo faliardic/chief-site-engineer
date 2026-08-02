@@ -1,5 +1,19 @@
 # Changelog
 
+## Issue #297 - İlk canlı kontrollü CSE Orchestrator pilotu
+
+- O0-O8 MVP, gerçek `SubprocessProcessAdapter` ile source değiştirmeyen exact
+  pytest action'ında ilk kez uçtan uca çalıştırıldı.
+- O1 gerçek Git/GitHub observation, O2 `FULL_VALIDATION` admission, canonical
+  dry-run/execute plan, pre-invocation admission ledger ve O3 result parser
+  zinciri `30 passed`, `0 failed`, exit `0` ve `FULL_PASS` üretti.
+- External append-only ledger iki event ile hash-chain verification PASS verdi.
+  Aynı planın duplicate execute denemesi ikinci subprocess başlamadan
+  `duplicate_action` ile `BLOCKED` oldu.
+- Runtime repository dışında kaldı; environment değerleri ve raw stdout/stderr
+  evidence'a yazılmadı. Production/mobile/tools/tests/dependency/workflow ve
+  `.cse/state` davranışı değişmedi.
+
 ## Issue #295 - CSE Development Orchestrator O5-O8 MVP
 
 - O1 Observation ve O2 policy admission'ından immutable, canonical-hash
