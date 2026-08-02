@@ -1,5 +1,22 @@
 # Changelog
 
+## Issue #287 - CSE Development Orchestrator O1 Read-Only Observer
+
+- İlk executable Orchestrator katmanı; tracked-only local Git, GET-only live
+  GitHub, machine-readable authorization ve exact task/result/state kayıtlarını
+  Observation v1 içinde veri-minimal olarak gözleyecek şekilde eklendi.
+- Authorization v1 parser; exact marker/fenced JSON, duplicate-key rejection,
+  strict schema/budget, canonical UTF-8 SHA-256, transport comment ID, UTC
+  expiry ve explicit supersession zincirini fail-closed doğrular.
+- Mutating Git aileleri command guard'da reddedilir; ignored/untracked, ZIP,
+  export, cache ve gerçek kullanıcı alanları enumerate edilmez.
+- Runtime JSON yalnız repository dışındaki unique run klasörüne temp file ve
+  `os.replace` ile atomik yazılır. Raw command veya comment body output'a
+  girmez.
+- O1 action admission/policy engine değildir; approval tüketimi, O2, live
+  integration, full validation, commit/publish, API, build ve device ayrı
+  yetki kapılarında kalır.
+
 ## Issue #285 - CSE Development Orchestrator O0 Temeli
 
 - CSE geliştirme disiplininin otomasyondan önce doğrulanabilmesi için
