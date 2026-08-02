@@ -197,6 +197,15 @@ source precedence, budget/retry, result class, evidence reuse ve checkpoint
 provenance fail-closed doğrulanır. O4 action çalıştırmaz ve tarihsel Issue'yu
 tamamlanmış saymaz; frozen checkpoint ile açık `DEVICE` gate'ini korur.
 
+Issue #295 ile O5-O8 zorunlu MVP; deterministic ActionPlan, repository dışı
+append-only admission/result ledger, injected controlled runner, ayrı
+checkpoint/build/device gate planları ve normal push + tek Draft PR publish
+adapter'ını O1-O4 oracle zincirine bağlar. Default dry-run, exact argv,
+source/action fingerprint recheck, one-time approval/budget ve data-minimal O3
+result sınırları executable olur. Gerçek Codex/build/device/GitHub action'ı
+validation sırasında çalıştırılmaz. O9 OpenAI planner ve O10 opsiyonel Windows
+operasyon yüzeyi zorunlu MVP dışında kalır.
+
 # 5. Fazlar
 
 ## Faz 0 — Release 0.1 gerçek saha kabulü

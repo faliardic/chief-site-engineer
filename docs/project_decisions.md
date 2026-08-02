@@ -1,5 +1,35 @@
 # Proje Kararlari
 
+## Issue 295 — O5-O8 execution approval ile process arasında immutable plan ister
+
+- O1 Observation ve O2 invocation admission doğrudan subprocess yetkisi
+  değildir. Exact argv/cwd/repository/branch/base/head/tree, allowlist,
+  capability, budget ve source/contract/action fingerprint bağları immutable
+  `ActionPlan v1` içinde canonical hash ile dondurulur.
+- Planner, gate builder ve publish-plan saf/deterministic kalır; subprocess,
+  network veya filesystem mutation yapmaz. Default mode `dry_run`dır.
+- Controlled action yalnız execute-mode plan, explicit execute flag, allowed
+  policy decision, current source/action fingerprint recheck ve repository-dışı
+  admission ledger ile başlayabilir. Real adapter `shell=False` exact argv
+  kullanır; testler yalnız injected fake adapter kullanır.
+- Approval consumption, budget admission ve invocation-start provenance aynı
+  append-only admission event'inde tutulur. Ledger monoton sequence ve
+  previous-hash zinciri taşır; duplicate action veya tamper fail-closed olur.
+- Raw stdout/stderr ledger'a yazılmaz. Frozen result O3 parser üzerinden hash,
+  bounded sanitized excerpt, failure class ve action-start budget evidence'ına
+  dönüşür.
+- CHECKPOINT_COMMIT, BUILD, DEVICE ve PUBLISH ayrı action/approval/budget
+  kapılarıdır. Bir gate PASS'i sonraki gate authority'si değildir.
+- Device planı gerçek serial taşımaz; yalnız sembolik target kabul eder.
+  Uninstall, clear-data ve hard-delete varsayılan olarak yasaktır.
+- Publish yalnız exact normal push ve `master` hedefli tek Draft PR'dır.
+  Force-push, blind retry, duplicate PR, Ready, merge, Issue close, branch
+  delete ve release bu adapter kapsamı dışındadır.
+- Runtime root repository içinde olamaz. Secret/raw authorization-comment body,
+  kullanıcı verisi ve ignored kullanıcı alanı plan/result/ledger kaynağı değildir.
+- O5-O8 completion O0-O8 zorunlu Orchestrator MVP'yi tamamlar; O9 OpenAI API
+  planner ve O10 service/tray ayrı future approval/faz olarak kalır.
+
 ## Issue 277 — Hatırlatıcı Exact Hızlı Planlama Zamanları
 
 - `Yarın sabah` ve timed `Yarın 08:00`, operation anına göre
