@@ -177,6 +177,12 @@ v1 ve repository-dışı atomik runtime output sınırında başlatılmıştır.
 veya action runner değildir; full Python/live integration, checkpoint ve publish
 ayrı approval kapılarında kalır.
 
+Issue #289 ile O2 state/policy engine; O0 transition tablosunu executable hâle
+getirir ve immutable Observation/authorization girdisinden approval,
+capability, drift, budget, retry, evidence reuse ve blocker precedence kararı
+üretir. O2 action çalıştırmaz, approval tüketmez, dış I/O yapmaz ve persistence
+kurmaz; O3 result parser ile sonraki controlled runner fazlarının ön koşuludur.
+
 # 5. Fazlar
 
 ## Faz 0 — Release 0.1 gerçek saha kabulü

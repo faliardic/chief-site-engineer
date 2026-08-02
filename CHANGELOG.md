@@ -1,5 +1,20 @@
 # Changelog
 
+## Issue #289 - CSE Development Orchestrator O2 State ve Policy Engine
+
+- O0 transition tablosu executable `State` modeli ve immutable,
+  canonical-hash kimlikli transition event/projection sözleşmesi olarak eklendi.
+- O2 policy engine; approval level/action bağı, Code/Device/Publish capability,
+  source/scope/action/capability/budget drift'i, budget/retry/correction,
+  full-gate revision reuse, optional gate ve blocker precedence kararlarını
+  yalnız immutable girdiden deterministic üretir.
+- Unknown veya uyumsuz state/action/approval/capability/budget fail-closed
+  reddedilir. Reused evidence yalnız exact source ve contract fingerprint
+  eşleşmesinde kabul edilir; canonical karar output'u byte-stable'dır.
+- Policy subprocess, network veya filesystem erişimi yapmaz; approval üretmez
+  ya da tüketmez ve action çalıştırmaz. Persistence, runner, API, build, device,
+  commit ve publish sonraki ayrı approval/fazlarda kalır.
+
 ## Issue #287 - CSE Development Orchestrator O1 Read-Only Observer
 
 - İlk executable Orchestrator katmanı; tracked-only local Git, GET-only live
