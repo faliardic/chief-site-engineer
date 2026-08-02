@@ -257,3 +257,31 @@ Orchestrator hiçbir approval seviyesi altında şunları kendi kendine yapamaz:
 
 Mekanik action gelecekte otomatikleştirilebilse bile kararın kaynağı Fatih'in
 exact, current ve tek kullanımlık approval'ı olarak kalır.
+
+## 14. O10 workflow-level authorization
+
+O10 initial authorization, tek action approval'ı değildir; açıkça sıralanmış ve
+üst sınırları dondurulmuş bir stage zinciridir. Exact payload şunları birlikte
+bağlar:
+
+- Issue/comment/supersession ve UTC expiry;
+- controller revision ile ayrı target branch/base/HEAD/tree;
+- read/write allowlist ve stage başına capability;
+- exact argv, cwd, environment-name allowlist, timeout/output sınırı;
+- primary, correction, command, commit, push, Draft PR, Issue comment ve hard
+  stop budgets;
+- varsa artifact, exact device ve publish contract'ı;
+- source/tool/command/artifact fingerprint'i tam eşleşen reused evidence.
+
+CLI `--execute` ile payload `execution=true` birlikte değilse mutation yoktur.
+Scope, source, target, capability, risk veya budget genişlemesi mevcut workflow'u
+ilerletmez; yeni insan kararı gerekir. `PAUSED_EXTERNAL` yalnız kaynak ve
+artifact provenance değişmediyse resume edilebilir. `RESUMABLE_FAILURE`, aynı
+stage için ayrı attempt ID ve kalan correction/invocation budget ister.
+`AWAITING_USER_DECISION` ile `UNSAFE_BLOCKED` otomatik resume alamaz.
+
+Device capability yalnız exact device contract ve her ADB argv'sinde tek
+`-s <serial>` bağıyla kabul edilir. Uninstall, clear-data ve downgrade tokenları
+authorization parse aşamasında reddedilir. Publish yalnız normal commit/push ve
+`master` hedefli Draft PR olabilir; Ready, merge, release ve branch delete bu
+authorization şemasında yoktur.

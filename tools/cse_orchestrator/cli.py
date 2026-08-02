@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
+import subprocess
 from pathlib import Path
 from typing import Mapping, Sequence
 
@@ -21,11 +23,27 @@ from .github_rest import (
     HostPublishRequest,
 )
 from .ledger import LedgerError, RuntimeLedger
-from .observer import REPOSITORY_PATTERN, observe_repository
+from .observer import GhGitHubClient, REPOSITORY_PATTERN, observe_repository
 from .openai_client import OpenAIClientError, OpenAIResponsesClient
 from .planner import ActionPlan, PlanError, build_action_plan, current_environment
 from .policy import PolicyDecision
 from .runner import ControlledRunner, ExecutionError, SubprocessProcessAdapter
+from .workflow import (
+    GhIssueEvidenceSink,
+    WorkflowCoordinator,
+    WorkflowError,
+    verify_projected_artifact,
+)
+from .workflow_authorization import (
+    WorkflowAuthorizationError,
+    parse_workflow_authorization,
+    select_latest_workflow_authorization,
+)
+from .workflow_store import (
+    WorkflowStore,
+    WorkflowStoreError,
+    find_workflow_ids,
+)
 
 
 def _positive_issue(value: str) -> int:
@@ -108,6 +126,57 @@ def _json_inputs(parser: argparse.ArgumentParser, *, contract: bool = False) -> 
         parser.add_argument("--contract", required=True, type=_strict_path)
 
 
+def _workflow_inputs(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--issue", required=True, type=_positive_issue)
+    parser.add_argument("--repo-root", required=True, type=_strict_path)
+    parser.add_argument("--runtime-root", required=True, type=_strict_path)
+    parser.add_argument("--repository", type=_repository)
+    parser.add_argument("--workflow-id")
+    parser.add_argument("--controller-root", type=_strict_path)
+
+
+def _infer_repository(repo_root: Path) -> str:
+    try:
+        completed = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            cwd=Path(repo_root).resolve(),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=False,
+            check=False,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise WorkflowError("repository_remote_unavailable") from exc
+    if completed.returncode != 0:
+        raise WorkflowError("repository_remote_unavailable")
+    value = completed.stdout.strip().replace("\\", "/")
+    match = re.search(r"github\.com[/:]([^/]+/[^/]+?)(?:\.git)?$", value)
+    if match is None or not REPOSITORY_PATTERN.fullmatch(match.group(1)):
+        raise WorkflowError("repository_remote_invalid")
+    return match.group(1)
+
+
+def _workflow_repository(args: argparse.Namespace) -> str:
+    return args.repository or _infer_repository(args.repo_root)
+
+
+def _workflow_id(args: argparse.Namespace, repository: str) -> str:
+    if args.workflow_id:
+        return str(args.workflow_id)
+    matches = find_workflow_ids(
+        runtime_root=args.runtime_root,
+        repository=repository,
+        issue=args.issue,
+    )
+    if len(matches) != 1:
+        raise WorkflowError(
+            "workflow_not_found" if not matches else "workflow_selection_ambiguous"
+        )
+    return matches[0]
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m tools.cse_orchestrator.cli",
@@ -164,7 +233,81 @@ def build_parser() -> argparse.ArgumentParser:
     api_run.add_argument("--execute-api", action="store_true")
     api_run.add_argument("--execute-codex", action="store_true")
     api_run.add_argument("--execute-publish", action="store_true")
+
+    workflow_run = subparsers.add_parser(
+        "workflow-run",
+        help="Start or resume one workflow; real execution requires --execute",
+    )
+    _workflow_inputs(workflow_run)
+    workflow_run.add_argument("--authorization", type=_strict_path)
+    workflow_run.add_argument("--execute", action="store_true")
+
+    workflow_status = subparsers.add_parser(
+        "workflow-status", help="Read the replayed workflow projection"
+    )
+    _workflow_inputs(workflow_status)
+
+    workflow_verify = subparsers.add_parser(
+        "workflow-verify", help="Verify workflow ledger, projection and artifact"
+    )
+    _workflow_inputs(workflow_verify)
     return parser
+
+
+def _workflow_authorization(args: argparse.Namespace, repository: str):
+    if args.authorization is not None:
+        return parse_workflow_authorization(_read_object(args.authorization))
+    comments = GhGitHubClient(repository).get_issue_comments(args.issue)
+    selection = select_latest_workflow_authorization(comments)
+    if selection.status != "valid" or selection.authorization is None:
+        raise WorkflowAuthorizationError(
+            selection.reason or "workflow_authorization_missing"
+        )
+    return selection.authorization
+
+
+def _workflow_run(args: argparse.Namespace) -> dict[str, object]:
+    repository = _workflow_repository(args)
+    authorization = _workflow_authorization(args, repository)
+    if authorization.repository != repository or authorization.issue != args.issue:
+        raise WorkflowAuthorizationError("workflow_authorization_target_mismatch")
+    controller = args.controller_root or Path(__file__).resolve().parents[2]
+    sink = (
+        GhIssueEvidenceSink(repository, args.issue)
+        if args.execute
+        else None
+    )
+    return WorkflowCoordinator(
+        authorization=authorization,
+        controller_root=controller,
+        target_root=args.repo_root,
+        runtime_root=args.runtime_root,
+        evidence_sink=sink,
+    ).run(execute=args.execute)
+
+
+def _workflow_status(args: argparse.Namespace, *, verify_artifact: bool) -> dict[str, object]:
+    repository = _workflow_repository(args)
+    workflow_id = _workflow_id(args, repository)
+    verification = WorkflowStore(
+        runtime_root=args.runtime_root,
+        repo_root=args.repo_root,
+        workflow_id=workflow_id,
+    ).verify()
+    result = verification.projection.public_dict(verification.contract)
+    if verify_artifact:
+        result = {
+            **result,
+            "verification": {
+                "ledger": True,
+                "projection": True,
+                "artifact": verify_projected_artifact(
+                    verification.projection,
+                    target_root=args.repo_root,
+                ),
+            },
+        }
+    return result
 
 
 def _api_run(args: argparse.Namespace) -> dict[str, object]:
@@ -304,6 +447,30 @@ def main(argv: Sequence[str] | None = None) -> int:
             }
         print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
         return 0 if result.get("status") in {"DRY_RUN", "API_COMPLETED", "CHILD_COMPLETED", "PUBLISHED"} else 12
+
+    if args.command in {"workflow-run", "workflow-status", "workflow-verify"}:
+        try:
+            if args.command == "workflow-run":
+                result = _workflow_run(args)
+            else:
+                result = _workflow_status(
+                    args, verify_artifact=args.command == "workflow-verify"
+                )
+        except (
+            OSError,
+            ValueError,
+            json.JSONDecodeError,
+            WorkflowAuthorizationError,
+            WorkflowStoreError,
+            WorkflowError,
+        ) as exc:
+            result = {
+                "schema_version": 1,
+                "status": "UNSAFE_BLOCKED",
+                "reason": str(exc).split(":", 1)[0],
+            }
+        print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0 if result.get("status") in {"DRY_RUN", "RUNNING", "PAUSED_EXTERNAL", "RESUMABLE_FAILURE", "COMPLETED"} else 14
 
     try:
         if args.command == "plan":

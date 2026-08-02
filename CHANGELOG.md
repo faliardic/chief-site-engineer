@@ -1,5 +1,20 @@
 # Changelog
 
+## Issue #303 - O10 resumable one-command workflow
+
+- Machine-readable workflow authorization; exact controller/target, allowlist,
+  capability, command, budget, artifact/device/publish ve reuse fingerprint
+  sözleşmeleriyle eklendi.
+- Repository-dışı immutable manifest, append-only hash-chain ledger ve replayed
+  projection; crash-safe cache recovery, unique attempt admission ve stable
+  blocker diagnostics sağlar.
+- `workflow-run`, `workflow-status` ve `workflow-verify`; same-process gate
+  progression, external pause/resume, artifact korunumu ve exact PASS reuse
+  davranışını sunar.
+- Commit, normal push, Draft PR ve Issue evidence duplicate-safe çalışır; raw
+  stream/user content saklanmaz. Merge/release ile product/mobile/device
+  development bu teslimatın kapsamına alınmadı.
+
 ## Issue #299 - CSE Development Orchestrator O9 API otomasyonu
 
 - Standard-library OpenAI Responses API client; environment-only key/model,
