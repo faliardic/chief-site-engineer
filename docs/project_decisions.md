@@ -3531,3 +3531,26 @@
   değiştirilmez veya O1 olarak doğrudan yeniden kullanılmaz.
 - O2, full validation, live integration, commit, publish, OpenAI API, build ve
   device ayrı Issue/approval gerektirir.
+
+## Issue 289 — O2 policy kararı runner ve persistence'tan ayrılır
+
+- O0 state tablosu executable exact transition setidir. Bütün non-terminal
+  states explicit cancellation taşır; terminal state devamı yeni run ister.
+- Transition eventleri immutable ve canonical SHA-256 kimliklidir. Exact replay
+  idempotenttir; aynı event ID ile farklı payload history rewrite sayılıp
+  reddedilir. O2 kalıcı event store yazmaz.
+- Policy input'u exact şemadır ve caller mapping'ini değiştirmez. Unknown veya
+  eksik state/action/approval/capability/budget/evidence alanı normalize edilmez;
+  fail-closed karar üretir.
+- Approval seviyesi sıralıdır fakat admission exact action, capability,
+  source/scope/action/capability/budget fingerprint ve expiry bağı ister. Daha
+  üst fakat farklı action approval'ı ambient yetki değildir.
+- Action invocation öncesi hard stop ve ilgili counter doğrulanır; policy yalnız
+  `budget_delta` önerir. Approval consumption, budget mutation ve
+  invocation-start provenance persistence'ı O2 kapsamında değildir.
+- Same-operation retry yalnız exact `CORRECTION` fingerprint'i ve ayrı retry
+  bütçesiyle admit edilir. Aynı source full gate'i tekrar çalıştırılmaz; exact
+  source+contract evidence reuse veya explicit `not_required` gerekir.
+- Policy filesystem, subprocess veya network kullanmaz ve action çalıştırmaz.
+  O3 parser, SQLite, runner, GitHub write, API, build ve device ayrı faz/approval
+  sınırında kalır.
