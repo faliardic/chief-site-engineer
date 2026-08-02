@@ -358,3 +358,29 @@ Evidence yalnız şu durumda yeniden kullanılabilir:
 
 Reuse yeni PASS üretmez; önceki PASS'in current run'a neden taşınabildiğini
 kanıtlar.
+
+## 10. O10 workflow projection durumları
+
+Action state'leri korunur. O10, birden çok action'ın sırasını ayrı projection
+ile yönetir:
+
+| Durum | Anlam | Otomatik devam |
+| --- | --- | --- |
+| `NEW` | Manifest var, start event'i henüz yok. | Start admission sonrası. |
+| `RUNNING` | Exact current stage belirli. | PASS sonrası aynı process'te. |
+| `PAUSED_EXTERNAL` | Ağ/cihaz/fiziksel koşul eksik. | Aynı source ve artifact ile sonraki çağrıda. |
+| `RESUMABLE_FAILURE` | Exact stage retry bütçesi kaldı. | Yeni bounded attempt identity ile. |
+| `AWAITING_USER_DECISION` | Scope/risk/target kararı gerekiyor. | Hayır. |
+| `UNSAFE_BLOCKED` | Hash, branch, allowlist, secret veya provenance drift'i. | Hayır. |
+| `COMPLETED` | Bütün stage'ler ve final clean/publish postcondition PASS. | Terminal. |
+
+Her `stage_admitted`, benzersiz attempt ID ve stage contract fingerprint'i
+taşır. Aktif attempt sonuç/pause/failure almadan aynı veya ikinci admission
+alamaz. `stage_passed` ve `stage_reused`, next stage indexini yalnız ledger
+replay ile bir artırır. Artifact/device/publish ayrıntıları projection'da merge
+edilir; önceki commit/push provenance'i sonraki PR sonucu tarafından silinmez.
+
+Projection cache otorite değildir. Hash-chain ledger ve immutable manifest
+otoritedir. Crash ledger append ile atomic cache replace arasına girerse resume
+ledger'dan projection'ı yeniden kurar. Salt-okunur `workflow-verify`, ledger,
+projection cache ve varsa artifact hash farkını fail-closed raporlar.

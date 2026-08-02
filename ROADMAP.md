@@ -29,7 +29,11 @@
 - Credential yokluğunda O9 live pilot `CREDENTIALS_MISSING` kalır; secret
   istenmez veya üretilmez. Production/mobile source, build ve device kapsamı
   genişlemez.
-- O10 service/tray ayrı Issue, capability ve approval sözleşmesi gerektirir.
+- Issue #303, O10 resumable workflow coordinator ile gate bazlı prompt taşıma
+  döngüsünü kaldırır; workflow-level authorization, external runtime projection,
+  pause/resume, evidence reuse ve duplicate-safe publication sağlar.
+- Opsiyonel service/tray yüzeyi O10 contract'ının parçası değildir; gerekirse
+  ayrı Issue, capability ve approval sözleşmesi ister.
 
 ## 1. Ürün kararı
 
@@ -179,7 +183,7 @@ O0 mimari/güvenlik sözleşmesi
 → O7 commit/build/device gates
 → O8 GitHub evidence/Draft PR
 → O9 OpenAI API planner
-→ O10 opsiyonel Windows operasyon yüzeyi
+→ O10 resumable one-command workflow coordinator
 ```
 
 O0–O4 deterministik oracle katmanıdır ve OpenAI API kullanmaz. Her Orchestrator
@@ -220,8 +224,11 @@ adapter'ını O1-O4 oracle zincirine bağlar. Default dry-run, exact argv,
 source/action fingerprint recheck, one-time approval/budget ve data-minimal O3
 result sınırları executable olur. Gerçek Codex/build/device/GitHub action'ı
 validation sırasında çalıştırılmaz. Issue #299 ile O9 OpenAI planner ve
-controlled API/Codex/GitHub adapter zinciri eklenir; O10 opsiyonel Windows
-operasyon yüzeyi zorunlu MVP dışında kalır.
+controlled API/Codex/GitHub adapter zinciri eklenir. Issue #303 ile O10;
+controller/target ayrımı, workflow-level authorization, repository-dışı
+append-only projection, same-process progression, pause/resume, exact evidence
+reuse ve duplicate-safe publish zincirini executable hâle getirir. Opsiyonel
+Windows service/tray yüzeyi ayrı gelecek iş olarak kalır.
 
 # 5. Fazlar
 

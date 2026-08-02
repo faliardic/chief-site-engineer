@@ -1,5 +1,26 @@
 # Proje Kararlari
 
+## Issue 303 — Workflow ledger otoritedir, prompt zinciri değildir
+
+- Bir development run'ının bütün mekanik stage'leri tek machine-readable
+  workflow authorization içinde exact sıralama ve budget üst sınırıyla
+  bağlanabilir. Aynı scope içinde PASS sonrası yeni kullanıcı prompt'u gerekmez.
+- Controller source checkout, target repository/worktree ve runtime root ayrı
+  provenance alanlarıdır. Çalışan package source root'u authorization'daki temiz
+  controller revision ile aynı checkout olmalıdır.
+- Immutable contract manifesti ve append-only hash-chain event ledger otoritedir;
+  projection cache yalnız yeniden üretilebilir hızlandırıcıdır. Cache kaybı
+  workflow'u ilerletmez, ledger'dan exact state'i yeniden kurar.
+- Aynı action sonuçsuz ikinci admission alamaz. Authorized correction yeni
+  attempt identity taşır; exact source/tool/command/artifact fingerprint'li PASS
+  ise invocation olmadan reuse edilebilir.
+- External device/ağ yokluğu terminal failure değildir: artifact provenance
+  korunarak `PAUSED_EXTERNAL` olur. Hash/allowlist/branch/secret drift'i
+  `UNSAFE_BLOCKED`, gerçek ürün/risk kararı `AWAITING_USER_DECISION` olur.
+- GitHub evidence, commit, normal push ve Draft PR duplicate-safe'tir. Merge,
+  release, Ready, branch delete ve product/mobile/device kapsam genişlemesi
+  workflow authorization'ın dışında kalır.
+
 ## Issue 299 — Model planı local authority değildir
 
 - Responses API yalnız `OPENAI_API_KEY` ve `OPENAI_MODEL` environment

@@ -272,3 +272,48 @@ O0 tamamlandığında:
 - API key veya secret oluşturulmamıştır;
 - GitHub, commit, build veya cihaz otomasyonu yoktur;
 - production davranışı değişmemiştir.
+
+## 10. O10 resumable workflow coordinator
+
+O10, O1-O9 parçalarını silmeden veya action state modelini yeniden
+yorumlamadan ayrı bir workflow projection altında birleştirir:
+
+```text
+machine authorization
+→ controller/target/tool preflight
+→ immutable workflow contract
+→ append-only event admission/result
+→ deterministic next stage
+→ PASS/reuse | pause | decision | retry | unsafe block
+→ clean target + publish provenance
+→ COMPLETED
+```
+
+- `workflow_authorization.py`, Issue yorumundaki exact repository, Issue,
+  controller revision, target checkpoint, allowlist, capability sequence,
+  stage planı, budgets ve optional artifact/device/publish hedeflerini canonical
+  SHA-256 fingerprint'e bağlar. Unknown alan, secret biçimi, expiry,
+  supersession veya device serial/argv drift'i reddedilir.
+- `workflow_store.py`, repository dışındaki immutable contract manifesti ile
+  append-only hash-chain event ledger'ını tutar. Projection yalnız bu ledger'dan
+  yeniden üretilir; stale/missing cache mutating resume sırasında ledger'dan
+  güvenle onarılır, read-only verify ise cache tamper'ını bildirir.
+- `workflow.py`, controller source checkout'unu target Git deposundan ve runtime
+  kökünden ayırır. Aynı process içinde PASS sonrası sıradaki stage'e geçer;
+  external blocker'da artifact'i koruyup pause eder; correction bütçesindeki
+  resumable failure'a yeni attempt identity verir.
+- Command evidence raw stream taşımaz. Stage, family, argv hash, command index,
+  exit, duration, timeout/truncation, stdout/stderr hash, stable reason ve ilk
+  başarısız predicate saklanır.
+- Commit, push, Draft PR ve Issue evidence önce mevcut exact sonucu arar.
+  Exact eşleşme reuse, farklı sonuç provenance blocker'ıdır; ikinci mutation
+  yapılmaz.
+
+Controller checkout, target repository ve runtime root üç farklı resolved
+path'tir. CLI'daki controller root ayrıca çalışan package'ın gerçek source
+root'una eşit olmalıdır. Böylece başka bir temiz Git deposunun revision'ı,
+değiştirilmiş controller kodunun provenance'i olarak gösterilemez.
+
+O10 merge veya release yetkisi vermez. Product/mobile ve fiziksel cihaz action'ı
+yalnız current machine authorization exact stage/capability/target sınırında
+çalışabilir.
