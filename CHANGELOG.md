@@ -5,32 +5,38 @@
 - CSE geliştirme disiplininin otomasyondan önce doğrulanabilmesi için
   Orchestrator architecture, state machine, security boundary, approval model
   ve O0–O10 MVP planı belgelendi.
-- Operational truth; local Git, local/cached/live master, current Issue ve
-  latest-valid authorization, task/result, append-only event store, finalized
-  `.cse/state` snapshot ve docs iddiaları olarak sıralandı. Bilgi-türü bazlı
-  kanonik kaynak rolleri korundu.
+- Operational truth; local Git, local/cached/live master, GitHub Issue
+  authorization, task/result, append-only event store, finalized `.cse/state`
+  snapshot ve docs iddiaları olarak ayrıldı. Bilgi-türü bazlı kanonik kaynak
+  rolleri korundu.
 - `SAFE_READ`den `RELEASE`e approval seviyeleri, one-time fingerprint,
   Code/Device/Publish capability isolation, standart blocker kodları ve
   machine-readable retry/correction/invocation/time budget alanları tanımlandı.
-- Review correction'ında `AWAITING_APPROVAL`; pending action, gerekli approval
-  seviyesi, resume state ve source/action fingerprint bağlarıyla kesinleştirildi.
-  `CODEX_AUTHORIZED` yalnız Codex code/correction action'larına ayrıldı;
-  checkpoint commit, build, device ve publish için ayrı `ACTION_AUTHORIZED`
-  gate'i ve admission consumption/budget/provenance bağı tanımlandı.
+- Review correction'larında `AWAITING_APPROVAL`; `pending_action`,
+  `required_approval_level`, `resume_state`, `expected_success_state` ve
+  source/action fingerprint bağlarıyla kesinleştirildi.
+- `CODEX_AUTHORIZED` yalnız bounded Codex code/correction action'larına ayrıldı.
+  Codex dışı mutable/maliyetli action'lar için `ACTION_AUTHORIZED` ve
+  `ACTION_RUNNING` ayrımı tanımlandı.
+- `FULL_VALIDATION`, checkpoint commit, build, device ve publish; ayrı
+  `AWAITING_APPROVAL` kapısından sonra `ACTION_RUNNING → RESULT_RECEIVED →
+  DETERMINISTIC_VALIDATION` zincirine bağlandı. Approval consumption, budget
+  admission ve invocation-start provenance aynı append-only admission event'inde
+  tutulur; PASS sonucu `pending_action` ve `expected_success_state` ile seçilir.
 - Runtime state `%LOCALAPPDATA%\CSE-Orchestrator\` altında repository dışı
   tasarlandı. Secret plaintext, gerçek kullanıcı verisi, broad UI/log/DB
   içeriği ve protected/ignored alan taraması yasaklandı.
 - O1 read-only observer minimumu ve Issue #284'ün sanitized O4 replay yaklaşımı
   belirlendi. OpenAI API O9'dan önce kullanılmayacak.
-- İlk docs run'ı yalnız docs/governance kapsamını hazırladı; production, mobile,
-  test, workflow, schema, migration, backup ve cihaz davranışı değişmedi.
-- Foundation checkpoint'i
-  `64b8cb2998cd2e4d77aca2c1e90f20c18d113293` commit'iyle oluşturuldu, remote
-  branch normal yayımlandı ve `master` hedefli Draft PR `#286` open durumda
-  açıldı.
-- Merge, Issue close ve branch delete yapılmadı. API, secret, runtime
-  implementation, build ve device işlemi yapılmadı. Current review correction
-  ayrı ordinary follow-up commit ve publish approval'ı bekler.
+- İlk bounded docs run'ı exact docs/governance kapsamını hazırladı, docs
+  validation kapılarını geçti ve kendi sınırı içinde stage, commit, push veya
+  PR işlemi yapmadı. Production, mobile, test, workflow, schema, migration,
+  backup ve cihaz davranışı değişmedi.
+- Result ve changelog kalıcı tarihsel/teknik kayıt sınırına alındı. Publication
+  gerçeği burada izlenmez; live durum local/remote Git ile GitHub Issue #285 ve
+  PR #286 metadata'sından okunur.
+- API, secret, runtime Orchestrator implementation, build ve device davranışı
+  eklenmedi.
 
 ## Issue #279 - Hatırlatıcı Hızlı Erkene Alma ve Geçmiş Zaman Onayı
 

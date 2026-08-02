@@ -58,9 +58,10 @@ Policy engine observer çıktısını aşağıdaki sözleşmelerle değerlendiri
 Policy engine karar üretir fakat eylem çalıştırmaz. Çıktısı `allow`, `deny` veya
 `awaiting_approval` sınıfı ve gerekçeli state transition önerisidir.
 `awaiting_approval`; `pending_action`, `required_approval_level`,
-`resume_state`, source fingerprint ve action fingerprint bağlarını taşır.
-Geçerli Codex `CODE_CHANGE`/`CORRECTION` action'ı `CODEX_AUTHORIZED`, diğer
-mutable veya maliyetli action'lar ise `ACTION_AUTHORIZED` gate'ine yönelir.
+`resume_state`, `expected_success_state`, source fingerprint ve action
+fingerprint bağlarını taşır. Geçerli Codex `CODE_CHANGE`/`CORRECTION` action'ı
+`CODEX_AUTHORIZED`, diğer mutable veya maliyetli action'lar ise
+`ACTION_AUTHORIZED` gate'ine yönelir.
 
 ### 3.3 Append-only event store
 
@@ -92,7 +93,8 @@ bağını doğrular. Yetkiyi kendi kendine oluşturamaz veya genişletemez.
 Verifier yalnız authorization gate'ini açar; checkpoint commit, build, device
 ve publish result state'lerini doğrudan üretmez. Her action önce
 `AWAITING_APPROVAL`dan doğru specialized veya generic authorized state'e
-geçmelidir.
+geçmeli; Codex dışı action daha sonra `ACTION_RUNNING`, `RESULT_RECEIVED` ve
+`DETERMINISTIC_VALIDATION` zincirini tamamlamalıdır.
 
 O0 ilk docs koşusu geçiş dönemi insan-okur yorumuyla yetkilidir. Future
 machine-readable schema O1 ve sonraki fazlarda uygulanır.
@@ -103,15 +105,26 @@ Capability runner gelecekte yalnız policy engine tarafından kabul edilmiş tek
 profile ve exact action fingerprint'i çalıştırabilir. Her profile ayrı process,
 environment, readable-path ve writable-path sınırı gerekir.
 
-Action başlamadan hemen önce approval consumption, budget admission ve
-invocation provenance tek append-only admission event'inde birlikte
-kaydedilir. `CODEX_AUTHORIZED` yalnız Codex action'larını;
-`ACTION_AUTHORIZED` ise Codex dışındaki exact mutable/maliyetli action'ı kabul
-eder. Bir result state'e geçiş ancak bounded action sonucu doğrulandıktan sonra
-mümkündür.
+`CODEX_AUTHORIZED`, bounded `CODE_CHANGE`/`CORRECTION` action'ını
+`CODEX_RUNNING`e; `ACTION_AUTHORIZED` ise Codex dışındaki exact
+`FULL_VALIDATION`, `CHECKPOINT_COMMIT`, `BUILD`, `DEVICE` veya `PUBLISH`
+action'ını `ACTION_RUNNING`e kabul eder.
+
+`ACTION_RUNNING` entry'sinde `pending_action`, `required_approval_level`,
+`resume_state`, `expected_success_state`, source/action fingerprint ve admission
+event bağları korunur. Approval consumption, budget admission ve
+invocation-start provenance aynı append-only admission event'inde atomik olarak
+kaydedilir. Wrapper eylemi gerçekten başlatmadıysa consumption veya invocation
+tahmin edilmez.
+
+Her runner sonucu önce `RESULT_RECEIVED` içinde exit code/result, duration ve
+sanitized stdout/stderr hashlerine bağlanır. Ardından
+`DETERMINISTIC_VALIDATION`, korunmuş `pending_action` ve
+`expected_success_state` bağına göre PASS result state'ini, `FAILED`ı veya
+`BLOCKED`ı seçer. Codex dışı mutable/maliyetli bir action bu generic execution
+zincirini atlayamaz.
 
 O0'da runner implementation'ı yoktur.
-
 ### 3.6 Evidence assembler
 
 Evidence assembler; source hash, command fingerprint, exit code, sayaç, süre,
@@ -146,6 +159,20 @@ validation genişliği minimum sufficient validation protocol'de kalır.
 - `.cse/state` yalnız yayımlanmış/finalized safe point'tir; açık branch'i
   temsil etmek zorunda değildir.
 - Dokümantasyon daha yüksek otoriteli kanıtla çelişirse ilerleme izni vermez.
+
+### 4.2 Publication live-truth sınırı
+
+Publication'ın güncel gerçeği canlı yürütme yüzeylerinden okunur:
+
+- local branch, HEAD, index ve tracked worktree için local Git;
+- remote branch ve commit için live remote Git;
+- authorization ve completion evidence için GitHub Issue #285 yorumları;
+- PR state, head/base ve review metadata'sı için GitHub PR #286.
+
+Task ve result dosyaları bounded run'ların tarihsel/factual kaydıdır;
+`CHANGELOG.md` teknik sözleşme değişikliklerini kaydeder. Bu yüzeyler live
+publication state'ini mirror veya override etmez. Bilinen commit ve PR
+kimlikleri yalnız stable tarihsel referans olarak tutulabilir.
 
 ## 5. Run manifesti
 

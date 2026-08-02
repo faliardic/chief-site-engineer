@@ -18,6 +18,7 @@ koşullarda fail-closed durduğunu tanımlar. O0'da executable engine yoktur.
 | `CODEX_AUTHORIZED` | Yalnız bounded Codex `CODE_CHANGE` veya `CORRECTION` action'ı için tek kullanımlık yetki geçerlidir. |
 | `ACTION_AUTHORIZED` | Codex dışı tek bir mutable/maliyetli action için generic, tek kullanımlık yetki geçerlidir. |
 | `CODEX_RUNNING` | Yetkili Codex action'ı kabul edilip başlamıştır. |
+| `ACTION_RUNNING` | Codex dışındaki yetkili mutable/maliyetli action admission sonrasında gerçekten başlamıştır. |
 | `RESULT_RECEIVED` | Action sonucu ve provenance alınmıştır. |
 | `DETERMINISTIC_VALIDATION` | Sonuç allowlist, source, parser ve gate kurallarıyla doğrulanır. |
 | `FOCUSED_PASS` | Değişen sözleşmenin dar doğrulaması geçmiştir. |
@@ -48,27 +49,44 @@ IDLE
 → RESULT_RECEIVED
 → DETERMINISTIC_VALIDATION
 → FOCUSED_PASS
+→ AWAITING_APPROVAL [FULL_VALIDATION]
+→ ACTION_AUTHORIZED
+→ ACTION_RUNNING
+→ RESULT_RECEIVED
+→ DETERMINISTIC_VALIDATION
 → FULL_PASS
 → SOURCE_VALIDATED
 → AWAITING_APPROVAL [CHECKPOINT_COMMIT]
 → ACTION_AUTHORIZED
+→ ACTION_RUNNING
+→ RESULT_RECEIVED
+→ DETERMINISTIC_VALIDATION
 → CHECKPOINT_COMMITTED
 → AWAITING_APPROVAL [BUILD]
 → ACTION_AUTHORIZED
+→ ACTION_RUNNING
+→ RESULT_RECEIVED
+→ DETERMINISTIC_VALIDATION
 → ARTIFACT_BUILT
 → AWAITING_APPROVAL [DEVICE]
 → ACTION_AUTHORIZED
+→ ACTION_RUNNING
+→ RESULT_RECEIVED
+→ DETERMINISTIC_VALIDATION
 → DEVICE_ACCEPTANCE
 → PUBLISH_READY
 → AWAITING_APPROVAL [PUBLISH]
 → ACTION_AUTHORIZED
+→ ACTION_RUNNING
+→ RESULT_RECEIVED
+→ DETERMINISTIC_VALIDATION
 → COMPLETED
 ```
 
-Her run bütün optional durumlara uğramaz. Atlanan gate manifestte
-`not_required` veya `reused_evidence` gerekçesi ve source revision ile tutulur.
-Sessiz skip geçerli değildir.
-
+Her run bütün optional durumlara uğramaz. `FULL_VALIDATION`, build, device veya
+publish atlanacaksa manifestte explicit `not_required` ya da geçerli
+`reused_evidence` gerekçesi ve source revision tutulur. Sessiz skip geçerli
+değildir.
 ## 4. Geçiş tablosu
 
 | Kaynak | Hedef | Zorunlu kanıt |
@@ -76,35 +94,37 @@ Sessiz skip geçerli değildir.
 | `IDLE` | `OBSERVING` | Benzersiz run ID ve `SAFE_READ` sınırı |
 | `OBSERVING` | `SCOPE_VALIDATED` | Operational truth uyumu, exact base, temiz admission state, geçerli Issue/scope |
 | `OBSERVING` | `PREFLIGHT_BLOCKED` | Failed invariant ve standart blocker kodu |
-| `SCOPE_VALIDATED` | `AWAITING_APPROVAL` | `pending_action`, `required_approval_level`, `resume_state`, capability ve source/action fingerprint taslağı |
+| `SCOPE_VALIDATED` | `AWAITING_APPROVAL` | Codex action'ı için `pending_action`, `required_approval_level`, `resume_state`, `expected_success_state=FOCUSED_PASS`, capability ve source/action fingerprint taslağı |
+| `FOCUSED_PASS` | `AWAITING_APPROVAL` | `pending_action=FULL_VALIDATION`, `required_approval_level=FULL_VALIDATION`, `resume_state=FOCUSED_PASS`, `expected_success_state=FULL_PASS` ve source/action fingerprint'leri |
+| `SOURCE_VALIDATED` | `AWAITING_APPROVAL` | `pending_action=CHECKPOINT_COMMIT`, `required_approval_level=CHECKPOINT_COMMIT`, `resume_state=SOURCE_VALIDATED`, `expected_success_state=CHECKPOINT_COMMITTED` ve source/action fingerprint'leri |
+| `CHECKPOINT_COMMITTED` | `AWAITING_APPROVAL` | `pending_action=BUILD`, `required_approval_level=BUILD`, `resume_state=CHECKPOINT_COMMITTED`, `expected_success_state=ARTIFACT_BUILT` ve checkpoint/action fingerprint'leri |
+| `ARTIFACT_BUILT` | `AWAITING_APPROVAL` | `pending_action=DEVICE`, `required_approval_level=DEVICE`, `resume_state=ARTIFACT_BUILT`, `expected_success_state=DEVICE_ACCEPTANCE` ve artifact/target/action fingerprint'leri |
+| `PUBLISH_READY` | `AWAITING_APPROVAL` | `pending_action=PUBLISH`, `required_approval_level=PUBLISH`, `resume_state=PUBLISH_READY`, `expected_success_state=COMPLETED` ve branch/commit/remote action fingerprint'leri |
 | `AWAITING_APPROVAL` | `CODEX_AUTHORIZED` | `pending_action` bounded Codex action'ıdır; approval level `CODE_CHANGE` veya `CORRECTION`dır; one-time approval geçerli ve tüketilmemiştir |
-| `AWAITING_APPROVAL` | `ACTION_AUTHORIZED` | `pending_action` Codex dışıdır; exact action'a uygun one-time approval geçerli ve tüketilmemiştir |
-| `CODEX_AUTHORIZED` | `CODEX_RUNNING` | Action başlamadan hemen önce approval consumption, budget admission ve invocation provenance tek append-only admission event'inde kaydedilir |
-| `CODEX_RUNNING` | `RESULT_RECEIVED` | Exit/result, elapsed time ve provenance |
-| `RESULT_RECEIVED` | `DETERMINISTIC_VALIDATION` | Parse edilebilir sanitized result |
-| `DETERMINISTIC_VALIDATION` | `FOCUSED_PASS` | Değişen sözleşmenin focused gate PASS'i |
+| `AWAITING_APPROVAL` | `ACTION_AUTHORIZED` | `pending_action` Codex dışıdır; required level, expected success state ve exact action'a bağlı one-time approval geçerli ve tüketilmemiştir |
+| `CODEX_AUTHORIZED` | `CODEX_RUNNING` | Codex invocation gerçekten başlarken approval consumption, budget admission ve invocation-start provenance tek append-only admission event'inde kaydedilir |
+| `ACTION_AUTHORIZED` | `ACTION_RUNNING` | `FULL_VALIDATION`, `CHECKPOINT_COMMIT`, `BUILD`, `DEVICE` veya `PUBLISH` invocation'ı gerçekten başlarken approval consumption, budget admission ve invocation-start provenance tek append-only admission event'inde kaydedilir |
+| `CODEX_RUNNING` | `RESULT_RECEIVED` | Exit code/result, duration ve sanitized stdout/stderr hashleri |
+| `ACTION_RUNNING` | `RESULT_RECEIVED` | Exit code/result, duration ve sanitized stdout/stderr hashleri |
+| `RESULT_RECEIVED` | `DETERMINISTIC_VALIDATION` | Parse edilebilir sanitized result; `pending_action`, `expected_success_state`, fingerprint ve admission-event bağları korunmuştur |
+| `DETERMINISTIC_VALIDATION` | `FOCUSED_PASS` | `pending_action` `CODE_CHANGE` veya `CORRECTION`; focused gate PASS |
+| `DETERMINISTIC_VALIDATION` | `FULL_PASS` | `pending_action=FULL_VALIDATION`; ayrı full gate PASS |
+| `DETERMINISTIC_VALIDATION` | `CHECKPOINT_COMMITTED` | `pending_action=CHECKPOINT_COMMIT`; ordinary commit, parent/subject ve exact staged allowlist doğrulanmıştır |
+| `DETERMINISTIC_VALIDATION` | `ARTIFACT_BUILT` | `pending_action=BUILD`; artifact exact checkpoint ve build provenance'ına bağlanmıştır |
+| `DETERMINISTIC_VALIDATION` | `DEVICE_ACCEPTANCE` | `pending_action=DEVICE`; exact target'taki veri-minimal acceptance sonucu doğrulanmıştır |
+| `DETERMINISTIC_VALIDATION` | `COMPLETED` | `pending_action=PUBLISH`; bounded publish sonucu ve completion evidence doğrulanmıştır |
 | `DETERMINISTIC_VALIDATION` | `FAILED` | Doğrulanmış source/test/analyze/action failure'ı |
 | `DETERMINISTIC_VALIDATION` | `BLOCKED` | Toolchain, harness, provenance veya external blocker |
-| `FOCUSED_PASS` | `FULL_PASS` | Issue'nun zorunlu tuttuğu full gate PASS'i |
-| `FOCUSED_PASS` | `SOURCE_VALIDATED` | Full gate `not_required` veya geçerli reused evidence |
+| `FOCUSED_PASS` | `SOURCE_VALIDATED` | Full gate explicit `not_required` veya geçerli reused evidence |
 | `FULL_PASS` | `SOURCE_VALIDATED` | Source/tree eşitliği ve post-gate drift `0` |
-| `SOURCE_VALIDATED` | `AWAITING_APPROVAL` | `pending_action=CHECKPOINT_COMMIT`, `required_approval_level=CHECKPOINT_COMMIT`, `resume_state=SOURCE_VALIDATED` ve current source/action fingerprint'leri |
-| `ACTION_AUTHORIZED` | `CHECKPOINT_COMMITTED` | `CHECKPOINT_COMMIT` admission event'i approval consumption, budget ve provenance'ı birlikte taşır; ordinary commit sonucu ve exact staged allowlist doğrulanmıştır |
-| `CHECKPOINT_COMMITTED` | `AWAITING_APPROVAL` | `pending_action=BUILD`, `required_approval_level=BUILD`, `resume_state=CHECKPOINT_COMMITTED` ve checkpoint/artifact action fingerprint'leri |
-| `ACTION_AUTHORIZED` | `ARTIFACT_BUILT` | `BUILD` admission event'i approval consumption, budget ve provenance'ı birlikte taşır; artifact sonucu exact checkpoint'e bağlanmıştır |
-| `ARTIFACT_BUILT` | `AWAITING_APPROVAL` | `pending_action=DEVICE`, `required_approval_level=DEVICE`, `resume_state=ARTIFACT_BUILT` ve artifact/target/action fingerprint'leri |
-| `ACTION_AUTHORIZED` | `DEVICE_ACCEPTANCE` | `DEVICE` admission event'i approval consumption, budget ve provenance'ı birlikte taşır; exact target'taki veri-minimal sonuç doğrulanmıştır |
-| `CHECKPOINT_COMMITTED` | `PUBLISH_READY` | Build ve device `not_required` veya geçerli reused evidence; hiçbir build/device action'ı sessizce çalıştırılmamıştır |
-| `ARTIFACT_BUILT` | `PUBLISH_READY` | Device `not_required` veya geçerli reused evidence; hiçbir device action'ı sessizce çalıştırılmamıştır |
+| `CHECKPOINT_COMMITTED` | `PUBLISH_READY` | Build ve device explicit `not_required` veya geçerli reused evidence; action çalıştırılmamıştır |
+| `ARTIFACT_BUILT` | `PUBLISH_READY` | Device explicit `not_required` veya geçerli reused evidence; action çalıştırılmamıştır |
 | `DEVICE_ACCEPTANCE` | `PUBLISH_READY` | Completion evidence ve publish prerequisites |
-| `PUBLISH_READY` | `AWAITING_APPROVAL` | `pending_action=PUBLISH`, `required_approval_level=PUBLISH`, `resume_state=PUBLISH_READY` ve branch/commit/remote action fingerprint'leri |
-| `ACTION_AUTHORIZED` | `COMPLETED` | `PUBLISH` admission event'i approval consumption, budget ve provenance'ı birlikte taşır; bounded publish sonucu ve completion evidence doğrulanmıştır |
-| `PUBLISH_READY` | `COMPLETED` | Publish bu run için açıkça `not_required`; Git/GitHub mutation yapılmadan yalnız bounded run sonucu tamamlanmıştır |
+| `PUBLISH_READY` | `COMPLETED` | Publish bu run için explicit `not_required`; Git/GitHub mutation olmadan bounded run tamamlanmıştır |
 
 Her non-terminal durum `CANCELLED` durumuna geçebilir. External prerequisite
 kaybı `BLOCKED`, doğrulanmış action failure'ı `FAILED` üretir. Terminal durumdan
 devam etmek yeni run ve yeni authorization gerektirir.
-
 ## 5. Entry ve exit invariant'ları
 
 ### 5.1 `OBSERVING`
@@ -138,7 +158,8 @@ Exit:
 
 Entry:
 
-- `pending_action` ve `required_approval_level` tek anlamlıdır;
+- `pending_action`, `required_approval_level` ve `expected_success_state` tek
+  anlamlıdır;
 - `resume_state`, approval istenen son doğrulanmış state'i gösterir;
 - source fingerprint ve action fingerprint current branch, HEAD/tree, scope,
   capability, target ve budget ile bağlıdır.
@@ -157,43 +178,77 @@ Entry:
 - fingerprint current source ile eşleşir;
 - approval tüketilmemiş ve süresi dolmamıştır;
 - pending action bounded Codex `CODE_CHANGE` veya `CORRECTION`dır;
-- budget yeterlidir.
+- expected success state `FOCUSED_PASS` ve budget yeterlidir.
 
 Exit:
 
-- action başlamadan önce admission event'i append-only yazılmıştır;
-- approval consumption, budget admission ve invocation provenance aynı eventte
-  atomik olarak uygulanmıştır.
+- invocation gerçekten başlarken admission event'i append-only yazılmıştır;
+- approval consumption, budget admission ve invocation-start provenance aynı
+  eventte atomik olarak uygulanmıştır.
 
 ### 5.5 `ACTION_AUTHORIZED`
 
 Entry:
 
 - pending action Codex dışındaki exact mutable/maliyetli action'dır;
-- required approval level action ile exact eşleşir;
+- required approval level ve expected success state action ile exact eşleşir;
 - approval tüketilmemiştir; source/action fingerprint'leri ve budget geçerlidir.
 
 Exit:
 
-- action başlamadan önce approval consumption, budget admission ve invocation
-  provenance tek append-only admission event'inde kaydedilir;
-- action sonucu yalnız `pending_action`ın tanımlı result state'ine geçebilir;
+- yalnız exact action runner'ına geçişe izin verir;
+- bu state tek başına approval tüketimi, invocation veya success sonucu değildir;
 - başka capability veya sonraki action için authorization devredilemez.
 
-### 5.6 `DETERMINISTIC_VALIDATION`
+### 5.6 `ACTION_RUNNING`
+
+Entry:
+
+- `pending_action`; `FULL_VALIDATION`, `CHECKPOINT_COMMIT`, `BUILD`, `DEVICE`
+  veya `PUBLISH` değerlerinden exact biridir;
+- `required_approval_level`, `resume_state`, `expected_success_state`,
+  source/action fingerprint ve admission event bağı korunmuştur;
+- action'ın gerçekten başladığı invocation-start provenance ile kanıtlanmıştır;
+- approval consumption, budget admission ve invocation-start provenance aynı
+  append-only admission event'inde atomik olarak kaydedilmiştir.
+
+Exit:
+
+- yalnız `RESULT_RECEIVED`a geçilir;
+- wrapper action'ı başlatmadıysa bu state'e girildiği veya approval/invocation
+  tüketildiği tahmin edilmez.
+
+### 5.7 `RESULT_RECEIVED`
+
+Entry:
+
+- exit code/result, duration ve sanitized stdout/stderr hashleri kayıtlıdır;
+- `pending_action`, `expected_success_state`, source/action fingerprint'leri ve
+  admission event bağı korunmuştur.
+
+Exit:
+
+- yalnız schema-valid sanitized result `DETERMINISTIC_VALIDATION`a geçer.
+
+### 5.8 `DETERMINISTIC_VALIDATION`
 
 Entry:
 
 - action gerçekten başladı mı bilgisi provenance ile sabittir;
 - result parser output'u schema-valid'dir;
-- source drift kontrol edilmiştir.
+- source drift kontrol edilmiştir;
+- `pending_action` ile `expected_success_state` eşleşmesi doğrulanmıştır.
 
 Exit:
 
-- PASS, FAILED veya BLOCKED sınıfı tahminsizdir;
+- `pending_action`a göre PASS sonucu `FOCUSED_PASS`, `FULL_PASS`,
+  `CHECKPOINT_COMMITTED`, `ARTIFACT_BUILT`, `DEVICE_ACCEPTANCE` veya
+  `COMPLETED` olur;
+- doğrulanmış action failure `FAILED`; toolchain, harness, provenance veya
+  external prerequisite `BLOCKED` olur;
 - consumed budget ve exact failed stage kaydedilmiştir.
 
-### 5.7 `COMPLETED`
+### 5.9 `COMPLETED`
 
 Entry:
 
@@ -206,7 +261,6 @@ Entry:
 `COMPLETED` yalnız bu run'ın sonucudur. PR'ı Ready yapma, merge, Issue close,
 branch delete veya release kararı üretmez; bunların her biri Fatih'in ayrı exact
 approval'ını ve gerekiyorsa ayrı run'ı ister. Exit yoktur. Yeni iş yeni run'dır.
-
 ## 6. Bütçe alanları
 
 ```json

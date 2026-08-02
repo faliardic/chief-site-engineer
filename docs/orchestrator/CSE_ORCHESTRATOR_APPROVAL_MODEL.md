@@ -71,6 +71,7 @@ O1/O2 için önerilen asgari payload:
   "pending_action": "prepare-o0-docs",
   "required_approval_level": "CODE_CHANGE",
   "resume_state": "SCOPE_VALIDATED",
+  "expected_success_state": "FOCUSED_PASS",
   "read_allowlist": ["tracked:authorized-sources"],
   "write_allowlist": ["issue:exact-paths"],
   "budgets": {
@@ -128,19 +129,25 @@ alabilir.
 
 ## 8. Consumption
 
-- `AWAITING_APPROVAL` yalnız beklenen action, gerekli seviye, resume state ve
-  fingerprint bağlarını tutar; approval parse edildi diye tüketim oluşmaz.
+- `AWAITING_APPROVAL`; `pending_action`, `required_approval_level`,
+  `resume_state`, `expected_success_state` ve fingerprint bağlarını tutar;
+  approval parse edildi diye tüketim oluşmaz.
 - `CODE_CHANGE` ve `CORRECTION` yalnız `CODEX_AUTHORIZED`a; Codex dışındaki
   mutable/maliyetli seviyeler yalnız `ACTION_AUTHORIZED`a geçebilir.
-- Approval action başlamadan hemen önce admission'da tüketilir; sonuç
-  beklenirken ikinci action başlatılamaz.
-- Admission event'i approval consumption, budget artışı ve invocation
-  provenance'ı aynı logical transition'da birlikte tutar.
+- `ACTION_AUTHORIZED`, generic action'ı çalışmış saymaz; yalnız exact
+  `ACTION_RUNNING` transition'ına admission verir.
+- Approval action gerçekten başlarken admission'da tüketilir; sonuç beklenirken
+  ikinci action başlatılamaz.
+- Admission event'i approval consumption, budget admission ve invocation-start
+  provenance'ı aynı append-only logical transition'da birlikte tutar.
 - Tool wrapper action'ı gerçekten başlatmadıysa consumption kararı provenance
   ile verilir, tahmin edilmez.
+- `ACTION_RUNNING` sonucu önce `RESULT_RECEIVED`, sonra
+  `DETERMINISTIC_VALIDATION` durumuna girer; `pending_action` ve
+  `expected_success_state` bağı uygun PASS result state'ini veya
+  `FAILED`/`BLOCKED` sınıfını belirler.
 - Tek approval aynı command için kör retry izni vermez.
 - Correction yeni `CORRECTION` approval'ı ve yeni fingerprint gerektirir.
-
 ## 9. Expiry ve drift
 
 Aşağıdaki değişikliklerden biri approval'ı `APPROVAL_EXPIRED` yapar:
@@ -202,19 +209,41 @@ Profile geçişleri implicit değildir:
 
 ```text
 validated state
-→ AWAITING_APPROVAL [pending action + required level + resume state + fingerprints]
+→ AWAITING_APPROVAL
+  [pending_action + required_approval_level + resume_state
+   + expected_success_state + source/action fingerprints]
 → CODEX_AUTHORIZED [yalnız CODE_CHANGE veya CORRECTION]
-  veya ACTION_AUTHORIZED [Codex dışı mutable/maliyetli action]
-→ action admission [consumption + budget + provenance]
-→ doğrulanmış bounded result state
+  → CODEX_RUNNING
+  → RESULT_RECEIVED
+  → DETERMINISTIC_VALIDATION
+  → FOCUSED_PASS | FAILED | BLOCKED
+veya
+→ ACTION_AUTHORIZED [Codex dışı mutable/maliyetli action]
+  → ACTION_RUNNING
+    [consumption + budget admission + invocation-start provenance]
+  → RESULT_RECEIVED
+  → DETERMINISTIC_VALIDATION
+  → expected_success_state | FAILED | BLOCKED
 ```
 
-Checkpoint commit, build, device ve publish aşamalarının her biri önce ayrı
-`AWAITING_APPROVAL` kaydı, sonra `ACTION_AUTHORIZED` gate'i ister. Action
-sonucundan sonraki profile geçiş yeni approval, source/action fingerprint ve
-budget admission gerektirir. Bir profile'ın ambient credentials'ı sonraki
-profile taşınmaz; `PUBLISH` de merge veya release izni vermez.
+`FULL_VALIDATION` exact akışı şöyledir:
 
+```text
+FOCUSED_PASS
+→ AWAITING_APPROVAL [FULL_VALIDATION]
+→ ACTION_AUTHORIZED
+→ ACTION_RUNNING
+→ RESULT_RECEIVED
+→ DETERMINISTIC_VALIDATION
+→ FULL_PASS | FAILED | BLOCKED
+```
+
+`CHECKPOINT_COMMIT`, `BUILD`, `DEVICE` ve `PUBLISH` aşamalarının her biri de
+önce ayrı `AWAITING_APPROVAL` kaydı, sonra aynı generic execution zincirini
+ister. Action sonucundan sonraki profile geçiş yeni approval, source/action
+fingerprint ve budget admission gerektirir. Bir profile'ın ambient
+credentials'ı sonraki profile taşınmaz; `PUBLISH` de merge veya release izni
+vermez.
 ## 13. Kalıcı insan kontrolü
 
 Orchestrator hiçbir approval seviyesi altında şunları kendi kendine yapamaz:
