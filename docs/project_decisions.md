@@ -3508,3 +3508,26 @@
 - Bu karar docs/governance kapsamındadır; production/mobile/test/workflow,
   schema, migration, backup, build, device, commit, publish ve release
   davranışı eklemez.
+
+## Issue 287 — O1 gözlemi action kararından ayrılır
+
+- O1'in tek görevi local Git, live GitHub, machine authorization ve exact CSE
+  kayıtlarından deterministic/sanitized Observation v1 üretmektir. Approval
+  consumption, action admission ve policy kararı O1 kapsamına girmez.
+- Machine authorization yalnız exact marker ve fenced JSON'dan alınır;
+  duplicate/unknown/missing alan, transport comment-ID farkı, non-UTC expiry
+  veya source fingerprint drift'i fail-closed sonuçtur.
+- Authorization fingerprint'i sorted, whitespace'siz UTF-8 canonical JSON
+  byte'larının SHA-256 değeridir. Daha yeni yorum yalnız schema-valid ve açık
+  `supersedes_comment_id` bağıyla önceki yetkiyi değiştirebilir.
+- Git observer yalnız tracked metadata ve staged/tracked diff'i okur. Mutating
+  Git aileleri subprocess başlamadan reddedilir; ignored/untracked, ZIP,
+  export, cache ve kullanıcı alanı taranmaz.
+- GitHub adapter yalnız repository, exact Issue ve paginated comments için GET
+  kullanır. Raw Issue/comment body evidence output'una girmez.
+- Runtime root repository'nin içinde olamaz. Sanitized JSON unique dış run
+  klasörüne temporary file, flush/fsync ve atomik `os.replace` ile yazılır.
+- `scripts/cse_status.py` broad tarihsel diagnosis/finalize davranışı nedeniyle
+  değiştirilmez veya O1 olarak doğrudan yeniden kullanılmaz.
+- O2, full validation, live integration, commit, publish, OpenAI API, build ve
+  device ayrı Issue/approval gerektirir.

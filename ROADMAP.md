@@ -171,6 +171,12 @@ fazı ayrı Issue, exact capability/allowlist, Fatih approval'ı ve minimum yete
 validation planı gerektirir. Bu program açık production Issue sırasını,
 Release 0.1 kabulünü veya gerçek saha backlog'unu sessizce değiştirmez.
 
+Issue #287 ile O1 read-only observer implementation'ı; strict authorization v1,
+tracked-only Git, GET-only GitHub, exact record metadata, sanitized Observation
+v1 ve repository-dışı atomik runtime output sınırında başlatılmıştır. O1 policy
+veya action runner değildir; full Python/live integration, checkpoint ve publish
+ayrı approval kapılarında kalır.
+
 # 5. Fazlar
 
 ## Faz 0 — Release 0.1 gerçek saha kabulü
