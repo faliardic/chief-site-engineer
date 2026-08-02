@@ -3554,3 +3554,21 @@
 - Policy filesystem, subprocess veya network kullanmaz ve action çalıştırmaz.
   O3 parser, SQLite, runner, GitHub write, API, build ve device ayrı faz/approval
   sınırında kalır.
+
+## Issue 291 — O3 result evidence runner ve policy'den ayrılır
+
+- O3 yalnız caller tarafından dondurulmuş exact-schema command result mapping'i
+  ayrıştırır; action başlatmaz, approval/budget tüketmez ve success state seçmez.
+- Supported family seti `pytest`, `compileall`, `git_diff_check`,
+  `flutter_test`, `flutter_analyze`, `build` ve `generic_command` ile explicit
+  kalır. Unknown family veya uyumsuz schema fail-closed reddedilir.
+- Action başlamadı/harness failure, timeout, truncation, malformed output ve
+  exit/output contradiction ayrı provenance evidence'ıdır. Invocation budget
+  yalnız action gerçekten başladıysa consumed olarak raporlanır; sayaç yazılmaz.
+- Count yalnız kanıtlanmış summary token'ından üretilir. Kanıt yokluğu `null`,
+  explicit sıfır sonucu `0`dır; warnings test toplamına eklenmez.
+- Raw stdout/stderr kalıcı result'a kopyalanmaz. Exact UTF-8 stream hash'i ile
+  secret, e-posta ve Windows kullanıcı yolu maskelenmiş bounded excerpt taşınır.
+- Parser filesystem, subprocess veya network erişimi yapmaz. Runner,
+  append-only admission/result persistence, GitHub write, API, gerçek build ve
+  device sonraki ayrı Issue/approval sınırındadır.
