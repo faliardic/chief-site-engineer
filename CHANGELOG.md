@@ -2875,3 +2875,8 @@
 - Adim 001, 002 ve 003 learning dosyalari yeni kod bloklu CSE Learning Standardi'na gore genisletildi.
 - Eski kisa learning notlari detayli yazilim ogretim dosyalarina donusturuldu.
 - `learning/GLOSSARY.md` eksik terimlerle guclendirildi.
+# Issue 301 — Host-owned API publication pre-live
+
+- Deferred Draft PR template ile final SHA child sonrasına taşındı.
+- Host exact validation/staging, tek commit, normal push ve provenance sahibi oldu.
+- Shell-free platform-safe `codex`/`codex.cmd` resolution eklendi.

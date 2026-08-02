@@ -9,19 +9,27 @@ from tools.cse_orchestrator.api_planner import (
     PROPOSAL_JSON_SCHEMA,
     ApiProposalError,
     ProposalContract,
+)
+from tools.cse_orchestrator.automation import (
+    ApiAutomationEngine,
+    AutomationStatus,
     validate_api_proposal,
 )
-from tools.cse_orchestrator.automation import ApiAutomationEngine, AutomationStatus
 from tools.cse_orchestrator.cli import build_parser
 from tools.cse_orchestrator.codex_adapter import (
     CodexChildAdapter,
     CodexChildRequest,
     CodexProcessResult,
+    CodexAdapterError,
 )
 from tools.cse_orchestrator.github_rest import (
     GitHubRestClient,
     GitHubRestContract,
     GitHubRestError,
+    GitHubRestTemplate,
+    GitProcessResult,
+    HostPublisher,
+    HostPublishRequest,
     RestResponse,
 )
 from tools.cse_orchestrator.openai_client import (
@@ -38,11 +46,12 @@ HEAD = "1" * 40
 
 
 def proposal() -> dict[str, object]:
-    return json.loads(FIXTURE.read_text(encoding="utf-8"))
+    value = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    return {key: value[key] for key in ("decision", "summary", "risk", "codex_prompt")}
 
 
 def contract() -> ProposalContract:
-    value = proposal()
+    value = json.loads(FIXTURE.read_text(encoding="utf-8"))
     return ProposalContract(
         capability="Code + Network + Publish",
         write_allowlist=tuple(value["write_allowlist"]),
@@ -167,15 +176,19 @@ def test_proposal_validation_accepts_exact_contract():
     validated = validate_api_proposal(proposal(), contract(), allowed_decision())
     assert validated.decision == "proceed"
     assert validated.write_allowlist == contract().write_allowlist
+    assert validated.validation_commands == contract().validation_commands
+    assert validated.commit_message == contract().commit_message
+    assert validated.pr_title == contract().pr_title
+    assert validated.required_approval_level == contract().required_approval_level
 
 
 @pytest.mark.parametrize(
     ("mutation", "reason"),
     [
         (lambda value: value.update({"unknown": True}), "proposal_fields_invalid"),
-        (lambda value: value["write_allowlist"].append("outside.txt"), "write_allowlist_drift"),
-        (lambda value: value["validation_commands"].append("rm -rf ."), "validation_commands_drift"),
-        (lambda value: value.update({"required_approval_level": "PUBLISH"}), "approval_drift"),
+        (lambda value: value.update({"write_allowlist": ["outside.txt"]}), "proposal_fields_invalid"),
+        (lambda value: value.update({"validation_commands": ["rm -rf ."]}), "proposal_fields_invalid"),
+        (lambda value: value.update({"required_approval_level": "PUBLISH"}), "proposal_fields_invalid"),
     ],
 )
 def test_proposal_cannot_expand_local_contract(mutation, reason):
@@ -228,11 +241,14 @@ def child_request(tmp_path: Path) -> CodexChildRequest:
 
 
 def test_codex_child_uses_exact_stdin_argv_cwd_and_bounds(tmp_path):
+    executable = tmp_path / "bin" / "codex.cmd"
+    executable.parent.mkdir()
+    executable.write_text("stub", encoding="utf-8")
     process = FakeCodexProcess()
-    adapter = CodexChildAdapter(process)
+    adapter = CodexChildAdapter(process, executable_resolver=lambda _: str(executable))
     result = adapter.execute(child_request(tmp_path), execute=True, environment={"PATH": "p", "SECRET": "x"})
     call = process.calls[0]
-    assert call["argv"] == ("codex", "exec", "-")
+    assert call["argv"] == (str(executable.resolve()), "exec", "-")
     assert call["cwd"] == (tmp_path / "repo").resolve()
     assert call["environment"] == {"PATH": "p"}
     assert call["timeout"] == 120 and call["limit"] == 262144
@@ -240,9 +256,35 @@ def test_codex_child_uses_exact_stdin_argv_cwd_and_bounds(tmp_path):
     assert list((tmp_path / "runtime").rglob("*prompt*")) == []
 
 
-def test_codex_default_dry_run_and_duplicate_guard(tmp_path):
+@pytest.mark.parametrize("name", ["codex", "codex.exe", "codex.cmd"])
+def test_codex_executable_resolution_accepts_only_safe_platform_names(tmp_path, name):
+    executable = tmp_path / "bin" / name
+    executable.parent.mkdir()
+    executable.write_text("stub", encoding="utf-8")
     process = FakeCodexProcess()
-    adapter = CodexChildAdapter(process)
+    CodexChildAdapter(process, executable_resolver=lambda _: str(executable)).execute(
+        child_request(tmp_path), execute=True
+    )
+    assert process.calls[0]["argv"][0] == str(executable.resolve())
+
+
+def test_codex_executable_resolution_rejects_repo_path_and_arbitrary_name(tmp_path):
+    request = child_request(tmp_path)
+    for executable in (request.repo_root / "codex", tmp_path / "bin" / "runner"):
+        executable.parent.mkdir(exist_ok=True)
+        executable.write_text("stub", encoding="utf-8")
+        with pytest.raises(CodexAdapterError, match="codex_executable"):
+            CodexChildAdapter(
+                FakeCodexProcess(), executable_resolver=lambda _, p=executable: str(p)
+            ).execute(request, execute=True)
+
+
+def test_codex_default_dry_run_and_duplicate_guard(tmp_path):
+    executable = tmp_path / "bin" / "codex"
+    executable.parent.mkdir()
+    executable.write_text("stub", encoding="utf-8")
+    process = FakeCodexProcess()
+    adapter = CodexChildAdapter(process, executable_resolver=lambda _: str(executable))
     request = child_request(tmp_path)
     assert adapter.execute(request).status == "DRY_RUN"
     adapter.execute(request, execute=True)
@@ -261,7 +303,12 @@ def test_codex_default_dry_run_and_duplicate_guard(tmp_path):
     ],
 )
 def test_codex_failures_are_classified(tmp_path, result, status):
-    outcome = CodexChildAdapter(FakeCodexProcess(result)).execute(
+    executable = tmp_path / "bin" / "codex"
+    executable.parent.mkdir()
+    executable.write_text("stub", encoding="utf-8")
+    outcome = CodexChildAdapter(
+        FakeCodexProcess(result), executable_resolver=lambda _: str(executable)
+    ).execute(
         child_request(tmp_path), execute=True
     )
     assert outcome.status == status
@@ -336,6 +383,136 @@ def test_github_existing_pr_blocks_creation():
     assert [call[0] for call in transport.calls] == ["GET"]
 
 
+class FakeGitProcess:
+    def __init__(self, branch: str, base: str, paths: tuple[str, ...]) -> None:
+        self.branch = branch
+        self.base = base
+        self.head = base
+        self.paths = paths
+        self.calls: list[tuple[str, ...]] = []
+
+    def run(self, argv, *, cwd, timeout_seconds, output_limit_bytes):
+        self.calls.append(argv)
+        answers = {
+            ("git", "branch", "--show-current"): self.branch + "\n",
+            ("git", "rev-parse", "HEAD"): self.head + "\n",
+            ("git", "rev-parse", "origin/master"): self.base + "\n",
+            ("git", "diff", "--name-only"): "\n".join(self.paths) + "\n",
+            ("git", "diff", "--cached", "--name-only"): "",
+            ("git", "status", "--porcelain", "--untracked-files=all"): "\n".join(
+                f" M {path}" for path in self.paths
+            ) + "\n",
+            ("git", "merge-base", "HEAD", "origin/master"): self.base + "\n",
+            ("git", "diff", "--cached", "--check"): "",
+        }
+        if argv[:3] == ("git", "add", "--"):
+            return GitProcessResult(0, b"", b"", False, False)
+        if argv[:2] == ("git", "commit"):
+            self.head = "2" * 40
+            return GitProcessResult(0, b"committed", b"", False, False)
+        if argv[:3] == ("git", "push", "origin"):
+            return GitProcessResult(0, b"pushed", b"", False, False)
+        if argv == ("git", "rev-parse", f"origin/{self.branch}"):
+            return GitProcessResult(0, (self.head + "\n").encode(), b"", False, False)
+        if argv == ("git", "rev-list", "--left-right", "--count", f"origin/{self.branch}...HEAD"):
+            return GitProcessResult(0, b"0\t0\n", b"", False, False)
+        if argv == ("git", "rev-list", "--left-right", "--count", "origin/master...HEAD"):
+            return GitProcessResult(0, b"0\t1\n", b"", False, False)
+        if argv == ("git", "diff", "--cached", "--name-only") and any(
+            call[:3] == ("git", "add", "--") for call in self.calls
+        ):
+            return GitProcessResult(0, ("\n".join(self.paths) + "\n").encode(), b"", False, False)
+        if argv == ("git", "status", "--porcelain", "--untracked-files=all") and self.head != self.base:
+            return GitProcessResult(0, b"", b"", False, False)
+        return GitProcessResult(0, answers.get(argv, "").encode(), b"", False, False)
+
+
+def publish_request(tmp_path: Path) -> HostPublishRequest:
+    paths = ("tools/cse_orchestrator/automation.py", "tests/test_cse_orchestrator_api_automation.py")
+    for path in paths:
+        candidate = tmp_path / path
+        candidate.parent.mkdir(parents=True, exist_ok=True)
+        candidate.write_text(path, encoding="utf-8")
+    return HostPublishRequest(
+        repo_root=tmp_path,
+        branch="codex/issue-301-cse-orchestrator-live-api-pilot",
+        expected_base_sha="1" * 40,
+        write_allowlist=paths,
+        validation_argv=(("python", "-m", "compileall", "tools/cse_orchestrator"),),
+        commit_message="Complete live API-driven orchestrator pilot",
+        github=GitHubRestTemplate(
+            repository="faliardic/chief-site-engineer",
+            branch="codex/issue-301-cse-orchestrator-live-api-pilot",
+            base_branch="master",
+            expected_base_sha="1" * 40,
+            issue=301,
+            title="Complete live API-driven orchestrator pilot",
+            body="Closes #301\n\nPre-live pilot.",
+            draft=True,
+        ),
+    )
+
+
+def test_host_publisher_validates_stages_commits_pushes_and_resolves_provenance(tmp_path):
+    request = publish_request(tmp_path)
+    process = FakeGitProcess(request.branch, request.expected_base_sha, request.write_allowlist)
+    contract = HostPublisher(process).publish(request, execute=True)
+    assert contract.head_sha == "2" * 40
+    assert contract.remote_head_sha == contract.head_sha
+    assert contract.remote_divergence == (0, 0)
+    assert [call for call in process.calls if call[:2] == ("git", "commit")] == [
+        ("git", "commit", "-m", request.commit_message)
+    ]
+    assert [call for call in process.calls if call[:2] == ("git", "push")] == [
+        ("git", "push", "origin", request.branch)
+    ]
+
+
+def test_host_preflight_accepts_authorized_dirty_baseline_and_detects_content_drift(tmp_path):
+    request = publish_request(tmp_path)
+    process = FakeGitProcess(request.branch, request.expected_base_sha, request.write_allowlist)
+    publisher = HostPublisher(process)
+    publisher.preflight(request, execute=True)
+    publisher.verify_baseline(request, execute=True)
+    (tmp_path / request.write_allowlist[0]).write_text("changed", encoding="utf-8")
+    with pytest.raises(GitHubRestError, match="baseline_fingerprint_drift"):
+        publisher.verify_baseline(request, execute=True)
+
+
+def test_host_publisher_dry_run_has_no_process_calls(tmp_path):
+    request = publish_request(tmp_path)
+    process = FakeGitProcess(request.branch, request.expected_base_sha, request.write_allowlist)
+    assert HostPublisher(process).publish(request).head_sha == request.expected_base_sha
+    assert process.calls == []
+
+
+def test_host_publisher_rejects_mutating_validation_argv(tmp_path):
+    request = publish_request(tmp_path)
+    request = HostPublishRequest(
+        **{**request.__dict__, "validation_argv": (("git", "reset", "--hard"),)}
+    )
+    with pytest.raises(GitHubRestError, match="validation_argv_forbidden"):
+        HostPublisher(FakeGitProcess(request.branch, request.expected_base_sha, request.write_allowlist)).publish(request)
+
+
+class FakeHostPublisher:
+    def __init__(self, resolved: GitHubRestContract) -> None:
+        self.resolved = resolved
+        self.preflight_calls = 0
+        self.verify_calls = 0
+        self.publish_calls = 0
+
+    def preflight(self, request, *, execute=False):
+        self.preflight_calls += 1
+
+    def verify_baseline(self, request, *, execute=False):
+        self.verify_calls += 1
+
+    def publish(self, request, *, execute=False):
+        self.publish_calls += 1
+        return self.resolved
+
+
 def test_automation_defaults_to_dry_run_without_adapter_calls(tmp_path):
     openai_transport = FakeHttpTransport(api_response())
     openai = OpenAIResponsesClient("key", "model", transport=openai_transport)
@@ -357,9 +534,9 @@ def test_automation_defaults_to_dry_run_without_adapter_calls(tmp_path):
     assert openai_transport.calls == [] and process.calls == [] and rest.calls == []
 
 
-def test_automation_revalidates_api_proposal_before_child(tmp_path):
+def test_automation_rejects_model_attempt_to_control_immutable_scope(tmp_path):
     expanded = proposal()
-    expanded["write_allowlist"].append("outside.txt")
+    expanded["write_allowlist"] = ["outside.txt"]
     openai = OpenAIResponsesClient("key", "model", transport=FakeHttpTransport(api_response(expanded)))
     process = FakeCodexProcess()
     engine = ApiAutomationEngine(
@@ -376,7 +553,7 @@ def test_automation_revalidates_api_proposal_before_child(tmp_path):
         execute=True,
     )
     assert result.status is AutomationStatus.BLOCKED
-    assert result.reason == "write_allowlist_drift"
+    assert result.reason == "proposal_fields_invalid"
     assert process.calls == []
 
 
@@ -412,19 +589,92 @@ def test_automation_publish_chain_requires_explicit_publish(tmp_path):
         openai_client=openai,
         codex_adapter=CodexChildAdapter(process),
         github_client=GitHubRestClient("token", transport=rest),
+        host_publisher=FakeHostPublisher(rest_contract()),
+    )
+    request = publish_request(tmp_path)
+    local_contract = contract()
+    local_contract = ProposalContract(
+        **{
+            **local_contract.__dict__,
+            "write_allowlist": request.write_allowlist,
+            "validation_commands": tuple(" ".join(argv) for argv in request.validation_argv),
+            "commit_message": request.commit_message,
+            "pr_title": request.github.title,
+            "pr_body_prefix": "Closes #301",
+        }
     )
     result = engine.run(
         prompt="plan",
-        proposal_contract=contract(),
+        proposal_contract=local_contract,
         policy_decision=allowed_decision(),
         codex_request=child_request(tmp_path),
-        github_contract=rest_contract(),
+        host_publish_request=request,
         execute=True,
         publish=True,
     )
     assert result.status is AutomationStatus.PUBLISHED
     assert len(process.calls) == 1
     assert [call[0] for call in rest.calls] == ["GET", "POST"]
+    assert engine._host.preflight_calls == 1
+    assert engine._host.verify_calls == 1
+    assert engine._host.publish_calls == 1
+
+
+@pytest.mark.parametrize(
+    ("field", "reason"),
+    [
+        ("write_allowlist", "host_write_allowlist_drift"),
+        ("validation_argv", "host_validation_commands_drift"),
+        ("commit_message", "host_commit_message_drift"),
+        ("pr_title", "host_pr_title_drift"),
+        ("pr_body_prefix", "host_pr_body_prefix_drift"),
+    ],
+)
+def test_automation_rejects_host_drift_from_local_contract_before_api(tmp_path, field, reason):
+    request = publish_request(tmp_path)
+    local = contract()
+    matching = {
+        **local.__dict__,
+        "write_allowlist": request.write_allowlist,
+        "validation_commands": tuple(" ".join(argv) for argv in request.validation_argv),
+        "commit_message": request.commit_message,
+        "pr_title": request.github.title,
+        "pr_body_prefix": "Closes #301",
+    }
+    local = ProposalContract(**matching)
+    if field == "write_allowlist":
+        request = HostPublishRequest(**{**request.__dict__, field: ("outside.txt",)})
+    elif field == "validation_argv":
+        request = HostPublishRequest(
+            **{**request.__dict__, field: (("python", "-m", "pytest", "outside"),)}
+        )
+    elif field == "commit_message":
+        request = HostPublishRequest(**{**request.__dict__, field: "Different commit"})
+    else:
+        github = GitHubRestTemplate(
+            **{
+                **request.github.__dict__,
+                "title" if field == "pr_title" else "body": "Different value",
+            }
+        )
+        request = HostPublishRequest(**{**request.__dict__, "github": github})
+    transport = FakeHttpTransport(api_response())
+    result = ApiAutomationEngine(
+        openai_client=OpenAIResponsesClient("key", "model", transport=transport),
+        codex_adapter=CodexChildAdapter(FakeCodexProcess()),
+        github_client=GitHubRestClient("token", transport=FakeRestTransport()),
+    ).run(
+        prompt="plan",
+        proposal_contract=local,
+        policy_decision=allowed_decision(),
+        codex_request=child_request(tmp_path),
+        host_publish_request=request,
+        execute=True,
+        publish=True,
+    )
+    assert result.status is AutomationStatus.BLOCKED
+    assert result.reason == reason
+    assert transport.calls == []
 
 
 def test_api_run_cli_defaults_to_dry_run_and_has_separate_execute_gates(tmp_path):

@@ -3676,3 +3676,15 @@
 - Final summary Issue #284 için completion/publication iddiası değildir.
   Checkpoint frozen/unpublished, state `ACTION_AUTHORIZED` ve next gate `DEVICE`
   olarak korunur.
+## Issue 301 — Git ve publish sahipliği host'tadır
+
+- Nested Codex yalnız exact allowlist dosyalarını düzenler ve test çalıştırır;
+  branch, index, commit, push ve PR yetkisi taşımaz.
+- Final SHA child öncesi contract girdisi değildir. Host child PASS sonrasında
+  exact base/scope/worktree doğrulayıp final validation, staging, tek commit ve
+  tek normal push yapar; REST contract push sonrası provenance'dan oluşur.
+- Codex executable shell açmadan bir kez çözülür; yalnız güvenli platform
+  basename'leri ve repository/runtime dışındaki mevcut dosya kabul edilir.
+- Host publish isteğinin allowlist, doğrulama komutları, commit mesajı ve Draft
+  PR metadatası API çağrısından önce yerel ProposalContract ile birebir
+  bağlanır; bağımsız host girdisi bu otoriteyi genişletemez.
