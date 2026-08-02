@@ -1,5 +1,24 @@
 # Changelog
 
+## Issue #295 - CSE Development Orchestrator O5-O8 MVP
+
+- O1 Observation ve O2 policy admission'ından immutable, canonical-hash
+  `ActionPlan v1` üreten dry-run planner eklendi. Shell string, wildcard,
+  repository dışı cwd, unknown executable/action ve fingerprint drift'i
+  fail-closed kalır.
+- Repository dışı append-only hash-chain ledger ile approval consumption,
+  budget admission ve invocation-start provenance tek admission event'inde
+  bağlandı. Duplicate action, result-without-admission ve tamper reddedilir.
+- Explicit execute, exact argv, allowlisted environment, timeout/bounded output
+  ve injected process adapter kullanan controlled runner O3 frozen result
+  parser'ına bağlandı.
+- CHECKPOINT_COMMIT, BUILD ve DEVICE için ayrı provenance-bound gate planları;
+  normal push ve master hedefli tek Draft PR için injected GitHub adapter
+  sözleşmesi eklendi. Ready/merge/close/delete/release kapsam dışı kaldı.
+- CLI default dry-run `plan`, explicit `execute`, `gate-plan`, `publish-plan` ve
+  `ledger-verify` komutlarıyla genişletildi. Gerçek external action validation
+  sırasında çalıştırılmadı.
+
 ## Issue #293 - CSE Development Orchestrator O4 Issue #284 Replay
 
 - Issue #284'ün exact 19 yorumluk authorization/result/correction/continuation
