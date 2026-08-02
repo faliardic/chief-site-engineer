@@ -145,6 +145,32 @@ AI dört kontrollü seviyede eklenir:
 AI teknik kabul, resmî karar, imalat onayı veya sessiz kayıt kapatma yetkisi
 kazanmaz.
 
+### Yatay geliştirme yönetişimi — CSE Development Orchestrator
+
+Issue #285 ile başlayan O0–O10 programı, production ürün fazlarının yerine
+geçmeyen yatay bir geliştirme-güvenliği katmanıdır. İlk amaç otomatik kod
+yazmak değil; mevcut CSE scope, approval, provenance, evidence reuse, retry ve
+fail-closed kurallarını makine tarafından doğrulanabilir hâle getirmektir.
+
+```text
+O0 mimari/güvenlik sözleşmesi
+→ O1 read-only observer
+→ O2 state/policy engine
+→ O3 sonuç parser'ları
+→ O4 sanitized #284 replay
+→ O5 Codex dry-run
+→ O6 controlled Codex
+→ O7 commit/build/device gates
+→ O8 GitHub evidence/Draft PR
+→ O9 OpenAI API planner
+→ O10 opsiyonel Windows operasyon yüzeyi
+```
+
+O0–O4 deterministik oracle katmanıdır ve OpenAI API kullanmaz. Her Orchestrator
+fazı ayrı Issue, exact capability/allowlist, Fatih approval'ı ve minimum yeterli
+validation planı gerektirir. Bu program açık production Issue sırasını,
+Release 0.1 kabulünü veya gerçek saha backlog'unu sessizce değiştirmez.
+
 # 5. Fazlar
 
 ## Faz 0 — Release 0.1 gerçek saha kabulü
