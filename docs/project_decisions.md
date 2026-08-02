@@ -3572,3 +3572,27 @@
 - Parser filesystem, subprocess veya network erişimi yapmaz. Runner,
   append-only admission/result persistence, GitHub write, API, gerçek build ve
   device sonraki ayrı Issue/approval sınırındadır.
+
+## Issue 293 — O4 replay transcript değil sanitize karar zinciridir
+
+- Issue #284 replay fixture'ı raw comment body veya command stream kopyalamaz;
+  yalnız exact 19 comment/event identity, scope, approval/capability,
+  fingerprint, allowlist/budget, result class, blocker/gate ve evidence kimliği
+  taşır.
+- Device target yalnız `tablet_primary` sembolüdür. Gerçek kullanıcı kaydı,
+  cihaz seri/modeli, app-private data, backup, UI dump, log, credential veya
+  Windows kullanıcı yolu fixture kaynağı olamaz.
+- GitHub authorization, task/result ve `.cse_state` kayıtlarından üst
+  authority'dir. Daha yeni ordinary/lower-authority kayıt explicit
+  supersession olmadan approval veya budget genişletemez.
+- Aynı authorization ikinci started action üretemez. Action başlangıcı
+  kanıtlanmayan tool timeout invocation budget tüketmiş sayılmaz; source,
+  harness, timeout ve test result sınıfları ayrı korunur.
+- Reused evidence exact identity; checkpoint build/device zinciri exact
+  commit-parent-tree provenance'ı ister. Publish authorization/budget fixture'da
+  yoktur.
+- Replay engine yalnız in-memory immutable mapping değerlendirir; filesystem,
+  subprocess veya network kullanmaz ve action çalıştırmaz.
+- Final summary Issue #284 için completion/publication iddiası değildir.
+  Checkpoint frozen/unpublished, state `ACTION_AUTHORIZED` ve next gate `DEVICE`
+  olarak korunur.

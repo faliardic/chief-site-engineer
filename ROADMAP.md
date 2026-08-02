@@ -190,6 +190,13 @@ sanitized excerpt içeren canonical result'a çevirir. O3 action çalıştırmaz
 policy/state kararı vermez veya persistence kurmaz; O4 sanitized replay ve
 sonraki controlled runner fazlarına deterministic evidence sağlar.
 
+Issue #293 ile O4 sanitized replay; Issue #284'ün exact 19 comment
+authorization/result/correction zincirini raw body veya gerçek kullanıcı/device
+verisi taşımayan fixture üzerinden tekrar hesaplar. Latest-valid supersession,
+source precedence, budget/retry, result class, evidence reuse ve checkpoint
+provenance fail-closed doğrulanır. O4 action çalıştırmaz ve tarihsel Issue'yu
+tamamlanmış saymaz; frozen checkpoint ile açık `DEVICE` gate'ini korur.
+
 # 5. Fazlar
 
 ## Faz 0 — Release 0.1 gerçek saha kabulü

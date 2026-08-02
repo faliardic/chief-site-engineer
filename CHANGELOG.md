@@ -1,5 +1,19 @@
 # Changelog
 
+## Issue #293 - CSE Development Orchestrator O4 Issue #284 Replay
+
+- Issue #284'ün exact 19 yorumluk authorization/result/correction/continuation
+  zinciri raw body taşımayan sanitize event fixture'ına dönüştürüldü.
+- Replay engine O1 latest-valid supersession/source precedence, O2
+  approval-capability-budget-drift ve O3 failure-class/action-start
+  sözleşmelerini immutable mapping üzerinde deterministic doğrular.
+- Exact duplicate replay idempotenttir; collision, blind retry, ordinary-result
+  budget delta'sı, fingerprint/evidence/checkpoint drift'i ve lower-authority
+  action genişletmesi fail-closed kalır.
+- Fixture device target'ını yalnız `tablet_primary` olarak taşır. Final özet
+  checkpoint'i frozen ve unpublished, Issue #284'ü açık ve next gate'i
+  `DEVICE` olarak korur; completion veya publish kararı üretmez.
+
 ## Issue #291 - CSE Development Orchestrator O3 Result Parser
 
 - Frozen exact-schema command result'ları için `pytest`, `compileall`,
