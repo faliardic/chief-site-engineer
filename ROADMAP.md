@@ -15,6 +15,18 @@
 **Sıradaki production işi:** #279 merge/closure sonrasında ayrı GitHub yetkisiyle seçilecek\
 **Bloklu yatay kabul zinciri:** #257 → #254 / #256, Draft PR #259
 
+## CSE Orchestrator programı
+
+- O0-O8 MVP, Issue #285, #287, #289, #291, #293 ve #295 zincirinde merged
+  source üzerinde tamamlandı.
+- Issue #297, exact pytest action'ını gerçek subprocess adapter ile tek kez
+  çalıştıran ilk controlled live pilot kanıtıdır: O3 `30/30` PASS, external
+  ledger verification PASS ve duplicate execute subprocess öncesi BLOCKED.
+- Pilot production/mobile source, build, device, OpenAI API veya Orchestrator
+  üzerinden GitHub mutation kapsamını genişletmez.
+- O9 OpenAI API planner ve O10 service/tray ayrı Issue, capability, secret,
+  network, cost ve approval sözleşmesi gerektirir.
+
 ## 1. Ürün kararı
 
 CSE bir şantiye ERP'si veya modül kataloğu değildir. Tek gerçek kullanıcısı

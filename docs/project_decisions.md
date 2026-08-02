@@ -1,5 +1,29 @@
 # Proje Kararlari
 
+## Issue 297 — Gerçek action tek kullanımlık plan ve ledger ile çalışır
+
+- İlk live pilot yalnız source değiştirmeyen exact pytest action'ını gerçek
+  `SubprocessProcessAdapter` ile çalıştırır. Exact argv, cwd, source/contract/
+  action fingerprint ve environment-name allowlist immutable execute planına
+  bağlıdır.
+- Repository pytest addopts değeri yalnız bu invocation için `-o addopts=` ile
+  temizlenir; `--color=no`, O3'ün explicit `30 passed` summary token'ını
+  deterministic okumasını sağlar.
+- Environment yalnız sekiz allowlisted ad üzerinden process'e aktarılır;
+  değerler plan, ledger, result veya repository evidence'ına yazılmaz.
+- Approval consumption, `full_gate_used +1` budget admission ve
+  invocation-start provenance subprocess'ten önce aynı append-only admission
+  event'ine yazılır. Result event'i raw stream değil O3 veri-minimal sonucudur.
+- Exit code tek başına PASS değildir. Kabul; `failure_class = null`,
+  `passed = 30`, `failed = 0`, ledger verification PASS ve duplicate execute'ın
+  adapter çağrısından önce BLOCKED olmasıyla birlikte sağlanır.
+- Runtime ve ledger repository dışında kalır. Önceki ledger'lar immutable
+  read-only kanıttır; yeni authorization yeni run/action/fingerprint ve yeni
+  ledger gerektirir.
+- Pilot production/mobile/tools/tests/dependency/workflow/`.cse/state`, build,
+  device, OpenAI API veya Orchestrator-driven GitHub mutation yetkisi değildir.
+  Ready, merge, Issue close, branch delete ve release ayrı insan kararıdır.
+
 ## Issue 295 — O5-O8 execution approval ile process arasında immutable plan ister
 
 - O1 Observation ve O2 invocation admission doğrudan subprocess yetkisi
