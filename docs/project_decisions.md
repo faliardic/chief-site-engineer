@@ -1,5 +1,31 @@
 # Proje Kararlari
 
+## Issue 299 — Model planı local authority değildir
+
+- Responses API yalnız `OPENAI_API_KEY` ve `OPENAI_MODEL` environment
+  değişkenleriyle, `store=false`, strict JSON Schema, bounded input/output ve
+  retry `0` sözleşmesinde kullanılır. Raw prompt/response ve authorization
+  header evidence veya ledger'a yazılmaz.
+- Structured proposal untrusted input'tur. Unknown/missing alan, exact
+  allowlist/command/approval drift'i, policy deny veya budget/fingerprint
+  uyumsuzluğu dış adapter başlamadan fail-closed olur.
+- Source, contract ve action fingerprint'leri model output'una verilmiş mutable
+  karar alanları değildir; local immutable contract ile child request arasında
+  doğrulanır. Model capability, action seti veya budget genişletemez.
+- Codex child yalnız help inventory'sinde kanıtlanan exact stdin argv, exact
+  repository cwd, allowlisted environment adları, `shell=false`, bounded
+  timeout/output ve unique action fingerprint ile çalışır. Prompt geçici
+  external runtime dosyasından stdin'e verilip silinir.
+- GitHub REST adapter exact repo/branch/base/head/divergence/Issue bağını ve
+  existing PR yokluğunu doğrular; yalnız tek Draft PR mutation'ı sunar. Normal
+  push O8 controlled runner'da kalır. Force, Ready, merge, close, delete ve
+  release endpoint'i yoktur.
+- `api-run` default dry-run'dır. API, Codex child ve publish ayrı explicit
+  execute gate'leridir; sonraki gate önceki gate olmadan açılamaz.
+- Credentials yoksa implementation fake adapters ile doğrulanır ve live pilot
+  `CREDENTIALS_MISSING` kalır. Secret istenmez, üretilmez veya repository'ye
+  yazılmaz.
+
 ## Issue 297 — Gerçek action tek kullanımlık plan ve ledger ile çalışır
 
 - İlk live pilot yalnız source değiştirmeyen exact pytest action'ını gerçek

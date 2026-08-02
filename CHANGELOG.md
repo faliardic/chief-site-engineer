@@ -1,5 +1,19 @@
 # Changelog
 
+## Issue #299 - CSE Development Orchestrator O9 API otomasyonu
+
+- Standard-library OpenAI Responses API client; environment-only key/model,
+  `store=false`, strict JSON Schema, bounded request ve retry `0` ile eklendi.
+- API proposal'ı untrusted input olarak exact local policy, allowlist,
+  capability, budget ve fingerprint sınırlarına yeniden bağlandı.
+- Read-only help inventory'sine bağlı exact argv Codex child ve exact source'a
+  bağlı tek Draft PR GitHub REST adapter'ları default dry-run/explicit execute
+  modeliyle eklendi.
+- `api-run`, API/Codex/publish için ayrı explicit kapılar sunar. Fake-adapter
+  focused suite gerçek secret, network veya subprocess kullanmaz.
+- Credential adları mevcut olmadığından live pilot `CREDENTIALS_MISSING`, Codex
+  inventory de `CLI_UNAVAILABLE` kaldı; gerçek API/child/REST invocation `0`dır.
+
 ## Issue #297 - İlk canlı kontrollü CSE Orchestrator pilotu
 
 - O0-O8 MVP, gerçek `SubprocessProcessAdapter` ile source değiştirmeyen exact
