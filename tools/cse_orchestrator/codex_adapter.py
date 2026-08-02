@@ -5,11 +5,12 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping, Protocol
+from typing import Callable, Mapping, Protocol
 
 
 _FINGERPRINT = re.compile(r"^sha256:[0-9a-f]{64}$")
@@ -153,7 +154,11 @@ def _validated_request(request: CodexChildRequest) -> tuple[Path, Path]:
         raise CodexAdapterError("prompt_too_large")
     if (
         "Usage: codex exec" not in request.help_output
-        or not re.search(r"(?m)^\s*-\s+.*stdin", request.help_output, re.IGNORECASE)
+        or not re.search(
+            r"(?:read(?: prompt)?|instructions are read)[^\n]*stdin",
+            request.help_output,
+            re.IGNORECASE,
+        )
     ):
         raise CodexAdapterError("codex_stdin_argv_not_verified")
     if request.timeout_seconds < 1 or request.output_limit_bytes < 1024:
@@ -166,9 +171,28 @@ def _validated_request(request: CodexChildRequest) -> tuple[Path, Path]:
 class CodexChildAdapter:
     """Admit each action fingerprint once and never invoke a shell."""
 
-    def __init__(self, process: CodexProcess | None = None) -> None:
+    def __init__(
+        self,
+        process: CodexProcess | None = None,
+        *,
+        executable_resolver: Callable[[str], str | None] | None = None,
+    ) -> None:
         self._process = process or SubprocessCodexProcess()
+        self._executable_resolver = executable_resolver or shutil.which
         self._used: set[str] = set()
+
+    def _resolve_executable(self, repo: Path, runtime: Path) -> Path:
+        resolved_value = self._executable_resolver("codex")
+        if not resolved_value:
+            raise CodexAdapterError("codex_executable_unavailable")
+        resolved = Path(resolved_value).resolve()
+        if resolved.name.lower() not in {"codex", "codex.exe", "codex.cmd"}:
+            raise CodexAdapterError("codex_executable_name_invalid")
+        if not resolved.is_file():
+            raise CodexAdapterError("codex_executable_file_invalid")
+        if not _outside(resolved, repo) or not _outside(resolved, runtime):
+            raise CodexAdapterError("codex_executable_writable_path")
+        return resolved
 
     def execute(
         self,
@@ -183,6 +207,7 @@ class CodexChildAdapter:
         if request.action_fingerprint in self._used:
             raise CodexAdapterError("duplicate_codex_child")
         self._used.add(request.action_fingerprint)
+        executable = self._resolve_executable(repo, runtime)
         source = environment if environment is not None else os.environ
         child_environment = {
             name: source[name]
@@ -202,7 +227,7 @@ class CodexChildAdapter:
                 stream.write(request.prompt.encode("utf-8"))
             prompt = temporary_path.read_bytes()
             result = self._process.run(
-                ("codex", "exec", "-"),
+                (str(executable), "exec", "-"),
                 cwd=repo,
                 environment=child_environment,
                 prompt=prompt,

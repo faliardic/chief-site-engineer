@@ -5,9 +5,13 @@ from .api_planner import (
     ApiProposal,
     ApiProposalError,
     ProposalContract,
+)
+from .automation import (
+    ApiAutomationEngine,
+    ApiAutomationResult,
+    AutomationStatus,
     validate_api_proposal,
 )
-from .automation import ApiAutomationEngine, ApiAutomationResult, AutomationStatus
 from .codex_adapter import (
     CodexAdapterError,
     CodexChildAdapter,
@@ -32,6 +36,9 @@ from .github_rest import (
     GitHubRestClient,
     GitHubRestContract,
     GitHubRestError,
+    GitHubRestTemplate,
+    HostPublisher,
+    HostPublishRequest,
 )
 from .ledger import LedgerError, LedgerVerification, RuntimeLedger
 from .observer import observe_repository
@@ -83,6 +90,9 @@ __all__ = [
     "GitHubRestClient",
     "GitHubRestContract",
     "GitHubRestError",
+    "GitHubRestTemplate",
+    "HostPublisher",
+    "HostPublishRequest",
     "LedgerError",
     "LedgerVerification",
     "ParsedCommandResult",

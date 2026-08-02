@@ -13,7 +13,13 @@ from .api_planner import ApiProposalError, ProposalContract
 from .automation import ApiAutomationEngine
 from .codex_adapter import CodexAdapterError, CodexChildAdapter, CodexChildRequest
 from .github_adapter import PublishError, build_publish_plan
-from .github_rest import GitHubRestClient, GitHubRestContract, GitHubRestError
+from .github_rest import (
+    GitHubRestClient,
+    GitHubRestError,
+    GitHubRestTemplate,
+    HostPublisher,
+    HostPublishRequest,
+)
 from .ledger import LedgerError, RuntimeLedger
 from .observer import REPOSITORY_PATTERN, observe_repository
 from .openai_client import OpenAIClientError, OpenAIResponsesClient
@@ -169,6 +175,7 @@ def _api_run(args: argparse.Namespace) -> dict[str, object]:
         "policy_decision",
         "codex",
         "github",
+        "host",
     }
     if set(value) != expected:
         raise ValueError("api_run_contract_fields_invalid")
@@ -176,9 +183,10 @@ def _api_run(args: argparse.Namespace) -> dict[str, object]:
     proposal_value = value["proposal_contract"]
     codex_value = value["codex"]
     github_value = value["github"]
+    host_value = value["host"]
     if not isinstance(prompt, str) or not isinstance(proposal_value, dict):
         raise ValueError("api_run_contract_invalid")
-    if not isinstance(codex_value, dict) or not isinstance(github_value, dict):
+    if not isinstance(codex_value, dict) or not isinstance(github_value, dict) or not isinstance(host_value, dict):
         raise ValueError("api_run_contract_invalid")
     proposal_fields = set(ProposalContract.__dataclass_fields__)
     if set(proposal_value) != proposal_fields:
@@ -199,7 +207,7 @@ def _api_run(args: argparse.Namespace) -> dict[str, object]:
     }
     if set(codex_value) != codex_expected:
         raise ValueError("codex_contract_fields_invalid")
-    github_expected = set(GitHubRestContract.__dataclass_fields__)
+    github_expected = set(GitHubRestTemplate.__dataclass_fields__)
     if set(github_value) != github_expected:
         raise ValueError("github_contract_fields_invalid")
     codex_request = CodexChildRequest(
@@ -212,11 +220,24 @@ def _api_run(args: argparse.Namespace) -> dict[str, object]:
         timeout_seconds=int(codex_value["timeout_seconds"]),
         output_limit_bytes=int(codex_value["output_limit_bytes"]),
     )
-    github_contract = GitHubRestContract(
-        **{
-            **github_value,
-            "remote_divergence": tuple(github_value["remote_divergence"]),
-        }
+    github_template = GitHubRestTemplate(**github_value)
+    host_expected = {"branch", "expected_base_sha", "write_allowlist", "validation_argv", "commit_message"}
+    if set(host_value) != host_expected:
+        raise ValueError("host_contract_fields_invalid")
+    validation_argv = host_value["validation_argv"]
+    if not isinstance(validation_argv, list) or any(
+        not isinstance(argv, list) or not all(isinstance(item, str) for item in argv)
+        for argv in validation_argv
+    ):
+        raise ValueError("host_validation_argv_invalid")
+    host_request = HostPublishRequest(
+        repo_root=args.repo_root,
+        branch=str(host_value["branch"]),
+        expected_base_sha=str(host_value["expected_base_sha"]),
+        write_allowlist=tuple(host_value["write_allowlist"]),
+        validation_argv=tuple(tuple(argv) for argv in validation_argv),
+        commit_message=str(host_value["commit_message"]),
+        github=github_template,
     )
     if args.execute_api:
         openai = OpenAIResponsesClient.from_environment(os.environ)
@@ -235,7 +256,7 @@ def _api_run(args: argparse.Namespace) -> dict[str, object]:
         proposal_contract=proposal_contract,
         policy_decision=_decision(value["policy_decision"]),
         codex_request=codex_request,
-        github_contract=github_contract,
+        host_publish_request=host_request,
         execute_api=args.execute_api,
         execute_codex=args.execute_codex,
         execute_publish=args.execute_publish,

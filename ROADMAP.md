@@ -1063,3 +1063,9 @@ paketi, Saha, arama, Asistan veya ikincil `Tüm araçlar` alanından açılır.
 
 Başarı modül sayısıyla değil, şefin daha az zihinsel yükle daha hızlı, eksiksiz ve
 kanıtlı saha yönetimi yapmasıyla ölçülür.
+# Issue 301 — Orchestrator live API pilot pre-live
+
+- Host-owned commit/push/REST Draft PR sıralaması implementation ve fake-adapter
+  doğrulaması aşamasındadır.
+- Gerçek live zincir bu outer pre-live oturumun kapsamı dışındadır; dış runtime
+  contract sonraki tek yetkili çalıştırma için hazırlanır.
