@@ -183,6 +183,13 @@ capability, drift, budget, retry, evidence reuse ve blocker precedence kararı
 üretir. O2 action çalıştırmaz, approval tüketmez, dış I/O yapmaz ve persistence
 kurmaz; O3 result parser ile sonraki controlled runner fazlarının ön koşuludur.
 
+Issue #291 ile O3 result parser; frozen `pytest`, `compileall`,
+`git_diff_check`, Flutter test/analyze, build ve generic command output'unu
+proven-only count, failure class, budget evidence, stream hash ve bounded
+sanitized excerpt içeren canonical result'a çevirir. O3 action çalıştırmaz,
+policy/state kararı vermez veya persistence kurmaz; O4 sanitized replay ve
+sonraki controlled runner fazlarına deterministic evidence sağlar.
+
 # 5. Fazlar
 
 ## Faz 0 — Release 0.1 gerçek saha kabulü

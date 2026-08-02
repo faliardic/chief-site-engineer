@@ -1,5 +1,20 @@
 # Changelog
 
+## Issue #291 - CSE Development Orchestrator O3 Result Parser
+
+- Frozen exact-schema command result'ları için `pytest`, `compileall`,
+  `git_diff_check`, `flutter_test`, `flutter_analyze`, `build` ve
+  `generic_command` family parser'ları eklendi.
+- Action-start, wrapper/harness failure, timeout, truncation, failed stage,
+  exit/output contradiction ve invocation budget evidence'ı deterministic
+  olarak ayrıldı; unknown veya uyumsuz input fail-closed kalır.
+- Count alanları yalnız explicit summary token'larından üretilir. Raw
+  stdout/stderr output'a kopyalanmaz; SHA-256 hash ve secret, e-posta ile
+  Windows kullanıcı yolu maskelenmiş bounded excerpt tutulur.
+- O3 subprocess, network veya filesystem erişimi yapmaz; action çalıştırmaz,
+  admission/policy kararı vermez ve approval/budget tüketmez. Runner,
+  persistence, API, build ve device sonraki ayrı fazlardadır.
+
 ## Issue #289 - CSE Development Orchestrator O2 State ve Policy Engine
 
 - O0 transition tablosu executable `State` modeli ve immutable,
