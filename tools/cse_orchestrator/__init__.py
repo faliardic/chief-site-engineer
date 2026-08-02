@@ -1,4 +1,19 @@
-"""CSE Development Orchestrator deterministic O1-O8 MVP package."""
+"""CSE Development Orchestrator deterministic O1-O9 package."""
+
+from .api_planner import (
+    PROPOSAL_JSON_SCHEMA,
+    ApiProposal,
+    ApiProposalError,
+    ProposalContract,
+    validate_api_proposal,
+)
+from .automation import ApiAutomationEngine, ApiAutomationResult, AutomationStatus
+from .codex_adapter import (
+    CodexAdapterError,
+    CodexChildAdapter,
+    CodexChildRequest,
+    CodexChildResult,
+)
 
 from .gates import (
     GatePlanError,
@@ -12,8 +27,20 @@ from .github_adapter import (
     build_publish_plan,
     execute_publish,
 )
+from .github_rest import (
+    DraftPullRequestResult,
+    GitHubRestClient,
+    GitHubRestContract,
+    GitHubRestError,
+)
 from .ledger import LedgerError, LedgerVerification, RuntimeLedger
 from .observer import observe_repository
+from .openai_client import (
+    OpenAIClientError,
+    OpenAIProposalEnvelope,
+    OpenAIResponseMetadata,
+    OpenAIResponsesClient,
+)
 from .planner import ActionPlan, PlanError, build_action_plan, canonical_plan_json
 from .policy import PolicyDecision, canonical_decision_json, evaluate_policy
 from .results import (
@@ -39,15 +66,34 @@ from .runner import (
 
 __all__ = [
     "ActionPlan",
+    "ApiAutomationEngine",
+    "ApiAutomationResult",
+    "ApiProposal",
+    "ApiProposalError",
+    "AutomationStatus",
+    "CodexAdapterError",
+    "CodexChildAdapter",
+    "CodexChildRequest",
+    "CodexChildResult",
     "ControlledRunner",
+    "DraftPullRequestResult",
     "ExecutionError",
     "ExecutionResult",
     "GatePlanError",
+    "GitHubRestClient",
+    "GitHubRestContract",
+    "GitHubRestError",
     "LedgerError",
     "LedgerVerification",
     "ParsedCommandResult",
     "PlanError",
     "PolicyDecision",
+    "OpenAIClientError",
+    "OpenAIProposalEnvelope",
+    "OpenAIResponseMetadata",
+    "OpenAIResponsesClient",
+    "PROPOSAL_JSON_SCHEMA",
+    "ProposalContract",
     "PublishError",
     "PublishResult",
     "ReplayInputError",
@@ -74,4 +120,5 @@ __all__ = [
     "parse_command_result",
     "project_events",
     "replay_issue_284",
+    "validate_api_proposal",
 ]

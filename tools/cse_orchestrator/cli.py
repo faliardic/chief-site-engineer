@@ -4,13 +4,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 from typing import Mapping, Sequence
 
 from .gates import GatePlanError, build_build_plan, build_checkpoint_plan, build_device_plan
+from .api_planner import ApiProposalError, ProposalContract
+from .automation import ApiAutomationEngine
+from .codex_adapter import CodexAdapterError, CodexChildAdapter, CodexChildRequest
 from .github_adapter import PublishError, build_publish_plan
+from .github_rest import GitHubRestClient, GitHubRestContract, GitHubRestError
 from .ledger import LedgerError, RuntimeLedger
 from .observer import REPOSITORY_PATTERN, observe_repository
+from .openai_client import OpenAIClientError, OpenAIResponsesClient
 from .planner import ActionPlan, PlanError, build_action_plan, current_environment
 from .policy import PolicyDecision
 from .runner import ControlledRunner, ExecutionError, SubprocessProcessAdapter
@@ -142,7 +148,98 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--repo-root", required=True, type=_strict_path)
     verify.add_argument("--runtime-root", required=True, type=_strict_path)
     verify.add_argument("--run-id", required=True)
+
+    api_run = subparsers.add_parser(
+        "api-run", help="Plan or explicitly execute the O9 controlled API chain"
+    )
+    api_run.add_argument("--contract", required=True, type=_strict_path)
+    api_run.add_argument("--repo-root", required=True, type=_strict_path)
+    api_run.add_argument("--runtime-root", required=True, type=_strict_path)
+    api_run.add_argument("--execute-api", action="store_true")
+    api_run.add_argument("--execute-codex", action="store_true")
+    api_run.add_argument("--execute-publish", action="store_true")
     return parser
+
+
+def _api_run(args: argparse.Namespace) -> dict[str, object]:
+    value = _read_object(args.contract)
+    expected = {
+        "prompt",
+        "proposal_contract",
+        "policy_decision",
+        "codex",
+        "github",
+    }
+    if set(value) != expected:
+        raise ValueError("api_run_contract_fields_invalid")
+    prompt = value["prompt"]
+    proposal_value = value["proposal_contract"]
+    codex_value = value["codex"]
+    github_value = value["github"]
+    if not isinstance(prompt, str) or not isinstance(proposal_value, dict):
+        raise ValueError("api_run_contract_invalid")
+    if not isinstance(codex_value, dict) or not isinstance(github_value, dict):
+        raise ValueError("api_run_contract_invalid")
+    proposal_fields = set(ProposalContract.__dataclass_fields__)
+    if set(proposal_value) != proposal_fields:
+        raise ValueError("proposal_contract_fields_invalid")
+    proposal_contract = ProposalContract(
+        **{
+            **proposal_value,
+            "write_allowlist": tuple(proposal_value["write_allowlist"]),
+            "validation_commands": tuple(proposal_value["validation_commands"]),
+        }
+    )
+    codex_expected = {
+        "action_fingerprint",
+        "help_output",
+        "environment_allowlist",
+        "timeout_seconds",
+        "output_limit_bytes",
+    }
+    if set(codex_value) != codex_expected:
+        raise ValueError("codex_contract_fields_invalid")
+    github_expected = set(GitHubRestContract.__dataclass_fields__)
+    if set(github_value) != github_expected:
+        raise ValueError("github_contract_fields_invalid")
+    codex_request = CodexChildRequest(
+        action_fingerprint=str(codex_value["action_fingerprint"]),
+        repo_root=args.repo_root,
+        runtime_root=args.runtime_root,
+        prompt="validated API proposal pending",
+        help_output=str(codex_value["help_output"]),
+        environment_allowlist=tuple(codex_value["environment_allowlist"]),
+        timeout_seconds=int(codex_value["timeout_seconds"]),
+        output_limit_bytes=int(codex_value["output_limit_bytes"]),
+    )
+    github_contract = GitHubRestContract(
+        **{
+            **github_value,
+            "remote_divergence": tuple(github_value["remote_divergence"]),
+        }
+    )
+    if args.execute_api:
+        openai = OpenAIResponsesClient.from_environment(os.environ)
+    else:
+        openai = OpenAIResponsesClient(None, os.environ.get("OPENAI_MODEL"))
+    if args.execute_publish:
+        github = GitHubRestClient.from_environment(os.environ)
+    else:
+        github = GitHubRestClient(None)
+    return ApiAutomationEngine(
+        openai_client=openai,
+        codex_adapter=CodexChildAdapter(),
+        github_client=github,
+    ).run(
+        prompt=prompt,
+        proposal_contract=proposal_contract,
+        policy_decision=_decision(value["policy_decision"]),
+        codex_request=codex_request,
+        github_contract=github_contract,
+        execute_api=args.execute_api,
+        execute_codex=args.execute_codex,
+        execute_publish=args.execute_publish,
+    ).public_dict()
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -166,6 +263,26 @@ def main(argv: Sequence[str] | None = None) -> int:
             }
         print(json.dumps(observation, ensure_ascii=False, indent=2, sort_keys=True))
         return int(observation.get("exit_code", 11))
+
+    if args.command == "api-run":
+        try:
+            result = _api_run(args)
+        except (
+            OSError,
+            ValueError,
+            json.JSONDecodeError,
+            ApiProposalError,
+            OpenAIClientError,
+            CodexAdapterError,
+            GitHubRestError,
+        ) as exc:
+            result = {
+                "schema_version": 1,
+                "status": "BLOCKED",
+                "reason": str(exc).split(":", 1)[0],
+            }
+        print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0 if result.get("status") in {"DRY_RUN", "API_COMPLETED", "CHILD_COMPLETED", "PUBLISHED"} else 12
 
     try:
         if args.command == "plan":

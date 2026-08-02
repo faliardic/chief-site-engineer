@@ -1,0 +1,19 @@
+{
+  "codex_prompt": "Implement only the exact authorized O9 documentation change and preserve all existing boundaries.",
+  "commit_message": "Complete API-driven CSE orchestrator automation",
+  "decision": "proceed",
+  "pr_body_prefix": "Closes #299",
+  "pr_title": "Complete API-driven CSE orchestrator automation",
+  "required_approval_level": "CODE_CHANGE",
+  "risk": "high",
+  "summary": "Apply the exact authorized change and run only the declared validation commands.",
+  "validation_commands": [
+    "python -m pytest -o addopts= --color=no tests/test_cse_orchestrator_api_automation.py",
+    "python -m compileall tools/cse_orchestrator",
+    "python -m pytest -o addopts= --color=no",
+    "git diff --check"
+  ],
+  "write_allowlist": [
+    "docs/299_cse_orchestrator_o9_api_automation.md"
+  ]
+}

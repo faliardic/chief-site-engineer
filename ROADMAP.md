@@ -22,10 +22,14 @@
 - Issue #297, exact pytest action'ını gerçek subprocess adapter ile tek kez
   çalıştıran ilk controlled live pilot kanıtıdır: O3 `30/30` PASS, external
   ledger verification PASS ve duplicate execute subprocess öncesi BLOCKED.
-- Pilot production/mobile source, build, device, OpenAI API veya Orchestrator
-  üzerinden GitHub mutation kapsamını genişletmez.
-- O9 OpenAI API planner ve O10 service/tray ayrı Issue, capability, secret,
-  network, cost ve approval sözleşmesi gerektirir.
+- Issue #299, O9 Responses API planner, local proposal revalidation, gerçek
+  Codex child adapter, GitHub REST Draft PR client ve `api-run` CLI
+  implementation'ını tamamlar. Default dry-run ve ayrı explicit execute
+  kapıları korunur.
+- Credential yokluğunda O9 live pilot `CREDENTIALS_MISSING` kalır; secret
+  istenmez veya üretilmez. Production/mobile source, build ve device kapsamı
+  genişlemez.
+- O10 service/tray ayrı Issue, capability ve approval sözleşmesi gerektirir.
 
 ## 1. Ürün kararı
 
@@ -215,7 +219,8 @@ checkpoint/build/device gate planları ve normal push + tek Draft PR publish
 adapter'ını O1-O4 oracle zincirine bağlar. Default dry-run, exact argv,
 source/action fingerprint recheck, one-time approval/budget ve data-minimal O3
 result sınırları executable olur. Gerçek Codex/build/device/GitHub action'ı
-validation sırasında çalıştırılmaz. O9 OpenAI planner ve O10 opsiyonel Windows
+validation sırasında çalıştırılmaz. Issue #299 ile O9 OpenAI planner ve
+controlled API/Codex/GitHub adapter zinciri eklenir; O10 opsiyonel Windows
 operasyon yüzeyi zorunlu MVP dışında kalır.
 
 # 5. Fazlar
