@@ -44,6 +44,7 @@ from .workflow_store import (
     WorkflowStoreError,
     find_workflow_ids,
 )
+from .workflow_bootstrap import BootstrapError, WorkflowBootstrap
 
 
 def _positive_issue(value: str) -> int:
@@ -251,6 +252,17 @@ def build_parser() -> argparse.ArgumentParser:
         "workflow-verify", help="Verify workflow ledger, projection and artifact"
     )
     _workflow_inputs(workflow_verify)
+
+    workflow_bootstrap = subparsers.add_parser(
+        "workflow-bootstrap",
+        help="Generate and run the strict existing-work Issue #284 pilot",
+    )
+    workflow_bootstrap.add_argument("--issue", required=True, type=_positive_issue)
+    workflow_bootstrap.add_argument("--target-root", required=True, type=_strict_path)
+    workflow_bootstrap.add_argument("--runtime-root", required=True, type=_strict_path)
+    workflow_bootstrap.add_argument("--repository", type=_repository)
+    workflow_bootstrap.add_argument("--controller-root", type=_strict_path)
+    workflow_bootstrap.add_argument("--execute", action="store_true")
     return parser
 
 
@@ -308,6 +320,20 @@ def _workflow_status(args: argparse.Namespace, *, verify_artifact: bool) -> dict
             },
         }
     return result
+
+
+def _workflow_bootstrap(args: argparse.Namespace) -> dict[str, object]:
+    if args.issue != 284:
+        raise BootstrapError("bootstrap_issue_unsupported")
+    controller = args.controller_root or Path(__file__).resolve().parents[2]
+    bootstrap = WorkflowBootstrap(
+        target_root=args.target_root,
+        runtime_root=args.runtime_root,
+        controller_root=controller,
+    )
+    if args.repository is not None and args.repository != bootstrap.profile.repository:
+        raise BootstrapError("bootstrap_repository_mismatch")
+    return bootstrap.run(execute=args.execute)
 
 
 def _api_run(args: argparse.Namespace) -> dict[str, object]:
@@ -448,9 +474,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
         return 0 if result.get("status") in {"DRY_RUN", "API_COMPLETED", "CHILD_COMPLETED", "PUBLISHED"} else 12
 
-    if args.command in {"workflow-run", "workflow-status", "workflow-verify"}:
+    if args.command in {
+        "workflow-bootstrap",
+        "workflow-run",
+        "workflow-status",
+        "workflow-verify",
+    }:
         try:
-            if args.command == "workflow-run":
+            if args.command == "workflow-bootstrap":
+                result = _workflow_bootstrap(args)
+            elif args.command == "workflow-run":
                 result = _workflow_run(args)
             else:
                 result = _workflow_status(
@@ -463,6 +496,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             WorkflowAuthorizationError,
             WorkflowStoreError,
             WorkflowError,
+            BootstrapError,
         ) as exc:
             result = {
                 "schema_version": 1,

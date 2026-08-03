@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Protocol
 
+from .device_smoke import DeviceSmokeRunner, TabletAutomationAdapter
 from .observer import GhGitHubClient
 from .workflow_authorization import (
     WorkflowAuthorization,
@@ -378,6 +379,13 @@ def prepare_target_branch(
 class DefaultStageExecutor:
     """Shell-free command, artifact, commit, push and Draft-PR executor."""
 
+    def __init__(
+        self,
+        *,
+        tablet_adapter: TabletAutomationAdapter | None = None,
+    ) -> None:
+        self._tablet_adapter = tablet_adapter
+
     def _command(
         self,
         stage: WorkflowStageAuthorization,
@@ -462,6 +470,57 @@ class DefaultStageExecutor:
             }
         }
         return StageExecution(True, "unsafe", None, None, (diagnostic,), details)
+
+    def _device_smoke(self, stage, authorization):
+        device = authorization.payload["device"]
+        artifact = authorization.payload["artifact"]
+        if not isinstance(device, Mapping) or not isinstance(artifact, Mapping):
+            return StageExecution(
+                False,
+                "unsafe",
+                "device_contract_missing",
+                "device_and_artifact_contracts_present",
+                (),
+                {},
+            )
+        started = time.monotonic()
+        result = DeviceSmokeRunner(self._tablet_adapter).run(
+            stage.argv,
+            device=device,
+            artifact=artifact,
+        )
+        safe_output = canonical_json_bytes(
+            {
+                "success": result.success,
+                "classification": result.classification,
+                "reason_code": result.reason_code,
+                "details": dict(result.details),
+            }
+        )
+        diagnostic = CommandDiagnostic(
+            stage=stage.name,
+            command_family=stage.command_family,
+            argv_fingerprint=_hash_mapping({"argv": list(stage.argv)}),
+            command_index=1,
+            action_started=result.action_started,
+            exit_code=0 if result.success else 1,
+            duration_ms=int((time.monotonic() - started) * 1000),
+            truncated=False,
+            timed_out=False,
+            stdout_sha256=_hash_bytes(safe_output),
+            stderr_sha256=_hash_bytes(b""),
+            reason_code=result.reason_code,
+            first_failed_predicate=result.first_failed_predicate,
+        )
+        return StageExecution(
+            result.success,
+            result.classification,
+            result.reason_code,
+            result.first_failed_predicate,
+            (diagnostic,),
+            result.details,
+            result.reused,
+        )
 
     def _commit(self, stage, authorization, target_root):
         publish = authorization.payload["publish"]
@@ -606,6 +665,8 @@ class DefaultStageExecutor:
         return StageExecution(True, "unsafe", None, None, tuple(diagnostics), {"publish": {"pr": created[0], "pr_reused": False}})
 
     def execute(self, stage, authorization, *, controller_root, target_root):
+        if stage.kind == "command" and stage.command_family == "cse_tablet_smoke":
+            return self._device_smoke(stage, authorization)
         if stage.kind == "artifact_verify":
             return self._artifact(stage, authorization, target_root)
         if stage.kind == "commit":
@@ -616,7 +677,13 @@ class DefaultStageExecutor:
             return self._draft_pr(stage, authorization, target_root)
         if stage.kind == "issue_comment":
             return StageExecution(True, "unsafe", None, None, (), {})
-        cwd = controller_root if stage.cwd == "controller" else target_root
+        cwd = (
+            controller_root
+            if stage.cwd == "controller"
+            else target_root / "mobile"
+            if stage.cwd == "target/mobile"
+            else target_root
+        )
         environment = {
             key: os.environ[key]
             for key in stage.environment_allowlist
@@ -726,6 +793,29 @@ def _artifact_fingerprint(authorization: WorkflowAuthorization, target_root: Pat
     if not path.is_file():
         return None
     return _hash_bytes(path.read_bytes())
+
+
+def current_reused_evidence_record(
+    authorization: WorkflowAuthorization,
+    stage_name: str,
+    *,
+    target_root: Path,
+) -> dict[str, object]:
+    """Bind one reused PASS to the current source/tool/command/artifact tuple."""
+
+    matches = [stage for stage in authorization.stages if stage.name == stage_name]
+    if len(matches) != 1 or not matches[0].reusable:
+        raise WorkflowError("reused_stage_invalid")
+    stage = matches[0]
+    observation = observe_target(target_root)
+    identity: dict[str, object] = {
+        "stage": stage.name,
+        "source_fingerprint": observation.source_fingerprint,
+        "tool_fingerprint": _tool_fingerprint(stage),
+        "command_fingerprint": _command_fingerprint(stage),
+        "artifact_fingerprint": _artifact_fingerprint(authorization, target_root),
+    }
+    return {**identity, "evidence_fingerprint": _hash_mapping(identity)}
 
 
 def _budget_counter(stage: WorkflowStageAuthorization) -> str:

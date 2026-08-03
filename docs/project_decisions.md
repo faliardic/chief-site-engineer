@@ -1,5 +1,27 @@
 # Proje Kararlari
 
+## Issue 305 — Canlı pilot authorization'ı target ve kanıttan türetilir
+
+- Target-specific workflow JSON'u operator tarafından elle taşınmaz. Bootstrap;
+  current controller revision, exact checkpoint/tree/blob, frozen Issue evidence,
+  artifact/tool/device ve publish contract'ını doğrulayıp canonical schema-v2
+  authorization üretir.
+- Frozen Issue body/comment SHA-256 kümesi `evidence_source_fingerprint` olarak
+  authorization'a girer. Reused PASS ayrıca current source/tool/command/artifact
+  fingerprint'i eşleşmeden stage atlatamaz.
+- İlk execute authorization'ı repository dışı immutable bootstrap store'a yazar;
+  resume bu exact payload'ı yükler. Böylece yetkili completion diff'i yeni bir
+  workflow üretmez ve stored payload tamper'ı metadata/contract ile reddedilir.
+- Tablet smoke arbitrary shell/ADB string'i değil typed semantic action'lardır.
+  Production adapter yalnız exact serial/model/debug package ve synthetic title
+  kabul eder; telefon, gerçek kayıt ve destructive operation API yüzeyinde yoktur.
+- Smoke adımları ayrı ledger stage'leridir. Her PASS sonrası process crash'i
+  replay ile önceki stage'i çalıştırmadan sürer; device yokluğu artifact'i
+  koruyan external pause'tur.
+- O10.1 implementation fake-adapter validation'dır. Gerçek Issue #284 build,
+  install ve tablet smoke ancak merged controller revision'da explicit bootstrap
+  execute ile ayrı canlı workflow olarak başlar.
+
 ## Issue 303 — Workflow ledger otoritedir, prompt zinciri değildir
 
 - Bir development run'ının bütün mekanik stage'leri tek machine-readable

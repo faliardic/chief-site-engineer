@@ -32,6 +32,10 @@
 - Issue #303, O10 resumable workflow coordinator ile gate bazlı prompt taşıma
   döngüsünü kaldırır; workflow-level authorization, external runtime projection,
   pause/resume, evidence reuse ve duplicate-safe publication sağlar.
+- Issue #305, O10.1 ile checkpoint'te bekleyen #284 için strict bootstrap,
+  shell-free exact-tablet smoke ve completion publish zincirini tek komuta
+  bağlar. Implementation fake-adapter acceptance'tır; canlı #284 pilotu bu
+  değişiklik merged olduktan sonra explicit bootstrap execute ile yürütülür.
 - Opsiyonel service/tray yüzeyi O10 contract'ının parçası değildir; gerekirse
   ayrı Issue, capability ve approval sözleşmesi ister.
 

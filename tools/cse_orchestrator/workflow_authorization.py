@@ -49,6 +49,7 @@ TOP_LEVEL_FIELDS = frozenset(
         "supersedes_comment_id",
     }
 )
+TOP_LEVEL_FIELDS_V2 = TOP_LEVEL_FIELDS | frozenset({"evidence_source_fingerprint"})
 REUSED_EVIDENCE_FIELDS = frozenset(
     {
         "stage",
@@ -101,6 +102,19 @@ STAGE_KINDS = frozenset(
     {"command", "artifact_verify", "commit", "push", "draft_pr", "issue_comment"}
 )
 FAILURE_CLASSES = frozenset({"unsafe", "resumable", "external", "decision"})
+DEVICE_SMOKE_ACTIONS = frozenset(
+    {
+        "tablet_preflight",
+        "tablet_install",
+        "smoke_timed_to_all_day",
+        "smoke_all_day_date_change",
+        "smoke_same_day_noop",
+        "smoke_all_day_to_timed",
+        "smoke_notification_binding",
+        "smoke_cold_relaunch",
+        "smoke_recoverable_cleanup",
+    }
+)
 
 
 class WorkflowAuthorizationError(ValueError):
@@ -331,7 +345,7 @@ def _stage(value: object, index: int) -> WorkflowStageAuthorization:
     if kind != "command" and argv:
         raise WorkflowAuthorizationError(f"stage_argv_forbidden:{name}")
     cwd = _string(item["cwd"], f"stages[{index}].cwd", limit=16)
-    if cwd not in {"controller", "target"}:
+    if cwd not in {"controller", "target", "target/mobile"}:
         raise WorkflowAuthorizationError(f"stage_cwd_invalid:{name}")
     timeout = _integer(item["timeout_seconds"], f"stages[{index}].timeout_seconds", minimum=1)
     output_limit = _integer(
@@ -372,9 +386,19 @@ def parse_workflow_authorization(
     transport_comment_id: int | None = None,
     now: datetime | None = None,
 ) -> WorkflowAuthorization:
-    payload = _exact(value, TOP_LEVEL_FIELDS, "workflow_authorization")
-    if payload["schema_version"] != 1:
-        raise WorkflowAuthorizationError("schema_version_must_be_1")
+    schema_version = value.get("schema_version")
+    if schema_version not in {1, 2}:
+        raise WorkflowAuthorizationError("schema_version_unsupported")
+    payload = _exact(
+        value,
+        TOP_LEVEL_FIELDS if schema_version == 1 else TOP_LEVEL_FIELDS_V2,
+        "workflow_authorization",
+    )
+    if schema_version == 2:
+        payload["evidence_source_fingerprint"] = _hash(
+            payload["evidence_source_fingerprint"],
+            "evidence_source_fingerprint",
+        )
     repository = _string(payload["repository"], "repository")
     if not REPOSITORY_PATTERN.fullmatch(repository):
         raise WorkflowAuthorizationError("repository_invalid")
@@ -536,6 +560,21 @@ def parse_workflow_authorization(
                 raise WorkflowAuthorizationError(
                     f"device_stage_forbidden_operation:{stage.name}"
                 )
+            if stage.command_family == "cse_tablet_smoke":
+                if schema_version != 2:
+                    raise WorkflowAuthorizationError(
+                        f"device_smoke_requires_schema_2:{stage.name}"
+                    )
+                if (
+                    len(stage.argv) != 9
+                    or stage.argv[1:3] != ("-s", serial)
+                    or stage.argv[3] != "cse-smoke"
+                    or stage.argv[4] not in DEVICE_SMOKE_ACTIONS
+                    or stage.argv[8] != "recoverable-only"
+                ):
+                    raise WorkflowAuthorizationError(
+                        f"device_smoke_argv_invalid:{stage.name}"
+                    )
 
     publish = payload["publish"]
     if publish is not None:
