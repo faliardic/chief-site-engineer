@@ -4,7 +4,7 @@ import hashlib
 import json
 import subprocess
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,6 +22,7 @@ from tools.cse_orchestrator.workflow_bootstrap import (
     ISSUE_284_READ_WRITE_ALLOWLIST,
     ISSUE_305_AUTHORIZATION_COMMENT,
     ISSUE_305_HANDOFF_AUTHORIZATION_COMMENT,
+    ISSUE_305_PAUSED_HANDOFF_AUTHORIZATION_COMMENT,
     Issue284PilotProfile,
     WorkflowBootstrap,
     canonical_markdown_bytes,
@@ -399,6 +400,112 @@ def advance_controller(controller: Path) -> str:
     return git(controller, "rev-parse", "HEAD")
 
 
+def pause_successor_at_exact_tablet_preflight(
+    values, authorization
+) -> tuple[WorkflowStore, object]:
+    _, target, runtime, _, _ = values
+    contract = WorkflowContract.from_authorization(authorization)
+    store = WorkflowStore(
+        runtime_root=runtime,
+        repo_root=target,
+        workflow_id=contract.workflow_id,
+    )
+    store.start(contract)
+    source = "sha256:" + "1" * 64
+    store.append("target_observed", {"source_fingerprint": source})
+    reused = {item["stage"]: item for item in authorization.reused_evidence}
+    for index in range(5):
+        stage = contract.stages[index]
+        store.append(
+            "stage_reused",
+            {
+                "stage_index": index,
+                "stage": stage.name,
+                "evidence": dict(reused[stage.name]),
+                "details": {"target_after_fingerprint": source},
+            },
+        )
+    artifact_stage = contract.stages[5]
+    store.append(
+        "stage_admitted",
+        {
+            "stage_index": 5,
+            "stage": "artifact_verify",
+            "attempt": 1,
+            "attempt_id": "sha256:" + sha("artifact-attempt"),
+            "stage_fingerprint": artifact_stage.stage_fingerprint,
+            "budget_counter": "command",
+        },
+    )
+    store.append(
+        "stage_passed",
+        {
+            "stage_index": 5,
+            "stage": "artifact_verify",
+            "evidence": {
+                "stage": "artifact_verify",
+                "evidence_fingerprint": "sha256:" + sha("artifact-evidence"),
+            },
+            "details": {
+                "artifact": dict(authorization.payload["artifact"]),
+                "target_after_fingerprint": source,
+            },
+        },
+    )
+    preflight_stage = contract.stages[6]
+    for attempt in range(1, 4):
+        store.append(
+            "stage_admitted",
+            {
+                "stage_index": 6,
+                "stage": "tablet_preflight",
+                "attempt": attempt,
+                "attempt_id": "sha256:" + sha(f"preflight-attempt-{attempt}"),
+                "stage_fingerprint": preflight_stage.stage_fingerprint,
+                "budget_counter": "command",
+            },
+        )
+        store.append(
+            "stage_paused",
+            {
+                "stage": "tablet_preflight",
+                "reason_code": "screen_not_interactive",
+                "command_index": 1,
+                "first_failed_predicate": "screen_is_interactive",
+            },
+        )
+        if attempt < 3:
+            store.append("workflow_resumed", {"stage_index": 6})
+    return store, store.verify()
+
+
+def exact_paused_successor_fixture(values):
+    controller, target, runtime, profile, client = values
+    _, root_authorization, bootstrap_store, _ = persisted_pre_stage(values)
+    first_controller = advance_controller(controller)
+    first_authorization, _, _ = bootstrap(values).authorization(persist=True)
+    first_store, paused = pause_successor_at_exact_tablet_preflight(
+        values, first_authorization
+    )
+    paused_public = paused.projection.public_dict(paused.contract)
+    paused_profile = replace(
+        profile,
+        paused_handoff_predecessor_revision=first_controller,
+        paused_predecessor_authorization=first_authorization.fingerprint,
+        paused_predecessor_workflow=paused.contract.workflow_id,
+        paused_projection_fingerprint=paused_public["projection_fingerprint"],
+        paused_tail_hash=paused.projection.tail_hash,
+    )
+    return (
+        (controller, target, runtime, paused_profile, client),
+        root_authorization,
+        first_authorization,
+        bootstrap_store,
+        first_store,
+        paused,
+    )
+
+
 def test_exact_pre_stage_controller_handoff_is_immutable_and_idempotent(
     bootstrap_fixture,
 ):
@@ -456,6 +563,153 @@ def test_exact_pre_stage_controller_handoff_is_immutable_and_idempotent(
     advance_controller(controller)
     with pytest.raises(BootstrapError, match="^controller_handoff_not_safe$"):
         bootstrap(bootstrap_fixture).authorization(persist=True)
+
+
+def test_exact_paused_tablet_successor_preserves_history_and_all_predecessor_bytes(
+    bootstrap_fixture,
+):
+    (
+        paused_values,
+        _,
+        first_authorization,
+        store,
+        first_workflow,
+        paused,
+    ) = exact_paused_successor_fixture(bootstrap_fixture)
+    controller, target, runtime, _, _ = paused_values
+    first_authorization_path, first_metadata_path = store._successor_paths(
+        str(first_authorization.payload["controller_revision"])
+    )
+    immutable = {
+        "root_authorization": store.authorization_path.read_bytes(),
+        "root_metadata": store.metadata_path.read_bytes(),
+        "first_authorization": first_authorization_path.read_bytes(),
+        "first_metadata": first_metadata_path.read_bytes(),
+        "manifest": first_workflow.manifest_path.read_bytes(),
+        "ledger": first_workflow.ledger_path.read_bytes(),
+    }
+    successor_controller = advance_controller(controller)
+
+    successor, resumed, predecessor_id = bootstrap(paused_values).authorization(
+        persist=True
+    )
+    successor_contract = WorkflowContract.from_authorization(successor)
+    successor_store = WorkflowStore(
+        runtime_root=runtime,
+        repo_root=target,
+        workflow_id=successor_contract.workflow_id,
+    )
+    successor_verification = successor_store.verify()
+
+    assert resumed is True
+    assert predecessor_id == paused.contract.workflow_id
+    assert successor.payload["controller_revision"] == successor_controller
+    assert successor_contract.workflow_id != paused.contract.workflow_id
+    assert successor_verification.projection.status == "PAUSED_EXTERNAL"
+    assert successor_verification.projection.current_stage_index == 6
+    assert successor_verification.projection.stage_attempts == {
+        "artifact_verify": 1,
+        "tablet_preflight": 3,
+    }
+    assert successor_verification.projection.active_attempt_id is None
+    assert successor_verification.projection.device is None
+    assert successor_verification.projection.publish is None
+    assert bootstrap_module.WorkflowBootstrap._same_continuation_state(
+        paused, successor_verification
+    )
+    assert store.authorization_path.read_bytes() == immutable["root_authorization"]
+    assert store.metadata_path.read_bytes() == immutable["root_metadata"]
+    assert first_authorization_path.read_bytes() == immutable["first_authorization"]
+    assert first_metadata_path.read_bytes() == immutable["first_metadata"]
+    assert first_workflow.manifest_path.read_bytes() == immutable["manifest"]
+    assert first_workflow.ledger_path.read_bytes() == immutable["ledger"]
+
+    second_authorization_path, second_metadata_path = store._successor_paths(
+        successor_controller
+    )
+    metadata = json.loads(second_metadata_path.read_text(encoding="utf-8"))
+    assert second_authorization_path.is_file()
+    assert metadata["handoff_authorization_comment_id"] == (
+        ISSUE_305_PAUSED_HANDOFF_AUTHORIZATION_COMMENT
+    )
+    successor_bytes = {
+        "authorization": second_authorization_path.read_bytes(),
+        "metadata": second_metadata_path.read_bytes(),
+        "manifest": successor_store.manifest_path.read_bytes(),
+        "ledger": successor_store.ledger_path.read_bytes(),
+    }
+
+    repeated, repeated_resumed, repeated_predecessor = bootstrap(
+        paused_values
+    ).authorization(persist=True)
+    assert repeated.fingerprint == successor.fingerprint
+    assert repeated_resumed is True
+    assert repeated_predecessor == predecessor_id
+    assert second_authorization_path.read_bytes() == successor_bytes["authorization"]
+    assert second_metadata_path.read_bytes() == successor_bytes["metadata"]
+    assert successor_store.manifest_path.read_bytes() == successor_bytes["manifest"]
+    assert successor_store.ledger_path.read_bytes() == successor_bytes["ledger"]
+
+    advance_controller(controller)
+    with pytest.raises(BootstrapError, match="^controller_handoff_not_safe$"):
+        bootstrap(paused_values).authorization(persist=True)
+
+
+def test_paused_handoff_rejects_every_projection_and_effect_mismatch(
+    bootstrap_fixture,
+):
+    paused_values, _, _, _, _, paused = exact_paused_successor_fixture(
+        bootstrap_fixture
+    )
+    profile = paused_values[3]
+    mismatches = [
+        ("status", "RUNNING"),
+        ("current_stage_index", 7),
+        ("stage_attempts", {"artifact_verify": 1, "tablet_preflight": 4}),
+        ("external_pauses", {"tablet_preflight": 2}),
+        ("active_attempt_id", "sha256:" + "a" * 64),
+        ("artifact", None),
+        ("device", {"installed": True}),
+        ("publish", {"commit_sha": "b" * 40}),
+        ("last_blocker", "device_not_connected"),
+        ("blocker_phase", "tablet_install"),
+        ("command_index", 0),
+        ("first_failed_predicate", "tablet_state_is_device"),
+    ]
+    for field, value in mismatches:
+        projection = deepcopy(paused.projection)
+        setattr(projection, field, value)
+        assert not bootstrap_module._is_exact_paused_tablet_handoff(
+            projection,
+            paused.events,
+            paused.contract,
+            expected_projection_fingerprint=profile.paused_projection_fingerprint,
+            expected_tail_hash=profile.paused_tail_hash,
+        ), field
+
+
+def test_paused_handoff_rejects_projection_fingerprint_and_tail_mismatch(
+    bootstrap_fixture,
+):
+    paused_values, _, _, _, _, paused = exact_paused_successor_fixture(
+        bootstrap_fixture
+    )
+    profile = paused_values[3]
+
+    assert not bootstrap_module._is_exact_paused_tablet_handoff(
+        paused.projection,
+        paused.events,
+        paused.contract,
+        expected_projection_fingerprint="sha256:" + "0" * 64,
+        expected_tail_hash=profile.paused_tail_hash,
+    )
+    assert not bootstrap_module._is_exact_paused_tablet_handoff(
+        paused.projection,
+        paused.events,
+        paused.contract,
+        expected_projection_fingerprint=profile.paused_projection_fingerprint,
+        expected_tail_hash="sha256:" + "0" * 64,
+    )
 
 
 @pytest.mark.parametrize(

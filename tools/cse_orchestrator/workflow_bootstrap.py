@@ -12,6 +12,7 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Mapping, Protocol, Sequence
 
 from .device_smoke import (
@@ -71,6 +72,18 @@ ISSUE_284_ADB_SHA256 = (
 ISSUE_305_AUTHORIZATION_COMMENT = 5160233470
 ISSUE_305_HANDOFF_AUTHORIZATION_COMMENT = 5167123792
 ISSUE_305_HANDOFF_PREDECESSOR = "894ac311cb9d6d454fb5121169b9031c4ae466b8"
+ISSUE_305_PAUSED_HANDOFF_AUTHORIZATION_COMMENT = 5168941496
+ISSUE_305_PAUSED_HANDOFF_PREDECESSOR = "5e5d6dc9b06312e6e78be60d1542954d1fd05eca"
+ISSUE_305_PAUSED_PREDECESSOR_AUTHORIZATION = (
+    "sha256:3c09c0068d20cb4b8b95b2a3067d50a5fb66976db7cf8a4936cea501c5123019"
+)
+ISSUE_305_PAUSED_PREDECESSOR_WORKFLOW = "wf-284-3c09c0068d20"
+ISSUE_305_PAUSED_PROJECTION_FINGERPRINT = (
+    "sha256:0074c74280ae39648372397c378eefd385e4259915a78d5e242c56c03c24aa3c"
+)
+ISSUE_305_PAUSED_TAIL_HASH = (
+    "sha256:6601305f5cb94dfbbf75f826788414e76d20e38b54bdd296bc34eac1e0a56ba5"
+)
 
 ISSUE_284_CHECKPOINT_PATHS = (
     ".cse/tasks/284_task.md",
@@ -158,6 +171,11 @@ class Issue284PilotProfile:
     adb_sha256: str = ISSUE_284_ADB_SHA256
     controller_base: str = ISSUE_305_BASE
     handoff_predecessor_revision: str = ISSUE_305_HANDOFF_PREDECESSOR
+    paused_handoff_predecessor_revision: str = ISSUE_305_PAUSED_HANDOFF_PREDECESSOR
+    paused_predecessor_authorization: str = ISSUE_305_PAUSED_PREDECESSOR_AUTHORIZATION
+    paused_predecessor_workflow: str = ISSUE_305_PAUSED_PREDECESSOR_WORKFLOW
+    paused_projection_fingerprint: str = ISSUE_305_PAUSED_PROJECTION_FINGERPRINT
+    paused_tail_hash: str = ISSUE_305_PAUSED_TAIL_HASH
     authorization_comment_id: int = ISSUE_305_AUTHORIZATION_COMMENT
     issue_body_hashes: Mapping[int, str] = field(
         default_factory=lambda: dict(ISSUE_BODY_HASHES)
@@ -279,6 +297,51 @@ def _is_exact_pre_stage_handoff(projection, events) -> bool:
     )
 
 
+def _is_exact_paused_tablet_handoff(
+    projection,
+    events,
+    contract: WorkflowContract,
+    *,
+    expected_projection_fingerprint: str,
+    expected_tail_hash: str,
+) -> bool:
+    """Accept only the exact immutable tablet-preflight pause boundary."""
+
+    try:
+        public = projection.public_dict(contract)
+    except (AttributeError, IndexError, TypeError, ValueError):
+        return False
+    passed_stages = tuple(
+        str(item.get("stage", ""))
+        for item in projection.passed_evidence
+        if isinstance(item, Mapping)
+    )
+    return (
+        projection.status == "PAUSED_EXTERNAL"
+        and projection.current_stage_index == 6
+        and public.get("current_stage") == "tablet_preflight"
+        and projection.stage_attempts
+        == {"artifact_verify": 1, "tablet_preflight": 3}
+        and projection.external_pauses == {"tablet_preflight": 3}
+        and projection.active_attempt_id is None
+        and len(projection.admitted_attempt_ids) == 4
+        and passed_stages == (*REUSED_STAGE_NAMES, "artifact_verify")
+        and projection.artifact is not None
+        and projection.device is None
+        and projection.publish is None
+        and projection.last_blocker == "screen_not_interactive"
+        and projection.blocker_phase == "tablet_preflight"
+        and projection.command_index == 1
+        and projection.first_failed_predicate == "screen_is_interactive"
+        and projection.event_count == len(events)
+        and bool(events)
+        and events[-1].get("event_hash") == expected_tail_hash
+        and projection.tail_hash == expected_tail_hash
+        and public.get("projection_fingerprint")
+        == expected_projection_fingerprint
+    )
+
+
 class BootstrapAuthorizationStore:
     """Repository-external immutable authorization used by every resume."""
 
@@ -383,11 +446,18 @@ class BootstrapAuthorizationStore:
         predecessor: WorkflowAuthorization,
         successor: WorkflowAuthorization,
         target_root: Path,
+        *,
+        handoff_authorization_comment_id: int = ISSUE_305_HANDOFF_AUTHORIZATION_COMMENT,
     ) -> None:
         controller = str(successor.payload["controller_revision"])
         authorization_path, metadata_path = self._successor_paths(controller)
         if authorization_path.exists() or metadata_path.exists():
-            current = self.load_successor(predecessor, controller, target_root)
+            current = self.load_successor(
+                predecessor,
+                controller,
+                target_root,
+                handoff_authorization_comment_id=handoff_authorization_comment_id,
+            )
             if current.fingerprint != successor.fingerprint:
                 raise BootstrapError("bootstrap_successor_authorization_drift")
             return
@@ -398,9 +468,7 @@ class BootstrapAuthorizationStore:
             "issue": ISSUE_284,
             "repository": successor.repository,
             "target_root": str(Path(target_root).resolve()),
-            "handoff_authorization_comment_id": (
-                ISSUE_305_HANDOFF_AUTHORIZATION_COMMENT
-            ),
+            "handoff_authorization_comment_id": handoff_authorization_comment_id,
             "predecessor_authorization_fingerprint": predecessor.fingerprint,
             "predecessor_workflow_id": predecessor_contract.workflow_id,
             "successor_authorization_fingerprint": successor.fingerprint,
@@ -415,6 +483,8 @@ class BootstrapAuthorizationStore:
         predecessor: WorkflowAuthorization,
         controller: str,
         target_root: Path,
+        *,
+        handoff_authorization_comment_id: int = ISSUE_305_HANDOFF_AUTHORIZATION_COMMENT,
     ) -> WorkflowAuthorization:
         authorization_path, metadata_path = self._successor_paths(controller)
         if not authorization_path.is_file() or not metadata_path.is_file():
@@ -436,9 +506,7 @@ class BootstrapAuthorizationStore:
             "issue": ISSUE_284,
             "repository": successor.repository,
             "target_root": str(Path(target_root).resolve()),
-            "handoff_authorization_comment_id": (
-                ISSUE_305_HANDOFF_AUTHORIZATION_COMMENT
-            ),
+            "handoff_authorization_comment_id": handoff_authorization_comment_id,
             "predecessor_authorization_fingerprint": predecessor.fingerprint,
             "predecessor_workflow_id": predecessor_contract.workflow_id,
             "successor_authorization_fingerprint": successor.fingerprint,
@@ -545,13 +613,44 @@ class WorkflowBootstrap:
         ):
             raise BootstrapError("controller_handoff_not_safe")
 
+    def _verify_paused_tablet_ledger(
+        self,
+        predecessor: WorkflowAuthorization,
+    ):
+        contract = WorkflowContract.from_authorization(predecessor)
+        profile = self.profile
+        if (
+            predecessor.fingerprint != profile.paused_predecessor_authorization
+            or contract.workflow_id != profile.paused_predecessor_workflow
+        ):
+            raise BootstrapError("controller_handoff_not_safe")
+        try:
+            verification = WorkflowStore(
+                runtime_root=self.runtime_root,
+                repo_root=self.target_root,
+                workflow_id=contract.workflow_id,
+            ).verify()
+        except (OSError, ValueError, WorkflowStoreError) as exc:
+            raise BootstrapError("controller_handoff_not_safe") from exc
+        if not _is_exact_paused_tablet_handoff(
+            verification.projection,
+            verification.events,
+            verification.contract,
+            expected_projection_fingerprint=profile.paused_projection_fingerprint,
+            expected_tail_hash=profile.paused_tail_hash,
+        ):
+            raise BootstrapError("controller_handoff_not_safe")
+        return verification
+
     def _validate_predecessor_contract(
         self,
         predecessor: WorkflowAuthorization,
         controller: str,
+        *,
+        expected_predecessor_revision: str,
     ) -> None:
         old_controller = str(predecessor.payload["controller_revision"])
-        if old_controller != self.profile.handoff_predecessor_revision:
+        if old_controller != expected_predecessor_revision:
             raise BootstrapError("controller_handoff_not_safe")
         try:
             ancestry = subprocess.run(
@@ -666,9 +765,20 @@ class WorkflowBootstrap:
         self,
         predecessor: WorkflowAuthorization,
         controller: str,
+        *,
+        paused_tablet: bool,
     ) -> WorkflowAuthorization:
-        self._verify_pre_stage_ledger(predecessor)
-        self._validate_predecessor_contract(predecessor, controller)
+        if paused_tablet:
+            self._verify_paused_tablet_ledger(predecessor)
+            expected_predecessor = self.profile.paused_handoff_predecessor_revision
+        else:
+            self._verify_pre_stage_ledger(predecessor)
+            expected_predecessor = self.profile.handoff_predecessor_revision
+        self._validate_predecessor_contract(
+            predecessor,
+            controller,
+            expected_predecessor_revision=expected_predecessor,
+        )
         payload = json.loads(canonical_json_bytes(predecessor.payload))
         payload["controller_revision"] = controller
         payload["nonce"] = (
@@ -684,6 +794,96 @@ class WorkflowBootstrap:
         ):
             raise BootstrapError("controller_handoff_not_safe")
         return successor
+
+    @staticmethod
+    def _same_continuation_state(predecessor_verification, successor_verification) -> bool:
+        def semantic_projection(verification) -> dict[str, object]:
+            value = dict(
+                verification.projection.public_dict(verification.contract)
+            )
+            for field in (
+                "workflow_id",
+                "contract_fingerprint",
+                "authorization_fingerprint",
+                "controller_revision",
+                "tail_hash",
+                "projection_fingerprint",
+            ):
+                value.pop(field, None)
+            return value
+
+        def semantic_events(verification) -> list[tuple[object, object]]:
+            return [
+                (event.get("event_type"), event.get("payload"))
+                for event in verification.events[1:]
+            ]
+
+        return (
+            semantic_projection(predecessor_verification)
+            == semantic_projection(successor_verification)
+            and semantic_events(predecessor_verification)
+            == semantic_events(successor_verification)
+        )
+
+    def _seed_paused_successor_history(
+        self,
+        predecessor: WorkflowAuthorization,
+        successor: WorkflowAuthorization,
+    ) -> None:
+        """Atomically seed a successor without mutating predecessor runtime bytes."""
+
+        predecessor_verification = self._verify_paused_tablet_ledger(predecessor)
+        successor_contract = WorkflowContract.from_authorization(successor)
+        destination = WorkflowStore(
+            runtime_root=self.runtime_root,
+            repo_root=self.target_root,
+            workflow_id=successor_contract.workflow_id,
+        )
+        if destination.root.exists():
+            try:
+                current = destination.verify()
+            except (OSError, ValueError, WorkflowStoreError) as exc:
+                raise BootstrapError("controller_handoff_not_safe") from exc
+            if not self._same_continuation_state(
+                predecessor_verification, current
+            ):
+                raise BootstrapError("controller_handoff_not_safe")
+            return
+
+        self.runtime_root.mkdir(parents=True, exist_ok=True)
+        with TemporaryDirectory(
+            prefix=".issue-284-paused-handoff-", dir=self.runtime_root
+        ) as temporary:
+            staged = WorkflowStore(
+                runtime_root=Path(temporary),
+                repo_root=self.target_root,
+                workflow_id=successor_contract.workflow_id,
+            )
+            staged.start(successor_contract)
+            for event in predecessor_verification.events[1:]:
+                payload = event.get("payload")
+                if not isinstance(payload, Mapping):
+                    raise BootstrapError("controller_handoff_not_safe")
+                staged.append(str(event.get("event_type")), dict(payload))
+            staged_verification = staged.verify()
+            if not self._same_continuation_state(
+                predecessor_verification, staged_verification
+            ):
+                raise BootstrapError("controller_handoff_not_safe")
+            destination.root.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                os.replace(staged.root, destination.root)
+            except OSError as exc:
+                if not destination.root.exists():
+                    raise BootstrapError("controller_handoff_not_safe") from exc
+                try:
+                    current = destination.verify()
+                except (OSError, ValueError, WorkflowStoreError) as verify_exc:
+                    raise BootstrapError("controller_handoff_not_safe") from verify_exc
+                if not self._same_continuation_state(
+                    predecessor_verification, current
+                ):
+                    raise BootstrapError("controller_handoff_not_safe") from exc
 
     def _validate_target(self) -> None:
         observation = observe_target(self.target_root)
@@ -973,34 +1173,111 @@ class WorkflowBootstrap:
         persist: bool,
     ) -> tuple[WorkflowAuthorization, bool, str | None]:
         if self.store.exists:
-            predecessor = self.store.load(self.target_root)
+            root_predecessor = self.store.load(self.target_root)
             controller = self._validate_controller()
-            if predecessor.payload["controller_revision"] == controller:
-                if self.store.successor_revisions():
+            revisions = self.store.successor_revisions()
+            if not revisions:
+                if root_predecessor.payload["controller_revision"] == controller:
+                    return root_predecessor, True, None
+                if (
+                    self.profile.handoff_predecessor_revision
+                    == ISSUE_305_HANDOFF_PREDECESSOR
+                    and controller
+                    != self.profile.paused_handoff_predecessor_revision
+                ):
                     raise BootstrapError("controller_handoff_not_safe")
-                return predecessor, True, None
-            successor = self._build_controller_successor(predecessor, controller)
-            if self.store.successor_exists(controller):
+                successor = self._build_controller_successor(
+                    root_predecessor, controller, paused_tablet=False
+                )
+                if persist:
+                    self.store.save_successor(
+                        root_predecessor, successor, self.target_root
+                    )
+                return (
+                    successor,
+                    True,
+                    WorkflowContract.from_authorization(root_predecessor).workflow_id,
+                )
+
+            if len(revisions) > 2:
+                raise BootstrapError("controller_handoff_not_safe")
+            first_revision = self.profile.paused_handoff_predecessor_revision
+            if first_revision not in revisions:
+                if len(revisions) != 1 or controller != revisions[0]:
+                    raise BootstrapError("controller_handoff_not_safe")
+                expected = self._build_controller_successor(
+                    root_predecessor, controller, paused_tablet=False
+                )
                 stored = self.store.load_successor(
-                    predecessor, controller, self.target_root
+                    root_predecessor, controller, self.target_root
+                )
+                if (
+                    stored.fingerprint != expected.fingerprint
+                    or not self._same_handoff_contract(root_predecessor, stored)
+                ):
+                    raise BootstrapError("controller_handoff_not_safe")
+                return (
+                    stored,
+                    True,
+                    WorkflowContract.from_authorization(root_predecessor).workflow_id,
+                )
+
+            first_successor = self.store.load_successor(
+                root_predecessor, first_revision, self.target_root
+            )
+            if len(revisions) == 1 and controller == first_revision:
+                expected = self._build_controller_successor(
+                    root_predecessor, controller, paused_tablet=False
+                )
+                if first_successor.fingerprint != expected.fingerprint:
+                    raise BootstrapError("controller_handoff_not_safe")
+                return (
+                    first_successor,
+                    True,
+                    WorkflowContract.from_authorization(root_predecessor).workflow_id,
+                )
+
+            if len(revisions) == 2:
+                second_revisions = tuple(
+                    revision for revision in revisions if revision != first_revision
+                )
+                if second_revisions != (controller,):
+                    raise BootstrapError("controller_handoff_not_safe")
+
+            successor = self._build_controller_successor(
+                first_successor, controller, paused_tablet=True
+            )
+            if len(revisions) == 2:
+                stored = self.store.load_successor(
+                    first_successor,
+                    controller,
+                    self.target_root,
+                    handoff_authorization_comment_id=(
+                        ISSUE_305_PAUSED_HANDOFF_AUTHORIZATION_COMMENT
+                    ),
                 )
                 if (
                     stored.fingerprint != successor.fingerprint
-                    or not self._same_handoff_contract(predecessor, stored)
+                    or not self._same_handoff_contract(first_successor, stored)
                 ):
                     raise BootstrapError("controller_handoff_not_safe")
                 successor = stored
-            else:
-                if self.store.successor_revisions():
-                    raise BootstrapError("controller_handoff_not_safe")
-                if persist:
+            if persist:
+                self._seed_paused_successor_history(first_successor, successor)
+                if len(revisions) == 1:
                     self.store.save_successor(
-                        predecessor, successor, self.target_root
+                        first_successor,
+                        successor,
+                        self.target_root,
+                        handoff_authorization_comment_id=(
+                            ISSUE_305_PAUSED_HANDOFF_AUTHORIZATION_COMMENT
+                        ),
                     )
-            predecessor_id = WorkflowContract.from_authorization(
-                predecessor
-            ).workflow_id
-            return successor, True, predecessor_id
+            return (
+                successor,
+                True,
+                WorkflowContract.from_authorization(first_successor).workflow_id,
+            )
         authorization = self.build_authorization()
         if persist:
             self.store.save(authorization, self.target_root)
