@@ -37,19 +37,71 @@ jobs:
         run: |
           git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
           git clone --no-tags "https://github.com/$GITHUB_REPOSITORY.git" repo
-      - name: Bridge unit tests
+
+      - name: Bridge self-check
+        id: selfcheck
         working-directory: repo
-        run: >-
-          python -m unittest discover -s tests
-          -p 'test_cse_*bridge*.py' -v
-      - name: Bridge compile check
+        shell: bash
+        run: |
+          set +e
+          python -m unittest discover -s tests -p 'test_cse_*bridge*.py' -v > bridge-selfcheck.log 2>&1
+          tests_rc=$?
+          python -m compileall -q \
+            tools/cse_api_bridge.py \
+            tools/cse_bridge_poll.py \
+            tests/test_cse_api_bridge.py \
+            tests/test_cse_bridge_poll.py >> bridge-selfcheck.log 2>&1
+          compile_rc=$?
+          echo "tests_rc=$tests_rc" >> "$GITHUB_OUTPUT"
+          echo "compile_rc=$compile_rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Report bridge self-check failure
+        if: ${{ steps.selfcheck.outputs.tests_rc != '0' || steps.selfcheck.outputs.compile_rc != '0' }}
         working-directory: repo
-        run: >-
-          python -m compileall -q
-          tools/cse_api_bridge.py
-          tools/cse_bridge_poll.py
-          tests/test_cse_api_bridge.py
-          tests/test_cse_bridge_poll.py
+        env:
+          DIAGNOSTIC_ISSUE: "314"
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.request
+
+          tail = open("bridge-selfcheck.log", encoding="utf-8", errors="replace").read()[-4000:]
+          tail = re.sub(r"(?i)(sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{12,})", "[REDACTED]", tail)
+          body = (
+              "<!-- cse-bridge-bootstrap:SELF_CHECK_FAILED -->\n"
+              "CSE API Bridge self-check failed; API task execution was skipped.\n\n"
+              "```text\n" + tail + "\n```"
+          )
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GITHUB_TOKEN"]
+          issue = os.environ["DIAGNOSTIC_ISSUE"]
+          headers = {
+              "Authorization": f"Bearer {token}",
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "User-Agent": "cse-api-bridge",
+          }
+          comments_url = f"https://api.github.com/repos/{repo}/issues/{issue}/comments?per_page=100"
+          request = urllib.request.Request(comments_url, headers=headers)
+          with urllib.request.urlopen(request, timeout=30) as response:
+              comments = json.loads(response.read().decode("utf-8"))
+          if any(comment.get("body") == body for comment in comments):
+              raise SystemExit(0)
+          post = urllib.request.Request(
+              f"https://api.github.com/repos/{repo}/issues/{issue}/comments",
+              data=json.dumps({"body": body}).encode("utf-8"),
+              method="POST",
+              headers={**headers, "Content-Type": "application/json"},
+          )
+          with urllib.request.urlopen(post, timeout=30):
+              pass
+          PY
+
       - name: Execute next approved task
+        if: ${{ steps.selfcheck.outputs.tests_rc == '0' && steps.selfcheck.outputs.compile_rc == '0' }}
         working-directory: repo
         run: python tools/cse_bridge_poll.py --repo-root .
