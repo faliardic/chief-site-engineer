@@ -1,5 +1,16 @@
 # Changelog
 
+## Issue #305 - Wakefulness numeric alias resume düzeltmesi
+
+- `mWakefulness` sembolik ve sayısal değerleri tek semantik mapping'de
+  birleştirildi; aynı-semantik tekrarlar kabul edilirken mismatch, unknown ve
+  malformed output fail closed kalır.
+- Mevcut interactive/display/keyguard ve exact-device güvenlik sözleşmeleri ile
+  data-minimal diagnostics korunur.
+- Exact dördüncü tablet-preflight pause state'i predecessor zincirini
+  değiştirmeden üçüncü immutable successor'a devredilebilir; state/contract/
+  effect drift, rollback ve duplicate successor reddedilir.
+
 ## Issue #305 - Tablet interactive preflight resume düzeltmesi
 
 - Production power preflight, exact `mWakefulness=Awake`, mevcut

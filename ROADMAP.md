@@ -47,6 +47,10 @@
   fail-closed power parser'a ekler. Yalnız exact paused tablet-preflight state'i,
   eski authorization/manifest/ledger değişmeden stage ve attempt sayaçlarını
   koruyan tek successor identity'ye devredilebilir.
+- Issue #305 numeric-alias correction, sembolik ve sayısal wakefulness
+  gösterimlerini tek semantiğe bağlar. Exact dördüncü pause state'i bütün önceki
+  authorization/runtime zincirini immutable tutan tek üçüncü successor'a
+  devredilir; duplicate veya drift fail closed kalır.
 - Opsiyonel service/tray yüzeyi O10 contract'ının parçası değildir; gerekirse
   ayrı Issue, capability ve approval sözleşmesi ister.
 
