@@ -1,6 +1,6 @@
 param(
     [string]$RepoRoot = "V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer",
-    [string]$Model = "gpt-5.1",
+    [string]$Model = "gpt-5.1-codex",
     [switch]$ResetKey,
     [switch]$Uninstall
 )
