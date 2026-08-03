@@ -20,7 +20,11 @@ from .device_smoke import (
     ISSUE_284_TABLET_MODEL,
     ISSUE_284_TABLET_SERIAL,
 )
-from .observer import CommandResult, GhGitHubClient
+from .observer import (
+    GhGitHubClient,
+    GitHubClientError,
+    sanitized_github_error_reason,
+)
 from .workflow import (
     GhIssueEvidenceSink,
     WorkflowCoordinator,
@@ -35,7 +39,7 @@ from .workflow_authorization import (
     canonical_json_bytes,
     parse_workflow_authorization,
 )
-from .workflow_store import WorkflowContract
+from .workflow_store import WorkflowContract, WorkflowStore, WorkflowStoreError
 
 
 ISSUE_284 = 284
@@ -65,6 +69,8 @@ ISSUE_284_ADB_SHA256 = (
     "1e1c2280b90b3f01ad84cd8df4858b1b1995012814f3ca8893bcc3ba3848edec"
 )
 ISSUE_305_AUTHORIZATION_COMMENT = 5160233470
+ISSUE_305_HANDOFF_AUTHORIZATION_COMMENT = 5167123792
+ISSUE_305_HANDOFF_PREDECESSOR = "894ac311cb9d6d454fb5121169b9031c4ae466b8"
 
 ISSUE_284_CHECKPOINT_PATHS = (
     ".cse/tasks/284_task.md",
@@ -151,6 +157,7 @@ class Issue284PilotProfile:
     adb_path: Path = ISSUE_284_ADB
     adb_sha256: str = ISSUE_284_ADB_SHA256
     controller_base: str = ISSUE_305_BASE
+    handoff_predecessor_revision: str = ISSUE_305_HANDOFF_PREDECESSOR
     authorization_comment_id: int = ISSUE_305_AUTHORIZATION_COMMENT
     issue_body_hashes: Mapping[int, str] = field(
         default_factory=lambda: dict(ISSUE_BODY_HASHES)
@@ -194,32 +201,6 @@ def _file_sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
-
-
-def _run_gh_api_utf8(args: tuple[str, ...]) -> CommandResult:
-    if args[:4] != ("gh", "api", "--method", "GET") or len(args) != 5:
-        raise ValueError("github_api_command_not_read_only_get")
-    try:
-        completed = subprocess.run(
-            args,
-            text=True,
-            encoding="utf-8",
-            errors="strict",
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            stdin=subprocess.DEVNULL,
-            shell=False,
-            check=False,
-            timeout=30,
-        )
-    except (OSError, subprocess.TimeoutExpired, UnicodeError):
-        return CommandResult(args, 127, "", "github evidence unavailable")
-    return CommandResult(
-        args,
-        completed.returncode,
-        completed.stdout,
-        completed.stderr,
-    )
 
 
 def _git(root: Path, *argv: str, timeout: int = 30) -> str:
@@ -272,6 +253,32 @@ def _stage(
     }
 
 
+def _is_exact_pre_stage_handoff(projection, events) -> bool:
+    """Accept only the immutable one-event boundary authorized by Issue #305."""
+
+    return (
+        projection.status == "RUNNING"
+        and len(events) == 1
+        and events[0].get("event_type") == "workflow_started"
+        and projection.event_count == 1
+        and projection.current_stage_index == 0
+        and not projection.stage_attempts
+        and not projection.external_pauses
+        and not projection.admitted_attempt_ids
+        and projection.active_attempt_id is None
+        and not projection.consumed_budgets
+        and not projection.passed_evidence
+        and projection.last_target_fingerprint is None
+        and projection.artifact is None
+        and projection.device is None
+        and projection.publish is None
+        and projection.last_blocker is None
+        and projection.blocker_phase is None
+        and projection.command_index is None
+        and projection.first_failed_predicate is None
+    )
+
+
 class BootstrapAuthorizationStore:
     """Repository-external immutable authorization used by every resume."""
 
@@ -280,6 +287,32 @@ class BootstrapAuthorizationStore:
         self.root = Path(runtime_root).resolve() / "bootstrap" / f"issue-284-{key}"
         self.authorization_path = self.root / "authorization-v2.json"
         self.metadata_path = self.root / "bootstrap-v1.json"
+
+    def _successor_paths(self, controller: str) -> tuple[Path, Path]:
+        if re.fullmatch(r"[0-9a-f]{40}", controller) is None:
+            raise BootstrapError("successor_controller_revision_invalid")
+        root = self.root / "successors" / controller
+        return root / "authorization-v2.json", root / "handoff-v1.json"
+
+    def successor_exists(self, controller: str) -> bool:
+        authorization_path, metadata_path = self._successor_paths(controller)
+        return authorization_path.exists() or metadata_path.exists()
+
+    def successor_revisions(self) -> tuple[str, ...]:
+        root = self.root / "successors"
+        if not root.exists():
+            return ()
+        if not root.is_dir():
+            raise BootstrapError("bootstrap_successor_store_tampered")
+        revisions: list[str] = []
+        for candidate in root.iterdir():
+            if (
+                not candidate.is_dir()
+                or re.fullmatch(r"[0-9a-f]{40}", candidate.name) is None
+            ):
+                raise BootstrapError("bootstrap_successor_store_tampered")
+            revisions.append(candidate.name)
+        return tuple(sorted(revisions))
 
     @property
     def exists(self) -> bool:
@@ -345,6 +378,77 @@ class BootstrapAuthorizationStore:
             raise BootstrapError("bootstrap_store_tampered")
         return authorization
 
+    def save_successor(
+        self,
+        predecessor: WorkflowAuthorization,
+        successor: WorkflowAuthorization,
+        target_root: Path,
+    ) -> None:
+        controller = str(successor.payload["controller_revision"])
+        authorization_path, metadata_path = self._successor_paths(controller)
+        if authorization_path.exists() or metadata_path.exists():
+            current = self.load_successor(predecessor, controller, target_root)
+            if current.fingerprint != successor.fingerprint:
+                raise BootstrapError("bootstrap_successor_authorization_drift")
+            return
+        predecessor_contract = WorkflowContract.from_authorization(predecessor)
+        successor_contract = WorkflowContract.from_authorization(successor)
+        metadata = {
+            "schema_version": 1,
+            "issue": ISSUE_284,
+            "repository": successor.repository,
+            "target_root": str(Path(target_root).resolve()),
+            "handoff_authorization_comment_id": (
+                ISSUE_305_HANDOFF_AUTHORIZATION_COMMENT
+            ),
+            "predecessor_authorization_fingerprint": predecessor.fingerprint,
+            "predecessor_workflow_id": predecessor_contract.workflow_id,
+            "successor_authorization_fingerprint": successor.fingerprint,
+            "successor_workflow_id": successor_contract.workflow_id,
+            "controller_revision": controller,
+        }
+        self._write_exclusive(authorization_path, successor.public_dict())
+        self._write_exclusive(metadata_path, metadata)
+
+    def load_successor(
+        self,
+        predecessor: WorkflowAuthorization,
+        controller: str,
+        target_root: Path,
+    ) -> WorkflowAuthorization:
+        authorization_path, metadata_path = self._successor_paths(controller)
+        if not authorization_path.is_file() or not metadata_path.is_file():
+            raise BootstrapError("bootstrap_successor_store_incomplete")
+        try:
+            authorization_value = json.loads(
+                authorization_path.read_text(encoding="utf-8")
+            )
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise BootstrapError("bootstrap_successor_store_unreadable") from exc
+        if not isinstance(authorization_value, dict) or not isinstance(metadata, dict):
+            raise BootstrapError("bootstrap_successor_store_shape_invalid")
+        successor = parse_workflow_authorization(authorization_value)
+        predecessor_contract = WorkflowContract.from_authorization(predecessor)
+        successor_contract = WorkflowContract.from_authorization(successor)
+        expected = {
+            "schema_version": 1,
+            "issue": ISSUE_284,
+            "repository": successor.repository,
+            "target_root": str(Path(target_root).resolve()),
+            "handoff_authorization_comment_id": (
+                ISSUE_305_HANDOFF_AUTHORIZATION_COMMENT
+            ),
+            "predecessor_authorization_fingerprint": predecessor.fingerprint,
+            "predecessor_workflow_id": predecessor_contract.workflow_id,
+            "successor_authorization_fingerprint": successor.fingerprint,
+            "successor_workflow_id": successor_contract.workflow_id,
+            "controller_revision": controller,
+        }
+        if metadata != expected or successor.payload["controller_revision"] != controller:
+            raise BootstrapError("bootstrap_successor_store_tampered")
+        return successor
+
 
 class WorkflowBootstrap:
     """Generate, persist, and execute the exact Issue #284 pilot contract."""
@@ -366,8 +470,7 @@ class WorkflowBootstrap:
         self.controller_root = Path(controller_root).resolve()
         self.profile = profile or Issue284PilotProfile()
         self.evidence_client = evidence_client or GhGitHubClient(
-            self.profile.repository,
-            api_runner=_run_gh_api_utf8,
+            self.profile.repository
         )
         self.evidence_sink = evidence_sink
         self.executor = executor
@@ -383,16 +486,25 @@ class WorkflowBootstrap:
         if controller.changed_paths or controller.staged_paths:
             raise BootstrapError("controller_worktree_dirty")
         revision, _ = controller_revision(self.controller_root)
-        ancestry = subprocess.run(
-            ["git", "merge-base", "--is-ancestor", self.profile.controller_base, revision],
-            cwd=self.controller_root,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            shell=False,
-            check=False,
-            timeout=30,
-        )
+        try:
+            ancestry = subprocess.run(
+                [
+                    "git",
+                    "merge-base",
+                    "--is-ancestor",
+                    self.profile.controller_base,
+                    revision,
+                ],
+                cwd=self.controller_root,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                shell=False,
+                check=False,
+                timeout=30,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise BootstrapError("controller_release_not_merged") from exc
         if ancestry.returncode != 0 or revision == self.profile.controller_base:
             raise BootstrapError("controller_release_not_merged")
         if self.profile.require_controller_on_origin_master:
@@ -402,6 +514,176 @@ class WorkflowBootstrap:
             if origin_master != revision:
                 raise BootstrapError("controller_not_on_origin_master")
         return revision
+
+    @staticmethod
+    def _same_handoff_contract(
+        predecessor: WorkflowAuthorization,
+        successor: WorkflowAuthorization,
+    ) -> bool:
+        old_payload = dict(predecessor.payload)
+        new_payload = dict(successor.payload)
+        for field in ("controller_revision", "nonce"):
+            old_payload.pop(field, None)
+            new_payload.pop(field, None)
+        return old_payload == new_payload
+
+    def _verify_pre_stage_ledger(
+        self,
+        predecessor: WorkflowAuthorization,
+    ) -> None:
+        contract = WorkflowContract.from_authorization(predecessor)
+        try:
+            verification = WorkflowStore(
+                runtime_root=self.runtime_root,
+                repo_root=self.target_root,
+                workflow_id=contract.workflow_id,
+            ).verify()
+        except (OSError, ValueError, WorkflowStoreError) as exc:
+            raise BootstrapError("controller_handoff_not_safe") from exc
+        if not _is_exact_pre_stage_handoff(
+            verification.projection, verification.events
+        ):
+            raise BootstrapError("controller_handoff_not_safe")
+
+    def _validate_predecessor_contract(
+        self,
+        predecessor: WorkflowAuthorization,
+        controller: str,
+    ) -> None:
+        old_controller = str(predecessor.payload["controller_revision"])
+        if old_controller != self.profile.handoff_predecessor_revision:
+            raise BootstrapError("controller_handoff_not_safe")
+        try:
+            ancestry = subprocess.run(
+                ["git", "merge-base", "--is-ancestor", old_controller, controller],
+                cwd=self.controller_root,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                shell=False,
+                check=False,
+                timeout=30,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise BootstrapError("controller_handoff_not_safe") from exc
+        if ancestry.returncode != 0 or old_controller == controller:
+            raise BootstrapError("controller_handoff_not_safe")
+
+        profile = self.profile
+        expected_target = {
+            "branch": profile.target_branch,
+            "base_sha": profile.target_parent,
+            "head_sha": profile.target_checkpoint,
+            "tree_sha": profile.target_tree,
+        }
+        expected_artifact = {
+            "path": str(profile.artifact_path),
+            "sha256": "sha256:" + profile.artifact_sha256,
+            "package": ISSUE_284_DEBUG_PACKAGE,
+            "version": profile.artifact_version,
+            "signer": "cert-sha256:" + profile.signer_sha256,
+            "checkpoint_sha": profile.target_checkpoint,
+        }
+        expected_device = {
+            "serial": ISSUE_284_TABLET_SERIAL,
+            "model": ISSUE_284_TABLET_MODEL,
+            "package": ISSUE_284_DEBUG_PACKAGE,
+        }
+        expected_publish = {
+            "base_branch": "master",
+            "title": "Complete reminder all-day editing",
+            "body_first_line": "Related to #284",
+            "commit_message": "Complete reminder all-day editing",
+        }
+        payload = predecessor.payload
+        if (
+            payload.get("schema_version") != 2
+            or predecessor.repository != profile.repository
+            or predecessor.issue != ISSUE_284
+            or predecessor.comment_id != profile.authorization_comment_id
+            or payload.get("target") != expected_target
+            or tuple(predecessor.write_allowlist) != profile.read_write_allowlist
+            or tuple(payload.get("read_allowlist", ()))
+            != profile.read_write_allowlist
+            or payload.get("artifact") != expected_artifact
+            or payload.get("device") != expected_device
+            or payload.get("publish") != expected_publish
+            or payload.get("execution") is not True
+        ):
+            raise BootstrapError("controller_handoff_not_safe")
+
+        raw_stages = payload.get("stages")
+        if not isinstance(raw_stages, list):
+            raise BootstrapError("controller_handoff_not_safe")
+        smoke_stages = [
+            item
+            for item in raw_stages
+            if isinstance(item, Mapping) and item.get("name") == "tablet_preflight"
+        ]
+        if len(smoke_stages) != 1:
+            raise BootstrapError("controller_handoff_not_safe")
+        smoke_argv = smoke_stages[0].get("argv")
+        if (
+            not isinstance(smoke_argv, list)
+            or len(smoke_argv) != 9
+            or not all(isinstance(item, str) for item in smoke_argv)
+            or not re_full_synthetic(smoke_argv[5])
+        ):
+            raise BootstrapError("controller_handoff_not_safe")
+        expected_stages = self._stages(
+            synthetic_title=smoke_argv[5],
+            first_day=smoke_argv[6],
+            second_day=smoke_argv[7],
+        )
+        if (
+            raw_stages != expected_stages
+            or payload.get("capability_sequence")
+            != [stage["capability"] for stage in expected_stages]
+        ):
+            raise BootstrapError("controller_handoff_not_safe")
+
+        self._validate_target()
+        self._validate_tools_and_artifact()
+        try:
+            evidence_source = self._evidence_fingerprint()
+            current_reused = [
+                current_reused_evidence_record(
+                    predecessor,
+                    stage_name,
+                    target_root=self.target_root,
+                )
+                for stage_name in REUSED_STAGE_NAMES
+            ]
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise BootstrapError("controller_handoff_not_safe") from exc
+        if (
+            payload.get("evidence_source_fingerprint") != evidence_source
+            or payload.get("reused_evidence") != current_reused
+        ):
+            raise BootstrapError("controller_handoff_not_safe")
+
+    def _build_controller_successor(
+        self,
+        predecessor: WorkflowAuthorization,
+        controller: str,
+    ) -> WorkflowAuthorization:
+        self._verify_pre_stage_ledger(predecessor)
+        self._validate_predecessor_contract(predecessor, controller)
+        payload = json.loads(canonical_json_bytes(predecessor.payload))
+        payload["controller_revision"] = controller
+        payload["nonce"] = (
+            "issue-284-controller-handoff-"
+            + _sha256_text(f"{predecessor.fingerprint}:{controller}")[:24]
+        )
+        successor = parse_workflow_authorization(payload, now=self.now)
+        if (
+            successor.fingerprint == predecessor.fingerprint
+            or WorkflowContract.from_authorization(successor).workflow_id
+            == WorkflowContract.from_authorization(predecessor).workflow_id
+            or not self._same_handoff_contract(predecessor, successor)
+        ):
+            raise BootstrapError("controller_handoff_not_safe")
+        return successor
 
     def _validate_target(self) -> None:
         observation = observe_target(self.target_root)
@@ -457,7 +739,13 @@ class WorkflowBootstrap:
         evidence: dict[str, object] = {"issues": {}}
         issues: dict[str, object] = {}
         for issue_number in (ISSUE_284, ISSUE_305):
-            issue = self.evidence_client.get_issue(issue_number)
+            try:
+                issue = self.evidence_client.get_issue(issue_number)
+            except GitHubClientError as exc:
+                raise BootstrapError(
+                    "evidence_issue_read_failed_"
+                    f"{issue_number}_{sanitized_github_error_reason(exc)}"
+                ) from None
             body = issue.get("body")
             if not isinstance(body, str):
                 raise BootstrapError(f"evidence_issue_body_missing_{issue_number}")
@@ -465,7 +753,13 @@ class WorkflowBootstrap:
                 issue_number
             ):
                 raise BootstrapError(f"evidence_issue_body_drift_{issue_number}")
-            comments = self.evidence_client.get_issue_comments(issue_number)
+            try:
+                comments = self.evidence_client.get_issue_comments(issue_number)
+            except GitHubClientError as exc:
+                raise BootstrapError(
+                    "evidence_comments_read_failed_"
+                    f"{issue_number}_{sanitized_github_error_reason(exc)}"
+                ) from None
             by_id = {
                 int(item["id"]): item
                 for item in comments
@@ -673,16 +967,49 @@ class WorkflowBootstrap:
         ]
         return parse_workflow_authorization(base, now=self.now)
 
-    def authorization(self, *, persist: bool) -> tuple[WorkflowAuthorization, bool]:
+    def authorization(
+        self,
+        *,
+        persist: bool,
+    ) -> tuple[WorkflowAuthorization, bool, str | None]:
         if self.store.exists:
-            return self.store.load(self.target_root), True
+            predecessor = self.store.load(self.target_root)
+            controller = self._validate_controller()
+            if predecessor.payload["controller_revision"] == controller:
+                if self.store.successor_revisions():
+                    raise BootstrapError("controller_handoff_not_safe")
+                return predecessor, True, None
+            successor = self._build_controller_successor(predecessor, controller)
+            if self.store.successor_exists(controller):
+                stored = self.store.load_successor(
+                    predecessor, controller, self.target_root
+                )
+                if (
+                    stored.fingerprint != successor.fingerprint
+                    or not self._same_handoff_contract(predecessor, stored)
+                ):
+                    raise BootstrapError("controller_handoff_not_safe")
+                successor = stored
+            else:
+                if self.store.successor_revisions():
+                    raise BootstrapError("controller_handoff_not_safe")
+                if persist:
+                    self.store.save_successor(
+                        predecessor, successor, self.target_root
+                    )
+            predecessor_id = WorkflowContract.from_authorization(
+                predecessor
+            ).workflow_id
+            return successor, True, predecessor_id
         authorization = self.build_authorization()
         if persist:
             self.store.save(authorization, self.target_root)
-        return authorization, False
+        return authorization, False, None
 
     def run(self, *, execute: bool) -> dict[str, object]:
-        authorization, resumed = self.authorization(persist=execute)
+        authorization, resumed, predecessor_id = self.authorization(
+            persist=execute
+        )
         sink = self.evidence_sink
         if sink is None and execute:
             sink = GhIssueEvidenceSink(self.profile.repository, ISSUE_284)
@@ -699,6 +1026,8 @@ class WorkflowBootstrap:
             "schema_version": 2,
             "status": result.get("status"),
             "bootstrap_resumed": resumed,
+            "controller_handoff": predecessor_id is not None,
+            "predecessor_workflow_id": predecessor_id,
             "authorization_fingerprint": authorization.fingerprint,
             "evidence_source_fingerprint": authorization.payload[
                 "evidence_source_fingerprint"

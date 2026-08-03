@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
@@ -507,6 +509,92 @@ def test_gh_client_uses_get_only_and_paginates() -> None:
     assert len(comments) == 101
     assert all(call[:4] == ("gh", "api", "--method", "GET") for call in calls)
     assert not any(any(word in call for word in ("POST", "PATCH", "DELETE")) for call in calls)
+
+
+def test_shared_gh_runner_captures_binary_and_decodes_strict_utf8(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_run(args, **kwargs):
+        captured.update(kwargs)
+        return subprocess.CompletedProcess(
+            args,
+            0,
+            '{"body":"Şantiye – İstanbul"}'.encode("utf-8"),
+            b"",
+        )
+
+    monkeypatch.setattr(observer.subprocess, "run", fake_run)
+    result = observer._run_gh_api(
+        ("gh", "api", "--method", "GET", "repos/owner/repository")
+    )
+
+    assert json.loads(result.stdout) == {"body": "Şantiye – İstanbul"}
+    assert "text" not in captured
+    assert "encoding" not in captured
+    assert captured["stdout"] is subprocess.PIPE
+    assert captured["stderr"] is subprocess.PIPE
+    assert captured["stdin"] is subprocess.DEVNULL
+    assert captured["shell"] is False
+
+
+def test_real_subprocess_utf8_json_regresses_cp1254_failure() -> None:
+    raw = '{"body":"Şantiye – İstanbul"}\n'.encode("utf-8")
+    with pytest.raises(UnicodeDecodeError):
+        raw.decode("cp1254")
+    script = f"import sys;sys.stdout.buffer.write({raw!r})"
+
+    result = observer._run_binary_utf8((sys.executable, "-c", script))
+
+    assert result.ok
+    assert json.loads(result.stdout) == {"body": "Şantiye – İstanbul"}
+
+
+@pytest.mark.parametrize(
+    ("failure", "reason"),
+    [
+        ("decode", "github_get_utf8_invalid"),
+        ("executable", "github_get_executable_unavailable"),
+    ],
+)
+def test_shared_gh_runner_failures_are_stable_and_content_free(
+    monkeypatch, failure, reason
+) -> None:
+    def fake_run(args, **kwargs):
+        if failure == "executable":
+            raise FileNotFoundError("raw executable path")
+        return subprocess.CompletedProcess(args, 0, b'{"body":"\xffsecret"}', b"")
+
+    monkeypatch.setattr(observer.subprocess, "run", fake_run)
+    result = observer._run_gh_api(
+        ("gh", "api", "--method", "GET", "repos/owner/repository")
+    )
+
+    assert result.returncode != 0
+    assert result.stdout == ""
+    assert result.stderr == reason
+    with pytest.raises(observer.GitHubClientError, match=f"^{reason}$"):
+        observer.GhGitHubClient("owner/repository").get_repository()
+
+
+def test_gh_client_json_and_pagination_failures_are_stable(monkeypatch) -> None:
+    invalid = observer.GhGitHubClient(
+        "owner/repository",
+        api_runner=lambda args: observer.CommandResult(args, 0, "not-json:private", ""),
+    )
+    with pytest.raises(observer.GitHubClientError, match="^github_get_json_invalid$"):
+        invalid.get_repository()
+
+    monkeypatch.setattr(observer, "GITHUB_COMMENTS_MAX_PAGES", 2)
+    paged = observer.GhGitHubClient(
+        "owner/repository",
+        api_runner=lambda args: observer.CommandResult(
+            args, 0, json.dumps([{"id": value} for value in range(100)]), ""
+        ),
+    )
+    with pytest.raises(
+        observer.GitHubClientError, match="^github_get_pagination_limit$"
+    ):
+        paged.get_issue_comments(287)
 
 
 def test_exact_record_collector_reads_only_three_paths(tmp_path: Path) -> None:

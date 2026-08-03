@@ -15,7 +15,11 @@ from pathlib import Path
 from typing import Mapping, Protocol
 
 from .device_smoke import DeviceSmokeRunner, TabletAutomationAdapter
-from .observer import GhGitHubClient
+from .observer import (
+    GhGitHubClient,
+    GitHubClientError,
+    sanitized_github_error_reason,
+)
 from .workflow_authorization import (
     WorkflowAuthorization,
     WorkflowStageAuthorization,
@@ -707,7 +711,12 @@ class GhIssueEvidenceSink:
         if not REASON_PATTERN.fullmatch(evidence_key):
             raise WorkflowError("evidence_key_invalid")
         marker = f"<!-- {EVIDENCE_MARKER_PREFIX}:{workflow_id}:{evidence_key} -->"
-        comments = self._client.get_issue_comments(self.issue)
+        try:
+            comments = self._client.get_issue_comments(self.issue)
+        except GitHubClientError as exc:
+            raise WorkflowError(sanitized_github_error_reason(exc)) from None
+        except (OSError, RuntimeError, ValueError, TypeError):
+            raise WorkflowError("github_evidence_read_failed") from None
         matches = [item for item in comments if marker in str(item.get("body", ""))]
         if len(matches) > 1:
             raise WorkflowError("duplicate_evidence_comment")

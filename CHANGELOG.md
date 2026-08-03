@@ -1,5 +1,16 @@
 # Changelog
 
+## Issue #305 - Ortak GitHub UTF-8 ve controller handoff düzeltmesi
+
+- Ortak `GhGitHubClient`, locale-dependent `text=True` yerine binary capture ve
+  caller-thread strict UTF-8 decode kullanır; source hataları stable ve
+  content-free blocker reason üretir.
+- Evidence sink ortak client hatalarını workflow/CLI structured
+  `UNSAFE_BLOCKED` sınırına taşır; raw GitHub içerik ve traceback yazılmaz.
+- Issue #284 canlı runtime'ı yalnız exact tek-event pre-stage state'inden,
+  old authorization/ledger değişmeden yeni immutable controller successor
+  identity'sine devredilebilir. İleri state ve contract drift fail-closed kalır.
+
 ## Issue #305 - Canlı workflow evidence taşıma düzeltmesi
 
 - GitHub Markdown evidence hash'i BOM, CRLF/CR ve terminal-newline taşıma
