@@ -1,6 +1,8 @@
 name: CSE API Bridge
 
 on:
+  push:
+    branches: [master]
   schedule:
     - cron: "*/5 * * * *"
   issue_comment:
