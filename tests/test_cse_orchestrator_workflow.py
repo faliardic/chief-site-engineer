@@ -1056,17 +1056,32 @@ def test_schema2_device_absence_pauses_then_same_workflow_resumes_after_artifact
     assert first["artifact"]["sha256"] == artifact["sha256"]
     assert first["stage_attempts"] == {"artifact_verify": 1, "tablet_preflight": 1}
 
+    for expected_attempt in (2, 3):
+        paused = coordinator(
+            auth,
+            controller,
+            target,
+            runtime,
+            DefaultStageExecutor(tablet_adapter=fake),
+        ).run(execute=True)
+        assert paused["status"] == "PAUSED_EXTERNAL"
+        assert paused["current_stage"] == "tablet_preflight"
+        assert paused["stage_attempts"] == {
+            "artifact_verify": 1,
+            "tablet_preflight": expected_attempt,
+        }
+
     fake.connected = True
-    second = coordinator(
+    resumed = coordinator(
         auth,
         controller,
         target,
         runtime,
         DefaultStageExecutor(tablet_adapter=fake),
     ).run(execute=True)
-    assert second["status"] == "COMPLETED"
-    assert second["stage_attempts"]["artifact_verify"] == 1
-    assert second["stage_attempts"]["tablet_preflight"] == 2
+    assert resumed["status"] == "COMPLETED"
+    assert resumed["stage_attempts"]["artifact_verify"] == 1
+    assert resumed["stage_attempts"]["tablet_preflight"] == 4
     assert fake.calls == list(ISSUE_284_SMOKE_ACTIONS)
 
 

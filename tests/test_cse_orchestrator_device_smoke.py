@@ -1,18 +1,23 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
 
 from tools.cse_orchestrator.device_smoke import (
+    AdbTabletAutomationAdapter,
     AdapterActionResult,
+    DeviceSmokeContract,
     DeviceSmokeError,
     DeviceSmokeRunner,
     ISSUE_284_DEBUG_PACKAGE,
     ISSUE_284_SMOKE_ACTIONS,
     ISSUE_284_TABLET_MODEL,
     ISSUE_284_TABLET_SERIAL,
+    PowerInteractiveState,
+    parse_power_interactive_state,
     validate_adb_argv,
 )
 
@@ -243,3 +248,139 @@ def test_every_targeted_adb_command_requires_exact_single_tablet_serial():
             (r"C:\sdk\platform-tools\adb.exe", "-s", "PHONE123", "get-state"),
             serial=ISSUE_284_TABLET_SERIAL,
         )
+
+
+class FixtureAdbTabletAutomationAdapter(AdbTabletAutomationAdapter):
+    def __init__(self, adb_path: Path, power: str, *, window: str = "showing=false"):
+        super().__init__(adb_path)
+        self.outputs = {
+            ("devices", "-l"): (
+                "List of devices attached\n"
+                f"{ISSUE_284_TABLET_SERIAL} device product:gts9fewifi "
+                "model:SM-X610 transport_id:1\n"
+            ),
+            ("get-state",): "device\n",
+            ("shell", "getprop", "ro.product.model"): "SM-X610\n",
+            ("shell", "getprop", "sys.boot_completed"): "1\n",
+            ("shell", "dumpsys", "power"): power,
+            ("shell", "dumpsys", "window", "policy"): window,
+            (
+                "shell",
+                "cmd",
+                "package",
+                "list",
+                "packages",
+                "android",
+            ): "package:android\n",
+        }
+        self.calls: list[tuple[str, ...]] = []
+
+    def _run(self, contract, *arguments, **kwargs):
+        key = tuple(arguments)
+        self.calls.append(key)
+        return self.outputs[key].encode("utf-8")
+
+
+def production_contract(tmp_path: Path) -> DeviceSmokeContract:
+    apk = tmp_path / "app-debug.apk"
+    apk.write_bytes(b"fixture-apk")
+    return DeviceSmokeContract(
+        adb_path=(tmp_path / "adb.exe").resolve(),
+        serial=ISSUE_284_TABLET_SERIAL,
+        model=ISSUE_284_TABLET_MODEL,
+        package=ISSUE_284_DEBUG_PACKAGE,
+        artifact_path=apk.resolve(),
+        artifact_sha256="sha256:" + hashlib.sha256(b"fixture-apk").hexdigest(),
+        synthetic_title=TITLE,
+        first_all_day=DAY_ONE,
+        second_all_day=DAY_TWO,
+    )
+
+
+@pytest.mark.parametrize(
+    "power",
+    [
+        "POWER MANAGER (dumpsys power)\n  mWakefulness=Awake\n",
+        "POWER MANAGER (dumpsys power)\n  mInteractive=true\n",
+        "POWER MANAGER (dumpsys power)\nDisplay Power: state=ON\n",
+    ],
+)
+def test_production_preflight_accepts_each_exact_interactive_power_shape(
+    tmp_path, power
+):
+    contract = production_contract(tmp_path)
+    result = FixtureAdbTabletAutomationAdapter(contract.adb_path, power).preflight(
+        contract
+    )
+
+    assert result.details == {
+        "boot_completed": True,
+        "interactive": True,
+        "power_state": "interactive",
+        "unlocked": True,
+    }
+
+
+@pytest.mark.parametrize(
+    "power",
+    [
+        "  mWakefulness=Asleep\n",
+        "  mWakefulness=Dozing\n",
+        "  mWakefulness=Dreaming\n",
+        "  mInteractive=false\n",
+        "Display Power: state=OFF\n",
+        "  mWakefulness=Awake\n  mInteractive=false\n",
+        "  mWakefulness=Awake\n  mInteractive=TRUE\n",
+        "  mWakefulness=AWAKE\n",
+        "POWER MANAGER (dumpsys power)\n",
+    ],
+)
+def test_production_preflight_rejects_negative_conflicting_and_malformed_power(
+    tmp_path, power
+):
+    contract = production_contract(tmp_path)
+
+    with pytest.raises(DeviceSmokeError) as raised:
+        FixtureAdbTabletAutomationAdapter(contract.adb_path, power).preflight(contract)
+
+    assert raised.value.reason == "screen_not_interactive"
+    assert raised.value.predicate == "screen_is_interactive"
+    assert raised.value.external is True
+    assert str(raised.value) == "screen_not_interactive"
+    assert power.strip() not in str(raised.value)
+
+
+def test_power_parser_returns_only_data_minimal_deterministic_states():
+    assert (
+        parse_power_interactive_state("mWakefulness=Awake\nmInteractive=true\n")
+        is PowerInteractiveState.INTERACTIVE
+    )
+    assert (
+        parse_power_interactive_state("mWakefulness=Dozing\nDisplay Power: state=OFF\n")
+        is PowerInteractiveState.NON_INTERACTIVE
+    )
+    assert (
+        parse_power_interactive_state("mWakefulness=Awake\nDisplay Power: state=OFF\n")
+        is PowerInteractiveState.CONFLICTING
+    )
+    assert (
+        parse_power_interactive_state("mWakefulness = Awake\n")
+        is PowerInteractiveState.MALFORMED
+    )
+
+
+def test_keyguard_remains_an_independent_unchanged_preflight_gate(tmp_path):
+    contract = production_contract(tmp_path)
+    adapter = FixtureAdbTabletAutomationAdapter(
+        contract.adb_path,
+        "  mWakefulness=Awake\n",
+        window="WINDOW MANAGER POLICY STATE\n  mShowingLockscreen=true\n",
+    )
+
+    with pytest.raises(DeviceSmokeError) as raised:
+        adapter.preflight(contract)
+
+    assert raised.value.reason == "keyguard_locked"
+    assert raised.value.predicate == "keyguard_is_unlocked"
+    assert ("shell", "dumpsys", "power") in adapter.calls
+    assert ("shell", "dumpsys", "window", "policy") in adapter.calls

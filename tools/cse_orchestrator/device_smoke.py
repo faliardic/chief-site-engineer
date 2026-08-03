@@ -14,6 +14,7 @@ import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from enum import Enum
 from pathlib import Path
 from typing import Mapping, Protocol, Sequence
 
@@ -47,6 +48,9 @@ FORBIDDEN_ADB_TOKENS = frozenset(
 )
 BOUNDS_PATTERN = re.compile(r"^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$")
 DAY_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+WAKEFULNESS_LINE = re.compile(r"^\s*mWakefulness=(Awake|Asleep|Dozing|Dreaming)\s*$")
+INTERACTIVE_LINE = re.compile(r"^\s*mInteractive=(true|false)\s*$")
+DISPLAY_POWER_LINE = re.compile(r"^\s*Display Power: state=(ON|OFF)\s*$")
 
 
 class DeviceSmokeError(RuntimeError):
@@ -57,6 +61,45 @@ class DeviceSmokeError(RuntimeError):
         self.reason = reason
         self.predicate = predicate
         self.external = external
+
+
+class PowerInteractiveState(str, Enum):
+    """Data-minimal classification of supported ``dumpsys power`` signals."""
+
+    INTERACTIVE = "interactive"
+    NON_INTERACTIVE = "non_interactive"
+    CONFLICTING = "conflicting"
+    MALFORMED = "malformed"
+
+
+def parse_power_interactive_state(output: str) -> PowerInteractiveState:
+    """Parse exact line-level power signals without returning raw device output."""
+
+    signals: list[bool] = []
+    malformed = False
+    for line in output.splitlines():
+        stripped = line.strip()
+        wakefulness = WAKEFULNESS_LINE.fullmatch(line)
+        interactive = INTERACTIVE_LINE.fullmatch(line)
+        display = DISPLAY_POWER_LINE.fullmatch(line)
+        if wakefulness:
+            signals.append(wakefulness.group(1) == "Awake")
+        elif interactive:
+            signals.append(interactive.group(1) == "true")
+        elif display:
+            signals.append(display.group(1) == "ON")
+        elif (
+            re.match(r"^(mWakefulness|mInteractive)\s*=", stripped)
+            or stripped.startswith("Display Power:")
+        ):
+            malformed = True
+    if malformed or not signals:
+        return PowerInteractiveState.MALFORMED
+    if any(signals) and not all(signals):
+        return PowerInteractiveState.CONFLICTING
+    if all(signals):
+        return PowerInteractiveState.INTERACTIVE
+    return PowerInteractiveState.NON_INTERACTIVE
 
 
 @dataclass(frozen=True)
@@ -396,8 +439,10 @@ class AdbTabletAutomationAdapter:
         )
         if boot != "1":
             raise DeviceSmokeError("device_not_booted", "sys_boot_completed_is_one", external=True)
-        power = self._decode(self._run(contract, "shell", "dumpsys", "power"))
-        if not re.search(r"mInteractive=true|Display Power: state=ON", power):
+        power_state = parse_power_interactive_state(
+            self._decode(self._run(contract, "shell", "dumpsys", "power"))
+        )
+        if power_state is not PowerInteractiveState.INTERACTIVE:
             raise DeviceSmokeError("screen_not_interactive", "screen_is_interactive", external=True)
         window = self._decode(
             self._run(contract, "shell", "dumpsys", "window", "policy")
@@ -415,7 +460,12 @@ class AdbTabletAutomationAdapter:
                 "package_manager_unavailable", "package_manager_is_accessible", external=True
             )
         return AdapterActionResult(
-            details={"boot_completed": True, "interactive": True, "unlocked": True}
+            details={
+                "boot_completed": True,
+                "interactive": True,
+                "power_state": PowerInteractiveState.INTERACTIVE.value,
+                "unlocked": True,
+            }
         )
 
     def _installed_apk_path(self, contract: DeviceSmokeContract) -> str | None:

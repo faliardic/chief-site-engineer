@@ -1,5 +1,15 @@
 # Changelog
 
+## Issue #305 - Tablet interactive preflight resume düzeltmesi
+
+- Production power preflight, exact `mWakefulness=Awake`, mevcut
+  `mInteractive=true` ve `Display Power: state=ON` sinyallerini merkezi parser'da
+  birleştirir; negative/conflict/malformed output fail closed kalır.
+- Raw dumpsys diagnostic üretilmez ve keyguard gate'i bağımsız korunur.
+- Exact paused Issue #284 workflow state'i predecessor byte'larını değiştirmeden
+  stage/attempt/evidence/artifact durumunu koruyan tek immutable successor'a
+  devredilebilir; projection/tail/effect drift ve ikinci successor reddedilir.
+
 ## Issue #305 - Ortak GitHub UTF-8 ve controller handoff düzeltmesi
 
 - Ortak `GhGitHubClient`, locale-dependent `text=True` yerine binary capture ve

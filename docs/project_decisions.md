@@ -3765,3 +3765,21 @@
 - Host publish isteğinin allowlist, doğrulama komutları, commit mesajı ve Draft
   PR metadatası API çağrısından önce yerel ProposalContract ile birebir
   bağlanır; bağımsız host girdisi bu otoriteyi genişletemez.
+
+## Issue 305 — Tablet interactive sinyali ve paused controller devri
+
+- Power preflight yalnız exact line-level `mWakefulness`, `mInteractive` ve
+  `Display Power` sinyallerini merkezi enum parser'da birleştirir. Bütün bulunan
+  sinyaller positive değilse veya output malformed ise interactive PASS verilmez.
+- Power ve keyguard farklı güvenlik kapılarıdır; Awake sonucu unlocked anlamına
+  gelmez. Raw dumpsys output kalıcı diagnostic veya workflow evidence değildir.
+- Paused controller handoff yalnız binding authorization'daki exact predecessor
+  authorization/workflow, projection fingerprint, tail, stage, attempt, blocker
+  ve sıfır-effect state'i için açılır.
+- Predecessor authorization/manifest/ledger immutable kalır. Successor yeni
+  identity altında aynı event payload history'sini atomik seed eder; semantic
+  projection eşit değilse yayınlanmaz. Böylece önceki validation/build/artifact
+  stage'leri ve attempt sayaçları resetlenmez.
+- Aynı controller successor'ı idempotenttir; başka controller revision,
+  rollback, projection/tail/effect drift veya eksik successor history
+  `controller_handoff_not_safe` ile durur.
