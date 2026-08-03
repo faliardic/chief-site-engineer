@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,11 +21,13 @@ from tools.cse_orchestrator.workflow_bootstrap import (
     ISSUE_284_CHECKPOINT_PATHS,
     ISSUE_284_READ_WRITE_ALLOWLIST,
     ISSUE_305_AUTHORIZATION_COMMENT,
+    ISSUE_305_HANDOFF_AUTHORIZATION_COMMENT,
     Issue284PilotProfile,
     WorkflowBootstrap,
     canonical_markdown_bytes,
     write_issue_284_completion,
 )
+from tools.cse_orchestrator.workflow_store import WorkflowContract, WorkflowStore
 
 
 def git(root: Path, *argv: str) -> str:
@@ -93,6 +96,7 @@ def bootstrap_fixture(tmp_path):
     (controller / "release.txt").write_text("O10.1\n", encoding="utf-8")
     git(controller, "add", "release.txt")
     git(controller, "commit", "-m", "release")
+    controller_release = git(controller, "rev-parse", "HEAD")
 
     init_repo(target, ISSUE_284_BRANCH)
     paths = set(ISSUE_284_CHECKPOINT_PATHS) | {
@@ -152,6 +156,7 @@ def bootstrap_fixture(tmp_path):
         adb_path=adb,
         adb_sha256=sha(b"adb"),
         controller_base=controller_base,
+        handoff_predecessor_revision=controller_release,
         issue_body_hashes={
             key: sha(canonical_markdown_bytes(value)) for key, value in bodies.items()
         },
@@ -251,29 +256,6 @@ def test_canonical_markdown_bytes_preserves_character_and_inner_whitespace_drift
     assert canonical_markdown_bytes(drifted) != expected
 
 
-def test_live_evidence_runner_is_utf8_read_only_and_shell_free(monkeypatch):
-    captured = {}
-
-    def fake_run(args, **kwargs):
-        captured["args"] = args
-        captured.update(kwargs)
-        return subprocess.CompletedProcess(args, 0, '{"body":"Türkçe"}', "")
-
-    monkeypatch.setattr(bootstrap_module.subprocess, "run", fake_run)
-    args = ("gh", "api", "--method", "GET", "repos/owner/repo/issues/1")
-
-    result = bootstrap_module._run_gh_api_utf8(args)
-
-    assert result.ok
-    assert captured["args"] == args
-    assert captured["encoding"] == "utf-8"
-    assert captured["errors"] == "strict"
-    assert captured["shell"] is False
-    assert captured["stdin"] is subprocess.DEVNULL
-    with pytest.raises(ValueError, match="read_only_get"):
-        bootstrap_module._run_gh_api_utf8(("gh", "api", "--method", "POST", "x"))
-
-
 def test_bootstrap_accepts_bom_eol_and_terminal_newline_transport(
     bootstrap_fixture,
 ):
@@ -325,6 +307,26 @@ def test_comment_drift_reason_identifies_source(
         bootstrap(bootstrap_fixture).build_authorization()
 
 
+def test_bootstrap_translates_shared_github_error_to_source_specific_reason(
+    bootstrap_fixture,
+):
+    instance = bootstrap(bootstrap_fixture)
+
+    class BrokenEvidence:
+        def get_issue(self, issue_number):
+            raise bootstrap_module.GitHubClientError("github_get_utf8_invalid")
+
+        def get_issue_comments(self, issue_number):
+            raise AssertionError("comments must not be read after issue failure")
+
+    instance.evidence_client = BrokenEvidence()
+    with pytest.raises(
+        BootstrapError,
+        match="^evidence_issue_read_failed_284_github_get_utf8_invalid$",
+    ):
+        instance.build_authorization()
+
+
 def test_bootstrap_dry_run_shows_authorization_and_does_not_persist(
     bootstrap_fixture, monkeypatch
 ):
@@ -370,6 +372,149 @@ def test_external_bootstrap_authorization_is_immutable_and_tamper_evident(
     store.authorization_path.write_text(json.dumps(value), encoding="utf-8")
     with pytest.raises(BootstrapError, match="tampered"):
         store.load(target)
+
+
+def persisted_pre_stage(values):
+    controller, target, runtime, _, _ = values
+    instance = bootstrap(values)
+    predecessor = instance.build_authorization()
+    bootstrap_store = BootstrapAuthorizationStore(runtime, target)
+    bootstrap_store.save(predecessor, target)
+    contract = WorkflowContract.from_authorization(predecessor)
+    workflow_store = WorkflowStore(
+        runtime_root=runtime,
+        repo_root=target,
+        workflow_id=contract.workflow_id,
+    )
+    workflow_store.start(contract)
+    return instance, predecessor, bootstrap_store, workflow_store
+
+
+def advance_controller(controller: Path) -> str:
+    path = controller / "handoff.txt"
+    current = path.read_text(encoding="utf-8") if path.exists() else ""
+    path.write_text(current + "shared utf8 handoff\n", encoding="utf-8")
+    git(controller, "add", "handoff.txt")
+    git(controller, "commit", "-m", "controller handoff")
+    return git(controller, "rev-parse", "HEAD")
+
+
+def test_exact_pre_stage_controller_handoff_is_immutable_and_idempotent(
+    bootstrap_fixture,
+):
+    controller, target, runtime, _, _ = bootstrap_fixture
+    _, predecessor, store, old_workflow = persisted_pre_stage(bootstrap_fixture)
+    old_authorization = store.authorization_path.read_bytes()
+    old_metadata = store.metadata_path.read_bytes()
+    old_ledger = old_workflow.ledger_path.read_bytes()
+    controller_head = advance_controller(controller)
+
+    successor, resumed, predecessor_id = bootstrap(bootstrap_fixture).authorization(
+        persist=True
+    )
+    successor_contract = WorkflowContract.from_authorization(successor)
+
+    assert resumed is True
+    assert predecessor_id == WorkflowContract.from_authorization(predecessor).workflow_id
+    assert successor.payload["controller_revision"] == controller_head
+    assert successor.fingerprint != predecessor.fingerprint
+    assert successor_contract.workflow_id != predecessor_id
+    assert bootstrap_module._is_exact_pre_stage_handoff(
+        old_workflow.verify().projection, old_workflow.verify().events
+    )
+    assert store.authorization_path.read_bytes() == old_authorization
+    assert store.metadata_path.read_bytes() == old_metadata
+    assert old_workflow.ledger_path.read_bytes() == old_ledger
+
+    successor_authorization, successor_metadata = store._successor_paths(controller_head)
+    metadata = json.loads(successor_metadata.read_text(encoding="utf-8"))
+    assert successor_authorization.is_file()
+    assert metadata["handoff_authorization_comment_id"] == (
+        ISSUE_305_HANDOFF_AUTHORIZATION_COMMENT
+    )
+    assert metadata["predecessor_workflow_id"] == predecessor_id
+    assert metadata["successor_workflow_id"] == successor_contract.workflow_id
+
+    successor_workflow = WorkflowStore(
+        runtime_root=runtime,
+        repo_root=target,
+        workflow_id=successor_contract.workflow_id,
+    )
+    assert successor_workflow.start(successor_contract).status == "RUNNING"
+    assert successor_workflow.root.parent == runtime.resolve() / "workflows"
+    assert old_workflow.ledger_path.read_bytes() == old_ledger
+
+    repeated, repeated_resumed, repeated_predecessor = bootstrap(
+        bootstrap_fixture
+    ).authorization(persist=True)
+    assert repeated.fingerprint == successor.fingerprint
+    assert repeated_resumed is True
+    assert repeated_predecessor == predecessor_id
+    assert store.authorization_path.read_bytes() == old_authorization
+    assert old_workflow.ledger_path.read_bytes() == old_ledger
+
+    advance_controller(controller)
+    with pytest.raises(BootstrapError, match="^controller_handoff_not_safe$"):
+        bootstrap(bootstrap_fixture).authorization(persist=True)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("status", "UNSAFE_BLOCKED"),
+        ("event_count", 2),
+        ("current_stage_index", 1),
+        ("stage_attempts", {"focused_lifecycle": 1}),
+        ("external_pauses", {"tablet_preflight": 1}),
+        ("admitted_attempt_ids", ["sha256:" + "a" * 64]),
+        ("active_attempt_id", "sha256:" + "b" * 64),
+        ("consumed_budgets", {"command": 1}),
+        ("passed_evidence", [{"stage": "focused_lifecycle"}]),
+        ("last_target_fingerprint", "sha256:" + "c" * 64),
+        ("artifact", {"sha256": "sha256:" + "d" * 64}),
+        ("device", {"serial": "R52W90JFN1M"}),
+        ("publish", {"commit_sha": "e" * 40}),
+        ("last_blocker", "blocked"),
+        ("blocker_phase", "focused_lifecycle"),
+        ("command_index", 1),
+        ("first_failed_predicate", "stage_succeeded"),
+    ],
+)
+def test_controller_handoff_rejects_every_admission_and_effect_field(
+    bootstrap_fixture, field, value
+):
+    _, _, _, workflow_store = persisted_pre_stage(bootstrap_fixture)
+    verification = workflow_store.verify()
+    projection = deepcopy(verification.projection)
+    setattr(projection, field, value)
+
+    assert not bootstrap_module._is_exact_pre_stage_handoff(
+        projection, verification.events
+    )
+
+
+def test_controller_handoff_rejects_advanced_or_tampered_old_ledger(
+    bootstrap_fixture,
+):
+    controller, _, _, _, _ = bootstrap_fixture
+    _, _, _, workflow_store = persisted_pre_stage(bootstrap_fixture)
+    workflow_store.append(
+        "target_observed", {"source_fingerprint": "sha256:" + "a" * 64}
+    )
+    advance_controller(controller)
+    with pytest.raises(BootstrapError, match="^controller_handoff_not_safe$"):
+        bootstrap(bootstrap_fixture).authorization(persist=True)
+
+
+def test_controller_handoff_rejects_hash_tampered_old_ledger(bootstrap_fixture):
+    controller, _, _, _, _ = bootstrap_fixture
+    _, _, _, workflow_store = persisted_pre_stage(bootstrap_fixture)
+    ledger = workflow_store.ledger_path.read_bytes()
+    workflow_store.ledger_path.write_bytes(ledger.replace(b"workflow_started", b"workflow_tampered"))
+    advance_controller(controller)
+
+    with pytest.raises(BootstrapError, match="^controller_handoff_not_safe$"):
+        bootstrap(bootstrap_fixture).authorization(persist=True)
 
 
 def test_cli_exposes_single_workflow_bootstrap_entry_point(

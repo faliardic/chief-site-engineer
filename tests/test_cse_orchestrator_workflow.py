@@ -34,6 +34,7 @@ from tools.cse_orchestrator.workflow_store import (
     WorkflowStore,
     WorkflowStoreError,
 )
+from tools.cse_orchestrator.observer import GitHubClientError
 from tools.cse_orchestrator.device_smoke import (
     AdapterActionResult,
     DeviceSmokeError,
@@ -804,6 +805,64 @@ def test_issue_evidence_is_duplicate_safe_and_redacts_raw_payload(monkeypatch):
     )
     assert reused == {"reused": True, "comment_id": 123}
     assert len(calls) == 1
+
+
+def test_issue_evidence_translates_shared_github_failure() -> None:
+    sink = GhIssueEvidenceSink("owner/repository", 303)
+
+    class BrokenComments:
+        def get_issue_comments(self, issue):
+            raise GitHubClientError("github_get_utf8_invalid")
+
+    sink._client = BrokenComments()
+    with pytest.raises(WorkflowError, match="^github_get_utf8_invalid$"):
+        sink.emit(
+            workflow_id="wf-303-aaaaaaaaaaaa",
+            evidence_key="workflow_started",
+            payload={"status": "RUNNING", "raw": "private-github-content"},
+        )
+
+
+def test_cli_returns_structured_blocker_for_evidence_read_failure(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    sink = GhIssueEvidenceSink("owner/repository", 303)
+
+    class BrokenComments:
+        def get_issue_comments(self, issue):
+            raise GitHubClientError("github_get_utf8_invalid")
+
+    sink._client = BrokenComments()
+
+    def fail_from_sink(args):
+        return sink.emit(
+            workflow_id="wf-303-aaaaaaaaaaaa",
+            evidence_key="workflow_started",
+            payload={"status": "RUNNING", "raw": "private-github-content"},
+        )
+
+    monkeypatch.setattr(cli, "_workflow_bootstrap", fail_from_sink)
+    exit_code = cli.main(
+        [
+            "workflow-bootstrap",
+            "--issue",
+            "284",
+            "--target-root",
+            str(tmp_path / "target"),
+            "--runtime-root",
+            str(tmp_path / "runtime"),
+        ]
+    )
+    captured = capsys.readouterr()
+    assert exit_code == 14
+    assert json.loads(captured.out) == {
+        "schema_version": 1,
+        "status": "UNSAFE_BLOCKED",
+        "reason": "github_get_utf8_invalid",
+    }
+    assert captured.err == ""
+    assert "private-github-content" not in captured.out
+    assert "Traceback" not in captured.out
 
 
 def test_cli_workflow_run_status_verify_end_to_end(tmp_path, monkeypatch, capsys):

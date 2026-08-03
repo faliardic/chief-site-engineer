@@ -39,6 +39,10 @@
 - Issue #305 correction, canlı bootstrap'ta görülen Markdown transport farkını
   content drift'ten ayırır: yalnız BOM/EOL/terminal-newline canonicalize edilir,
   source-specific fail-closed reason ve semantik tamper koruması sürer.
+- Issue #305 shared-client correction, GitHub JSON byte'larını Windows
+  locale'inden bağımsız strict UTF-8 okur. Exact pre-stage #284 runtime'ı old
+  ledger'ı değiştirmeden yeni merged controller identity'sine immutable successor
+  ile devreder; action/effect sonrası handoff reddedilir.
 - Opsiyonel service/tray yüzeyi O10 contract'ının parçası değildir; gerekirse
   ayrı Issue, capability ve approval sözleşmesi ister.
 

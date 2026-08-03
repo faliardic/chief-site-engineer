@@ -1,5 +1,24 @@
 # Proje Kararlari
 
+## Issue 305 — Controller düzeltmesi eski workflow tarihçesini yeniden yazmaz
+
+- Ortak GitHub GET adapter'ı stdout/stderr'i binary yakalar ve yalnız caller
+  thread'de strict UTF-8 çözer. Windows locale'i API JSON contract'ına authority
+  olamaz; invalid byte ve adapter hataları raw içeriksiz stable reason'dır.
+- Evidence sink ortak client error'unu `WorkflowError` sınırına çevirir. CLI
+  traceback veya raw comment yerine structured `UNSAFE_BLOCKED` üretir.
+- Existing Issue #284 ledger yalnız `RUNNING`, tek `workflow_started`, stage `0`
+  ve tüm admission/effect alanları boşsa controller handoff'a uygundur.
+- Old authorization, manifest ve ledger immutable kalır. New origin/master SHA
+  predecessor'ın descendant'ı ve bütün target/evidence/artifact/tool/device/
+  publish/stage contract'ları exact eşitse ayrı successor authorization/workflow
+  identity exclusive yazılır.
+- Successor aynı SHA için idempotenttir. İkinci successor, controller rollback,
+  advanced/tampered ledger veya contract drift `controller_handoff_not_safe`
+  sonucudur; dar correction zincirleme authority üretmez.
+- Product/mobile, Issue #284 target/APK/live runtime ve device akışı bu
+  implementation run'ında değiştirilmez veya çalıştırılmaz.
+
 ## Issue 305 — Evidence hash'i içerik ile transport'u ayırır
 
 - GitHub Markdown evidence doğrudan platforma özgü metin byte'larıyla değil,

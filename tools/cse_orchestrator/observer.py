@@ -50,6 +50,34 @@ class CommandResult:
 CommandRunner = Callable[[Sequence[str], Path], CommandResult]
 ApiRunner = Callable[[tuple[str, ...]], CommandResult]
 
+GITHUB_GET_FAILURE_REASONS = frozenset(
+    {
+        "github_get_executable_unavailable",
+        "github_get_timeout",
+        "github_get_utf8_invalid",
+    }
+)
+GITHUB_CLIENT_ERROR_REASONS = GITHUB_GET_FAILURE_REASONS | frozenset(
+    {
+        "github_get_failed",
+        "github_get_json_invalid",
+        "github_get_pagination_limit",
+        "github_get_repository_shape_invalid",
+        "github_get_issue_shape_invalid",
+        "github_get_comments_shape_invalid",
+    }
+)
+GITHUB_COMMENTS_MAX_PAGES = 100
+
+
+class GitHubClientError(RuntimeError):
+    """A sanitized, stable failure from the shared GitHub GET adapter."""
+
+
+def sanitized_github_error_reason(value: object) -> str:
+    reason = str(value)
+    return reason if reason in GITHUB_CLIENT_ERROR_REASONS else "github_get_failed"
+
 
 class GitHubClient(Protocol):
     def get_repository(self) -> dict[str, Any]: ...
@@ -115,19 +143,39 @@ def run_read_only_command(args: Sequence[str], cwd: Path) -> CommandResult:
     return CommandResult(command, completed.returncode, completed.stdout, completed.stderr)
 
 
-def _run_gh_api(args: tuple[str, ...]) -> CommandResult:
-    if args[:4] != ("gh", "api", "--method", "GET") or len(args) != 5:
-        raise ValueError("github_api_command_not_read_only_get")
+def _run_binary_utf8(
+    args: tuple[str, ...],
+    *,
+    timeout_seconds: int = 30,
+) -> CommandResult:
+    """Capture bytes and decode them strictly on the calling thread."""
+
     try:
         completed = subprocess.run(
             args,
-            text=True,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL,
+            shell=False,
             check=False,
+            timeout=timeout_seconds,
         )
     except OSError:
-        return CommandResult(args, 127, "", "gh unavailable")
-    return CommandResult(args, completed.returncode, completed.stdout, completed.stderr)
+        return CommandResult(args, 127, "", "github_get_executable_unavailable")
+    except subprocess.TimeoutExpired:
+        return CommandResult(args, 124, "", "github_get_timeout")
+    try:
+        stdout = bytes(completed.stdout or b"").decode("utf-8", errors="strict")
+        stderr = bytes(completed.stderr or b"").decode("utf-8", errors="strict")
+    except UnicodeDecodeError:
+        return CommandResult(args, 65, "", "github_get_utf8_invalid")
+    return CommandResult(args, completed.returncode, stdout, stderr)
+
+
+def _run_gh_api(args: tuple[str, ...]) -> CommandResult:
+    if args[:4] != ("gh", "api", "--method", "GET") or len(args) != 5:
+        raise ValueError("github_api_command_not_read_only_get")
+    return _run_binary_utf8(args)
 
 
 class GhGitHubClient:
@@ -143,22 +191,27 @@ class GhGitHubClient:
         args = ("gh", "api", "--method", "GET", endpoint)
         result = self.api_runner(args)
         if not result.ok:
-            raise RuntimeError("github_get_failed")
+            reason = (
+                result.stderr
+                if result.stderr in GITHUB_GET_FAILURE_REASONS
+                else "github_get_failed"
+            )
+            raise GitHubClientError(reason)
         try:
             return json.loads(result.stdout)
-        except json.JSONDecodeError as exc:
-            raise RuntimeError("github_json_invalid") from exc
+        except (json.JSONDecodeError, TypeError) as exc:
+            raise GitHubClientError("github_get_json_invalid") from exc
 
     def get_repository(self) -> dict[str, Any]:
         value = self._get_json(f"repos/{self.repository}")
         if not isinstance(value, dict):
-            raise RuntimeError("github_repository_shape_invalid")
+            raise GitHubClientError("github_get_repository_shape_invalid")
         return value
 
     def get_issue(self, issue_number: int) -> dict[str, Any]:
         value = self._get_json(f"repos/{self.repository}/issues/{issue_number}")
         if not isinstance(value, dict):
-            raise RuntimeError("github_issue_shape_invalid")
+            raise GitHubClientError("github_get_issue_shape_invalid")
         return value
 
     def get_issue_comments(self, issue_number: int) -> list[dict[str, Any]]:
@@ -173,10 +226,12 @@ class GhGitHubClient:
             if not isinstance(current, list) or not all(
                 isinstance(item, dict) for item in current
             ):
-                raise RuntimeError("github_comments_shape_invalid")
+                raise GitHubClientError("github_get_comments_shape_invalid")
             values.extend(current)
             if len(current) < 100:
                 return values
+            if page >= GITHUB_COMMENTS_MAX_PAGES:
+                raise GitHubClientError("github_get_pagination_limit")
             page += 1
 
 
