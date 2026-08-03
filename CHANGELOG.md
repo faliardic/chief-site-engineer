@@ -1,5 +1,16 @@
 # Changelog
 
+## Issue #305 - Canlı workflow evidence taşıma düzeltmesi
+
+- GitHub Markdown evidence hash'i BOM, CRLF/CR ve terminal-newline taşıma
+  farklarını canonicalize eden tek sözleşmeye bağlandı.
+- İç whitespace ve semantik karakter drift'i hash-significant kalır; body ve
+  comment blocker reason exact Issue/comment source ID'sini verir.
+- Bootstrap evidence GET adapter'ı Windows locale'inden bağımsız strict UTF-8,
+  shell-free ve read-only argv kullanır.
+- Hash-only canlı diagnostic semantik drift olmadığını kanıtladı. Product/mobile,
+  Issue #284 target/runtime ve gerçek build/install/device akışı değiştirilmedi.
+
 ## Issue #305 - O10.1 live pilot bootstrap ve tablet smoke
 
 - `workflow-bootstrap`, current Issue #284 checkpoint/evidence/artifact/tool

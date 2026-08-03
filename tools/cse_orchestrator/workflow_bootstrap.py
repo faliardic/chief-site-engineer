@@ -20,7 +20,7 @@ from .device_smoke import (
     ISSUE_284_TABLET_MODEL,
     ISSUE_284_TABLET_SERIAL,
 )
-from .observer import GhGitHubClient
+from .observer import CommandResult, GhGitHubClient
 from .workflow import (
     GhIssueEvidenceSink,
     WorkflowCoordinator,
@@ -98,19 +98,19 @@ ISSUE_284_BLOBS = {
 }
 ISSUE_BODY_HASHES = {
     ISSUE_284: "19d4d0d954e33ed96f4dd26a2a0d72afad656588ac2358edea19db1fc6321d23",
-    ISSUE_305: "d8af86982b8aa34485a838641d89f4cecc10b8a4af2d74ef16ad5f9f0f90c0e1",
+    ISSUE_305: "3fbfb160e920c9e68a65cbeedd5cd62e47cdf61e28b31460d561863487535304",
 }
 EVIDENCE_COMMENT_HASHES = {
     ISSUE_284: {
-        5159802594: "d8dc4c47f53257628c172bda6b5729db6f460015e00d720c4ff0105e2db7308d",
-        5159834136: "3ef9bc499bddb654dc2b6d62a1a7f5b9d9473efdb96d0f7c4de20e7c21da1c34",
-        5159861939: "bf43b639915b171b78cbd0f37964ea7c77f9a84a46373229cfc53d8426d5644f",
-        5159903268: "4d1fd145faf8372d48c5e41bc83d1d70f3ced1df0b842aafb6a0261dc49bce40",
-        5159955414: "fa41418dcf5d23ca09bcab4d05c1475182b59005071faa82393c8bb02c92c2a7",
+        5159802594: "d1151b633c007e4cdd2da1299cfedfd539e2f780444bb38672d10b0c21d651c9",
+        5159834136: "5a6a569c2955ca2215d8f8ce3b101458216fb8d7d20be030494bc028c83316e6",
+        5159861939: "4d6167e93a33310ccecc1b778a1c39c39e53179321e18d2d6f38166daafa30c0",
+        5159903268: "b6c929b817be916883dcca237d537d4a69a04715cd820f3b78dbeab3638e8724",
+        5159955414: "91fdb47371de06499fa8c615d7785053c9d432fcd9f8365ffef547ab719ced9f",
     },
     ISSUE_305: {
         ISSUE_305_AUTHORIZATION_COMMENT: (
-            "6dd0054fcb98836d113351017b93d8a88b892e54d8e55cb57cba100e4b03828c"
+            "295503753da308f0a1f8fd79fa059eb07546e2da3b2cb2fd646c17fa463d2a59"
         )
     },
 }
@@ -171,6 +171,19 @@ def _sha256_text(value: str) -> str:
     return _sha256_bytes(value.encode("utf-8"))
 
 
+def canonical_markdown_bytes(value: str) -> bytes:
+    """Return transport-stable Markdown bytes without hiding content drift."""
+
+    if value.startswith("\ufeff"):
+        value = value[1:]
+    normalized = value.replace("\r\n", "\n").replace("\r", "\n")
+    return (normalized.rstrip("\n") + "\n").encode("utf-8")
+
+
+def _sha256_markdown(value: str) -> str:
+    return _sha256_bytes(canonical_markdown_bytes(value))
+
+
 def _hash_mapping(value: Mapping[str, object]) -> str:
     return "sha256:" + _sha256_bytes(canonical_json_bytes(value))
 
@@ -181,6 +194,32 @@ def _file_sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _run_gh_api_utf8(args: tuple[str, ...]) -> CommandResult:
+    if args[:4] != ("gh", "api", "--method", "GET") or len(args) != 5:
+        raise ValueError("github_api_command_not_read_only_get")
+    try:
+        completed = subprocess.run(
+            args,
+            text=True,
+            encoding="utf-8",
+            errors="strict",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL,
+            shell=False,
+            check=False,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired, UnicodeError):
+        return CommandResult(args, 127, "", "github evidence unavailable")
+    return CommandResult(
+        args,
+        completed.returncode,
+        completed.stdout,
+        completed.stderr,
+    )
 
 
 def _git(root: Path, *argv: str, timeout: int = 30) -> str:
@@ -327,7 +366,8 @@ class WorkflowBootstrap:
         self.controller_root = Path(controller_root).resolve()
         self.profile = profile or Issue284PilotProfile()
         self.evidence_client = evidence_client or GhGitHubClient(
-            self.profile.repository
+            self.profile.repository,
+            api_runner=_run_gh_api_utf8,
         )
         self.evidence_sink = evidence_sink
         self.executor = executor
@@ -420,9 +460,11 @@ class WorkflowBootstrap:
             issue = self.evidence_client.get_issue(issue_number)
             body = issue.get("body")
             if not isinstance(body, str):
-                raise BootstrapError("evidence_issue_body_missing")
-            if _sha256_text(body) != self.profile.issue_body_hashes.get(issue_number):
-                raise BootstrapError("evidence_issue_body_drift")
+                raise BootstrapError(f"evidence_issue_body_missing_{issue_number}")
+            if _sha256_markdown(body) != self.profile.issue_body_hashes.get(
+                issue_number
+            ):
+                raise BootstrapError(f"evidence_issue_body_drift_{issue_number}")
             comments = self.evidence_client.get_issue_comments(issue_number)
             by_id = {
                 int(item["id"]): item
@@ -435,8 +477,13 @@ class WorkflowBootstrap:
             ).items():
                 item = by_id.get(comment_id)
                 body_value = item.get("body") if item is not None else None
-                if not isinstance(body_value, str) or _sha256_text(body_value) != expected:
-                    raise BootstrapError("evidence_comment_drift")
+                if (
+                    not isinstance(body_value, str)
+                    or _sha256_markdown(body_value) != expected
+                ):
+                    raise BootstrapError(
+                        f"evidence_comment_drift_{issue_number}_{comment_id}"
+                    )
                 selected[str(comment_id)] = expected
             issues[str(issue_number)] = {
                 "body_sha256": self.profile.issue_body_hashes[issue_number],

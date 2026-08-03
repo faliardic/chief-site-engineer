@@ -22,6 +22,7 @@ from tools.cse_orchestrator.workflow_bootstrap import (
     ISSUE_305_AUTHORIZATION_COMMENT,
     Issue284PilotProfile,
     WorkflowBootstrap,
+    canonical_markdown_bytes,
     write_issue_284_completion,
 )
 
@@ -151,9 +152,14 @@ def bootstrap_fixture(tmp_path):
         adb_path=adb,
         adb_sha256=sha(b"adb"),
         controller_base=controller_base,
-        issue_body_hashes={key: sha(value) for key, value in bodies.items()},
+        issue_body_hashes={
+            key: sha(canonical_markdown_bytes(value)) for key, value in bodies.items()
+        },
         comment_hashes={
-            issue: {comment_id: sha(body) for comment_id, body in values.items()}
+            issue: {
+                comment_id: sha(canonical_markdown_bytes(body))
+                for comment_id, body in values.items()
+            }
             for issue, values in comments.items()
         },
         require_controller_on_origin_master=False,
@@ -211,6 +217,112 @@ def test_bootstrap_generates_exact_schema_2_authorization_from_live_inputs(
         "body_first_line": "Related to #284",
         "commit_message": "Complete reminder all-day editing",
     }
+
+
+@pytest.mark.parametrize(
+    "transport_value",
+    [
+        "# Başlık\n\nİçerik\n",
+        "# Başlık\r\n\r\nİçerik\r\n",
+        "# Başlık\r\rİçerik\r",
+        "\ufeff# Başlık\n\nİçerik",
+        "# Başlık\n\nİçerik",
+    ],
+)
+def test_canonical_markdown_bytes_accepts_only_transport_equivalent_forms(
+    transport_value,
+):
+    assert canonical_markdown_bytes(transport_value) == (
+        "# Başlık\n\nİçerik\n".encode("utf-8")
+    )
+
+
+@pytest.mark.parametrize(
+    "drifted",
+    [
+        "# Başlık\n\nİçeriX\n",
+        "# Başlık\n\nİçe rik\n",
+    ],
+)
+def test_canonical_markdown_bytes_preserves_character_and_inner_whitespace_drift(
+    drifted,
+):
+    expected = canonical_markdown_bytes("# Başlık\n\nİçerik\n")
+    assert canonical_markdown_bytes(drifted) != expected
+
+
+def test_live_evidence_runner_is_utf8_read_only_and_shell_free(monkeypatch):
+    captured = {}
+
+    def fake_run(args, **kwargs):
+        captured["args"] = args
+        captured.update(kwargs)
+        return subprocess.CompletedProcess(args, 0, '{"body":"Türkçe"}', "")
+
+    monkeypatch.setattr(bootstrap_module.subprocess, "run", fake_run)
+    args = ("gh", "api", "--method", "GET", "repos/owner/repo/issues/1")
+
+    result = bootstrap_module._run_gh_api_utf8(args)
+
+    assert result.ok
+    assert captured["args"] == args
+    assert captured["encoding"] == "utf-8"
+    assert captured["errors"] == "strict"
+    assert captured["shell"] is False
+    assert captured["stdin"] is subprocess.DEVNULL
+    with pytest.raises(ValueError, match="read_only_get"):
+        bootstrap_module._run_gh_api_utf8(("gh", "api", "--method", "POST", "x"))
+
+
+def test_bootstrap_accepts_bom_eol_and_terminal_newline_transport(
+    bootstrap_fixture,
+):
+    *_, client = bootstrap_fixture
+    client.bodies[284] = "\ufeffissue-284-body\r\n"
+    client.bodies[305] = "issue-305-body\r"
+    for comment_id, body in client.comments[284].items():
+        client.comments[284][comment_id] = f"\ufeff{body}\r\n"
+    client.comments[305][ISSUE_305_AUTHORIZATION_COMMENT] = (
+        "binding authorization\n"
+    )
+
+    generated = bootstrap(bootstrap_fixture).build_authorization()
+
+    assert generated.issue == 284
+
+
+@pytest.mark.parametrize("issue_number", [284, 305])
+def test_issue_body_drift_reason_identifies_source(bootstrap_fixture, issue_number):
+    *_, client = bootstrap_fixture
+    client.bodies[issue_number] += "X"
+
+    with pytest.raises(
+        BootstrapError,
+        match=rf"^evidence_issue_body_drift_{issue_number}$",
+    ):
+        bootstrap(bootstrap_fixture).build_authorization()
+
+
+@pytest.mark.parametrize(
+    ("issue_number", "comment_id"),
+    [
+        (284, 5159834136),
+        (305, ISSUE_305_AUTHORIZATION_COMMENT),
+    ],
+)
+def test_comment_drift_reason_identifies_source(
+    bootstrap_fixture,
+    issue_number,
+    comment_id,
+):
+    *_, client = bootstrap_fixture
+    client.comments[issue_number][comment_id] += " X"
+
+    with pytest.raises(
+        BootstrapError,
+        match=rf"^evidence_comment_drift_{issue_number}_{comment_id}$",
+    ):
+        bootstrap(bootstrap_fixture).build_authorization()
 
 
 def test_bootstrap_dry_run_shows_authorization_and_does_not_persist(
