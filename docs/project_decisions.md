@@ -1,5 +1,20 @@
 # Proje Kararlari
 
+## Issue 305 — Evidence hash'i içerik ile transport'u ayırır
+
+- GitHub Markdown evidence doğrudan platforma özgü metin byte'larıyla değil,
+  leading BOM'u kaldıran, CRLF/CR'ı LF yapan ve terminal newline'ı deterministic
+  temsil eden `canonical_markdown_bytes(...)` üzerinden hashlenir.
+- Canonicalization iç whitespace, kelime, sayı, link, başlık veya karakter
+  değiştiremez. Bu alanlardaki her drift action başlamadan fail-closed kalır.
+- Evidence blocker raw içerik loglamadan exact source ID taşır. Frozen hash
+  değişikliği yalnız hash-only canlı diagnostic semantik eşitliği kanıtlarsa
+  yapılabilir.
+- Bootstrap evidence adapter'ı GitHub JSON'unu Windows locale'ine bırakmaz;
+  yalnız GET argv, `shell=False` ve strict UTF-8 decode kullanır.
+- Bu correction Issue #284 target/runtime state'ini veya product/mobile/device
+  akışını değiştirmez; gerçek canlı pilot ayrı workflow execution'dır.
+
 ## Issue 305 — Canlı pilot authorization'ı target ve kanıttan türetilir
 
 - Target-specific workflow JSON'u operator tarafından elle taşınmaz. Bootstrap;
