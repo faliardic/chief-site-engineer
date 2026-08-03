@@ -98,6 +98,20 @@ ISSUE_305_NUMERIC_PROJECTION_FINGERPRINT = (
 ISSUE_305_NUMERIC_TAIL_HASH = (
     "sha256:28917b5bf6ab90ae60e68174177a57fb65328f6bf30a343f651a52cf3d10f0f5"
 )
+ISSUE_305_DISPLAY_HANDOFF_AUTHORIZATION_COMMENT = 5170082561
+ISSUE_305_DISPLAY_HANDOFF_PREDECESSOR = (
+    "d83efc2e1c07dc13a53df66753f7f59b7115c053"
+)
+ISSUE_305_DISPLAY_PREDECESSOR_AUTHORIZATION = (
+    "sha256:22b98a6db3d0921bb72fc49f0c753dd576d1e9e97572dfbff5ee96b8078f4f74"
+)
+ISSUE_305_DISPLAY_PREDECESSOR_WORKFLOW = "wf-284-22b98a6db3d0"
+ISSUE_305_DISPLAY_PROJECTION_FINGERPRINT = (
+    "sha256:2f60c67b96425d5f29e06cd46cbc5d82b90a821593c26807f9baea20aabb6946"
+)
+ISSUE_305_DISPLAY_TAIL_HASH = (
+    "sha256:962b0e860f032f3c03b24ff773546ffc90c07f765ea075cc1841dc7909c03816"
+)
 
 ISSUE_284_CHECKPOINT_PATHS = (
     ".cse/tasks/284_task.md",
@@ -195,6 +209,11 @@ class Issue284PilotProfile:
     numeric_predecessor_workflow: str = ISSUE_305_NUMERIC_PREDECESSOR_WORKFLOW
     numeric_projection_fingerprint: str = ISSUE_305_NUMERIC_PROJECTION_FINGERPRINT
     numeric_tail_hash: str = ISSUE_305_NUMERIC_TAIL_HASH
+    display_handoff_predecessor_revision: str = ISSUE_305_DISPLAY_HANDOFF_PREDECESSOR
+    display_predecessor_authorization: str = ISSUE_305_DISPLAY_PREDECESSOR_AUTHORIZATION
+    display_predecessor_workflow: str = ISSUE_305_DISPLAY_PREDECESSOR_WORKFLOW
+    display_projection_fingerprint: str = ISSUE_305_DISPLAY_PROJECTION_FINGERPRINT
+    display_tail_hash: str = ISSUE_305_DISPLAY_TAIL_HASH
     authorization_comment_id: int = ISSUE_305_AUTHORIZATION_COMMENT
     issue_body_hashes: Mapping[int, str] = field(
         default_factory=lambda: dict(ISSUE_BODY_HASHES)
@@ -400,6 +419,52 @@ def _is_exact_numeric_paused_tablet_handoff(
         and projection.first_failed_predicate == "screen_is_interactive"
         and projection.event_count == 29
         and len(events) == 29
+        and events[-1].get("event_hash") == expected_tail_hash
+        and projection.tail_hash == expected_tail_hash
+        and public.get("projection_fingerprint")
+        == expected_projection_fingerprint
+    )
+
+
+def _is_exact_display_paused_tablet_handoff(
+    projection,
+    events,
+    contract: WorkflowContract,
+    *,
+    expected_projection_fingerprint: str,
+    expected_tail_hash: str,
+) -> bool:
+    """Accept only the exact fifth tablet-preflight pause boundary."""
+
+    try:
+        public = projection.public_dict(contract)
+    except (AttributeError, IndexError, TypeError, ValueError):
+        return False
+    passed_stages = tuple(
+        str(item.get("stage", ""))
+        for item in projection.passed_evidence
+        if isinstance(item, Mapping)
+    )
+    return (
+        projection.status == "PAUSED_EXTERNAL"
+        and projection.current_stage_index == 6
+        and public.get("current_stage") == "tablet_preflight"
+        and projection.stage_attempts
+        == {"artifact_verify": 1, "tablet_preflight": 5}
+        and projection.external_pauses == {"tablet_preflight": 5}
+        and projection.active_attempt_id is None
+        and len(projection.admitted_attempt_ids) == 6
+        and projection.consumed_budgets == {"command": 6, "github_comment": 9}
+        and passed_stages == (*REUSED_STAGE_NAMES, "artifact_verify")
+        and projection.artifact is not None
+        and projection.device is None
+        and projection.publish is None
+        and projection.last_blocker == "screen_not_interactive"
+        and projection.blocker_phase == "tablet_preflight"
+        and projection.command_index == 1
+        and projection.first_failed_predicate == "screen_is_interactive"
+        and projection.event_count == 32
+        and len(events) == 32
         and events[-1].get("event_hash") == expected_tail_hash
         and projection.tail_hash == expected_tail_hash
         and public.get("projection_fingerprint")
@@ -736,6 +801,35 @@ class WorkflowBootstrap:
             raise BootstrapError("controller_handoff_not_safe")
         return verification
 
+    def _verify_display_paused_tablet_ledger(
+        self,
+        predecessor: WorkflowAuthorization,
+    ):
+        contract = WorkflowContract.from_authorization(predecessor)
+        profile = self.profile
+        if (
+            predecessor.fingerprint != profile.display_predecessor_authorization
+            or contract.workflow_id != profile.display_predecessor_workflow
+        ):
+            raise BootstrapError("controller_handoff_not_safe")
+        try:
+            verification = WorkflowStore(
+                runtime_root=self.runtime_root,
+                repo_root=self.target_root,
+                workflow_id=contract.workflow_id,
+            ).verify()
+        except (OSError, ValueError, WorkflowStoreError) as exc:
+            raise BootstrapError("controller_handoff_not_safe") from exc
+        if not _is_exact_display_paused_tablet_handoff(
+            verification.projection,
+            verification.events,
+            verification.contract,
+            expected_projection_fingerprint=profile.display_projection_fingerprint,
+            expected_tail_hash=profile.display_tail_hash,
+        ):
+            raise BootstrapError("controller_handoff_not_safe")
+        return verification
+
     def _validate_predecessor_contract(
         self,
         predecessor: WorkflowAuthorization,
@@ -862,10 +956,16 @@ class WorkflowBootstrap:
         *,
         paused_tablet: bool,
         numeric_paused_tablet: bool = False,
+        display_paused_tablet: bool = False,
     ) -> WorkflowAuthorization:
-        if paused_tablet and numeric_paused_tablet:
+        if sum((paused_tablet, numeric_paused_tablet, display_paused_tablet)) > 1:
             raise BootstrapError("controller_handoff_not_safe")
-        if numeric_paused_tablet:
+        if display_paused_tablet:
+            self._verify_display_paused_tablet_ledger(predecessor)
+            expected_predecessor = (
+                self.profile.display_handoff_predecessor_revision
+            )
+        elif numeric_paused_tablet:
             self._verify_numeric_paused_tablet_ledger(predecessor)
             expected_predecessor = (
                 self.profile.numeric_handoff_predecessor_revision
@@ -933,10 +1033,17 @@ class WorkflowBootstrap:
         successor: WorkflowAuthorization,
         *,
         numeric_paused_tablet: bool = False,
+        display_paused_tablet: bool = False,
     ) -> None:
         """Atomically seed a successor without mutating predecessor runtime bytes."""
 
-        if numeric_paused_tablet:
+        if numeric_paused_tablet and display_paused_tablet:
+            raise BootstrapError("controller_handoff_not_safe")
+        if display_paused_tablet:
+            predecessor_verification = self._verify_display_paused_tablet_ledger(
+                predecessor
+            )
+        elif numeric_paused_tablet:
             predecessor_verification = self._verify_numeric_paused_tablet_ledger(
                 predecessor
             )
@@ -1308,7 +1415,7 @@ class WorkflowBootstrap:
                     WorkflowContract.from_authorization(root_predecessor).workflow_id,
                 )
 
-            if len(revisions) > 3:
+            if len(revisions) > 4:
                 raise BootstrapError("controller_handoff_not_safe")
             first_revision = self.profile.paused_handoff_predecessor_revision
             if first_revision not in revisions:
@@ -1424,22 +1531,48 @@ class WorkflowBootstrap:
                     WorkflowContract.from_authorization(first_successor).workflow_id,
                 )
 
-            if len(revisions) == 3:
+            display_revision = self.profile.display_handoff_predecessor_revision
+            if len(revisions) == 2:
+                successor = self._build_controller_successor(
+                    second_successor,
+                    controller,
+                    paused_tablet=False,
+                    numeric_paused_tablet=True,
+                )
+                if persist:
+                    self._seed_paused_successor_history(
+                        second_successor,
+                        successor,
+                        numeric_paused_tablet=True,
+                    )
+                    self.store.save_successor(
+                        second_successor,
+                        successor,
+                        self.target_root,
+                        handoff_authorization_comment_id=(
+                            ISSUE_305_NUMERIC_HANDOFF_AUTHORIZATION_COMMENT
+                        ),
+                    )
+                return (
+                    successor,
+                    True,
+                    WorkflowContract.from_authorization(second_successor).workflow_id,
+                )
+
+            if display_revision not in revisions:
                 third_revisions = tuple(
                     revision
                     for revision in revisions
                     if revision not in (first_revision, numeric_revision)
                 )
-                if third_revisions != (controller,):
+                if len(revisions) != 3 or third_revisions != (controller,):
                     raise BootstrapError("controller_handoff_not_safe")
-
-            successor = self._build_controller_successor(
-                second_successor,
-                controller,
-                paused_tablet=False,
-                numeric_paused_tablet=True,
-            )
-            if len(revisions) == 3:
+                expected = self._build_controller_successor(
+                    second_successor,
+                    controller,
+                    paused_tablet=False,
+                    numeric_paused_tablet=True,
+                )
                 stored = self.store.load_successor(
                     second_successor,
                     controller,
@@ -1449,30 +1582,104 @@ class WorkflowBootstrap:
                     ),
                 )
                 if (
-                    stored.fingerprint != successor.fingerprint
+                    stored.fingerprint != expected.fingerprint
                     or not self._same_handoff_contract(second_successor, stored)
+                ):
+                    raise BootstrapError("controller_handoff_not_safe")
+                if persist:
+                    self._seed_paused_successor_history(
+                        second_successor,
+                        stored,
+                        numeric_paused_tablet=True,
+                    )
+                return (
+                    stored,
+                    True,
+                    WorkflowContract.from_authorization(second_successor).workflow_id,
+                )
+
+            third_successor = self.store.load_successor(
+                second_successor,
+                display_revision,
+                self.target_root,
+                handoff_authorization_comment_id=(
+                    ISSUE_305_NUMERIC_HANDOFF_AUTHORIZATION_COMMENT
+                ),
+            )
+            expected_third = self._build_controller_successor(
+                second_successor,
+                display_revision,
+                paused_tablet=False,
+                numeric_paused_tablet=True,
+            )
+            if (
+                third_successor.fingerprint != expected_third.fingerprint
+                or not self._same_handoff_contract(second_successor, third_successor)
+            ):
+                raise BootstrapError("controller_handoff_not_safe")
+            if len(revisions) == 3 and controller == display_revision:
+                if persist:
+                    self._seed_paused_successor_history(
+                        second_successor,
+                        third_successor,
+                        numeric_paused_tablet=True,
+                    )
+                return (
+                    third_successor,
+                    True,
+                    WorkflowContract.from_authorization(second_successor).workflow_id,
+                )
+
+            if len(revisions) == 4:
+                fourth_revisions = tuple(
+                    revision
+                    for revision in revisions
+                    if revision
+                    not in (first_revision, numeric_revision, display_revision)
+                )
+                if fourth_revisions != (controller,):
+                    raise BootstrapError("controller_handoff_not_safe")
+
+            successor = self._build_controller_successor(
+                third_successor,
+                controller,
+                paused_tablet=False,
+                display_paused_tablet=True,
+            )
+            if len(revisions) == 4:
+                stored = self.store.load_successor(
+                    third_successor,
+                    controller,
+                    self.target_root,
+                    handoff_authorization_comment_id=(
+                        ISSUE_305_DISPLAY_HANDOFF_AUTHORIZATION_COMMENT
+                    ),
+                )
+                if (
+                    stored.fingerprint != successor.fingerprint
+                    or not self._same_handoff_contract(third_successor, stored)
                 ):
                     raise BootstrapError("controller_handoff_not_safe")
                 successor = stored
             if persist:
                 self._seed_paused_successor_history(
-                    second_successor,
+                    third_successor,
                     successor,
-                    numeric_paused_tablet=True,
+                    display_paused_tablet=True,
                 )
-                if len(revisions) == 2:
+                if len(revisions) == 3:
                     self.store.save_successor(
-                        second_successor,
+                        third_successor,
                         successor,
                         self.target_root,
                         handoff_authorization_comment_id=(
-                            ISSUE_305_NUMERIC_HANDOFF_AUTHORIZATION_COMMENT
+                            ISSUE_305_DISPLAY_HANDOFF_AUTHORIZATION_COMMENT
                         ),
                     )
             return (
                 successor,
                 True,
-                WorkflowContract.from_authorization(second_successor).workflow_id,
+                WorkflowContract.from_authorization(third_successor).workflow_id,
             )
         authorization = self.build_authorization()
         if persist:

@@ -302,6 +302,12 @@ def production_contract(tmp_path: Path) -> DeviceSmokeContract:
     [
         "POWER MANAGER (dumpsys power)\n  mWakefulness=Awake\n",
         "POWER MANAGER (dumpsys power)\n  mWakefulness=Awake\n  mWakefulness=1\n",
+        (
+            "POWER MANAGER (dumpsys power)\n"
+            "  mWakefulness=Awake\n"
+            "  Display Power: com.android.server.power.PowerManagerService$3@3786411\n"
+            "  mWakefulness=1\n"
+        ),
         "POWER MANAGER (dumpsys power)\n  mInteractive=true\n",
         "POWER MANAGER (dumpsys power)\nDisplay Power: state=ON\n",
     ],
@@ -338,6 +344,10 @@ def test_production_preflight_accepts_each_exact_interactive_power_shape(
         "  mWakefulness=AWAKE\n",
         "  mWakefulness=Awake\n  mWakefulness=0\n",
         "  mWakefulness=4\n",
+        "Display Power: state=\n",
+        "Display Power: state=UNKNOWN\n",
+        "Display Power: state = ON\n",
+        "Display Power: state=ON extra\n",
         "POWER MANAGER (dumpsys power)\n",
     ],
 )
@@ -394,6 +404,19 @@ def test_power_parser_accepts_symbolic_and_numeric_wakefulness_aliases():
 
 
 @pytest.mark.parametrize(
+    "header",
+    [
+        "Display Power: com.android.server.power.PowerManagerService$3@3786411",
+        "Display Power: controller summary",
+        "Display Power: callbacks=1",
+    ],
+)
+def test_power_parser_ignores_benign_non_state_display_headers(header):
+    output = f"mWakefulness=Awake\n{header}\nmWakefulness=1\n"
+    assert parse_power_interactive_state(output) is PowerInteractiveState.INTERACTIVE
+
+
+@pytest.mark.parametrize(
     "output",
     [
         "mWakefulness=Awake\nmWakefulness=0\n",
@@ -414,6 +437,11 @@ def test_power_parser_rejects_semantic_and_cross_signal_conflicts(output):
         "mWakefulness=Unknown\n",
         "mWakefulness=\n",
         "mWakefulness=Awake extra\n",
+        "Display Power: state=\n",
+        "Display Power: state=UNKNOWN\n",
+        "Display Power: state = ON\n",
+        "Display Power: state=ON extra\n",
+        "Display Power: com.android.server.power.PowerManagerService$3@3786411\n",
         "POWER MANAGER (dumpsys power)\n",
     ],
 )

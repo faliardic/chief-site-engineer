@@ -1,5 +1,15 @@
 # Changelog
 
+## Issue #305 - Display Power header resume düzeltmesi
+
+- Power parser yalnız exact display-state adaylarını doğrular; benign non-state
+  `Display Power:` object/header satırlarını sinyal saymadan ignore eder.
+- Existing wakefulness alias, interactive/display/keyguard ve exact-device
+  güvenlik sözleşmeleri ile raw-output koruması değişmeden kalır.
+- Exact fifth tablet-preflight pause state'i bütün predecessor zincirini
+  değiştirmeden dördüncü immutable successor'a devredilebilir; state/contract/
+  effect drift, rollback ve duplicate/later successor reddedilir.
+
 ## Issue #305 - Wakefulness numeric alias resume düzeltmesi
 
 - `mWakefulness` sembolik ve sayısal değerleri tek semantik mapping'de
