@@ -34,6 +34,14 @@ from tools.cse_orchestrator.workflow_store import (
     WorkflowStore,
     WorkflowStoreError,
 )
+from tools.cse_orchestrator.device_smoke import (
+    AdapterActionResult,
+    DeviceSmokeError,
+    ISSUE_284_DEBUG_PACKAGE,
+    ISSUE_284_SMOKE_ACTIONS,
+    ISSUE_284_TABLET_MODEL,
+    ISSUE_284_TABLET_SERIAL,
+)
 
 
 HASH = "sha256:" + "a" * 64
@@ -856,3 +864,197 @@ def test_controller_target_separation_and_target_scope_drift_fail_closed(tmp_pat
         coordinator(auth, controller, target, runtime, ScriptedExecutor()).run(
             execute=True
         )
+
+
+class WorkflowFakeTabletAdapter:
+    def __init__(self, *, connected: bool = True):
+        self.connected = connected
+        self.calls: list[str] = []
+
+    def _pass(self, action: str):
+        self.calls.append(action)
+        return AdapterActionResult()
+
+    def preflight(self, contract):
+        if not self.connected:
+            raise DeviceSmokeError(
+                "device_not_connected", "exact_tablet_is_listed", external=True
+            )
+        return self._pass("tablet_preflight")
+
+    def install(self, contract):
+        return self._pass("tablet_install")
+
+    def timed_to_all_day(self, contract):
+        return self._pass("smoke_timed_to_all_day")
+
+    def all_day_date_change(self, contract):
+        return self._pass("smoke_all_day_date_change")
+
+    def same_day_noop(self, contract):
+        return self._pass("smoke_same_day_noop")
+
+    def all_day_to_timed(self, contract):
+        return self._pass("smoke_all_day_to_timed")
+
+    def notification_binding(self, contract):
+        return self._pass("smoke_notification_binding")
+
+    def cold_relaunch(self, contract):
+        return self._pass("smoke_cold_relaunch")
+
+    def recoverable_cleanup(self, contract):
+        return self._pass("smoke_recoverable_cleanup")
+
+
+def smoke_stage(name: str, adb_path: Path) -> dict[str, object]:
+    return {
+        "name": name,
+        "kind": "command",
+        "capability": "Device",
+        "command_family": "cse_tablet_smoke",
+        "argv": [
+            str(adb_path),
+            "-s",
+            ISSUE_284_TABLET_SERIAL,
+            "cse-smoke",
+            name,
+            "CSE284_O10_ABCDEF123456",
+            "2026-08-03",
+            "2026-08-04",
+            "recoverable-only",
+        ],
+        "cwd": "target",
+        "timeout_seconds": 30,
+        "output_limit_bytes": 65536,
+        "retry_max": 0,
+        "reusable": False,
+        "failure_class": "external" if name == "tablet_preflight" else "unsafe",
+        "environment_allowlist": [],
+    }
+
+
+def schema2_smoke_authorization(
+    controller_head: str,
+    target_head: str,
+    target_tree: str,
+    stages: list[dict[str, object]],
+    artifact: dict[str, object],
+):
+    value = authorization_value(
+        controller_head,
+        target_head,
+        target_tree,
+        stages,
+        artifact=artifact,
+        device={
+            "serial": ISSUE_284_TABLET_SERIAL,
+            "model": ISSUE_284_TABLET_MODEL,
+            "package": ISSUE_284_DEBUG_PACKAGE,
+        },
+    )
+    value["schema_version"] = 2
+    value["evidence_source_fingerprint"] = HASH
+    value["budgets"]["command_max"] = 64
+    return parse_workflow_authorization(
+        value, now=datetime(2026, 8, 2, tzinfo=timezone.utc)
+    )
+
+
+def test_schema2_device_absence_pauses_then_same_workflow_resumes_after_artifact(
+    tmp_path,
+):
+    controller, target, runtime, controller_head, target_head, target_tree = roots(
+        tmp_path
+    )
+    adb = tmp_path / "adb.exe"
+    adb.write_bytes(b"fake-adb")
+    apk = tmp_path / "app-debug.apk"
+    apk.write_bytes(b"exact-apk")
+    artifact = {
+        "path": str(apk),
+        "sha256": "sha256:" + hashlib.sha256(b"exact-apk").hexdigest(),
+        "package": ISSUE_284_DEBUG_PACKAGE,
+        "version": "0.1.0-debug (1)",
+        "signer": HASH,
+        "checkpoint_sha": target_head,
+    }
+    stages = [non_command_stage("artifact_verify", "artifact_verify")]
+    stages.extend(smoke_stage(name, adb) for name in ISSUE_284_SMOKE_ACTIONS)
+    auth = schema2_smoke_authorization(
+        controller_head, target_head, target_tree, stages, artifact
+    )
+    fake = WorkflowFakeTabletAdapter(connected=False)
+    first = coordinator(
+        auth,
+        controller,
+        target,
+        runtime,
+        DefaultStageExecutor(tablet_adapter=fake),
+    ).run(execute=True)
+    assert first["status"] == "PAUSED_EXTERNAL"
+    assert first["current_stage"] == "tablet_preflight"
+    assert first["artifact"]["sha256"] == artifact["sha256"]
+    assert first["stage_attempts"] == {"artifact_verify": 1, "tablet_preflight": 1}
+
+    fake.connected = True
+    second = coordinator(
+        auth,
+        controller,
+        target,
+        runtime,
+        DefaultStageExecutor(tablet_adapter=fake),
+    ).run(execute=True)
+    assert second["status"] == "COMPLETED"
+    assert second["stage_attempts"]["artifact_verify"] == 1
+    assert second["stage_attempts"]["tablet_preflight"] == 2
+    assert fake.calls == list(ISSUE_284_SMOKE_ACTIONS)
+
+
+@pytest.mark.parametrize("crash_after", ISSUE_284_SMOKE_ACTIONS)
+def test_crash_after_every_smoke_step_resumes_without_reexecuting_that_step(
+    tmp_path, crash_after
+):
+    controller, target, runtime, controller_head, target_head, target_tree = roots(
+        tmp_path
+    )
+    adb = tmp_path / "adb.exe"
+    adb.write_bytes(b"fake-adb")
+    apk = tmp_path / "app-debug.apk"
+    apk.write_bytes(b"exact-apk")
+    artifact = {
+        "path": str(apk),
+        "sha256": "sha256:" + hashlib.sha256(b"exact-apk").hexdigest(),
+        "package": ISSUE_284_DEBUG_PACKAGE,
+        "version": "0.1.0-debug (1)",
+        "signer": HASH,
+        "checkpoint_sha": target_head,
+    }
+    stages = [smoke_stage(name, adb) for name in ISSUE_284_SMOKE_ACTIONS]
+    auth = schema2_smoke_authorization(
+        controller_head, target_head, target_tree, stages, artifact
+    )
+    fake = WorkflowFakeTabletAdapter()
+    with pytest.raises(WorkflowError, match="simulated_process_crash"):
+        coordinator(
+            auth,
+            controller,
+            target,
+            runtime,
+            DefaultStageExecutor(tablet_adapter=fake),
+            RecordingSink(fail_key=f"gate_pass_{crash_after}"),
+        ).run(execute=True)
+    before = list(fake.calls)
+    assert before.count(crash_after) == 1
+
+    completed = coordinator(
+        auth,
+        controller,
+        target,
+        runtime,
+        DefaultStageExecutor(tablet_adapter=fake),
+        RecordingSink(),
+    ).run(execute=True)
+    assert completed["status"] == "COMPLETED"
+    assert fake.calls.count(crash_after) == 1
+    assert fake.calls == list(ISSUE_284_SMOKE_ACTIONS)

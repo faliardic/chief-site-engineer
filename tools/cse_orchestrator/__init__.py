@@ -1,4 +1,4 @@
-"""CSE Development Orchestrator deterministic O1-O9 package."""
+"""CSE Development Orchestrator deterministic O1-O10.1 package."""
 
 from .api_planner import (
     PROPOSAL_JSON_SCHEMA,
@@ -80,6 +80,22 @@ from .workflow import (
     observe_target,
     verify_projected_artifact,
 )
+from .device_smoke import (
+    AdapterActionResult,
+    DeviceSmokeContract,
+    DeviceSmokeError,
+    DeviceSmokeResult,
+    DeviceSmokeRunner,
+    TabletAutomationAdapter,
+    validate_adb_argv,
+)
+from .workflow_bootstrap import (
+    BootstrapAuthorizationStore,
+    BootstrapError,
+    Issue284PilotProfile,
+    WorkflowBootstrap,
+    write_issue_284_completion,
+)
 from .workflow_authorization import (
     WORKFLOW_AUTHORIZATION_MARKER,
     WorkflowAuthorization,
@@ -143,7 +159,14 @@ __all__ = [
     "SubprocessProcessAdapter",
     "TransitionEvent",
     "CommandDiagnostic",
+    "AdapterActionResult",
+    "BootstrapAuthorizationStore",
+    "BootstrapError",
     "DefaultStageExecutor",
+    "DeviceSmokeContract",
+    "DeviceSmokeError",
+    "DeviceSmokeResult",
+    "DeviceSmokeRunner",
     "GhIssueEvidenceSink",
     "StageExecution",
     "WorkflowAuthorization",
@@ -157,6 +180,9 @@ __all__ = [
     "WorkflowStore",
     "WorkflowStoreError",
     "WorkflowVerification",
+    "WorkflowBootstrap",
+    "Issue284PilotProfile",
+    "TabletAutomationAdapter",
     "WORKFLOW_AUTHORIZATION_MARKER",
     "build_action_plan",
     "build_build_plan",
@@ -183,4 +209,6 @@ __all__ = [
     "select_latest_workflow_authorization",
     "validate_api_proposal",
     "verify_projected_artifact",
+    "validate_adb_argv",
+    "write_issue_284_completion",
 ]

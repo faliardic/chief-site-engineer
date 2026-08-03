@@ -1,5 +1,19 @@
 # Changelog
 
+## Issue #305 - O10.1 live pilot bootstrap ve tablet smoke
+
+- `workflow-bootstrap`, current Issue #284 checkpoint/evidence/artifact/tool
+  provenance'inden schema-v2 strict authorization üretir; dry-run ve explicit
+  execute aynı tek giriş komutundadır.
+- Authorization external immutable store'da korunur. Device yokluğunda artifact
+  PASS'i kaybolmadan pause olur ve aynı komut build'i tekrar etmeden resume eder.
+- Exact `R52W90JFN1M / SM-X610` ve debug package ile sınırlı shell-free tablet
+  adapter; synthetic timed↔all-day matrix, binding, cold relaunch ve recoverable
+  cleanup adımlarını stage bazında yürütür.
+- Telefon, gerçek kullanıcı kaydı, uninstall, clear-data, downgrade ve hard-delete
+  action öncesi fail-closed reddedilir. Implementation kabulü fake adapter'dır;
+  gerçek build/install/device invocation yapılmaz.
+
 ## Issue #303 - O10 resumable one-command workflow
 
 - Machine-readable workflow authorization; exact controller/target, allowlist,
