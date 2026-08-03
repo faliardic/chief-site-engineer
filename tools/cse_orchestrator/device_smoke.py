@@ -48,9 +48,19 @@ FORBIDDEN_ADB_TOKENS = frozenset(
 )
 BOUNDS_PATTERN = re.compile(r"^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$")
 DAY_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-WAKEFULNESS_LINE = re.compile(r"^\s*mWakefulness=(Awake|Asleep|Dozing|Dreaming)\s*$")
+WAKEFULNESS_LINE = re.compile(r"^\s*mWakefulness=([^\s=]+)\s*$")
 INTERACTIVE_LINE = re.compile(r"^\s*mInteractive=(true|false)\s*$")
 DISPLAY_POWER_LINE = re.compile(r"^\s*Display Power: state=(ON|OFF)\s*$")
+WAKEFULNESS_INTERACTIVE = {
+    "Awake": True,
+    "1": True,
+    "Asleep": False,
+    "0": False,
+    "Dreaming": False,
+    "2": False,
+    "Dozing": False,
+    "3": False,
+}
 
 
 class DeviceSmokeError(RuntimeError):
@@ -83,7 +93,11 @@ def parse_power_interactive_state(output: str) -> PowerInteractiveState:
         interactive = INTERACTIVE_LINE.fullmatch(line)
         display = DISPLAY_POWER_LINE.fullmatch(line)
         if wakefulness:
-            signals.append(wakefulness.group(1) == "Awake")
+            wakefulness_value = WAKEFULNESS_INTERACTIVE.get(wakefulness.group(1))
+            if wakefulness_value is None:
+                malformed = True
+            else:
+                signals.append(wakefulness_value)
         elif interactive:
             signals.append(interactive.group(1) == "true")
         elif display:

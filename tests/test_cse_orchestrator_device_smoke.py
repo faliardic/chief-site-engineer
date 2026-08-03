@@ -301,6 +301,7 @@ def production_contract(tmp_path: Path) -> DeviceSmokeContract:
     "power",
     [
         "POWER MANAGER (dumpsys power)\n  mWakefulness=Awake\n",
+        "POWER MANAGER (dumpsys power)\n  mWakefulness=Awake\n  mWakefulness=1\n",
         "POWER MANAGER (dumpsys power)\n  mInteractive=true\n",
         "POWER MANAGER (dumpsys power)\nDisplay Power: state=ON\n",
     ],
@@ -327,11 +328,16 @@ def test_production_preflight_accepts_each_exact_interactive_power_shape(
         "  mWakefulness=Asleep\n",
         "  mWakefulness=Dozing\n",
         "  mWakefulness=Dreaming\n",
+        "  mWakefulness=Asleep\n  mWakefulness=0\n",
+        "  mWakefulness=Dreaming\n  mWakefulness=2\n",
+        "  mWakefulness=Dozing\n  mWakefulness=3\n",
         "  mInteractive=false\n",
         "Display Power: state=OFF\n",
         "  mWakefulness=Awake\n  mInteractive=false\n",
         "  mWakefulness=Awake\n  mInteractive=TRUE\n",
         "  mWakefulness=AWAKE\n",
+        "  mWakefulness=Awake\n  mWakefulness=0\n",
+        "  mWakefulness=4\n",
         "POWER MANAGER (dumpsys power)\n",
     ],
 )
@@ -367,6 +373,52 @@ def test_power_parser_returns_only_data_minimal_deterministic_states():
         parse_power_interactive_state("mWakefulness = Awake\n")
         is PowerInteractiveState.MALFORMED
     )
+
+
+def test_power_parser_accepts_symbolic_and_numeric_wakefulness_aliases():
+    assert (
+        parse_power_interactive_state("mWakefulness=Awake\nmWakefulness=1\n")
+        is PowerInteractiveState.INTERACTIVE
+    )
+    for symbolic, numeric in (
+        ("Asleep", "0"),
+        ("Dreaming", "2"),
+        ("Dozing", "3"),
+    ):
+        assert (
+            parse_power_interactive_state(
+                f"mWakefulness={symbolic}\nmWakefulness={numeric}\n"
+            )
+            is PowerInteractiveState.NON_INTERACTIVE
+        )
+
+
+@pytest.mark.parametrize(
+    "output",
+    [
+        "mWakefulness=Awake\nmWakefulness=0\n",
+        "mWakefulness=Asleep\nmWakefulness=1\n",
+        "mWakefulness=1\nmInteractive=false\n",
+        "mWakefulness=0\nDisplay Power: state=ON\n",
+    ],
+)
+def test_power_parser_rejects_semantic_and_cross_signal_conflicts(output):
+    assert parse_power_interactive_state(output) is PowerInteractiveState.CONFLICTING
+
+
+@pytest.mark.parametrize(
+    "output",
+    [
+        "mWakefulness=4\n",
+        "mWakefulness=-1\n",
+        "mWakefulness=Unknown\n",
+        "mWakefulness=\n",
+        "mWakefulness=Awake extra\n",
+        "POWER MANAGER (dumpsys power)\n",
+    ],
+)
+def test_power_parser_rejects_unknown_malformed_or_missing_wakefulness(output):
+    assert parse_power_interactive_state(output) is PowerInteractiveState.MALFORMED
 
 
 def test_keyguard_remains_an_independent_unchanged_preflight_gate(tmp_path):

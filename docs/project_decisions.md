@@ -1,5 +1,25 @@
 # Proje Kararlari
 
+## Issue 305 — Wakefulness alias'ları semantik olarak birleştirilir
+
+- `mWakefulness` token'ları regex dalıyla değil tek mapping ile semantiğe
+  çevrilir: `Awake/1` interactive, `Asleep/0`, `Dreaming/2`, `Dozing/3`
+  non-interactive'dir.
+- Aynı boolean semantiği bildiren tekrarlar tutarlı kabul edilir. Symbolic/
+  numeric veya diğer power signal mismatch'i `conflicting`; unknown/malformed
+  değer ve signal yokluğu fail-closed `malformed` sonucudur.
+- Raw dumpsys output log/evidence değildir. Existing interactive/display
+  desteği, bağımsız keyguard ve exact tablet/device/destructive guard'ları
+  değiştirilmez.
+- Yeni controller handoff yalnız authorization `5169514740` içindeki exact
+  29-event, fourth-pause predecessor'a açıktır. Attempts/pauses/admissions,
+  budgets, evidence, artifact ve sıfır effect exact korunur.
+- Root ve iki predecessor successor authorization/metadata/manifest/ledger
+  byte'ları immutable kalır. Üçüncü successor idempotenttir; drift, rollback,
+  duplicate veya dördüncü successor `controller_handoff_not_safe` sonucudur.
+- Product/mobile, Issue #284 runtime/target/APK ve build/install/ADB/tablet bu
+  implementation run'ında değiştirilmez veya çalıştırılmaz.
+
 ## Issue 305 — Controller düzeltmesi eski workflow tarihçesini yeniden yazmaz
 
 - Ortak GitHub GET adapter'ı stdout/stderr'i binary yakalar ve yalnız caller

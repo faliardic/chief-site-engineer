@@ -1056,7 +1056,7 @@ def test_schema2_device_absence_pauses_then_same_workflow_resumes_after_artifact
     assert first["artifact"]["sha256"] == artifact["sha256"]
     assert first["stage_attempts"] == {"artifact_verify": 1, "tablet_preflight": 1}
 
-    for expected_attempt in (2, 3):
+    for expected_attempt in (2, 3, 4):
         paused = coordinator(
             auth,
             controller,
@@ -1081,7 +1081,7 @@ def test_schema2_device_absence_pauses_then_same_workflow_resumes_after_artifact
     ).run(execute=True)
     assert resumed["status"] == "COMPLETED"
     assert resumed["stage_attempts"]["artifact_verify"] == 1
-    assert resumed["stage_attempts"]["tablet_preflight"] == 4
+    assert resumed["stage_attempts"]["tablet_preflight"] == 5
     assert fake.calls == list(ISSUE_284_SMOKE_ACTIONS)
 
 
