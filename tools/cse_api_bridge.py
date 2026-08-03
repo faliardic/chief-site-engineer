@@ -1,7 +1,7 @@
 """Minimal GitHub Issue -> OpenAI Responses API -> Draft PR bridge.
 
-The bridge intentionally exposes only bounded file tools to the model. Git,
-validation and publication remain deterministic host-side operations.
+The model receives bounded repository file tools only. Validation, Git and
+publication are deterministic host operations.
 """
 
 from __future__ import annotations
@@ -20,13 +20,14 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 TASK_MARKER = "<!-- cse-bridge-task:v1 -->"
 APPROVAL_LINE = "CSE_BRIDGE_APPROVED"
-STATUS_PREFIX = "<!-- cse-bridge-status:"
-TERMINAL_STATES = {"PASS", "FAILED", "NEEDS_HUMAN"}
-ALLOWED_APPROVER_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
+TRUSTED_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
+TERMINAL_PATTERN = re.compile(
+    r"<!-- cse-bridge-status:(PASS|FAILED|NEEDS_HUMAN) -->"
+)
 PROTECTED_PREFIXES = (
     ".git/",
     ".github/workflows/",
@@ -46,10 +47,17 @@ SECRET_PATTERN = re.compile(
     r"\s*[:=]\s*\S+|sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{12,})"
 )
 SHELL_META_PATTERN = re.compile(r"[;&|><`]|\$\(|\r|\n")
+FATAL_TOOL_ERRORS = {
+    "model_path_escape",
+    "model_write_out_of_scope",
+    "task_path_protected",
+    "model_tool_forbidden",
+    "model_write_invalid",
+}
 
 
 class BridgeError(RuntimeError):
-    """Stable bridge failure suitable for a data-minimal Issue comment."""
+    """Stable, data-minimal bridge failure."""
 
     def __init__(self, reason: str):
         super().__init__(reason)
@@ -69,40 +77,41 @@ class BridgeTask:
     pr_body_first_line: str
 
 
-def _section_map(body: str) -> dict[str, str]:
-    sections: dict[str, list[str]] = {}
+def _sections(body: str) -> dict[str, str]:
+    result: dict[str, list[str]] = {}
     current: str | None = None
-    for line in body.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+    normalized = body.replace("\r\n", "\n").replace("\r", "\n")
+    for line in normalized.split("\n"):
         match = re.fullmatch(r"##\s+(.+?)\s*", line)
         if match:
             current = match.group(1).strip()
-            if current in sections:
+            if current in result:
                 raise BridgeError("duplicate_task_section")
-            sections[current] = []
+            result[current] = []
         elif current is not None:
-            sections[current].append(line)
-    return {key: "\n".join(value).strip() for key, value in sections.items()}
+            result[current].append(line)
+    return {key: "\n".join(value).strip() for key, value in result.items()}
 
 
-def _single_line(value: str, reason: str) -> str:
+def _one_line(value: str, reason: str, *, limit: int = 200) -> str:
     lines = [line.strip() for line in value.splitlines() if line.strip()]
-    if len(lines) != 1 or len(lines[0]) > 200:
+    if len(lines) != 1 or len(lines[0]) > limit:
         raise BridgeError(reason)
     return lines[0]
 
 
-def _bullet_lines(value: str, reason: str) -> tuple[str, ...]:
-    result: list[str] = []
+def _bullets(value: str, reason: str) -> tuple[str, ...]:
+    items: list[str] = []
     for line in value.splitlines():
-        stripped = line.strip()
-        if not stripped:
+        line = line.strip()
+        if not line:
             continue
-        if not stripped.startswith("- "):
+        if not line.startswith("- "):
             raise BridgeError(reason)
-        result.append(stripped[2:].strip())
-    if not result or len(result) > 64:
+        items.append(line[2:].strip())
+    if not items or len(items) > 64:
         raise BridgeError(reason)
-    return tuple(result)
+    return tuple(items)
 
 
 def normalize_repo_path(value: str) -> str:
@@ -123,60 +132,6 @@ def normalize_repo_path(value: str) -> str:
     ):
         raise BridgeError("task_path_protected")
     return normalized
-
-
-def parse_task(body: str) -> BridgeTask:
-    if TASK_MARKER not in body:
-        raise BridgeError("task_marker_missing")
-    sections = _section_map(body)
-    required = {
-        "Repository",
-        "Base",
-        "Branch",
-        "Goal",
-        "Allowed paths",
-        "Validation commands",
-        "Commit",
-        "Draft PR",
-    }
-    if set(sections) != required:
-        raise BridgeError("task_sections_invalid")
-    repository = _single_line(sections["Repository"], "task_repository_invalid")
-    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
-        raise BridgeError("task_repository_invalid")
-    base = _single_line(sections["Base"], "task_base_invalid")
-    branch = _single_line(sections["Branch"], "task_branch_invalid")
-    if not re.fullmatch(r"codex/[a-z0-9][a-z0-9._/-]{2,120}", branch):
-        raise BridgeError("task_branch_invalid")
-    goal = sections["Goal"].strip()
-    if not goal or len(goal) > 20_000 or SECRET_PATTERN.search(goal):
-        raise BridgeError("task_goal_invalid")
-    allowed_paths = tuple(
-        normalize_repo_path(item)
-        for item in _bullet_lines(sections["Allowed paths"], "task_allowlist_invalid")
-    )
-    validation_commands = _bullet_lines(
-        sections["Validation commands"], "task_validation_invalid"
-    )
-    for command in validation_commands:
-        validate_command(command)
-    commit_subject = _single_line(sections["Commit"], "task_commit_invalid")
-    if len(commit_subject) > 100 or SECRET_PATTERN.search(commit_subject):
-        raise BridgeError("task_commit_invalid")
-    pr_lines = [line.strip() for line in sections["Draft PR"].splitlines() if line.strip()]
-    if len(pr_lines) != 2 or any(len(line) > 200 for line in pr_lines):
-        raise BridgeError("task_pr_invalid")
-    return BridgeTask(
-        repository=repository,
-        base=base,
-        branch=branch,
-        goal=goal,
-        allowed_paths=allowed_paths,
-        validation_commands=validation_commands,
-        commit_subject=commit_subject,
-        pr_title=pr_lines[0],
-        pr_body_first_line=pr_lines[1],
-    )
 
 
 def path_allowed(path: str, patterns: Sequence[str]) -> bool:
@@ -225,14 +180,67 @@ def validate_command(command: str) -> tuple[str, ...]:
     return argv
 
 
+def parse_task(body: str) -> BridgeTask:
+    if TASK_MARKER not in body:
+        raise BridgeError("task_marker_missing")
+    sections = _sections(body)
+    required = {
+        "Repository",
+        "Base",
+        "Branch",
+        "Goal",
+        "Allowed paths",
+        "Validation commands",
+        "Commit",
+        "Draft PR",
+    }
+    if set(sections) != required:
+        raise BridgeError("task_sections_invalid")
+    repository = _one_line(sections["Repository"], "task_repository_invalid")
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
+        raise BridgeError("task_repository_invalid")
+    base = _one_line(sections["Base"], "task_base_invalid")
+    if not re.fullmatch(r"[A-Za-z0-9._/-]+", base):
+        raise BridgeError("task_base_invalid")
+    branch = _one_line(sections["Branch"], "task_branch_invalid")
+    if not re.fullmatch(r"codex/[a-z0-9][a-z0-9._/-]{2,120}", branch):
+        raise BridgeError("task_branch_invalid")
+    goal = sections["Goal"].strip()
+    if not goal or len(goal) > 20_000 or SECRET_PATTERN.search(goal):
+        raise BridgeError("task_goal_invalid")
+    allowed_paths = tuple(
+        normalize_repo_path(item)
+        for item in _bullets(sections["Allowed paths"], "task_allowlist_invalid")
+    )
+    commands = _bullets(sections["Validation commands"], "task_validation_invalid")
+    for command in commands:
+        validate_command(command)
+    commit_subject = _one_line(sections["Commit"], "task_commit_invalid", limit=100)
+    if SECRET_PATTERN.search(commit_subject):
+        raise BridgeError("task_commit_invalid")
+    pr_lines = [line.strip() for line in sections["Draft PR"].splitlines() if line.strip()]
+    if len(pr_lines) != 2 or any(len(line) > 200 for line in pr_lines):
+        raise BridgeError("task_pr_invalid")
+    return BridgeTask(
+        repository=repository,
+        base=base,
+        branch=branch,
+        goal=goal,
+        allowed_paths=allowed_paths,
+        validation_commands=commands,
+        commit_subject=commit_subject,
+        pr_title=pr_lines[0],
+        pr_body_first_line=pr_lines[1],
+    )
+
+
 def redact(value: str) -> str:
     return SECRET_PATTERN.sub("[REDACTED]", value)[:6000]
 
 
 def terminal_state(comments: Sequence[Mapping[str, Any]]) -> str | None:
     for comment in reversed(comments):
-        body = str(comment.get("body", ""))
-        match = re.search(r"<!-- cse-bridge-status:(PASS|FAILED|NEEDS_HUMAN) -->", body)
+        match = TERMINAL_PATTERN.search(str(comment.get("body", "")))
         if match:
             return match.group(1)
     return None
@@ -240,11 +248,11 @@ def terminal_state(comments: Sequence[Mapping[str, Any]]) -> str | None:
 
 def approved(comments: Sequence[Mapping[str, Any]]) -> bool:
     for comment in comments:
-        body = str(comment.get("body", ""))
-        association = str(comment.get("author_association", ""))
-        if association in ALLOWED_APPROVER_ASSOCIATIONS and APPROVAL_LINE in {
-            line.strip() for line in body.splitlines()
-        }:
+        lines = {line.strip() for line in str(comment.get("body", "")).splitlines()}
+        if (
+            APPROVAL_LINE in lines
+            and str(comment.get("author_association", "")) in TRUSTED_ASSOCIATIONS
+        ):
             return True
     return False
 
@@ -260,10 +268,17 @@ class GitHubClient:
             "User-Agent": "cse-api-bridge",
         }
 
-    def request(self, method: str, path: str, payload: Mapping[str, Any] | None = None) -> Any:
-        data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    def request(
+        self,
+        method: str,
+        path: str,
+        payload: Mapping[str, Any] | None = None,
+    ) -> Any:
         request = urllib.request.Request(
-            f"{self.api_url}{path}", data=data, method=method, headers=self.headers
+            f"{self.api_url}{path}",
+            data=(json.dumps(payload).encode("utf-8") if payload is not None else None),
+            method=method,
+            headers=self.headers,
         )
         try:
             with urllib.request.urlopen(request, timeout=30) as response:
@@ -278,10 +293,12 @@ class GitHubClient:
         return self.request("GET", f"/repos/{self.repository}/issues/{number}")
 
     def comments(self, number: int) -> list[Mapping[str, Any]]:
-        value = self.request(
-            "GET", f"/repos/{self.repository}/issues/{number}/comments?per_page=100"
+        return list(
+            self.request(
+                "GET",
+                f"/repos/{self.repository}/issues/{number}/comments?per_page=100",
+            )
         )
-        return list(value)
 
     def comment(self, number: int, body: str) -> None:
         self.request(
@@ -293,10 +310,11 @@ class GitHubClient:
     def open_pr_for_branch(self, branch: str) -> Mapping[str, Any] | None:
         owner = self.repository.split("/", 1)[0]
         head = urllib.parse.quote(f"{owner}:{branch}", safe="")
-        value = self.request(
-            "GET", f"/repos/{self.repository}/pulls?state=open&head={head}&per_page=10"
+        values = self.request(
+            "GET",
+            f"/repos/{self.repository}/pulls?state=open&head={head}&per_page=10",
         )
-        return value[0] if value else None
+        return values[0] if values else None
 
     def create_draft_pr(self, task: BridgeTask) -> Mapping[str, Any]:
         existing = self.open_pr_for_branch(task.branch)
@@ -321,23 +339,24 @@ class ResponsesClient:
         self.model = model
 
     def create(self, payload: Mapping[str, Any]) -> Mapping[str, Any]:
-        request = urllib.request.Request(
-            "https://api.openai.com/v1/responses",
-            data=json.dumps(payload).encode("utf-8"),
-            method="POST",
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-                "User-Agent": "cse-api-bridge",
-            },
-        )
         delay = 2.0
         for attempt in range(3):
+            request = urllib.request.Request(
+                "https://api.openai.com/v1/responses",
+                data=json.dumps(payload).encode("utf-8"),
+                method="POST",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                    "User-Agent": "cse-api-bridge",
+                },
+            )
             try:
                 with urllib.request.urlopen(request, timeout=180) as response:
                     return json.loads(response.read().decode("utf-8"))
             except urllib.error.HTTPError as exc:
-                if exc.code not in {408, 409, 429, 500, 502, 503, 504} or attempt == 2:
+                retryable = exc.code in {408, 409, 429, 500, 502, 503, 504}
+                if not retryable or attempt == 2:
                     raise BridgeError(f"openai_http_{exc.code}") from exc
             except (OSError, TimeoutError) as exc:
                 if attempt == 2:
@@ -410,7 +429,11 @@ TOOLS = [
         "type": "function",
         "name": "list_changed_paths",
         "description": "List current Git changed paths.",
-        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
         "strict": True,
     },
     {
@@ -428,7 +451,13 @@ TOOLS = [
 ]
 
 
-def _run(argv: Sequence[str], *, cwd: Path, timeout: int = 120, check: bool = True) -> subprocess.CompletedProcess[str]:
+def _run(
+    argv: Sequence[str],
+    *,
+    cwd: Path,
+    timeout: int = 120,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
     try:
         result = subprocess.run(
             list(argv),
@@ -451,19 +480,19 @@ def _run(argv: Sequence[str], *, cwd: Path, timeout: int = 120, check: bool = Tr
 
 
 def changed_paths(root: Path) -> tuple[str, ...]:
-    value = _run(
+    output = _run(
         ["git", "status", "--porcelain=v1", "--untracked-files=all"],
         cwd=root,
     ).stdout
-    result: set[str] = set()
-    for line in value.splitlines():
+    paths: set[str] = set()
+    for line in output.splitlines():
         if len(line) < 4:
             continue
         path = line[3:]
         if " -> " in path:
             path = path.split(" -> ", 1)[1]
-        result.add(path.replace("\\", "/"))
-    return tuple(sorted(result))
+        paths.add(path.replace("\\", "/"))
+    return tuple(sorted(paths))
 
 
 class LocalTools:
@@ -507,7 +536,8 @@ class LocalTools:
             for candidate in tracked:
                 normalized = candidate.replace("\\", "/")
                 if roots and not any(
-                    normalized == root or normalized.startswith(root.rstrip("/") + "/")
+                    normalized == root
+                    or normalized.startswith(root.rstrip("/") + "/")
                     for root in roots
                 ):
                     continue
@@ -524,7 +554,9 @@ class LocalTools:
                     continue
                 for number, line in enumerate(lines, 1):
                     if query in line:
-                        hits.append({"path": normalized, "line": number, "text": line[:500]})
+                        hits.append(
+                            {"path": normalized, "line": number, "text": line[:500]}
+                        )
                         if len(hits) >= 50:
                             return {"hits": hits}
             return {"hits": hits}
@@ -545,7 +577,11 @@ class LocalTools:
             current = path.read_text(encoding="utf-8")
             if current.count(old) != 1:
                 raise BridgeError("model_replace_not_exact")
-            path.write_text(current.replace(old, new, 1), encoding="utf-8", newline="\n")
+            path.write_text(
+                current.replace(old, new, 1),
+                encoding="utf-8",
+                newline="\n",
+            )
             return {"replaced": path.relative_to(self.root).as_posix()}
         if name == "list_changed_paths":
             return {"paths": list(changed_paths(self.root))}
@@ -559,15 +595,19 @@ class LocalTools:
 
 
 def run_model(client: ResponsesClient, tools: LocalTools, prompt: str) -> str:
-    payload: dict[str, Any] = {
-        "model": client.model,
-        "input": prompt,
-        "tools": TOOLS,
-        "tool_choice": "auto",
-        "store": False,
-    }
+    conversation: list[Mapping[str, Any]] = [
+        {"role": "user", "content": prompt}
+    ]
     for _ in range(40):
-        response = client.create(payload)
+        response = client.create(
+            {
+                "model": client.model,
+                "input": conversation,
+                "tools": TOOLS,
+                "tool_choice": "auto",
+                "store": False,
+            }
+        )
         output = response.get("output")
         if not isinstance(output, list):
             raise BridgeError("openai_response_invalid")
@@ -576,7 +616,8 @@ def run_model(client: ResponsesClient, tools: LocalTools, prompt: str) -> str:
             raise BridgeError("model_finished_without_finish")
         if any(item.get("name") == "finish" for item in calls) and len(calls) != 1:
             raise BridgeError("model_finish_must_be_single")
-        results: list[dict[str, Any]] = []
+        conversation.extend(output)
+        tool_outputs: list[dict[str, Any]] = []
         for call in calls:
             try:
                 arguments = json.loads(str(call.get("arguments", "{}")))
@@ -584,27 +625,25 @@ def run_model(client: ResponsesClient, tools: LocalTools, prompt: str) -> str:
                 raise BridgeError("model_arguments_invalid") from exc
             if not isinstance(arguments, Mapping):
                 raise BridgeError("model_arguments_invalid")
-            result = tools.dispatch(str(call.get("name", "")), arguments)
-            results.append(
+            try:
+                result = tools.dispatch(str(call.get("name", "")), arguments)
+            except BridgeError as exc:
+                if exc.reason in FATAL_TOOL_ERRORS:
+                    raise
+                result = {"error": exc.reason}
+            call_id = call.get("call_id")
+            if not isinstance(call_id, str) or not call_id:
+                raise BridgeError("openai_response_invalid")
+            tool_outputs.append(
                 {
                     "type": "function_call_output",
-                    "call_id": str(call.get("call_id", "")),
+                    "call_id": call_id,
                     "output": json.dumps(result, ensure_ascii=False),
                 }
             )
         if tools.finished_summary is not None:
             return tools.finished_summary
-        response_id = response.get("id")
-        if not isinstance(response_id, str) or not response_id:
-            raise BridgeError("openai_response_invalid")
-        payload = {
-            "model": client.model,
-            "previous_response_id": response_id,
-            "input": results,
-            "tools": TOOLS,
-            "tool_choice": "auto",
-            "store": False,
-        }
+        conversation.extend(tool_outputs)
     raise BridgeError("model_tool_round_limit")
 
 
@@ -615,8 +654,7 @@ def validate_scope(root: Path, task: BridgeTask) -> tuple[str, ...]:
     for path in paths:
         if not path_allowed(path, task.allowed_paths):
             raise BridgeError("changed_path_out_of_scope")
-    diff_check = _run(["git", "diff", "--check"], cwd=root, check=False)
-    if diff_check.returncode != 0:
+    if _run(["git", "diff", "--check"], cwd=root, check=False).returncode != 0:
         raise BridgeError("git_diff_check_failed")
     return paths
 
@@ -625,8 +663,12 @@ def run_validations(root: Path, task: BridgeTask) -> tuple[bool, str]:
     summaries: list[str] = []
     timeout = int(os.environ.get("CSE_BRIDGE_COMMAND_TIMEOUT", "1200"))
     for command in task.validation_commands:
-        argv = validate_command(command)
-        result = _run(argv, cwd=root, timeout=timeout, check=False)
+        result = _run(
+            validate_command(command),
+            cwd=root,
+            timeout=timeout,
+            check=False,
+        )
         summaries.append(f"{command}: exit {result.returncode}")
         if result.returncode != 0:
             detail = redact((result.stdout + "\n" + result.stderr)[-5000:])
@@ -636,18 +678,19 @@ def run_validations(root: Path, task: BridgeTask) -> tuple[bool, str]:
 
 def model_prompt(task: BridgeTask, *, correction: str | None = None) -> str:
     correction_text = (
-        "\nThe previous pass failed deterministic validation. Fix only the reported failure:\n"
-        + correction
+        "\nThe previous pass failed deterministic validation. "
+        "Fix only this failure:\n" + correction
         if correction
         else ""
     )
+    writable = "\n".join(f"- {item}" for item in task.allowed_paths)
     return f"""You are the coding model for CSE Bridge.
 
 Goal:
 {task.goal}
 
 Writable paths:
-{chr(10).join('- ' + item for item in task.allowed_paths)}
+{writable}
 
 Rules:
 - Inspect repository files with read_file/search_files.
@@ -663,12 +706,12 @@ def prepare_branch(root: Path, task: BridgeTask) -> None:
     if changed_paths(root):
         raise BridgeError("checkout_not_clean")
     _run(["git", "fetch", "origin", task.base, "--prune"], cwd=root)
-    remote = _run(
+    exists = _run(
         ["git", "ls-remote", "--exit-code", "--heads", "origin", task.branch],
         cwd=root,
         check=False,
     )
-    if remote.returncode == 0:
+    if exists.returncode == 0:
         raise BridgeError("task_branch_already_exists")
     _run(["git", "switch", "-c", task.branch, f"origin/{task.base}"], cwd=root)
 
@@ -676,24 +719,41 @@ def prepare_branch(root: Path, task: BridgeTask) -> None:
 def publish(root: Path, task: BridgeTask, github: GitHubClient) -> Mapping[str, Any]:
     paths = validate_scope(root, task)
     _run(["git", "config", "user.name", "CSE API Bridge"], cwd=root)
-    _run(["git", "config", "user.email", "cse-bridge@users.noreply.github.com"], cwd=root)
+    _run(
+        ["git", "config", "user.email", "cse-bridge@users.noreply.github.com"],
+        cwd=root,
+    )
     _run(["git", "add", "-A"], cwd=root)
-    staged = _run(["git", "diff", "--cached", "--name-only"], cwd=root).stdout.splitlines()
-    if tuple(sorted(item.replace("\\", "/") for item in staged)) != paths:
+    staged = tuple(
+        sorted(
+            line.replace("\\", "/")
+            for line in _run(
+                ["git", "diff", "--cached", "--name-only"], cwd=root
+            ).stdout.splitlines()
+            if line.strip()
+        )
+    )
+    if staged != paths:
         raise BridgeError("staged_scope_mismatch")
     _run(["git", "commit", "-m", task.commit_subject], cwd=root)
-    _run(["git", "push", "origin", f"HEAD:refs/heads/{task.branch}"], cwd=root, timeout=300)
+    _run(
+        ["git", "push", "origin", f"HEAD:refs/heads/{task.branch}"],
+        cwd=root,
+        timeout=300,
+    )
     return github.create_draft_pr(task)
 
 
 def execute(issue_number: int, root: Path) -> int:
     repository = os.environ.get("GITHUB_REPOSITORY", "")
     token = os.environ.get("GITHUB_TOKEN", "")
-    api_key = os.environ.get("OPENAI_API_KEY", "")
-    model = os.environ.get("CSE_BRIDGE_MODEL", "")
     if not repository or not token:
         raise BridgeError("github_configuration_missing")
-    github = GitHubClient(repository, token, os.environ.get("GITHUB_API_URL", "https://api.github.com"))
+    github = GitHubClient(
+        repository,
+        token,
+        os.environ.get("GITHUB_API_URL", "https://api.github.com"),
+    )
     issue = github.issue(issue_number)
     comments = github.comments(issue_number)
     if terminal_state(comments) is not None:
@@ -704,20 +764,24 @@ def execute(issue_number: int, root: Path) -> int:
     task = parse_task(body)
     if task.repository != repository:
         raise BridgeError("task_repository_mismatch")
-    expected_base = os.environ.get("CSE_BRIDGE_BASE", "master")
-    if task.base != expected_base:
+    if task.base != os.environ.get("CSE_BRIDGE_BASE", "master"):
         raise BridgeError("task_base_forbidden")
     if not approved(comments):
         raise BridgeError("task_not_approved")
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    model = os.environ.get("CSE_BRIDGE_MODEL", "")
     if not api_key or not model:
         github.comment(
             issue_number,
-            "<!-- cse-bridge-status:NEEDS_HUMAN -->\nCSE Bridge configuration is missing: repository secret `OPENAI_API_KEY` and/or repository variable `CSE_BRIDGE_MODEL`.",
+            "<!-- cse-bridge-status:WAITING_CONFIG -->\n"
+            "Configure repository secret `OPENAI_API_KEY` and repository variable "
+            "`CSE_BRIDGE_MODEL`, then dispatch the workflow again.",
         )
         return 2
     github.comment(
         issue_number,
-        "<!-- cse-bridge-status:RUNNING -->\nCSE API Bridge started the approved task.",
+        "<!-- cse-bridge-status:RUNNING -->\n"
+        "CSE API Bridge started the approved task.",
     )
     prepare_branch(root, task)
     client = ResponsesClient(api_key, model)
@@ -740,15 +804,16 @@ def execute(issue_number: int, root: Path) -> int:
     if not passed:
         github.comment(
             issue_number,
-            "<!-- cse-bridge-status:NEEDS_HUMAN -->\nThe primary pass and one bounded correction did not pass validation.\n\n" + redact(validation),
+            "<!-- cse-bridge-status:NEEDS_HUMAN -->\n"
+            "The primary pass and one bounded correction did not pass validation.\n\n"
+            + redact(validation),
         )
         return 3
     pr = publish(root, task, github)
-    pr_url = str(pr.get("html_url", ""))
     github.comment(
         issue_number,
         "<!-- cse-bridge-status:PASS -->\n"
-        f"CSE API Bridge completed the task and opened a Draft PR: {pr_url}\n\n"
+        f"CSE API Bridge opened a Draft PR: {pr.get('html_url', '')}\n\n"
         f"Summary: {redact(summary)}\n\nValidation:\n{redact(validation)}",
     )
     return 0
@@ -769,7 +834,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             try:
                 GitHubClient(repository, token).comment(
                     args.issue_number,
-                    f"<!-- cse-bridge-status:FAILED -->\nCSE API Bridge stopped: `{exc.reason}`.",
+                    "<!-- cse-bridge-status:FAILED -->\n"
+                    f"CSE API Bridge stopped: `{exc.reason}`.",
                 )
             except BridgeError:
                 pass
