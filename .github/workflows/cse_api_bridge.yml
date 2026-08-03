@@ -1,0 +1,72 @@
+name: CSE API Bridge
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/cse_api_bridge.yml"
+      - "tools/cse_api_bridge.py"
+      - "tests/test_cse_api_bridge.py"
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Approved CSE bridge task Issue number"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    if: github.event_name == 'pull_request'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Unit tests
+        run: python -m unittest tests/test_cse_api_bridge.py -v
+      - name: Compile
+        run: python -m compileall -q tools/cse_api_bridge.py tests/test_cse_api_bridge.py
+
+  bridge:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request == null &&
+       contains(github.event.comment.body, 'CSE_BRIDGE_APPROVED'))
+    runs-on: windows-latest
+    timeout-minutes: 60
+    concurrency:
+      group: cse-api-bridge-${{ github.event.issue.number || inputs.issue_number }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      CSE_BRIDGE_MODEL: ${{ vars.CSE_BRIDGE_MODEL }}
+      CSE_BRIDGE_BASE: master
+      ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Bridge self-test
+        run: python -m unittest tests/test_cse_api_bridge.py -v
+      - name: Execute approved task
+        shell: pwsh
+        run: >-
+          python tools/cse_api_bridge.py run
+          --issue-number $env:ISSUE_NUMBER
+          --repo-root .
