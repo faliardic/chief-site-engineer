@@ -51,6 +51,10 @@
   gösterimlerini tek semantiğe bağlar. Exact dördüncü pause state'i bütün önceki
   authorization/runtime zincirini immutable tutan tek üçüncü successor'a
   devredilir; duplicate veya drift fail closed kalır.
+- Issue #305 display-header correction, yalnız exact display-state adaylarını
+  doğrular ve benign `Display Power:` object/header bilgisini ignore eder. Exact
+  fifth-pause state'i önceki bütün provenance zincirini koruyan tek dördüncü
+  successor'a devredilir; later successor ve drift fail closed kalır.
 - Opsiyonel service/tray yüzeyi O10 contract'ının parçası değildir; gerekirse
   ayrı Issue, capability ve approval sözleşmesi ister.
 

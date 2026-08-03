@@ -51,6 +51,9 @@ DAY_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 WAKEFULNESS_LINE = re.compile(r"^\s*mWakefulness=([^\s=]+)\s*$")
 INTERACTIVE_LINE = re.compile(r"^\s*mInteractive=(true|false)\s*$")
 DISPLAY_POWER_LINE = re.compile(r"^\s*Display Power: state=(ON|OFF)\s*$")
+DISPLAY_POWER_STATE_CANDIDATE = re.compile(
+    r"^Display Power:\s*state(?:\s*=|$)", re.IGNORECASE
+)
 WAKEFULNESS_INTERACTIVE = {
     "Awake": True,
     "1": True,
@@ -104,7 +107,7 @@ def parse_power_interactive_state(output: str) -> PowerInteractiveState:
             signals.append(display.group(1) == "ON")
         elif (
             re.match(r"^(mWakefulness|mInteractive)\s*=", stripped)
-            or stripped.startswith("Display Power:")
+            or DISPLAY_POWER_STATE_CANDIDATE.match(stripped) is not None
         ):
             malformed = True
     if malformed or not signals:

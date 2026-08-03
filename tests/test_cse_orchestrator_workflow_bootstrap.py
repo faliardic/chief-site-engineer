@@ -21,6 +21,7 @@ from tools.cse_orchestrator.workflow_bootstrap import (
     ISSUE_284_CHECKPOINT_PATHS,
     ISSUE_284_READ_WRITE_ALLOWLIST,
     ISSUE_305_AUTHORIZATION_COMMENT,
+    ISSUE_305_DISPLAY_HANDOFF_AUTHORIZATION_COMMENT,
     ISSUE_305_HANDOFF_AUTHORIZATION_COMMENT,
     ISSUE_305_NUMERIC_HANDOFF_AUTHORIZATION_COMMENT,
     ISSUE_305_PAUSED_HANDOFF_AUTHORIZATION_COMMENT,
@@ -573,6 +574,72 @@ def numeric_paused_successor_fixture(values):
     )
 
 
+def display_paused_successor_fixture(values):
+    (
+        numeric_values,
+        root_authorization,
+        first_authorization,
+        second_authorization,
+        bootstrap_store,
+        first_store,
+        second_store,
+        _,
+    ) = numeric_paused_successor_fixture(values)
+    controller, target, runtime, profile, client = numeric_values
+    third_controller = advance_controller(controller)
+    third_authorization, _, _ = bootstrap(numeric_values).authorization(persist=True)
+    third_contract = WorkflowContract.from_authorization(third_authorization)
+    third_store = WorkflowStore(
+        runtime_root=runtime,
+        repo_root=target,
+        workflow_id=third_contract.workflow_id,
+    )
+    third_store.append("workflow_resumed", {"stage_index": 6})
+    preflight_stage = third_contract.stages[6]
+    third_store.append(
+        "stage_admitted",
+        {
+            "stage_index": 6,
+            "stage": "tablet_preflight",
+            "attempt": 5,
+            "attempt_id": "sha256:" + sha("preflight-attempt-5"),
+            "stage_fingerprint": preflight_stage.stage_fingerprint,
+            "budget_counter": "command",
+        },
+    )
+    third_store.append(
+        "stage_paused",
+        {
+            "stage": "tablet_preflight",
+            "reason_code": "screen_not_interactive",
+            "command_index": 1,
+            "first_failed_predicate": "screen_is_interactive",
+        },
+    )
+    display_paused = third_store.verify()
+    display_public = display_paused.projection.public_dict(display_paused.contract)
+    display_profile = replace(
+        profile,
+        display_handoff_predecessor_revision=third_controller,
+        display_predecessor_authorization=third_authorization.fingerprint,
+        display_predecessor_workflow=display_paused.contract.workflow_id,
+        display_projection_fingerprint=display_public["projection_fingerprint"],
+        display_tail_hash=display_paused.projection.tail_hash,
+    )
+    return (
+        (controller, target, runtime, display_profile, client),
+        root_authorization,
+        first_authorization,
+        second_authorization,
+        third_authorization,
+        bootstrap_store,
+        first_store,
+        second_store,
+        third_store,
+        display_paused,
+    )
+
+
 def test_exact_pre_stage_controller_handoff_is_immutable_and_idempotent(
     bootstrap_fixture,
 ):
@@ -882,6 +949,176 @@ def test_numeric_paused_handoff_rejects_every_state_and_effect_mismatch(
 def test_numeric_paused_successor_rejects_contract_drift(bootstrap_fixture):
     numeric_values, *_ = numeric_paused_successor_fixture(bootstrap_fixture)
     controller, target, runtime, profile, client = numeric_values
+    advance_controller(controller)
+    drifted = (
+        controller,
+        target,
+        runtime,
+        replace(profile, artifact_version="changed-contract"),
+        client,
+    )
+
+    with pytest.raises(BootstrapError, match="^controller_handoff_not_safe$"):
+        bootstrap(drifted).authorization(persist=True)
+
+
+def test_exact_display_paused_successor_preserves_full_chain_and_is_idempotent(
+    bootstrap_fixture,
+):
+    (
+        display_values,
+        _,
+        first_authorization,
+        second_authorization,
+        third_authorization,
+        store,
+        first_workflow,
+        second_workflow,
+        third_workflow,
+        display_paused,
+    ) = display_paused_successor_fixture(bootstrap_fixture)
+    controller, target, runtime, _, _ = display_values
+    authorization_paths = [
+        store._successor_paths(
+            str(authorization.payload["controller_revision"])
+        )
+        for authorization in (
+            first_authorization,
+            second_authorization,
+            third_authorization,
+        )
+    ]
+    immutable_paths = [store.authorization_path, store.metadata_path]
+    immutable_paths.extend(path for paths in authorization_paths for path in paths)
+    for workflow_store in (first_workflow, second_workflow, third_workflow):
+        immutable_paths.extend(
+            (workflow_store.manifest_path, workflow_store.ledger_path)
+        )
+    immutable = {path: path.read_bytes() for path in immutable_paths}
+    fourth_controller = advance_controller(controller)
+
+    successor, resumed, predecessor_id = bootstrap(display_values).authorization(
+        persist=True
+    )
+    successor_contract = WorkflowContract.from_authorization(successor)
+    successor_workflow = WorkflowStore(
+        runtime_root=runtime,
+        repo_root=target,
+        workflow_id=successor_contract.workflow_id,
+    )
+    successor_verification = successor_workflow.verify()
+
+    assert resumed is True
+    assert predecessor_id == display_paused.contract.workflow_id
+    assert successor.payload["controller_revision"] == fourth_controller
+    assert successor_verification.projection.status == "PAUSED_EXTERNAL"
+    assert successor_verification.projection.current_stage_index == 6
+    assert successor_verification.projection.stage_attempts == {
+        "artifact_verify": 1,
+        "tablet_preflight": 5,
+    }
+    assert successor_verification.projection.external_pauses == {
+        "tablet_preflight": 5
+    }
+    assert successor_verification.projection.consumed_budgets == {
+        "command": 6,
+        "github_comment": 9,
+    }
+    assert len(successor_verification.projection.admitted_attempt_ids) == 6
+    assert tuple(
+        item["stage"] for item in successor_verification.projection.passed_evidence
+    ) == (*bootstrap_module.REUSED_STAGE_NAMES, "artifact_verify")
+    assert successor_verification.projection.device is None
+    assert successor_verification.projection.publish is None
+    assert bootstrap_module.WorkflowBootstrap._same_continuation_state(
+        display_paused, successor_verification
+    )
+    for path, expected in immutable.items():
+        assert path.read_bytes() == expected, path
+
+    fourth_paths = store._successor_paths(fourth_controller)
+    metadata = json.loads(fourth_paths[1].read_text(encoding="utf-8"))
+    assert metadata["handoff_authorization_comment_id"] == (
+        ISSUE_305_DISPLAY_HANDOFF_AUTHORIZATION_COMMENT
+    )
+    successor_bytes = {
+        "authorization": fourth_paths[0].read_bytes(),
+        "metadata": fourth_paths[1].read_bytes(),
+        "manifest": successor_workflow.manifest_path.read_bytes(),
+        "ledger": successor_workflow.ledger_path.read_bytes(),
+    }
+
+    repeated, repeated_resumed, repeated_predecessor = bootstrap(
+        display_values
+    ).authorization(persist=True)
+    assert repeated.fingerprint == successor.fingerprint
+    assert repeated_resumed is True
+    assert repeated_predecessor == predecessor_id
+    assert fourth_paths[0].read_bytes() == successor_bytes["authorization"]
+    assert fourth_paths[1].read_bytes() == successor_bytes["metadata"]
+    assert successor_workflow.manifest_path.read_bytes() == successor_bytes["manifest"]
+    assert successor_workflow.ledger_path.read_bytes() == successor_bytes["ledger"]
+
+    advance_controller(controller)
+    with pytest.raises(BootstrapError, match="^controller_handoff_not_safe$"):
+        bootstrap(display_values).authorization(persist=True)
+
+
+def test_display_paused_handoff_rejects_state_tail_and_effect_mismatch(
+    bootstrap_fixture,
+):
+    display_values, *_, display_paused = display_paused_successor_fixture(
+        bootstrap_fixture
+    )
+    profile = display_values[3]
+    mismatches = [
+        ("status", "RUNNING"),
+        ("current_stage_index", 5),
+        ("stage_attempts", {"artifact_verify": 1, "tablet_preflight": 4}),
+        ("external_pauses", {"tablet_preflight": 4}),
+        ("active_attempt_id", "sha256:" + "a" * 64),
+        ("admitted_attempt_ids", display_paused.projection.admitted_attempt_ids[:-1]),
+        ("consumed_budgets", {"command": 5, "github_comment": 9}),
+        ("passed_evidence", display_paused.projection.passed_evidence[:-1]),
+        ("artifact", None),
+        ("device", {"installed": True}),
+        ("publish", {"commit_sha": "b" * 40}),
+        ("last_blocker", "device_not_connected"),
+        ("blocker_phase", "tablet_install"),
+        ("command_index", 0),
+        ("first_failed_predicate", "tablet_state_is_device"),
+        ("event_count", 31),
+    ]
+    for field, value in mismatches:
+        projection = deepcopy(display_paused.projection)
+        setattr(projection, field, value)
+        assert not bootstrap_module._is_exact_display_paused_tablet_handoff(
+            projection,
+            display_paused.events,
+            display_paused.contract,
+            expected_projection_fingerprint=profile.display_projection_fingerprint,
+            expected_tail_hash=profile.display_tail_hash,
+        ), field
+
+    assert not bootstrap_module._is_exact_display_paused_tablet_handoff(
+        display_paused.projection,
+        display_paused.events,
+        display_paused.contract,
+        expected_projection_fingerprint="sha256:" + "0" * 64,
+        expected_tail_hash=profile.display_tail_hash,
+    )
+    assert not bootstrap_module._is_exact_display_paused_tablet_handoff(
+        display_paused.projection,
+        display_paused.events,
+        display_paused.contract,
+        expected_projection_fingerprint=profile.display_projection_fingerprint,
+        expected_tail_hash="sha256:" + "0" * 64,
+    )
+
+
+def test_display_paused_successor_rejects_contract_drift(bootstrap_fixture):
+    display_values, *_ = display_paused_successor_fixture(bootstrap_fixture)
+    controller, target, runtime, profile, client = display_values
     advance_controller(controller)
     drifted = (
         controller,

@@ -1,5 +1,23 @@
 # Proje Kararlari
 
+## Issue 305 — Display Power bilgi satırı state sinyali değildir
+
+- `Display Power: state=ON|OFF` exact supported sinyaldir. State anahtarına
+  benzeyen boş, unknown veya malformed aday fail closed kalır.
+- Exact state anahtarı taşımayan `Display Power:` object/header/callback bilgisi
+  sinyal veya malformed state değildir ve parser kararından ignore edilir.
+- Wakefulness alias mapping, `mInteractive`, cross-signal conflict, bağımsız
+  keyguard, exact tablet/model/package ve shell-free/destructive/real-user
+  guard'ları değiştirilmez. Raw dumpsys output log/evidence değildir.
+- Yeni controller handoff yalnız authorization `5170082561` içindeki exact
+  32-event, fifth-pause predecessor'a açıktır. Stage, attempts/pauses/admissions,
+  budgets, evidence, artifact ve sıfır effect exact korunur.
+- Root ve önceki üç successor authorization/metadata/manifest/ledger byte'ları
+  immutable kalır. Dördüncü successor idempotenttir; drift, rollback, corrupt
+  history, duplicate veya later successor `controller_handoff_not_safe` olur.
+- Product/mobile, Issue #284 runtime/target/APK ve build/install/ADB/tablet bu
+  implementation run'ında değiştirilmez veya çalıştırılmaz.
+
 ## Issue 305 — Wakefulness alias'ları semantik olarak birleştirilir
 
 - `mWakefulness` token'ları regex dalıyla değil tek mapping ile semantiğe
