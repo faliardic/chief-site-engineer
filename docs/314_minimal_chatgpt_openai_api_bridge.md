@@ -6,40 +6,58 @@ The bridge removes Fatih from the prompt-relay loop.
 
 ```text
 ChatGPT task Issue + approval comment
-→ GitHub Actions
+→ Windows Task Scheduler
+→ local repository-external worktree
 → OpenAI Responses API with bounded file tools
 → deterministic validation and publication
 → Draft PR
 → ChatGPT review
 ```
 
-The bridge is deliberately smaller than the former Orchestrator design. It does
-not use workflow projections, successor runtimes, controller SHA handoffs or a
-new approval for every gate.
+The bridge deliberately avoids the former controller SHA, projection, tail-hash
+and successor-chain design. It protects only the main risks and stops on unknown
+or high-risk conditions.
 
 ## Main safety guards
 
-1. Only the configured repository and `master` base are accepted.
-2. Every task uses a new `codex/*` branch on an ephemeral GitHub runner.
-3. The model can write only paths listed in the task Issue.
-4. The model cannot run shell, Git, GitHub, credentials, ADB or device tools.
+1. Only `faliardic/chief-site-engineer` and the configured canonical checkout
+   are accepted.
+2. The canonical checkout is never switched to a task branch. Every task runs
+   in `%LOCALAPPDATA%\CSE-Bridge\worktrees\issue-N`.
+3. The model writes only paths listed in the task Issue.
+4. The model cannot call shell, Git, GitHub, credentials, ADB or device tools.
 5. Validation commands are parsed without a shell and limited to approved
-   Python, Flutter and `git diff --check` families.
-6. Commit, push and Draft PR happen only after scope and validation PASS.
+   Python, Flutter and `git diff --check` command families.
+6. Commit, normal push and Draft PR happen only after scope and validation PASS.
 7. Only one correction pass is permitted.
-8. Force-push, merge, release, hard reset/clean, branch deletion and device-data
-   operations are outside the bridge.
-9. Secrets are read from GitHub Actions secrets and are never passed to model
-   tools or written to Issue comments.
+8. Force-push, merge, release, hard reset/clean, branch deletion and real-user
+   or device-data operations remain outside the bridge.
+9. The OpenAI API key is stored with the current Windows user's DPAPI protection
+   as a PowerShell SecureString export. It is decrypted only into the launcher
+   process environment and is cleared after the worker exits.
+10. GitHub authentication comes from the existing `gh auth` session and is not
+    persisted by the bridge.
 
 ## One-time setup
 
-After the bootstrap PR is merged, configure:
+From the canonical repository, run:
 
-- repository secret `OPENAI_API_KEY`;
-- repository variable `CSE_BRIDGE_MODEL`.
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install_cse_bridge.ps1
+```
 
-No local daemon or recurring PowerShell command is required.
+The installer:
+
+- verifies `python`, `git`, `gh` and the current GitHub login;
+- asks for the OpenAI API key through a secure prompt;
+- stores it under `%LOCALAPPDATA%\CSE-Bridge` using user-bound encryption;
+- writes non-secret model/repository configuration;
+- registers the user-level `CSE Bridge` Scheduled Task;
+- starts the task immediately and repeats every five minutes.
+
+No administrator permission is required. To replace the key, run with
+`-ResetKey`. To remove the scheduled task while preserving credentials, run
+with `-Uninstall`.
 
 ## Task format
 
@@ -80,8 +98,7 @@ ChatGPT adds a trusted Issue comment containing exactly:
 CSE_BRIDGE_APPROVED
 ```
 
-That comment starts the GitHub Actions workflow. The bridge posts one of these
-machine-readable states back to the Issue:
+The scheduled worker selects one approved, non-terminal task and posts one of:
 
 - `RUNNING`
 - `PASS`
@@ -90,8 +107,8 @@ machine-readable states back to the Issue:
 
 ## OpenAI API loop
 
-The bridge calls the Responses API using the model selected by
-`CSE_BRIDGE_MODEL`. The model receives only these tools:
+The bridge calls the Responses API using the locally configured model. The
+model receives only these bounded tools:
 
 - read a tracked, non-protected text file;
 - search tracked text files;
@@ -100,8 +117,19 @@ The bridge calls the Responses API using the model selected by
 - finish with a summary.
 
 The host, not the model, owns validation, commit, push and Draft PR creation.
-Transport retries for temporary API errors are separate from the single coding
-correction budget.
+Temporary API transport retries are separate from the single coding correction
+budget.
+
+## Worktree lifecycle
+
+Before a task starts, the local worker verifies the canonical repository and
+origin, fetches the exact base, checks that the task branch does not already
+exist remotely, and creates a detached repository-external worktree. The
+existing bridge then creates the task branch inside that worktree.
+
+After a successful publish, only the bridge-owned worktree and local task branch
+are removed; the remote branch and Draft PR remain. On failure, the worktree is
+preserved for diagnosis. A lock file prevents concurrent workers.
 
 ## Human-on-exception boundary
 
@@ -110,6 +138,6 @@ Fatih is interrupted only for:
 - product or scope decisions;
 - real-user-data or destructive-operation risk;
 - physical device action;
-- missing API configuration;
+- missing local API/GitHub configuration;
 - one correction failing to reach PASS;
 - an unknown high-risk condition.
