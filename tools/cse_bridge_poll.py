@@ -26,10 +26,14 @@ TERMINAL_MARKERS = (
     "<!-- cse-bridge-status:PASS -->",
     "<!-- cse-bridge-status:FAILED -->",
     "<!-- cse-bridge-status:NEEDS_HUMAN -->",
+    "<!-- cse-agent-loop-status:PASS -->",
+    "<!-- cse-agent-loop-status:FAILED -->",
+    "<!-- cse-agent-loop-status:NEEDS_HUMAN -->",
 )
 PAUSE_MARKERS = (
     "<!-- cse-bridge-status:WAITING_CONFIG -->",
     "<!-- cse-bridge-status:RUNNING -->",
+    "<!-- cse-agent-loop-status:RUNNING -->",
 )
 
 
