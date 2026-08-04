@@ -36,3 +36,6 @@ temp/
 *.tmp
 *.log
 *.zip
+
+# CSE agent loop runtime
+.cse/agent-loop/
