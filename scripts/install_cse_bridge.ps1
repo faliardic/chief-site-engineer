@@ -72,20 +72,25 @@ Start-Sleep -Seconds 1
 Write-Host "Running one foreground bridge verification..."
 & $powershellPath -NoProfile -ExecutionPolicy Bypass -File $runnerPath -RepoRoot $RepoRoot -RuntimeRoot $runtimeRoot
 $verificationExit = $LASTEXITCODE
-
-if ($verificationExit -ne 0) {
-    $reason = "launcher_failure"
-    if (Test-Path -LiteralPath $statusPath) {
-        try {
-            $status = Get-Content -LiteralPath $statusPath -Raw -Encoding UTF8 | ConvertFrom-Json
-            if ($status.reason -and ([string]$status.reason -match "^[a-z0-9_]+$")) {
-                $reason = [string]$status.reason
-            }
+$verificationState = ""
+$reason = "launcher_failure"
+if (Test-Path -LiteralPath $statusPath) {
+    try {
+        $status = Get-Content -LiteralPath $statusPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $verificationState = [string]$status.state
+        if ($status.reason -and ([string]$status.reason -match "^[a-z0-9_]+$")) {
+            $reason = [string]$status.reason
         }
-        catch {
-            $reason = "status_unavailable"
+        elseif ($verificationState -and ($verificationState -ne "PASS")) {
+            $reason = "verification_not_pass"
         }
     }
+    catch {
+        $reason = "status_unavailable"
+    }
+}
+
+if (($verificationExit -ne 0) -or ($verificationState -ne "PASS")) {
     $body = "<!-- cse-bridge-local-install:FAILED -->`nLocal CSE Bridge verification failed: ``$reason``. API key and raw logs were not posted."
     & $ghPath issue comment 314 --repo "faliardic/chief-site-engineer" --body $body 1>$null 2>$null
     throw "CSE Bridge verification failed: $reason. Details remain in $logPath."
