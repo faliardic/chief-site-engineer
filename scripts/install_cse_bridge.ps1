@@ -16,6 +16,7 @@ $runnerPath = Join-Path $RepoRoot "scripts\run_cse_bridge.ps1"
 $powershellPath = Join-Path $PSHOME "powershell.exe"
 
 if ($Uninstall) {
+    Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
     Write-Host "CSE Bridge scheduled task removed. Credentials were preserved in $runtimeRoot."
     exit 0
@@ -65,7 +66,9 @@ if ($ResetKey -or -not (Test-Path -LiteralPath $credentialPath)) {
     gh_path = $ghPath
 } | ConvertTo-Json | Set-Content -LiteralPath $configPath -Encoding UTF8
 
+Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 1
 Write-Host "Running one foreground bridge verification..."
 & $powershellPath -NoProfile -ExecutionPolicy Bypass -File $runnerPath -RepoRoot $RepoRoot -RuntimeRoot $runtimeRoot
 $verificationExit = $LASTEXITCODE
