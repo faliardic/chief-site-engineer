@@ -44,10 +44,29 @@ class StatusTests(unittest.TestCase):
 
 
 class InstallerContractTests(unittest.TestCase):
+    def installer(self) -> str:
+        return Path("scripts/install_cse_bridge.ps1").read_text(encoding="utf-8")
+
     def test_default_model_is_general_responses_model(self) -> None:
-        installer = Path("scripts/install_cse_bridge.ps1").read_text(encoding="utf-8")
+        installer = self.installer()
         self.assertIn('[string]$Model = "gpt-5.1"', installer)
         self.assertNotIn('[string]$Model = "gpt-5.1-codex"', installer)
+
+    def test_scheduled_task_uses_interactive_limited_principal(self) -> None:
+        installer = self.installer()
+        self.assertIn("New-ScheduledTaskPrincipal", installer)
+        self.assertIn("-LogonType Interactive", installer)
+        self.assertIn("-RunLevel Limited", installer)
+        self.assertIn("-Principal $principal", installer)
+
+    def test_scheduled_task_launch_is_verified_from_new_status(self) -> None:
+        installer = self.installer()
+        self.assertIn("Start-ScheduledTask -TaskName $taskName", installer)
+        self.assertIn("Remove-Item -LiteralPath $statusPath", installer)
+        self.assertIn("worker-status.json", installer)
+        self.assertIn("$attempt -lt 30", installer)
+        self.assertIn('@("STARTING", "RUNNING", "PASS", "SKIPPED")', installer)
+        self.assertIn("scheduled_task_no_status", installer)
 
 
 if __name__ == "__main__":
