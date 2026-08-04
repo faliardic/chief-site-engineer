@@ -1,0 +1,278 @@
+name: CSE Agent Loop
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Optional approved CSE task Issue number
+        required: false
+        type: string
+  schedule:
+    - cron: "*/5 * * * *"
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: cse-agent-loop
+  cancel-in-progress: false
+
+jobs:
+  implement-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      CSE_REVIEW_MODEL: ${{ vars.CSE_REVIEW_MODEL || 'gpt-5.6' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install reviewer dependency
+        run: python -m pip install --disable-pip-version-check "openai>=2,<3"
+
+      - name: Select approved task
+        id: select
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REQUESTED_ISSUE: ${{ inputs.issue_number }}
+        run: |
+          python -m tools.cse_agent_loop select \
+            --issue-number "${REQUESTED_ISSUE}"
+
+      - name: Stop when no task is ready
+        if: steps.select.outputs.found != 'true'
+        run: echo "No approved CSE task is ready."
+
+      - name: Prepare task contract
+        id: task
+        if: steps.select.outputs.found == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python -m tools.cse_agent_loop prepare \
+            --issue-number "${{ steps.select.outputs.issue_number }}"
+
+      - name: Prepare isolated task branch
+        if: steps.select.outputs.found == 'true'
+        env:
+          BASE: ${{ steps.task.outputs.base }}
+          BRANCH: ${{ steps.task.outputs.branch }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            echo "Remote task branch already exists: $BRANCH" >&2
+            exit 1
+          fi
+          git fetch origin "$BASE" --prune
+          git switch --force-create "$BRANCH" "origin/$BASE"
+          git config user.name "cse-agent-loop[bot]"
+          git config user.email "cse-agent-loop[bot]@users.noreply.github.com"
+
+      - name: Mark task running
+        if: steps.select.outputs.found == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python -m tools.cse_agent_loop comment \
+            --issue-number "${{ steps.select.outputs.issue_number }}" \
+            --state RUNNING \
+            --message "CSE Codex implementation and ChatGPT review loop started."
+
+      - name: Codex implementation
+        id: codex_initial
+        if: steps.select.outputs.found == 'true'
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: ${{ steps.task.outputs.prompt_file }}
+          working-directory: .
+          sandbox: workspace-write
+          safety-strategy: drop-sudo
+
+      - name: Enforce initial write scope
+        if: steps.select.outputs.found == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python -m tools.cse_agent_loop scope \
+            --issue-number "${{ steps.select.outputs.issue_number }}" \
+            --repo-root .
+
+      - name: Run initial binding validation
+        id: validate_initial
+        if: steps.select.outputs.found == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python -m tools.cse_agent_loop validate \
+            --issue-number "${{ steps.select.outputs.issue_number }}" \
+            --round-number 1 \
+            --repo-root .
+
+      - name: Commit and push initial implementation
+        if: steps.select.outputs.found == 'true'
+        env:
+          BRANCH: ${{ steps.task.outputs.branch }}
+          COMMIT_SUBJECT: ${{ steps.task.outputs.commit_subject }}
+        run: |
+          set -euo pipefail
+          git add -A
+          git commit -m "$COMMIT_SUBJECT"
+          git push origin "HEAD:$BRANCH"
+
+      - name: Open Draft PR
+        id: pr
+        if: steps.select.outputs.found == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python -m tools.cse_agent_loop pr \
+            --issue-number "${{ steps.select.outputs.issue_number }}"
+
+      - name: ChatGPT review round 1
+        id: review1
+        if: steps.select.outputs.found == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python -m tools.cse_agent_loop review \
+            --issue-number "${{ steps.select.outputs.issue_number }}" \
+            --round-number 1 \
+            --validation-log "${{ steps.validate_initial.outputs.validation_log }}" \
+            --repo-root .
+
+      - name: Publish review round 1 feedback
+        if: steps.review1.outputs.verdict == 'changes_requested'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ steps.select.outputs.issue_number }}
+          FEEDBACK_FILE: ${{ steps.review1.outputs.feedback_file }}
+        run: |
+          {
+            echo '<!-- cse-agent-loop-status:CHATGPT_CHANGES_REQUESTED_1 -->'
+            cat "$FEEDBACK_FILE"
+          } > "$RUNNER_TEMP/cse-review-1.md"
+          gh issue comment "$ISSUE" --body-file "$RUNNER_TEMP/cse-review-1.md"
+
+      - name: Prepare Codex correction round 1
+        id: correction1
+        if: steps.review1.outputs.verdict == 'changes_requested'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python -m tools.cse_agent_loop correction-prompt \
+            --issue-number "${{ steps.select.outputs.issue_number }}" \
+            --round-number 1 \
+            --feedback-file "${{ steps.review1.outputs.feedback_file }}"
+
+      - name: Codex correction round 1
+        if: steps.review1.outputs.verdict == 'changes_requested'
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: ${{ steps.correction1.outputs.prompt_file }}
+          working-directory: .
+          sandbox: workspace-write
+          safety-strategy: drop-sudo
+
+      - name: Enforce correction write scope
+        if: steps.review1.outputs.verdict == 'changes_requested'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python -m tools.cse_agent_loop scope \
+            --issue-number "${{ steps.select.outputs.issue_number }}" \
+            --repo-root .
+
+      - name: Run correction binding validation
+        id: validate_correction1
+        if: steps.review1.outputs.verdict == 'changes_requested'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python -m tools.cse_agent_loop validate \
+            --issue-number "${{ steps.select.outputs.issue_number }}" \
+            --round-number 2 \
+            --repo-root .
+
+      - name: Commit and push correction
+        if: steps.review1.outputs.verdict == 'changes_requested'
+        env:
+          BRANCH: ${{ steps.task.outputs.branch }}
+        run: |
+          set -euo pipefail
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Codex produced no correction changes." >&2
+            exit 1
+          fi
+          git commit -m "Address ChatGPT review for Issue #${{ steps.select.outputs.issue_number }}"
+          git push origin "HEAD:$BRANCH"
+
+      - name: ChatGPT review round 2
+        id: review2
+        if: steps.review1.outputs.verdict == 'changes_requested'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python -m tools.cse_agent_loop review \
+            --issue-number "${{ steps.select.outputs.issue_number }}" \
+            --round-number 2 \
+            --validation-log "${{ steps.validate_correction1.outputs.validation_log }}" \
+            --repo-root .
+
+      - name: Mark ready for Fatih after first review
+        if: steps.review1.outputs.verdict == 'approved'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python -m tools.cse_agent_loop comment \
+            --issue-number "${{ steps.select.outputs.issue_number }}" \
+            --state PASS \
+            --message "READY_FOR_FATIH — ChatGPT approved Draft PR ${{ steps.pr.outputs.pr_url }} after the initial implementation."
+
+      - name: Mark ready for Fatih after correction
+        if: steps.review2.outputs.verdict == 'approved'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python -m tools.cse_agent_loop comment \
+            --issue-number "${{ steps.select.outputs.issue_number }}" \
+            --state PASS \
+            --message "READY_FOR_FATIH — ChatGPT approved Draft PR ${{ steps.pr.outputs.pr_url }} after one correction round."
+
+      - name: Escalate unresolved review
+        if: >-
+          steps.review1.outputs.verdict == 'needs_human' ||
+          steps.review2.outputs.verdict == 'changes_requested' ||
+          steps.review2.outputs.verdict == 'needs_human'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python -m tools.cse_agent_loop comment \
+            --issue-number "${{ steps.select.outputs.issue_number }}" \
+            --state NEEDS_HUMAN \
+            --message "NEEDS_HUMAN — the bounded ChatGPT/Codex loop did not reach approval. Draft PR: ${{ steps.pr.outputs.pr_url }}"
+
+      - name: Report workflow failure
+        if: failure() && steps.select.outputs.found == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python -m tools.cse_agent_loop comment \
+            --issue-number "${{ steps.select.outputs.issue_number }}" \
+            --state FAILED \
+            --message "CSE agent loop failed closed. Inspect the GitHub Actions run for the failing stage; no automatic merge was attempted."
