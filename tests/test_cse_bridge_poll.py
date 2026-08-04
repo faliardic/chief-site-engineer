@@ -69,6 +69,20 @@ class PollerTests(unittest.TestCase):
         ]
         self.assertFalse(task_ready(TASK, comments))
 
+    def test_agent_loop_running_requires_newer_approval(self) -> None:
+        comments = [
+            {
+                "body": "CSE_BRIDGE_APPROVED",
+                "author_association": "OWNER",
+                "created_at": "2026-08-03T19:00:00Z",
+            },
+            {
+                "body": "<!-- cse-agent-loop-status:RUNNING -->",
+                "created_at": "2026-08-03T19:01:00Z",
+            },
+        ]
+        self.assertFalse(task_ready(TASK, comments))
+
     def test_terminal_task_is_never_selected(self) -> None:
         comments = [
             {
@@ -84,6 +98,20 @@ class PollerTests(unittest.TestCase):
                 "body": "CSE_BRIDGE_APPROVED",
                 "author_association": "OWNER",
                 "created_at": "2026-08-03T19:02:00Z",
+            },
+        ]
+        self.assertFalse(task_ready(TASK, comments))
+
+    def test_agent_loop_terminal_task_is_never_selected(self) -> None:
+        comments = [
+            {
+                "body": "CSE_BRIDGE_APPROVED",
+                "author_association": "OWNER",
+                "created_at": "2026-08-03T19:00:00Z",
+            },
+            {
+                "body": "<!-- cse-agent-loop-status:PASS -->",
+                "created_at": "2026-08-03T19:01:00Z",
             },
         ]
         self.assertFalse(task_ready(TASK, comments))
