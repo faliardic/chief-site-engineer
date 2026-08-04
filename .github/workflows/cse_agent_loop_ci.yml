@@ -23,29 +23,59 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install test dependency
         run: python -m pip install --disable-pip-version-check pytest
 
-      - name: Compile changed Python modules
+      - name: Capture focused verification evidence
+        shell: bash
         run: |
+          set +e
+          mkdir -p cse-ci-evidence
+
           python -m compileall -q \
             tools/cse_agent_loop.py \
             tools/cse_bridge_poll.py \
             tests/test_cse_agent_loop.py \
-            tests/test_cse_bridge_poll.py
+            tests/test_cse_bridge_poll.py \
+            > cse-ci-evidence/compile.txt 2>&1
+          echo "$?" > cse-ci-evidence/compile.exit
 
-      - name: Run focused tests
-        run: |
           python -m pytest -q \
             tests/test_cse_agent_loop.py \
-            tests/test_cse_bridge_poll.py
+            tests/test_cse_bridge_poll.py \
+            > cse-ci-evidence/pytest.txt 2>&1
+          echo "$?" > cse-ci-evidence/pytest.exit
 
-      - name: Check whitespace errors
-        run: git diff --check origin/${{ github.base_ref }}...HEAD
+          git diff --check "origin/${{ github.base_ref }}...HEAD" \
+            > cse-ci-evidence/diff-check.txt 2>&1
+          echo "$?" > cse-ci-evidence/diff-check.exit
+
+      - name: Upload focused verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cse-agent-loop-ci-evidence
+          path: cse-ci-evidence
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce verification gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat cse-ci-evidence/compile.txt
+          cat cse-ci-evidence/pytest.txt
+          cat cse-ci-evidence/diff-check.txt
+
+          test "$(cat cse-ci-evidence/compile.exit)" = "0"
+          test "$(cat cse-ci-evidence/pytest.exit)" = "0"
+          test "$(cat cse-ci-evidence/diff-check.exit)" = "0"
