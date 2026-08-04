@@ -1,0 +1,19 @@
+name: CSE Runner Probe
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/cse_runner_probe.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  runner-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Confirm runner execution
+        run: |
+          echo "CSE_RUNNER_PROBE_PASS"
+          uname -a
