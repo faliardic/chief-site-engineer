@@ -43,5 +43,12 @@ class StatusTests(unittest.TestCase):
             self.assertFalse((runtime / "worker-status.tmp").exists())
 
 
+class InstallerContractTests(unittest.TestCase):
+    def test_default_model_is_general_responses_model(self) -> None:
+        installer = Path("scripts/install_cse_bridge.ps1").read_text(encoding="utf-8")
+        self.assertIn('[string]$Model = "gpt-5.1"', installer)
+        self.assertNotIn('[string]$Model = "gpt-5.1-codex"', installer)
+
+
 if __name__ == "__main__":
     unittest.main()
