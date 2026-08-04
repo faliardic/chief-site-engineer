@@ -48,16 +48,33 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install_cse_bridge.ps1
 
 The installer:
 
-- verifies `python`, `git`, `gh` and the current GitHub login;
-- asks for the OpenAI API key through a secure prompt;
-- stores it under `%LOCALAPPDATA%\CSE-Bridge` using user-bound encryption;
-- writes non-secret model/repository configuration;
-- registers the user-level `CSE Bridge` Scheduled Task;
-- starts the task immediately and repeats every five minutes.
+- verifies the exact `python`, `git`, `gh` executables and current GitHub login;
+- asks for the OpenAI API key through a secure prompt only when no encrypted key
+  is already installed;
+- stores the key under `%LOCALAPPDATA%\CSE-Bridge` using user-bound encryption;
+- writes non-secret model, repository and executable-path configuration;
+- runs the bridge once in the foreground before claiming success;
+- posts the foreground verification result to Issue #314 without secrets or raw
+  logs;
+- registers the user-level `CSE Bridge` Scheduled Task only after foreground
+  verification PASS;
+- repeats every five minutes.
 
 No administrator permission is required. To replace the key, run with
 `-ResetKey`. To remove the scheduled task while preserving credentials, run
 with `-Uninstall`.
+
+## Runtime diagnostics
+
+Every worker invocation writes repository-external diagnostics:
+
+- `%LOCALAPPDATA%\CSE-Bridge\worker-status.json` — atomic state, exit code,
+  stable reason and UTC update time;
+- `%LOCALAPPDATA%\CSE-Bridge\worker-last.log` — bounded launcher/worker output
+  without the API key.
+
+A valid lock whose process is still alive prevents concurrent workers. A lock
+left by a dead process is recovered automatically.
 
 ## Task format
 
