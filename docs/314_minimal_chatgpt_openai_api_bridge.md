@@ -54,11 +54,16 @@ The installer:
 - stores the key under `%LOCALAPPDATA%\CSE-Bridge` using user-bound encryption;
 - writes non-secret model, repository and executable-path configuration;
 - runs the bridge once in the foreground before claiming success;
-- posts the foreground verification result to Issue #314 without secrets or raw
-  logs;
-- registers the user-level `CSE Bridge` Scheduled Task only after foreground
-  verification PASS;
-- repeats every five minutes.
+- registers the `CSE Bridge` Scheduled Task with the current Windows identity,
+  interactive logon and limited run level so mapped drives such as `V:` remain
+  visible without administrator privileges;
+- starts the registered Scheduled Task immediately and requires a fresh
+  `worker-status.json` state within 30 seconds before claiming installation
+  success;
+- removes the task and reports a stable failure reason if the actual Scheduled
+  Task cannot launch;
+- repeats every five minutes after both foreground and scheduled launch checks
+  pass.
 
 No administrator permission is required. To replace the key, run with
 `-ResetKey`. To remove the scheduled task while preserving credentials, run
