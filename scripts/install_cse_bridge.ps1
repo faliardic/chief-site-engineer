@@ -91,17 +91,58 @@ if (Test-Path -LiteralPath $statusPath) {
 }
 
 if (($verificationExit -ne 0) -or ($verificationState -ne "PASS")) {
-    $body = "<!-- cse-bridge-local-install:FAILED -->`nLocal CSE Bridge verification failed: ``$reason``. API key and raw logs were not posted."
+    $body = "<!-- cse-bridge-local-install:FAILED -->`nLocal CSE Bridge foreground verification failed: ``$reason``. API key and raw logs were not posted."
     & $ghPath issue comment 314 --repo "faliardic/chief-site-engineer" --body $body 1>$null 2>$null
-    throw "CSE Bridge verification failed: $reason. Details remain in $logPath."
+    throw "CSE Bridge foreground verification failed: $reason. Details remain in $logPath."
 }
 
 $argument = "-NoProfile -ExecutionPolicy Bypass -File `"$runnerPath`" -RepoRoot `"$RepoRoot`" -RuntimeRoot `"$runtimeRoot`""
 $action = New-ScheduledTaskAction -Execute $powershellPath -Argument $argument -WorkingDirectory $RepoRoot
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(5) -RepetitionInterval (New-TimeSpan -Minutes 5)
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew
-Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Description "CSE OpenAI API development bridge" -Force | Out-Null
+$currentIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+$principal = New-ScheduledTaskPrincipal -UserId $currentIdentity -LogonType Interactive -RunLevel Limited
+Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description "CSE OpenAI API development bridge" -Force | Out-Null
 
-$passBody = "<!-- cse-bridge-local-install:PASS -->`nLocal CSE Bridge foreground verification passed. The five-minute Scheduled Task is registered."
+Remove-Item -LiteralPath $statusPath -Force -ErrorAction SilentlyContinue
+$scheduledStart = (Get-Date).ToUniversalTime()
+Start-ScheduledTask -TaskName $taskName
+$scheduledState = ""
+$scheduledReason = "scheduled_task_no_status"
+for ($attempt = 0; $attempt -lt 30; $attempt++) {
+    Start-Sleep -Seconds 1
+    if (-not (Test-Path -LiteralPath $statusPath)) {
+        continue
+    }
+    try {
+        $scheduledStatus = Get-Content -LiteralPath $statusPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $updatedAt = [DateTimeOffset]::Parse([string]$scheduledStatus.updated_at).UtcDateTime
+        if ($updatedAt -lt $scheduledStart.AddSeconds(-1)) {
+            continue
+        }
+        $scheduledState = [string]$scheduledStatus.state
+        if ($scheduledStatus.reason -and ([string]$scheduledStatus.reason -match "^[a-z0-9_]+$")) {
+            $scheduledReason = [string]$scheduledStatus.reason
+        }
+        elseif ($scheduledState -eq "FAILED") {
+            $scheduledReason = "scheduled_task_failed"
+        }
+        break
+    }
+    catch {
+        $scheduledReason = "scheduled_status_invalid"
+    }
+}
+
+$acceptedScheduledStates = @("STARTING", "RUNNING", "PASS", "SKIPPED")
+if ($acceptedScheduledStates -notcontains $scheduledState) {
+    Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+    $body = "<!-- cse-bridge-local-install:FAILED -->`nLocal CSE Bridge Scheduled Task verification failed: ``$scheduledReason``. API key and raw logs were not posted."
+    & $ghPath issue comment 314 --repo "faliardic/chief-site-engineer" --body $body 1>$null 2>$null
+    throw "CSE Bridge Scheduled Task verification failed: $scheduledReason. Details remain in $logPath."
+}
+
+$passBody = "<!-- cse-bridge-local-install:PASS -->`nLocal CSE Bridge foreground and Scheduled Task launch verification passed. The five-minute task is active."
 & $ghPath issue comment 314 --repo "faliardic/chief-site-engineer" --body $passBody 1>$null 2>$null
-Write-Host "CSE Bridge verified and installed. It will check approved tasks every five minutes."
+Write-Host "CSE Bridge verified and installed. The Scheduled Task launched successfully and will repeat every five minutes."
