@@ -51,7 +51,7 @@ try {
 
     Push-Location -LiteralPath $RepoRoot
     try {
-        $output = & $pythonPath -m tools.cse_bridge_local --repo-root $RepoRoot --runtime-root $RuntimeRoot 2>&1
+        $output = & $pythonPath -m tools.cse_bridge_entrypoint --repo-root $RepoRoot --runtime-root $RuntimeRoot 2>&1
         $exitCode = $LASTEXITCODE
         foreach ($line in $output) {
             Write-BridgeLog ([string]$line)
