@@ -13,6 +13,7 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Mapping, Sequence
 
@@ -22,6 +23,7 @@ from tools.cse_bridge_poll import select_task
 DEFAULT_REPOSITORY = "faliardic/chief-site-engineer"
 DEFAULT_REPO_ROOT = Path(r"V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer")
 LOCK_NAME = "worker.lock"
+STATUS_NAME = "worker-status.json"
 
 
 @dataclass(frozen=True)
@@ -32,6 +34,7 @@ class CommandResult:
 
 
 CommandAdapter = Callable[[Sequence[str], Path, int], CommandResult]
+PidChecker = Callable[[int], bool]
 
 
 def default_runtime_root() -> Path:
@@ -118,23 +121,77 @@ def resolve_github_token(
     return token
 
 
+def pid_is_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def write_status(
+    runtime_root: Path,
+    state: str,
+    exit_code: int | None,
+    reason: str | None = None,
+) -> None:
+    runtime = runtime_root.resolve()
+    runtime.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "state": state,
+        "exit_code": exit_code,
+        "reason": reason,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    destination = runtime / STATUS_NAME
+    temporary = destination.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    os.replace(temporary, destination)
+
+
 class SingleInstanceLock:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, checker: PidChecker = pid_is_alive):
         self.path = path
+        self.checker = checker
         self.fd: int | None = None
+
+    def _existing_pid(self) -> int | None:
+        try:
+            raw = self.path.read_text(encoding="ascii").strip()
+            return int(raw)
+        except (OSError, UnicodeError, ValueError):
+            return None
 
     def __enter__(self) -> "SingleInstanceLock":
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            self.fd = os.open(
-                self.path,
-                os.O_CREAT | os.O_EXCL | os.O_WRONLY,
-                0o600,
-            )
-        except FileExistsError as exc:
-            raise BridgeError("bridge_already_running") from exc
-        os.write(self.fd, str(os.getpid()).encode("ascii"))
-        return self
+        for _ in range(2):
+            try:
+                self.fd = os.open(
+                    self.path,
+                    os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+                    0o600,
+                )
+            except FileExistsError as exc:
+                existing_pid = self._existing_pid()
+                if existing_pid is None or self.checker(existing_pid):
+                    raise BridgeError("bridge_already_running") from exc
+                try:
+                    self.path.unlink()
+                except FileNotFoundError:
+                    pass
+                continue
+            os.write(self.fd, str(os.getpid()).encode("ascii"))
+            return self
+        raise BridgeError("bridge_already_running")
 
     def __exit__(self, exc_type, exc, tb) -> None:  # type: ignore[no-untyped-def]
         if self.fd is not None:
@@ -216,7 +273,7 @@ def load_local_config(runtime_root: Path) -> Mapping[str, object]:
     if not config_path.is_file():
         raise BridgeError("local_config_missing")
     try:
-        value = json.loads(config_path.read_text(encoding="utf-8"))
+        value = json.loads(config_path.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError) as exc:
         raise BridgeError("local_config_invalid") from exc
     if not isinstance(value, dict):
@@ -273,14 +330,28 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--repo-root", type=Path, default=DEFAULT_REPO_ROOT)
     parser.add_argument("--runtime-root", type=Path, default=default_runtime_root())
     args = parser.parse_args(argv)
+    runtime_root = args.runtime_root.resolve()
+    write_status(runtime_root, "STARTING", None)
     try:
-        with SingleInstanceLock(args.runtime_root / LOCK_NAME):
-            return run_once(args.repo_root, args.runtime_root)
+        with SingleInstanceLock(runtime_root / LOCK_NAME):
+            write_status(runtime_root, "RUNNING", None)
+            result = run_once(args.repo_root, runtime_root)
     except BridgeError as exc:
         if exc.reason == "bridge_already_running":
+            write_status(runtime_root, "SKIPPED", 0, exc.reason)
             return 0
+        write_status(runtime_root, "FAILED", 1, exc.reason)
         print(exc.reason, file=sys.stderr)
         return 1
+    except Exception:
+        write_status(runtime_root, "FAILED", 1, "unexpected_worker_failure")
+        print("unexpected_worker_failure", file=sys.stderr)
+        return 1
+    if result == 0:
+        write_status(runtime_root, "PASS", 0)
+    else:
+        write_status(runtime_root, "FAILED", result, f"worker_exit_{result}")
+    return result
 
 
 if __name__ == "__main__":
