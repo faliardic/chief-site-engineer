@@ -8,12 +8,14 @@ import tempfile
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 
 from tools.cse_api_bridge import BridgeError
 from tools.cse_codex_loop import (
     CommandResult,
     LoopConfig,
     RunArtifacts,
+    WORKTREE_REMOVE_ATTEMPTS,
     _validation_argv,
     create_worktree,
     process_issue,
@@ -128,6 +130,12 @@ class FakeCommands:
         reviews: list[dict[str, object]] | None = None,
         validation_exit: int = 0,
         implementer_exit: int = 0,
+        cleanup_remove_failures: int = 0,
+        cleanup_dirty: bool = False,
+        cleanup_absent_after_push: bool = False,
+        cleanup_absent_but_registered: bool = False,
+        cleanup_unregister_on_failed_remove: bool = False,
+        include_unrelated_stale_worktree: bool = False,
     ):
         self.changed = changed
         self.reviews = list(
@@ -136,10 +144,23 @@ class FakeCommands:
         )
         self.validation_exit = validation_exit
         self.implementer_exit = implementer_exit
+        self.cleanup_remove_failures = cleanup_remove_failures
+        self.cleanup_dirty = cleanup_dirty
+        self.cleanup_absent_after_push = cleanup_absent_after_push
+        self.cleanup_absent_but_registered = cleanup_absent_but_registered
+        self.cleanup_unregister_on_failed_remove = cleanup_unregister_on_failed_remove
+        self.include_unrelated_stale_worktree = include_unrelated_stale_worktree
         self.calls: list[tuple[str, ...]] = []
         self.prompts: list[str] = []
         self.review_prompts: list[str] = []
         self.cleanup = False
+        self.cleanup_remove_calls = 0
+        self.prune_invoked = False
+        self.registered_worktrees: list[Path] = []
+        self.worktree_list_snapshots: list[tuple[Path, ...]] = []
+        self.unrelated_stale_worktree: Path | None = None
+        self.committed = False
+        self.published_commit = "a" * 40
 
     def __call__(self, argv, cwd, timeout, input_text):  # type: ignore[no-untyped-def]
         call = tuple(str(item) for item in argv)
@@ -170,8 +191,17 @@ class FakeCommands:
         if args[:2] == ("worktree", "add"):
             worktree = Path(args[-2])
             worktree.mkdir(parents=True)
+            self.registered_worktrees = [cwd.resolve(), worktree.resolve()]
+            if self.include_unrelated_stale_worktree:
+                self.unrelated_stale_worktree = (
+                    worktree.parent / "unrelated-historical-stale"
+                ).resolve()
+                self.registered_worktrees.append(self.unrelated_stale_worktree)
             return CommandResult(0)
         if args[:2] == ("status", "--porcelain=v1"):
+            if self.committed:
+                changed = f" M {self.changed}\n" if self.cleanup_dirty else ""
+                return CommandResult(0, changed)
             return CommandResult(0, f"?? {self.changed}\n")
         if args == ("diff", "--check"):
             return CommandResult(0)
@@ -180,12 +210,63 @@ class FakeCommands:
         if args == ("diff", "--cached", "--name-only"):
             return CommandResult(0, self.changed + "\n")
         if "commit" in args:
+            self.committed = True
             return CommandResult(0)
+        if args == ("rev-parse", "--verify", "HEAD"):
+            return CommandResult(0, self.published_commit + "\n")
         if args[:2] == ("push", "origin"):
+            if self.cleanup_absent_after_push or self.cleanup_absent_but_registered:
+                shutil.rmtree(cwd)
+            if self.cleanup_absent_after_push:
+                self.registered_worktrees = [
+                    path for path in self.registered_worktrees if path != cwd.resolve()
+                ]
             return CommandResult(0)
+        if args == ("symbolic-ref", "--quiet", "HEAD"):
+            return CommandResult(
+                0, "refs/heads/codex/issue-345-local-codex-agent-loop\n"
+            )
         if args[:2] == ("worktree", "remove"):
-            shutil.rmtree(Path(args[-1]))
+            self.cleanup_remove_calls += 1
+            if self.cleanup_remove_calls <= self.cleanup_remove_failures:
+                if self.cleanup_unregister_on_failed_remove:
+                    removed = Path(args[-1]).resolve()
+                    shutil.rmtree(removed)
+                    self.registered_worktrees = [
+                        path for path in self.registered_worktrees if path != removed
+                    ]
+                return CommandResult(1, stderr="transient cleanup failure")
+            removed = Path(args[-1]).resolve()
+            shutil.rmtree(removed)
+            self.registered_worktrees = [
+                path for path in self.registered_worktrees if path != removed
+            ]
             self.cleanup = True
+            return CommandResult(0)
+        if args == ("worktree", "list", "--porcelain", "-z"):
+            snapshot = tuple(self.registered_worktrees)
+            self.worktree_list_snapshots.append(snapshot)
+            records = []
+            for registered in snapshot:
+                fields = [f"worktree {registered}", f"HEAD {self.published_commit}"]
+                if registered == self.unrelated_stale_worktree:
+                    fields.extend(
+                        (
+                            "detached",
+                            "prunable gitdir file points to non-existent location",
+                        )
+                    )
+                else:
+                    fields.append("branch refs/heads/test")
+                records.append("\0".join(fields) + "\0\0")
+            return CommandResult(0, "".join(records))
+        if args == ("worktree", "prune", "--expire", "now"):
+            self.prune_invoked = True
+            self.registered_worktrees = [
+                path
+                for path in self.registered_worktrees
+                if path != self.unrelated_stale_worktree
+            ]
             return CommandResult(0)
         raise AssertionError(args)
 
@@ -338,6 +419,129 @@ class OrchestrationTests(LoopFixture):
             (artifacts.run_root / "status.json").read_text(encoding="utf-8")
         )
         self.assertEqual(status["state"], "PASS")
+
+    def test_transient_first_remove_failure_is_retried_then_cleaned(self) -> None:
+        commands = FakeCommands(cleanup_remove_failures=1)
+
+        result, github, artifacts = self.run_issue(commands)
+
+        self.assertEqual(result, 0)
+        self.assertEqual(commands.cleanup_remove_calls, 2)
+        self.assertFalse(task_worktree(self.runtime, 345).exists())
+        self.assertNotIn("approved_cleanup_pending", github.posted[-1])
+        status = json.loads(
+            (artifacts.run_root / "status.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(status["reason"], "approved")
+
+    def test_already_absent_unregistered_worktree_is_cleanup_complete(self) -> None:
+        commands = FakeCommands(cleanup_absent_after_push=True)
+
+        result, github, _ = self.run_issue(commands)
+
+        self.assertEqual(result, 0)
+        self.assertEqual(commands.cleanup_remove_calls, 0)
+        self.assertFalse(commands.prune_invoked)
+        self.assertIn(
+            (
+                str(self.config.git_path),
+                "worktree",
+                "list",
+                "--porcelain",
+                "-z",
+            ),
+            commands.calls,
+        )
+        self.assertNotIn("approved_cleanup_pending", github.posted[-1])
+
+    def test_failed_remove_is_complete_when_exact_path_is_unregistered(self) -> None:
+        commands = FakeCommands(
+            cleanup_remove_failures=1,
+            cleanup_unregister_on_failed_remove=True,
+        )
+
+        result, github, _ = self.run_issue(commands)
+
+        self.assertEqual(result, 0)
+        self.assertEqual(commands.cleanup_remove_calls, 1)
+        self.assertFalse(commands.prune_invoked)
+        self.assertNotIn("approved_cleanup_pending", github.posted[-1])
+
+    def test_absent_but_registered_worktree_is_preserved_as_cleanup_pending(
+        self,
+    ) -> None:
+        commands = FakeCommands(cleanup_absent_but_registered=True)
+
+        result, github, _ = self.run_issue(commands)
+
+        self.assertEqual(result, 0)
+        self.assertEqual(commands.cleanup_remove_calls, 0)
+        self.assertFalse(commands.prune_invoked)
+        self.assertIn("`approved_cleanup_pending`", github.posted[-1])
+
+    def test_cleanup_never_prunes_unrelated_stale_worktree_metadata(self) -> None:
+        commands = FakeCommands(include_unrelated_stale_worktree=True)
+
+        result, github, _ = self.run_issue(commands)
+
+        issue_worktree = task_worktree(self.runtime, 345).resolve()
+        unrelated = commands.unrelated_stale_worktree
+        self.assertEqual(result, 0)
+        self.assertIsNotNone(unrelated)
+        self.assertIn(issue_worktree, commands.worktree_list_snapshots[0])
+        self.assertIn(unrelated, commands.worktree_list_snapshots[0])
+        self.assertNotIn(issue_worktree, commands.registered_worktrees)
+        self.assertIn(unrelated, commands.registered_worktrees)
+        self.assertFalse(commands.prune_invoked)
+        self.assertFalse(
+            any(call[1:3] == ("worktree", "prune") for call in commands.calls)
+        )
+        self.assertNotIn("approved_cleanup_pending", github.posted[-1])
+
+    def test_dirty_published_worktree_is_preserved_with_cleanup_warning(self) -> None:
+        commands = FakeCommands(cleanup_dirty=True)
+
+        result, github, artifacts = self.run_issue(commands)
+
+        self.assertEqual(result, 0)
+        self.assertEqual(commands.cleanup_remove_calls, 0)
+        self.assertTrue(task_worktree(self.runtime, 345).exists())
+        self.assertIn("READY_FOR_FATIH", github.posted[-1])
+        self.assertIn("https://github.example/pr/1", github.posted[-1])
+        self.assertIn("`approved_cleanup_pending`", github.posted[-1])
+        self.assertNotIn("FAILED\n", github.posted[-1])
+        status = json.loads(
+            (artifacts.run_root / "status.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(status["state"], "PASS")
+        self.assertEqual(status["exit_code"], 0)
+        self.assertEqual(status["reason"], "approved_cleanup_pending")
+
+    def test_persistent_cleanup_failure_after_publication_is_pass_warning(
+        self,
+    ) -> None:
+        commands = FakeCommands(cleanup_remove_failures=WORKTREE_REMOVE_ATTEMPTS)
+
+        with patch(
+            "tools.cse_codex_loop.shutil.rmtree",
+            side_effect=PermissionError("locked"),
+        ):
+            result, github, artifacts = self.run_issue(commands)
+
+        self.assertEqual(result, 0)
+        self.assertEqual(commands.cleanup_remove_calls, WORKTREE_REMOVE_ATTEMPTS)
+        self.assertTrue(task_worktree(self.runtime, 345).exists())
+        self.assertEqual(len(github.prs), 1)
+        self.assertIn("READY_FOR_FATIH", github.posted[-1])
+        self.assertIn("https://github.example/pr/1", github.posted[-1])
+        self.assertIn("`approved_cleanup_pending`", github.posted[-1])
+        self.assertNotIn("FAILED\n", github.posted[-1])
+        status = json.loads(
+            (artifacts.run_root / "status.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(status["state"], "PASS")
+        self.assertEqual(status["exit_code"], 0)
+        self.assertEqual(status["reason"], "approved_cleanup_pending")
 
     def test_scope_violation_fails_and_preserves_worktree(self) -> None:
         commands = FakeCommands(changed="app/product.py")
@@ -545,17 +749,33 @@ if tool == "git":
     elif args[:4] == ["ls-remote", "--exit-code", "--heads", "origin"]:
         sys.exit(2)
     elif args[:2] == ["worktree", "add"]:
-        Path(args[-2]).mkdir(parents=True)
+        worktree = Path(args[-2])
+        worktree.mkdir(parents=True)
+        state["worktree"] = str(worktree)
     elif args[:2] == ["status", "--porcelain=v1"]:
-        print("?? docs/cse_codex_loop.md")
+        if not state["committed"]:
+            print("?? docs/cse_codex_loop.md")
     elif args == ["diff", "--cached", "--name-only"]:
         print("docs/cse_codex_loop.md")
     elif "commit" in args:
         state["committed"] = True
+    elif args == ["rev-parse", "--verify", "HEAD"]:
+        print("a" * 40)
     elif args[:2] == ["push", "origin"]:
         state["pushed"] = True
+    elif args == ["symbolic-ref", "--quiet", "HEAD"]:
+        print("refs/heads/codex/issue-345-local-codex-agent-loop")
+    elif args == ["worktree", "list", "--porcelain", "-z"]:
+        paths = [repo]
+        if state.get("worktree"):
+            paths.append(Path(state["worktree"]))
+        sys.stdout.write("".join(
+            f"worktree {path}\0HEAD {'a' * 40}\0branch refs/heads/test\0\0"
+            for path in paths
+        ))
     elif args[:2] == ["worktree", "remove"]:
         shutil.rmtree(Path(args[-1]))
+        state.pop("worktree", None)
     save()
 elif tool == "codex":
     if args[args.index("--sandbox") + 1] == "read-only":

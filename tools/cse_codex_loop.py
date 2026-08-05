@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -42,6 +43,8 @@ PASS_MARKER = "<!-- cse-bridge-status:PASS -->"
 FAILED_MARKER = "<!-- cse-bridge-status:FAILED -->"
 NEEDS_HUMAN_MARKER = "<!-- cse-bridge-status:NEEDS_HUMAN -->"
 RUNNING_MARKER = "<!-- cse-bridge-status:RUNNING -->"
+WORKTREE_REMOVE_ATTEMPTS = 3
+WORKTREE_CLEANUP_RETRY_SECONDS = 0.2
 
 _SECRET_PATTERNS = (
     re.compile(r"(?i)authorization\s*:\s*bearer\s+\S+"),
@@ -81,6 +84,12 @@ class ReviewResult:
     verdict: str
     summary: str
     findings: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class PublicationResult:
+    pr: Mapping[str, Any]
+    commit: str
 
 
 def utc_now() -> str:
@@ -789,7 +798,7 @@ def publish(
     github: GitHubClient,
     command: CommandAdapter,
     artifacts: RunArtifacts,
-) -> Mapping[str, Any]:
+) -> PublicationResult:
     paths = enforce_scope(config, worktree, task, command, artifacts)
     add = _git_result(
         config,
@@ -837,6 +846,20 @@ def publish(
     )
     if commit.returncode != 0:
         raise BridgeError("git_commit_failed")
+    published_commit = _git_result(
+        config,
+        ("rev-parse", "--verify", "HEAD"),
+        worktree,
+        command,
+        artifacts,
+        "published-commit",
+        timeout=30,
+    )
+    commit_sha = published_commit.stdout.strip()
+    if published_commit.returncode != 0 or not re.fullmatch(
+        r"[0-9a-fA-F]{40,64}", commit_sha
+    ):
+        raise BridgeError("published_commit_unavailable")
     pushed = _git_result(
         config,
         ("push", "origin", f"HEAD:refs/heads/{task.branch}"),
@@ -848,26 +871,192 @@ def publish(
     )
     if pushed.returncode != 0:
         raise BridgeError("git_push_failed")
-    return github.create_draft_pr(task)
+    return PublicationResult(github.create_draft_pr(task), commit_sha)
+
+
+def _published_worktree_is_clean(
+    config: LoopConfig,
+    worktree: Path,
+    task: BridgeTask,
+    published_commit: str,
+    command: CommandAdapter,
+    artifacts: RunArtifacts,
+    *,
+    stage: str,
+) -> bool:
+    status = _git_result(
+        config,
+        ("status", "--porcelain=v1", "--untracked-files=all"),
+        worktree,
+        command,
+        artifacts,
+        f"{stage}-status",
+        timeout=30,
+    )
+    if status.returncode != 0 or status.stdout.strip():
+        return False
+    branch = _git_result(
+        config,
+        ("symbolic-ref", "--quiet", "HEAD"),
+        worktree,
+        command,
+        artifacts,
+        f"{stage}-branch",
+        timeout=30,
+    )
+    if branch.returncode != 0 or branch.stdout.strip() != f"refs/heads/{task.branch}":
+        return False
+    head = _git_result(
+        config,
+        ("rev-parse", "--verify", "HEAD"),
+        worktree,
+        command,
+        artifacts,
+        f"{stage}-commit",
+        timeout=30,
+    )
+    return (
+        head.returncode == 0
+        and head.stdout.strip().casefold() == published_commit.casefold()
+    )
+
+
+def _registered_worktree_paths(output: str) -> tuple[Path, ...] | None:
+    if not output or not output.endswith("\0\0"):
+        return None
+    paths: list[Path] = []
+    for record in output[:-2].split("\0\0"):
+        fields = record.split("\0")
+        if not fields or not fields[0].startswith("worktree "):
+            return None
+        raw_path = fields[0].removeprefix("worktree ")
+        path = Path(raw_path)
+        if not raw_path or not path.is_absolute():
+            return None
+        paths.append(path)
+    return tuple(paths)
+
+
+def _issue_worktree_is_registered(
+    config: LoopConfig,
+    worktree: Path,
+    command: CommandAdapter,
+    artifacts: RunArtifacts,
+    *,
+    stage: str,
+) -> bool | None:
+    result = _git_result(
+        config,
+        ("worktree", "list", "--porcelain", "-z"),
+        config.repo_root,
+        command,
+        artifacts,
+        stage,
+        timeout=30,
+    )
+    if result.returncode != 0:
+        return None
+    registered_paths = _registered_worktree_paths(result.stdout)
+    if registered_paths is None:
+        return None
+    expected = os.path.normcase(os.path.abspath(worktree))
+    return any(
+        os.path.normcase(os.path.abspath(path)) == expected
+        for path in registered_paths
+    )
 
 
 def remove_successful_worktree(
     config: LoopConfig,
     worktree: Path,
+    task: BridgeTask,
+    published_commit: str,
     command: CommandAdapter,
     artifacts: RunArtifacts,
-) -> None:
-    result = _git_result(
-        config,
-        ("worktree", "remove", "--force", str(worktree)),
-        config.repo_root,
-        command,
-        artifacts,
-        "worktree-cleanup",
-        timeout=120,
-    )
-    if result.returncode != 0:
-        raise BridgeError("worktree_cleanup_failed")
+) -> bool:
+    issue_number = artifacts.issue_number
+    if issue_number is None:
+        return False
+    expected = task_worktree(artifacts.runtime_root, issue_number)
+    if worktree.resolve() != expected.resolve():
+        return False
+    try:
+        worktree.resolve().relative_to(config.repo_root)
+    except ValueError:
+        pass
+    else:
+        return False
+
+    try:
+        registered = _issue_worktree_is_registered(
+            config,
+            worktree,
+            command,
+            artifacts,
+            stage="worktree-cleanup-list-initial",
+        )
+        if registered is None:
+            return False
+        if not worktree.exists():
+            return not registered
+        if not registered:
+            return False
+        for attempt in range(1, WORKTREE_REMOVE_ATTEMPTS + 1):
+            if not _published_worktree_is_clean(
+                config,
+                worktree,
+                task,
+                published_commit,
+                command,
+                artifacts,
+                stage=f"worktree-cleanup-check-{attempt}",
+            ):
+                return False
+            result = _git_result(
+                config,
+                ("worktree", "remove", "--force", str(worktree)),
+                config.repo_root,
+                command,
+                artifacts,
+                f"worktree-cleanup-remove-{attempt}",
+                timeout=120,
+            )
+            registered = _issue_worktree_is_registered(
+                config,
+                worktree,
+                command,
+                artifacts,
+                stage=f"worktree-cleanup-list-{attempt}",
+            )
+            if registered is None:
+                return False
+            if not registered:
+                if result.returncode != 0 or not worktree.exists():
+                    return True
+                if not _published_worktree_is_clean(
+                    config,
+                    worktree,
+                    task,
+                    published_commit,
+                    command,
+                    artifacts,
+                    stage="worktree-cleanup-fallback-check",
+                ):
+                    return False
+                try:
+                    shutil.rmtree(worktree)
+                except FileNotFoundError:
+                    pass
+                except OSError:
+                    return False
+                return not worktree.exists()
+            if not worktree.exists():
+                return False
+            if attempt < WORKTREE_REMOVE_ATTEMPTS:
+                time.sleep(WORKTREE_CLEANUP_RETRY_SECONDS)
+        return False
+    except (BridgeError, OSError):
+        return False
 
 
 def terminal_comment(kind: str, reason: str, run_id: str, pr_url: str = "") -> str:
@@ -882,6 +1071,8 @@ def terminal_comment(kind: str, reason: str, run_id: str, pr_url: str = "") -> s
         ]
         if pr_url:
             lines.append(f"Draft PR: {pr_url}")
+        if reason != "approved":
+            lines.append(f"Cleanup warning: `{reason}`.")
         return "\n".join(lines)
     if kind == "NEEDS_HUMAN":
         return (
@@ -986,14 +1177,25 @@ def process_issue(
             if review.verdict != "approved":
                 raise BridgeError("review_unresolved")
         artifacts.update("RUNNING", "publish", None)
-        pr = publish(config, worktree, task, github, command, artifacts)
-        pr_url = str(pr.get("html_url", ""))
-        remove_successful_worktree(config, worktree, command, artifacts)
+        publication = publish(config, worktree, task, github, command, artifacts)
+        pr_url = str(publication.pr.get("html_url", ""))
+        try:
+            cleanup_complete = remove_successful_worktree(
+                config,
+                worktree,
+                task,
+                publication.commit,
+                command,
+                artifacts,
+            )
+        except Exception:
+            cleanup_complete = False
+        reason = "approved" if cleanup_complete else "approved_cleanup_pending"
         github.comment(
             issue_number,
-            terminal_comment("READY_FOR_FATIH", "approved", artifacts.run_id, pr_url),
+            terminal_comment("READY_FOR_FATIH", reason, artifacts.run_id, pr_url),
         )
-        artifacts.update("PASS", "complete", 0, "approved")
+        artifacts.update("PASS", "complete", 0, reason)
         return 0
     except BridgeError as exc:
         kind = _failure_kind(exc.reason)
