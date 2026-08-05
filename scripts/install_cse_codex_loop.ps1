@@ -25,8 +25,21 @@ if (-not (Test-Path -LiteralPath $runnerPath)) {
     throw "Codex loop runner not found: $runnerPath"
 }
 
+$supportedCodexExtensions = @(".exe", ".com", ".cmd", ".bat")
 $pythonCommand = Get-Command python -CommandType Application -ErrorAction SilentlyContinue
-$codexCommand = Get-Command codex -CommandType Application -ErrorAction SilentlyContinue
+$codexCommand = Get-Command codex -CommandType Application -ErrorAction SilentlyContinue |
+    Where-Object {
+        if (-not $_.Source) {
+            return $false
+        }
+        $candidate = [string]$_.Source
+        $extension = [System.IO.Path]::GetExtension($candidate).ToLowerInvariant()
+        return (
+            $extension -in $supportedCodexExtensions -and
+            (Test-Path -LiteralPath $candidate -PathType Leaf)
+        )
+    } |
+    Select-Object -First 1
 $gitCommand = Get-Command git -CommandType Application -ErrorAction SilentlyContinue
 $ghCommand = Get-Command gh -CommandType Application -ErrorAction SilentlyContinue
 $flutterCommand = Get-Command flutter.bat -CommandType Application -ErrorAction SilentlyContinue
@@ -45,6 +58,7 @@ foreach ($entry in @(
 }
 
 $pythonPath = (Resolve-Path -LiteralPath ([string]$pythonCommand.Source)).Path
+$codexPath = (Resolve-Path -LiteralPath ([string]$codexCommand.Source)).Path
 $gitPath = (Resolve-Path -LiteralPath ([string]$gitCommand.Source)).Path
 $ghPath = (Resolve-Path -LiteralPath ([string]$ghCommand.Source)).Path
 $flutterPath = $null
@@ -53,33 +67,9 @@ if ($flutterCommand -and $flutterCommand.Source) {
 }
 $resolvedRepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 
-$nativeCodexCommand = Get-Command codex.exe -CommandType Application -ErrorAction SilentlyContinue
-$codexCandidate = if ($nativeCodexCommand) { [string]$nativeCodexCommand.Source } else { "" }
-if (-not $codexCandidate) {
-    $launcherRoot = Split-Path -Parent ([string]$codexCommand.Source)
-    $architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
-    if ($architecture -eq "Arm64") {
-        $targetTriple = "aarch64-pc-windows-msvc"
-        $platformPackage = "codex-win32-arm64"
-    }
-    else {
-        $targetTriple = "x86_64-pc-windows-msvc"
-        $platformPackage = "codex-win32-x64"
-    }
-    $codexCandidates = @(
-        (Join-Path $launcherRoot "node_modules\@openai\codex\node_modules\@openai\$platformPackage\vendor\$targetTriple\bin\codex.exe"),
-        (Join-Path $launcherRoot "node_modules\@openai\$platformPackage\vendor\$targetTriple\bin\codex.exe")
-    )
-    $codexCandidate = $codexCandidates | Where-Object {
-        Test-Path -LiteralPath $_ -PathType Leaf
-    } | Select-Object -First 1
-}
-if (-not $codexCandidate) {
-    throw "Native codex.exe was not found behind the installed Codex launcher."
-}
-$codexPath = (Resolve-Path -LiteralPath $codexCandidate).Path
-if ([System.IO.Path]::GetFileName($codexPath) -ne "codex.exe") {
-    throw "Resolved Codex executable is not codex.exe."
+$codexExtension = [System.IO.Path]::GetExtension($codexPath).ToLowerInvariant()
+if ($codexExtension -notin $supportedCodexExtensions) {
+    throw "Resolved Codex application launcher type is unsupported."
 }
 
 & $ghPath auth status 1>$null 2>$null
