@@ -23,7 +23,6 @@ from tools.cse_api_bridge import (
     BridgeError,
     BridgeTask,
     GitHubClient,
-    approved,
     parse_task,
     path_allowed,
     terminal_state,
@@ -74,6 +73,7 @@ class LoopConfig:
     python_path: Path
     allowed_base: str = "master"
     max_runs: int = 20
+    flutter_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -261,6 +261,12 @@ def _exact_path(value: object, reason: str) -> Path:
     return path.resolve()
 
 
+def _optional_exact_path(value: object, reason: str) -> Path | None:
+    if value is None:
+        return None
+    return _exact_path(value, reason)
+
+
 def load_config(runtime_root: Path) -> LoopConfig:
     path = runtime_root.resolve() / "config.json"
     try:
@@ -289,6 +295,9 @@ def load_config(runtime_root: Path) -> LoopConfig:
             value.get("allowed_base", "master"), "allowed_base_invalid"
         ),
         max_runs=max_runs,
+        flutter_path=_optional_exact_path(
+            value.get("flutter_path"), "flutter_path_invalid"
+        ),
     )
 
 
@@ -611,6 +620,10 @@ def _validation_argv(config: LoopConfig, command_text: str) -> tuple[str, ...]:
         return (str(config.python_path), *argv[1:])
     if executable in {"git", "git.exe"}:
         return (str(config.git_path), *argv[1:])
+    if executable in {"flutter", "flutter.bat"}:
+        if config.flutter_path is None:
+            raise BridgeError("validation_executable_unconfigured")
+        return (str(config.flutter_path), *argv[1:])
     raise BridgeError("validation_executable_unconfigured")
 
 
@@ -676,9 +689,43 @@ def parse_review(value: object) -> ReviewResult:
     return ReviewResult(str(verdict), summary.strip(), tuple(findings))
 
 
+def review_prompt(task: BridgeTask, changed_paths: Sequence[str]) -> str:
+    writable = "\n".join(f"- {path}" for path in task.allowed_paths)
+    changed = "\n".join(f"- {path}" for path in changed_paths)
+    validations = "\n".join(
+        f"- PASS: {command}" for command in task.validation_commands
+    )
+    prompt = f"""Independently review the uncommitted changes in this worktree.
+
+Issue goal, constraints, and acceptance criteria:
+{task.goal}
+
+Allowed paths:
+{writable}
+
+Host-observed changed paths:
+{changed}
+
+Data-minimal host validation summary:
+{validations}
+
+Review rules:
+- Work read-only and inspect the uncommitted diff against the complete Issue contract.
+- Verify scope, correctness, regressions, and whether the acceptance criteria are met.
+- Treat the host summary only as evidence that the listed deterministic commands passed.
+- Return only the required structured verdict, summary, and actionable findings.
+- Use verdict needs_human when the contract cannot be verified safely from this worktree.
+"""
+    if len(prompt) > 28_000:
+        raise BridgeError("review_prompt_too_large")
+    return prompt
+
+
 def run_review(
     config: LoopConfig,
     worktree: Path,
+    task: BridgeTask,
+    changed_paths: Sequence[str],
     command: CommandAdapter,
     artifacts: RunArtifacts,
     *,
@@ -694,6 +741,7 @@ def run_review(
         result_path.unlink()
     except FileNotFoundError:
         pass
+    prompt = review_prompt(task, changed_paths)
     result = command(
         (
             str(config.codex_path),
@@ -707,14 +755,15 @@ def run_review(
             str(schema_path),
             "--output-last-message",
             str(result_path),
-            "review",
-            "--uncommitted",
+            "-",
         ),
         worktree,
         1800,
-        None,
+        prompt,
     )
-    artifacts.record_command(f"codex-review-{round_number}", result)
+    artifacts.record_command(
+        f"codex-review-{round_number}", result, sensitive=(prompt,)
+    )
     if result.returncode != 0:
         raise BridgeError("codex_review_failed")
     try:
@@ -863,6 +912,8 @@ def process_issue(
     artifacts.update("RUNNING", "task", None)
     issue = github.issue(issue_number)
     comments = github.comments(issue_number)
+    if str(issue.get("state", "")).casefold() != "open" or "pull_request" in issue:
+        raise BridgeError("task_not_ready")
     if terminal_state(comments) is not None:
         artifacts.update("SKIPPED", "terminal", 0, "task_already_terminal")
         return 0
@@ -874,8 +925,8 @@ def process_issue(
         raise BridgeError("task_repository_mismatch")
     if task.base != config.allowed_base:
         raise BridgeError("task_base_forbidden")
-    if not approved(comments):
-        raise BridgeError("task_not_approved")
+    if not task_ready(issue, comments):
+        raise BridgeError("task_not_ready")
     github.comment(
         issue_number,
         f"{RUNNING_MARKER}\nCSE Codex Loop started.\nRun: `{artifacts.run_id}`",
@@ -895,11 +946,17 @@ def process_issue(
             artifacts,
         )
         artifacts.update("RUNNING", "validate", None)
-        enforce_scope(config, worktree, task, command, artifacts)
+        paths = enforce_scope(config, worktree, task, command, artifacts)
         run_validations(config, worktree, task, command, artifacts)
         artifacts.update("RUNNING", "review", None)
         review = run_review(
-            config, worktree, command, artifacts, round_number=1
+            config,
+            worktree,
+            task,
+            paths,
+            command,
+            artifacts,
+            round_number=1,
         )
         if review.verdict == "needs_human":
             raise BridgeError("review_needs_human")
@@ -914,11 +971,17 @@ def process_issue(
                 correction=True,
             )
             artifacts.update("RUNNING", "revalidate", None)
-            enforce_scope(config, worktree, task, command, artifacts)
+            paths = enforce_scope(config, worktree, task, command, artifacts)
             run_validations(config, worktree, task, command, artifacts)
             artifacts.update("RUNNING", "rereview", None)
             review = run_review(
-                config, worktree, command, artifacts, round_number=2
+                config,
+                worktree,
+                task,
+                paths,
+                command,
+                artifacts,
+                round_number=2,
             )
             if review.verdict != "approved":
                 raise BridgeError("review_unresolved")

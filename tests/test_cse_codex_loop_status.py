@@ -90,6 +90,14 @@ class InstallerSourceTests(unittest.TestCase):
             self.assertIn(f"${name} = (Resolve-Path", self.installer)
             self.assertIn(f"{name.lower()[:-4]}_path", self.installer)
 
+    def test_installer_persists_optional_exact_flutter_path(self) -> None:
+        self.assertIn("Get-Command flutter.bat", self.installer)
+        self.assertIn("$flutterPath = $null", self.installer)
+        self.assertIn(
+            "$flutterPath = (Resolve-Path -LiteralPath", self.installer
+        )
+        self.assertIn("flutter_path = $flutterPath", self.installer)
+
     def test_new_loop_never_invokes_the_old_api_bridge_or_key_file(self) -> None:
         combined = "\n".join((self.installer, self.runner, self.source))
         self.assertNotIn("cse_api_bridge.py", combined)

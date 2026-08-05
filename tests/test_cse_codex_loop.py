@@ -6,12 +6,15 @@ import shutil
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
+from tools.cse_api_bridge import BridgeError
 from tools.cse_codex_loop import (
     CommandResult,
     LoopConfig,
     RunArtifacts,
+    _validation_argv,
     create_worktree,
     process_issue,
     run_loop,
@@ -62,20 +65,37 @@ APPROVAL = {
 class FakeGitHub:
     repository = "faliardic/chief-site-engineer"
 
-    def __init__(self, *, body: str | None = None, approval: bool = True):
+    def __init__(
+        self,
+        *,
+        body: str | None = None,
+        approval: bool = True,
+        comments: list[dict[str, object]] | None = None,
+        issue_overrides: dict[str, object] | None = None,
+    ):
         self.body = body or task_body()
-        self._comments = [dict(APPROVAL)] if approval else []
+        self._comments = (
+            [dict(item) for item in comments]
+            if comments is not None
+            else ([dict(APPROVAL)] if approval else [])
+        )
+        self.issue_data: dict[str, object] = {
+            "number": 345,
+            "body": self.body,
+            "state": "open",
+        }
+        self.issue_data.update(issue_overrides or {})
         self.posted: list[str] = []
         self.prs: list[object] = []
 
     def request(self, method, path, payload=None):  # type: ignore[no-untyped-def]
         if method == "GET" and path.endswith("issues?state=open&per_page=100"):
-            return [{"number": 345, "body": self.body}]
+            return [dict(self.issue_data)]
         raise AssertionError((method, path, payload))
 
     def issue(self, number: int):
         self.assert_issue(number)
-        return {"number": number, "body": self.body}
+        return dict(self.issue_data)
 
     def comments(self, number: int):
         self.assert_issue(number)
@@ -118,6 +138,7 @@ class FakeCommands:
         self.implementer_exit = implementer_exit
         self.calls: list[tuple[str, ...]] = []
         self.prompts: list[str] = []
+        self.review_prompts: list[str] = []
         self.cleanup = False
 
     def __call__(self, argv, cwd, timeout, input_text):  # type: ignore[no-untyped-def]
@@ -171,7 +192,9 @@ class FakeCommands:
     def codex(
         self, call: tuple[str, ...], cwd: Path, input_text: str | None
     ) -> CommandResult:
-        if "review" in call:
+        sandbox = call[call.index("--sandbox") + 1]
+        if sandbox == "read-only":
+            self.review_prompts.append(input_text or "")
             result_path = Path(call[call.index("--output-last-message") + 1])
             value = self.reviews.pop(0)
             result_path.write_text(json.dumps(value), encoding="utf-8")
@@ -257,6 +280,27 @@ class WorktreeTests(LoopFixture):
         )
 
 
+class ValidationExecutableTests(LoopFixture):
+    def test_configured_flutter_validation_uses_exact_executable(self) -> None:
+        flutter_path = self.root / "flutter.bat"
+        config = replace(self.config, flutter_path=flutter_path)
+
+        self.assertEqual(
+            _validation_argv(config, "flutter test test/widget_test.dart"),
+            (str(flutter_path), "test", "test/widget_test.dart"),
+        )
+
+    def test_flutter_is_required_only_for_declared_flutter_validation(self) -> None:
+        self.assertEqual(
+            _validation_argv(self.config, "python -m unittest"),
+            (str(self.config.python_path), "-m", "unittest"),
+        )
+        with self.assertRaisesRegex(
+            BridgeError, "validation_executable_unconfigured"
+        ):
+            _validation_argv(self.config, "flutter analyze")
+
+
 class OrchestrationTests(LoopFixture):
     def run_issue(
         self, commands: FakeCommands, github: FakeGitHub | None = None
@@ -284,6 +328,12 @@ class OrchestrationTests(LoopFixture):
         self.assertIn(
             "--sandbox", "\n".join(" ".join(call) for call in commands.calls)
         )
+        self.assertEqual(len(commands.review_prompts), 1)
+        review_prompt = commands.review_prompts[0]
+        self.assertIn("Implement the local loop test fixture.", review_prompt)
+        self.assertIn("- docs/cse_codex_loop.md", review_prompt)
+        self.assertIn("- PASS: python -m unittest", review_prompt)
+        self.assertIn("Host-observed changed paths", review_prompt)
         status = json.loads(
             (artifacts.run_root / "status.json").read_text(encoding="utf-8")
         )
@@ -335,6 +385,68 @@ class OrchestrationTests(LoopFixture):
         self.assertIn("`review_unresolved`", github.posted[-1])
         self.assertTrue(task_worktree(self.runtime, 345).exists())
         self.assertFalse(github.prs)
+
+    def test_explicit_issue_rejects_stale_running_approval(self) -> None:
+        stale = FakeGitHub(
+            comments=[
+                dict(APPROVAL),
+                {
+                    "body": "<!-- cse-bridge-status:RUNNING -->",
+                    "author_association": "OWNER",
+                    "created_at": "2026-08-04T19:56:02Z",
+                },
+            ]
+        )
+        commands = FakeCommands()
+
+        with self.assertRaisesRegex(BridgeError, "task_not_ready"):
+            self.run_issue(commands, stale)
+
+        self.assertFalse(commands.calls)
+
+    def test_explicit_issue_accepts_newer_reapproval_after_running(self) -> None:
+        reapproved = FakeGitHub(
+            comments=[
+                dict(APPROVAL),
+                {
+                    "body": "<!-- cse-bridge-status:RUNNING -->",
+                    "author_association": "OWNER",
+                    "created_at": "2026-08-04T19:56:02Z",
+                },
+                {
+                    "body": "CSE_BRIDGE_APPROVED",
+                    "author_association": "OWNER",
+                    "created_at": "2026-08-04T19:57:02Z",
+                },
+            ]
+        )
+
+        result, github, _ = self.run_issue(FakeCommands(), reapproved)
+
+        self.assertEqual(result, 0)
+        self.assertIn("READY_FOR_FATIH", github.posted[-1])
+
+    def test_explicit_issue_requires_open_non_pr_issue(self) -> None:
+        for index, overrides in enumerate(
+            ({"state": "closed"}, {"pull_request": {"url": "example"}})
+        ):
+            with self.subTest(overrides=overrides):
+                commands = FakeCommands()
+                artifacts = RunArtifacts.create(
+                    self.runtime,
+                    345,
+                    run_id=f"not-ready-{index}",
+                )
+                with self.assertRaisesRegex(BridgeError, "task_not_ready"):
+                    process_issue(
+                        345,
+                        self.config,
+                        self.runtime,
+                        FakeGitHub(issue_overrides=overrides),
+                        commands,
+                        artifacts,
+                    )
+                self.assertFalse(commands.calls)
 
     def test_codex_failure_is_data_minimal_and_preserves_worktree(self) -> None:
         commands = FakeCommands(implementer_exit=2)
@@ -446,7 +558,7 @@ if tool == "git":
         shutil.rmtree(Path(args[-1]))
     save()
 elif tool == "codex":
-    if "review" in args:
+    if args[args.index("--sandbox") + 1] == "read-only":
         state["reviews"] += 1
         verdict = "changes_requested" if state["reviews"] == 1 else "approved"
         findings = ["Apply the stub correction."] if state["reviews"] == 1 else []

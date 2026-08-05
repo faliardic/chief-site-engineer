@@ -29,6 +29,10 @@ $pythonCommand = Get-Command python -CommandType Application -ErrorAction Silent
 $codexCommand = Get-Command codex -CommandType Application -ErrorAction SilentlyContinue
 $gitCommand = Get-Command git -CommandType Application -ErrorAction SilentlyContinue
 $ghCommand = Get-Command gh -CommandType Application -ErrorAction SilentlyContinue
+$flutterCommand = Get-Command flutter.bat -CommandType Application -ErrorAction SilentlyContinue
+if (-not $flutterCommand) {
+    $flutterCommand = Get-Command flutter -CommandType Application -ErrorAction SilentlyContinue
+}
 foreach ($entry in @(
     @{ Name = "python"; Command = $pythonCommand },
     @{ Name = "codex"; Command = $codexCommand },
@@ -43,6 +47,10 @@ foreach ($entry in @(
 $pythonPath = (Resolve-Path -LiteralPath ([string]$pythonCommand.Source)).Path
 $gitPath = (Resolve-Path -LiteralPath ([string]$gitCommand.Source)).Path
 $ghPath = (Resolve-Path -LiteralPath ([string]$ghCommand.Source)).Path
+$flutterPath = $null
+if ($flutterCommand -and $flutterCommand.Source) {
+    $flutterPath = (Resolve-Path -LiteralPath ([string]$flutterCommand.Source)).Path
+}
 $resolvedRepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 
 $nativeCodexCommand = Get-Command codex.exe -CommandType Application -ErrorAction SilentlyContinue
@@ -87,6 +95,7 @@ New-Item -ItemType Directory -Path $runtimeRoot -Force | Out-Null
     codex_path = $codexPath
     git_path = $gitPath
     gh_path = $ghPath
+    flutter_path = $flutterPath
     allowed_base = "master"
     max_runs = 20
 } | ConvertTo-Json | Set-Content -LiteralPath $configPath -Encoding UTF8
