@@ -44,7 +44,6 @@ FAILED_MARKER = "<!-- cse-bridge-status:FAILED -->"
 NEEDS_HUMAN_MARKER = "<!-- cse-bridge-status:NEEDS_HUMAN -->"
 RUNNING_MARKER = "<!-- cse-bridge-status:RUNNING -->"
 WORKTREE_REMOVE_ATTEMPTS = 3
-WORKTREE_PRUNE_ATTEMPTS = 2
 WORKTREE_CLEANUP_RETRY_SECONDS = 0.2
 
 _SECRET_PATTERNS = (
@@ -922,26 +921,49 @@ def _published_worktree_is_clean(
     )
 
 
-def _prune_stale_worktrees(
+def _registered_worktree_paths(output: str) -> tuple[Path, ...] | None:
+    if not output or not output.endswith("\0\0"):
+        return None
+    paths: list[Path] = []
+    for record in output[:-2].split("\0\0"):
+        fields = record.split("\0")
+        if not fields or not fields[0].startswith("worktree "):
+            return None
+        raw_path = fields[0].removeprefix("worktree ")
+        path = Path(raw_path)
+        if not raw_path or not path.is_absolute():
+            return None
+        paths.append(path)
+    return tuple(paths)
+
+
+def _issue_worktree_is_registered(
     config: LoopConfig,
+    worktree: Path,
     command: CommandAdapter,
     artifacts: RunArtifacts,
-) -> bool:
-    for attempt in range(1, WORKTREE_PRUNE_ATTEMPTS + 1):
-        result = _git_result(
-            config,
-            ("worktree", "prune", "--expire", "now"),
-            config.repo_root,
-            command,
-            artifacts,
-            f"worktree-cleanup-prune-{attempt}",
-            timeout=120,
-        )
-        if result.returncode == 0:
-            return True
-        if attempt < WORKTREE_PRUNE_ATTEMPTS:
-            time.sleep(WORKTREE_CLEANUP_RETRY_SECONDS)
-    return False
+    *,
+    stage: str,
+) -> bool | None:
+    result = _git_result(
+        config,
+        ("worktree", "list", "--porcelain", "-z"),
+        config.repo_root,
+        command,
+        artifacts,
+        stage,
+        timeout=30,
+    )
+    if result.returncode != 0:
+        return None
+    registered_paths = _registered_worktree_paths(result.stdout)
+    if registered_paths is None:
+        return None
+    expected = os.path.normcase(os.path.abspath(worktree))
+    return any(
+        os.path.normcase(os.path.abspath(path)) == expected
+        for path in registered_paths
+    )
 
 
 def remove_successful_worktree(
@@ -966,8 +988,19 @@ def remove_successful_worktree(
         return False
 
     try:
+        registered = _issue_worktree_is_registered(
+            config,
+            worktree,
+            command,
+            artifacts,
+            stage="worktree-cleanup-list-initial",
+        )
+        if registered is None:
+            return False
         if not worktree.exists():
-            return _prune_stale_worktrees(config, command, artifacts)
+            return not registered
+        if not registered:
+            return False
         for attempt in range(1, WORKTREE_REMOVE_ATTEMPTS + 1):
             if not _published_worktree_is_clean(
                 config,
@@ -988,32 +1021,40 @@ def remove_successful_worktree(
                 f"worktree-cleanup-remove-{attempt}",
                 timeout=120,
             )
-            if result.returncode == 0:
+            registered = _issue_worktree_is_registered(
+                config,
+                worktree,
+                command,
+                artifacts,
+                stage=f"worktree-cleanup-list-{attempt}",
+            )
+            if registered is None:
+                return False
+            if not registered:
+                if result.returncode != 0 or not worktree.exists():
+                    return True
+                if not _published_worktree_is_clean(
+                    config,
+                    worktree,
+                    task,
+                    published_commit,
+                    command,
+                    artifacts,
+                    stage="worktree-cleanup-fallback-check",
+                ):
+                    return False
+                try:
+                    shutil.rmtree(worktree)
+                except FileNotFoundError:
+                    pass
+                except OSError:
+                    return False
                 return not worktree.exists()
             if not worktree.exists():
-                return _prune_stale_worktrees(config, command, artifacts)
+                return False
             if attempt < WORKTREE_REMOVE_ATTEMPTS:
                 time.sleep(WORKTREE_CLEANUP_RETRY_SECONDS)
-
-        if not _published_worktree_is_clean(
-            config,
-            worktree,
-            task,
-            published_commit,
-            command,
-            artifacts,
-            stage="worktree-cleanup-fallback-check",
-        ):
-            return False
-        try:
-            shutil.rmtree(worktree)
-        except FileNotFoundError:
-            pass
-        except OSError:
-            return False
-        if worktree.exists():
-            return False
-        return _prune_stale_worktrees(config, command, artifacts)
+        return False
     except (BridgeError, OSError):
         return False
 

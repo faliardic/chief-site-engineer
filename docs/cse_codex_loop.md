@@ -20,9 +20,16 @@ anahtarı, özel Responses istemcisi veya GitHub Actions kullanmaz.
 - Başarılı worktree cleanup’ı host tarafından sınırlı tekrarlarla yapılır.
   Kaldırmadan önce worktree’nin temiz olduğu, beklenen görev branch’inde kaldığı
   ve push edilen commit’i gösterdiği doğrulanır. Windows’ta `git worktree remove
-  --force` geçici olarak hata verirse yeniden denenir; dizin zaten yoksa stale
-  metadata `git worktree prune --expire now` ile temizlenir. Yalnız aynı güvenlik
-  kapısı yeniden geçilirse dosya sistemi fallback’i kullanılabilir.
+  --force` geçici olarak hata verirse yeniden denenir. Kayıt durumu yalnız
+  `git worktree list --porcelain -z` ile salt-okunur incelenir ve yalnız kesin
+  Issue worktree yolu değerlendirilir. Otomatik cleanup repository-wide
+  `git worktree prune` çalıştırmaz veya ilgisiz worktree metadata’sına dokunmaz.
+  Dizin zaten yoksa ve kesin yol kayıtlı değilse cleanup tamamdır. Başarısız
+  remove sonrasında kesin yol kayıtlı değilse de cleanup tamamdır; yol kayıtlı
+  kalıyorsa worktree/metadata korunur ve cleanup pending sonucu üretilir. Dosya
+  sistemi fallback’i ancak aynı clean/branch/push edilmiş commit güvenlik kapısı
+  yeniden geçildikten ve kesin kaydın kaldırıldığı doğrulandıktan sonra
+  kullanılabilir.
 - Scope, validation, Codex veya review hatasındaki worktree tanı için korunur.
   Yayın ve Draft PR tamamlandıktan sonra cleanup yine mümkün olmazsa worktree
   manuel cleanup için korunur; sonuç `FAILED` olmaz. Draft PR URL’siyle

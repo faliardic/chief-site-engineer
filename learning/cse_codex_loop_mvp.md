@@ -91,12 +91,17 @@ status = ("status", "--porcelain=v1", "--untracked-files=all")
 branch = ("symbolic-ref", "--quiet", "HEAD")
 head = ("rev-parse", "--verify", "HEAD")
 remove = ("worktree", "remove", "--force", str(worktree))
-prune = ("worktree", "prune", "--expire", "now")
+registration = ("worktree", "list", "--porcelain", "-z")
 ```
 
-Remove ve prune tekrar sayıları sabittir. Git remove denemeleri tükenirse Python
-dosya sistemi fallback’inden hemen önce aynı clean/branch/commit kapısı tekrar
-çalışır; dirty veya başka branch/commit gösteren worktree silinmez.
+Remove tekrar sayısı sabittir. Registration çıktısı NUL ayrımlı porcelain kayıtlar
+olarak parse edilir ve yalnız kesin Issue worktree yolu karşılaştırılır. Otomatik
+cleanup hiçbir zaman repository-wide `git worktree prune` çalıştırmaz. Dizin
+yoksa veya başarısız remove sonrasında kesin yol artık kayıtlı değilse cleanup
+tamamdır. Kesin yol kayıtlı kalıyorsa worktree/metadata korunur ve sonuç pending
+olur. Dosya sistemi fallback’i ancak kayıt kaldırılmışsa ve aynı
+clean/branch/commit kapısı yeniden geçerse kullanılabilir; dirty veya başka
+branch/commit gösteren worktree silinmez.
 
 ## Kullanılan teknik kavramlar
 
@@ -119,9 +124,13 @@ ikinci review, terminal yorumlar, cleanup, hata worktree’sinin korunması ve
 secret-free log sözleşmelerini mock eder.
 
 Cleanup odaklı testler normal başarıyı, ilk remove hatasından sonraki başarıyı,
-zaten bulunmayan path için prune başarısını, dirty worktree’nin korunmasını ve
-yayın sonrası kalıcı cleanup hatasının `FAILED` yerine
+zaten bulunmayan ve kayıtlı olmayan path’in tamamlanmasını, kayıtlı kalan path’in
+korunmasını, başarısız remove sonrası kaydı kalkmış path’i, dirty worktree’nin
+korunmasını ve yayın sonrası kalıcı cleanup hatasının `FAILED` yerine
 `READY_FOR_FATIH + approved_cleanup_pending` üretmesini ayrı ayrı kanıtlar.
+Issue worktree ile ilgisiz stale worktree kaydını aynı fixture’da taşıyan
+regresyon testi, hiçbir prune argv’si çağrılmadığını ve ilgisiz metadata’nın
+değişmeden kaldığını ayrıca kanıtlar.
 
 Windows integration testi gerçek `shell=False` subprocess sınırında stub
 `codex/git/python/gh` executable’ları kullanır. Ağ veya cihaz olmadan şu sırayı
@@ -164,6 +173,10 @@ görülür.
   yapılabilsin.
 - Cleanup öncesinde clean/branch/commit üçlüsünü doğruladık ki `--force` veya
   dosya sistemi fallback’i yayınlanan commit dışındaki yerel emeği silemesin.
+- Worktree kayıtlarını `--porcelain -z` ile salt-okunur ve kesin Issue yolu
+  üzerinden inceledik ki otomatik cleanup ilgisiz stale metadata’yı değiştirmesin.
+- Repository-wide prune’u otomatik cleanup’tan tamamen çıkardık ki tarihsel veya
+  başka Issue’lara ait worktree kayıtlarına dokunulmasın.
 - Yayın sonrası kalıcı cleanup hatasını `approved_cleanup_pending` yaptık ki
   hazır Draft PR sırf Windows dosya kilidi yüzünden sıradan `FAILED` görünmesin.
 
