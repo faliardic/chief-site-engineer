@@ -25,8 +25,21 @@ if (-not (Test-Path -LiteralPath $runnerPath)) {
     throw "Codex loop runner not found: $runnerPath"
 }
 
+$supportedCodexExtensions = @(".exe", ".com", ".cmd", ".bat")
 $pythonCommand = Get-Command python -CommandType Application -ErrorAction SilentlyContinue
-$codexCommand = Get-Command codex -CommandType Application -ErrorAction SilentlyContinue
+$codexCommand = Get-Command codex -CommandType Application -ErrorAction SilentlyContinue |
+    Where-Object {
+        if (-not $_.Source) {
+            return $false
+        }
+        $candidate = [string]$_.Source
+        $extension = [System.IO.Path]::GetExtension($candidate).ToLowerInvariant()
+        return (
+            $extension -in $supportedCodexExtensions -and
+            (Test-Path -LiteralPath $candidate -PathType Leaf)
+        )
+    } |
+    Select-Object -First 1
 $gitCommand = Get-Command git -CommandType Application -ErrorAction SilentlyContinue
 $ghCommand = Get-Command gh -CommandType Application -ErrorAction SilentlyContinue
 $flutterCommand = Get-Command flutter.bat -CommandType Application -ErrorAction SilentlyContinue
@@ -54,7 +67,6 @@ if ($flutterCommand -and $flutterCommand.Source) {
 }
 $resolvedRepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 
-$supportedCodexExtensions = @(".exe", ".com", ".cmd", ".bat")
 $codexExtension = [System.IO.Path]::GetExtension($codexPath).ToLowerInvariant()
 if ($codexExtension -notin $supportedCodexExtensions) {
     throw "Resolved Codex application launcher type is unsupported."
