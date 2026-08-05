@@ -17,9 +17,18 @@ anahtarı, özel Responses istemcisi veya GitHub Actions kullanmaz.
 - Review yalnız `approved`, `changes_requested` veya `needs_human` verdict’i ile
   yapılandırılmış JSON döndürür. `changes_requested` için en fazla bir correction
   çalışır; ikinci review onaylamazsa sonuç `NEEDS_HUMAN` olur.
-- Başarılı worktree kaldırılır. Scope, validation, Codex veya review hatasındaki
-  worktree tanı için korunur. Force-push, merge, branch silme, release, cihaz,
-  ADB, backup/restore ve kullanıcı verisi işlemi yoktur.
+- Başarılı worktree cleanup’ı host tarafından sınırlı tekrarlarla yapılır.
+  Kaldırmadan önce worktree’nin temiz olduğu, beklenen görev branch’inde kaldığı
+  ve push edilen commit’i gösterdiği doğrulanır. Windows’ta `git worktree remove
+  --force` geçici olarak hata verirse yeniden denenir; dizin zaten yoksa stale
+  metadata `git worktree prune --expire now` ile temizlenir. Yalnız aynı güvenlik
+  kapısı yeniden geçilirse dosya sistemi fallback’i kullanılabilir.
+- Scope, validation, Codex veya review hatasındaki worktree tanı için korunur.
+  Yayın ve Draft PR tamamlandıktan sonra cleanup yine mümkün olmazsa worktree
+  manuel cleanup için korunur; sonuç `FAILED` olmaz. Draft PR URL’siyle
+  `READY_FOR_FATIH`, PASS exit semantics ve veri-minimal
+  `approved_cleanup_pending` uyarısı üretilir. Force-push, merge, branch silme,
+  release, cihaz, ADB, backup/restore ve kullanıcı verisi işlemi yoktur.
 
 ## Kurulum
 
@@ -78,7 +87,9 @@ Disable-ScheduledTask -TaskName 'CSE Codex Loop'
 ```
 
 Otomatik merge yoktur. Başarı terminal yorumu `READY_FOR_FATIH` ve bir Draft PR
-üretir; sonraki yayın kararı insandadır.
+üretir; sonraki yayın kararı insandadır. Normal cleanup başarısı `approved`
+olarak kalır. Yalnız cleanup bekliyorsa aynı PASS yorumunda
+`approved_cleanup_pending` uyarısı bulunur.
 
 ## Kayıtlar ve tanı
 
@@ -99,4 +110,5 @@ loglanmaz; Codex aşamaları yalnız veri-minimal exit kaydı bırakır.
 Başlıca terminal nedenler sabit ve veri-minimaldir: `scope_violation`,
 `validation_failed`, `codex_implementer_failed`, `codex_review_failed`,
 `review_needs_human`, `review_unresolved`, `branch_conflict` ve
-`worktree_conflict`.
+`worktree_conflict`. Yayın sonrası cleanup sorunu terminal failure nedeni değil,
+PASS durumuna eşlik eden `approved_cleanup_pending` uyarısıdır.
