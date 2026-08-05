@@ -104,6 +104,18 @@ class InstallerSourceTests(unittest.TestCase):
         self.assertNotIn("Get-Command codex.exe", self.installer)
         self.assertNotIn("Native codex.exe was not found", self.installer)
 
+    def test_installer_selects_one_existing_supported_codex_launcher(self) -> None:
+        self.assertIn("Where-Object {", self.installer)
+        self.assertIn("$candidate = [string]$_.Source", self.installer)
+        self.assertIn(
+            "Test-Path -LiteralPath $candidate -PathType Leaf", self.installer
+        )
+        self.assertIn("Select-Object -First 1", self.installer)
+        self.assertLess(
+            self.installer.index("Where-Object {"),
+            self.installer.index("$codexPath = (Resolve-Path"),
+        )
+
     def test_installer_persists_optional_exact_flutter_path(self) -> None:
         self.assertIn("Get-Command flutter.bat", self.installer)
         self.assertIn("$flutterPath = $null", self.installer)
