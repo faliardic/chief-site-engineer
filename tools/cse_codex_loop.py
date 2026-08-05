@@ -636,6 +636,18 @@ def _validation_argv(config: LoopConfig, command_text: str) -> tuple[str, ...]:
     raise BridgeError("validation_executable_unconfigured")
 
 
+def _validation_working_directory(worktree: Path, command_text: str) -> Path:
+    executable = Path(validate_command(command_text)[0]).name.casefold()
+    if executable not in {"flutter", "flutter.bat"}:
+        return worktree
+    if (worktree / "pubspec.yaml").is_file():
+        return worktree
+    mobile_root = worktree / "mobile"
+    if (mobile_root / "pubspec.yaml").is_file():
+        return mobile_root
+    raise BridgeError("validation_working_directory_unavailable")
+
+
 def run_validations(
     config: LoopConfig,
     worktree: Path,
@@ -644,8 +656,10 @@ def run_validations(
     artifacts: RunArtifacts,
 ) -> None:
     for index, command_text in enumerate(task.validation_commands, start=1):
+        argv = _validation_argv(config, command_text)
+        cwd = _validation_working_directory(worktree, command_text)
         result = command(
-            _validation_argv(config, command_text), worktree, 1200, None
+            argv, cwd, 1200, None
         )
         artifacts.record_command(
             f"validation-{index}", result, include_output=False
