@@ -10,7 +10,7 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.cse_api_bridge import BridgeError
+from tools.cse_api_bridge import BridgeError, parse_task
 from tools.cse_codex_loop import (
     CommandResult,
     LoopConfig,
@@ -20,6 +20,7 @@ from tools.cse_codex_loop import (
     create_worktree,
     process_issue,
     run_loop,
+    run_validations,
     select_approved_issue,
     task_worktree,
     terminal_comment,
@@ -55,6 +56,15 @@ Add local Codex implementer reviewer loop
 Add local Codex implementer reviewer loop
 Related to this Issue
 """
+
+
+def validation_task(*commands: str):  # type: ignore[no-untyped-def]
+    validation_commands = "\n".join(f"- {command}" for command in commands)
+    return parse_task(
+        task_body().replace(
+            "- python -m unittest\n- git diff --check", validation_commands
+        )
+    )
 
 
 APPROVAL = {
@@ -380,6 +390,118 @@ class ValidationExecutableTests(LoopFixture):
             BridgeError, "validation_executable_unconfigured"
         ):
             _validation_argv(self.config, "flutter analyze")
+
+
+class ValidationWorkingDirectoryTests(LoopFixture):
+    def configured_flutter(self) -> LoopConfig:
+        return replace(self.config, flutter_path=self.root / "flutter.bat")
+
+    def validation_adapter(self):  # type: ignore[no-untyped-def]
+        calls: list[tuple[tuple[str, ...], Path, int, str | None]] = []
+
+        def command(argv, cwd, timeout, input_text):  # type: ignore[no-untyped-def]
+            calls.append((tuple(argv), Path(cwd), timeout, input_text))
+            return CommandResult(0)
+
+        return calls, command
+
+    def test_root_flutter_package_selects_worktree_root(self) -> None:
+        worktree = self.root / "worktree"
+        mobile_root = worktree / "mobile"
+        mobile_root.mkdir(parents=True)
+        (worktree / "pubspec.yaml").write_text("name: root\n", encoding="utf-8")
+        (mobile_root / "pubspec.yaml").write_text(
+            "name: nested\n", encoding="utf-8"
+        )
+        calls, command = self.validation_adapter()
+
+        run_validations(
+            self.configured_flutter(),
+            worktree,
+            validation_task("flutter test test/widget_test.dart"),
+            command,
+            self.artifacts(),
+        )
+
+        self.assertEqual(calls[0][1], worktree)
+
+    def test_nested_flutter_package_selects_mobile_root(self) -> None:
+        worktree = self.root / "worktree"
+        mobile_root = worktree / "mobile"
+        mobile_root.mkdir(parents=True)
+        (mobile_root / "pubspec.yaml").write_text(
+            "name: nested\n", encoding="utf-8"
+        )
+        calls, command = self.validation_adapter()
+
+        run_validations(
+            self.configured_flutter(),
+            worktree,
+            validation_task("flutter analyze"),
+            command,
+            self.artifacts(),
+        )
+
+        self.assertEqual(calls[0][1], mobile_root)
+
+    def test_missing_pubspec_fails_before_command_adapter(self) -> None:
+        worktree = self.root / "worktree"
+        worktree.mkdir()
+        calls, command = self.validation_adapter()
+
+        with self.assertRaisesRegex(
+            BridgeError, "validation_working_directory_unavailable"
+        ):
+            run_validations(
+                self.configured_flutter(),
+                worktree,
+                validation_task("flutter test test/widget_test.dart"),
+                command,
+                self.artifacts(),
+            )
+
+        self.assertEqual(calls, [])
+
+    def test_python_and_git_keep_worktree_root(self) -> None:
+        worktree = self.root / "worktree"
+        worktree.mkdir()
+        calls, command = self.validation_adapter()
+
+        run_validations(
+            self.config,
+            worktree,
+            validation_task("python -m unittest", "git diff --check"),
+            command,
+            self.artifacts(),
+        )
+
+        self.assertEqual([call[1] for call in calls], [worktree, worktree])
+        self.assertEqual(
+            [call[0] for call in calls],
+            [
+                (str(self.config.python_path), "-m", "unittest"),
+                (str(self.config.git_path), "diff", "--check"),
+            ],
+        )
+
+    def test_flutter_path_remains_required_before_command_adapter(self) -> None:
+        worktree = self.root / "worktree"
+        worktree.mkdir()
+        (worktree / "pubspec.yaml").write_text("name: root\n", encoding="utf-8")
+        calls, command = self.validation_adapter()
+
+        with self.assertRaisesRegex(
+            BridgeError, "validation_executable_unconfigured"
+        ):
+            run_validations(
+                self.config,
+                worktree,
+                validation_task("flutter analyze"),
+                command,
+                self.artifacts(),
+            )
+
+        self.assertEqual(calls, [])
 
 
 class OrchestrationTests(LoopFixture):

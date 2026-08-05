@@ -12,6 +12,11 @@ anahtarı, özel Responses istemcisi veya GitHub Actions kullanmaz.
 - Implementer `workspace-write`, bağımsız reviewer `read-only` sandbox kullanır.
 - Allowed path ve Issue validation komutları Codex’e bırakılmaz; host bunları
   `shell=False` subprocess’leriyle uygular.
+- Python ve Git validation komutları Issue worktree kökünde çalışır. Flutter
+  validation için host önce `<worktree>/pubspec.yaml`, sonra yalnız
+  `<worktree>/mobile/pubspec.yaml` konumunu kontrol eder. İlki varsa worktree
+  kökünü, yalnız ikincisi varsa `mobile/` paket kökünü seçer; ikisi de yoksa
+  Flutter’ı çağırmadan `validation_working_directory_unavailable` ile kapanır.
 - Validation, Git, GitHub publication, Draft PR ve terminal Issue yorumu host
   kontrolündedir.
 - Review yalnız `approved`, `changes_requested` veya `needs_human` verdict’i ile
@@ -51,6 +56,17 @@ Installer `python`, `codex`, `git` ve `gh` executable yollarını kesin olarak
 `CSE Codex Loop` Scheduled Task’ı mevcut interaktif kullanıcı ve `Limited` run
 level ile kaydedilir ve hemen **Disabled** yapılır. Mevcut `CSE Bridge` görevi
 okunmaz, değiştirilmez veya etkinleştirilmez.
+
+Bu repository’de Flutter paketi `mobile/` altında olduğundan Issue validation
+komutları seçilen paket köküne göre package-local yol kullanmalıdır:
+
+```text
+flutter test test/widget_test.dart
+flutter analyze
+```
+
+Host `mobile/` kökünü seçtiğinde `mobile/test/widget_test.dart` gibi worktree
+köküne göre yazılmış yollar kullanılmaz.
 
 ## İlk manuel smoke
 
