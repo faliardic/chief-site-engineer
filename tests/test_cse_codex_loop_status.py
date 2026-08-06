@@ -90,6 +90,8 @@ class InstallerSourceTests(unittest.TestCase):
         self.assertIn("-RunLevel Limited", self.installer)
         self.assertIn("-Principal $principal", self.installer)
         self.assertIn('State -ne "Disabled"', self.installer)
+        self.assertIn("-AllowStartIfOnBatteries", self.installer)
+        self.assertIn("-DontStopIfGoingOnBatteries", self.installer)
 
     def test_installer_resolves_all_exact_executable_paths(self) -> None:
         for name in ("pythonPath", "codexPath", "gitPath", "ghPath"):

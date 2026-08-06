@@ -260,7 +260,7 @@ if (-not (Test-Path -LiteralPath $runnerPath -PathType Leaf)) {
 $argument = "-NoProfile -ExecutionPolicy Bypass -File `"$runnerPath`" -RuntimeRoot `"$runtimeRoot`""
 $action = New-ScheduledTaskAction -Execute $powershellPath -Argument $argument -WorkingDirectory $resolvedControlRepoRoot
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(5) -RepetitionInterval (New-TimeSpan -Minutes 5)
-$settings = New-ScheduledTaskSettingsSet -Disable -StartWhenAvailable -MultipleInstances IgnoreNew
+$settings = New-ScheduledTaskSettingsSet -Disable -StartWhenAvailable -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 $currentIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 $principal = New-ScheduledTaskPrincipal -UserId $currentIdentity -LogonType Interactive -RunLevel Limited
 
