@@ -182,6 +182,8 @@ Her invocation tek run ID kullanır:
   stdout.log
   stderr.log
   status.json
+  review-round-1.json
+  review-round-2.json  # yalnız correction sonrası ikinci review çalıştıysa
 ```
 
 Son status ayrıca `worker-status.json` içinde atomik olarak tutulur. Status her
@@ -189,8 +191,26 @@ zaman `run_id` ve `issue_number` alanlarını taşır. Varsayılan rotation son 
 run’ı korur. Tam prompt, GitHub tokenı, ChatGPT auth malzemesi ve secret’lar
 loglanmaz; Codex aşamaları yalnız veri-minimal exit kaydı bırakır.
 
+Başarıyla parse edilen her structured review turu, ham Codex çıktısı yerine
+atomik bir `review-round-<n>.json` kanıtı bırakır. Bu dosya yalnız `round`,
+`verdict`, `summary`, `findings` ve `recorded_at` alanlarını taşır. Summary 1200
+karakter, her finding 500 karakter ve finding sayısı 8 ile sınırlıdır; mevcut
+secret redaction uygulanır ve bilinen yerel çalışma/tool yollarının büyük-küçük
+harf ile Windows ayraç varyantları gizlenir.
+Transient `review-result.json` parse sonrasında silinmeye devam eder. Sanitized
+kanıt dosya sistemi, serialization veya UTF-8 encoding nedeniyle atomik
+yazılamazsa yayın başlamadan `review_evidence_write_failed` ile fail closed
+olunur.
+
+Yalnız `review_needs_human` ve `review_unresolved` terminal yorumları aynı
+immutable yorumda ilgili turun verdict, sanitized summary ve en fazla 5
+finding’ini gösterir. Reviewer bölümü toplam 1800 karakteri aşmaz; ilk neden
+birinci review’u, unresolved correction ise ikinci ve son review’u kullanır.
+Diğer failure yorumlarının veri-minimal biçimi değişmez.
+
 Başlıca terminal nedenler sabit ve veri-minimaldir: `scope_violation`,
 `validation_failed`, `codex_implementer_failed`, `codex_review_failed`,
-`review_needs_human`, `review_unresolved`, `branch_conflict` ve
-`worktree_conflict`. Yayın sonrası cleanup sorunu terminal failure nedeni değil,
-PASS durumuna eşlik eden `approved_cleanup_pending` uyarısıdır.
+`review_evidence_write_failed`, `review_needs_human`, `review_unresolved`,
+`branch_conflict` ve `worktree_conflict`. Yayın sonrası cleanup sorunu terminal
+failure nedeni değil, PASS durumuna eşlik eden `approved_cleanup_pending`
+uyarısıdır.

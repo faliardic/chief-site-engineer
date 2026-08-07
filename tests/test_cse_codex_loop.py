@@ -10,6 +10,7 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
+from tools import cse_codex_loop
 from tools.cse_api_bridge import BridgeError, parse_task
 from tools.cse_codex_loop import (
     CommandResult,
@@ -595,6 +596,17 @@ class OrchestrationTests(LoopFixture):
             (artifacts.run_root / "status.json").read_text(encoding="utf-8")
         )
         self.assertEqual(status["state"], "PASS")
+        evidence = json.loads(
+            (artifacts.run_root / "review-round-1.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(evidence["round"], 1)
+        self.assertEqual(evidence["verdict"], "approved")
+        self.assertEqual(evidence["summary"], "Looks good.")
+        self.assertEqual(evidence["findings"], [])
+        self.assertIsInstance(evidence["recorded_at"], str)
+        self.assertFalse((artifacts.run_root / "review-result.json").exists())
 
     def test_transient_first_remove_failure_is_retried_then_cleaned(self) -> None:
         commands = FakeCommands(cleanup_remove_failures=1)
@@ -732,6 +744,10 @@ class OrchestrationTests(LoopFixture):
         result, github, _ = self.run_issue(commands)
         self.assertEqual(result, 1)
         self.assertIn("`validation_failed`", github.posted[-1])
+        self.assertEqual(
+            github.posted[-1],
+            terminal_comment("FAILED", "validation_failed", "20260804T200000Z-12345678"),
+        )
         self.assertEqual(len(commands.prompts), 1)
         self.assertTrue(task_worktree(self.runtime, 345).exists())
 
@@ -746,23 +762,173 @@ class OrchestrationTests(LoopFixture):
                 {"verdict": "approved", "summary": "Fixed.", "findings": []},
             ]
         )
-        result, github, _ = self.run_issue(commands)
+        result, github, artifacts = self.run_issue(commands)
         self.assertEqual(result, 0)
         self.assertEqual(len(commands.prompts), 2)
         self.assertIn("Tighten the status assertion", commands.prompts[1])
         self.assertIn("READY_FOR_FATIH", github.posted[-1])
+        first = json.loads(
+            (artifacts.run_root / "review-round-1.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        second = json.loads(
+            (artifacts.run_root / "review-round-2.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(first["verdict"], "changes_requested")
+        self.assertEqual(first["summary"], "One fix is needed.")
+        self.assertEqual(first["findings"], ["Tighten the status assertion."])
+        self.assertEqual(second["verdict"], "approved")
+        self.assertEqual(second["summary"], "Fixed.")
+        self.assertFalse((artifacts.run_root / "review-result.json").exists())
+
+    def test_needs_human_review_evidence_is_sanitized_and_bounded(self) -> None:
+        worktree_path = str(task_worktree(self.runtime, 345).resolve())
+        repo_path = str(self.config.repo_root.resolve())
+        worktree_variant = worktree_path.swapcase().replace("\\", "/")
+        repo_variant = repo_path.swapcase().replace("\\", "/")
+        secret = "ghp_1234567890abcdefghijkl"
+        reviews = [
+            {
+                "verdict": "needs_human",
+                "summary": f"{worktree_variant} token=topsecret {secret} "
+                + "s" * 1800,
+                "findings": [
+                    f"finding-{index} {repo_variant} api_key=hidden " + "f" * 700
+                    for index in range(10)
+                ],
+            }
+        ]
+
+        result, github, artifacts = self.run_issue(FakeCommands(reviews=reviews))
+
+        self.assertEqual(result, 3)
+        evidence_text = (artifacts.run_root / "review-round-1.json").read_text(
+            encoding="utf-8"
+        )
+        evidence = json.loads(evidence_text)
+        self.assertEqual(evidence["verdict"], "needs_human")
+        self.assertLessEqual(len(evidence["summary"]), 1200)
+        self.assertEqual(len(evidence["findings"]), 8)
+        self.assertTrue(
+            all(len(finding) <= 500 for finding in evidence["findings"])
+        )
+        for sensitive in (
+            worktree_variant,
+            repo_variant,
+            secret,
+            "topsecret",
+            "hidden",
+        ):
+            self.assertNotIn(sensitive, evidence_text)
+            self.assertNotIn(sensitive, github.posted[-1])
+        self.assertIn("[REDACTED]", evidence_text)
+        self.assertFalse((artifacts.run_root / "review-result.json").exists())
+
+    def test_review_needs_human_comment_uses_bounded_first_review_evidence(
+        self,
+    ) -> None:
+        findings = [f"first-round-finding-{index}" for index in range(6)]
+        commands = FakeCommands(
+            reviews=[
+                {
+                    "verdict": "needs_human",
+                    "summary": "First review needs an operator decision.",
+                    "findings": findings,
+                }
+            ]
+        )
+
+        result, github, _ = self.run_issue(commands)
+
+        self.assertEqual(result, 3)
+        comment = github.posted[-1]
+        self.assertIn("`review_needs_human`", comment)
+        self.assertIn("Verdict: `needs_human`", comment)
+        self.assertIn("First review needs an operator decision.", comment)
+        for finding in findings[:5]:
+            self.assertIn(finding, comment)
+        self.assertNotIn(findings[5], comment)
+        reviewer_section = "Reviewer evidence:" + comment.split(
+            "Reviewer evidence:", 1
+        )[1]
+        self.assertLessEqual(len(reviewer_section), 1800)
+
+    def test_review_evidence_write_failure_stops_before_publication(self) -> None:
+        original_atomic_json = cse_codex_loop._atomic_json
+
+        def fail_review_evidence(path, payload):  # type: ignore[no-untyped-def]
+            if path.name == "review-round-1.json":
+                raise OSError("read-only evidence directory")
+            return original_atomic_json(path, payload)
+
+        with patch.object(
+            cse_codex_loop, "_atomic_json", side_effect=fail_review_evidence
+        ):
+            result, github, artifacts = self.run_issue(FakeCommands())
+
+        self.assertEqual(result, 1)
+        self.assertIn("`review_evidence_write_failed`", github.posted[-1])
+        self.assertFalse(github.prs)
+        self.assertTrue(task_worktree(self.runtime, 345).exists())
+        self.assertFalse((artifacts.run_root / "review-result.json").exists())
+
+    def test_review_evidence_encoding_failure_uses_exact_fail_closed_reason(
+        self,
+    ) -> None:
+        reviews = [
+            {
+                "verdict": "needs_human",
+                "summary": "escaped lone surrogate: \ud800",
+                "findings": [],
+            }
+        ]
+
+        result, github, artifacts = self.run_issue(FakeCommands(reviews=reviews))
+
+        self.assertEqual(result, 1)
+        self.assertEqual(
+            github.posted[-1],
+            terminal_comment(
+                "FAILED",
+                "review_evidence_write_failed",
+                "20260804T200000Z-12345678",
+            ),
+        )
+        self.assertFalse(github.prs)
+        self.assertTrue(task_worktree(self.runtime, 345).exists())
+        self.assertFalse((artifacts.run_root / "review-result.json").exists())
 
     def test_unresolved_second_review_needs_human_and_preserves_worktree(self) -> None:
-        requested = {
+        first = {
             "verdict": "changes_requested",
-            "summary": "Still wrong.",
-            "findings": ["Fix the remaining issue."],
+            "summary": "First review requested a correction.",
+            "findings": ["Fix the first-round issue."],
         }
-        commands = FakeCommands(reviews=[requested, requested])
-        result, github, _ = self.run_issue(commands)
+        final = {
+            "verdict": "changes_requested",
+            "summary": "Final review remains unresolved.",
+            "findings": ["A human must inspect the final state."],
+        }
+        commands = FakeCommands(reviews=[first, final])
+        result, github, artifacts = self.run_issue(commands)
         self.assertEqual(result, 3)
         self.assertIn("NEEDS_HUMAN", github.posted[-1])
         self.assertIn("`review_unresolved`", github.posted[-1])
+        self.assertIn("Verdict: `changes_requested`", github.posted[-1])
+        self.assertIn("Final review remains unresolved.", github.posted[-1])
+        self.assertIn("A human must inspect the final state.", github.posted[-1])
+        self.assertNotIn("First review requested a correction.", github.posted[-1])
+        final_evidence = json.loads(
+            (artifacts.run_root / "review-round-2.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(final_evidence["round"], 2)
+        self.assertEqual(final_evidence["summary"], final["summary"])
+        self.assertFalse((artifacts.run_root / "review-result.json").exists())
         self.assertTrue(task_worktree(self.runtime, 345).exists())
         self.assertFalse(github.prs)
 
