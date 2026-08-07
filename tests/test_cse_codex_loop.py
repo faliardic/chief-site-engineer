@@ -18,10 +18,11 @@ from tools.cse_codex_loop import (
     WORKTREE_REMOVE_ATTEMPTS,
     _validation_argv,
     create_worktree,
+    local_gate_ready,
     process_issue,
     run_loop,
     run_validations,
-    select_approved_issue,
+    select_local_gate_issue,
     task_worktree,
     terminal_comment,
 )
@@ -68,7 +69,7 @@ def validation_task(*commands: str):  # type: ignore[no-untyped-def]
 
 
 APPROVAL = {
-    "body": "CSE_BRIDGE_APPROVED",
+    "body": "CSE_BRIDGE_APPROVED\nCSE_LOCAL_GATE_REQUEST",
     "author_association": "OWNER",
     "created_at": "2026-08-04T19:55:02Z",
 }
@@ -340,9 +341,62 @@ class SelectionTests(LoopFixture):
         self.assertEqual(status["state"], "IDLE")
         self.assertEqual(status["reason"], "no_task")
 
-    def test_only_trusted_approval_is_selected(self) -> None:
-        self.assertEqual(select_approved_issue(FakeGitHub()), 345)
-        self.assertIsNone(select_approved_issue(FakeGitHub(approval=False)))
+    def test_only_explicit_trusted_local_gate_is_selected(self) -> None:
+        self.assertEqual(select_local_gate_issue(FakeGitHub()), 345)
+        self.assertIsNone(select_local_gate_issue(FakeGitHub(approval=False)))
+
+    def test_generic_approval_without_local_gate_is_idle(self) -> None:
+        generic = FakeGitHub(
+            comments=[
+                {
+                    **APPROVAL,
+                    "body": "CSE_BRIDGE_APPROVED",
+                }
+            ]
+        )
+
+        self.assertFalse(
+            local_gate_ready(generic.issue_data, generic.comments(345))
+        )
+        self.assertIsNone(select_local_gate_issue(generic))
+
+        commands = FakeCommands()
+        artifacts = self.artifacts()
+        self.assertEqual(
+            run_loop(
+                self.config,
+                self.runtime,
+                generic,
+                commands,
+                artifacts,
+            ),
+            0,
+        )
+        self.assertEqual(
+            [call[1:] for call in commands.calls],
+            [
+                ("rev-parse", "--show-toplevel"),
+                ("remote", "get-url", "origin"),
+            ],
+        )
+
+    def test_stale_local_gate_does_not_authorize_new_generic_approval(
+        self,
+    ) -> None:
+        comments = [
+            dict(APPROVAL),
+            {
+                "body": "CSE_BRIDGE_APPROVED",
+                "author_association": "OWNER",
+                "created_at": "2026-08-04T19:56:02Z",
+            },
+        ]
+        github = FakeGitHub(comments=comments)
+
+        self.assertFalse(
+            local_gate_ready(github.issue_data, github.comments(345))
+        )
+        self.assertIsNone(select_local_gate_issue(github))
 
 
 class WorktreeTests(LoopFixture):
@@ -740,7 +794,10 @@ class OrchestrationTests(LoopFixture):
                     "created_at": "2026-08-04T19:56:02Z",
                 },
                 {
-                    "body": "CSE_BRIDGE_APPROVED",
+                    "body": (
+                        "CSE_BRIDGE_APPROVED\n"
+                        "CSE_LOCAL_GATE_REQUEST"
+                    ),
                     "author_association": "OWNER",
                     "created_at": "2026-08-04T19:57:02Z",
                 },
@@ -751,6 +808,22 @@ class OrchestrationTests(LoopFixture):
 
         self.assertEqual(result, 0)
         self.assertIn("READY_FOR_FATIH", github.posted[-1])
+
+    def test_explicit_issue_cannot_bypass_local_gate_boundary(self) -> None:
+        generic = FakeGitHub(
+            comments=[
+                {
+                    **APPROVAL,
+                    "body": "CSE_BRIDGE_APPROVED",
+                }
+            ]
+        )
+        commands = FakeCommands()
+
+        with self.assertRaisesRegex(BridgeError, "task_not_ready"):
+            self.run_issue(commands, generic)
+
+        self.assertFalse(commands.calls)
 
     def test_explicit_issue_requires_open_non_pr_issue(self) -> None:
         for index, overrides in enumerate(

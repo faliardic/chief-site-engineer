@@ -21,9 +21,11 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
 from tools.cse_api_bridge import (
+    APPROVAL_LINE,
     BridgeError,
     BridgeTask,
     GitHubClient,
+    TRUSTED_ASSOCIATIONS,
     parse_task,
     path_allowed,
     terminal_state,
@@ -43,6 +45,7 @@ PASS_MARKER = "<!-- cse-bridge-status:PASS -->"
 FAILED_MARKER = "<!-- cse-bridge-status:FAILED -->"
 NEEDS_HUMAN_MARKER = "<!-- cse-bridge-status:NEEDS_HUMAN -->"
 RUNNING_MARKER = "<!-- cse-bridge-status:RUNNING -->"
+LOCAL_GATE_REQUEST_LINE = "CSE_LOCAL_GATE_REQUEST"
 WORKTREE_REMOVE_ATTEMPTS = 3
 WORKTREE_CLEANUP_RETRY_SECONDS = 0.2
 
@@ -390,14 +393,57 @@ def resolve_github_token(
     return result.stdout.strip()
 
 
-def select_approved_issue(github: GitHubClient) -> int | None:
+def _comment_timestamp(value: object) -> datetime:
+    if not isinstance(value, str) or not value:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def local_gate_ready(
+    issue: Mapping[str, Any], comments: Sequence[Mapping[str, Any]]
+) -> bool:
+    """Return whether the latest trusted approval is an explicit local handoff."""
+
+    if not task_ready(issue, comments):
+        return False
+
+    latest_approval: tuple[datetime, frozenset[str]] | None = None
+    for comment in comments:
+        lines = frozenset(
+            line.strip() for line in str(comment.get("body", "")).splitlines()
+        )
+        if (
+            APPROVAL_LINE not in lines
+            or str(comment.get("author_association", ""))
+            not in TRUSTED_ASSOCIATIONS
+        ):
+            continue
+        candidate = (_comment_timestamp(comment.get("created_at")), lines)
+        if latest_approval is None or candidate[0] >= latest_approval[0]:
+            latest_approval = candidate
+
+    return (
+        latest_approval is not None
+        and LOCAL_GATE_REQUEST_LINE in latest_approval[1]
+    )
+
+
+def select_local_gate_issue(github: GitHubClient) -> int | None:
     issues = github.request(
         "GET", f"/repos/{github.repository}/issues?state=open&per_page=100"
     )
     candidates: list[int] = []
     for issue in issues:
         number = issue.get("number")
-        if isinstance(number, int) and task_ready(issue, github.comments(number)):
+        if isinstance(number, int) and local_gate_ready(
+            issue, github.comments(number)
+        ):
             candidates.append(number)
     return min(candidates) if candidates else None
 
@@ -1130,7 +1176,7 @@ def process_issue(
         raise BridgeError("task_repository_mismatch")
     if task.base != config.allowed_base:
         raise BridgeError("task_base_forbidden")
-    if not task_ready(issue, comments):
+    if not local_gate_ready(issue, comments):
         raise BridgeError("task_not_ready")
     github.comment(
         issue_number,
@@ -1242,7 +1288,11 @@ def run_loop(
     issue_number: int | None = None,
 ) -> int:
     validate_repository(config, command, artifacts)
-    selected = issue_number if issue_number is not None else select_approved_issue(github)
+    selected = (
+        issue_number
+        if issue_number is not None
+        else select_local_gate_issue(github)
+    )
     if selected is None:
         artifacts.update("IDLE", "complete", 0, "no_task")
         return 0
