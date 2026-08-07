@@ -1445,6 +1445,416 @@ void main() {
   );
 
   test(
+    'direct all-day scheduling is atomic idempotent and returns to timed paths',
+    () async {
+      now = DateTime.utc(2026, 7, 20, 8);
+      final timed = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(926),
+          title: 'Saatliden tam güne',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-20T12:00:00Z',
+        ),
+      );
+      final timedDetail = await agenda.getReminderLifecycleDetail(timed.id);
+      final scheduledBeforeAllDay = notifications.scheduled.length;
+      final cancelledBeforeAllDay = notifications.cancelled.length;
+      final allDayCommand = MutateReminderCommand(
+        reminderId: timed.id,
+        eventId: eventId(927),
+        expectedRevision: timed.revision,
+        action: ReminderMutationAction.schedule,
+        schedule: ReminderScheduleKind.custom,
+        allDayLocalDate: '2026-07-21',
+      );
+
+      var allDay = await agenda.mutateReminder(allDayCommand);
+
+      expect(allDay.status, ReminderStatus.active);
+      expect(allDay.nextAttentionAt, isNull);
+      expect(allDay.allDayLocalDate, '2026-07-21');
+      expect(allDay.revision, timed.revision + 1);
+      expect(notifications.scheduled, hasLength(scheduledBeforeAllDay));
+      expect(notifications.cancelled, hasLength(cancelledBeforeAllDay + 1));
+      expect(
+        notifications.cancelled.last,
+        timedDetail.notification.platformNotificationId,
+      );
+      expect(notifications.pending, isEmpty);
+      var detail = await agenda.getReminderLifecycleDetail(timed.id);
+      expect(detail.notification.scheduledFor, isNull);
+      expect(detail.notification.syncState, NotificationSyncState.cancelled);
+      var businessEvent = detail.events.lastWhere(
+        (event) => !event.eventType.startsWith('notification_'),
+      );
+      expect(businessEvent.eventType, 'rescheduled');
+      var payload =
+          jsonDecode(businessEvent.payloadJson) as Map<String, Object?>;
+      expect(payload['next_attention_at'], isNull);
+      expect(payload['all_day_local_date'], '2026-07-21');
+      expect(payload['status'], ReminderStatus.active.storageValue);
+      expect(payload['revision'], allDay.revision);
+
+      final eventCountAfterAllDay = detail.events.length;
+      final cancelledAfterAllDay = notifications.cancelled.length;
+      final retried = await agenda.mutateReminder(allDayCommand);
+      expect(retried.revision, allDay.revision);
+      expect(retried.allDayLocalDate, allDay.allDayLocalDate);
+      expect(
+        await agenda.listReminderEvents(timed.id),
+        hasLength(eventCountAfterAllDay),
+      );
+      expect(notifications.cancelled, hasLength(cancelledAfterAllDay));
+
+      final sameDay = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: timed.id,
+          eventId: eventId(928),
+          expectedRevision: allDay.revision,
+          action: ReminderMutationAction.schedule,
+          schedule: ReminderScheduleKind.custom,
+          allDayLocalDate: '2026-07-21',
+        ),
+      );
+      expect(sameDay.revision, allDay.revision);
+      expect(
+        await agenda.listReminderEvents(timed.id),
+        hasLength(eventCountAfterAllDay),
+      );
+      expect(notifications.cancelled, hasLength(cancelledAfterAllDay));
+
+      allDay = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: timed.id,
+          eventId: eventId(929),
+          expectedRevision: allDay.revision,
+          action: ReminderMutationAction.schedule,
+          schedule: ReminderScheduleKind.custom,
+          allDayLocalDate: '2026-07-22',
+        ),
+      );
+      expect(allDay.allDayLocalDate, '2026-07-22');
+      expect(allDay.revision, sameDay.revision + 1);
+      expect(notifications.scheduled, hasLength(scheduledBeforeAllDay));
+
+      var timedAgain = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: timed.id,
+          eventId: eventId(930),
+          expectedRevision: allDay.revision,
+          action: ReminderMutationAction.schedule,
+          schedule: ReminderScheduleKind.tomorrowMorning,
+        ),
+      );
+      expect(timedAgain.allDayLocalDate, isNull);
+      expect(timedAgain.nextAttentionAt, '2026-07-21T05:00:00Z');
+      expect(notifications.scheduled, hasLength(scheduledBeforeAllDay + 1));
+
+      timedAgain = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: timed.id,
+          eventId: eventId(931),
+          expectedRevision: timedAgain.revision,
+          action: ReminderMutationAction.schedule,
+          schedule: ReminderScheduleKind.nextWeekStart,
+        ),
+      );
+      expect(timedAgain.allDayLocalDate, isNull);
+      expect(timedAgain.nextAttentionAt, '2026-07-27T05:00:00Z');
+      expect(notifications.scheduled, hasLength(scheduledBeforeAllDay + 2));
+
+      timedAgain = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: timed.id,
+          eventId: eventId(932),
+          expectedRevision: timedAgain.revision,
+          action: ReminderMutationAction.schedule,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-22T10:00:00Z',
+        ),
+      );
+      expect(timedAgain.allDayLocalDate, isNull);
+      expect(timedAgain.nextAttentionAt, '2026-07-22T10:00:00Z');
+      expect(notifications.scheduled, hasLength(scheduledBeforeAllDay + 3));
+
+      final inbox = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder2,
+          eventId: eventId(933),
+          title: 'Inbox tam gün',
+          kind: ReminderKind.recheck,
+          schedule: ReminderScheduleKind.inbox,
+        ),
+      );
+      final scheduledBeforeInbox = notifications.scheduled.length;
+      final inboxAllDay = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: inbox.id,
+          eventId: eventId(934),
+          expectedRevision: inbox.revision,
+          action: ReminderMutationAction.schedule,
+          schedule: ReminderScheduleKind.custom,
+          allDayLocalDate: '2026-07-23',
+        ),
+      );
+      expect(inboxAllDay.status, ReminderStatus.active);
+      expect(inboxAllDay.nextAttentionAt, isNull);
+      expect(inboxAllDay.allDayLocalDate, '2026-07-23');
+      expect(notifications.scheduled, hasLength(scheduledBeforeInbox));
+
+      final beforeStale = await agenda.getReminderLifecycleDetail(timed.id);
+      await expectLater(
+        agenda.mutateReminder(
+          MutateReminderCommand(
+            reminderId: timed.id,
+            eventId: eventId(935),
+            expectedRevision: timedAgain.revision - 1,
+            action: ReminderMutationAction.schedule,
+            schedule: ReminderScheduleKind.custom,
+            allDayLocalDate: '2026-07-24',
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      final afterStale = await agenda.getReminderLifecycleDetail(timed.id);
+      expect(afterStale.reminder.revision, beforeStale.reminder.revision);
+      expect(eventSnapshot(afterStale), eventSnapshot(beforeStale));
+      expect(
+        notificationSnapshot(afterStale),
+        notificationSnapshot(beforeStale),
+      );
+
+      await expectLater(
+        agenda.mutateReminder(
+          MutateReminderCommand(
+            reminderId: timed.id,
+            eventId: allDayCommand.eventId,
+            expectedRevision: timedAgain.revision,
+            action: ReminderMutationAction.schedule,
+            schedule: ReminderScheduleKind.custom,
+            allDayLocalDate: '2026-07-24',
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      detail = await agenda.getReminderLifecycleDetail(timed.id);
+      expect(detail.reminder.revision, timedAgain.revision);
+      businessEvent = detail.events.lastWhere(
+        (event) => !event.eventType.startsWith('notification_'),
+      );
+      payload = jsonDecode(businessEvent.payloadJson) as Map<String, Object?>;
+      expect(payload['next_attention_at'], timedAgain.nextAttentionAt);
+      expect(payload['all_day_local_date'], isNull);
+    },
+  );
+
+  test(
+    'direct all-day scheduling rejects attendance terminal and trash records',
+    () async {
+      await agenda.createProject(
+        const CreateProjectCommand(id: projectId, name: 'Puantaj all-day'),
+      );
+      final attendance = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(935),
+          projectId: projectId,
+          title: 'Puantaj yönetimli',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.custom,
+          customAttentionAt: '2026-07-19T12:00:00Z',
+        ),
+      );
+      final database = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      try {
+        await database.update(
+          'follow_up_items',
+          {'attendance_day_id': 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'},
+          where: 'id = ?',
+          whereArgs: [attendance.id],
+        );
+      } finally {
+        await database.close();
+      }
+      final attendanceBefore = await agenda.getReminderLifecycleDetail(
+        attendance.id,
+      );
+      await expectLater(
+        agenda.mutateReminder(
+          MutateReminderCommand(
+            reminderId: attendance.id,
+            eventId: eventId(936),
+            expectedRevision: attendanceBefore.reminder.revision,
+            action: ReminderMutationAction.schedule,
+            schedule: ReminderScheduleKind.custom,
+            allDayLocalDate: '2026-07-20',
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      final attendanceAfter = await agenda.getReminderLifecycleDetail(
+        attendance.id,
+      );
+      expect(
+        notificationSnapshot(attendanceAfter),
+        notificationSnapshot(attendanceBefore),
+      );
+      expect(eventSnapshot(attendanceAfter), eventSnapshot(attendanceBefore));
+      expect(attendanceAfter.reminder.revision, attendance.revision);
+
+      var terminal = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder2,
+          eventId: eventId(937),
+          title: 'Terminal all-day guard',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.inbox,
+        ),
+      );
+      terminal = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: terminal.id,
+          eventId: eventId(938),
+          expectedRevision: terminal.revision,
+          action: ReminderMutationAction.complete,
+        ),
+      );
+      await expectLater(
+        agenda.mutateReminder(
+          MutateReminderCommand(
+            reminderId: terminal.id,
+            eventId: eventId(939),
+            expectedRevision: terminal.revision,
+            action: ReminderMutationAction.schedule,
+            schedule: ReminderScheduleKind.custom,
+            allDayLocalDate: '2026-07-20',
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+
+      var trashed = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder3,
+          eventId: eventId(940),
+          title: 'Trash all-day guard',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.inbox,
+        ),
+      );
+      trashed = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: trashed.id,
+          eventId: eventId(941),
+          expectedRevision: trashed.revision,
+          action: ReminderMutationAction.moveToTrash,
+        ),
+      );
+      await expectLater(
+        agenda.mutateReminder(
+          MutateReminderCommand(
+            reminderId: trashed.id,
+            eventId: eventId(942),
+            expectedRevision: trashed.revision,
+            action: ReminderMutationAction.schedule,
+            schedule: ReminderScheduleKind.custom,
+            allDayLocalDate: '2026-07-20',
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+    },
+  );
+
+  test(
+    'all-day event rollback and notification cancel failure stay safe',
+    () async {
+      final rollbackTarget = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(943),
+          title: 'Tam gün rollback',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.in1Hour,
+        ),
+      );
+      final rollbackBefore = await agenda.getReminderLifecycleDetail(
+        rollbackTarget.id,
+      );
+      final failing = SqliteAgendaApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        notificationGateway: notifications,
+        beforeReminderEventInsert: (_) async {
+          throw StateError('forced all-day event failure');
+        },
+      );
+      await expectLater(
+        failing.mutateReminder(
+          MutateReminderCommand(
+            reminderId: rollbackTarget.id,
+            eventId: eventId(944),
+            expectedRevision: rollbackTarget.revision,
+            action: ReminderMutationAction.schedule,
+            schedule: ReminderScheduleKind.custom,
+            allDayLocalDate: '2026-07-20',
+          ),
+        ),
+        throwsA(anything),
+      );
+      var rollbackAfter = await agenda.getReminderLifecycleDetail(
+        rollbackTarget.id,
+      );
+      expect(rollbackAfter.reminder.revision, rollbackTarget.revision);
+      expect(
+        notificationSnapshot(rollbackAfter),
+        notificationSnapshot(rollbackBefore),
+      );
+      expect(eventSnapshot(rollbackAfter), eventSnapshot(rollbackBefore));
+
+      final cancelTarget = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder2,
+          eventId: eventId(945),
+          title: 'Tam gün cancel safe-state',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.in1Hour,
+        ),
+      );
+      notifications.failCancel = true;
+      final allDay = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: cancelTarget.id,
+          eventId: eventId(946),
+          expectedRevision: cancelTarget.revision,
+          action: ReminderMutationAction.schedule,
+          schedule: ReminderScheduleKind.custom,
+          allDayLocalDate: '2026-07-20',
+        ),
+      );
+      expect(allDay.nextAttentionAt, isNull);
+      expect(allDay.allDayLocalDate, '2026-07-20');
+      rollbackAfter = await agenda.getReminderLifecycleDetail(cancelTarget.id);
+      expect(rollbackAfter.notification.scheduledFor, isNull);
+      expect(
+        rollbackAfter.notification.syncState,
+        NotificationSyncState.failed,
+      );
+      expect(rollbackAfter.notification.safeErrorCode, 'cancel_failed');
+      expect(
+        rollbackAfter.events.where((event) => event.eventType == 'rescheduled'),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
     'full lifecycle uses optimistic revision append-only events and no-op',
     () async {
       var reminder = await agenda.createReminder(
