@@ -217,9 +217,28 @@ if ($LASTEXITCODE -ne 0 -or $remoteMasterOutput.Count -ne 1) {
 }
 $remoteMasterHead = ([string]$remoteMasterOutput[0]).Trim()
 
-& $gitPath -C $controlRepoRoot switch --detach refs/remotes/origin/master 1>$null 2>$null
-if ($LASTEXITCODE -ne 0) {
-    throw "control_repository_switch_failed"
+$currentHeadOutput = @(
+    & $gitPath -C $controlRepoRoot rev-parse --verify "HEAD^{commit}" 2>$null
+)
+if ($LASTEXITCODE -ne 0 -or $currentHeadOutput.Count -ne 1) {
+    throw "control_repository_head_unavailable"
+}
+$currentHead = ([string]$currentHeadOutput[0]).Trim()
+
+if ($currentHead -cne $remoteMasterHead) {
+    & $gitPath -C $controlRepoRoot merge-base --is-ancestor $currentHead $remoteMasterHead 1>$null 2>$null
+    $ancestryExitCode = $LASTEXITCODE
+    if ($ancestryExitCode -eq 1) {
+        throw "control_repository_master_non_fast_forward"
+    }
+    if ($ancestryExitCode -ne 0) {
+        throw "control_repository_master_ancestry_failed"
+    }
+
+    & $gitPath -C $controlRepoRoot switch --detach refs/remotes/origin/master 1>$null 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        throw "control_repository_switch_failed"
+    }
 }
 $finalHeadOutput = @(
     & $gitPath -C $controlRepoRoot rev-parse --verify "HEAD^{commit}" 2>$null
@@ -284,3 +303,4 @@ if ($Smoke) {
 }
 
 Write-Host "Acceptance and a separate operator action are required before enabling the task."
+

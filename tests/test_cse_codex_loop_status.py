@@ -243,6 +243,31 @@ class InstallerSourceTests(unittest.TestCase):
         )
         self.assertNotIn("--prune", self.scripts)
 
+    def test_installer_ancestry_guard_precedes_switch(self) -> None:
+        update_block_start = self.installer.index("$currentHeadOutput")
+        update_block_end = self.installer.index(
+            "$finalHeadOutput", update_block_start
+        )
+        update_block = self.installer[
+            update_block_start:update_block_end
+        ]
+        self.assertIn("merge-base --is-ancestor", update_block)
+        self.assertIn(
+            'throw "control_repository_master_non_fast_forward"',
+            update_block,
+        )
+        self.assertIn(
+            'throw "control_repository_master_ancestry_failed"',
+            update_block,
+        )
+        self.assert_source_order(
+            update_block,
+            "$currentHeadOutput",
+            'if ($currentHead -cne $remoteMasterHead)',
+            "merge-base --is-ancestor",
+            "switch --detach refs/remotes/origin/master",
+        )
+
     def test_runner_ancestry_and_final_guards_precede_python(self) -> None:
         update_block_start = self.runner.index(
             "if ($currentHead -cne $remoteMasterHead)"
@@ -316,3 +341,4 @@ class InstallerSourceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
