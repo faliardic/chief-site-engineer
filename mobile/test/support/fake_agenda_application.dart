@@ -377,6 +377,13 @@ class FakeAgendaApplication
         'Bu hatırlatıcı yarına ertelenemez. Tarihi veya kaynak akışı kontrol edin.',
       );
     }
+    if (command.action == ReminderMutationAction.schedule &&
+        command.allDayLocalDate != null &&
+        current.attendanceDayId != null) {
+      throw const AgendaValidationFailure(
+        'Puantaj tarafından yönetilen hatırlatıcı doğrudan tam gün planlanamaz.',
+      );
+    }
     final status = switch (command.action) {
       ReminderMutationAction.complete => ReminderStatus.completed,
       ReminderMutationAction.cancel => ReminderStatus.cancelled,
@@ -406,6 +413,8 @@ class FakeAgendaApplication
       _ => current.allDayLocalDate,
     };
     final scheduledAt = switch (command.action) {
+      ReminderMutationAction.schedule when command.allDayLocalDate != null =>
+        null,
       ReminderMutationAction.schedule =>
         command.customAttentionAt ??
             (command.schedule == null
