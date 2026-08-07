@@ -6,9 +6,32 @@ anahtarı, özel Responses istemcisi veya GitHub Actions kullanmaz.
 
 ## Güvenlik sınırı
 
-- Kanonik checkout branch değiştirmez. Her görev
+- Operatörün kanonik checkout’u bootstrap kaynağıdır; Scheduled Task bu
+  checkout’ta branch/HEAD değiştirmez, checkout/switch/reset/clean/stash
+  çalıştırmaz, index veya dosyalara dokunmaz ve Git yapılandırmasını değiştirmez.
+  Installer `-RepoRoot` değerini yalnız kabul edilmiş installer’ı doğrulamak ve
+  Git ile tam `origin` URL’sini okumak için kullanır. Yalnız
+  `faliardic/chief-site-engineer` origin’i kabul edilir.
+- Scheduler’ın kontrol düzlemi ayrı
+  `%LOCALAPPDATA%\CSE-Codex-Loop\control-repo` clone’udur. Her görev
   `%LOCALAPPDATA%\CSE-Codex-Loop\worktrees\issue-N` altında dış worktree’de
   çalışır.
+- Runtime yapılandırmasında `repository_role` tam olarak
+  `dedicated_control_clone_v1` olmalı ve çözümlenmiş `repo_root`, çözümlenmiş
+  `control-repo` yoluyla aynı olmalıdır. Eski veya elle değiştirilmiş config bu
+  kapıyı geçemez ve Git/Python çağrısından önce
+  `runtime_control_clone_unconfigured` ile kapanır.
+- Her scheduler çevriminde control clone’un yalnız tracked index/worktree
+  temizliği kontrol edilir; untracked ve ignored yollar listelenmez veya
+  değiştirilmez. Host yalnız `origin master` ref’ini tagsiz ve prune olmadan
+  fetch eder. HEAD ilerideyse veya ayrışmışsa kapanır; yalnız doğrulanmış
+  fast-forward durumunda `refs/remotes/origin/master` commit’ine force olmadan
+  detached switch yapılır. HEAD zaten eşitse switch yapılmaz.
+- Güncelleme sonrasında HEAD ve tracked temizlik yeniden doğrulanmadan Python
+  modülü başlatılmaz. Çalışan PowerShell süreci diskteki runner’ı güncellemiş
+  olsa da script’i dot-source etmez, yeniden başlatmaz veya aynı invocation’da
+  tekrar çalıştırmaz. Yeni Python süreci seçilen control commit’inden yüklenir;
+  yeni runner doğal olarak sonraki Scheduled Task çevriminde çalışır.
 - Implementer `workspace-write`, bağımsız reviewer `read-only` sandbox kullanır.
 - Allowed path ve Issue validation komutları Codex’e bırakılmaz; host bunları
   `shell=False` subprocess’leriyle uygular.
@@ -52,10 +75,16 @@ PowerShell’i mevcut interaktif Windows kullanıcısıyla açın:
 ```
 
 Installer `python`, `codex`, `git` ve `gh` executable yollarını kesin olarak
-çözer; yapılandırmayı `%LOCALAPPDATA%\CSE-Codex-Loop\config.json` içine yazar.
+çözer. Kanonik checkout’un kabul edilen origin’inden yalnız `master`, tagsiz ve
+submodule çalıştırmadan dedicated control clone’a alınır. Mevcut control yolu
+varsa beklenen origin, rol ve tracked temizlik doğrulanır; doğrulama hatasında
+silinmez, resetlenmez veya yeniden kurulmaz. Yapılandırma
+`%LOCALAPPDATA%\CSE-Codex-Loop\config.json` içine control clone yolu ve
+`dedicated_control_clone_v1` rolüyle yazılır.
 `CSE Codex Loop` Scheduled Task’ı mevcut interaktif kullanıcı ve `Limited` run
-level ile kaydedilir ve hemen **Disabled** yapılır. Mevcut `CSE Bridge` görevi
-okunmaz, değiştirilmez veya etkinleştirilmez.
+level ile control clone’daki runner ve working directory kullanılarak kaydedilir
+ve hemen **Disabled** yapılır. Mevcut `CSE Bridge` görevi okunmaz, değiştirilmez
+veya etkinleştirilmez.
 
 Bu repository’de Flutter paketi `mobile/` altında olduğundan Issue validation
 komutları seçilen paket köküne göre package-local yol kullanmalıdır:
@@ -80,7 +109,8 @@ veya scheduler başlatmaz. Operatör açıkça şu komutu verir:
 ```
 
 Bu komut `codex exec --ephemeral --sandbox read-only` çalıştırır, dosya
-değiştirmez ve başarıda tam olarak şunu yazar:
+değiştirmez. Smoke, kanonik checkout’tan değil dedicated control clone’daki
+runner’dan çalışır ve başarıda tam olarak şunu yazar:
 
 ```text
 CSE_CODEX_EXEC_PASS
@@ -89,7 +119,8 @@ CSE_CODEX_EXEC_PASS
 Belirli bir onaylı Issue foreground çalıştırması:
 
 ```powershell
-& .\scripts\run_cse_codex_loop.ps1 -IssueNumber 345
+& "$env:LOCALAPPDATA\CSE-Codex-Loop\control-repo\scripts\run_cse_codex_loop.ps1" `
+  -IssueNumber 345
 ```
 
 Issue numarası verilmezse en küçük numaralı hazır/onaylı görev seçilir; görev
@@ -97,7 +128,28 @@ yoksa invocation `IDLE` biter.
 
 ## Scheduler aktivasyonu
 
-Aktivasyon, kod kabulünden ve manuel smoke’dan ayrı bir operatör adımıdır:
+### Merge sonrası tek gerekli bootstrap
+
+Bu mimari merge edildikten sonra operatör yalnız bir kez şu sırayı uygular:
+
+1. Kanonik checkout’u `master`ın kabul edilmiş merge commit’ine günceller.
+2. O checkout içindeki kabul edilmiş installer’ı aynı kanonik `-RepoRoot` ve
+   `-Smoke` ile çalıştırır.
+3. Smoke kabulünden sonra `CSE Codex Loop` görevini açıkça etkinleştirir.
+
+```powershell
+Set-Location 'V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer'
+git pull --ff-only origin master
+& .\scripts\install_cse_codex_loop.ps1 `
+  -RepoRoot 'V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer' `
+  -Smoke
+Enable-ScheduledTask -TaskName 'CSE Codex Loop'
+```
+
+Bu bootstrap’tan sonra kabul edilmiş host güncellemeleri dedicated control
+clone’u güvenli fast-forward ile seçebilir; kanonik checkout değişmeden kalır.
+Aktivasyon yine kod kabulünden ve manuel smoke’dan ayrı operatör adımıdır.
+Yalnız aktivasyon gerekiyorsa:
 
 ```powershell
 Enable-ScheduledTask -TaskName 'CSE Codex Loop'
