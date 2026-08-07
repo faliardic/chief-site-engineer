@@ -129,6 +129,38 @@ Future<void> chooseEarlierLocalTime(
   await tester.pumpAndSettle();
 }
 
+Future<void> openDetailAllDayPicker(WidgetTester tester) async {
+  final scheduleButton = find.byKey(const Key('schedule-reminder'));
+  final detailListView = find.byWidgetPredicate(
+    (widget) =>
+        widget is ListView &&
+        widget.key == const Key('reminder-detail'),
+    description: 'outer reminder detail ListView',
+  );
+  expect(detailListView, findsOneWidget);
+  for (
+    var attempt = 0;
+    scheduleButton.evaluate().isEmpty && attempt < 8;
+    attempt += 1
+  ) {
+    await tester.drag(detailListView, const Offset(0, -300));
+    await tester.pumpAndSettle();
+  }
+  expect(scheduleButton, findsOneWidget);
+  await tester.ensureVisible(scheduleButton);
+  await tester.pumpAndSettle();
+  await tester.tap(scheduleButton);
+  await tester.pumpAndSettle();
+  final allDay = find.byKey(const Key('reminder-schedule-option-allDay'));
+  await tester.scrollUntilVisible(
+    allDay,
+    200,
+    scrollable: find.byType(Scrollable).last,
+  );
+  await tester.tap(allDay);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('+ Unutma is usable at 320 px with 44 px targets', (
     tester,
@@ -1347,9 +1379,7 @@ void main() {
     (tester) async {
       await withClock(Clock.fixed(DateTime.utc(2026, 7, 19, 8)), () async {
         final item = reminder(nextAttentionAt: '2026-07-19T12:00:00Z');
-        final updatedItem = reminder(
-          nextAttentionAt: '2026-07-19T11:00:00Z',
-        );
+        final updatedItem = reminder(nextAttentionAt: '2026-07-19T11:00:00Z');
         final mutationCompleter = Completer<MobileReminder>();
         final agenda = FakeAgendaApplication(
           reminders: [item],
@@ -1689,6 +1719,369 @@ void main() {
       expect(agenda.lastMutationCommand!.schedule, schedule);
     });
   }
+
+  testWidgets('active timed detail planning sheet exposes Tam gün option', (
+    tester,
+  ) async {
+    final item = reminder(nextAttentionAt: '2026-07-20T06:00:00Z');
+    final agenda = FakeAgendaApplication(
+      reminders: [item],
+      reminderDetail: item,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final scheduleButton = find.byKey(const Key('schedule-reminder'));
+    await tester.scrollUntilVisible(
+      scheduleButton,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(scheduleButton);
+    await tester.pumpAndSettle();
+
+    final allDay = find.byKey(const Key('reminder-schedule-option-allDay'));
+    await tester.scrollUntilVisible(
+      allDay,
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(allDay, findsOneWidget);
+    expect(find.text('Tam gün'), findsOneWidget);
+  });
+
+  for (final configuration in [
+    (
+      name: 'timed local day',
+      item: reminder(nextAttentionAt: '2026-07-20T21:30:00Z'),
+      today: '2026-07-19',
+      expected: DateTime(2026, 7, 21),
+    ),
+    (
+      name: 'existing all-day',
+      item: reminder(allDayLocalDate: '2026-07-24'),
+      today: '2026-07-19',
+      expected: DateTime(2026, 7, 24),
+    ),
+    (
+      name: 'inbox Istanbul today',
+      item: reminder(status: ReminderStatus.inbox),
+      today: '2026-07-19',
+      expected: DateTime(2026, 7, 19),
+    ),
+  ]) {
+    testWidgets('Tam gün picker starts from ${configuration.name}', (
+      tester,
+    ) async {
+      final agenda = FakeAgendaApplication(
+        reminders: [configuration.item],
+        reminderDetail: configuration.item,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReminderDetailPage(
+            agenda: agenda,
+            reminderId: reminderId,
+            istanbulToday: configuration.today,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await openDetailAllDayPicker(tester);
+
+      final picker = tester.widget<CalendarDatePicker>(
+        find.byType(CalendarDatePicker),
+      );
+      expect(picker.initialDate, configuration.expected);
+      expect(find.byType(TimePickerDialog), findsNothing);
+      expect(agenda.mutateReminderCalls, 0);
+      await tester.tap(find.text('Vazgeç'));
+      await tester.pumpAndSettle();
+      expect(agenda.mutateReminderCalls, 0);
+    });
+  }
+
+  testWidgets(
+    'Tam gün previews exact day and mutates only after explicit confirmation',
+    (tester) async {
+      await withClock(Clock.fixed(DateTime.utc(2026, 7, 19, 8)), () async {
+        final item = reminder(nextAttentionAt: '2026-07-20T06:00:00Z');
+        final agenda = FakeAgendaApplication(
+          reminders: [item],
+          reminderDetail: item,
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ReminderDetailPage(
+              agenda: agenda,
+              reminderId: reminderId,
+              istanbulToday: '2026-07-19',
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await openDetailAllDayPicker(tester);
+        expect(find.byType(TimePickerDialog), findsNothing);
+        await tester.tap(find.text('21').last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('İleri'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('reminder-all-day-schedule-preview')),
+          findsOneWidget,
+        );
+        expect(find.text('21.07.2026 • Tam gün'), findsOneWidget);
+        expect(agenda.mutateReminderCalls, 0);
+
+        final confirm = find.byKey(
+          const Key('confirm-reminder-all-day-schedule'),
+        );
+        await tester.tap(confirm);
+        await tester.pumpAndSettle();
+
+        expect(agenda.mutateReminderCalls, 1);
+        expect(
+          agenda.lastMutationCommand!.action,
+          ReminderMutationAction.schedule,
+        );
+        expect(
+          agenda.lastMutationCommand!.schedule,
+          ReminderScheduleKind.custom,
+        );
+        expect(agenda.lastMutationCommand!.customAttentionAt, isNull);
+        expect(agenda.lastMutationCommand!.allDayLocalDate, '2026-07-21');
+        expect(agenda.reminders.single.nextAttentionAt, isNull);
+        expect(agenda.reminders.single.allDayLocalDate, '2026-07-21');
+        expect(find.text('21.07.2026 • Tam gün'), findsOneWidget);
+      });
+    },
+  );
+
+  testWidgets('Tam gün async mutation is double-tap guarded', (tester) async {
+    final item = reminder(nextAttentionAt: '2026-07-20T06:00:00Z');
+    final completer = Completer<MobileReminder>();
+    final agenda = FakeAgendaApplication(
+      reminders: [item],
+      reminderDetail: item,
+    )..mutateReminderCompleter = completer;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReminderDetailPage(
+          agenda: agenda,
+          reminderId: reminderId,
+          istanbulToday: '2026-07-19',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await openDetailAllDayPicker(tester);
+    await tester.tap(find.text('21').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('İleri'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('confirm-reminder-all-day-schedule')),
+    );
+    await tester.pump();
+
+    expect(agenda.mutateReminderCalls, 1);
+    final scheduleButton = find.byKey(const Key('schedule-reminder'));
+    final outlined = find.descendant(
+      of: scheduleButton,
+      matching: find.byType(OutlinedButton),
+    );
+    expect(tester.widget<OutlinedButton>(outlined).onPressed, isNull);
+    await tester.tap(scheduleButton, warnIfMissed: false);
+    await tester.pump();
+    expect(agenda.mutateReminderCalls, 1);
+
+    completer.complete(item);
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('Tam gün picker and confirmation cancellation mutate nothing', (
+    tester,
+  ) async {
+    final item = reminder(nextAttentionAt: '2026-07-20T06:00:00Z');
+    final agenda = FakeAgendaApplication(
+      reminders: [item],
+      reminderDetail: item,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReminderDetailPage(
+          agenda: agenda,
+          reminderId: reminderId,
+          istanbulToday: '2026-07-19',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await openDetailAllDayPicker(tester);
+    await tester.tap(find.text('Vazgeç'));
+    await tester.pumpAndSettle();
+    expect(agenda.mutateReminderCalls, 0);
+
+    await openDetailAllDayPicker(tester);
+    await tester.tap(find.text('21').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('İleri'));
+    await tester.pumpAndSettle();
+    expect(find.text('21.07.2026 • Tam gün'), findsOneWidget);
+    await tester.tap(find.text('Vazgeç'));
+    await tester.pumpAndSettle();
+    expect(agenda.mutateReminderCalls, 0);
+  });
+
+  testWidgets('attendance-managed detail hides direct Tam gün option', (
+    tester,
+  ) async {
+    final item = reminder(
+      attendanceDayId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+    );
+    final agenda = FakeAgendaApplication(
+      reminders: [item],
+      reminderDetail: item,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final scheduleButton = find.byKey(const Key('schedule-reminder'));
+    await tester.scrollUntilVisible(
+      scheduleButton,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(scheduleButton);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('reminder-schedule-option-allDay')),
+      findsNothing,
+    );
+    expect(agenda.mutateReminderCalls, 0);
+  });
+
+  for (final item in [
+    reminder(status: ReminderStatus.completed),
+    reminder(trashedAt: '2026-07-20T07:00:00Z'),
+  ]) {
+    testWidgets(
+      '${item.status.name}/${item.trashedAt == null ? 'active' : 'trash'} '
+      'detail cannot open planning sheet',
+      (tester) async {
+        final agenda = FakeAgendaApplication(
+          reminders: [item],
+          reminderDetail: item,
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('schedule-reminder')), findsNothing);
+        expect(
+          find.byKey(const Key('reminder-schedule-option-allDay')),
+          findsNothing,
+        );
+      },
+    );
+  }
+
+  testWidgets('all-day detail can return to an exact timed quick schedule', (
+    tester,
+  ) async {
+    await withClock(Clock.fixed(DateTime.utc(2026, 7, 19, 8)), () async {
+      final item = reminder(allDayLocalDate: '2026-07-20');
+      final agenda = FakeAgendaApplication(
+        reminders: [item],
+        reminderDetail: item,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final scheduleButton = find.byKey(const Key('schedule-reminder'));
+      await tester.scrollUntilVisible(
+        scheduleButton,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(scheduleButton);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('reminder-schedule-option-tomorrowMorning')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        agenda.lastMutationCommand!.schedule,
+        ReminderScheduleKind.tomorrowMorning,
+      );
+      expect(
+        agenda.lastMutationCommand!.customAttentionAt,
+        '2026-07-20T05:00:00Z',
+      );
+      expect(agenda.lastMutationCommand!.allDayLocalDate, isNull);
+      expect(agenda.reminders.single.allDayLocalDate, isNull);
+      expect(agenda.reminders.single.nextAttentionAt, '2026-07-20T05:00:00Z');
+    });
+  });
+
+  testWidgets('Tam gün flow is overflow-safe at 320 px large dark text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 780);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final item = reminder(nextAttentionAt: '2026-07-20T06:00:00Z');
+    final agenda = FakeAgendaApplication(
+      reminders: [item],
+      reminderDetail: item,
+    );
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+        child: MaterialApp(
+          theme: ThemeData(brightness: Brightness.dark),
+          home: ReminderDetailPage(
+            agenda: agenda,
+            reminderId: reminderId,
+            istanbulToday: '2026-07-19',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await openDetailAllDayPicker(tester);
+
+    expect(find.byType(DatePickerDialog), findsOneWidget);
+    expect(find.byType(TimePickerDialog), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Vazgeç'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('detail sheet previews and submits exact quick schedules', (
     tester,
