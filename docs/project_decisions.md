@@ -1,5 +1,17 @@
 # Proje Kararlari
 
+## Issue 367 — Work Mode yönetir, yerel loop yalnız açık handoff alır
+
+- GitHub Issue/PR koordinasyonu ve uzaktan yapılabilen geliştirme/test işleri
+  ChatGPT Work Mode tarafından yürütülür.
+- Windows `CSE Codex Loop`, yalnız en son trusted-owner approval yorumunda
+  `CSE_LOCAL_GATE_REQUEST` exact satırı bulunan hazır görevi seçer.
+- Genel `CSE_BRIDGE_APPROVED` yerel kabul değildir; explicit Issue numarası da
+  bu sınırı atlayamaz.
+- Dedicated control clone, pil ayarları, fail-closed güncelleme, scope,
+  validation, review, publication ve cleanup sözleşmeleri değişmez.
+- Platform API, API anahtarı, production/mobile ve cihaz davranışı eklenmez.
+
 ## Issue 305 — Display Power bilgi satırı state sinyali değildir
 
 - `Display Power: state=ON|OFF` exact supported sinyaldir. State anahtarına

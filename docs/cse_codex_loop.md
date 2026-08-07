@@ -1,8 +1,9 @@
 # CSE Codex Loop
 
-`CSE Codex Loop`, onaylanmış tek bir `cse-bridge-task:v1` Issue’yu mevcut
-ChatGPT/Codex oturumuyla işleyen Windows-yerel geliştirme aracıdır. OpenAI API
-anahtarı, özel Responses istemcisi veya GitHub Actions kullanmaz.
+`CSE Codex Loop`, ChatGPT Work Mode tarafından açıkça yerel yürütmeye devredilen
+tek bir `cse-bridge-task:v1` Issue’yu mevcut ChatGPT/Codex oturumuyla işleyen
+Windows-yerel yürütücüdür. Genel GitHub/product geliştirme yöneticisi değildir;
+OpenAI API anahtarı, özel Responses istemcisi veya GitHub Actions kullanmaz.
 
 ## Güvenlik sınırı
 
@@ -16,6 +17,11 @@ anahtarı, özel Responses istemcisi veya GitHub Actions kullanmaz.
   `%LOCALAPPDATA%\CSE-Codex-Loop\control-repo` clone’udur. Her görev
   `%LOCALAPPDATA%\CSE-Codex-Loop\worktrees\issue-N` altında dış worktree’de
   çalışır.
+- GitHub triage, uzaktan uygulanabilen kod/test, commit, normal push ve kanıt
+  yönetiminin birincil koordinatörü Work Mode’dur. Yerel loop yalnız en son
+  trusted-owner approval yorumunda `CSE_LOCAL_GATE_REQUEST` satırı da varsa
+  görevi kabul eder. Yalnız `CSE_BRIDGE_APPROVED` yerel scheduler için yeterli
+  değildir; `-IssueNumber` bu sınırı atlayamaz.
 - Runtime yapılandırmasında `repository_role` tam olarak
   `dedicated_control_clone_v1` olmalı ve çözümlenmiş `repo_root`, çözümlenmiş
   `control-repo` yoluyla aynı olmalıdır. Eski veya elle değiştirilmiş config bu
@@ -123,8 +129,9 @@ Belirli bir onaylı Issue foreground çalıştırması:
   -IssueNumber 345
 ```
 
-Issue numarası verilmezse en küçük numaralı hazır/onaylı görev seçilir; görev
-yoksa invocation `IDLE` biter.
+Issue numarası verilmezse en küçük numaralı, hazır/onaylı ve en son trusted-owner
+approval yorumunda `CSE_LOCAL_GATE_REQUEST` bulunan görev seçilir. Genel onaylı
+Issue’lar yerel loop için görünmezdir. Görev yoksa invocation `IDLE` biter.
 
 ## Scheduler aktivasyonu
 

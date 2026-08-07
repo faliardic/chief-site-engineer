@@ -1,5 +1,14 @@
 # Changelog
 
+## Issue #367 - Work Mode local gate handoff sınırı
+
+- Work Mode, GitHub ve uzaktan yürütülebilen CSE geliştirme işlerinin birincil
+  koordinatörü olarak sabitlendi.
+- Yerel `CSE Codex Loop` yalnız en son trusted-owner approval yorumunda
+  `CSE_LOCAL_GATE_REQUEST` bulunan hazır Issue’ları seçer.
+- Genel approval ve explicit Issue numarası bu kabul sınırını aşamaz; mevcut
+  dedicated-clone ve fail-closed güvenlik sözleşmeleri korunur.
+
 ## Issue #305 - Display Power header resume düzeltmesi
 
 - Power parser yalnız exact display-state adaylarını doğrular; benign non-state
