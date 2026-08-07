@@ -41,6 +41,11 @@ RUN_STDOUT_NAME = "stdout.log"
 RUN_STDERR_NAME = "stderr.log"
 REVIEW_SCHEMA_NAME = "review-schema.json"
 REVIEW_RESULT_NAME = "review-result.json"
+REVIEW_EVIDENCE_SUMMARY_LIMIT = 1200
+REVIEW_EVIDENCE_FINDING_LIMIT = 500
+REVIEW_EVIDENCE_FINDINGS_LIMIT = 8
+REVIEW_COMMENT_FINDINGS_LIMIT = 5
+REVIEW_COMMENT_LIMIT = 1800
 PASS_MARKER = "<!-- cse-bridge-status:PASS -->"
 FAILED_MARKER = "<!-- cse-bridge-status:FAILED -->"
 NEEDS_HUMAN_MARKER = "<!-- cse-bridge-status:NEEDS_HUMAN -->"
@@ -121,6 +126,55 @@ def sanitize(value: str, *, sensitive: Sequence[str] = (), limit: int = 8000) ->
     return cleaned[:limit]
 
 
+def _sanitize_review_text(
+    value: str,
+    *,
+    limit: int,
+    sensitive: Sequence[str] = (),
+) -> str:
+    cleaned = value
+    for item in sensitive:
+        if item:
+            cleaned = re.sub(
+                re.escape(item),
+                "[REDACTED]",
+                cleaned,
+                flags=re.IGNORECASE,
+            )
+    return sanitize(cleaned, limit=limit)
+
+
+def _sanitized_review(
+    review: ReviewResult, *, sensitive: Sequence[str] = ()
+) -> ReviewResult:
+    return ReviewResult(
+        verdict=review.verdict,
+        summary=_sanitize_review_text(
+            review.summary,
+            sensitive=sensitive,
+            limit=REVIEW_EVIDENCE_SUMMARY_LIMIT,
+        ),
+        findings=tuple(
+            _sanitize_review_text(
+                finding,
+                sensitive=sensitive,
+                limit=REVIEW_EVIDENCE_FINDING_LIMIT,
+            )
+            for finding in review.findings[:REVIEW_EVIDENCE_FINDINGS_LIMIT]
+        ),
+    )
+
+
+def _path_sanitization_inputs(*paths: Path) -> tuple[str, ...]:
+    values: list[str] = []
+    for path in paths:
+        value = str(path.resolve())
+        for candidate in (value, value.replace("\\", "/")):
+            if candidate and candidate not in values:
+                values.append(candidate)
+    return tuple(values)
+
+
 def _atomic_json(path: Path, payload: Mapping[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -139,6 +193,7 @@ class RunArtifacts:
         self.run_id = run_id
         self.issue_number = issue_number
         self.run_root = self.runtime_root / "runs" / run_id
+        self._review_evidence: dict[int, ReviewResult] = {}
         self.run_root.mkdir(parents=True, exist_ok=False)
         (self.run_root / RUN_STDOUT_NAME).write_text("", encoding="utf-8")
         (self.run_root / RUN_STDERR_NAME).write_text("", encoding="utf-8")
@@ -207,6 +262,33 @@ class RunArtifacts:
                 "a", encoding="utf-8"
             ) as stream:
                 stream.write(stderr)
+
+    def record_review(
+        self,
+        round_number: int,
+        review: ReviewResult,
+        *,
+        sensitive: Sequence[str] = (),
+    ) -> ReviewResult:
+        evidence = _sanitized_review(review, sensitive=sensitive)
+        payload: dict[str, object] = {
+            "round": round_number,
+            "verdict": evidence.verdict,
+            "summary": evidence.summary,
+            "findings": list(evidence.findings),
+            "recorded_at": utc_now(),
+        }
+        try:
+            _atomic_json(
+                self.run_root / f"review-round-{round_number}.json", payload
+            )
+        except (OSError, TypeError, ValueError) as exc:
+            raise BridgeError("review_evidence_write_failed") from exc
+        self._review_evidence[round_number] = evidence
+        return evidence
+
+    def review_evidence(self, round_number: int) -> ReviewResult | None:
+        return self._review_evidence.get(round_number)
 
 
 def rotate_runs(runtime_root: Path, *, max_runs: int, keep: Path | None = None) -> None:
@@ -836,19 +918,37 @@ def run_review(
     if result.returncode != 0:
         raise BridgeError("codex_review_failed")
     try:
-        raw = result_path.read_text(encoding="utf-8")
-    except OSError:
-        raw = result.stdout
+        try:
+            raw = result_path.read_text(encoding="utf-8")
+        except OSError:
+            raw = result.stdout
+        try:
+            value = json.loads(raw.strip())
+        except json.JSONDecodeError as exc:
+            raise BridgeError("structured_review_invalid") from exc
+        review = parse_review(value)
     finally:
         try:
             result_path.unlink()
         except FileNotFoundError:
             pass
-    try:
-        value = json.loads(raw.strip())
-    except json.JSONDecodeError as exc:
-        raise BridgeError("structured_review_invalid") from exc
-    return parse_review(value)
+    sensitive_paths = _path_sanitization_inputs(
+        worktree,
+        config.repo_root,
+        config.codex_path,
+        config.git_path,
+        config.gh_path,
+        config.python_path,
+        artifacts.runtime_root,
+        artifacts.run_root,
+        *(tuple([config.flutter_path]) if config.flutter_path is not None else ()),
+    )
+    artifacts.record_review(
+        round_number,
+        review,
+        sensitive=(prompt, *sensitive_paths),
+    )
+    return review
 
 
 def publish(
@@ -1119,7 +1219,40 @@ def remove_successful_worktree(
         return False
 
 
-def terminal_comment(kind: str, reason: str, run_id: str, pr_url: str = "") -> str:
+def _reviewer_section(review: ReviewResult) -> str:
+    evidence = _sanitized_review(review)
+    summary = " ".join(evidence.summary.split())
+    lines = [
+        "Reviewer evidence:",
+        f"Verdict: `{evidence.verdict}`",
+        f"Summary: {summary}",
+    ]
+    findings = [
+        " ".join(finding.split())
+        for finding in evidence.findings[:REVIEW_COMMENT_FINDINGS_LIMIT]
+    ]
+    if findings:
+        lines.append("Findings:")
+    section = "\n".join(lines)
+    for finding in findings:
+        prefix = "- "
+        remaining = REVIEW_COMMENT_LIMIT - len(section) - 1 - len(prefix)
+        if remaining <= 0:
+            break
+        section += f"\n{prefix}{finding[:remaining]}"
+        if len(finding) > remaining:
+            break
+    return section[:REVIEW_COMMENT_LIMIT]
+
+
+def terminal_comment(
+    kind: str,
+    reason: str,
+    run_id: str,
+    pr_url: str = "",
+    *,
+    review: ReviewResult | None = None,
+) -> str:
     if not _SAFE_REASON.fullmatch(reason):
         reason = "unsafe_reason_rejected"
     if kind == "READY_FOR_FATIH":
@@ -1135,10 +1268,13 @@ def terminal_comment(kind: str, reason: str, run_id: str, pr_url: str = "") -> s
             lines.append(f"Cleanup warning: `{reason}`.")
         return "\n".join(lines)
     if kind == "NEEDS_HUMAN":
-        return (
+        comment = (
             f"{NEEDS_HUMAN_MARKER}\nNEEDS_HUMAN\nRun: `{run_id}`\n"
             f"CSE Codex Loop stopped: `{reason}`."
         )
+        if reason in {"review_needs_human", "review_unresolved"} and review:
+            comment += f"\n\n{_reviewer_section(review)}"
+        return comment
     return (
         f"{FAILED_MARKER}\nFAILED\nRun: `{run_id}`\n"
         f"CSE Codex Loop stopped: `{reason}`."
@@ -1183,6 +1319,7 @@ def process_issue(
         f"{RUNNING_MARKER}\nCSE Codex Loop started.\nRun: `{artifacts.run_id}`",
     )
     worktree: Path | None = None
+    terminal_review: ReviewResult | None = None
     try:
         artifacts.update("RUNNING", "worktree", None)
         worktree = create_worktree(
@@ -1210,6 +1347,7 @@ def process_issue(
             round_number=1,
         )
         if review.verdict == "needs_human":
+            terminal_review = artifacts.review_evidence(1)
             raise BridgeError("review_needs_human")
         if review.verdict == "changes_requested":
             artifacts.update("RUNNING", "correction", None)
@@ -1235,6 +1373,7 @@ def process_issue(
                 round_number=2,
             )
             if review.verdict != "approved":
+                terminal_review = artifacts.review_evidence(2)
                 raise BridgeError("review_unresolved")
         artifacts.update("RUNNING", "publish", None)
         publication = publish(config, worktree, task, github, command, artifacts)
@@ -1261,7 +1400,12 @@ def process_issue(
         kind = _failure_kind(exc.reason)
         github.comment(
             issue_number,
-            terminal_comment(kind, exc.reason, artifacts.run_id),
+            terminal_comment(
+                kind,
+                exc.reason,
+                artifacts.run_id,
+                review=terminal_review,
+            ),
         )
         artifacts.update(kind, "complete", 3 if kind == "NEEDS_HUMAN" else 1, exc.reason)
         return 3 if kind == "NEEDS_HUMAN" else 1
