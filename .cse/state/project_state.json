@@ -1,33 +1,25 @@
 {
   "active_work": {
-    "base_commit": "c72f6bc55fc658996a546d9833b85a2614b99327",
-    "blocker": "Focused reminder widget retry: 47 PASS / 4 FAIL; retry budget exhausted. Full Flutter, analyze, build and tablet gates were not run.",
-    "branch": "codex/issue-279-reminder-quick-earlier-time",
-    "issue": 279,
+    "base_commit": "7c9f65a811c9f4bca561adab6bd1f8e64e6908cc",
+    "branch": "docs/issue-383-cse-v2-repository-truth-sync",
+    "issue": 383,
+    "kind": "documentation_state_truth_sync",
     "merge_claim": false,
-    "publication_status": "not_committed_not_pushed",
-    "state": "paused_for_readme_notebooklm_sync"
+    "production_behavior_changed": false,
+    "publication_status": "branch_created_not_merged",
+    "state": "in_progress"
   },
   "base_branch": "master",
-  "blocked_draft_pull_requests": [
-    {
-      "branch": "codex/issue-254-physical-smoke-acceptance-harness",
-      "mergeable": "conflicting",
-      "merged": false,
-      "pull_request": 259,
-      "state": "open",
-      "title": "WIP: isolated physical smoke acceptance harness"
-    }
-  ],
   "current_safe_point": {
-    "issue": 277,
-    "local_test_summary": "Issue #277: focused lifecycle 48/48, widget 46/46, concrete 1/1, full Flutter 333/333 and analyze 0; Samsung SM-X610 tablet wide smoke PASS.",
-    "merge_commit": "c72f6bc55fc658996a546d9833b85a2614b99327",
+    "issue": 382,
+    "local_test_summary": "V1 final baseline through PR #382; focused application/widget/backup tests, flutter analyze and git diff check were reported PASS in the merged PR evidence.",
+    "merge_commit": "7c9f65a811c9f4bca561adab6bd1f8e64e6908cc",
     "mobile_backup_format_version": 1,
     "mobile_schema_version": 10,
     "mobile_version": "0.1.0+1",
-    "pull_request": 278,
-    "semantics": "latest_merged_finalized_checkpoint"
+    "pull_request": 382,
+    "record_kind": "pull_request_baseline",
+    "semantics": "latest_merged_v1_field_used_baseline"
   },
   "legacy_last_numbered_step": 225,
   "mobile": {
@@ -43,15 +35,33 @@
     "issue_start": 227,
     "latest_podcast": 36,
     "legacy_last_numbered_step": 225,
-    "range_kind": "issue"
+    "range_kind": "issue",
+    "status": "historical_until_v1_closure_podcast_sync"
   },
   "product_maturity": {
-    "field_ready_application": false,
+    "field_ready_application": true,
+    "owner_field_use": "approximately_one_month",
     "production_ready_application": false,
-    "state": "tested_offline_mobile_core_with_tablet_only_issue_acceptance",
+    "public_release": false,
+    "state": "v1_completed_owner_field_used_v2_planning",
     "store_released": false
   },
   "state_version": 3,
+  "v1": {
+    "baseline_commit": "7c9f65a811c9f4bca561adab6bd1f8e64e6908cc",
+    "baseline_pull_request": 382,
+    "field_use": "approximately_one_month",
+    "status": "completed_field_used"
+  },
+  "v2": {
+    "canonical_scope": "docs/v2/CSE_V2_SCOPE.md",
+    "current_item": 1,
+    "current_item_name": "Proje ve Mahal omurgası",
+    "current_phase": "repository_truth_sync",
+    "parent_issue": 383,
+    "roadmap": "ROADMAP.md",
+    "status": "planning"
+  },
   "validation_policy": {
     "current_issue": "documentation",
     "production_behavior_changed": false,

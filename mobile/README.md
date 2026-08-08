@@ -1,27 +1,31 @@
 # CSE mobil uygulaması
 
-`mobile/`, Chief Site Engineer `0.1.0+1` için tek Dart codebase kullanan
-Flutter Android/iOS uygulamasıdır. Runtime Python/Flask sunucusuna bağlanmaz;
-cihaz-içi SQLite ve uygulamaya özel yerel dosya dizinleriyle offline çalışır.
+`mobile/`, Chief Site Engineer'ın Flutter Android/iOS ürünüdür. Uygulama
+offline-first çalışır; cihaz-içi SQLite ve uygulamaya özel yerel dosya alanını
+kullanır. Mobil runtime Python/Flask sunucusuna bağlanmaz.
 
-## Sabit kimlikler
+## Güncel durum
 
 | Alan | Değer |
 | --- | --- |
+| Ürün fazı | V1 tamamlandı; V2 planlama başladı |
+| V1 baseline | `7c9f65a811c9f4bca561adab6bd1f8e64e6908cc` |
+| Son baseline PR | `#382` |
 | Flutter proje adı | `chief_site_engineer` |
-| Uygulama adı | `Chief Site Engineer` |
-| Sürüm/build | `0.1.0+1` |
-| Android release application ID | `com.faliardic.chiefsiteengineer` |
-| Android debug application ID | `com.faliardic.chiefsiteengineer.debug` |
-| iOS release bundle ID | `com.faliardic.chiefsiteengineer` |
-| iOS debug bundle ID | `com.faliardic.chiefsiteengineer.debug` |
-| Mobil schema version | `10` |
-| Backup format version | `1` |
+| Uygulama sürümü | `0.1.0+1` |
+| Android release ID | `com.faliardic.chiefsiteengineer` |
+| Android debug ID | `com.faliardic.chiefsiteengineer.debug` |
+| iOS release ID | `com.faliardic.chiefsiteengineer` |
+| iOS debug ID | `com.faliardic.chiefsiteengineer.debug` |
+| Mobil schema | `10` |
+| Backup formatı | `1` |
 | Canonical timezone | `Europe/Istanbul` |
 | Android compile/target SDK | `36 / 36` |
+| Owner saha kullanımı | Yaklaşık bir ay |
+| Store release | İlan edilmedi |
 
-Debug ve release farklı platform kimlikleri ve `debug` / `release` veri
-kökleri kullanır; geliştirme kaydı yayın verisine karışmaz.
+V1'in tamamlanması mobil modüllerin dondurulduğu anlamına gelmez. V2 aynı
+uygulama ve veri omurgası üzerinde ilerler.
 
 ## Yerel veri düzeni
 
@@ -33,178 +37,123 @@ cse_mobile/<debug|release>/
 ├── attachments/
 ├── exports_backups/
 ├── temp_staging/
-└── restore_journal.json  # yalnız yarım restore varken
+└── restore_journal.json
 ```
 
-Child yollar environment kökü altında doğrulanır. Relative traversal, absolute
-kullanıcı yolu ve kök dışına kaçış fail-closed reddedilir. Repository
-`exports/` klasörü mobil runtime tarafından kullanılmaz.
+Debug ve release farklı uygulama kimlikleri ve veri kökleri kullanır. Child
+yollar environment kökü altında doğrulanır; relative traversal, absolute
+kullanıcı yolu ve kök dışına kaçış fail-closed reddedilir.
 
-Kalıcı anlar aware UTC exact `YYYY-MM-DDTHH:MM:SSZ` biçimindedir. Kullanıcı
-gün/saat sunumu ve local-date kararları `Europe/Istanbul` kullanır. Naive,
-invalid veya canonical olmayan storage değeri reddedilir.
+Kalıcı anlar aware UTC `YYYY-MM-DDTHH:MM:SSZ` biçimindedir. Kullanıcı gün/saat
+sunumu ve local-date kararları `Europe/Istanbul` kullanır.
 
 ## SQLite schema geçmişi
 
-Bütün migration'lar atomiktir; hata yarım tablo veya yarım event bırakmadan
-rollback olur.
-
 | Schema | Birleşmiş veri sözleşmesi |
 | --- | --- |
-| `1` | Bootstrap, schema kaydı ve `mobile-foundation-v1` smoke kaydı |
-| `2` | Projects, Ajanda observations, append-only observation events, linked follow-up/reminder ve events |
-| `3` | Tam reminder lifecycle, aggregate event sequence ve notification bindings |
-| `4` | Proje personeli, Puantaj gün/entry/event, çalışma günü ayarı ve exact day/reminder bağları |
-| `5` | Beton paketi, built-in checklist, mikser/irsaliye, numune, takip, kanıt ve append-only events |
-| `6` | Taşeronlar, iş gücü ekipleri, workforce events ve deterministic legacy workforce normalizasyonu |
-| `7` | Ajanda fotoğraf attachments; source photo/PDF akışları ve nullable irsaliye için Beton truck graph rebuild |
-| `8` | Reminder aggregate rebuild; all-day local date, sade lifecycle vocabulary ve source constraints |
-| `9` | Reminder `trashed_at`, çöp/geri yükleme event vocabulary'si ve index |
-| `10` | Proje Beton sınıfı kataloğu, append-only class events, paket–Ajanda bağlamı ve deterministic legacy class migration |
+| `1` | Mobil bootstrap |
+| `2` | Projects, Ajanda, observation events ve linked reminder |
+| `3` | Reminder lifecycle ve notification bindings |
+| `4` | Puantaj gün/entry/event ve çalışma günü bağları |
+| `5` | Beton paketi, checklist, mikser/irsaliye, numune ve kanıt |
+| `6` | Taşeronlar, ekipler, workforce events ve legacy normalizasyon |
+| `7` | Ajanda attachments ve Beton truck graph rebuild |
+| `8` | All-day reminder, sade lifecycle vocabulary ve source constraints |
+| `9` | Reminder çöp/geri yükleme yaşam döngüsü |
+| `10` | Proje Beton sınıfı kataloğu ve paket–Ajanda bağı |
 
-Physical delete ana aggregate'lerde kullanılmaz. Event tabloları append-only,
-mutation'lar expected revision ve idempotent event ID kullanır. Schema `10`
-restore hedefidir; desteklenen eski backup schema'ları yalnız staging'de
-güncele migrate edilir, downgrade yapılmaz.
+Migration'lar atomiktir. Hata yarım tablo veya yarım event bırakmadan rollback
+olur. Physical delete ana aggregate'lerde kullanılmaz; event tabloları
+append-only, mutation'lar expected revision ve idempotent event ID kullanır.
 
 ## Ajanda
 
-Ajanda seçili İstanbul gününü gösterir; proje, tür, aktif/arşiv ve wildcard
-yorumlamayan literal arama filtreleri vardır. Sıralama typed application query
-ile `observed_at`, `created_at`, `id` alanlarında deterministik en yeni veya en
-eski üstte çalışır; `updated_at` sıralamaya katılmaz.
-
-Route-local gün, filtre, arama ve scroll bağlamı detail push/pop sonrasında
-korunur. Arama metni ile focus/caret/IME ayrı sözleşmedir: detail dönüşü
-klavyeyi kendiliğinden açmaz, gerçek drag klavyeyi kapatır ve odaksız scroll
-arama focus'u üretmez.
-
-Ajanda kaydına JPEG/PNG/HEIC/PDF kanıt eklenebilir. MIME içerikten sniff edilir;
-boyut, SHA-256, atomik staging/finalize ve DB failure orphan cleanup uygulanır.
-Beton/betonaj sinyali yalnız kullanıcıya öneri verir; otomatik saha kararı,
-paket veya reminder üretmez.
+- Seçili İstanbul günü
+- Proje, tür, aktif/arşiv ve literal arama
+- `observed_at`, `created_at`, `id` ile deterministik sıra
+- Route-local gün, filtre, arama, focus ve scroll korunumu
+- JPEG/PNG/HEIC/PDF attachment
+- MIME sniff, boyut, SHA-256, atomik staging/finalize
+- Beton/betonaj sinyali için kullanıcı kontrollü öneri
+- Salt-okunur alan değişikliği geçmişi
 
 ## Hatırlatıcı
 
-Reminder; bağımsız veya Ajanda, Puantaj ve Beton kaynaklı olabilir. Creation ve
-her lifecycle mutation row ile append-only event'i tek transaction'da yazar.
-Schedule/reschedule, waiting, inbox, complete/cancel, reopen, trash/restore ve
-revision conflict görünümü desteklenir.
+- Standalone veya Ajanda, Puantaj ve Beton kaynaklı kayıt
+- Schedule/reschedule, inbox, complete/cancel, reopen, trash/restore
+- Saatli ve tam gün planlama
+- Hızlı bugün/yarın/iki-üç saat/hafta başı eylemleri
+- Canonical UTC ve Europe/Istanbul wall-clock resolver
+- Append-only event ve optimistic revision
+- Native notification binding/reconciliation
+- Kaynak Ajanda fotoğraflarının salt-okunur görünümü
 
-Hızlı eylemler arasında:
+## Puantaj ve Sicil
 
-- 15 dakika ve 1 saat;
-- 2 saat ve 3 saat;
-- bugün çıkmadan;
-- `Yarına ertele`;
-- timed `Yarın 08:00`;
-- sonraki pazartesi `08:00`;
-- özel tarih/saat ve Unutma Kutusu
+- Proje, taşeron, ekip ve personel
+- Tam gün, yarım gün, gelmedi, izin, fazla mesai ve not
+- Taslak, tamamlandı, çalışma yok ve explicit reopen
+- Gün/ekip toplamları
+- UTF-8 BOM ve formula-injection korumalı CSV
+- Kaynağa bağlı çalışma günü reminder'ı
 
-bulunur. Ertesi gün ve hafta başı değerleri exact Europe/Istanbul wall-clock
-resolver ile üretilir. UI preview ile application sonucu gün sınırında
-uyuşmazsa mutation fail-closed reddedilir. All-day local date ayrı korunur.
-
-Kaynak Ajanda fotoğrafları reminder detayında salt-okunur gösterilir. Byte ve
-metadata reminder aggregate'ine kopyalanmaz; mevcut attachment integrity yolu
-kullanılır.
-
-## Yerel bildirimler
-
-`flutter_local_notifications`, canonical UTC reminder anını timezone-aware
-native schedule'a çevirir. Android manifestte:
-
-- `POST_NOTIFICATIONS`;
-- `RECEIVE_BOOT_COMPLETED`;
-- kullanıcıya görünür reminder alarmı için `SCHEDULE_EXACT_ALARM`;
-- kanıt çekimi için `CAMERA`
-
-bulunur. Android 12+ exact alarm özel erişimi yalnız explicit reminder
-eyleminden istenir. İzin reddi veya plugin hatası SQLite reminder'ını geri
-almaz; sync state kullanıcıya görünür.
-
-Broad media/storage ve `INTERNET` izinleri final manifestten çıkarılır;
-cleartext kapalıdır. Notification payload reminder UUID'sini taşır. Bootstrap
-reconciliation SQLite source-of-truth ile OS pending listesini uzlaştırır;
-schedulable, korunacak delivered one-time, terminal, stale, duplicate ve orphan
-durumlarını ayırır. Bir reminder mutation'ı ilgisiz reminder bildirimini
-silmez.
-
-## Puantaj
-
-Puantaj proje ve İstanbul yerel günüyle çalışır. Personel, ekip/taşeron, rol ve
-optional proje-içi kodla yönetilir. Tam gün, yarım gün, gelmedi, izin, fazla
-mesai ve not tutulur.
-
-Gün taslak, tamamlandı veya çalışma yok durumundadır. Geçmiş gün yalnız
-explicit reopen ile düzeltilir. Gün/ekip toplamları entry'lerden türetilir.
-Çalışma günü reminder'ı exact proje/gün bağını taşır. Gün CSV'si UTF-8 BOM,
-CRLF, deterministic sıra ve formula-injection korumasıyla atomik hazırlanır.
+V2 içinde aynı kişi ve firma kimlikleri ortak Saha Rehberi omurgasına
+taşınacaktır. Bu plan henüz yeni schema veya migration uygulanmış olduğu
+anlamına gelmez.
 
 ## Beton paketi
 
-Proje bazlı sınıf kataloğu aktif seçimleri ve tarihsel paket snapshot'larını
-ayırır. Paket proje, mahal, İstanbul zamanı, sınıf ve pozitif plan metrajını
-doğrular.
+- Proje bazlı sınıf kataloğu
+- Planlandı → Devam ediyor → Tamamlandı
+- Required checklist ve system-owned kalemler
+- Mikser/irsaliye, numune, takip ve attachment
+- Türetilen gerçek metraj ve açıklanabilir kapanış kontrolleri
+- Yönetilen Ajanda projeksiyonu
+- İnsan okunabilir rapor ve manifest
 
-Detayda:
-
-- Planlandı → Devam ediyor → Tamamlandı zaman çizgisi;
-- required checklist ve system-owned laboratuvar/yapı denetim kalemleri;
-- mikser/irsaliye, received/held/returned/partial sonuçları;
-- türetilen gerçek metraj, numune, takip ve linked reminder'lar;
-- kanıt ve rapor/export
-
-bulunur. Required pending kalem, eksik truck kanıtı, açık numune/takip veya
-açıklamasız metraj farkı kapanışı engeller. Uygulama kullanıcı yerine beton
-kabul/red kararı üretmez.
-
-İlk başarılı döküm başlangıcı Beton event'i ve yönetilen Ajanda kaydını aynı
-transaction'da oluşturur; bitiş aynı kaydı günceller. Yönetilen Ajanda kaydı
-bağımsız ana metin edit/archive mutation'ını reddeder ve kaynak Beton paketine
-döner.
+Uygulama kullanıcı adına otomatik beton kabul/red kararı üretmez.
 
 ## Backup ve restore
 
-`.csebackup` format `1`, mobil SQLite ile aktif kanıtları tek şifreli pakette
-taşır. PBKDF2-HMAC-SHA256 ile 256-bit anahtar türetilir; AES-256-GCM
-authenticated encryption kullanılır. Parola, absolute path, secret ve signing
-materyali manifest/state içine yazılmaz.
+`.csebackup` format `1`, SQLite ile etkin attachment dosyalarını tek şifreli
+pakette taşır.
 
-Backup; SQLite `VACUUM INTO`, integrity/FK/read-model smoke, attachment
-size/hash audit ve atomik rename uygular. Restore, aktif state'e dokunmadan
-magic/format/KDF/schema/parola, traversal, duplicate, symlink, extra entry,
-boyut/hash, SQLite integrity/FK ve DB row–attachment eşliğini doğrular.
+- PBKDF2-HMAC-SHA256
+- AES-256-GCM authenticated encryption
+- SQLite integrity/FK/read-model smoke
+- Attachment size/hash audit
+- Atomik finalize
+- Restore preflight
+- Safety backup ve rollback
+- Crash-safe restore journal
+- Gerçek hazırlama, paketleme, doğrulama ve kaydetme aşamaları
 
-Tam replace iki ayrı kullanıcı onayı ister. Önce safety backup alınır; database
-ve attachments çifti rollback alanına taşınır. Journal
-`prepared → old_state_moved → new_state_activated → validated` aşamalarını
-bootstrap recovery için tutar. Belirsiz durumda normal mutation açılmaz ve
-kanıt recovery dizini silinmez.
+Parola, secret, absolute kullanıcı yolu ve signing materyali state veya
+manifest içine yazılmaz.
 
-## Güncel kabul sınırı
+## CSE V2 veri yönü
 
-Son merged safe point Issue #277 / PR #278 /
-`c72f6bc55fc658996a546d9833b85a2614b99327`dir. Bu revision için:
+V2'nin ilk temel zinciri:
 
-- focused lifecycle `48/48`;
-- focused widget `46/46`;
-- Beton regression `1/1`;
-- full Flutter `333/333`;
-- analyze `0`;
-- Samsung `SM-X610` tablet wide smoke PASS
+```text
+Stable Proje/Mahal ID
+→ Ortak kişi/firma ID
+→ Ortak attachment/link
+→ Ajanda ve Hatırlatıcı kaynak ilişkisi
+→ İş ve günlük log read-modeli
+```
 
-kanıtı vardır. Kullanıcı tablet PASS'i bu dar Issue'nun fiziksel tamamlanma
-kapısı seçti; telefon promotion yapılmadı. Bu sonuç field-ready,
-production-ready veya store release kanıtı değildir.
+Kanonik kapsam:
 
-Issue #279 duraklatılmış ve birleşmemiştir. PR #259 açık, Draft ve conflicting
-acceptance altyapısıdır; ikisi de bu README'deki birleşmiş mobil capability
-olarak yorumlanmamalıdır.
+[`../docs/v2/CSE_V2_SCOPE.md`](../docs/v2/CSE_V2_SCOPE.md)
+
+İlk production maddesi Proje ve Mahal omurgasıdır. V2 planning çalışması yeni
+schema numarası ilan etmez; schema ancak migration implementation'ı ve testleri
+tamamlandığında yükseltilir.
 
 ## Geliştirici komutları
 
-Flutter `3.44.6 stable` ve Dart `3.12.2` ile son safe point doğrulanmıştır:
+Flutter `3.44.6 stable` ve Dart `3.12.2` baseline'ı:
 
 ```powershell
 cd mobile
@@ -213,22 +162,28 @@ dart format lib test integration_test
 flutter analyze
 flutter test
 flutter build apk --debug
-flutter build appbundle --release
 ```
 
-Current Issue yalnız değişen sözleşmeyle orantılı kapıları çalıştırır; her dar
-değişiklik full release/device zincirini tekrar etmez.
+Dar Issue yalnız değişen sözleşmeyle orantılı kapıları çalıştırır. Her UI
+değişikliği full release, AAB, signing, backup ve cihaz zincirini tekrar etmez.
 
 ## Signing ve platform sınırı
 
-Release build debug signing kullanmaz. Gerçek Android signing yalnız
-repository dışındaki `CSE_KEY_PROPERTIES_FILE` ile açılır; eksik alan
-fail-closed durur. Keystore, certificate, provisioning profile ve secret
-commitlenmez.
+Gerçek Android signing yalnız repository dışındaki
+`CSE_KEY_PROPERTIES_FILE` ile açılır. Eksik signing materyali fail-closed
+durur; release debug key'e sessizce düşmez.
 
-iOS project/scheme tracked durumdadır. Gerçek archive/TestFlight yalnız macOS,
-Xcode, Apple Developer hesabı ve repository dışı signing materyaliyle
-üretilebilir.
+Gerçek iOS archive/TestFlight yalnız macOS, Xcode, Apple Developer hesabı ve
+repository dışı signing materyaliyle üretilebilir.
 
 Ayrıntılar:
-[`docs/release/mobile_identity_signing_and_rc.md`](../docs/release/mobile_identity_signing_and_rc.md).
+
+[`../docs/release/mobile_identity_signing_and_rc.md`](../docs/release/mobile_identity_signing_and_rc.md)
+
+## Olgunluk sınırı
+
+- V1 owner saha kullanımı vardır.
+- Kamuya açık production/store release ilan edilmemiştir.
+- V2 planlama ve repository truth-sync aşamasındadır.
+- Eski #279, PR #259, Orchestrator, Bridge ve Work Mode kayıtları güncel mobil
+  capability veya V2 blocker'ı değildir.
