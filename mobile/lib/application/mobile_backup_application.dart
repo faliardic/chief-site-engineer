@@ -16,10 +16,27 @@ import 'package:cryptography/cryptography.dart';
 import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart';
 
+enum MobileBackupCreationStage { preparing, packaging, verifying, saving }
+
+typedef MobileBackupCreationProgress =
+    void Function(MobileBackupCreationStage stage);
+
+void _reportBackupStage(
+  MobileBackupCreationProgress? observer,
+  MobileBackupCreationStage stage,
+) {
+  try {
+    observer?.call(stage);
+  } on Object {
+    // Progress visibility must never invalidate backup truth.
+  }
+}
+
 abstract interface class MobileBackupApplication {
   Future<MobileBackupCreationResult> createBackup(
-    CreateMobileBackupCommand command,
-  );
+    CreateMobileBackupCommand command, {
+    MobileBackupCreationProgress? onProgress,
+  });
 
   Future<void> shareBackup(String absolutePath);
 
@@ -615,8 +632,9 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
 
   @override
   Future<MobileBackupCreationResult> createBackup(
-    CreateMobileBackupCommand command,
-  ) async {
+    CreateMobileBackupCommand command, {
+    MobileBackupCreationProgress? onProgress,
+  }) async {
     _validateNewPassword(command.password, command.passwordConfirmation);
     final operationTime = _readClockOnce();
     return coordinator.runExclusive(
@@ -625,6 +643,7 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
         operationTime: operationTime,
         filePrefix: 'cse_mobile_backup',
         recordSummary: true,
+        onProgress: onProgress,
       ),
     );
   }
@@ -758,7 +777,9 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
     required DateTime operationTime,
     required String filePrefix,
     required bool recordSummary,
+    MobileBackupCreationProgress? onProgress,
   }) async {
+    _reportBackupStage(onProgress, MobileBackupCreationStage.preparing);
     directories.validate();
     await directories.ensureCreated();
     final operationId = _operationId(operationTime);
@@ -828,6 +849,7 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
       attachmentManifest.sort(
         (left, right) => left.logicalPath.compareTo(right.logicalPath),
       );
+      _reportBackupStage(onProgress, MobileBackupCreationStage.packaging);
       final timestamp = CseTimeCodec.encodeUtc(operationTime);
       final manifest = MobileBackupManifest(
         formatVersion: CseBackupCodec.formatVersion,
@@ -857,6 +879,7 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
           'Yedek paket boyutu güvenli sınırı aşıyor.',
         );
       }
+      _reportBackupStage(onProgress, MobileBackupCreationStage.verifying);
       final verifiedArchive = archiveCodec.decode(
         await encryptionCodec.decrypt(packageBytes, password),
       );
@@ -867,6 +890,7 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
           'Yedek paket doğrulaması başarısız.',
         );
       }
+      _reportBackupStage(onProgress, MobileBackupCreationStage.saving);
       await partial.writeAsBytes(packageBytes, flush: true);
       final safeTimestamp = timestamp
           .replaceAll('-', '')

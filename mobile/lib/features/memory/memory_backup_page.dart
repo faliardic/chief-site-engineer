@@ -26,6 +26,7 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
   String? _restoreMessage;
   bool _backupBusy = false;
   bool _restoreBusy = false;
+  MobileBackupCreationStage? _backupStage;
   bool _replacementAcknowledged = false;
 
   @override
@@ -63,6 +64,7 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
     if (_backupBusy || _restoreBusy) return;
     setState(() {
       _backupBusy = true;
+      _backupStage = null;
       _backupMessage = null;
     });
     try {
@@ -71,6 +73,9 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
           password: _backupPassword.text,
           passwordConfirmation: _backupPasswordConfirmation.text,
         ),
+        onProgress: (stage) {
+          if (mounted) setState(() => _backupStage = stage);
+        },
       );
       if (!mounted) return;
       _backupPassword.clear();
@@ -84,7 +89,12 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
       if (!mounted) return;
       setState(() => _backupMessage = _safeMessage(error));
     } finally {
-      if (mounted) setState(() => _backupBusy = false);
+      if (mounted) {
+        setState(() {
+          _backupBusy = false;
+          _backupStage = null;
+        });
+      }
     }
   }
 
@@ -224,165 +234,262 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Hafıza ve Yedekleme')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+    return PopScope(
+      canPop: _backupStage == null,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Hafıza ve Yedekleme')),
+        body: Stack(
           children: [
-            Text('Tam mobil yedek', style: theme.textTheme.titleLarge),
-            const SizedBox(height: 8),
-            const Text(
-              'SQLite kayıtları ve etkin Beton eki dosyaları, parola korumalı '
-              '.csebackup paketi olarak hazırlanır. Parola saklanmaz.',
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              key: const Key('backup-password'),
-              controller: _backupPassword,
-              obscureText: true,
-              enableSuggestions: false,
-              autocorrect: false,
-              decoration: const InputDecoration(
-                labelText: 'Yedek parolası',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              key: const Key('backup-password-confirmation'),
-              controller: _backupPasswordConfirmation,
-              obscureText: true,
-              enableSuggestions: false,
-              autocorrect: false,
-              decoration: const InputDecoration(
-                labelText: 'Parolayı doğrula',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 48,
-              child: FilledButton.icon(
-                key: const Key('create-backup'),
-                onPressed: _backupBusy || _restoreBusy ? null : _createBackup,
-                icon: _backupBusy
-                    ? const SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.archive_outlined),
-                label: const Text('Yedek oluştur'),
-              ),
-            ),
-            if (_created != null) ...[
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 48,
-                child: OutlinedButton.icon(
-                  key: const Key('share-backup'),
-                  onPressed: _backupBusy || _restoreBusy ? null : _shareBackup,
-                  icon: const Icon(Icons.ios_share_outlined),
-                  label: const Text('Yedeği paylaş / kaydet'),
-                ),
-              ),
-            ],
-            if (_backupMessage != null) ...[
-              const SizedBox(height: 8),
-              Text(_backupMessage!, key: const Key('backup-message')),
-            ],
-            if (_lastBackup case final last?) ...[
-              const SizedBox(height: 12),
-              _SummaryCard(title: 'Son başarılı yedek', summary: last),
-            ],
-            const SizedBox(height: 28),
-            const Divider(),
-            const SizedBox(height: 20),
-            Text('Tam geri yükleme', style: theme.textTheme.titleLarge),
-            const SizedBox(height: 8),
-            const Text(
-              'Geri yükleme mevcut mobil hafızayı birleştirmeden tamamen '
-              'değiştirir. Ön kontrol aktif veriye dokunmaz.',
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 48,
-              child: OutlinedButton.icon(
-                key: const Key('pick-backup'),
-                onPressed: _backupBusy || _restoreBusy ? null : _pickPackage,
-                icon: const Icon(Icons.folder_open_outlined),
-                label: Text(
-                  _selectedPackage == null ? 'Yedek seç' : 'Başka yedek seç',
-                ),
-              ),
-            ),
-            if (_selectedPackage != null) ...[
-              const SizedBox(height: 8),
-              const Text('Bir .csebackup dosyası seçildi.'),
-              const SizedBox(height: 12),
-              TextField(
-                key: const Key('restore-password'),
-                controller: _restorePassword,
-                obscureText: true,
-                enableSuggestions: false,
-                autocorrect: false,
-                decoration: const InputDecoration(
-                  labelText: 'Yedek parolası',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 48,
-                child: FilledButton.tonalIcon(
-                  key: const Key('preflight-backup'),
-                  onPressed: _backupBusy || _restoreBusy
-                      ? null
-                      : _preflightPackage,
-                  icon: const Icon(Icons.verified_outlined),
-                  label: const Text('Ön kontrolü çalıştır'),
-                ),
-              ),
-            ],
-            if (_preflight case final preflight?) ...[
-              const SizedBox(height: 12),
-              _PreflightCard(preflight: preflight),
-              CheckboxListTile(
-                key: const Key('replacement-acknowledgement'),
-                contentPadding: EdgeInsets.zero,
-                minVerticalPadding: 12,
-                value: _replacementAcknowledged,
-                onChanged: _restoreBusy
-                    ? null
-                    : (value) => setState(
-                        () => _replacementAcknowledged = value ?? false,
+            SafeArea(
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  Text('Tam mobil yedek', style: theme.textTheme.titleLarge),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'SQLite kayıtları ve etkin Beton eki dosyaları, parola korumalı '
+                    '.csebackup paketi olarak hazırlanır. Parola saklanmaz.',
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    key: const Key('backup-password'),
+                    controller: _backupPassword,
+                    obscureText: true,
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    decoration: const InputDecoration(
+                      labelText: 'Yedek parolası',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    key: const Key('backup-password-confirmation'),
+                    controller: _backupPasswordConfirmation,
+                    obscureText: true,
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    decoration: const InputDecoration(
+                      labelText: 'Parolayı doğrula',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 48,
+                    child: FilledButton.icon(
+                      key: const Key('create-backup'),
+                      onPressed: _backupBusy || _restoreBusy
+                          ? null
+                          : _createBackup,
+                      icon: _backupBusy
+                          ? const SizedBox.square(
+                              dimension: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.archive_outlined),
+                      label: const Text('Yedek oluştur'),
+                    ),
+                  ),
+                  if (_created != null) ...[
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 48,
+                      child: OutlinedButton.icon(
+                        key: const Key('share-backup'),
+                        onPressed: _backupBusy || _restoreBusy
+                            ? null
+                            : _shareBackup,
+                        icon: const Icon(Icons.ios_share_outlined),
+                        label: const Text('Yedeği paylaş / kaydet'),
                       ),
-                title: const Text(
-                  'Mevcut mobil hafızanın tamamen değişeceğini anlıyorum.',
-                ),
-                controlAffinity: ListTileControlAffinity.leading,
+                    ),
+                  ],
+                  if (_backupMessage != null) ...[
+                    const SizedBox(height: 8),
+                    Text(_backupMessage!, key: const Key('backup-message')),
+                  ],
+                  if (_lastBackup case final last?) ...[
+                    const SizedBox(height: 12),
+                    _SummaryCard(title: 'Son başarılı yedek', summary: last),
+                  ],
+                  const SizedBox(height: 28),
+                  const Divider(),
+                  const SizedBox(height: 20),
+                  Text('Tam geri yükleme', style: theme.textTheme.titleLarge),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Geri yükleme mevcut mobil hafızayı birleştirmeden tamamen '
+                    'değiştirir. Ön kontrol aktif veriye dokunmaz.',
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      key: const Key('pick-backup'),
+                      onPressed: _backupBusy || _restoreBusy
+                          ? null
+                          : _pickPackage,
+                      icon: const Icon(Icons.folder_open_outlined),
+                      label: Text(
+                        _selectedPackage == null
+                            ? 'Yedek seç'
+                            : 'Başka yedek seç',
+                      ),
+                    ),
+                  ),
+                  if (_selectedPackage != null) ...[
+                    const SizedBox(height: 8),
+                    const Text('Bir .csebackup dosyası seçildi.'),
+                    const SizedBox(height: 12),
+                    TextField(
+                      key: const Key('restore-password'),
+                      controller: _restorePassword,
+                      obscureText: true,
+                      enableSuggestions: false,
+                      autocorrect: false,
+                      decoration: const InputDecoration(
+                        labelText: 'Yedek parolası',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 48,
+                      child: FilledButton.tonalIcon(
+                        key: const Key('preflight-backup'),
+                        onPressed: _backupBusy || _restoreBusy
+                            ? null
+                            : _preflightPackage,
+                        icon: const Icon(Icons.verified_outlined),
+                        label: const Text('Ön kontrolü çalıştır'),
+                      ),
+                    ),
+                  ],
+                  if (_preflight case final preflight?) ...[
+                    const SizedBox(height: 12),
+                    _PreflightCard(preflight: preflight),
+                    CheckboxListTile(
+                      key: const Key('replacement-acknowledgement'),
+                      contentPadding: EdgeInsets.zero,
+                      minVerticalPadding: 12,
+                      value: _replacementAcknowledged,
+                      onChanged: _restoreBusy
+                          ? null
+                          : (value) => setState(
+                              () => _replacementAcknowledged = value ?? false,
+                            ),
+                      title: const Text(
+                        'Mevcut mobil hafızanın tamamen değişeceğini anlıyorum.',
+                      ),
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
+                    SizedBox(
+                      height: 48,
+                      child: FilledButton.icon(
+                        key: const Key('restore-backup'),
+                        onPressed:
+                            _replacementAcknowledged &&
+                                !_restoreBusy &&
+                                !_backupBusy
+                            ? _askFinalRestoreConfirmation
+                            : null,
+                        icon: const Icon(Icons.restore_rounded),
+                        label: const Text('Tam geri yüklemeyi başlat'),
+                      ),
+                    ),
+                  ],
+                  if (_restoreMessage != null) ...[
+                    const SizedBox(height: 8),
+                    Text(_restoreMessage!, key: const Key('restore-message')),
+                  ],
+                  const SizedBox(height: 24),
+                ],
               ),
-              SizedBox(
-                height: 48,
-                child: FilledButton.icon(
-                  key: const Key('restore-backup'),
-                  onPressed:
-                      _replacementAcknowledged && !_restoreBusy && !_backupBusy
-                      ? _askFinalRestoreConfirmation
-                      : null,
-                  icon: const Icon(Icons.restore_rounded),
-                  label: const Text('Tam geri yüklemeyi başlat'),
-                ),
+            ),
+            if (_backupStage case final stage?)
+              Positioned.fill(
+                child: _BackupCreationProgressSurface(stage: stage),
               ),
-            ],
-            if (_restoreMessage != null) ...[
-              const SizedBox(height: 8),
-              Text(_restoreMessage!, key: const Key('restore-message')),
-            ],
-            const SizedBox(height: 24),
           ],
         ),
       ),
+    );
+  }
+}
+
+String _backupStageLabel(MobileBackupCreationStage stage) => switch (stage) {
+  MobileBackupCreationStage.preparing => 'Hazırlanıyor',
+  MobileBackupCreationStage.packaging => 'Paketleniyor',
+  MobileBackupCreationStage.verifying => 'Bütünlük kontrolü yapılıyor',
+  MobileBackupCreationStage.saving => 'Kaydediliyor',
+};
+
+class _BackupCreationProgressSurface extends StatelessWidget {
+  const _BackupCreationProgressSurface({required this.stage});
+
+  final MobileBackupCreationStage stage;
+
+  @override
+  Widget build(BuildContext context) {
+    final stageLabel = _backupStageLabel(stage);
+    return Stack(
+      children: [
+        const Positioned.fill(
+          child: ModalBarrier(dismissible: false, color: Color(0x99000000)),
+        ),
+        Positioned.fill(
+          child: SafeArea(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Semantics(
+                  key: const Key('backup-creation-progress'),
+                  container: true,
+                  liveRegion: true,
+                  excludeSemantics: true,
+                  label:
+                      'Yedek oluşturuluyor. $stageLabel. '
+                      'İşlem tamamlanana kadar bu ekrandan çıkılamaz.',
+                  child: Card(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 360),
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Yedek oluşturuluyor',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 16),
+                            const LinearProgressIndicator(
+                              key: Key('backup-creation-indicator'),
+                              value: null,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              stageLabel,
+                              key: const Key('backup-creation-stage'),
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'İşlem tamamlanana kadar bu ekrandan çıkılamaz.',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
