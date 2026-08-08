@@ -1,0 +1,63 @@
+name: CSE saha geri bildirimi
+description: Hata olmayan günlük kullanım sürtünmesi, eksik akış veya geliştirme ihtiyacını kaydet.
+title: "[SAHA] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: situation
+    attributes:
+      label: Saha durumu
+      description: Bu ihtiyaç hangi gerçek iş sırasında ortaya çıktı?
+    validations:
+      required: true
+  - type: textarea
+    id: friction
+    attributes:
+      label: Mevcut sürtünme
+      description: Şu anda neyi tekrar yazıyor, hatırlıyor, başka uygulamada yapıyor veya gereksiz tıklıyorsun?
+    validations:
+      required: true
+  - type: input
+    id: frequency
+    attributes:
+      label: Ne sıklıkta oluyor?
+      placeholder: "günde 5 kez / haftada 1 / beton günlerinde"
+    validations:
+      required: true
+  - type: input
+    id: workaround
+    attributes:
+      label: Şu anki workaround
+      placeholder: "Excel / telefon notu / WhatsApp / kağıt / yok"
+  - type: textarea
+    id: desired
+    attributes:
+      label: CSE'de ideal davranış
+    validations:
+      required: true
+  - type: dropdown
+    id: v2_relation
+    attributes:
+      label: V2 ile ilişkisi
+      options:
+        - V2.1 Proje/Mahal
+        - V2.2 Sicil/Puantaj/Saha Rehberi
+        - V2.3 Attachment/Medya
+        - V2.4 Ajanda/Hatırlatıcı
+        - V2.5 Günlük Log v1
+        - V2.6 İş/Yapılacak/Gün Planı
+        - V2.7 İş Zinciri
+        - V2.8 İstenecek Malzemeler
+        - V2.9 Kişi/Firma önerileri
+        - V2.10 Telefon görüşmesi → Ajanda
+        - V2.11 Proje albümü
+        - V2.12 Günlük Log v2
+        - V2.13 Mini hesap makinesi
+        - Post-V2 / emin değilim
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Ek not / veri-minimal kanıt
