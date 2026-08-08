@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show SemanticsAction;
 
 import 'package:chief_site_engineer/app.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
@@ -11,6 +12,7 @@ import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_destination_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
+import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/capabilities.dart';
@@ -1161,6 +1163,174 @@ void main() {
       expect(_agendaSearchHasFocus(tester), isFalse);
       expect(tester.testTextInput.isVisible, isFalse);
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Ajanda card shows only real linked reminder indicator and opens reminder detail',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final semanticsHandle = tester.ensureSemantics();
+
+      final linkedLog = log();
+      final noLinkLog = _navigationLog(
+        1,
+        description: 'Bağlı Hatırlatıcı bulunmayan Ajanda kaydı',
+      );
+      final unrelatedLog = _navigationLog(
+        2,
+        description: 'Aynı projedeki ilgisiz Hatırlatıcılar',
+      );
+      final linkedReminder = reminder();
+      const unrelatedSourceId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaa999';
+      final fake = FakeAgendaApplication(
+        projects: [project()],
+        logs: [linkedLog, noLinkLog, unrelatedLog],
+        reminders: [
+          linkedReminder,
+          const MobileReminder(
+            id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2',
+            projectId: projectId,
+            projectName: 'Çok Uzun Kuzey Şantiyesi Proje Adı',
+            sourceLogId: unrelatedSourceId,
+            title: 'Aynı projede başka kaynaklı Hatırlatıcı',
+            kind: ReminderKind.recheck,
+            status: ReminderStatus.active,
+            nextAttentionAt: '2026-07-19T11:00:00Z',
+            createdAt: '2026-07-19T08:00:00Z',
+            updatedAt: '2026-07-19T08:00:00Z',
+            revision: 1,
+          ),
+          const MobileReminder(
+            id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3',
+            projectId: projectId,
+            projectName: 'Çok Uzun Kuzey Şantiyesi Proje Adı',
+            sourceLogId: null,
+            title: 'Aynı projede kaynaksız Hatırlatıcı',
+            kind: ReminderKind.action,
+            status: ReminderStatus.inbox,
+            nextAttentionAt: null,
+            createdAt: '2026-07-19T08:00:00Z',
+            updatedAt: '2026-07-19T08:00:00Z',
+            revision: 1,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(),
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+            child: AgendaPage(agenda: fake),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.byKey(const Key('agenda-sort-order')));
+      await tester.tap(find.byKey(const Key('agenda-sort-order')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('En eski üstte').last);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const Key('agenda-project-filter')),
+      );
+      await tester.tap(find.byKey(const Key('agenda-project-filter')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(project().name).last);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const Key('agenda-category-filter')),
+      );
+      await tester.tap(find.byKey(const Key('agenda-category-filter')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AgendaCategory.inspection.label).last);
+      await tester.pumpAndSettle();
+      await _enterAgendaSearch(tester, fake, 'bağlı kaynak');
+
+      final indicator = find.byKey(
+        Key('agenda-log-linked-reminder-${linkedLog.id}'),
+      );
+      await tester.ensureVisible(indicator);
+      await tester.pumpAndSettle();
+
+      expect(indicator, findsOneWidget);
+      expect(find.byIcon(Icons.notifications_active_outlined), findsOneWidget);
+      expect(
+        find.byKey(Key('agenda-log-linked-reminder-${noLinkLog.id}')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(Key('agenda-log-linked-reminder-${unrelatedLog.id}')),
+        findsNothing,
+      );
+      final indicatorWidget = tester.widget<IconButton>(indicator);
+      expect(indicatorWidget.tooltip, 'Bağlı hatırlatıcıyı aç');
+      final linkedReminderSemantics = find.bySemanticsLabel(
+        'Bağlı hatırlatıcıyı aç',
+      );
+      expect(linkedReminderSemantics, findsOneWidget);
+      final indicatorSemantics = tester
+          .getSemantics(linkedReminderSemantics)
+          .getSemanticsData();
+      expect(indicatorSemantics.flagsCollection.isButton, isTrue);
+      expect(indicatorSemantics.hasAction(SemanticsAction.tap), isTrue);
+      final linkedReminderSemanticsNode = find.semantics.byLabel(
+        'Bağlı hatırlatıcıyı aç',
+      );
+      expect(linkedReminderSemanticsNode, findsOneWidget);
+      expect(tester.getSize(indicator).shortestSide, greaterThanOrEqualTo(48));
+      expect(Theme.of(tester.element(indicator)).brightness, Brightness.dark);
+      expect(tester.takeException(), isNull);
+
+      tester.semantics.performAction(
+        linkedReminderSemanticsNode,
+        SemanticsAction.tap,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ReminderDetailPage), findsOneWidget);
+      expect(
+        tester
+            .widget<ReminderDetailPage>(find.byType(ReminderDetailPage))
+            .reminderId,
+        linkedReminder.id,
+      );
+      expect(find.byType(LogDetailPage), findsNothing);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(indicator);
+      await tester.pumpAndSettle();
+      await tester.tap(indicator);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ReminderDetailPage), findsOneWidget);
+      expect(
+        tester
+            .widget<ReminderDetailPage>(find.byType(ReminderDetailPage))
+            .reminderId,
+        linkedReminder.id,
+      );
+      expect(find.byType(LogDetailPage), findsNothing);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('agenda-day-list')), findsOneWidget);
+      expect(indicator, findsOneWidget);
+      expect(fake.lastAgendaQuery?.projectId, projectId);
+      expect(fake.lastAgendaQuery?.category, AgendaCategory.inspection);
+      expect(fake.lastAgendaQuery?.literalSearch, 'bağlı kaynak');
+      expect(fake.lastAgendaQuery?.sortOrder, AgendaSortOrder.oldestFirst);
+      expect(_agendaSearchHasFocus(tester), isFalse);
+      expect(tester.testTextInput.isVisible, isFalse);
+      expect(tester.takeException(), isNull);
+      semanticsHandle.dispose();
     },
   );
 

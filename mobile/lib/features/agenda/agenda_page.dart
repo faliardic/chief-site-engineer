@@ -8,6 +8,7 @@ import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
 import 'package:chief_site_engineer/features/owned_text_input_dialog.dart';
+import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:flutter/material.dart';
 
@@ -36,6 +37,7 @@ class _AgendaPageState extends State<AgendaPage> {
   late String _selectedDay;
   List<MobileProject> _projects = const [];
   List<AgendaLog> _logs = const [];
+  Map<String, MobileReminder> _linkedReminders = const {};
   String? _projectId;
   AgendaCategory? _category;
   String _search = '';
@@ -115,10 +117,27 @@ class _AgendaPageState extends State<AgendaPage> {
           sortOrder: _sortOrder,
         ),
       );
+      final linkedReminders = <String, MobileReminder>{};
+      await Future.wait(
+        logs.map((log) async {
+          try {
+            final detail = await widget.agenda.getAgendaLogDetail(log.id);
+            for (final reminder in detail.reminders) {
+              if (reminder.sourceLogId == log.id) {
+                linkedReminders[log.id] = reminder;
+                break;
+              }
+            }
+          } on Object {
+            // A single detail read must not hide the remaining Agenda cards.
+          }
+        }),
+      );
       if (!mounted) return;
       setState(() {
         _projects = projects;
         _logs = logs;
+        _linkedReminders = linkedReminders;
         _loading = false;
         _preservingDetailReload = false;
       });
@@ -190,6 +209,26 @@ class _AgendaPageState extends State<AgendaPage> {
             concrete: widget.concrete,
             concreteAttachments: widget.concreteAttachments,
             logId: log.id,
+          ),
+        ),
+      );
+      if (mounted) await _reload(restoreOffset: restoreOffset);
+    } finally {
+      _detailNavigationBusy = false;
+    }
+  }
+
+  Future<void> _openLinkedReminder(MobileReminder reminder) async {
+    if (_detailNavigationBusy) return;
+    final restoreOffset = _currentScrollOffset;
+    _searchFocusNode.unfocus();
+    _detailNavigationBusy = true;
+    try {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => ReminderDetailPage(
+            agenda: widget.agenda,
+            reminderId: reminder.id,
           ),
         ),
       );
@@ -419,8 +458,12 @@ class _AgendaPageState extends State<AgendaPage> {
                 message: 'Bu günde Ajanda kaydı yok.',
               )
             else
-              ..._logs.map(
-                (log) => Card(
+              ..._logs.map((log) {
+                final linkedReminder = _linkedReminders[log.id];
+                final VoidCallback? openLinkedReminder = linkedReminder == null
+                    ? null
+                    : () => _openLinkedReminder(linkedReminder);
+                return Card(
                   key: Key('agenda-log-${log.id}'),
                   child: InkWell(
                     onTap: () => _openDetail(log),
@@ -445,6 +488,28 @@ class _AgendaPageState extends State<AgendaPage> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
+                              if (openLinkedReminder != null)
+                                Semantics(
+                                  container: true,
+                                  button: true,
+                                  label: 'Bağlı hatırlatıcıyı aç',
+                                  excludeSemantics: true,
+                                  onTap: openLinkedReminder,
+                                  child: IconButton(
+                                    key: Key(
+                                      'agenda-log-linked-reminder-${log.id}',
+                                    ),
+                                    constraints: const BoxConstraints(
+                                      minWidth: 48,
+                                      minHeight: 48,
+                                    ),
+                                    onPressed: openLinkedReminder,
+                                    icon: const Icon(
+                                      Icons.notifications_active_outlined,
+                                    ),
+                                    tooltip: 'Bağlı hatırlatıcıyı aç',
+                                  ),
+                                ),
                             ],
                           ),
                           const SizedBox(height: 6),
@@ -476,8 +541,8 @@ class _AgendaPageState extends State<AgendaPage> {
                       ),
                     ),
                   ),
-                ),
-              ),
+                );
+              }),
           ],
         ),
       ),
