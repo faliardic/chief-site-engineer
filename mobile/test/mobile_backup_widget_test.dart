@@ -49,8 +49,161 @@ void main() {
     expect(find.text('Parola doğrulaması eşleşmiyor.'), findsOneWidget);
     expect(find.text('guvenli-parola'), findsOneWidget);
     expect(find.text('farkli-parola'), findsOneWidget);
+    expect(find.byKey(const Key('backup-creation-progress')), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'backup creation shows real stages without fake percentage and blocks exit',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final semanticsHandle = tester.ensureSemantics();
+      final backup = _FakeBackupApplication();
+      final gate = Completer<MobileBackupCreationResult>();
+      backup.createGate = gate;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(),
+          initialRoute: '/backup',
+          routes: {
+            '/': (_) => const Scaffold(body: Text('Önceki ekran')),
+            '/backup': (_) => MediaQuery(
+              data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+              child: MemoryBackupPage(backup: backup),
+            ),
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('backup-password')),
+        'guvenli-parola',
+      );
+      await tester.ensureVisible(
+        find.byKey(const Key('backup-password-confirmation')),
+      );
+      await tester.enterText(
+        find.byKey(const Key('backup-password-confirmation')),
+        'guvenli-parola',
+      );
+      final createButton = find.byKey(const Key('create-backup'));
+      await tester.ensureVisible(createButton);
+      await tester.tap(createButton);
+      await tester.pump();
+      expect(backup.createCalls, 1);
+      expect(backup.createProgress, isNotNull);
+
+      backup.emitStage(MobileBackupCreationStage.preparing);
+      await tester.pump();
+      final progressSurface = find.byKey(const Key('backup-creation-progress'));
+      expect(progressSurface, findsOneWidget);
+      expect(find.text('Yedek oluşturuluyor'), findsOneWidget);
+      expect(find.text('Hazırlanıyor'), findsOneWidget);
+      expect(
+        find.text('İşlem tamamlanana kadar bu ekrandan çıkılamaz.'),
+        findsOneWidget,
+      );
+      final progressStack = find
+          .ancestor(of: progressSurface, matching: find.byType(Stack))
+          .first;
+      final progressBarrier = find.descendant(
+        of: progressStack,
+        matching: find.byType(ModalBarrier),
+      );
+      expect(progressBarrier, findsOneWidget);
+      final barrier = tester.widget<ModalBarrier>(progressBarrier);
+      expect(barrier.dismissible, isFalse);
+      final indicator = tester.widget<LinearProgressIndicator>(
+        find.byKey(const Key('backup-creation-indicator')),
+      );
+      expect(indicator.value, isNull);
+      final preparingSemantics = tester
+          .getSemantics(progressSurface)
+          .getSemanticsData();
+      expect(preparingSemantics.flagsCollection.isLiveRegion, isTrue);
+      expect(
+        preparingSemantics.label,
+        'Yedek oluşturuluyor. Hazırlanıyor. '
+        'İşlem tamamlanana kadar bu ekrandan çıkılamaz.',
+      );
+      expect(
+        Theme.of(tester.element(progressSurface)).brightness,
+        Brightness.dark,
+      );
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      expect(find.byType(MemoryBackupPage), findsOneWidget);
+      expect(find.text('Önceki ekran'), findsNothing);
+
+      backup.emitStage(MobileBackupCreationStage.packaging);
+      await tester.pump();
+      expect(find.text('Paketleniyor'), findsOneWidget);
+      expect(find.text('Hazırlanıyor'), findsNothing);
+      backup.emitStage(MobileBackupCreationStage.verifying);
+      await tester.pump();
+      expect(find.text('Bütünlük kontrolü yapılıyor'), findsOneWidget);
+      expect(find.text('Paketleniyor'), findsNothing);
+      backup.emitStage(MobileBackupCreationStage.saving);
+      await tester.pump();
+      expect(find.text('Kaydediliyor'), findsOneWidget);
+      expect(find.text('Bütünlük kontrolü yapılıyor'), findsNothing);
+      final savingSemantics = tester
+          .getSemantics(progressSurface)
+          .getSemanticsData();
+      expect(savingSemantics.flagsCollection.isLiveRegion, isTrue);
+      expect(savingSemantics.label, contains('Kaydediliyor'));
+      Finder progressTextContaining(String text) => find.descendant(
+        of: progressSurface,
+        matching: find.textContaining(text),
+      );
+      expect(progressTextContaining('%'), findsNothing);
+      for (final fakeProgressText in const [
+        '1 / 4',
+        '2 / 4',
+        '3 / 4',
+        '4 / 4',
+        '1/4',
+        '2/4',
+        '3/4',
+        '4/4',
+        '25%',
+        '50%',
+        '75%',
+        '100%',
+        'Tahmini süre',
+      ]) {
+        expect(progressTextContaining(fakeProgressText), findsNothing);
+      }
+      expect(tester.widget<FilledButton>(createButton).onPressed, isNull);
+      await tester.tap(createButton, warnIfMissed: false);
+      await tester.pump();
+      expect(backup.createCalls, 1);
+      expect(tester.takeException(), isNull);
+
+      gate.complete(_creationResult);
+      await tester.pumpAndSettle();
+      expect(progressSurface, findsNothing);
+      expect(find.text('Yedek güvenle oluşturuldu.'), findsOneWidget);
+      final shareButton = find.byKey(const Key('share-backup'));
+      await tester.ensureVisible(shareButton);
+      await tester.tap(shareButton);
+      await tester.pumpAndSettle();
+      expect(backup.sharedPath, '/safe/generated.csebackup');
+      expect(progressSurface, findsNothing);
+      expect(tester.takeException(), isNull);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('Önceki ekran'), findsOneWidget);
+      expect(find.byType(MemoryBackupPage), findsNothing);
+      semanticsHandle.dispose();
+    },
+  );
 
   testWidgets('double tap starts only one backup and enables explicit share', (
     tester,
@@ -191,6 +344,7 @@ const _pickedPackage = PickedBackupPackage(
 class _FakeBackupApplication implements MobileBackupApplication {
   Object? createFailure;
   Completer<MobileBackupCreationResult>? createGate;
+  MobileBackupCreationProgress? createProgress;
   int createCalls = 0;
   int preflightCalls = 0;
   int restoreCalls = 0;
@@ -200,12 +354,17 @@ class _FakeBackupApplication implements MobileBackupApplication {
 
   @override
   Future<MobileBackupCreationResult> createBackup(
-    CreateMobileBackupCommand command,
-  ) async {
+    CreateMobileBackupCommand command, {
+    MobileBackupCreationProgress? onProgress,
+  }) async {
     createCalls += 1;
+    createProgress = onProgress;
     if (createFailure case final failure?) throw failure;
     return createGate?.future ?? Future.value(_creationResult);
   }
+
+  void emitStage(MobileBackupCreationStage stage) =>
+      createProgress?.call(stage);
 
   @override
   Future<MobileBackupSummary?> lastSuccessfulBackup() async => null;

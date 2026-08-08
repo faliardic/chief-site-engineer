@@ -51,6 +51,50 @@ void main() {
     }
   });
 
+  test('backup creation reports real stages in pipeline order', () async {
+    final application = _application(directories, gateway: gateway);
+    final stages = <MobileBackupCreationStage>[];
+
+    final created = await application.createBackup(
+      const CreateMobileBackupCommand(
+        password: _password,
+        passwordConfirmation: _password,
+      ),
+      onProgress: stages.add,
+    );
+
+    const expectedStages = [
+      MobileBackupCreationStage.preparing,
+      MobileBackupCreationStage.packaging,
+      MobileBackupCreationStage.verifying,
+      MobileBackupCreationStage.saving,
+    ];
+    expect(stages, expectedStages);
+    expect(stages.toSet(), hasLength(expectedStages.length));
+    final package = File(created.absolutePath);
+    expect(await package.exists(), isTrue);
+    final packageBytes = await package.readAsBytes();
+    expect(packageBytes, hasLength(created.summary.packageByteSize));
+    expect(sha256.convert(packageBytes).toString(), created.packageSha256);
+    expect(
+      (await application.lastSuccessfulBackup())?.toJson(),
+      created.summary.toJson(),
+    );
+
+    final invalidStages = <MobileBackupCreationStage>[];
+    await expectLater(
+      application.createBackup(
+        const CreateMobileBackupCommand(
+          password: _password,
+          passwordConfirmation: 'baska-parola',
+        ),
+        onProgress: invalidStages.add,
+      ),
+      _failureCode('password_confirmation_mismatch'),
+    );
+    expect(invalidStages, isEmpty);
+  });
+
   test('empty fixture round-trips and remains valid after restart', () async {
     final application = _application(
       directories,
