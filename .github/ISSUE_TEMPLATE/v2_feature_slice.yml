@@ -1,0 +1,108 @@
+name: CSE V2 feature slice
+description: V2 kanonik paketindeki dar ve test edilebilir bir geliştirme dilimi aç.
+title: "[V2] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Parent ürün Epic'i #385'tir. Bir Issue tek dar production sonucuna odaklanmalıdır.
+  - type: dropdown
+    id: v2_item
+    attributes:
+      label: V2 maddesi
+      options:
+        - "V2.1 — Proje ve Mahal omurgası"
+        - "V2.2 — Sicil / Puantaj V2 / Saha Rehberi"
+        - "V2.3 — Attachment / Fotoğraf / Medya V2"
+        - "V2.4 — Ajanda V2 + Ajanda–Hatırlatıcı senkronu"
+        - "V2.5 — Günlük Log Çıktısı v1"
+        - "V2.6 — İş / Yapılacaklar / Gün Planı"
+        - "V2.7 — İş Zinciri / Bağlı Log v1"
+        - "V2.8 — İstenecek Malzemeler"
+        - "V2.9 — Deterministik kişi/firma/etiket önerileri"
+        - "V2.10 — Telefon görüşmesi sonucu → Ajanda"
+        - "V2.11 — Proje fotoğraf/video albümü"
+        - "V2.12 — Günlük Log Çıktısı v2"
+        - "V2.13 — Mini hesap makinesi"
+    validations:
+      required: true
+  - type: input
+    id: depends_on
+    attributes:
+      label: Depends on
+      placeholder: "#NNN veya none"
+    validations:
+      required: true
+  - type: textarea
+    id: user_problem
+    attributes:
+      label: Kullanıcı problemi
+      description: Sahadaki gerçek ihtiyacı kısa ve somut yaz.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Kabul ölçütleri
+      description: Kullanıcı tarafından gözlenebilir PASS koşulları.
+    validations:
+      required: true
+  - type: dropdown
+    id: validation_class
+    attributes:
+      label: Validation class
+      options:
+        - narrow-ui
+        - domain
+        - persistence
+        - release-critical
+        - docs
+    validations:
+      required: true
+  - type: textarea
+    id: contracts
+    attributes:
+      label: Değişen sözleşmeler ve veri etkisi
+      placeholder: |
+        Changed contracts:
+        Schema impact:
+        Migration impact:
+        Backup impact:
+        Attachment impact:
+        Notification impact:
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: Focused test ve saha kabul planı
+      placeholder: |
+        Focused tests:
+        Allowed broad gates:
+        Field/device acceptance:
+        Reused evidence:
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Exact scope / out of scope / stop conditions
+      placeholder: |
+        Allowed paths:
+        Out of scope:
+        Retry budget:
+        Time budget:
+        Stop conditions:
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Güvenlik onayı
+      options:
+        - label: Gerçek kullanıcı data root'u açık yetki olmadan okunmayacak/değiştirilmeyecek.
+          required: true
+        - label: Scope dışı schema, backup, release, device veya tooling işi sessizce eklenmeyecek.
+          required: true

@@ -1,147 +1,108 @@
-# Step NNN Task
+# Issue NNN Task
 
 ## Objective
 
 Describe one small, testable, reversible outcome.
+
+## V2 Context
+
+- Parent Epic: `#385`
+- V2 item: `<V2.x — name>`
+- Wave: `<1-6>`
+- Depends on: `<issues/merged contracts or none>`
+- Canonical scope: `docs/v2/CSE_V2_SCOPE.md`
+- Roadmap: `ROADMAP.md`
 
 ## Repository Context
 
 - Repository: `faliardic/chief-site-engineer`
 - Base branch: `master`
 - Expected base commit: `<sha>`
-- Working branch: `step-NNN-<purpose>`
+- Working branch: `codex/issue-NNN-<slug>`
 - Official local working directory: `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer`
 
 ## Required Sources Read
 
-Codex must read these sources in order before editing:
+1. `AGENTS.md`
+2. `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
+3. `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
+4. `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`
+5. `docs/v2/CSE_V2_SCOPE.md`
+6. `ROADMAP.md`
+7. current GitHub Issue and scope comments
+8. `.cse/tasks/NNN_task.md`
 
-1. `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
-2. `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
-3. current GitHub Issue
-4. `.cse/tasks/NNN_task.md`
+For workflow/bootstrap/source-authority tasks also read the new-chat bootstrap and source register.
 
-If this task concerns workflow, handoff, bootstrap, source authority, or new-chat recovery, also read:
+## Local Preconditions
 
-- `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md`
+- Inspect tracked, staged, untracked and ignored status before any write.
+- Do not reset, clean, stash, delete or overwrite unexpected user work.
+- Fast-forward local `master` from `origin/master`; required divergence: `0 0`.
+- Keep ignored ZIP, device backups, reports and user artifacts untouched.
 
-If a required tracked source is missing or the task contradicts an unresolved permanent product/data/safety rule, stop before edits and report.
+## Validation Contract
 
-## Local-First Preconditions
+- Validation class: `<docs|narrow-ui|domain|persistence|release-critical>`
+- Changed contracts: `<list>`
+- Focused tests: `<list>`
+- Allowed broad gates: `<none|full Flutter|analyze|build|release gate|device etc.>`
+- Reused merged evidence: `<list or none>`
+- Minimum physical-device/field acceptance: `<scenario or none>`
+- Retry budget: `<value>`
+- Time budget: `<value>`
+- Stop conditions: `<list>`
 
-- Work must start from the official local repository.
-- GitHub-only project file creation or editing is incomplete.
-- Before branch changes, pulls, edits, commits, or pushes, inspect:
+## Data / Compatibility Impact
 
-```powershell
-git status --short --branch
-git status --ignored --short --untracked-files=all
-```
+- Schema impact: `<none|details>`
+- Migration impact: `<none|details>`
+- Backup compatibility impact: `<none|details>`
+- Attachment impact: `<none|details>`
+- Notification impact: `<none|details>`
+- User-data access: `<forbidden by default|explicit allowed boundary>`
 
-- If unexpected tracked, staged, or untracked project changes exist, stop and report them. Do not reset, clean, stash, delete, or overwrite.
-- Existing ignored ZIP files must remain untouched.
-
-## Required Master Synchronization
-
-Run from the official local repository before branch work:
-
-```powershell
-git fetch origin --prune
-git checkout master
-git pull --ff-only origin master
-git rev-parse master
-git rev-parse origin/master
-git rev-list --left-right --count origin/master...master
-```
-
-Required evidence:
-
-- Local `master` SHA: `<sha>`
-- `origin/master` SHA: `<sha>`
-- Master divergence: `0 0`
-
-## Local Branch Requirement
-
-- Create or check out the step branch locally after synchronized `master`.
-- Record branch creation source and branch SHA.
-- Verify local/remote divergence after push:
-
-```powershell
-git rev-parse HEAD
-git rev-parse origin/step-NNN-<purpose>
-git rev-list --left-right --count origin/step-NNN-<purpose>...HEAD
-```
-
-## Physical Local File Requirement
-
-All task, result, state, documentation, and project files for this step must physically exist in the official local working tree before completion.
-
-## Reasoning Level
-
-- Codex: `<high|extra high>`
-- ChatGPT review: `<High|Extra High>`
-
-## Authorized Changes
+## Authorized Paths
 
 - `.cse/tasks/NNN_task.md`
 - `.cse/results/NNN_result.md`
-- `.cse/state/project_state.json`
-- `<path or file group>`
+- `<exact path or bounded file group>`
+
+`.cse/state/project_state.json` is changed only when the Issue explicitly requires a canonical merged/finalized state update.
 
 ## Required Work
 
 1. `<action>`
 2. `<action>`
 
+## Out of Scope
+
+- `<explicit non-goals>`
+- no unrelated schema/migration/backup/audit/API/GUI/CLI/release/device expansion
+- no hidden hard-delete or automatic formal decision
+
 ## Required Verification
 
-- `python -m pytest`
+- Run only the focused and broad gates authorized above.
 - `git diff --check`
-- `git diff -- app/models.py tests/test_models.py .github/workflows/pytest.yml` must be empty unless explicitly authorized.
-- Confirm required sources were read and no unresolved conflict was found.
-- Confirm changed/staged files match scope.
-- Confirm `exports/` is clean unless explicitly authorized.
-- Confirm ignored ZIP files remain untouched.
-- Confirm required files physically exist in the official local working tree.
-- Confirm local/remote branch divergence is reported.
-- Confirm final working tree status is reported.
+- changed/staged files equal the Issue allowlist
+- no unintended export/artifact output
+- ignored/user areas untouched
+- final branch/local-remote divergence reported
 
-## Forbidden Scope
-
-Unless explicitly authorized, do not add or modify:
-
-- hard validation or automatic blocking
-- generated `blocked` status
-- API, GUI, or CLI behavior
-- database or repository access
-- audit event behavior
-- backup/restore or migration behavior
-- export output files
-- ignored ZIP files
-
-## Commit and Push Permission
+## Publication Permission
 
 - Commit: `<allowed|not allowed>`
 - Push: `<allowed|not allowed>`
 - Pull request: `<draft|required|not allowed>`
+- Ready: `<allowed|not allowed>`
 - Merge: `<allowed|not allowed>`
-
-## Post-Merge Sync Boundary
-
-After merge, local `master` must be fast-forwarded from `origin/master` before any next step begins. Do not start future work from stale local `master`.
-
-## Required Result Files
-
-- `.cse/results/NNN_result.md`
-- `.cse/state/project_state.json`
 
 ## Completion Criteria
 
-- Work stays inside scope.
+- User-visible acceptance is satisfied.
+- Data/compatibility invariants are preserved.
 - Required checks pass.
-- Local `master` sync evidence is recorded.
-- Branch divergence evidence is recorded.
-- Required files exist physically in the official local working tree.
-- Result report is complete and factual.
-- No unrelated files change.
-- The branch is ready for ChatGPT review.
+- Result report is factual and distinguishes executed, reused and skipped gates.
+- No unrelated file changes.
+- Next V2 dependency is not started automatically unless explicitly authorized.

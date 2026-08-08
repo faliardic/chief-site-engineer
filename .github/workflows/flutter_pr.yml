@@ -1,0 +1,50 @@
+name: Flutter PR
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - "mobile/**"
+
+permissions:
+  contents: read
+
+jobs:
+  flutter-pr:
+    name: Flutter format, analyze and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.6"
+          channel: stable
+          cache: true
+
+      - name: Install Flutter dependencies
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Check Dart formatting
+        working-directory: mobile
+        run: dart format --output=none --set-exit-if-changed lib test integration_test
+
+      - name: Analyze
+        working-directory: mobile
+        run: flutter analyze --no-pub
+
+      - name: Test
+        working-directory: mobile
+        run: flutter test --no-pub

@@ -1,0 +1,82 @@
+name: CSE saha bug
+description: Gerçek kullanımda görülen tekrarlanabilir hata veya veri güvenliği problemini kaydet.
+title: "[BUG] "
+labels:
+  - bug
+body:
+  - type: input
+    id: device
+    attributes:
+      label: Cihaz / Android sürümü
+      placeholder: "Örn. SM-X610 / Android 16"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Uygulama sürümü / source SHA
+      placeholder: "0.1.0+1 / <sha>"
+  - type: textarea
+    id: steps
+    attributes:
+      label: Tekrarlama adımları
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Beklenen davranış
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Gerçekleşen davranış
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Saha etkisi
+      options:
+        - P0 — veri kaybı / yanlış bağlama / backup bozulması
+        - P1 — ana saha akışı çalışmıyor
+        - P2 — belirgin fakat workaround var
+        - P3 — küçük sürtünme / görsel
+    validations:
+      required: true
+  - type: dropdown
+    id: reproducible
+    attributes:
+      label: Tekrarlanabilirlik
+      options:
+        - Her seferinde
+        - Sık
+        - Ara sıra
+        - Bir kez görüldü
+    validations:
+      required: true
+  - type: textarea
+    id: data_impact
+    attributes:
+      label: Veri / attachment / notification etkisi
+      placeholder: |
+        Veri kaybı:
+        Yanlış kayıt/proje bağı:
+        Attachment etkisi:
+        Notification etkisi:
+        Restart sonrası durum:
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Veri-minimal kanıt
+      description: Gerçek proje/kişi/telefon/belge içeriğini GitHub'a yazma.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Gizlilik
+      options:
+        - label: Bu kayıtta hassas gerçek saha verisi paylaşmadım.
+          required: true
