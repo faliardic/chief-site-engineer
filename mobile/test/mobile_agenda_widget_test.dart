@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui' show SemanticsAction;
 
 import 'package:chief_site_engineer/app.dart';
@@ -742,6 +743,366 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('detail-reminder-action')), findsOneWidget);
   });
+
+  testWidgets(
+    'Ajanda detail renders immutable field change history from update events',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      const oldestUpdateId = '10000000-0000-4000-8000-000000000002';
+      const malformedUpdateId = '10000000-0000-4000-8000-000000000004';
+      const newestUpdateId = '10000000-0000-4000-8000-000000000006';
+      const replacementProjectId = '22222222-2222-4222-8222-222222222222';
+      const longBeforeNotes =
+          'Uzun saha notu; kuzey cephedeki donatı bindirmeleri, pas payları ve '
+          'kalıp aksları birlikte kontrol edildi.';
+      const longAfterDescription =
+          'Kalıp ve donatı kontrolü tamamlandı; kuzey cephedeki bütün bindirme '
+          'boyları, pas payları ve aks ölçüleri saha ekibiyle yeniden doğrulandı.';
+      final events = [
+        const AppendOnlyEvent(
+          id: '10000000-0000-4000-8000-000000000001',
+          recordId: logId,
+          projectId: projectId,
+          eventType: 'agenda_log.created',
+          occurredAt: '2026-07-15T07:00:00Z',
+          payloadJson: '{}',
+        ),
+        AppendOnlyEvent(
+          id: oldestUpdateId,
+          recordId: logId,
+          projectId: projectId,
+          eventType: 'agenda_log.updated',
+          occurredAt: '2026-07-15T10:00:00Z',
+          payloadJson: jsonEncode({
+            'before': {
+              'project_id': projectId,
+              'observed_at': '2026-07-15T08:00:00Z',
+              'category': 'inspection',
+              'description': 'Aynı kalan açıklama',
+              'location': null,
+              'notes': longBeforeNotes,
+            },
+            'after': {
+              'project_id': projectId,
+              'observed_at': '2026-07-15T09:00:00Z',
+              'category': 'safety',
+              'description': 'Aynı kalan açıklama',
+              'location': 'A Blok 2. Kat',
+              'notes': null,
+            },
+          }),
+        ),
+        const AppendOnlyEvent(
+          id: '10000000-0000-4000-8000-000000000003',
+          recordId: logId,
+          projectId: projectId,
+          eventType: 'agenda_log.photo_attached',
+          occurredAt: '2026-07-15T11:00:00Z',
+          payloadJson: '{}',
+        ),
+        const AppendOnlyEvent(
+          id: malformedUpdateId,
+          recordId: logId,
+          projectId: projectId,
+          eventType: 'agenda_log.updated',
+          occurredAt: 'invalid-event-time',
+          payloadJson: '{"before": [], "after": {}}',
+        ),
+        const AppendOnlyEvent(
+          id: '10000000-0000-4000-8000-000000000005',
+          recordId: logId,
+          projectId: projectId,
+          eventType: 'agenda_log.archived',
+          occurredAt: '2026-07-15T13:00:00Z',
+          payloadJson: '{}',
+        ),
+        AppendOnlyEvent(
+          id: newestUpdateId,
+          recordId: logId,
+          projectId: projectId,
+          eventType: 'agenda_log.updated',
+          occurredAt: '2026-07-15T14:30:00Z',
+          payloadJson: jsonEncode({
+            'before': {
+              'project_id': projectId,
+              'observed_at': '2026-07-15T09:00:00Z',
+              'category': 'safety',
+              'description': 'Kalıp kontrolü tamamlandı.',
+              'location': 'A Blok 2. Kat',
+              'notes': null,
+            },
+            'after': {
+              'project_id': replacementProjectId,
+              'observed_at': '2026-07-15T09:00:00Z',
+              'category': 'safety',
+              'description': longAfterDescription,
+              'location': 'A Blok 2. Kat',
+              'notes': null,
+            },
+          }),
+        ),
+      ];
+      final fake = FakeAgendaApplication(
+        projects: [project()],
+        logs: [log()],
+        reminders: [reminder()],
+        logDetail: AgendaLogDetail(
+          log: log(),
+          reminders: [reminder()],
+          events: events,
+        ),
+        reminderDetail: reminder(),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(),
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+            child: LogDetailPage(agenda: fake, logId: logId),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('edit-agenda-log')),
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(find.byKey(const Key('edit-agenda-log')), findsOneWidget);
+      expect(find.byKey(const Key('archive-agenda-log')), findsOneWidget);
+      expect(find.byKey(const Key('detail-reminder-action')), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Fotoğraflar'),
+        250,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(find.text('Bu kayda bağlı fotoğraf yok.'), findsOneWidget);
+
+      const sectionKey = Key('agenda-change-history-section');
+      await tester.scrollUntilVisible(
+        find.byKey(sectionKey),
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+
+      final section = find.byKey(sectionKey);
+      final newestCard = find.byKey(
+        const Key('agenda-change-history-$newestUpdateId'),
+      );
+      final malformedCard = find.byKey(
+        const Key('agenda-change-history-$malformedUpdateId'),
+      );
+      final oldestCard = find.byKey(
+        const Key('agenda-change-history-$oldestUpdateId'),
+      );
+      expect(find.text('Değişiklik geçmişi'), findsOneWidget);
+      expect(
+        find.descendant(of: section, matching: find.byType(Card)),
+        findsNWidgets(3),
+      );
+      expect(newestCard, findsOneWidget);
+      expect(malformedCard, findsOneWidget);
+      expect(oldestCard, findsOneWidget);
+      expect(
+        tester.getTopLeft(newestCard).dy,
+        lessThan(tester.getTopLeft(malformedCard).dy),
+      );
+      expect(
+        tester.getTopLeft(malformedCard).dy,
+        lessThan(tester.getTopLeft(oldestCard).dy),
+      );
+      expect(
+        find.descendant(
+          of: newestCard,
+          matching: find.text('15.07.2026 17:30:00'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: oldestCard,
+          matching: find.text('15.07.2026 13:00:00'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: oldestCard, matching: find.text('Olay zamanı')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: oldestCard,
+          matching: find.text('Önce: 15.07.2026 11:00:00'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: oldestCard,
+          matching: find.text('Sonra: 15.07.2026 12:00:00'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: oldestCard, matching: find.text('Tür')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: oldestCard, matching: find.text('Önce: Kontrol')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: oldestCard,
+          matching: find.text('Sonra: İş güvenliği'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: oldestCard, matching: find.text('Mahal')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: oldestCard, matching: find.text('Önce: —')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: oldestCard,
+          matching: find.text('Sonra: A Blok 2. Kat'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: oldestCard, matching: find.text('Ayrıntılı not')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: oldestCard,
+          matching: find.text('Önce: $longBeforeNotes'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: oldestCard, matching: find.text('Sonra: —')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: oldestCard, matching: find.text('Açıklama')),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: oldestCard, matching: find.text('Proje kimliği')),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: newestCard, matching: find.text('Açıklama')),
+        findsOneWidget,
+      );
+      final longAfter = find.descendant(
+        of: newestCard,
+        matching: find.text('Sonra: $longAfterDescription'),
+      );
+      expect(longAfter, findsOneWidget);
+      expect(tester.getSize(longAfter).height, greaterThan(40));
+      expect(
+        find.descendant(of: newestCard, matching: find.text('Proje kimliği')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: newestCard,
+          matching: find.text('Önce: $projectId'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: newestCard,
+          matching: find.text('Sonra: $replacementProjectId'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: malformedCard,
+          matching: find.text('Zaman okunamadı'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: malformedCard,
+          matching: find.text('Değişiklik ayrıntısı okunamadı.'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const Key(
+            'agenda-change-history-10000000-0000-4000-8000-000000000001',
+          ),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.byKey(
+          const Key(
+            'agenda-change-history-10000000-0000-4000-8000-000000000003',
+          ),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.byKey(
+          const Key(
+            'agenda-change-history-10000000-0000-4000-8000-000000000005',
+          ),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: section, matching: find.byType(TextButton)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: section, matching: find.byType(FilledButton)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: section, matching: find.byType(OutlinedButton)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: section, matching: find.byType(IconButton)),
+        findsNothing,
+      );
+      expect(Theme.of(tester.element(section)).brightness, Brightness.dark);
+      expect(tester.takeException(), isNull);
+
+      final linkedReminder = find.byKey(
+        const Key('linked-reminder-$reminderId'),
+      );
+      await tester.scrollUntilVisible(
+        linkedReminder,
+        -300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(linkedReminder);
+      await tester.pumpAndSettle();
+      expect(find.byType(ReminderDetailPage), findsOneWidget);
+      expect(find.byKey(const Key('open-source-agenda-log')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('reminder text is suggested from log and remains editable', (
     tester,
