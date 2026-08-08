@@ -136,7 +136,7 @@ void main() {
   });
 
   test(
-    'format 1 backup round-trips schema 10 trashed all-day reminder and audit',
+    'format 1 backup round-trips schema 11 trashed all-day reminder and audit',
     () async {
       final agenda = SqliteAgendaApplication(
         databasePath: directories.databaseFile,
@@ -191,7 +191,7 @@ void main() {
         whereArgs: [reminder.id],
       )).single;
       expect(preflight.manifest.formatVersion, 1);
-      expect(preflight.migratedSchemaVersion, 10);
+      expect(preflight.migratedSchemaVersion, AppDatabase.schemaVersion);
       expect(row['status'], 'active');
       expect(row['next_attention_at'], isNull);
       expect(row['all_day_local_date'], '2026-07-20');
@@ -615,9 +615,9 @@ void main() {
     },
   );
 
-  for (final schemaVersion in [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+  for (final schemaVersion in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
     test(
-      'schema v$schemaVersion package migrates to v10 without count loss',
+      'schema v$schemaVersion package migrates to v11 without count loss',
       () async {
         final oldRoot = await Directory.systemTemp.createTemp(
           'cse_schema${schemaVersion}_',
@@ -642,10 +642,31 @@ void main() {
         await _seedLegacySchema(oldDatabase.database, schemaVersion);
         await oldDatabase.close();
         final databaseBytes = await File(oldFile).readAsBytes();
+        const legacyAgendaBytes = <int>[0xff, 0xd8, 0xff, 0xd9];
+        const legacyConcreteBytes = <int>[7, 8, 9];
+        final attachmentBytes = schemaVersion == 10
+            ? <String, List<int>>{
+                'agenda/legacy.jpg': legacyAgendaBytes,
+                'concrete/legacy.bin': legacyConcreteBytes,
+              }
+            : const <String, List<int>>{};
+        final attachmentManifest = attachmentBytes.entries
+            .map(
+              (entry) => BackupManifestFile(
+                logicalPath: entry.key,
+                byteSize: entry.value.length,
+                sha256: sha256.convert(entry.value).toString(),
+              ),
+            )
+            .toList();
         final archive = const CseBackupArchiveCodec().encode(
-          manifest: _manifest(databaseBytes, schemaVersion: schemaVersion),
+          manifest: _manifest(
+            databaseBytes,
+            schemaVersion: schemaVersion,
+            attachments: attachmentManifest,
+          ),
           databaseBytes: databaseBytes,
-          attachments: const {},
+          attachments: attachmentBytes,
         );
         final package = File(path.join(oldRoot.path, 'old.csebackup'));
         await package.writeAsBytes(
@@ -668,7 +689,7 @@ void main() {
         );
 
         expect(preflight.manifest.mobileSchemaVersion, schemaVersion);
-        expect(preflight.migratedSchemaVersion, 10);
+        expect(preflight.migratedSchemaVersion, AppDatabase.schemaVersion);
         final counts = await _tableCounts(directories);
         final hasAgenda = schemaVersion >= 2 ? 1 : 0;
         final hasAttendance = schemaVersion >= 4 ? 1 : 0;
@@ -689,12 +710,17 @@ void main() {
         expect(counts['attendance_days'], hasAttendance);
         expect(counts['attendance_entries'], hasAttendance);
         expect(counts['attendance_events'], hasAttendance);
-        expect(counts['concrete_pours'], 0);
-        expect(counts['project_concrete_classes'], 0);
-        expect(counts['project_concrete_class_events'], 0);
-        expect(counts['concrete_pour_context_links'], 0);
-        expect(counts['concrete_pour_events'], 0);
-        expect(counts['concrete_attachments'], 0);
+        final hasConcrete = schemaVersion == 10 ? 1 : 0;
+        expect(counts['concrete_pours'], hasConcrete);
+        expect(counts['project_concrete_classes'], hasConcrete);
+        expect(counts['project_concrete_class_events'], hasConcrete);
+        expect(counts['concrete_pour_context_links'], hasConcrete);
+        expect(counts['concrete_pour_events'], hasConcrete);
+        expect(counts['concrete_attachments'], hasConcrete);
+        expect(counts['agenda_log_attachments'], schemaVersion == 10 ? 1 : 0);
+        expect(counts['project_locations'], 0);
+        expect(counts['project_events'], 0);
+        expect(counts['project_location_events'], 0);
         if (schemaVersion == 7) {
           final restored = await _openRaw(directories);
           final legacyReminder = (await restored.query(
@@ -735,6 +761,47 @@ void main() {
           );
           await restored.close();
         }
+        if (schemaVersion == 10) {
+          final restored = await _openRaw(directories);
+          final observation = (await restored.query(
+            'field_observations',
+            where: 'id = ?',
+            whereArgs: ['legacy-observation'],
+          )).single;
+          final reminder = (await restored.query(
+            'follow_up_items',
+            where: 'id = ?',
+            whereArgs: ['legacy-reminder'],
+          )).single;
+          final pour = (await restored.query(
+            'concrete_pours',
+            where: 'id = ?',
+            whereArgs: ['legacy-pour'],
+          )).single;
+          expect(observation['location'], ' Eski Mahal / 3. Kat ');
+          expect(reminder['location'], 'Hatırlatıcı Mahal');
+          expect(pour['element_location'], 'Eski temel elemanı');
+          expect(pour['block_name'], 'Eski Blok');
+          expect(pour['floor_name'], 'Eski Kat');
+          expect(pour['axis_name'], 'A/1');
+          expect(observation['location_id'], isNull);
+          expect(reminder['location_id'], isNull);
+          expect(pour['location_id'], isNull);
+          expect(
+            await File(
+              path.join(directories.attachments.path, 'agenda/legacy.jpg'),
+            ).readAsBytes(),
+            legacyAgendaBytes,
+          );
+          expect(
+            await File(
+              path.join(directories.attachments.path, 'concrete/legacy.bin'),
+            ).readAsBytes(),
+            legacyConcreteBytes,
+          );
+          expect(await restored.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+          await restored.close();
+        }
         expect(await directories.staging.list().toList(), isEmpty);
       },
     );
@@ -752,7 +819,7 @@ void main() {
     });
     final databaseBytes = await File(directories.databaseFile).readAsBytes();
     final archive = const CseBackupArchiveCodec().encode(
-      manifest: _manifest(databaseBytes, schemaVersion: 11),
+      manifest: _manifest(databaseBytes, schemaVersion: 12),
       databaseBytes: databaseBytes,
       attachments: const {},
     );
@@ -1171,6 +1238,31 @@ Future<void> _seedFullFixture(
       'updated_at': _now,
       'revision': 1,
     });
+    await tx.insert('project_locations', {
+      'id': 'location-1',
+      'project_id': 'project-1',
+      'display_name': 'A Blok / 1. Kat',
+      'normalized_name': 'a blok / 1. kat',
+      'revision': 1,
+      'created_at': _now,
+      'updated_at': _now,
+    });
+    await tx.insert('project_events', {
+      'id': 'project-event-1',
+      'project_id': 'project-1',
+      'sequence': 1,
+      'event_type': 'project.renamed',
+      'occurred_at': _now,
+      'payload_json': '{}',
+    });
+    await tx.insert('project_location_events', {
+      'id': 'location-event-1',
+      'location_id': 'location-1',
+      'sequence': 1,
+      'event_type': 'location.created',
+      'occurred_at': _now,
+      'payload_json': '{}',
+    });
     await tx.insert('field_observations', {
       'id': 'observation-1',
       'project_id': 'project-1',
@@ -1179,6 +1271,8 @@ Future<void> _seedFullFixture(
       'updated_at': _now,
       'category': 'inspection',
       'description': 'Donatı kontrolü tamamlandı.',
+      'location': 'A Blok / 1. Kat',
+      'location_id': 'location-1',
       'revision': 3,
       'archived_at': _now,
     });
@@ -1232,6 +1326,8 @@ Future<void> _seedFullFixture(
       'status': 'active',
       'project_id': 'project-1',
       'observation_id': 'observation-1',
+      'location': 'A Blok / 1. Kat',
+      'location_id': 'location-1',
       'is_important': 1,
       'next_attention_at': '2026-07-20T06:00:00Z',
       'revision': 1,
@@ -1373,6 +1469,7 @@ Future<void> _seedFullFixture(
       'project_id': 'project-1',
       'pour_code': 'BT-189',
       'element_location': 'A Blok temel',
+      'location_id': 'location-1',
       'planned_at': '2026-07-20T05:00:00Z',
       'concrete_class': 'C30/37',
       'planned_volume_m3': 25.0,
@@ -1443,6 +1540,7 @@ Future<void> _seedLegacySchema(Database database, int schemaVersion) async {
     'updated_at': _now,
     'category': 'inspection',
     'description': 'Legacy gözlem',
+    'location': ' Eski Mahal / 3. Kat ',
     'revision': 1,
   });
   await database.insert('observation_events', {
@@ -1485,6 +1583,7 @@ Future<void> _seedLegacySchema(Database database, int schemaVersion) async {
     'status': schemaVersion == 7 ? 'waiting' : 'active',
     'project_id': 'legacy-project',
     'observation_id': 'legacy-observation',
+    'location': 'Hatırlatıcı Mahal',
     'is_important': 1,
     'next_attention_at': '2026-07-20T06:00:00Z',
     'revision': 1,
@@ -1573,6 +1672,84 @@ Future<void> _seedLegacySchema(Database database, int schemaVersion) async {
     'occurred_at': _now,
     'payload_json': '{}',
   });
+  if (schemaVersion < 10) return;
+
+  const legacyAgendaBytes = <int>[0xff, 0xd8, 0xff, 0xd9];
+  const legacyConcreteBytes = <int>[7, 8, 9];
+  await database.insert('project_concrete_classes', {
+    'id': 'legacy-concrete-class',
+    'project_id': 'legacy-project',
+    'display_name': 'C30/37',
+    'normalized_name': 'c30/37',
+    'revision': 1,
+    'created_at': _now,
+    'updated_at': _now,
+  });
+  await database.insert('project_concrete_class_events', {
+    'id': 'legacy-concrete-class-event',
+    'concrete_class_id': 'legacy-concrete-class',
+    'sequence': 1,
+    'event_type': 'class.created',
+    'occurred_at': _now,
+    'payload_json': '{}',
+  });
+  await database.insert('concrete_pours', {
+    'id': 'legacy-pour',
+    'project_id': 'legacy-project',
+    'pour_code': 'BT-LEGACY',
+    'element_location': 'Eski temel elemanı',
+    'block_name': 'Eski Blok',
+    'floor_name': 'Eski Kat',
+    'axis_name': 'A/1',
+    'planned_at': '2026-07-20T05:00:00Z',
+    'concrete_class': 'C30/37',
+    'planned_volume_m3': 12.0,
+    'status': 'draft',
+    'revision': 3,
+    'created_at': _now,
+    'updated_at': _now,
+  });
+  await database.insert('concrete_pour_context_links', {
+    'concrete_pour_id': 'legacy-pour',
+    'project_id': 'legacy-project',
+    'concrete_class_id': 'legacy-concrete-class',
+    'created_at': _now,
+    'updated_at': _now,
+  });
+  await database.insert('concrete_pour_events', {
+    'id': 'legacy-pour-event',
+    'concrete_pour_id': 'legacy-pour',
+    'sequence': 1,
+    'event_type': 'pour.created',
+    'occurred_at': _now,
+    'payload_json': '{}',
+  });
+  await database.insert('agenda_log_attachments', {
+    'id': 'legacy-agenda-attachment',
+    'observation_id': 'legacy-observation',
+    'project_id': 'legacy-project',
+    'attachment_type': 'site_photo',
+    'original_file_name': 'legacy.jpg',
+    'mime_type': 'image/jpeg',
+    'byte_size': legacyAgendaBytes.length,
+    'sha256': sha256.convert(legacyAgendaBytes).toString(),
+    'relative_path': 'agenda/legacy.jpg',
+    'revision': 1,
+    'created_at': _now,
+    'updated_at': _now,
+  });
+  await database.insert('concrete_attachments', {
+    'id': 'legacy-concrete-attachment',
+    'concrete_pour_id': 'legacy-pour',
+    'evidence_type': 'site_photo',
+    'original_file_name': 'legacy.bin',
+    'mime_type': 'application/octet-stream',
+    'byte_size': legacyConcreteBytes.length,
+    'sha256': sha256.convert(legacyConcreteBytes).toString(),
+    'relative_path': 'concrete/legacy.bin',
+    'captured_at': _now,
+    'created_at': _now,
+  });
 }
 
 Future<Map<String, int>> _tableCounts(AppDirectories directories) async {
@@ -1580,6 +1757,9 @@ Future<Map<String, int>> _tableCounts(AppDirectories directories) async {
   final counts = <String, int>{};
   for (final table in const [
     'projects',
+    'project_locations',
+    'project_events',
+    'project_location_events',
     'field_observations',
     'observation_events',
     'follow_up_items',
@@ -1617,6 +1797,9 @@ Future<Map<String, Object?>> _fixtureSnapshot(
   final result = <String, Object?>{};
   for (final table in const [
     'projects',
+    'project_locations',
+    'project_events',
+    'project_location_events',
     'field_observations',
     'observation_events',
     'follow_up_items',
@@ -1666,6 +1849,7 @@ Future<int> _projectCount(AppDirectories directories) async {
 MobileBackupManifest _manifest(
   List<int> databaseBytes, {
   required int schemaVersion,
+  List<BackupManifestFile> attachments = const [],
 }) => MobileBackupManifest(
   formatVersion: 1,
   appVersion: '0.1.0',
@@ -1677,7 +1861,7 @@ MobileBackupManifest _manifest(
     byteSize: databaseBytes.length,
     sha256: sha256.convert(databaseBytes).toString(),
   ),
-  attachments: const [],
+  attachments: attachments,
 );
 
 Matcher _failureCode(String code) => throwsA(
