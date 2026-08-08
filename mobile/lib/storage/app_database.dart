@@ -27,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 10;
+  static const schemaVersion = 11;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2575,14 +2575,9 @@ class AppDatabase {
           final pourId = row['id']! as String;
           final projectId = row['project_id']! as String;
           final snapshot = row['concrete_class']! as String;
-          final displayName = snapshot.trim().replaceAll(
-            RegExp(r'\s+'),
-            ' ',
-          );
+          final displayName = snapshot.trim().replaceAll(RegExp(r'\s+'), ' ');
           if (displayName.isEmpty) {
-            throw StateError(
-              'legacy concrete class is empty for pour $pourId',
-            );
+            throw StateError('legacy concrete class is empty for pour $pourId');
           }
           final normalizedName = displayName.toLowerCase();
           final lookupKey = '$projectId\u0000$normalizedName';
@@ -2716,6 +2711,146 @@ class AppDatabase {
             END
           ''');
         }
+      },
+    ),
+    DatabaseMigration(
+      version: 11,
+      apply: (transaction) async {
+        await transaction.execute('''
+          CREATE TABLE project_locations (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES projects(id),
+            display_name TEXT NOT NULL,
+            normalized_name TEXT NOT NULL,
+            parent_location_id TEXT REFERENCES project_locations(id),
+            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            archived_at TEXT,
+            UNIQUE (id, project_id),
+            FOREIGN KEY (parent_location_id, project_id)
+              REFERENCES project_locations(id, project_id),
+            CHECK (parent_location_id IS NULL OR parent_location_id != id)
+          )
+        ''');
+        await transaction.execute('''
+          CREATE TABLE project_events (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES projects(id),
+            sequence INTEGER NOT NULL CHECK (sequence >= 1),
+            event_type TEXT NOT NULL CHECK (event_type IN (
+              'project.renamed', 'project.archived', 'project.restored'
+            )),
+            occurred_at TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            UNIQUE (project_id, sequence)
+          )
+        ''');
+        await transaction.execute('''
+          CREATE TABLE project_location_events (
+            id TEXT PRIMARY KEY,
+            location_id TEXT NOT NULL REFERENCES project_locations(id),
+            sequence INTEGER NOT NULL CHECK (sequence >= 1),
+            event_type TEXT NOT NULL CHECK (event_type IN (
+              'location.created', 'location.renamed',
+              'location.reparented', 'location.archived',
+              'location.restored'
+            )),
+            occurred_at TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            UNIQUE (location_id, sequence)
+          )
+        ''');
+
+        for (final table in [
+          'field_observations',
+          'follow_up_items',
+          'concrete_pours',
+        ]) {
+          await transaction.execute('''
+            ALTER TABLE $table
+            ADD COLUMN location_id TEXT REFERENCES project_locations(id)
+          ''');
+        }
+
+        await transaction.execute('''
+          CREATE UNIQUE INDEX uq_project_locations_active_sibling_name
+          ON project_locations(
+            project_id,
+            COALESCE(parent_location_id, ''),
+            normalized_name
+          )
+          WHERE archived_at IS NULL
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_project_locations_project_parent
+          ON project_locations(
+            project_id, parent_location_id, archived_at, display_name, id
+          )
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_project_events_project
+          ON project_events(project_id, sequence, id)
+        ''');
+        await transaction.execute('''
+          CREATE INDEX ix_project_location_events_location
+          ON project_location_events(location_id, sequence, id)
+        ''');
+
+        for (final table in [
+          'field_observations',
+          'follow_up_items',
+          'concrete_pours',
+        ]) {
+          await transaction.execute('''
+            CREATE TRIGGER ${table}_location_project_insert
+            BEFORE INSERT ON $table
+            WHEN NEW.location_id IS NOT NULL AND NOT EXISTS (
+              SELECT 1
+              FROM project_locations
+              WHERE id = NEW.location_id AND project_id = NEW.project_id
+            )
+            BEGIN
+              SELECT RAISE(ABORT, 'location must belong to record project');
+            END
+          ''');
+          await transaction.execute('''
+            CREATE TRIGGER ${table}_location_project_update
+            BEFORE UPDATE OF location_id, project_id ON $table
+            WHEN NEW.location_id IS NOT NULL AND NOT EXISTS (
+              SELECT 1
+              FROM project_locations
+              WHERE id = NEW.location_id AND project_id = NEW.project_id
+            )
+            BEGIN
+              SELECT RAISE(ABORT, 'location must belong to record project');
+            END
+          ''');
+        }
+
+        for (final table in ['project_events', 'project_location_events']) {
+          await transaction.execute('''
+            CREATE TRIGGER ${table}_append_only_update
+            BEFORE UPDATE ON $table
+            BEGIN
+              SELECT RAISE(ABORT, 'append-only event history');
+            END
+          ''');
+          await transaction.execute('''
+            CREATE TRIGGER ${table}_append_only_delete
+            BEFORE DELETE ON $table
+            BEGIN
+              SELECT RAISE(ABORT, 'append-only event history');
+            END
+          ''');
+        }
+        await transaction.execute('''
+          CREATE TRIGGER project_locations_no_physical_delete
+          BEFORE DELETE ON project_locations
+          BEGIN
+            SELECT RAISE(ABORT, 'physical delete is not allowed');
+          END
+        ''');
       },
     ),
   ];

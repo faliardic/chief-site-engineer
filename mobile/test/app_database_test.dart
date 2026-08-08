@@ -69,6 +69,7 @@ void main() {
       {'version': 8, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 9, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 10, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 11, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
   });
 
@@ -110,6 +111,9 @@ void main() {
       tables.map((row) => row['name']),
       containsAll([
         'projects',
+        'project_events',
+        'project_locations',
+        'project_location_events',
         'field_observations',
         'observation_events',
         'follow_up_items',
@@ -1426,10 +1430,7 @@ void main() {
       await upgraded.database.rawQuery('PRAGMA foreign_key_check'),
       isEmpty,
     );
-    expect(
-      await upgraded.database.query('project_concrete_classes'),
-      isEmpty,
-    );
+    expect(await upgraded.database.query('project_concrete_classes'), isEmpty);
     await upgraded.close();
   });
 
@@ -1690,7 +1691,10 @@ void main() {
       const pourA2 = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
       const pourB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3';
       const timestamp = '2026-07-20T08:00:00Z';
-      for (final value in const [(projectA, 'Proje A'), (projectB, 'Proje B')]) {
+      for (final value in const [
+        (projectA, 'Proje A'),
+        (projectB, 'Proje B'),
+      ]) {
         await db.insert('projects', {
           'id': value.$1,
           'name': value.$2,
@@ -1779,7 +1783,10 @@ void main() {
       expect(classes.first['default_target_slump'], 'S3');
       expect(links, hasLength(3));
       expect(links[0]['concrete_class_id'], links[1]['concrete_class_id']);
-      expect(links[2]['concrete_class_id'], isNot(links[0]['concrete_class_id']));
+      expect(
+        links[2]['concrete_class_id'],
+        isNot(links[0]['concrete_class_id']),
+      );
       expect(pours.map((row) => row['concrete_class']), [
         ' C30/37 ',
         'c30/37',
@@ -1840,10 +1847,9 @@ void main() {
         throwsA(isA<sqflite.DatabaseException>()),
       );
       await expectLater(
-        upgraded.database.update(
-          'project_concrete_class_events',
-          {'payload_json': '{"changed":true}'},
-        ),
+        upgraded.database.update('project_concrete_class_events', {
+          'payload_json': '{"changed":true}',
+        }),
         throwsA(isA<sqflite.DatabaseException>()),
       );
       await upgraded.close();
