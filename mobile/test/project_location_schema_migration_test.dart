@@ -268,6 +268,46 @@ void main() {
           'location-a-root',
         );
       }
+      await expectLater(
+        database.database.update(
+          'project_locations',
+          {'project_id': _projectB},
+          where: 'id = ?',
+          whereArgs: ['location-a-root'],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      expect(
+        (await database.database.query(
+          'project_locations',
+          columns: ['project_id'],
+          where: 'id = ?',
+          whereArgs: ['location-a-root'],
+        )).single['project_id'],
+        _projectA,
+      );
+      for (final tableAndId in const [
+        ('field_observations', _observation),
+        ('follow_up_items', _reminder),
+        ('concrete_pours', _pour),
+      ]) {
+        expect(
+          await database.database.query(
+            tableAndId.$1,
+            columns: ['project_id', 'location_id'],
+            where: 'id = ?',
+            whereArgs: [tableAndId.$2],
+          ),
+          [
+            {'project_id': _projectA, 'location_id': 'location-a-root'},
+          ],
+          reason: tableAndId.$1,
+        );
+      }
+      expect(
+        await database.database.rawQuery('PRAGMA foreign_key_check'),
+        isEmpty,
+      );
 
       for (final event in const [
         'project.renamed',

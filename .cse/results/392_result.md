@@ -18,7 +18,7 @@ Issue #392 için schema 10 verisini değiştirmeden schema 11 Project/Location p
 ## Implemented Contract
 
 - `project_locations` canonical table, project-scoped hierarchy, revision/timestamp/archive fields and active sibling-name uniqueness were added.
-- Cross-project parents, self-parenting and physical location deletion fail closed.
+- Cross-project parents, self-parenting, post-creation `project_id` changes and physical location deletion fail closed.
 - Empty `project_events` and `project_location_events` foundations use the exact allowed vocabularies and append-only histories.
 - `field_observations`, `follow_up_items` and `concrete_pours` received nullable `location_id` foreign keys.
 - Record-to-location project consistency is enforced on insert and update.
@@ -29,15 +29,16 @@ Issue #392 için schema 10 verisini değiştirmeden schema 11 Project/Location p
 ## Focused Validation
 
 - `flutter test --no-pub test/project_location_schema_migration_test.dart test/app_database_test.dart test/mobile_backup_application_test.dart`: **55/55 passed**.
-- `flutter test --no-pub test/project_location_schema_migration_test.dart`: **4/4 passed** after completing the non-null sibling uniqueness case.
+- PR #393 review correction sonrası `flutter test --no-pub test/project_location_schema_migration_test.dart`: **4/4 passed**; Project-A location Project-B'ye taşınamadı, Ajanda/Reminder/Concrete linkleri aynı kaldı ve FK check temiz kaldı.
 - `flutter test --no-pub test/platform_notification_configuration_test.dart`: **6/6 passed** after updating its explicit schema pin from 10 to 11.
-- Fresh schema 11, contiguous migration history, schema 10 preservation, atomic rollback, foreign keys, hierarchy constraints, event vocabularies, append-only/no-delete protection and backup restore were exercised with synthetic temporary data.
+- Fresh schema 11, contiguous migration history, schema 10 preservation, atomic rollback, foreign keys, immutable location-project identity, hierarchy constraints, event vocabularies, append-only/no-delete protection and backup restore were exercised with synthetic temporary data.
 
 ## Broad Validation
 
 - First `flutter test --no-pub` run found one stale source-text assertion that still pinned schema 10.
-- After the exact test-only correction, the single permitted full-suite retry passed: **367/367**.
-- `flutter analyze --no-pub`: **passed, no issues found**.
+- After the exact test-only correction, the initial implementation full-suite retry passed: **367/367**.
+- PR #393 review correction changed the production migration; the explicitly required final-source full Flutter suite passed: **367/367**.
+- Final-source `flutter analyze --no-pub`: **passed, no issues found**.
 - `git diff --check`: **passed**.
 
 ## Reused and Skipped Evidence
@@ -48,8 +49,9 @@ Issue #392 için schema 10 verisini değiştirmeden schema 11 Project/Location p
 
 ## Budget and Exceptions
 
-- One primary validation run and one blocking correction run were used.
-- The failed full-suite operation was retried exactly once after the narrow schema-pin correction.
+- The primary implementation run used one exact failed-operation retry after the narrow stale schema-pin fix.
+- The single blocking correction run authorized by PR #393 review was used for `project_locations.project_id` immutability and its regression proof.
+- No GitHub Actions rerun was requested because the account billing lock remains an external runner-start blocker.
 - The configured Dart executable was not on `PATH`; formatting was completed with the repository-compatible bundled Flutter SDK path. This did not change product scope or require an infrastructure fix.
 - The 90-minute target and 120-minute hard stop were respected.
 - No out-of-scope infrastructure issue was taken into the feature branch.

@@ -2845,6 +2845,14 @@ class AppDatabase {
           ''');
         }
         await transaction.execute('''
+          CREATE TRIGGER project_locations_project_immutable
+          BEFORE UPDATE OF project_id ON project_locations
+          WHEN NEW.project_id != OLD.project_id
+          BEGIN
+            SELECT RAISE(ABORT, 'location project is immutable');
+          END
+        ''');
+        await transaction.execute('''
           CREATE TRIGGER project_locations_no_physical_delete
           BEFORE DELETE ON project_locations
           BEGIN
