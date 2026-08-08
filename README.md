@@ -1,117 +1,145 @@
 # CHIEF SITE ENGINEER
 
-CHIEF SITE ENGINEER (CSE), şantiye şefinin dağınık saha bilgisini hızlı kayıt,
-kanıt, takip, arşiv ve devir düzenine taşıyan offline-first mobil uygulamadır.
+CHIEF SITE ENGINEER (CSE), şantiye şefinin saha notunu, takibini, kanıtını,
+puantajını, beton kaydını ve yedeğini cihaz üzerinde güvenilir biçimde yöneten
+offline-first kişisel saha asistanıdır.
+
 Güncel ürün Flutter ile geliştirilir; cihaz-içi SQLite ve uygulamaya özel yerel
-dosya alanını kullanır.
+dosya alanını kullanır. Python/Flask çekirdeği repository içinde tarihsel ürün
+omurgası, sözleşme referansı ve geliştirici araçları için korunur; mobil runtime
+bir Python sunucusuna bağlanmaz.
 
-Python/Flask çekirdeği repository içinde tarihsel ürün omurgası, sözleşme
-referansı ve geliştirici araçları için korunur. Mobil runtime bir Python/Flask
-sunucusuna bağlanmaz.
-
-## Güncel güvenli nokta
-
-Son birleşmiş ve tamamlanmış safe point:
+## Güncel ürün durumu
 
 | Alan | Değer |
 | --- | --- |
-| Issue | `#277` |
-| Pull Request | `#278` |
-| Merge commit | `c72f6bc55fc658996a546d9833b85a2614b99327` |
+| Ürün fazı | V1 tamamlandı; V2 planlama/truth-sync başladı |
+| V1 baseline commit | `7c9f65a811c9f4bca561adab6bd1f8e64e6908cc` |
+| Son V1 baseline PR | `#382` |
 | Mobil sürüm | `0.1.0+1` |
 | SQLite schema | `10` |
 | `.csebackup` formatı | `1` |
 | Canonical timezone | `Europe/Istanbul` |
 | Android compile/target SDK | `36 / 36` |
+| Saha kullanımı | Proje sahibi tarafından yaklaşık bir ay |
+| GitHub Release / store release | Henüz ilan edilmedi |
 
-Issue #277 kanıtı focused lifecycle `48/48`, focused widget `46/46`, Beton
-regression `1/1`, full Flutter `333/333`, `flutter analyze` `0` ve Samsung
-`SM-X610` tablet wide smoke PASS sonucudur. Bu dar Issue için kullanıcı tablet
-PASS'i fiziksel tamamlanma kapısı seçti; telefon promotion yapılmadı.
+V1'in tamamlanması ve sahada kullanılmış olması, kamuya açık production veya
+store release yapıldığı anlamına gelmez. Aynı şekilde V1 modülleri dondurulmuş
+değildir; V2 içinde geliştirilmeye devam eder.
 
-Bu kanıt test edilmiş merged davranışı gösterir. CSE henüz field-ready,
-production-ready veya store-released ilan edilmiş değildir.
-
-## Birleşmiş mobil yetenekler
+## V1 mobil baseline
 
 ### Ajanda
 
-- Proje, gün, tür, aktif/arşiv, literal arama ve deterministik yeni/eski
-  sıralama.
-- Geçmiş saha zamanı, kaynak fotoğrafları ve güvenli attachment integrity yolu.
-- Beton sinyalinden kullanıcı kontrollü öneri ve aynı proje/gün bağlamıyla
-  Beton oluşturma deep-link'i; otomatik saha kararı veya paket üretimi yoktur.
-- Detail dönüşünde route-local filtre, arama ve scroll bağlamı korunur; arama
-  odağı ve klavye yalnız kullanıcı niyetiyle etkinleşir.
+- Proje, gün, tür, aktif/arşiv ve literal arama filtreleri
+- Geçmiş saha zamanı ve deterministik sıralama
+- Fotoğraf/PDF kanıtı ve güvenli attachment bütünlüğü
+- Beton sinyalinden kullanıcı kontrollü öneri ve deep-link
+- Detail dönüşünde route-local filtre, arama, focus ve scroll korunumu
+- Salt-okunur alan değişikliği geçmişi
 
 ### Hatırlatıcı
 
-- Ajanda, Puantaj ve Beton kaynak bağları; standalone reminder desteği.
-- Schedule/reschedule, waiting, inbox, complete/cancel, reopen, çöp/geri
-  yükleme ve append-only lifecycle geçmişi.
-- `Yarına ertele`, iki/üç saat, ertesi gün `08:00` ve sonraki pazartesi `08:00`
-  hızlı planlama davranışları.
-- Source-of-truth SQLite ile Android/iOS pending notification reconciliation;
-  bir reminder mutation'ının ilgisiz reminder bildirimini silmemesi için
-  izolasyon.
-- Reminder detayında kaynak Ajanda fotoğraflarının salt-okunur görünümü.
+- Standalone veya Ajanda, Puantaj ve Beton kaynaklı kayıt
+- Schedule/reschedule, inbox, complete/cancel, reopen ve çöp/geri yükleme
+- Tam gün ve saatli planlama
+- `Yarına ertele`, iki/üç saat, ertesi gün ve hafta başı hızlı eylemleri
+- Append-only lifecycle geçmişi ve optimistic revision
+- SQLite source-of-truth ile native notification reconciliation
+- Bir reminder mutation'ının ilgisiz bildirimi silmemesi için izolasyon
 
-### Puantaj
+### Puantaj ve Sicil
 
-- Proje personeli, ekip/taşeron, tam/yarım gün, gelmedi/izin, fazla mesai ve
-  notlar.
-- Taslak, tamamlandı, çalışma yok ve explicit reopen yaşam döngüsü.
-- Gün/ekip toplamları, CSV paylaşımı ve kaynağa bağlı çalışma günü
-  hatırlatıcıları.
+- Taşeron, ekip ve personel bağlamı
+- Tam/yarım gün, gelmedi, izin, fazla mesai ve notlar
+- Taslak, tamamlandı, çalışma yok ve explicit reopen
+- Gün/ekip toplamları ve CSV çıktısı
+- Kaynağa bağlı çalışma günü hatırlatıcıları
 
 ### Beton
 
-- Proje bazlı Beton sınıfı kataloğu ve legacy değerler için deterministik
-  schema `10` migration'ı.
-- Paket oluşturma; planlanan/gerçek zaman çizgisi; required checklist,
-  mikser/irsaliye, numune, takip ve kapanış blocker'ları.
-- System-owned checklist kalemleri, optimistic revision, append-only event ve
-  transaction içinde yönetilen Ajanda projeksiyonu.
-- JPEG/PNG/HEIC/PDF kanıtı için MIME sniff, boyut/hash kontrolü, atomik staging
-  ve orphan cleanup.
-- İnsan-okunabilir paket raporu, CSV/JSON-ready özet ve attachment manifesti.
+- Proje bazlı Beton sınıfı kataloğu
+- Planlandı → Devam ediyor → Tamamlandı zaman çizgisi
+- Required checklist, mikser/irsaliye, numune ve takip kayıtları
+- Kullanıcı kararıyla kapanış ve açıklanabilir blocker görünümü
+- Yönetilen Ajanda projeksiyonu
+- İnsan okunabilir rapor ve attachment manifesti
 
 ### Hafıza ve yedekleme
 
-- Mobil SQLite ve aktif kanıtları tek `.csebackup` format `1` paketine alan
-  şifreli backup.
-- PBKDF2-HMAC-SHA256 anahtar türetme, AES-256-GCM authenticated encryption,
-  hash/size/integrity kontrolleri ve atomik finalize.
-- Restore preflight, traversal/symlink/extra-entry reddi, desteklenen eski
-  schema'ların yalnız staging'de schema `10`a migration'ı, safety backup,
-  journal ve fail-closed rollback.
-- Secret, parola, absolute kullanıcı yolu ve signing materyali state ya da
-  manifest içine yazılmaz.
+- SQLite ve etkin kanıtları tek `.csebackup` format `1` paketinde toplama
+- PBKDF2-HMAC-SHA256 ve AES-256-GCM authenticated encryption
+- Attachment size/hash audit ve paket bütünlüğü
+- Atomik finalize, restore preflight, safety backup, journal ve rollback
+- Gerçek hazırlama, paketleme, doğrulama ve kaydetme aşamalarının görünürlüğü
+- Parola, secret, absolute kullanıcı yolu ve signing materyalinin repository'ye
+  yazılmaması
 
-## Uygulanan ve uygulanmayan iş sınırı
+## CSE V2
 
-| Durum | Kayıt | Ürün gerçeği |
-| --- | --- | --- |
-| Birleşmiş safe point | Issue `#277`, PR `#278` | Uygulanmış ve doğrulanmış |
-| Aktif, duraklatılmış | Issue `#279` | README/NotebookLM senkronu için paused; birleşmemiş davranış uygulanmış sayılmaz |
-| Açık Draft altyapı | PR `#259` | Conflicting; physical smoke acceptance harness birleşmiş değildir |
-| Açık pilot/release işleri | Issues `#245`, `#254`, `#256`, `#257` | Plan/altyapı kaydı; merged ürün özelliği değildir |
+Güncel kanonik kapsam:
 
-Issue #279 dalındaki fail-closed widget blocker'ı, bu safe point'in ve README'de
-anlatılan birleşmiş davranışın parçası değildir. PR #259 da ayrı bir Draft
-altyapı çalışmasıdır; mobil ürün capability'si gibi sunulmaz.
+[`docs/v2/CSE_V2_SCOPE.md`](docs/v2/CSE_V2_SCOPE.md)
+
+V2 paketi 13 maddeden oluşur:
+
+1. Proje ve Mahal omurgası
+2. Sicil / Puantaj V2 / Saha Rehberi
+3. Attachment / Fotoğraf / Medya V2
+4. Ajanda V2 ve kontrollü Ajanda–Hatırlatıcı senkronu
+5. Günlük Log Çıktısı v1
+6. İş / Yapılacaklar / Gün Planı
+7. İş Zinciri / Bağlı Log v1
+8. İstenecek Malzemeler
+9. Deterministik kişi/firma/etiket önerileri
+10. Telefon görüşmesi sonucu → Ajanda
+11. Proje fotoğraf/video albümü
+12. Günlük Log Çıktısı v2
+13. Mini hesap makinesi
+
+Ana bağımlılık:
+
+```text
+Proje/Mahal
+→ Saha Rehberi
+→ Attachment v2
+→ Ajanda v2
+→ İş/Yapılacak
+→ İş Zinciri
+→ Günlük Log v2
+```
+
+İlk production yönü **Proje ve Mahal omurgasıdır**. Issue #383 yalnız
+documentation/state truth-sync işidir; production davranışı değiştirmez.
+
+## Kaynak otoritesi
+
+| Bilgi | Yetkili kaynak |
+| --- | --- |
+| Kalıcı ürün amacı ve veri ilkeleri | `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md` |
+| Güncel V2 kapsamı | `docs/v2/CSE_V2_SCOPE.md` |
+| Güncel sıra | `ROADMAP.md` |
+| Operasyon ve güvenlik | `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` |
+| Doğrulama politikası | `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md` |
+| Aktif iş | Güncel GitHub Issue |
+| İkincil machine-readable snapshot | `.cse/state/project_state.json` |
+
+Eski roadmap, Epic, Orchestrator, Bridge, Work Mode, handoff veya podcast
+kayıtları tarihsel bağlamdır; güncel V2 kapsamını override etmez.
 
 ## Repository yapısı
 
 ```text
 mobile/                 Flutter Android/iOS uygulaması
-src/                    Python/Flask tarihsel çekirdek ve destek kodu
+app/                    Python/Flask tarihsel çekirdek ve destek kodu
 tests/                  Python doğrulama suite'i
 scripts/                Deterministik geliştirici ve release araçları
-docs/                   Protokoller, kararlar, podcast ve öğrenim belgeleri
-.cse/state/             Küçük canonical proje durumu
+tools/                  Geliştirici otomasyon araçları
+docs/                   Protokoller, kararlar, V2 kapsamı ve teknik belgeler
+.cse/state/             Machine-readable proje snapshot'ı
 .cse/tasks/             Issue yürütme sözleşmeleri
-.cse/results/           Issue doğrulama ve tamamlama kanıtları
+.cse/results/           Doğrulama ve tamamlama kanıtları
 ```
 
 ## Geliştirici başlangıcı
@@ -120,13 +148,6 @@ Python doğrulaması:
 
 ```powershell
 python -m pytest
-```
-
-NotebookLM rolling source:
-
-```powershell
-python -m pytest tests/test_notebooklm_podcast_source.py
-python scripts/build_notebooklm_podcast_source.py
 ```
 
 Flutter geliştirme:
@@ -139,37 +160,36 @@ flutter test
 flutter build apk --debug
 ```
 
-Bu komutların tamamı her dar Issue için otomatik zorunlu değildir. Current
-Issue sözleşmesi ve
-`docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`, değişen riske
-uygun minimum yeterli doğrulamayı belirler.
+Her dar Issue bu komutların tamamını otomatik çalıştırmaz. Değişen sözleşmeye
+uygun minimum yeterli doğrulama:
+
+[`docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`](docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md)
+
+tarafından belirlenir.
 
 ## Android ve iOS sınırı
 
 Android release kimliği `com.faliardic.chiefsiteengineer`, debug kimliği
 `com.faliardic.chiefsiteengineer.debug`dır. Android uygulaması camera,
-notification, reboot ve user-managed exact alarm erişimini kendi dar
-sözleşmeleri için kullanır; broad storage/media ve `INTERNET` izni merged
-manifestte yoktur.
+notification, reboot ve user-managed exact alarm erişimini dar sözleşmeleri
+için kullanır; broad storage/media ve `INTERNET` izni merged manifestte yoktur.
 
-iOS project/scheme ve kimlikler tracked durumdadır; gerçek archive/TestFlight
+iOS project/scheme ve kimlikler tracked durumdadır. Gerçek archive/TestFlight
 yalnız macOS, Xcode, Apple Developer hesabı ve repository dışında tutulan
 signing materyaliyle üretilebilir.
 
-Release/signing ayrıntıları:
-[`docs/release/mobile_identity_signing_and_rc.md`](docs/release/mobile_identity_signing_and_rc.md).
+Ayrıntılar:
 
-## Dokümantasyon ve podcast
+[`docs/release/mobile_identity_signing_and_rc.md`](docs/release/mobile_identity_signing_and_rc.md)
 
-- Güncel roadmap: [`ROADMAP.md`](ROADMAP.md)
-- Değişiklik geçmişi: [`CHANGELOG.md`](CHANGELOG.md)
-- Teknik kararlar: [`docs/project_decisions.md`](docs/project_decisions.md)
-- Mobil ayrıntılar: [`mobile/README.md`](mobile/README.md)
-- Podcast protokolü:
-  [`docs/podcast_notes/README.md`](docs/podcast_notes/README.md)
-- Stable NotebookLM source:
-  [`docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md`](docs/notebooklm/CSE_PODCAST_LATEST_SOURCE.md)
+## Olgunluk sınırı
 
-Podcast 036, legacy Adım 001–225 döneminden Issue tabanlı döneme geçer ve
-Issue #227–#277 arasındaki gerçek CHANGELOG bölümlerini kapsar. Eksik Issue
-numaraları tamamlanmış iş gibi uydurulmaz.
+- **V1 ürün fazı:** tamamlandı
+- **Owner saha kullanımı:** yaklaşık bir ay
+- **V2:** planlama ve repository truth-sync
+- **Kamuya açık production release:** ilan edilmedi
+- **Google Play/App Store yayını:** ilan edilmedi
+- **Çok kullanıcılı/SaaS ürün:** kapsam dışı
+
+Tarihsel test veya tablet kabulü, tek başına store-ready ilanı değildir. Saha
+kullanımı da geriye dönük, gün gün kanıt uydurulmasına gerekçe oluşturmaz.

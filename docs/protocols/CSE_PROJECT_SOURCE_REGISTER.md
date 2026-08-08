@@ -1,72 +1,92 @@
 # CSE Project Source Register
 
-**Belge turu:** Proje kaynak kaydi
-**Guncelleme adimi:** Issue #285
-**Guncelleme tarihi:** 2026-08-01
+**Belge türü:** Proje kaynak kaydı
+**Güncelleme Issue:** #383
+**Güncelleme tarihi:** 8 Ağustos 2026
 
-Bu dosya, CHIEF SITE ENGINEER icin kalici proje kaynaklarini, destekleyici kaynaklari ve erisim durumunu kaydeder. Kaynak dosya yoksa veya bu Codex ortaminda erisilebilir degilse icerik uydurulmaz.
+Bu dosya CSE için kalıcı ürün kaynaklarını, güncel V2 yürütme kaynaklarını,
+destekleyici tarihsel kaynakları ve otorite sınırlarını kaydeder.
 
-## Canonical Tracked Sources
+## 1. Kanonik aktif kaynaklar
 
-| Source | Repository path | Role | Status |
+| Source | Repository path | Yetkili rol | Durum |
 | --- | --- | --- | --- |
-| `CHIEF_SITE_ENGINEER_EXE_BIRLESTIRILMIS_PROJE_KAYNAGI.md` | `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md` | Approved merged source for product purpose, strategy, data principles, product layers, roadmap, source-conflict resolutions, and long-term architecture | Available; copied with trailing-space normalization and Step 207 bootstrap addendum |
-| `CSE_PROJECT_INSTRUCTIONS.md` | `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` | Operational workflow, Git/GitHub/Codex rules, safety, verification, and execution protocol | Tracked canonical operational instructions |
-| `CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md` | `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md` | Binding addendum for validation class, evidence reuse, retry/time budgets, gate breadth, scope control and stop rules | Available; created by Issue #215 |
-| `AGENTS.md` | `AGENTS.md` | Repository-root Codex pre-read and concise enforcement of minimum sufficient validation | Available; expanded by Issue #215 |
-| `CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md` | `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md` | GitHub-native fresh-chat bootstrap, continuation rule and mandatory validation-protocol pre-read | Updated by Issue #215 |
-| `CSE_ORCHESTRATOR_ARCHITECTURE.md` | `docs/orchestrator/CSE_ORCHESTRATOR_ARCHITECTURE.md` | Orchestrator component boundaries, operational truth, runtime-state and local/CI responsibility contract | O0 canonical design source; no runtime implementation |
-| `CSE_ORCHESTRATOR_STATE_MACHINE.md` | `docs/orchestrator/CSE_ORCHESTRATOR_STATE_MACHINE.md` | Run states, transitions, invariants, blockers, budgets and append-only event contract | O0 canonical design source; executable engine deferred |
-| `CSE_ORCHESTRATOR_SECURITY_BOUNDARY.md` | `docs/orchestrator/CSE_ORCHESTRATOR_SECURITY_BOUNDARY.md` | User-data, secret, capability, network and fail-closed security boundaries | O0 canonical design source; security implementation deferred |
-| `CSE_ORCHESTRATOR_APPROVAL_MODEL.md` | `docs/orchestrator/CSE_ORCHESTRATOR_APPROVAL_MODEL.md` | Approval levels, latest-valid authorization and one-time fingerprint contract | O0 canonical design source; machine-readable verifier deferred |
-| `CSE_ORCHESTRATOR_MVP_PLAN.md` | `docs/orchestrator/CSE_ORCHESTRATOR_MVP_PLAN.md` | O0-O10 delivery sequence and per-phase admission boundaries | O0 canonical program source; does not replace product roadmap |
+| Birleştirilmiş Proje Kaynağı | `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md` | Kalıcı ürün amacı, tek kullanıcı modeli, veri ilkeleri ve uzun vadeli mimari | Aktif kalıcı kaynak |
+| CSE V2 Kanonik Kapsamı | `docs/v2/CSE_V2_SCOPE.md` | Güncel 13 maddelik V2 kapsamı, bağımlılıklar, V2 dışı alanlar ve DoD | Aktif güncel yürütme kaynağı |
+| CSE V2 Roadmap | `ROADMAP.md` | Güncel dalga, sıra, geçiş kapısı ve ilk production yönü | Aktif güncel sıra |
+| Proje Talimatları | `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` | Git/GitHub/execution güvenliği ve operasyon protokolü | Aktif operasyon kaynağı |
+| Minimum Yeterli Doğrulama | `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md` | Validation class, evidence reuse, retry/time budget ve gate genişliği | Aktif doğrulama kaynağı |
+| Repository giriş talimatı | `AGENTS.md` | Zorunlu pre-read ve kısa enforcement | Aktif |
+| New Chat Bootstrap | `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md` | Yeni sohbetin GitHub'dan güncel V2 bağlamıyla devamı | Aktif |
+| Machine-readable state | `.cse/state/project_state.json` | Son yayımlanmış/finalized checkpoint ve aktif Issue snapshot'ı | İkincil factual mirror |
 
-## Authority and conflict rules
+## 2. Otorite ve çakışma kuralları
 
-- Product purpose, user model and long-term direction: `CSE_UNIFIED_PROJECT_SOURCE.md`.
-- General Git/GitHub/Codex safety and execution: `CSE_PROJECT_INSTRUCTIONS.md`.
-- Validation breadth, evidence reuse, retry/time budget, environment-error handling and stop rules: `CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`.
-- `AGENTS.md` is the repository-level automatic Codex entry point and requires reading the full canonical documents.
-- A current Issue may narrow the validation plan but cannot silently weaken data-safety rules.
-- A current Issue cannot expand a narrow feature into release/toolchain work without explicit scope and validation-class change.
-- Orchestrator sources govern development-run observation, approval, state and capability contracts; they do not override permanent product purpose, Git/Codex safety or minimum-validation protocols.
-- `.cse/state/project_state.json` remains a published/finalized snapshot and cannot override current Git/GitHub/Issue evidence.
+1. Kalıcı ürün amacı ve veri ilkelerinde Unified Project Source üst kaynaktır.
+2. Güncel ürün paketi ve bağımlılıklarında `docs/v2/CSE_V2_SCOPE.md` üst
+   kaynaktır.
+3. Güncel sıra ve dalga durumunda `ROADMAP.md` esas alınır.
+4. Aktif teknik kapsam current GitHub Issue tarafından daraltılır.
+5. Current Issue V2 kapsamını sessizce genişletemez ve safety kurallarını
+   zayıflatamaz.
+6. `.cse/state`, README, podcast, handoff, ZIP veya sohbet hafızası current Git
+   ve GitHub gerçeğini override edemez.
+7. Geçmiş Issue/PR/test/podcast kaydı geriye dönük yeniden yazılmaz.
+8. V1 saha kullanımı, store/public release iddiası değildir.
 
-## Original Project Sources
+## 3. V1 kapanış kaynağı
 
-| Original title | Role | Repository copy | Status |
-| --- | --- | --- | --- |
-| `Şantiye Şefi İçin Dünya Örneklerine Dayalı Kontrol, Takip ve Arşivleme Sistemi Yol Haritası.pdf` | Supporting research source | None | Not available in this Codex environment; not fabricated |
-| `CHIEF_SITE_ENGINEER_Guncel_Yol_Haritasi_Ozel_Alan_Ekli.pdf` | Supporting product/module roadmap source | None | Not available in this Codex environment; not fabricated |
-| `CSE_CHAT_HANDOFF_PROTOCOL_SOURCE_PACKAGE.zip` | Historical handoff package provenance | None | Raw ZIP not available in this Codex environment and must not be committed |
-| `1. CSE önce güvenilir veri omurgası.txt` | Active data-principles source | `docs/reference_sources/cse_once_guvenilir_veri_omurgasi.txt` | Available and copied with ASCII-safe filename |
-| `CSE_STRATEGIC_PRODUCT_DIRECTION.md` | Active strategy source | None | Not available in this Codex environment; not fabricated |
-| `CHIEF_SITE_ENGINEER_EXE_BIRLESTIRILMIS_PROJE_KAYNAGI.md` | Approved merged source used to create tracked unified source | `docs/reference_sources/chief_site_engineer_exe_birlestirilmis_proje_kaynagi.md` and `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md` | Available; repository copies normalize trailing line spaces and do not reconstruct source content |
-
-## Source Handling Rules
-
-- Do not commit duplicate `(1)` source copies.
-- Do not commit raw handoff ZIP packages.
-- Do not fabricate unavailable PDF, TXT, Markdown, or ZIP content.
-- Preserve original source titles in this register even when repository filenames use ASCII-safe names.
-- Future chats read tracked GitHub versions after the source has been added to the repository.
-- Uploaded or local source files may establish or update tracked canonical sources only in an authorized step.
-- Every new chat and Codex run must read the minimum sufficient validation protocol before choosing tests, builds or physical-device gates.
-
-## Historical Step 207 Access Evidence
-
-Accessible local source files found during Step 207:
+V1 baseline:
 
 ```text
-V:\1_PROJECTS\2_ACTIVE\Python\CHIEF_SITE_ENGINEER_EXE_BIRLESTIRILMIS_PROJE_KAYNAGI.md
-V:\1_PROJECTS\2_ACTIVE\Python\cse-notes\1. CSE önce güvenilir veri omurgası.txt
+commit: 7c9f65a811c9f4bca561adab6bd1f8e64e6908cc
+pull request: #382
+mobile version: 0.1.0+1
+schema: 10
+backup format: 1
 ```
 
-Unavailable original source files in that environment:
+Proje sahibi V1'in yaklaşık bir ay gerçek sahada kullanıldığını ve V1 ürün
+fazının tamamlandığını bildirmiştir. Bu karar, geriye dönük günlük test kanıtı
+veya store release kaydı üretmez.
 
-```text
-Şantiye Şefi İçin Dünya Örneklerine Dayalı Kontrol, Takip ve Arşivleme Sistemi Yol Haritası.pdf
-CHIEF_SITE_ENGINEER_Guncel_Yol_Haritasi_Ozel_Alan_Ekli.pdf
-CSE_CHAT_HANDOFF_PROTOCOL_SOURCE_PACKAGE.zip
-CSE_STRATEGIC_PRODUCT_DIRECTION.md
-```
+## 4. Tarihsel geliştirici otomasyonu kaynakları
+
+Aşağıdaki belgeler korunur; fakat aktif V2 ürün roadmap'i değildir:
+
+| Source | Path | Tarihsel rol |
+| --- | --- | --- |
+| Orchestrator Architecture | `docs/orchestrator/CSE_ORCHESTRATOR_ARCHITECTURE.md` | Geliştirici otomasyon mimarisi |
+| Orchestrator State Machine | `docs/orchestrator/CSE_ORCHESTRATOR_STATE_MACHINE.md` | Yürütme state modeli |
+| Orchestrator Security Boundary | `docs/orchestrator/CSE_ORCHESTRATOR_SECURITY_BOUNDARY.md` | Tooling güvenlik araştırması |
+| Orchestrator Approval Model | `docs/orchestrator/CSE_ORCHESTRATOR_APPROVAL_MODEL.md` | Tooling approval modeli |
+| Orchestrator MVP Plan | `docs/orchestrator/CSE_ORCHESTRATOR_MVP_PLAN.md` | O0–O10 tarihsel program |
+
+Bridge ve Work Mode Issue/branch/PR kayıtları da tarihsel developer-tooling
+kanıtıdır. V2 product item'larını bloke etmez ve V2 milestone'una alınmaz.
+
+## 5. Tarihsel ürün ve araştırma kaynakları
+
+| Original title | Repository copy | Durum |
+| --- | --- | --- |
+| `Şantiye Şefi İçin Dünya Örneklerine Dayalı Kontrol, Takip ve Arşivleme Sistemi Yol Haritası.pdf` | None | Bu ortamda yok; içerik uydurulmaz |
+| `CHIEF_SITE_ENGINEER_Guncel_Yol_Haritasi_Ozel_Alan_Ekli.pdf` | None | Bu ortamda yok; içerik uydurulmaz |
+| `CSE_CHAT_HANDOFF_PROTOCOL_SOURCE_PACKAGE.zip` | None | Raw ZIP commitlenmez |
+| `1. CSE önce güvenilir veri omurgası.txt` | `docs/reference_sources/cse_once_guvenilir_veri_omurgasi.txt` | Tracked supporting source |
+| `CSE_STRATEGIC_PRODUCT_DIRECTION.md` | None | Bu ortamda yok; içerik uydurulmaz |
+| Birleştirilmiş proje kaynağının repository kopyası | `docs/reference_sources/chief_site_engineer_exe_birlestirilmis_proje_kaynagi.md` | Tarihsel provenance |
+
+## 6. Source handling rules
+
+- Duplicate `(1)` kopyaları commitlenmez.
+- Raw handoff ZIP paketleri commitlenmez.
+- Erişilemeyen PDF/TXT/Markdown/ZIP içeriği uydurulmaz.
+- Original title bilgisi register içinde korunur.
+- Yeni kalıcı ürün kararı yetkili Issue ve tracked canonical kaynakla
+  kaydedilir.
+- Yeni V2 production işi başlamadan V2 scope, roadmap, current Issue ve
+  validation protocol okunur.
+- V2 dışında kalan fikirler silinmez; post-V2 backlog veya tarihsel kaynak olarak
+  sınıflandırılır.
+- Store release, field acceptance ve production readiness birbirinin yerine
+  kullanılmaz.
