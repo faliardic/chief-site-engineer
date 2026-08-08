@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
@@ -318,6 +320,7 @@ class _LogDetailPageState extends State<LogDetailPage> {
     }
     final detail = snapshot.requireData;
     final log = detail.log;
+    final history = _agendaUpdateHistory(detail.events);
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -525,6 +528,165 @@ class _LogDetailPageState extends State<LogDetailPage> {
                   );
                   if (mounted) setState(_reload);
                 },
+              ),
+            ),
+          ),
+        if (history.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _AgendaHistorySection(entries: history),
+        ],
+      ],
+    );
+  }
+}
+
+const _agendaUpdateFieldLabels = <String, String>{
+  'observed_at': 'Olay zamanı',
+  'category': 'Tür',
+  'description': 'Açıklama',
+  'location': 'Mahal',
+  'notes': 'Ayrıntılı not',
+  'project_id': 'Proje kimliği',
+};
+
+List<_AgendaHistoryEntry> _agendaUpdateHistory(
+  Iterable<AppendOnlyEvent> events,
+) {
+  final updates = events
+      .where((event) => event.eventType == 'agenda_log.updated')
+      .toList(growable: false);
+  return updates.reversed.map(_agendaUpdateEntry).toList(growable: false);
+}
+
+_AgendaHistoryEntry _agendaUpdateEntry(AppendOnlyEvent event) {
+  try {
+    final payload = jsonDecode(event.payloadJson);
+    if (payload is! Map<String, dynamic>) {
+      return _AgendaHistoryEntry.malformed(event);
+    }
+    final before = payload['before'];
+    final after = payload['after'];
+    if (before is! Map<String, dynamic> || after is! Map<String, dynamic>) {
+      return _AgendaHistoryEntry.malformed(event);
+    }
+    return _AgendaHistoryEntry(
+      event: event,
+      changes: [
+        for (final field in _agendaUpdateFieldLabels.entries)
+          if (before[field.key] != after[field.key])
+            _AgendaHistoryChange(
+              label: field.value,
+              before: _agendaHistoryValue(field.key, before[field.key]),
+              after: _agendaHistoryValue(field.key, after[field.key]),
+            ),
+      ],
+    );
+  } on FormatException {
+    return _AgendaHistoryEntry.malformed(event);
+  }
+}
+
+String _agendaHistoryValue(String field, Object? value) {
+  if (field == 'observed_at') {
+    if (value is! String) return 'Okunamadı';
+    try {
+      return CseTimeCodec.formatIstanbul(value);
+    } on TimeContractViolation {
+      return 'Okunamadı';
+    }
+  }
+  if (field == 'category') {
+    if (value is! String) return 'Okunamadı';
+    try {
+      return AgendaCategory.fromStorage(value).label;
+    } on AgendaValidationFailure {
+      return 'Okunamadı';
+    }
+  }
+  if (field == 'project_id') {
+    return value is String && RecordId.isUuid(value) ? value : '—';
+  }
+  return value is String && value.trim().isNotEmpty ? value : '—';
+}
+
+String _agendaHistoryOccurredAt(String value) {
+  try {
+    return CseTimeCodec.formatIstanbul(value);
+  } on TimeContractViolation {
+    return 'Zaman okunamadı';
+  }
+}
+
+class _AgendaHistoryEntry {
+  const _AgendaHistoryEntry({required this.event, required this.changes})
+    : malformed = false;
+
+  const _AgendaHistoryEntry.malformed(this.event)
+    : changes = const [],
+      malformed = true;
+
+  final AppendOnlyEvent event;
+  final List<_AgendaHistoryChange> changes;
+  final bool malformed;
+}
+
+class _AgendaHistoryChange {
+  const _AgendaHistoryChange({
+    required this.label,
+    required this.before,
+    required this.after,
+  });
+
+  final String label;
+  final String before;
+  final String after;
+}
+
+class _AgendaHistorySection extends StatelessWidget {
+  const _AgendaHistorySection({required this.entries});
+
+  final List<_AgendaHistoryEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const Key('agenda-change-history-section'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Değişiklik geçmişi',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 8),
+        for (final entry in entries)
+          Card(
+            key: Key('agenda-change-history-${entry.event.id}'),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _agendaHistoryOccurredAt(entry.event.occurredAt),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  if (entry.malformed)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text('Değişiklik ayrıntısı okunamadı.'),
+                    )
+                  else
+                    for (final change in entry.changes) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        change.label,
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 2),
+                      Text('Önce: ${change.before}'),
+                      Text('Sonra: ${change.after}'),
+                    ],
+                ],
               ),
             ),
           ),
