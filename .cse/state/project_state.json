@@ -1,14 +1,10 @@
 {
   "active_work": {
-    "base_commit": "7c9f65a811c9f4bca561adab6bd1f8e64e6908cc",
-    "branch": "docs/issue-383-cse-v2-repository-truth-sync",
-    "issue": 383,
-    "kind": "documentation_state_truth_sync",
+    "issue": 385,
+    "kind": "v2_product_epic",
     "merge_claim": false,
     "production_behavior_changed": false,
-    "publication_status": "draft_pull_request_open",
-    "pull_request": 384,
-    "state": "in_review"
+    "state": "v2_item_1_ready_for_planning"
   },
   "base_branch": "master",
   "current_safe_point": {
@@ -43,7 +39,7 @@
     "owner_field_use": "approximately_one_month",
     "production_ready_application": false,
     "public_release": false,
-    "state": "v1_completed_owner_field_used_v2_planning",
+    "state": "v1_completed_owner_field_used_v2_active",
     "store_released": false
   },
   "state_version": 3,
@@ -58,13 +54,15 @@
     "canonical_scope": "docs/v2/CSE_V2_SCOPE.md",
     "current_item": 1,
     "current_item_name": "Proje ve Mahal omurgası",
-    "current_phase": "repository_truth_sync",
-    "parent_issue": 383,
+    "current_phase": "item_1_ready_for_planning",
+    "parent_issue": 385,
     "roadmap": "ROADMAP.md",
-    "status": "planning"
+    "status": "active",
+    "truth_sync_merge_commit": "78ad9245331398994ce0f47a5380d65a23189572",
+    "truth_sync_pull_request": 384
   },
   "validation_policy": {
-    "current_issue": "documentation",
+    "current_issue": "v2_item_specific",
     "production_behavior_changed": false,
     "reuse_merged_mobile_evidence": true
   }
