@@ -246,6 +246,120 @@ void main() {
     expect(find.byKey(const Key('create-agenda-log')), findsOneWidget);
   });
 
+  testWidgets('home field tips stay single cycle manually and remain accessible', (
+    tester,
+  ) async {
+    final semanticsHandle = tester.ensureSemantics();
+    tester.view.physicalSize = const Size(320, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    tester.binding.platformDispatcher.textScaleFactorTestValue = 1.6;
+    tester.binding.platformDispatcher.platformBrightnessTestValue =
+        Brightness.dark;
+    addTearDown(
+      tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
+    );
+    addTearDown(
+      tester.binding.platformDispatcher.clearPlatformBrightnessTestValue,
+    );
+
+    const tips = <String>[
+      'Sahada görülen veya söylenenler, mümkün olduğunca anında kayda geçtiğinde unutulmaz.',
+      'Fotoğraf; neyi, nerede ve neden gösterdiğiyle birlikte anlam kazanır.',
+      'Gün sonu, önemli gelişmelerin rapor ve kayıtlara yansıdığını kontrol etme zamanıdır.',
+      'Açık işler zihinde değil, sistemde görünür kaldığında daha kolay takip edilir.',
+    ];
+
+    await tester.pumpWidget(
+      CseApp(
+        bootstrap: Future<BootstrapResult>.value(
+          BootstrapSuccess(
+            environmentLabel: 'Geliştirme',
+            smokeRecordId: 'home-field-tips',
+            smokeRecordCreatedAt: '2026-08-08T08:00:00Z',
+            agenda: FakeAgendaApplication(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('home-field-tip-card')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    void expectOnlyTip(int index) {
+      for (var tipIndex = 0; tipIndex < tips.length; tipIndex += 1) {
+        expect(
+          find.text(tips[tipIndex]),
+          tipIndex == index ? findsOneWidget : findsNothing,
+        );
+      }
+    }
+
+    Future<void> tapTipControl(Key key) async {
+      final control = find.byKey(key);
+      await tester.ensureVisible(control);
+      await tester.tap(control);
+      await tester.pump();
+    }
+
+    expect(find.byKey(const Key('home-field-tip-card')), findsOneWidget);
+    expect(find.text('Saha İpucu'), findsOneWidget);
+    expect(find.byKey(const Key('field-tip-text')), findsOneWidget);
+    expectOnlyTip(0);
+    expect(find.text('1 / 4'), findsOneWidget);
+
+    final previous = tester.widget<IconButton>(
+      find.byKey(const Key('previous-field-tip')),
+    );
+    final next = tester.widget<IconButton>(
+      find.byKey(const Key('next-field-tip')),
+    );
+    expect(previous.tooltip, 'Önceki saha ipucu');
+    expect(next.tooltip, 'Sonraki saha ipucu');
+
+    var liveRegion = tester.widget<Semantics>(
+      find.byKey(const Key('field-tip-live-region')),
+    );
+    expect(liveRegion.properties.liveRegion, isTrue);
+    expect(liveRegion.properties.label, 'Saha İpucu 1 / 4: ${tips.first}');
+
+    await tapTipControl(const Key('next-field-tip'));
+    expectOnlyTip(1);
+    expect(find.text('2 / 4'), findsOneWidget);
+
+    await tapTipControl(const Key('next-field-tip'));
+    await tapTipControl(const Key('next-field-tip'));
+    expectOnlyTip(3);
+    expect(find.text('4 / 4'), findsOneWidget);
+
+    await tapTipControl(const Key('next-field-tip'));
+    expectOnlyTip(0);
+    expect(find.text('1 / 4'), findsOneWidget);
+
+    await tapTipControl(const Key('previous-field-tip'));
+    expectOnlyTip(3);
+    expect(find.text('4 / 4'), findsOneWidget);
+    liveRegion = tester.widget<Semantics>(
+      find.byKey(const Key('field-tip-live-region')),
+    );
+    expect(liveRegion.properties.liveRegion, isTrue);
+    expect(liveRegion.properties.label, 'Saha İpucu 4 / 4: ${tips.last}');
+
+    final cardContext = tester.element(
+      find.byKey(const Key('home-field-tip-card')),
+    );
+    expect(Theme.of(cardContext).brightness, Brightness.dark);
+    expect(MediaQuery.textScalerOf(cardContext).scale(10), 16);
+    final exception = tester.takeException();
+    semanticsHandle.dispose();
+    expect(exception, isNull);
+  });
+
   testWidgets('database bootstrap failure is fail closed and user safe', (
     tester,
   ) async {
