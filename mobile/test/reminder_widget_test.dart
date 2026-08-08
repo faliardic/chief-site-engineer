@@ -375,7 +375,7 @@ void main() {
   }
 
   testWidgets(
-    'Today is default and renders overdue timed and all-day sections once',
+    'Today is default and renders overdue all-day and timed sections once in priority order',
     (tester) async {
       final overdue = reminder(
         id: widgetReminderId(1),
@@ -418,12 +418,26 @@ void main() {
             .selected,
         isTrue,
       );
-      expect(find.byKey(const Key('reminder-section-overdue')), findsOneWidget);
-      expect(
-        find.byKey(const Key('reminder-section-timed-today')),
-        findsOneWidget,
+      final overdueSection = find.byKey(
+        const Key('reminder-section-overdue'),
       );
-      expect(find.byKey(const Key('reminder-section-all-day')), findsOneWidget);
+      final allDaySection = find.byKey(
+        const Key('reminder-section-all-day'),
+      );
+      final timedSection = find.byKey(
+        const Key('reminder-section-timed-today'),
+      );
+      expect(overdueSection, findsOneWidget);
+      expect(allDaySection, findsOneWidget);
+      expect(timedSection, findsOneWidget);
+      expect(
+        tester.getTopLeft(overdueSection).dy,
+        lessThan(tester.getTopLeft(allDaySection).dy),
+      );
+      expect(
+        tester.getTopLeft(allDaySection).dy,
+        lessThan(tester.getTopLeft(timedSection).dy),
+      );
       expect(find.byKey(Key('reminder-${overdue.id}')), findsOneWidget);
       expect(find.byKey(Key('reminder-${timed.id}')), findsOneWidget);
       expect(find.byKey(Key('reminder-${allDay.id}')), findsOneWidget);

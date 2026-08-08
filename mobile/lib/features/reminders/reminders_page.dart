@@ -413,19 +413,19 @@ class _RemindersPageState extends State<RemindersPage> {
           items: _todayOverview.overdue,
           section: _ReminderTodaySection.overdue,
         ),
-      if (_todayOverview.timedToday.isNotEmpty)
-        ..._todaySection(
-          title: 'Saatli bugün',
-          key: const Key('reminder-section-timed-today'),
-          items: _todayOverview.timedToday,
-          section: _ReminderTodaySection.timedToday,
-        ),
       if (_todayOverview.allDayToday.isNotEmpty)
         ..._todaySection(
           title: 'Tam gün',
           key: const Key('reminder-section-all-day'),
           items: _todayOverview.allDayToday,
           section: _ReminderTodaySection.allDayToday,
+        ),
+      if (_todayOverview.timedToday.isNotEmpty)
+        ..._todaySection(
+          title: 'Saatli bugün',
+          key: const Key('reminder-section-timed-today'),
+          items: _todayOverview.timedToday,
+          section: _ReminderTodaySection.timedToday,
         ),
       if (_todayOverview.inboxCount > 0)
         Card(
