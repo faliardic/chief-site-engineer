@@ -342,13 +342,42 @@ class _MobileShellState extends State<MobileShell> {
   }
 }
 
-class _HomePage extends StatelessWidget {
+class _HomePage extends StatefulWidget {
   const _HomePage({required this.bootstrap});
 
   final BootstrapSuccess bootstrap;
 
   @override
+  State<_HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<_HomePage> {
+  static const _fieldTips = <String>[
+    'Sahada görülen veya söylenenler, mümkün olduğunca anında kayda geçtiğinde unutulmaz.',
+    'Fotoğraf; neyi, nerede ve neden gösterdiğiyle birlikte anlam kazanır.',
+    'Gün sonu, önemli gelişmelerin rapor ve kayıtlara yansıdığını kontrol etme zamanıdır.',
+    'Açık işler zihinde değil, sistemde görünür kaldığında daha kolay takip edilir.',
+  ];
+
+  var _fieldTipIndex = 0;
+
+  void _showPreviousFieldTip() {
+    setState(() {
+      _fieldTipIndex =
+          (_fieldTipIndex - 1 + _fieldTips.length) % _fieldTips.length;
+    });
+  }
+
+  void _showNextFieldTip() {
+    setState(() {
+      _fieldTipIndex = (_fieldTipIndex + 1) % _fieldTips.length;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final fieldTip = _fieldTips[_fieldTipIndex];
+    final fieldTipPosition = '${_fieldTipIndex + 1} / ${_fieldTips.length}';
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
@@ -366,7 +395,7 @@ class _HomePage extends StatelessWidget {
             leading: const Icon(Icons.offline_bolt_outlined),
             title: const Text('Çevrim dışı temel hazır'),
             subtitle: Text(
-              'Cihaz-içi SQLite • ${bootstrap.environmentLabel} ortamı',
+              'Cihaz-içi SQLite • ${widget.bootstrap.environmentLabel} ortamı',
             ),
           ),
         ),
@@ -379,7 +408,61 @@ class _HomePage extends StatelessWidget {
             ),
           ),
         ),
-        if (bootstrap.backup case final backup?)
+        Card(
+          key: const Key('home-field-tip-card'),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.tips_and_updates_outlined),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Saha İpucu',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Semantics(
+                  key: const Key('field-tip-live-region'),
+                  label: 'Saha İpucu $fieldTipPosition: $fieldTip',
+                  liveRegion: true,
+                  child: Text(fieldTip, key: const Key('field-tip-text')),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    IconButton(
+                      key: const Key('previous-field-tip'),
+                      tooltip: 'Önceki saha ipucu',
+                      onPressed: _showPreviousFieldTip,
+                      icon: const Icon(Icons.arrow_back_rounded),
+                    ),
+                    Expanded(
+                      child: Text(
+                        fieldTipPosition,
+                        key: const Key('field-tip-position'),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    IconButton(
+                      key: const Key('next-field-tip'),
+                      tooltip: 'Sonraki saha ipucu',
+                      onPressed: _showNextFieldTip,
+                      icon: const Icon(Icons.arrow_forward_rounded),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (widget.bootstrap.backup case final backup?)
           Card(
             child: ListTile(
               key: const Key('open-memory-backup'),
