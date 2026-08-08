@@ -6,20 +6,20 @@
     "kind": "documentation_state_truth_sync",
     "merge_claim": false,
     "production_behavior_changed": false,
-    "publication_status": "branch_created_not_merged",
-    "state": "in_progress"
+    "publication_status": "draft_pull_request_open",
+    "pull_request": 384,
+    "state": "in_review"
   },
   "base_branch": "master",
   "current_safe_point": {
-    "issue": 382,
-    "local_test_summary": "V1 final baseline through PR #382; focused application/widget/backup tests, flutter analyze and git diff check were reported PASS in the merged PR evidence.",
-    "merge_commit": "7c9f65a811c9f4bca561adab6bd1f8e64e6908cc",
+    "issue": 277,
+    "local_test_summary": "Issue #277: focused lifecycle 48/48, widget 46/46, concrete 1/1, full Flutter 333/333 and analyze 0; Samsung SM-X610 tablet wide smoke PASS.",
+    "merge_commit": "c72f6bc55fc658996a546d9833b85a2614b99327",
     "mobile_backup_format_version": 1,
     "mobile_schema_version": 10,
     "mobile_version": "0.1.0+1",
-    "pull_request": 382,
-    "record_kind": "pull_request_baseline",
-    "semantics": "latest_merged_v1_field_used_baseline"
+    "pull_request": 278,
+    "semantics": "latest_issue_based_mobile_validation_checkpoint"
   },
   "legacy_last_numbered_step": 225,
   "mobile": {
@@ -50,6 +50,7 @@
   "v1": {
     "baseline_commit": "7c9f65a811c9f4bca561adab6bd1f8e64e6908cc",
     "baseline_pull_request": 382,
+    "baseline_validation_summary": "PR #382 reports focused application, widget and backup tests, flutter analyze and git diff check PASS; schema and backup format unchanged.",
     "field_use": "approximately_one_month",
     "status": "completed_field_used"
   },

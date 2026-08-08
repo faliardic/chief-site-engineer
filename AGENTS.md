@@ -47,16 +47,25 @@ edemez.
 - Her adım küçük, anlaşılır, test edilebilir ve geri alınabilir olmalıdır.
 - Aynı anda yalnız bir production implementation Issue'su aktiftir.
 - Her production Issue tek V2 maddesine ve dar değişen sözleşmeye bağlıdır.
+- Framework, veritabanı veya servis bağımlılığı ancak ihtiyaç netleştiğinde
+  eklenir.
 - Kullanıcının ve önceki görevlerin değişiklikleri korunur.
+- Kod okunabilir, sade ve proje standartlarına uygun yazılır.
 - Production kodu değiştiyse uygun seviyede test eklenir.
+- Kullanıcıya dönük dokümanlar Türkçe; kod, modül ve fonksiyon adları sade
+  İngilizce tutulur.
+- Teknik kararlar `docs/project_decisions.md` içinde kısa ve olgusal maddelerle
+  kaydedilir.
 - Gerçek kullanıcı data root'u current Issue açıkça izin vermedikçe okunmaz veya
   değiştirilmez.
 - Offline-first, owner-only, append-only event, optimistic revision ve
   recoverable archive ilkeleri korunur.
 - Kullanıcı onayı olmadan resmî karar, otomatik kapatma veya private→project
   dönüşümü yapılmaz.
-- Yeni teknik terimler gerekiyorsa learning belgesinde açıklanır; kalıcı terim
+- Yeni teknik terimler ilk geçtiği learning belgesinde açıklanır; kalıcı terim
   `learning/GLOSSARY.md` içine eklenir.
+- Learning belgesi yalnız kısa özet değildir. Gerçek uygulama kodu, test amacı,
+  çalışma akışı, teknik karar ve “Şunu şöyle yaptık ki...” açıklaması içerir.
 
 ## Ana yürütme kuralı
 
@@ -87,6 +96,8 @@ tutulur.
 - Blocking correction: en fazla 1 correction.
 - Aynı başarısız aşama: en fazla 1 düzeltme denemesi.
 - Dar UI/read-model işi hedefi 30 dakika, hard stop 45 dakikadır.
+- 45 dakika sonunda iş tamamlanmadıysa yeni çözüm zinciri veya yeni full gate
+  başlatma; exact blocker, tamamlanan kanıt ve kalan tek adımı raporla.
 - Kaynak kod değişmeden full gate tekrar başlatılmaz.
 - Test veya build kesildiyse yalnız kalan aşama sürdürülür; geçerli kanıtlar
   sıfırlanmaz.
@@ -134,6 +145,9 @@ Current Issue veya task dosyasında şu alanlar bulunmalıdır:
 - UI/read-model değişikliği backup, reboot veya notification motorunu
   değiştirmiyorsa bu kapıları yeniden çalıştırma.
 - ADB otomasyonu minimum, veri koruyan ve exact cihazla sınırlı olmalıdır.
+- Koordinat veya selector otomasyonu hata verirse bir kez düzelt; ikinci aynı
+  başarısızlıkta kör otomasyonu genişletme ve açık kullanıcı ekran doğrulamasına
+  dön.
 
 ## Completion evidence
 
