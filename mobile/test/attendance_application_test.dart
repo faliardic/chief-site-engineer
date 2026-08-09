@@ -147,6 +147,162 @@ void main() {
   });
 
   test(
+    'schema 12 registry profiles persist preserve and clear explicitly',
+    () async {
+      final subcontractor = await attendance.createSubcontractor(
+        const CreateSubcontractorCommand(
+          id: subcontractor1,
+          eventId: '33333333-3333-4333-8333-333333333301',
+          projectId: project1,
+          name: 'Profil taşeronu',
+          contactName: 'Yetkili',
+          phone: '0555 000 00 00',
+          address: '  Şantiye adresi  ',
+          specialty: '  İnce işler  ',
+          startedOn: '2026-07-01',
+          endedOn: '2026-12-31',
+          note: 'Korunan not',
+        ),
+      );
+      expect(subcontractor.address, 'Şantiye adresi');
+      expect(subcontractor.specialty, 'İnce işler');
+      expect(subcontractor.startedOn, '2026-07-01');
+      expect(subcontractor.endedOn, '2026-12-31');
+
+      final noOp = await attendance.updateSubcontractor(
+        UpdateSubcontractorCommand(
+          id: subcontractor.id,
+          eventId: '33333333-3333-4333-8333-333333333302',
+          expectedRevision: subcontractor.revision,
+          name: subcontractor.name,
+          contactName: subcontractor.contactName,
+          phone: subcontractor.phone,
+          note: subcontractor.note,
+        ),
+      );
+      expect(noOp.revision, subcontractor.revision);
+      expect(noOp.address, subcontractor.address);
+      expect(noOp.specialty, subcontractor.specialty);
+      expect(noOp.startedOn, subcontractor.startedOn);
+      expect(noOp.endedOn, subcontractor.endedOn);
+
+      final updatedSubcontractor = await attendance.updateSubcontractor(
+        UpdateSubcontractorCommand(
+          id: subcontractor.id,
+          eventId: '33333333-3333-4333-8333-333333333303',
+          expectedRevision: noOp.revision,
+          name: subcontractor.name,
+          contactName: subcontractor.contactName,
+          phone: subcontractor.phone,
+          specialty: 'Cephe ve ince işler',
+          endedOn: null,
+          replaceSpecialty: true,
+          replaceEndedOn: true,
+          note: subcontractor.note,
+        ),
+      );
+      expect(updatedSubcontractor.address, 'Şantiye adresi');
+      expect(updatedSubcontractor.specialty, 'Cephe ve ince işler');
+      expect(updatedSubcontractor.startedOn, '2026-07-01');
+      expect(updatedSubcontractor.endedOn, isNull);
+
+      await expectLater(
+        attendance.updateSubcontractor(
+          UpdateSubcontractorCommand(
+            id: subcontractor.id,
+            eventId: '33333333-3333-4333-8333-333333333304',
+            expectedRevision: updatedSubcontractor.revision,
+            name: subcontractor.name,
+            contactName: subcontractor.contactName,
+            phone: subcontractor.phone,
+            startedOn: '2026-08-01',
+            endedOn: '2026-07-31',
+            replaceStartedOn: true,
+            replaceEndedOn: true,
+            note: subcontractor.note,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+
+      final team = await attendance.createTeam(
+        const CreateWorkforceTeamCommand(
+          id: team1,
+          eventId: '33333333-3333-4333-8333-333333333305',
+          projectId: project1,
+          subcontractorId: subcontractor1,
+          name: 'Profil ekibi',
+        ),
+      );
+      final member = await attendance.createMember(
+        CreateWorkforceMemberCommand(
+          id: member1,
+          eventId: '33333333-3333-4333-8333-333333333306',
+          projectId: project1,
+          subcontractorId: subcontractor1,
+          teamId: team.id,
+          fullName: 'Profil Personeli',
+          teamName: team.name,
+          roleName: 'Usta',
+          address: 'Personel adresi',
+          startedOn: '2026-07-02',
+        ),
+      );
+      expect(member.address, 'Personel adresi');
+      expect(member.startedOn, '2026-07-02');
+
+      final unrelated = await attendance.updateMember(
+        UpdateWorkforceMemberCommand(
+          id: member.id,
+          eventId: '33333333-3333-4333-8333-333333333307',
+          expectedRevision: member.revision,
+          fullName: member.fullName,
+          subcontractorId: member.subcontractorId,
+          teamId: member.teamId,
+          teamName: member.teamName,
+          roleName: 'Usta başı',
+        ),
+      );
+      expect(unrelated.address, member.address);
+      expect(unrelated.startedOn, member.startedOn);
+
+      final cleared = await attendance.updateMember(
+        UpdateWorkforceMemberCommand(
+          id: member.id,
+          eventId: '33333333-3333-4333-8333-333333333308',
+          expectedRevision: unrelated.revision,
+          fullName: unrelated.fullName,
+          subcontractorId: unrelated.subcontractorId,
+          teamId: unrelated.teamId,
+          teamName: unrelated.teamName,
+          roleName: unrelated.roleName,
+          replaceAddress: true,
+          address: null,
+        ),
+      );
+      expect(cleared.address, isNull);
+      expect(cleared.startedOn, '2026-07-02');
+
+      final restarted = SqliteAttendanceApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        agenda: agenda,
+      );
+      final persistedSubcontractor = (await restarted.listSubcontractors(
+        project1,
+      )).single;
+      final persistedMember = (await restarted.listMembers(project1)).single;
+      expect(persistedSubcontractor.address, 'Şantiye adresi');
+      expect(persistedSubcontractor.specialty, 'Cephe ve ince işler');
+      expect(persistedSubcontractor.startedOn, '2026-07-01');
+      expect(persistedSubcontractor.endedOn, isNull);
+      expect(persistedMember.address, isNull);
+      expect(persistedMember.startedOn, '2026-07-02');
+    },
+  );
+
+  test(
     'registry lifecycle is optimistic append-only and blocks active-person archive',
     () async {
       final subcontractor = await attendance.createSubcontractor(
@@ -411,6 +567,198 @@ void main() {
           ),
         ),
         throwsA(isA<AgendaValidationFailure>()),
+      );
+    },
+  );
+
+  test(
+    'registry move and archive keep canonical attendance compliance and PPE links',
+    () async {
+      await attendance.createSubcontractor(
+        const CreateSubcontractorCommand(
+          id: subcontractor1,
+          eventId: '12121212-1212-4212-8212-121212121201',
+          projectId: project1,
+          name: 'Birinci taşeron',
+        ),
+      );
+      final firstTeam = await attendance.createTeam(
+        const CreateWorkforceTeamCommand(
+          id: team1,
+          eventId: '12121212-1212-4212-8212-121212121202',
+          projectId: project1,
+          subcontractorId: subcontractor1,
+          name: 'Birinci ekip',
+        ),
+      );
+      final member = await attendance.createMember(
+        CreateWorkforceMemberCommand(
+          id: member1,
+          eventId: '12121212-1212-4212-8212-121212121203',
+          projectId: project1,
+          subcontractorId: subcontractor1,
+          teamId: firstTeam.id,
+          fullName: 'Stable Personel',
+          teamName: firstTeam.name,
+          roleName: 'Usta',
+          address: 'Korunan adres',
+          startedOn: '2026-07-01',
+        ),
+      );
+      final oldDay = await _ensureDay(attendance);
+      await attendance.saveRoster(
+        SaveAttendanceRosterCommand(
+          dayId: oldDay.id,
+          eventId: event2,
+          expectedRevision: oldDay.revision,
+          values: const [
+            AttendanceRosterValue(
+              entryId: entry1,
+              memberId: member1,
+              result: AttendanceResult.fullDay,
+              overtimeMinutes: 0,
+            ),
+          ],
+        ),
+      );
+      await attendance.saveComplianceRecord(
+        const SaveComplianceRecordCommand(
+          id: '13131313-1313-4313-8313-131313131301',
+          eventId: '14141414-1414-4414-8414-141414141401',
+          memberId: member1,
+          expectedRevision: 0,
+          documentType: ComplianceDocumentType.employmentEntry,
+          sourceStatus: ComplianceSourceStatus.valid,
+          issuedDate: '2026-07-01',
+        ),
+      );
+      await attendance.savePpeAssignment(
+        const SavePpeAssignmentCommand(
+          id: '15151515-1515-4515-8515-151515151501',
+          eventId: '16161616-1616-4616-8616-161616161601',
+          memberId: member1,
+          expectedRevision: 0,
+          ppeType: 'Baret',
+          quantity: 1,
+          assignedDate: '2026-07-01',
+          status: PpeAssignmentStatus.assigned,
+        ),
+      );
+      await attendance.createSubcontractor(
+        const CreateSubcontractorCommand(
+          id: subcontractor2,
+          eventId: '12121212-1212-4212-8212-121212121204',
+          projectId: project1,
+          name: 'İkinci taşeron',
+        ),
+      );
+      final secondTeam = await attendance.createTeam(
+        const CreateWorkforceTeamCommand(
+          id: '22222222-2222-4222-8222-222222222222',
+          eventId: '12121212-1212-4212-8212-121212121205',
+          projectId: project1,
+          subcontractorId: subcontractor2,
+          name: 'İkinci ekip',
+        ),
+      );
+      final moved = await attendance.updateMember(
+        UpdateWorkforceMemberCommand(
+          id: member.id,
+          eventId: '12121212-1212-4212-8212-121212121206',
+          expectedRevision: member.revision,
+          fullName: member.fullName,
+          subcontractorId: subcontractor2,
+          teamId: secondTeam.id,
+          teamName: secondTeam.name,
+          roleName: member.roleName,
+        ),
+      );
+      expect(moved.id, member.id);
+      expect(moved.subcontractorId, subcontractor2);
+      expect(moved.teamId, secondTeam.id);
+      expect(moved.address, member.address);
+      expect(moved.startedOn, member.startedOn);
+
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      for (final table in [
+        'attendance_entries',
+        'workforce_compliance_records',
+        'workforce_ppe_assignments',
+      ]) {
+        expect(
+          (await raw.query(table)).single['workforce_member_id'],
+          member.id,
+        );
+      }
+      expect(await raw.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      await raw.close();
+
+      final archived = await attendance.archiveMember(
+        ArchiveWorkforceMemberCommand(
+          id: moved.id,
+          eventId: '12121212-1212-4212-8212-121212121207',
+          expectedRevision: moved.revision,
+        ),
+      );
+      final historical = await attendance.getDayDetail(oldDay.id);
+      expect(historical.entries.single.memberId, member.id);
+      expect(historical.entries.single.memberIsActive, isFalse);
+
+      final newDay = await attendance.ensureDay(
+        const EnsureAttendanceDayCommand(
+          id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2',
+          eventId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee5',
+          projectId: project1,
+          localDate: '2026-07-20',
+        ),
+      );
+      await expectLater(
+        attendance.saveRoster(
+          SaveAttendanceRosterCommand(
+            dayId: newDay.id,
+            eventId: event6,
+            expectedRevision: newDay.revision,
+            values: const [
+              AttendanceRosterValue(
+                entryId: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd2',
+                memberId: member1,
+                result: AttendanceResult.fullDay,
+                overtimeMinutes: 0,
+              ),
+            ],
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      final restored = await attendance.archiveMember(
+        ArchiveWorkforceMemberCommand(
+          id: archived.id,
+          eventId: '12121212-1212-4212-8212-121212121208',
+          expectedRevision: archived.revision,
+          archive: false,
+        ),
+      );
+      expect(restored.id, member.id);
+      expect(restored.isActive, isTrue);
+      expect(restored.subcontractorId, subcontractor2);
+      expect(restored.teamId, secondTeam.id);
+      await attendance.saveRoster(
+        SaveAttendanceRosterCommand(
+          dayId: newDay.id,
+          eventId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee6',
+          expectedRevision: newDay.revision,
+          values: const [
+            AttendanceRosterValue(
+              entryId: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd2',
+              memberId: member1,
+              result: AttendanceResult.fullDay,
+              overtimeMinutes: 0,
+            ),
+          ],
+        ),
       );
     },
   );

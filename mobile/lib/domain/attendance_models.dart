@@ -64,6 +64,10 @@ class Subcontractor {
     required this.name,
     required this.contactName,
     required this.phone,
+    this.address,
+    this.specialty,
+    this.startedOn,
+    this.endedOn,
     required this.note,
     required this.status,
     required this.activeTeamCount,
@@ -79,6 +83,10 @@ class Subcontractor {
   final String name;
   final String? contactName;
   final String? phone;
+  final String? address;
+  final String? specialty;
+  final String? startedOn;
+  final String? endedOn;
   final String? note;
   final WorkforceRecordStatus status;
   final int activeTeamCount;
@@ -137,6 +145,8 @@ class WorkforceMember {
     this.subcontractorName,
     this.teamId,
     this.phone,
+    this.address,
+    this.startedOn,
     this.note,
     required this.isActive,
     required this.revision,
@@ -155,6 +165,8 @@ class WorkforceMember {
   final String? subcontractorName;
   final String? teamId;
   final String? phone;
+  final String? address;
+  final String? startedOn;
   final String? note;
   final bool isActive;
   final int revision;
@@ -509,6 +521,8 @@ class CreateWorkforceMemberCommand {
     this.subcontractorId,
     this.teamId,
     this.phone,
+    this.address,
+    this.startedOn,
     this.note,
     this.eventId,
   });
@@ -522,6 +536,8 @@ class CreateWorkforceMemberCommand {
   final String? subcontractorId;
   final String? teamId;
   final String? phone;
+  final String? address;
+  final String? startedOn;
   final String? note;
   final String? eventId;
 }
@@ -537,6 +553,10 @@ class UpdateWorkforceMemberCommand {
     this.subcontractorId,
     this.teamId,
     this.phone,
+    this.address,
+    this.startedOn,
+    this.replaceAddress = false,
+    this.replaceStartedOn = false,
     this.note,
     this.eventId,
   });
@@ -550,6 +570,10 @@ class UpdateWorkforceMemberCommand {
   final String? subcontractorId;
   final String? teamId;
   final String? phone;
+  final String? address;
+  final String? startedOn;
+  final bool replaceAddress;
+  final bool replaceStartedOn;
   final String? note;
   final String? eventId;
 }
@@ -642,6 +666,10 @@ class CreateSubcontractorCommand {
     required this.name,
     this.contactName,
     this.phone,
+    this.address,
+    this.specialty,
+    this.startedOn,
+    this.endedOn,
     this.note,
   });
   final String id;
@@ -650,6 +678,10 @@ class CreateSubcontractorCommand {
   final String name;
   final String? contactName;
   final String? phone;
+  final String? address;
+  final String? specialty;
+  final String? startedOn;
+  final String? endedOn;
   final String? note;
 }
 
@@ -661,6 +693,14 @@ class UpdateSubcontractorCommand {
     required this.name,
     this.contactName,
     this.phone,
+    this.address,
+    this.specialty,
+    this.startedOn,
+    this.endedOn,
+    this.replaceAddress = false,
+    this.replaceSpecialty = false,
+    this.replaceStartedOn = false,
+    this.replaceEndedOn = false,
     this.note,
   });
   final String id;
@@ -669,6 +709,14 @@ class UpdateSubcontractorCommand {
   final String name;
   final String? contactName;
   final String? phone;
+  final String? address;
+  final String? specialty;
+  final String? startedOn;
+  final String? endedOn;
+  final bool replaceAddress;
+  final bool replaceSpecialty;
+  final bool replaceStartedOn;
+  final bool replaceEndedOn;
   final String? note;
 }
 

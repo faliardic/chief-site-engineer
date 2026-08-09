@@ -136,7 +136,7 @@ void main() {
   });
 
   test(
-    'format 1 backup round-trips schema 11 trashed all-day reminder and audit',
+    'format 1 backup round-trips schema 12 trashed all-day reminder and audit',
     () async {
       final agenda = SqliteAgendaApplication(
         databasePath: directories.databaseFile,
@@ -390,7 +390,7 @@ void main() {
   });
 
   test(
-    'full fixture preserves rows, append-only events, links and attachment bytes',
+    'schema 12 full fixture preserves profiles IDs events links and attachments',
     () async {
       final expectedBytes = <int>[0, 1, 2, 127, 128, 255];
       await _seedFullFixture(directories, expectedBytes);
@@ -460,6 +460,30 @@ void main() {
 
       expect(await _fixtureSnapshot(directories), before);
       await _expectV21LocationFixture(directories);
+      final restoredProfiles = await _openRaw(directories);
+      final restoredSubcontractor = (await restoredProfiles.query(
+        'subcontractors',
+        where: 'id = ?',
+        whereArgs: ['subcontractor-1'],
+      )).single;
+      final restoredMember = (await restoredProfiles.query(
+        'workforce_members',
+        where: 'id = ?',
+        whereArgs: ['worker-1'],
+      )).single;
+      expect(restoredSubcontractor['address'], 'Şantiye firma adresi');
+      expect(restoredSubcontractor['specialty'], 'Kalıp ve beton');
+      expect(restoredSubcontractor['started_on'], '2026-07-01');
+      expect(restoredSubcontractor['ended_on'], '2026-12-31');
+      expect(restoredMember['address'], 'Personel saha adresi');
+      expect(restoredMember['started_on'], '2026-07-02');
+      expect(
+        (await restoredProfiles.query(
+          'attendance_entries',
+        )).single['workforce_member_id'],
+        restoredMember['id'],
+      );
+      await restoredProfiles.close();
       expect(await attachment.readAsBytes(), expectedBytes);
       expect(
         await File(
@@ -616,9 +640,9 @@ void main() {
     },
   );
 
-  for (final schemaVersion in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+  for (final schemaVersion in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) {
     test(
-      'schema v$schemaVersion package migrates to v11 without count loss',
+      'schema v$schemaVersion package migrates to v12 without count loss',
       () async {
         final oldRoot = await Directory.systemTemp.createTemp(
           'cse_schema${schemaVersion}_',
@@ -645,7 +669,7 @@ void main() {
         final databaseBytes = await File(oldFile).readAsBytes();
         const legacyAgendaBytes = <int>[0xff, 0xd8, 0xff, 0xd9];
         const legacyConcreteBytes = <int>[7, 8, 9];
-        final attachmentBytes = schemaVersion == 10
+        final attachmentBytes = schemaVersion >= 10
             ? <String, List<int>>{
                 'agenda/legacy.jpg': legacyAgendaBytes,
                 'concrete/legacy.bin': legacyConcreteBytes,
@@ -711,17 +735,39 @@ void main() {
         expect(counts['attendance_days'], hasAttendance);
         expect(counts['attendance_entries'], hasAttendance);
         expect(counts['attendance_events'], hasAttendance);
-        final hasConcrete = schemaVersion == 10 ? 1 : 0;
+        final hasConcrete = schemaVersion >= 10 ? 1 : 0;
         expect(counts['concrete_pours'], hasConcrete);
         expect(counts['project_concrete_classes'], hasConcrete);
         expect(counts['project_concrete_class_events'], hasConcrete);
         expect(counts['concrete_pour_context_links'], hasConcrete);
         expect(counts['concrete_pour_events'], hasConcrete);
         expect(counts['concrete_attachments'], hasConcrete);
-        expect(counts['agenda_log_attachments'], schemaVersion == 10 ? 1 : 0);
+        expect(counts['agenda_log_attachments'], schemaVersion >= 10 ? 1 : 0);
         expect(counts['project_locations'], 0);
         expect(counts['project_events'], 0);
         expect(counts['project_location_events'], 0);
+        if (schemaVersion == 11) {
+          final restored = await _openRaw(directories);
+          final subcontractor = (await restored.query('subcontractors')).single;
+          final member = (await restored.query('workforce_members')).single;
+          expect([
+            subcontractor['address'],
+            subcontractor['specialty'],
+            subcontractor['started_on'],
+            subcontractor['ended_on'],
+            member['address'],
+            member['started_on'],
+          ], everyElement(isNull));
+          expect(subcontractor['id'], 'legacy-subcontractor');
+          expect(member['id'], 'legacy-worker');
+          expect(
+            (await restored.query(
+              'attendance_entries',
+            )).single['workforce_member_id'],
+            member['id'],
+          );
+          await restored.close();
+        }
         if (schemaVersion == 7) {
           final restored = await _openRaw(directories);
           final legacyReminder = (await restored.query(
@@ -762,7 +808,7 @@ void main() {
           );
           await restored.close();
         }
-        if (schemaVersion == 10) {
+        if (schemaVersion >= 10) {
           final restored = await _openRaw(directories);
           final observation = (await restored.query(
             'field_observations',
@@ -820,7 +866,10 @@ void main() {
     });
     final databaseBytes = await File(directories.databaseFile).readAsBytes();
     final archive = const CseBackupArchiveCodec().encode(
-      manifest: _manifest(databaseBytes, schemaVersion: 12),
+      manifest: _manifest(
+        databaseBytes,
+        schemaVersion: AppDatabase.schemaVersion + 1,
+      ),
       databaseBytes: databaseBytes,
       attachments: const {},
     );
@@ -1419,6 +1468,10 @@ Future<void> _seedFullFixture(
       'project_id': 'project-1',
       'name': 'Ana yüklenici',
       'name_normalized': 'ana yüklenici',
+      'address': 'Şantiye firma adresi',
+      'specialty': 'Kalıp ve beton',
+      'started_on': '2026-07-01',
+      'ended_on': '2026-12-31',
       'status': 'active',
       'revision': 1,
       'created_at': _now,
@@ -1443,6 +1496,8 @@ Future<void> _seedFullFixture(
       'full_name': 'Ayşe Usta',
       'team_name': 'Kalıp',
       'role_name': 'Usta',
+      'address': 'Personel saha adresi',
+      'started_on': '2026-07-02',
       'is_active': 1,
       'revision': 1,
       'created_at': _now,

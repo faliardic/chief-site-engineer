@@ -27,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 11;
+  static const schemaVersion = 12;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2859,6 +2859,26 @@ class AppDatabase {
             SELECT RAISE(ABORT, 'physical delete is not allowed');
           END
         ''');
+      },
+    ),
+    DatabaseMigration(
+      version: 12,
+      apply: (transaction) async {
+        for (final column in [
+          'address TEXT',
+          'specialty TEXT',
+          'started_on TEXT',
+          'ended_on TEXT',
+        ]) {
+          await transaction.execute(
+            'ALTER TABLE subcontractors ADD COLUMN $column',
+          );
+        }
+        for (final column in ['address TEXT', 'started_on TEXT']) {
+          await transaction.execute(
+            'ALTER TABLE workforce_members ADD COLUMN $column',
+          );
+        }
       },
     ),
   ];
