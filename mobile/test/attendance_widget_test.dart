@@ -53,10 +53,24 @@ void main() {
     await tester.tap(find.byKey(const Key('open-attendance-day')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('attendance-day-detail')), findsOneWidget);
-    expect(find.byKey(Key('attendance-member-$memberId')), findsOneWidget);
-    expect(find.textContaining('Çok Uzun Türkçe'), findsWidgets);
+    expect(find.byKey(const Key('attendance-roster-selector')), findsOneWidget);
+    expect(find.byKey(Key('attendance-member-$memberId')), findsNothing);
+    expect(find.textContaining('Önce taşeron seçin'), findsOneWidget);
     expect(find.byKey(const Key('mark-all-full')), findsOneWidget);
-    expect(find.byKey(const Key('save-attendance-draft')), findsOneWidget);
+    final save = find.byKey(const Key('save-attendance-draft'));
+    await tester.scrollUntilVisible(
+      save,
+      240,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('attendance-day-detail')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+      maxScrolls: 12,
+    );
+    await tester.pumpAndSettle();
+    expect(save, findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
