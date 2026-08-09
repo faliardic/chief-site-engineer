@@ -1,21 +1,26 @@
+import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/concrete_models.dart';
+import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/features/owned_text_input_dialog.dart';
+import 'package:chief_site_engineer/features/agenda/project_location_catalog_page.dart';
 import 'package:flutter/material.dart';
 
 class ConcretePourFormPage extends StatefulWidget {
   const ConcretePourFormPage({
     required this.concrete,
     required this.projects,
+    this.projectLocations,
     this.initialProject,
     super.key,
   });
 
   final ConcreteApplication concrete;
   final List<MobileProject> projects;
+  final ProjectLocationApplication? projectLocations;
   final MobileProject? initialProject;
 
   @override
@@ -44,6 +49,10 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
   DateTime? _laboratoryAppointment;
   DateTime? _inspectionNotifiedAt;
   List<ProjectConcreteClass> _classes = const [];
+  List<MobileProjectLocation> _locations = const [];
+  String? _locationId;
+  bool _loadingLocations = false;
+  String? _locationError;
   ProjectConcreteClass? _selectedClass;
   bool _loadingClasses = true;
   bool _saving = false;
@@ -55,6 +64,7 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
     _project = widget.initialProject ?? widget.projects.first;
     _planned = DateTime.now().add(const Duration(hours: 1));
     _loadClasses();
+    _loadLocations();
   }
 
   @override
@@ -108,8 +118,51 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
       _project = value;
       _selectedClass = null;
       _classes = const [];
+      _locations = const [];
+      _locationId = null;
     });
-    await _loadClasses();
+    await Future.wait([_loadClasses(), _loadLocations()]);
+  }
+
+  Future<void> _loadLocations() async {
+    final application = widget.projectLocations;
+    if (application == null) return;
+    setState(() {
+      _loadingLocations = true;
+      _locationError = null;
+    });
+    try {
+      final values = await application.listProjectLocations(
+        ProjectLocationQuery(projectId: _project.id),
+      );
+      if (!mounted) return;
+      setState(() {
+        _locations = values;
+        if (!values.any((item) => item.id == _locationId)) _locationId = null;
+        _loadingLocations = false;
+      });
+    } on Object {
+      if (!mounted) return;
+      setState(() {
+        _locations = const [];
+        _loadingLocations = false;
+        _locationError = 'Mahaller güvenli biçimde okunamadı.';
+      });
+    }
+  }
+
+  Future<void> _openLocationCatalog() async {
+    final application = widget.projectLocations;
+    if (application == null) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ProjectLocationCatalogPage(
+          application: application,
+          initialProjectId: _project.id,
+        ),
+      ),
+    );
+    if (mounted) await _loadLocations();
   }
 
   Future<void> _addClass() async {
@@ -136,8 +189,10 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
       if (!mounted) return;
       setState(() {
         _classes = [..._classes, value]
-          ..sort((left, right) =>
-              left.normalizedName.compareTo(right.normalizedName));
+          ..sort(
+            (left, right) =>
+                left.normalizedName.compareTo(right.normalizedName),
+          );
         _selectedClass = value;
         _slump.text = value.defaultTargetSlump ?? '';
       });
@@ -200,6 +255,7 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
               ? 'DOKUM-${_id.substring(0, 8).toUpperCase()}'
               : _code.text,
           elementLocation: _location.text,
+          locationId: _locationId,
           plannedAt: canonical,
           concreteClassId: selectedClass.id,
           plannedVolumeM3: double.parse(_volume.text.replaceAll(',', '.')),
@@ -261,7 +317,8 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
               ),
               const SizedBox(height: 12),
               _field(_code, 'Döküm kodu (boşsa otomatik üretilir)'),
-              _field(_location, 'Mahal / eleman', required: true),
+              _buildLocationSelector(),
+              _field(_location, 'Eleman / yer tarifi', required: true),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Planlanan tarih/saat'),
@@ -377,6 +434,64 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
     );
   }
 
+  Widget _buildLocationSelector() => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_loadingLocations) const LinearProgressIndicator(),
+        DropdownButtonFormField<String>(
+          key: const Key('concrete-location-selector'),
+          initialValue: _locationId,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Katalog Mahali (opsiyonel)',
+            border: OutlineInputBorder(),
+          ),
+          items: [
+            const DropdownMenuItem<String>(
+              value: null,
+              child: Text('Mahal seçilmedi'),
+            ),
+            ..._concreteLocationOptions(_locations).map(
+              (item) => DropdownMenuItem<String>(
+                value: item.$1,
+                child: Text(item.$2, overflow: TextOverflow.ellipsis),
+              ),
+            ),
+          ],
+          onChanged: _loadingLocations
+              ? null
+              : (value) => setState(() => _locationId = value),
+        ),
+        if (!_loadingLocations && _locations.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: Text(
+              'Bu projede aktif mahal yok.',
+              key: Key('concrete-location-empty'),
+            ),
+          ),
+        if (_locationError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              _locationError!,
+              key: const Key('concrete-location-load-error'),
+            ),
+          ),
+        TextButton.icon(
+          key: const Key('open-location-catalog-from-concrete'),
+          onPressed: widget.projectLocations == null
+              ? null
+              : _openLocationCatalog,
+          icon: const Icon(Icons.account_tree_outlined),
+          label: const Text('Mahal Kataloğu'),
+        ),
+      ],
+    ),
+  );
+
   Widget _field(
     TextEditingController controller,
     String label, {
@@ -468,4 +583,25 @@ class _ConcretePourFormPageState extends State<ConcretePourFormPage> {
       '${value.month.toString().padLeft(2, '0')}.${value.year} '
       '${value.hour.toString().padLeft(2, '0')}:'
       '${value.minute.toString().padLeft(2, '0')}';
+}
+
+List<(String, String)> _concreteLocationOptions(
+  List<MobileProjectLocation> locations,
+) {
+  final byId = {for (final item in locations) item.id: item};
+  String pathFor(MobileProjectLocation item, Set<String> visiting) {
+    if (!visiting.add(item.id)) return item.displayName;
+    final parent = item.parentLocationId == null
+        ? null
+        : byId[item.parentLocationId];
+    final value = parent == null
+        ? item.displayName
+        : '${pathFor(parent, visiting)} › ${item.displayName}';
+    visiting.remove(item.id);
+    return value;
+  }
+
+  return locations
+      .map((item) => (item.id, pathFor(item, <String>{})))
+      .toList(growable: false);
 }

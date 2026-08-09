@@ -183,6 +183,9 @@ class ConcretePour {
     required this.projectName,
     required this.pourCode,
     required this.elementLocation,
+    this.locationId,
+    this.stableLocationName,
+    this.stableLocationArchivedAt,
     required this.blockName,
     required this.floorName,
     required this.axisName,
@@ -222,6 +225,9 @@ class ConcretePour {
   final String projectName;
   final String pourCode;
   final String elementLocation;
+  final String? locationId;
+  final String? stableLocationName;
+  final String? stableLocationArchivedAt;
   final String? blockName;
   final String? floorName;
   final String? axisName;
@@ -573,6 +579,7 @@ class CreateConcretePourCommand {
     required this.projectId,
     required this.pourCode,
     required this.elementLocation,
+    this.locationId,
     required this.plannedAt,
     required this.concreteClassId,
     required this.plannedVolumeM3,
@@ -599,6 +606,7 @@ class CreateConcretePourCommand {
   final String projectId;
   final String pourCode;
   final String elementLocation;
+  final String? locationId;
   final String plannedAt;
   final String concreteClassId;
   final double plannedVolumeM3;
@@ -668,6 +676,7 @@ class UpdateConcretePourCommand {
     required this.eventId,
     required this.expectedRevision,
     required this.elementLocation,
+    this.locationId,
     required this.plannedAt,
     required this.concreteClass,
     required this.plannedVolumeM3,
@@ -695,6 +704,7 @@ class UpdateConcretePourCommand {
   final String eventId;
   final int expectedRevision;
   final String elementLocation;
+  final String? locationId;
   final String plannedAt;
   final String concreteClass;
   final double plannedVolumeM3;

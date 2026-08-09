@@ -4,6 +4,7 @@ import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_photo_viewer_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_day_page.dart';
@@ -19,6 +20,7 @@ class ReminderDetailPage extends StatefulWidget {
     this.attendance,
     this.concrete,
     this.concreteAttachments,
+    this.projectLocations,
     this.istanbulToday,
     super.key,
   });
@@ -28,6 +30,7 @@ class ReminderDetailPage extends StatefulWidget {
   final AttendanceApplication? attendance;
   final ConcreteApplication? concrete;
   final SafeAttachmentPicker? concreteAttachments;
+  final ProjectLocationApplication? projectLocations;
   final String? istanbulToday;
 
   @override
@@ -158,6 +161,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
     String? title,
     String? description,
     ReminderKind? kind,
+    String? locationId,
     String? location,
     String? relatedPerson,
     bool? isImportant,
@@ -183,6 +187,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
           title: title,
           description: description,
           kind: kind,
+          locationId: locationId,
           location: location,
           relatedPerson: relatedPerson,
           isImportant: isImportant,
@@ -317,10 +322,10 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
                       subtitle: const Text(
                         'Saat seçmeden bir takvim günü planla',
                       ),
-                      onTap: () => Navigator.pop(
-                        sheetContext,
-                        (allDay: true, schedule: null),
-                      ),
+                      onTap: () => Navigator.pop(sheetContext, (
+                        allDay: true,
+                        schedule: null,
+                      )),
                     ),
                 ],
               ),
@@ -678,6 +683,23 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
     final title = TextEditingController(text: reminder.title);
     final description = TextEditingController(text: reminder.description);
     final location = TextEditingController(text: reminder.location);
+    var locationId = reminder.locationId;
+    List<MobileProjectLocation> locations = const [];
+    if (reminder.projectId != null && widget.projectLocations != null) {
+      try {
+        locations = await widget.projectLocations!.listProjectLocations(
+          ProjectLocationQuery(projectId: reminder.projectId!),
+        );
+      } on Object {
+        locations = const [];
+      }
+    }
+    if (!mounted) {
+      title.dispose();
+      description.dispose();
+      location.dispose();
+      return;
+    }
     final person = TextEditingController(text: reminder.relatedPerson);
     final condition = TextEditingController(text: reminder.conditionText);
     var kind = reminder.kind;
@@ -731,10 +753,42 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
                         .toList(),
                     onChanged: (value) => setDialogState(() => kind = value!),
                   ),
-                  TextField(
-                    controller: location,
-                    decoration: const InputDecoration(labelText: 'Mahál'),
-                  ),
+                  if (reminder.projectId == null)
+                    TextField(
+                      controller: location,
+                      decoration: const InputDecoration(labelText: 'Mahál'),
+                    )
+                  else
+                    DropdownButtonFormField<String>(
+                      key: const Key('edit-reminder-location-selector'),
+                      initialValue: locationId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Mahal (opsiyonel)',
+                      ),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: null,
+                          child: Text('Mahal seçilmedi'),
+                        ),
+                        ...locations.map(
+                          (item) => DropdownMenuItem<String>(
+                            value: item.id,
+                            child: Text(item.displayName),
+                          ),
+                        ),
+                        if (locationId != null &&
+                            !locations.any((item) => item.id == locationId))
+                          DropdownMenuItem<String>(
+                            value: locationId,
+                            child: Text(
+                              '${reminder.stableLocationName ?? reminder.location ?? 'Arşivli mahal'} (Arşivli)',
+                            ),
+                          ),
+                      ],
+                      onChanged: (value) =>
+                          setDialogState(() => locationId = value),
+                    ),
                   TextField(
                     controller: person,
                     decoration: const InputDecoration(labelText: 'İlgili kişi'),
@@ -817,6 +871,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
         title: title.text,
         description: description.text,
         kind: kind,
+        locationId: locationId,
         location: location.text,
         relatedPerson: person.text,
         isImportant: important,
@@ -909,8 +964,12 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
         ),
         if (reminder.description != null)
           _ReminderRow(label: 'Açıklama', value: reminder.description!),
-        if (reminder.location != null)
-          _ReminderRow(label: 'Mahál', value: reminder.location!),
+        if (reminder.displayLocation != null)
+          _ReminderRow(
+            label: 'Mahal',
+            value:
+                '${reminder.displayLocation!}${reminder.stableLocationArchivedAt == null ? '' : ' (Arşivli)'}',
+          ),
         if (reminder.relatedPerson != null)
           _ReminderRow(label: 'İlgili kişi', value: reminder.relatedPerson!),
         if (reminder.conditionText != null)
@@ -1015,6 +1074,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
                     concrete: widget.concrete!,
                     agenda: widget.agenda,
                     attachments: widget.concreteAttachments!,
+                    projectLocations: widget.projectLocations,
                     pourId: reminder.concretePourId!,
                   ),
                 ),

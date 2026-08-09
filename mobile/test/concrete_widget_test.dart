@@ -228,29 +228,52 @@ void main() {
           ),
         ),
       );
-      await tester.enterText(
-        find.widgetWithText(
-          TextFormField,
-          'Döküm kodu (boşsa otomatik üretilir)',
-        ),
-        'BT-187',
+      final codeField = find.widgetWithText(
+        TextFormField,
+        'Döküm kodu (boşsa otomatik üretilir)',
+      );
+      await tester.enterText(codeField, 'BT-187');
+      final createButton = find.widgetWithText(
+        FilledButton,
+        'Beton paketini oluştur',
+      );
+      final formScrollable = find
+          .descendant(
+            of: find.byType(ListView).first,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  widget.axisDirection == AxisDirection.down,
+            ),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        createButton,
+        300,
+        scrollable: formScrollable,
       );
       tester
           .widget<FilledButton>(
-            find.widgetWithText(FilledButton, 'Beton paketini oluştur'),
+            createButton,
           )
           .onPressed!();
       await tester.pump();
+      await tester.scrollUntilVisible(
+        codeField,
+        -300,
+        scrollable: formScrollable,
+      );
+      await tester.pumpAndSettle();
       expect(find.text('BT-187'), findsOneWidget);
-      expect(find.text('Mahal / eleman zorunludur.'), findsOneWidget);
+      expect(find.text('Eleman / yer tarifi zorunludur.'), findsOneWidget);
 
       await tester.scrollUntilVisible(
-        find.widgetWithText(TextFormField, 'Mahal / eleman'),
+        find.widgetWithText(TextFormField, 'Eleman / yer tarifi'),
         -300,
-        scrollable: find.byType(Scrollable).last,
+        scrollable: formScrollable,
       );
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Mahal / eleman'),
+        find.widgetWithText(TextFormField, 'Eleman / yer tarifi'),
         'KOLON A1',
       );
       await tester.tap(find.byKey(const Key('concrete-class-selector')));
@@ -660,6 +683,16 @@ void main() {
 
       await tester.pumpWidget(page());
       await tester.pumpAndSettle();
+      final detailScrollable = find
+          .descendant(
+            of: find.byType(ListView).first,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  widget.axisDirection == AxisDirection.down,
+            ),
+          )
+          .first;
       await tester.tap(find.byKey(const Key('start-concrete-pour')));
       await tester.pumpAndSettle();
       for (final blocker in [
@@ -674,10 +707,13 @@ void main() {
       await tester.scrollUntilVisible(
         threeOpen,
         300,
-        scrollable: find.byType(Scrollable).last,
+        scrollable: detailScrollable,
       );
       expect(threeOpen, findsOneWidget);
-      await tester.tap(find.byKey(const Key('bulk-complete-concrete')));
+      final bulkComplete = find.byKey(const Key('bulk-complete-concrete'));
+      await tester.ensureVisible(bulkComplete);
+      await tester.pumpAndSettle();
+      await tester.tap(bulkComplete);
       await tester.pumpAndSettle();
       expect(find.text('Manuel maddeleri tamamla'), findsNWidgets(3));
       expect(
@@ -707,12 +743,18 @@ void main() {
         await tester.scrollUntilVisible(
           finder,
           200,
-          scrollable: find.byType(Scrollable).last,
+          scrollable: detailScrollable,
         );
         expect(finder, findsOneWidget);
       }
 
-      await tester.tap(find.text('Laboratuvar randevusunu güncelle'));
+      final laboratoryAction = find.text(
+        'Laboratuvar randevusunu güncelle',
+      );
+      await tester.ensureVisible(laboratoryAction);
+      await tester.drag(detailScrollable, const Offset(0, 120));
+      await tester.pumpAndSettle();
+      await tester.tap(laboratoryAction);
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const Key('laboratory-appointment-complete')),
@@ -737,7 +779,7 @@ void main() {
       await tester.scrollUntilVisible(
         start,
         -300,
-        scrollable: find.byType(Scrollable).last,
+        scrollable: detailScrollable,
       );
       await tester.ensureVisible(start);
       await tester.pumpAndSettle();

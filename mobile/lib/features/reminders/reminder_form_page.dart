@@ -4,13 +4,21 @@ import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/domain/project_location_models.dart';
+import 'package:chief_site_engineer/features/agenda/project_location_catalog_page.dart';
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 
 class ReminderFormPage extends StatefulWidget {
-  const ReminderFormPage({required this.agenda, this.log, super.key});
+  const ReminderFormPage({
+    required this.agenda,
+    this.projectLocations,
+    this.log,
+    super.key,
+  });
 
   final AgendaApplication agenda;
+  final ProjectLocationApplication? projectLocations;
   final AgendaLog? log;
 
   @override
@@ -27,7 +35,12 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   late final String _recordId;
   late final String _eventId;
   List<MobileProject> _projects = const [];
+  List<MobileProjectLocation> _locations = const [];
   String? _projectId;
+  String? _locationId;
+  bool _loadingLocations = false;
+  String? _locationError;
+  int _locationLoadGeneration = 0;
   ReminderKind _kind = ReminderKind.action;
   ReminderScheduleKind _schedule = ReminderScheduleKind.in15Minutes;
   String? _quickSchedulePreviewAt;
@@ -47,6 +60,8 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
     super.initState();
     _title = TextEditingController(text: widget.log?.description ?? '');
     _projectId = widget.log?.projectId;
+    _locationId = widget.log?.locationId;
+    if (_locationId == null) _location.text = widget.log?.location ?? '';
     _recordId = RecordId.randomUuid();
     _eventId = RecordId.randomUuid();
     final local = CseTimeCodec.toIstanbul(
@@ -57,7 +72,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
     _projectSubscription = widget.agenda.projectChanges.listen(
       (_) => _loadProjects(),
     );
-    _loadProjects();
+    _loadProjects().then((_) => _loadLocations());
   }
 
   Future<void> _loadProjects() async {
@@ -67,6 +82,69 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
     } on Object {
       // Standalone capture remains available without a project.
     }
+  }
+
+  Future<void> _loadLocations() async {
+    final application = widget.projectLocations;
+    final projectId = widget.log?.projectId ?? _projectId;
+    if (application == null) return;
+    final generation = ++_locationLoadGeneration;
+    setState(() {
+      _loadingLocations = projectId != null;
+      _locationError = null;
+      if (projectId == null) _locations = const [];
+    });
+    if (projectId == null) return;
+    try {
+      final values = await application.listProjectLocations(
+        ProjectLocationQuery(projectId: projectId),
+      );
+      if (!mounted || generation != _locationLoadGeneration) return;
+      final canKeepSourceArchived =
+          _locationId != null &&
+          widget.log?.locationId == _locationId &&
+          widget.log?.stableLocationName != null;
+      setState(() {
+        _locations = values;
+        if (!values.any((item) => item.id == _locationId) &&
+            !canKeepSourceArchived) {
+          _locationId = null;
+        }
+        _loadingLocations = false;
+      });
+    } on Object {
+      if (!mounted || generation != _locationLoadGeneration) return;
+      setState(() {
+        _locations = const [];
+        _loadingLocations = false;
+        _locationError = 'Mahaller güvenli biçimde okunamadı.';
+      });
+    }
+  }
+
+  Future<void> _selectProject(String? projectId) async {
+    if (projectId == _projectId) return;
+    setState(() {
+      _projectId = projectId;
+      _locationId = null;
+      _location.clear();
+    });
+    await _loadLocations();
+  }
+
+  Future<void> _openLocationCatalog() async {
+    final application = widget.projectLocations;
+    final projectId = widget.log?.projectId ?? _projectId;
+    if (application == null || projectId == null) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ProjectLocationCatalogPage(
+          application: application,
+          initialProjectId: projectId,
+        ),
+      ),
+    );
+    if (mounted) await _loadLocations();
   }
 
   @override
@@ -118,6 +196,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
           description: _description.text,
           kind: _kind,
           schedule: _schedule,
+          locationId: _locationId,
           location: _location.text,
           relatedPerson: _relatedPerson.text,
           isImportant: _isImportant,
@@ -290,7 +369,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
                     ),
                   ),
                 ],
-                onChanged: (value) => setState(() => _projectId = value),
+                onChanged: _selectProject,
               ),
               const SizedBox(height: 12),
             ],
@@ -415,14 +494,17 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                TextField(
-                  key: const Key('reminder-location'),
-                  controller: _location,
-                  decoration: const InputDecoration(
-                    labelText: 'Mahál',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
+                if ((widget.log?.projectId ?? _projectId) == null)
+                  TextField(
+                    key: const Key('reminder-location'),
+                    controller: _location,
+                    decoration: const InputDecoration(
+                      labelText: 'Mahál',
+                      border: OutlineInputBorder(),
+                    ),
+                  )
+                else
+                  _buildStableLocationField(),
                 const SizedBox(height: 12),
                 TextField(
                   key: const Key('reminder-related-person'),
@@ -522,4 +604,133 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
       ),
     );
   }
+
+  Widget _buildStableLocationField() {
+    final options = _reminderLocationOptions(_locations);
+    final source = widget.log;
+    if (_locationId != null &&
+        !options.any((item) => item.id == _locationId) &&
+        source?.locationId == _locationId &&
+        source?.stableLocationName != null) {
+      options.add(
+        _ReminderLocationOption(
+          id: _locationId!,
+          label: '${source!.stableLocationName!} (Arşivli)',
+          archived: true,
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_loadingLocations) const LinearProgressIndicator(),
+        DropdownButtonFormField<String>(
+          key: const Key('reminder-location-selector'),
+          initialValue: _locationId,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Mahal (opsiyonel)',
+            border: OutlineInputBorder(),
+          ),
+          items: [
+            const DropdownMenuItem<String>(
+              value: null,
+              child: Text('Mahal seçilmedi'),
+            ),
+            ...options.map(
+              (item) => DropdownMenuItem<String>(
+                value: item.id,
+                child: Text(item.label, overflow: TextOverflow.ellipsis),
+              ),
+            ),
+          ],
+          onChanged: _loadingLocations
+              ? null
+              : (value) => setState(() {
+                  _locationId = value;
+                  if (value == null) _location.clear();
+                }),
+        ),
+        if (!_loadingLocations &&
+            options.where((item) => !item.archived).isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: Text(
+              'Bu projede aktif mahal yok. Mahal Kataloğu’ndan ekleyebilirsiniz.',
+              key: Key('reminder-location-empty'),
+            ),
+          ),
+        if (_locationError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              _locationError!,
+              key: const Key('reminder-location-load-error'),
+            ),
+          ),
+        if (source?.locationId == null &&
+            (source?.location?.trim().isNotEmpty ?? false))
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              'Eski serbest mahal: ${source!.location}',
+              key: const Key('reminder-legacy-location-context'),
+            ),
+          ),
+        if (options.any((item) => item.id == _locationId && item.archived))
+          const Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: Text(
+              'Arşivli mahal bağlantısı korunuyor.',
+              key: Key('reminder-archived-location-context'),
+            ),
+          ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          key: const Key('open-location-catalog-from-reminder'),
+          onPressed: _openLocationCatalog,
+          icon: const Icon(Icons.account_tree_outlined),
+          label: const Text('Mahal Kataloğu'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ReminderLocationOption {
+  const _ReminderLocationOption({
+    required this.id,
+    required this.label,
+    this.archived = false,
+  });
+
+  final String id;
+  final String label;
+  final bool archived;
+}
+
+List<_ReminderLocationOption> _reminderLocationOptions(
+  List<MobileProjectLocation> locations,
+) {
+  final byId = {for (final item in locations) item.id: item};
+  String pathFor(MobileProjectLocation item, Set<String> visiting) {
+    if (!visiting.add(item.id)) return item.displayName;
+    final parent = item.parentLocationId == null
+        ? null
+        : byId[item.parentLocationId];
+    final value = parent == null
+        ? item.displayName
+        : '${pathFor(parent, visiting)} › ${item.displayName}';
+    visiting.remove(item.id);
+    return value;
+  }
+
+  return locations
+      .map(
+        (item) => _ReminderLocationOption(
+          id: item.id,
+          label: pathFor(item, <String>{}),
+        ),
+      )
+      .toList(growable: true);
 }

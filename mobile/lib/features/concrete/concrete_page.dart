@@ -15,6 +15,7 @@ class ConcretePage extends StatefulWidget {
     required this.concrete,
     required this.agenda,
     required this.attachments,
+    this.projectLocations,
     this.initialProjectId,
     this.initialIstanbulDay,
     super.key,
@@ -23,6 +24,7 @@ class ConcretePage extends StatefulWidget {
   final ConcreteApplication concrete;
   final AgendaApplication agenda;
   final SafeAttachmentPicker attachments;
+  final ProjectLocationApplication? projectLocations;
   final String? initialProjectId;
   final String? initialIstanbulDay;
 
@@ -129,6 +131,7 @@ class _ConcretePageState extends State<ConcretePage> {
         builder: (_) => ConcretePourFormPage(
           concrete: widget.concrete,
           projects: _projects,
+          projectLocations: widget.projectLocations,
           initialProject: _project,
         ),
       ),
@@ -150,6 +153,7 @@ class _ConcretePageState extends State<ConcretePage> {
             concrete: widget.concrete,
             agenda: widget.agenda,
             attachments: widget.attachments,
+            projectLocations: widget.projectLocations,
             pourId: id,
           ),
         ),
@@ -306,6 +310,7 @@ class _ConcretePageState extends State<ConcretePage> {
                 title: Text('${pour.pourCode} • ${pour.elementLocation}'),
                 subtitle: Text(
                   '${CseTimeCodec.formatIstanbul(pour.plannedAt)}\n'
+                  '${pour.stableLocationName == null ? '' : '${pour.stableLocationName}${pour.stableLocationArchivedAt == null ? '' : ' (Arşivli)'} • '}'
                   '${pour.concreteClass} • ${pour.plannedVolumeM3.toStringAsFixed(2)} m³ • ${pour.status.label}\n'
                   '${pour.pendingCheckCount} checklist • '
                   '${pour.missingEvidenceTruckCount} kanıt • '

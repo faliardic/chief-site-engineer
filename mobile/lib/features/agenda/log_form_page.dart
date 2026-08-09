@@ -136,6 +136,7 @@ class _LogFormPageState extends State<LogFormPage> {
           concrete: concrete,
           agenda: widget.agenda,
           attachments: attachments,
+          projectLocations: widget.projectLocations,
           initialProjectId: projectId,
           initialIstanbulDay: _selectedIstanbulDay,
         ),

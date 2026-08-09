@@ -1539,6 +1539,14 @@ class SqliteAgendaApplication
     if (command.projectId case final projectId?) {
       validateUuid(projectId, 'Proje kimliği');
     }
+    if (command.locationId case final locationId?) {
+      validateUuid(locationId, 'Mahal kimliği');
+      if (command.projectId == null) {
+        throw const AgendaValidationFailure(
+          'Stable mahal seçimi için proje zorunludur.',
+        );
+      }
+    }
     if (command.sourceLogId case final sourceLogId?) {
       validateUuid(sourceLogId, 'Kaynak log kimliği');
       if (command.projectId == null) {
@@ -1558,7 +1566,11 @@ class SqliteAgendaApplication
       maxLength: 500,
     );
     final description = optionalTrimmed(command.description, 'Açıklama');
-    final location = optionalTrimmed(command.location, 'Mahál', maxLength: 200);
+    final legacyLocation = optionalTrimmed(
+      command.location,
+      'Mahál',
+      maxLength: 200,
+    );
     final relatedPerson = optionalTrimmed(
       command.relatedPerson,
       'İlgili kişi',
@@ -1574,6 +1586,10 @@ class SqliteAgendaApplication
     final reminder = await _withDatabase(now, (database) {
       return database.transaction((transaction) async {
         String? projectName;
+        String? effectiveLocationId = command.locationId;
+        String? location = legacyLocation;
+        String? stableLocationName;
+        String? stableLocationArchivedAt;
         if (command.projectId case final projectId?) {
           final projects = await transaction.query(
             'projects',
@@ -1589,6 +1605,7 @@ class SqliteAgendaApplication
         if (command.sourceLogId case final sourceLogId?) {
           final sources = await transaction.query(
             'field_observations',
+            columns: ['id', 'location_id'],
             where: 'id = ? AND project_id = ? AND archived_at IS NULL',
             whereArgs: [sourceLogId, command.projectId],
             limit: 1,
@@ -1598,12 +1615,33 @@ class SqliteAgendaApplication
               'Kaynak Ajanda kaydı proje ile eşleşmiyor.',
             );
           }
+          effectiveLocationId ??= sources.single['location_id'] as String?;
+        }
+        if (effectiveLocationId case final locationId?) {
+          final stable = command.locationId == null
+              ? await _requireProjectLocation(transaction, locationId)
+              : await _requireActiveAgendaLocation(
+                  transaction,
+                  projectId: command.projectId!,
+                  locationId: locationId,
+                );
+          if (stable.projectId != command.projectId) {
+            throw const AgendaValidationFailure(
+              'Seçilen mahal aynı projeye ait olmalıdır.',
+            );
+          }
+          location = stable.displayName;
+          stableLocationName = stable.displayName;
+          stableLocationArchivedAt = stable.archivedAt;
         }
         final existing = await transaction.rawQuery(
           '''
-          SELECT f.*, p.name AS project_name
+          SELECT f.*, p.name AS project_name,
+            l.display_name AS stable_location_name,
+            l.archived_at AS stable_location_archived_at
           FROM follow_up_items f
           LEFT JOIN projects p ON p.id = f.project_id
+          LEFT JOIN project_locations l ON l.id = f.location_id
           WHERE f.id = ?
           LIMIT 1
         ''',
@@ -1621,6 +1659,7 @@ class SqliteAgendaApplication
             relatedPerson,
             conditionText,
             schedule,
+            effectiveLocationId,
           )) {
             throw const AgendaValidationFailure(
               'Hatırlatıcı kimliği başka bir içerikle kullanılıyor.',
@@ -1637,6 +1676,7 @@ class SqliteAgendaApplication
           'status': schedule.status.storageValue,
           'project_id': command.projectId,
           'observation_id': command.sourceLogId,
+          'location_id': effectiveLocationId,
           'location': location,
           'related_person': relatedPerson,
           'is_important': command.isImportant ? 1 : 0,
@@ -1662,6 +1702,7 @@ class SqliteAgendaApplication
             'next_attention_at': schedule.nextAttentionAt,
             'all_day_local_date': schedule.allDayLocalDate,
             'source_observation_id': command.sourceLogId,
+            'location_id': effectiveLocationId,
             'status': schedule.status.storageValue,
           }),
         });
@@ -1691,6 +1732,9 @@ class SqliteAgendaApplication
           description: description,
           kind: command.kind,
           status: schedule.status,
+          locationId: effectiveLocationId,
+          stableLocationName: stableLocationName,
+          stableLocationArchivedAt: stableLocationArchivedAt,
           location: location,
           relatedPerson: relatedPerson,
           isImportant: command.isImportant,
@@ -1725,9 +1769,12 @@ class SqliteAgendaApplication
     return _withDatabase(now, (database) async {
       final rows = await database.rawQuery(
         '''
-        SELECT f.*, p.name AS project_name
+        SELECT f.*, p.name AS project_name,
+          l.display_name AS stable_location_name,
+          l.archived_at AS stable_location_archived_at
         FROM follow_up_items f
         LEFT JOIN projects p ON p.id = f.project_id
+        LEFT JOIN project_locations l ON l.id = f.location_id
         WHERE f.trashed_at IS NULL
           AND (
             f.status = 'inbox'
@@ -1815,9 +1862,12 @@ class SqliteAgendaApplication
             f.id ASC
             ''';
       final rows = await database.rawQuery('''
-        SELECT f.*, p.name AS project_name
+        SELECT f.*, p.name AS project_name,
+          l.display_name AS stable_location_name,
+          l.archived_at AS stable_location_archived_at
         FROM follow_up_items f
         LEFT JOIN projects p ON p.id = f.project_id
+        LEFT JOIN project_locations l ON l.id = f.location_id
         WHERE $visibilityWhere
         ORDER BY $orderBy
       ''', arguments);
@@ -1836,9 +1886,12 @@ class SqliteAgendaApplication
     return _withDatabase(now, (database) async {
       final rows = await database.rawQuery(
         '''
-        SELECT f.*, p.name AS project_name
+        SELECT f.*, p.name AS project_name,
+          l.display_name AS stable_location_name,
+          l.archived_at AS stable_location_archived_at
         FROM follow_up_items f
         LEFT JOIN projects p ON p.id = f.project_id
+        LEFT JOIN project_locations l ON l.id = f.location_id
         WHERE f.id = ?
         LIMIT 1
       ''',
@@ -1858,9 +1911,12 @@ class SqliteAgendaApplication
     return _withDatabase(now, (database) async {
       final rows = await database.rawQuery(
         '''
-        SELECT f.*, p.name AS project_name
+        SELECT f.*, p.name AS project_name,
+          l.display_name AS stable_location_name,
+          l.archived_at AS stable_location_archived_at
         FROM follow_up_items f
         LEFT JOIN projects p ON p.id = f.project_id
+        LEFT JOIN project_locations l ON l.id = f.location_id
         WHERE f.id = ?
         LIMIT 1
         ''',
@@ -1980,6 +2036,9 @@ class SqliteAgendaApplication
   Future<MobileReminder> mutateReminder(MutateReminderCommand command) async {
     validateUuid(command.reminderId, 'Hatırlatıcı kimliği');
     validateUuid(command.eventId, 'Event kimliği');
+    if (command.locationId case final locationId?) {
+      validateUuid(locationId, 'Mahal kimliği');
+    }
     if (command.expectedRevision < 1) {
       throw const AgendaValidationFailure('Beklenen revision geçersizdir.');
     }
@@ -1988,9 +2047,12 @@ class SqliteAgendaApplication
       return database.transaction((transaction) async {
         final rows = await transaction.rawQuery(
           '''
-          SELECT f.*, p.name AS project_name
+          SELECT f.*, p.name AS project_name,
+            l.display_name AS stable_location_name,
+            l.archived_at AS stable_location_archived_at
           FROM follow_up_items f
           LEFT JOIN projects p ON p.id = f.project_id
+          LEFT JOIN project_locations l ON l.id = f.location_id
           WHERE f.id = ?
           LIMIT 1
           ''',
@@ -2108,6 +2170,7 @@ class SqliteAgendaApplication
           'item_type': current.kind.storageValue,
           'status': current.status.storageValue,
           'project_id': current.projectId,
+          'location_id': current.locationId,
           'location': current.location,
           'related_person': current.relatedPerson,
           'is_important': current.isImportant ? 1 : 0,
@@ -2150,6 +2213,29 @@ class SqliteAgendaApplication
             throw const AgendaValidationFailure('Seçilen proje bulunamadı.');
           }
         }
+        if (command.action == ReminderMutationAction.updateDetails) {
+          if (values['location_id'] case final String locationId) {
+            final projectId = values['project_id'] as String?;
+            if (projectId == null) {
+              throw const AgendaValidationFailure(
+                'Stable mahal seçimi için proje zorunludur.',
+              );
+            }
+            final preservesExisting =
+                locationId == current.locationId &&
+                projectId == current.projectId;
+            if (preservesExisting) {
+              values['location'] = current.location;
+            } else {
+              final stable = await _requireActiveAgendaLocation(
+                transaction,
+                projectId: projectId,
+                locationId: locationId,
+              );
+              values['location'] = stable.displayName;
+            }
+          }
+        }
         final updatedAt = CseTimeCodec.encodeUtc(now);
         final nextRevision = current.revision + 1;
         final updated = await transaction.update(
@@ -2186,6 +2272,11 @@ class SqliteAgendaApplication
           'payload_json': jsonEncode({
             'next_attention_at': values['next_attention_at'],
             'all_day_local_date': values['all_day_local_date'],
+            'location_id': values['location_id'],
+            if (eventType == 'details_updated')
+              'before': {'location_id': current.locationId},
+            if (eventType == 'details_updated')
+              'after': {'location_id': values['location_id']},
             'trashed_at': values['trashed_at'],
             if (command.expectedEarlierFromAttentionAt != null)
               'earlier_from_attention_at':
@@ -2203,9 +2294,12 @@ class SqliteAgendaApplication
         });
         final refreshed = await transaction.rawQuery(
           '''
-          SELECT f.*, p.name AS project_name
+          SELECT f.*, p.name AS project_name,
+            l.display_name AS stable_location_name,
+            l.archived_at AS stable_location_archived_at
           FROM follow_up_items f
           LEFT JOIN projects p ON p.id = f.project_id
+          LEFT JOIN project_locations l ON l.id = f.location_id
           WHERE f.id = ?
           LIMIT 1
           ''',
@@ -2341,6 +2435,7 @@ class SqliteAgendaApplication
         );
         values['item_type'] = (command.kind ?? current.kind).storageValue;
         values['project_id'] = command.projectId ?? current.projectId;
+        values['location_id'] = command.locationId;
         values['location'] = optionalTrimmed(
           command.location,
           'Mahál',
@@ -2576,6 +2671,7 @@ class SqliteAgendaApplication
         values['item_type'] == current.kind.storageValue &&
         values['status'] == current.status.storageValue &&
         values['project_id'] == current.projectId &&
+        values['location_id'] == current.locationId &&
         values['location'] == current.location &&
         values['related_person'] == current.relatedPerson &&
         values['is_important'] == (current.isImportant ? 1 : 0) &&
@@ -2598,6 +2694,8 @@ class SqliteAgendaApplication
       final rows = await database.rawQuery('''
         SELECT
           f.*, p.name AS project_name,
+          l.display_name AS stable_location_name,
+          l.archived_at AS stable_location_archived_at,
           b.platform_notification_id,
           b.scheduled_for AS binding_scheduled_for,
           b.sync_state,
@@ -2606,6 +2704,7 @@ class SqliteAgendaApplication
           b.repeat_interval_minutes
         FROM follow_up_items f
         LEFT JOIN projects p ON p.id = f.project_id
+        LEFT JOIN project_locations l ON l.id = f.location_id
         JOIN reminder_notification_bindings b ON b.reminder_id = f.id
         ORDER BY
           CASE WHEN f.next_attention_at IS NULL THEN 1 ELSE 0 END,
@@ -3152,9 +3251,12 @@ class SqliteAgendaApplication
     final log = await _requireAgendaLog(database, logId);
     final reminders = await database.rawQuery(
       '''
-      SELECT f.*, p.name AS project_name
+      SELECT f.*, p.name AS project_name,
+        l.display_name AS stable_location_name,
+        l.archived_at AS stable_location_archived_at
       FROM follow_up_items f
       LEFT JOIN projects p ON p.id = f.project_id
+      LEFT JOIN project_locations l ON l.id = f.location_id
       WHERE f.observation_id = ? AND f.trashed_at IS NULL
       ORDER BY f.created_at ASC, f.id ASC
       ''',
@@ -3429,6 +3531,7 @@ class SqliteAgendaApplication
     String? relatedPerson,
     String? conditionText,
     _ResolvedReminderSchedule _,
+    String? locationId,
   ) {
     final originalSchedule = _resolveScheduleValues(
       command.schedule,
@@ -3445,6 +3548,7 @@ class SqliteAgendaApplication
         reminder.description == description &&
         reminder.kind == command.kind &&
         reminder.status == originalSchedule.status &&
+        reminder.locationId == locationId &&
         reminder.location == location &&
         reminder.relatedPerson == relatedPerson &&
         reminder.isImportant == command.isImportant &&
@@ -4081,6 +4185,7 @@ MobileReminder _reminderFromRow(Map<String, Object?> row) {
   final id = row['id']! as String;
   final projectId = row['project_id'] as String?;
   final sourceLogId = row['observation_id'] as String?;
+  final locationId = row['location_id'] as String?;
   final attendanceDayId = row['attendance_day_id'] as String?;
   final concretePourId = row['concrete_pour_id'] as String?;
   final createdAt = row['created_at']! as String;
@@ -4094,6 +4199,7 @@ MobileReminder _reminderFromRow(Map<String, Object?> row) {
   validateUuid(id, 'Hatırlatıcı kimliği');
   if (projectId != null) validateUuid(projectId, 'Proje kimliği');
   if (sourceLogId != null) validateUuid(sourceLogId, 'Kaynak log kimliği');
+  if (locationId != null) validateUuid(locationId, 'Mahal kimliği');
   if (attendanceDayId != null) {
     validateUuid(attendanceDayId, 'Kaynak Puantaj günü kimliği');
   }
@@ -4144,6 +4250,9 @@ MobileReminder _reminderFromRow(Map<String, Object?> row) {
     description: row['description'] as String?,
     kind: ReminderKind.fromStorage(row['item_type']! as String),
     status: ReminderStatus.fromStorage(row['status']! as String),
+    locationId: locationId,
+    stableLocationName: row['stable_location_name'] as String?,
+    stableLocationArchivedAt: row['stable_location_archived_at'] as String?,
     location: row['location'] as String?,
     relatedPerson: row['related_person'] as String?,
     isImportant: row['is_important'] == 1,

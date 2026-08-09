@@ -59,6 +59,7 @@ class _LogDetailPageState extends State<LogDetailPage> {
         MaterialPageRoute(
           builder: (_) => ReminderDetailPage(
             agenda: widget.agenda,
+            projectLocations: widget.projectLocations,
             reminderId: detail.reminders.first.id,
           ),
         ),
@@ -66,8 +67,11 @@ class _LogDetailPageState extends State<LogDetailPage> {
     } else {
       await Navigator.of(context).push<MobileReminder>(
         MaterialPageRoute(
-          builder: (_) =>
-              ReminderFormPage(agenda: widget.agenda, log: detail.log),
+          builder: (_) => ReminderFormPage(
+            agenda: widget.agenda,
+            projectLocations: widget.projectLocations,
+            log: detail.log,
+          ),
         ),
       );
     }
@@ -84,6 +88,7 @@ class _LogDetailPageState extends State<LogDetailPage> {
           concrete: concrete,
           agenda: widget.agenda,
           attachments: attachments,
+          projectLocations: widget.projectLocations,
           pourId: pourId,
         ),
       ),
@@ -101,6 +106,7 @@ class _LogDetailPageState extends State<LogDetailPage> {
           concrete: concrete,
           agenda: widget.agenda,
           attachments: attachments,
+          projectLocations: widget.projectLocations,
           initialProjectId: log.projectId,
           initialIstanbulDay: CseTimeCodec.istanbulDayKey(log.observedAt),
         ),
@@ -533,6 +539,7 @@ class _LogDetailPageState extends State<LogDetailPage> {
                     MaterialPageRoute(
                       builder: (_) => ReminderDetailPage(
                         agenda: widget.agenda,
+                        projectLocations: widget.projectLocations,
                         reminderId: reminder.id,
                       ),
                     ),

@@ -422,6 +422,9 @@ class MobileReminder {
     this.description,
     required this.kind,
     required this.status,
+    this.locationId,
+    this.stableLocationName,
+    this.stableLocationArchivedAt,
     this.location,
     this.relatedPerson,
     this.isImportant = false,
@@ -450,6 +453,9 @@ class MobileReminder {
   final String? description;
   final ReminderKind kind;
   final ReminderStatus status;
+  final String? locationId;
+  final String? stableLocationName;
+  final String? stableLocationArchivedAt;
   final String? location;
   final String? relatedPerson;
   final bool isImportant;
@@ -465,6 +471,8 @@ class MobileReminder {
   final String? cancelledAt;
   final String? trashedAt;
   final int revision;
+
+  String? get displayLocation => stableLocationName ?? location;
 }
 
 bool isReminderEligibleForTomorrowSnooze(
@@ -785,6 +793,7 @@ class CreateReminderCommand {
     this.sourceLogId,
     this.captureText,
     this.description,
+    this.locationId,
     this.location,
     this.relatedPerson,
     this.isImportant = false,
@@ -803,6 +812,7 @@ class CreateReminderCommand {
   final String? description;
   final ReminderKind kind;
   final ReminderScheduleKind schedule;
+  final String? locationId;
   final String? location;
   final String? relatedPerson;
   final bool isImportant;
@@ -822,6 +832,7 @@ class MutateReminderCommand {
     this.description,
     this.kind,
     this.projectId,
+    this.locationId,
     this.location,
     this.relatedPerson,
     this.isImportant,
@@ -844,6 +855,7 @@ class MutateReminderCommand {
   final String? description;
   final ReminderKind? kind;
   final String? projectId;
+  final String? locationId;
   final String? location;
   final String? relatedPerson;
   final bool? isImportant;

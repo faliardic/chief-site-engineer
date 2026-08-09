@@ -1,0 +1,27 @@
+# Issue #402 — Reminder and Concrete stable Mahal adoption
+
+- Issue: `#402`
+- Parent Epic: `#385`
+- Previous child: `#400` / PR `#401`
+- Official repository: `V:\\1_PROJECTS\\2_ACTIVE\\Python\\chief-site-engineer`
+- Linked worktree: `C:\\Users\\Fatih\\AppData\\Local\\CSE-Worktrees\\issue-402`
+- Base: `origin/master` / `6442dd5c8d5f921616ea6e24bee1faf7d851602e`
+- Branch: `codex/issue-402-v2-1f-reminder-concrete-stable-location`
+- Codex model: current full Codex model
+- Reasoning: `Extra High`; Reminder/Concrete persistence, child propagation, event/idempotency and multi-surface UI regression risk nedeniyle.
+- Validation class: `application + domain + UI integration` within existing schema 11; no migration.
+- Changed contracts: Reminder and Concrete optional stable `locationId`, current-name read projection, archived-link preservation, active same-project validation, event/idempotency, managed Agenda/Reminder propagation, and project-scoped selectors.
+- Authorized production paths: `mobile/lib/domain/agenda_models.dart`, `mobile/lib/domain/concrete_models.dart`, `mobile/lib/application/agenda_application.dart`, `mobile/lib/application/concrete_application.dart`, Reminder feature files, and Concrete feature files listed in Issue #402.
+- Authorized tests: new focused Reminder/Concrete stable-location application/widget tests; relevant existing Agenda/Reminder/Concrete and ProjectLocation regressions.
+- Conditional paths: production composition/root, test fakes, and existing regression files only when compile or constructor forwarding requires.
+- Protected paths: `mobile/lib/storage/app_database.dart`, backup/restore production/tests, attendance production, schema/migration, release/signing/workflow.
+- Reused evidence: merged schema-11 cross-project triggers and ProjectLocation lifecycle/catalog contracts from V2.1a-e; backup format 1 and unchanged notification/release contracts.
+- Focused validation: Reminder application/widget; Concrete application/widget; managed child propagation; relevant regressions.
+- Allowed broad gates: one full `flutter test --no-pub`, one `flutter analyze --no-pub`, `git diff --check`, one `flutter build apk --debug`.
+- Physical-device acceptance: replace-install only; Reminder project-driven selector; Concrete selector plus required element detail; optional catalog navigation; legacy records open without crash; no save/mutation required.
+- Retry budget: 1 primary run; at most 1 blocking correction; same failed operation at most 1 retry after exact fix.
+- Time budget: 45-minute target; 75-minute hard stop.
+- Explicit out of scope: Puantaj adoption, schema 12, migration/backfill/fuzzy matching, backup changes, lifecycle redesign, notification platform redesign, V2.2, Attachment V2, and V2.1g.
+- Stop conditions: schema/migration/trigger/index, backup change, historical backfill, Puantaj adoption, ProjectLocation lifecycle expansion, notification redesign, destructive device/user-data operation, or unresolved stable-link/source-text ambiguity.
+- Publication: commit/push only after authorized local and device gates PASS; Draft PR required; no Ready/merge; do not start V2.1g.
+- Post-merge sync: not performed in this task; next authorized local task must verify current GitHub truth before synchronization.
