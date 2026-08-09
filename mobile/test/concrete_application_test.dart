@@ -7,6 +7,7 @@ import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/domain/attachment_models.dart';
 import 'package:chief_site_engineer/domain/concrete_models.dart';
 import 'package:chief_site_engineer/platform/concrete_attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/concrete_export_gateway.dart';
@@ -1409,6 +1410,96 @@ void main() {
   );
 
   test(
+    'general evidence persists MP3 M4A WAV and rejects spoofed audio atomically',
+    () async {
+      final created = await concrete.createPour(_createCommand());
+      final audioFixtures = <(int, String, List<int>)>[
+        (130, 'voice.mp3', _mp3AudioFixture()),
+        (132, 'voice.m4a', _m4aAudioFixture()),
+        (134, 'voice.wav', _wavAudioFixture()),
+      ];
+      final detail = await concrete.attachEvidenceBatch(
+        AttachConcreteEvidenceBatchCommand(
+          pourId: pourId,
+          expectedPourRevision: created.pour.revision,
+          classifyGeneralByMime: true,
+          attachments: [
+            for (final fixture in audioFixtures)
+              AttachConcreteEvidenceCommand(
+                id: _uuid(fixture.$1),
+                pourId: pourId,
+                eventId: _uuid(fixture.$1 + 1),
+                expectedPourRevision: created.pour.revision,
+                evidenceType: ConcreteEvidenceType.sitePhoto,
+                originalFileName: fixture.$2,
+                bytes: fixture.$3,
+                capturedAt: '2026-07-19T08:00:00Z',
+              ),
+          ],
+        ),
+      );
+
+      expect(detail.pour.revision, created.pour.revision + 1);
+      expect(detail.attachments.map((item) => item.mimeType), [
+        'audio/mpeg',
+        'audio/mp4',
+        'audio/wav',
+      ]);
+      expect(
+        detail.attachments.map((item) => item.evidenceType),
+        everyElement(ConcreteEvidenceType.other),
+      );
+      expect(
+        detail.events.where((item) => item.eventType == 'evidence.attached'),
+        hasLength(3),
+      );
+
+      await expectLater(
+        concrete.attachEvidenceBatch(
+          AttachConcreteEvidenceBatchCommand(
+            pourId: pourId,
+            expectedPourRevision: detail.pour.revision,
+            classifyGeneralByMime: true,
+            attachments: [
+              AttachConcreteEvidenceCommand(
+                id: _uuid(136),
+                pourId: pourId,
+                eventId: _uuid(137),
+                expectedPourRevision: detail.pour.revision,
+                evidenceType: ConcreteEvidenceType.sitePhoto,
+                originalFileName: 'valid.mp3',
+                bytes: _mp3AudioFixture(),
+                capturedAt: '2026-07-19T08:01:00Z',
+              ),
+              AttachConcreteEvidenceCommand(
+                id: _uuid(138),
+                pourId: pourId,
+                eventId: _uuid(139),
+                expectedPourRevision: detail.pour.revision,
+                evidenceType: ConcreteEvidenceType.sitePhoto,
+                originalFileName: 'spoofed.m4a',
+                bytes: const [0x4f, 0x67, 0x67, 0x53, 0x00],
+                capturedAt: '2026-07-19T08:02:00Z',
+              ),
+            ],
+          ),
+        ),
+        throwsA(
+          isA<AgendaValidationFailure>().having(
+            (error) => error.message,
+            'message',
+            contains('ses biçimi olarak doğrulanamadı'),
+          ),
+        ),
+      );
+      final afterFailure = await concrete.getPourDetail(pourId);
+      expect(afterFailure.pour.revision, detail.pour.revision);
+      expect(afterFailure.attachments, hasLength(3));
+      expect(attachments.values, hasLength(3));
+    },
+  );
+
+  test(
     'source reminder mutation does not mutate concrete and follow-up closes reminder',
     () async {
       var detail = await concrete.createPour(_createCommand());
@@ -2458,18 +2549,137 @@ class _MemoryAttachmentStore implements ConcreteAttachmentStore {
     required String originalFileName,
     required List<int> bytes,
   }) async {
-    final mimeType = DeviceManagedAttachmentStore.sniffMime(bytes);
-    final extension = DeviceManagedAttachmentStore.extensionForMime(mimeType);
-    final relative = 'managed/$attachmentId$extension';
-    values[relative] = List.of(bytes);
-    return StagedConcreteAttachment(
-      relativePath: relative,
-      mimeType: mimeType,
-      byteSize: bytes.length,
-      sha256Value: sha256.convert(bytes).toString(),
-    );
+    try {
+      final mimeType = DeviceManagedAttachmentStore.sniffMime(bytes);
+      final extension = DeviceManagedAttachmentStore.extensionForMime(mimeType);
+      final relative = 'managed/$attachmentId$extension';
+      values[relative] = List.of(bytes);
+      return StagedConcreteAttachment(
+        relativePath: relative,
+        mimeType: mimeType,
+        byteSize: bytes.length,
+        sha256Value: sha256.convert(bytes).toString(),
+      );
+    } on ManagedAttachmentFailure catch (error) {
+      throw ConcreteAttachmentFailure(error.code);
+    }
   }
 }
+
+List<int> _mp3AudioFixture() => const [
+  0x49,
+  0x44,
+  0x33,
+  0x04,
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+  0xff,
+  0xfb,
+  0x90,
+  0x64,
+];
+
+List<int> _m4aAudioFixture() => [
+  ..._isoBox('ftyp', [...'mp42'.codeUnits, 0, 0, 0, 0, ...'isom'.codeUnits]),
+  ..._isoBox('moov', [
+    ..._isoBox('trak', [
+      ..._isoBox('mdia', [
+        ..._isoBox('hdlr', [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          ...'soun'.codeUnits,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+        ]),
+      ]),
+    ]),
+  ]),
+  ..._isoBox('mdat', const [1, 2, 3, 4]),
+];
+
+List<int> _wavAudioFixture() => const [
+  0x52,
+  0x49,
+  0x46,
+  0x46,
+  0x28,
+  0x00,
+  0x00,
+  0x00,
+  0x57,
+  0x41,
+  0x56,
+  0x45,
+  0x66,
+  0x6d,
+  0x74,
+  0x20,
+  0x10,
+  0x00,
+  0x00,
+  0x00,
+  0x01,
+  0x00,
+  0x01,
+  0x00,
+  0x40,
+  0x1f,
+  0x00,
+  0x00,
+  0x80,
+  0x3e,
+  0x00,
+  0x00,
+  0x02,
+  0x00,
+  0x10,
+  0x00,
+  0x64,
+  0x61,
+  0x74,
+  0x61,
+  0x04,
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+];
+
+List<int> _isoBox(String type, List<int> payload) => [
+  ..._uint32(payload.length + 8),
+  ...type.codeUnits,
+  ...payload,
+];
+
+List<int> _uint32(int value) => [
+  (value >> 24) & 0xff,
+  (value >> 16) & 0xff,
+  (value >> 8) & 0xff,
+  value & 0xff,
+];
 
 class _MemoryExportGateway implements ConcreteExportGateway {
   Uint8List? bytes;

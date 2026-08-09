@@ -1329,13 +1329,26 @@ class SqliteConcreteApplication
             : command.evidenceType;
         staged.add((command, file, evidenceType));
       }
-    } on Object {
+    } on Object catch (error) {
       for (final item in staged.reversed) {
         try {
           await attachmentStore.cleanup(item.$2.relativePath);
         } on Object {
           // Only artifacts staged by this failed operation are candidates.
         }
+      }
+      if (error is ConcreteAttachmentFailure) {
+        throw AgendaValidationFailure(switch (error.code) {
+          'unsupported_mime' =>
+            'Seçilen dosyanın içeriği desteklenen fotoğraf, PDF, video veya '
+                'ses biçimi olarak doğrulanamadı; Beton kaydı değişmedi.',
+          'invalid_file_size' =>
+            'Seçilen dosya boş veya 20 MiB sınırını aşıyor; Beton kaydı '
+                'değişmedi.',
+          _ =>
+            'Seçilen dosya güvenli biçimde eklenemedi; Beton kaydı '
+                'değişmedi.',
+        });
       }
       rethrow;
     }

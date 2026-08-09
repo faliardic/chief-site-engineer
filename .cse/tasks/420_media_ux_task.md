@@ -4,6 +4,7 @@
 
 - GitHub Issue: `#420`
 - Binding authorization: `#issuecomment-5232628409`
+- Audio correction authorization: `#issuecomment-5232827614`
 - Parent Epic: `#385`
 - Canonical V2 item: `V2.3 Attachment / Fotoğraf / Medya V2`
 - Exact base: `f5895653b64d3c26aefcbb5256eb7a2b5f22749f`
@@ -129,3 +130,15 @@ Allowed final gates at the final source revision:
   change, unsafe batch compensation, preserved-flow regression, uncertain MIME
   sniffing, integrity-gate bypass, allowlist expansion, real-user data access,
   or any non-V2.3 requirement.
+
+## Audio correction
+
+The physical-device acceptance in `#issuecomment-5232827614` is partial PASS:
+photo, PDF, video, specialized evidence, restart, and the existing viewer/open
+paths passed; selected audio did not attach. The authorized correction is
+limited to MP3/M4A/WAV picker-to-store-to-Concrete batch behavior, secure
+byte/container classification, visible non-destructive failure feedback, and
+the corresponding focused/full/analyze/diff/build/replace-install gates.
+Schema, backup format, dependency, permission, Agenda batch, photo/PDF/video,
+and specialized Concrete contracts remain unchanged. PR #423 stays Draft and
+manual re-acceptance is only the audio select/add/list/open/restart path.

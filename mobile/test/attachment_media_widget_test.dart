@@ -131,9 +131,61 @@ void main() {
     expect(concrete.lastBatch?.classifyGeneralByMime, isTrue);
     expect(
       concrete.lastBatch?.attachments.map((item) => item.originalFileName),
-      ['saha.jpg', 'rapor.pdf'],
+      ['saha.jpg', 'rapor.pdf', 'voice.mp3', 'voice.m4a', 'voice.wav'],
     );
   });
+
+  testWidgets(
+    'selected audio stage failure stays non-destructive and explains the reason',
+    (tester) async {
+      final concrete = _BatchConcrete(
+        _pourDetail(),
+        failure: const AgendaValidationFailure(
+          'Seçilen dosyanın içeriği desteklenen fotoğraf, PDF, video veya ses '
+          'biçimi olarak doğrulanamadı; Beton kaydı değişmedi.',
+        ),
+      );
+      final picker = SafeAttachmentPicker(
+        permissions: const SafeCapabilityService(_GrantedPermission()),
+        picker: _UnsupportedAudioPicker(),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ConcretePourDetailPage(
+            concrete: concrete,
+            agenda: _AgendaStub(),
+            attachments: picker,
+            pourId: concrete.detail.pour.id,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final addButton = find.widgetWithText(OutlinedButton, 'Saha kanıtı ekle');
+      await tester.scrollUntilVisible(
+        addButton,
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await Scrollable.ensureVisible(
+        tester.element(addButton),
+        alignment: 0.5,
+        duration: Duration.zero,
+      );
+      await tester.pumpAndSettle();
+      expect(addButton.hitTestable(), findsOneWidget);
+      await tester.tap(addButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dosya seç'));
+      await tester.pumpAndSettle();
+
+      expect(concrete.batchCalls, 1);
+      expect(
+        find.textContaining('ses biçimi olarak doğrulanamadı'),
+        findsOneWidget,
+      );
+      expect(concrete.detail.attachments, isEmpty);
+    },
+  );
 }
 
 ConcreteAttachment _attachment(
@@ -195,9 +247,10 @@ class _ViewerConcrete implements ConcreteApplication {
 
 class _BatchConcrete
     implements ConcreteApplication, ConcreteEvidenceBatchApplication {
-  _BatchConcrete(this.detail);
+  _BatchConcrete(this.detail, {this.failure});
 
   final ConcretePourDetail detail;
+  final Object? failure;
   int batchCalls = 0;
   AttachConcreteEvidenceBatchCommand? lastBatch;
 
@@ -210,6 +263,7 @@ class _BatchConcrete
   ) async {
     batchCalls += 1;
     lastBatch = command;
+    if (failure case final error?) throw error;
     return detail;
   }
 
@@ -248,8 +302,99 @@ class _MediaManyPicker
       bytes: const [0x25, 0x50, 0x44, 0x46, 0x2d, 0x31],
       source: source,
     ),
+    SelectedAttachment(
+      name: 'voice.mp3',
+      bytes: const [0x49, 0x44, 0x33, 0x04, 0xff, 0xfb, 0x90, 0x64],
+      source: source,
+    ),
+    SelectedAttachment(
+      name: 'voice.m4a',
+      bytes: _m4aAudioFixture(),
+      source: source,
+    ),
+    SelectedAttachment(
+      name: 'voice.wav',
+      bytes: const [
+        0x52,
+        0x49,
+        0x46,
+        0x46,
+        0x04,
+        0x00,
+        0x00,
+        0x00,
+        0x57,
+        0x41,
+        0x56,
+        0x45,
+      ],
+      source: source,
+    ),
   ];
 }
+
+class _UnsupportedAudioPicker
+    implements AttachmentPickerPort, MultipleAttachmentPickerPort {
+  @override
+  Future<SelectedAttachment?> pick(AttachmentSource source) async =>
+      (await pickMany(source))!.single;
+
+  @override
+  Future<List<SelectedAttachment>?> pickMany(AttachmentSource source) async => [
+    SelectedAttachment(
+      name: 'spoofed.m4a',
+      bytes: const [0x4f, 0x67, 0x67, 0x53, 0x00],
+      source: source,
+    ),
+  ];
+}
+
+List<int> _m4aAudioFixture() => [
+  ..._isoBox('ftyp', [...'mp42'.codeUnits, 0, 0, 0, 0, ...'isom'.codeUnits]),
+  ..._isoBox('moov', [
+    ..._isoBox('trak', [
+      ..._isoBox('mdia', [
+        ..._isoBox('hdlr', [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          ...'soun'.codeUnits,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+        ]),
+      ]),
+    ]),
+  ]),
+  ..._isoBox('mdat', const [1, 2, 3, 4]),
+];
+
+List<int> _isoBox(String type, List<int> payload) => [
+  ..._uint32(payload.length + 8),
+  ...type.codeUnits,
+  ...payload,
+];
+
+List<int> _uint32(int value) => [
+  (value >> 24) & 0xff,
+  (value >> 16) & 0xff,
+  (value >> 8) & 0xff,
+  value & 0xff,
+];
 
 ConcretePourDetail _pourDetail() {
   const pourId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';

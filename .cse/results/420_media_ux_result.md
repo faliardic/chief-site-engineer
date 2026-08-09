@@ -3,6 +3,7 @@
 ## Authority and source
 
 - Binding authorization: `#issuecomment-5232628409`
+- Audio correction authorization: `#issuecomment-5232827614`
 - Branch: `codex/issue-420-v2-3-media-ux`
 - Linked worktree:
   `C:\Users\Fatih\AppData\Local\CSE-Worktrees\issue-420-media-ux`
@@ -107,3 +108,48 @@ Exact focused files exercised:
   allowlist checks.
 - Issue #420 must remain open; the Draft PR uses `Part of #420` and must not be
   marked Ready or merged by Codex.
+
+## Audio blocker correction evidence
+
+The owner device acceptance passed the existing Agenda photo, Concrete batch,
+photo/PDF/video open, specialized evidence, and restart paths, but selected
+audio did not attach. Source diagnosis found that the managed-store classifier
+treated generic `mp42` / `isom` containers only by their `ftyp` major brand and
+never inspected the ISO-BMFF media handler. Audio-only M4A/MP4 variants using a
+`soun` track could therefore be misclassified or rejected.
+
+The correction:
+
+- parses bounded ISO-BMFF box structure and recognizes an audio-only `soun`
+  handler without trusting the selected file extension;
+- keeps `vide` containers on the existing video path and keeps unsupported or
+  spoofed audio fail-closed;
+- preserves MP3 and WAV byte-signature classification;
+- maps store classification/size failures to a concrete, non-destructive user
+  message and shows attachment failures in the current viewport;
+- keeps Concrete general evidence batch rollback/compensation, attachment/link/
+  event ordering, photo/PDF/video behavior, specialized roles, Agenda batches,
+  schema `13`, and backup format `1` unchanged.
+
+Final-source correction validation:
+
+- affected focused aggregate: PASS, `43` tests;
+- synthetic MP3, `mp42` audio-only M4A, and WAV all persist through the
+  Concrete general evidence batch as `other` attachments with one revision;
+- spoofed audio: PASS fail-closed, no partial DB/file mutation, visible reason;
+- full `flutter test --no-pub`: PASS, `472` tests;
+- `flutter analyze --no-pub`: PASS, no issues;
+- `git diff --check`: PASS;
+- correction working diff: 6 allowlisted files; PR diff: exact 20-file
+  allowlist; protected paths unchanged;
+- debug APK build: PASS;
+- debug APK SHA-256:
+  `F15BD13811AF73B4287578C3381B549DE2E6A413E180F4A61ED7FA7C7BD53439`;
+- exactly one authorized physical device: `SM-S938B`, `ro.kernel.qemu=0`;
+- only `adb install -r`: PASS (`Success`); explicit cold launch: PASS.
+
+No uninstall, clear-data, restore, UI dump, real-user attachment/data scan, or
+record mutation was performed. Manual correction acceptance remains limited to
+audio select → attach → list → device player open → restart visibility/open.
+This result does not claim manual PASS or FAIL. PR #423 remains Draft; Ready and
+merge are not authorized.

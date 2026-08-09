@@ -400,8 +400,15 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
         selectedItems.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Dosya seçilmedi; Beton kaydı değişmedi.'),
+          SnackBar(
+            content: Text(switch (pickOutcome) {
+              AttachmentPickOutcome.denied =>
+                'Dosya erişim izni verilmedi; Beton kaydı değişmedi.',
+              AttachmentPickOutcome.unavailable =>
+                'Dosya seçimi tamamlanamadı; seçilen dosya okunamadı veya '
+                    'seçim sınırını aştı. Beton kaydı değişmedi.',
+              _ => 'Dosya seçilmedi; Beton kaydı değişmedi.',
+            }),
           ),
         );
       }
@@ -478,7 +485,7 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
           ),
         )
         .toList(growable: false);
-    await _run(() {
+    final attached = await _run(() {
       final concrete = widget.concrete;
       if (isGeneralBatch && concrete is ConcreteEvidenceBatchApplication) {
         final batchApp = concrete as ConcreteEvidenceBatchApplication;
@@ -498,6 +505,14 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
         'Çoklu saha kanıtı bu uygulama oturumunda kullanılamıyor.',
       );
     });
+    if (!attached && mounted) {
+      final message = _error;
+      if (message != null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+      }
+    }
   }
 
   Future<void> _completeFollowUp(
