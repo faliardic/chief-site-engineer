@@ -33,7 +33,7 @@ void main() {
   });
 
   test(
-    'fresh install creates the complete contiguous schema 11 contract',
+    'fresh install creates the complete contiguous schema 12 contract',
     () async {
       final database = _database(databasePath);
       await database.open();
@@ -50,10 +50,10 @@ void main() {
         "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
       );
 
-      expect(version, 11);
+      expect(version, AppDatabase.schemaVersion);
       expect(
         history.map((row) => row['version']),
-        List.generate(11, (i) => i + 1),
+        List.generate(12, (i) => i + 1),
       );
       expect(
         tables.map((row) => row['name']),

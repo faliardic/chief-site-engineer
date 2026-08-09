@@ -160,6 +160,15 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       maxLength: 200,
     );
     final phone = optionalTrimmed(command.phone, 'Telefon', maxLength: 80);
+    final address = optionalTrimmed(command.address, 'Adres', maxLength: 1000);
+    final specialty = optionalTrimmed(
+      command.specialty,
+      'İş kalemi/uzmanlık',
+      maxLength: 200,
+    );
+    final startedOn = _optionalLocalDate(command.startedOn, 'Başlangıç tarihi');
+    final endedOn = _optionalLocalDate(command.endedOn, 'Bitiş tarihi');
+    _validateRegistryDateRange(startedOn, endedOn);
     final note = optionalTrimmed(command.note, 'Not', maxLength: 1000);
     final now = _readClockOnce();
     final timestamp = CseTimeCodec.encodeUtc(now);
@@ -179,6 +188,10 @@ class SqliteAttendanceApplication implements AttendanceApplication {
               value.name != name ||
               value.contactName != contact ||
               value.phone != phone ||
+              value.address != address ||
+              value.specialty != specialty ||
+              value.startedOn != startedOn ||
+              value.endedOn != endedOn ||
               value.note != note) {
             throw const AgendaValidationFailure(
               'Taşeron kimliği başka bir içerikle kullanılıyor.',
@@ -193,6 +206,10 @@ class SqliteAttendanceApplication implements AttendanceApplication {
           'name_normalized': normalized,
           'contact_name': contact,
           'phone': phone,
+          'address': address,
+          'specialty': specialty,
+          'started_on': startedOn,
+          'ended_on': endedOn,
           'note': note,
           'status': WorkforceRecordStatus.active.storageValue,
           'revision': 1,
@@ -228,6 +245,24 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       maxLength: 200,
     );
     final phone = optionalTrimmed(command.phone, 'Telefon', maxLength: 80);
+    final requestedAddress = optionalTrimmed(
+      command.address,
+      'Adres',
+      maxLength: 1000,
+    );
+    final requestedSpecialty = optionalTrimmed(
+      command.specialty,
+      'İş kalemi/uzmanlık',
+      maxLength: 200,
+    );
+    final requestedStartedOn = _optionalLocalDate(
+      command.startedOn,
+      'Başlangıç tarihi',
+    );
+    final requestedEndedOn = _optionalLocalDate(
+      command.endedOn,
+      'Bitiş tarihi',
+    );
     final note = optionalTrimmed(command.note, 'Not', maxLength: 1000);
     final now = _readClockOnce();
     final timestamp = CseTimeCodec.encodeUtc(now);
@@ -236,9 +271,26 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       (database) => database.transaction((tx) async {
         final current = await _loadSubcontractor(tx, command.id);
         _requireRevision(current.revision, command.expectedRevision);
+        final address = command.replaceAddress
+            ? requestedAddress
+            : current.address;
+        final specialty = command.replaceSpecialty
+            ? requestedSpecialty
+            : current.specialty;
+        final startedOn = command.replaceStartedOn
+            ? requestedStartedOn
+            : current.startedOn;
+        final endedOn = command.replaceEndedOn
+            ? requestedEndedOn
+            : current.endedOn;
+        _validateRegistryDateRange(startedOn, endedOn);
         if (current.name == name &&
             current.contactName == contact &&
             current.phone == phone &&
+            current.address == address &&
+            current.specialty == specialty &&
+            current.startedOn == startedOn &&
+            current.endedOn == endedOn &&
             current.note == note) {
           return current;
         }
@@ -249,6 +301,10 @@ class SqliteAttendanceApplication implements AttendanceApplication {
             'name_normalized': _normalizeRegistryName(name),
             'contact_name': contact,
             'phone': phone,
+            'address': address,
+            'specialty': specialty,
+            'started_on': startedOn,
+            'ended_on': endedOn,
             'note': note,
             'revision': current.revision + 1,
             'updated_at': timestamp,
@@ -982,6 +1038,11 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       maxLength: 80,
     );
     final phone = optionalTrimmed(command.phone, 'Telefon', maxLength: 80);
+    final address = optionalTrimmed(command.address, 'Adres', maxLength: 1000);
+    final startedOn = _optionalLocalDate(
+      command.startedOn,
+      'İşe başlama tarihi',
+    );
     final note = optionalTrimmed(command.note, 'Not', maxLength: 1000);
     if (command.eventId != null) {
       validateUuid(command.eventId!, 'Event kimliği');
@@ -1014,6 +1075,8 @@ class SqliteAttendanceApplication implements AttendanceApplication {
               member.roleName != roleName ||
               member.personnelCode != personnelCode ||
               member.phone != phone ||
+              member.address != address ||
+              member.startedOn != startedOn ||
               member.note != note) {
             throw const AgendaValidationFailure(
               'Personel kimliği başka bir içerikle kullanılıyor.',
@@ -1036,6 +1099,8 @@ class SqliteAttendanceApplication implements AttendanceApplication {
           'subcontractor_id': registry.subcontractor.id,
           'team_id': registry.team.id,
           'phone': phone,
+          'address': address,
+          'started_on': startedOn,
           'note': note,
           'is_active': 1,
           'revision': 1,
@@ -1067,6 +1132,8 @@ class SqliteAttendanceApplication implements AttendanceApplication {
           'role_name': roleName,
           'personnel_code': personnelCode,
           'phone': phone,
+          'address': address,
+          'started_on': startedOn,
           'note': note,
           'is_active': 1,
           'revision': 1,
@@ -1105,6 +1172,15 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       maxLength: 80,
     );
     final phone = optionalTrimmed(command.phone, 'Telefon', maxLength: 80);
+    final requestedAddress = optionalTrimmed(
+      command.address,
+      'Adres',
+      maxLength: 1000,
+    );
+    final requestedStartedOn = _optionalLocalDate(
+      command.startedOn,
+      'İşe başlama tarihi',
+    );
     final note = optionalTrimmed(command.note, 'Not', maxLength: 1000);
     if (command.eventId != null) {
       validateUuid(command.eventId!, 'Event kimliği');
@@ -1114,6 +1190,12 @@ class SqliteAttendanceApplication implements AttendanceApplication {
       return database.transaction((transaction) async {
         final member = await _requireMember(transaction, command.id);
         _requireRevision(member.revision, command.expectedRevision);
+        final address = command.replaceAddress
+            ? requestedAddress
+            : member.address;
+        final startedOn = command.replaceStartedOn
+            ? requestedStartedOn
+            : member.startedOn;
         final registry = await _resolveRegistrySelection(
           transaction,
           projectId: member.projectId,
@@ -1128,6 +1210,8 @@ class SqliteAttendanceApplication implements AttendanceApplication {
             member.roleName == roleName &&
             member.personnelCode == personnelCode &&
             member.phone == phone &&
+            member.address == address &&
+            member.startedOn == startedOn &&
             member.note == note) {
           return member;
         }
@@ -1148,6 +1232,8 @@ class SqliteAttendanceApplication implements AttendanceApplication {
             'role_name': roleName,
             'personnel_code': personnelCode,
             'phone': phone,
+            'address': address,
+            'started_on': startedOn,
             'note': note,
             'revision': member.revision + 1,
             'updated_at': timestamp,
@@ -1183,6 +1269,8 @@ class SqliteAttendanceApplication implements AttendanceApplication {
           'role_name': roleName,
           'personnel_code': personnelCode,
           'phone': phone,
+          'address': address,
+          'started_on': startedOn,
           'note': note,
           'is_active': member.isActive ? 1 : 0,
           'revision': member.revision + 1,
@@ -2672,6 +2760,16 @@ class SqliteAttendanceApplication implements AttendanceApplication {
     return normalized;
   }
 
+  void _validateRegistryDateRange(String? startedOn, String? endedOn) {
+    if (startedOn != null &&
+        endedOn != null &&
+        endedOn.compareTo(startedOn) < 0) {
+      throw const AgendaValidationFailure(
+        'Bitiş tarihi başlangıç tarihinden önce olamaz.',
+      );
+    }
+  }
+
   bool _complianceMatches(
     WorkforceComplianceRecord current,
     Map<String, Object?> values,
@@ -2959,6 +3057,10 @@ Subcontractor _subcontractorFromRow(Map<String, Object?> row) => Subcontractor(
   name: requiredTrimmed(row['name']! as String, 'Taşeron adı'),
   contactName: row['contact_name'] as String?,
   phone: row['phone'] as String?,
+  address: row['address'] as String?,
+  specialty: row['specialty'] as String?,
+  startedOn: row['started_on'] as String?,
+  endedOn: row['ended_on'] as String?,
   note: row['note'] as String?,
   status: WorkforceRecordStatus.fromStorage(row['status']! as String),
   activeTeamCount: (row['active_team_count'] as int?) ?? 0,
@@ -3018,6 +3120,8 @@ WorkforceMember _memberFromRow(Map<String, Object?> row) {
     subcontractorName: row['subcontractor_name'] as String?,
     teamId: teamId,
     phone: row['phone'] as String?,
+    address: row['address'] as String?,
+    startedOn: row['started_on'] as String?,
     note: row['note'] as String?,
     isActive: row['is_active'] == 1,
     revision: row['revision']! as int,

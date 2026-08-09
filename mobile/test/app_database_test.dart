@@ -70,8 +70,235 @@ void main() {
       {'version': 9, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 10, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 11, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 12, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
   });
+
+  test(
+    'schema 11 to 12 is additive atomic and preserves registry identity graph',
+    () async {
+      final schemaEleven = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+        migrations: AppDatabase.foundationMigrations.take(11).toList(),
+      );
+      await schemaEleven.open();
+      final database = schemaEleven.database;
+      await database.insert('projects', {
+        'id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'name': 'Kimliği korunan proje',
+        'revision': 3,
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await database.insert('subcontractors', {
+        'id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        'project_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'name': 'Korunan taşeron',
+        'name_normalized': 'korunan taşeron',
+        'status': 'active',
+        'revision': 4,
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await database.insert('workforce_teams', {
+        'id': 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        'project_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'subcontractor_id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        'name': 'Korunan ekip',
+        'name_normalized': 'korunan ekip',
+        'status': 'active',
+        'revision': 2,
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await database.insert('workforce_members', {
+        'id': 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        'project_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'subcontractor_id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        'team_id': 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        'full_name': 'Korunan kişi',
+        'team_name': 'Korunan ekip',
+        'role_name': 'Usta',
+        'is_active': 0,
+        'revision': 5,
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T09:00:00Z',
+        'archived_at': '2026-07-19T09:00:00Z',
+      });
+      await database.insert('workforce_events', {
+        'id': 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        'aggregate_type': 'person',
+        'aggregate_id': 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        'project_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'sequence': 1,
+        'event_type': 'person.archived',
+        'occurred_at': '2026-07-19T09:00:00Z',
+        'payload_json': '{}',
+      });
+      await database.insert('workforce_compliance_records', {
+        'id': 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+        'workforce_member_id': 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        'document_type': 'employment_entry',
+        'document_number': 'SGK-1',
+        'issued_date': '2026-07-01',
+        'source_status': 'valid',
+        'revision': 2,
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await database.insert('workforce_ppe_assignments', {
+        'id': '11111111-1111-4111-8111-111111111111',
+        'workforce_member_id': 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        'ppe_type': 'Baret',
+        'quantity': 1,
+        'assigned_date': '2026-07-01',
+        'status': 'assigned',
+        'revision': 3,
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await database.insert('attendance_days', {
+        'id': '22222222-2222-4222-8222-222222222222',
+        'project_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'local_date': '2026-07-18',
+        'status': 'draft',
+        'revision': 2,
+        'created_at': '2026-07-18T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await database.insert('attendance_entries', {
+        'id': '33333333-3333-4333-8333-333333333333',
+        'attendance_day_id': '22222222-2222-4222-8222-222222222222',
+        'workforce_member_id': 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        'result': 'full_day',
+        'overtime_minutes': 60,
+        'created_at': '2026-07-18T08:00:00Z',
+        'updated_at': '2026-07-18T08:00:00Z',
+      });
+      await database.insert('attendance_events', {
+        'id': '44444444-4444-4444-8444-444444444444',
+        'attendance_day_id': '22222222-2222-4222-8222-222222222222',
+        'sequence': 1,
+        'event_type': 'attendance_day.created',
+        'occurred_at': '2026-07-18T08:00:00Z',
+        'payload_json': '{}',
+      });
+      await schemaEleven.close();
+
+      final failing = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 10),
+        migrations: [
+          ...AppDatabase.foundationMigrations.take(11),
+          DatabaseMigration(
+            version: 12,
+            apply: (transaction) async {
+              await AppDatabase.foundationMigrations[11].apply(transaction);
+              throw StateError('intentional schema 12 failure');
+            },
+          ),
+        ],
+      );
+      await expectLater(failing.open(), throwsA(isA<DatabaseOpenFailure>()));
+      final afterFailure = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: sqflite.OpenDatabaseOptions(singleInstance: false),
+      );
+      expect(
+        sqflite.Sqflite.firstIntValue(
+          await afterFailure.rawQuery('PRAGMA user_version'),
+        ),
+        11,
+      );
+      expect(
+        (await afterFailure.rawQuery(
+          'PRAGMA table_info(subcontractors)',
+        )).where((row) => row['name'] == 'address'),
+        isEmpty,
+      );
+      expect(
+        (await afterFailure.query('workforce_members')).single['revision'],
+        5,
+      );
+      await afterFailure.close();
+
+      final upgraded = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 10),
+      );
+      await upgraded.open();
+      final upgradedDatabase = upgraded.database;
+      final subcontractor = (await upgradedDatabase.query(
+        'subcontractors',
+      )).single;
+      final member = (await upgradedDatabase.query('workforce_members')).single;
+      expect([
+        subcontractor['address'],
+        subcontractor['specialty'],
+        subcontractor['started_on'],
+        subcontractor['ended_on'],
+        member['address'],
+        member['started_on'],
+      ], everyElement(isNull));
+      expect(subcontractor['id'], 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+      expect(subcontractor['revision'], 4);
+      expect(member['id'], 'dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+      expect(member['revision'], 5);
+      expect(member['archived_at'], '2026-07-19T09:00:00Z');
+      expect(
+        (await upgradedDatabase.query(
+          'attendance_entries',
+        )).single['workforce_member_id'],
+        member['id'],
+      );
+      expect(
+        (await upgradedDatabase.query(
+          'workforce_compliance_records',
+        )).single['workforce_member_id'],
+        member['id'],
+      );
+      expect(
+        (await upgradedDatabase.query(
+          'workforce_ppe_assignments',
+        )).single['workforce_member_id'],
+        member['id'],
+      );
+      expect(await upgradedDatabase.query('workforce_events'), hasLength(1));
+      expect(await upgradedDatabase.query('attendance_events'), hasLength(1));
+      expect(
+        await upgradedDatabase.rawQuery('PRAGMA foreign_key_check'),
+        isEmpty,
+      );
+      final upgradedSubcontractorColumns = await upgradedDatabase.rawQuery(
+        'PRAGMA table_info(subcontractors)',
+      );
+      final upgradedMemberColumns = await upgradedDatabase.rawQuery(
+        'PRAGMA table_info(workforce_members)',
+      );
+      await upgraded.close();
+
+      final freshPath = '${directories.databaseFile}.fresh';
+      final fresh = AppDatabase(
+        path: freshPath,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 10),
+      );
+      await fresh.open();
+      expect(
+        await fresh.database.rawQuery('PRAGMA table_info(subcontractors)'),
+        upgradedSubcontractorColumns,
+      );
+      expect(
+        await fresh.database.rawQuery('PRAGMA table_info(workforce_members)'),
+        upgradedMemberColumns,
+      );
+      await fresh.close();
+    },
+  );
 
   test('schema 1 upgrades atomically and preserves its smoke record', () async {
     final versionOne = AppDatabase(
