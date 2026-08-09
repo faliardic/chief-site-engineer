@@ -50,6 +50,15 @@ void main() {
     );
     expect(tester.takeException(), isNull);
 
+    await tester.tap(find.byKey(const Key('manage-workforce')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('workforce-list')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('attendance-page')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
     await tester.tap(find.byKey(const Key('open-attendance-day')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('attendance-day-detail')), findsOneWidget);

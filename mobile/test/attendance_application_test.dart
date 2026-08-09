@@ -393,6 +393,10 @@ void main() {
           projectId: project1,
           name: '  Örnek   Taşeron  ',
           contactName: 'Yetkili',
+          address: 'Yaşam döngüsü firma adresi',
+          specialty: 'Kalıp ve beton',
+          startedOn: '2026-07-01',
+          endedOn: '2026-12-31',
         ),
       );
       expect(subcontractor.name, 'Örnek   Taşeron');
@@ -436,6 +440,8 @@ void main() {
           fullName: 'Ayşe Usta',
           teamName: 'Çevre duvarcı',
           roleName: 'Duvarcı',
+          address: 'Yaşam döngüsü personel adresi',
+          startedOn: '2026-07-02',
         ),
       );
       final registry = (await attendance.listSubcontractors(project1)).single;
@@ -529,8 +535,14 @@ void main() {
         ),
       );
       expect(reopenedSubcontractor.isActive, isTrue);
+      expect(reopenedSubcontractor.address, 'Yaşam döngüsü firma adresi');
+      expect(reopenedSubcontractor.specialty, 'Kalıp ve beton');
+      expect(reopenedSubcontractor.startedOn, '2026-07-01');
+      expect(reopenedSubcontractor.endedOn, '2026-12-31');
       expect(reopenedTeam.isActive, isTrue);
       expect(reopenedMember.isActive, isTrue);
+      expect(reopenedMember.address, 'Yaşam döngüsü personel adresi');
+      expect(reopenedMember.startedOn, '2026-07-02');
       await expectLater(
         attendance.updateTeam(
           const UpdateWorkforceTeamCommand(
