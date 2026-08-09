@@ -321,6 +321,7 @@ class WorkforcePersonDetail {
     required this.expiringComplianceCount,
     required this.expiredComplianceCount,
     required this.activePpeCount,
+    this.attendanceSummary = const WorkforceAttendanceSummary.empty(),
   });
 
   final WorkforceMember member;
@@ -331,6 +332,39 @@ class WorkforcePersonDetail {
   final int expiringComplianceCount;
   final int expiredComplianceCount;
   final int activePpeCount;
+  final WorkforceAttendanceSummary attendanceSummary;
+}
+
+class WorkforceAttendanceSummary {
+  const WorkforceAttendanceSummary({
+    required this.personDayEquivalentTotal,
+    required this.recentDays,
+  });
+
+  const WorkforceAttendanceSummary.empty()
+    : personDayEquivalentTotal = 0,
+      recentDays = const [];
+
+  final double personDayEquivalentTotal;
+  final List<WorkforceAttendanceDay> recentDays;
+
+  WorkforceAttendanceDay? get lastAttendance => recentDays.firstOrNull;
+}
+
+class WorkforceAttendanceDay {
+  const WorkforceAttendanceDay({
+    required this.attendanceDayId,
+    required this.localDate,
+    required this.dayStatus,
+    required this.result,
+  });
+
+  final String attendanceDayId;
+  final String localDate;
+  final AttendanceDayStatus dayStatus;
+  final AttendanceResult result;
+
+  double get personDayEquivalent => result.dayEquivalent;
 }
 
 class AttendanceDay {

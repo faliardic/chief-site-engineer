@@ -147,6 +147,87 @@ void main() {
   });
 
   test(
+    'person attendance summary follows canonical id and keeps archived history',
+    () async {
+      final member = await _createMember(
+        attendance,
+        id: member1,
+        name: 'Ali Usta',
+        team: 'Kalıp Ekibi',
+      );
+      final firstDay = await attendance.ensureDay(
+        const EnsureAttendanceDayCommand(
+          id: day1,
+          eventId: event1,
+          projectId: project1,
+          localDate: '2026-07-18',
+        ),
+      );
+      await attendance.saveRoster(
+        SaveAttendanceRosterCommand(
+          dayId: firstDay.id,
+          eventId: event2,
+          expectedRevision: firstDay.revision,
+          values: const [
+            AttendanceRosterValue(
+              entryId: entry1,
+              memberId: member1,
+              result: AttendanceResult.halfDay,
+              overtimeMinutes: 0,
+            ),
+          ],
+        ),
+      );
+      final secondDay = await attendance.ensureDay(
+        const EnsureAttendanceDayCommand(
+          id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2',
+          eventId: event3,
+          projectId: project1,
+          localDate: '2026-07-19',
+        ),
+      );
+      await attendance.saveRoster(
+        SaveAttendanceRosterCommand(
+          dayId: secondDay.id,
+          eventId: event4,
+          expectedRevision: secondDay.revision,
+          values: const [
+            AttendanceRosterValue(
+              entryId: entry2,
+              memberId: member1,
+              result: AttendanceResult.fullDay,
+              overtimeMinutes: 0,
+            ),
+          ],
+        ),
+      );
+      await attendance.archiveMember(
+        ArchiveWorkforceMemberCommand(
+          id: member.id,
+          expectedRevision: member.revision,
+        ),
+      );
+
+      final detail = await attendance.getPersonDetail(member.id);
+
+      expect(detail.member.isActive, isFalse);
+      expect(detail.attendanceSummary.personDayEquivalentTotal, 1.5);
+      expect(
+        detail.attendanceSummary.recentDays.map((item) => item.localDate),
+        ['2026-07-19', '2026-07-18'],
+      );
+      expect(
+        detail.attendanceSummary.lastAttendance!.result,
+        AttendanceResult.fullDay,
+      );
+      expect(
+        detail.attendanceSummary.lastAttendance!.dayStatus,
+        AttendanceDayStatus.draft,
+      );
+    },
+  );
+
+  test(
     'schema 12 registry profiles persist preserve and clear explicitly',
     () async {
       final subcontractor = await attendance.createSubcontractor(

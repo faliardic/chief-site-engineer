@@ -271,7 +271,9 @@ void main() {
     );
     await tester.enterText(find.byKey(const Key('workforce-role')), 'Demirci');
     await tester.enterText(find.byKey(const Key('workforce-code')), 'D-01');
-    await tester.tap(find.byKey(const Key('save-workforce-member')));
+    final save = find.byKey(const Key('save-workforce-member'));
+    await _scrollWorkforceFormTo(tester, save);
+    await tester.tap(save);
     await tester.pumpAndSettle();
 
     expect(find.textContaining('zaten kullanılıyor'), findsOneWidget);
@@ -326,7 +328,7 @@ void main() {
     );
     await tester.enterText(find.byKey(const Key('workforce-role')), 'Usta');
     final save = find.byKey(const Key('save-workforce-member'));
-    await tester.ensureVisible(save);
+    await _scrollWorkforceFormTo(tester, save);
     await tester.tap(save);
     await tester.pump();
     await tester.tap(save);
@@ -659,6 +661,22 @@ Finder _attendanceScrollableFinder() => find
       matching: find.byType(Scrollable),
     )
     .first;
+
+Future<void> _scrollWorkforceFormTo(WidgetTester tester, Finder target) async {
+  final scrollable = find
+      .descendant(
+        of: find.byKey(const Key('workforce-member-form')),
+        matching: find.byType(Scrollable),
+      )
+      .first;
+  await tester.scrollUntilVisible(
+    target,
+    240,
+    scrollable: scrollable,
+    maxScrolls: 8,
+  );
+  await tester.pumpAndSettle();
+}
 
 class _DelayedAttendanceApplication extends FakeAttendanceApplication {
   _DelayedAttendanceApplication({

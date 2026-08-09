@@ -4,6 +4,7 @@ import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_day_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_page.dart';
+import 'package:chief_site_engineer/features/attendance/workforce_directory_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
 import 'package:chief_site_engineer/features/memory/memory_backup_page.dart';
@@ -282,6 +283,7 @@ class _MobileShellState extends State<MobileShell> {
       icon: Icon(Icons.foundation_outlined),
       label: 'Beton Paketi',
     ),
+    NavigationDestination(icon: Icon(Icons.contacts_outlined), label: 'Sicil'),
   ];
 
   @override
@@ -333,6 +335,16 @@ class _MobileShellState extends State<MobileShell> {
               const _PreparingPage(
                 icon: Icons.foundation_outlined,
                 title: 'Beton Paketi',
+              ),
+            if (widget.bootstrap.attendance case final attendance?)
+              WorkforceDirectoryPage(
+                attendance: attendance,
+                agenda: widget.bootstrap.agenda,
+              )
+            else
+              const _PreparingPage(
+                icon: Icons.contacts_outlined,
+                title: 'Sicil',
               ),
           ],
         ),

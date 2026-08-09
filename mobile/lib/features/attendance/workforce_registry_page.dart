@@ -64,6 +64,10 @@ class _WorkforceRegistryPageState extends State<WorkforceRegistryPage> {
     final name = TextEditingController(text: value?.name);
     final contact = TextEditingController(text: value?.contactName);
     final phone = TextEditingController(text: value?.phone);
+    final address = TextEditingController(text: value?.address);
+    final specialty = TextEditingController(text: value?.specialty);
+    final startedOn = TextEditingController(text: value?.startedOn);
+    final endedOn = TextEditingController(text: value?.endedOn);
     final note = TextEditingController(text: value?.note);
     final result = await showDialog<_SubcontractorInput>(
       context: context,
@@ -78,6 +82,14 @@ class _WorkforceRegistryPageState extends State<WorkforceRegistryPage> {
               _field(contact, 'Yetkili adı'),
               _gap,
               _field(phone, 'Telefon'),
+              _gap,
+              _field(address, 'Adres', maxLines: 3),
+              _gap,
+              _field(specialty, 'İş kalemi/uzmanlık'),
+              _gap,
+              _field(startedOn, 'Başlangıç tarihi (YYYY-AA-GG)'),
+              _gap,
+              _field(endedOn, 'Bitiş tarihi (YYYY-AA-GG)'),
               _gap,
               _field(note, 'Not', maxLines: 3),
             ],
@@ -95,6 +107,10 @@ class _WorkforceRegistryPageState extends State<WorkforceRegistryPage> {
                 name.text,
                 contact.text,
                 phone.text,
+                address.text,
+                specialty.text,
+                startedOn.text,
+                endedOn.text,
                 note.text,
               ),
             ),
@@ -107,6 +123,10 @@ class _WorkforceRegistryPageState extends State<WorkforceRegistryPage> {
     name.dispose();
     contact.dispose();
     phone.dispose();
+    address.dispose();
+    specialty.dispose();
+    startedOn.dispose();
+    endedOn.dispose();
     note.dispose();
     return result;
   }
@@ -124,6 +144,10 @@ class _WorkforceRegistryPageState extends State<WorkforceRegistryPage> {
             name: input.name,
             contactName: input.contact,
             phone: input.phone,
+            address: input.address,
+            specialty: input.specialty,
+            startedOn: input.startedOn,
+            endedOn: input.endedOn,
             note: input.note,
           ),
         );
@@ -136,6 +160,14 @@ class _WorkforceRegistryPageState extends State<WorkforceRegistryPage> {
             name: input.name,
             contactName: input.contact,
             phone: input.phone,
+            address: input.address,
+            specialty: input.specialty,
+            startedOn: input.startedOn,
+            endedOn: input.endedOn,
+            replaceAddress: true,
+            replaceSpecialty: true,
+            replaceStartedOn: true,
+            replaceEndedOn: true,
             note: input.note,
           ),
         );
@@ -428,10 +460,23 @@ TextField _field(
 );
 
 class _SubcontractorInput {
-  const _SubcontractorInput(this.name, this.contact, this.phone, this.note);
+  const _SubcontractorInput(
+    this.name,
+    this.contact,
+    this.phone,
+    this.address,
+    this.specialty,
+    this.startedOn,
+    this.endedOn,
+    this.note,
+  );
   final String name;
   final String contact;
   final String phone;
+  final String address;
+  final String specialty;
+  final String startedOn;
+  final String endedOn;
   final String note;
 }
 
