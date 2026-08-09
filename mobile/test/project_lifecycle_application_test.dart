@@ -156,20 +156,34 @@ void main() {
           'occurred_at': timestamp,
           'payload_json': '{}',
         });
-        await transaction.insert('agenda_log_attachments', {
+        await transaction.insert('managed_attachments', {
           'id': _attachmentId,
-          'observation_id': _logId,
-          'project_id': _projectA,
-          'attachment_type': 'site_photo',
-          'original_file_name': 'kolon.png',
+          'relative_path': 'agenda/kolon.png',
           'mime_type': 'image/png',
           'byte_size': 1,
           'sha256': List.filled(64, 'a').join(),
-          'relative_path': 'agenda/kolon.png',
+          'created_at': timestamp,
+        });
+        await transaction.insert('attachment_links', {
+          'id': _attachmentId,
+          'attachment_id': _attachmentId,
+          'project_id': _projectA,
+          'source_type': 'agenda_observation',
+          'source_id': _logId,
+          'role': 'site_photo',
+          'original_file_name': 'kolon.png',
           'captured_at': timestamp,
           'revision': 1,
           'created_at': timestamp,
           'updated_at': timestamp,
+        });
+        await transaction.insert('attachment_link_events', {
+          'id': _eventId(107),
+          'attachment_link_id': _attachmentId,
+          'sequence': 1,
+          'event_type': 'link.created',
+          'occurred_at': timestamp,
+          'payload_json': '{}',
         });
         await transaction.insert('project_concrete_classes', {
           'id': _concreteClassId,
@@ -207,7 +221,7 @@ void main() {
       'follow_up_items': ['id', 'project_id'],
       'attendance_days': ['id', 'project_id'],
       'concrete_pours': ['id', 'project_id'],
-      'agenda_log_attachments': ['id', 'observation_id', 'project_id'],
+      'attachment_links': ['id', 'source_id', 'project_id'],
       'observation_events': ['id', 'observation_id', 'project_id'],
       'follow_up_events': ['id', 'follow_up_id', 'project_id'],
       'attendance_events': ['id', 'attendance_day_id'],
@@ -412,7 +426,7 @@ void main() {
       expect(before['follow_up_items'], hasLength(1));
       expect(before['attendance_days'], hasLength(1));
       expect(before['concrete_pours'], hasLength(1));
-      expect(before['agenda_log_attachments'], hasLength(1));
+      expect(before['attachment_links'], hasLength(1));
       expect(before['concrete_pour_context_links'], hasLength(1));
 
       var signals = 0;

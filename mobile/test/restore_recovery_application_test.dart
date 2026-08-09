@@ -6,6 +6,7 @@ import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
 import 'package:chief_site_engineer/storage/smoke_record.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as path;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -139,6 +140,149 @@ void main() {
     expect(journal, isNot(contains('password')));
     expect(journal, isNot(contains('.csebackup')));
   });
+
+  test(
+    'active recovery audits canonical graph and required physical file',
+    () async {
+      const bytes = <int>[0xff, 0xd8, 0xff, 0xd9];
+      await _insertAgendaAttachmentGraph(
+        directories,
+        relativePath: 'agenda/recovery/photo.jpg',
+        digest: sha256.convert(bytes).toString(),
+      );
+      final recovery = MobileRestoreRecoveryApplication(
+        directories: directories,
+        databaseFactory: databaseFactoryFfi,
+        clock: _clock,
+      );
+
+      await expectLater(
+        recovery.validateActiveState(),
+        throwsA(
+          isA<RestoreRecoveryFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'active_attachment_missing',
+          ),
+        ),
+      );
+
+      final file = File(
+        path.join(directories.attachments.path, 'agenda/recovery/photo.jpg'),
+      );
+      await file.parent.create(recursive: true);
+      await file.writeAsBytes(bytes, flush: true);
+      await expectLater(recovery.validateActiveState(), completes);
+
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      await raw.execute('DROP TRIGGER attachment_links_target_project_insert');
+      await raw.insert('managed_attachments', {
+        'id': 'broken-physical',
+        'relative_path': 'agenda/recovery/broken.jpg',
+        'mime_type': 'image/jpeg',
+        'byte_size': bytes.length,
+        'sha256': sha256.convert(bytes).toString(),
+        'created_at': '2026-07-19T18:00:00Z',
+      });
+      await raw.insert('attachment_links', {
+        'id': 'broken-link',
+        'attachment_id': 'broken-physical',
+        'project_id': 'old-project',
+        'source_type': 'agenda_observation',
+        'source_id': 'missing-observation',
+        'role': 'site_photo',
+        'original_file_name': 'broken.jpg',
+        'revision': 1,
+        'created_at': '2026-07-19T18:00:00Z',
+        'updated_at': '2026-07-19T18:00:00Z',
+      });
+      await raw.insert('attachment_link_events', {
+        'id': 'broken-event',
+        'attachment_link_id': 'broken-link',
+        'sequence': 1,
+        'event_type': 'link.created',
+        'occurred_at': '2026-07-19T18:00:00Z',
+        'payload_json': '{}',
+      });
+      await raw.close();
+
+      await expectLater(
+        recovery.validateActiveState(),
+        throwsA(
+          isA<RestoreRecoveryFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'active_attachment_graph_invalid',
+          ),
+        ),
+      );
+    },
+  );
+
+  test('migrated archived Concrete physical file remains optional', () async {
+    final database = AppDatabase(
+      path: directories.databaseFile,
+      factory: databaseFactoryFfi,
+      clock: _clock,
+    );
+    await database.open();
+    await database.database.insert('concrete_pours', {
+      'id': 'archived-pour',
+      'project_id': 'old-project',
+      'pour_code': 'ARCHIVED-1',
+      'element_location': 'Arşiv elemanı',
+      'planned_at': '2026-07-19T18:00:00Z',
+      'concrete_class': 'C30/37',
+      'planned_volume_m3': 1.0,
+      'status': 'draft',
+      'revision': 1,
+      'created_at': '2026-07-19T18:00:00Z',
+      'updated_at': '2026-07-19T18:00:00Z',
+    });
+    await database.database.insert('managed_attachments', {
+      'id': 'archived-physical',
+      'relative_path': 'concrete/archived/missing.bin',
+      'mime_type': 'application/octet-stream',
+      'byte_size': 3,
+      'sha256': sha256.convert(const <int>[1, 2, 3]).toString(),
+      'created_at': '2026-07-19T18:00:00Z',
+    });
+    await database.database.insert('attachment_links', {
+      'id': 'archived-link',
+      'attachment_id': 'archived-physical',
+      'project_id': 'old-project',
+      'source_type': 'concrete_pour',
+      'source_id': 'archived-pour',
+      'role': 'site_photo',
+      'original_file_name': 'missing.bin',
+      'captured_at': '2026-07-19T18:00:00Z',
+      'revision': 1,
+      'created_at': '2026-07-19T18:00:00Z',
+      'updated_at': '2026-07-19T18:00:00Z',
+      'archived_at': '2026-07-19T19:00:00Z',
+      'legacy_source': 'concrete_attachments',
+      'legacy_id': 'legacy-archived-attachment',
+    });
+    await database.database.insert('attachment_link_events', {
+      'id': 'archived-link-event',
+      'attachment_link_id': 'archived-link',
+      'sequence': 1,
+      'event_type': 'link.created',
+      'occurred_at': '2026-07-19T18:00:00Z',
+      'payload_json': '{}',
+    });
+    await database.close();
+
+    final recovery = MobileRestoreRecoveryApplication(
+      directories: directories,
+      databaseFactory: databaseFactoryFfi,
+      clock: _clock,
+    );
+    await expectLater(recovery.validateActiveState(), completes);
+  });
 }
 
 class _InterruptedRestore {
@@ -242,4 +386,56 @@ Future<List<String>> _projectNames(String databasePath) async {
   } finally {
     await database.close();
   }
+}
+
+Future<void> _insertAgendaAttachmentGraph(
+  AppDirectories directories, {
+  required String relativePath,
+  required String digest,
+}) async {
+  final database = AppDatabase(
+    path: directories.databaseFile,
+    factory: databaseFactoryFfi,
+    clock: _clock,
+  );
+  await database.open();
+  await database.database.insert('field_observations', {
+    'id': 'recovery-observation',
+    'project_id': 'old-project',
+    'observed_at': '2026-07-19T18:00:00Z',
+    'created_at': '2026-07-19T18:00:00Z',
+    'updated_at': '2026-07-19T18:00:00Z',
+    'category': 'inspection',
+    'description': 'Recovery attachment source',
+    'revision': 1,
+  });
+  await database.database.insert('managed_attachments', {
+    'id': 'recovery-physical',
+    'relative_path': relativePath,
+    'mime_type': 'image/jpeg',
+    'byte_size': 4,
+    'sha256': digest,
+    'created_at': '2026-07-19T18:00:00Z',
+  });
+  await database.database.insert('attachment_links', {
+    'id': 'recovery-link',
+    'attachment_id': 'recovery-physical',
+    'project_id': 'old-project',
+    'source_type': 'agenda_observation',
+    'source_id': 'recovery-observation',
+    'role': 'site_photo',
+    'original_file_name': 'photo.jpg',
+    'revision': 1,
+    'created_at': '2026-07-19T18:00:00Z',
+    'updated_at': '2026-07-19T18:00:00Z',
+  });
+  await database.database.insert('attachment_link_events', {
+    'id': 'recovery-link-event',
+    'attachment_link_id': 'recovery-link',
+    'sequence': 1,
+    'event_type': 'link.created',
+    'occurred_at': '2026-07-19T18:00:00Z',
+    'payload_json': '{}',
+  });
+  await database.close();
 }

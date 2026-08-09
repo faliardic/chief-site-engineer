@@ -236,12 +236,63 @@ class MobileRestoreRecoveryApplication {
       )).isNotEmpty) {
         throw const RestoreRecoveryFailure('active_foreign_key_violation');
       }
-      final rows = await database.database.query(
-        'concrete_attachments',
-        columns: ['relative_path', 'byte_size', 'sha256'],
-        where: 'archived_at IS NULL',
-        orderBy: 'relative_path ASC',
-      );
+      final brokenLinks = await database.database.rawQuery('''
+        SELECT l.id
+        FROM attachment_links l
+        LEFT JOIN field_observations o
+          ON l.source_type = 'agenda_observation' AND o.id = l.source_id
+        LEFT JOIN concrete_pours p
+          ON l.source_type = 'concrete_pour' AND p.id = l.source_id
+        LEFT JOIN concrete_trucks t
+          ON l.context_type = 'concrete_truck' AND t.id = l.context_id
+        LEFT JOIN concrete_sample_sets s
+          ON l.context_type = 'concrete_sample_set' AND s.id = l.context_id
+        LEFT JOIN concrete_check_items c
+          ON l.context_type = 'concrete_check_item' AND c.id = l.context_id
+        WHERE (
+          l.source_type = 'agenda_observation'
+          AND (o.id IS NULL OR o.project_id != l.project_id)
+        ) OR (
+          l.source_type = 'concrete_pour'
+          AND (p.id IS NULL OR p.project_id != l.project_id)
+        ) OR (
+          l.context_type = 'concrete_truck'
+          AND (t.id IS NULL OR t.concrete_pour_id != l.source_id)
+        ) OR (
+          l.context_type = 'concrete_sample_set'
+          AND (s.id IS NULL OR s.concrete_pour_id != l.source_id)
+        ) OR (
+          l.context_type = 'concrete_check_item'
+          AND (c.id IS NULL OR c.concrete_pour_id != l.source_id)
+        ) OR NOT EXISTS (
+          SELECT 1 FROM attachment_link_events e
+          WHERE e.attachment_link_id = l.id
+        )
+        LIMIT 1
+      ''');
+      if (brokenLinks.isNotEmpty) {
+        throw const RestoreRecoveryFailure('active_attachment_graph_invalid');
+      }
+      final orphanedPhysical = await database.database.rawQuery('''
+        SELECT m.id
+        FROM managed_attachments m
+        WHERE NOT EXISTS (
+          SELECT 1 FROM attachment_links l WHERE l.attachment_id = m.id
+        )
+        LIMIT 1
+      ''');
+      if (orphanedPhysical.isNotEmpty) {
+        throw const RestoreRecoveryFailure('active_attachment_graph_invalid');
+      }
+      final rows = await database.database.rawQuery('''
+        SELECT DISTINCT m.relative_path, m.byte_size, m.sha256
+        FROM managed_attachments m
+        JOIN attachment_links l ON l.attachment_id = m.id
+        WHERE l.legacy_source IS NULL
+          OR l.legacy_source != 'concrete_attachments'
+          OR l.archived_at IS NULL
+        ORDER BY m.relative_path ASC
+      ''');
       for (final row in rows) {
         final relative = row['relative_path']! as String;
         final attachment = await _resolveAttachment(relative);

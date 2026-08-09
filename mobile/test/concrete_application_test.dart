@@ -1137,6 +1137,34 @@ void main() {
         0xff,
         1,
       ]);
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      final canonicalLinks = await raw.query(
+        'attachment_links',
+        where: "source_type = 'concrete_pour' AND source_id = ?",
+        whereArgs: [pourId],
+        orderBy: 'created_at ASC',
+      );
+      expect(canonicalLinks, hasLength(3));
+      expect(
+        canonicalLinks.every(
+          (row) =>
+              row['context_type'] == 'concrete_truck' &&
+              row['context_id'] == truck.id,
+        ),
+        isTrue,
+      );
+      expect(
+        await raw.query(
+          'attachment_link_events',
+          where: 'attachment_link_id = ?',
+          whereArgs: [_uuid(52)],
+        ),
+        hasLength(1),
+      );
+      await raw.close();
 
       detail = await concrete.saveSampleSet(
         SaveConcreteSampleSetCommand(

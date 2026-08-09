@@ -105,14 +105,15 @@ void main() {
       final pubspec = File('pubspec.yaml').readAsStringSync();
       final lock = File('pubspec.lock').readAsStringSync();
 
-      expect(schema, contains('static const schemaVersion = 12'));
+      expect(schema, contains('static const schemaVersion = 13'));
       expect(schema, contains('CREATE TABLE workforce_members'));
       expect(schema, contains('CREATE TABLE attendance_days'));
       expect(schema, contains('CREATE TABLE attendance_entries'));
       expect(schema, contains('CREATE TABLE attendance_events'));
       expect(schema, contains('CREATE TABLE concrete_pours'));
-      expect(schema, contains('CREATE TABLE concrete_attachments'));
-      expect(schema, contains('CREATE TABLE agenda_log_attachments'));
+      expect(schema, contains('CREATE TABLE managed_attachments'));
+      expect(schema, contains('CREATE TABLE attachment_links'));
+      expect(schema, contains('CREATE TABLE attachment_link_events'));
       expect(pubspec, contains('share_plus: ^12.0.1'));
       expect(pubspec, contains('image_picker: ^1.2.1'));
       expect(pubspec, contains('file_picker: ^10.3.10'));

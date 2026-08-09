@@ -27,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 12;
+  static const schemaVersion = 13;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2881,6 +2881,7 @@ class AppDatabase {
         }
       },
     ),
+    DatabaseMigration(version: 13, apply: _applyAttachmentFoundationMigration),
   ];
 
   final String path;
@@ -2978,6 +2979,368 @@ class AppDatabase {
       CseTimeCodec.decodeCanonicalUtc(history[index]['applied_at']! as String);
     }
   }
+}
+
+Future<void> _applyAttachmentFoundationMigration(
+  Transaction transaction,
+) async {
+  await transaction.execute('''
+    CREATE TABLE managed_attachments (
+      id TEXT PRIMARY KEY,
+      relative_path TEXT NOT NULL UNIQUE CHECK (
+        length(relative_path) > 0
+        AND relative_path = trim(relative_path)
+        AND substr(relative_path, 1, 1) != '/'
+        AND instr(relative_path, char(92)) = 0
+        AND instr(relative_path, ':') = 0
+        AND instr(relative_path, '//') = 0
+        AND relative_path != '..'
+        AND relative_path NOT LIKE '../%'
+        AND relative_path NOT LIKE '%/../%'
+        AND relative_path NOT LIKE '%/..'
+      ),
+      mime_type TEXT NOT NULL CHECK (
+        length(trim(mime_type)) > 0 AND mime_type = trim(mime_type)
+      ),
+      byte_size INTEGER NOT NULL CHECK (byte_size > 0),
+      sha256 TEXT NOT NULL CHECK (
+        length(sha256) = 64
+        AND sha256 = lower(sha256)
+        AND sha256 NOT GLOB '*[^0-9a-f]*'
+      ),
+      created_at TEXT NOT NULL
+    )
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_managed_attachments_content_candidate
+    ON managed_attachments(sha256, byte_size, mime_type)
+  ''');
+
+  await transaction.execute('''
+    CREATE TABLE attachment_links (
+      id TEXT PRIMARY KEY,
+      attachment_id TEXT NOT NULL REFERENCES managed_attachments(id),
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      source_type TEXT NOT NULL CHECK (
+        source_type IN ('agenda_observation', 'concrete_pour')
+      ),
+      source_id TEXT NOT NULL,
+      context_type TEXT CHECK (
+        context_type IS NULL OR context_type IN (
+          'concrete_truck', 'concrete_sample_set', 'concrete_check_item'
+        )
+      ),
+      context_id TEXT,
+      role TEXT NOT NULL CHECK (role IN (
+        'site_photo', 'delivery_receipt_scan', 'delivery_note_scan',
+        'mixer_photo', 'sample_photo', 'laboratory_delivery_document',
+        'result_document', 'other'
+      )),
+      original_file_name TEXT NOT NULL CHECK (
+        length(trim(original_file_name)) > 0
+      ),
+      description TEXT,
+      captured_at TEXT,
+      revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      archived_at TEXT,
+      legacy_source TEXT CHECK (
+        legacy_source IS NULL OR legacy_source IN (
+          'agenda_log_attachments', 'concrete_attachments'
+        )
+      ),
+      legacy_id TEXT,
+      UNIQUE (legacy_source, legacy_id),
+      CHECK (
+        (context_type IS NULL AND context_id IS NULL)
+        OR (context_type IS NOT NULL AND context_id IS NOT NULL)
+      ),
+      CHECK (
+        (legacy_source IS NULL AND legacy_id IS NULL)
+        OR (legacy_source IS NOT NULL AND legacy_id IS NOT NULL)
+      ),
+      CHECK (source_type = 'concrete_pour' OR context_type IS NULL),
+      CHECK (source_type = 'concrete_pour' OR role = 'site_photo'),
+      CHECK (source_type = 'agenda_observation' OR captured_at IS NOT NULL)
+    )
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_attachment_links_source
+    ON attachment_links(
+      source_type, source_id, archived_at, created_at, id
+    )
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_attachment_links_attachment
+    ON attachment_links(attachment_id, archived_at, created_at, id)
+  ''');
+  await transaction.execute('''
+    CREATE UNIQUE INDEX uq_attachment_links_active_relation
+    ON attachment_links(
+      attachment_id,
+      source_type,
+      source_id,
+      COALESCE(context_type, ''),
+      COALESCE(context_id, ''),
+      role
+    )
+    WHERE archived_at IS NULL
+  ''');
+  await transaction.execute('''
+    CREATE UNIQUE INDEX uq_attachment_links_source_public_id
+    ON attachment_links(source_type, COALESCE(legacy_id, id))
+  ''');
+
+  await transaction.execute('''
+    CREATE TABLE attachment_link_events (
+      id TEXT PRIMARY KEY,
+      attachment_link_id TEXT NOT NULL REFERENCES attachment_links(id),
+      sequence INTEGER NOT NULL CHECK (sequence >= 1),
+      event_type TEXT NOT NULL CHECK (event_type IN (
+        'link.created', 'link.archived', 'link.restored', 'link.unlinked'
+      )),
+      occurred_at TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      UNIQUE (attachment_link_id, sequence)
+    )
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_attachment_link_events_link
+    ON attachment_link_events(attachment_link_id, sequence, id)
+  ''');
+
+  for (final suffix in ['insert', 'update']) {
+    final action = suffix == 'insert' ? 'INSERT' : 'UPDATE';
+    final updateFields = suffix == 'insert'
+        ? ''
+        : ' OF project_id, source_type, source_id, context_type, context_id';
+    await transaction.execute('''
+      CREATE TRIGGER attachment_links_target_project_$suffix
+      BEFORE $action$updateFields ON attachment_links
+      WHEN (
+        NEW.source_type = 'agenda_observation'
+        AND NOT EXISTS (
+          SELECT 1 FROM field_observations o
+          WHERE o.id = NEW.source_id AND o.project_id = NEW.project_id
+        )
+      ) OR (
+        NEW.source_type = 'concrete_pour'
+        AND NOT EXISTS (
+          SELECT 1 FROM concrete_pours p
+          WHERE p.id = NEW.source_id AND p.project_id = NEW.project_id
+        )
+      ) OR (
+        NEW.context_type = 'concrete_truck'
+        AND NOT EXISTS (
+          SELECT 1 FROM concrete_trucks t
+          WHERE t.id = NEW.context_id
+            AND t.concrete_pour_id = NEW.source_id
+        )
+      ) OR (
+        NEW.context_type = 'concrete_sample_set'
+        AND NOT EXISTS (
+          SELECT 1 FROM concrete_sample_sets s
+          WHERE s.id = NEW.context_id
+            AND s.concrete_pour_id = NEW.source_id
+        )
+      ) OR (
+        NEW.context_type = 'concrete_check_item'
+        AND NOT EXISTS (
+          SELECT 1 FROM concrete_check_items c
+          WHERE c.id = NEW.context_id
+            AND c.concrete_pour_id = NEW.source_id
+        )
+      )
+      BEGIN
+        SELECT RAISE(ABORT, 'attachment target must exist in link project');
+      END
+    ''');
+  }
+
+  await transaction.execute('''
+    CREATE TRIGGER attachment_links_source_digest_unique
+    BEFORE INSERT ON attachment_links
+    WHEN EXISTS (
+      SELECT 1
+      FROM managed_attachments incoming
+      JOIN attachment_links existing
+        ON existing.source_type = NEW.source_type
+        AND existing.source_id = NEW.source_id
+      JOIN managed_attachments stored
+        ON stored.id = existing.attachment_id
+      WHERE incoming.id = NEW.attachment_id
+        AND stored.sha256 = incoming.sha256
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'attachment digest already linked to source');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER attachment_links_identity_immutable
+    BEFORE UPDATE OF attachment_id, project_id, source_type, source_id,
+      context_type, context_id ON attachment_links
+    WHEN NEW.attachment_id != OLD.attachment_id
+      OR NEW.project_id != OLD.project_id
+      OR NEW.source_type != OLD.source_type
+      OR NEW.source_id != OLD.source_id
+      OR NEW.context_type IS NOT OLD.context_type
+      OR NEW.context_id IS NOT OLD.context_id
+    BEGIN
+      SELECT RAISE(ABORT, 'attachment link identity is immutable');
+    END
+  ''');
+  for (final table in ['managed_attachments', 'attachment_links']) {
+    await transaction.execute('''
+      CREATE TRIGGER ${table}_no_physical_delete
+      BEFORE DELETE ON $table
+      BEGIN
+        SELECT RAISE(ABORT, 'physical delete is not allowed');
+      END
+    ''');
+  }
+  for (final operation in ['update', 'delete']) {
+    await transaction.execute('''
+      CREATE TRIGGER attachment_link_events_append_only_$operation
+      BEFORE ${operation.toUpperCase()} ON attachment_link_events
+      BEGIN
+        SELECT RAISE(ABORT, 'append-only event history');
+      END
+    ''');
+  }
+
+  final agendaRows = await transaction.query(
+    'agenda_log_attachments',
+    orderBy: 'id ASC',
+  );
+  for (final row in agendaRows) {
+    final legacyId = row['id']! as String;
+    final physicalId = _migrationStableUuid('agenda_binary:$legacyId');
+    final linkId = _migrationStableUuid('agenda_log_attachments:$legacyId');
+    await transaction.insert('managed_attachments', {
+      'id': physicalId,
+      'relative_path': row['relative_path'],
+      'mime_type': row['mime_type'],
+      'byte_size': row['byte_size'],
+      'sha256': row['sha256'],
+      'created_at': row['created_at'],
+    });
+    await transaction.insert('attachment_links', {
+      'id': linkId,
+      'attachment_id': physicalId,
+      'project_id': row['project_id'],
+      'source_type': 'agenda_observation',
+      'source_id': row['observation_id'],
+      'role': row['attachment_type'],
+      'original_file_name': row['original_file_name'],
+      'description': row['description'],
+      'captured_at': row['captured_at'],
+      'revision': row['revision'],
+      'created_at': row['created_at'],
+      'updated_at': row['updated_at'],
+      'archived_at': row['archived_at'],
+      'legacy_source': 'agenda_log_attachments',
+      'legacy_id': legacyId,
+    });
+    await transaction.insert('attachment_link_events', {
+      'id': _migrationStableUuid('attachment_link_event:$linkId:created'),
+      'attachment_link_id': linkId,
+      'sequence': 1,
+      'event_type': 'link.created',
+      'occurred_at': row['created_at'],
+      'payload_json': jsonEncode({
+        'legacy_source': 'agenda_log_attachments',
+        'legacy_id': legacyId,
+      }),
+    });
+  }
+
+  final concreteRows = await transaction.rawQuery('''
+    SELECT a.*, p.project_id AS link_project_id
+    FROM concrete_attachments a
+    JOIN concrete_pours p ON p.id = a.concrete_pour_id
+    ORDER BY a.id ASC
+  ''');
+  for (final row in concreteRows) {
+    final legacyId = row['id']! as String;
+    final physicalId = _migrationStableUuid('concrete_binary:$legacyId');
+    final linkId = _migrationStableUuid('concrete_attachments:$legacyId');
+    final truckId = row['truck_id'] as String?;
+    final sampleSetId = row['sample_set_id'] as String?;
+    final checkItemId = row['check_item_id'] as String?;
+    final contextType = truckId != null
+        ? 'concrete_truck'
+        : sampleSetId != null
+        ? 'concrete_sample_set'
+        : checkItemId != null
+        ? 'concrete_check_item'
+        : null;
+    final contextId = truckId ?? sampleSetId ?? checkItemId;
+    await transaction.insert('managed_attachments', {
+      'id': physicalId,
+      'relative_path': row['relative_path'],
+      'mime_type': row['mime_type'],
+      'byte_size': row['byte_size'],
+      'sha256': row['sha256'],
+      'created_at': row['created_at'],
+    });
+    await transaction.insert('attachment_links', {
+      'id': linkId,
+      'attachment_id': physicalId,
+      'project_id': row['link_project_id'],
+      'source_type': 'concrete_pour',
+      'source_id': row['concrete_pour_id'],
+      'context_type': contextType,
+      'context_id': contextId,
+      'role': row['evidence_type'],
+      'original_file_name': row['original_file_name'],
+      'description': row['description'],
+      'captured_at': row['captured_at'],
+      'revision': 1,
+      'created_at': row['created_at'],
+      'updated_at': row['created_at'],
+      'archived_at': row['archived_at'],
+      'legacy_source': 'concrete_attachments',
+      'legacy_id': legacyId,
+    });
+    await transaction.insert('attachment_link_events', {
+      'id': _migrationStableUuid('attachment_link_event:$linkId:created'),
+      'attachment_link_id': linkId,
+      'sequence': 1,
+      'event_type': 'link.created',
+      'occurred_at': row['created_at'],
+      'payload_json': jsonEncode({
+        'legacy_source': 'concrete_attachments',
+        'legacy_id': legacyId,
+      }),
+    });
+  }
+
+  final agendaMappings = Sqflite.firstIntValue(
+    await transaction.rawQuery('''
+      SELECT count(*) FROM attachment_links
+      WHERE legacy_source = 'agenda_log_attachments'
+    '''),
+  );
+  final concreteMappings = Sqflite.firstIntValue(
+    await transaction.rawQuery('''
+      SELECT count(*) FROM attachment_links
+      WHERE legacy_source = 'concrete_attachments'
+    '''),
+  );
+  if (agendaMappings != agendaRows.length ||
+      concreteMappings != concreteRows.length) {
+    throw StateError('legacy attachment mapping count mismatch');
+  }
+
+  await transaction.execute(
+    'DROP TRIGGER IF EXISTS agenda_log_attachments_no_physical_delete',
+  );
+  await transaction.execute(
+    'DROP TRIGGER IF EXISTS concrete_attachments_no_physical_delete',
+  );
+  await transaction.execute('DROP TABLE agenda_log_attachments');
+  await transaction.execute('DROP TABLE concrete_attachments');
 }
 
 String _normalizeRegistryName(String value) =>

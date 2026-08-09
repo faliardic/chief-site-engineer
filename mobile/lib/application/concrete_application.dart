@@ -240,6 +240,117 @@ ConcreteAttachment _attachmentFromRow(Map<String, Object?> row) =>
       integrity: ConcreteAttachmentIntegrity.ok,
     );
 
+Future<void> _insertConcreteAttachment(
+  DatabaseExecutor database, {
+  required String attachmentId,
+  required String linkId,
+  required String linkEventId,
+  required String pourId,
+  required String projectId,
+  required String? truckId,
+  required String? sampleSetId,
+  required String? checkItemId,
+  required String evidenceType,
+  required String originalFileName,
+  required String mimeType,
+  required int byteSize,
+  required String sha256Value,
+  required String relativePath,
+  required String capturedAt,
+  required String? description,
+  required String timestamp,
+}) async {
+  final contexts = <(String, String)>[
+    if (truckId != null) ('concrete_truck', truckId),
+    if (sampleSetId != null) ('concrete_sample_set', sampleSetId),
+    if (checkItemId != null) ('concrete_check_item', checkItemId),
+  ];
+  if (contexts.length > 1) {
+    throw const AgendaValidationFailure(
+      'Kanıt aynı anda birden fazla Beton bağlamına bağlanamaz.',
+    );
+  }
+  final context = contexts.firstOrNull;
+  await database.insert('managed_attachments', {
+    'id': attachmentId,
+    'relative_path': relativePath,
+    'mime_type': mimeType,
+    'byte_size': byteSize,
+    'sha256': sha256Value,
+    'created_at': timestamp,
+  });
+  await database.insert('attachment_links', {
+    'id': linkId,
+    'attachment_id': attachmentId,
+    'project_id': projectId,
+    'source_type': 'concrete_pour',
+    'source_id': pourId,
+    'context_type': context?.$1,
+    'context_id': context?.$2,
+    'role': evidenceType,
+    'original_file_name': originalFileName,
+    'description': description,
+    'captured_at': capturedAt,
+    'revision': 1,
+    'created_at': timestamp,
+    'updated_at': timestamp,
+  });
+  await database.insert('attachment_link_events', {
+    'id': linkEventId,
+    'attachment_link_id': linkId,
+    'sequence': 1,
+    'event_type': 'link.created',
+    'occurred_at': timestamp,
+    'payload_json': jsonEncode({'source': 'concrete_pour'}),
+  });
+}
+
+Future<List<Map<String, Object?>>> _queryConcreteAttachmentRows(
+  DatabaseExecutor database, {
+  String? publicId,
+  String? pourId,
+  bool activeOnly = false,
+  bool orderByCaptured = false,
+}) {
+  final where = <String>["l.source_type = 'concrete_pour'"];
+  final arguments = <Object?>[];
+  if (publicId != null) {
+    where.add('COALESCE(l.legacy_id, l.id) = ?');
+    arguments.add(publicId);
+  }
+  if (pourId != null) {
+    where.add('l.source_id = ?');
+    arguments.add(pourId);
+  }
+  if (activeOnly) where.add('l.archived_at IS NULL');
+  return database.rawQuery('''
+    SELECT
+      COALESCE(l.legacy_id, l.id) AS id,
+      l.id AS link_id,
+      l.source_id AS concrete_pour_id,
+      CASE WHEN l.context_type = 'concrete_truck'
+        THEN l.context_id END AS truck_id,
+      CASE WHEN l.context_type = 'concrete_sample_set'
+        THEN l.context_id END AS sample_set_id,
+      CASE WHEN l.context_type = 'concrete_check_item'
+        THEN l.context_id END AS check_item_id,
+      l.role AS evidence_type,
+      l.original_file_name,
+      m.mime_type,
+      m.byte_size,
+      m.sha256,
+      m.relative_path,
+      l.captured_at,
+      l.description,
+      l.created_at,
+      l.archived_at
+    FROM attachment_links l
+    JOIN managed_attachments m ON m.id = l.attachment_id
+    WHERE ${where.join(' AND ')}
+    ${orderByCaptured ? 'ORDER BY l.captured_at ASC, l.created_at ASC, l.id ASC' : ''}
+  ''', arguments);
+}
+
 ConcreteAttachment _withIntegrity(
   ConcreteAttachment item,
   ConcreteAttachmentIntegrity value,
@@ -610,13 +721,19 @@ class SqliteConcreteApplication implements ConcreteApplication {
               AND (t.evidence_exception_reason IS NULL
                 OR length(trim(t.evidence_exception_reason)) = 0)
               AND (
-                NOT EXISTS (SELECT 1 FROM concrete_attachments a
-                  WHERE a.truck_id = t.id AND a.archived_at IS NULL
-                    AND a.evidence_type IN (
+                NOT EXISTS (SELECT 1 FROM attachment_links a
+                  WHERE a.source_type = 'concrete_pour'
+                    AND a.source_id = c.id
+                    AND a.context_type = 'concrete_truck'
+                    AND a.context_id = t.id AND a.archived_at IS NULL
+                    AND a.role IN (
                       'delivery_receipt_scan', 'delivery_note_scan'))
-                OR NOT EXISTS (SELECT 1 FROM concrete_attachments a
-                  WHERE a.truck_id = t.id AND a.archived_at IS NULL
-                    AND a.evidence_type = 'mixer_photo')
+                OR NOT EXISTS (SELECT 1 FROM attachment_links a
+                  WHERE a.source_type = 'concrete_pour'
+                    AND a.source_id = c.id
+                    AND a.context_type = 'concrete_truck'
+                    AND a.context_id = t.id AND a.archived_at IS NULL
+                    AND a.role = 'mixer_photo')
               )) AS missing_evidence_truck_count
         FROM concrete_pours c
         JOIN projects p ON p.id = c.project_id
@@ -1186,11 +1303,10 @@ class SqliteConcreteApplication implements ConcreteApplication {
             command.eventId,
             command.pourId,
           )) {
-            final existing = await transaction.query(
-              'concrete_attachments',
-              where: 'id = ? AND concrete_pour_id = ?',
-              whereArgs: [command.id, command.pourId],
-              limit: 1,
+            final existing = await _queryConcreteAttachmentRows(
+              transaction,
+              publicId: command.id,
+              pourId: command.pourId,
             );
             if (existing.isEmpty ||
                 existing.single['sha256'] != staged.sha256Value) {
@@ -1200,38 +1316,46 @@ class SqliteConcreteApplication implements ConcreteApplication {
             }
             return _loadDetail(transaction, command.pourId);
           }
-          final duplicate = await transaction.query(
-            'concrete_attachments',
-            columns: ['id'],
-            where: 'concrete_pour_id = ? AND sha256 = ?',
-            whereArgs: [command.pourId, staged.sha256Value],
-            limit: 1,
+          final duplicate = await transaction.rawQuery(
+            '''
+            SELECT l.id
+            FROM attachment_links l
+            JOIN managed_attachments m ON m.id = l.attachment_id
+            WHERE l.source_type = 'concrete_pour'
+              AND l.source_id = ? AND m.sha256 = ?
+            LIMIT 1
+            ''',
+            [command.pourId, staged.sha256Value],
           );
           if (duplicate.isNotEmpty) {
             throw const AgendaValidationFailure(
               'Bu kanıt dosyası pakete daha önce eklenmiş.',
             );
           }
-          await transaction.insert('concrete_attachments', {
-            'id': command.id,
-            'concrete_pour_id': command.pourId,
-            'truck_id': command.truckId,
-            'sample_set_id': command.sampleSetId,
-            'check_item_id': command.checkItemId,
-            'evidence_type': command.evidenceType.storageValue,
-            'original_file_name': command.originalFileName.trim(),
-            'mime_type': staged.mimeType,
-            'byte_size': staged.byteSize,
-            'sha256': staged.sha256Value,
-            'relative_path': staged.relativePath,
-            'captured_at': command.capturedAt,
-            'description': optionalTrimmed(
+          await _insertConcreteAttachment(
+            transaction,
+            attachmentId: command.id,
+            linkId: command.id,
+            linkEventId: command.eventId,
+            pourId: command.pourId,
+            projectId: pour.projectId,
+            truckId: command.truckId,
+            sampleSetId: command.sampleSetId,
+            checkItemId: command.checkItemId,
+            evidenceType: command.evidenceType.storageValue,
+            originalFileName: command.originalFileName.trim(),
+            mimeType: staged.mimeType,
+            byteSize: staged.byteSize,
+            sha256Value: staged.sha256Value,
+            relativePath: staged.relativePath,
+            capturedAt: command.capturedAt,
+            description: optionalTrimmed(
               command.description,
               'Kanıt açıklaması',
               maxLength: 1000,
             ),
-            'created_at': timestamp,
-          });
+            timestamp: timestamp,
+          );
           await _advancePour(transaction, pour, timestamp);
           await _insertConcreteEvent(
             transaction,
@@ -1933,11 +2057,11 @@ class SqliteConcreteApplication implements ConcreteApplication {
       whereArgs: [pourId],
       orderBy: 'due_at IS NULL ASC, due_at ASC, created_at ASC, id ASC',
     )).map(_followUpFromRow).toList(growable: false);
-    final attachments = (await database.query(
-      'concrete_attachments',
-      where: 'concrete_pour_id = ? AND archived_at IS NULL',
-      whereArgs: [pourId],
-      orderBy: 'captured_at ASC, created_at ASC, id ASC',
+    final attachments = (await _queryConcreteAttachmentRows(
+      database,
+      pourId: pourId,
+      activeOnly: true,
+      orderByCaptured: true,
     )).map(_attachmentFromRow).toList(growable: false);
     final events = (await database.query(
       'concrete_pour_events',
@@ -2452,15 +2576,21 @@ class SqliteConcreteApplication implements ConcreteApplication {
         AND (t.evidence_exception_reason IS NULL OR length(trim(t.evidence_exception_reason)) = 0)
         AND (
           NOT EXISTS (
-            SELECT 1 FROM concrete_attachments a
-            WHERE a.truck_id = t.id AND a.archived_at IS NULL
-              AND a.evidence_type IN (
+            SELECT 1 FROM attachment_links a
+            WHERE a.source_type = 'concrete_pour'
+              AND a.source_id = t.concrete_pour_id
+              AND a.context_type = 'concrete_truck'
+              AND a.context_id = t.id AND a.archived_at IS NULL
+              AND a.role IN (
                 'delivery_receipt_scan', 'delivery_note_scan'
               )
           ) OR NOT EXISTS (
-            SELECT 1 FROM concrete_attachments a
-            WHERE a.truck_id = t.id AND a.archived_at IS NULL
-              AND a.evidence_type = 'mixer_photo'
+            SELECT 1 FROM attachment_links a
+            WHERE a.source_type = 'concrete_pour'
+              AND a.source_id = t.concrete_pour_id
+              AND a.context_type = 'concrete_truck'
+              AND a.context_id = t.id AND a.archived_at IS NULL
+              AND a.role = 'mixer_photo'
           )
         )
       ''',
@@ -3239,11 +3369,10 @@ class SqliteConcreteApplication implements ConcreteApplication {
     validateUuid(attachmentId, 'Kanıt kimliği');
     final now = _readClockOnce();
     final attachment = await _withDatabase(now, (database) async {
-      final rows = await database.query(
-        'concrete_attachments',
-        where: 'id = ? AND archived_at IS NULL',
-        whereArgs: [attachmentId],
-        limit: 1,
+      final rows = await _queryConcreteAttachmentRows(
+        database,
+        publicId: attachmentId,
+        activeOnly: true,
       );
       if (rows.isEmpty) {
         throw const AgendaValidationFailure('Kanıt dosyası bulunamadı.');
@@ -3263,11 +3392,10 @@ class SqliteConcreteApplication implements ConcreteApplication {
     validateUuid(attachmentId, 'Kanıt kimliği');
     final now = _readClockOnce();
     final attachment = await _withDatabase(now, (database) async {
-      final rows = await database.query(
-        'concrete_attachments',
-        where: 'id = ? AND archived_at IS NULL',
-        whereArgs: [attachmentId],
-        limit: 1,
+      final rows = await _queryConcreteAttachmentRows(
+        database,
+        publicId: attachmentId,
+        activeOnly: true,
       );
       if (rows.isEmpty) {
         throw const AgendaValidationFailure('Kanıt dosyası bulunamadı.');

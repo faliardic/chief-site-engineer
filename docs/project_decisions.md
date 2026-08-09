@@ -3833,3 +3833,22 @@
 - Aynı controller successor'ı idempotenttir; başka controller revision,
   rollback, projection/tail/effect drift veya eksik successor history
   `controller_handoff_not_safe` ile durur.
+
+## Issue 420 — Attachment fiziksel kimliği bağlamsal linkten ayrılır
+
+- Schema 13'te dosyanın taşınabilir yol, MIME, boyut ve SHA-256 kimliği
+  `managed_attachments`; Agenda/Beton kaynak ve çocuk bağlamı ise
+  `attachment_links` içinde tutulur. Link yaşam döngüsü append-only
+  `attachment_link_events` ile kanıtlanır.
+- Schema 12 cutover'ı her legacy satırı ayrı fiziksel kayıt ve ayrı link olarak
+  atomik taşır. Aynı SHA-256 otomatik birleştirme yetkisi değildir; migration
+  attachment byte'ı okumaz, taşımaz veya silmez.
+- Mevcut Agenda ve Beton API kimlikleri legacy provenance üzerinden korunur.
+  Yeni yazımlar canonical tablolara gider; bilinmeyen, cross-project veya
+  yanlış çocuk bağlamı SQLite seviyesinde fail-closed reddedilir.
+- Backup formatı 1 kalır. Schema 13 paketleri bağlı aktif/arşiv tüm fiziksel
+  dosyaları birer kez taşır; schema 12 restore denetimi eski Agenda-tümü ve
+  Concrete-aktif kuralını kaynak schema bilgisiyle korur.
+- Recovery canonical source/context/project/event grafiğini ve gerekli fiziksel
+  dosyaları denetler. Schema 12'den taşınmış arşivli Concrete kaydının tarihsel
+  olarak opsiyonel byte'ı sentetik biçimde zorunlu yapılmaz.
