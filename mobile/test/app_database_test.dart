@@ -71,6 +71,7 @@ void main() {
       {'version': 10, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 11, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 12, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 13, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
   });
 
@@ -359,8 +360,9 @@ void main() {
         'concrete_trucks',
         'concrete_sample_sets',
         'concrete_follow_up_items',
-        'concrete_attachments',
-        'agenda_log_attachments',
+        'managed_attachments',
+        'attachment_links',
+        'attachment_link_events',
         'concrete_pour_events',
         'subcontractors',
         'workforce_teams',
@@ -1227,11 +1229,18 @@ void main() {
         )).single['source_truck_id'],
         truck,
       );
+      final migratedAttachment = (await upgraded.database.rawQuery('''
+        SELECT l.context_type, l.context_id, l.legacy_id, m.relative_path
+        FROM attachment_links l
+        JOIN managed_attachments m ON m.id = l.attachment_id
+        WHERE l.source_type = 'concrete_pour'
+        ''')).single;
+      expect(migratedAttachment['context_type'], 'concrete_truck');
+      expect(migratedAttachment['context_id'], truck);
+      expect(migratedAttachment['legacy_id'], attachment);
       expect(
-        (await upgraded.database.query(
-          'concrete_attachments',
-        )).single['truck_id'],
-        truck,
+        migratedAttachment['relative_path'],
+        'concrete/$pour/$attachment.jpg',
       );
       final truckColumns = await upgraded.database.rawQuery(
         'PRAGMA table_info(concrete_trucks)',
@@ -1282,30 +1291,40 @@ void main() {
         ),
         throwsA(isA<DatabaseException>()),
       );
+      await upgraded.database.insert('managed_attachments', {
+        'id': '44444444-4444-4444-8444-444444444444',
+        'relative_path': 'agenda/$observation/photo.jpg',
+        'mime_type': 'image/jpeg',
+        'byte_size': 4,
+        'sha256': 'b'.padLeft(64, 'b'),
+        'created_at': timestamp,
+      });
+      await upgraded.database.insert('attachment_links', {
+        'id': '55555555-5555-4555-8555-555555555555',
+        'attachment_id': '44444444-4444-4444-8444-444444444444',
+        'project_id': project,
+        'source_type': 'agenda_observation',
+        'source_id': observation,
+        'role': 'site_photo',
+        'original_file_name': 'saha.jpg',
+        'revision': 1,
+        'created_at': timestamp,
+        'updated_at': timestamp,
+      });
+      await upgraded.database.insert('attachment_link_events', {
+        'id': '66666666-6666-4666-8666-666666666666',
+        'attachment_link_id': '55555555-5555-4555-8555-555555555555',
+        'sequence': 1,
+        'event_type': 'link.created',
+        'occurred_at': timestamp,
+        'payload_json': '{}',
+      });
       await expectLater(
-        upgraded.database.rawInsert(
-          '''
-          INSERT INTO agenda_log_attachments (
-            id, observation_id, project_id, attachment_type,
-            original_file_name, mime_type, byte_size, sha256, relative_path,
-            revision, created_at, updated_at
-          ) VALUES (?, ?, ?, 'site_photo', 'saha.jpg', 'image/jpeg', 4, ?, ?,
-            1, ?, ?)
-        ''',
-          [
-            '44444444-4444-4444-8444-444444444444',
-            observation,
-            project,
-            'b'.padLeft(64, 'b'),
-            'agenda/$observation/photo.jpg',
-            timestamp,
-            timestamp,
-          ],
+        upgraded.database.delete(
+          'attachment_links',
+          where: 'id = ?',
+          whereArgs: ['55555555-5555-4555-8555-555555555555'],
         ),
-        completes,
-      );
-      await expectLater(
-        upgraded.database.delete('agenda_log_attachments'),
         throwsA(isA<DatabaseException>()),
       );
       expect(

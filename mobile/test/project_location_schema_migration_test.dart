@@ -33,7 +33,7 @@ void main() {
   });
 
   test(
-    'fresh install creates the complete contiguous schema 12 contract',
+    'fresh install creates the complete contiguous schema 13 contract',
     () async {
       final database = _database(databasePath);
       await database.open();
@@ -53,7 +53,7 @@ void main() {
       expect(version, AppDatabase.schemaVersion);
       expect(
         history.map((row) => row['version']),
-        List.generate(12, (i) => i + 1),
+        List.generate(13, (i) => i + 1),
       );
       expect(
         tables.map((row) => row['name']),
@@ -651,8 +651,6 @@ Future<Map<String, List<Map<String, Object?>>>> _legacySnapshots(
     'follow_up_events',
     'concrete_pours',
     'concrete_pour_events',
-    'agenda_log_attachments',
-    'concrete_attachments',
   ]) {
     final rows = await database.query(table, orderBy: 'id ASC');
     result[table] = rows.map((row) {
@@ -667,6 +665,68 @@ Future<Map<String, List<Map<String, Object?>>>> _legacySnapshots(
       }
       return copy;
     }).toList();
+  }
+  final legacyTables = await database.rawQuery('''
+    SELECT name FROM sqlite_master
+    WHERE type = 'table' AND name = 'agenda_log_attachments'
+  ''');
+  if (legacyTables.isNotEmpty) {
+    result['agenda_log_attachments'] = await database.query(
+      'agenda_log_attachments',
+      orderBy: 'id ASC',
+    );
+    result['concrete_attachments'] = await database.query(
+      'concrete_attachments',
+      orderBy: 'id ASC',
+    );
+  } else {
+    result['agenda_log_attachments'] = await database.rawQuery('''
+      SELECT
+        l.legacy_id AS id,
+        l.source_id AS observation_id,
+        l.project_id,
+        l.role AS attachment_type,
+        l.original_file_name,
+        m.mime_type,
+        m.byte_size,
+        m.sha256,
+        m.relative_path,
+        l.description,
+        l.captured_at,
+        l.revision,
+        l.created_at,
+        l.updated_at,
+        l.archived_at
+      FROM attachment_links l
+      JOIN managed_attachments m ON m.id = l.attachment_id
+      WHERE l.legacy_source = 'agenda_log_attachments'
+      ORDER BY l.legacy_id ASC
+    ''');
+    result['concrete_attachments'] = await database.rawQuery('''
+      SELECT
+        l.legacy_id AS id,
+        l.source_id AS concrete_pour_id,
+        CASE WHEN l.context_type = 'concrete_truck'
+          THEN l.context_id END AS truck_id,
+        CASE WHEN l.context_type = 'concrete_sample_set'
+          THEN l.context_id END AS sample_set_id,
+        CASE WHEN l.context_type = 'concrete_check_item'
+          THEN l.context_id END AS check_item_id,
+        l.role AS evidence_type,
+        l.original_file_name,
+        m.mime_type,
+        m.byte_size,
+        m.sha256,
+        m.relative_path,
+        l.captured_at,
+        l.description,
+        l.created_at,
+        l.archived_at
+      FROM attachment_links l
+      JOIN managed_attachments m ON m.id = l.attachment_id
+      WHERE l.legacy_source = 'concrete_attachments'
+      ORDER BY l.legacy_id ASC
+    ''');
   }
   return result;
 }

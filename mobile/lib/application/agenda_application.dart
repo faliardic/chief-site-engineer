@@ -1044,26 +1044,26 @@ class SqliteAgendaApplication
           for (final item in staged) {
             final photo = item.$1;
             final file = item.$2;
-            await transaction.insert('agenda_log_attachments', {
-              'id': photo.id,
-              'observation_id': command.id,
-              'project_id': command.projectId,
-              'attachment_type': 'site_photo',
-              'original_file_name': photo.originalFileName.trim(),
-              'mime_type': file.mimeType,
-              'byte_size': file.byteSize,
-              'sha256': file.sha256Value,
-              'relative_path': file.relativePath,
-              'description': optionalTrimmed(
+            await _insertAgendaAttachment(
+              transaction,
+              attachmentId: photo.id,
+              linkId: photo.id,
+              linkEventId: photo.eventId,
+              observationId: command.id,
+              projectId: command.projectId,
+              originalFileName: photo.originalFileName.trim(),
+              mimeType: file.mimeType,
+              byteSize: file.byteSize,
+              sha256Value: file.sha256Value,
+              relativePath: file.relativePath,
+              description: optionalTrimmed(
                 photo.description,
                 'Fotoğraf açıklaması',
                 maxLength: 500,
               ),
-              'captured_at': photo.capturedAt,
-              'revision': 1,
-              'created_at': createdAt,
-              'updated_at': createdAt,
-            });
+              capturedAt: photo.capturedAt,
+              timestamp: createdAt,
+            );
             await transaction.insert('observation_events', {
               'id': photo.eventId,
               'observation_id': command.id,
@@ -1347,22 +1347,22 @@ class SqliteAgendaApplication
               'Ajanda kaydı başka bir işlemde değişti; yeniden açın.',
             );
           }
-          await transaction.insert('agenda_log_attachments', {
-            'id': command.id,
-            'observation_id': command.logId,
-            'project_id': current.projectId,
-            'attachment_type': 'site_photo',
-            'original_file_name': command.originalFileName.trim(),
-            'mime_type': staged.mimeType,
-            'byte_size': staged.byteSize,
-            'sha256': staged.sha256Value,
-            'relative_path': staged.relativePath,
-            'description': description,
-            'captured_at': command.capturedAt,
-            'revision': 1,
-            'created_at': timestamp,
-            'updated_at': timestamp,
-          });
+          await _insertAgendaAttachment(
+            transaction,
+            attachmentId: command.id,
+            linkId: command.id,
+            linkEventId: command.eventId,
+            observationId: command.logId,
+            projectId: current.projectId,
+            originalFileName: command.originalFileName.trim(),
+            mimeType: staged.mimeType,
+            byteSize: staged.byteSize,
+            sha256Value: staged.sha256Value,
+            relativePath: staged.relativePath,
+            description: description,
+            capturedAt: command.capturedAt,
+            timestamp: timestamp,
+          );
           final changed = await transaction.update(
             'field_observations',
             {'revision': current.revision + 1, 'updated_at': timestamp},
@@ -1413,11 +1413,10 @@ class SqliteAgendaApplication
             'Ajanda kaydı başka bir işlemde değişti; yeniden açın.',
           );
         }
-        final rows = await transaction.query(
-          'agenda_log_attachments',
-          where: 'id = ? AND observation_id = ?',
-          whereArgs: [command.photoId, command.logId],
-          limit: 1,
+        final rows = await _queryAgendaAttachmentRows(
+          transaction,
+          publicId: command.photoId,
+          observationId: command.logId,
         );
         if (rows.isEmpty) {
           throw const AgendaValidationFailure('Fotoğraf bulunamadı.');
@@ -1429,16 +1428,32 @@ class SqliteAgendaApplication
           );
         }
         if (photo.archivedAt != null) return;
-        await transaction.update(
-          'agenda_log_attachments',
+        final changed = await transaction.update(
+          'attachment_links',
           {
             'archived_at': timestamp,
             'updated_at': timestamp,
             'revision': photo.revision + 1,
           },
           where: 'id = ? AND revision = ?',
-          whereArgs: [photo.id, photo.revision],
+          whereArgs: [rows.single['link_id'], photo.revision],
         );
+        if (changed != 1) {
+          throw const AgendaValidationFailure(
+            'Fotoğraf başka bir işlemde değişti; yeniden açın.',
+          );
+        }
+        await transaction.insert('attachment_link_events', {
+          'id': command.eventId,
+          'attachment_link_id': rows.single['link_id'],
+          'sequence': await _nextAttachmentLinkEventSequence(
+            transaction,
+            rows.single['link_id']! as String,
+          ),
+          'event_type': 'link.archived',
+          'occurred_at': timestamp,
+          'payload_json': jsonEncode({'photo_id': photo.id}),
+        });
         await transaction.update(
           'field_observations',
           {'revision': current.revision + 1, 'updated_at': timestamp},
@@ -1463,11 +1478,10 @@ class SqliteAgendaApplication
     validateUuid(photoId, 'Fotoğraf kimliği');
     final now = _readClockOnce();
     final photo = await _withDatabase(now, (database) async {
-      final rows = await database.query(
-        'agenda_log_attachments',
-        where: 'id = ? AND archived_at IS NULL',
-        whereArgs: [photoId],
-        limit: 1,
+      final rows = await _queryAgendaAttachmentRows(
+        database,
+        publicId: photoId,
+        activeOnly: true,
       );
       if (rows.isEmpty) {
         throw const AgendaValidationFailure('Fotoğraf bulunamadı.');
@@ -1511,11 +1525,11 @@ class SqliteAgendaApplication
         if (sourceRows.isEmpty) {
           throw const AgendaValidationFailure('Ajanda kaydı bulunamadı.');
         }
-        final photos = await database.query(
-          'agenda_log_attachments',
-          where: 'observation_id = ? AND archived_at IS NULL',
-          whereArgs: [sourceLogId],
-          orderBy: 'created_at ASC, id ASC',
+        final photos = await _queryAgendaAttachmentRows(
+          database,
+          observationId: sourceLogId,
+          activeOnly: true,
+          orderByCreated: true,
         );
         return (
           sourceLogArchivedAt: sourceRows.single['archived_at'] as String?,
@@ -3262,11 +3276,11 @@ class SqliteAgendaApplication
       ''',
       [logId],
     );
-    final photos = await database.query(
-      'agenda_log_attachments',
-      where: 'observation_id = ? AND archived_at IS NULL',
-      whereArgs: [logId],
-      orderBy: 'created_at ASC, id ASC',
+    final photos = await _queryAgendaAttachmentRows(
+      database,
+      observationId: logId,
+      activeOnly: true,
+      orderByCreated: true,
     );
     final events = await database.query(
       'observation_events',
@@ -4116,6 +4130,108 @@ AgendaLog _logFromRow(Map<String, Object?> row) {
     stableLocationArchivedAt: stableLocationArchivedAt,
     archivedAt: archivedAt,
   );
+}
+
+Future<void> _insertAgendaAttachment(
+  DatabaseExecutor database, {
+  required String attachmentId,
+  required String linkId,
+  required String linkEventId,
+  required String observationId,
+  required String projectId,
+  required String originalFileName,
+  required String mimeType,
+  required int byteSize,
+  required String sha256Value,
+  required String relativePath,
+  required String? description,
+  required String? capturedAt,
+  required String timestamp,
+}) async {
+  await database.insert('managed_attachments', {
+    'id': attachmentId,
+    'relative_path': relativePath,
+    'mime_type': mimeType,
+    'byte_size': byteSize,
+    'sha256': sha256Value,
+    'created_at': timestamp,
+  });
+  await database.insert('attachment_links', {
+    'id': linkId,
+    'attachment_id': attachmentId,
+    'project_id': projectId,
+    'source_type': 'agenda_observation',
+    'source_id': observationId,
+    'role': 'site_photo',
+    'original_file_name': originalFileName,
+    'description': description,
+    'captured_at': capturedAt,
+    'revision': 1,
+    'created_at': timestamp,
+    'updated_at': timestamp,
+  });
+  await database.insert('attachment_link_events', {
+    'id': linkEventId,
+    'attachment_link_id': linkId,
+    'sequence': 1,
+    'event_type': 'link.created',
+    'occurred_at': timestamp,
+    'payload_json': jsonEncode({'source': 'agenda_observation'}),
+  });
+}
+
+Future<List<Map<String, Object?>>> _queryAgendaAttachmentRows(
+  DatabaseExecutor database, {
+  String? publicId,
+  String? observationId,
+  bool activeOnly = false,
+  bool orderByCreated = false,
+}) {
+  final where = <String>["l.source_type = 'agenda_observation'"];
+  final arguments = <Object?>[];
+  if (publicId != null) {
+    where.add('COALESCE(l.legacy_id, l.id) = ?');
+    arguments.add(publicId);
+  }
+  if (observationId != null) {
+    where.add('l.source_id = ?');
+    arguments.add(observationId);
+  }
+  if (activeOnly) where.add('l.archived_at IS NULL');
+  return database.rawQuery('''
+    SELECT
+      COALESCE(l.legacy_id, l.id) AS id,
+      l.id AS link_id,
+      l.source_id AS observation_id,
+      l.project_id,
+      l.original_file_name,
+      m.mime_type,
+      m.byte_size,
+      m.sha256,
+      m.relative_path,
+      l.description,
+      l.captured_at,
+      l.revision,
+      l.created_at,
+      l.updated_at,
+      l.archived_at
+    FROM attachment_links l
+    JOIN managed_attachments m ON m.id = l.attachment_id
+    WHERE ${where.join(' AND ')}
+    ${orderByCreated ? 'ORDER BY l.created_at ASC, l.id ASC' : ''}
+  ''', arguments);
+}
+
+Future<int> _nextAttachmentLinkEventSequence(
+  DatabaseExecutor database,
+  String linkId,
+) async {
+  final rows = await database.rawQuery(
+    '''SELECT COALESCE(MAX(sequence), 0) + 1 AS value
+       FROM attachment_link_events WHERE attachment_link_id = ?''',
+    [linkId],
+  );
+  return rows.single['value']! as int;
 }
 
 AgendaLogPhoto _agendaPhotoFromRow(Map<String, Object?> row) {

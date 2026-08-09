@@ -136,7 +136,7 @@ void main() {
   });
 
   test(
-    'format 1 backup round-trips schema 12 trashed all-day reminder and audit',
+    'format 1 backup round-trips current schema trashed all-day reminder and audit',
     () async {
       final agenda = SqliteAgendaApplication(
         databasePath: directories.databaseFile,
@@ -390,7 +390,7 @@ void main() {
   });
 
   test(
-    'schema 12 full fixture preserves profiles IDs events links and attachments',
+    'schema 13 full fixture preserves profiles IDs events links and attachments',
     () async {
       final expectedBytes = <int>[0, 1, 2, 127, 128, 255];
       await _seedFullFixture(directories, expectedBytes);
@@ -423,7 +423,7 @@ void main() {
       });
       final changedAttachmentBytes = <int>[9, 9, 9];
       await active.update(
-        'concrete_attachments',
+        'managed_attachments',
         {
           'byte_size': changedAttachmentBytes.length,
           'sha256': sha256.convert(changedAttachmentBytes).toString(),
@@ -640,9 +640,9 @@ void main() {
     },
   );
 
-  for (final schemaVersion in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) {
+  for (final schemaVersion in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
     test(
-      'schema v$schemaVersion package migrates to v12 without count loss',
+      'schema v$schemaVersion package migrates to v13 without count loss',
       () async {
         final oldRoot = await Directory.systemTemp.createTemp(
           'cse_schema${schemaVersion}_',
@@ -665,6 +665,21 @@ void main() {
           clock: () => DateTime.parse(_now),
         ).ensureFoundationRecord();
         await _seedLegacySchema(oldDatabase.database, schemaVersion);
+        if (schemaVersion == 12) {
+          await oldDatabase.database.insert('concrete_attachments', {
+            'id': 'legacy-archived-concrete-attachment',
+            'concrete_pour_id': 'legacy-pour',
+            'evidence_type': 'site_photo',
+            'original_file_name': 'archived-missing.bin',
+            'mime_type': 'application/octet-stream',
+            'byte_size': 3,
+            'sha256': sha256.convert(const <int>[3, 2, 1]).toString(),
+            'relative_path': 'concrete/archived-missing.bin',
+            'captured_at': _now,
+            'created_at': _now,
+            'archived_at': _now,
+          });
+        }
         await oldDatabase.close();
         final databaseBytes = await File(oldFile).readAsBytes();
         const legacyAgendaBytes = <int>[0xff, 0xd8, 0xff, 0xd9];
@@ -741,8 +756,10 @@ void main() {
         expect(counts['project_concrete_class_events'], hasConcrete);
         expect(counts['concrete_pour_context_links'], hasConcrete);
         expect(counts['concrete_pour_events'], hasConcrete);
-        expect(counts['concrete_attachments'], hasConcrete);
-        expect(counts['agenda_log_attachments'], schemaVersion >= 10 ? 1 : 0);
+        final attachmentCount = hasConcrete * 2 + (schemaVersion == 12 ? 1 : 0);
+        expect(counts['managed_attachments'], attachmentCount);
+        expect(counts['attachment_links'], attachmentCount);
+        expect(counts['attachment_link_events'], attachmentCount);
         expect(counts['project_locations'], 0);
         expect(counts['project_events'], 0);
         expect(counts['project_location_events'], 0);
@@ -766,6 +783,17 @@ void main() {
             )).single['workforce_member_id'],
             member['id'],
           );
+          await restored.close();
+        }
+        if (schemaVersion == 12) {
+          final restored = await _openRaw(directories);
+          final archived = (await restored.query(
+            'attachment_links',
+            where: 'legacy_id = ?',
+            whereArgs: ['legacy-archived-concrete-attachment'],
+          )).single;
+          expect(archived['legacy_source'], 'concrete_attachments');
+          expect(archived['archived_at'], _now);
           await restored.close();
         }
         if (schemaVersion == 7) {
@@ -1401,21 +1429,35 @@ Future<void> _seedFullFixture(
       'location': ' Legacy Serbest Mahal ',
       'revision': 1,
     });
-    await tx.insert('agenda_log_attachments', {
+    await tx.insert('managed_attachments', {
       'id': 'agenda-attachment-1',
-      'observation_id': 'observation-1',
-      'project_id': 'project-1',
-      'attachment_type': 'site_photo',
-      'original_file_name': 'saha-fotografi.jpg',
+      'relative_path': 'agenda/observation-1/site-photo.jpg',
       'mime_type': 'image/jpeg',
       'byte_size': agendaPhotoBytes.length,
       'sha256': agendaPhotoDigest,
-      'relative_path': 'agenda/observation-1/site-photo.jpg',
+      'created_at': _now,
+    });
+    await tx.insert('attachment_links', {
+      'id': 'agenda-link-1',
+      'attachment_id': 'agenda-attachment-1',
+      'project_id': 'project-1',
+      'source_type': 'agenda_observation',
+      'source_id': 'observation-1',
+      'role': 'site_photo',
+      'original_file_name': 'saha-fotografi.jpg',
       'description': 'Donatı saha fotoğrafı',
       'captured_at': _now,
       'revision': 1,
       'created_at': _now,
       'updated_at': _now,
+    });
+    await tx.insert('attachment_link_events', {
+      'id': 'agenda-link-event-1',
+      'attachment_link_id': 'agenda-link-1',
+      'sequence': 1,
+      'event_type': 'link.created',
+      'occurred_at': _now,
+      'payload_json': '{}',
     });
     await tx.insert('follow_up_items', {
       'id': 'reminder-1',
@@ -1627,18 +1669,56 @@ Future<void> _seedFullFixture(
       'created_at': _now,
       'updated_at': _now,
     });
-    await tx.insert('concrete_attachments', {
+    await tx.insert('managed_attachments', {
       'id': 'attachment-1',
-      'concrete_pour_id': 'pour-1',
-      'evidence_type': 'site_photo',
-      'original_file_name': 'kanıt.bin',
+      'relative_path': 'concrete/pour-1/evidence.bin',
       'mime_type': 'application/octet-stream',
       'byte_size': attachmentBytes.length,
       'sha256': attachmentDigest,
-      'relative_path': 'concrete/pour-1/evidence.bin',
+      'created_at': _now,
+    });
+    await tx.insert('attachment_links', {
+      'id': 'attachment-link-1',
+      'attachment_id': 'attachment-1',
+      'project_id': 'project-1',
+      'source_type': 'concrete_pour',
+      'source_id': 'pour-1',
+      'role': 'site_photo',
+      'original_file_name': 'kanıt.bin',
       'captured_at': _now,
       'description': 'Taşınabilir ikili kanıt',
+      'revision': 1,
       'created_at': _now,
+      'updated_at': _now,
+    });
+    await tx.insert('attachment_link_events', {
+      'id': 'attachment-link-event-1',
+      'attachment_link_id': 'attachment-link-1',
+      'sequence': 1,
+      'event_type': 'link.created',
+      'occurred_at': _now,
+      'payload_json': '{}',
+    });
+    await tx.insert('attachment_links', {
+      'id': 'attachment-link-2',
+      'attachment_id': 'attachment-1',
+      'project_id': 'project-1',
+      'source_type': 'concrete_pour',
+      'source_id': 'legacy-pour-1',
+      'role': 'site_photo',
+      'original_file_name': 'paylaşılan-kanıt.bin',
+      'captured_at': _now,
+      'revision': 1,
+      'created_at': _now,
+      'updated_at': _now,
+    });
+    await tx.insert('attachment_link_events', {
+      'id': 'attachment-link-event-2',
+      'attachment_link_id': 'attachment-link-2',
+      'sequence': 1,
+      'event_type': 'link.created',
+      'occurred_at': _now,
+      'payload_json': '{}',
     });
   });
   await database.close();
@@ -1913,8 +1993,9 @@ Future<Map<String, int>> _tableCounts(AppDirectories directories) async {
     'project_concrete_class_events',
     'concrete_pour_context_links',
     'concrete_pour_events',
-    'concrete_attachments',
-    'agenda_log_attachments',
+    'managed_attachments',
+    'attachment_links',
+    'attachment_link_events',
   ]) {
     counts[table] = Sqflite.firstIntValue(
       await database.rawQuery('SELECT count(*) FROM $table'),
@@ -1953,8 +2034,9 @@ Future<Map<String, Object?>> _fixtureSnapshot(
     'project_concrete_class_events',
     'concrete_pour_context_links',
     'concrete_pour_events',
-    'concrete_attachments',
-    'agenda_log_attachments',
+    'managed_attachments',
+    'attachment_links',
+    'attachment_link_events',
   ]) {
     result[table] = await database.query(table, orderBy: 'rowid ASC');
   }

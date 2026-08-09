@@ -293,9 +293,7 @@ void main() {
     'Agenda sort composes with filters and empty or single results',
     () async {
       expect(
-        await agenda.listAgenda(
-          const AgendaQuery(istanbulDay: '2026-07-19'),
-        ),
+        await agenda.listAgenda(const AgendaQuery(istanbulDay: '2026-07-19')),
         isEmpty,
       );
       await createLog(
@@ -852,8 +850,9 @@ void main() {
       );
       expect(atCutoff.allDayToday, isEmpty);
       expect(
-        (await agenda.listReminders(ReminderViewGroup.tomorrow))
-            .map((item) => item.id),
+        (await agenda.listReminders(
+          ReminderViewGroup.tomorrow,
+        )).map((item) => item.id),
         containsAll([tomorrowTimed.id, tomorrowAllDay.id]),
       );
     },
@@ -893,19 +892,22 @@ void main() {
       concretePourId: log2,
       allDayLocalDate: '2026-12-31',
     );
-    final overview = buildReminderTodayOverview(
-      [attendance, attendance, concrete, concrete],
-      asOfUtc: DateTime.utc(2026, 12, 31, 14),
-    );
+    final overview = buildReminderTodayOverview([
+      attendance,
+      attendance,
+      concrete,
+      concrete,
+    ], asOfUtc: DateTime.utc(2026, 12, 31, 14));
 
     expect(overview.timedToday.single.id, attendance.id);
     expect(overview.timedToday.single.attendanceDayId, log1);
     expect(overview.allDayToday.single.id, concrete.id);
     expect(overview.allDayToday.single.concretePourId, log2);
     expect(
-      [...overview.timedToday, ...overview.allDayToday]
-          .map((item) => item.id)
-          .toSet(),
+      [
+        ...overview.timedToday,
+        ...overview.allDayToday,
+      ].map((item) => item.id).toSet(),
       hasLength(2),
     );
   });
@@ -1244,12 +1246,25 @@ void main() {
         directories.databaseFile,
         options: OpenDatabaseOptions(singleInstance: false),
       );
-      await expectLater(
-        raw.delete(
-          'agenda_log_attachments',
-          where: 'id = ?',
-          whereArgs: [log3],
+      expect(
+        await raw.query(
+          'attachment_links',
+          where: "source_type = 'agenda_observation' AND source_id = ?",
+          whereArgs: [log1],
         ),
+        hasLength(2),
+      );
+      expect(
+        await raw.query(
+          'attachment_link_events',
+          where: 'attachment_link_id = ?',
+          whereArgs: [log3],
+          orderBy: 'sequence ASC',
+        ),
+        hasLength(2),
+      );
+      await expectLater(
+        raw.delete('attachment_links', where: 'id = ?', whereArgs: [log3]),
         throwsA(anything),
       );
       await raw.close();

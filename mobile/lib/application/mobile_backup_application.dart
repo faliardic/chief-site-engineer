@@ -1010,6 +1010,7 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
         databaseFile,
         attachmentsRoot,
         archive.manifest.attachments,
+        sourceSchemaVersion: archive.manifest.mobileSchemaVersion,
       );
       return _PreparedRestore(
         root: root,
@@ -1167,6 +1168,7 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
         File(directories.databaseFile),
         directories.attachments,
         prepared.archive.manifest.attachments,
+        sourceSchemaVersion: prepared.archive.manifest.mobileSchemaVersion,
       );
       journal = await recovery.advance(journal, RestoreJournalPhase.validated);
       await restoreHooks.beforeNotificationReconcile?.call();
@@ -1319,8 +1321,9 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
         'project_concrete_class_events',
         'concrete_pour_context_links',
         'concrete_pour_events',
-        'concrete_attachments',
-        'agenda_log_attachments',
+        'managed_attachments',
+        'attachment_links',
+        'attachment_link_events',
       ]) {
         await current.database.rawQuery('SELECT count(*) FROM $table');
       }
@@ -1348,27 +1351,44 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
 
   Future<List<Map<String, Object?>>> _activeAttachmentRows(Database database) =>
       database.rawQuery('''
-        SELECT relative_path, byte_size, sha256
-        FROM concrete_attachments
-        WHERE archived_at IS NULL
-        UNION ALL
-        SELECT relative_path, byte_size, sha256
-        FROM agenda_log_attachments
-        ORDER BY relative_path ASC
+        SELECT DISTINCT m.relative_path, m.byte_size, m.sha256
+        FROM managed_attachments m
+        JOIN attachment_links l ON l.attachment_id = m.id
+        ORDER BY m.relative_path ASC
       ''');
+
+  Future<List<Map<String, Object?>>> _manifestAttachmentRows(
+    Database database,
+    int sourceSchemaVersion,
+  ) => database.rawQuery(
+    '''
+      SELECT DISTINCT m.relative_path, m.byte_size, m.sha256
+      FROM managed_attachments m
+      JOIN attachment_links l ON l.attachment_id = m.id
+      WHERE ? >= 13
+        OR l.legacy_source = 'agenda_log_attachments'
+        OR (
+          l.legacy_source = 'concrete_attachments'
+          AND l.archived_at IS NULL
+        )
+      ORDER BY m.relative_path ASC
+    ''',
+    [sourceSchemaVersion],
+  );
 
   Future<void> _requireAttachmentManifestMatchesDatabase(
     File databaseFile,
     Directory attachmentsRoot,
-    List<BackupManifestFile> manifestAttachments,
-  ) async {
+    List<BackupManifestFile> manifestAttachments, {
+    required int sourceSchemaVersion,
+  }) async {
     Database? database;
     try {
       database = await databaseFactory.openDatabase(
         databaseFile.path,
         options: OpenDatabaseOptions(singleInstance: false, readOnly: true),
       );
-      final rows = await _activeAttachmentRows(database);
+      final rows = await _manifestAttachmentRows(database, sourceSchemaVersion);
       final expected = {
         for (final item in manifestAttachments) item.logicalPath: item,
       };
