@@ -1,14 +1,17 @@
 import 'dart:convert';
 
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/application/attachment_catalog_application.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/domain/attachment_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_concrete_signal.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_concrete_suggestion_card.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_photo_viewer_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
+import 'package:chief_site_engineer/features/attachments/attachment_catalog_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_destination_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
@@ -42,6 +45,11 @@ class _LogDetailPageState extends State<LogDetailPage> {
   late Future<AgendaLogDetail> _detail;
   bool _mutating = false;
   String? _error;
+
+  AttachmentCatalogApplication? get _attachmentCatalog =>
+      widget.agenda is AttachmentCatalogHost
+      ? (widget.agenda as AttachmentCatalogHost).attachmentCatalog
+      : null;
 
   @override
   void initState() {
@@ -279,6 +287,41 @@ class _LogDetailPageState extends State<LogDetailPage> {
     );
   }
 
+  Future<void> _linkExistingPhoto(AgendaLog log) async {
+    final catalog = _attachmentCatalog;
+    final agenda = widget.agenda;
+    if (catalog == null || agenda is! AgendaExistingAttachmentApplication) {
+      return;
+    }
+    final existingAgenda = agenda as AgendaExistingAttachmentApplication;
+    final selected = await Navigator.of(context)
+        .push<ProjectAttachmentCatalogItem>(
+          MaterialPageRoute(
+            builder: (_) => AttachmentCatalogPage(
+              catalog: catalog,
+              initialProjectId: log.projectId,
+              selectionSourceType:
+                  AttachmentCatalogSourceType.agendaObservation,
+              selectionSourceId: log.id,
+              allowedMimeTypes: const {'image/jpeg', 'image/png', 'image/heic'},
+              title: 'Mevcut fotoğrafı bağla',
+            ),
+          ),
+        );
+    if (selected == null || !mounted) return;
+    await _run(
+      () => existingAgenda.linkExistingAgendaPhoto(
+        LinkExistingAgendaPhotoCommand(
+          logId: log.id,
+          physicalAttachmentId: selected.physicalAttachmentId,
+          linkId: RecordId.randomUuid(),
+          eventId: RecordId.randomUuid(),
+          expectedLogRevision: log.revision,
+        ),
+      ),
+    );
+  }
+
   Future<void> _run(Future<Object?> Function() action) async {
     if (_mutating) return;
     setState(() {
@@ -484,6 +527,18 @@ class _LogDetailPageState extends State<LogDetailPage> {
                 tooltip: 'Fotoğraf ekle',
                 onPressed: _mutating ? null : () => _addPhoto(log),
                 icon: const Icon(Icons.add_a_photo_outlined),
+              ),
+            if (log.archivedAt == null &&
+                _attachmentCatalog != null &&
+                widget.agenda is AgendaExistingAttachmentApplication)
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: IconButton.filledTonal(
+                  key: const Key('detail-link-existing-agenda-photo'),
+                  tooltip: 'Mevcut fotoğrafı bağla',
+                  onPressed: _mutating ? null : () => _linkExistingPhoto(log),
+                  icon: const Icon(Icons.add_link_rounded),
+                ),
               ),
           ],
         ),

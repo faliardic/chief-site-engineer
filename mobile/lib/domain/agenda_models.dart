@@ -778,6 +778,22 @@ class AttachAgendaPhotosCommand {
   final List<AgendaPhotoDraft> photos;
 }
 
+class LinkExistingAgendaPhotoCommand {
+  const LinkExistingAgendaPhotoCommand({
+    required this.logId,
+    required this.physicalAttachmentId,
+    required this.linkId,
+    required this.eventId,
+    required this.expectedLogRevision,
+  });
+
+  final String logId;
+  final String physicalAttachmentId;
+  final String linkId;
+  final String eventId;
+  final int expectedLogRevision;
+}
+
 class ArchiveAgendaPhotoCommand {
   const ArchiveAgendaPhotoCommand({
     required this.logId,

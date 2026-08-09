@@ -3875,3 +3875,16 @@
 - JPEG/PNG uygulama içi `InteractiveViewer` ile kalır. HEIC/PDF/MP4/MP3/M4A/WAV
   yalnız path, MIME, boyut ve SHA-256 bütünlüğü doğrulandıktan sonra mevcut
   `open_filex` geçidine verilir; embedded player veya yeni dependency eklenmez.
+- Proje-kapsamlı dosya kataloğu canonical fiziksel kayıtları linklerinden
+  türetir; aynı fiziksel kaydın bütün Ajanda/Beton bağlarını ve salt-okunur
+  integrity durumunu gösterir. SHA-256 eşitliği fiziksel kayıtları birleştirmez.
+- “Mevcut dosyayı bağla” işlemi yeni byte üretmez veya stage etmez; seçilen
+  fiziksel kimliğe kullanıcı açık seçimiyle yeni link/event ekler. Agenda yalnız
+  JPEG/PNG/HEIC `site_photo`; Beton genel kanıtı image için `site_photo`, diğer
+  shipping MIME aileleri için `other` kullanır.
+- Katalog ve mutation katmanı unknown/cross-project/duplicate source seçimini
+  fail-closed reddeder. Tek contextual linkin arşivlenmesi fiziksel kaydı ve
+  diğer bağları koruyan schema-13 sözleşmesini değiştirmez.
+- Dosya sağlığı ekranı existing reconciliation matrisini yalnız kullanıcı
+  ekranı açtığında salt-okunur çalıştırır. Bootstrap otomatik inspect, repair,
+  delete, move, adopt, relink veya dedupe yapmaz.

@@ -5,6 +5,8 @@ import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_day_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_page.dart';
 import 'package:chief_site_engineer/features/attendance/workforce_directory_page.dart';
+import 'package:chief_site_engineer/features/attachments/attachment_catalog_page.dart';
+import 'package:chief_site_engineer/features/attachments/attachment_health_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
 import 'package:chief_site_engineer/features/memory/memory_backup_page.dart';
@@ -493,6 +495,44 @@ class _HomePageState extends State<_HomePage> {
               onTap: () => Navigator.of(context).push<void>(
                 MaterialPageRoute(
                   builder: (_) => MemoryBackupPage(backup: backup),
+                ),
+              ),
+            ),
+          ),
+        if (widget.bootstrap.attachmentCatalog case final catalog?)
+          Card(
+            child: ListTile(
+              key: const Key('open-attachment-catalog'),
+              minVerticalPadding: 12,
+              leading: const Icon(Icons.folder_copy_outlined),
+              title: const Text('Dosya Kataloğu'),
+              subtitle: const Text(
+                'Projedeki dosyaları ve bağlı CSE kayıtlarını görüntüle.',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => AttachmentCatalogPage(catalog: catalog),
+                ),
+              ),
+            ),
+          ),
+        if (widget.bootstrap.attachmentReconciliation
+            case final reconciliation?)
+          Card(
+            child: ListTile(
+              key: const Key('open-attachment-health'),
+              minVerticalPadding: 12,
+              leading: const Icon(Icons.health_and_safety_outlined),
+              title: const Text('Dosya sağlığı'),
+              subtitle: const Text(
+                'Eksik, bozuk veya kırık bağlantıları salt-okunur denetle.',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      AttachmentHealthPage(reconciliation: reconciliation),
                 ),
               ),
             ),

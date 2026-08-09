@@ -1500,6 +1500,137 @@ void main() {
   );
 
   test(
+    'existing physical attachment links without stage and rejects duplicate or cross-project',
+    () async {
+      final sourcePour = await concrete.createPour(_createCommand());
+      final source = await concrete.attachEvidence(
+        AttachConcreteEvidenceCommand(
+          id: _uuid(150),
+          pourId: sourcePour.pour.id,
+          eventId: _uuid(151),
+          expectedPourRevision: sourcePour.pour.revision,
+          evidenceType: ConcreteEvidenceType.other,
+          originalFileName: 'ortak.pdf',
+          bytes: const [0x25, 0x50, 0x44, 0x46, 0x2d, 0x31],
+          capturedAt: '2026-07-19T08:00:00Z',
+        ),
+      );
+      expect(source.attachments.single.id, _uuid(150));
+      final target = await concrete.createPour(
+        _createCommand(id: _uuid(152), event: _uuid(153), code: 'BT-002'),
+      );
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      final physicalBefore = Sqflite.firstIntValue(
+        await raw.rawQuery('SELECT count(*) FROM managed_attachments'),
+      );
+      await raw.close();
+      final storedFilesBefore = Map<String, List<int>>.from(attachments.values);
+
+      final linked = await concrete.linkExistingAttachment(
+        LinkExistingConcreteAttachmentCommand(
+          pourId: target.pour.id,
+          physicalAttachmentId: _uuid(150),
+          linkId: _uuid(154),
+          eventId: _uuid(155),
+          expectedPourRevision: target.pour.revision,
+        ),
+      );
+
+      expect(linked.pour.revision, target.pour.revision + 1);
+      expect(linked.attachments.single.id, _uuid(154));
+      expect(
+        linked.attachments.single.evidenceType,
+        ConcreteEvidenceType.other,
+      );
+      expect(
+        linked.attachments.single.relativePath,
+        source.attachments.single.relativePath,
+      );
+      expect(attachments.values, storedFilesBefore);
+      final verified = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      expect(
+        Sqflite.firstIntValue(
+          await verified.rawQuery('SELECT count(*) FROM managed_attachments'),
+        ),
+        physicalBefore,
+      );
+      expect(
+        await verified.query(
+          'attachment_links',
+          where: 'attachment_id = ?',
+          whereArgs: [_uuid(150)],
+        ),
+        hasLength(2),
+      );
+      await verified.close();
+      final linkedEvent = linked.events.singleWhere(
+        (item) => item.id == _uuid(155),
+      );
+      final payload = jsonDecode(linkedEvent.payloadJson) as Map;
+      expect(payload['physical_attachment_id'], _uuid(150));
+      expect(payload['reused_existing'], isTrue);
+
+      await expectLater(
+        concrete.linkExistingAttachment(
+          LinkExistingConcreteAttachmentCommand(
+            pourId: target.pour.id,
+            physicalAttachmentId: _uuid(150),
+            linkId: _uuid(156),
+            eventId: _uuid(157),
+            expectedPourRevision: linked.pour.revision,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      expect((await concrete.getPourDetail(target.pour.id)).pour.revision, 2);
+
+      const otherProject = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+      await agenda.createProject(
+        const CreateProjectCommand(id: otherProject, name: 'Şantiye B'),
+      );
+      await concrete.createConcreteClass(
+        CreateProjectConcreteClassCommand(
+          id: _uuid(158),
+          eventId: _uuid(159),
+          projectId: otherProject,
+          displayName: 'C35/45',
+        ),
+      );
+      final crossProjectPour = await concrete.createPour(
+        CreateConcretePourCommand(
+          id: _uuid(160),
+          eventId: _uuid(161),
+          projectId: otherProject,
+          pourCode: 'BT-B-001',
+          elementLocation: 'KOLON B1',
+          plannedAt: '2026-07-19T09:00:00Z',
+          concreteClassId: _uuid(158),
+          plannedVolumeM3: 10,
+        ),
+      );
+      await expectLater(
+        concrete.linkExistingAttachment(
+          LinkExistingConcreteAttachmentCommand(
+            pourId: crossProjectPour.pour.id,
+            physicalAttachmentId: _uuid(150),
+            linkId: _uuid(162),
+            eventId: _uuid(163),
+            expectedPourRevision: crossProjectPour.pour.revision,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      expect(attachments.values, storedFilesBefore);
+    },
+  );
+
+  test(
     'source reminder mutation does not mutate concrete and follow-up closes reminder',
     () async {
       var detail = await concrete.createPour(_createCommand());
@@ -2368,9 +2499,11 @@ UpdateConcretePourCommand _updatePourCommand(
 CreateConcretePourCommand _createCommand({
   double plannedVolume = 20,
   String code = 'BT-001',
+  String id = pourId,
+  String event = createEventId,
 }) => CreateConcretePourCommand(
-  id: pourId,
-  eventId: createEventId,
+  id: id,
+  eventId: event,
   projectId: projectId,
   pourCode: code,
   elementLocation: 'KOLON A1',

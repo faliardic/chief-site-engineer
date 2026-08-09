@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/application/attachment_catalog_application.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/core/environment.dart';
@@ -63,6 +64,16 @@ void main() {
           (first.concrete! as SqliteConcreteApplication).attachmentStore
               as DeviceConcreteAttachmentStore;
       expect(agendaStore.managedStore, same(concreteStore.managedStore));
+      expect(first.attachmentCatalog, isNotNull);
+      expect(first.attachmentReconciliation, isNotNull);
+      expect(
+        (first.agenda as AttachmentCatalogHost).attachmentCatalog,
+        same(first.attachmentCatalog),
+      );
+      expect(
+        (first.concrete! as AttachmentCatalogHost).attachmentCatalog,
+        same(first.attachmentCatalog),
+      );
     },
   );
 

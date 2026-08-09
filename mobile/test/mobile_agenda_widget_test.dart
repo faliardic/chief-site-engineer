@@ -3,10 +3,13 @@ import 'dart:convert';
 import 'dart:ui' show SemanticsAction;
 
 import 'package:chief_site_engineer/app.dart';
+import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/application/attachment_catalog_application.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/domain/attachment_models.dart';
 import 'package:chief_site_engineer/domain/concrete_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
@@ -751,6 +754,58 @@ void main() {
       expect(concrete.createPourCalls, 0);
     },
   );
+
+  testWidgets('Agenda detail explicitly links a healthy catalog image', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final fake = _CatalogAgendaFake(
+      projects: [project()],
+      logs: [log()],
+      logDetail: AgendaLogDetail(log: log(), reminders: const []),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LogDetailPage(agenda: fake, logId: logId),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final linkButton = find.byKey(
+      const Key('detail-link-existing-agenda-photo'),
+    );
+    await tester.scrollUntilVisible(
+      linkButton,
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(linkButton);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('attachment-catalog-project-selector')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(
+        const Key(
+          'attachment-catalog-item-dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(fake.linkExistingCalls, 1);
+    expect(
+      fake.lastExistingCommand?.physicalAttachmentId,
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    );
+    expect(find.text('katalog-fotografi.png'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('log and reminder details provide bidirectional navigation', (
     tester,
@@ -1897,6 +1952,106 @@ void main() {
     expect(fake.logs, isEmpty);
     expect(fake.createLogCalls, 0);
   });
+}
+
+class _CatalogAgendaFake extends FakeAgendaApplication
+    implements AttachmentCatalogHost, AgendaExistingAttachmentApplication {
+  _CatalogAgendaFake({
+    required super.projects,
+    required super.logs,
+    required super.logDetail,
+  });
+
+  int linkExistingCalls = 0;
+  LinkExistingAgendaPhotoCommand? lastExistingCommand;
+
+  @override
+  final AttachmentCatalogApplication attachmentCatalog = _FakeCatalog();
+
+  @override
+  Future<AgendaLogDetail> linkExistingAgendaPhoto(
+    LinkExistingAgendaPhotoCommand command,
+  ) async {
+    linkExistingCalls += 1;
+    lastExistingCommand = command;
+    final current = logDetail!;
+    final updatedLog = AgendaLog(
+      id: current.log.id,
+      projectId: current.log.projectId,
+      projectName: current.log.projectName,
+      observedAt: current.log.observedAt,
+      createdAt: current.log.createdAt,
+      updatedAt: '2026-07-19T08:05:00Z',
+      category: current.log.category,
+      description: current.log.description,
+      location: current.log.location,
+      notes: current.log.notes,
+      revision: current.log.revision + 1,
+      archivedAt: current.log.archivedAt,
+    );
+    final photo = AgendaLogPhoto(
+      id: command.linkId,
+      logId: command.logId,
+      projectId: current.log.projectId,
+      originalFileName: 'katalog-fotografi.png',
+      mimeType: 'image/png',
+      byteSize: 9,
+      sha256: List.filled(64, 'a').join(),
+      relativePath: 'managed/${command.physicalAttachmentId}.png',
+      description: null,
+      capturedAt: '2026-07-19T08:05:00Z',
+      revision: 1,
+      createdAt: '2026-07-19T08:05:00Z',
+      updatedAt: '2026-07-19T08:05:00Z',
+      archivedAt: null,
+      integrity: AgendaAttachmentIntegrity.ok,
+    );
+    logDetail = AgendaLogDetail(
+      log: updatedLog,
+      reminders: current.reminders,
+      photos: [...current.photos, photo],
+      events: current.events,
+      managedConcretePourId: current.managedConcretePourId,
+    );
+    logs = [updatedLog];
+    return logDetail!;
+  }
+}
+
+class _FakeCatalog implements AttachmentCatalogApplication {
+  static const physicalId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+  @override
+  Future<List<AttachmentCatalogProject>> listProjects() async => const [
+    AttachmentCatalogProject(id: projectId, name: 'Kuzey Şantiyesi'),
+  ];
+
+  @override
+  Future<List<ProjectAttachmentCatalogItem>> listProjectAttachments(
+    String projectId,
+  ) async => [
+    ProjectAttachmentCatalogItem(
+      physicalAttachmentId: physicalId,
+      relativePath: 'managed/$physicalId.png',
+      mimeType: 'image/png',
+      byteSize: 9,
+      sha256Value: List.filled(64, 'a').join(),
+      createdAt: '2026-07-19T07:00:00Z',
+      integrity: ManagedAttachmentIntegrity.healthy,
+      links: const [
+        AttachmentCatalogLink(
+          id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+          sourceType: AttachmentCatalogSourceType.agendaObservation,
+          sourceId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa9',
+          sourceLabel: 'Ajanda • Kaynak kayıt',
+          role: 'site_photo',
+          originalFileName: 'katalog-fotografi.png',
+          createdAt: '2026-07-19T07:00:00Z',
+          archivedAt: null,
+        ),
+      ],
+    ),
+  ];
 }
 
 Finder _agendaSearchEditable({Finder? within}) {

@@ -1,4 +1,6 @@
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/application/attachment_catalog_application.dart';
+import 'package:chief_site_engineer/application/attachment_reconciliation_application.dart';
 import 'package:chief_site_engineer/application/attendance_application.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/application/mobile_backup_application.dart';
@@ -36,6 +38,8 @@ class BootstrapSuccess extends BootstrapResult {
     this.concrete,
     this.concreteAttachments,
     this.backup,
+    this.attachmentCatalog,
+    this.attachmentReconciliation,
   });
 
   final String environmentLabel;
@@ -47,6 +51,8 @@ class BootstrapSuccess extends BootstrapResult {
   final ConcreteApplication? concrete;
   final SafeAttachmentPicker? concreteAttachments;
   final MobileBackupApplication? backup;
+  final AttachmentCatalogApplication? attachmentCatalog;
+  final AttachmentReconciliationApplication? attachmentReconciliation;
 }
 
 class BootstrapFailure extends BootstrapResult {
@@ -129,6 +135,16 @@ class AppBootstrap {
       final managedAttachmentStore = DeviceManagedAttachmentStore(
         directories: directories,
       );
+      final attachmentCatalog = SqliteAttachmentCatalogApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactory,
+        managedStore: managedAttachmentStore,
+      );
+      final attachmentReconciliation = AttachmentReconciliationApplication(
+        directories: directories,
+        databaseFactory: databaseFactory,
+        managedStore: managedAttachmentStore,
+      );
       final agenda = SqliteAgendaApplication(
         databasePath: directories.databaseFile,
         databaseFactory: databaseFactory,
@@ -138,6 +154,7 @@ class AppBootstrap {
         attachmentStore: DeviceAgendaAttachmentStore.shared(
           managedStore: managedAttachmentStore,
         ),
+        attachmentCatalog: attachmentCatalog,
       );
       final attendance = SqliteAttendanceApplication(
         databasePath: directories.databaseFile,
@@ -157,6 +174,7 @@ class AppBootstrap {
         attachmentStore: DeviceConcreteAttachmentStore.shared(
           managedStore: managedAttachmentStore,
         ),
+        attachmentCatalog: attachmentCatalog,
         exportGateway: DeviceConcreteExportGateway(
           stager: LocalExportStager(directories),
         ),
@@ -203,6 +221,8 @@ class AppBootstrap {
         concrete: concrete,
         concreteAttachments: concreteAttachments,
         backup: backup,
+        attachmentCatalog: attachmentCatalog,
+        attachmentReconciliation: attachmentReconciliation,
       );
     } on Object {
       return const BootstrapFailure();

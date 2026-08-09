@@ -1,11 +1,14 @@
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/application/attachment_catalog_application.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/domain/attachment_models.dart';
 import 'package:chief_site_engineer/domain/concrete_models.dart';
 import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
+import 'package:chief_site_engineer/features/attachments/attachment_catalog_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_attachment_viewer_page.dart';
 import 'package:chief_site_engineer/features/owned_text_input_dialog.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
@@ -38,6 +41,11 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
   bool _mutating = false;
   String? _error;
   _TruckRetry? _retryTruck;
+
+  AttachmentCatalogApplication? get _attachmentCatalog =>
+      widget.concrete is AttachmentCatalogHost
+      ? (widget.concrete as AttachmentCatalogHost).attachmentCatalog
+      : null;
 
   @override
   void initState() {
@@ -513,6 +521,50 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
         ).showSnackBar(SnackBar(content: Text(message)));
       }
     }
+  }
+
+  Future<void> _linkExistingAttachment() async {
+    final detail = _detail!;
+    final catalog = _attachmentCatalog;
+    final concrete = widget.concrete;
+    if (catalog == null || concrete is! ConcreteExistingAttachmentApplication) {
+      return;
+    }
+    final existingConcrete = concrete as ConcreteExistingAttachmentApplication;
+    final selected = await Navigator.of(context)
+        .push<ProjectAttachmentCatalogItem>(
+          MaterialPageRoute(
+            builder: (_) => AttachmentCatalogPage(
+              catalog: catalog,
+              initialProjectId: detail.pour.projectId,
+              selectionSourceType: AttachmentCatalogSourceType.concretePour,
+              selectionSourceId: detail.pour.id,
+              allowedMimeTypes: const {
+                'image/jpeg',
+                'image/png',
+                'image/heic',
+                'application/pdf',
+                'video/mp4',
+                'audio/mpeg',
+                'audio/mp4',
+                'audio/wav',
+              },
+              title: 'Mevcut dosyayı bağla',
+            ),
+          ),
+        );
+    if (selected == null || !mounted) return;
+    await _run(
+      () => existingConcrete.linkExistingAttachment(
+        LinkExistingConcreteAttachmentCommand(
+          pourId: detail.pour.id,
+          physicalAttachmentId: selected.physicalAttachmentId,
+          linkId: RecordId.randomUuid(),
+          eventId: RecordId.randomUuid(),
+          expectedPourRevision: detail.pour.revision,
+        ),
+      ),
+    );
   }
 
   Future<void> _completeFollowUp(
@@ -1063,6 +1115,17 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
                   label: const Text('Saha kanıtı ekle'),
                 ),
               ),
+              if (_attachmentCatalog != null &&
+                  widget.concrete is ConcreteExistingAttachmentApplication)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    key: const Key('link-existing-concrete-attachment'),
+                    onPressed: _mutating ? null : _linkExistingAttachment,
+                    icon: const Icon(Icons.add_link_rounded),
+                    label: const Text('Mevcut dosyayı bağla'),
+                  ),
+                ),
               for (final item in detail.attachments)
                 ListTile(
                   leading: Icon(
