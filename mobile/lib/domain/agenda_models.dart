@@ -216,6 +216,7 @@ class MobileProject {
     required this.createdAt,
     required this.updatedAt,
     required this.revision,
+    this.archivedAt,
   });
 
   final String id;
@@ -223,6 +224,39 @@ class MobileProject {
   final String createdAt;
   final String updatedAt;
   final int revision;
+  final String? archivedAt;
+
+  bool get isArchived => archivedAt != null;
+}
+
+enum ProjectArchiveFilter { active, archived }
+
+enum ProjectEventType {
+  renamed('project.renamed'),
+  archived('project.archived'),
+  restored('project.restored');
+
+  const ProjectEventType(this.storageValue);
+
+  final String storageValue;
+}
+
+class ProjectEvent {
+  const ProjectEvent({
+    required this.id,
+    required this.projectId,
+    required this.sequence,
+    required this.eventType,
+    required this.occurredAt,
+    required this.payloadJson,
+  });
+
+  final String id;
+  final String projectId;
+  final int sequence;
+  final ProjectEventType eventType;
+  final String occurredAt;
+  final String payloadJson;
 }
 
 class AgendaLog {
@@ -598,6 +632,34 @@ class CreateProjectCommand {
 
   final String id;
   final String name;
+}
+
+class RenameProjectCommand {
+  const RenameProjectCommand({
+    required this.projectId,
+    required this.eventId,
+    required this.expectedRevision,
+    required this.name,
+  });
+
+  final String projectId;
+  final String eventId;
+  final int expectedRevision;
+  final String name;
+}
+
+class MutateProjectArchiveCommand {
+  const MutateProjectArchiveCommand({
+    required this.projectId,
+    required this.eventId,
+    required this.expectedRevision,
+    required this.archive,
+  });
+
+  final String projectId;
+  final String eventId;
+  final int expectedRevision;
+  final bool archive;
 }
 
 class CreateAgendaLogCommand {

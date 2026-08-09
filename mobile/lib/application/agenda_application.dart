@@ -206,6 +206,22 @@ abstract interface class ProjectLocationApplication {
   );
 }
 
+abstract interface class ProjectLifecycleApplication {
+  Stream<void> get projectChanges;
+
+  Future<MobileProject> getProject(String projectId);
+
+  Future<List<MobileProject>> listProjectRecords(ProjectArchiveFilter filter);
+
+  Future<MobileProject> renameProject(RenameProjectCommand command);
+
+  Future<MobileProject> mutateProjectArchive(
+    MutateProjectArchiveCommand command,
+  );
+
+  Future<List<ProjectEvent>> listProjectEvents(String projectId);
+}
+
 abstract interface class ReminderSourceAgendaMediaApplication {
   Future<ReminderSourceAgendaMedia> getReminderSourceAgendaMedia(
     String sourceLogId,
@@ -230,6 +246,7 @@ typedef ReminderTransactionHook =
 class SqliteAgendaApplication
     implements
         AgendaApplication,
+        ProjectLifecycleApplication,
         ProjectLocationApplication,
         ReminderTodayApplication,
         ReminderSourceAgendaMediaApplication,
@@ -345,6 +362,167 @@ class SqliteAgendaApplication
     });
     if (result.changed) _projectChanges.add(null);
     return result.project;
+  }
+
+  @override
+  Future<MobileProject> getProject(String projectId) async {
+    validateUuid(projectId, 'Proje kimliği');
+    final now = _readClockOnce();
+    return _withDatabase(
+      now,
+      (database) => _requireProjectRecord(database, projectId),
+    );
+  }
+
+  @override
+  Future<List<MobileProject>> listProjectRecords(
+    ProjectArchiveFilter filter,
+  ) async {
+    final now = _readClockOnce();
+    return _withDatabase(now, (database) async {
+      final rows = await database.query(
+        'projects',
+        where: filter == ProjectArchiveFilter.active
+            ? 'archived_at IS NULL'
+            : 'archived_at IS NOT NULL',
+      );
+      final projects = rows.map(_projectFromRow).toList(growable: true)
+        ..sort((left, right) {
+          final nameOrder = _normalizeProjectName(
+            left.name,
+          ).compareTo(_normalizeProjectName(right.name));
+          if (nameOrder != 0) return nameOrder;
+          return left.id.compareTo(right.id);
+        });
+      return List.unmodifiable(projects);
+    });
+  }
+
+  @override
+  Future<MobileProject> renameProject(RenameProjectCommand command) async {
+    validateUuid(command.projectId, 'Proje kimliği');
+    validateUuid(command.eventId, 'Proje event kimliği');
+    _validateProjectRevision(command.expectedRevision);
+    final name = requiredTrimmed(command.name, 'Proje adı', maxLength: 160);
+    final now = _readClockOnce();
+    final occurredAt = CseTimeCodec.encodeUtc(now);
+    final result = await _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final current = await _requireProjectRecord(
+          transaction,
+          command.projectId,
+        );
+        _requireActiveProjectRecord(current);
+        _requireProjectRevision(current, command.expectedRevision);
+        if (current.name == name) {
+          return (project: current, changed: false);
+        }
+        await _rejectActiveProjectDuplicate(
+          transaction,
+          normalizedName: _normalizeProjectName(name),
+          excludingProjectId: current.id,
+        );
+        await _updateProject(
+          transaction,
+          projectId: current.id,
+          expectedRevision: current.revision,
+          values: {
+            'name': name,
+            'updated_at': occurredAt,
+            'revision': current.revision + 1,
+          },
+        );
+        await _insertProjectEvent(
+          transaction,
+          id: command.eventId,
+          projectId: current.id,
+          eventType: ProjectEventType.renamed,
+          occurredAt: occurredAt,
+          payload: {'old_name': current.name, 'new_name': name},
+        );
+        return (
+          project: await _requireProjectRecord(transaction, current.id),
+          changed: true,
+        );
+      });
+    });
+    if (result.changed) _projectChanges.add(null);
+    return result.project;
+  }
+
+  @override
+  Future<MobileProject> mutateProjectArchive(
+    MutateProjectArchiveCommand command,
+  ) async {
+    validateUuid(command.projectId, 'Proje kimliği');
+    validateUuid(command.eventId, 'Proje event kimliği');
+    _validateProjectRevision(command.expectedRevision);
+    final now = _readClockOnce();
+    final occurredAt = CseTimeCodec.encodeUtc(now);
+    final result = await _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final current = await _requireProjectRecord(
+          transaction,
+          command.projectId,
+        );
+        if (current.isArchived == command.archive) {
+          return (project: current, changed: false);
+        }
+        _requireProjectRevision(current, command.expectedRevision);
+        if (!command.archive) {
+          await _rejectActiveProjectDuplicate(
+            transaction,
+            normalizedName: _normalizeProjectName(current.name),
+            excludingProjectId: current.id,
+          );
+        }
+        await _updateProject(
+          transaction,
+          projectId: current.id,
+          expectedRevision: current.revision,
+          values: {
+            'archived_at': command.archive ? occurredAt : null,
+            'updated_at': occurredAt,
+            'revision': current.revision + 1,
+          },
+        );
+        await _insertProjectEvent(
+          transaction,
+          id: command.eventId,
+          projectId: current.id,
+          eventType: command.archive
+              ? ProjectEventType.archived
+              : ProjectEventType.restored,
+          occurredAt: occurredAt,
+          payload: {
+            'was_archived': current.isArchived,
+            'is_archived': command.archive,
+          },
+        );
+        return (
+          project: await _requireProjectRecord(transaction, current.id),
+          changed: true,
+        );
+      });
+    });
+    if (result.changed) _projectChanges.add(null);
+    return result.project;
+  }
+
+  @override
+  Future<List<ProjectEvent>> listProjectEvents(String projectId) async {
+    validateUuid(projectId, 'Proje kimliği');
+    final now = _readClockOnce();
+    return _withDatabase(now, (database) async {
+      await _requireProjectRecord(database, projectId);
+      final rows = await database.query(
+        'project_events',
+        where: 'project_id = ?',
+        whereArgs: [projectId],
+        orderBy: 'sequence ASC, id ASC',
+      );
+      return rows.map(_projectEventFromRow).toList(growable: false);
+    });
   }
 
   @override
@@ -3245,6 +3423,112 @@ Future<void> _requireProjectExists(
   }
 }
 
+Future<MobileProject> _requireProjectRecord(
+  DatabaseExecutor database,
+  String projectId,
+) async {
+  final rows = await database.query(
+    'projects',
+    where: 'id = ?',
+    whereArgs: [projectId],
+    limit: 1,
+  );
+  if (rows.isEmpty) {
+    throw const AgendaValidationFailure('Proje bulunamadı.');
+  }
+  return _projectFromRow(rows.single);
+}
+
+void _requireActiveProjectRecord(MobileProject project) {
+  if (project.isArchived) {
+    throw const AgendaValidationFailure('Arşivli proje değiştirilemez.');
+  }
+}
+
+void _validateProjectRevision(int revision) {
+  if (revision < 1) {
+    throw const AgendaValidationFailure('Beklenen revision geçersizdir.');
+  }
+}
+
+void _requireProjectRevision(MobileProject project, int expectedRevision) {
+  if (project.revision != expectedRevision) {
+    throw const AgendaValidationFailure(
+      'Proje başka bir işlem tarafından değiştirilmiş.',
+    );
+  }
+}
+
+Future<void> _rejectActiveProjectDuplicate(
+  DatabaseExecutor database, {
+  required String normalizedName,
+  String? excludingProjectId,
+}) async {
+  final rows = await database.query(
+    'projects',
+    columns: ['id', 'name'],
+    where: 'archived_at IS NULL',
+  );
+  if (rows.any(
+    (row) =>
+        row['id'] != excludingProjectId &&
+        _normalizeProjectName(row['name']! as String) == normalizedName,
+  )) {
+    throw const AgendaValidationFailure(
+      'Aynı adlı aktif proje zaten bulunuyor.',
+    );
+  }
+}
+
+Future<void> _updateProject(
+  DatabaseExecutor database, {
+  required String projectId,
+  required int expectedRevision,
+  required Map<String, Object?> values,
+}) async {
+  final changed = await database.update(
+    'projects',
+    values,
+    where: 'id = ? AND revision = ?',
+    whereArgs: [projectId, expectedRevision],
+  );
+  if (changed != 1) {
+    throw const AgendaValidationFailure(
+      'Proje başka bir işlem tarafından değiştirilmiş.',
+    );
+  }
+}
+
+Future<void> _insertProjectEvent(
+  DatabaseExecutor database, {
+  required String id,
+  required String projectId,
+  required ProjectEventType eventType,
+  required String occurredAt,
+  required Map<String, Object?> payload,
+}) async {
+  final sequence =
+      Sqflite.firstIntValue(
+        await database.rawQuery(
+          '''
+            SELECT COALESCE(MAX(sequence), 0) + 1
+            FROM project_events
+            WHERE project_id = ?
+          ''',
+          [projectId],
+        ),
+      ) ??
+      1;
+  await database.insert('project_events', {
+    'id': id,
+    'project_id': projectId,
+    'sequence': sequence,
+    'event_type': eventType.storageValue,
+    'occurred_at': occurredAt,
+    'payload_json': jsonEncode(payload),
+  });
+}
+
 Future<void> _requireActiveProject(
   DatabaseExecutor database,
   String projectId,
@@ -3498,15 +3782,52 @@ MobileProject _projectFromRow(Map<String, Object?> row) {
   final id = row['id']! as String;
   final createdAt = row['created_at']! as String;
   final updatedAt = row['updated_at']! as String;
+  final archivedAt = row['archived_at'] as String?;
+  final revision = row['revision']! as int;
   validateUuid(id, 'Proje kimliği');
   validateCanonicalTimestamp(createdAt, 'Proje oluşturma zamanı');
   validateCanonicalTimestamp(updatedAt, 'Proje güncelleme zamanı');
+  if (archivedAt != null) {
+    validateCanonicalTimestamp(archivedAt, 'Proje arşivleme zamanı');
+  }
+  if (revision < 1) {
+    throw const AgendaValidationFailure('Proje revision geçersizdir.');
+  }
   return MobileProject(
     id: id,
-    name: requiredTrimmed(row['name']! as String, 'Proje adı'),
+    name: requiredTrimmed(row['name']! as String, 'Proje adı', maxLength: 160),
     createdAt: createdAt,
     updatedAt: updatedAt,
-    revision: row['revision']! as int,
+    revision: revision,
+    archivedAt: archivedAt,
+  );
+}
+
+ProjectEvent _projectEventFromRow(Map<String, Object?> row) {
+  final id = row['id']! as String;
+  final projectId = row['project_id']! as String;
+  final occurredAt = row['occurred_at']! as String;
+  final sequence = row['sequence']! as int;
+  validateUuid(id, 'Proje event kimliği');
+  validateUuid(projectId, 'Proje kimliği');
+  validateCanonicalTimestamp(occurredAt, 'Proje event zamanı');
+  if (sequence < 1) {
+    throw const AgendaValidationFailure('Proje event sırası geçersizdir.');
+  }
+  final storageType = row['event_type']! as String;
+  final eventType = ProjectEventType.values.where(
+    (item) => item.storageValue == storageType,
+  );
+  if (eventType.isEmpty) {
+    throw const AgendaValidationFailure('Proje event türü desteklenmiyor.');
+  }
+  return ProjectEvent(
+    id: id,
+    projectId: projectId,
+    sequence: sequence,
+    eventType: eventType.single,
+    occurredAt: occurredAt,
+    payloadJson: row['payload_json']! as String,
   );
 }
 
