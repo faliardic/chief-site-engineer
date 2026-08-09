@@ -370,7 +370,11 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
       if (detail.member.personnelCode != null)
         _row('Personel kodu', detail.member.personnelCode!),
       if (detail.member.phone != null) _row('Telefon', detail.member.phone!),
+      if (detail.member.address != null) _row('Adres', detail.member.address!),
+      if (detail.member.startedOn != null)
+        _row('İşe başlama tarihi', detail.member.startedOn!),
       if (detail.member.note != null) _row('Not', detail.member.note!),
+      _attendanceSummary(detail.attendanceSummary),
       const Card(
         child: Padding(
           padding: EdgeInsets.all(12),
@@ -382,6 +386,53 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
       ),
     ],
   );
+
+  Widget _attendanceSummary(WorkforceAttendanceSummary summary) {
+    final last = summary.lastAttendance;
+    return Card(
+      key: const Key('workforce-attendance-summary'),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Puantaj özeti',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Toplam ${summary.personDayEquivalentTotal.toStringAsFixed(1)} kişi-gün',
+            ),
+            if (last == null)
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Text('Henüz Puantaj geçmişi yok.'),
+              )
+            else ...[
+              const SizedBox(height: 4),
+              Text(
+                'Son kayıt: ${last.localDate} • ${last.result.label} • ${last.dayStatus.label}',
+              ),
+              const Divider(),
+              Text('Son günler', style: Theme.of(context).textTheme.labelLarge),
+              for (final day in summary.recentDays)
+                ListTile(
+                  key: Key('workforce-attendance-${day.attendanceDayId}'),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(day.localDate),
+                  subtitle: Text(
+                    '${day.result.label} • ${day.dayStatus.label}',
+                  ),
+                  trailing: Text(day.personDayEquivalent.toStringAsFixed(1)),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _compliance(WorkforcePersonDetail detail) => ListView(
     padding: const EdgeInsets.all(12),

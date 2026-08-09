@@ -258,6 +258,8 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
   late final TextEditingController _role;
   late final TextEditingController _code;
   late final TextEditingController _phone;
+  late final TextEditingController _address;
+  late final TextEditingController _startedOn;
   late final TextEditingController _note;
   List<Subcontractor> _subcontractors = const [];
   List<WorkforceTeam> _teams = const [];
@@ -275,6 +277,8 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
     _role = TextEditingController(text: widget.member?.roleName);
     _code = TextEditingController(text: widget.member?.personnelCode);
     _phone = TextEditingController(text: widget.member?.phone);
+    _address = TextEditingController(text: widget.member?.address);
+    _startedOn = TextEditingController(text: widget.member?.startedOn);
     _note = TextEditingController(text: widget.member?.note);
     _subcontractorId = widget.member?.subcontractorId;
     _teamId = widget.member?.teamId;
@@ -287,6 +291,8 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
     _role.dispose();
     _code.dispose();
     _phone.dispose();
+    _address.dispose();
+    _startedOn.dispose();
     _note.dispose();
     super.dispose();
   }
@@ -438,6 +444,8 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
                 roleName: _role.text,
                 personnelCode: _code.text,
                 phone: _phone.text,
+                address: _address.text,
+                startedOn: _startedOn.text,
                 note: _note.text,
               ),
             )
@@ -453,6 +461,10 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
                 roleName: _role.text,
                 personnelCode: _code.text,
                 phone: _phone.text,
+                address: _address.text,
+                startedOn: _startedOn.text,
+                replaceAddress: true,
+                replaceStartedOn: true,
                 note: _note.text,
               ),
             );
@@ -560,6 +572,19 @@ class _WorkforceMemberFormPageState extends State<WorkforceMemberFormPage> {
                 const Key('workforce-phone'),
                 _phone,
                 'Telefon (opsiyonel)',
+              ),
+              const SizedBox(height: 12),
+              _field(
+                const Key('workforce-address'),
+                _address,
+                'Adres (opsiyonel)',
+                maxLines: 3,
+              ),
+              const SizedBox(height: 12),
+              _field(
+                const Key('workforce-started-on'),
+                _startedOn,
+                'İşe başlama tarihi (YYYY-AA-GG)',
               ),
               const SizedBox(height: 12),
               _field(

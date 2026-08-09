@@ -655,6 +655,31 @@ class SqliteAttendanceApplication implements AttendanceApplication {
         whereArgs: [memberId],
         orderBy: 'assigned_date DESC, created_at DESC, id ASC',
       );
+      final attendanceTotalRows = await database.rawQuery(
+        '''
+        SELECT COALESCE(SUM(
+          CASE e.result
+            WHEN 'full_day' THEN 1.0
+            WHEN 'half_day' THEN 0.5
+            ELSE 0.0
+          END
+        ), 0.0) AS person_day_equivalent
+        FROM attendance_entries e
+        WHERE e.workforce_member_id = ? AND e.removed_at IS NULL
+        ''',
+        [memberId],
+      );
+      final attendanceRows = await database.rawQuery(
+        '''
+        SELECT e.attendance_day_id, d.local_date, d.status, e.result
+        FROM attendance_entries e
+        JOIN attendance_days d ON d.id = e.attendance_day_id
+        WHERE e.workforce_member_id = ? AND e.removed_at IS NULL
+        ORDER BY d.local_date DESC, e.updated_at DESC, e.id ASC
+        LIMIT 30
+        ''',
+        [memberId],
+      );
       final compliance = complianceRows
           .map((row) => _complianceFromRow(row, today))
           .toList(growable: false);
@@ -678,6 +703,25 @@ class SqliteAttendanceApplication implements AttendanceApplication {
         activePpeCount: ppe
             .where((item) => item.status == PpeAssignmentStatus.assigned)
             .fold(0, (sum, item) => sum + item.quantity),
+        attendanceSummary: WorkforceAttendanceSummary(
+          personDayEquivalentTotal:
+              (attendanceTotalRows.single['person_day_equivalent']! as num)
+                  .toDouble(),
+          recentDays: attendanceRows
+              .map(
+                (row) => WorkforceAttendanceDay(
+                  attendanceDayId: row['attendance_day_id']! as String,
+                  localDate: row['local_date']! as String,
+                  dayStatus: AttendanceDayStatus.fromStorage(
+                    row['status']! as String,
+                  ),
+                  result: AttendanceResult.fromStorage(
+                    row['result']! as String,
+                  ),
+                ),
+              )
+              .toList(growable: false),
+        ),
       );
     });
   }
@@ -1348,6 +1392,8 @@ class SqliteAttendanceApplication implements AttendanceApplication {
           subcontractorName: member.subcontractorName,
           teamId: member.teamId,
           phone: member.phone,
+          address: member.address,
+          startedOn: member.startedOn,
           note: member.note,
           isActive: !command.archive,
           revision: member.revision + 1,
