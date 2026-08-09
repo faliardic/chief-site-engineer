@@ -12,6 +12,7 @@ import 'package:chief_site_engineer/platform/capabilities.dart';
 import 'package:chief_site_engineer/platform/concrete_attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/concrete_export_gateway.dart';
 import 'package:chief_site_engineer/platform/export_gateway.dart';
+import 'package:chief_site_engineer/platform/managed_attachment_store.dart';
 import 'package:chief_site_engineer/platform/mobile_backup_gateway.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
@@ -125,13 +126,18 @@ class AppBootstrap {
       await database.close();
       database = null;
       final coordinator = MobileOperationCoordinator();
+      final managedAttachmentStore = DeviceManagedAttachmentStore(
+        directories: directories,
+      );
       final agenda = SqliteAgendaApplication(
         databasePath: directories.databaseFile,
         databaseFactory: databaseFactory,
         clock: clock,
         notificationGateway: notificationGateway,
         coordinator: coordinator,
-        attachmentStore: DeviceAgendaAttachmentStore(directories: directories),
+        attachmentStore: DeviceAgendaAttachmentStore.shared(
+          managedStore: managedAttachmentStore,
+        ),
       );
       final attendance = SqliteAttendanceApplication(
         databasePath: directories.databaseFile,
@@ -148,8 +154,8 @@ class AppBootstrap {
         databaseFactory: databaseFactory,
         clock: clock,
         agenda: agenda,
-        attachmentStore: DeviceConcreteAttachmentStore(
-          directories: directories,
+        attachmentStore: DeviceConcreteAttachmentStore.shared(
+          managedStore: managedAttachmentStore,
         ),
         exportGateway: DeviceConcreteExportGateway(
           stager: LocalExportStager(directories),

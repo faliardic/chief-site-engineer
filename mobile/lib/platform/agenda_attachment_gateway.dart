@@ -1,9 +1,7 @@
-import 'dart:io';
-
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/domain/attachment_models.dart';
+import 'package:chief_site_engineer/platform/managed_attachment_store.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
-import 'package:crypto/crypto.dart';
-import 'package:path/path.dart' as path;
 
 class AgendaAttachmentFailure implements Exception {
   const AgendaAttachmentFailure(this.code);
@@ -83,13 +81,17 @@ class UnavailableAgendaAttachmentStore implements AgendaAttachmentStore {
 }
 
 class DeviceAgendaAttachmentStore implements AgendaAttachmentStore {
-  const DeviceAgendaAttachmentStore({
-    required this.directories,
-    this.maximumBytes = 20 * 1024 * 1024,
-  });
+  DeviceAgendaAttachmentStore({
+    required AppDirectories directories,
+    int maximumBytes = 20 * 1024 * 1024,
+  }) : managedStore = DeviceManagedAttachmentStore(
+         directories: directories,
+         maximumBytes: maximumBytes,
+       );
 
-  final AppDirectories directories;
-  final int maximumBytes;
+  const DeviceAgendaAttachmentStore.shared({required this.managedStore});
+
+  final ManagedAttachmentStore managedStore;
 
   @override
   Future<StagedAgendaPhoto> stage({
@@ -100,48 +102,20 @@ class DeviceAgendaAttachmentStore implements AgendaAttachmentStore {
   }) async {
     validateUuid(logId, 'Log kimliği');
     validateUuid(attachmentId, 'Fotoğraf kimliği');
-    final safeName = path.basename(originalFileName.trim());
-    if (safeName.isEmpty || safeName != originalFileName.trim()) {
-      throw const AgendaAttachmentFailure('invalid_file_name');
-    }
-    if (bytes.isEmpty || bytes.length > maximumBytes) {
-      throw const AgendaAttachmentFailure('invalid_file_size');
-    }
-    final mime = _sniffMime(bytes);
-    final extension = mime == 'image/jpeg' ? '.jpg' : '.png';
-    directories.validate();
-    await directories.ensureCreated();
-    final relative = path.posix.join(
-      'agenda',
-      logId,
-      '$attachmentId$extension',
-    );
-    final destination = _resolve(relative);
-    final temporary = File(
-      path.join(directories.staging.path, 'agenda-$attachmentId.part'),
-    );
-    if (await destination.exists() || await temporary.exists()) {
-      throw const AgendaAttachmentFailure('attachment_destination_exists');
-    }
-    await destination.parent.create(recursive: true);
     try {
-      await temporary.writeAsBytes(bytes, flush: true);
-      final stagedDigest = sha256.convert(await temporary.readAsBytes());
-      final expectedDigest = sha256.convert(bytes);
-      if (stagedDigest != expectedDigest) {
-        throw const AgendaAttachmentFailure('staging_hash_mismatch');
-      }
-      await temporary.rename(destination.path);
-      return StagedAgendaPhoto(
-        relativePath: relative,
-        mimeType: mime,
-        byteSize: bytes.length,
-        sha256Value: expectedDigest.toString(),
+      final staged = await managedStore.stage(
+        attachmentId: attachmentId,
+        originalFileName: originalFileName,
+        bytes: bytes,
       );
-    } on Object {
-      if (await temporary.exists()) await temporary.delete();
-      if (await destination.exists()) await destination.delete();
-      rethrow;
+      return StagedAgendaPhoto(
+        relativePath: staged.relativePath,
+        mimeType: staged.mimeType,
+        byteSize: staged.byteSize,
+        sha256Value: staged.sha256Value,
+      );
+    } on ManagedAttachmentFailure catch (error) {
+      throw AgendaAttachmentFailure(error.code);
     }
   }
 
@@ -151,20 +125,26 @@ class DeviceAgendaAttachmentStore implements AgendaAttachmentStore {
     String expectedSha256,
     String expectedMimeType,
   ) async {
-    final file = _resolve(relativePath);
-    if (!await file.exists()) return AgendaAttachmentIntegrity.missing;
-    final bytes = await file.readAsBytes();
-    if (sha256.convert(bytes).toString() != expectedSha256) {
-      return AgendaAttachmentIntegrity.tampered;
-    }
     try {
-      if (_sniffMime(bytes) != expectedMimeType) {
-        return AgendaAttachmentIntegrity.invalidMime;
-      }
-    } on AgendaAttachmentFailure {
-      return AgendaAttachmentIntegrity.invalidMime;
+      final result = await managedStore.inspect(
+        relativePath: relativePath,
+        expectedSha256: expectedSha256,
+        expectedMimeType: expectedMimeType,
+      );
+      return switch (result) {
+        ManagedAttachmentIntegrity.healthy => AgendaAttachmentIntegrity.ok,
+        ManagedAttachmentIntegrity.missingFile ||
+        ManagedAttachmentIntegrity.unsafePath =>
+          AgendaAttachmentIntegrity.missing,
+        ManagedAttachmentIntegrity.mimeMismatch =>
+          AgendaAttachmentIntegrity.invalidMime,
+        ManagedAttachmentIntegrity.sizeMismatch ||
+        ManagedAttachmentIntegrity.hashMismatch =>
+          AgendaAttachmentIntegrity.tampered,
+      };
+    } on ManagedAttachmentFailure catch (error) {
+      throw AgendaAttachmentFailure(error.code);
     }
-    return AgendaAttachmentIntegrity.ok;
   }
 
   @override
@@ -174,60 +154,29 @@ class DeviceAgendaAttachmentStore implements AgendaAttachmentStore {
     String expectedSha256,
     String expectedMimeType,
   ) async {
-    final integrity = await inspect(
-      relativePath,
-      expectedSha256,
-      expectedMimeType,
-    );
-    if (integrity != AgendaAttachmentIntegrity.ok) {
-      throw AgendaAttachmentFailure('attachment_${integrity.name}');
+    try {
+      final content = await managedStore.read(
+        relativePath: relativePath,
+        originalFileName: originalFileName,
+        expectedSha256: expectedSha256,
+        expectedMimeType: expectedMimeType,
+      );
+      return StoredAttachmentContent(
+        fileName: content.fileName,
+        mimeType: content.mimeType,
+        bytes: content.bytes,
+      );
+    } on ManagedAttachmentFailure catch (error) {
+      throw AgendaAttachmentFailure(error.code);
     }
-    return StoredAttachmentContent(
-      fileName: path.basename(originalFileName),
-      mimeType: expectedMimeType,
-      bytes: await _resolve(relativePath).readAsBytes(),
-    );
   }
 
   @override
   Future<void> cleanup(String relativePath) async {
-    final file = _resolve(relativePath);
-    if (await file.exists()) await file.delete();
-  }
-
-  File _resolve(String relativePath) {
-    directories.validate();
-    if (relativePath.trim().isEmpty || path.isAbsolute(relativePath)) {
-      throw const AgendaAttachmentFailure('invalid_relative_path');
+    try {
+      await managedStore.cleanup(relativePath);
+    } on ManagedAttachmentFailure catch (error) {
+      throw AgendaAttachmentFailure(error.code);
     }
-    final root = path.normalize(path.absolute(directories.attachments.path));
-    final candidate = path.normalize(
-      path.absolute(path.join(root, path.normalize(relativePath))),
-    );
-    if (!path.isWithin(root, candidate)) {
-      throw const AgendaAttachmentFailure('attachment_path_escaped_root');
-    }
-    return File(candidate);
-  }
-
-  String _sniffMime(List<int> bytes) {
-    if (bytes.length >= 3 &&
-        bytes[0] == 0xff &&
-        bytes[1] == 0xd8 &&
-        bytes[2] == 0xff) {
-      return 'image/jpeg';
-    }
-    if (bytes.length >= 8 &&
-        bytes[0] == 0x89 &&
-        bytes[1] == 0x50 &&
-        bytes[2] == 0x4e &&
-        bytes[3] == 0x47 &&
-        bytes[4] == 0x0d &&
-        bytes[5] == 0x0a &&
-        bytes[6] == 0x1a &&
-        bytes[7] == 0x0a) {
-      return 'image/png';
-    }
-    throw const AgendaAttachmentFailure('unsupported_mime');
   }
 }

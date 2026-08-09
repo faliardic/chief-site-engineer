@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 const pourId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const attachmentId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const nonJpegAttachmentId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
 void main() {
   late Directory root;
@@ -37,7 +38,7 @@ void main() {
         bytes: const [0xff, 0xd8, 0xff, 1, 2, 3],
       );
       expect(staged.mimeType, 'image/jpeg');
-      expect(staged.relativePath, 'concrete/$pourId/$attachmentId.jpg');
+      expect(staged.relativePath, 'managed/$attachmentId.jpg');
       expect(staged.relativePath, isNot(contains(root.path)));
       expect(await directories.staging.list().isEmpty, isTrue);
       expect(
@@ -46,7 +47,8 @@ void main() {
       );
 
       final file = File(
-        '${directories.attachments.path}${Platform.pathSeparator}concrete${Platform.pathSeparator}$pourId${Platform.pathSeparator}$attachmentId.jpg',
+        '${directories.attachments.path}${Platform.pathSeparator}managed'
+        '${Platform.pathSeparator}$attachmentId.jpg',
       );
       await file.writeAsBytes(const [0xff, 0xd8, 0xff, 9]);
       expect(
@@ -55,6 +57,24 @@ void main() {
       );
       await store.cleanup(staged.relativePath);
       expect(await file.exists(), isFalse);
+    },
+  );
+
+  test(
+    'keeps non-JPEG integrity ok when MIME expectation is omitted',
+    () async {
+      final staged = await store.stage(
+        pourId: pourId,
+        attachmentId: nonJpegAttachmentId,
+        originalFileName: 'rapor.pdf',
+        bytes: const [0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37],
+      );
+
+      expect(staged.mimeType, 'application/pdf');
+      expect(
+        await store.inspect(staged.relativePath, staged.sha256Value),
+        ConcreteAttachmentIntegrity.ok,
+      );
     },
   );
 

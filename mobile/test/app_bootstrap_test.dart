@@ -1,7 +1,11 @@
 import 'dart:io';
 
+import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/core/environment.dart';
+import 'package:chief_site_engineer/platform/agenda_attachment_gateway.dart';
+import 'package:chief_site_engineer/platform/concrete_attachment_gateway.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as path;
@@ -52,6 +56,13 @@ void main() {
       expect(restarted.backup, isNotNull);
       expect(first.projectLocations, same(first.agenda));
       expect(restarted.projectLocations, same(restarted.agenda));
+      final agendaStore =
+          (first.agenda as SqliteAgendaApplication).attachmentStore
+              as DeviceAgendaAttachmentStore;
+      final concreteStore =
+          (first.concrete! as SqliteConcreteApplication).attachmentStore
+              as DeviceConcreteAttachmentStore;
+      expect(agendaStore.managedStore, same(concreteStore.managedStore));
     },
   );
 
@@ -84,7 +95,13 @@ void main() {
       path.join(directories.incomingBackups.path, 'fresh.csebackup'),
     );
     final outside = File(path.join(temporaryRoot.path, 'outside.part'));
-    for (final file in [partial, expired, fresh, outside]) {
+    final managedStaging = File(
+      path.join(
+        directories.staging.path,
+        'managed-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.part',
+      ),
+    );
+    for (final file in [partial, expired, fresh, outside, managedStaging]) {
       await file.writeAsBytes([1, 2, 3], flush: true);
     }
     await expired.setLastModified(now.subtract(const Duration(days: 2)));
@@ -102,5 +119,10 @@ void main() {
     expect(await expired.exists(), isFalse);
     expect(await fresh.exists(), isTrue);
     expect(await outside.exists(), isTrue);
+    expect(
+      await managedStaging.exists(),
+      isTrue,
+      reason: 'Attachment reconciliation is never automatic at bootstrap.',
+    );
   });
 }

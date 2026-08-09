@@ -3852,3 +3852,14 @@
 - Recovery canonical source/context/project/event grafiğini ve gerekli fiziksel
   dosyaları denetler. Schema 12'den taşınmış arşivli Concrete kaydının tarihsel
   olarak opsiyonel byte'ı sentetik biçimde zorunlu yapılmaz.
+- Yeni Agenda ve Beton attachment byte'ları feature klasörleri yerine tek ortak
+  store tarafından `managed/<attachmentId>.<ext>` yoluna yazılır. Mevcut
+  `agenda/...` ve `concrete/...` yolları taşınmadan salt-okunur uyumla korunur.
+- Ortak store safe basename, boyut, sniff edilmiş MIME, private-root containment,
+  symlink/non-regular-file reddi ve `.part` dosyasını yeniden okuyarak
+  size/hash/MIME doğrulaması sonrasında atomik finalize uygular. Failure
+  compensation yalnız o operasyonun yeni artifact'ına dokunur.
+- Reconciliation schema-13 metadata, canonical link target'ları, managed final
+  dosyaları ve yalnız `managed-<uuid>.part` staging pattern'ini salt-okunur
+  sınıflandırır. Delete/adopt/relink/dedupe/rewrite/move yapmaz ve bootstrap'ta
+  otomatik çalışmaz.

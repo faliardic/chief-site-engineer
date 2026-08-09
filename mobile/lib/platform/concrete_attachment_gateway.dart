@@ -1,13 +1,13 @@
 import 'dart:io';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/domain/attachment_models.dart';
 import 'package:chief_site_engineer/domain/concrete_models.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/capabilities.dart';
+import 'package:chief_site_engineer/platform/managed_attachment_store.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
-import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:open_filex/open_filex.dart';
 import 'package:path/path.dart' as path;
 import 'package:permission_handler/permission_handler.dart';
 
@@ -60,13 +60,17 @@ abstract interface class ConcreteAttachmentStore {
 }
 
 class DeviceConcreteAttachmentStore implements ConcreteAttachmentStore {
-  const DeviceConcreteAttachmentStore({
-    required this.directories,
-    this.maximumBytes = 20 * 1024 * 1024,
-  });
+  DeviceConcreteAttachmentStore({
+    required AppDirectories directories,
+    int maximumBytes = 20 * 1024 * 1024,
+  }) : managedStore = DeviceManagedAttachmentStore(
+         directories: directories,
+         maximumBytes: maximumBytes,
+       );
 
-  final AppDirectories directories;
-  final int maximumBytes;
+  const DeviceConcreteAttachmentStore.shared({required this.managedStore});
+
+  final ManagedAttachmentStore managedStore;
 
   @override
   Future<StagedConcreteAttachment> stage({
@@ -77,49 +81,21 @@ class DeviceConcreteAttachmentStore implements ConcreteAttachmentStore {
   }) async {
     validateUuid(pourId, 'Beton paketi kimliği');
     validateUuid(attachmentId, 'Kanıt kimliği');
-    final safeName = path.basename(originalFileName.trim());
-    if (safeName.isEmpty || safeName != originalFileName.trim()) {
-      throw const ConcreteAttachmentFailure('invalid_file_name');
-    }
-    if (bytes.isEmpty || bytes.length > maximumBytes) {
-      throw const ConcreteAttachmentFailure('invalid_file_size');
-    }
-    final mime = _sniffMime(bytes);
-    final extension = switch (mime) {
-      'image/jpeg' => '.jpg',
-      'image/png' => '.png',
-      'image/heic' => '.heic',
-      'application/pdf' => '.pdf',
-      _ => throw const ConcreteAttachmentFailure('unsupported_mime'),
-    };
-    directories.validate();
-    await directories.ensureCreated();
-    final relative = path.join('concrete', pourId, '$attachmentId$extension');
-    final destination = _resolve(relative);
-    final temporary = File(
-      path.join(directories.staging.path, 'concrete-$attachmentId.part'),
-    );
-    if (await destination.exists() || await temporary.exists()) {
-      throw const ConcreteAttachmentFailure('attachment_destination_exists');
-    }
-    await destination.parent.create(recursive: true);
     try {
-      await temporary.writeAsBytes(bytes, flush: true);
-      await temporary.rename(destination.path);
-    } on Object {
-      if (await temporary.exists()) await temporary.delete();
-      rethrow;
+      final staged = await managedStore.stage(
+        attachmentId: attachmentId,
+        originalFileName: originalFileName,
+        bytes: bytes,
+      );
+      return StagedConcreteAttachment(
+        relativePath: staged.relativePath,
+        mimeType: staged.mimeType,
+        byteSize: staged.byteSize,
+        sha256Value: staged.sha256Value,
+      );
+    } on ManagedAttachmentFailure catch (error) {
+      throw ConcreteAttachmentFailure(error.code);
     }
-    return StagedConcreteAttachment(
-      relativePath: path.posix.join(
-        'concrete',
-        pourId,
-        '$attachmentId$extension',
-      ),
-      mimeType: mime,
-      byteSize: bytes.length,
-      sha256Value: sha256.convert(bytes).toString(),
-    );
   }
 
   @override
@@ -128,21 +104,25 @@ class DeviceConcreteAttachmentStore implements ConcreteAttachmentStore {
     String expectedSha256, [
     String? expectedMimeType,
   ]) async {
-    final file = _resolve(relativePath);
-    if (!await file.exists()) return ConcreteAttachmentIntegrity.missing;
-    final bytes = await file.readAsBytes();
-    final digest = sha256.convert(bytes).toString();
-    if (digest != expectedSha256) return ConcreteAttachmentIntegrity.tampered;
-    if (expectedMimeType != null) {
-      try {
-        if (_sniffMime(bytes) != expectedMimeType) {
-          return ConcreteAttachmentIntegrity.tampered;
-        }
-      } on ConcreteAttachmentFailure {
-        return ConcreteAttachmentIntegrity.tampered;
-      }
+    try {
+      final result = await managedStore.inspect(
+        relativePath: relativePath,
+        expectedSha256: expectedSha256,
+        expectedMimeType: expectedMimeType,
+      );
+      return switch (result) {
+        ManagedAttachmentIntegrity.healthy => ConcreteAttachmentIntegrity.ok,
+        ManagedAttachmentIntegrity.missingFile ||
+        ManagedAttachmentIntegrity.unsafePath =>
+          ConcreteAttachmentIntegrity.missing,
+        ManagedAttachmentIntegrity.sizeMismatch ||
+        ManagedAttachmentIntegrity.hashMismatch ||
+        ManagedAttachmentIntegrity.mimeMismatch =>
+          ConcreteAttachmentIntegrity.tampered,
+      };
+    } on ManagedAttachmentFailure catch (error) {
+      throw ConcreteAttachmentFailure(error.code);
     }
-    return ConcreteAttachmentIntegrity.ok;
   }
 
   @override
@@ -152,89 +132,42 @@ class DeviceConcreteAttachmentStore implements ConcreteAttachmentStore {
     String expectedSha256,
     String expectedMimeType,
   ) async {
-    if (await inspect(relativePath, expectedSha256, expectedMimeType) !=
-        ConcreteAttachmentIntegrity.ok) {
-      throw const ConcreteAttachmentFailure('attachment_integrity_failed');
+    try {
+      final content = await managedStore.read(
+        relativePath: relativePath,
+        originalFileName: originalFileName,
+        expectedSha256: expectedSha256,
+        expectedMimeType: expectedMimeType,
+      );
+      return StoredAttachmentContent(
+        fileName: content.fileName,
+        mimeType: content.mimeType,
+        bytes: content.bytes,
+      );
+    } on ManagedAttachmentFailure catch (error) {
+      throw ConcreteAttachmentFailure(error.code);
     }
-    return StoredAttachmentContent(
-      fileName: path.basename(originalFileName),
-      mimeType: expectedMimeType,
-      bytes: await _resolve(relativePath).readAsBytes(),
-    );
   }
 
   @override
   Future<void> open(String relativePath, String expectedMimeType) async {
-    final file = _resolve(relativePath);
-    if (!await file.exists()) {
-      throw const ConcreteAttachmentFailure('attachment_missing');
-    }
-    final bytes = await file.readAsBytes();
-    if (_sniffMime(bytes) != expectedMimeType) {
-      throw const ConcreteAttachmentFailure('attachment_mime_mismatch');
-    }
-    final result = await OpenFilex.open(file.path, type: expectedMimeType);
-    if (result.type != ResultType.done) {
-      throw ConcreteAttachmentFailure('viewer_${result.type.name}');
+    try {
+      await managedStore.open(
+        relativePath: relativePath,
+        expectedMimeType: expectedMimeType,
+      );
+    } on ManagedAttachmentFailure catch (error) {
+      throw ConcreteAttachmentFailure(error.code);
     }
   }
 
   @override
   Future<void> cleanup(String relativePath) async {
-    final file = _resolve(relativePath);
-    if (await file.exists()) await file.delete();
-  }
-
-  File _resolve(String relativePath) {
-    directories.validate();
-    if (relativePath.trim().isEmpty || path.isAbsolute(relativePath)) {
-      throw const ConcreteAttachmentFailure('invalid_relative_path');
+    try {
+      await managedStore.cleanup(relativePath);
+    } on ManagedAttachmentFailure catch (error) {
+      throw ConcreteAttachmentFailure(error.code);
     }
-    final root = path.normalize(path.absolute(directories.attachments.path));
-    final candidate = path.normalize(
-      path.absolute(path.join(root, path.normalize(relativePath))),
-    );
-    if (!path.isWithin(root, candidate)) {
-      throw const ConcreteAttachmentFailure('attachment_path_escaped_root');
-    }
-    return File(candidate);
-  }
-
-  String _sniffMime(List<int> bytes) {
-    if (bytes.length >= 3 &&
-        bytes[0] == 0xff &&
-        bytes[1] == 0xd8 &&
-        bytes[2] == 0xff) {
-      return 'image/jpeg';
-    }
-    if (bytes.length >= 8 &&
-        bytes[0] == 0x89 &&
-        bytes[1] == 0x50 &&
-        bytes[2] == 0x4e &&
-        bytes[3] == 0x47 &&
-        bytes[4] == 0x0d &&
-        bytes[5] == 0x0a &&
-        bytes[6] == 0x1a &&
-        bytes[7] == 0x0a) {
-      return 'image/png';
-    }
-    if (bytes.length >= 5 && String.fromCharCodes(bytes.take(5)) == '%PDF-') {
-      return 'application/pdf';
-    }
-    if (bytes.length >= 12) {
-      final brand = String.fromCharCodes(bytes.sublist(4, 12));
-      if (brand.startsWith('ftyp') &&
-          const {
-            'heic',
-            'heix',
-            'hevc',
-            'hevx',
-            'mif1',
-          }.contains(brand.substring(4))) {
-        return 'image/heic';
-      }
-    }
-    throw const ConcreteAttachmentFailure('unsupported_mime');
   }
 }
 
