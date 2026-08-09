@@ -902,7 +902,8 @@ class SqliteAgendaApplication
       where.add('''
         instr(
           lower(o.description || ' ' || coalesce(o.location, '') || ' ' ||
-            coalesce(o.notes, '') || ' ' || p.name),
+            coalesce(l.display_name, '') || ' ' || coalesce(o.notes, '') ||
+            ' ' || p.name),
           lower(?)
         ) > 0
       ''');
@@ -917,9 +918,13 @@ class SqliteAgendaApplication
     final now = _readClockOnce();
     return _withDatabase(now, (database) async {
       final rows = await database.rawQuery('''
-        SELECT o.*, p.name AS project_name
+        SELECT o.*, p.name AS project_name,
+          l.display_name AS stable_location_name,
+          l.archived_at AS stable_location_archived_at
         FROM field_observations o
         JOIN projects p ON p.id = o.project_id
+        LEFT JOIN project_locations l
+          ON l.id = o.location_id AND l.project_id = o.project_id
         WHERE ${where.join(' AND ')}
         ORDER BY $orderBy
       ''', arguments);
@@ -932,6 +937,8 @@ class SqliteAgendaApplication
     validateUuid(command.id, 'Log kimliği');
     validateUuid(command.eventId, 'Event kimliği');
     validateUuid(command.projectId, 'Proje kimliği');
+    final locationId = command.locationId;
+    if (locationId != null) validateUuid(locationId, 'Mahal kimliği');
     validateCanonicalTimestamp(command.observedAt, 'Olay zamanı');
     final description = requiredTrimmed(
       command.description,
@@ -955,9 +962,13 @@ class SqliteAgendaApplication
     final existing = await _withDatabase(now, (database) async {
       final rows = await database.rawQuery(
         '''
-        SELECT o.*, p.name AS project_name
+        SELECT o.*, p.name AS project_name,
+          l.display_name AS stable_location_name,
+          l.archived_at AS stable_location_archived_at
         FROM field_observations o
         JOIN projects p ON p.id = o.project_id
+        LEFT JOIN project_locations l
+          ON l.id = o.location_id AND l.project_id = o.project_id
         WHERE o.id = ? LIMIT 1
         ''',
         [command.id],
@@ -997,6 +1008,14 @@ class SqliteAgendaApplication
             throw const AgendaValidationFailure('Seçilen proje bulunamadı.');
           }
           final project = _projectFromRow(projects.single);
+          final stableLocation = locationId == null
+              ? null
+              : await _requireActiveAgendaLocation(
+                  transaction,
+                  projectId: command.projectId,
+                  locationId: locationId,
+                );
+          final storedLocation = stableLocation?.displayName ?? location;
           await transaction.insert('field_observations', {
             'id': command.id,
             'project_id': command.projectId,
@@ -1005,7 +1024,8 @@ class SqliteAgendaApplication
             'updated_at': createdAt,
             'category': command.category.storageValue,
             'description': description,
-            'location': location,
+            'location': storedLocation,
+            'location_id': locationId,
             'notes': notes,
             'revision': 1,
           });
@@ -1067,9 +1087,12 @@ class SqliteAgendaApplication
             updatedAt: createdAt,
             category: command.category,
             description: description,
-            location: location,
+            location: storedLocation,
             notes: notes,
             revision: 1,
+            locationId: locationId,
+            stableLocationName: stableLocation?.displayName,
+            stableLocationArchivedAt: stableLocation?.archivedAt,
             archivedAt: null,
           );
         });
@@ -1092,6 +1115,10 @@ class SqliteAgendaApplication
     validateUuid(command.id, 'Log kimliği');
     validateUuid(command.eventId, 'Event kimliği');
     validateUuid(command.projectId, 'Proje kimliği');
+    final requestedLocationId = command.locationId;
+    if (requestedLocationId != null) {
+      validateUuid(requestedLocationId, 'Mahal kimliği');
+    }
     validateCanonicalTimestamp(command.observedAt, 'Olay zamanı');
     if (command.expectedRevision < 1) {
       throw const AgendaValidationFailure('Beklenen revision geçersizdir.');
@@ -1161,13 +1188,29 @@ class SqliteAgendaApplication
             );
           }
         }
+        final preservesStableLocation =
+            requestedLocationId != null &&
+            requestedLocationId == current.locationId &&
+            command.projectId == current.projectId;
+        final stableLocation =
+            requestedLocationId == null || preservesStableLocation
+            ? null
+            : await _requireActiveAgendaLocation(
+                transaction,
+                projectId: command.projectId,
+                locationId: requestedLocationId,
+              );
+        final storedLocation = preservesStableLocation
+            ? current.location
+            : stableLocation?.displayName ?? location;
         final before = _agendaEventSnapshot(current);
         final after = <String, Object?>{
           'project_id': command.projectId,
           'observed_at': command.observedAt,
           'category': command.category.storageValue,
           'description': description,
-          'location': location,
+          'location': storedLocation,
+          'location_id': requestedLocationId,
           'notes': notes,
         };
         if (_mapsEqual(before, after)) return current;
@@ -3085,9 +3128,13 @@ class SqliteAgendaApplication
   ) async {
     final rows = await database.rawQuery(
       '''
-      SELECT o.*, p.name AS project_name
+      SELECT o.*, p.name AS project_name,
+        l.display_name AS stable_location_name,
+        l.archived_at AS stable_location_archived_at
       FROM field_observations o
       JOIN projects p ON p.id = o.project_id
+      LEFT JOIN project_locations l
+        ON l.id = o.location_id AND l.project_id = o.project_id
       WHERE o.id = ? LIMIT 1
       ''',
       [logId],
@@ -3367,7 +3414,8 @@ class SqliteAgendaApplication
         log.observedAt == command.observedAt &&
         log.category == command.category &&
         log.description == description &&
-        log.location == location &&
+        log.locationId == command.locationId &&
+        (command.locationId != null || log.location == location) &&
         log.notes == notes;
   }
 
@@ -3561,6 +3609,20 @@ Future<MobileProjectLocation> _requireProjectLocation(
   return _projectLocationFromRow(rows.single);
 }
 
+Future<MobileProjectLocation> _requireActiveAgendaLocation(
+  DatabaseExecutor database, {
+  required String projectId,
+  required String locationId,
+}) async {
+  final location = await _requireProjectLocation(database, locationId);
+  if (location.projectId != projectId || location.isArchived) {
+    throw const AgendaValidationFailure(
+      'Seçilen mahal aktif ve aynı projeye ait olmalıdır.',
+    );
+  }
+  return location;
+}
+
 Future<MobileProjectLocation> _requireActiveLocationInProject(
   DatabaseExecutor database,
   String locationId,
@@ -3748,6 +3810,7 @@ Map<String, Object?> _agendaEventSnapshot(AgendaLog log) => {
   'category': log.category.storageValue,
   'description': log.description,
   'location': log.location,
+  'location_id': log.locationId,
   'notes': log.notes,
 };
 
@@ -3903,6 +3966,10 @@ AgendaLog _logFromRow(Map<String, Object?> row) {
   final createdAt = row['created_at']! as String;
   final updatedAt = row['updated_at']! as String;
   final archivedAt = row['archived_at'] as String?;
+  final locationId = row['location_id'] as String?;
+  final stableLocationName = row['stable_location_name'] as String?;
+  final stableLocationArchivedAt =
+      row['stable_location_archived_at'] as String?;
   validateUuid(id, 'Log kimliği');
   validateUuid(projectId, 'Proje kimliği');
   validateCanonicalTimestamp(observedAt, 'Olay zamanı');
@@ -3910,6 +3977,20 @@ AgendaLog _logFromRow(Map<String, Object?> row) {
   validateCanonicalTimestamp(updatedAt, 'Log güncelleme zamanı');
   if (archivedAt != null) {
     validateCanonicalTimestamp(archivedAt, 'Log arşivleme zamanı');
+  }
+  if (locationId != null) {
+    validateUuid(locationId, 'Mahal kimliği');
+    if (stableLocationName == null) {
+      throw const AgendaValidationFailure(
+        'Bağlı mahal güvenli biçimde okunamadı.',
+      );
+    }
+  }
+  if (stableLocationArchivedAt != null) {
+    validateCanonicalTimestamp(
+      stableLocationArchivedAt,
+      'Mahal arşivleme zamanı',
+    );
   }
   return AgendaLog(
     id: id,
@@ -3926,6 +4007,9 @@ AgendaLog _logFromRow(Map<String, Object?> row) {
     location: row['location'] as String?,
     notes: row['notes'] as String?,
     revision: row['revision']! as int,
+    locationId: locationId,
+    stableLocationName: stableLocationName,
+    stableLocationArchivedAt: stableLocationArchivedAt,
     archivedAt: archivedAt,
   );
 }
