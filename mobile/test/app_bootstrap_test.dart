@@ -50,6 +50,8 @@ void main() {
       );
       expect(first.backup, isNotNull);
       expect(restarted.backup, isNotNull);
+      expect(first.projectLocations, same(first.agenda));
+      expect(restarted.projectLocations, same(restarted.agenda));
     },
   );
 

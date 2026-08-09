@@ -298,6 +298,7 @@ class _MobileShellState extends State<MobileShell> {
             ),
             AgendaPage(
               agenda: widget.bootstrap.agenda,
+              projectLocations: widget.bootstrap.projectLocations,
               attachments: widget.bootstrap.concreteAttachments,
               concrete: widget.bootstrap.concrete,
               concreteAttachments: widget.bootstrap.concreteAttachments,
