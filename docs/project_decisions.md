@@ -3863,3 +3863,15 @@
   dosyaları ve yalnız `managed-<uuid>.part` staging pattern'ini salt-okunur
   sınıflandırır. Delete/adopt/relink/dedupe/rewrite/move yapmaz ve bootstrap'ta
   otomatik çalışmaz.
+- Çoklu seçim tekli `pick(...)` uyumluluğunu koruyan ayrı bir picker yeteneğidir.
+  Kamera tek dosya; fotoğraf arşivi ve dosya seçici en çok 20 öğe / 100 MiB
+  toplam batch sınırıyla fail-safe çalışır.
+- Yeni Ajanda logundaki çoklu fotoğraflar create transaction'ına; mevcut log ve
+  genel Beton kanıtları ise tek kullanıcı işlemi başına tek revision artışına
+  bağlanır. Herhangi bir stage/validation/DB hatasında bütün batch rollback olur
+  ve compensation yalnız o işlemin yeni managed yollarını hedefler.
+- Genel Beton resimleri `site_photo`, PDF/video/ses dosyaları `other` rolündedir;
+  mikser, irsaliye ve numune gibi uzmanlaşmış tekli rol akışları değişmez.
+- JPEG/PNG uygulama içi `InteractiveViewer` ile kalır. HEIC/PDF/MP4/MP3/M4A/WAV
+  yalnız path, MIME, boyut ve SHA-256 bütünlüğü doğrulandıktan sonra mevcut
+  `open_filex` geçidine verilir; embedded player veya yeni dependency eklenmez.

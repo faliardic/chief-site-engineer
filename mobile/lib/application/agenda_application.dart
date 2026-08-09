@@ -7,6 +7,7 @@ import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/platform/agenda_attachment_gateway.dart';
+import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:sqflite/sqflite.dart';
@@ -166,6 +167,10 @@ abstract interface class AgendaApplication {
   Future<List<AppendOnlyEvent>> listReminderEvents(String reminderId);
 }
 
+abstract interface class AgendaPhotoBatchApplication {
+  Future<AgendaLogDetail> attachAgendaPhotos(AttachAgendaPhotosCommand command);
+}
+
 abstract interface class ReminderTodayApplication {
   Future<ReminderTodayOverview> getReminderTodayOverview();
 }
@@ -246,6 +251,7 @@ typedef ReminderTransactionHook =
 class SqliteAgendaApplication
     implements
         AgendaApplication,
+        AgendaPhotoBatchApplication,
         ProjectLifecycleApplication,
         ProjectLocationApplication,
         ReminderTodayApplication,
@@ -953,12 +959,7 @@ class SqliteAgendaApplication
       throw const AgendaValidationFailure('Gelecek tarihli olay kaydedilemez.');
     }
     final createdAt = CseTimeCodec.encodeUtc(now);
-    for (final photo in command.photos) {
-      validateUuid(photo.id, 'Fotoğraf kimliği');
-      validateUuid(photo.eventId, 'Fotoğraf event kimliği');
-      validateCanonicalTimestamp(photo.capturedAt, 'Fotoğraf çekim zamanı');
-      optionalTrimmed(photo.description, 'Fotoğraf açıklaması', maxLength: 500);
-    }
+    _validateAgendaPhotoDrafts(command.photos, allowEmpty: true);
     final existing = await _withDatabase(now, (database) async {
       final rows = await database.rawQuery(
         '''
@@ -986,15 +987,14 @@ class SqliteAgendaApplication
     final staged = <(AgendaPhotoDraft, StagedAgendaPhoto)>[];
     try {
       for (final photo in command.photos) {
-        staged.add((
-          photo,
-          await attachmentStore.stage(
-            logId: command.id,
-            attachmentId: photo.id,
-            originalFileName: photo.originalFileName,
-            bytes: photo.bytes,
-          ),
-        ));
+        final file = await attachmentStore.stage(
+          logId: command.id,
+          attachmentId: photo.id,
+          originalFileName: photo.originalFileName,
+          bytes: photo.bytes,
+        );
+        staged.add((photo, file));
+        _requireAgendaPhotoMime(file.mimeType);
       }
       return await _withDatabase(now, (database) {
         return database.transaction((transaction) async {
@@ -1310,27 +1310,56 @@ class SqliteAgendaApplication
   }
 
   @override
-  Future<AgendaLogDetail> attachAgendaPhoto(
-    AttachAgendaPhotoCommand command,
+  Future<AgendaLogDetail> attachAgendaPhoto(AttachAgendaPhotoCommand command) =>
+      attachAgendaPhotos(
+        AttachAgendaPhotosCommand(
+          logId: command.logId,
+          expectedLogRevision: command.expectedLogRevision,
+          photos: [
+            AgendaPhotoDraft(
+              id: command.id,
+              eventId: command.eventId,
+              originalFileName: command.originalFileName,
+              bytes: command.bytes,
+              capturedAt: command.capturedAt,
+              description: command.description,
+            ),
+          ],
+        ),
+      );
+
+  @override
+  Future<AgendaLogDetail> attachAgendaPhotos(
+    AttachAgendaPhotosCommand command,
   ) async {
     validateUuid(command.logId, 'Log kimliği');
-    validateUuid(command.id, 'Fotoğraf kimliği');
-    validateUuid(command.eventId, 'Event kimliği');
-    validateCanonicalTimestamp(command.capturedAt, 'Fotoğraf çekim zamanı');
     if (command.expectedLogRevision < 1) {
       throw const AgendaValidationFailure('Beklenen revision geçersizdir.');
     }
-    final description = optionalTrimmed(
-      command.description,
-      'Fotoğraf açıklaması',
-      maxLength: 500,
-    );
-    final staged = await attachmentStore.stage(
-      logId: command.logId,
-      attachmentId: command.id,
-      originalFileName: command.originalFileName,
-      bytes: command.bytes,
-    );
+    _validateAgendaPhotoDrafts(command.photos);
+    final staged = <(AgendaPhotoDraft, StagedAgendaPhoto)>[];
+    try {
+      for (final photo in command.photos) {
+        final file = await attachmentStore.stage(
+          logId: command.logId,
+          attachmentId: photo.id,
+          originalFileName: photo.originalFileName,
+          bytes: photo.bytes,
+        );
+        staged.add((photo, file));
+        _requireAgendaPhotoMime(file.mimeType);
+      }
+    } on Object {
+      for (final item in staged.reversed) {
+        try {
+          await attachmentStore.cleanup(item.$2.relativePath);
+        } on Object {
+          // The failed batch remains fail-closed; cleanup never reaches files
+          // that were not staged by this operation.
+        }
+      }
+      rethrow;
+    }
     final now = _readClockOnce();
     final timestamp = CseTimeCodec.encodeUtc(now);
     try {
@@ -1347,22 +1376,30 @@ class SqliteAgendaApplication
               'Ajanda kaydı başka bir işlemde değişti; yeniden açın.',
             );
           }
-          await _insertAgendaAttachment(
-            transaction,
-            attachmentId: command.id,
-            linkId: command.id,
-            linkEventId: command.eventId,
-            observationId: command.logId,
-            projectId: current.projectId,
-            originalFileName: command.originalFileName.trim(),
-            mimeType: staged.mimeType,
-            byteSize: staged.byteSize,
-            sha256Value: staged.sha256Value,
-            relativePath: staged.relativePath,
-            description: description,
-            capturedAt: command.capturedAt,
-            timestamp: timestamp,
-          );
+          for (var index = 0; index < staged.length; index += 1) {
+            final photo = staged[index].$1;
+            final file = staged[index].$2;
+            await _insertAgendaAttachment(
+              transaction,
+              attachmentId: photo.id,
+              linkId: photo.id,
+              linkEventId: photo.eventId,
+              observationId: command.logId,
+              projectId: current.projectId,
+              originalFileName: photo.originalFileName.trim(),
+              mimeType: file.mimeType,
+              byteSize: file.byteSize,
+              sha256Value: file.sha256Value,
+              relativePath: file.relativePath,
+              description: optionalTrimmed(
+                photo.description,
+                'Fotoğraf açıklaması',
+                maxLength: 500,
+              ),
+              capturedAt: photo.capturedAt,
+              timestamp: timestamp,
+            );
+          }
           final changed = await transaction.update(
             'field_observations',
             {'revision': current.revision + 1, 'updated_at': timestamp},
@@ -1374,23 +1411,35 @@ class SqliteAgendaApplication
               'Ajanda kaydı başka bir işlemde değişti; yeniden açın.',
             );
           }
-          await transaction.insert('observation_events', {
-            'id': command.eventId,
-            'observation_id': current.id,
-            'project_id': current.projectId,
-            'event_type': 'agenda_log.photo_attached',
-            'occurred_at': timestamp,
-            'payload_json': jsonEncode({
-              'photo_id': command.id,
-              'mime_type': staged.mimeType,
-              'byte_size': staged.byteSize,
-              'sha256': staged.sha256Value,
-            }),
-          });
+          for (var index = 0; index < staged.length; index += 1) {
+            final photo = staged[index].$1;
+            final file = staged[index].$2;
+            await transaction.insert('observation_events', {
+              'id': photo.eventId,
+              'observation_id': current.id,
+              'project_id': current.projectId,
+              'event_type': 'agenda_log.photo_attached',
+              'occurred_at': timestamp,
+              'payload_json': jsonEncode({
+                'photo_id': photo.id,
+                'mime_type': file.mimeType,
+                'byte_size': file.byteSize,
+                'sha256': file.sha256Value,
+                'batch_index': index,
+                'batch_size': staged.length,
+              }),
+            });
+          }
         });
       });
     } on Object {
-      await attachmentStore.cleanup(staged.relativePath);
+      for (final item in staged.reversed) {
+        try {
+          await attachmentStore.cleanup(item.$2.relativePath);
+        } on Object {
+          // Cleanup remains scoped to files staged by this operation.
+        }
+      }
       rethrow;
     }
     return getAgendaLogDetail(command.logId);
@@ -3570,6 +3619,51 @@ class SqliteAgendaApplication
         reminder.allDayLocalDate == originalSchedule.allDayLocalDate &&
         reminder.deadlineAt == command.deadlineAt &&
         reminder.conditionText == conditionText;
+  }
+}
+
+void _validateAgendaPhotoDrafts(
+  List<AgendaPhotoDraft> photos, {
+  bool allowEmpty = false,
+}) {
+  if (!allowEmpty && photos.isEmpty) {
+    throw const AgendaValidationFailure('En az bir fotoğraf seçilmelidir.');
+  }
+  if (photos.length > SafeAttachmentPicker.maximumBatchItems) {
+    throw const AgendaValidationFailure(
+      'Tek işlemde en fazla 20 dosya eklenebilir.',
+    );
+  }
+  var totalBytes = 0;
+  final ids = <String>{};
+  final eventIds = <String>{};
+  for (final photo in photos) {
+    validateUuid(photo.id, 'Fotoğraf kimliği');
+    validateUuid(photo.eventId, 'Fotoğraf event kimliği');
+    if (!ids.add(photo.id) || !eventIds.add(photo.eventId)) {
+      throw const AgendaValidationFailure(
+        'Fotoğraf ve event kimlikleri batch içinde benzersiz olmalıdır.',
+      );
+    }
+    validateCanonicalTimestamp(photo.capturedAt, 'Fotoğraf çekim zamanı');
+    requiredTrimmed(photo.originalFileName, 'Dosya adı', maxLength: 255);
+    optionalTrimmed(photo.description, 'Fotoğraf açıklaması', maxLength: 500);
+    totalBytes += photo.bytes.length;
+    if (totalBytes > SafeAttachmentPicker.maximumBatchBytes) {
+      throw const AgendaValidationFailure(
+        'Tek işlemdeki dosyaların toplamı 100 MiB sınırını aşamaz.',
+      );
+    }
+  }
+}
+
+void _requireAgendaPhotoMime(String mimeType) {
+  if (mimeType != 'image/jpeg' &&
+      mimeType != 'image/png' &&
+      mimeType != 'image/heic') {
+    throw const AgendaValidationFailure(
+      'Ajanda kaydına yalnız JPEG, PNG veya HEIC fotoğraf eklenebilir.',
+    );
   }
 }
 

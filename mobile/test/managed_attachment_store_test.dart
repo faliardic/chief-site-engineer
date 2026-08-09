@@ -12,6 +12,10 @@ const _attachmentJpeg = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const _attachmentPng = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const _attachmentHeic = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const _attachmentPdf = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+const _attachmentMp4 = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+const _attachmentMp3 = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+const _attachmentM4a = '11111111-1111-4111-8111-111111111111';
+const _attachmentWav = '22222222-2222-4222-8222-222222222222';
 
 const _jpeg = <int>[0xff, 0xd8, 0xff, 0x01];
 const _png = <int>[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01];
@@ -30,6 +34,49 @@ const _heic = <int>[
   0x63,
 ];
 const _pdf = <int>[0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37];
+const _mp4 = <int>[
+  0x00,
+  0x00,
+  0x00,
+  0x18,
+  0x66,
+  0x74,
+  0x79,
+  0x70,
+  0x6d,
+  0x70,
+  0x34,
+  0x32,
+];
+const _mp3 = <int>[0x49, 0x44, 0x33, 0x04];
+const _m4a = <int>[
+  0x00,
+  0x00,
+  0x00,
+  0x18,
+  0x66,
+  0x74,
+  0x79,
+  0x70,
+  0x4d,
+  0x34,
+  0x41,
+  0x20,
+];
+const _wav = <int>[
+  0x52,
+  0x49,
+  0x46,
+  0x46,
+  0x04,
+  0x00,
+  0x00,
+  0x00,
+  0x57,
+  0x41,
+  0x56,
+  0x45,
+];
 
 void main() {
   late Directory root;
@@ -57,6 +104,10 @@ void main() {
         (_attachmentPng, 'drawing.png', _png, 'image/png'),
         (_attachmentHeic, 'camera.heic', _heic, 'image/heic'),
         (_attachmentPdf, 'report.pdf', _pdf, 'application/pdf'),
+        (_attachmentMp4, 'walkthrough.mp4', _mp4, 'video/mp4'),
+        (_attachmentMp3, 'note.mp3', _mp3, 'audio/mpeg'),
+        (_attachmentM4a, 'note.m4a', _m4a, 'audio/mp4'),
+        (_attachmentWav, 'note.wav', _wav, 'audio/wav'),
       ];
 
       for (final fixture in fixtures) {

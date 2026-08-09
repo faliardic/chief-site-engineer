@@ -10,6 +10,7 @@ import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/concrete_models.dart';
 import 'package:chief_site_engineer/platform/concrete_attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/concrete_export_gateway.dart';
+import 'package:chief_site_engineer/platform/managed_attachment_store.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
@@ -1288,6 +1289,126 @@ void main() {
   );
 
   test(
+    'general evidence batch is atomic ordered and classifies media roles',
+    () async {
+      final created = await concrete.createPour(_createCommand());
+      final detail = await concrete.attachEvidenceBatch(
+        AttachConcreteEvidenceBatchCommand(
+          pourId: pourId,
+          expectedPourRevision: created.pour.revision,
+          classifyGeneralByMime: true,
+          attachments: [
+            AttachConcreteEvidenceCommand(
+              id: _uuid(120),
+              pourId: pourId,
+              eventId: _uuid(121),
+              expectedPourRevision: created.pour.revision,
+              evidenceType: ConcreteEvidenceType.sitePhoto,
+              originalFileName: 'saha.jpg',
+              bytes: const [0xff, 0xd8, 0xff, 1],
+              capturedAt: '2026-07-19T08:00:00Z',
+            ),
+            AttachConcreteEvidenceCommand(
+              id: _uuid(122),
+              pourId: pourId,
+              eventId: _uuid(123),
+              expectedPourRevision: created.pour.revision,
+              evidenceType: ConcreteEvidenceType.sitePhoto,
+              originalFileName: 'rapor.pdf',
+              bytes: const [0x25, 0x50, 0x44, 0x46, 0x2d, 0x31],
+              capturedAt: '2026-07-19T08:01:00Z',
+            ),
+          ],
+        ),
+      );
+
+      expect(detail.pour.revision, created.pour.revision + 1);
+      expect(detail.attachments.map((item) => item.id), [
+        _uuid(120),
+        _uuid(122),
+      ]);
+      expect(detail.attachments.map((item) => item.evidenceType), [
+        ConcreteEvidenceType.sitePhoto,
+        ConcreteEvidenceType.other,
+      ]);
+      final events = detail.events
+          .where((item) => item.eventType == 'evidence.attached')
+          .toList(growable: false);
+      expect(events.map((item) => item.id), [_uuid(121), _uuid(123)]);
+      expect(events.last.sequence, events.first.sequence + 1);
+      expect(jsonDecode(events.first.payloadJson)['batch_index'], 0);
+      expect(jsonDecode(events.last.payloadJson)['batch_index'], 1);
+
+      final pdf = detail.attachments.last;
+      attachments.values[pdf.relativePath] = const [
+        0x25,
+        0x50,
+        0x44,
+        0x46,
+        0x2d,
+        0x39,
+      ];
+      await expectLater(
+        concrete.openAttachment(pdf.id),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      expect(attachments.opened, isEmpty);
+      attachments.values[pdf.relativePath] = const [
+        0x25,
+        0x50,
+        0x44,
+        0x46,
+        0x2d,
+        0x31,
+      ];
+      await concrete.openAttachment(pdf.id);
+      expect(attachments.opened, [pdf.relativePath]);
+
+      attachments.values['legacy/shared.jpg'] = const [7, 7, 7];
+      await expectLater(
+        concrete.attachEvidenceBatch(
+          AttachConcreteEvidenceBatchCommand(
+            pourId: pourId,
+            expectedPourRevision: detail.pour.revision,
+            classifyGeneralByMime: true,
+            attachments: [
+              AttachConcreteEvidenceCommand(
+                id: _uuid(124),
+                pourId: pourId,
+                eventId: _uuid(125),
+                expectedPourRevision: detail.pour.revision,
+                evidenceType: ConcreteEvidenceType.sitePhoto,
+                originalFileName: 'new.jpg',
+                bytes: const [0xff, 0xd8, 0xff, 9],
+                capturedAt: '2026-07-19T08:02:00Z',
+              ),
+              AttachConcreteEvidenceCommand(
+                id: _uuid(126),
+                pourId: pourId,
+                eventId: _uuid(127),
+                expectedPourRevision: detail.pour.revision,
+                evidenceType: ConcreteEvidenceType.sitePhoto,
+                originalFileName: 'duplicate.pdf',
+                bytes: const [0x25, 0x50, 0x44, 0x46, 0x2d, 0x31],
+                capturedAt: '2026-07-19T08:03:00Z',
+              ),
+            ],
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      expect((await concrete.getPourDetail(pourId)).attachments, hasLength(2));
+      expect(attachments.values['legacy/shared.jpg'], [7, 7, 7]);
+      expect(
+        attachments.values.keys.where(
+          (path) => path.contains(_uuid(124)) || path.contains(_uuid(126)),
+        ),
+        isEmpty,
+      );
+    },
+  );
+
+  test(
     'source reminder mutation does not mutate concrete and follow-up closes reminder',
     () async {
       var detail = await concrete.createPour(_createCommand());
@@ -2294,6 +2415,7 @@ class _DurableNotificationGateway implements ReminderNotificationGateway {
 
 class _MemoryAttachmentStore implements ConcreteAttachmentStore {
   final values = <String, List<int>>{};
+  final opened = <String>[];
 
   @override
   Future<void> cleanup(String relativePath) async =>
@@ -2325,7 +2447,9 @@ class _MemoryAttachmentStore implements ConcreteAttachmentStore {
   );
 
   @override
-  Future<void> open(String relativePath, String expectedMimeType) async {}
+  Future<void> open(String relativePath, String expectedMimeType) async {
+    opened.add(relativePath);
+  }
 
   @override
   Future<StagedConcreteAttachment> stage({
@@ -2334,11 +2458,13 @@ class _MemoryAttachmentStore implements ConcreteAttachmentStore {
     required String originalFileName,
     required List<int> bytes,
   }) async {
-    final relative = 'concrete/$pourId/$attachmentId.jpg';
+    final mimeType = DeviceManagedAttachmentStore.sniffMime(bytes);
+    final extension = DeviceManagedAttachmentStore.extensionForMime(mimeType);
+    final relative = 'managed/$attachmentId$extension';
     values[relative] = List.of(bytes);
     return StagedConcreteAttachment(
       relativePath: relative,
-      mimeType: 'image/jpeg',
+      mimeType: mimeType,
       byteSize: bytes.length,
       sha256Value: sha256.convert(bytes).toString(),
     );

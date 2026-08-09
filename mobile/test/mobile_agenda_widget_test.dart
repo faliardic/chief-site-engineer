@@ -83,18 +83,17 @@ void main() {
     revision: 1,
   );
 
-  testWidgets(
-    'Issue 268 baseline: Ajanda exposes newest-first sort control',
-    (tester) async {
-      final fake = FakeAgendaApplication(projects: [project()], logs: [log()]);
+  testWidgets('Issue 268 baseline: Ajanda exposes newest-first sort control', (
+    tester,
+  ) async {
+    final fake = FakeAgendaApplication(projects: [project()], logs: [log()]);
 
-      await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: fake)));
+    await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('agenda-sort-order')), findsOneWidget);
-      expect(find.text('En yeni üstte'), findsOneWidget);
-    },
-  );
+    expect(find.byKey(const Key('agenda-sort-order')), findsOneWidget);
+    expect(find.text('En yeni üstte'), findsOneWidget);
+  });
 
   testWidgets('Ajanda changes deterministic card order in both directions', (
     tester,
@@ -203,7 +202,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(fake.lastAgendaQuery?.sortOrder, AgendaSortOrder.oldestFirst);
-    expect(_scrollOffset(tester, const Key('agenda-day-list')), closeTo(0, 0.1));
+    expect(
+      _scrollOffset(tester, const Key('agenda-day-list')),
+      closeTo(0, 0.1),
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -221,10 +223,7 @@ void main() {
         home: MediaQuery(
           data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
           child: AgendaPage(
-            agenda: FakeAgendaApplication(
-              projects: [project()],
-              logs: [log()],
-            ),
+            agenda: FakeAgendaApplication(projects: [project()], logs: [log()]),
           ),
         ),
       ),
@@ -395,6 +394,51 @@ void main() {
       expect(fake.lastLogCommand!.id, commandId);
     },
   );
+
+  testWidgets('new Agenda log keeps every photo from one multi selection', (
+    tester,
+  ) async {
+    final fake = FakeAgendaApplication(projects: [project()]);
+    final attachments = SafeAttachmentPicker(
+      permissions: SafeCapabilityService(_GrantedPermission()),
+      picker: _ManySelectedPicker(),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LogFormPage(agenda: fake, attachments: attachments),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('log-description')),
+      'Çoklu saha fotoğrafı',
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('log-add-photo')),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.byKey(const Key('log-add-photo')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sistem fotoğraf seçici'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('pending-log-photo-0')), findsOneWidget);
+    expect(find.byKey(const Key('pending-log-photo-1')), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('submit-log')),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.byKey(const Key('submit-log')));
+    await tester.pumpAndSettle();
+
+    expect(fake.createLogCalls, 1);
+    expect(fake.lastLogCommand?.photos.map((item) => item.originalFileName), [
+      'bir.jpg',
+      'iki.png',
+    ]);
+  });
 
   testWidgets(
     'Beton suggestion can be ignored and fail-soft save keeps text and category',
@@ -1353,7 +1397,9 @@ void main() {
       expect(focusAfterDrag, isFalse);
       expect(keyboardAfterDrag, isFalse);
       expect(
-        tester.widget<RefreshIndicator>(find.byType(RefreshIndicator)).onRefresh,
+        tester
+            .widget<RefreshIndicator>(find.byType(RefreshIndicator))
+            .onRefresh,
         isNotNull,
       );
       expect(tester.takeException(), isNull);
@@ -1424,10 +1470,7 @@ void main() {
       expect(fake.lastAgendaQuery?.sortOrder, AgendaSortOrder.newestFirst);
       await tester.tap(find.text('Arşivlenenler'));
       await tester.pumpAndSettle();
-      expect(
-        fake.lastAgendaQuery?.archiveFilter,
-        AgendaArchiveFilter.archived,
-      );
+      expect(fake.lastAgendaQuery?.archiveFilter, AgendaArchiveFilter.archived);
       expect(fake.lastAgendaQuery?.sortOrder, AgendaSortOrder.newestFirst);
       await tester.tap(find.byKey(const Key('next-day')));
       await tester.pumpAndSettle();
@@ -1459,9 +1502,7 @@ void main() {
         'CSE264 arama',
       );
       tester
-          .widget<TextField>(
-            find.byKey(const Key('agenda-literal-search')),
-          )
+          .widget<TextField>(find.byKey(const Key('agenda-literal-search')))
           .onSubmitted!('CSE264 arama');
       await tester.pumpAndSettle();
       expect(_agendaSearchHasFocus(tester), isTrue);
@@ -1739,14 +1780,8 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final logs = List.generate(18, _navigationLog);
-    final firstFake = FakeAgendaApplication(
-      projects: [project()],
-      logs: logs,
-    );
-    final secondFake = FakeAgendaApplication(
-      projects: [project()],
-      logs: logs,
-    );
+    final firstFake = FakeAgendaApplication(projects: [project()], logs: logs);
+    final secondFake = FakeAgendaApplication(projects: [project()], logs: logs);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -1919,9 +1954,7 @@ Future<void> _expectAgendaSearchTextAfterReveal(
   String text,
 ) async {
   final list = find.byKey(const Key('agenda-day-list'));
-  final position = tester
-      .state<ScrollableState>(_scrollableFor(list))
-      .position;
+  final position = tester.state<ScrollableState>(_scrollableFor(list)).position;
   position.jumpTo(position.minScrollExtent);
   await tester.pumpAndSettle();
   final editable = _agendaSearchEditable();
@@ -2026,6 +2059,27 @@ class _SelectedPicker implements AttachmentPickerPort {
         bytes: const [0xff, 0xd8, 0xff, 0xd9],
         source: source,
       );
+}
+
+class _ManySelectedPicker
+    implements AttachmentPickerPort, MultipleAttachmentPickerPort {
+  @override
+  Future<SelectedAttachment?> pick(AttachmentSource source) async =>
+      (await pickMany(source))!.first;
+
+  @override
+  Future<List<SelectedAttachment>?> pickMany(AttachmentSource source) async => [
+    SelectedAttachment(
+      name: 'bir.jpg',
+      bytes: const [0xff, 0xd8, 0xff, 1],
+      source: source,
+    ),
+    SelectedAttachment(
+      name: 'iki.png',
+      bytes: const [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+      source: source,
+    ),
+  ];
 }
 
 class _UnexpectedPicker implements AttachmentPickerPort {

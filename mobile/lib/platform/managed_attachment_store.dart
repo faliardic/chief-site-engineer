@@ -47,7 +47,7 @@ class DeviceManagedAttachmentStore implements ManagedAttachmentStore {
   });
 
   static final managedFinalPathPattern = RegExp(
-    r'^managed/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|png|heic|pdf)$',
+    r'^managed/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|png|heic|pdf|mp4|mp3|m4a|wav)$',
   );
   static final managedStagingNamePattern = RegExp(
     r'^managed-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.part$',
@@ -348,6 +348,10 @@ class DeviceManagedAttachmentStore implements ManagedAttachmentStore {
     'image/png' => '.png',
     'image/heic' => '.heic',
     'application/pdf' => '.pdf',
+    'video/mp4' => '.mp4',
+    'audio/mpeg' => '.mp3',
+    'audio/mp4' => '.m4a',
+    'audio/wav' => '.wav',
     _ => throw const ManagedAttachmentFailure('unsupported_mime'),
   };
 
@@ -372,17 +376,45 @@ class DeviceManagedAttachmentStore implements ManagedAttachmentStore {
     if (bytes.length >= 5 && String.fromCharCodes(bytes.take(5)) == '%PDF-') {
       return 'application/pdf';
     }
+    if (bytes.length >= 12 &&
+        String.fromCharCodes(bytes.take(4)) == 'RIFF' &&
+        String.fromCharCodes(bytes.sublist(8, 12)) == 'WAVE') {
+      return 'audio/wav';
+    }
+    if (bytes.length >= 3 && String.fromCharCodes(bytes.take(3)) == 'ID3') {
+      return 'audio/mpeg';
+    }
+    if (bytes.length >= 2 &&
+        bytes[0] == 0xff &&
+        (bytes[1] & 0xe0) == 0xe0 &&
+        (bytes[1] & 0x06) != 0) {
+      return 'audio/mpeg';
+    }
     if (bytes.length >= 12) {
       final brand = String.fromCharCodes(bytes.sublist(4, 12));
-      if (brand.startsWith('ftyp') &&
-          const {
-            'heic',
-            'heix',
-            'hevc',
-            'hevx',
-            'mif1',
-          }.contains(brand.substring(4))) {
-        return 'image/heic';
+      if (brand.startsWith('ftyp')) {
+        final majorBrand = brand.substring(4);
+        if (const {
+          'heic',
+          'heix',
+          'hevc',
+          'hevx',
+          'mif1',
+          'msf1',
+        }.contains(majorBrand)) {
+          return 'image/heic';
+        }
+        if (majorBrand == 'M4A ') return 'audio/mp4';
+        if (const {
+          'isom',
+          'iso2',
+          'mp41',
+          'mp42',
+          'avc1',
+          'dash',
+        }.contains(majorBrand)) {
+          return 'video/mp4';
+        }
       }
     }
     throw const ManagedAttachmentFailure('unsupported_mime');

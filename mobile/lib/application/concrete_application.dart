@@ -6,6 +6,7 @@ import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/concrete_models.dart';
+import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/concrete_attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/concrete_export_gateway.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
@@ -51,6 +52,12 @@ abstract interface class ConcreteApplication {
     bool share = false,
     bool save = false,
   });
+}
+
+abstract interface class ConcreteEvidenceBatchApplication {
+  Future<ConcretePourDetail> attachEvidenceBatch(
+    AttachConcreteEvidenceBatchCommand command,
+  );
 }
 
 ProjectConcreteClass _concreteClassFromRow(Map<String, Object?> row) {
@@ -442,7 +449,8 @@ String _stableUuid(String seed) {
 
 typedef ConcreteTransactionHook = Future<void> Function(Transaction value);
 
-class SqliteConcreteApplication implements ConcreteApplication {
+class SqliteConcreteApplication
+    implements ConcreteApplication, ConcreteEvidenceBatchApplication {
   SqliteConcreteApplication({
     required this.databasePath,
     required this.databaseFactory,
@@ -1274,110 +1282,166 @@ class SqliteConcreteApplication implements ConcreteApplication {
   @override
   Future<ConcretePourDetail> attachEvidence(
     AttachConcreteEvidenceCommand command,
-  ) => coordinator.run(() => _attachEvidenceCoordinated(command));
+  ) => attachEvidenceBatch(
+    AttachConcreteEvidenceBatchCommand(
+      pourId: command.pourId,
+      expectedPourRevision: command.expectedPourRevision,
+      attachments: [command],
+    ),
+  );
 
-  Future<ConcretePourDetail> _attachEvidenceCoordinated(
-    AttachConcreteEvidenceCommand command,
+  @override
+  Future<ConcretePourDetail> attachEvidenceBatch(
+    AttachConcreteEvidenceBatchCommand command,
+  ) => coordinator.run(() => _attachEvidenceBatchCoordinated(command));
+
+  Future<ConcretePourDetail> _attachEvidenceBatchCoordinated(
+    AttachConcreteEvidenceBatchCommand batch,
   ) async {
-    _validateAttachment(command);
+    _validateAttachmentBatch(batch);
     final now = _readClockOnce();
     final timestamp = CseTimeCodec.encodeUtc(now);
-    await _withDatabaseUnlocked(now, (database) {
-      return _validateAttachmentSources(database, command);
+    await _withDatabaseUnlocked(now, (database) async {
+      for (final command in batch.attachments) {
+        await _validateAttachmentSources(database, command);
+      }
     });
-    final staged = await attachmentStore.stage(
-      pourId: command.pourId,
-      attachmentId: command.id,
-      originalFileName: command.originalFileName,
-      bytes: command.bytes,
-    );
+    final staged =
+        <
+          (
+            AttachConcreteEvidenceCommand,
+            StagedConcreteAttachment,
+            ConcreteEvidenceType,
+          )
+        >[];
+    try {
+      for (final command in batch.attachments) {
+        final file = await attachmentStore.stage(
+          pourId: command.pourId,
+          attachmentId: command.id,
+          originalFileName: command.originalFileName,
+          bytes: command.bytes,
+        );
+        final evidenceType = batch.classifyGeneralByMime
+            ? (file.mimeType.startsWith('image/')
+                  ? ConcreteEvidenceType.sitePhoto
+                  : ConcreteEvidenceType.other)
+            : command.evidenceType;
+        staged.add((command, file, evidenceType));
+      }
+    } on Object {
+      for (final item in staged.reversed) {
+        try {
+          await attachmentStore.cleanup(item.$2.relativePath);
+        } on Object {
+          // Only artifacts staged by this failed operation are candidates.
+        }
+      }
+      rethrow;
+    }
     try {
       return await _withDatabaseUnlocked(now, (database) {
         return database.transaction((transaction) async {
-          final pour = await _requirePour(transaction, command.pourId);
-          _requireRevision(pour.revision, command.expectedPourRevision);
+          final pour = await _requirePour(transaction, batch.pourId);
+          _requireRevision(pour.revision, batch.expectedPourRevision);
           _requireMutable(pour);
-          await _validateAttachmentSources(transaction, command);
-          if (await _isIdempotentEvent(
-            transaction,
-            command.eventId,
-            command.pourId,
-          )) {
-            final existing = await _queryConcreteAttachmentRows(
+          for (final item in staged) {
+            final command = item.$1;
+            final file = item.$2;
+            await _validateAttachmentSources(transaction, command);
+            if (await _isIdempotentEvent(
               transaction,
-              publicId: command.id,
-              pourId: command.pourId,
+              command.eventId,
+              command.pourId,
+            )) {
+              final existing = await _queryConcreteAttachmentRows(
+                transaction,
+                publicId: command.id,
+                pourId: command.pourId,
+              );
+              if (existing.isEmpty ||
+                  existing.single['sha256'] != file.sha256Value) {
+                throw const AgendaValidationFailure(
+                  'Kanıt event kimliği başka içerikle kullanılıyor.',
+                );
+              }
+              continue;
+            }
+            final duplicate = await transaction.rawQuery(
+              '''
+              SELECT l.id
+              FROM attachment_links l
+              JOIN managed_attachments m ON m.id = l.attachment_id
+              WHERE l.source_type = 'concrete_pour'
+                AND l.source_id = ? AND m.sha256 = ?
+              LIMIT 1
+              ''',
+              [command.pourId, file.sha256Value],
             );
-            if (existing.isEmpty ||
-                existing.single['sha256'] != staged.sha256Value) {
+            if (duplicate.isNotEmpty) {
               throw const AgendaValidationFailure(
-                'Kanıt event kimliği başka içerikle kullanılıyor.',
+                'Bu kanıt dosyası pakete daha önce eklenmiş.',
               );
             }
-            return _loadDetail(transaction, command.pourId);
-          }
-          final duplicate = await transaction.rawQuery(
-            '''
-            SELECT l.id
-            FROM attachment_links l
-            JOIN managed_attachments m ON m.id = l.attachment_id
-            WHERE l.source_type = 'concrete_pour'
-              AND l.source_id = ? AND m.sha256 = ?
-            LIMIT 1
-            ''',
-            [command.pourId, staged.sha256Value],
-          );
-          if (duplicate.isNotEmpty) {
-            throw const AgendaValidationFailure(
-              'Bu kanıt dosyası pakete daha önce eklenmiş.',
+            await _insertConcreteAttachment(
+              transaction,
+              attachmentId: command.id,
+              linkId: command.id,
+              linkEventId: command.eventId,
+              pourId: command.pourId,
+              projectId: pour.projectId,
+              truckId: command.truckId,
+              sampleSetId: command.sampleSetId,
+              checkItemId: command.checkItemId,
+              evidenceType: item.$3.storageValue,
+              originalFileName: command.originalFileName.trim(),
+              mimeType: file.mimeType,
+              byteSize: file.byteSize,
+              sha256Value: file.sha256Value,
+              relativePath: file.relativePath,
+              capturedAt: command.capturedAt,
+              description: optionalTrimmed(
+                command.description,
+                'Kanıt açıklaması',
+                maxLength: 1000,
+              ),
+              timestamp: timestamp,
             );
           }
-          await _insertConcreteAttachment(
-            transaction,
-            attachmentId: command.id,
-            linkId: command.id,
-            linkEventId: command.eventId,
-            pourId: command.pourId,
-            projectId: pour.projectId,
-            truckId: command.truckId,
-            sampleSetId: command.sampleSetId,
-            checkItemId: command.checkItemId,
-            evidenceType: command.evidenceType.storageValue,
-            originalFileName: command.originalFileName.trim(),
-            mimeType: staged.mimeType,
-            byteSize: staged.byteSize,
-            sha256Value: staged.sha256Value,
-            relativePath: staged.relativePath,
-            capturedAt: command.capturedAt,
-            description: optionalTrimmed(
-              command.description,
-              'Kanıt açıklaması',
-              maxLength: 1000,
-            ),
-            timestamp: timestamp,
-          );
           await _advancePour(transaction, pour, timestamp);
-          await _insertConcreteEvent(
-            transaction,
-            id: command.eventId,
-            pourId: command.pourId,
-            eventType: 'evidence.attached',
-            occurredAt: timestamp,
-            payload: {
-              'attachment_id': command.id,
-              'evidence_type': command.evidenceType.storageValue,
-              'truck_id': command.truckId,
-              'sample_set_id': command.sampleSetId,
-              'check_item_id': command.checkItemId,
-              'sha256': staged.sha256Value,
-              'byte_size': staged.byteSize,
-            },
-          );
-          return _loadDetail(transaction, command.pourId);
+          for (var index = 0; index < staged.length; index += 1) {
+            final command = staged[index].$1;
+            final file = staged[index].$2;
+            await _insertConcreteEvent(
+              transaction,
+              id: command.eventId,
+              pourId: command.pourId,
+              eventType: 'evidence.attached',
+              occurredAt: timestamp,
+              payload: {
+                'attachment_id': command.id,
+                'evidence_type': staged[index].$3.storageValue,
+                'truck_id': command.truckId,
+                'sample_set_id': command.sampleSetId,
+                'check_item_id': command.checkItemId,
+                'sha256': file.sha256Value,
+                'byte_size': file.byteSize,
+                'batch_index': index,
+                'batch_size': staged.length,
+              },
+            );
+          }
+          return _loadDetail(transaction, batch.pourId);
         });
       });
     } on Object {
-      await attachmentStore.cleanup(staged.relativePath);
+      for (final item in staged.reversed) {
+        try {
+          await attachmentStore.cleanup(item.$2.relativePath);
+        } on Object {
+          // Cleanup cannot reach pre-existing, shared, or legacy paths.
+        }
+      }
       rethrow;
     }
   }
@@ -3071,6 +3135,50 @@ class SqliteConcreteApplication implements ConcreteApplication {
       throw const AgendaValidationFailure('Kanıt dosyası boş olamaz.');
     }
     validateCanonicalTimestamp(command.capturedAt, 'Kanıt zamanı');
+  }
+
+  void _validateAttachmentBatch(AttachConcreteEvidenceBatchCommand batch) {
+    validateUuid(batch.pourId, 'Beton paketi kimliği');
+    _validateExpectedRevision(batch.expectedPourRevision);
+    if (batch.attachments.isEmpty) {
+      throw const AgendaValidationFailure('En az bir kanıt seçilmelidir.');
+    }
+    if (batch.attachments.length > SafeAttachmentPicker.maximumBatchItems) {
+      throw const AgendaValidationFailure(
+        'Tek işlemde en fazla 20 dosya eklenebilir.',
+      );
+    }
+    final ids = <String>{};
+    final eventIds = <String>{};
+    var totalBytes = 0;
+    for (final command in batch.attachments) {
+      _validateAttachment(command);
+      if (command.pourId != batch.pourId ||
+          command.expectedPourRevision != batch.expectedPourRevision) {
+        throw const AgendaValidationFailure(
+          'Batch içindeki kanıtlar aynı Beton paketi ve revision için olmalıdır.',
+        );
+      }
+      if (!ids.add(command.id) || !eventIds.add(command.eventId)) {
+        throw const AgendaValidationFailure(
+          'Kanıt ve event kimlikleri batch içinde benzersiz olmalıdır.',
+        );
+      }
+      if (batch.classifyGeneralByMime &&
+          (command.truckId != null ||
+              command.sampleSetId != null ||
+              command.checkItemId != null)) {
+        throw const AgendaValidationFailure(
+          'Genel saha kanıtı batch işlemi uzmanlaşmış kaynağa bağlanamaz.',
+        );
+      }
+      totalBytes += command.bytes.length;
+      if (totalBytes > SafeAttachmentPicker.maximumBatchBytes) {
+        throw const AgendaValidationFailure(
+          'Tek işlemdeki dosyaların toplamı 100 MiB sınırını aşamaz.',
+        );
+      }
+    }
   }
 
   Future<void> _requireUniqueTruck(

@@ -766,6 +766,18 @@ class AttachAgendaPhotoCommand {
   final String? description;
 }
 
+class AttachAgendaPhotosCommand {
+  const AttachAgendaPhotosCommand({
+    required this.logId,
+    required this.expectedLogRevision,
+    required this.photos,
+  });
+
+  final String logId;
+  final int expectedLogRevision;
+  final List<AgendaPhotoDraft> photos;
+}
+
 class ArchiveAgendaPhotoCommand {
   const ArchiveAgendaPhotoCommand({
     required this.logId,

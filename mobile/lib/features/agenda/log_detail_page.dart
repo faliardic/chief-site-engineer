@@ -192,9 +192,9 @@ class _LogDetailPageState extends State<LogDetailPage> {
       ),
     );
     if (source == null) return;
-    final selected = await picker.pick(source);
+    final selected = await picker.pickMany(source);
     if (!mounted) return;
-    if (selected.$1 != AttachmentPickOutcome.selected || selected.$2 == null) {
+    if (selected.$1 != AttachmentPickOutcome.selected || selected.$2.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Fotoğraf eklenmedi; Ajanda kaydı değişmedi.'),
@@ -202,19 +202,47 @@ class _LogDetailPageState extends State<LogDetailPage> {
       );
       return;
     }
-    await _run(
-      () => widget.agenda.attachAgendaPhoto(
-        AttachAgendaPhotoCommand(
-          logId: log.id,
-          id: RecordId.randomUuid(),
-          eventId: RecordId.randomUuid(),
-          expectedLogRevision: log.revision,
-          originalFileName: selected.$2!.name,
-          bytes: selected.$2!.bytes,
-          capturedAt: CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
-        ),
-      ),
-    );
+    final capturedAt = CseTimeCodec.encodeUtc(DateTime.now().toUtc());
+    final photos = selected.$2
+        .map(
+          (item) => AgendaPhotoDraft(
+            id: RecordId.randomUuid(),
+            eventId: RecordId.randomUuid(),
+            originalFileName: item.name,
+            bytes: item.bytes,
+            capturedAt: capturedAt,
+          ),
+        )
+        .toList(growable: false);
+    await _run(() {
+      final agenda = widget.agenda;
+      if (agenda case final AgendaPhotoBatchApplication batchAgenda) {
+        return batchAgenda.attachAgendaPhotos(
+          AttachAgendaPhotosCommand(
+            logId: log.id,
+            expectedLogRevision: log.revision,
+            photos: photos,
+          ),
+        );
+      }
+      if (photos.length == 1) {
+        final photo = photos.single;
+        return agenda.attachAgendaPhoto(
+          AttachAgendaPhotoCommand(
+            logId: log.id,
+            id: photo.id,
+            eventId: photo.eventId,
+            expectedLogRevision: log.revision,
+            originalFileName: photo.originalFileName,
+            bytes: photo.bytes,
+            capturedAt: photo.capturedAt,
+          ),
+        );
+      }
+      throw const AgendaValidationFailure(
+        'Çoklu fotoğraf ekleme bu uygulama oturumunda kullanılamıyor.',
+      );
+    });
   }
 
   Future<void> _archivePhoto(AgendaLog log, AgendaLogPhoto photo) async {

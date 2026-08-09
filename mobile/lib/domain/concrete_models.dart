@@ -910,6 +910,20 @@ class AttachConcreteEvidenceCommand {
   final String? description;
 }
 
+class AttachConcreteEvidenceBatchCommand {
+  const AttachConcreteEvidenceBatchCommand({
+    required this.pourId,
+    required this.expectedPourRevision,
+    required this.attachments,
+    this.classifyGeneralByMime = false,
+  });
+
+  final String pourId;
+  final int expectedPourRevision;
+  final List<AttachConcreteEvidenceCommand> attachments;
+  final bool classifyGeneralByMime;
+}
+
 class ExportConcretePackageCommand {
   const ExportConcretePackageCommand({
     required this.pourId,
