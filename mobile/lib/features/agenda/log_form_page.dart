@@ -366,9 +366,9 @@ class _LogFormPageState extends State<LogFormPage> {
       ),
     );
     if (source == null) return;
-    final result = await picker.pick(source);
+    final result = await picker.pickMany(source);
     if (!mounted) return;
-    if (result.$1 != AttachmentPickOutcome.selected || result.$2 == null) {
+    if (result.$1 != AttachmentPickOutcome.selected || result.$2.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -378,13 +378,16 @@ class _LogFormPageState extends State<LogFormPage> {
       );
       return;
     }
+    final capturedAt = CseTimeCodec.encodeUtc(DateTime.now().toUtc());
     setState(() {
-      _pendingPhotos.add((
-        result.$2!,
-        RecordId.randomUuid(),
-        RecordId.randomUuid(),
-        CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
-      ));
+      for (final item in result.$2) {
+        _pendingPhotos.add((
+          item,
+          RecordId.randomUuid(),
+          RecordId.randomUuid(),
+          capturedAt,
+        ));
+      }
     });
   }
 

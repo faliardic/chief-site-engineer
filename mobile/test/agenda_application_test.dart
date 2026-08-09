@@ -1291,6 +1291,120 @@ void main() {
   );
 
   test(
+    'Agenda photo batches are ordered atomic and restricted to image MIME',
+    () async {
+      final created = await createLog(
+        id: log1,
+        event: 110,
+        observedAt: '2026-07-19T07:00:00Z',
+      );
+      final detail = await agenda.attachAgendaPhotos(
+        AttachAgendaPhotosCommand(
+          logId: log1,
+          expectedLogRevision: created.revision,
+          photos: [
+            AgendaPhotoDraft(
+              id: log2,
+              eventId: eventId(111),
+              originalFileName: 'bir.jpg',
+              bytes: const [0xff, 0xd8, 0xff, 1],
+              capturedAt: '2026-07-19T07:01:00Z',
+            ),
+            AgendaPhotoDraft(
+              id: log3,
+              eventId: eventId(112),
+              originalFileName: 'iki.png',
+              bytes: const [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 2],
+              capturedAt: '2026-07-19T07:02:00Z',
+            ),
+          ],
+        ),
+      );
+      expect(detail.log.revision, created.revision + 1);
+      expect(detail.photos.map((item) => item.id), [log2, log3]);
+      final attachedEvents = (await agenda.listObservationEvents(log1))
+          .where((item) => item.eventType == 'agenda_log.photo_attached')
+          .toList(growable: false);
+      expect(attachedEvents.map((item) => item.id), [
+        eventId(111),
+        eventId(112),
+      ]);
+      expect(jsonDecode(attachedEvents.first.payloadJson)['batch_index'], 0);
+      expect(jsonDecode(attachedEvents.last.payloadJson)['batch_index'], 1);
+
+      await expectLater(
+        agenda.attachAgendaPhotos(
+          AttachAgendaPhotosCommand(
+            logId: log1,
+            expectedLogRevision: detail.log.revision,
+            photos: [
+              AgendaPhotoDraft(
+                id: log4,
+                eventId: eventId(113),
+                originalFileName: 'duplicate-a.jpg',
+                bytes: const [0xff, 0xd8, 0xff, 9],
+                capturedAt: '2026-07-19T07:03:00Z',
+              ),
+              AgendaPhotoDraft(
+                id: reminder1,
+                eventId: eventId(114),
+                originalFileName: 'duplicate-b.jpg',
+                bytes: const [0xff, 0xd8, 0xff, 9],
+                capturedAt: '2026-07-19T07:04:00Z',
+              ),
+            ],
+          ),
+        ),
+        throwsA(anything),
+      );
+      expect((await agenda.getAgendaLogDetail(log1)).photos, hasLength(2));
+      for (final id in [log4, reminder1]) {
+        expect(
+          await File(
+            '${directories.attachments.path}${Platform.pathSeparator}'
+            'managed${Platform.pathSeparator}$id.jpg',
+          ).exists(),
+          isFalse,
+        );
+      }
+
+      await expectLater(
+        agenda.createAgendaLog(
+          CreateAgendaLogCommand(
+            id: reminder2,
+            eventId: eventId(115),
+            projectId: project1,
+            observedAt: '2026-07-19T08:00:00Z',
+            category: AgendaCategory.generalNote,
+            description: 'PDF kabul edilmemeli',
+            photos: [
+              AgendaPhotoDraft(
+                id: reminder3,
+                eventId: eventId(116),
+                originalFileName: 'valid.jpg',
+                bytes: const [0xff, 0xd8, 0xff, 3],
+                capturedAt: '2026-07-19T08:01:00Z',
+              ),
+              AgendaPhotoDraft(
+                id: reminder4,
+                eventId: eventId(117),
+                originalFileName: 'not-a-photo.pdf',
+                bytes: const [0x25, 0x50, 0x44, 0x46, 0x2d, 0x31],
+                capturedAt: '2026-07-19T08:02:00Z',
+              ),
+            ],
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      expect(
+        await agenda.listAgenda(const AgendaQuery(istanbulDay: '2026-07-19')),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
     'reminder source media is ordered read-only across archive and trash',
     () async {
       var log = await agenda.createAgendaLog(

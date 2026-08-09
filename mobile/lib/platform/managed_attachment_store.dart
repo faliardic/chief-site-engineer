@@ -47,7 +47,7 @@ class DeviceManagedAttachmentStore implements ManagedAttachmentStore {
   });
 
   static final managedFinalPathPattern = RegExp(
-    r'^managed/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|png|heic|pdf)$',
+    r'^managed/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|png|heic|pdf|mp4|mp3|m4a|wav)$',
   );
   static final managedStagingNamePattern = RegExp(
     r'^managed-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.part$',
@@ -348,6 +348,10 @@ class DeviceManagedAttachmentStore implements ManagedAttachmentStore {
     'image/png' => '.png',
     'image/heic' => '.heic',
     'application/pdf' => '.pdf',
+    'video/mp4' => '.mp4',
+    'audio/mpeg' => '.mp3',
+    'audio/mp4' => '.m4a',
+    'audio/wav' => '.wav',
     _ => throw const ManagedAttachmentFailure('unsupported_mime'),
   };
 
@@ -372,19 +376,137 @@ class DeviceManagedAttachmentStore implements ManagedAttachmentStore {
     if (bytes.length >= 5 && String.fromCharCodes(bytes.take(5)) == '%PDF-') {
       return 'application/pdf';
     }
+    if (bytes.length >= 12 &&
+        String.fromCharCodes(bytes.take(4)) == 'RIFF' &&
+        String.fromCharCodes(bytes.sublist(8, 12)) == 'WAVE') {
+      return 'audio/wav';
+    }
+    if (bytes.length >= 3 && String.fromCharCodes(bytes.take(3)) == 'ID3') {
+      return 'audio/mpeg';
+    }
+    if (bytes.length >= 2 &&
+        bytes[0] == 0xff &&
+        (bytes[1] & 0xe0) == 0xe0 &&
+        (bytes[1] & 0x06) != 0) {
+      return 'audio/mpeg';
+    }
     if (bytes.length >= 12) {
       final brand = String.fromCharCodes(bytes.sublist(4, 12));
-      if (brand.startsWith('ftyp') &&
-          const {
-            'heic',
-            'heix',
-            'hevc',
-            'hevx',
-            'mif1',
-          }.contains(brand.substring(4))) {
-        return 'image/heic';
+      if (brand.startsWith('ftyp')) {
+        final majorBrand = brand.substring(4);
+        if (const {
+          'heic',
+          'heix',
+          'hevc',
+          'hevx',
+          'mif1',
+          'msf1',
+        }.contains(majorBrand)) {
+          return 'image/heic';
+        }
+        final compatibleBrands = _ftypCompatibleBrands(bytes);
+        final handlers = _isoBmffHandlerTypes(bytes);
+        final hasAudioTrack = handlers.contains('soun');
+        final hasVideoTrack = handlers.contains('vide');
+        final audioContainerBrand = const {
+          'M4A ',
+          'isom',
+          'iso2',
+          'iso3',
+          'iso4',
+          'iso5',
+          'iso6',
+          'iso7',
+          'iso8',
+          'iso9',
+          'mp41',
+          'mp42',
+        }.contains(majorBrand);
+        if (!hasVideoTrack &&
+            (majorBrand == 'M4A ' ||
+                compatibleBrands.contains('M4A ') ||
+                (hasAudioTrack && audioContainerBrand))) {
+          return 'audio/mp4';
+        }
+        if (const {
+          'isom',
+          'iso2',
+          'mp41',
+          'mp42',
+          'avc1',
+          'dash',
+        }.contains(majorBrand)) {
+          return 'video/mp4';
+        }
       }
     }
     throw const ManagedAttachmentFailure('unsupported_mime');
   }
+
+  static Set<String> _ftypCompatibleBrands(List<int> bytes) {
+    if (bytes.length < 16 ||
+        String.fromCharCodes(bytes.sublist(4, 8)) != 'ftyp') {
+      return const <String>{};
+    }
+    final declaredSize = _readUint32(bytes, 0);
+    final end = declaredSize >= 16 && declaredSize <= bytes.length
+        ? declaredSize
+        : bytes.length;
+    final brands = <String>{};
+    for (var offset = 16; offset + 4 <= end; offset += 4) {
+      brands.add(String.fromCharCodes(bytes.sublist(offset, offset + 4)));
+    }
+    return brands;
+  }
+
+  static Set<String> _isoBmffHandlerTypes(List<int> bytes) {
+    final handlers = <String>{};
+    _walkIsoBmffBoxes(bytes, 0, bytes.length, handlers, 0);
+    return handlers;
+  }
+
+  static void _walkIsoBmffBoxes(
+    List<int> bytes,
+    int start,
+    int end,
+    Set<String> handlers,
+    int depth,
+  ) {
+    if (depth > 4) return;
+    var offset = start;
+    while (offset + 8 <= end) {
+      final size32 = _readUint32(bytes, offset);
+      final type = String.fromCharCodes(bytes.sublist(offset + 4, offset + 8));
+      var headerSize = 8;
+      int boxSize;
+      if (size32 == 1) {
+        if (offset + 16 > end || _readUint32(bytes, offset + 8) != 0) return;
+        headerSize = 16;
+        boxSize = _readUint32(bytes, offset + 12);
+      } else if (size32 == 0) {
+        boxSize = end - offset;
+      } else {
+        boxSize = size32;
+      }
+      if (boxSize < headerSize || offset + boxSize > end) return;
+      final payloadStart = offset + headerSize;
+      final boxEnd = offset + boxSize;
+      if (type == 'hdlr' && payloadStart + 12 <= boxEnd) {
+        final handler = String.fromCharCodes(
+          bytes.sublist(payloadStart + 8, payloadStart + 12),
+        );
+        if (handler == 'soun' || handler == 'vide') handlers.add(handler);
+      }
+      if (type == 'moov' || type == 'trak' || type == 'mdia') {
+        _walkIsoBmffBoxes(bytes, payloadStart, boxEnd, handlers, depth + 1);
+      }
+      offset = boxEnd;
+    }
+  }
+
+  static int _readUint32(List<int> bytes, int offset) =>
+      (bytes[offset] << 24) |
+      (bytes[offset + 1] << 16) |
+      (bytes[offset + 2] << 8) |
+      bytes[offset + 3];
 }

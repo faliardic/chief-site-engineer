@@ -199,7 +199,8 @@ class DevicePermissionGateway implements PermissionGateway {
   }
 }
 
-class FlutterAttachmentPickerPort implements AttachmentPickerPort {
+class FlutterAttachmentPickerPort
+    implements AttachmentPickerPort, MultipleAttachmentPickerPort {
   FlutterAttachmentPickerPort({ImagePicker? imagePicker})
     : _imagePicker = imagePicker ?? ImagePicker();
 
@@ -227,7 +228,17 @@ class FlutterAttachmentPickerPort implements AttachmentPickerPort {
           allowMultiple: false,
           withData: true,
           type: FileType.custom,
-          allowedExtensions: const ['jpg', 'jpeg', 'png', 'heic', 'pdf'],
+          allowedExtensions: const [
+            'jpg',
+            'jpeg',
+            'png',
+            'heic',
+            'pdf',
+            'mp4',
+            'mp3',
+            'm4a',
+            'wav',
+          ],
         );
         if (result == null || result.files.isEmpty) return null;
         final selected = result.files.single;
@@ -242,6 +253,65 @@ class FlutterAttachmentPickerPort implements AttachmentPickerPort {
           bytes: data,
           source: source,
         );
+    }
+  }
+
+  @override
+  Future<List<SelectedAttachment>?> pickMany(AttachmentSource source) async {
+    switch (source) {
+      case AttachmentSource.camera:
+        final selected = await pick(source);
+        return selected == null ? null : [selected];
+      case AttachmentSource.photoLibrary:
+        final files = await _imagePicker.pickMultiImage(
+          imageQuality: 92,
+          limit: SafeAttachmentPicker.maximumBatchItems,
+        );
+        if (files.isEmpty) return null;
+        final selected = <SelectedAttachment>[];
+        for (final file in files) {
+          selected.add(
+            SelectedAttachment(
+              name: path.basename(file.name),
+              bytes: await file.readAsBytes(),
+              source: source,
+            ),
+          );
+        }
+        return selected;
+      case AttachmentSource.filePicker:
+        final result = await FilePicker.platform.pickFiles(
+          allowMultiple: true,
+          withData: true,
+          type: FileType.custom,
+          allowedExtensions: const [
+            'jpg',
+            'jpeg',
+            'png',
+            'heic',
+            'pdf',
+            'mp4',
+            'mp3',
+            'm4a',
+            'wav',
+          ],
+        );
+        if (result == null || result.files.isEmpty) return null;
+        final selected = <SelectedAttachment>[];
+        for (final file in result.files) {
+          final data =
+              file.bytes ??
+              (file.path == null ? null : await File(file.path!).readAsBytes());
+          if (data == null) return null;
+          selected.add(
+            SelectedAttachment(
+              name: path.basename(file.name),
+              bytes: data,
+              source: source,
+            ),
+          );
+        }
+        return selected;
     }
   }
 }

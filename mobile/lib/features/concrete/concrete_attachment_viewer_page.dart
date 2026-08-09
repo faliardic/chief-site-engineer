@@ -19,9 +19,11 @@ class ConcreteAttachmentViewerPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(attachment.evidenceType.label)),
-      body: attachment.mimeType == 'application/pdf'
-          ? _PdfDocument(concrete: concrete, attachment: attachment)
-          : _ImageDocument(concrete: concrete, attachment: attachment),
+      body:
+          attachment.mimeType == 'image/jpeg' ||
+              attachment.mimeType == 'image/png'
+          ? _ImageDocument(concrete: concrete, attachment: attachment)
+          : _ExternalDocument(concrete: concrete, attachment: attachment),
     );
   }
 }
@@ -74,17 +76,17 @@ class _ImageDocument extends StatelessWidget {
   }
 }
 
-class _PdfDocument extends StatefulWidget {
-  const _PdfDocument({required this.concrete, required this.attachment});
+class _ExternalDocument extends StatefulWidget {
+  const _ExternalDocument({required this.concrete, required this.attachment});
 
   final ConcreteApplication concrete;
   final ConcreteAttachment attachment;
 
   @override
-  State<_PdfDocument> createState() => _PdfDocumentState();
+  State<_ExternalDocument> createState() => _ExternalDocumentState();
 }
 
-class _PdfDocumentState extends State<_PdfDocument> {
+class _ExternalDocumentState extends State<_ExternalDocument> {
   bool _opening = false;
   String? _error;
 
@@ -98,9 +100,7 @@ class _PdfDocumentState extends State<_PdfDocument> {
       await widget.concrete.openAttachment(widget.attachment.id);
     } on Object {
       if (mounted) {
-        setState(
-          () => _error = 'PDF güvenli cihaz görüntüleyicisinde açılamadı.',
-        );
+        setState(() => _error = 'Dosya güvenli cihaz uygulamasında açılamadı.');
       }
     } finally {
       if (mounted) setState(() => _opening = false);
@@ -118,7 +118,7 @@ class _PdfDocumentState extends State<_PdfDocument> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.picture_as_pdf_outlined, size: 72),
+            Icon(_externalIcon(widget.attachment.mimeType), size: 72),
             const SizedBox(height: 12),
             Text(
               widget.attachment.originalFileName,
@@ -126,11 +126,13 @@ class _PdfDocumentState extends State<_PdfDocument> {
             ),
             const SizedBox(height: 12),
             FilledButton.icon(
-              key: const Key('open-concrete-pdf'),
+              key: widget.attachment.mimeType == 'application/pdf'
+                  ? const Key('open-concrete-pdf')
+                  : const Key('open-concrete-media'),
               onPressed: _opening ? null : _open,
               icon: const Icon(Icons.open_in_new),
               label: Text(
-                _opening ? 'Açılıyor…' : 'Güvenli görüntüleyicide aç',
+                _opening ? 'Açılıyor…' : 'Güvenli cihaz uygulamasında aç',
               ),
             ),
             if (_error != null) ...[
@@ -147,6 +149,13 @@ class _PdfDocumentState extends State<_PdfDocument> {
       ),
     );
   }
+}
+
+IconData _externalIcon(String mimeType) {
+  if (mimeType == 'application/pdf') return Icons.picture_as_pdf_outlined;
+  if (mimeType.startsWith('video/')) return Icons.video_file_outlined;
+  if (mimeType.startsWith('audio/')) return Icons.audio_file_outlined;
+  return Icons.insert_drive_file_outlined;
 }
 
 class _Metadata extends StatelessWidget {

@@ -383,12 +383,32 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
       ),
     );
     if (source == null) return;
-    final selected = await widget.attachments.pick(source);
-    if (selected.$1 != AttachmentPickOutcome.selected || selected.$2 == null) {
+    final isGeneralBatch =
+        truck == null && sample == null && requestedType == null;
+    late final AttachmentPickOutcome pickOutcome;
+    late final List<SelectedAttachment> selectedItems;
+    if (isGeneralBatch) {
+      final selected = await widget.attachments.pickMany(source);
+      pickOutcome = selected.$1;
+      selectedItems = selected.$2;
+    } else {
+      final selected = await widget.attachments.pick(source);
+      pickOutcome = selected.$1;
+      selectedItems = selected.$2 == null ? const [] : [selected.$2!];
+    }
+    if (pickOutcome != AttachmentPickOutcome.selected ||
+        selectedItems.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Dosya seçilmedi; Beton kaydı değişmedi.'),
+          SnackBar(
+            content: Text(switch (pickOutcome) {
+              AttachmentPickOutcome.denied =>
+                'Dosya erişim izni verilmedi; Beton kaydı değişmedi.',
+              AttachmentPickOutcome.unavailable =>
+                'Dosya seçimi tamamlanamadı; seçilen dosya okunamadı veya '
+                    'seçim sınırını aştı. Beton kaydı değişmedi.',
+              _ => 'Dosya seçilmedi; Beton kaydı değişmedi.',
+            }),
           ),
         );
       }
@@ -429,7 +449,7 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
         builder: (context) => AlertDialog(
           title: const Text('İrsaliye belgesini kontrol et'),
           content: Text(
-            '${selected.$2!.name}\n\nBelge okunaklıysa kullanın. Değilse '
+            '${selectedItems.single.name}\n\nBelge okunaklıysa kullanın. Değilse '
             'yeniden çekmek/seçmek için vazgeçin.',
           ),
           actions: [
@@ -448,22 +468,51 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
       if (confirmed != true) return;
     }
     final detail = _detail!;
-    await _run(
-      () => widget.concrete.attachEvidence(
-        AttachConcreteEvidenceCommand(
-          id: RecordId.randomUuid(),
-          pourId: detail.pour.id,
-          eventId: RecordId.randomUuid(),
-          expectedPourRevision: detail.pour.revision,
-          evidenceType: type,
-          originalFileName: selected.$2!.name,
-          bytes: selected.$2!.bytes,
-          capturedAt: CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
-          truckId: truck?.id,
-          sampleSetId: sample?.id,
-        ),
-      ),
-    );
+    final capturedAt = CseTimeCodec.encodeUtc(DateTime.now().toUtc());
+    final commands = selectedItems
+        .map(
+          (item) => AttachConcreteEvidenceCommand(
+            id: RecordId.randomUuid(),
+            pourId: detail.pour.id,
+            eventId: RecordId.randomUuid(),
+            expectedPourRevision: detail.pour.revision,
+            evidenceType: type,
+            originalFileName: item.name,
+            bytes: item.bytes,
+            capturedAt: capturedAt,
+            truckId: truck?.id,
+            sampleSetId: sample?.id,
+          ),
+        )
+        .toList(growable: false);
+    final attached = await _run(() {
+      final concrete = widget.concrete;
+      if (isGeneralBatch && concrete is ConcreteEvidenceBatchApplication) {
+        final batchApp = concrete as ConcreteEvidenceBatchApplication;
+        return batchApp.attachEvidenceBatch(
+          AttachConcreteEvidenceBatchCommand(
+            pourId: detail.pour.id,
+            expectedPourRevision: detail.pour.revision,
+            attachments: commands,
+            classifyGeneralByMime: true,
+          ),
+        );
+      }
+      if (commands.length == 1) {
+        return concrete.attachEvidence(commands.single);
+      }
+      throw const AgendaValidationFailure(
+        'Çoklu saha kanıtı bu uygulama oturumunda kullanılamıyor.',
+      );
+    });
+    if (!attached && mounted) {
+      final message = _error;
+      if (message != null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+      }
+    }
   }
 
   Future<void> _completeFollowUp(
