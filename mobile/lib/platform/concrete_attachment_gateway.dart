@@ -108,7 +108,7 @@ class DeviceConcreteAttachmentStore implements ConcreteAttachmentStore {
       final result = await managedStore.inspect(
         relativePath: relativePath,
         expectedSha256: expectedSha256,
-        expectedMimeType: expectedMimeType ?? 'image/jpeg',
+        expectedMimeType: expectedMimeType,
       );
       return switch (result) {
         ManagedAttachmentIntegrity.healthy => ConcreteAttachmentIntegrity.ok,

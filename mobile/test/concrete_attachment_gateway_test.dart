@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 const pourId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const attachmentId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const nonJpegAttachmentId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
 void main() {
   late Directory root;
@@ -56,6 +57,24 @@ void main() {
       );
       await store.cleanup(staged.relativePath);
       expect(await file.exists(), isFalse);
+    },
+  );
+
+  test(
+    'keeps non-JPEG integrity ok when MIME expectation is omitted',
+    () async {
+      final staged = await store.stage(
+        pourId: pourId,
+        attachmentId: nonJpegAttachmentId,
+        originalFileName: 'rapor.pdf',
+        bytes: const [0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37],
+      );
+
+      expect(staged.mimeType, 'application/pdf');
+      expect(
+        await store.inspect(staged.relativePath, staged.sha256Value),
+        ConcreteAttachmentIntegrity.ok,
+      );
     },
   );
 

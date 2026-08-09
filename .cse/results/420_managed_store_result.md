@@ -50,7 +50,7 @@ bootstrap sırasında otomatik çalışmaz.
   test/attachment_reconciliation_application_test.dart
   test/concrete_attachment_gateway_test.dart test/agenda_application_test.dart
   test/concrete_application_test.dart test/app_bootstrap_test.dart`
-  - final source revision: **PASS — 57 test**
+  - PR #422 source-review correction revision: **PASS — 58 test**
   - Agenda/Reminder, Beton, adapter ve shared bootstrap regressions PASS.
 
 Yeni linked worktree ilk focused komutta ignore edilen `.dart_tool` metadata'sı
@@ -62,18 +62,34 @@ oldu.
 
 ## Final geniş kapılar
 
-- Final source `flutter test --no-pub`: **PASS — 458 test**
+- Final source `flutter test --no-pub`: **PASS — 459 test**
 - Final source `flutter analyze --no-pub`: **PASS — No issues found**
-- `git diff --check`: publication öncesi final kontrolde tekrar çalıştırılacak.
-- Exact allowlist/protected path: publication öncesi final kontrolde tekrar
-  doğrulanacak.
+- `git diff --check`: **PASS**
+- Exact 14-file allowlist/protected path: **PASS**
 
 İlk full-suite invocation yanlış kısa command timeout'u nedeniyle test sonucu
 üretmeden kesildi; exact linked-worktree `flutter_tester` orphan process'i
 doğrulanıp sonlandırıldı ve aynı source doğru timeout ile PASS oldu. Sonraki
 tek satırlık partial-write compensation düzeltmesi source revision'ı
 değiştirdiği için affected focused suite ve final-source full/analyze kapıları
-yeniden çalıştırıldı; final kanıt yukarıdaki 458-test sonucudur.
+yeniden çalıştırıldı.
+
+## PR #422 source-review correction
+
+`#issuecomment-5232544923` review blocker'ı için mevcut Concrete opsiyonel-MIME
+inspect sözleşmesi korundu. Shared `inspect` API'si nullable MIME beklentisini
+kabul eder ve MIME karşılaştırmasını yalnız beklenti non-null olduğunda yapar.
+Concrete adapter null değeri değiştirmeden forward eder; JPEG fallback
+kaldırıldı. MIME argümanı verilmeden inspect edilen PDF attachment'ın
+`ConcreteAttachmentIntegrity.ok` kaldığını doğrulayan focused regression eklendi.
+
+- Dar Concrete gateway suite: **PASS — 3 test**
+- Etkilenen aggregate suite: **PASS — 58 test**
+- Final full suite: **PASS — 459 test**
+- Final analyze: **PASS — No issues found**
+
+Correction commit/push SHA'sı, final diff/allowlist durumu ve PR state'i GitHub
+Issue #420 correction evidence yorumunda publication sonrasında kaydedilir.
 
 ## Yeniden kullanılan merged kanıt
 

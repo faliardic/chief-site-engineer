@@ -19,7 +19,7 @@ abstract interface class ManagedAttachmentStore {
   Future<ManagedAttachmentIntegrity> inspect({
     required String relativePath,
     required String expectedSha256,
-    required String expectedMimeType,
+    required String? expectedMimeType,
     int? expectedByteSize,
   });
 
@@ -170,7 +170,7 @@ class DeviceManagedAttachmentStore implements ManagedAttachmentStore {
   Future<ManagedAttachmentIntegrity> inspect({
     required String relativePath,
     required String expectedSha256,
-    required String expectedMimeType,
+    required String? expectedMimeType,
     int? expectedByteSize,
   }) async {
     File file;
@@ -193,12 +193,14 @@ class DeviceManagedAttachmentStore implements ManagedAttachmentStore {
     if (sha256.convert(bytes).toString() != expectedSha256) {
       return ManagedAttachmentIntegrity.hashMismatch;
     }
-    try {
-      if (sniffMime(bytes) != expectedMimeType) {
+    if (expectedMimeType != null) {
+      try {
+        if (sniffMime(bytes) != expectedMimeType) {
+          return ManagedAttachmentIntegrity.mimeMismatch;
+        }
+      } on ManagedAttachmentFailure {
         return ManagedAttachmentIntegrity.mimeMismatch;
       }
-    } on ManagedAttachmentFailure {
-      return ManagedAttachmentIntegrity.mimeMismatch;
     }
     return ManagedAttachmentIntegrity.healthy;
   }
