@@ -37,7 +37,7 @@ void main() {
         bytes: const [0xff, 0xd8, 0xff, 1, 2, 3],
       );
       expect(staged.mimeType, 'image/jpeg');
-      expect(staged.relativePath, 'concrete/$pourId/$attachmentId.jpg');
+      expect(staged.relativePath, 'managed/$attachmentId.jpg');
       expect(staged.relativePath, isNot(contains(root.path)));
       expect(await directories.staging.list().isEmpty, isTrue);
       expect(
@@ -46,7 +46,8 @@ void main() {
       );
 
       final file = File(
-        '${directories.attachments.path}${Platform.pathSeparator}concrete${Platform.pathSeparator}$pourId${Platform.pathSeparator}$attachmentId.jpg',
+        '${directories.attachments.path}${Platform.pathSeparator}managed'
+        '${Platform.pathSeparator}$attachmentId.jpg',
       );
       await file.writeAsBytes(const [0xff, 0xd8, 0xff, 9]);
       expect(

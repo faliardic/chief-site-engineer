@@ -1220,8 +1220,7 @@ void main() {
       expect(
         await File(
           '${directories.attachments.path}${Platform.pathSeparator}'
-          'agenda${Platform.pathSeparator}$log1${Platform.pathSeparator}'
-          '$log4.jpg',
+          'managed${Platform.pathSeparator}$log4.jpg',
         ).exists(),
         isFalse,
       );
@@ -1237,8 +1236,7 @@ void main() {
       expect(detail.photos.map((item) => item.id), [log2]);
       final archivedFile = File(
         '${directories.attachments.path}${Platform.pathSeparator}'
-        'agenda${Platform.pathSeparator}$log1${Platform.pathSeparator}'
-        '$log3.jpg',
+        'managed${Platform.pathSeparator}$log3.jpg',
       );
       expect(await archivedFile.exists(), isTrue);
 
@@ -1270,8 +1268,7 @@ void main() {
       await raw.close();
       final activeFile = File(
         '${directories.attachments.path}${Platform.pathSeparator}'
-        'agenda${Platform.pathSeparator}$log1${Platform.pathSeparator}'
-        '$log2.jpg',
+        'managed${Platform.pathSeparator}$log2.jpg',
       );
       await activeFile.writeAsBytes(const [0xff, 0xd8, 0xff, 9]);
       final restarted = SqliteAgendaApplication(
