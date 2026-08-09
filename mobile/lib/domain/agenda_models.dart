@@ -272,6 +272,9 @@ class AgendaLog {
     required this.location,
     required this.notes,
     required this.revision,
+    this.locationId,
+    this.stableLocationName,
+    this.stableLocationArchivedAt,
     this.archivedAt,
   });
 
@@ -286,7 +289,12 @@ class AgendaLog {
   final String? location;
   final String? notes;
   final int revision;
+  final String? locationId;
+  final String? stableLocationName;
+  final String? stableLocationArchivedAt;
   final String? archivedAt;
+
+  String? get displayLocation => stableLocationName ?? location;
 }
 
 enum AgendaArchiveFilter { active, archived }
@@ -671,6 +679,7 @@ class CreateAgendaLogCommand {
     required this.category,
     required this.description,
     this.location,
+    this.locationId,
     this.notes,
     this.photos = const [],
   });
@@ -682,6 +691,7 @@ class CreateAgendaLogCommand {
   final AgendaCategory category;
   final String description;
   final String? location;
+  final String? locationId;
   final String? notes;
   final List<AgendaPhotoDraft> photos;
 }
@@ -696,6 +706,7 @@ class UpdateAgendaLogCommand {
     required this.category,
     required this.description,
     this.location,
+    this.locationId,
     this.notes,
   });
 
@@ -707,6 +718,7 @@ class UpdateAgendaLogCommand {
   final AgendaCategory category;
   final String description;
   final String? location;
+  final String? locationId;
   final String? notes;
 }
 

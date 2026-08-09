@@ -1,0 +1,29 @@
+# Issue #400 — Ajanda stable Mahal selection and adoption
+
+- Issue: `#400`
+- Parent Epic: `#385`
+- V2 item: `V2.1 — Proje ve Mahal omurgası`
+- Base: `origin/master` / `a95823746ca4a04e60c80f57f66afcad3fbc0ec4`
+- Branch: `codex/issue-400-v2-1e-agenda-stable-location`
+- Worktree: `C:\\Users\\Fatih\\AppData\\Local\\CSE-Worktrees\\issue-400`
+- Codex model: current full Codex model
+- Reasoning: `Extra High`; stable kimlik, geriye uyumluluk, transaction/idempotency ve çok katmanlı UI regresyonu nedeniyle.
+- Validation class: `persistence + domain + UI integration`; mevcut schema içinde source-of-truth ve atomik write/read davranışı değişir, migration yoktur.
+- Changed contracts: `AgendaLog`, create/update command stable `locationId`, active same-project validation, archived-link preservation, stable-name read projection, literal search, event/idempotency snapshot ve LogForm/list/detail UI.
+- Allowed production paths: `mobile/lib/domain/agenda_models.dart`, `mobile/lib/application/agenda_application.dart`, `mobile/lib/features/agenda/agenda_page.dart`, `mobile/lib/features/agenda/log_form_page.dart`, `mobile/lib/features/agenda/log_detail_page.dart`.
+- Preferred tests: new `mobile/test/agenda_stable_location_application_test.dart`, new `mobile/test/agenda_stable_location_widget_test.dart`.
+- Conditional regression paths: `mobile/test/agenda_application_test.dart`, `mobile/test/mobile_agenda_widget_test.dart`, `mobile/test/support/fake_agenda_application.dart` only when compile/regression requires.
+- Focused tests: stable-location application matrix; stable-location widget matrix; relevant Agenda regression; ProjectLocation application regression.
+- Allowed broad gates: one full `flutter test --no-pub`, one `flutter analyze --no-pub`, `git diff --check`, one `flutter build apk --debug`.
+- Reused evidence: merged schema-11 cross-project fail-closed constraint and ProjectLocation persistence/application/lifecycle/catalog contracts from V2.1a-d; backup format 1, signing, release, background, reboot and notification evidence remains unchanged.
+- Schema impact: none; schema remains `11`; `mobile/lib/storage/app_database.dart` is protected.
+- Migration impact: none; no migration, backfill, fuzzy or exact automatic text matching.
+- Backup impact: none; format remains `1`; backup/decryption/restore production and tests are protected.
+- Attachment impact: none.
+- Notification impact: none.
+- Minimum physical-device acceptance: replace-install only; Ajanda → Log ekle; project-driven stable selector; catalog round-trip; legacy log opens without crash and preserves historical location; no save/mutation required.
+- Retry budget: 1 primary run; at most 1 blocking correction; same failed operation at most 1 retry after exact fix.
+- Time budget: 45-minute target; 75-minute hard stop.
+- Explicit out of scope: Reminder/Concrete/Puantaj location adoption, project lifecycle UI, schema 12, migration/backfill/canonicalization, backup changes, map/kroki and V2.1f.
+- Stop conditions: any schema/trigger/index/migration or backup change; historical text auto-backfill; Reminder/Concrete adoption; ProjectLocation lifecycle semantic expansion; destructive device/user-data operation; unresolved source-of-truth ambiguity.
+- Publication: no commit, push or Draft PR before device smoke PASS; no Ready/merge; do not start V2.1f.

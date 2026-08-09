@@ -3,8 +3,10 @@ import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_concrete_signal.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_concrete_suggestion_card.dart';
+import 'package:chief_site_engineer/features/agenda/project_location_catalog_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_destination_page.dart';
 import 'package:chief_site_engineer/features/owned_text_input_dialog.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
@@ -13,6 +15,7 @@ import 'package:flutter/material.dart';
 class LogFormPage extends StatefulWidget {
   const LogFormPage({
     required this.agenda,
+    this.projectLocations,
     this.attachments,
     this.concrete,
     this.concreteAttachments,
@@ -23,6 +26,7 @@ class LogFormPage extends StatefulWidget {
   });
 
   final AgendaApplication agenda;
+  final ProjectLocationApplication? projectLocations;
   final SafeAttachmentPicker? attachments;
   final ConcreteApplication? concrete;
   final SafeAttachmentPicker? concreteAttachments;
@@ -45,11 +49,16 @@ class _LogFormPageState extends State<LogFormPage> {
   late DateTime _date;
   late TimeOfDay _time;
   List<MobileProject> _projects = const [];
+  List<MobileProjectLocation> _locations = const [];
   String? _projectId;
+  String? _locationId;
   AgendaCategory _category = AgendaCategory.generalNote;
   bool _loadingProjects = true;
+  bool _loadingLocations = false;
   bool _submitting = false;
   String? _error;
+  String? _locationError;
+  int _locationLoadGeneration = 0;
   final List<(SelectedAttachment, String, String, String)> _pendingPhotos = [];
 
   @override
@@ -69,6 +78,7 @@ class _LogFormPageState extends State<LogFormPage> {
         : DateTime(initialDay.year, initialDay.month, initialDay.day);
     _time = TimeOfDay(hour: nowLocal.hour, minute: nowLocal.minute);
     _projectId = current?.projectId ?? widget.initialProjectId;
+    _locationId = current?.locationId;
     if (current != null) {
       _category = current.category;
       _description.text = current.description;
@@ -142,6 +152,7 @@ class _LogFormPageState extends State<LogFormPage> {
         _projectId ??= projects.isEmpty ? null : projects.first.id;
         _loadingProjects = false;
       });
+      await _loadLocations();
     } on Object {
       if (!mounted) return;
       setState(() {
@@ -169,10 +180,91 @@ class _LogFormPageState extends State<LogFormPage> {
         CreateProjectCommand(id: projectId, name: name),
       );
       await _loadProjects();
-      if (mounted) setState(() => _projectId = project.id);
+      if (mounted) {
+        setState(() => _projectId = project.id);
+        await _loadLocations();
+      }
     } on AgendaValidationFailure catch (error) {
       if (mounted) setState(() => _error = error.message);
     }
+  }
+
+  Future<void> _loadLocations() async {
+    final application = widget.projectLocations;
+    if (application == null) return;
+    final projectId = _projectId;
+    final generation = ++_locationLoadGeneration;
+    setState(() {
+      _loadingLocations = projectId != null;
+      _locationError = null;
+      if (projectId == null) _locations = const [];
+    });
+    if (projectId == null) return;
+    try {
+      final locations = await application.listProjectLocations(
+        ProjectLocationQuery(projectId: projectId),
+      );
+      if (!mounted || generation != _locationLoadGeneration) return;
+      final linkedExisting = widget.existing;
+      final canKeepArchivedLink =
+          _locationId != null &&
+          linkedExisting?.locationId == _locationId &&
+          linkedExisting?.projectId == projectId &&
+          linkedExisting?.stableLocationName != null;
+      final selectionIsActive = locations.any(
+        (location) => location.id == _locationId,
+      );
+      setState(() {
+        _locations = locations;
+        if (!selectionIsActive && !canKeepArchivedLink) {
+          _locationId = null;
+        }
+        _loadingLocations = false;
+      });
+    } on Object {
+      if (!mounted || generation != _locationLoadGeneration) return;
+      setState(() {
+        _locations = const [];
+        _loadingLocations = false;
+        _locationError = 'Mahaller güvenli biçimde okunamadı.';
+      });
+    }
+  }
+
+  Future<void> _selectProject(String? projectId) async {
+    if (projectId == _projectId) return;
+    setState(() {
+      _projectId = projectId;
+      if (_locationId != null) {
+        _locationId = null;
+        _location.clear();
+      }
+    });
+    await _loadLocations();
+  }
+
+  void _selectLocation(String? locationId) {
+    setState(() {
+      _locationId = locationId;
+      if (locationId == null && widget.existing?.locationId != null) {
+        _location.clear();
+      }
+    });
+  }
+
+  Future<void> _openLocationCatalog() async {
+    final application = widget.projectLocations;
+    final projectId = _projectId;
+    if (application == null || projectId == null) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ProjectLocationCatalogPage(
+          application: application,
+          initialProjectId: projectId,
+        ),
+      ),
+    );
+    if (mounted) await _loadLocations();
   }
 
   Future<void> _submit() async {
@@ -204,6 +296,7 @@ class _LogFormPageState extends State<LogFormPage> {
                 category: _category,
                 description: _description.text,
                 location: _location.text,
+                locationId: _locationId,
                 notes: _notes.text,
                 photos: _pendingPhotos
                     .map(
@@ -228,6 +321,7 @@ class _LogFormPageState extends State<LogFormPage> {
                 category: _category,
                 description: _description.text,
                 location: _location.text,
+                locationId: _locationId,
                 notes: _notes.text,
               ),
             );
@@ -338,7 +432,7 @@ class _LogFormPageState extends State<LogFormPage> {
                       ),
                     )
                     .toList(),
-                onChanged: (value) => setState(() => _projectId = value),
+                onChanged: _selectProject,
                 validator: (value) =>
                     value == null ? 'Proje zorunludur.' : null,
               ),
@@ -450,15 +544,18 @@ class _LogFormPageState extends State<LogFormPage> {
                   ),
                 ),
             ],
-            TextFormField(
-              key: const Key('log-location'),
-              controller: _location,
-              maxLength: 200,
-              decoration: const InputDecoration(
-                labelText: 'Mahal (opsiyonel)',
-                border: OutlineInputBorder(),
-              ),
-            ),
+            if (widget.projectLocations == null)
+              TextFormField(
+                key: const Key('log-location'),
+                controller: _location,
+                maxLength: 200,
+                decoration: const InputDecoration(
+                  labelText: 'Mahal (opsiyonel)',
+                  border: OutlineInputBorder(),
+                ),
+              )
+            else
+              _buildStableLocationField(),
             const SizedBox(height: 8),
             TextFormField(
               key: const Key('log-notes'),
@@ -510,4 +607,161 @@ class _LogFormPageState extends State<LogFormPage> {
       ),
     );
   }
+
+  Widget _buildStableLocationField() {
+    final options = _buildLocationOptions(_locations);
+    final existing = widget.existing;
+    final hasActiveSelection = options.any(
+      (option) => option.id == _locationId,
+    );
+    if (_locationId != null &&
+        !hasActiveSelection &&
+        existing?.locationId == _locationId &&
+        existing?.stableLocationName != null) {
+      options.add(
+        _LocationOption(
+          id: _locationId!,
+          label: '${existing!.stableLocationName!} (Arşivli)',
+          archived: true,
+        ),
+      );
+    }
+    final legacyLocation = existing?.locationId == null
+        ? existing?.location?.trim()
+        : null;
+    final selectedArchived = options.any(
+      (option) => option.id == _locationId && option.archived,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_loadingLocations) const LinearProgressIndicator(),
+        KeyedSubtree(
+          key: ValueKey(
+            'stable-location-${_projectId ?? 'none'}-'
+            '${_locationId ?? 'none'}-${options.length}',
+          ),
+          child: DropdownButtonFormField<String>(
+            key: const Key('log-location-selector'),
+            initialValue: _locationId,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Mahal (opsiyonel)',
+              border: OutlineInputBorder(),
+            ),
+            items: [
+              const DropdownMenuItem<String>(
+                value: null,
+                child: Text('Mahal seçilmedi'),
+              ),
+              ...options.map(
+                (option) => DropdownMenuItem<String>(
+                  value: option.id,
+                  child: Text(option.label, overflow: TextOverflow.ellipsis),
+                ),
+              ),
+            ],
+            onChanged: _loadingLocations ? null : _selectLocation,
+          ),
+        ),
+        if (!_loadingLocations &&
+            options.where((item) => !item.archived).isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: Text(
+              'Bu projede aktif mahal yok. Mahal Kataloğu’ndan ekleyebilirsiniz.',
+              key: Key('log-location-empty'),
+            ),
+          ),
+        if (_locationError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _locationError!,
+                    key: const Key('log-location-load-error'),
+                  ),
+                ),
+                TextButton(
+                  key: const Key('retry-log-locations'),
+                  onPressed: _loadLocations,
+                  child: const Text('Yeniden dene'),
+                ),
+              ],
+            ),
+          ),
+        if (legacyLocation != null && legacyLocation.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              'Eski serbest mahal: $legacyLocation',
+              key: const Key('legacy-location-context'),
+            ),
+          ),
+        if (selectedArchived)
+          const Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: Text(
+              'Arşivli mahal bağlantısı korunuyor.',
+              key: Key('archived-location-context'),
+            ),
+          ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 48,
+          child: OutlinedButton.icon(
+            key: const Key('open-location-catalog-from-log'),
+            onPressed: _projectId == null ? null : _openLocationCatalog,
+            icon: const Icon(Icons.account_tree_outlined),
+            label: const Text('Mahal Kataloğu'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LocationOption {
+  const _LocationOption({
+    required this.id,
+    required this.label,
+    this.archived = false,
+  });
+
+  final String id;
+  final String label;
+  final bool archived;
+}
+
+List<_LocationOption> _buildLocationOptions(
+  List<MobileProjectLocation> locations,
+) {
+  final byId = {for (final location in locations) location.id: location};
+  final cache = <String, String>{};
+
+  String pathFor(MobileProjectLocation location, Set<String> visiting) {
+    final cached = cache[location.id];
+    if (cached != null) return cached;
+    if (!visiting.add(location.id)) return location.displayName;
+    final parent = location.parentLocationId == null
+        ? null
+        : byId[location.parentLocationId];
+    final path = parent == null
+        ? location.displayName
+        : '${pathFor(parent, visiting)} › ${location.displayName}';
+    visiting.remove(location.id);
+    cache[location.id] = path;
+    return path;
+  }
+
+  return locations
+      .map(
+        (location) => _LocationOption(
+          id: location.id,
+          label: pathFor(location, <String>{}),
+        ),
+      )
+      .toList(growable: true);
 }

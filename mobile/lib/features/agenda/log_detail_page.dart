@@ -20,6 +20,7 @@ class LogDetailPage extends StatefulWidget {
   const LogDetailPage({
     required this.agenda,
     required this.logId,
+    this.projectLocations,
     this.attachments,
     this.concrete,
     this.concreteAttachments,
@@ -27,6 +28,7 @@ class LogDetailPage extends StatefulWidget {
   });
 
   final AgendaApplication agenda;
+  final ProjectLocationApplication? projectLocations;
   final String logId;
   final SafeAttachmentPicker? attachments;
   final ConcreteApplication? concrete;
@@ -111,6 +113,7 @@ class _LogDetailPageState extends State<LogDetailPage> {
       MaterialPageRoute(
         builder: (_) => LogFormPage(
           agenda: widget.agenda,
+          projectLocations: widget.projectLocations,
           attachments: widget.attachments,
           concrete: widget.concrete,
           concreteAttachments: widget.concreteAttachments,
@@ -391,8 +394,16 @@ class _LogDetailPageState extends State<LogDetailPage> {
           label: 'CSE’ye giriş',
           value: CseTimeCodec.formatIstanbul(log.createdAt),
         ),
-        if (log.location != null)
-          _DetailRow(label: 'Mahal', value: log.location!),
+        if (log.displayLocation != null)
+          _DetailRow(label: 'Mahal', value: log.displayLocation!),
+        if (log.stableLocationArchivedAt != null)
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text(
+              'Arşivli mahal',
+              key: Key('archived-stable-location-indicator'),
+            ),
+          ),
         if (log.notes != null)
           _DetailRow(label: 'Ayrıntılı not', value: log.notes!),
         const SizedBox(height: 12),

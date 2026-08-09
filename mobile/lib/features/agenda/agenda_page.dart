@@ -185,6 +185,7 @@ class _AgendaPageState extends State<AgendaPage> {
       MaterialPageRoute(
         builder: (_) => LogFormPage(
           agenda: widget.agenda,
+          projectLocations: widget.projectLocations,
           attachments: widget.attachments,
           concrete: widget.concrete,
           concreteAttachments: widget.concreteAttachments,
@@ -221,6 +222,7 @@ class _AgendaPageState extends State<AgendaPage> {
         MaterialPageRoute(
           builder: (_) => LogDetailPage(
             agenda: widget.agenda,
+            projectLocations: widget.projectLocations,
             attachments: widget.attachments,
             concrete: widget.concrete,
             concreteAttachments: widget.concreteAttachments,
@@ -548,7 +550,8 @@ class _AgendaPageState extends State<AgendaPage> {
                           Text(
                             [
                               log.projectName,
-                              if (log.location != null) log.location!,
+                              if (log.displayLocation != null)
+                                log.displayLocation!,
                             ].join(' • '),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
