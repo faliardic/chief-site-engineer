@@ -459,6 +459,7 @@ void main() {
       );
 
       expect(await _fixtureSnapshot(directories), before);
+      await _expectV21LocationFixture(directories);
       expect(await attachment.readAsBytes(), expectedBytes);
       expect(
         await File(
@@ -1236,16 +1237,28 @@ Future<void> _seedFullFixture(
       'name': 'Köprü Şantiyesi',
       'created_at': _now,
       'updated_at': _now,
+      'revision': 4,
+      'archived_at': _now,
+    });
+    await tx.insert('project_locations', {
+      'id': 'location-parent',
+      'project_id': 'project-1',
+      'display_name': 'A Blok',
+      'normalized_name': 'a blok',
       'revision': 1,
+      'created_at': _now,
+      'updated_at': _now,
     });
     await tx.insert('project_locations', {
       'id': 'location-1',
       'project_id': 'project-1',
-      'display_name': 'A Blok / 1. Kat',
-      'normalized_name': 'a blok / 1. kat',
-      'revision': 1,
+      'display_name': 'Güncel Mahal Adı',
+      'normalized_name': 'güncel mahal adı',
+      'parent_location_id': 'location-parent',
+      'revision': 4,
       'created_at': _now,
       'updated_at': _now,
+      'archived_at': _now,
     });
     await tx.insert('project_events', {
       'id': 'project-event-1',
@@ -1256,10 +1269,36 @@ Future<void> _seedFullFixture(
       'payload_json': '{}',
     });
     await tx.insert('project_location_events', {
+      'id': 'location-parent-event-1',
+      'location_id': 'location-parent',
+      'sequence': 1,
+      'event_type': 'location.created',
+      'occurred_at': _now,
+      'payload_json': '{}',
+    });
+    await tx.insert('project_location_events', {
       'id': 'location-event-1',
       'location_id': 'location-1',
       'sequence': 1,
       'event_type': 'location.created',
+      'occurred_at': _now,
+      'payload_json': '{}',
+    });
+    await tx.insert('project_location_events', {
+      'id': 'location-event-2',
+      'location_id': 'location-1',
+      'sequence': 2,
+      'event_type': 'location.renamed',
+      'occurred_at': _now,
+      'payload_json':
+          '{"before":{"display_name":"Eski Mahal Adı"},'
+          '"after":{"display_name":"Güncel Mahal Adı"}}',
+    });
+    await tx.insert('project_location_events', {
+      'id': 'location-event-3',
+      'location_id': 'location-1',
+      'sequence': 3,
+      'event_type': 'location.archived',
       'occurred_at': _now,
       'payload_json': '{}',
     });
@@ -1302,6 +1341,17 @@ Future<void> _seedFullFixture(
       'occurred_at': _now,
       'payload_json': '{"linked_reminders_unchanged":true}',
     });
+    await tx.insert('field_observations', {
+      'id': 'legacy-observation-1',
+      'project_id': 'project-1',
+      'observed_at': '2026-07-18T08:00:00Z',
+      'created_at': _now,
+      'updated_at': _now,
+      'category': 'inspection',
+      'description': 'Legacy text-only gözlem',
+      'location': ' Legacy Serbest Mahal ',
+      'revision': 1,
+    });
     await tx.insert('agenda_log_attachments', {
       'id': 'agenda-attachment-1',
       'observation_id': 'observation-1',
@@ -1343,6 +1393,19 @@ Future<void> _seedFullFixture(
       'event_type': 'created',
       'occurred_at': _now,
       'payload_json': '{}',
+    });
+    await tx.insert('follow_up_items', {
+      'id': 'legacy-reminder-1',
+      'capture_text': 'Legacy reminder',
+      'title': 'Legacy reminder',
+      'item_type': 'action',
+      'status': 'inbox',
+      'project_id': 'project-1',
+      'location': 'Legacy Hatırlatıcı Mahal',
+      'is_important': 0,
+      'revision': 1,
+      'created_at': _now,
+      'updated_at': _now,
     });
     await tx.insert('reminder_notification_bindings', {
       'reminder_id': 'reminder-1',
@@ -1492,6 +1555,22 @@ Future<void> _seedFullFixture(
       'event_type': 'pour.created',
       'occurred_at': _now,
       'payload_json': '{}',
+    });
+    await tx.insert('concrete_pours', {
+      'id': 'legacy-pour-1',
+      'project_id': 'project-1',
+      'pour_code': 'BT-LEGACY',
+      'element_location': 'Legacy Beton Elemanı',
+      'block_name': 'Legacy Blok',
+      'floor_name': 'Legacy Kat',
+      'axis_name': 'L/1',
+      'planned_at': '2026-07-21T05:00:00Z',
+      'concrete_class': 'C25/30',
+      'planned_volume_m3': 12.0,
+      'status': 'draft',
+      'revision': 1,
+      'created_at': _now,
+      'updated_at': _now,
     });
     await tx.insert('concrete_attachments', {
       'id': 'attachment-1',
@@ -1826,6 +1905,100 @@ Future<Map<String, Object?>> _fixtureSnapshot(
   }
   await database.close();
   return result;
+}
+
+Future<void> _expectV21LocationFixture(AppDirectories directories) async {
+  final database = await _openRaw(directories);
+  final project = (await database.query(
+    'projects',
+    where: 'id = ?',
+    whereArgs: ['project-1'],
+  )).single;
+  expect(project['revision'], 4);
+  expect(project['archived_at'], _now);
+
+  final parent = (await database.query(
+    'project_locations',
+    where: 'id = ?',
+    whereArgs: ['location-parent'],
+  )).single;
+  expect(parent['project_id'], 'project-1');
+  expect(parent['parent_location_id'], isNull);
+  expect(parent['display_name'], 'A Blok');
+
+  final location = (await database.query(
+    'project_locations',
+    where: 'id = ?',
+    whereArgs: ['location-1'],
+  )).single;
+  expect(location['project_id'], 'project-1');
+  expect(location['parent_location_id'], 'location-parent');
+  expect(location['display_name'], 'Güncel Mahal Adı');
+  expect(location['normalized_name'], 'güncel mahal adı');
+  expect(location['revision'], 4);
+  expect(location['archived_at'], _now);
+  expect(
+    await database.query(
+      'project_location_events',
+      where: 'location_id = ?',
+      whereArgs: ['location-1'],
+      orderBy: 'sequence ASC',
+    ),
+    hasLength(3),
+  );
+
+  for (final expected in const [
+    ('field_observations', 'observation-1', 'location', 'A Blok / 1. Kat'),
+    ('follow_up_items', 'reminder-1', 'location', 'A Blok / 1. Kat'),
+    ('concrete_pours', 'pour-1', 'element_location', 'A Blok temel'),
+  ]) {
+    final row = (await database.query(
+      expected.$1,
+      where: 'id = ?',
+      whereArgs: [expected.$2],
+    )).single;
+    expect(row['location_id'], 'location-1', reason: expected.$1);
+    expect(row[expected.$3], expected.$4, reason: expected.$1);
+  }
+
+  for (final expected in const [
+    (
+      'field_observations',
+      'legacy-observation-1',
+      'location',
+      ' Legacy Serbest Mahal ',
+    ),
+    (
+      'follow_up_items',
+      'legacy-reminder-1',
+      'location',
+      'Legacy Hatırlatıcı Mahal',
+    ),
+    (
+      'concrete_pours',
+      'legacy-pour-1',
+      'element_location',
+      'Legacy Beton Elemanı',
+    ),
+  ]) {
+    final row = (await database.query(
+      expected.$1,
+      where: 'id = ?',
+      whereArgs: [expected.$2],
+    )).single;
+    expect(row['location_id'], isNull, reason: expected.$1);
+    expect(row[expected.$3], expected.$4, reason: expected.$1);
+  }
+  final legacyPour = (await database.query(
+    'concrete_pours',
+    where: 'id = ?',
+    whereArgs: ['legacy-pour-1'],
+  )).single;
+  expect(legacyPour['block_name'], 'Legacy Blok');
+  expect(legacyPour['floor_name'], 'Legacy Kat');
+  expect(legacyPour['axis_name'], 'L/1');
+  expect(await database.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+  await database.close();
 }
 
 Future<Database> _openRaw(AppDirectories directories) =>
