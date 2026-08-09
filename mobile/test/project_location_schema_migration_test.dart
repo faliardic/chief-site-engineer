@@ -109,6 +109,24 @@ void main() {
       );
 
       expect(after, before);
+      final fresh = _database(path.join(temporaryRoot.path, 'fresh.sqlite3'));
+      await fresh.open();
+      expect(
+        await _schemaElevenObjects(upgraded.database),
+        await _schemaElevenObjects(fresh.database),
+      );
+      for (final table in [
+        'field_observations',
+        'follow_up_items',
+        'concrete_pours',
+      ]) {
+        expect(
+          await _locationColumnDefinition(upgraded.database, table),
+          await _locationColumnDefinition(fresh.database, table),
+          reason: table,
+        );
+      }
+      await fresh.close();
       for (final table in [
         'field_observations',
         'follow_up_items',
@@ -124,6 +142,43 @@ void main() {
       expect(await upgraded.database.query('project_locations'), isEmpty);
       expect(await upgraded.database.query('project_events'), isEmpty);
       expect(await upgraded.database.query('project_location_events'), isEmpty);
+
+      await _insertLocation(
+        upgraded.database,
+        id: 'upgraded-location-a',
+        projectId: _projectA,
+        displayName: 'Upgrade A Mahal',
+        normalizedName: 'upgrade a mahal',
+      );
+      await _insertLocation(
+        upgraded.database,
+        id: 'upgraded-location-b',
+        projectId: _projectB,
+        displayName: 'Upgrade B Mahal',
+        normalizedName: 'upgrade b mahal',
+      );
+      for (final tableAndId in const [
+        ('field_observations', _observation),
+        ('follow_up_items', _reminder),
+        ('concrete_pours', _pour),
+      ]) {
+        await upgraded.database.update(
+          tableAndId.$1,
+          {'location_id': 'upgraded-location-a'},
+          where: 'id = ?',
+          whereArgs: [tableAndId.$2],
+        );
+        await expectLater(
+          upgraded.database.update(
+            tableAndId.$1,
+            {'location_id': 'upgraded-location-b'},
+            where: 'id = ?',
+            whereArgs: [tableAndId.$2],
+          ),
+          throwsA(isA<sqflite.DatabaseException>()),
+          reason: tableAndId.$1,
+        );
+      }
       expect(
         await upgraded.database.rawQuery('PRAGMA foreign_key_check'),
         isEmpty,
@@ -635,3 +690,42 @@ Future<void> _insertLocation(
   'updated_at': _timestamp,
   'archived_at': archivedAt,
 });
+
+const _schemaElevenObjectNames = [
+  'project_locations',
+  'project_events',
+  'project_location_events',
+  'uq_project_locations_active_sibling_name',
+  'ix_project_locations_project_parent',
+  'ix_project_events_project',
+  'ix_project_location_events_location',
+  'field_observations_location_project_insert',
+  'field_observations_location_project_update',
+  'follow_up_items_location_project_insert',
+  'follow_up_items_location_project_update',
+  'concrete_pours_location_project_insert',
+  'concrete_pours_location_project_update',
+  'project_events_append_only_update',
+  'project_events_append_only_delete',
+  'project_location_events_append_only_update',
+  'project_location_events_append_only_delete',
+  'project_locations_project_immutable',
+  'project_locations_no_physical_delete',
+];
+
+Future<List<Map<String, Object?>>> _schemaElevenObjects(
+  sqflite.Database database,
+) => database.rawQuery('''
+  SELECT type, name, tbl_name, sql
+  FROM sqlite_master
+  WHERE name IN (${List.filled(_schemaElevenObjectNames.length, '?').join(', ')})
+  ORDER BY name ASC
+  ''', _schemaElevenObjectNames);
+
+Future<Map<String, Object?>> _locationColumnDefinition(
+  sqflite.Database database,
+  String table,
+) async {
+  final rows = await database.rawQuery('PRAGMA table_info($table)');
+  return rows.singleWhere((row) => row['name'] == 'location_id');
+}
