@@ -5,6 +5,7 @@ import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/platform/agenda_attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
@@ -169,6 +170,42 @@ abstract interface class ReminderTodayApplication {
   Future<ReminderTodayOverview> getReminderTodayOverview();
 }
 
+abstract interface class ProjectLocationApplication {
+  Stream<void> get projectChanges;
+
+  Stream<void> get projectLocationChanges;
+
+  Future<List<MobileProject>> listProjects();
+
+  Future<MobileProject> createProject(CreateProjectCommand command);
+
+  Future<List<MobileProjectLocation>> listProjectLocations(
+    ProjectLocationQuery query,
+  );
+
+  Future<MobileProjectLocation> getProjectLocation(String locationId);
+
+  Future<MobileProjectLocation> createProjectLocation(
+    CreateProjectLocationCommand command,
+  );
+
+  Future<MobileProjectLocation> renameProjectLocation(
+    RenameProjectLocationCommand command,
+  );
+
+  Future<MobileProjectLocation> reparentProjectLocation(
+    ReparentProjectLocationCommand command,
+  );
+
+  Future<MobileProjectLocation> mutateProjectLocationArchive(
+    MutateProjectLocationArchiveCommand command,
+  );
+
+  Future<List<ProjectLocationEvent>> listProjectLocationEvents(
+    String locationId,
+  );
+}
+
 abstract interface class ReminderSourceAgendaMediaApplication {
   Future<ReminderSourceAgendaMedia> getReminderSourceAgendaMedia(
     String sourceLogId,
@@ -193,6 +230,7 @@ typedef ReminderTransactionHook =
 class SqliteAgendaApplication
     implements
         AgendaApplication,
+        ProjectLocationApplication,
         ReminderTodayApplication,
         ReminderSourceAgendaMediaApplication,
         ReminderDeliveryApplication {
@@ -220,9 +258,14 @@ class SqliteAgendaApplication
   final ReminderTransactionHook? beforeReminderEventInsert;
   final StreamController<void> _projectChanges =
       StreamController<void>.broadcast();
+  final StreamController<void> _projectLocationChanges =
+      StreamController<void>.broadcast();
 
   @override
   Stream<void> get projectChanges => _projectChanges.stream;
+
+  @override
+  Stream<void> get projectLocationChanges => _projectLocationChanges.stream;
 
   @override
   String? get initialNotificationReminderId =>
@@ -302,6 +345,355 @@ class SqliteAgendaApplication
     });
     if (result.changed) _projectChanges.add(null);
     return result.project;
+  }
+
+  @override
+  Future<List<MobileProjectLocation>> listProjectLocations(
+    ProjectLocationQuery query,
+  ) async {
+    validateUuid(query.projectId, 'Proje kimliği');
+    final now = _readClockOnce();
+    return _withDatabase(now, (database) async {
+      await _requireProjectExists(database, query.projectId);
+      final rows = await database.query(
+        'project_locations',
+        where:
+            'project_id = ? AND '
+            '${query.archiveFilter == ProjectLocationArchiveFilter.active ? 'archived_at IS NULL' : 'archived_at IS NOT NULL'}',
+        whereArgs: [query.projectId],
+        orderBy: 'normalized_name ASC, id ASC',
+      );
+      return rows.map(_projectLocationFromRow).toList(growable: false);
+    });
+  }
+
+  @override
+  Future<MobileProjectLocation> getProjectLocation(String locationId) async {
+    validateUuid(locationId, 'Mahal kimliği');
+    final now = _readClockOnce();
+    return _withDatabase(
+      now,
+      (database) => _requireProjectLocation(database, locationId),
+    );
+  }
+
+  @override
+  Future<MobileProjectLocation> createProjectLocation(
+    CreateProjectLocationCommand command,
+  ) async {
+    validateUuid(command.id, 'Mahal kimliği');
+    validateUuid(command.eventId, 'Mahal event kimliği');
+    validateUuid(command.projectId, 'Proje kimliği');
+    final parentLocationId = command.parentLocationId;
+    if (parentLocationId != null) {
+      validateUuid(parentLocationId, 'Üst mahal kimliği');
+    }
+    final displayName = _locationDisplayName(command.displayName);
+    final normalizedName = _normalizeLocationName(displayName);
+    final now = _readClockOnce();
+    final occurredAt = CseTimeCodec.encodeUtc(now);
+    final result = await _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        await _requireActiveProject(transaction, command.projectId);
+        final existingRows = await transaction.query(
+          'project_locations',
+          where: 'id = ?',
+          whereArgs: [command.id],
+          limit: 1,
+        );
+        if (existingRows.isNotEmpty) {
+          final existing = _projectLocationFromRow(existingRows.single);
+          if (existing.projectId != command.projectId ||
+              existing.displayName != displayName ||
+              existing.parentLocationId != parentLocationId ||
+              existing.isArchived) {
+            throw const AgendaValidationFailure(
+              'Mahal kimliği başka bir içerikle kullanılıyor.',
+            );
+          }
+          return (location: existing, changed: false);
+        }
+        if (parentLocationId != null) {
+          await _requireActiveLocationInProject(
+            transaction,
+            parentLocationId,
+            command.projectId,
+          );
+        }
+        await _rejectActiveSiblingDuplicate(
+          transaction,
+          projectId: command.projectId,
+          parentLocationId: parentLocationId,
+          normalizedName: normalizedName,
+        );
+        await transaction.insert('project_locations', {
+          'id': command.id,
+          'project_id': command.projectId,
+          'display_name': displayName,
+          'normalized_name': normalizedName,
+          'parent_location_id': parentLocationId,
+          'revision': 1,
+          'created_at': occurredAt,
+          'updated_at': occurredAt,
+        });
+        await _insertProjectLocationEvent(
+          transaction,
+          id: command.eventId,
+          locationId: command.id,
+          eventType: ProjectLocationEventType.created,
+          occurredAt: occurredAt,
+          payload: {
+            'display_name': displayName,
+            'parent_location_id': parentLocationId,
+          },
+        );
+        return (
+          location: MobileProjectLocation(
+            id: command.id,
+            projectId: command.projectId,
+            displayName: displayName,
+            parentLocationId: parentLocationId,
+            revision: 1,
+            createdAt: occurredAt,
+            updatedAt: occurredAt,
+            archivedAt: null,
+          ),
+          changed: true,
+        );
+      });
+    });
+    if (result.changed) _projectLocationChanges.add(null);
+    return result.location;
+  }
+
+  @override
+  Future<MobileProjectLocation> renameProjectLocation(
+    RenameProjectLocationCommand command,
+  ) async {
+    validateUuid(command.locationId, 'Mahal kimliği');
+    validateUuid(command.eventId, 'Mahal event kimliği');
+    _validateLocationRevision(command.expectedRevision);
+    final displayName = _locationDisplayName(command.displayName);
+    final normalizedName = _normalizeLocationName(displayName);
+    final now = _readClockOnce();
+    final occurredAt = CseTimeCodec.encodeUtc(now);
+    final result = await _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final current = await _requireProjectLocation(
+          transaction,
+          command.locationId,
+        );
+        _requireActiveLocation(current);
+        _requireLocationRevision(current, command.expectedRevision);
+        if (current.displayName == displayName) {
+          return (location: current, changed: false);
+        }
+        await _rejectActiveSiblingDuplicate(
+          transaction,
+          projectId: current.projectId,
+          parentLocationId: current.parentLocationId,
+          normalizedName: normalizedName,
+          excludingLocationId: current.id,
+        );
+        await _updateProjectLocation(
+          transaction,
+          locationId: current.id,
+          expectedRevision: current.revision,
+          values: {
+            'display_name': displayName,
+            'normalized_name': normalizedName,
+            'updated_at': occurredAt,
+            'revision': current.revision + 1,
+          },
+        );
+        await _insertProjectLocationEvent(
+          transaction,
+          id: command.eventId,
+          locationId: current.id,
+          eventType: ProjectLocationEventType.renamed,
+          occurredAt: occurredAt,
+          payload: {
+            'old_display_name': current.displayName,
+            'new_display_name': displayName,
+          },
+        );
+        return (
+          location: await _requireProjectLocation(transaction, current.id),
+          changed: true,
+        );
+      });
+    });
+    if (result.changed) _projectLocationChanges.add(null);
+    return result.location;
+  }
+
+  @override
+  Future<MobileProjectLocation> reparentProjectLocation(
+    ReparentProjectLocationCommand command,
+  ) async {
+    validateUuid(command.locationId, 'Mahal kimliği');
+    validateUuid(command.eventId, 'Mahal event kimliği');
+    _validateLocationRevision(command.expectedRevision);
+    final parentLocationId = command.parentLocationId;
+    if (parentLocationId != null) {
+      validateUuid(parentLocationId, 'Üst mahal kimliği');
+    }
+    final now = _readClockOnce();
+    final occurredAt = CseTimeCodec.encodeUtc(now);
+    final result = await _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final current = await _requireProjectLocation(
+          transaction,
+          command.locationId,
+        );
+        _requireActiveLocation(current);
+        _requireLocationRevision(current, command.expectedRevision);
+        if (current.parentLocationId == parentLocationId) {
+          return (location: current, changed: false);
+        }
+        if (parentLocationId != null) {
+          if (parentLocationId == current.id) {
+            throw const AgendaValidationFailure(
+              'Mahal kendi üst mahali olamaz.',
+            );
+          }
+          await _requireActiveLocationInProject(
+            transaction,
+            parentLocationId,
+            current.projectId,
+          );
+          await _rejectDescendantParent(
+            transaction,
+            locationId: current.id,
+            parentLocationId: parentLocationId,
+          );
+        }
+        await _rejectActiveSiblingDuplicate(
+          transaction,
+          projectId: current.projectId,
+          parentLocationId: parentLocationId,
+          normalizedName: _normalizeLocationName(current.displayName),
+          excludingLocationId: current.id,
+        );
+        await _updateProjectLocation(
+          transaction,
+          locationId: current.id,
+          expectedRevision: current.revision,
+          values: {
+            'parent_location_id': parentLocationId,
+            'updated_at': occurredAt,
+            'revision': current.revision + 1,
+          },
+        );
+        await _insertProjectLocationEvent(
+          transaction,
+          id: command.eventId,
+          locationId: current.id,
+          eventType: ProjectLocationEventType.reparented,
+          occurredAt: occurredAt,
+          payload: {
+            'old_parent_location_id': current.parentLocationId,
+            'new_parent_location_id': parentLocationId,
+          },
+        );
+        return (
+          location: await _requireProjectLocation(transaction, current.id),
+          changed: true,
+        );
+      });
+    });
+    if (result.changed) _projectLocationChanges.add(null);
+    return result.location;
+  }
+
+  @override
+  Future<MobileProjectLocation> mutateProjectLocationArchive(
+    MutateProjectLocationArchiveCommand command,
+  ) async {
+    validateUuid(command.locationId, 'Mahal kimliği');
+    validateUuid(command.eventId, 'Mahal event kimliği');
+    _validateLocationRevision(command.expectedRevision);
+    final now = _readClockOnce();
+    final occurredAt = CseTimeCodec.encodeUtc(now);
+    final result = await _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final current = await _requireProjectLocation(
+          transaction,
+          command.locationId,
+        );
+        if (current.isArchived == command.archive) {
+          return (location: current, changed: false);
+        }
+        _requireLocationRevision(current, command.expectedRevision);
+        if (command.archive) {
+          await _rejectActiveDescendants(transaction, current.id);
+        } else {
+          final parentLocationId = current.parentLocationId;
+          if (parentLocationId != null) {
+            await _requireActiveLocationInProject(
+              transaction,
+              parentLocationId,
+              current.projectId,
+            );
+          }
+          await _rejectActiveSiblingDuplicate(
+            transaction,
+            projectId: current.projectId,
+            parentLocationId: parentLocationId,
+            normalizedName: _normalizeLocationName(current.displayName),
+            excludingLocationId: current.id,
+          );
+        }
+        await _updateProjectLocation(
+          transaction,
+          locationId: current.id,
+          expectedRevision: current.revision,
+          values: {
+            'archived_at': command.archive ? occurredAt : null,
+            'updated_at': occurredAt,
+            'revision': current.revision + 1,
+          },
+        );
+        final eventType = command.archive
+            ? ProjectLocationEventType.archived
+            : ProjectLocationEventType.restored;
+        await _insertProjectLocationEvent(
+          transaction,
+          id: command.eventId,
+          locationId: current.id,
+          eventType: eventType,
+          occurredAt: occurredAt,
+          payload: {
+            'was_archived': current.isArchived,
+            'is_archived': command.archive,
+          },
+        );
+        return (
+          location: await _requireProjectLocation(transaction, current.id),
+          changed: true,
+        );
+      });
+    });
+    if (result.changed) _projectLocationChanges.add(null);
+    return result.location;
+  }
+
+  @override
+  Future<List<ProjectLocationEvent>> listProjectLocationEvents(
+    String locationId,
+  ) async {
+    validateUuid(locationId, 'Mahal kimliği');
+    final now = _readClockOnce();
+    return _withDatabase(now, (database) async {
+      await _requireProjectLocation(database, locationId);
+      final rows = await database.query(
+        'project_location_events',
+        where: 'location_id = ?',
+        whereArgs: [locationId],
+        orderBy: 'sequence ASC, id ASC',
+      );
+      return rows.map(_projectLocationEventFromRow).toList(growable: false);
+    });
   }
 
   @override
@@ -2837,6 +3229,235 @@ class SqliteAgendaApplication
   }
 }
 
+Future<void> _requireProjectExists(
+  DatabaseExecutor database,
+  String projectId,
+) async {
+  final rows = await database.query(
+    'projects',
+    columns: ['id'],
+    where: 'id = ?',
+    whereArgs: [projectId],
+    limit: 1,
+  );
+  if (rows.isEmpty) {
+    throw const AgendaValidationFailure('Seçilen proje bulunamadı.');
+  }
+}
+
+Future<void> _requireActiveProject(
+  DatabaseExecutor database,
+  String projectId,
+) async {
+  final rows = await database.query(
+    'projects',
+    columns: ['id'],
+    where: 'id = ? AND archived_at IS NULL',
+    whereArgs: [projectId],
+    limit: 1,
+  );
+  if (rows.isEmpty) {
+    throw const AgendaValidationFailure('Aktif proje bulunamadı.');
+  }
+}
+
+Future<MobileProjectLocation> _requireProjectLocation(
+  DatabaseExecutor database,
+  String locationId,
+) async {
+  final rows = await database.query(
+    'project_locations',
+    where: 'id = ?',
+    whereArgs: [locationId],
+    limit: 1,
+  );
+  if (rows.isEmpty) {
+    throw const AgendaValidationFailure('Mahal bulunamadı.');
+  }
+  return _projectLocationFromRow(rows.single);
+}
+
+Future<MobileProjectLocation> _requireActiveLocationInProject(
+  DatabaseExecutor database,
+  String locationId,
+  String projectId,
+) async {
+  final location = await _requireProjectLocation(database, locationId);
+  if (location.projectId != projectId || location.isArchived) {
+    throw const AgendaValidationFailure(
+      'Üst mahal aynı aktif projeye ait olmalıdır.',
+    );
+  }
+  return location;
+}
+
+void _requireActiveLocation(MobileProjectLocation location) {
+  if (location.isArchived) {
+    throw const AgendaValidationFailure('Arşivli mahal değiştirilemez.');
+  }
+}
+
+void _validateLocationRevision(int revision) {
+  if (revision < 1) {
+    throw const AgendaValidationFailure('Beklenen revision geçersizdir.');
+  }
+}
+
+void _requireLocationRevision(
+  MobileProjectLocation location,
+  int expectedRevision,
+) {
+  if (location.revision != expectedRevision) {
+    throw const AgendaValidationFailure(
+      'Mahal başka bir işlem tarafından değiştirilmiş.',
+    );
+  }
+}
+
+Future<void> _rejectActiveSiblingDuplicate(
+  DatabaseExecutor database, {
+  required String projectId,
+  required String? parentLocationId,
+  required String normalizedName,
+  String? excludingLocationId,
+}) async {
+  final where = <String>[
+    'project_id = ?',
+    'normalized_name = ?',
+    'archived_at IS NULL',
+    parentLocationId == null
+        ? 'parent_location_id IS NULL'
+        : 'parent_location_id = ?',
+  ];
+  final arguments = <Object?>[projectId, normalizedName];
+  if (parentLocationId != null) arguments.add(parentLocationId);
+  if (excludingLocationId != null) {
+    where.add('id != ?');
+    arguments.add(excludingLocationId);
+  }
+  final rows = await database.query(
+    'project_locations',
+    columns: ['id'],
+    where: where.join(' AND '),
+    whereArgs: arguments,
+    limit: 1,
+  );
+  if (rows.isNotEmpty) {
+    throw const AgendaValidationFailure(
+      'Aynı adlı aktif kardeş mahal zaten bulunuyor.',
+    );
+  }
+}
+
+Future<void> _rejectDescendantParent(
+  DatabaseExecutor database, {
+  required String locationId,
+  required String parentLocationId,
+}) async {
+  String? currentId = parentLocationId;
+  final visited = <String>{};
+  while (currentId != null) {
+    if (currentId == locationId) {
+      throw const AgendaValidationFailure(
+        'Mahal kendi alt mahali altına taşınamaz.',
+      );
+    }
+    if (!visited.add(currentId)) {
+      throw const AgendaValidationFailure('Mahal hiyerarşisi döngülüdür.');
+    }
+    final rows = await database.query(
+      'project_locations',
+      columns: ['parent_location_id'],
+      where: 'id = ?',
+      whereArgs: [currentId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      throw const AgendaValidationFailure('Üst mahal bulunamadı.');
+    }
+    currentId = rows.single['parent_location_id'] as String?;
+  }
+}
+
+Future<void> _rejectActiveDescendants(
+  DatabaseExecutor database,
+  String locationId,
+) async {
+  final rows = await database.rawQuery(
+    '''
+      WITH RECURSIVE descendants(id) AS (
+        SELECT id
+        FROM project_locations
+        WHERE parent_location_id = ?
+        UNION
+        SELECT child.id
+        FROM project_locations child
+        JOIN descendants parent ON child.parent_location_id = parent.id
+      )
+      SELECT 1
+      FROM project_locations location
+      JOIN descendants ON descendants.id = location.id
+      WHERE location.archived_at IS NULL
+      LIMIT 1
+    ''',
+    [locationId],
+  );
+  if (rows.isNotEmpty) {
+    throw const AgendaValidationFailure(
+      'Aktif alt mahali bulunan mahal arşivlenemez.',
+    );
+  }
+}
+
+Future<void> _updateProjectLocation(
+  DatabaseExecutor database, {
+  required String locationId,
+  required int expectedRevision,
+  required Map<String, Object?> values,
+}) async {
+  final changed = await database.update(
+    'project_locations',
+    values,
+    where: 'id = ? AND revision = ?',
+    whereArgs: [locationId, expectedRevision],
+  );
+  if (changed != 1) {
+    throw const AgendaValidationFailure(
+      'Mahal başka bir işlem tarafından değiştirilmiş.',
+    );
+  }
+}
+
+Future<void> _insertProjectLocationEvent(
+  DatabaseExecutor database, {
+  required String id,
+  required String locationId,
+  required ProjectLocationEventType eventType,
+  required String occurredAt,
+  required Map<String, Object?> payload,
+}) async {
+  final sequence =
+      Sqflite.firstIntValue(
+        await database.rawQuery(
+          '''
+            SELECT COALESCE(MAX(sequence), 0) + 1
+            FROM project_location_events
+            WHERE location_id = ?
+          ''',
+          [locationId],
+        ),
+      ) ??
+      1;
+  await database.insert('project_location_events', {
+    'id': id,
+    'location_id': locationId,
+    'sequence': sequence,
+    'event_type': eventType.storageValue,
+    'occurred_at': occurredAt,
+    'payload_json': jsonEncode(payload),
+  });
+}
+
 Map<String, Object?> _agendaEventSnapshot(AgendaLog log) => {
   'project_id': log.projectId,
   'observed_at': log.observedAt,
@@ -2851,6 +3472,15 @@ bool _mapsEqual(Map<String, Object?> first, Map<String, Object?> second) =>
 
 String _normalizeProjectName(String value) =>
     value.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+
+String _locationDisplayName(String value) => requiredTrimmed(
+  value,
+  'Mahal adı',
+  maxLength: 160,
+).replaceAll(RegExp(r'\s+'), ' ');
+
+String _normalizeLocationName(String value) =>
+    _locationDisplayName(value).toLowerCase();
 
 class _ResolvedReminderSchedule {
   const _ResolvedReminderSchedule({
@@ -2877,6 +3507,71 @@ MobileProject _projectFromRow(Map<String, Object?> row) {
     createdAt: createdAt,
     updatedAt: updatedAt,
     revision: row['revision']! as int,
+  );
+}
+
+MobileProjectLocation _projectLocationFromRow(Map<String, Object?> row) {
+  final id = row['id']! as String;
+  final projectId = row['project_id']! as String;
+  final parentLocationId = row['parent_location_id'] as String?;
+  final createdAt = row['created_at']! as String;
+  final updatedAt = row['updated_at']! as String;
+  final archivedAt = row['archived_at'] as String?;
+  final revision = row['revision']! as int;
+  validateUuid(id, 'Mahal kimliği');
+  validateUuid(projectId, 'Proje kimliği');
+  if (parentLocationId != null) {
+    validateUuid(parentLocationId, 'Üst mahal kimliği');
+  }
+  validateCanonicalTimestamp(createdAt, 'Mahal oluşturma zamanı');
+  validateCanonicalTimestamp(updatedAt, 'Mahal güncelleme zamanı');
+  if (archivedAt != null) {
+    validateCanonicalTimestamp(archivedAt, 'Mahal arşivleme zamanı');
+  }
+  if (revision < 1) {
+    throw const AgendaValidationFailure('Mahal revision geçersizdir.');
+  }
+  return MobileProjectLocation(
+    id: id,
+    projectId: projectId,
+    displayName: requiredTrimmed(
+      row['display_name']! as String,
+      'Mahal adı',
+      maxLength: 160,
+    ),
+    parentLocationId: parentLocationId,
+    revision: revision,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+    archivedAt: archivedAt,
+  );
+}
+
+ProjectLocationEvent _projectLocationEventFromRow(Map<String, Object?> row) {
+  final id = row['id']! as String;
+  final locationId = row['location_id']! as String;
+  final occurredAt = row['occurred_at']! as String;
+  final sequence = row['sequence']! as int;
+  validateUuid(id, 'Mahal event kimliği');
+  validateUuid(locationId, 'Mahal kimliği');
+  validateCanonicalTimestamp(occurredAt, 'Mahal event zamanı');
+  if (sequence < 1) {
+    throw const AgendaValidationFailure('Mahal event sırası geçersizdir.');
+  }
+  final storageType = row['event_type']! as String;
+  final eventType = ProjectLocationEventType.values.where(
+    (item) => item.storageValue == storageType,
+  );
+  if (eventType.isEmpty) {
+    throw const AgendaValidationFailure('Mahal event türü desteklenmiyor.');
+  }
+  return ProjectLocationEvent(
+    id: id,
+    locationId: locationId,
+    sequence: sequence,
+    eventType: eventType.single,
+    occurredAt: occurredAt,
+    payloadJson: row['payload_json']! as String,
   );
 }
 
