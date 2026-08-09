@@ -7,6 +7,7 @@ import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
+import 'package:chief_site_engineer/features/agenda/project_location_catalog_page.dart';
 import 'package:chief_site_engineer/features/owned_text_input_dialog.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
@@ -15,6 +16,7 @@ import 'package:flutter/material.dart';
 class AgendaPage extends StatefulWidget {
   const AgendaPage({
     required this.agenda,
+    this.projectLocations,
     this.attachments,
     this.concrete,
     this.concreteAttachments,
@@ -22,6 +24,7 @@ class AgendaPage extends StatefulWidget {
   });
 
   final AgendaApplication agenda;
+  final ProjectLocationApplication? projectLocations;
   final SafeAttachmentPicker? attachments;
   final ConcreteApplication? concrete;
   final SafeAttachmentPicker? concreteAttachments;
@@ -195,6 +198,19 @@ class _AgendaPageState extends State<AgendaPage> {
     await _reload();
   }
 
+  Future<void> _openProjectLocationCatalog() async {
+    final projectLocations = widget.projectLocations;
+    if (projectLocations == null) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ProjectLocationCatalogPage(
+          application: projectLocations,
+          initialProjectId: _projectId,
+        ),
+      ),
+    );
+  }
+
   Future<void> _openDetail(AgendaLog log) async {
     if (_detailNavigationBusy) return;
     final restoreOffset = _currentScrollOffset;
@@ -279,14 +295,24 @@ class _AgendaPageState extends State<AgendaPage> {
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
           children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                key: const Key('create-agenda-project'),
-                onPressed: _createProject,
-                icon: const Icon(Icons.create_new_folder_outlined),
-                label: const Text('Yeni proje'),
-              ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  key: const Key('create-agenda-project'),
+                  onPressed: _createProject,
+                  icon: const Icon(Icons.create_new_folder_outlined),
+                  label: const Text('Yeni proje'),
+                ),
+                if (widget.projectLocations != null)
+                  OutlinedButton.icon(
+                    key: const Key('open-project-location-catalog'),
+                    onPressed: _openProjectLocationCatalog,
+                    icon: const Icon(Icons.account_tree_outlined),
+                    label: const Text('Mahal Kataloğu'),
+                  ),
+              ],
             ),
             const SizedBox(height: 8),
             Wrap(

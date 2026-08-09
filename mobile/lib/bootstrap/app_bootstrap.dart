@@ -30,6 +30,7 @@ class BootstrapSuccess extends BootstrapResult {
     required this.smokeRecordId,
     required this.smokeRecordCreatedAt,
     required this.agenda,
+    this.projectLocations,
     this.attendance,
     this.concrete,
     this.concreteAttachments,
@@ -40,6 +41,7 @@ class BootstrapSuccess extends BootstrapResult {
   final String smokeRecordId;
   final String smokeRecordCreatedAt;
   final AgendaApplication agenda;
+  final ProjectLocationApplication? projectLocations;
   final AttendanceApplication? attendance;
   final ConcreteApplication? concrete;
   final SafeAttachmentPicker? concreteAttachments;
@@ -190,6 +192,7 @@ class AppBootstrap {
         smokeRecordId: smoke.id,
         smokeRecordCreatedAt: smoke.createdAt,
         agenda: agenda,
+        projectLocations: agenda,
         attendance: attendance,
         concrete: concrete,
         concreteAttachments: concreteAttachments,
