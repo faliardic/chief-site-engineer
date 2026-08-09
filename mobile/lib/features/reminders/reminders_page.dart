@@ -12,10 +12,16 @@ enum _ReminderPrimaryView { today, tomorrow, other }
 enum _ReminderTodaySection { overdue, timedToday, allDayToday }
 
 class RemindersPage extends StatefulWidget {
-  const RemindersPage({required this.agenda, this.attendance, super.key});
+  const RemindersPage({
+    required this.agenda,
+    this.attendance,
+    this.projectLocations,
+    super.key,
+  });
 
   final AgendaApplication agenda;
   final AttendanceApplication? attendance;
+  final ProjectLocationApplication? projectLocations;
 
   @override
   State<RemindersPage> createState() => _RemindersPageState();
@@ -165,6 +171,7 @@ class _RemindersPageState extends State<RemindersPage> {
           builder: (_) => ReminderDetailPage(
             agenda: widget.agenda,
             attendance: widget.attendance,
+            projectLocations: widget.projectLocations,
             reminderId: reminder.id,
             istanbulToday: _todayOverview.istanbulDay.isEmpty
                 ? null
@@ -273,7 +280,10 @@ class _RemindersPageState extends State<RemindersPage> {
                 final created = await Navigator.of(context)
                     .push<MobileReminder>(
                       MaterialPageRoute(
-                        builder: (_) => ReminderFormPage(agenda: widget.agenda),
+                        builder: (_) => ReminderFormPage(
+                          agenda: widget.agenda,
+                          projectLocations: widget.projectLocations,
+                        ),
                       ),
                     );
                 if (created != null && mounted) {
@@ -502,6 +512,8 @@ class _RemindersPageState extends State<RemindersPage> {
                 reminder.kind.label,
                 reminder.status.label,
                 _sourceLabel(reminder),
+                if (reminder.displayLocation case final location?)
+                  '$location${reminder.stableLocationArchivedAt == null ? '' : ' (Arşivli)'}',
                 _scheduleLabel(reminder, section),
                 if (showRestore && reminder.trashedAt != null)
                   'Taşındı: '

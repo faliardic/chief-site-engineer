@@ -102,6 +102,9 @@ ConcretePour _pourFromRow(Map<String, Object?> row) {
     projectName: row['project_name']! as String,
     pourCode: row['pour_code']! as String,
     elementLocation: row['element_location']! as String,
+    locationId: row['location_id'] as String?,
+    stableLocationName: row['stable_location_name'] as String?,
+    stableLocationArchivedAt: row['stable_location_archived_at'] as String?,
     blockName: row['block_name'] as String?,
     floorName: row['floor_name'] as String?,
     axisName: row['axis_name'] as String?,
@@ -281,6 +284,9 @@ MobileReminder _reminderFromRow(Map<String, Object?> row) {
     description: row['description'] as String?,
     kind: ReminderKind.fromStorage(row['item_type']! as String),
     status: ReminderStatus.fromStorage(row['status']! as String),
+    locationId: row['location_id'] as String?,
+    stableLocationName: row['stable_location_name'] as String?,
+    stableLocationArchivedAt: row['stable_location_archived_at'] as String?,
     location: row['location'] as String?,
     relatedPerson: row['related_person'] as String?,
     isImportant: row['is_important'] == 1,
@@ -583,12 +589,15 @@ class SqliteConcreteApplication implements ConcreteApplication {
           OR instr(coalesce(c.block_name, ''), ?) > 0
           OR instr(coalesce(c.floor_name, ''), ?) > 0
           OR instr(coalesce(c.axis_name, ''), ?) > 0
+          OR instr(coalesce(l.display_name, ''), ?) > 0
           OR instr(p.name, ?) > 0
         )''');
-        args.addAll(List<Object?>.filled(6, search));
+        args.addAll(List<Object?>.filled(7, search));
       }
       final rows = await database.rawQuery('''
         SELECT c.*, p.name AS project_name,
+          l.display_name AS stable_location_name,
+          l.archived_at AS stable_location_archived_at,
           (SELECT count(*) FROM concrete_check_items x
             WHERE x.concrete_pour_id = c.id AND x.is_required = 1
               AND x.status = 'pending')
@@ -611,6 +620,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
               )) AS missing_evidence_truck_count
         FROM concrete_pours c
         JOIN projects p ON p.id = c.project_id
+        LEFT JOIN project_locations l ON l.id = c.location_id
         ${where.isEmpty ? '' : 'WHERE ${where.join(' AND ')}'}
         ORDER BY c.planned_at ASC, c.created_at ASC, c.id ASC
         ''', args);
@@ -638,6 +648,13 @@ class SqliteConcreteApplication implements ConcreteApplication {
           projectId: normalized.projectId,
           activeOnly: true,
         );
+        final stableLocationName = normalized.locationId == null
+            ? null
+            : await _requireActiveConcreteLocation(
+                transaction,
+                projectId: normalized.projectId,
+                locationId: normalized.locationId!,
+              );
         final targetSlump =
             normalized.targetSlump ?? selectedClass.defaultTargetSlump;
         final existing = await transaction.query(
@@ -676,6 +693,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
           'project_id': normalized.projectId,
           'pour_code': normalized.pourCode,
           'element_location': normalized.elementLocation,
+          'location_id': normalized.locationId,
           'block_name': normalized.blockName,
           'floor_name': normalized.floorName,
           'axis_name': normalized.axisName,
@@ -734,6 +752,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
             'project_id': normalized.projectId,
             'pour_code': normalized.pourCode,
             'planned_at': normalized.plannedAt,
+            'location_id': normalized.locationId,
             'concrete_class_id': selectedClass.id,
             'concrete_class_snapshot': selectedClass.displayName,
           },
@@ -761,6 +780,8 @@ class SqliteConcreteApplication implements ConcreteApplication {
             label: definition.$2,
             dueAt: dueAt,
             occurredAt: timestamp,
+            locationId: normalized.locationId,
+            locationSnapshot: stableLocationName,
             repeatIntervalMinutes: isHourlyFieldTask ? 60 : null,
           );
         }
@@ -934,6 +955,8 @@ class SqliteConcreteApplication implements ConcreteApplication {
             label: '${values['sample_code']} numunesini laboratuvara teslim et',
             dueAt: command.laboratoryAppointmentAt,
             occurredAt: timestamp,
+            locationId: pour.locationId,
+            locationSnapshot: pour.stableLocationName,
             sourceSampleSetId: command.id,
           );
           final dates = command.expectedResultDates;
@@ -948,6 +971,8 @@ class SqliteConcreteApplication implements ConcreteApplication {
               label: '${values['sample_code']} numune sonucu ${index + 1}',
               dueAt: dates[index],
               occurredAt: timestamp,
+              locationId: pour.locationId,
+              locationSnapshot: pour.stableLocationName,
               sourceSampleSetId: command.id,
             );
           }
@@ -1387,6 +1412,8 @@ class SqliteConcreteApplication implements ConcreteApplication {
     required String label,
     required String? dueAt,
     required String occurredAt,
+    String? locationId,
+    String? locationSnapshot,
     String? sourceSampleSetId,
     int? repeatIntervalMinutes,
   }) async {
@@ -1407,6 +1434,8 @@ class SqliteConcreteApplication implements ConcreteApplication {
           : ReminderStatus.active.storageValue,
       'project_id': projectId,
       'concrete_pour_id': pourId,
+      'location_id': locationId,
+      'location': locationSnapshot,
       'is_important': 0,
       'next_attention_at': dueAt,
       'revision': 1,
@@ -1423,6 +1452,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
       'occurred_at': occurredAt,
       'payload_json': jsonEncode({
         'source_concrete_pour_id': pourId,
+        'location_id': locationId,
         'next_attention_at': dueAt,
         'status': dueAt == null ? 'inbox' : 'active',
       }),
@@ -1917,9 +1947,12 @@ class SqliteConcreteApplication implements ConcreteApplication {
     )).map(_eventFromRow).toList(growable: false);
     final reminderRows = await database.rawQuery(
       '''
-      SELECT f.*, p.name AS project_name
+      SELECT f.*, p.name AS project_name,
+        l.display_name AS stable_location_name,
+        l.archived_at AS stable_location_archived_at
       FROM follow_up_items f
       JOIN projects p ON p.id = f.project_id
+      LEFT JOIN project_locations l ON l.id = f.location_id
       WHERE f.concrete_pour_id = ? AND f.trashed_at IS NULL
       ORDER BY f.created_at ASC, f.id ASC
       ''',
@@ -2006,8 +2039,11 @@ class SqliteConcreteApplication implements ConcreteApplication {
   ) async {
     final rows = await database.rawQuery(
       '''
-      SELECT c.*, p.name AS project_name
+      SELECT c.*, p.name AS project_name,
+        l.display_name AS stable_location_name,
+        l.archived_at AS stable_location_archived_at
       FROM concrete_pours c JOIN projects p ON p.id = c.project_id
+      LEFT JOIN project_locations l ON l.id = c.location_id
       WHERE c.id = ? LIMIT 1
       ''',
       [pourId],
@@ -2033,6 +2069,26 @@ class SqliteConcreteApplication implements ConcreteApplication {
       throw const AgendaValidationFailure('Seçilen proje bulunamadı.');
     }
     return rows.single['name']! as String;
+  }
+
+  Future<String> _requireActiveConcreteLocation(
+    DatabaseExecutor database, {
+    required String projectId,
+    required String locationId,
+  }) async {
+    final rows = await database.query(
+      'project_locations',
+      columns: ['display_name'],
+      where: 'id = ? AND project_id = ? AND archived_at IS NULL',
+      whereArgs: [locationId, projectId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      throw const AgendaValidationFailure(
+        'Seçilen mahal aktif ve aynı projeye ait olmalıdır.',
+      );
+    }
+    return rows.single['display_name']! as String;
   }
 
   Future<ProjectConcreteClass> _requireConcreteClass(
@@ -2193,6 +2249,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
       'updated_at': occurredAt,
       'category': AgendaCategory.concrete.storageValue,
       'description': summary.description,
+      'location_id': pour.locationId,
       'location': pour.elementLocation,
       'notes': summary.notes,
       'revision': 1,
@@ -2267,6 +2324,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
       {
         'observed_at': startedAt,
         'description': summary.description,
+        'location_id': pour.locationId,
         'location': pour.elementLocation,
         'notes': summary.notes,
         'updated_at': occurredAt,
@@ -2467,6 +2525,9 @@ class SqliteConcreteApplication implements ConcreteApplication {
     validateUuid(command.eventId, 'Event kimliği');
     validateUuid(command.projectId, 'Proje kimliği');
     validateUuid(command.concreteClassId, 'Beton sınıfı kimliği');
+    if (command.locationId case final locationId?) {
+      validateUuid(locationId, 'Mahal kimliği');
+    }
     requiredTrimmed(command.pourCode, 'Döküm kodu', maxLength: 80);
     requiredTrimmed(command.elementLocation, 'Mahal/eleman', maxLength: 240);
     validateCanonicalTimestamp(command.plannedAt, 'Planlanan döküm zamanı');
@@ -2492,6 +2553,9 @@ class SqliteConcreteApplication implements ConcreteApplication {
     validateUuid(command.id, 'Beton paketi kimliği');
     validateUuid(command.eventId, 'Event kimliği');
     _validateExpectedRevision(command.expectedRevision);
+    if (command.locationId case final locationId?) {
+      validateUuid(locationId, 'Mahal kimliği');
+    }
     requiredTrimmed(command.elementLocation, 'Mahal/eleman', maxLength: 240);
     requiredTrimmed(command.concreteClass, 'Beton sınıfı', maxLength: 80);
     validateCanonicalTimestamp(command.plannedAt, 'Planlanan döküm zamanı');
@@ -2525,6 +2589,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
       'Mahal/eleman',
       maxLength: 240,
     ),
+    locationId: value.locationId,
     plannedAt: value.plannedAt,
     concreteClassId: value.concreteClassId,
     plannedVolumeM3: value.plannedVolumeM3,
@@ -2588,6 +2653,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
       'Mahal/eleman',
       maxLength: 240,
     ),
+    'location_id': value.locationId,
     'block_name': optionalTrimmed(value.blockName, 'Blok', maxLength: 80),
     'floor_name': optionalTrimmed(value.floorName, 'Kat', maxLength: 80),
     'axis_name': optionalTrimmed(value.axisName, 'Aks', maxLength: 120),
@@ -2662,6 +2728,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
       current.projectId == value.projectId &&
       current.pourCode == value.pourCode &&
       current.elementLocation == value.elementLocation &&
+      current.locationId == value.locationId &&
       current.plannedAt == value.plannedAt &&
       concreteClassId == value.concreteClassId &&
       current.plannedVolumeM3 == value.plannedVolumeM3;
@@ -3284,6 +3351,7 @@ class SqliteConcreteApplication implements ConcreteApplication {
         final values = _normalizedUpdate(command);
         final currentValues = <String, Object?>{
           'element_location': current.elementLocation,
+          'location_id': current.locationId,
           'block_name': current.blockName,
           'floor_name': current.floorName,
           'axis_name': current.axisName,
@@ -3305,6 +3373,19 @@ class SqliteConcreteApplication implements ConcreteApplication {
           'sample_exception_reason': current.sampleExceptionReason,
           'variance_note': current.varianceNote,
         };
+        String? stableLocationSnapshot;
+        if (values['location_id'] case final String locationId) {
+          final preservesExisting = locationId == current.locationId;
+          if (!preservesExisting) {
+            stableLocationSnapshot = await _requireActiveConcreteLocation(
+              transaction,
+              projectId: current.projectId,
+              locationId: locationId,
+            );
+          } else {
+            stableLocationSnapshot = current.stableLocationName;
+          }
+        }
         if (_jsonEqual(currentValues, values)) {
           await _syncFieldReminderTasks(
             transaction,
@@ -3323,6 +3404,18 @@ class SqliteConcreteApplication implements ConcreteApplication {
           return _loadDetail(transaction, command.id);
         }
         await _advancePour(transaction, current, timestamp, values);
+        if (current.locationId != values['location_id'] ||
+            current.elementLocation != values['element_location']) {
+          await _syncConcreteLocationLinks(
+            transaction,
+            pour: current,
+            locationId: values['location_id'] as String?,
+            locationSnapshot: stableLocationSnapshot,
+            elementLocation: values['element_location']! as String,
+            occurredAt: timestamp,
+            eventSeed: command.eventId,
+          );
+        }
         await _insertConcreteEvent(
           transaction,
           id: command.eventId,
@@ -3355,6 +3448,103 @@ class SqliteConcreteApplication implements ConcreteApplication {
     });
     await _safeReconcileNotifications();
     return detail;
+  }
+
+  Future<void> _syncConcreteLocationLinks(
+    DatabaseExecutor database, {
+    required ConcretePour pour,
+    required String? locationId,
+    required String? locationSnapshot,
+    required String elementLocation,
+    required String occurredAt,
+    required String eventSeed,
+  }) async {
+    if (pour.locationId != locationId) {
+      final reminders = await database.query(
+        'follow_up_items',
+        columns: ['id', 'revision'],
+        where: 'concrete_pour_id = ?',
+        whereArgs: [pour.id],
+      );
+      for (final row in reminders) {
+        final reminderId = row['id']! as String;
+        final revision = row['revision']! as int;
+        final changed = await database.update(
+          'follow_up_items',
+          {
+            'location_id': locationId,
+            'location': locationSnapshot,
+            'revision': revision + 1,
+            'updated_at': occurredAt,
+          },
+          where: 'id = ? AND revision = ?',
+          whereArgs: [reminderId, revision],
+        );
+        if (changed != 1) throw _staleFailure();
+        await database.insert('follow_up_events', {
+          'id': _stableUuid(
+            'concrete-location-reminder:$eventSeed:$reminderId',
+          ),
+          'follow_up_id': reminderId,
+          'sequence': await _nextReminderSequence(database, reminderId),
+          'project_id': pour.projectId,
+          'source_concrete_pour_id': pour.id,
+          'event_type': 'details_updated',
+          'occurred_at': occurredAt,
+          'payload_json': jsonEncode({
+            'location_id': locationId,
+            'revision': revision + 1,
+            'source_concrete_pour_id': pour.id,
+          }),
+        });
+      }
+    }
+    final context = await database.query(
+      'concrete_pour_context_links',
+      columns: ['agenda_log_id'],
+      where: 'concrete_pour_id = ?',
+      whereArgs: [pour.id],
+      limit: 1,
+    );
+    final agendaLogId = context.isEmpty
+        ? null
+        : context.single['agenda_log_id'] as String?;
+    if (agendaLogId == null) return;
+    final observations = await database.query(
+      'field_observations',
+      columns: ['revision'],
+      where: 'id = ? AND project_id = ?',
+      whereArgs: [agendaLogId, pour.projectId],
+      limit: 1,
+    );
+    if (observations.isEmpty) {
+      throw const AgendaValidationFailure('Yönetilen Ajanda kaydı bulunamadı.');
+    }
+    final revision = observations.single['revision']! as int;
+    final changed = await database.update(
+      'field_observations',
+      {
+        'location_id': locationId,
+        'location': elementLocation,
+        'revision': revision + 1,
+        'updated_at': occurredAt,
+      },
+      where: 'id = ? AND project_id = ? AND revision = ?',
+      whereArgs: [agendaLogId, pour.projectId, revision],
+    );
+    if (changed != 1) throw _staleFailure();
+    await database.insert('observation_events', {
+      'id': _stableUuid('concrete-location-agenda:$eventSeed:$agendaLogId'),
+      'observation_id': agendaLogId,
+      'project_id': pour.projectId,
+      'event_type': 'concrete_pour.details_updated',
+      'occurred_at': occurredAt,
+      'payload_json': jsonEncode({
+        'concrete_pour_id': pour.id,
+        'location_id': locationId,
+        'managed_by': 'concrete_pour',
+      }),
+    });
   }
 
   Future<String> _nextSampleCode(

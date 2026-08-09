@@ -4,6 +4,7 @@ import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/concrete_models.dart';
+import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_attachment_viewer_page.dart';
 import 'package:chief_site_engineer/features/owned_text_input_dialog.dart';
@@ -17,6 +18,7 @@ class ConcretePourDetailPage extends StatefulWidget {
     required this.agenda,
     required this.attachments,
     required this.pourId,
+    this.projectLocations,
     super.key,
   });
 
@@ -24,6 +26,7 @@ class ConcretePourDetailPage extends StatefulWidget {
   final AgendaApplication agenda;
   final SafeAttachmentPicker attachments;
   final String pourId;
+  final ProjectLocationApplication? projectLocations;
 
   @override
   State<ConcretePourDetailPage> createState() => _ConcretePourDetailPageState();
@@ -100,6 +103,7 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
           eventId: RecordId.randomUuid(),
           expectedRevision: pour.revision,
           elementLocation: pour.elementLocation,
+          locationId: pour.locationId,
           plannedAt: pour.plannedAt,
           concreteClass: pour.concreteClass,
           plannedVolumeM3: pour.plannedVolumeM3,
@@ -504,6 +508,64 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
     );
   }
 
+  Future<void> _editLocation() async {
+    final pour = _detail!.pour;
+    List<MobileProjectLocation> locations = const [];
+    if (widget.projectLocations != null) {
+      try {
+        locations = await widget.projectLocations!.listProjectLocations(
+          ProjectLocationQuery(projectId: pour.projectId),
+        );
+      } on Object {
+        locations = const [];
+      }
+    }
+    if (!mounted) return;
+    final draft = await showDialog<_LocationEditDraft>(
+      context: context,
+      builder: (context) => _LocationEditDialog(
+        locations: locations,
+        initialLocationId: pour.locationId,
+        initialElementLocation: pour.elementLocation,
+        archivedLocationName: pour.stableLocationName,
+      ),
+    );
+    if (draft != null) {
+      await _run(
+        () => widget.concrete.updatePour(
+          UpdateConcretePourCommand(
+            id: pour.id,
+            eventId: RecordId.randomUuid(),
+            expectedRevision: pour.revision,
+            elementLocation: draft.elementLocation,
+            locationId: draft.locationId,
+            plannedAt: pour.plannedAt,
+            concreteClass: pour.concreteClass,
+            plannedVolumeM3: pour.plannedVolumeM3,
+            blockName: pour.blockName,
+            floorName: pour.floorName,
+            axisName: pour.axisName,
+            targetSlump: pour.targetSlump,
+            orderedVolumeM3: pour.orderedVolumeM3,
+            plantName: pour.plantName,
+            plantBranch: pour.plantBranch,
+            plantContact: pour.plantContact,
+            plantAppointmentReference: pour.plantAppointmentReference,
+            pumpEquipment: pour.pumpEquipment,
+            laboratoryName: pour.laboratoryName,
+            laboratoryContact: pour.laboratoryContact,
+            laboratoryAppointment: pour.laboratoryAppointment,
+            inspectionNotifiedAt: pour.inspectionNotifiedAt,
+            inspectionNotifiedPerson: pour.inspectionNotifiedPerson,
+            generalNote: pour.generalNote,
+            sampleExceptionReason: pour.sampleExceptionReason,
+            varianceNote: pour.varianceNote,
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _editTargetVolume() async {
     final detail = _detail!;
     final valueText = await showDialog<String>(
@@ -557,6 +619,7 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
           eventId: RecordId.randomUuid(),
           expectedRevision: pour.revision,
           elementLocation: pour.elementLocation,
+          locationId: pour.locationId,
           plannedAt: pour.plannedAt,
           concreteClass: pour.concreteClass,
           plannedVolumeM3: value,
@@ -769,9 +832,17 @@ class _ConcretePourDetailPageState extends State<ConcretePourDetailPage> {
               ListTile(
                 title: Text(pour.elementLocation),
                 subtitle: Text(
-                  '${pour.projectName}\n${CseTimeCodec.formatIstanbul(pour.plannedAt)} • ${pour.concreteClass} • ${pour.status.label}',
+                  '${pour.projectName}'
+                  '${pour.stableLocationName == null ? '' : '\nKatalog Mahali: ${pour.stableLocationName}${pour.stableLocationArchivedAt == null ? '' : ' (Arşivli)'}'}'
+                  '\n${CseTimeCodec.formatIstanbul(pour.plannedAt)} • ${pour.concreteClass} • ${pour.status.label}',
                 ),
                 isThreeLine: true,
+                trailing: IconButton(
+                  key: const Key('edit-concrete-location'),
+                  tooltip: 'Mahal ve yer tarifini değiştir',
+                  onPressed: _mutating ? null : _editLocation,
+                  icon: const Icon(Icons.edit_location_alt_outlined),
+                ),
               ),
               ListTile(
                 key: const Key('concrete-live-volume'),
@@ -1217,6 +1288,116 @@ class _ConcreteStageTimeline extends StatelessWidget {
             padding: EdgeInsets.only(top: 8),
             child: Text('İptal edildi • gerçek zaman geçmişi korunuyor.'),
           ),
+      ],
+    );
+  }
+}
+
+class _LocationEditDraft {
+  const _LocationEditDraft({
+    required this.locationId,
+    required this.elementLocation,
+  });
+
+  final String? locationId;
+  final String elementLocation;
+}
+
+class _LocationEditDialog extends StatefulWidget {
+  const _LocationEditDialog({
+    required this.locations,
+    required this.initialLocationId,
+    required this.initialElementLocation,
+    required this.archivedLocationName,
+  });
+
+  final List<MobileProjectLocation> locations;
+  final String? initialLocationId;
+  final String initialElementLocation;
+  final String? archivedLocationName;
+
+  @override
+  State<_LocationEditDialog> createState() => _LocationEditDialogState();
+}
+
+class _LocationEditDialogState extends State<_LocationEditDialog> {
+  late final TextEditingController _elementLocation;
+  late String? _locationId;
+
+  @override
+  void initState() {
+    super.initState();
+    _elementLocation = TextEditingController(
+      text: widget.initialElementLocation,
+    );
+    _locationId = widget.initialLocationId;
+  }
+
+  @override
+  void dispose() {
+    _elementLocation.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Mahal ve yer tarifi'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          DropdownButtonFormField<String>(
+            key: const Key('edit-concrete-location-selector'),
+            initialValue: _locationId,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Katalog Mahali (opsiyonel)',
+            ),
+            items: [
+              const DropdownMenuItem<String>(
+                value: null,
+                child: Text('Mahal seçilmedi'),
+              ),
+              ...widget.locations.map(
+                (item) => DropdownMenuItem<String>(
+                  value: item.id,
+                  child: Text(item.displayName),
+                ),
+              ),
+              if (_locationId != null &&
+                  !widget.locations.any((item) => item.id == _locationId))
+                DropdownMenuItem<String>(
+                  value: _locationId,
+                  child: Text(
+                    '${widget.archivedLocationName ?? 'Arşivli mahal'} (Arşivli)',
+                  ),
+                ),
+            ],
+            onChanged: (value) => setState(() => _locationId = value),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('edit-concrete-element-location'),
+            controller: _elementLocation,
+            decoration: const InputDecoration(labelText: 'Eleman / yer tarifi'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Vazgeç'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(
+            context,
+            _LocationEditDraft(
+              locationId: _locationId,
+              elementLocation: _elementLocation.text,
+            ),
+          ),
+          child: const Text('Kaydet'),
+        ),
       ],
     );
   }

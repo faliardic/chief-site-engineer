@@ -241,6 +241,7 @@ class _MobileShellState extends State<MobileShell> {
               concrete: concrete,
               agenda: widget.bootstrap.agenda,
               attachments: attachments,
+              projectLocations: widget.bootstrap.projectLocations,
               pourId: reminder.concretePourId!,
             ),
           ),
@@ -256,6 +257,7 @@ class _MobileShellState extends State<MobileShell> {
       MaterialPageRoute(
         builder: (_) => ReminderDetailPage(
           agenda: widget.bootstrap.agenda,
+          projectLocations: widget.bootstrap.projectLocations,
           attendance: widget.bootstrap.attendance,
           concrete: widget.bootstrap.concrete,
           concreteAttachments: widget.bootstrap.concreteAttachments,
@@ -295,6 +297,7 @@ class _MobileShellState extends State<MobileShell> {
             RemindersPage(
               agenda: widget.bootstrap.agenda,
               attendance: widget.bootstrap.attendance,
+              projectLocations: widget.bootstrap.projectLocations,
             ),
             AgendaPage(
               agenda: widget.bootstrap.agenda,
@@ -319,6 +322,7 @@ class _MobileShellState extends State<MobileShell> {
                   concrete: concrete,
                   agenda: widget.bootstrap.agenda,
                   attachments: attachments,
+                  projectLocations: widget.bootstrap.projectLocations,
                 )
               else
                 const _PreparingPage(

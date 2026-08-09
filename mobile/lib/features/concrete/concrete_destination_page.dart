@@ -11,6 +11,7 @@ class ConcreteDestinationPage extends StatelessWidget {
     required this.attachments,
     required this.initialProjectId,
     required this.initialIstanbulDay,
+    this.projectLocations,
     super.key,
   });
 
@@ -19,6 +20,7 @@ class ConcreteDestinationPage extends StatelessWidget {
   final SafeAttachmentPicker attachments;
   final String initialProjectId;
   final String initialIstanbulDay;
+  final ProjectLocationApplication? projectLocations;
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +30,7 @@ class ConcreteDestinationPage extends StatelessWidget {
         concrete: concrete,
         agenda: agenda,
         attachments: attachments,
+        projectLocations: projectLocations,
         initialProjectId: initialProjectId,
         initialIstanbulDay: initialIstanbulDay,
       ),
