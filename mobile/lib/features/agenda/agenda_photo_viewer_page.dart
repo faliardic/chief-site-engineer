@@ -60,7 +60,7 @@ class _AgendaPhotoThumbnailState extends State<AgendaPhotoThumbnail> {
   }
 }
 
-class AgendaPhotoViewerPage extends StatelessWidget {
+class AgendaPhotoViewerPage extends StatefulWidget {
   const AgendaPhotoViewerPage({
     required this.agenda,
     required this.photo,
@@ -71,17 +71,103 @@ class AgendaPhotoViewerPage extends StatelessWidget {
   final AgendaLogPhoto photo;
 
   @override
+  State<AgendaPhotoViewerPage> createState() => _AgendaPhotoViewerPageState();
+}
+
+class _AgendaPhotoViewerPageState extends State<AgendaPhotoViewerPage> {
+  late Future<StoredAttachmentContent> _content;
+  bool _exporting = false;
+  bool _operationFailed = false;
+  String? _operationMessage;
+
+  AgendaPhotoExportApplication? get _exporter {
+    final agenda = widget.agenda;
+    return agenda is AgendaPhotoExportApplication
+        ? agenda as AgendaPhotoExportApplication
+        : null;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _content = widget.agenda.readAgendaPhoto(widget.photo.id);
+  }
+
+  @override
+  void didUpdateWidget(covariant AgendaPhotoViewerPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.agenda != widget.agenda ||
+        oldWidget.photo.id != widget.photo.id) {
+      _content = widget.agenda.readAgendaPhoto(widget.photo.id);
+      _operationMessage = null;
+      _operationFailed = false;
+    }
+  }
+
+  Future<void> _save() async {
+    final exporter = _exporter;
+    if (exporter == null || _exporting) return;
+    setState(() {
+      _exporting = true;
+      _operationMessage = null;
+      _operationFailed = false;
+    });
+    try {
+      final saved = await exporter.saveAgendaPhoto(widget.photo.id);
+      if (!mounted) return;
+      setState(() {
+        _operationMessage = saved
+            ? 'Fotoğraf cihaza kaydedildi.'
+            : 'Kaydetme iptal edildi.';
+      });
+    } on Object {
+      if (!mounted) return;
+      setState(() {
+        _operationFailed = true;
+        _operationMessage =
+            'Fotoğraf güvenli biçimde kaydedilemedi. Kayıt değişmedi.';
+      });
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  Future<void> _share() async {
+    final exporter = _exporter;
+    if (exporter == null || _exporting) return;
+    setState(() {
+      _exporting = true;
+      _operationMessage = null;
+      _operationFailed = false;
+    });
+    try {
+      await exporter.shareAgendaPhoto(widget.photo.id);
+      if (!mounted) return;
+      setState(() => _operationMessage = 'Paylaşım ekranı açıldı.');
+    } on Object {
+      if (!mounted) return;
+      setState(() {
+        _operationFailed = true;
+        _operationMessage =
+            'Fotoğraf güvenli biçimde paylaşılamadı. Kayıt değişmedi.';
+      });
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Ajanda fotoğrafı')),
       body: FutureBuilder<StoredAttachmentContent>(
-        future: agenda.readAgendaPhoto(photo.id),
+        future: _content,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError || !snapshot.hasData) {
-            return _Diagnostic(photo: photo);
+            return _Diagnostic(photo: widget.photo);
           }
           final value = snapshot.requireData;
           return Column(
@@ -111,10 +197,58 @@ class AgendaPhotoViewerPage extends StatelessWidget {
                 top: false,
                 child: Padding(
                   padding: const EdgeInsets.all(12),
-                  child: Text(
-                    '${photo.originalFileName} • ${photo.mimeType} • '
-                    '${photo.byteSize} byte • ${photo.sha256.substring(0, 12)}…',
-                    textAlign: TextAlign.center,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_exporter != null) ...[
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            OutlinedButton.icon(
+                              key: const Key('agenda-photo-save'),
+                              onPressed: _exporting ? null : _save,
+                              icon: const Icon(Icons.download_outlined),
+                              label: const Text('Cihaza kaydet'),
+                            ),
+                            FilledButton.icon(
+                              key: const Key('agenda-photo-share'),
+                              onPressed: _exporting ? null : _share,
+                              icon: const Icon(Icons.share_outlined),
+                              label: const Text('Paylaş'),
+                            ),
+                          ],
+                        ),
+                        if (_exporting) ...[
+                          const SizedBox(height: 8),
+                          const LinearProgressIndicator(
+                            key: Key('agenda-photo-export-progress'),
+                          ),
+                        ],
+                        if (_operationMessage case final message?) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            message,
+                            key: const Key('agenda-photo-export-message'),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: _operationFailed
+                                  ? Theme.of(context).colorScheme.error
+                                  : null,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                      ],
+                      Text(
+                        '${widget.photo.originalFileName} • '
+                        '${widget.photo.mimeType} • '
+                        '${widget.photo.byteSize} byte • '
+                        '${widget.photo.sha256.substring(0, 12)}…',
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
                 ),
               ),
