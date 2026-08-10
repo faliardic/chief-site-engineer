@@ -188,6 +188,9 @@ void main() {
         AttachmentReconciliationFindingType.duplicateLegacyCandidate,
       }),
     );
+    expect(report.healthyCount, 3);
+    expect(report.problemCount, report.findings.length - 3);
+    expect(report.hasProblems, isTrue);
     expect(
       report
           .ofType(AttachmentReconciliationFindingType.healthy)

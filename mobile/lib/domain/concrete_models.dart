@@ -924,6 +924,22 @@ class AttachConcreteEvidenceBatchCommand {
   final bool classifyGeneralByMime;
 }
 
+class LinkExistingConcreteAttachmentCommand {
+  const LinkExistingConcreteAttachmentCommand({
+    required this.pourId,
+    required this.physicalAttachmentId,
+    required this.linkId,
+    required this.eventId,
+    required this.expectedPourRevision,
+  });
+
+  final String pourId;
+  final String physicalAttachmentId;
+  final String linkId;
+  final String eventId;
+  final int expectedPourRevision;
+}
+
 class ExportConcretePackageCommand {
   const ExportConcretePackageCommand({
     required this.pourId,

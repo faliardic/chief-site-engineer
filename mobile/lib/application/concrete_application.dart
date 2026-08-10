@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/application/attachment_catalog_application.dart';
 import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
@@ -59,6 +60,23 @@ abstract interface class ConcreteEvidenceBatchApplication {
     AttachConcreteEvidenceBatchCommand command,
   );
 }
+
+abstract interface class ConcreteExistingAttachmentApplication {
+  Future<ConcretePourDetail> linkExistingAttachment(
+    LinkExistingConcreteAttachmentCommand command,
+  );
+}
+
+const _supportedExistingConcreteMimeTypes = <String>{
+  'image/jpeg',
+  'image/png',
+  'image/heic',
+  'application/pdf',
+  'video/mp4',
+  'audio/mpeg',
+  'audio/mp4',
+  'audio/wav',
+};
 
 ProjectConcreteClass _concreteClassFromRow(Map<String, Object?> row) {
   final createdAt = row['created_at']! as String;
@@ -450,13 +468,18 @@ String _stableUuid(String seed) {
 typedef ConcreteTransactionHook = Future<void> Function(Transaction value);
 
 class SqliteConcreteApplication
-    implements ConcreteApplication, ConcreteEvidenceBatchApplication {
+    implements
+        ConcreteApplication,
+        ConcreteEvidenceBatchApplication,
+        ConcreteExistingAttachmentApplication,
+        AttachmentCatalogHost {
   SqliteConcreteApplication({
     required this.databasePath,
     required this.databaseFactory,
     required this.clock,
     required this.agenda,
     required this.attachmentStore,
+    this.attachmentCatalog,
     MobileOperationCoordinator? coordinator,
     ConcreteExportGateway? exportGateway,
     this.beforeConcreteEventInsert,
@@ -470,6 +493,8 @@ class SqliteConcreteApplication
   final UtcClock clock;
   final AgendaApplication agenda;
   final ConcreteAttachmentStore attachmentStore;
+  @override
+  final AttachmentCatalogApplication? attachmentCatalog;
   final MobileOperationCoordinator coordinator;
   final ConcreteExportGateway exportGateway;
   final ConcreteTransactionHook? beforeConcreteEventInsert;
@@ -1457,6 +1482,138 @@ class SqliteConcreteApplication
       }
       rethrow;
     }
+  }
+
+  @override
+  Future<ConcretePourDetail> linkExistingAttachment(
+    LinkExistingConcreteAttachmentCommand command,
+  ) async {
+    validateUuid(command.pourId, 'Beton paketi kimliği');
+    validateUuid(command.physicalAttachmentId, 'Fiziksel dosya kimliği');
+    validateUuid(command.linkId, 'Kanıt bağlantı kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    if (command.expectedPourRevision < 1) {
+      throw const AgendaValidationFailure('Beklenen revision geçersizdir.');
+    }
+    final now = _readClockOnce();
+    final timestamp = CseTimeCodec.encodeUtc(now);
+    return _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final pour = await _requirePour(transaction, command.pourId);
+        _requireRevision(pour.revision, command.expectedPourRevision);
+        _requireMutable(pour);
+        final priorEvent = await transaction.query(
+          'concrete_pour_events',
+          columns: ['concrete_pour_id', 'event_type', 'payload_json'],
+          where: 'id = ?',
+          whereArgs: [command.eventId],
+          limit: 1,
+        );
+        if (priorEvent.isNotEmpty) {
+          final payload = jsonDecode(
+            priorEvent.single['payload_json']! as String,
+          );
+          if (priorEvent.single['concrete_pour_id'] != pour.id ||
+              priorEvent.single['event_type'] != 'evidence.attached' ||
+              payload is! Map<String, Object?> ||
+              payload['attachment_id'] != command.linkId ||
+              payload['physical_attachment_id'] !=
+                  command.physicalAttachmentId) {
+            throw const AgendaValidationFailure(
+              'Event kimliği başka bir Beton işlemi için kullanılıyor.',
+            );
+          }
+          return _loadDetail(transaction, pour.id);
+        }
+        final candidates = await transaction.rawQuery(
+          '''
+          SELECT m.id, m.mime_type, m.sha256, l.original_file_name
+          FROM managed_attachments m
+          JOIN attachment_links l ON l.attachment_id = m.id
+          WHERE m.id = ? AND l.project_id = ?
+          ORDER BY (l.archived_at IS NULL) DESC, l.created_at ASC, l.id ASC
+          LIMIT 1
+          ''',
+          [command.physicalAttachmentId, pour.projectId],
+        );
+        if (candidates.isEmpty) {
+          throw const AgendaValidationFailure(
+            'Dosya bu Beton paketinin projesinde bulunamadı.',
+          );
+        }
+        final candidate = candidates.single;
+        final mimeType = candidate['mime_type']! as String;
+        if (!_supportedExistingConcreteMimeTypes.contains(mimeType)) {
+          throw const AgendaValidationFailure(
+            'Dosya türü genel saha kanıtı için desteklenmiyor.',
+          );
+        }
+        final duplicate = await transaction.rawQuery(
+          '''
+          SELECT l.id
+          FROM attachment_links l
+          JOIN managed_attachments m ON m.id = l.attachment_id
+          WHERE l.source_type = 'concrete_pour'
+            AND l.source_id = ? AND l.archived_at IS NULL
+            AND (l.attachment_id = ? OR m.sha256 = ?)
+          LIMIT 1
+          ''',
+          [
+            pour.id,
+            command.physicalAttachmentId,
+            candidate['sha256']! as String,
+          ],
+        );
+        if (duplicate.isNotEmpty) {
+          throw const AgendaValidationFailure(
+            'Bu fiziksel dosya Beton paketine zaten bağlı.',
+          );
+        }
+        final evidenceType = mimeType.startsWith('image/')
+            ? ConcreteEvidenceType.sitePhoto
+            : ConcreteEvidenceType.other;
+        await transaction.insert('attachment_links', {
+          'id': command.linkId,
+          'attachment_id': command.physicalAttachmentId,
+          'project_id': pour.projectId,
+          'source_type': 'concrete_pour',
+          'source_id': pour.id,
+          'role': evidenceType.storageValue,
+          'original_file_name': candidate['original_file_name']! as String,
+          'captured_at': timestamp,
+          'revision': 1,
+          'created_at': timestamp,
+          'updated_at': timestamp,
+        });
+        await transaction.insert('attachment_link_events', {
+          'id': command.eventId,
+          'attachment_link_id': command.linkId,
+          'sequence': 1,
+          'event_type': 'link.created',
+          'occurred_at': timestamp,
+          'payload_json': jsonEncode({
+            'source': 'concrete_pour',
+            'physical_attachment_id': command.physicalAttachmentId,
+            'reused_existing': true,
+          }),
+        });
+        await _advancePour(transaction, pour, timestamp);
+        await _insertConcreteEvent(
+          transaction,
+          id: command.eventId,
+          pourId: pour.id,
+          eventType: 'evidence.attached',
+          occurredAt: timestamp,
+          payload: {
+            'attachment_id': command.linkId,
+            'physical_attachment_id': command.physicalAttachmentId,
+            'evidence_type': evidenceType.storageValue,
+            'reused_existing': true,
+          },
+        );
+        return _loadDetail(transaction, pour.id);
+      });
+    });
   }
 
   Future<void> _validateTransition(

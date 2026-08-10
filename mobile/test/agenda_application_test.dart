@@ -1405,6 +1405,143 @@ void main() {
   );
 
   test(
+    'existing project photo links without byte copy and archive preserves shared physical',
+    () async {
+      final source = await agenda.createAgendaLog(
+        CreateAgendaLogCommand(
+          id: log1,
+          eventId: eventId(180),
+          projectId: project1,
+          observedAt: '2026-07-19T07:00:00Z',
+          category: AgendaCategory.generalNote,
+          description: 'Kaynak fotoğraf',
+          photos: [
+            AgendaPhotoDraft(
+              id: log3,
+              eventId: eventId(181),
+              originalFileName: 'ortak.jpg',
+              bytes: const [0xff, 0xd8, 0xff, 4],
+              capturedAt: '2026-07-19T07:00:00Z',
+            ),
+          ],
+        ),
+      );
+      expect(source.revision, 1);
+      final target = await createLog(
+        id: log2,
+        event: 182,
+        observedAt: '2026-07-19T08:00:00Z',
+      );
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      final physicalBefore = Sqflite.firstIntValue(
+        await raw.rawQuery('SELECT count(*) FROM managed_attachments'),
+      );
+      await raw.close();
+
+      var linked = await agenda.linkExistingAgendaPhoto(
+        LinkExistingAgendaPhotoCommand(
+          logId: target.id,
+          physicalAttachmentId: log3,
+          linkId: reminder1,
+          eventId: eventId(183),
+          expectedLogRevision: target.revision,
+        ),
+      );
+
+      expect(linked.log.revision, target.revision + 1);
+      expect(linked.photos.single.id, reminder1);
+      expect(linked.photos.single.relativePath, contains(log3));
+      final verified = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      expect(
+        Sqflite.firstIntValue(
+          await verified.rawQuery('SELECT count(*) FROM managed_attachments'),
+        ),
+        physicalBefore,
+      );
+      expect(
+        await verified.query(
+          'attachment_links',
+          columns: ['source_id', 'attachment_id'],
+          where: 'attachment_id = ?',
+          whereArgs: [log3],
+          orderBy: 'source_id ASC',
+        ),
+        hasLength(2),
+      );
+      expect(
+        await verified.query(
+          'attachment_link_events',
+          where: 'attachment_link_id = ?',
+          whereArgs: [reminder1],
+        ),
+        hasLength(1),
+      );
+      await verified.close();
+
+      await expectLater(
+        agenda.linkExistingAgendaPhoto(
+          LinkExistingAgendaPhotoCommand(
+            logId: target.id,
+            physicalAttachmentId: log3,
+            linkId: reminder2,
+            eventId: eventId(184),
+            expectedLogRevision: linked.log.revision,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      expect((await agenda.getAgendaLogDetail(target.id)).log.revision, 2);
+
+      await agenda.createProject(
+        const CreateProjectCommand(id: project2, name: 'Güney Şantiyesi'),
+      );
+      final otherProjectLog = await createLog(
+        id: log4,
+        event: 185,
+        projectId: project2,
+        observedAt: '2026-07-19T09:00:00Z',
+      );
+      await expectLater(
+        agenda.linkExistingAgendaPhoto(
+          LinkExistingAgendaPhotoCommand(
+            logId: otherProjectLog.id,
+            physicalAttachmentId: log3,
+            linkId: reminder3,
+            eventId: eventId(186),
+            expectedLogRevision: otherProjectLog.revision,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+
+      linked = await agenda.archiveAgendaPhoto(
+        ArchiveAgendaPhotoCommand(
+          logId: target.id,
+          photoId: reminder1,
+          eventId: eventId(187),
+          expectedLogRevision: linked.log.revision,
+          expectedPhotoRevision: 1,
+        ),
+      );
+      expect(linked.photos, isEmpty);
+      expect((await agenda.getAgendaLogDetail(log1)).photos.single.id, log3);
+      expect(
+        await File(
+          '${directories.attachments.path}${Platform.pathSeparator}'
+          'managed${Platform.pathSeparator}$log3.jpg',
+        ).exists(),
+        isTrue,
+      );
+    },
+  );
+
+  test(
     'reminder source media is ordered read-only across archive and trash',
     () async {
       var log = await agenda.createAgendaLog(
