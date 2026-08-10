@@ -9,6 +9,7 @@ import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/platform/attendance_export_gateway.dart';
 import 'package:chief_site_engineer/platform/agenda_attachment_gateway.dart';
+import 'package:chief_site_engineer/platform/agenda_photo_export_gateway.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/capabilities.dart';
 import 'package:chief_site_engineer/platform/concrete_attachment_gateway.dart';
@@ -153,6 +154,9 @@ class AppBootstrap {
         coordinator: coordinator,
         attachmentStore: DeviceAgendaAttachmentStore.shared(
           managedStore: managedAttachmentStore,
+        ),
+        photoExportGateway: DeviceAgendaPhotoExportGateway(
+          directories: directories,
         ),
         attachmentCatalog: attachmentCatalog,
       );

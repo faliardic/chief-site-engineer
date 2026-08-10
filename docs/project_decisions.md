@@ -3888,3 +3888,17 @@
 - Dosya sağlığı ekranı existing reconciliation matrisini yalnız kullanıcı
   ekranı açtığında salt-okunur çalıştırır. Bootstrap otomatik inspect, repair,
   delete, move, adopt, relink veya dedupe yapmaz.
+
+## Issue 427 — Ajanda fotoğraf export/share doğrulanmış byte kopyasıdır
+
+- Ajanda fotoğrafını cihaza kaydetme ve paylaşma işlemleri yalnız mevcut
+  `readAgendaPhoto(photo.id)` integrity kapısından geçen byte'ları kullanır;
+  managed source path/byte/hash ile attachment, link, revision ve event state'i
+  değişmez.
+- Save mevcut `file_picker` sistem Save flow'una exact byte kopyasını verir;
+  kullanıcı iptali normal no-op'tur. Share mevcut `share_plus` sistem sheet'ini
+  kullanır ve kopyayı yalnız UUID ile ayrılmış operation staging klasöründe,
+  güvenli/orijinale en yakın basename ile üretip işlem sonrasında temizler.
+- JPEG/PNG MIME-byte uyumu platform çağrısından önce yeniden doğrulanır. Unsafe
+  basename karakterleri fail-safe sanitize edilir; dependency, permission,
+  manifest, schema veya Backup formatı genişletilmez.

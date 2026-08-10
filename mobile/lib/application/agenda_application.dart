@@ -8,6 +8,7 @@ import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/platform/agenda_attachment_gateway.dart';
+import 'package:chief_site_engineer/platform/agenda_photo_export_gateway.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
@@ -172,6 +173,12 @@ abstract interface class AgendaPhotoBatchApplication {
   Future<AgendaLogDetail> attachAgendaPhotos(AttachAgendaPhotosCommand command);
 }
 
+abstract interface class AgendaPhotoExportApplication {
+  Future<bool> saveAgendaPhoto(String photoId);
+
+  Future<void> shareAgendaPhoto(String photoId);
+}
+
 abstract interface class AgendaExistingAttachmentApplication {
   Future<AgendaLogDetail> linkExistingAgendaPhoto(
     LinkExistingAgendaPhotoCommand command,
@@ -259,6 +266,7 @@ class SqliteAgendaApplication
     implements
         AgendaApplication,
         AgendaPhotoBatchApplication,
+        AgendaPhotoExportApplication,
         ProjectLifecycleApplication,
         ProjectLocationApplication,
         AttachmentCatalogHost,
@@ -273,6 +281,7 @@ class SqliteAgendaApplication
     MobileOperationCoordinator? coordinator,
     ReminderNotificationGateway? notificationGateway,
     AgendaAttachmentStore? attachmentStore,
+    AgendaPhotoExportGateway? photoExportGateway,
     this.attachmentCatalog,
     this.beforeReminderEventInsert,
   }) : coordinator = coordinator ?? MobileOperationCoordinator(),
@@ -280,7 +289,9 @@ class SqliteAgendaApplication
            notificationGateway ??
            const UnavailableReminderNotificationGateway(),
        attachmentStore =
-           attachmentStore ?? const UnavailableAgendaAttachmentStore();
+           attachmentStore ?? const UnavailableAgendaAttachmentStore(),
+       photoExportGateway =
+           photoExportGateway ?? const UnavailableAgendaPhotoExportGateway();
 
   final String databasePath;
   final DatabaseFactory databaseFactory;
@@ -288,6 +299,7 @@ class SqliteAgendaApplication
   final MobileOperationCoordinator coordinator;
   final ReminderNotificationGateway notificationGateway;
   final AgendaAttachmentStore attachmentStore;
+  final AgendaPhotoExportGateway photoExportGateway;
   @override
   final AttachmentCatalogApplication? attachmentCatalog;
   final ReminderTransactionHook? beforeReminderEventInsert;
@@ -1695,6 +1707,30 @@ class SqliteAgendaApplication
       photo.originalFileName,
       photo.sha256,
       photo.mimeType,
+    );
+  }
+
+  @override
+  Future<bool> saveAgendaPhoto(String photoId) async {
+    final content = await readAgendaPhoto(photoId);
+    return photoExportGateway.save(
+      AgendaPhotoExportRequest(
+        fileName: content.fileName,
+        mimeType: content.mimeType,
+        bytes: content.bytes,
+      ),
+    );
+  }
+
+  @override
+  Future<void> shareAgendaPhoto(String photoId) async {
+    final content = await readAgendaPhoto(photoId);
+    await photoExportGateway.share(
+      AgendaPhotoExportRequest(
+        fileName: content.fileName,
+        mimeType: content.mimeType,
+        bytes: content.bytes,
+      ),
     );
   }
 

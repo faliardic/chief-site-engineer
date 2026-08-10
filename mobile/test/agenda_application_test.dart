@@ -5,9 +5,11 @@ import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/platform/agenda_attachment_gateway.dart';
+import 'package:chief_site_engineer/platform/agenda_photo_export_gateway.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -32,6 +34,7 @@ void main() {
   late AppDirectories directories;
   late DateTime now;
   late SqliteAgendaApplication agenda;
+  late _RecordingAgendaPhotoExportGateway photoExporter;
 
   setUpAll(sqfliteFfiInit);
 
@@ -50,11 +53,13 @@ void main() {
     );
     await database.open();
     await database.close();
+    photoExporter = _RecordingAgendaPhotoExportGateway();
     agenda = SqliteAgendaApplication(
       databasePath: directories.databaseFile,
       databaseFactory: databaseFactoryFfi,
       clock: () => now,
       attachmentStore: DeviceAgendaAttachmentStore(directories: directories),
+      photoExportGateway: photoExporter,
     );
     await agenda.createProject(
       const CreateProjectCommand(id: project1, name: 'Kuzey Şantiyesi'),
@@ -1291,6 +1296,79 @@ void main() {
   );
 
   test(
+    'Agenda photo save and share are integrity-gated read-only operations',
+    () async {
+      await agenda.createAgendaLog(
+        CreateAgendaLogCommand(
+          id: log1,
+          eventId: eventId(85),
+          projectId: project1,
+          observedAt: '2026-07-19T07:00:00Z',
+          category: AgendaCategory.generalNote,
+          description: 'Dışa aktarılacak fotoğraf',
+          photos: [
+            AgendaPhotoDraft(
+              id: log2,
+              eventId: eventId(86),
+              originalFileName: 'saha.jpg',
+              bytes: const [0xff, 0xd8, 0xff, 5],
+              capturedAt: '2026-07-19T07:00:00Z',
+            ),
+          ],
+        ),
+      );
+      final before = await agenda.getAgendaLogDetail(log1);
+      final beforeEvents = await agenda.listObservationEvents(log1);
+      final rawBefore = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      final attachmentRowsBefore = await rawBefore.query('managed_attachments');
+      final linkRowsBefore = await rawBefore.query('attachment_links');
+      final linkEventRowsBefore = await rawBefore.query(
+        'attachment_link_events',
+      );
+      await rawBefore.close();
+
+      expect(await agenda.saveAgendaPhoto(log2), isTrue);
+      await agenda.shareAgendaPhoto(log2);
+
+      expect(photoExporter.savedRequests, hasLength(1));
+      expect(photoExporter.sharedRequests, hasLength(1));
+      expect(photoExporter.savedRequests.single.fileName, 'saha.jpg');
+      expect(photoExporter.savedRequests.single.mimeType, 'image/jpeg');
+      expect(photoExporter.savedRequests.single.bytes, [0xff, 0xd8, 0xff, 5]);
+      expect(photoExporter.sharedRequests.single.bytes, [0xff, 0xd8, 0xff, 5]);
+
+      final after = await agenda.getAgendaLogDetail(log1);
+      final afterEvents = await agenda.listObservationEvents(log1);
+      expect(after.log.revision, before.log.revision);
+      expect(after.photos.single.revision, before.photos.single.revision);
+      expect(afterEvents, hasLength(beforeEvents.length));
+      final rawAfter = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      expect(await rawAfter.query('managed_attachments'), attachmentRowsBefore);
+      expect(await rawAfter.query('attachment_links'), linkRowsBefore);
+      expect(
+        await rawAfter.query('attachment_link_events'),
+        linkEventRowsBefore,
+      );
+      await rawAfter.close();
+
+      final source = File(
+        path.join(directories.attachments.path, 'managed', '$log2.jpg'),
+      );
+      await source.writeAsBytes(const [0xff, 0xd8, 0xff, 9], flush: true);
+      await expectLater(agenda.saveAgendaPhoto(log2), throwsA(anything));
+      await expectLater(agenda.shareAgendaPhoto(log2), throwsA(anything));
+      expect(photoExporter.savedRequests, hasLength(1));
+      expect(photoExporter.sharedRequests, hasLength(1));
+    },
+  );
+
+  test(
     'Agenda photo batches are ordered atomic and restricted to image MIME',
     () async {
       final created = await createLog(
@@ -1839,4 +1917,21 @@ class _IntegrityAgendaAttachmentStore implements AgendaAttachmentStore {
     required String originalFileName,
     required List<int> bytes,
   }) => throw const AgendaAttachmentFailure('test_stage_unavailable');
+}
+
+class _RecordingAgendaPhotoExportGateway implements AgendaPhotoExportGateway {
+  final List<AgendaPhotoExportRequest> savedRequests = [];
+  final List<AgendaPhotoExportRequest> sharedRequests = [];
+  bool saveResult = true;
+
+  @override
+  Future<bool> save(AgendaPhotoExportRequest request) async {
+    savedRequests.add(request);
+    return saveResult;
+  }
+
+  @override
+  Future<void> share(AgendaPhotoExportRequest request) async {
+    sharedRequests.add(request);
+  }
 }

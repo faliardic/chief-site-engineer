@@ -6,6 +6,7 @@ import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/platform/agenda_attachment_gateway.dart';
+import 'package:chief_site_engineer/platform/agenda_photo_export_gateway.dart';
 import 'package:chief_site_engineer/platform/concrete_attachment_gateway.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -64,6 +65,10 @@ void main() {
           (first.concrete! as SqliteConcreteApplication).attachmentStore
               as DeviceConcreteAttachmentStore;
       expect(agendaStore.managedStore, same(concreteStore.managedStore));
+      expect(
+        (first.agenda as SqliteAgendaApplication).photoExportGateway,
+        isA<DeviceAgendaPhotoExportGateway>(),
+      );
       expect(first.attachmentCatalog, isNotNull);
       expect(first.attachmentReconciliation, isNotNull);
       expect(
