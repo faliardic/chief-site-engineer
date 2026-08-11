@@ -1266,6 +1266,21 @@ class _ReminderSourceAgendaPhotos extends StatelessWidget {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
+            if (snapshot.connectionState == ConnectionState.done &&
+                value?.isAvailable == true &&
+                value?.sourceLogArchivedAt != null) ...[
+              const Card(
+                key: Key('reminder-source-agenda-archived'),
+                child: ListTile(
+                  leading: Icon(Icons.archive_outlined),
+                  title: Text('Kaynak Ajanda arşivde'),
+                  subtitle: Text(
+                    'Hatırlatıcı değişmedi; kaynak fotoğraflar salt okunur.',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             if (snapshot.connectionState != ConnectionState.done)
               const Card(
                 child: Padding(

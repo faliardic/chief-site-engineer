@@ -640,7 +640,7 @@ void main() {
     expect(find.byKey(const Key('edit-reminder')), findsNothing);
   });
 
-  testWidgets('trashed source-linked detail keeps Agenda deep-link', (
+  testWidgets('trashed source-linked detail keeps archived Agenda state', (
     tester,
   ) async {
     final item = reminder(
@@ -658,7 +658,7 @@ void main() {
       reminderDetail: item,
       sourceAgendaMedia: ReminderSourceAgendaMedia.loaded(
         sourceLogId: item.sourceLogId!,
-        sourceLogArchivedAt: null,
+        sourceLogArchivedAt: '2026-07-20T07:00:00Z',
         photos: [photo],
       ),
       agendaPhotoContents: {
@@ -673,6 +673,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Kaynak Ajanda fotoğrafları'), findsOneWidget);
+    expect(
+      find.byKey(const Key('reminder-source-agenda-archived')),
+      findsOneWidget,
+    );
+    expect(find.text('Kaynak Ajanda arşivde'), findsOneWidget);
     expect(
       find.byKey(Key('reminder-source-agenda-photo-${photo.id}')),
       findsOneWidget,

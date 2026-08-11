@@ -61,28 +61,16 @@ class _LogDetailPageState extends State<LogDetailPage> {
     _detail = widget.agenda.getAgendaLogDetail(widget.logId);
   }
 
-  Future<void> _openReminder(AgendaLogDetail detail) async {
-    if (detail.reminders.isNotEmpty) {
-      await Navigator.of(context).push<void>(
-        MaterialPageRoute(
-          builder: (_) => ReminderDetailPage(
-            agenda: widget.agenda,
-            projectLocations: widget.projectLocations,
-            reminderId: detail.reminders.first.id,
-          ),
+  Future<void> _createReminder(AgendaLog log) async {
+    await Navigator.of(context).push<MobileReminder>(
+      MaterialPageRoute(
+        builder: (_) => ReminderFormPage(
+          agenda: widget.agenda,
+          projectLocations: widget.projectLocations,
+          log: log,
         ),
-      );
-    } else {
-      await Navigator.of(context).push<MobileReminder>(
-        MaterialPageRoute(
-          builder: (_) => ReminderFormPage(
-            agenda: widget.agenda,
-            projectLocations: widget.projectLocations,
-            log: detail.log,
-          ),
-        ),
-      );
-    }
+      ),
+    );
     if (mounted) setState(_reload);
   }
 
@@ -358,24 +346,15 @@ class _LogDetailPageState extends State<LogDetailPage> {
                   label: 'Hatırlatıcı oluştur',
                   child: IconButton(
                     key: const Key('detail-reminder-action'),
-                    tooltip: detail.reminders.isEmpty
-                        ? 'Hatırlatıcı oluştur'
-                        : 'Bağlı hatırlatıcıyı aç',
+                    tooltip: 'Hatırlatıcı oluştur',
                     constraints: const BoxConstraints(
                       minWidth: 48,
                       minHeight: 48,
                     ),
-                    onPressed:
-                        _mutating ||
-                            (detail.log.archivedAt != null &&
-                                detail.reminders.isEmpty)
+                    onPressed: _mutating || detail.log.archivedAt != null
                         ? null
-                        : () => _openReminder(detail),
-                    icon: Icon(
-                      detail.reminders.isEmpty
-                          ? Icons.add_alarm_outlined
-                          : Icons.notifications_active_outlined,
-                    ),
+                        : () => _createReminder(detail.log),
+                    icon: const Icon(Icons.add_alarm_outlined),
                   ),
                 ),
             ],
@@ -599,7 +578,7 @@ class _LogDetailPageState extends State<LogDetailPage> {
           const Card(
             child: Padding(
               padding: EdgeInsets.all(16),
-              child: Text('Bu kayda bağlı hatırlatıcı yok.'),
+              child: Text('Bu kayda bağlı aktif hatırlatıcı yok.'),
             ),
           )
         else
@@ -632,6 +611,44 @@ class _LogDetailPageState extends State<LogDetailPage> {
               ),
             ),
           ),
+        if (detail.trashedReminders.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Text(
+            'Çöpteki bağlı hatırlatıcılar',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          ...detail.trashedReminders.map(
+            (reminder) => Card(
+              child: ListTile(
+                key: Key('trashed-linked-reminder-${reminder.id}'),
+                minVerticalPadding: 12,
+                leading: const Icon(Icons.delete_outline),
+                title: Text(
+                  reminder.title,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  '${reminder.kind.label} • ${reminder.status.label} • Çöpte',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () async {
+                  await Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => ReminderDetailPage(
+                        agenda: widget.agenda,
+                        projectLocations: widget.projectLocations,
+                        reminderId: reminder.id,
+                      ),
+                    ),
+                  );
+                  if (mounted) setState(_reload);
+                },
+              ),
+            ),
+          ),
+        ],
         if (history.isNotEmpty) ...[
           const SizedBox(height: 24),
           _AgendaHistorySection(entries: history),

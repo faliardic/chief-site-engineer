@@ -41,7 +41,7 @@ void main() {
     revision: 1,
   );
 
-  AgendaLog log() => const AgendaLog(
+  AgendaLog log({String? archivedAt}) => AgendaLog(
     id: logId,
     projectId: projectId,
     projectName: 'Çok Uzun Kuzey Şantiyesi Proje Adı',
@@ -54,6 +54,7 @@ void main() {
     location: 'A Blok 12. Kat Kuzey Cephesi',
     notes: 'Ayrıntılı saha notu.',
     revision: 1,
+    archivedAt: archivedAt,
   );
 
   AgendaLog concreteSignalLog({
@@ -72,17 +73,22 @@ void main() {
     revision: 1,
   );
 
-  MobileReminder reminder() => const MobileReminder(
-    id: reminderId,
+  MobileReminder reminder({
+    String id = reminderId,
+    String title = 'Donatı kontrol sonucunu tekrar doğrula',
+    String? trashedAt,
+  }) => MobileReminder(
+    id: id,
     projectId: projectId,
     projectName: 'Çok Uzun Kuzey Şantiyesi Proje Adı',
     sourceLogId: logId,
-    title: 'Donatı kontrol sonucunu tekrar doğrula',
+    title: title,
     kind: ReminderKind.recheck,
     status: ReminderStatus.active,
     nextAttentionAt: '2026-07-19T10:00:00Z',
     createdAt: '2026-07-19T08:00:00Z',
     updatedAt: '2026-07-19T08:00:00Z',
+    trashedAt: trashedAt,
     revision: 1,
   );
 
@@ -842,6 +848,118 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('detail-reminder-action')), findsOneWidget);
   });
+
+  testWidgets(
+    'Agenda keeps 0..N cards exact, separates trash and create stays independent',
+    (tester) async {
+      tester.view.physicalSize = const Size(430, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      const secondId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
+      const trashId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3';
+      final first = reminder();
+      final second = reminder(id: secondId, title: 'İkinci aktif takip');
+      final trashed = reminder(
+        id: trashId,
+        title: 'Çöpteki bağlı takip',
+        trashedAt: '2026-07-19T09:00:00Z',
+      );
+      final detail = AgendaLogDetail(
+        log: log(),
+        reminders: [first, second],
+        trashedReminders: [trashed],
+      );
+      final fake = FakeAgendaApplication(
+        projects: [project()],
+        logs: [log()],
+        reminders: [first, second, trashed],
+        logDetail: detail,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: LogDetailPage(agenda: fake, logId: logId),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final createAction = find.byKey(const Key('detail-reminder-action'));
+      expect(find.bySemanticsLabel('Hatırlatıcı oluştur'), findsOneWidget);
+      await tester.tap(createAction);
+      await tester.pumpAndSettle();
+      expect(find.byType(ReminderFormPage), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      final secondCard = find.byKey(const Key('linked-reminder-$secondId'));
+      await tester.scrollUntilVisible(
+        secondCard,
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.drag(find.byType(ListView), const Offset(0, -120));
+      await tester.pump();
+      await tester.tap(secondCard);
+      await tester.pumpAndSettle();
+      expect(find.byType(ReminderDetailPage), findsOneWidget);
+      expect(find.text('İkinci aktif takip'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      final trashCard = find.byKey(
+        const Key('trashed-linked-reminder-$trashId'),
+      );
+      await tester.scrollUntilVisible(
+        trashCard,
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(find.text('Çöpteki bağlı hatırlatıcılar'), findsOneWidget);
+      expect(find.byKey(const Key('linked-reminder-$trashId')), findsNothing);
+      await tester.tap(trashCard);
+      await tester.pumpAndSettle();
+      expect(find.text('Çöpteki bağlı takip'), findsOneWidget);
+      expect(find.byKey(const Key('restore-reminder')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'archived Agenda disables create but keeps linked cards visible',
+    (tester) async {
+      final archived = log(archivedAt: '2026-07-19T09:00:00Z');
+      final linked = reminder();
+      final fake = FakeAgendaApplication(
+        projects: [project()],
+        logs: [archived],
+        reminders: [linked],
+        logDetail: AgendaLogDetail(log: archived, reminders: [linked]),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: LogDetailPage(agenda: fake, logId: logId),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final action = tester.widget<IconButton>(
+        find.byKey(const Key('detail-reminder-action')),
+      );
+      expect(action.tooltip, 'Hatırlatıcı oluştur');
+      expect(action.onPressed, isNull);
+      expect(find.text('Bu kayıt arşivde'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('linked-reminder-$reminderId')),
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(
+        find.byKey(const Key('linked-reminder-$reminderId')),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets(
     'Ajanda detail renders immutable field change history from update events',

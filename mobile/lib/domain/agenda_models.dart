@@ -613,6 +613,7 @@ class AgendaLogDetail {
   const AgendaLogDetail({
     required this.log,
     required this.reminders,
+    this.trashedReminders = const [],
     this.photos = const [],
     this.events = const [],
     this.managedConcretePourId,
@@ -620,6 +621,7 @@ class AgendaLogDetail {
 
   final AgendaLog log;
   final List<MobileReminder> reminders;
+  final List<MobileReminder> trashedReminders;
   final List<AgendaLogPhoto> photos;
   final List<AppendOnlyEvent> events;
   final String? managedConcretePourId;

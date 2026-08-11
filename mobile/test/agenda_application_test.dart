@@ -616,6 +616,28 @@ void main() {
         jsonDecode(events.single.payloadJson),
         containsPair('source_observation_id', log1),
       );
+
+      final trashed = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: created[1].id,
+          eventId: eventId(17),
+          expectedRevision: created[1].revision,
+          action: ReminderMutationAction.moveToTrash,
+        ),
+      );
+      final partitioned = await agenda.getAgendaLogDetail(log1);
+      expect(partitioned.reminders.map((item) => item.id), [
+        reminder1,
+        reminder3,
+        reminder4,
+        reminder5,
+        reminder6,
+      ]);
+      expect(partitioned.trashedReminders.map((item) => item.id), [reminder2]);
+      expect(partitioned.trashedReminders.single.sourceLogId, log1);
+      expect(partitioned.trashedReminders.single.trashedAt, trashed.trashedAt);
+      expect(partitioned.log.updatedAt, source.updatedAt);
+      expect(partitioned.log.revision, source.revision);
     },
   );
 
