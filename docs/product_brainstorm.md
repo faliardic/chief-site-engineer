@@ -1,7 +1,9 @@
 # CSE Ürün Brainstorm Havuzu
 
-> Durum: V2 sonrası / olgunlaşmamış fikirler
+> Durum: V2 sonrası / olgunlaşmamış fikirler  
 > Son güncelleme: 2026-08-11
+
+> Toplantıda davranışı netleştirilip kilitlenen kararlar bu dosyada tutulmaz. Onlar için `docs/post_v2_locked_feature_decisions.md` kullanılır.
 
 ## Amaç
 
