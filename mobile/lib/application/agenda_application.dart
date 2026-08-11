@@ -136,6 +136,10 @@ abstract interface class AgendaApplication {
 
   Future<AgendaLog> updateAgendaLog(UpdateAgendaLogCommand command);
 
+  Future<AgendaReminderSyncResult> syncAgendaToReminder(
+    SyncAgendaToReminderCommand command,
+  );
+
   Future<AgendaLogDetail> mutateAgendaLogArchive(
     MutateAgendaLogArchiveCommand command,
   );
@@ -1258,6 +1262,277 @@ class SqliteAgendaApplication
           'payload_json': jsonEncode({'before': before, 'after': after}),
         });
         return _requireAgendaLog(transaction, command.id);
+      });
+    });
+  }
+
+  @override
+  Future<AgendaReminderSyncResult> syncAgendaToReminder(
+    SyncAgendaToReminderCommand command,
+  ) async {
+    validateUuid(command.operationId, 'Sync işlem kimliği');
+    validateUuid(command.sourceEventId, 'Ajanda event kimliği');
+    validateUuid(command.targetEventId, 'Hatırlatıcı event kimliği');
+    validateUuid(command.sourceLogId, 'Kaynak log kimliği');
+    validateUuid(command.reminderId, 'Hatırlatıcı kimliği');
+    if (command.expectedSourceRevision < 1 ||
+        command.expectedTargetRevision < 1) {
+      throw const AgendaValidationFailure('Beklenen revision geçersizdir.');
+    }
+    final selectedFields = AgendaReminderSyncField.values
+        .where(command.selectedFields.contains)
+        .toList(growable: false);
+    if (selectedFields.isEmpty) {
+      throw const AgendaValidationFailure(
+        'Sync için en az bir alan seçilmelidir.',
+      );
+    }
+    final now = _readClockOnce();
+    final timestamp = CseTimeCodec.encodeUtc(now);
+    return _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final priorTargetEvents = await transaction.query(
+          'follow_up_events',
+          where: 'id = ?',
+          whereArgs: [command.targetEventId],
+          limit: 1,
+        );
+        final priorSourceEvents = await transaction.query(
+          'observation_events',
+          where: 'id = ?',
+          whereArgs: [command.sourceEventId],
+          limit: 1,
+        );
+        if (priorTargetEvents.isNotEmpty || priorSourceEvents.isNotEmpty) {
+          if (priorTargetEvents.length != 1 || priorSourceEvents.length != 1) {
+            throw const AgendaValidationFailure(
+              'Sync event kimliği başka bir işlemde kullanılıyor.',
+            );
+          }
+          return _agendaReminderSyncResultFromEvents(
+            command: command,
+            selectedFields: selectedFields,
+            targetEvent: priorTargetEvents.single,
+            sourceEvent: priorSourceEvents.single,
+          );
+        }
+        await _rejectAgendaReminderSyncOperationCollision(
+          transaction,
+          command.operationId,
+        );
+
+        final source = await _requireAgendaLog(
+          transaction,
+          command.sourceLogId,
+        );
+        final targetRows = await transaction.rawQuery(
+          '''
+          SELECT f.*, p.name AS project_name,
+            l.display_name AS stable_location_name,
+            l.archived_at AS stable_location_archived_at
+          FROM follow_up_items f
+          LEFT JOIN projects p ON p.id = f.project_id
+          LEFT JOIN project_locations l ON l.id = f.location_id
+          WHERE f.id = ?
+          LIMIT 1
+          ''',
+          [command.reminderId],
+        );
+        if (targetRows.isEmpty) {
+          throw const AgendaValidationFailure('Hatırlatıcı bulunamadı.');
+        }
+        final target = _reminderFromRow(targetRows.single);
+        if (target.sourceLogId != source.id) {
+          throw const AgendaValidationFailure(
+            'Hatırlatıcı seçilen Ajanda kaynağına bağlı değildir.',
+          );
+        }
+        if (target.projectId != source.projectId) {
+          throw const AgendaValidationFailure(
+            'Ajanda ve Hatırlatıcı aynı projeye ait olmalıdır.',
+          );
+        }
+        if (source.archivedAt != null) {
+          throw const AgendaValidationFailure(
+            'Arşivlenen Ajanda kaydı Hatırlatıcıya sync edilemez.',
+          );
+        }
+        if (target.trashedAt != null) {
+          throw const AgendaValidationFailure(
+            'Çöpteki Hatırlatıcı geri yüklenmeden sync edilemez.',
+          );
+        }
+        if (target.status == ReminderStatus.completed ||
+            target.status == ReminderStatus.cancelled) {
+          throw const AgendaValidationFailure(
+            'Tamamlanan veya iptal edilen Hatırlatıcı yeniden açılmadan sync edilemez.',
+          );
+        }
+        if (source.revision != command.expectedSourceRevision) {
+          throw const AgendaValidationFailure(
+            'Ajanda kaydı başka bir işlemde değişti; yeniden açın.',
+          );
+        }
+        if (target.revision != command.expectedTargetRevision) {
+          throw const AgendaValidationFailure(
+            'Hatırlatıcı başka bir işlemle değişti. Ekranı yenileyin.',
+          );
+        }
+        if (source.locationId != null && source.stableLocationName == null) {
+          throw const AgendaValidationFailure(
+            'Ajanda stable mahal bağlantısı güvenli biçimde okunamadı.',
+          );
+        }
+
+        final copiedFields = <AgendaReminderSyncField>[];
+        final changes = <String, Object?>{};
+        final updateValues = <String, Object?>{};
+        for (final field in selectedFields) {
+          switch (field) {
+            case AgendaReminderSyncField.title:
+              if (target.title != source.description) {
+                copiedFields.add(field);
+                changes[field.storageValue] = {
+                  'before': target.title,
+                  'after': source.description,
+                };
+                updateValues['title'] = source.description;
+              }
+            case AgendaReminderSyncField.description:
+              if (target.description != source.notes) {
+                copiedFields.add(field);
+                changes[field.storageValue] = {
+                  'before': target.description,
+                  'after': source.notes,
+                };
+                updateValues['description'] = source.notes;
+              }
+            case AgendaReminderSyncField.location:
+              final before = <String, Object?>{
+                'location_id': target.locationId,
+                'location': target.location,
+              };
+              final after = <String, Object?>{
+                'location_id': source.locationId,
+                'location': source.locationId == null
+                    ? source.location
+                    : source.stableLocationName,
+              };
+              if (!_mapsEqual(before, after)) {
+                copiedFields.add(field);
+                changes[field.storageValue] = {
+                  'before': before,
+                  'after': after,
+                };
+                updateValues['location_id'] = after['location_id'];
+                updateValues['location'] = after['location'];
+              }
+          }
+        }
+        if (copiedFields.isEmpty) {
+          return AgendaReminderSyncResult(
+            operationId: command.operationId,
+            sourceLogId: source.id,
+            reminderId: target.id,
+            sourceRevision: source.revision,
+            targetRevisionBefore: target.revision,
+            targetRevisionAfter: target.revision,
+            selectedFields: List.unmodifiable(selectedFields),
+            copiedFields: const [],
+            changes: const {},
+            changed: false,
+            idempotent: false,
+          );
+        }
+
+        final nextTargetRevision = target.revision + 1;
+        final updated = await transaction.update(
+          'follow_up_items',
+          {
+            ...updateValues,
+            'updated_at': timestamp,
+            'revision': nextTargetRevision,
+          },
+          where: 'id = ? AND revision = ?',
+          whereArgs: [target.id, target.revision],
+        );
+        if (updated != 1) {
+          throw const AgendaValidationFailure(
+            'Hatırlatıcı başka bir işlemle değişti. Ekranı yenileyin.',
+          );
+        }
+        final fingerprint = _agendaReminderSyncFingerprint(
+          command: command,
+          selectedFields: selectedFields,
+          copiedFields: copiedFields,
+          targetRevisionAfter: nextTargetRevision,
+          changes: changes,
+        );
+        final commonPayload = <String, Object?>{
+          'operation_kind': 'agenda_to_reminder_sync',
+          'operation_id': command.operationId,
+          'source_event_id': command.sourceEventId,
+          'target_event_id': command.targetEventId,
+          'source_log_id': source.id,
+          'reminder_id': target.id,
+          'expected_source_revision': command.expectedSourceRevision,
+          'expected_target_revision': command.expectedTargetRevision,
+          'source_revision': source.revision,
+          'target_revision_before': target.revision,
+          'target_revision_after': nextTargetRevision,
+          'selected_fields': selectedFields
+              .map((field) => field.storageValue)
+              .toList(growable: false),
+          'copied_fields': copiedFields
+              .map((field) => field.storageValue)
+              .toList(growable: false),
+          'changes': changes,
+          'result_fingerprint': fingerprint,
+        };
+        final sequenceRows = await transaction.rawQuery(
+          '''
+          SELECT COALESCE(MAX(sequence), 0) + 1 AS next_sequence
+          FROM follow_up_events
+          WHERE follow_up_id = ?
+          ''',
+          [target.id],
+        );
+        final sequence = sequenceRows.single['next_sequence']! as int;
+        await beforeReminderEventInsert?.call(transaction);
+        await transaction.insert('follow_up_events', {
+          'id': command.targetEventId,
+          'follow_up_id': target.id,
+          'sequence': sequence,
+          'project_id': target.projectId,
+          'source_observation_id': source.id,
+          'source_attendance_day_id': target.attendanceDayId,
+          'source_concrete_pour_id': target.concretePourId,
+          'event_type': 'details_updated',
+          'occurred_at': timestamp,
+          'payload_json': jsonEncode(commonPayload),
+        });
+        await beforeReminderEventInsert?.call(transaction);
+        await transaction.insert('observation_events', {
+          'id': command.sourceEventId,
+          'observation_id': source.id,
+          'project_id': source.projectId,
+          'event_type': 'agenda_log.reminder_sync_applied',
+          'occurred_at': timestamp,
+          'payload_json': jsonEncode(commonPayload),
+        });
+        return AgendaReminderSyncResult(
+          operationId: command.operationId,
+          sourceLogId: source.id,
+          reminderId: target.id,
+          sourceRevision: source.revision,
+          targetRevisionBefore: target.revision,
+          targetRevisionAfter: nextTargetRevision,
+          selectedFields: List.unmodifiable(selectedFields),
+          copiedFields: List.unmodifiable(copiedFields),
+          changes: Map.unmodifiable(changes),
+          changed: true,
+          idempotent: false,
+        );
       });
     });
   }
@@ -2633,6 +2908,146 @@ class SqliteAgendaApplication
       );
       return rows.map(_reminderEventFromRow).toList(growable: false);
     });
+  }
+
+  Future<void> _rejectAgendaReminderSyncOperationCollision(
+    DatabaseExecutor database,
+    String operationId,
+  ) async {
+    final targetEvents = await database.query(
+      'follow_up_events',
+      columns: ['payload_json'],
+      where: 'event_type = ?',
+      whereArgs: ['details_updated'],
+    );
+    final sourceEvents = await database.query(
+      'observation_events',
+      columns: ['payload_json'],
+      where: 'event_type = ?',
+      whereArgs: ['agenda_log.reminder_sync_applied'],
+    );
+    for (final row in [...targetEvents, ...sourceEvents]) {
+      final payload = _tryAgendaReminderSyncPayload(row['payload_json']);
+      if (payload?['operation_kind'] == 'agenda_to_reminder_sync' &&
+          payload?['operation_id'] == operationId) {
+        throw const AgendaValidationFailure(
+          'Sync işlem kimliği başka bir payload veya hedef için kullanılıyor.',
+        );
+      }
+    }
+  }
+
+  AgendaReminderSyncResult _agendaReminderSyncResultFromEvents({
+    required SyncAgendaToReminderCommand command,
+    required List<AgendaReminderSyncField> selectedFields,
+    required Map<String, Object?> targetEvent,
+    required Map<String, Object?> sourceEvent,
+  }) {
+    final targetPayload = _tryAgendaReminderSyncPayload(
+      targetEvent['payload_json'],
+    );
+    final sourcePayload = _tryAgendaReminderSyncPayload(
+      sourceEvent['payload_json'],
+    );
+    final invalidMetadata =
+        targetEvent['follow_up_id'] != command.reminderId ||
+        targetEvent['source_observation_id'] != command.sourceLogId ||
+        targetEvent['event_type'] != 'details_updated' ||
+        sourceEvent['observation_id'] != command.sourceLogId ||
+        sourceEvent['event_type'] != 'agenda_log.reminder_sync_applied';
+    if (invalidMetadata ||
+        targetPayload == null ||
+        sourcePayload == null ||
+        jsonEncode(targetPayload) != jsonEncode(sourcePayload)) {
+      throw const AgendaValidationFailure(
+        'Sync event kimliği başka bir işlemde kullanılıyor.',
+      );
+    }
+    final selectedNames = selectedFields
+        .map((field) => field.storageValue)
+        .toList(growable: false);
+    final storedSelected = _agendaReminderSyncFieldsFromPayload(
+      targetPayload['selected_fields'],
+    );
+    final copiedFields = _agendaReminderSyncFieldsFromPayload(
+      targetPayload['copied_fields'],
+    );
+    final changesValue = targetPayload['changes'];
+    if (changesValue is! Map) {
+      throw const AgendaValidationFailure(
+        'Önceki sync event payloadı güvenli biçimde okunamadı.',
+      );
+    }
+    final changes = Map<String, Object?>.from(changesValue);
+    final sourceRevision = _agendaReminderSyncPayloadInt(
+      targetPayload,
+      'source_revision',
+    );
+    final targetRevisionBefore = _agendaReminderSyncPayloadInt(
+      targetPayload,
+      'target_revision_before',
+    );
+    final targetRevisionAfter = _agendaReminderSyncPayloadInt(
+      targetPayload,
+      'target_revision_after',
+    );
+    final expectedSourceRevision = _agendaReminderSyncPayloadInt(
+      targetPayload,
+      'expected_source_revision',
+    );
+    final expectedTargetRevision = _agendaReminderSyncPayloadInt(
+      targetPayload,
+      'expected_target_revision',
+    );
+    final fingerprint = targetPayload['result_fingerprint'];
+    final exactCommand =
+        targetPayload['operation_kind'] == 'agenda_to_reminder_sync' &&
+        targetPayload['operation_id'] == command.operationId &&
+        targetPayload['source_event_id'] == command.sourceEventId &&
+        targetPayload['target_event_id'] == command.targetEventId &&
+        targetPayload['source_log_id'] == command.sourceLogId &&
+        targetPayload['reminder_id'] == command.reminderId &&
+        expectedSourceRevision == command.expectedSourceRevision &&
+        expectedTargetRevision == command.expectedTargetRevision &&
+        _sameStringList(
+          storedSelected.map((field) => field.storageValue).toList(),
+          selectedNames,
+        ) &&
+        targetRevisionBefore == command.expectedTargetRevision &&
+        targetRevisionAfter == targetRevisionBefore + 1 &&
+        copiedFields.isNotEmpty &&
+        copiedFields.every(selectedFields.contains) &&
+        _sameStringList(
+          changes.keys.toList(growable: false),
+          copiedFields.map((field) => field.storageValue).toList(),
+        );
+    final expectedFingerprint = _agendaReminderSyncFingerprint(
+      command: command,
+      selectedFields: selectedFields,
+      copiedFields: copiedFields,
+      targetRevisionAfter: targetRevisionAfter,
+      changes: changes,
+    );
+    if (!exactCommand ||
+        sourceRevision != command.expectedSourceRevision ||
+        fingerprint != expectedFingerprint) {
+      throw const AgendaValidationFailure(
+        'Sync işlem kimliği farklı bir payload ile kullanılıyor.',
+      );
+    }
+    return AgendaReminderSyncResult(
+      operationId: command.operationId,
+      sourceLogId: command.sourceLogId,
+      reminderId: command.reminderId,
+      sourceRevision: sourceRevision,
+      targetRevisionBefore: targetRevisionBefore,
+      targetRevisionAfter: targetRevisionAfter,
+      selectedFields: List.unmodifiable(selectedFields),
+      copiedFields: List.unmodifiable(copiedFields),
+      changes: Map.unmodifiable(changes),
+      changed: true,
+      idempotent: true,
+    );
   }
 
   String _applyReminderMutation({
@@ -4226,6 +4641,86 @@ Map<String, Object?> _agendaEventSnapshot(AgendaLog log) => {
 
 bool _mapsEqual(Map<String, Object?> first, Map<String, Object?> second) =>
     jsonEncode(first) == jsonEncode(second);
+
+Map<String, Object?>? _tryAgendaReminderSyncPayload(Object? encoded) {
+  if (encoded is! String) return null;
+  try {
+    final decoded = jsonDecode(encoded);
+    return decoded is Map ? Map<String, Object?>.from(decoded) : null;
+  } on FormatException {
+    return null;
+  }
+}
+
+List<AgendaReminderSyncField> _agendaReminderSyncFieldsFromPayload(
+  Object? value,
+) {
+  if (value is! List || value.any((item) => item is! String)) {
+    throw const AgendaValidationFailure(
+      'Önceki sync event alanları güvenli biçimde okunamadı.',
+    );
+  }
+  final fields = value
+      .cast<String>()
+      .map(AgendaReminderSyncField.fromStorage)
+      .toList(growable: false);
+  final ordered = AgendaReminderSyncField.values
+      .where(fields.contains)
+      .toList(growable: false);
+  if (fields.length != ordered.length ||
+      !_sameStringList(
+        fields.map((field) => field.storageValue).toList(growable: false),
+        ordered.map((field) => field.storageValue).toList(growable: false),
+      )) {
+    throw const AgendaValidationFailure(
+      'Önceki sync event alan sırası geçersizdir.',
+    );
+  }
+  return ordered;
+}
+
+int _agendaReminderSyncPayloadInt(Map<String, Object?> payload, String field) {
+  final value = payload[field];
+  if (value is! int) {
+    throw const AgendaValidationFailure(
+      'Önceki sync revision payloadı güvenli biçimde okunamadı.',
+    );
+  }
+  return value;
+}
+
+bool _sameStringList(List<String> first, List<String> second) {
+  if (first.length != second.length) return false;
+  for (var index = 0; index < first.length; index += 1) {
+    if (first[index] != second[index]) return false;
+  }
+  return true;
+}
+
+String _agendaReminderSyncFingerprint({
+  required SyncAgendaToReminderCommand command,
+  required List<AgendaReminderSyncField> selectedFields,
+  required List<AgendaReminderSyncField> copiedFields,
+  required int targetRevisionAfter,
+  required Map<String, Object?> changes,
+}) => jsonEncode({
+  'operation_kind': 'agenda_to_reminder_sync',
+  'operation_id': command.operationId,
+  'source_event_id': command.sourceEventId,
+  'target_event_id': command.targetEventId,
+  'source_log_id': command.sourceLogId,
+  'reminder_id': command.reminderId,
+  'expected_source_revision': command.expectedSourceRevision,
+  'expected_target_revision': command.expectedTargetRevision,
+  'target_revision_after': targetRevisionAfter,
+  'selected_fields': selectedFields
+      .map((field) => field.storageValue)
+      .toList(growable: false),
+  'copied_fields': copiedFields
+      .map((field) => field.storageValue)
+      .toList(growable: false),
+  'changes': changes,
+});
 
 String _normalizeProjectName(String value) =>
     value.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();

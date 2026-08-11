@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/platform/agenda_attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/agenda_photo_export_gateway.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
@@ -80,6 +81,7 @@ void main() {
     AgendaCategory category = AgendaCategory.generalNote,
     String description = 'Saha kontrolü yapıldı',
     String? location = 'A Blok 1. Kat',
+    String? locationId,
     String? notes,
   }) {
     return agenda.createAgendaLog(
@@ -91,10 +93,31 @@ void main() {
         category: category,
         description: description,
         location: location,
+        locationId: locationId,
         notes: notes,
       ),
     );
   }
+
+  SyncAgendaToReminderCommand syncCommand({
+    int operation = 900,
+    int sourceEvent = 901,
+    int targetEvent = 902,
+    String sourceLogId = log1,
+    String reminderId = reminder1,
+    int sourceRevision = 1,
+    int targetRevision = 1,
+    Set<AgendaReminderSyncField> fields = const {AgendaReminderSyncField.title},
+  }) => SyncAgendaToReminderCommand(
+    operationId: eventId(operation),
+    sourceEventId: eventId(sourceEvent),
+    targetEventId: eventId(targetEvent),
+    sourceLogId: sourceLogId,
+    reminderId: reminderId,
+    expectedSourceRevision: sourceRevision,
+    expectedTargetRevision: targetRevision,
+    selectedFields: fields,
+  );
 
   test(
     'Issue 268 baseline: default AgendaQuery returns newest log first',
@@ -638,6 +661,714 @@ void main() {
       expect(partitioned.trashedReminders.single.trashedAt, trashed.trashedAt);
       expect(partitioned.log.updatedAt, source.updatedAt);
       expect(partitioned.log.revision, source.revision);
+    },
+  );
+
+  test(
+    'agenda sync copies only selected fields to exact 0..N targets atomically',
+    () async {
+      final source = await createLog(
+        id: log1,
+        event: 1,
+        observedAt: '2026-07-19T07:00:00Z',
+        description: 'Kaynak başlık',
+        location: 'Kaynak mahal',
+        notes: 'Kaynak açıklama',
+      );
+
+      Future<MobileReminder> createTarget({
+        required String id,
+        required int event,
+        required String title,
+        String? description = 'Korunan açıklama',
+        String? location = 'Korunan mahal',
+        ReminderKind kind = ReminderKind.action,
+        ReminderScheduleKind schedule = ReminderScheduleKind.inbox,
+        String? customAttentionAt,
+        String? relatedPerson,
+        bool isImportant = false,
+        String? deadlineAt,
+        String? conditionText,
+      }) => agenda.createReminder(
+        CreateReminderCommand(
+          id: id,
+          eventId: eventId(event),
+          projectId: project1,
+          sourceLogId: log1,
+          captureText: 'Değişmez yakalama $id',
+          title: title,
+          description: description,
+          kind: kind,
+          schedule: schedule,
+          customAttentionAt: customAttentionAt,
+          location: location,
+          relatedPerson: relatedPerson,
+          isImportant: isImportant,
+          deadlineAt: deadlineAt,
+          conditionText: conditionText,
+        ),
+      );
+
+      await createTarget(id: reminder1, event: 11, title: 'Eski başlık 1');
+      await createTarget(id: reminder2, event: 12, title: 'Korunan başlık 2');
+      await createTarget(id: reminder3, event: 13, title: 'Korunan başlık 3');
+      final allTarget = await createTarget(
+        id: reminder4,
+        event: 14,
+        title: 'Eski başlık 4',
+        kind: ReminderKind.recheck,
+        schedule: ReminderScheduleKind.custom,
+        customAttentionAt: '2026-07-20T10:00:00Z',
+        relatedPerson: 'Kontrol mühendisi',
+        isImportant: true,
+        deadlineAt: '2026-07-21T08:00:00Z',
+        conditionText: 'Sahaya çıkınca',
+      );
+      final rawBefore = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      final bindingBefore = Map<String, Object?>.from(
+        (await rawBefore.query(
+          'reminder_notification_bindings',
+          where: 'reminder_id = ?',
+          whereArgs: [reminder4],
+        )).single,
+      );
+      await rawBefore.close();
+
+      final titleResult = await agenda.syncAgendaToReminder(
+        syncCommand(reminderId: reminder1),
+      );
+      final descriptionResult = await agenda.syncAgendaToReminder(
+        syncCommand(
+          operation: 903,
+          sourceEvent: 904,
+          targetEvent: 905,
+          reminderId: reminder2,
+          fields: const {AgendaReminderSyncField.description},
+        ),
+      );
+      final locationResult = await agenda.syncAgendaToReminder(
+        syncCommand(
+          operation: 906,
+          sourceEvent: 907,
+          targetEvent: 908,
+          reminderId: reminder3,
+          fields: const {AgendaReminderSyncField.location},
+        ),
+      );
+      final allResult = await agenda.syncAgendaToReminder(
+        syncCommand(
+          operation: 909,
+          sourceEvent: 910,
+          targetEvent: 911,
+          reminderId: reminder4,
+          fields: const {
+            AgendaReminderSyncField.location,
+            AgendaReminderSyncField.title,
+            AgendaReminderSyncField.description,
+          },
+        ),
+      );
+
+      expect(titleResult.copiedFields, [AgendaReminderSyncField.title]);
+      expect(descriptionResult.copiedFields, [
+        AgendaReminderSyncField.description,
+      ]);
+      expect(locationResult.copiedFields, [AgendaReminderSyncField.location]);
+      expect(allResult.copiedFields, AgendaReminderSyncField.values);
+      expect(allResult.targetRevisionBefore, 1);
+      expect(allResult.targetRevisionAfter, 2);
+      expect(allResult.sourceRevision, source.revision);
+
+      final target1 = await agenda.getReminderDetail(reminder1);
+      final target2 = await agenda.getReminderDetail(reminder2);
+      final target3 = await agenda.getReminderDetail(reminder3);
+      final target4 = await agenda.getReminderDetail(reminder4);
+      expect(target1.title, source.description);
+      expect(target1.description, 'Korunan açıklama');
+      expect(target1.location, 'Korunan mahal');
+      expect(target2.title, 'Korunan başlık 2');
+      expect(target2.description, source.notes);
+      expect(target2.location, 'Korunan mahal');
+      expect(target3.title, 'Korunan başlık 3');
+      expect(target3.description, 'Korunan açıklama');
+      expect(target3.location, source.location);
+      expect(target4.title, source.description);
+      expect(target4.description, source.notes);
+      expect(target4.location, source.location);
+      expect(target4.captureText, allTarget.captureText);
+      expect(target4.kind, allTarget.kind);
+      expect(target4.status, allTarget.status);
+      expect(target4.nextAttentionAt, allTarget.nextAttentionAt);
+      expect(target4.allDayLocalDate, allTarget.allDayLocalDate);
+      expect(target4.deadlineAt, allTarget.deadlineAt);
+      expect(target4.isImportant, allTarget.isImportant);
+      expect(target4.relatedPerson, allTarget.relatedPerson);
+      expect(target4.conditionText, allTarget.conditionText);
+      expect(target4.outcomeType, allTarget.outcomeType);
+      expect(target4.outcomeNote, allTarget.outcomeNote);
+      expect(target4.revision, 2);
+
+      final sourceAfter = (await agenda.getAgendaLogDetail(log1)).log;
+      expect(sourceAfter.revision, source.revision);
+      expect(sourceAfter.updatedAt, source.updatedAt);
+      final reminderPayload =
+          jsonDecode(
+                (await agenda.listReminderEvents(reminder4)).last.payloadJson,
+              )
+              as Map<String, dynamic>;
+      expect(reminderPayload['operation_kind'], 'agenda_to_reminder_sync');
+      expect(reminderPayload['operation_id'], eventId(909));
+      expect(reminderPayload['copied_fields'], [
+        'title',
+        'description',
+        'location',
+      ]);
+      expect(reminderPayload['target_revision_before'], 1);
+      expect(reminderPayload['target_revision_after'], 2);
+      expect(reminderPayload['changes'].keys, [
+        'title',
+        'description',
+        'location',
+      ]);
+      final sourceSyncEvents = (await agenda.listObservationEvents(log1))
+          .where(
+            (event) => event.eventType == 'agenda_log.reminder_sync_applied',
+          )
+          .toList(growable: false);
+      expect(sourceSyncEvents, hasLength(4));
+      final sourcePayload =
+          jsonDecode(sourceSyncEvents.last.payloadJson) as Map<String, dynamic>;
+      expect(sourcePayload['operation_id'], reminderPayload['operation_id']);
+      expect(
+        sourcePayload['result_fingerprint'],
+        reminderPayload['result_fingerprint'],
+      );
+
+      final rawAfter = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      final bindingAfter = Map<String, Object?>.from(
+        (await rawAfter.query(
+          'reminder_notification_bindings',
+          where: 'reminder_id = ?',
+          whereArgs: [reminder4],
+        )).single,
+      );
+      await rawAfter.close();
+      expect(bindingAfter, bindingBefore);
+    },
+  );
+
+  test(
+    'agenda sync preserves trim nullable and no-op retry semantics',
+    () async {
+      final source = await createLog(
+        id: log1,
+        event: 1,
+        observedAt: '2026-07-19T07:00:00Z',
+        description: '  Trimlenen kaynak başlık  ',
+        location: null,
+        notes: '   ',
+      );
+      final target = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(11),
+          projectId: project1,
+          sourceLogId: log1,
+          title: 'Eski başlık',
+          description: 'Silinecek açıklama',
+          location: 'Silinecek mahal',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.inbox,
+        ),
+      );
+      final first = await agenda.syncAgendaToReminder(
+        syncCommand(fields: AgendaReminderSyncField.values.toSet()),
+      );
+      expect(first.changed, isTrue);
+      final refreshed = await agenda.getReminderDetail(target.id);
+      expect(refreshed.title, 'Trimlenen kaynak başlık');
+      expect(refreshed.description, isNull);
+      expect(refreshed.locationId, isNull);
+      expect(refreshed.location, isNull);
+      expect(
+        (await agenda.getAgendaLogDetail(log1)).log.revision,
+        source.revision,
+      );
+
+      final sourceEventsBefore = await _countRows(
+        directories.databaseFile,
+        'observation_events',
+      );
+      final targetEventsBefore = await _countRows(
+        directories.databaseFile,
+        'follow_up_events',
+      );
+      final noOpCommand = syncCommand(
+        operation: 903,
+        sourceEvent: 904,
+        targetEvent: 905,
+        sourceRevision: source.revision,
+        targetRevision: refreshed.revision,
+        fields: AgendaReminderSyncField.values.toSet(),
+      );
+      final noOp = await agenda.syncAgendaToReminder(noOpCommand);
+      final noOpRetry = await agenda.syncAgendaToReminder(noOpCommand);
+      expect(noOp.changed, isFalse);
+      expect(noOpRetry.changed, isFalse);
+      expect(noOp.targetRevisionAfter, refreshed.revision);
+      expect(noOpRetry.copiedFields, isEmpty);
+      expect(
+        await _countRows(directories.databaseFile, 'observation_events'),
+        sourceEventsBefore,
+      );
+      expect(
+        await _countRows(directories.databaseFile, 'follow_up_events'),
+        targetEventsBefore,
+      );
+      expect((await agenda.getReminderDetail(target.id)).revision, 2);
+    },
+  );
+
+  test(
+    'agenda sync exact retry is idempotent and collisions fail closed',
+    () async {
+      await createLog(
+        id: log1,
+        event: 1,
+        observedAt: '2026-07-19T07:00:00Z',
+        description: 'Kaynak başlık',
+        notes: 'Kaynak açıklama',
+      );
+      for (final item in [(reminder1, 11), (reminder2, 12)]) {
+        await agenda.createReminder(
+          CreateReminderCommand(
+            id: item.$1,
+            eventId: eventId(item.$2),
+            projectId: project1,
+            sourceLogId: log1,
+            title: 'Hedef ${item.$2}',
+            kind: ReminderKind.action,
+            schedule: ReminderScheduleKind.inbox,
+          ),
+        );
+      }
+      final command = syncCommand(
+        operation: 930,
+        sourceEvent: 931,
+        targetEvent: 932,
+      );
+      final first = await agenda.syncAgendaToReminder(command);
+      final changedLater = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: reminder1,
+          eventId: eventId(933),
+          expectedRevision: first.targetRevisionAfter,
+          action: ReminderMutationAction.updateDetails,
+          title: 'Daha sonraki manuel başlık',
+          projectId: project1,
+        ),
+      );
+      final retry = await agenda.syncAgendaToReminder(command);
+      expect(retry.idempotent, isTrue);
+      expect(retry.targetRevisionBefore, 1);
+      expect(retry.targetRevisionAfter, 2);
+      expect(
+        (await agenda.getReminderDetail(reminder1)).title,
+        changedLater.title,
+      );
+      expect((await agenda.getReminderDetail(reminder1)).revision, 3);
+      expect(
+        (await agenda.listReminderEvents(reminder1))
+            .where(
+              (event) =>
+                  jsonDecode(event.payloadJson) is Map &&
+                  (jsonDecode(event.payloadJson) as Map)['operation_id'] ==
+                      eventId(930),
+            )
+            .length,
+        1,
+      );
+
+      await expectLater(
+        agenda.syncAgendaToReminder(
+          syncCommand(
+            operation: 930,
+            sourceEvent: 931,
+            targetEvent: 932,
+            fields: const {AgendaReminderSyncField.description},
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      await expectLater(
+        agenda.syncAgendaToReminder(
+          syncCommand(
+            operation: 930,
+            sourceEvent: 934,
+            targetEvent: 935,
+            reminderId: reminder2,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      await expectLater(
+        agenda.syncAgendaToReminder(
+          syncCommand(
+            operation: 936,
+            sourceEvent: 937,
+            targetEvent: 11,
+            targetRevision: 3,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      await expectLater(
+        agenda.syncAgendaToReminder(
+          syncCommand(
+            operation: 938,
+            sourceEvent: 1,
+            targetEvent: 939,
+            targetRevision: 3,
+          ),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      expect((await agenda.getReminderDetail(reminder1)).revision, 3);
+      expect((await agenda.getReminderDetail(reminder2)).revision, 1);
+    },
+  );
+
+  test(
+    'agenda sync validates input revisions link and project fail closed',
+    () async {
+      await agenda.createProject(
+        const CreateProjectCommand(id: project2, name: 'Başka Proje'),
+      );
+      await createLog(
+        id: log1,
+        event: 1,
+        observedAt: '2026-07-19T07:00:00Z',
+        description: 'Birinci kaynak',
+      );
+      await createLog(
+        id: log2,
+        event: 2,
+        observedAt: '2026-07-19T07:30:00Z',
+        description: 'İkinci kaynak',
+      );
+      await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(11),
+          projectId: project1,
+          sourceLogId: log1,
+          title: 'Hedef',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.inbox,
+        ),
+      );
+
+      for (final command in [
+        syncCommand(sourceRevision: 2),
+        syncCommand(
+          operation: 903,
+          sourceEvent: 904,
+          targetEvent: 905,
+          targetRevision: 2,
+        ),
+        syncCommand(
+          operation: 906,
+          sourceEvent: 907,
+          targetEvent: 908,
+          sourceLogId: log2,
+        ),
+        SyncAgendaToReminderCommand(
+          operationId: 'invalid',
+          sourceEventId: eventId(910),
+          targetEventId: eventId(911),
+          sourceLogId: log1,
+          reminderId: reminder1,
+          expectedSourceRevision: 1,
+          expectedTargetRevision: 1,
+          selectedFields: const {AgendaReminderSyncField.title},
+        ),
+        syncCommand(
+          operation: 912,
+          sourceEvent: 913,
+          targetEvent: 914,
+          sourceRevision: 0,
+        ),
+        syncCommand(
+          operation: 915,
+          sourceEvent: 916,
+          targetEvent: 917,
+          fields: const {},
+        ),
+      ]) {
+        await expectLater(
+          agenda.syncAgendaToReminder(command),
+          throwsA(isA<AgendaValidationFailure>()),
+        );
+      }
+
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      await raw.execute('PRAGMA foreign_keys = OFF');
+      await raw.update(
+        'follow_up_items',
+        {'project_id': project2},
+        where: 'id = ?',
+        whereArgs: [reminder1],
+      );
+      await raw.close();
+      await expectLater(
+        agenda.syncAgendaToReminder(
+          syncCommand(operation: 918, sourceEvent: 919, targetEvent: 920),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      expect(await _countRows(directories.databaseFile, 'follow_up_events'), 1);
+      expect((await agenda.getAgendaLogDetail(log1)).log.revision, 1);
+    },
+  );
+
+  test(
+    'agenda sync rejects archived trash completed and cancelled records',
+    () async {
+      var source = await createLog(
+        id: log1,
+        event: 1,
+        observedAt: '2026-07-19T07:00:00Z',
+        description: 'Kaynak başlık',
+      );
+      final targets = <MobileReminder>[];
+      for (final item in [(reminder1, 11), (reminder2, 12), (reminder3, 13)]) {
+        targets.add(
+          await agenda.createReminder(
+            CreateReminderCommand(
+              id: item.$1,
+              eventId: eventId(item.$2),
+              projectId: project1,
+              sourceLogId: log1,
+              title: 'Hedef ${item.$2}',
+              kind: ReminderKind.action,
+              schedule: ReminderScheduleKind.inbox,
+            ),
+          ),
+        );
+      }
+      source = (await agenda.mutateAgendaLogArchive(
+        MutateAgendaLogArchiveCommand(
+          id: log1,
+          eventId: eventId(70),
+          expectedRevision: source.revision,
+          archive: true,
+        ),
+      )).log;
+      await expectLater(
+        agenda.syncAgendaToReminder(
+          syncCommand(sourceRevision: source.revision),
+        ),
+        throwsA(isA<AgendaValidationFailure>()),
+      );
+      source = (await agenda.mutateAgendaLogArchive(
+        MutateAgendaLogArchiveCommand(
+          id: log1,
+          eventId: eventId(71),
+          expectedRevision: source.revision,
+          archive: false,
+        ),
+      )).log;
+      final trashed = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: reminder1,
+          eventId: eventId(72),
+          expectedRevision: targets[0].revision,
+          action: ReminderMutationAction.moveToTrash,
+        ),
+      );
+      final completed = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: reminder2,
+          eventId: eventId(73),
+          expectedRevision: targets[1].revision,
+          action: ReminderMutationAction.complete,
+        ),
+      );
+      final cancelled = await agenda.mutateReminder(
+        MutateReminderCommand(
+          reminderId: reminder3,
+          eventId: eventId(74),
+          expectedRevision: targets[2].revision,
+          action: ReminderMutationAction.cancel,
+        ),
+      );
+      var operation = 920;
+      for (final target in [trashed, completed, cancelled]) {
+        await expectLater(
+          agenda.syncAgendaToReminder(
+            syncCommand(
+              operation: operation,
+              sourceEvent: operation + 1,
+              targetEvent: operation + 2,
+              reminderId: target.id,
+              sourceRevision: source.revision,
+              targetRevision: target.revision,
+            ),
+          ),
+          throwsA(isA<AgendaValidationFailure>()),
+        );
+        operation += 3;
+      }
+      expect(
+        (await agenda.listObservationEvents(log1)).where(
+          (event) => event.eventType == 'agenda_log.reminder_sync_applied',
+        ),
+        isEmpty,
+      );
+    },
+  );
+
+  test('agenda sync rolls back update and both event boundaries', () async {
+    final source = await createLog(
+      id: log1,
+      event: 1,
+      observedAt: '2026-07-19T07:00:00Z',
+      description: 'Kaynak başlık',
+    );
+    final target = await agenda.createReminder(
+      CreateReminderCommand(
+        id: reminder1,
+        eventId: eventId(11),
+        projectId: project1,
+        sourceLogId: log1,
+        title: 'Eski başlık',
+        kind: ReminderKind.action,
+        schedule: ReminderScheduleKind.inbox,
+      ),
+    );
+    final failBeforeTargetEvent = SqliteAgendaApplication(
+      databasePath: directories.databaseFile,
+      databaseFactory: databaseFactoryFfi,
+      clock: () => now,
+      beforeReminderEventInsert: (_) async {
+        throw StateError('forced before target event');
+      },
+    );
+    await expectLater(
+      failBeforeTargetEvent.syncAgendaToReminder(syncCommand()),
+      throwsStateError,
+    );
+    expect((await agenda.getReminderDetail(reminder1)).title, target.title);
+    expect((await agenda.getReminderDetail(reminder1)).revision, 1);
+    expect(
+      (await agenda.getAgendaLogDetail(log1)).log.revision,
+      source.revision,
+    );
+    expect(await _countRows(directories.databaseFile, 'follow_up_events'), 1);
+    expect(await _countRows(directories.databaseFile, 'observation_events'), 1);
+
+    var hookCalls = 0;
+    final failAfterTargetEvent = SqliteAgendaApplication(
+      databasePath: directories.databaseFile,
+      databaseFactory: databaseFactoryFfi,
+      clock: () => now,
+      beforeReminderEventInsert: (_) async {
+        hookCalls += 1;
+        if (hookCalls == 2) throw StateError('forced before source event');
+      },
+    );
+    await expectLater(
+      failAfterTargetEvent.syncAgendaToReminder(
+        syncCommand(operation: 903, sourceEvent: 904, targetEvent: 905),
+      ),
+      throwsStateError,
+    );
+    expect(hookCalls, 2);
+    expect((await agenda.getReminderDetail(reminder1)).title, target.title);
+    expect((await agenda.getReminderDetail(reminder1)).revision, 1);
+    expect(await _countRows(directories.databaseFile, 'follow_up_events'), 1);
+    expect(await _countRows(directories.databaseFile, 'observation_events'), 1);
+  });
+
+  test(
+    'agenda sync transfers archived stable location without resurrecting it',
+    () async {
+      const sourceLocation = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1';
+      const targetLocation = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2';
+      final location1 = await agenda.createProjectLocation(
+        const CreateProjectLocationCommand(
+          id: sourceLocation,
+          eventId: 'dddddddd-dddd-4ddd-8ddd-dddddddddd01',
+          projectId: project1,
+          displayName: 'Arşivlenecek mahal',
+        ),
+      );
+      await agenda.createProjectLocation(
+        const CreateProjectLocationCommand(
+          id: targetLocation,
+          eventId: 'dddddddd-dddd-4ddd-8ddd-dddddddddd02',
+          projectId: project1,
+          displayName: 'Hedef mahal',
+        ),
+      );
+      final source = await createLog(
+        id: log1,
+        event: 1,
+        observedAt: '2026-07-19T07:00:00Z',
+        description: 'Stable mahal kaynağı',
+        locationId: sourceLocation,
+      );
+      final target = await agenda.createReminder(
+        CreateReminderCommand(
+          id: reminder1,
+          eventId: eventId(11),
+          projectId: project1,
+          sourceLogId: log1,
+          title: 'Hedef',
+          kind: ReminderKind.action,
+          schedule: ReminderScheduleKind.inbox,
+          locationId: targetLocation,
+        ),
+      );
+      final archivedLocation = await agenda.mutateProjectLocationArchive(
+        MutateProjectLocationArchiveCommand(
+          locationId: sourceLocation,
+          eventId: 'dddddddd-dddd-4ddd-8ddd-dddddddddd03',
+          expectedRevision: location1.revision,
+          archive: true,
+        ),
+      );
+      expect(archivedLocation.isArchived, isTrue);
+
+      final result = await agenda.syncAgendaToReminder(
+        syncCommand(
+          sourceRevision: source.revision,
+          targetRevision: target.revision,
+          fields: const {AgendaReminderSyncField.location},
+        ),
+      );
+      final refreshed = await agenda.getReminderDetail(reminder1);
+      expect(result.copiedFields, [AgendaReminderSyncField.location]);
+      expect(refreshed.locationId, sourceLocation);
+      expect(refreshed.stableLocationName, 'Arşivlenecek mahal');
+      expect(refreshed.stableLocationArchivedAt, archivedLocation.archivedAt);
+      expect(
+        (await agenda.getProjectLocation(sourceLocation)).isArchived,
+        isTrue,
+      );
+      expect(
+        (await agenda.getAgendaLogDetail(log1)).log.revision,
+        source.revision,
+      );
     },
   );
 

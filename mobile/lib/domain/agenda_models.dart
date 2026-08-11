@@ -732,6 +732,73 @@ class UpdateAgendaLogCommand {
   final String? notes;
 }
 
+enum AgendaReminderSyncField {
+  title('title'),
+  description('description'),
+  location('location');
+
+  const AgendaReminderSyncField(this.storageValue);
+
+  final String storageValue;
+
+  static AgendaReminderSyncField fromStorage(String value) => values.firstWhere(
+    (item) => item.storageValue == value,
+    orElse: () => throw const AgendaValidationFailure(
+      'Ajanda-Hatırlatıcı sync alanı desteklenmiyor.',
+    ),
+  );
+}
+
+class SyncAgendaToReminderCommand {
+  const SyncAgendaToReminderCommand({
+    required this.operationId,
+    required this.sourceEventId,
+    required this.targetEventId,
+    required this.sourceLogId,
+    required this.reminderId,
+    required this.expectedSourceRevision,
+    required this.expectedTargetRevision,
+    required this.selectedFields,
+  });
+
+  final String operationId;
+  final String sourceEventId;
+  final String targetEventId;
+  final String sourceLogId;
+  final String reminderId;
+  final int expectedSourceRevision;
+  final int expectedTargetRevision;
+  final Set<AgendaReminderSyncField> selectedFields;
+}
+
+class AgendaReminderSyncResult {
+  const AgendaReminderSyncResult({
+    required this.operationId,
+    required this.sourceLogId,
+    required this.reminderId,
+    required this.sourceRevision,
+    required this.targetRevisionBefore,
+    required this.targetRevisionAfter,
+    required this.selectedFields,
+    required this.copiedFields,
+    required this.changes,
+    required this.changed,
+    required this.idempotent,
+  });
+
+  final String operationId;
+  final String sourceLogId;
+  final String reminderId;
+  final int sourceRevision;
+  final int targetRevisionBefore;
+  final int targetRevisionAfter;
+  final List<AgendaReminderSyncField> selectedFields;
+  final List<AgendaReminderSyncField> copiedFields;
+  final Map<String, Object?> changes;
+  final bool changed;
+  final bool idempotent;
+}
+
 class MutateAgendaLogArchiveCommand {
   const MutateAgendaLogArchiveCommand({
     required this.id,

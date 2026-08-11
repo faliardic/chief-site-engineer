@@ -3932,3 +3932,25 @@
 - Kaynak Ajanda arşivlendiğinde Hatırlatıcı yaşam döngüsü ve read-only kaynak
   fotoğrafları korunur; Hatırlatıcı detayında kaynak arşiv durumu ayrıca
   görünür kılınır. Archive/trash/complete durumları birbirine çevrilmez.
+
+## Issue 434 — Ajanda → Hatırlatıcı sync açık, tek hedefli ve atomiktir
+
+- Sync yalnız çağıranın seçtiği `title | description | location` logical
+  alanlarını transaction içindeki güncel Ajanda satırından exact bağlı
+  Hatırlatıcıya taşır. `captureText`, source/project bağı, lifecycle, plan,
+  deadline, importance, kişi/koşul/outcome ve notification binding değişmez.
+- Source ve target revision birlikte doğrulanır. Gerçek diff yoksa revision veya
+  event üretilmez; diff varsa yalnız target revision bir artar ve source satırı
+  immutable kalır.
+- Reminder `details_updated` ve Ajanda
+  `agenda_log.reminder_sync_applied` eventleri aynı operation kimliği ve
+  deterministic selected/copied field özetiyle tek SQLite transaction içinde
+  yazılır. İki eventten herhangi biri başarısızsa target update dahil tamamı
+  rollback olur.
+- Exact başarılı retry, iki event payloadındaki canonical operation/result
+  fingerprint'ini stale revision kontrolünden önce tanır ve önceki sonucu
+  idempotent döndürür. Aynı event/operation kimliğinin farklı hedef, alan veya
+  payload ile kullanımı fail-closed reddedilir; yeni ledger veya schema gerekmez.
+- Stable source mahal arşivlenmiş olsa da mevcut source linki salt-okunur
+  aktarılabilir; bu işlem mahalı restore etmez veya yeni aktif seçim gibi
+  yorumlamaz. Reverse, toplu veya background sync yoktur.
