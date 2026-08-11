@@ -43,6 +43,7 @@ class FakeAgendaApplication
   CreateReminderCommand? lastReminderCommand;
   Object? createReminderFailure;
   Object? mutateReminderFailure;
+  Object? syncAgendaToReminderFailure;
   ReminderViewGroup? lastReminderGroup;
   Completer<MobileReminder>? createReminderCompleter;
   Completer<MobileReminder>? mutateReminderCompleter;
@@ -51,8 +52,10 @@ class FakeAgendaApplication
   int todayOverviewCalls = 0;
   int sourceAgendaMediaCalls = 0;
   int mutateReminderCalls = 0;
+  int syncAgendaToReminderCalls = 0;
   int listAgendaCalls = 0;
   MutateReminderCommand? lastMutationCommand;
+  SyncAgendaToReminderCommand? lastSyncAgendaToReminderCommand;
   AgendaQuery? lastAgendaQuery;
   final StreamController<void> _projectChanges =
       StreamController<void>.broadcast();
@@ -126,6 +129,134 @@ class FakeAgendaApplication
     );
     logs = [...logs]..[index] = updated;
     return updated;
+  }
+
+  @override
+  Future<AgendaReminderSyncResult> syncAgendaToReminder(
+    SyncAgendaToReminderCommand command,
+  ) async {
+    syncAgendaToReminderCalls += 1;
+    lastSyncAgendaToReminderCommand = command;
+    if (syncAgendaToReminderFailure case final failure?) throw failure;
+    final log = logs.firstWhere((item) => item.id == command.sourceLogId);
+    final index = reminders.indexWhere((item) => item.id == command.reminderId);
+    if (index < 0) throw StateError('missing reminder');
+    final current = reminders[index];
+    if (log.revision != command.expectedSourceRevision ||
+        current.revision != command.expectedTargetRevision) {
+      throw const AgendaValidationFailure('stale revision');
+    }
+    if (log.archivedAt != null ||
+        current.trashedAt != null ||
+        current.status == ReminderStatus.completed ||
+        current.status == ReminderStatus.cancelled ||
+        current.sourceLogId != log.id ||
+        current.projectId != log.projectId) {
+      throw const AgendaValidationFailure('unsafe sync target');
+    }
+    final selectedFields = AgendaReminderSyncField.values
+        .where(command.selectedFields.contains)
+        .toList(growable: false);
+    if (selectedFields.isEmpty) {
+      throw const AgendaValidationFailure('missing sync fields');
+    }
+    final copiedFields = <AgendaReminderSyncField>[];
+    final changes = <String, Object?>{};
+    var title = current.title;
+    var description = current.description;
+    var locationId = current.locationId;
+    var location = current.location;
+    var stableLocationName = current.stableLocationName;
+    var stableLocationArchivedAt = current.stableLocationArchivedAt;
+    for (final field in selectedFields) {
+      switch (field) {
+        case AgendaReminderSyncField.title:
+          if (title != log.description) {
+            copiedFields.add(field);
+            changes[field.storageValue] = {
+              'before': title,
+              'after': log.description,
+            };
+            title = log.description;
+          }
+        case AgendaReminderSyncField.description:
+          if (description != log.notes) {
+            copiedFields.add(field);
+            changes[field.storageValue] = {
+              'before': description,
+              'after': log.notes,
+            };
+            description = log.notes;
+          }
+        case AgendaReminderSyncField.location:
+          final nextLocation = log.locationId == null
+              ? log.location
+              : log.stableLocationName;
+          if (locationId != log.locationId || location != nextLocation) {
+            copiedFields.add(field);
+            changes[field.storageValue] = {
+              'before': {'location_id': locationId, 'location': location},
+              'after': {
+                'location_id': log.locationId,
+                'location': nextLocation,
+              },
+            };
+            locationId = log.locationId;
+            location = nextLocation;
+            stableLocationName = log.stableLocationName;
+            stableLocationArchivedAt = log.stableLocationArchivedAt;
+          }
+      }
+    }
+    final changed = copiedFields.isNotEmpty;
+    if (changed) {
+      final updated = MobileReminder(
+        id: current.id,
+        projectId: current.projectId,
+        projectName: current.projectName,
+        sourceLogId: current.sourceLogId,
+        attendanceDayId: current.attendanceDayId,
+        concretePourId: current.concretePourId,
+        captureText: current.captureText,
+        title: title,
+        description: description,
+        kind: current.kind,
+        status: current.status,
+        locationId: locationId,
+        stableLocationName: stableLocationName,
+        stableLocationArchivedAt: stableLocationArchivedAt,
+        location: location,
+        relatedPerson: current.relatedPerson,
+        isImportant: current.isImportant,
+        nextAttentionAt: current.nextAttentionAt,
+        allDayLocalDate: current.allDayLocalDate,
+        deadlineAt: current.deadlineAt,
+        conditionText: current.conditionText,
+        outcomeType: current.outcomeType,
+        outcomeNote: current.outcomeNote,
+        createdAt: current.createdAt,
+        updatedAt: '2026-07-19T08:01:00Z',
+        completedAt: current.completedAt,
+        cancelledAt: current.cancelledAt,
+        trashedAt: current.trashedAt,
+        revision: current.revision + 1,
+      );
+      reminders = [...reminders]..[index] = updated;
+      reminderDetail = updated;
+    }
+    return AgendaReminderSyncResult(
+      operationId: command.operationId,
+      sourceLogId: log.id,
+      reminderId: current.id,
+      sourceRevision: log.revision,
+      targetRevisionBefore: current.revision,
+      targetRevisionAfter: current.revision + (changed ? 1 : 0),
+      selectedFields: List.unmodifiable(selectedFields),
+      copiedFields: List.unmodifiable(copiedFields),
+      changes: Map.unmodifiable(changes),
+      changed: changed,
+      idempotent: false,
+    );
   }
 
   @override
