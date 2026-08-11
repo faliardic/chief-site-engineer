@@ -3954,3 +3954,24 @@
 - Stable source mahal arşivlenmiş olsa da mevcut source linki salt-okunur
   aktarılabilir; bu işlem mahalı restore etmez veya yeni aktif seçim gibi
   yorumlamaz. Reverse, toplu veya background sync yoktur.
+
+## Issue 437 — Ajanda → Hatırlatıcı sync yalnız görünür diff ve açık onayla başlar
+
+- Sync eylemi yalnız exact açık Hatırlatıcı detayında; kaynak Ajanda güvenli,
+  aktif ve aynı proje/link bağlamındaysa, hedef çöpte/terminal değilse ve izinli
+  üç alandan en az biri gerçekten farklıysa görünür. Ajanda tarafında toplu veya
+  `first` hedef seçimi yapılmaz.
+- Confirmation yalnız farklı `Başlık | Açıklama | Mahal` satırlarını mevcut ve
+  gelecek kullanıcı-dostu değerlerle gösterir. Bütün diffler varsayılan seçili
+  olabilir; kullanıcı alanları çıkarabilir, seçim kalmazsa mutation kapalıdır.
+- UI command içine yeni field value koymaz. Fresh operation/source/target event
+  UUID'leri, preview source/target revision'ları ve yalnız seçilmiş field seti
+  mevcut Slice 2 transactionına gönderilir; gerçek source değerleri mutation
+  anında application katmanında yeniden türetilir.
+- Başarı ve no-op sonrasında source/target yeniden yüklenir. Stale veya
+  validation failure optimistic text rewrite üretmez; hata gösterilir ve güvenli
+  reload sonrası yeni diff kullanıcıya tekrar sunulur. Dialog ve mutation busy
+  guard ile tek çağrı üretir.
+- Source photo/media, arşiv banner'ı ve çift yönlü navigation mevcut sırasını ve
+  salt-okunur davranışını korur; schema 13, Backup format 1, lifecycle,
+  notification, attachment, platform ve dependency sözleşmeleri değişmez.
