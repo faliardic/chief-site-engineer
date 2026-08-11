@@ -9,7 +9,9 @@ import 'package:chief_site_engineer/application/mobile_backup_application.dart';
 import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/domain/attachment_models.dart';
 import 'package:chief_site_engineer/domain/mobile_backup_models.dart';
+import 'package:chief_site_engineer/platform/managed_attachment_store.dart';
 import 'package:chief_site_engineer/platform/mobile_backup_gateway.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
@@ -24,6 +26,10 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _password = 'guvenli-parola';
 const _now = '2026-07-19T09:30:00Z';
+const _closureManagedAttachmentId = '11111111-1111-4111-8111-111111111111';
+const _closureLegacyAttachmentId = '22222222-2222-4222-8222-222222222222';
+const _closureManagedPath = 'managed/11111111-1111-4111-8111-111111111111.jpg';
+const _closureLegacyPath = 'agenda/closure-observation-legacy/site-photo.jpg';
 
 void main() {
   late Directory temporaryRoot;
@@ -499,6 +505,247 @@ void main() {
         (await application.lastSuccessfulBackup())?.fileName,
         created.summary.fileName,
       );
+    },
+  );
+
+  test(
+    'schema 13 attachment graph restores to a clean root and survives reopen',
+    () async {
+      const expectedBytes = <int>[0xff, 0xd8, 0xff, 0xd9];
+      final expectedDigest = sha256.convert(expectedBytes).toString();
+      await _seedAttachmentClosureFixture(directories, expectedBytes);
+      final sourceApplication = _application(directories, gateway: gateway);
+      final created = await sourceApplication.createBackup(
+        const CreateMobileBackupCommand(
+          password: _password,
+          passwordConfirmation: _password,
+        ),
+      );
+      expect(created.summary.attachmentCount, 2);
+
+      final targetDirectories = AppDirectories.fromSupportRoot(
+        Directory(path.join(temporaryRoot.path, 'clean-restore-target')),
+        AppEnvironment.debug,
+      );
+      await targetDirectories.ensureCreated();
+      await _bootstrapDatabase(targetDirectories);
+      final packageFile = File(created.absolutePath);
+      final targetGateway = DeviceMobileBackupFileGateway(
+        directories: targetDirectories,
+        picker: () async => PlatformFile(
+          name: 'v2-3-closure.csebackup',
+          size: created.summary.packageByteSize,
+          readStream: packageFile.openRead(),
+        ),
+        clock: () => DateTime.parse(_now),
+        importIdFactory: (_) => 'v2-3-clean-target',
+      );
+      final targetApplication = _application(
+        targetDirectories,
+        gateway: targetGateway,
+      );
+
+      final imported = (await targetApplication.pickBackupPackage())!;
+      final preflight = await targetApplication.preflightBackup(
+        imported,
+        _password,
+      );
+      expect(preflight.manifest.formatVersion, 1);
+      expect(preflight.manifest.mobileSchemaVersion, AppDatabase.schemaVersion);
+      expect(preflight.manifest.attachments.map((item) => item.logicalPath), [
+        _closureLegacyPath,
+        _closureManagedPath,
+      ]);
+      final restored = await targetApplication.restoreBackup(
+        RestoreMobileBackupCommand(
+          package: preflight.package,
+          password: _password,
+          expectedPackageSha256: preflight.packageSha256,
+        ),
+      );
+      expect(restored.restoredManifest.formatVersion, 1);
+      expect(restored.activeSchemaVersion, AppDatabase.schemaVersion);
+      expect(await File(imported.stablePath).exists(), isFalse);
+      expect(await targetDirectories.incomingBackups.exists(), isFalse);
+
+      final reopened = AppDatabase(
+        path: targetDirectories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.parse(_now),
+      );
+      await reopened.open();
+      final database = reopened.database;
+      expect(
+        Sqflite.firstIntValue(
+          await database.rawQuery('SELECT max(version) FROM schema_versions'),
+        ),
+        AppDatabase.schemaVersion,
+      );
+      expect(
+        await database.rawQuery('''
+          SELECT id, relative_path, mime_type, byte_size, sha256
+          FROM managed_attachments
+          ORDER BY id
+        '''),
+        [
+          {
+            'id': _closureManagedAttachmentId,
+            'relative_path': _closureManagedPath,
+            'mime_type': 'image/jpeg',
+            'byte_size': expectedBytes.length,
+            'sha256': expectedDigest,
+          },
+          {
+            'id': _closureLegacyAttachmentId,
+            'relative_path': _closureLegacyPath,
+            'mime_type': 'image/jpeg',
+            'byte_size': expectedBytes.length,
+            'sha256': expectedDigest,
+          },
+        ],
+      );
+      expect(
+        await database.rawQuery('''
+          SELECT id, attachment_id, project_id, source_type, source_id, role,
+                 original_file_name, captured_at
+          FROM attachment_links
+          ORDER BY id
+        '''),
+        [
+          {
+            'id': 'closure-link-agenda-shared',
+            'attachment_id': _closureManagedAttachmentId,
+            'project_id': 'closure-project',
+            'source_type': 'agenda_observation',
+            'source_id': 'closure-observation-shared',
+            'role': 'site_photo',
+            'original_file_name': 'paylasilan-saha.jpg',
+            'captured_at': _now,
+          },
+          {
+            'id': 'closure-link-concrete-shared',
+            'attachment_id': _closureManagedAttachmentId,
+            'project_id': 'closure-project',
+            'source_type': 'concrete_pour',
+            'source_id': 'closure-pour',
+            'role': 'site_photo',
+            'original_file_name': 'paylasilan-beton.jpg',
+            'captured_at': _now,
+          },
+          {
+            'id': 'closure-link-legacy',
+            'attachment_id': _closureLegacyAttachmentId,
+            'project_id': 'closure-project',
+            'source_type': 'agenda_observation',
+            'source_id': 'closure-observation-legacy',
+            'role': 'site_photo',
+            'original_file_name': 'legacy-saha.jpg',
+            'captured_at': _now,
+          },
+        ],
+      );
+      expect(
+        Sqflite.firstIntValue(
+          await database.rawQuery(
+            '''
+            SELECT count(*) FROM attachment_links
+            WHERE attachment_id = ?
+          ''',
+            [_closureManagedAttachmentId],
+          ),
+        ),
+        2,
+      );
+      expect(
+        await database.rawQuery(
+          '''
+          SELECT source_type, source_id
+          FROM attachment_links
+          WHERE attachment_id = ?
+          ORDER BY source_type
+        ''',
+          [_closureManagedAttachmentId],
+        ),
+        [
+          {
+            'source_type': 'agenda_observation',
+            'source_id': 'closure-observation-shared',
+          },
+          {'source_type': 'concrete_pour', 'source_id': 'closure-pour'},
+        ],
+      );
+      expect(
+        await database.rawQuery('''
+          SELECT attachment_link_id, sequence, event_type
+          FROM attachment_link_events
+          ORDER BY attachment_link_id
+        '''),
+        [
+          {
+            'attachment_link_id': 'closure-link-agenda-shared',
+            'sequence': 1,
+            'event_type': 'link.created',
+          },
+          {
+            'attachment_link_id': 'closure-link-concrete-shared',
+            'sequence': 1,
+            'event_type': 'link.created',
+          },
+          {
+            'attachment_link_id': 'closure-link-legacy',
+            'sequence': 1,
+            'event_type': 'link.created',
+          },
+        ],
+      );
+      expect(
+        await database.query(
+          'field_observations',
+          columns: ['id'],
+          orderBy: 'id',
+        ),
+        [
+          {'id': 'closure-observation-legacy'},
+          {'id': 'closure-observation-shared'},
+        ],
+      );
+      expect((await database.query('concrete_pours', columns: ['id'])).single, {
+        'id': 'closure-pour',
+      });
+      expect(await database.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      await reopened.close();
+
+      final store = DeviceManagedAttachmentStore(
+        directories: targetDirectories,
+      );
+      for (final relativePath in [_closureManagedPath, _closureLegacyPath]) {
+        expect(
+          await store.inspect(
+            relativePath: relativePath,
+            expectedSha256: expectedDigest,
+            expectedMimeType: 'image/jpeg',
+            expectedByteSize: expectedBytes.length,
+          ),
+          ManagedAttachmentIntegrity.healthy,
+        );
+        expect(
+          await File(
+            path.join(targetDirectories.attachments.path, relativePath),
+          ).readAsBytes(),
+          expectedBytes,
+        );
+      }
+      final restoredFiles = await targetDirectories.attachments
+          .list(recursive: true)
+          .where((entity) => entity is File)
+          .map(
+            (entity) => path
+                .relative(entity.path, from: targetDirectories.attachments.path)
+                .replaceAll('\\', '/'),
+          )
+          .toList();
+      restoredFiles.sort();
+      expect(restoredFiles, [_closureLegacyPath, _closureManagedPath]);
     },
   );
 
@@ -1298,6 +1545,115 @@ Future<void> _bootstrapDatabase(AppDirectories directories) async {
     clock: () => DateTime.parse(_now),
   ).ensureFoundationRecord();
   await database.close();
+}
+
+Future<void> _seedAttachmentClosureFixture(
+  AppDirectories directories,
+  List<int> attachmentBytes,
+) async {
+  final database = await _openRaw(directories);
+  final digest = sha256.convert(attachmentBytes).toString();
+  await database.transaction((transaction) async {
+    await transaction.insert('projects', {
+      'id': 'closure-project',
+      'name': 'V2.3 Kapanış Projesi',
+      'created_at': _now,
+      'updated_at': _now,
+      'revision': 1,
+    });
+    for (final observation in const [
+      ('closure-observation-shared', 'Paylaşılan fiziksel dosya'),
+      ('closure-observation-legacy', 'Legacy okunabilir dosya'),
+    ]) {
+      await transaction.insert('field_observations', {
+        'id': observation.$1,
+        'project_id': 'closure-project',
+        'observed_at': _now,
+        'created_at': _now,
+        'updated_at': _now,
+        'category': 'inspection',
+        'description': observation.$2,
+        'revision': 1,
+      });
+    }
+    await transaction.insert('concrete_pours', {
+      'id': 'closure-pour',
+      'project_id': 'closure-project',
+      'pour_code': 'V23-CLOSURE',
+      'element_location': 'Kapanış temel betonu',
+      'planned_at': _now,
+      'concrete_class': 'C30/37',
+      'planned_volume_m3': 10.0,
+      'status': 'draft',
+      'revision': 1,
+      'created_at': _now,
+      'updated_at': _now,
+    });
+    for (final attachment in [
+      (_closureManagedAttachmentId, _closureManagedPath),
+      (_closureLegacyAttachmentId, _closureLegacyPath),
+    ]) {
+      await transaction.insert('managed_attachments', {
+        'id': attachment.$1,
+        'relative_path': attachment.$2,
+        'mime_type': 'image/jpeg',
+        'byte_size': attachmentBytes.length,
+        'sha256': digest,
+        'created_at': _now,
+      });
+    }
+    for (final link in const [
+      (
+        'closure-link-agenda-shared',
+        _closureManagedAttachmentId,
+        'agenda_observation',
+        'closure-observation-shared',
+        'paylasilan-saha.jpg',
+      ),
+      (
+        'closure-link-concrete-shared',
+        _closureManagedAttachmentId,
+        'concrete_pour',
+        'closure-pour',
+        'paylasilan-beton.jpg',
+      ),
+      (
+        'closure-link-legacy',
+        _closureLegacyAttachmentId,
+        'agenda_observation',
+        'closure-observation-legacy',
+        'legacy-saha.jpg',
+      ),
+    ]) {
+      await transaction.insert('attachment_links', {
+        'id': link.$1,
+        'attachment_id': link.$2,
+        'project_id': 'closure-project',
+        'source_type': link.$3,
+        'source_id': link.$4,
+        'role': 'site_photo',
+        'original_file_name': link.$5,
+        'captured_at': _now,
+        'revision': 1,
+        'created_at': _now,
+        'updated_at': _now,
+      });
+      await transaction.insert('attachment_link_events', {
+        'id': '${link.$1}-event',
+        'attachment_link_id': link.$1,
+        'sequence': 1,
+        'event_type': 'link.created',
+        'occurred_at': _now,
+        'payload_json': '{}',
+      });
+    }
+  });
+  await database.close();
+  for (final relativePath in [_closureManagedPath, _closureLegacyPath]) {
+    final file = File(path.join(directories.attachments.path, relativePath));
+    await file.parent.create(recursive: true);
+    await file.writeAsBytes(attachmentBytes, flush: true);
+  }
 }
 
 Future<void> _seedFullFixture(

@@ -3902,3 +3902,20 @@
 - JPEG/PNG MIME-byte uyumu platform çağrısından önce yeniden doğrulanır. Unsafe
   basename karakterleri fail-safe sanitize edilir; dependency, permission,
   manifest, schema veya Backup formatı genişletilmez.
+
+## Issue 420 final closure — Kapanış production diff yerine executable veri kanıtıdır
+
+- V2.3 attachment kapanışı yeni ürün davranışı eklemez. Schema 13 / Backup
+  format 1 üzerinde source ve ayrı temiz target kullanan sentetik round-trip;
+  physical ID, çoklu Agenda/Concrete link/event grafiği, managed + legacy path,
+  exact byte/size/SHA/MIME ve yeniden açılış bütünlüğünü production diff `0` ile
+  kanıtlar.
+- Aynı SHA-256'ya sahip iki fiziksel kimlik restore sonrasında da ayrı tutulur;
+  SHA eşitliği migration, backup veya restore için dedupe yetkisi değildir.
+- Final debug artifact temiz dependency/registrant üretimiyle oluşturulur;
+  registrant, plugin sınıfları ve ARM64 runtime inventory install öncesi
+  doğrulanır. Fiziksel cihaz kabulü data-preserving `install -r` ve cold-launch
+  smoke ile sınırlıdır; gerçek cihazda restore yapılmaz.
+- PR Ready ve V2.3 owner closure, source review sonrasında mevcut Agenda/Concrete
+  attachment, shared link, cold reopen, Dosya Kataloğu ve Dosya Sağlığı için
+  manuel kullanıcı kabulü gerektirir.
