@@ -3501,7 +3501,7 @@ class SqliteAgendaApplication
     String logId,
   ) async {
     final log = await _requireAgendaLog(database, logId);
-    final reminders = await database.rawQuery(
+    final reminderRows = await database.rawQuery(
       '''
       SELECT f.*, p.name AS project_name,
         l.display_name AS stable_location_name,
@@ -3509,11 +3509,14 @@ class SqliteAgendaApplication
       FROM follow_up_items f
       LEFT JOIN projects p ON p.id = f.project_id
       LEFT JOIN project_locations l ON l.id = f.location_id
-      WHERE f.observation_id = ? AND f.trashed_at IS NULL
+      WHERE f.observation_id = ?
       ORDER BY f.created_at ASC, f.id ASC
       ''',
       [logId],
     );
+    final allReminders = reminderRows
+        .map(_reminderFromRow)
+        .toList(growable: false);
     final photos = await _queryAgendaAttachmentRows(
       database,
       observationId: logId,
@@ -3535,7 +3538,12 @@ class SqliteAgendaApplication
     );
     return AgendaLogDetail(
       log: log,
-      reminders: reminders.map(_reminderFromRow).toList(growable: false),
+      reminders: allReminders
+          .where((reminder) => reminder.trashedAt == null)
+          .toList(growable: false),
+      trashedReminders: allReminders
+          .where((reminder) => reminder.trashedAt != null)
+          .toList(growable: false),
       photos: photos.map(_agendaPhotoFromRow).toList(growable: false),
       events: events.map(_observationEventFromRow).toList(growable: false),
       managedConcretePourId: managedLinks.isEmpty
@@ -3551,6 +3559,7 @@ class SqliteAgendaApplication
     return AgendaLogDetail(
       log: detail.log,
       reminders: detail.reminders,
+      trashedReminders: detail.trashedReminders,
       photos: photos,
       events: detail.events,
       managedConcretePourId: detail.managedConcretePourId,

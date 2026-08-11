@@ -149,7 +149,16 @@ class FakeAgendaApplication
       archivedAt: command.archive ? '2026-07-19T08:01:00Z' : null,
     );
     logs = [...logs]..[index] = updated;
-    return AgendaLogDetail(log: updated, reminders: reminders);
+    final linked = reminders.where((item) => item.sourceLogId == command.id);
+    return AgendaLogDetail(
+      log: updated,
+      reminders: linked
+          .where((item) => item.trashedAt == null)
+          .toList(growable: false),
+      trashedReminders: linked
+          .where((item) => item.trashedAt != null)
+          .toList(growable: false),
+    );
   }
 
   @override
@@ -228,7 +237,10 @@ class FakeAgendaApplication
       log: log,
       reminders: reminders
           .where((item) => item.sourceLogId == logId && item.trashedAt == null)
-          .toList(),
+          .toList(growable: false),
+      trashedReminders: reminders
+          .where((item) => item.sourceLogId == logId && item.trashedAt != null)
+          .toList(growable: false),
     );
   }
 

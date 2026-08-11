@@ -3919,3 +3919,16 @@
 - PR Ready ve V2.3 owner closure, source review sonrasında mevcut Agenda/Concrete
   attachment, shared link, cold reopen, Dosya Kataloğu ve Dosya Sağlığı için
   manuel kullanıcı kabulü gerektirir.
+
+## Issue 432 — Ajanda–Hatırlatıcı bağı 0..N read-model olarak görünürdür
+
+- Bir Ajanda kaydı sıfır veya birden çok Hatırlatıcıya kaynak olabilir. Aktif ve
+  çöpteki bağlı kayıtlar aynı deterministik sorgudan ayrı read-model
+  koleksiyonlarına bölünür; source bağlantısı veya lifecycle durumu değişmez.
+- Ajanda app-bar Hatırlatıcı eylemi bağlı kayıt seçmez ve her zaman yeni kayıt
+  oluşturma anlamındadır. Mevcut bağlı kayıtlar yalnız kendi exact kimlikli
+  kartlarından açılır; arşivli veya Beton tarafından yönetilen Ajanda yeni
+  Hatırlatıcı üretemez.
+- Kaynak Ajanda arşivlendiğinde Hatırlatıcı yaşam döngüsü ve read-only kaynak
+  fotoğrafları korunur; Hatırlatıcı detayında kaynak arşiv durumu ayrıca
+  görünür kılınır. Archive/trash/complete durumları birbirine çevrilmez.
