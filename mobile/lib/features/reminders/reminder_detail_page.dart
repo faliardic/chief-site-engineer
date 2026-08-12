@@ -39,10 +39,12 @@ class ReminderDetailPage extends StatefulWidget {
 
 class _ReminderDetailPageState extends State<ReminderDetailPage> {
   ReminderDetail? _detail;
+  AgendaLogDetail? _sourceAgendaDetail;
   ReminderDeliveryDiagnostic? _deliveryDiagnostic;
   Future<ReminderSourceAgendaMedia>? _sourceAgendaMedia;
   bool _loading = true;
   bool _mutating = false;
+  bool _syncDialogOpen = false;
   bool _scheduleFlowOpen = false;
   String? _error;
 
@@ -52,16 +54,28 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
     _reload();
   }
 
-  Future<void> _reload() async {
+  Future<void> _reload({String? errorAfterReload}) async {
     setState(() {
       _loading = true;
       _error = null;
+      _sourceAgendaDetail = null;
       _sourceAgendaMedia = null;
     });
     try {
       final detail = await widget.agenda.getReminderLifecycleDetail(
         widget.reminderId,
       );
+      AgendaLogDetail? sourceAgendaDetail;
+      final sourceLogId = detail.reminder.sourceLogId;
+      if (sourceLogId != null) {
+        try {
+          sourceAgendaDetail = await widget.agenda.getAgendaLogDetail(
+            sourceLogId,
+          );
+        } on Object {
+          sourceAgendaDetail = null;
+        }
+      }
       ReminderDeliveryDiagnostic? diagnostic;
       final application = widget.agenda;
       if (detail.reminder.nextAttentionAt != null &&
@@ -74,14 +88,15 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
         }
       }
       if (mounted) {
-        final sourceLogId = detail.reminder.sourceLogId;
         setState(() {
           _detail = detail;
+          _sourceAgendaDetail = sourceAgendaDetail;
           _deliveryDiagnostic = diagnostic;
           _sourceAgendaMedia = sourceLogId == null
               ? null
               : _loadSourceAgendaMedia(sourceLogId);
           _loading = false;
+          _error = errorAfterReload;
         });
       }
     } on Object {
@@ -91,6 +106,192 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
           _error = 'Hatırlatıcı güvenli biçimde okunamadı.';
         });
       }
+    }
+  }
+
+  List<_AgendaReminderSyncDiff> _agendaReminderSyncDiffs(
+    ReminderDetail detail,
+  ) {
+    final sourceDetail = _sourceAgendaDetail;
+    if (sourceDetail == null) return const [];
+    final reminder = detail.reminder;
+    final source = sourceDetail.log;
+    if (reminder.sourceLogId != source.id ||
+        reminder.projectId != source.projectId ||
+        source.archivedAt != null ||
+        reminder.trashedAt != null ||
+        reminder.status == ReminderStatus.completed ||
+        reminder.status == ReminderStatus.cancelled ||
+        (source.locationId != null && source.stableLocationName == null)) {
+      return const [];
+    }
+    final result = <_AgendaReminderSyncDiff>[];
+    if (reminder.title != source.description) {
+      result.add(
+        _AgendaReminderSyncDiff(
+          field: AgendaReminderSyncField.title,
+          label: 'Başlık',
+          before: reminder.title,
+          after: source.description,
+        ),
+      );
+    }
+    if (reminder.description != source.notes) {
+      result.add(
+        _AgendaReminderSyncDiff(
+          field: AgendaReminderSyncField.description,
+          label: 'Açıklama',
+          before: reminder.description,
+          after: source.notes,
+        ),
+      );
+    }
+    final sourceLocation = source.locationId == null
+        ? source.location
+        : source.stableLocationName;
+    if (reminder.locationId != source.locationId ||
+        reminder.location != sourceLocation) {
+      result.add(
+        _AgendaReminderSyncDiff(
+          field: AgendaReminderSyncField.location,
+          label: 'Mahal',
+          before: reminder.displayLocation,
+          after: source.displayLocation,
+        ),
+      );
+    }
+    return List.unmodifiable(result);
+  }
+
+  Future<void> _showAgendaSyncConfirmation() async {
+    final detail = _detail;
+    if (_mutating || _syncDialogOpen || detail == null) return;
+    final sourceDetail = _sourceAgendaDetail;
+    final diffs = _agendaReminderSyncDiffs(detail);
+    if (sourceDetail == null || diffs.isEmpty) return;
+    setState(() => _syncDialogOpen = true);
+    try {
+      final selected = diffs.map((diff) => diff.field).toSet();
+      var confirmationSubmitted = false;
+      final confirmedFields = await showDialog<Set<AgendaReminderSyncField>>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            key: const Key('agenda-reminder-sync-dialog'),
+            title: const Text('Ajanda’dan güncelle'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final diff in diffs)
+                    CheckboxListTile(
+                      key: Key('agenda-sync-field-${diff.field.storageValue}'),
+                      contentPadding: EdgeInsets.zero,
+                      value: selected.contains(diff.field),
+                      onChanged: (value) => setDialogState(() {
+                        if (value == true) {
+                          selected.add(diff.field);
+                        } else {
+                          selected.remove(diff.field);
+                        }
+                      }),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: Text(diff.label),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Hatırlatıcı: ${_syncDisplayValue(diff.before)}',
+                            key: Key(
+                              'agenda-sync-before-${diff.field.storageValue}',
+                            ),
+                          ),
+                          Text(
+                            'Ajanda: ${_syncDisplayValue(diff.after)}',
+                            key: Key(
+                              'agenda-sync-after-${diff.field.storageValue}',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                key: const Key('cancel-agenda-reminder-sync'),
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Vazgeç'),
+              ),
+              FilledButton(
+                key: const Key('confirm-agenda-reminder-sync'),
+                onPressed: selected.isEmpty
+                    ? null
+                    : () {
+                        if (confirmationSubmitted) return;
+                        confirmationSubmitted = true;
+                        Navigator.of(
+                          dialogContext,
+                        ).pop(Set.unmodifiable(selected));
+                      },
+                child: const Text('Seçilenleri güncelle'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (confirmedFields == null || confirmedFields.isEmpty || !mounted) {
+        return;
+      }
+      await _syncAgendaToReminder(
+        detail: detail,
+        sourceDetail: sourceDetail,
+        selectedFields: confirmedFields,
+      );
+    } finally {
+      if (mounted) setState(() => _syncDialogOpen = false);
+    }
+  }
+
+  Future<void> _syncAgendaToReminder({
+    required ReminderDetail detail,
+    required AgendaLogDetail sourceDetail,
+    required Set<AgendaReminderSyncField> selectedFields,
+  }) async {
+    if (_mutating) return;
+    setState(() {
+      _mutating = true;
+      _error = null;
+    });
+    try {
+      final result = await widget.agenda.syncAgendaToReminder(
+        SyncAgendaToReminderCommand(
+          operationId: RecordId.randomUuid(),
+          sourceEventId: RecordId.randomUuid(),
+          targetEventId: RecordId.randomUuid(),
+          sourceLogId: sourceDetail.log.id,
+          reminderId: detail.reminder.id,
+          expectedSourceRevision: sourceDetail.log.revision,
+          expectedTargetRevision: detail.reminder.revision,
+          selectedFields: selectedFields,
+        ),
+      );
+      await _reload();
+      if (result.changed && mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Ajanda’dan güncellendi')));
+      }
+    } on AgendaValidationFailure catch (error) {
+      await _reload(errorAfterReload: error.message);
+    } on Object {
+      await _reload(
+        errorAfterReload:
+            'Ajanda’dan güncelleme güvenli biçimde tamamlanamadı.',
+      );
+    } finally {
+      if (mounted) setState(() => _mutating = false);
     }
   }
 
@@ -913,6 +1114,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
 
   Widget _buildDetail(BuildContext context, ReminderDetail detail) {
     final reminder = detail.reminder;
+    final agendaSyncDiffs = _agendaReminderSyncDiffs(detail);
     final terminal =
         reminder.status == ReminderStatus.completed ||
         reminder.status == ReminderStatus.cancelled;
@@ -1039,6 +1241,20 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
               label: const Text('Kaynak Ajanda kaydına dön'),
             ),
           ),
+          if (agendaSyncDiffs.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 52,
+              child: FilledButton.icon(
+                key: const Key('sync-agenda-to-reminder'),
+                onPressed: _mutating || _syncDialogOpen
+                    ? null
+                    : _showAgendaSyncConfirmation,
+                icon: const Icon(Icons.sync_outlined),
+                label: const Text('Ajanda’dan güncelle'),
+              ),
+            ),
+          ],
         ],
         if (reminder.attendanceDayId != null && widget.attendance != null) ...[
           const SizedBox(height: 16),
@@ -1240,6 +1456,25 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
       ],
     );
   }
+}
+
+class _AgendaReminderSyncDiff {
+  const _AgendaReminderSyncDiff({
+    required this.field,
+    required this.label,
+    required this.before,
+    required this.after,
+  });
+
+  final AgendaReminderSyncField field;
+  final String label;
+  final String? before;
+  final String? after;
+}
+
+String _syncDisplayValue(String? value) {
+  final normalized = value?.trim();
+  return normalized == null || normalized.isEmpty ? 'Boş' : normalized;
 }
 
 class _ReminderSourceAgendaPhotos extends StatelessWidget {

@@ -15,9 +15,11 @@ class FakeAgendaApplication
     this.reminders = const [],
     this.todayOverview,
     this.logDetail,
+    this.agendaLogDetailFailure,
     this.reminderDetail,
     this.sourceAgendaMedia,
     this.sourceAgendaMediaFailure,
+    this.syncAgendaToReminderFailure,
     this.agendaPhotoContents = const {},
     this.initialNotificationReminderId,
     this.notificationTapStream = const Stream<String>.empty(),
@@ -30,6 +32,7 @@ class FakeAgendaApplication
   ReminderTodayOverview? todayOverview;
   final DateTime asOfUtc;
   AgendaLogDetail? logDetail;
+  Object? agendaLogDetailFailure;
   MobileReminder? reminderDetail;
   ReminderSourceAgendaMedia? sourceAgendaMedia;
   Object? sourceAgendaMediaFailure;
@@ -47,12 +50,15 @@ class FakeAgendaApplication
   ReminderViewGroup? lastReminderGroup;
   Completer<MobileReminder>? createReminderCompleter;
   Completer<MobileReminder>? mutateReminderCompleter;
+  Completer<AgendaReminderSyncResult>? syncAgendaToReminderCompleter;
   int createLogCalls = 0;
   int createReminderCalls = 0;
   int todayOverviewCalls = 0;
   int sourceAgendaMediaCalls = 0;
   int mutateReminderCalls = 0;
   int syncAgendaToReminderCalls = 0;
+  int getAgendaLogDetailCalls = 0;
+  int reminderLifecycleDetailCalls = 0;
   int listAgendaCalls = 0;
   MutateReminderCommand? lastMutationCommand;
   SyncAgendaToReminderCommand? lastSyncAgendaToReminderCommand;
@@ -138,6 +144,9 @@ class FakeAgendaApplication
     syncAgendaToReminderCalls += 1;
     lastSyncAgendaToReminderCommand = command;
     if (syncAgendaToReminderFailure case final failure?) throw failure;
+    if (syncAgendaToReminderCompleter case final completer?) {
+      return completer.future;
+    }
     final log = logs.firstWhere((item) => item.id == command.sourceLogId);
     final index = reminders.indexWhere((item) => item.id == command.reminderId);
     if (index < 0) throw StateError('missing reminder');
@@ -362,6 +371,8 @@ class FakeAgendaApplication
 
   @override
   Future<AgendaLogDetail> getAgendaLogDetail(String logId) async {
+    getAgendaLogDetailCalls += 1;
+    if (agendaLogDetailFailure case final failure?) throw failure;
     if (logDetail case final detail?) return detail;
     final log = logs.firstWhere((item) => item.id == logId);
     return AgendaLogDetail(
@@ -401,6 +412,7 @@ class FakeAgendaApplication
 
   @override
   Future<ReminderDetail> getReminderLifecycleDetail(String reminderId) async {
+    reminderLifecycleDetailCalls += 1;
     final reminder = await getReminderDetail(reminderId);
     return ReminderDetail(
       reminder: reminder,

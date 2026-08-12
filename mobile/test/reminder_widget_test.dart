@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:chief_site_engineer/app.dart';
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
+import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_photo_viewer_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
@@ -18,6 +19,8 @@ import 'support/fake_agenda_application.dart';
 import 'support/fake_attendance_application.dart';
 
 const reminderId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const agendaProjectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const agendaSourceLogId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
 String widgetReminderId(int value) =>
     'dddddddd-dddd-4ddd-8ddd-${value.toString().padLeft(12, '0')}';
@@ -25,35 +28,99 @@ String widgetReminderId(int value) =>
 MobileReminder reminder({
   String id = reminderId,
   String title = 'Mobil hızlı yakalama',
+  String? captureText,
+  String? description,
+  ReminderKind kind = ReminderKind.action,
   ReminderStatus status = ReminderStatus.active,
   String? nextAttentionAt,
   String? allDayLocalDate,
+  String? deadlineAt,
   String? trashedAt,
   bool isImportant = false,
   String? projectId,
   String? projectName,
   String? sourceLogId,
   String? attendanceDayId,
+  String? locationId,
+  String? stableLocationName,
+  String? stableLocationArchivedAt,
+  String? location,
+  String? relatedPerson,
+  String? conditionText,
+  ReminderOutcomeType? outcomeType,
+  String? outcomeNote,
+  int revision = 1,
 }) => MobileReminder(
   id: id,
   projectId: projectId,
   projectName: projectName,
   sourceLogId: sourceLogId,
   attendanceDayId: attendanceDayId,
-  captureText: title,
+  captureText: captureText ?? title,
   title: title,
-  kind: ReminderKind.action,
+  description: description,
+  kind: kind,
   status: status,
+  locationId: locationId,
+  stableLocationName: stableLocationName,
+  stableLocationArchivedAt: stableLocationArchivedAt,
+  location: location,
+  relatedPerson: relatedPerson,
   isImportant: isImportant,
   nextAttentionAt: status == ReminderStatus.inbox || allDayLocalDate != null
       ? null
       : nextAttentionAt ?? '2026-07-20T06:00:00Z',
   allDayLocalDate: allDayLocalDate,
+  deadlineAt: deadlineAt,
+  conditionText: conditionText,
+  outcomeType: outcomeType,
+  outcomeNote: outcomeNote,
   createdAt: '2026-07-19T08:00:00Z',
   updatedAt: '2026-07-19T08:00:00Z',
   trashedAt: trashedAt,
-  revision: 1,
+  revision: revision,
 );
+
+AgendaLog sourceAgendaLog({
+  String id = agendaSourceLogId,
+  String projectId = agendaProjectId,
+  String description = 'Ajanda başlığı',
+  String? notes = 'Ajanda açıklaması',
+  String? locationId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+  String? stableLocationName = 'A Blok / Kat 1',
+  String? stableLocationArchivedAt,
+  String? location = 'A Blok / Kat 1',
+  String? archivedAt,
+  int revision = 7,
+}) => AgendaLog(
+  id: id,
+  projectId: projectId,
+  projectName: 'Şantiye A',
+  observedAt: '2026-07-20T06:00:00Z',
+  createdAt: '2026-07-20T06:00:00Z',
+  updatedAt: '2026-07-20T06:00:00Z',
+  category: AgendaCategory.inspection,
+  description: description,
+  locationId: locationId,
+  stableLocationName: stableLocationName,
+  stableLocationArchivedAt: stableLocationArchivedAt,
+  location: location,
+  notes: notes,
+  archivedAt: archivedAt,
+  revision: revision,
+);
+
+Future<void> openAgendaReminderSyncDialog(WidgetTester tester) async {
+  final action = find.byKey(const Key('sync-agenda-to-reminder'));
+  await tester.scrollUntilVisible(
+    action,
+    300,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.tap(action);
+  await tester.pumpAndSettle();
+  expect(find.byKey(const Key('agenda-reminder-sync-dialog')), findsOneWidget);
+}
 
 AgendaLogPhoto sourcePhoto({
   required String id,
@@ -133,8 +200,7 @@ Future<void> openDetailAllDayPicker(WidgetTester tester) async {
   final scheduleButton = find.byKey(const Key('schedule-reminder'));
   final detailListView = find.byWidgetPredicate(
     (widget) =>
-        widget is ListView &&
-        widget.key == const Key('reminder-detail'),
+        widget is ListView && widget.key == const Key('reminder-detail'),
     description: 'outer reminder detail ListView',
   );
   expect(detailListView, findsOneWidget);
@@ -418,12 +484,8 @@ void main() {
             .selected,
         isTrue,
       );
-      final overdueSection = find.byKey(
-        const Key('reminder-section-overdue'),
-      );
-      final allDaySection = find.byKey(
-        const Key('reminder-section-all-day'),
-      );
+      final overdueSection = find.byKey(const Key('reminder-section-overdue'));
+      final allDaySection = find.byKey(const Key('reminder-section-all-day'));
       final timedSection = find.byKey(
         const Key('reminder-section-timed-today'),
       );
@@ -902,6 +964,463 @@ void main() {
       expect(standaloneAgenda.sourceAgendaMediaCalls, 0);
     },
   );
+
+  testWidgets('Ajanda sync action appears only for eligible real field diffs', (
+    tester,
+  ) async {
+    final source = sourceAgendaLog();
+
+    MobileReminder matchingTarget({
+      String title = 'Ajanda başlığı',
+      String? description = 'Ajanda açıklaması',
+      ReminderStatus status = ReminderStatus.active,
+      String? trashedAt,
+      String projectId = agendaProjectId,
+      String? locationId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      String? stableLocationName = 'A Blok / Kat 1',
+      String? location = 'A Blok / Kat 1',
+    }) => reminder(
+      title: title,
+      description: description,
+      status: status,
+      trashedAt: trashedAt,
+      projectId: projectId,
+      projectName: 'Şantiye A',
+      sourceLogId: agendaSourceLogId,
+      locationId: locationId,
+      stableLocationName: stableLocationName,
+      location: location,
+    );
+
+    Future<void> pumpCase(
+      String name, {
+      required MobileReminder item,
+      required AgendaLog log,
+      required bool actionVisible,
+      Object? sourceFailure,
+    }) async {
+      final agenda = FakeAgendaApplication(
+        reminders: [item],
+        reminderDetail: item,
+        logs: [log],
+        agendaLogDetailFailure: sourceFailure,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          key: ValueKey('sync-case-$name'),
+          home: ReminderDetailPage(
+            key: ValueKey('sync-detail-$name'),
+            agenda: agenda,
+            reminderId: item.id,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('sync-agenda-to-reminder')),
+        actionVisible ? findsOneWidget : findsNothing,
+        reason: name,
+      );
+      expect(agenda.syncAgendaToReminderCalls, 0, reason: name);
+    }
+
+    await pumpCase(
+      'title',
+      item: matchingTarget(title: 'Eski başlık'),
+      log: source,
+      actionVisible: true,
+    );
+    await pumpCase(
+      'description',
+      item: matchingTarget(description: 'Eski açıklama'),
+      log: source,
+      actionVisible: true,
+    );
+    await pumpCase(
+      'location',
+      item: matchingTarget(
+        locationId: null,
+        stableLocationName: null,
+        location: 'Eski mahal',
+      ),
+      log: source,
+      actionVisible: true,
+    );
+    await pumpCase(
+      'no-diff',
+      item: matchingTarget(),
+      log: source,
+      actionVisible: false,
+    );
+    await pumpCase(
+      'archived-source',
+      item: matchingTarget(title: 'Eski başlık'),
+      log: sourceAgendaLog(archivedAt: '2026-07-20T07:00:00Z'),
+      actionVisible: false,
+    );
+    await pumpCase(
+      'trashed-target',
+      item: matchingTarget(
+        title: 'Eski başlık',
+        trashedAt: '2026-07-20T07:00:00Z',
+      ),
+      log: source,
+      actionVisible: false,
+    );
+    await pumpCase(
+      'completed-target',
+      item: matchingTarget(
+        title: 'Eski başlık',
+        status: ReminderStatus.completed,
+      ),
+      log: source,
+      actionVisible: false,
+    );
+    await pumpCase(
+      'cancelled-target',
+      item: matchingTarget(
+        title: 'Eski başlık',
+        status: ReminderStatus.cancelled,
+      ),
+      log: source,
+      actionVisible: false,
+    );
+    await pumpCase(
+      'project-mismatch',
+      item: matchingTarget(
+        title: 'Eski başlık',
+        projectId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      ),
+      log: source,
+      actionVisible: false,
+    );
+    await pumpCase(
+      'source-load-failure',
+      item: matchingTarget(title: 'Eski başlık'),
+      log: source,
+      sourceFailure: StateError('private database path'),
+      actionVisible: false,
+    );
+  });
+
+  testWidgets(
+    'Ajanda sync dialog shows only diffs and requires a selected field',
+    (tester) async {
+      final source = sourceAgendaLog(notes: null);
+      final item = reminder(
+        title: 'Eski başlık',
+        description: 'Eski açıklama',
+        projectId: agendaProjectId,
+        projectName: 'Şantiye A',
+        sourceLogId: agendaSourceLogId,
+      );
+      final agenda = FakeAgendaApplication(
+        reminders: [item],
+        reminderDetail: item,
+        logs: [source],
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReminderDetailPage(agenda: agenda, reminderId: item.id),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await openAgendaReminderSyncDialog(tester);
+
+      for (final field in AgendaReminderSyncField.values) {
+        final tile = find.byKey(Key('agenda-sync-field-${field.storageValue}'));
+        expect(tile, findsOneWidget);
+        expect(tester.widget<CheckboxListTile>(tile).value, isTrue);
+      }
+      expect(find.text('Başlık'), findsOneWidget);
+      expect(find.text('Açıklama'), findsOneWidget);
+      expect(find.text('Mahal'), findsOneWidget);
+      expect(find.text('Hatırlatıcı: Eski başlık'), findsOneWidget);
+      expect(find.text('Ajanda: Ajanda başlığı'), findsOneWidget);
+      expect(find.text('Hatırlatıcı: Eski açıklama'), findsOneWidget);
+      expect(find.text('Ajanda: Boş'), findsOneWidget);
+      expect(find.text('Hatırlatıcı: Boş'), findsOneWidget);
+      expect(find.text('Ajanda: A Blok / Kat 1'), findsOneWidget);
+
+      for (final field in AgendaReminderSyncField.values) {
+        final tile = find.byKey(Key('agenda-sync-field-${field.storageValue}'));
+        await tester.ensureVisible(tile);
+        await tester.tap(tile);
+        await tester.pump();
+      }
+      final confirm = find.byKey(const Key('confirm-agenda-reminder-sync'));
+      expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
+
+      await tester.tap(find.byKey(const Key('cancel-agenda-reminder-sync')));
+      await tester.pumpAndSettle();
+      expect(agenda.syncAgendaToReminderCalls, 0);
+    },
+  );
+
+  testWidgets(
+    'Ajanda sync confirm sends exact snapshots and preserves unselected fields',
+    (tester) async {
+      final source = sourceAgendaLog(revision: 7);
+      final item = reminder(
+        title: 'Eski başlık',
+        captureText: 'İlk hızlı yakalama değişmez',
+        description: 'Eski açıklama',
+        kind: ReminderKind.recheck,
+        projectId: agendaProjectId,
+        projectName: 'Şantiye A',
+        sourceLogId: agendaSourceLogId,
+        location: 'Eski mahal',
+        relatedPerson: 'Ahmet Usta',
+        isImportant: true,
+        nextAttentionAt: '2026-07-20T09:30:00Z',
+        deadlineAt: '2026-07-21T12:00:00Z',
+        conditionText: 'Yağmur durunca',
+        outcomeType: ReminderOutcomeType.noLongerNeeded,
+        outcomeNote: 'Korunacak sonuç',
+        revision: 4,
+      );
+      final agenda = FakeAgendaApplication(
+        reminders: [item],
+        reminderDetail: item,
+        logs: [source],
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReminderDetailPage(agenda: agenda, reminderId: item.id),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await openAgendaReminderSyncDialog(tester);
+
+      for (final field in [
+        AgendaReminderSyncField.description,
+        AgendaReminderSyncField.location,
+      ]) {
+        final tile = find.byKey(Key('agenda-sync-field-${field.storageValue}'));
+        await tester.ensureVisible(tile);
+        await tester.tap(tile);
+        await tester.pump();
+      }
+      await tester.tap(find.byKey(const Key('confirm-agenda-reminder-sync')));
+      await tester.pumpAndSettle();
+
+      expect(agenda.syncAgendaToReminderCalls, 1);
+      final command = agenda.lastSyncAgendaToReminderCommand!;
+      expect(command.sourceLogId, agendaSourceLogId);
+      expect(command.reminderId, item.id);
+      expect(command.expectedSourceRevision, 7);
+      expect(command.expectedTargetRevision, 4);
+      expect(command.selectedFields, {AgendaReminderSyncField.title});
+      final ids = {
+        command.operationId,
+        command.sourceEventId,
+        command.targetEventId,
+      };
+      expect(ids.length, 3);
+      expect(ids.every(RecordId.isUuid), isTrue);
+
+      final updated = agenda.reminderDetail!;
+      expect(updated.title, source.description);
+      expect(updated.description, item.description);
+      expect(updated.locationId, item.locationId);
+      expect(updated.location, item.location);
+      expect(updated.captureText, item.captureText);
+      expect(updated.kind, item.kind);
+      expect(updated.status, item.status);
+      expect(updated.nextAttentionAt, item.nextAttentionAt);
+      expect(updated.deadlineAt, item.deadlineAt);
+      expect(updated.isImportant, item.isImportant);
+      expect(updated.relatedPerson, item.relatedPerson);
+      expect(updated.conditionText, item.conditionText);
+      expect(updated.outcomeType, item.outcomeType);
+      expect(updated.outcomeNote, item.outcomeNote);
+      expect(updated.revision, 5);
+      expect(find.byKey(const Key('sync-agenda-to-reminder')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Ajanda sync success reloads exact target and leaves sibling untouched',
+    (tester) async {
+      final source = sourceAgendaLog();
+      final item = reminder(
+        title: 'Eski başlık',
+        description: 'Eski açıklama',
+        projectId: agendaProjectId,
+        projectName: 'Şantiye A',
+        sourceLogId: agendaSourceLogId,
+        location: 'Eski mahal',
+        revision: 2,
+      );
+      final sibling = reminder(
+        id: widgetReminderId(196),
+        title: 'Diğer bağlı Hatırlatıcı',
+        description: 'Değişmemeli',
+        projectId: agendaProjectId,
+        projectName: 'Şantiye A',
+        sourceLogId: agendaSourceLogId,
+        location: 'Diğer mahal',
+        revision: 8,
+      );
+      final agenda = FakeAgendaApplication(
+        reminders: [item, sibling],
+        reminderDetail: item,
+        logs: [source],
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReminderDetailPage(agenda: agenda, reminderId: item.id),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await openAgendaReminderSyncDialog(tester);
+      await tester.tap(find.byKey(const Key('confirm-agenda-reminder-sync')));
+      await tester.pumpAndSettle();
+
+      expect(agenda.syncAgendaToReminderCalls, 1);
+      expect(agenda.reminderLifecycleDetailCalls, greaterThanOrEqualTo(2));
+      expect(agenda.getAgendaLogDetailCalls, greaterThanOrEqualTo(2));
+      expect(agenda.reminderDetail!.title, source.description);
+      expect(agenda.reminderDetail!.description, source.notes);
+      expect(agenda.reminderDetail!.locationId, source.locationId);
+      expect(agenda.reminderDetail!.location, source.stableLocationName);
+      expect(agenda.reminderDetail!.revision, 3);
+      final unchangedSibling = agenda.reminders.singleWhere(
+        (value) => value.id == sibling.id,
+      );
+      expect(unchangedSibling.title, sibling.title);
+      expect(unchangedSibling.description, sibling.description);
+      expect(unchangedSibling.location, sibling.location);
+      expect(unchangedSibling.revision, sibling.revision);
+      expect(find.byKey(const Key('sync-agenda-to-reminder')), findsNothing);
+      expect(find.text('Ajanda’dan güncellendi'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Ajanda sync stale failure keeps old snapshot and safely reloads diff',
+    (tester) async {
+      final source = sourceAgendaLog();
+      final item = reminder(
+        title: 'Eski başlık',
+        description: source.notes,
+        projectId: agendaProjectId,
+        projectName: 'Şantiye A',
+        sourceLogId: agendaSourceLogId,
+        locationId: source.locationId,
+        stableLocationName: source.stableLocationName,
+        location: source.stableLocationName,
+      );
+      const staleMessage =
+          'Hatırlatıcı başka bir işlemle değişti. Ekranı yenileyin.';
+      final agenda = FakeAgendaApplication(
+        reminders: [item],
+        reminderDetail: item,
+        logs: [source],
+        syncAgendaToReminderFailure: const AgendaValidationFailure(
+          staleMessage,
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReminderDetailPage(agenda: agenda, reminderId: item.id),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await openAgendaReminderSyncDialog(tester);
+      await tester.tap(find.byKey(const Key('confirm-agenda-reminder-sync')));
+      await tester.pumpAndSettle();
+
+      expect(agenda.syncAgendaToReminderCalls, 1);
+      expect(agenda.reminderLifecycleDetailCalls, greaterThanOrEqualTo(2));
+      expect(agenda.getAgendaLogDetailCalls, greaterThanOrEqualTo(2));
+      expect(agenda.reminderDetail!.title, item.title);
+      tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position
+          .jumpTo(0);
+      await tester.pump();
+      expect(find.text(item.title), findsOneWidget);
+      expect(find.byKey(const Key('reminder-detail-error')), findsOneWidget);
+      expect(find.text(staleMessage), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('sync-agenda-to-reminder')),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.byKey(const Key('sync-agenda-to-reminder')), findsOneWidget);
+    },
+  );
+
+  testWidgets('Ajanda sync action and confirm are double-tap safe', (
+    tester,
+  ) async {
+    final source = sourceAgendaLog();
+    final item = reminder(
+      title: 'Eski başlık',
+      description: source.notes,
+      projectId: agendaProjectId,
+      projectName: 'Şantiye A',
+      sourceLogId: agendaSourceLogId,
+      locationId: source.locationId,
+      stableLocationName: source.stableLocationName,
+      location: source.stableLocationName,
+    );
+    final completer = Completer<AgendaReminderSyncResult>();
+    final agenda = FakeAgendaApplication(
+      reminders: [item],
+      reminderDetail: item,
+      logs: [source],
+    )..syncAgendaToReminderCompleter = completer;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReminderDetailPage(agenda: agenda, reminderId: item.id),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final action = find.byKey(const Key('sync-agenda-to-reminder'));
+    await tester.scrollUntilVisible(
+      action,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(action);
+    await tester.tap(action, warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('agenda-reminder-sync-dialog')),
+      findsOneWidget,
+    );
+
+    final confirm = find.byKey(const Key('confirm-agenda-reminder-sync'));
+    await tester.tap(confirm);
+    await tester.tap(confirm, warnIfMissed: false);
+    await tester.pump();
+    expect(agenda.syncAgendaToReminderCalls, 1);
+    expect(find.byType(ReminderDetailPage), findsOneWidget);
+
+    final command = agenda.lastSyncAgendaToReminderCommand!;
+    completer.complete(
+      AgendaReminderSyncResult(
+        operationId: command.operationId,
+        sourceLogId: command.sourceLogId,
+        reminderId: command.reminderId,
+        sourceRevision: source.revision,
+        targetRevisionBefore: item.revision,
+        targetRevisionAfter: item.revision,
+        selectedFields: const [AgendaReminderSyncField.title],
+        copiedFields: const [],
+        changes: const {},
+        changed: false,
+        idempotent: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(agenda.syncAgendaToReminderCalls, 1);
+    expect(find.byKey(const Key('sync-agenda-to-reminder')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'quick capture preserves input on validation/application failure',
