@@ -1016,8 +1016,12 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      final syncAction = find.byKey(
+        const Key('sync-agenda-to-reminder'),
+        skipOffstage: false,
+      );
       expect(
-        find.byKey(const Key('sync-agenda-to-reminder')),
+        syncAction,
         actionVisible ? findsOneWidget : findsNothing,
         reason: name,
       );

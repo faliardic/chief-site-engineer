@@ -150,6 +150,14 @@ Geçiş kapısı:
 - Kullanıcı onayı olmadan sessiz yeniden yazma yoktur.
 - Archive/trash sonrasında kaynak bağı kaybolmaz.
 
+Kapanış durumu:
+
+- Issue #432 / #434 / #437 dilimleri merged `master` üzerindedir.
+- Issue #439 mevcut sözleşmeleri production diff olmadan karakterize eden final
+  closure çalışmasıdır.
+- Issue #439 closure PR'ı merge edilmeden V2.4 tamamlandı sayılmaz ve V2.5
+  current direction yapılmaz.
+
 ## 6. Dalga 3 — Günlük iş yönetimi
 
 ### V2.5 — Günlük Log Çıktısı v1
@@ -281,20 +289,22 @@ Bu başlıklar ayrı post-V2 backlog'da tarihsel olarak korunur.
 Aktif iş:
 
 ```text
-Issue #383 — CSE V2 repository truth sync and canonical 13-item scope
+Issue #439 — V2.4 final karakterizasyon ve kapanış
 ```
 
-Bu iş documentation/state kapsamındadır. Production kodu, schema, migration,
-backup formatı, notification veya cihaz davranışı değiştirmez.
+Bu iş evidence/documentation kapsamındadır. Production kodu, schema, migration,
+backup formatı, notification veya cihaz davranışı değiştirmez. Exact çalışma
+tabanı merged Slice 3 commit'i
+`3b4bc86cd407c6417f9c6cb67ffd33d660ca5fcd` değeridir.
 
-Issue #383 merge edildikten sonraki ilk production yönü:
+Issue #439 closure PR'ı merge edilene kadar sonraki production yönü açılmaz:
 
 ```text
-V2.1 — Proje ve Mahal omurgası
+V2.5 — current direction değil; closure sonrası ayrı owner kararı gerekir
 ```
 
-Önce domain ve migration preflight Issue'su açılır; doğrudan geniş bir UI veya
-çok modüllü migration değişikliği başlatılmaz.
+Epic #385 V2.4 checkboxı closure merge öncesinde kapatılmaz. Merge sonrasında
+roadmap/current-direction ve sonraki preflight ayrı yetkili adımda güncellenir.
 
 ## 13. Tarihsel roadmap sınırı
 

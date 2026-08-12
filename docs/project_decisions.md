@@ -3975,3 +3975,22 @@
 - Source photo/media, arşiv banner'ı ve çift yönlü navigation mevcut sırasını ve
   salt-okunur davranışını korur; schema 13, Backup format 1, lifecycle,
   notification, attachment, platform ve dependency sözleşmeleri değişmez.
+
+## Issue 439 — V2.4 kapanışı yeni davranış değil karakterizasyon kanıtıdır
+
+- Ajanda ve Hatırlatıcı ayrı source-of-truth olarak kalır. Ajanda 1 →
+  Hatırlatıcı 0..N bağı exact kart/read-model ile görünür; create yolu mevcut
+  hedef açma yolundan ayrıdır.
+- Ajanda → Hatırlatıcı sync yalnız exact açık hedefte, gerçek
+  `title | description | location` diffi, açık alan seçimi ve kullanıcı onayıyla
+  başlar. Reverse/toplu/background sync ve otomatik lifecycle mapping yoktur.
+- Mutation iki revisionı ve kalıcı link/proje/lifecycle bağlamını transaction
+  içinde doğrular; source'u değiştirmez, yalnız gerçek target diffini yazar ve
+  iki taraflı eventleri aynı operation kimliğiyle atomik üretir. Exact retry
+  idempotent, fingerprint/kimlik collisionı fail-closed kalır.
+- Source link ve salt-okunur source media archive/trash/restore/reopen boyunca
+  korunur. Schema 13, Backup format 1, attachment, notification, dependency,
+  permission ve platform sözleşmeleri değişmez.
+- Issue #439 closure PR'ı merge edilmeden Epic #385 içindeki V2.4 tamamlandı
+  sayılmaz ve V2.5 current direction yapılmaz; Ready ve merge owner/review
+  kapılarına bağlıdır.
