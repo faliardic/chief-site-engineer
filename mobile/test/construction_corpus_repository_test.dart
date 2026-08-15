@@ -6,6 +6,8 @@ import 'package:chief_site_engineer/domain/construction_corpus_models.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/construction_profile_fixtures.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -355,7 +357,9 @@ void main() {
 
   test('RADYE profile includes RADYE branch without TEKIL leakage', () async {
     final corpus = await BundledConstructionCorpusRepository().load();
-    final activities = corpus.filterActivities(_radyeProfile());
+    final activities = corpus.filterActivities(
+      validConstructionProjectProfile(),
+    );
 
     expect(
       activities.any((activity) => activity.activityId.contains('-RADYE-')),
@@ -373,11 +377,11 @@ void main() {
       final corpus = await BundledConstructionCorpusRepository().load();
 
       final first = corpus
-          .filterActivities(_radyeProfile())
+          .filterActivities(validConstructionProjectProfile())
           .map((activity) => activity.activityId)
           .toList();
       final second = corpus
-          .filterActivities(_radyeProfile())
+          .filterActivities(validConstructionProjectProfile())
           .map((activity) => activity.activityId)
           .toList();
 
@@ -452,35 +456,3 @@ Set<String> _collectKeys(Object? value) {
   visit(value);
   return result;
 }
-
-ConstructionProjectProfile _radyeProfile() => ConstructionProjectProfile({
-  'project_type': 'KONUT',
-  'foundation_type': 'RADYE',
-  'structural_system': 'BETONARME',
-  'formwork_system': 'KONVANSIYONEL',
-  'wall_type': 'GAZBETON',
-  'facade_type': 'MANTOLAMA',
-  'roof_type': 'TERAS',
-  'heating_system': 'MERKEZI',
-  'cooling_system': 'SPLIT',
-  'excavation_required': true,
-  'has_shoring': true,
-  'has_dewatering': false,
-  'ground_improvement_required': false,
-  'has_piles': false,
-  'foundation_waterproofing_required': true,
-  'foundation_thermal_insulation_required': false,
-  'has_steel_auxiliary': false,
-  'has_precast_auxiliary': false,
-  'has_fire_system': true,
-  'has_sprinkler': true,
-  'has_elevator': true,
-  'has_generator': false,
-  'has_ups': false,
-  'has_transformer': false,
-  'has_bms': false,
-  'has_parking': true,
-  'has_internal_roads': true,
-  'has_landscape': true,
-  'has_basement': true,
-});
