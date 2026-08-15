@@ -50,7 +50,22 @@ Serbest profile Map sözleşmesi canonical enum, topology, applicability ve cale
 
 Profil, storage stringlerini enumların `jsonValue` alanında canonical tutar; applicability değerlendirmesine yalnız `toApplicabilityMap()` üzerinden girer. Şunu böyle yaptık ki identity, topology veya calendar alanları corpus condition diline istemeden açılmasın ve 29-field sözleşmesi tek bir typed sınırdan beslensin. Dependency condition parser ayrı evaluator içermez: Issue #443'ün `matches / doesNotMatch / missingField` semantiğini ve recursive field validation'ını doğrudan reuse eder. Böylece nested `not/any/all` eksik bilgiyi positive match'e çeviremez.
 
+## PR #446 Windows EOL correction kanıtı — 15 Ağustos 2026
+
+- Root cause: canonical corpus `.b64` dosyalarının repository `.gitattributes` dosyasında no-EOL kuralı yoktu; global Windows `core.autocrlf=true` normal checkout sırasında tracked activity assetinin trailing LF byte'ını CRLF'ye dönüştürebiliyordu.
+- Correction: başka attribute kuralı değiştirilmeden yalnız `mobile/assets/corpus/*.b64 -text` eklendi. `git check-attr` iki asset için `text: unset`, `git ls-files --eol` ise `attr/-text` gösterdi.
+- Tamamen yeni detached Windows linked worktree normal `git worktree add --detach ... HEAD` checkout'u ile oluşturuldu; ilk status temizdi.
+- Fresh checkout activity asset SHA-256: `a9b225d6403168f7d3fd35494eceb4907d1ea705492700bc865add95021f42ca` — doğrudan fiziksel dosyadan PASS.
+- Fresh checkout dependency asset SHA-256: `07f58de9912fe76303d18b48863b45aeaaac0f0f203aa14ebe8f8b1a8db12c86` — doğrudan fiziksel dosyadan PASS.
+- Fresh worktree'te `git show`, `git checkout-index`, index/blob copy, asset üzerine byte restore veya başka manuel normalization workaround'u kullanılmadı.
+- Fresh worktree environment prep `flutter.bat pub get --offline`: exit `0`; `mobile/pubspec.lock` drift `0`.
+- Fresh focused `flutter.bat test --no-pub test/construction_corpus_repository_test.dart test/construction_dependency_repository_test.dart`: exit `0`, `58/58 PASS`; asset dosyalarına müdahale edilmedi.
+- Fresh `flutter.bat analyze --no-pub`: exit `0`, `No issues found`.
+- Correction `git diff --check`: exit `0`; correction changed-file seti yalnız `.gitattributes`, toplam PR allowlist ihlali `0`, protected drift `0`.
+- `AppDatabase.schemaVersion = 13`, `CseBackupCodec.formatVersion = 1`; dependency declarations, `mobile/pubspec.lock`, Android/iOS platform/config drift'i `0`.
+- Final source correction revision `flutter.bat test --no-pub`: exit `0`, `565/565 PASS`; source correction üzerinde yalnız bir full suite çalıştırıldı.
+
 ## Publication durumu
 
-- Intentional commit, normal push, Draft PR ve Issue #445 completion evidence bu dosyadan sonra oluşturulacaktır.
+- Draft PR #446 mevcut branch üzerindedir; correction evidence sonrası intentional amend, normal push ve Issue #445 completion güncellemesi yapılacaktır.
 - PR Ready yapılmayacak, merge edilmeyecek ve sonraki Schedule/Instantiation Issue'ına geçilmeyecektir.

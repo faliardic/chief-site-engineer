@@ -3,3 +3,4 @@
 *.txt text eol=lf
 .gitattributes text eol=lf
 .gitignore text eol=lf
+mobile/assets/corpus/*.b64 -text
