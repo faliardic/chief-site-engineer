@@ -123,10 +123,8 @@ class BundledConstructionCorpusRepository
             applicability: ConstructionApplicabilityRule.fromJson(
               _asMap(map['applicability'], 'invalid_applicability'),
             ),
-            repeatDimension: _requiredString(
-              map,
-              'repeat_dimension',
-              'invalid_activity',
+            repeatDimension: ConstructionActivityRepeatDimension.fromJson(
+              map['repeat_dimension'],
             ),
             naturalUnit: _requiredString(
               map,

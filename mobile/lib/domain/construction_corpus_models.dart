@@ -45,6 +45,30 @@ class ConstructionWbsPackage {
   final String frequencyClass;
 }
 
+enum ConstructionActivityRepeatDimension {
+  project('PROJECT'),
+  block('BLOCK'),
+  basement('BASEMENT'),
+  floor('FLOOR'),
+  zone('ZONE'),
+  facadeElevation('FACADE_ELEVATION'),
+  roof('ROOF'),
+  lot('LOT'),
+  system('SYSTEM');
+
+  const ConstructionActivityRepeatDimension(this.jsonValue);
+
+  final String jsonValue;
+
+  static ConstructionActivityRepeatDimension fromJson(Object? value) =>
+      _enumFromJson(
+        value,
+        values,
+        (item) => item.jsonValue,
+        'invalid_activity_repeat_dimension',
+      );
+}
+
 class ConstructionActivity {
   ConstructionActivity({
     required this.activityId,
@@ -68,7 +92,7 @@ class ConstructionActivity {
   final String activityNameTr;
   final List<String> aliasesTr;
   final ConstructionApplicabilityRule applicability;
-  final String repeatDimension;
+  final ConstructionActivityRepeatDimension repeatDimension;
   final String naturalUnit;
   final String durationStatus;
   final String durationConfidence;
