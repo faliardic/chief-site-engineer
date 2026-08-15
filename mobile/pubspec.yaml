@@ -40,3 +40,4 @@ flutter:
   assets:
     - assets/fonts/Roboto-Regular.ttf
     - assets/fonts/Roboto-Bold.ttf
+    - assets/corpus/cse_construction_activity_catalog_v0_3.b64
