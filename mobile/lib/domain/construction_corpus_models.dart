@@ -111,20 +111,20 @@ class ConstructionCorpus {
   final List<ConstructionActivity> activities;
 
   List<ConstructionActivity> searchActivities(String query) {
-    final result = activities
-        .where((activity) => activity.matchesSearch(query))
-        .toList()
-      ..sort(compareConstructionActivities);
+    final result =
+        activities.where((activity) => activity.matchesSearch(query)).toList()
+          ..sort(compareConstructionActivities);
     return List.unmodifiable(result);
   }
 
   List<ConstructionActivity> filterActivities(
     ConstructionProjectProfile profile,
   ) {
-    final result = activities
-        .where((activity) => activity.applicability.matches(profile.values))
-        .toList()
-      ..sort(compareConstructionActivities);
+    final result =
+        activities
+            .where((activity) => activity.applicability.matches(profile.values))
+            .toList()
+          ..sort(compareConstructionActivities);
     return List.unmodifiable(result);
   }
 }
@@ -151,7 +151,12 @@ int compareConstructionActivities(
 sealed class ConstructionApplicabilityRule {
   const ConstructionApplicabilityRule();
 
-  bool matches(Map<String, Object?> profile);
+  bool matches(Map<String, Object?> profile) =>
+      _evaluate(profile) == _ConstructionApplicabilityMatch.matches;
+
+  _ConstructionApplicabilityMatch _evaluate(Map<String, Object?> profile);
+
+  void validateProfileFields(Set<String> profileFields);
 
   factory ConstructionApplicabilityRule.fromJson(Map<String, Object?> json) {
     final op = json['op'];
@@ -175,7 +180,10 @@ sealed class ConstructionApplicabilityRule {
       case 'in':
         final field = json['field'];
         final values = json['values'];
-        if (field is! String || field.isEmpty || values is! List || values.isEmpty) {
+        if (field is! String ||
+            field.isEmpty ||
+            values is! List ||
+            values.isEmpty) {
           throw const ConstructionCorpusFailure('invalid_applicability');
         }
         return ConstructionInRule(field: field, values: values);
@@ -209,7 +217,11 @@ class ConstructionAlwaysRule extends ConstructionApplicabilityRule {
   const ConstructionAlwaysRule();
 
   @override
-  bool matches(Map<String, Object?> profile) => true;
+  _ConstructionApplicabilityMatch _evaluate(Map<String, Object?> profile) =>
+      _ConstructionApplicabilityMatch.matches;
+
+  @override
+  void validateProfileFields(Set<String> profileFields) {}
 }
 
 class ConstructionFieldComparisonRule extends ConstructionApplicabilityRule {
@@ -224,12 +236,19 @@ class ConstructionFieldComparisonRule extends ConstructionApplicabilityRule {
   final bool isEqual;
 
   @override
-  bool matches(Map<String, Object?> profile) {
+  _ConstructionApplicabilityMatch _evaluate(Map<String, Object?> profile) {
     if (!profile.containsKey(field)) {
-      return false;
+      return _ConstructionApplicabilityMatch.missingField;
     }
     final equal = profile[field] == expected;
-    return isEqual ? equal : !equal;
+    return (isEqual ? equal : !equal)
+        ? _ConstructionApplicabilityMatch.matches
+        : _ConstructionApplicabilityMatch.doesNotMatch;
+  }
+
+  @override
+  void validateProfileFields(Set<String> profileFields) {
+    _validateProfileField(field, profileFields);
   }
 }
 
@@ -241,11 +260,18 @@ class ConstructionInRule extends ConstructionApplicabilityRule {
   final List<Object?> values;
 
   @override
-  bool matches(Map<String, Object?> profile) {
+  _ConstructionApplicabilityMatch _evaluate(Map<String, Object?> profile) {
     if (!profile.containsKey(field)) {
-      return false;
+      return _ConstructionApplicabilityMatch.missingField;
     }
-    return values.contains(profile[field]);
+    return values.contains(profile[field])
+        ? _ConstructionApplicabilityMatch.matches
+        : _ConstructionApplicabilityMatch.doesNotMatch;
+  }
+
+  @override
+  void validateProfileFields(Set<String> profileFields) {
+    _validateProfileField(field, profileFields);
   }
 }
 
@@ -259,9 +285,29 @@ class ConstructionGroupRule extends ConstructionApplicabilityRule {
   final bool matchAny;
 
   @override
-  bool matches(Map<String, Object?> profile) => matchAny
-      ? rules.any((rule) => rule.matches(profile))
-      : rules.every((rule) => rule.matches(profile));
+  _ConstructionApplicabilityMatch _evaluate(Map<String, Object?> profile) {
+    final results = rules.map((rule) => rule._evaluate(profile)).toList();
+    if (results.contains(_ConstructionApplicabilityMatch.missingField)) {
+      return _ConstructionApplicabilityMatch.missingField;
+    }
+    final matches = matchAny
+        ? results.any(
+            (result) => result == _ConstructionApplicabilityMatch.matches,
+          )
+        : results.every(
+            (result) => result == _ConstructionApplicabilityMatch.matches,
+          );
+    return matches
+        ? _ConstructionApplicabilityMatch.matches
+        : _ConstructionApplicabilityMatch.doesNotMatch;
+  }
+
+  @override
+  void validateProfileFields(Set<String> profileFields) {
+    for (final rule in rules) {
+      rule.validateProfileFields(profileFields);
+    }
+  }
 }
 
 class ConstructionNotRule extends ConstructionApplicabilityRule {
@@ -270,7 +316,29 @@ class ConstructionNotRule extends ConstructionApplicabilityRule {
   final ConstructionApplicabilityRule rule;
 
   @override
-  bool matches(Map<String, Object?> profile) => !rule.matches(profile);
+  _ConstructionApplicabilityMatch _evaluate(Map<String, Object?> profile) {
+    return switch (rule._evaluate(profile)) {
+      _ConstructionApplicabilityMatch.matches =>
+        _ConstructionApplicabilityMatch.doesNotMatch,
+      _ConstructionApplicabilityMatch.doesNotMatch =>
+        _ConstructionApplicabilityMatch.matches,
+      _ConstructionApplicabilityMatch.missingField =>
+        _ConstructionApplicabilityMatch.missingField,
+    };
+  }
+
+  @override
+  void validateProfileFields(Set<String> profileFields) {
+    rule.validateProfileFields(profileFields);
+  }
+}
+
+enum _ConstructionApplicabilityMatch { matches, doesNotMatch, missingField }
+
+void _validateProfileField(String field, Set<String> profileFields) {
+  if (!profileFields.contains(field)) {
+    throw const ConstructionCorpusFailure('unknown_applicability_field');
+  }
 }
 
 String normalizeConstructionSearch(String input) => input

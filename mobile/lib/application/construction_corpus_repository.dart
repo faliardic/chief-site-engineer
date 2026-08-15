@@ -19,8 +19,14 @@ class BundledConstructionCorpusRepository
 
   static const defaultAssetPath =
       'assets/corpus/cse_construction_activity_catalog_v0_3.b64';
+  static const expectedCorpusVersion = '0.3-yfk-resource-seed';
+  static const expectedPublicationStatus = 'RESEARCH_RESOURCE_SEED';
+  static const expectedProductionStatus = 'NOT_FOR_PRODUCTION';
   static const expectedRuntimeScope =
       'ACTIVITY_CATALOG_READ_ONLY_NO_YFK_RESOURCE_COEFFICIENTS';
+  static const expectedWbsCount = 34;
+  static const expectedActivityCount = 316;
+  static const expectedProfileFieldCount = 29;
 
   final ConstructionCorpusAssetLoader _loader;
   final String assetPath;
@@ -105,11 +111,7 @@ class BundledConstructionCorpusRepository
         .map((value) {
           final map = _asMap(value, 'invalid_activity');
           return ConstructionActivity(
-            activityId: _requiredString(
-              map,
-              'activity_id',
-              'invalid_activity',
-            ),
+            activityId: _requiredString(map, 'activity_id', 'invalid_activity'),
             wbsCode: _requiredString(map, 'wbs_code', 'invalid_activity'),
             packageId: _requiredString(map, 'package_id', 'invalid_activity'),
             activityNameTr: _requiredString(
@@ -168,11 +170,24 @@ class BundledConstructionCorpusRepository
   }
 
   void _validateCorpus(ConstructionCorpus corpus) {
+    if (corpus.metadata.corpusVersion != expectedCorpusVersion) {
+      throw const ConstructionCorpusFailure('unsupported_corpus_version');
+    }
+    if (corpus.metadata.sourcePublicationStatus != expectedPublicationStatus) {
+      throw const ConstructionCorpusFailure('unexpected_publication_status');
+    }
+    if (corpus.metadata.sourceProductionStatus != expectedProductionStatus) {
+      throw const ConstructionCorpusFailure('unexpected_production_status');
+    }
     if (corpus.metadata.runtimeScope != expectedRuntimeScope) {
       throw const ConstructionCorpusFailure('unsupported_runtime_scope');
     }
-    if (corpus.metadata.sourceProductionStatus != 'NOT_FOR_PRODUCTION') {
-      throw const ConstructionCorpusFailure('unexpected_production_status');
+    if (corpus.metadata.wbsCount != expectedWbsCount ||
+        corpus.metadata.activityCount != expectedActivityCount) {
+      throw const ConstructionCorpusFailure('unexpected_corpus_counts');
+    }
+    if (corpus.profileFields.length != expectedProfileFieldCount) {
+      throw const ConstructionCorpusFailure('unexpected_profile_field_count');
     }
     if (corpus.metadata.wbsCount != corpus.wbsPackages.length ||
         corpus.metadata.activityCount != corpus.activities.length) {
@@ -188,13 +203,15 @@ class BundledConstructionCorpusRepository
     if (_hasDuplicates(corpus.activities.map((item) => item.activityId))) {
       throw const ConstructionCorpusFailure('duplicate_activity');
     }
-    final knownWbs = corpus.wbsPackages.map((item) => item.wbsCode).toSet();
-    final knownPackages = corpus.wbsPackages.map((item) => item.packageId).toSet();
+    final knownPairs = corpus.wbsPackages
+        .map((item) => (item.wbsCode, item.packageId))
+        .toSet();
+    final profileFields = corpus.profileFields.toSet();
     for (final activity in corpus.activities) {
-      if (!knownWbs.contains(activity.wbsCode) ||
-          !knownPackages.contains(activity.packageId)) {
+      if (!knownPairs.contains((activity.wbsCode, activity.packageId))) {
         throw const ConstructionCorpusFailure('dangling_activity_package');
       }
+      activity.applicability.validateProfileFields(profileFields);
     }
   }
 }
@@ -253,11 +270,7 @@ String _requiredString(
   return value;
 }
 
-int _requiredInt(
-  Map<String, Object?> map,
-  String key,
-  String failureCode,
-) {
+int _requiredInt(Map<String, Object?> map, String key, String failureCode) {
   final value = map[key];
   if (value is! int) {
     throw ConstructionCorpusFailure(failureCode);

@@ -8,6 +8,24 @@
 
 `496e5bd0100a55d42e0320b932e510d34453f2dd`
 
+## Canonical correction input
+
+- runtime input ZIP çalışma girdisidir; repository'ye eklenmez;
+- source v0.3 ZIP SHA-256: `de2bf1a542a331ea79fadddb81e315120e46c2e3b8204ea239e30fb4aaa616cd`;
+- runtime JSON SHA-256: `5636d6286b09c09182cd7b96af2276fba2eedf8cd0b0607c8bab0060a9f57688`;
+- committed runtime asset SHA-256: `a9b225d6403168f7d3fd35494eceb4907d1ea705492700bc865add95021f42ca`.
+
+## Validation contract
+
+- validation class: `domain`;
+- değişen sözleşmeler: read-only corpus metadata/count doğrulaması, exact WBS/package referansı, recursive typed applicability ve deterministic filter/search;
+- izin verilen test/build/gate: offline pub get, üç Dart dosyası format, focused corpus testi, analyze, diff/allowlist sınıflandırması ve final revision full Flutter suite;
+- yeniden kullanılacak merged kanıt: değişmeyen schema `13`, Backup format `1`, dependency/platform sözleşmeleri;
+- fiziksel cihaz kabulinin minimum kapsamı: yok; UI, persistence, backup, notification ve platform davranışı değişmiyor;
+- retry budget: bir primary run, blocking hata için en fazla bir correction run; aynı başarısız aşama yalnız bir kez düzeltilir;
+- time budget: Issue yorumunda yetkilendirilen 75 dakika hard stop;
+- açık kapsam dışı: release/device gate'leri, APK/AAB/signing, SQLite/migration, backup/restore, UI, platform ve schedule engine.
+
 ## Scope
 
 - derlenmiş, YFK ham/uzun metin, fiyat veya kaynak katsayılarını içermeyen runtime activity-catalog asseti;
@@ -43,6 +61,7 @@ Corpus metadata `RESEARCH_RESOURCE_SEED / NOT_FOR_PRODUCTION` sınırını korur
 - `mobile/test/construction_corpus_repository_test.dart`
 - `mobile/pubspec.yaml`
 - `.cse/tasks/443_task.md`
+- `.cse/results/443_result.md`
 
 ## Acceptance
 
