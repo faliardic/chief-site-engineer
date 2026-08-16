@@ -138,6 +138,7 @@ Kaynak otoritesi bilgi türüne göre ayrılır:
 | --- | --- |
 | Kalıcı ürün amacı, strateji ve veri ilkeleri | `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md` |
 | Operasyon, Git/GitHub/Codex güvenliği | `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` |
+| Model/reasoning/execution/orchestration routing | `docs/protocols/CSE_MODEL_REASONING_ROUTING_POLICY.md` |
 | Aktif görev kapsamı | current GitHub Issue ve `.cse/tasks/<issue_no>_task.md` |
 | Değişken repository durumu | GitHub `master`, PR, Issue, branch ve commit kanıtı |
 | İkincil factual mirror/evidence | `.cse/state/project_state.json` ve `.cse/results/<issue_no>_result.md` |
@@ -189,9 +190,10 @@ V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer
 
   1. `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
   2. `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
-  3. workflow, handoff, bootstrap veya source-authority işinde `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md`
-  4. current GitHub Issue ve bütün scope/izin yorumları
-  5. `.cse/tasks/<issue_no>_task.md` (yeni görevde ilk yetkili yerel dosya olarak oluşturulur)
+  3. `docs/protocols/CSE_MODEL_REASONING_ROUTING_POLICY.md`
+  4. workflow, handoff, bootstrap veya source-authority işinde `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md`
+  5. current GitHub Issue ve bütün scope/izin yorumları
+  6. `.cse/tasks/<issue_no>_task.md` (yeni görevde ilk yetkili yerel dosya olarak oluşturulur)
 
 - Required tracked source eksikse veya current task cozulmemis kalici rule ile celisiyorsa Codex edit yapmadan durur ve raporlar.
 - Her Codex execution once resmi `V:` yoluna gecmelidir:
@@ -432,9 +434,12 @@ Her adımda aşağıdaki dosyalar kullanılır:
 - Resmî yerel repo yolu
 - Beklenen base commit
 - Branch adı
-- Codex model secimi
-- Reasoning seviyesi
-- Model/reasoning secim nedeni
+- CSE-MRP policy version ve task risk
+- ChatGPT/orchestrator model ve reasoning secimi
+- Codex/executor model ve reasoning secimi
+- Execution mode ve orchestration
+- Secim nedeni, routing request evidence, allowed fallback, review floor ve
+  fail-closed-if-mismatch
 - Yetkili dosyalar
 - Yapılacak iş
 - Yasak kapsam
@@ -460,6 +465,8 @@ Her adımda aşağıdaki dosyalar kullanılır:
 - Push sonucu
 - PR durumu
 - Sonraki dar adım
+- `execution_record` YAML bloğu
+- `review_recommendation` YAML bloğu
 
 State/result dosyalarına henüz gerçekleşmemiş “push tamamlandı”, “çalışma ağacı temiz” veya “branch farkı 0 0” gibi ifadeler yazılmaz. Her kayıt gerçek komut çıktısına dayanır.
 
@@ -519,26 +526,31 @@ Resmî yerel repository project-file changes için execution source, GitHub ise 
 
 ---
 
-## 14. Codex Modeli ve Reasoning Seviyesi
+## 14. Model, Reasoning ve Yürütme Routing'i
 
-Her yeni Codex instruction ve `.cse/tasks/<step>_task.md` kaydi acikca su uc bilgiyi tasir:
+CSE'nin bağlayıcı routing sözleşmesi:
 
-1. Codex model secimi
-2. Reasoning seviyesi
-3. Model ve seviyenin neden secildigi
+```text
+docs/protocols/CSE_MODEL_REASONING_ROUTING_POLICY.md
+```
 
-Model isimleri UI'da degisebilecegi icin obsolete hard-coded model adi korunmaz; kullanicinin current Codex selector'unda gorunen tam etiket kullanilir.
+Her yeni görevde `CSE-MRP-1.0` routing request'i önce current Issue'da bulunur.
+`.cse/tasks/<issue_no>_task.md`, ilk yetkili local edit olarak diğer substantive
+edit/test/build/commit işlemlerinden önce bu request'i kaydeder. Model,
+reasoning effort, execution mode ve orchestration birbirinden bağımsız
+alanlardır; `pro` model/effort değildir, `Ultra` da reasoning effort değildir.
 
-- **High:** dar dokümantasyon-only adımlar, rutin Git/GitHub durumu ve düşük riskli state güncellemeleri.
-- **Extra High:** Python mantığı, veri sözleşmeleri, parser/formatter, test matrisi, CLI, migration sınırları, regresyon riski ve karmaşık CI tanısı.
+Routing request, invocation evidence ve runtime actual birbirinden ayrılır.
+R3/R4 işte otomatik fallback veya downgrade yoktur. Launch surface selector,
+API config veya runner kaydını gösteriyorsa exact requested eşleşme zorunludur;
+görünür mismatch fail-closed durur. Launch surface invocation ve runtime actual
+metadata'yı göstermiyorsa tahmin yapılmaz; recorded request ile sonuç
+`unknown / null / unverified` kaydedilebilir ve review floor en az bir risk
+kademesi yükseltilir.
 
-Çoklu kanonik kaynak, source authority, repository truth drift veya kalıcı ürün politikası değişikliği de kod değiştirmese bile çelişki riski nedeniyle **Extra High** kullanır.
-
-- Documentation-only, routine verification, commit/push ve low-risk state sync icin selector'daki standard full Codex model ve `high` reasoning kullanilir.
-- Production code, executable tests, generator scripts, contracts, regressions, migrations veya multi-file behavior changes icin selector'daki en guclu full Codex model ve `extra high` reasoning kullanilir.
-- Contract-defining veya regression-sensitive CSE islerinde Spark, fast veya lightweight varyant secilmez.
-
-Her Issue ve task dosyasında model, reasoning ve secim gerekcesi acikca yazilir.
+Her result ve Codex completion çıktısı `execution_record` ile
+`review_recommendation` YAML bloklarını taşır. Review önerisi görev başındaki
+review floor'u düşüremez; yalnız korur veya yükseltir.
 
 ---
 
