@@ -1,5 +1,24 @@
 # Changelog
 
+## Issue #462 - Living 7-Day Plan MVP Core
+
+- Mobil schema `14 → 15` additive migration ile Living Plan projection ve
+  append-only lifecycle event tabloları eklendi; stable project/activity
+  instance duplicate'i ve exact persisted reference-snapshot activity bağı
+  database seviyesinde korunuyor.
+- Trusted current snapshot üzerinden yedi günlük öneri ve Türkçe ad/alias
+  arama sınırları; create/start/complete/defer/reopen/note işlemleri, optimistic
+  revision, exact event replay, no-op ve backward-clock korumalarıyla eklendi.
+- Yaşayan yedi günlük sorgu overdue açık işi gizlemiyor; completed kayıtları
+  yalnız pencere içindeyken gösteriyor ve origin snapshot'ın current/superseded
+  durumunu salt-okunur olarak döndürüyor.
+- Backup format `1` değişmeden schema-15 Living Plan projection/history ve
+  superseded origin gerçek round-trip ile; format-1 schema-14 paket ise gerçek
+  restore yolunda schema 15'e migration ile doğrulandı.
+- Reference schedule immutable kalır; silent rebind, UI/route/bootstrap,
+  APK/device/release, notification, actual quantity/progress ve reforecast bu
+  Slice'a eklenmedi.
+
 ## Issue #460 - Living 7-Day Plan canonical truth-sync
 
 - V2'nin 13 maddelik paketi korunarak Items 1–4 complete, revised Item 5

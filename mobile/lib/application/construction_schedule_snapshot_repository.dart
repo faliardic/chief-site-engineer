@@ -17,6 +17,18 @@ typedef ConstructionScheduleWindowIntegrityHook = Future<void> Function();
 typedef ConstructionScheduleFullSnapshotMetadataHook = Future<void> Function();
 typedef ConstructionSchedulePersistCommitHook = Future<void> Function();
 
+class ConstructionScheduleActivityWindow {
+  ConstructionScheduleActivityWindow({
+    required this.metadata,
+    required this.profile,
+    required Iterable<ConstructionScheduledActivity> activities,
+  }) : activities = List.unmodifiable(activities);
+
+  final ConstructionScheduleSnapshotMetadata metadata;
+  final ConstructionProjectProfile profile;
+  final List<ConstructionScheduledActivity> activities;
+}
+
 class ConstructionScheduleSnapshotRepository {
   ConstructionScheduleSnapshotRepository({
     required this.database,
@@ -294,6 +306,18 @@ class ConstructionScheduleSnapshotRepository {
     required String projectId,
     required DateTime windowStart,
     required DateTime windowEnd,
+  }) async =>
+      (await loadCurrentActivityWindow(
+        projectId: projectId,
+        windowStart: windowStart,
+        windowEnd: windowEnd,
+      ))?.activities ??
+      const <ConstructionScheduledActivity>[];
+
+  Future<ConstructionScheduleActivityWindow?> loadCurrentActivityWindow({
+    required String projectId,
+    required DateTime windowStart,
+    required DateTime windowEnd,
   }) async {
     final start = formatCanonicalConstructionDate(windowStart);
     final finish = formatCanonicalConstructionDate(windowEnd);
@@ -316,9 +340,10 @@ class ConstructionScheduleSnapshotRepository {
         );
       }
       if (current.isEmpty) {
-        return const <ConstructionScheduledActivity>[];
+        return null;
       }
-      final metadata = _metadataAndProfile(current.single).$1;
+      final parsed = _metadataAndProfile(current.single);
+      final metadata = parsed.$1;
       final storedActivityCount = Sqflite.firstIntValue(
         await transaction.rawQuery(
           '''
@@ -344,8 +369,10 @@ class ConstructionScheduleSnapshotRepository {
         whereArgs: [projectId, metadata.snapshotId, finish, start],
         orderBy: 'start_date ASC, finish_date ASC, instance_id ASC',
       );
-      return List.unmodifiable(
-        rows.map(
+      return ConstructionScheduleActivityWindow(
+        metadata: metadata,
+        profile: parsed.$2,
+        activities: rows.map(
           (row) => _activityFromRow(
             row,
             expectedProjectId: projectId,

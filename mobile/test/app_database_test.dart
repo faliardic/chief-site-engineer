@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:chief_site_engineer/core/environment.dart';
@@ -73,6 +74,7 @@ void main() {
       {'version': 12, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 13, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 14, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 15, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
   });
 
@@ -114,6 +116,7 @@ void main() {
         path: directories.databaseFile,
         factory: databaseFactoryFfi,
         clock: () => DateTime.utc(2026, 7, 19, 9),
+        migrations: AppDatabase.foundationMigrations.take(14).toList(),
       );
       await upgraded.open();
       final db = upgraded.database;
@@ -326,6 +329,542 @@ void main() {
           'is_isolated': 1,
           'row_sha256': '2' * 64,
         }),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      expect(await db.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      expect(
+        (await db.rawQuery('PRAGMA integrity_check')).single['integrity_check'],
+        'ok',
+      );
+      await upgraded.close();
+    },
+  );
+
+  test(
+    'schema 14 to 15 is additive and guards living plan projection history',
+    () async {
+      final schemaFourteen = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+        migrations: AppDatabase.foundationMigrations.take(14).toList(),
+      );
+      await schemaFourteen.open();
+      final old = schemaFourteen.database;
+      await old.insert('projects', {
+        'id': 'living-project',
+        'name': 'Korunan yaşayan plan projesi',
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await old.insert('projects', {
+        'id': 'other-living-project',
+        'name': 'Diğer proje',
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await old.insert('project_schedule_snapshots', {
+        'id': 'living-snapshot-a',
+        'project_id': 'living-project',
+        'profile_json': '{}',
+        'corpus_version': 'corpus-v1',
+        'schedule_seed_version': 'seed-v1',
+        'schedule_seed_provenance': 'seed-catalog',
+        'production_status': 'NOT_FOR_PRODUCTION',
+        'duration_source': 'TEST_SEED_ONLY',
+        'baseline_status': 'NOT_A_BASELINE',
+        'schedule_start': '2026-09-01',
+        'schedule_finish': '2026-09-02',
+        'activity_count': 7,
+        'root_count': 1,
+        'leaf_count': 1,
+        'isolated_count': 1,
+        'milestone_count': 0,
+        'projection_sha256': '0' * 64,
+        'generated_at': '2026-07-19T08:00:00Z',
+      });
+      await old.insert('project_schedule_snapshot_activities', {
+        'snapshot_id': 'living-snapshot-a',
+        'project_id': 'living-project',
+        'instance_id': 'ACT-1@PROJECT',
+        'activity_id': 'ACT-1',
+        'start_date': '2026-09-01',
+        'finish_date': '2026-09-02',
+        'duration_days': 2.0,
+        'rounded_scheduling_days': 2,
+        'duration_calendar_type': 'WORKING_DAY',
+        'duration_status': 'UNKNOWN',
+        'duration_confidence': 'E_UNKNOWN',
+        'is_milestone': 0,
+        'is_isolated': 1,
+        'row_sha256': '1' * 64,
+      });
+      for (var index = 0; index < 6; index += 1) {
+        await old.insert('project_schedule_snapshot_activities', {
+          'snapshot_id': 'living-snapshot-a',
+          'project_id': 'living-project',
+          'instance_id': 'ACT-INVALID-$index@PROJECT',
+          'activity_id': 'ACT-INVALID-$index',
+          'start_date': '2026-09-01',
+          'finish_date': '2026-09-02',
+          'duration_days': 2.0,
+          'rounded_scheduling_days': 2,
+          'duration_calendar_type': 'WORKING_DAY',
+          'duration_status': 'UNKNOWN',
+          'duration_confidence': 'E_UNKNOWN',
+          'is_milestone': 0,
+          'is_isolated': 1,
+          'row_sha256': '${index + 2}' * 64,
+        });
+      }
+      final oldSchema = await old.rawQuery('''
+        SELECT type, name, tbl_name, sql
+        FROM sqlite_master
+        WHERE sql IS NOT NULL
+        ORDER BY type, name
+      ''');
+      final oldProjects = await old.query('projects', orderBy: 'id ASC');
+      final oldSnapshots = await old.query('project_schedule_snapshots');
+      final oldActivities = await old.query(
+        'project_schedule_snapshot_activities',
+      );
+      await schemaFourteen.close();
+
+      final upgraded = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 9),
+      );
+      await upgraded.open();
+      final db = upgraded.database;
+      const newNames = <String>{
+        'project_schedule_snapshot_activities_living_plan_ref',
+        'project_living_plan_items',
+        'project_living_plan_command_receipts',
+        'project_living_plan_events',
+        'project_living_plan_items_window',
+        'project_living_plan_items_reference',
+        'project_living_plan_command_receipts_item',
+        'project_living_plan_events_history',
+        'project_living_plan_command_receipts_result_match',
+        'project_living_plan_command_receipts_append_only_update',
+        'project_living_plan_command_receipts_append_only_delete',
+        'project_living_plan_items_guarded_update',
+        'project_living_plan_items_no_physical_delete',
+        'project_living_plan_events_revision_match',
+        'project_living_plan_events_append_only_update',
+        'project_living_plan_events_append_only_delete',
+      };
+      final newSchema = await db.rawQuery('''
+        SELECT type, name, tbl_name, sql
+        FROM sqlite_master
+        WHERE sql IS NOT NULL
+        ORDER BY type, name
+      ''');
+      expect(
+        newSchema.where((row) => !newNames.contains(row['name'])).toList(),
+        oldSchema,
+      );
+      expect(
+        newSchema
+            .where((row) => newNames.contains(row['name']))
+            .map((row) => row['name'])
+            .toSet(),
+        newNames,
+      );
+      expect(await db.query('projects', orderBy: 'id ASC'), oldProjects);
+      expect(await db.query('project_schedule_snapshots'), oldSnapshots);
+      expect(
+        await db.query('project_schedule_snapshot_activities'),
+        oldActivities,
+      );
+      expect(
+        sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
+        15,
+      );
+
+      Map<String, Object?> livingRow({
+        String id = 'living-item-1',
+        String instanceId = 'ACT-1@PROJECT',
+        String activityId = 'ACT-1',
+        String projectId = 'living-project',
+        String snapshotId = 'living-snapshot-a',
+        String plannedDate = '2026-09-03',
+        String status = 'PLANNED',
+        String? note = 'Kalıp ekibi teyit edildi',
+        String createdAt = '2026-07-19T09:00:00Z',
+        String updatedAt = '2026-07-19T09:00:00Z',
+        String statusChangedAt = '2026-07-19T09:00:00Z',
+        int revision = 1,
+      }) => <String, Object?>{
+        'id': id,
+        'project_id': projectId,
+        'reference_snapshot_id': snapshotId,
+        'activity_instance_id': instanceId,
+        'activity_id': activityId,
+        'activity_name_snapshot': 'Temel kalıbı',
+        'activity_context_json': '{}',
+        'natural_unit_snapshot': 'm²',
+        'planned_date': plannedDate,
+        'status': status,
+        'note': note,
+        'revision': revision,
+        'created_at': createdAt,
+        'updated_at': updatedAt,
+        'status_changed_at': statusChangedAt,
+      };
+
+      String receiptResult(Map<String, Object?> item) => jsonEncode({
+        'activity_context_json': item['activity_context_json'],
+        'activity_id': item['activity_id'],
+        'activity_instance_id': item['activity_instance_id'],
+        'activity_name_snapshot': item['activity_name_snapshot'],
+        'created_at': item['created_at'],
+        'id': item['id'],
+        'natural_unit_snapshot': item['natural_unit_snapshot'],
+        'note': item['note'],
+        'planned_date': item['planned_date'],
+        'project_id': item['project_id'],
+        'reference_snapshot_id': item['reference_snapshot_id'],
+        'revision': item['revision'],
+        'status': item['status'],
+        'status_changed_at': item['status_changed_at'],
+        'updated_at': item['updated_at'],
+      });
+
+      Map<String, Object?> receiptRow({
+        required String id,
+        required Map<String, Object?> item,
+        required String eventType,
+        required bool isNoOp,
+        int? eventSequence,
+        Map<String, Object?> intent = const {'operation': 'TEST'},
+      }) => <String, Object?>{
+        'id': id,
+        'living_plan_item_id': item['id'],
+        'project_id': item['project_id'],
+        'event_type': eventType,
+        'intent_json': jsonEncode(intent),
+        'result_json': receiptResult(item),
+        'result_revision': item['revision'],
+        'is_no_op': isNoOp ? 1 : 0,
+        'event_sequence': eventSequence,
+      };
+
+      final initialLiving = livingRow();
+      await db.insert('project_living_plan_items', initialLiving);
+      await db.insert(
+        'project_living_plan_command_receipts',
+        receiptRow(
+          id: 'living-event-1',
+          item: initialLiving,
+          eventType: 'CREATED',
+          isNoOp: false,
+          eventSequence: 1,
+        ),
+      );
+      await db.insert('project_living_plan_events', {
+        'id': 'living-event-1',
+        'living_plan_item_id': 'living-item-1',
+        'project_id': 'living-project',
+        'sequence': 1,
+        'event_type': 'CREATED',
+        'occurred_at': '2026-07-19T09:00:00Z',
+        'payload_json': '{}',
+      });
+      await db.insert(
+        'project_living_plan_command_receipts',
+        receiptRow(
+          id: 'living-no-op-1',
+          item: initialLiving,
+          eventType: 'STARTED',
+          isNoOp: true,
+          intent: const {'expected_revision': 1, 'operation': 'STARTED'},
+        ),
+      );
+
+      for (final invalid in <Map<String, Object?>>[
+        livingRow(
+          id: 'invalid-date',
+          instanceId: 'ACT-INVALID-0@PROJECT',
+          activityId: 'ACT-INVALID-0',
+          plannedDate: '2026-02-30',
+        ),
+        livingRow(
+          id: 'invalid-status',
+          instanceId: 'ACT-INVALID-1@PROJECT',
+          activityId: 'ACT-INVALID-1',
+          status: 'ACTIVE',
+        ),
+        livingRow(
+          id: 'invalid-note',
+          instanceId: 'ACT-INVALID-2@PROJECT',
+          activityId: 'ACT-INVALID-2',
+          note: ' note ',
+        ),
+        livingRow(
+          id: 'invalid-created',
+          instanceId: 'ACT-INVALID-3@PROJECT',
+          activityId: 'ACT-INVALID-3',
+          createdAt: '2026-13-19T09:00:00Z',
+        ),
+        livingRow(
+          id: 'invalid-order',
+          instanceId: 'ACT-INVALID-4@PROJECT',
+          activityId: 'ACT-INVALID-4',
+          createdAt: '2026-07-19T09:00:01Z',
+          updatedAt: '2026-07-19T09:00:00Z',
+        ),
+        livingRow(
+          id: 'invalid-status-time',
+          instanceId: 'ACT-INVALID-5@PROJECT',
+          activityId: 'ACT-INVALID-5',
+          statusChangedAt: '2026-07-19T09:00:01Z',
+        ),
+        livingRow(id: 'invalid-reference', snapshotId: 'missing-snapshot'),
+        livingRow(
+          id: 'cross-project-reference',
+          projectId: 'other-living-project',
+        ),
+      ]) {
+        await expectLater(
+          db.insert('project_living_plan_items', invalid),
+          throwsA(isA<sqflite.DatabaseException>()),
+        );
+      }
+      await expectLater(
+        db.insert(
+          'project_living_plan_items',
+          livingRow(id: 'duplicate-instance'),
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.update(
+          'project_living_plan_items',
+          {
+            'activity_name_snapshot': 'Değiştirilemez',
+            'revision': 2,
+            'updated_at': '2026-07-19T09:00:01Z',
+          },
+          where: 'id = ?',
+          whereArgs: ['living-item-1'],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.update(
+          'project_living_plan_items',
+          {'planned_date': '2026-09-04'},
+          where: 'id = ?',
+          whereArgs: ['living-item-1'],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.delete(
+          'project_living_plan_items',
+          where: 'id = ?',
+          whereArgs: ['living-item-1'],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.update(
+          'project_living_plan_command_receipts',
+          {'intent_json': '{"operation":"CHANGED"}'},
+          where: 'id = ?',
+          whereArgs: ['living-no-op-1'],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.delete(
+          'project_living_plan_command_receipts',
+          where: 'id = ?',
+          whereArgs: ['living-no-op-1'],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      final mismatchedReceipt =
+          receiptRow(
+              id: 'living-receipt-result-mismatch',
+              item: initialLiving,
+              eventType: 'STARTED',
+              isNoOp: true,
+            )
+            ..['result_json'] = receiptResult({
+              ...initialLiving,
+              'status': 'STARTED',
+            });
+      await expectLater(
+        db.insert('project_living_plan_command_receipts', mismatchedReceipt),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.insert('project_living_plan_events', {
+          'id': 'living-event-sequence-mismatch',
+          'living_plan_item_id': 'living-item-1',
+          'project_id': 'living-project',
+          'sequence': 2,
+          'event_type': 'STARTED',
+          'occurred_at': '2026-07-19T09:00:01Z',
+          'payload_json': '{}',
+        }),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      expect(
+        await db.update(
+          'project_living_plan_items',
+          {
+            'planned_date': '2026-09-03',
+            'status': 'STARTED',
+            'note': 'Kalıp ekibi teyit edildi',
+            'revision': 2,
+            'updated_at': '2026-07-19T09:00:01Z',
+            'status_changed_at': '2026-07-19T09:00:01Z',
+          },
+          where: 'id = ? AND revision = 1',
+          whereArgs: ['living-item-1'],
+        ),
+        1,
+      );
+      final startedLiving = livingRow(
+        status: 'STARTED',
+        revision: 2,
+        updatedAt: '2026-07-19T09:00:01Z',
+        statusChangedAt: '2026-07-19T09:00:01Z',
+      );
+      await db.insert(
+        'project_living_plan_command_receipts',
+        receiptRow(
+          id: 'living-event-2',
+          item: startedLiving,
+          eventType: 'STARTED',
+          isNoOp: false,
+          eventSequence: 2,
+          intent: const {'expected_revision': 1, 'operation': 'STARTED'},
+        ),
+      );
+      await db.insert('project_living_plan_events', {
+        'id': 'living-event-2',
+        'living_plan_item_id': 'living-item-1',
+        'project_id': 'living-project',
+        'sequence': 2,
+        'event_type': 'STARTED',
+        'occurred_at': '2026-07-19T09:00:01Z',
+        'payload_json': '{}',
+      });
+
+      final secondInitial = livingRow(
+        id: 'living-item-2',
+        instanceId: 'ACT-INVALID-0@PROJECT',
+        activityId: 'ACT-INVALID-0',
+      );
+      await db.insert('project_living_plan_items', secondInitial);
+      await db.insert(
+        'project_living_plan_command_receipts',
+        receiptRow(
+          id: 'living-item-2-event-1',
+          item: secondInitial,
+          eventType: 'CREATED',
+          isNoOp: false,
+          eventSequence: 1,
+        ),
+      );
+      await db.insert('project_living_plan_events', {
+        'id': 'living-item-2-event-1',
+        'living_plan_item_id': 'living-item-2',
+        'project_id': 'living-project',
+        'sequence': 1,
+        'event_type': 'CREATED',
+        'occurred_at': '2026-07-19T09:00:00Z',
+        'payload_json': '{}',
+      });
+      expect(
+        await db.update(
+          'project_living_plan_items',
+          {
+            'planned_date': '2026-09-03',
+            'status': 'STARTED',
+            'note': 'Kalıp ekibi teyit edildi',
+            'revision': 2,
+            'updated_at': '2026-07-19T09:00:02Z',
+            'status_changed_at': '2026-07-19T09:00:02Z',
+          },
+          where: 'id = ? AND revision = 1',
+          whereArgs: ['living-item-2'],
+        ),
+        1,
+      );
+      final secondStarted = livingRow(
+        id: 'living-item-2',
+        instanceId: 'ACT-INVALID-0@PROJECT',
+        activityId: 'ACT-INVALID-0',
+        status: 'STARTED',
+        revision: 2,
+        updatedAt: '2026-07-19T09:00:02Z',
+        statusChangedAt: '2026-07-19T09:00:02Z',
+      );
+      await expectLater(
+        db.insert('project_living_plan_events', {
+          'id': 'living-no-op-1',
+          'living_plan_item_id': 'living-item-2',
+          'project_id': 'living-project',
+          'sequence': 2,
+          'event_type': 'STARTED',
+          'occurred_at': '2026-07-19T09:00:02Z',
+          'payload_json': '{}',
+        }),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.insert(
+          'project_living_plan_command_receipts',
+          receiptRow(
+            id: 'living-event-1',
+            item: secondStarted,
+            eventType: 'STARTED',
+            isNoOp: true,
+          ),
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await db.insert(
+        'project_living_plan_command_receipts',
+        receiptRow(
+          id: 'living-item-2-event-2',
+          item: secondStarted,
+          eventType: 'STARTED',
+          isNoOp: false,
+          eventSequence: 2,
+        ),
+      );
+      await db.insert('project_living_plan_events', {
+        'id': 'living-item-2-event-2',
+        'living_plan_item_id': 'living-item-2',
+        'project_id': 'living-project',
+        'sequence': 2,
+        'event_type': 'STARTED',
+        'occurred_at': '2026-07-19T09:00:02Z',
+        'payload_json': '{}',
+      });
+      expect(
+        await db.query(
+          'project_living_plan_command_receipts',
+          where: 'id = ? AND is_no_op = 1 AND event_sequence IS NULL',
+          whereArgs: ['living-no-op-1'],
+        ),
+        hasLength(1),
+      );
+      await expectLater(
+        db.update('project_living_plan_events', {
+          'payload_json': '{"changed":true}',
+        }),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.delete('project_living_plan_events'),
         throwsA(isA<sqflite.DatabaseException>()),
       );
       expect(await db.rawQuery('PRAGMA foreign_key_check'), isEmpty);

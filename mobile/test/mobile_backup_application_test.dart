@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/application/construction_living_plan_application.dart';
 import 'package:chief_site_engineer/application/construction_schedule_date_engine.dart';
 import 'package:chief_site_engineer/application/construction_schedule_snapshot_repository.dart';
 import 'package:chief_site_engineer/application/mobile_backup_application.dart';
@@ -13,6 +14,7 @@ import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attachment_models.dart';
 import 'package:chief_site_engineer/domain/construction_corpus_models.dart';
+import 'package:chief_site_engineer/domain/construction_living_plan_models.dart';
 import 'package:chief_site_engineer/domain/construction_project_graph_models.dart';
 import 'package:chief_site_engineer/domain/construction_schedule_models.dart';
 import 'package:chief_site_engineer/domain/mobile_backup_models.dart';
@@ -229,7 +231,7 @@ void main() {
   );
 
   test(
-    'format 1 schema 14 backup restores schedule snapshot to a clean root',
+    'format 1 schema 15 backup restores living plan history and superseded origin',
     () async {
       final scenario = _backupScheduleScenario();
       final sourceDatabase = AppDatabase(
@@ -247,14 +249,116 @@ void main() {
       final sourceRepository = ConstructionScheduleSnapshotRepository(
         database: sourceDatabase,
         clock: () => DateTime.parse(_now),
-        idFactory: () => 'backup-schedule-snapshot',
+        idFactory: () => 'backup-schedule-snapshot-a',
       );
-      final sourceSnapshot = await sourceRepository.persistCurrentSnapshot(
+      final sourceSnapshotA = await sourceRepository.persistCurrentSnapshot(
         schedule: scenario.schedule,
         profile: scenario.profile,
         graph: scenario.graph,
         seedCatalog: scenario.catalog,
       );
+      const livingItemId = '33333333-3333-4333-8333-333333333333';
+      const createdEventId = '44444444-4444-4444-8444-444444444444';
+      const startedEventId = '55555555-5555-4555-8555-555555555555';
+      const noteEventId = '66666666-6666-4666-8666-666666666666';
+      const noOpEventId = '77777777-7777-4777-8777-777777777777';
+      var livingNow = DateTime.parse(_now);
+      final sourceLivingApplication = ConstructionLivingPlanApplication(
+        database: sourceDatabase,
+        snapshotRepository: sourceRepository,
+        clock: () => livingNow,
+        graphLoader: (_) async => scenario.graph,
+        corpusLoader: () async => scenario.corpus,
+      );
+      final createdLivingItem = await sourceLivingApplication
+          .createLivingPlanItem(
+            CreateConstructionLivingPlanItemCommand(
+              itemId: livingItemId,
+              eventId: createdEventId,
+              projectId: scenario.profile.projectId,
+              expectedReferenceSnapshotId: sourceSnapshotA.metadata.snapshotId,
+              activityInstanceId: 'ACT-BACKUP@PROJECT',
+              plannedDate: parseCanonicalConstructionDate('2026-09-04'),
+              note: 'İlk saha notu',
+            ),
+          );
+      expect(createdLivingItem.revision, 1);
+      livingNow = DateTime.parse('2026-07-19T09:31:00Z');
+      final startedLivingItem = await sourceLivingApplication
+          .startLivingPlanItem(
+            const StartConstructionLivingPlanItemCommand(
+              itemId: livingItemId,
+              eventId: startedEventId,
+              expectedRevision: 1,
+            ),
+          );
+      expect(startedLivingItem.revision, 2);
+      final noOpResult = await sourceLivingApplication.startLivingPlanItem(
+        const StartConstructionLivingPlanItemCommand(
+          itemId: livingItemId,
+          eventId: noOpEventId,
+          expectedRevision: 2,
+        ),
+      );
+      final immediateNoOpReplay = await sourceLivingApplication
+          .startLivingPlanItem(
+            const StartConstructionLivingPlanItemCommand(
+              itemId: livingItemId,
+              eventId: noOpEventId,
+              expectedRevision: 2,
+            ),
+          );
+      expect(immediateNoOpReplay.revision, noOpResult.revision);
+      expect(immediateNoOpReplay.updatedAt, noOpResult.updatedAt);
+      livingNow = DateTime.parse('2026-07-19T09:32:00Z');
+      final notedLivingItem = await sourceLivingApplication
+          .updateLivingPlanNote(
+            const UpdateConstructionLivingPlanNoteCommand(
+              itemId: livingItemId,
+              eventId: noteEventId,
+              expectedRevision: 2,
+              note: 'Ekip teslimi tamamlandı',
+            ),
+          );
+      expect(notedLivingItem.revision, 3);
+      final lateNoOpReplay = await sourceLivingApplication.startLivingPlanItem(
+        const StartConstructionLivingPlanItemCommand(
+          itemId: livingItemId,
+          eventId: noOpEventId,
+          expectedRevision: 2,
+        ),
+      );
+      expect(lateNoOpReplay.revision, 2);
+      expect(lateNoOpReplay.note, 'İlk saha notu');
+      final sourceEvents = await sourceDatabase.database.query(
+        'project_living_plan_events',
+        where: 'living_plan_item_id = ?',
+        whereArgs: [livingItemId],
+        orderBy: 'sequence ASC',
+      );
+      final sourceReceipts = await sourceDatabase.database.query(
+        'project_living_plan_command_receipts',
+        where: 'living_plan_item_id = ?',
+        whereArgs: [livingItemId],
+        orderBy: 'result_revision ASC, id ASC',
+      );
+      expect(sourceEvents, hasLength(3));
+      expect(sourceReceipts, hasLength(4));
+      expect(
+        sourceReceipts.singleWhere((row) => row['id'] == noOpEventId),
+        containsPair('is_no_op', 1),
+      );
+      final sourceSnapshotB =
+          await ConstructionScheduleSnapshotRepository(
+            database: sourceDatabase,
+            clock: () => DateTime.parse('2026-07-19T09:33:00Z'),
+            idFactory: () => 'backup-schedule-snapshot-b',
+          ).persistCurrentSnapshot(
+            schedule: scenario.schedule,
+            profile: scenario.profile,
+            graph: scenario.graph,
+            seedCatalog: scenario.catalog,
+          );
       await sourceDatabase.close();
 
       final sourceApplication = _application(directories, gateway: gateway);
@@ -274,12 +378,12 @@ void main() {
       final targetGateway = DeviceMobileBackupFileGateway(
         directories: targetDirectories,
         picker: () async => PlatformFile(
-          name: 'schedule-v14.csebackup',
+          name: 'schedule-v15.csebackup',
           size: created.summary.packageByteSize,
           readStream: packageFile.openRead(),
         ),
         clock: () => DateTime.parse(_now),
-        importIdFactory: (_) => 'schedule-v14-clean-target',
+        importIdFactory: (_) => 'schedule-v15-clean-target',
       );
       final targetApplication = _application(
         targetDirectories,
@@ -299,10 +403,10 @@ void main() {
       );
 
       expect(preflight.manifest.formatVersion, 1);
-      expect(preflight.manifest.mobileSchemaVersion, 14);
-      expect(preflight.migratedSchemaVersion, 14);
+      expect(preflight.manifest.mobileSchemaVersion, 15);
+      expect(preflight.migratedSchemaVersion, 15);
       expect(restored.restoredManifest.formatVersion, 1);
-      expect(restored.activeSchemaVersion, 14);
+      expect(restored.activeSchemaVersion, 15);
       final reopened = AppDatabase(
         path: targetDirectories.databaseFile,
         factory: databaseFactoryFfi,
@@ -319,16 +423,137 @@ void main() {
       expect(restoredSnapshot, isNotNull);
       expect(
         restoredSnapshot!.metadata.snapshotId,
-        sourceSnapshot.metadata.snapshotId,
+        sourceSnapshotB.metadata.snapshotId,
       );
       expect(restoredSnapshot.metadata.isCurrent, isTrue);
       expect(
         restoredSnapshot.metadata.projectionSha256,
-        sourceSnapshot.metadata.projectionSha256,
+        sourceSnapshotB.metadata.projectionSha256,
       );
       expect(
         _backupActivityProjection(restoredSnapshot.activities),
-        _backupActivityProjection(sourceSnapshot.activities),
+        _backupActivityProjection(sourceSnapshotB.activities),
+      );
+      final restoredOrigin = await restoredRepository.loadSnapshotById(
+        sourceSnapshotA.metadata.snapshotId,
+      );
+      expect(restoredOrigin?.metadata.isCurrent, isFalse);
+      expect(
+        restoredOrigin?.metadata.supersededAt,
+        DateTime.parse('2026-07-19T09:33:00Z'),
+      );
+      final restoredItem = (await reopened.database.query(
+        'project_living_plan_items',
+        where: 'id = ?',
+        whereArgs: [livingItemId],
+      )).single;
+      expect(restoredItem, {
+        'id': livingItemId,
+        'project_id': scenario.profile.projectId,
+        'reference_snapshot_id': sourceSnapshotA.metadata.snapshotId,
+        'activity_instance_id': 'ACT-BACKUP@PROJECT',
+        'activity_id': 'ACT-BACKUP',
+        'activity_name_snapshot': 'Backup milestone',
+        'activity_context_json': '{}',
+        'natural_unit_snapshot': 'TEST',
+        'planned_date': '2026-09-04',
+        'status': 'STARTED',
+        'note': 'Ekip teslimi tamamlandı',
+        'revision': 3,
+        'created_at': _now,
+        'updated_at': '2026-07-19T09:32:00Z',
+        'status_changed_at': '2026-07-19T09:31:00Z',
+      });
+      final restoredEvents = await reopened.database.query(
+        'project_living_plan_events',
+        where: 'living_plan_item_id = ?',
+        whereArgs: [livingItemId],
+        orderBy: 'sequence ASC',
+      );
+      expect(restoredEvents.map((row) => row['sequence']), [1, 2, 3]);
+      expect(restoredEvents.map((row) => row['event_type']), [
+        'CREATED',
+        'STARTED',
+        'NOTE_UPDATED',
+      ]);
+      expect(
+        restoredEvents.map((row) => row['payload_json']),
+        sourceEvents.map((row) => row['payload_json']),
+      );
+      final restoredReceipts = await reopened.database.query(
+        'project_living_plan_command_receipts',
+        where: 'living_plan_item_id = ?',
+        whereArgs: [livingItemId],
+        orderBy: 'result_revision ASC, id ASC',
+      );
+      expect(restoredReceipts, sourceReceipts);
+      expect(
+        restoredReceipts.singleWhere((row) => row['id'] == noOpEventId),
+        containsPair('event_sequence', isNull),
+      );
+      final restoredLivingApplication = ConstructionLivingPlanApplication(
+        database: reopened,
+        snapshotRepository: restoredRepository,
+        clock: () => DateTime.parse('2026-07-19T09:34:00Z'),
+        graphLoader: (_) async => scenario.graph,
+        corpusLoader: () async => scenario.corpus,
+      );
+      final restoredNoOpReplay = await restoredLivingApplication
+          .startLivingPlanItem(
+            const StartConstructionLivingPlanItemCommand(
+              itemId: livingItemId,
+              eventId: noOpEventId,
+              expectedRevision: 2,
+            ),
+          );
+      expect(restoredNoOpReplay.revision, 2);
+      expect(restoredNoOpReplay.status, ConstructionLivingPlanStatus.started);
+      expect(restoredNoOpReplay.note, 'İlk saha notu');
+      expect(
+        (await restoredLivingApplication.loadLivingPlanItem(
+          livingItemId,
+        ))?.revision,
+        3,
+      );
+      await expectLater(
+        restoredLivingApplication.completeLivingPlanItem(
+          const CompleteConstructionLivingPlanItemCommand(
+            itemId: livingItemId,
+            eventId: noOpEventId,
+            expectedRevision: 3,
+          ),
+        ),
+        throwsA(
+          isA<ConstructionLivingPlanFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'living_plan_event_id_conflict',
+          ),
+        ),
+      );
+      await expectLater(
+        reopened.database.insert('project_living_plan_items', {
+          ...restoredItem,
+          'id': '77777777-7777-4777-8777-777777777777',
+          'reference_snapshot_id': sourceSnapshotB.metadata.snapshotId,
+          'created_at': '2026-07-19T09:34:00Z',
+          'updated_at': '2026-07-19T09:34:00Z',
+          'status_changed_at': '2026-07-19T09:34:00Z',
+        }),
+        throwsA(isA<DatabaseException>()),
+      );
+      await expectLater(
+        reopened.database.insert('project_living_plan_items', {
+          ...restoredItem,
+          'id': '88888888-8888-4888-8888-888888888888',
+          'reference_snapshot_id': sourceSnapshotB.metadata.snapshotId,
+          'activity_instance_id': 'MISSING@PROJECT',
+          'activity_id': 'MISSING',
+          'created_at': '2026-07-19T09:34:00Z',
+          'updated_at': '2026-07-19T09:34:00Z',
+          'status_changed_at': '2026-07-19T09:34:00Z',
+        }),
+        throwsA(isA<DatabaseException>()),
       );
       expect(
         await reopened.database.rawQuery('PRAGMA foreign_key_check'),
@@ -345,38 +570,50 @@ void main() {
   );
 
   test(
-    'format 1 schema 13 backup restores and migrates normally to 14',
+    'format 1 schema 14 backup restores and migrates normally to 15',
     () async {
-      final oldRoot = await Directory.systemTemp.createTemp('cse_schema13_');
+      final oldRoot = await Directory.systemTemp.createTemp('cse_schema14_');
       addTearDown(() async {
         if (await oldRoot.exists()) await oldRoot.delete(recursive: true);
       });
-      final oldFile = path.join(oldRoot.path, 'schema13.sqlite3');
+      final oldFile = path.join(oldRoot.path, 'schema14.sqlite3');
       final oldDatabase = AppDatabase(
         path: oldFile,
         factory: databaseFactoryFfi,
         clock: () => DateTime.parse(_now),
-        migrations: AppDatabase.foundationMigrations.take(13).toList(),
+        migrations: AppDatabase.foundationMigrations.take(14).toList(),
       );
       await oldDatabase.open();
       await SmokeRecordRepository(
         database: oldDatabase,
         clock: () => DateTime.parse(_now),
       ).ensureFoundationRecord();
+      final legacyScenario = _backupScheduleScenario();
       await oldDatabase.database.insert('projects', {
-        'id': 'schema13-project',
-        'name': 'Schema 13 project',
+        'id': legacyScenario.profile.projectId,
+        'name': 'Schema 14 project',
         'created_at': _now,
         'updated_at': _now,
       });
+      final legacySnapshot =
+          await ConstructionScheduleSnapshotRepository(
+            database: oldDatabase,
+            clock: () => DateTime.parse(_now),
+            idFactory: () => 'schema14-snapshot',
+          ).persistCurrentSnapshot(
+            schedule: legacyScenario.schedule,
+            profile: legacyScenario.profile,
+            graph: legacyScenario.graph,
+            seedCatalog: legacyScenario.catalog,
+          );
       await oldDatabase.close();
       final databaseBytes = await File(oldFile).readAsBytes();
       final archive = const CseBackupArchiveCodec().encode(
-        manifest: _manifest(databaseBytes, schemaVersion: 13),
+        manifest: _manifest(databaseBytes, schemaVersion: 14),
         databaseBytes: databaseBytes,
         attachments: const {},
       );
-      final package = File(path.join(oldRoot.path, 'schema13.csebackup'));
+      final package = File(path.join(oldRoot.path, 'schema14.csebackup'));
       await package.writeAsBytes(
         await _testEncryptionCodec().encrypt(archive, _password),
         flush: true,
@@ -393,9 +630,9 @@ void main() {
       );
 
       expect(preflight.manifest.formatVersion, 1);
-      expect(preflight.manifest.mobileSchemaVersion, 13);
-      expect(preflight.migratedSchemaVersion, 14);
-      expect(restored.activeSchemaVersion, 14);
+      expect(preflight.manifest.mobileSchemaVersion, 14);
+      expect(preflight.migratedSchemaVersion, 15);
+      expect(restored.activeSchemaVersion, 15);
       final reopened = AppDatabase(
         path: directories.databaseFile,
         factory: databaseFactoryFfi,
@@ -406,16 +643,36 @@ void main() {
         (await reopened.database.query(
           'projects',
           where: 'id = ?',
-          whereArgs: ['schema13-project'],
+          whereArgs: [legacyScenario.profile.projectId],
         )).single['name'],
-        'Schema 13 project',
+        'Schema 14 project',
       );
       expect(
         await reopened.database.query('project_schedule_snapshots'),
-        isEmpty,
+        hasLength(1),
       );
       expect(
         await reopened.database.query('project_schedule_snapshot_activities'),
+        hasLength(1),
+      );
+      final restoredLegacy = await ConstructionScheduleSnapshotRepository(
+        database: reopened,
+        clock: () => DateTime.parse(_now),
+      ).loadCurrentSnapshot(legacyScenario.profile.projectId);
+      expect(
+        restoredLegacy?.metadata.projectionSha256,
+        legacySnapshot.metadata.projectionSha256,
+      );
+      expect(
+        await reopened.database.query('project_living_plan_items'),
+        isEmpty,
+      );
+      expect(
+        await reopened.database.query('project_living_plan_command_receipts'),
+        isEmpty,
+      );
+      expect(
+        await reopened.database.query('project_living_plan_events'),
         isEmpty,
       );
       expect(
@@ -2731,6 +2988,44 @@ _BackupScheduleScenario _backupScheduleScenario() {
   );
   const activityId = 'ACT-BACKUP';
   const instanceId = '$activityId@PROJECT';
+  final activity = ConstructionActivity(
+    activityId: activityId,
+    wbsCode: 'TEST',
+    packageId: 'TEST',
+    activityNameTr: 'Backup milestone',
+    aliasesTr: const ['backup'],
+    applicability: const ConstructionAlwaysRule(),
+    repeatDimension: ConstructionActivityRepeatDimension.project,
+    naturalUnit: 'TEST',
+    durationStatus: 'UNKNOWN',
+    durationConfidence: 'E_UNKNOWN',
+    testSeedDurationDays: 0,
+    sequenceConfidence: 'TEST',
+    sequenceIndex: 1,
+  );
+  final corpus = ConstructionCorpus(
+    metadata: const ConstructionCorpusMetadata(
+      name: 'BACKUP LIVING PLAN TEST CORPUS',
+      corpusVersion: '0.3-yfk-resource-seed',
+      sourcePublicationStatus: 'RESEARCH_RESOURCE_SEED',
+      sourceProductionStatus: 'NOT_FOR_PRODUCTION',
+      warning: 'test',
+      runtimeScope: 'ACTIVITY_CATALOG_READ_ONLY_NO_YFK_RESOURCE_COEFFICIENTS',
+      wbsCount: 1,
+      activityCount: 1,
+    ),
+    profileFields: const <String>[],
+    wbsPackages: const [
+      ConstructionWbsPackage(
+        wbsCode: 'TEST',
+        packageId: 'TEST',
+        packageNameTr: 'Test',
+        packageNameEn: 'Test',
+        frequencyClass: 'TEST',
+      ),
+    ],
+    activities: [activity],
+  );
   final graph = ConstructionProjectActivityGraph(
     projectId: profile.projectId,
     activityInstances: const [
@@ -2790,7 +3085,7 @@ _BackupScheduleScenario _backupScheduleScenario() {
     graph: graph,
     seedCatalog: catalog,
   );
-  return _BackupScheduleScenario(profile, graph, catalog, schedule);
+  return _BackupScheduleScenario(profile, corpus, graph, catalog, schedule);
 }
 
 List<Map<String, Object?>> _backupActivityProjection(
@@ -2815,12 +3110,14 @@ List<Map<String, Object?>> _backupActivityProjection(
 class _BackupScheduleScenario {
   const _BackupScheduleScenario(
     this.profile,
+    this.corpus,
     this.graph,
     this.catalog,
     this.schedule,
   );
 
   final ConstructionProjectProfile profile;
+  final ConstructionCorpus corpus;
   final ConstructionProjectActivityGraph graph;
   final ConstructionScheduleSeedCatalog catalog;
   final ConstructionProjectReferenceSchedule schedule;
