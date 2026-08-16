@@ -76,6 +76,7 @@ ConstructionProjectProfile referenceConstructionProfile01() =>
         'cooling_system': 'VRF',
         'has_dewatering': true,
         'foundation_thermal_insulation_required': true,
+        'calendar': _referenceScheduleCalendar(),
       },
     );
 
@@ -106,6 +107,7 @@ ConstructionProjectProfile referenceConstructionProfile02() =>
         'has_elevator': false,
         'has_parking': false,
         'has_basement': false,
+        'calendar': _referenceScheduleCalendar(),
       },
     );
 
@@ -146,5 +148,13 @@ ConstructionProjectProfile referenceConstructionProfile03() =>
         'has_ups': true,
         'has_transformer': true,
         'has_bms': true,
+        'calendar': _referenceScheduleCalendar(),
       },
     );
+
+Map<String, Object?> _referenceScheduleCalendar() => <String, Object?>{
+  'start_date': '2026-09-01',
+  'working_weekdays': <Object?>[0, 1, 2, 3, 4, 5],
+  'holidays': <Object?>['2026-10-29'],
+  'workday_hours': 9,
+};
