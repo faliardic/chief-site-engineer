@@ -438,7 +438,8 @@ Her adımda aşağıdaki dosyalar kullanılır:
 - ChatGPT/orchestrator model ve reasoning secimi
 - Codex/executor model ve reasoning secimi
 - Execution mode ve orchestration
-- Secim nedeni, allowed fallback, review floor ve fail-closed-if-mismatch
+- Secim nedeni, routing request evidence, allowed fallback, review floor ve
+  fail-closed-if-mismatch
 - Yetkili dosyalar
 - Yapılacak iş
 - Yasak kapsam
@@ -533,16 +534,19 @@ CSE'nin bağlayıcı routing sözleşmesi:
 docs/protocols/CSE_MODEL_REASONING_ROUTING_POLICY.md
 ```
 
-Her yeni Issue ve `.cse/tasks/<issue_no>_task.md`, iş başlamadan önce
-`CSE-MRP-1.0` görev başlığını taşır. Model, reasoning effort, execution mode ve
-orchestration birbirinden bağımsız alanlardır; `pro` model/effort değildir,
-`Ultra` da reasoning effort değildir.
+Her yeni görevde `CSE-MRP-1.0` routing request'i önce current Issue'da bulunur.
+`.cse/tasks/<issue_no>_task.md`, ilk yetkili local edit olarak diğer substantive
+edit/test/build/commit işlemlerinden önce bu request'i kaydeder. Model,
+reasoning effort, execution mode ve orchestration birbirinden bağımsız
+alanlardır; `pro` model/effort değildir, `Ultra` da reasoning effort değildir.
 
-R3/R4 işte otomatik fallback veya downgrade yoktur. İstenen selector/invocation
-kanıtı yoksa ya da görünür actual değer requested değerle uyuşmuyorsa yürütme
-fail-closed durur. Runtime actual değerleri göstermiyorsa tahmin yapılmaz;
-requested invocation kanıtı mevcut olmak şartıyla sonuç `unknown / null /
-unverified` olarak kaydedilir.
+Routing request, invocation evidence ve runtime actual birbirinden ayrılır.
+R3/R4 işte otomatik fallback veya downgrade yoktur. Launch surface selector,
+API config veya runner kaydını gösteriyorsa exact requested eşleşme zorunludur;
+görünür mismatch fail-closed durur. Launch surface invocation ve runtime actual
+metadata'yı göstermiyorsa tahmin yapılmaz; recorded request ile sonuç
+`unknown / null / unverified` kaydedilebilir ve review floor en az bir risk
+kademesi yükseltilir.
 
 Her result ve Codex completion çıktısı `execution_record` ile
 `review_recommendation` YAML bloklarını taşır. Review önerisi görev başındaki

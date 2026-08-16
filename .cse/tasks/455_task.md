@@ -23,6 +23,7 @@ model_routing:
   execution_mode: "standard"
   orchestration: "single-agent"
   selection_reason: "Birden fazla canonical kaynakta kalıcı source-authority ve execution protocol değişikliği."
+  routing_request_evidence: "https://github.com/faliardic/chief-site-engineer/issues/455#issuecomment-5305060904"
   allowed_fallback: null
   review_floor:
     chatgpt_model: "gpt-5.6-sol"
@@ -30,9 +31,10 @@ model_routing:
   fail_closed_if_mismatch: true
 ```
 
-Requested invocation kanıtı Issue #455 owner authorization yorumundaki exact
-routing kaydıdır. Runtime actual model/effort metadata'sı görünmüyorsa tahmin
-edilmez; completion kaydı `unknown / null / unverified` kullanır.
+Owner authorization yorumu yalnız requested routing evidence'dır; UI selector,
+API request/config, runner kaydı veya runtime actual kanıtı değildir. Bu launch
+surface invocation ve runtime actual metadata'yı göstermediği için tahmin
+yapılmaz; completion `unverified` olur ve review floor bir kademe yükseltilir.
 
 ## Validation contract
 
@@ -45,7 +47,7 @@ edilmez; completion kaydı `unknown / null / unverified` kullanır.
 - Minimum physical-device acceptance: yok.
 - Retry budget: 1 primary execution + en fazla 1 blocking correction; aynı başarısız operasyon exact fix sonrasında en fazla 1 retry.
 - Time budget: hedef 10–15 dakika, hard stop 25 dakika.
-- Stop conditions: routing invocation kanıtı yokluğu/görünür mismatch, authority çelişkisi, allowlist dışı edit ihtiyacı, #454 veya schedule drift'i, ikinci aynı hata veya hard stop.
+- Stop conditions: recorded routing request yokluğu; launch surface selector/config gösterirken exact mismatch; authority çelişkisi; allowlist dışı edit ihtiyacı; #454 veya schedule drift'i; ikinci aynı hata veya hard stop. Launch surface invocation/runtime metadata göstermiyorsa unverified completion ve yükseltilmiş review uygulanır.
 
 ## Authorized files
 

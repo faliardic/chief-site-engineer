@@ -9,7 +9,9 @@
 - Master divergence: `0 0`
 - Branch: `docs/issue-455-model-reasoning-routing-policy`
 - Primary execution: `1`
-- Blocking correction: `0`
+- Blocking correction: `1` — PR #457 owner review comment
+  `#issuecomment-5305699565`.
+- Correction focused retries: `0`; correction yaklaşık 5 dakikada tamamlandı.
 - Focused validation retries: `3` — iki ayrı fail-fast phrase assertion'ı ve
   staged whitespace assertion'ı için exact düzeltmeden sonra; her assertion
   yalnız bir kez tekrarlandı.
@@ -23,6 +25,10 @@
   `standard`, `pro`; `single-agent`, `Ultra` alanları ayrıştırıldı.
 - R0–R4 risk matrisi, R3/R4 no-fallback/no-downgrade ve fail-closed selector/
   invocation kapısı tanımlandı.
+- Routing request, invocation evidence ve runtime actual üç ayrı kanıt katmanı
+  olarak tanımlandı; recorded request artık invocation kanıtı sayılmıyor.
+- Metadata göstermeyen launch surface için tahminsiz `unverified` completion ve
+  bir kademe yükseltilmiş review yolu eklendi.
 - Runtime actual değerleri görünmüyorsa tahmin etmeyen `unknown / null /
   unverified` sözleşmesi eklendi.
 - Her task için başlangıç routing başlığı; her result/final output için
@@ -44,9 +50,19 @@
 Altı dosyanın tamamı fiziksel linked worktree içinde doğrulandı. Changed-file
 allowlist violation: `0`.
 
+Correction commit yalnız şu dört dosyayı değiştirir:
+
+- `.cse/tasks/455_task.md`
+- `.cse/results/455_result.md`
+- `docs/protocols/CSE_MODEL_REASONING_ROUTING_POLICY.md`
+- `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
+
 ## Focused validation
 
 - Required protocol phrases/search: PASS.
+- Routing request / invocation evidence / runtime actual ayrımı: PASS.
+- Task-first substantive edit sırası: PASS.
+- Metadata-hidden unverified completion + bir kademe review escalation: PASS.
 - Markdown fence consistency: PASS.
 - Markdown table row structure: PASS.
 - Fenced YAML examples (`PyYAML 6.0.3`): PASS.
@@ -72,10 +88,11 @@ allowlist violation: `0`.
 - Gerçek kullanıcı verisi, #454 Draft PR içeriği ve sonraki production/
   persistence/7 günlük plan Slice'ı okunmadı veya değiştirilmedi.
 
-## Publication state at result-file time
+## Correction publication state at result-file time
 
-- Intentional commit ve normal push yetkili, fakat bu pre-commit result içinde
-  tamamlanmış olarak iddia edilmez.
+- İlk intentional commit, normal push ve Draft PR #457 mevcuttur. Tek correction
+  commit'i ve normal push yetkili, fakat bu pre-commit result içinde tamamlanmış
+  olarak iddia edilmez.
 - Branch/remote SHA, divergence, final clean status, Issue completion comment ve
   Draft PR URL'si commit sonrasında GitHub completion evidence'inde kaydedilir;
   yalnız metadata için ikinci commit üretilmez.
@@ -93,13 +110,18 @@ execution_record:
   actual_reasoning_effort: "unknown"
   execution_mode: "standard"
   orchestration: "single-agent"
+  routing_request_evidence: "https://github.com/faliardic/chief-site-engineer/issues/455#issuecomment-5305060904"
+  invocation_evidence: null
+  invocation_verification_status: "unverified"
   mismatch_detected: null
   runtime_verification_status: "unverified"
 ```
 
-Requested routing, Issue #455 owner authorization yorumunda invocation seçimi
-olarak exact kaydedildi. Runtime actual model/effort metadata'sı görünmedi;
-downgrade veya exact eşleşme varsayılmadı.
+Issue #455 owner authorization yorumu yalnız requested routing evidence'dır;
+invocation kanıtı değildir. Launch surface UI selector, API request/config,
+runner kaydı veya runtime actual model/effort metadata'sı göstermedi. Bu nedenle
+invocation ve runtime verification `unverified`; downgrade, mismatch veya exact
+eşleşme varsayılmadı.
 
 ## Review recommendation
 
@@ -109,12 +131,12 @@ review_recommendation:
   recommended_chatgpt_model: "gpt-5.6-sol"
   recommended_reasoning_effort: "max"
   recommended_mode: "standard"
-  recommendation_reason: "R3 canonical source-authority değişikliği tamamlandı; runtime actual model/effort unverified olduğu için review bir kademe R4/Max'e yükseltilmelidir."
+  recommendation_reason: "R3 canonical source-authority değişikliği tamamlandı; invocation evidence ve runtime actual metadata unverified olduğu için review bir kademe R4/Max'e yükseltilmelidir."
   must_review:
     - "altı dosyalık exact allowlist ve #454/schedule drift sıfırı"
     - "model/reasoning/execution/orchestration eksenlerinin bağımsızlığı"
     - "volatile model/retirement iddialarının resmî kaynak ve as-of kapısı"
     - "execution_record unknown/null/unverified semantiği"
-  residual_uncertainty: "Runtime actual model ve reasoning effort metadata'sı görünmüyor."
+  residual_uncertainty: "Launch surface invocation evidence ile runtime actual model/reasoning metadata'sını göstermiyor."
   escalation_condition: "Unexpected diff, resmî katalog çelişkisi, eksik validation veya görünür routing mismatch."
 ```

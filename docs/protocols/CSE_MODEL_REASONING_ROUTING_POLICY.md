@@ -74,10 +74,21 @@ validation/regression tabanı `xhigh`dır. R4 için `gpt-5.6-sol / max`
 değerlendirmesi zorunludur. Çoklu kanonik source-authority değişikliği, kod
 değiştirmese bile çelişki riski nedeniyle R3 olabilir.
 
-## 4. İş başlamadan zorunlu routing kaydı
+## 4. Üç kanıt katmanı ve görev başlangıcı
 
-ChatGPT seçimi, herhangi bir edit/test/build/commit öncesinde current Issue ve
-`.cse/tasks/<issue_no>_task.md` içinde kaydedilir:
+Routing doğrulaması üç farklı kavramı karıştırmaz:
+
+1. **Routing request:** ChatGPT'nin current Issue ve task içinde kaydettiği
+   requested model, effort, mode ve orchestration seçimi.
+2. **Invocation evidence:** launch surface gösteriyorsa UI selector, API
+   request/config veya runner kaydı.
+3. **Runtime actual:** runtime expose ediyorsa gerçekten çalışan model ve
+   reasoning effort.
+
+Routing request önce current Issue'da bulunur. `.cse/tasks/<issue_no>_task.md`,
+ilk yetkili local edit olarak ve diğer substantive edit/test/build/commit
+işlemlerinden önce oluşturulur; Issue'daki request'i tekrarlar. Read-only
+preflight bu sırayı bozmaz.
 
 ```yaml
 model_routing:
@@ -91,6 +102,7 @@ model_routing:
   execution_mode: "standard"
   orchestration: "single-agent"
   selection_reason: "Exact görev riski ve değişen sözleşme."
+  routing_request_evidence: "Current Issue URL veya owner comment URL"
   allowed_fallback: null
   review_floor:
     chatgpt_model: "gpt-5.6-sol"
@@ -98,9 +110,15 @@ model_routing:
   fail_closed_if_mismatch: true
 ```
 
-R3/R4 için otomatik fallback veya downgrade yasaktır. İstenen model/effort
-selector ya da invocation config'inde kanıtlanamıyorsa execution başlamaz.
-Görünür actual model/effort requested değerle uyuşmuyorsa fail-closed durulur.
+R3/R4 için otomatik fallback veya downgrade yasaktır. Launch surface selector,
+API config veya runner kaydını gösteriyorsa requested model/effort ile exact
+eşleşme zorunludur; görünür mismatch fail-closed durur.
+
+Launch surface invocation evidence'i ve runtime actual metadata'yı
+göstermiyorsa değerler tahmin edilmez. Current Issue'da kayıtlı routing request
+ile execution `unverified` olarak tamamlanabilir; review floor en az bir risk
+kademesi yükseltilir. Metadata'yı göstermeyen bir surface, tek başına mismatch
+veya downgrade kanıtı değildir.
 
 ## 5. Runtime doğrulaması ve execution record
 
@@ -114,6 +132,9 @@ execution_record:
   actual_reasoning_effort: "unknown"
   execution_mode: "standard"
   orchestration: "single-agent"
+  routing_request_evidence: "Current Issue veya owner comment URL"
+  invocation_evidence: null
+  invocation_verification_status: "unverified"
   mismatch_detected: null
   runtime_verification_status: "unverified"
 ```
@@ -121,8 +142,12 @@ execution_record:
 Runtime actual model/effort'i göstermiyorsa tahmin yapılmaz. Bu durumda exact
 değerler `unknown`, `mismatch_detected: null` ve
 `runtime_verification_status: unverified` olur. Metadata'nın gizli olması tek
-başına mismatch kanıtı veya downgrade yetkisi değildir; ancak requested
-selector/invocation kanıtı yine zorunludur.
+başına mismatch kanıtı veya downgrade yetkisi değildir.
+
+`routing_request_evidence` yalnız recorded request'in kaynağıdır; invocation
+kanıtı değildir. Launch surface invocation bilgisini göstermiyorsa
+`invocation_evidence: null` ve `invocation_verification_status: unverified`
+yazılır. Bu durumda review floor en az bir risk kademesi yükseltilir.
 
 `mismatch_detected: false` yalnız actual model ve actual effort görünür olup
 requested değerlerle exact eşitse yazılır. Görünür uyuşmazlıkta
