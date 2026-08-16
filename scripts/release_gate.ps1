@@ -117,8 +117,8 @@ try {
             throw 'Android adb was not found for the integration gate.'
         }
         Invoke-Checked -Command $adb -Arguments @('-s', $AndroidDevice, 'install', '-r', '-g', $debugApk)
-        & $adb -s $AndroidDevice shell pm grant com.faliardic.chiefsiteengineer.debug android.permission.POST_NOTIFICATIONS 2>$null
-        & $adb -s $AndroidDevice shell appops set com.faliardic.chiefsiteengineer.debug SCHEDULE_EXACT_ALARM allow 2>$null
+        & $adb -s $AndroidDevice shell pm grant com.faliardic.sefim.debug android.permission.POST_NOTIFICATIONS 2>$null
+        & $adb -s $AndroidDevice shell appops set com.faliardic.sefim.debug SCHEDULE_EXACT_ALARM allow 2>$null
         Invoke-Flutter -Arguments @('test', '--no-pub', 'integration_test\app_smoke_test.dart', '-d', $AndroidDevice)
         $gradle = Join-Path $mobileRoot 'android\gradlew.bat'
         if (Test-Path -LiteralPath $gradle) {
@@ -146,7 +146,8 @@ try {
         '--forbidden-marker', 'CSE_ENTRYPOINT_REBOOT_ACCEPTANCE_V1'
     )
     $sidecarPackage = (& $aapt2 dump packagename $sidecarApk 2>&1) -join "`n"
-    if ($LASTEXITCODE -ne 0 -or $sidecarPackage.Trim() -ne 'com.faliardic.chiefsiteengineer.debug') {
+    # Frozen legacy debug identity: com.faliardic.chiefsiteengineer.debug.
+    if ($LASTEXITCODE -ne 0 -or $sidecarPackage.Trim() -ne 'com.faliardic.sefim.debug') {
         throw 'Debug sidecar package identity verification failed.'
     }
     $sidecarPermissions = (& $aapt2 dump permissions $sidecarApk 2>&1) -join "`n"

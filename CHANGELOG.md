@@ -1,5 +1,20 @@
 # Changelog
 
+## Issue #464 - Şefim kimlik ayrımı ve Living Plan cihaz kabulü
+
+- Owner A3 sonucunu kabul etti; kayıp legacy production paketi bu Issue'da
+  restore, reinstall, fresh-install, açma, veri erişimi veya migration hedefi
+  değildir. Üç legacy CSE kimliği dondurulmuş ve korunmuştur.
+- Yeni ürün adı `Şefim`; Android/iOS production/debug kimlikleri
+  `com.faliardic.sefim` / `.debug`, sentetik Android kabul kimliği
+  `com.faliardic.sefim.acceptance` olarak ayrılmıştır. Kabul UI'ı
+  `Kabul ortamı · sentetik veri` uyarısını taşır ve yeni sandbox temiz yerel
+  veritabanıyla başlar.
+- Android reboot audit receiver'ı, kilitli
+  `flutter_local_notifications 22.1.0` resmî receiver'ına delege eder.
+  Fiziksel cihaz lifecycle'ı Flutter tooling'e verilmez; host-built APK exact
+  package/label/marker/ABI/SHA kanıtından sonra yalnız ADB ile kurulur.
+
 ## Issue #462 - Living 7-Day Plan MVP Core
 
 - Mobil schema `14 → 15` additive migration ile Living Plan projection ve

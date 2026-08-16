@@ -86,7 +86,7 @@ function Build-AcceptanceApk {
     )
     $package = (& $aapt2 dump packagename $sharedOutput 2>&1) -join "`n"
     if ($LASTEXITCODE -ne 0 -or
-        $package.Trim() -ne 'com.faliardic.chiefsiteengineer.acceptance') {
+        $package.Trim() -ne 'com.faliardic.sefim.acceptance') {
         throw 'Synthetic acceptance APK package isolation verification failed.'
     }
     New-Item -ItemType Directory -Force -Path $artifactRoot | Out-Null

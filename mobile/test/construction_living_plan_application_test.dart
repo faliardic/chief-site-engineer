@@ -1154,6 +1154,115 @@ void main() {
       expect(plan.map((entry) => entry.item.id), isNot(contains(f.id)));
     },
   );
+
+  test(
+    'path-backed adapter closes every operation and observes database swap',
+    () async {
+      await database.close();
+      final adapter = SqliteConstructionLivingPlanApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        graphLoader: (_) async => scenario.graph,
+        corpusLoader: () async => scenario.corpus,
+      );
+
+      final candidates = await adapter.loadSevenDayReferenceSuggestions(
+        projectId: scenario.profile.projectId,
+        windowStart: _date('2026-09-04'),
+      );
+      final candidate = candidates.first;
+      await adapter.createLivingPlanItem(
+        CreateConstructionLivingPlanItemCommand(
+          itemId: _uuid(901),
+          eventId: _uuid(902),
+          projectId: scenario.profile.projectId,
+          expectedReferenceSnapshotId: candidate.referenceSnapshotId,
+          activityInstanceId: candidate.activityInstanceId,
+          plannedDate: _date('2026-09-04'),
+        ),
+      );
+      expect(
+        await adapter.loadSevenDayPlan(
+          projectId: scenario.profile.projectId,
+          windowStart: _date('2026-09-04'),
+        ),
+        hasLength(1),
+      );
+      await expectLater(
+        adapter.searchCurrentReferenceCandidates(
+          projectId: scenario.profile.projectId,
+          query: '  ',
+        ),
+        _failure('living_plan_empty_reference_query'),
+      );
+
+      final replacementPath = '${directories.databaseFile}.replacement';
+      final replacement = AppDatabase(
+        path: replacementPath,
+        factory: databaseFactoryFfi,
+        clock: () => now,
+      );
+      await replacement.open();
+      await replacement.database.insert('projects', {
+        'id': scenario.profile.projectId,
+        'name': scenario.profile.projectName,
+        'created_at': '2026-08-16T06:00:00Z',
+        'updated_at': '2026-08-16T06:00:00Z',
+      });
+      await _persist(
+        _snapshotRepository(
+          replacement,
+          snapshotId: 'snapshot-replacement',
+          generatedAt: DateTime.utc(2026, 8, 16, 11),
+        ),
+        scenario,
+      );
+      await replacement.close();
+
+      await File(
+        directories.databaseFile,
+      ).rename('${directories.databaseFile}.before-swap');
+      await File(replacementPath).rename(directories.databaseFile);
+
+      expect(
+        await adapter.loadSevenDayPlan(
+          projectId: scenario.profile.projectId,
+          windowStart: _date('2026-09-04'),
+        ),
+        isEmpty,
+        reason: 'A per-operation open must observe the replacement truth.',
+      );
+    },
+  );
+
+  test('path-backed adapter keeps concurrent operations isolated', () async {
+    await database.close();
+    final adapter = SqliteConstructionLivingPlanApplication(
+      databasePath: directories.databaseFile,
+      databaseFactory: databaseFactoryFfi,
+      clock: () => now,
+      graphLoader: (_) async => scenario.graph,
+      corpusLoader: () async => scenario.corpus,
+    );
+
+    final results = await Future.wait([
+      adapter.loadSevenDayReferenceSuggestions(
+        projectId: scenario.profile.projectId,
+        windowStart: _date('2026-09-04'),
+      ),
+      adapter.loadSevenDayReferenceSuggestions(
+        projectId: scenario.profile.projectId,
+        windowStart: _date('2026-09-04'),
+      ),
+    ]);
+
+    expect(results.first, isNotEmpty);
+    expect(
+      results.last.map((item) => item.activityInstanceId),
+      orderedEquals(results.first.map((item) => item.activityInstanceId)),
+    );
+  });
 }
 
 ConstructionLivingPlanApplication _application({

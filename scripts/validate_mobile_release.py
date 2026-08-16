@@ -139,7 +139,7 @@ def validate_static(repository: Path) -> list[str]:
         'compileSdk = 36',
         'targetSdk = 36',
         'ndkVersion = "28.2.13676358"',
-        'applicationId = "com.faliardic.chiefsiteengineer"',
+        'applicationId = "com.faliardic.sefim"',
         'CSE_ACCEPTANCE_HARNESS',
         'applicationIdSuffix = if (acceptanceHarnessBuild) ".acceptance" else ".debug"',
         'JavaVersion.VERSION_17',
@@ -189,8 +189,8 @@ def validate_static(repository: Path) -> list[str]:
         "first release must be iPhone-only",
     )
     require(
-        "com.faliardic.chiefsiteengineer.debug" in project
-        and "com.faliardic.chiefsiteengineer;" in project,
+        "com.faliardic.sefim.debug" in project
+        and "com.faliardic.sefim;" in project,
         "iOS debug and production bundle identifiers are not distinct",
     )
 
@@ -320,7 +320,7 @@ def validate_plugin_privacy_inventory(repository: Path) -> str:
 
 def validate_merged_manifest(manifest: Path) -> str:
     permissions, root = _permissions(manifest)
-    package_name = root.attrib.get("package", "com.faliardic.chiefsiteengineer")
+    package_name = root.attrib.get("package", "com.faliardic.sefim")
     private_receiver_permission = (
         f"{package_name}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
     )

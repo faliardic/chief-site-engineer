@@ -4,7 +4,7 @@ enum AppEnvironment {
 
   const AppEnvironment({required this.storageSegment, required this.label});
 
-  static const releaseApplicationId = 'com.faliardic.chiefsiteengineer';
+  static const releaseApplicationId = 'com.faliardic.sefim';
   static const environmentContractVersion = 1;
 
   final String storageSegment;

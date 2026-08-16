@@ -4055,3 +4055,23 @@
 - Bu karar source/state truth-sync'tir; Living Plan production behavior,
   UI/APK/device acceptance, public/store release veya production readiness
   iddiası üretmez.
+
+## Issue 464 — Yeni ürün kimliği Şefim'dir; legacy CSE kimlikleri dondurulur
+
+- A3 sonucu kabul edilmiştir. Kayıp legacy production paketi Issue #464 içinde
+  restore/reinstall/fresh-install edilmez, açılmaz, içeriği incelenmez ve
+  verisi yeni ürüne taşınmaz; veri survival durumu unknown kalır.
+- Kullanıcıya görünen ürün adı tam `Şefim`'dir. Android production/debug/
+  acceptance kimlikleri sırasıyla `com.faliardic.sefim`,
+  `com.faliardic.sefim.debug` ve `com.faliardic.sefim.acceptance`; gelecekteki
+  iOS production/debug bundle kimlikleri aynı ASCII `sefim` kökünü kullanır.
+- `com.faliardic.chiefsiteengineer`, `.debug` ve `.acceptance` kimlikleri
+  dondurulmuş legacy paketlerdir. Şefim ayrı OS sandbox ve temiz local database
+  kullanır; shared data root, legacy database fallback veya otomatik migration
+  yoktur.
+- Internal Java/Kotlin namespace churn yaratmamak için legacy namespace'te
+  kalabilir; installed-app otoritesi Gradle `applicationId`dır.
+- Sentetik kabul APK'sının cihaz etiketi `Şefim`, uygulama içi uyarısı
+  `Kabul ortamı · sentetik veri`dir. APK host-side build edilir; exact package,
+  label, marker, ABI ve SHA doğrulanmadan ADB mutation yapılmaz ve fiziksel
+  package lifecycle Flutter tooling'e verilmez.
