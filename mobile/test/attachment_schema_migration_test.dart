@@ -121,7 +121,7 @@ void main() {
         sqflite.Sqflite.firstIntValue(
           await upgraded.database.rawQuery('PRAGMA user_version'),
         ),
-        13,
+        AppDatabase.schemaVersion,
       );
       final managed = await upgraded.database.query(
         'managed_attachments',

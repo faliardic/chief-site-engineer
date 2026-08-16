@@ -272,3 +272,68 @@ class ConstructionProjectReferenceSchedule {
     syntheticDependencyCount: syntheticDependencyCount,
   );
 }
+
+class ConstructionScheduleSnapshotFailure implements Exception {
+  const ConstructionScheduleSnapshotFailure(this.code);
+
+  final String code;
+
+  @override
+  String toString() => 'ConstructionScheduleSnapshotFailure($code)';
+}
+
+class ConstructionScheduleSnapshotMetadata {
+  const ConstructionScheduleSnapshotMetadata({
+    required this.snapshotId,
+    required this.projectId,
+    required this.corpusVersion,
+    required this.scheduleSeedVersion,
+    required this.scheduleSeedProvenance,
+    required this.productionStatus,
+    required this.durationSource,
+    required this.baselineStatus,
+    required this.scheduleStart,
+    required this.scheduleFinish,
+    required this.activityCount,
+    required this.rootCount,
+    required this.leafCount,
+    required this.isolatedCount,
+    required this.milestoneCount,
+    required this.projectionSha256,
+    required this.generatedAt,
+    required this.supersededAt,
+  });
+
+  final String snapshotId;
+  final String projectId;
+  final String corpusVersion;
+  final String scheduleSeedVersion;
+  final String scheduleSeedProvenance;
+  final String productionStatus;
+  final String durationSource;
+  final String baselineStatus;
+  final DateTime scheduleStart;
+  final DateTime scheduleFinish;
+  final int activityCount;
+  final int rootCount;
+  final int leafCount;
+  final int isolatedCount;
+  final int milestoneCount;
+  final String projectionSha256;
+  final DateTime generatedAt;
+  final DateTime? supersededAt;
+
+  bool get isCurrent => supersededAt == null;
+}
+
+class ConstructionScheduleSnapshot {
+  ConstructionScheduleSnapshot({
+    required this.metadata,
+    required this.profile,
+    required Iterable<ConstructionScheduledActivity> activities,
+  }) : activities = List.unmodifiable(activities);
+
+  final ConstructionScheduleSnapshotMetadata metadata;
+  final ConstructionProjectProfile profile;
+  final List<ConstructionScheduledActivity> activities;
+}

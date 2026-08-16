@@ -72,8 +72,270 @@ void main() {
       {'version': 11, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 12, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 13, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 14, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
   });
+
+  test(
+    'schema 13 to 14 is additive and enforces schedule snapshot integrity',
+    () async {
+      final schemaThirteen = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+        migrations: AppDatabase.foundationMigrations.take(13).toList(),
+      );
+      await schemaThirteen.open();
+      await schemaThirteen.database.insert('projects', {
+        'id': 'schedule-project',
+        'name': 'Korunan proje',
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await schemaThirteen.database.insert('projects', {
+        'id': 'other-project',
+        'name': 'Diğer proje',
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      final existingSchema = await schemaThirteen.database.rawQuery('''
+        SELECT type, name, tbl_name, sql
+        FROM sqlite_master
+        WHERE sql IS NOT NULL
+        ORDER BY type, name
+      ''');
+      final existingProjects = await schemaThirteen.database.query(
+        'projects',
+        orderBy: 'id ASC',
+      );
+      await schemaThirteen.close();
+
+      final upgraded = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 9),
+      );
+      await upgraded.open();
+      final db = upgraded.database;
+      final newNames = <String>{
+        'project_schedule_snapshots',
+        'project_schedule_snapshot_activities',
+        'project_schedule_snapshots_one_current',
+        'project_schedule_snapshots_history',
+        'project_schedule_snapshot_activities_window',
+        'project_schedule_snapshot_activities_immutable_update',
+        'project_schedule_snapshot_activities_immutable_delete',
+        'project_schedule_snapshots_no_physical_delete',
+        'project_schedule_snapshots_supersede_only',
+      };
+      final afterSchema = await db.rawQuery('''
+        SELECT type, name, tbl_name, sql
+        FROM sqlite_master
+        WHERE sql IS NOT NULL
+        ORDER BY type, name
+      ''');
+      expect(
+        afterSchema.where((row) => !newNames.contains(row['name'])).toList(),
+        existingSchema,
+      );
+      expect(await db.query('projects', orderBy: 'id ASC'), existingProjects);
+      expect(
+        sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
+        14,
+      );
+      expect(
+        afterSchema
+            .where((row) => newNames.contains(row['name']))
+            .map((row) => row['name'])
+            .toSet(),
+        newNames,
+      );
+
+      Map<String, Object?> snapshotRow(String id) => {
+        'id': id,
+        'project_id': 'schedule-project',
+        'profile_json': '{}',
+        'corpus_version': 'corpus-v1',
+        'schedule_seed_version': 'seed-v1',
+        'schedule_seed_provenance': 'seed-catalog',
+        'production_status': 'NOT_FOR_PRODUCTION',
+        'duration_source': 'TEST_SEED_ONLY',
+        'baseline_status': 'NOT_A_BASELINE',
+        'schedule_start': '2026-09-01',
+        'schedule_finish': '2026-09-01',
+        'activity_count': 1,
+        'root_count': 1,
+        'leaf_count': 1,
+        'isolated_count': 1,
+        'milestone_count': 1,
+        'projection_sha256': '0' * 64,
+        'generated_at': '2026-07-19T09:00:00Z',
+      };
+
+      await expectLater(
+        db.insert('project_schedule_snapshots', {
+          ...snapshotRow('snapshot-noncanonical-generated'),
+          'generated_at': '2026-07-19T09:00:00.000Z',
+        }),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      for (final invalidGeneratedAt in const [
+        '2026-13-19T09:00:00Z',
+        '2026-07-19T25:00:00Z',
+      ]) {
+        await expectLater(
+          db.insert('project_schedule_snapshots', {
+            ...snapshotRow('snapshot-impossible-generated'),
+            'generated_at': invalidGeneratedAt,
+          }),
+          throwsA(isA<sqflite.DatabaseException>()),
+        );
+      }
+      await db.insert('project_schedule_snapshots', snapshotRow('snapshot-1'));
+      await expectLater(
+        db.insert('project_schedule_snapshots', snapshotRow('snapshot-2')),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await db.insert('project_schedule_snapshot_activities', {
+        'snapshot_id': 'snapshot-1',
+        'project_id': 'schedule-project',
+        'instance_id': 'instance-1',
+        'activity_id': 'activity-1',
+        'start_date': '2026-09-01',
+        'finish_date': '2026-09-01',
+        'duration_days': 0.0,
+        'rounded_scheduling_days': 0,
+        'duration_calendar_type': 'WORKING_DAY',
+        'duration_status': 'UNKNOWN',
+        'duration_confidence': 'E_UNKNOWN',
+        'is_milestone': 1,
+        'is_isolated': 1,
+        'row_sha256': '1' * 64,
+      });
+      await expectLater(
+        db.insert('project_schedule_snapshot_activities', {
+          'snapshot_id': 'snapshot-1',
+          'project_id': 'schedule-project',
+          'instance_id': 'invalid-row-seal',
+          'activity_id': 'activity-1',
+          'start_date': '2026-09-01',
+          'finish_date': '2026-09-01',
+          'duration_days': 0.0,
+          'rounded_scheduling_days': 0,
+          'duration_calendar_type': 'WORKING_DAY',
+          'duration_status': 'UNKNOWN',
+          'duration_confidence': 'E_UNKNOWN',
+          'is_milestone': 1,
+          'is_isolated': 1,
+          'row_sha256': 'A' * 64,
+        }),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.update('project_schedule_snapshot_activities', {
+          'activity_id': 'changed',
+        }),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.delete('project_schedule_snapshot_activities'),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.update(
+          'project_schedule_snapshots',
+          {'superseded_at': '2026-07-19T10:00:00.000Z'},
+          where: 'id = ?',
+          whereArgs: ['snapshot-1'],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.update(
+          'project_schedule_snapshots',
+          {'superseded_at': '2026-07-19T08:59:59Z'},
+          where: 'id = ?',
+          whereArgs: ['snapshot-1'],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      for (final invalidSupersededAt in const [
+        '2026-13-19T10:00:00Z',
+        '2026-07-19T25:00:00Z',
+      ]) {
+        await expectLater(
+          db.update(
+            'project_schedule_snapshots',
+            {'superseded_at': invalidSupersededAt},
+            where: 'id = ?',
+            whereArgs: ['snapshot-1'],
+          ),
+          throwsA(isA<sqflite.DatabaseException>()),
+        );
+      }
+      await expectLater(
+        db.update(
+          'project_schedule_snapshots',
+          {'corpus_version': 'changed'},
+          where: 'id = ?',
+          whereArgs: ['snapshot-1'],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      expect(
+        await db.update(
+          'project_schedule_snapshots',
+          {'superseded_at': '2026-07-19T10:00:00Z'},
+          where: 'id = ?',
+          whereArgs: ['snapshot-1'],
+        ),
+        1,
+      );
+      await expectLater(
+        db.update(
+          'project_schedule_snapshots',
+          {'superseded_at': null},
+          where: 'id = ?',
+          whereArgs: ['snapshot-1'],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.delete(
+          'project_schedule_snapshots',
+          where: 'id = ?',
+          whereArgs: ['snapshot-1'],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await db.insert('project_schedule_snapshots', snapshotRow('snapshot-2'));
+      await expectLater(
+        db.insert('project_schedule_snapshot_activities', {
+          'snapshot_id': 'snapshot-2',
+          'project_id': 'other-project',
+          'instance_id': 'cross-project',
+          'activity_id': 'activity-1',
+          'start_date': '2026-09-01',
+          'finish_date': '2026-09-01',
+          'duration_days': 0.0,
+          'rounded_scheduling_days': 0,
+          'duration_calendar_type': 'WORKING_DAY',
+          'duration_status': 'UNKNOWN',
+          'duration_confidence': 'E_UNKNOWN',
+          'is_milestone': 1,
+          'is_isolated': 1,
+          'row_sha256': '2' * 64,
+        }),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      expect(await db.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      expect(
+        (await db.rawQuery('PRAGMA integrity_check')).single['integrity_check'],
+        'ok',
+      );
+      await upgraded.close();
+    },
+  );
 
   test(
     'schema 11 to 12 is additive atomic and preserves registry identity graph',

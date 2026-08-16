@@ -33,7 +33,7 @@ void main() {
   });
 
   test(
-    'fresh install creates the complete contiguous schema 13 contract',
+    'fresh install creates the complete contiguous current schema contract',
     () async {
       final database = _database(databasePath);
       await database.open();
@@ -53,7 +53,7 @@ void main() {
       expect(version, AppDatabase.schemaVersion);
       expect(
         history.map((row) => row['version']),
-        List.generate(13, (i) => i + 1),
+        List.generate(AppDatabase.schemaVersion, (i) => i + 1),
       );
       expect(
         tables.map((row) => row['name']),
