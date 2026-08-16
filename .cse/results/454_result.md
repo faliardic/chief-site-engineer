@@ -156,3 +156,108 @@ review_recommendation:
   recommended_reasoning_effort: "max"
   recommended_mode: "standard"
 ```
+
+## Owner-authorized post-review correction result
+
+- Yetki kaynağı:
+  `https://github.com/faliardic/chief-site-engineer/pull/456#issuecomment-5305755352`
+- Correction parent/head:
+  `e7d49b13f3d852042373becec3e43f91bf39feb4`.
+- Original `primary_runs: 1` ve `correction_runs: 1` kayıtları tarihsel olarak
+  değişmedi; bu çalışma ayrı `review_correction_runs: 1` olarak tamamlandı.
+- `WORKING_DAY` zero-duration finish hesabı artık zero-day early return öncesi
+  başlangıcın seçili workday olduğunu doğruluyor. Arbitrary `[1, 3]`
+  Tuesday/Thursday takviminde `2026-09-02` Wednesday başlangıcı exact
+  `working_duration_non_workday_start` ile fail-closed reddedildi.
+- Build ve validator aynı deterministic predecessor candidate helper'ını
+  kullanıyor. Existing per-edge minimum guard korundu; ayrıca her non-root
+  successor bütün FS/SS + WORKING_DAY lag candidate'larının maximum değeriyle
+  exact eşleşmek zorunda. `SS0` successor'ın `2026-09-04` yerine daha geç legal
+  `2026-09-05` tarihine kaydırılması matching finish ile birlikte
+  `schedule_dependency_start_mismatch` olarak reddedildi.
+- Calendar-day zero duration, build output/order, dependency semantiği,
+  deterministic fingerprints ve marker'lar değişmedi.
+
+### Correction validation evidence
+
+1. Changed Dart format: PASS; iki dosya kontrol edildi, yalnız engine yeniden
+   biçimlendirildi.
+2. Focused corpus/dependency/graph + seed/date:
+   `142 / 142 PASS`; iki yeni negatif regresyon dahil, tek attempt.
+3. Exact reference parity:
+   - P01: `1687 / 1702`, `2026-09-01..2028-06-20`, schedule/root/leaf/isolated
+     SHA exact.
+   - P02: `599 / 644`, `2026-09-01..2027-07-19`, schedule/root/leaf/isolated
+     SHA exact.
+   - P03: `3537 / 3605`, `2026-09-01..2028-10-20`, schedule/root/leaf/isolated
+     SHA exact.
+4. Sunday violation `0`; holiday violation `0`;
+   `DERIVED-CONNECTIVITY` / synthetic dependency `0`.
+5. `flutter analyze --no-pub`: PASS, `No issues found`.
+6. `git diff --check`: PASS.
+7. Exact four-file correction allowlist: PASS; violation `0`.
+8. Protected drift: seed asset/repository/model, corpus/dependency assets,
+   schema/migration, Backup/attachment, dependency/lockfile, platform/config,
+   UI ve PR #457 docs `0`.
+9. Seed B64 SHA-256 unchanged:
+   `b80ebe90f57fa71bafcaee5102acfe3dda29368f53cd5a164b248b6530b9587e`.
+10. Schema `13`; Backup format `1`.
+11. Yalnız focused PASS sonrasında, final source revision üzerinde tek review
+    correction full `flutter test --no-pub`: `649 / 649 PASS`.
+
+APK/AAB, signing, release, ARM64/16 KiB, device, background/reboot ve
+Backup/Restore acceptance çalıştırılmadı; correction yalnız deterministic
+domain validation ve regresyon kapsamındadır. Reused evidence'in dayandığı
+protected sözleşmelerde drift yoktur.
+
+### Correction publication boundary
+
+- Exact correction allowlist:
+  `.cse/tasks/454_task.md`, `.cse/results/454_result.md`,
+  `mobile/lib/application/construction_schedule_date_engine.dart`,
+  `mobile/test/construction_schedule_date_engine_test.dart`.
+- Intentional correction commit ve normal push bu kayıt hazırlanırken pending;
+  exact final SHA Issue #454 ve PR #456 evidence yorumlarında kaydedilir.
+- PR #456 Draft kalır. Ready, merge, deploy, persistence/living 7-day plan ve
+  sonraki Slice uygulanmaz.
+
+```yaml
+execution_record:
+  routing_policy: "CSE-MRP-1.0"
+  risk_class: "R4"
+  requested_model: "gpt-5.6-sol"
+  requested_reasoning_effort: "max"
+  requested_mode: "standard"
+  execution_mode: "standard"
+  orchestration: "single-agent"
+  routing_request_evidence: "https://github.com/faliardic/chief-site-engineer/pull/456#issuecomment-5305755352"
+  invocation_evidence: null
+  invocation_verification_status: "unverified"
+  fallback_or_downgrade_allowed: false
+  actual_model: "unknown"
+  actual_reasoning_effort: "unknown"
+  mismatch_detected: null
+  runtime_verification_status: "unverified"
+  primary_runs: 1
+  correction_runs: 1
+  review_correction_runs: 1
+  review_focused_attempts: 1
+  review_full_suite_attempts: 1
+  result: "PASS"
+```
+
+```yaml
+review_recommendation:
+  risk_observed: "R4"
+  recommended_chatgpt_model: "gpt-5.6-sol"
+  recommended_reasoning_effort: "max"
+  recommended_mode: "standard"
+  recommendation_reason: "Correction changes deterministic working-day duration validation and exact dependency-start post-validation while preserving canonical schedule fingerprints."
+  must_review:
+    - "Exact four-file correction diff and stable failure codes"
+    - "142/142 focused and 649/649 full validation evidence"
+    - "PR #456 remains Draft and protected drift is zero"
+  residual_uncertainty:
+    - "Actual runtime model and reasoning metadata are not exposed"
+  escalation_condition: "Review finds a routing mismatch, semantic regression, validation discrepancy, or scope drift."
+```

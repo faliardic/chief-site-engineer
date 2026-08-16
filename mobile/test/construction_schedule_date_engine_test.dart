@@ -157,6 +157,22 @@ void main() {
       );
     });
 
+    test('zero working days still require a selected workday start', () {
+      final sparseCalendar = _calendar(
+        start: '2026-09-01',
+        weekdays: const [1, 3],
+      );
+      expect(
+        () => constructionDurationFinishDate(
+          startDate: parseCanonicalConstructionDate('2026-09-02'),
+          roundedSchedulingDays: 0,
+          calendarType: ConstructionActivityDurationCalendarType.workingDay,
+          calendar: sparseCalendar,
+        ),
+        _throwsCorpusFailure('working_duration_non_workday_start'),
+      );
+    });
+
     test('working durations are inclusive and skip Sunday and holiday', () {
       expect(
         constructionDurationFinishDate(
@@ -326,6 +342,37 @@ void main() {
           seedCatalog: scenario.catalog,
         ),
         _throwsCorpusFailure('schedule_dependency_constraint_violation'),
+      );
+    });
+
+    test('a later legal successor start fails exact post-validation', () {
+      final scenario = _microScenario(
+        seeds: [_seed('A', 3), _seed('B', 1)],
+        edges: [_edge('A', 'B', relationship: 'SS', lag: 0)],
+      );
+      final valid = scenario.engine.build(
+        profile: scenario.profile,
+        graph: scenario.graph,
+        seedCatalog: scenario.catalog,
+      );
+      expect(_start(valid, 'B'), '2026-09-04');
+      final corruptedActivities = [
+        for (final activity in valid.scheduledActivities)
+          activity.activityId == 'B'
+              ? activity.copyWith(
+                  startDate: parseCanonicalConstructionDate('2026-09-05'),
+                  finishDate: parseCanonicalConstructionDate('2026-09-05'),
+                )
+              : activity,
+      ];
+      expect(
+        () => scenario.engine.validateSchedule(
+          schedule: valid.copyWith(scheduledActivities: corruptedActivities),
+          profile: scenario.profile,
+          graph: scenario.graph,
+          seedCatalog: scenario.catalog,
+        ),
+        _throwsCorpusFailure('schedule_dependency_start_mismatch'),
       );
     });
   });

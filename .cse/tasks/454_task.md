@@ -165,3 +165,49 @@ yetkili değildir ve read-only boundary korunursa çalıştırılmaz.
 - Draft PR sonrasında durulur; persistence/living 7-day-plan veya Issue #455
   başlatılmaz.
 - Post-merge sync bu görevde uygulanmaz; merge yetkisi yoktur.
+
+## Owner-authorized post-review correction
+
+- Yetki kaynağı:
+  `https://github.com/faliardic/chief-site-engineer/pull/456#issuecomment-5305755352`
+- Existing branch/head: `codex/issue-454-schedule-date-engine` /
+  `e7d49b13f3d852042373becec3e43f91bf39feb4`.
+- Değişen sözleşmeler:
+  - `WORKING_DAY` zero-duration activity başlangıcı da seçili workday olmak
+    zorundadır; hata kodu `working_duration_non_workday_start` olarak kalır.
+  - Her non-root successor başlangıcı, bütün predecessor FS/SS + WORKING_DAY
+    lag candidate'larının deterministic maximum değeriyle exact eşleşir;
+    daha geç legal tarih `schedule_dependency_start_mismatch` ile reddedilir.
+- Exact correction allowlist:
+  - `mobile/lib/application/construction_schedule_date_engine.dart`
+  - `mobile/test/construction_schedule_date_engine_test.dart`
+  - `.cse/tasks/454_task.md`
+  - `.cse/results/454_result.md`
+- Existing per-edge minimum constraint, build output/order/dependency semantiği,
+  fingerprints, calendar-day zero duration ve tüm protected boundaries korunur.
+- Original `correction_runs: 1` tarihsel kaydı değişmez;
+  `review_correction_runs: 1` bu review düzeltmesi için ayrı kaydedilir.
+- Validation sırası: changed Dart format; iki yeni negatif regresyonu içeren
+  focused corpus/dependency/graph + seed/date PASS; exact P01/P02/P03 parity ve
+  violation sayımları; analyze; diff/allowlist/protected drift; yalnız focused
+  PASS sonrasında final source revision üzerinde tek full Flutter suite.
+- PASS sonrasında yalnız bir intentional correction commit, normal push ve
+  Issue #454/PR #456 evidence update yetkilidir. PR Draft kalır; Ready, merge,
+  deploy, persistence/living 7-day plan ve sonraki Slice yasaktır.
+
+```yaml
+model_routing:
+  policy_version: "CSE-MRP-1.0"
+  task_risk: "R4"
+  codex_model: "gpt-5.6-sol"
+  codex_reasoning_effort: "max"
+  execution_mode: "standard"
+  orchestration: "single-agent"
+  selection_reason: "Post-review correction changes deterministic Schedule Date Engine validation semantics and regression coverage."
+  routing_request_evidence: "https://github.com/faliardic/chief-site-engineer/pull/456#issuecomment-5305755352"
+  allowed_fallback: null
+  review_floor:
+    chatgpt_model: "gpt-5.6-sol"
+    chatgpt_reasoning_effort: "max"
+  fail_closed_if_mismatch: true
+```

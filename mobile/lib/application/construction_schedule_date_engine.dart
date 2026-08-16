@@ -55,25 +55,12 @@ class ConstructionScheduleDateEngine {
               'invalid_schedule_topological_order',
             );
           }
-          final anchor = switch (edge.relationshipType) {
-            ConstructionDependencyRelationshipType.finishToStart =>
-              predecessor.finishDate.add(const Duration(days: 1)),
-            ConstructionDependencyRelationshipType.startToStart =>
-              predecessor.startDate,
-          };
-          var candidate = addConstructionWorkdays(
-            anchor,
-            edge.lagValue,
-            profile.calendar,
+          final candidate = _dependencyCandidateStart(
+            predecessor: predecessor,
+            successorCalendarType: seed.durationCalendarType,
+            edge: edge,
+            calendar: profile.calendar,
           );
-          if (seed.durationCalendarType ==
-              ConstructionActivityDurationCalendarType.workingDay) {
-            candidate = nextConstructionWorkday(
-              candidate,
-              profile.calendar,
-              includeCurrent: true,
-            );
-          }
           if (latest == null || candidate.isAfter(latest)) {
             latest = candidate;
           }
@@ -250,28 +237,40 @@ class ConstructionScheduleDateEngine {
     for (final edge in graph.dependencyEdges) {
       final predecessor = scheduledById[edge.predecessorInstanceId]!;
       final successor = scheduledById[edge.successorInstanceId]!;
-      final anchor = switch (edge.relationshipType) {
-        ConstructionDependencyRelationshipType.finishToStart =>
-          predecessor.finishDate.add(const Duration(days: 1)),
-        ConstructionDependencyRelationshipType.startToStart =>
-          predecessor.startDate,
-      };
-      var minimumStart = addConstructionWorkdays(
-        anchor,
-        edge.lagValue,
-        profile.calendar,
+      final minimumStart = _dependencyCandidateStart(
+        predecessor: predecessor,
+        successorCalendarType: successor.durationCalendarType,
+        edge: edge,
+        calendar: profile.calendar,
       );
-      if (successor.durationCalendarType ==
-          ConstructionActivityDurationCalendarType.workingDay) {
-        minimumStart = nextConstructionWorkday(
-          minimumStart,
-          profile.calendar,
-          includeCurrent: true,
-        );
-      }
       if (successor.startDate.isBefore(minimumStart)) {
         throw const ConstructionCorpusFailure(
           'schedule_dependency_constraint_violation',
+        );
+      }
+    }
+
+    for (final successorId in topology.orderedInstanceIds) {
+      final incoming = topology.incomingEdges[successorId]!;
+      if (incoming.isEmpty) {
+        continue;
+      }
+      final successor = scheduledById[successorId]!;
+      DateTime? exactStart;
+      for (final edge in incoming) {
+        final candidate = _dependencyCandidateStart(
+          predecessor: scheduledById[edge.predecessorInstanceId]!,
+          successorCalendarType: successor.durationCalendarType,
+          edge: edge,
+          calendar: profile.calendar,
+        );
+        if (exactStart == null || candidate.isAfter(exactStart)) {
+          exactStart = candidate;
+        }
+      }
+      if (successor.startDate != exactStart) {
+        throw const ConstructionCorpusFailure(
+          'schedule_dependency_start_mismatch',
         );
       }
     }
@@ -426,24 +425,44 @@ DateTime constructionDurationFinishDate({
   if (roundedSchedulingDays < 0) {
     throw const ConstructionCorpusFailure('invalid_schedule_duration');
   }
+  if (calendarType == ConstructionActivityDurationCalendarType.workingDay &&
+      !isConstructionWorkday(startDate, calendar)) {
+    throw const ConstructionCorpusFailure('working_duration_non_workday_start');
+  }
   if (roundedSchedulingDays == 0) {
     return startDate;
   }
   return switch (calendarType) {
     ConstructionActivityDurationCalendarType.workingDay =>
-      isConstructionWorkday(startDate, calendar)
-          ? addConstructionWorkdays(
-              startDate,
-              roundedSchedulingDays - 1,
-              calendar,
-            )
-          : throw const ConstructionCorpusFailure(
-              'working_duration_non_workday_start',
-            ),
+      addConstructionWorkdays(startDate, roundedSchedulingDays - 1, calendar),
     ConstructionActivityDurationCalendarType.calendarDay => startDate.add(
       Duration(days: roundedSchedulingDays - 1),
     ),
   };
+}
+
+DateTime _dependencyCandidateStart({
+  required ConstructionScheduledActivity predecessor,
+  required ConstructionActivityDurationCalendarType successorCalendarType,
+  required ConstructionResolvedDependencyEdge edge,
+  required ConstructionProjectCalendar calendar,
+}) {
+  final anchor = switch (edge.relationshipType) {
+    ConstructionDependencyRelationshipType.finishToStart =>
+      predecessor.finishDate.add(const Duration(days: 1)),
+    ConstructionDependencyRelationshipType.startToStart =>
+      predecessor.startDate,
+  };
+  var candidate = addConstructionWorkdays(anchor, edge.lagValue, calendar);
+  if (successorCalendarType ==
+      ConstructionActivityDurationCalendarType.workingDay) {
+    candidate = nextConstructionWorkday(
+      candidate,
+      calendar,
+      includeCurrent: true,
+    );
+  }
+  return candidate;
 }
 
 class _ConstructionScheduleTopology {
