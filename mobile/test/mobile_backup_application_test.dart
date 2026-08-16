@@ -5,11 +5,16 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/application/construction_schedule_date_engine.dart';
+import 'package:chief_site_engineer/application/construction_schedule_snapshot_repository.dart';
 import 'package:chief_site_engineer/application/mobile_backup_application.dart';
 import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attachment_models.dart';
+import 'package:chief_site_engineer/domain/construction_corpus_models.dart';
+import 'package:chief_site_engineer/domain/construction_project_graph_models.dart';
+import 'package:chief_site_engineer/domain/construction_schedule_models.dart';
 import 'package:chief_site_engineer/domain/mobile_backup_models.dart';
 import 'package:chief_site_engineer/platform/managed_attachment_store.dart';
 import 'package:chief_site_engineer/platform/mobile_backup_gateway.dart';
@@ -23,6 +28,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart' show Sqflite;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+import 'support/construction_profile_fixtures.dart';
 
 const _password = 'guvenli-parola';
 const _now = '2026-07-19T09:30:00Z';
@@ -218,6 +225,204 @@ void main() {
         hasLength(1),
       );
       await restored.close();
+    },
+  );
+
+  test(
+    'format 1 schema 14 backup restores schedule snapshot to a clean root',
+    () async {
+      final scenario = _backupScheduleScenario();
+      final sourceDatabase = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.parse(_now),
+      );
+      await sourceDatabase.open();
+      await sourceDatabase.database.insert('projects', {
+        'id': scenario.profile.projectId,
+        'name': 'Backup schedule project',
+        'created_at': _now,
+        'updated_at': _now,
+      });
+      final sourceRepository = ConstructionScheduleSnapshotRepository(
+        database: sourceDatabase,
+        clock: () => DateTime.parse(_now),
+        idFactory: () => 'backup-schedule-snapshot',
+      );
+      final sourceSnapshot = await sourceRepository.persistCurrentSnapshot(
+        schedule: scenario.schedule,
+        profile: scenario.profile,
+        graph: scenario.graph,
+        seedCatalog: scenario.catalog,
+      );
+      await sourceDatabase.close();
+
+      final sourceApplication = _application(directories, gateway: gateway);
+      final created = await sourceApplication.createBackup(
+        const CreateMobileBackupCommand(
+          password: _password,
+          passwordConfirmation: _password,
+        ),
+      );
+      final targetDirectories = AppDirectories.fromSupportRoot(
+        Directory(path.join(temporaryRoot.path, 'schedule-restore-target')),
+        AppEnvironment.debug,
+      );
+      await targetDirectories.ensureCreated();
+      await _bootstrapDatabase(targetDirectories);
+      final packageFile = File(created.absolutePath);
+      final targetGateway = DeviceMobileBackupFileGateway(
+        directories: targetDirectories,
+        picker: () async => PlatformFile(
+          name: 'schedule-v14.csebackup',
+          size: created.summary.packageByteSize,
+          readStream: packageFile.openRead(),
+        ),
+        clock: () => DateTime.parse(_now),
+        importIdFactory: (_) => 'schedule-v14-clean-target',
+      );
+      final targetApplication = _application(
+        targetDirectories,
+        gateway: targetGateway,
+      );
+      final imported = (await targetApplication.pickBackupPackage())!;
+      final preflight = await targetApplication.preflightBackup(
+        imported,
+        _password,
+      );
+      final restored = await targetApplication.restoreBackup(
+        RestoreMobileBackupCommand(
+          package: preflight.package,
+          password: _password,
+          expectedPackageSha256: preflight.packageSha256,
+        ),
+      );
+
+      expect(preflight.manifest.formatVersion, 1);
+      expect(preflight.manifest.mobileSchemaVersion, 14);
+      expect(preflight.migratedSchemaVersion, 14);
+      expect(restored.restoredManifest.formatVersion, 1);
+      expect(restored.activeSchemaVersion, 14);
+      final reopened = AppDatabase(
+        path: targetDirectories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.parse(_now),
+      );
+      await reopened.open();
+      final restoredRepository = ConstructionScheduleSnapshotRepository(
+        database: reopened,
+        clock: () => DateTime.parse(_now),
+      );
+      final restoredSnapshot = await restoredRepository.loadCurrentSnapshot(
+        scenario.profile.projectId,
+      );
+      expect(restoredSnapshot, isNotNull);
+      expect(
+        restoredSnapshot!.metadata.snapshotId,
+        sourceSnapshot.metadata.snapshotId,
+      );
+      expect(restoredSnapshot.metadata.isCurrent, isTrue);
+      expect(
+        restoredSnapshot.metadata.projectionSha256,
+        sourceSnapshot.metadata.projectionSha256,
+      );
+      expect(
+        _backupActivityProjection(restoredSnapshot.activities),
+        _backupActivityProjection(sourceSnapshot.activities),
+      );
+      expect(
+        await reopened.database.rawQuery('PRAGMA foreign_key_check'),
+        isEmpty,
+      );
+      expect(
+        (await reopened.database.rawQuery(
+          'PRAGMA integrity_check',
+        )).single['integrity_check'],
+        'ok',
+      );
+      await reopened.close();
+    },
+  );
+
+  test(
+    'format 1 schema 13 backup restores and migrates normally to 14',
+    () async {
+      final oldRoot = await Directory.systemTemp.createTemp('cse_schema13_');
+      addTearDown(() async {
+        if (await oldRoot.exists()) await oldRoot.delete(recursive: true);
+      });
+      final oldFile = path.join(oldRoot.path, 'schema13.sqlite3');
+      final oldDatabase = AppDatabase(
+        path: oldFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.parse(_now),
+        migrations: AppDatabase.foundationMigrations.take(13).toList(),
+      );
+      await oldDatabase.open();
+      await SmokeRecordRepository(
+        database: oldDatabase,
+        clock: () => DateTime.parse(_now),
+      ).ensureFoundationRecord();
+      await oldDatabase.database.insert('projects', {
+        'id': 'schema13-project',
+        'name': 'Schema 13 project',
+        'created_at': _now,
+        'updated_at': _now,
+      });
+      await oldDatabase.close();
+      final databaseBytes = await File(oldFile).readAsBytes();
+      final archive = const CseBackupArchiveCodec().encode(
+        manifest: _manifest(databaseBytes, schemaVersion: 13),
+        databaseBytes: databaseBytes,
+        attachments: const {},
+      );
+      final package = File(path.join(oldRoot.path, 'schema13.csebackup'));
+      await package.writeAsBytes(
+        await _testEncryptionCodec().encrypt(archive, _password),
+        flush: true,
+      );
+      final imported = await _stageIncomingPackage(directories, package);
+      final application = _application(directories, gateway: gateway);
+      final preflight = await application.preflightBackup(imported, _password);
+      final restored = await application.restoreBackup(
+        RestoreMobileBackupCommand(
+          package: imported,
+          password: _password,
+          expectedPackageSha256: preflight.packageSha256,
+        ),
+      );
+
+      expect(preflight.manifest.formatVersion, 1);
+      expect(preflight.manifest.mobileSchemaVersion, 13);
+      expect(preflight.migratedSchemaVersion, 14);
+      expect(restored.activeSchemaVersion, 14);
+      final reopened = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.parse(_now),
+      );
+      await reopened.open();
+      expect(
+        (await reopened.database.query(
+          'projects',
+          where: 'id = ?',
+          whereArgs: ['schema13-project'],
+        )).single['name'],
+        'Schema 13 project',
+      );
+      expect(
+        await reopened.database.query('project_schedule_snapshots'),
+        isEmpty,
+      );
+      expect(
+        await reopened.database.query('project_schedule_snapshot_activities'),
+        isEmpty,
+      );
+      expect(
+        await reopened.database.rawQuery('PRAGMA foreign_key_check'),
+        isEmpty,
+      );
+      await reopened.close();
     },
   );
 
@@ -889,7 +1094,7 @@ void main() {
 
   for (final schemaVersion in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
     test(
-      'schema v$schemaVersion package migrates to v13 without count loss',
+      'schema v$schemaVersion package migrates to current schema without count loss',
       () async {
         final oldRoot = await Directory.systemTemp.createTemp(
           'cse_schema${schemaVersion}_',
@@ -2510,6 +2715,115 @@ Future<int> _projectCount(AppDirectories directories) async {
   )!;
   await database.close();
   return count;
+}
+
+_BackupScheduleScenario _backupScheduleScenario() {
+  final profile = validConstructionProjectProfile(
+    overrides: {
+      'project_id': 'PRJ-BACKUP-SCHEDULE',
+      'calendar': <String, Object?>{
+        'start_date': '2026-09-04',
+        'working_weekdays': <Object?>[0, 1, 2, 3, 4, 5],
+        'holidays': <Object?>['2026-09-07'],
+        'workday_hours': 8,
+      },
+    },
+  );
+  const activityId = 'ACT-BACKUP';
+  const instanceId = '$activityId@PROJECT';
+  final graph = ConstructionProjectActivityGraph(
+    projectId: profile.projectId,
+    activityInstances: const [
+      ConstructionProjectActivityInstance(
+        instanceId: instanceId,
+        activityId: activityId,
+        wbsCode: 'TEST',
+        packageId: 'TEST',
+        activityNameTr: 'Backup milestone',
+        repeatDimension: ConstructionActivityRepeatDimension.project,
+        context: ConstructionProjectActivityContext(),
+        naturalUnit: 'TEST',
+        durationStatus: 'UNKNOWN',
+        durationConfidence: 'E_UNKNOWN',
+        testSeedDurationDays: 0,
+      ),
+    ],
+    dependencyEdges: const [],
+    isolatedInstanceIds: const [instanceId],
+    corpusVersion: '0.3-yfk-resource-seed',
+    selectedActivityTemplateCount: 1,
+    selectedDependencyTemplateCount: 0,
+  );
+  final catalog = ConstructionScheduleSeedCatalog(
+    metadata: const ConstructionScheduleSeedCatalogMetadata(
+      name: 'BACKUP SNAPSHOT TEST SEEDS',
+      corpusVersion: '0.3-yfk-resource-seed',
+      sourcePublicationStatus: 'RESEARCH_RESOURCE_SEED',
+      sourceProductionStatus: 'NOT_FOR_PRODUCTION',
+      sourceZipSha256: 'test',
+      warning: 'test',
+      runtimeScope: 'SCHEDULE_SEED_CATALOG_READ_ONLY_NOT_A_BASELINE',
+      activityCount: 1,
+      workingDayCount: 1,
+      calendarDayCount: 0,
+      milestoneCount: 1,
+      authoritativeCount: 0,
+      aiSeedCount: 0,
+      unknownConfidenceCount: 1,
+      sourceBackedCount: 0,
+      aiSeedEstimateCount: 0,
+      unknownStatusCount: 1,
+    ),
+    seeds: [
+      ConstructionScheduleSeed(
+        activityId: activityId,
+        durationDays: 0,
+        durationCalendarType:
+            ConstructionActivityDurationCalendarType.workingDay,
+        durationStatus: ConstructionScheduleDurationStatus.unknown,
+        durationConfidence: ConstructionScheduleDurationConfidence.unknown,
+      ),
+    ],
+  );
+  final schedule = ConstructionScheduleDateEngine().build(
+    profile: profile,
+    graph: graph,
+    seedCatalog: catalog,
+  );
+  return _BackupScheduleScenario(profile, graph, catalog, schedule);
+}
+
+List<Map<String, Object?>> _backupActivityProjection(
+  Iterable<ConstructionScheduledActivity> activities,
+) => [
+  for (final item in activities)
+    {
+      'instance_id': item.instanceId,
+      'activity_id': item.activityId,
+      'start_date': formatCanonicalConstructionDate(item.startDate),
+      'finish_date': formatCanonicalConstructionDate(item.finishDate),
+      'duration_days': item.durationDays,
+      'rounded_scheduling_days': item.roundedSchedulingDays,
+      'duration_calendar_type': item.durationCalendarType.jsonValue,
+      'duration_status': item.durationStatus.jsonValue,
+      'duration_confidence': item.durationConfidence.jsonValue,
+      'is_milestone': item.isMilestone,
+      'is_isolated': item.isIsolated,
+    },
+];
+
+class _BackupScheduleScenario {
+  const _BackupScheduleScenario(
+    this.profile,
+    this.graph,
+    this.catalog,
+    this.schedule,
+  );
+
+  final ConstructionProjectProfile profile;
+  final ConstructionProjectActivityGraph graph;
+  final ConstructionScheduleSeedCatalog catalog;
+  final ConstructionProjectReferenceSchedule schedule;
 }
 
 MobileBackupManifest _manifest(

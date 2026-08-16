@@ -27,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 13;
+  static const schemaVersion = 14;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2882,6 +2882,10 @@ class AppDatabase {
       },
     ),
     DatabaseMigration(version: 13, apply: _applyAttachmentFoundationMigration),
+    DatabaseMigration(
+      version: 14,
+      apply: _applyConstructionScheduleSnapshotMigration,
+    ),
   ];
 
   final String path;
@@ -2979,6 +2983,176 @@ class AppDatabase {
       CseTimeCodec.decodeCanonicalUtc(history[index]['applied_at']! as String);
     }
   }
+}
+
+Future<void> _applyConstructionScheduleSnapshotMigration(
+  Transaction transaction,
+) async {
+  await transaction.execute('''
+    CREATE TABLE project_schedule_snapshots (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      profile_json TEXT NOT NULL CHECK (length(profile_json) > 0),
+      corpus_version TEXT NOT NULL CHECK (
+        length(corpus_version) > 0 AND corpus_version = trim(corpus_version)
+      ),
+      schedule_seed_version TEXT NOT NULL CHECK (
+        length(schedule_seed_version) > 0
+        AND schedule_seed_version = trim(schedule_seed_version)
+      ),
+      schedule_seed_provenance TEXT NOT NULL CHECK (
+        length(schedule_seed_provenance) > 0
+        AND schedule_seed_provenance = trim(schedule_seed_provenance)
+      ),
+      production_status TEXT NOT NULL CHECK (
+        production_status = 'NOT_FOR_PRODUCTION'
+      ),
+      duration_source TEXT NOT NULL CHECK (
+        duration_source = 'TEST_SEED_ONLY'
+      ),
+      baseline_status TEXT NOT NULL CHECK (
+        baseline_status = 'NOT_A_BASELINE'
+      ),
+      schedule_start TEXT NOT NULL CHECK (
+        length(schedule_start) = 10
+        AND schedule_start GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+        AND date(schedule_start) IS NOT NULL
+        AND date(schedule_start) = schedule_start
+      ),
+      schedule_finish TEXT NOT NULL CHECK (
+        length(schedule_finish) = 10
+        AND schedule_finish GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+        AND date(schedule_finish) IS NOT NULL
+        AND date(schedule_finish) = schedule_finish
+        AND schedule_finish >= schedule_start
+      ),
+      activity_count INTEGER NOT NULL CHECK (activity_count > 0),
+      root_count INTEGER NOT NULL CHECK (root_count >= 0),
+      leaf_count INTEGER NOT NULL CHECK (leaf_count >= 0),
+      isolated_count INTEGER NOT NULL CHECK (isolated_count >= 0),
+      milestone_count INTEGER NOT NULL CHECK (milestone_count >= 0),
+      projection_sha256 TEXT NOT NULL CHECK (
+        length(projection_sha256) = 64
+        AND projection_sha256 NOT GLOB '*[^0-9a-f]*'
+      ),
+      generated_at TEXT NOT NULL CHECK (length(generated_at) > 0),
+      superseded_at TEXT,
+      UNIQUE (id, project_id)
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE project_schedule_snapshot_activities (
+      snapshot_id TEXT NOT NULL,
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      instance_id TEXT NOT NULL CHECK (
+        length(instance_id) > 0 AND instance_id = trim(instance_id)
+      ),
+      activity_id TEXT NOT NULL CHECK (
+        length(activity_id) > 0 AND activity_id = trim(activity_id)
+      ),
+      start_date TEXT NOT NULL CHECK (
+        length(start_date) = 10
+        AND start_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+        AND date(start_date) IS NOT NULL
+        AND date(start_date) = start_date
+      ),
+      finish_date TEXT NOT NULL CHECK (
+        length(finish_date) = 10
+        AND finish_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+        AND date(finish_date) IS NOT NULL
+        AND date(finish_date) = finish_date
+        AND finish_date >= start_date
+      ),
+      duration_days REAL NOT NULL CHECK (duration_days >= 0),
+      rounded_scheduling_days INTEGER NOT NULL CHECK (
+        rounded_scheduling_days >= 0
+      ),
+      duration_calendar_type TEXT NOT NULL CHECK (
+        duration_calendar_type IN ('WORKING_DAY', 'CALENDAR_DAY')
+      ),
+      duration_status TEXT NOT NULL CHECK (
+        duration_status IN ('SOURCE_BACKED', 'AI_SEED_ESTIMATE', 'UNKNOWN')
+      ),
+      duration_confidence TEXT NOT NULL CHECK (
+        duration_confidence IN (
+          'A_AUTHORITATIVE', 'D_AI_SEED', 'E_UNKNOWN'
+        )
+      ),
+      is_milestone INTEGER NOT NULL CHECK (is_milestone IN (0, 1)),
+      is_isolated INTEGER NOT NULL CHECK (is_isolated IN (0, 1)),
+      PRIMARY KEY (snapshot_id, instance_id),
+      FOREIGN KEY (snapshot_id, project_id)
+        REFERENCES project_schedule_snapshots(id, project_id),
+      CHECK (is_milestone = 0 OR start_date = finish_date)
+    )
+  ''');
+
+  await transaction.execute('''
+    CREATE UNIQUE INDEX project_schedule_snapshots_one_current
+    ON project_schedule_snapshots(project_id)
+    WHERE superseded_at IS NULL
+  ''');
+  await transaction.execute('''
+    CREATE INDEX project_schedule_snapshots_history
+    ON project_schedule_snapshots(project_id, generated_at DESC, id DESC)
+  ''');
+  await transaction.execute('''
+    CREATE INDEX project_schedule_snapshot_activities_window
+    ON project_schedule_snapshot_activities(
+      project_id, snapshot_id, start_date, finish_date, instance_id
+    )
+  ''');
+
+  await transaction.execute('''
+    CREATE TRIGGER project_schedule_snapshot_activities_immutable_update
+    BEFORE UPDATE ON project_schedule_snapshot_activities
+    BEGIN
+      SELECT RAISE(ABORT, 'schedule snapshot activities are immutable');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_schedule_snapshot_activities_immutable_delete
+    BEFORE DELETE ON project_schedule_snapshot_activities
+    BEGIN
+      SELECT RAISE(ABORT, 'schedule snapshot activities are immutable');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_schedule_snapshots_no_physical_delete
+    BEFORE DELETE ON project_schedule_snapshots
+    BEGIN
+      SELECT RAISE(ABORT, 'schedule snapshots cannot be deleted');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_schedule_snapshots_supersede_only
+    BEFORE UPDATE ON project_schedule_snapshots
+    WHEN NOT (
+      OLD.superseded_at IS NULL
+      AND NEW.superseded_at IS NOT NULL
+      AND NEW.id IS OLD.id
+      AND NEW.project_id IS OLD.project_id
+      AND NEW.profile_json IS OLD.profile_json
+      AND NEW.corpus_version IS OLD.corpus_version
+      AND NEW.schedule_seed_version IS OLD.schedule_seed_version
+      AND NEW.schedule_seed_provenance IS OLD.schedule_seed_provenance
+      AND NEW.production_status IS OLD.production_status
+      AND NEW.duration_source IS OLD.duration_source
+      AND NEW.baseline_status IS OLD.baseline_status
+      AND NEW.schedule_start IS OLD.schedule_start
+      AND NEW.schedule_finish IS OLD.schedule_finish
+      AND NEW.activity_count IS OLD.activity_count
+      AND NEW.root_count IS OLD.root_count
+      AND NEW.leaf_count IS OLD.leaf_count
+      AND NEW.isolated_count IS OLD.isolated_count
+      AND NEW.milestone_count IS OLD.milestone_count
+      AND NEW.projection_sha256 IS OLD.projection_sha256
+      AND NEW.generated_at IS OLD.generated_at
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'schedule snapshot metadata is immutable');
+    END
+  ''');
 }
 
 Future<void> _applyAttachmentFoundationMigration(
