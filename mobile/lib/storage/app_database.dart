@@ -3041,6 +3041,9 @@ Future<void> _applyConstructionScheduleSnapshotMigration(
           '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
         AND strftime(
           '%Y-%m-%dT%H:%M:%SZ', generated_at, '+0 seconds'
+        ) IS NOT NULL
+        AND strftime(
+          '%Y-%m-%dT%H:%M:%SZ', generated_at, '+0 seconds'
         ) = generated_at
       ),
       superseded_at TEXT CHECK (
@@ -3048,6 +3051,9 @@ Future<void> _applyConstructionScheduleSnapshotMigration(
           length(superseded_at) = 20
           AND superseded_at GLOB
             '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+          AND strftime(
+            '%Y-%m-%dT%H:%M:%SZ', superseded_at, '+0 seconds'
+          ) IS NOT NULL
           AND strftime(
             '%Y-%m-%dT%H:%M:%SZ', superseded_at, '+0 seconds'
           ) = superseded_at
@@ -3154,6 +3160,9 @@ Future<void> _applyConstructionScheduleSnapshotMigration(
       AND length(NEW.superseded_at) = 20
       AND NEW.superseded_at GLOB
         '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+      AND strftime(
+        '%Y-%m-%dT%H:%M:%SZ', NEW.superseded_at, '+0 seconds'
+      ) IS NOT NULL
       AND strftime(
         '%Y-%m-%dT%H:%M:%SZ', NEW.superseded_at, '+0 seconds'
       ) = NEW.superseded_at

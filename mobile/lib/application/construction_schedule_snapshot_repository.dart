@@ -14,6 +14,8 @@ typedef ConstructionScheduleSnapshotIdFactory = String Function();
 typedef ConstructionScheduleActivityInsertHook =
     Future<void> Function(int index, ConstructionScheduledActivity activity);
 typedef ConstructionScheduleWindowIntegrityHook = Future<void> Function();
+typedef ConstructionScheduleFullSnapshotMetadataHook = Future<void> Function();
+typedef ConstructionSchedulePersistCommitHook = Future<void> Function();
 
 class ConstructionScheduleSnapshotRepository {
   ConstructionScheduleSnapshotRepository({
@@ -23,6 +25,8 @@ class ConstructionScheduleSnapshotRepository {
     ConstructionScheduleSnapshotIdFactory? idFactory,
     this.beforeActivityInsert,
     this.afterWindowIntegrityCheck,
+    this.afterFullSnapshotMetadataRead,
+    this.afterPersistCommit,
   }) : _dateEngine = dateEngine ?? ConstructionScheduleDateEngine(),
        _idFactory = idFactory ?? RecordId.randomUuid;
 
@@ -54,6 +58,9 @@ class ConstructionScheduleSnapshotRepository {
   final ConstructionScheduleSnapshotIdFactory _idFactory;
   final ConstructionScheduleActivityInsertHook? beforeActivityInsert;
   final ConstructionScheduleWindowIntegrityHook? afterWindowIntegrityCheck;
+  final ConstructionScheduleFullSnapshotMetadataHook?
+  afterFullSnapshotMetadataRead;
+  final ConstructionSchedulePersistCommitHook? afterPersistCommit;
 
   Future<ConstructionScheduleSnapshot> persistCurrentSnapshot({
     required ConstructionProjectReferenceSchedule schedule,
@@ -91,7 +98,7 @@ class ConstructionScheduleSnapshotRepository {
       schedule.scheduleFinish,
     );
 
-    await database.database.transaction((transaction) async {
+    final stored = await database.database.transaction((transaction) async {
       final project = await transaction.query(
         'projects',
         columns: const ['id'],
@@ -205,58 +212,70 @@ class ConstructionScheduleSnapshotRepository {
           'schedule_snapshot_write_verification_failed',
         );
       }
-    });
 
-    final stored = await loadSnapshotById(snapshotId);
-    if (stored == null || !stored.metadata.isCurrent) {
-      throw const ConstructionScheduleSnapshotFailure(
-        'schedule_snapshot_commit_verification_failed',
+      final storedRows = await transaction.query(
+        'project_schedule_snapshots',
+        columns: _metadataColumns,
+        where: 'id = ?',
+        whereArgs: [snapshotId],
+        limit: 2,
       );
-    }
+      if (storedRows.length != 1) {
+        throw const ConstructionScheduleSnapshotFailure(
+          'schedule_snapshot_commit_verification_failed',
+        );
+      }
+      final stored = await _loadSnapshot(transaction, storedRows.single);
+      if (!stored.metadata.isCurrent) {
+        throw const ConstructionScheduleSnapshotFailure(
+          'schedule_snapshot_commit_verification_failed',
+        );
+      }
+      return stored;
+    });
+    await afterPersistCommit?.call();
     return stored;
   }
 
-  Future<ConstructionScheduleSnapshot?> loadCurrentSnapshot(
-    String projectId,
-  ) async {
-    final rows = await database.database.query(
-      'project_schedule_snapshots',
-      columns: _metadataColumns,
-      where: 'project_id = ? AND superseded_at IS NULL',
-      whereArgs: [projectId],
-      limit: 2,
-    );
-    if (rows.length > 1) {
-      throw const ConstructionScheduleSnapshotFailure(
-        'multiple_current_schedule_snapshots',
-      );
-    }
-    if (rows.isEmpty) {
-      return null;
-    }
-    return _loadSnapshot(rows.single);
-  }
+  Future<ConstructionScheduleSnapshot?> loadCurrentSnapshot(String projectId) =>
+      database.database.transaction((transaction) async {
+        final rows = await transaction.query(
+          'project_schedule_snapshots',
+          columns: _metadataColumns,
+          where: 'project_id = ? AND superseded_at IS NULL',
+          whereArgs: [projectId],
+          limit: 2,
+        );
+        if (rows.length > 1) {
+          throw const ConstructionScheduleSnapshotFailure(
+            'multiple_current_schedule_snapshots',
+          );
+        }
+        if (rows.isEmpty) {
+          return null;
+        }
+        return _loadSnapshot(transaction, rows.single);
+      });
 
-  Future<ConstructionScheduleSnapshot?> loadSnapshotById(
-    String snapshotId,
-  ) async {
-    final rows = await database.database.query(
-      'project_schedule_snapshots',
-      columns: _metadataColumns,
-      where: 'id = ?',
-      whereArgs: [snapshotId],
-      limit: 2,
-    );
-    if (rows.length > 1) {
-      throw const ConstructionScheduleSnapshotFailure(
-        'duplicate_schedule_snapshot_id',
-      );
-    }
-    if (rows.isEmpty) {
-      return null;
-    }
-    return _loadSnapshot(rows.single);
-  }
+  Future<ConstructionScheduleSnapshot?> loadSnapshotById(String snapshotId) =>
+      database.database.transaction((transaction) async {
+        final rows = await transaction.query(
+          'project_schedule_snapshots',
+          columns: _metadataColumns,
+          where: 'id = ?',
+          whereArgs: [snapshotId],
+          limit: 2,
+        );
+        if (rows.length > 1) {
+          throw const ConstructionScheduleSnapshotFailure(
+            'duplicate_schedule_snapshot_id',
+          );
+        }
+        if (rows.isEmpty) {
+          return null;
+        }
+        return _loadSnapshot(transaction, rows.single);
+      });
 
   Future<List<ConstructionScheduleSnapshotMetadata>> listSnapshotHistory(
     String projectId,
@@ -338,11 +357,13 @@ class ConstructionScheduleSnapshotRepository {
   }
 
   Future<ConstructionScheduleSnapshot> _loadSnapshot(
+    DatabaseExecutor executor,
     Map<String, Object?> metadataRow,
   ) async {
     final parsed = _metadataAndProfile(metadataRow);
     final metadata = parsed.$1;
-    final rows = await database.database.query(
+    await afterFullSnapshotMetadataRead?.call();
+    final rows = await executor.query(
       'project_schedule_snapshot_activities',
       where: 'snapshot_id = ?',
       whereArgs: [metadata.snapshotId],

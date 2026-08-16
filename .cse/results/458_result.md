@@ -282,3 +282,144 @@ review_recommendation:
   residual_uncertainty: "Runtime actual model/effort is hidden; correction remains uncommitted and unpushed pending new owner authorization."
   escalation_condition: "No correction commit/push without explicit owner authorization that acknowledges the recorded transient command failures."
 ```
+
+---
+
+## PR #459 post-publication review correction #2 — PASS
+
+### Authority and run identity
+
+- Owner correction authorization:
+  https://github.com/faliardic/chief-site-engineer/pull/459#issuecomment-5306342000
+- Reviewed parent/head at correction start:
+  `4814fec8e8eea25b12e812591dabb6fb81c08cc5`
+- Existing branch: `codex/issue-458-schedule-snapshot-foundation`
+- Validation class: `persistence`
+- Task risk: `R4`
+- Correction #2 primary run: `1`
+- Correction #2 retry/correction: `0`
+- Cumulative `review_correction_runs: 2`
+- Runtime invocation/actual metadata: hidden; canonical
+  `unknown / null / unverified` semantics used.
+
+### Implemented correction
+
+- Schema remains `14`; Backup format remains `1`.
+- Migration 14 now requires `strftime(...) IS NOT NULL` before equality for
+  `generated_at`, non-null `superseded_at`, and the supersede-only trigger.
+  Shape-valid impossible month/hour timestamps therefore fail closed instead
+  of passing SQLite `CHECK` through a `NULL` result.
+- Fractional-second rejection, `superseded_at >= generated_at`, snapshot
+  immutability, no-resurrection, one-current, row-seal and full projection SHA
+  contracts remain unchanged.
+- Full snapshot reconstruction now accepts the active `DatabaseExecutor`.
+  `loadCurrentSnapshot` and `loadSnapshotById` select metadata and activity
+  rows inside one read transaction/database snapshot.
+- Persist reconstruction, row-seal/count/summary/full-SHA verification and
+  current-state verification now complete inside the same write transaction
+  before commit. The transaction returns the verified snapshot result; the
+  post-commit current requirement was removed.
+- Narrow synchronization hooks make the two required interleavings
+  deterministic in tests without changing production scheduling or
+  persistence semantics.
+
+### Focused validation
+
+- Changed Dart format with exact SDK
+  `C:\Users\Fatih\.cache\flutter-sdk\3.44.6-ee80f08`: PASS; final check
+  `0 changed`.
+- Database/migration: `22/22 PASS`.
+  - invalid month and invalid hour `generated_at`: rejected;
+  - invalid month and invalid hour `superseded_at`: rejected;
+  - existing fractional-second and earlier-than-generated cases: rejected;
+  - schema-14 additive migration chain: PASS;
+  - SQLite `integrity_check = ok`;
+  - SQLite `foreign_key_check = empty`.
+- Snapshot repository: `11/11 PASS`.
+  - full current read holds one consistent metadata/activity boundary and
+    blocks replacement interleaving until reconstruction completes;
+  - two coordinated valid persists both return successfully at their own
+    transaction linearization points;
+  - final state has one current and one immutable superseded snapshot, both
+    fully loadable and fingerprint-valid;
+  - prior rollback, clock-regression, row-seal, total-count, corruption and
+    window read/replacement regressions remain PASS.
+- Schedule Date Engine regression/parity: `23/23 PASS`; P01/P02/P03 exact
+  fingerprints and Sunday/holiday/synthetic `0 / 0 / 0` remain unchanged.
+- Backup/restore: `36/36 PASS`; format-1 schema-14 roundtrip and schema-13
+  restore/migrate-to-14 remain compatible.
+- `flutter analyze --no-pub`: PASS, no issues.
+- `git diff --check`: PASS.
+- Final full `flutter test --no-pub`: one run, `663/663 PASS`.
+- No failure or retry occurred in correction #2. Production/test files were
+  not edited after the final full PASS revision.
+
+### Exact correction #2 changed-file set
+
+- `.cse/tasks/458_task.md`
+- `.cse/results/458_result.md`
+- `mobile/lib/storage/app_database.dart`
+- `mobile/lib/application/construction_schedule_snapshot_repository.dart`
+- `mobile/test/app_database_test.dart`
+- `mobile/test/construction_schedule_snapshot_repository_test.dart`
+
+Unexpected changed files: `0`. Domain models, Schedule Date Engine,
+backup production/tests, stale-schema tests, corpus/dependency/seed assets,
+`.gitattributes`, pubspec/lock, platform/config and UI drift: `0`.
+
+Protected asset SHA-256 values remain exact:
+
+- Activity:
+  `a9b225d6403168f7d3fd35494eceb4907d1ea705492700bc865add95021f42ca`.
+- Dependency:
+  `07f58de9912fe76303d18b48863b45aeaaac0f0f203aa14ebe8f8b1a8db12c86`.
+- Schedule seed:
+  `b80ebe90f57fa71bafcaee5102acfe3dda29368f53cd5a164b248b6530b9587e`.
+
+### Intentionally omitted broad gates
+
+- APK/AAB, device, release, notification, reboot and UI acceptance gates were
+  not run because correction #2 changes only SQLite/persistence consistency.
+- No real user database, backup, attachment or device data was accessed.
+- No UI/APK work, living 7-day plan or later Slice was started.
+
+### Publication boundary at result write
+
+- Correction commit/push: authorized after final evidence; not yet performed
+  while this result section is written.
+- Exact final commit SHA and parent/divergence will be recorded in Issue #458
+  and PR #459 publication evidence to avoid metadata-only commit churn.
+- PR #459 remains Draft. Ready, merge and deploy are not authorized.
+
+```yaml
+execution_record:
+  requested_model: "gpt-5.6-sol"
+  actual_model: "unknown"
+  requested_reasoning_effort: "max"
+  actual_reasoning_effort: "unknown"
+  execution_mode: "standard"
+  orchestration: "single-agent"
+  routing_request_evidence: "https://github.com/faliardic/chief-site-engineer/pull/459#issuecomment-5306342000"
+  invocation_evidence: null
+  invocation_verification_status: "unverified"
+  mismatch_detected: null
+  runtime_verification_status: "unverified"
+```
+
+```yaml
+review_recommendation:
+  risk_observed: "R4"
+  recommended_chatgpt_model: "gpt-5.6-sol"
+  recommended_reasoning_effort: "max"
+  recommended_mode: "standard"
+  recommendation_reason: "Schema-14 NULL-safe timestamp enforcement and linearizable full-read/persist result semantics are R4 persistence boundaries."
+  must_review:
+    - "NULL-safe generated_at and superseded_at CHECK/trigger predicates"
+    - "single-transaction full current and by-id reconstruction"
+    - "commit-before-return verification and concurrent successful persist semantics"
+    - "unchanged row seal, full projection SHA, one-current and immutable history invariants"
+    - "focused/full counts, exact six-file allowlist and protected drift 0"
+    - "runtime model/reasoning verification uncertainty"
+  residual_uncertainty: "Runtime actual model/effort metadata is not exposed; invocation/runtime remain unverified."
+  escalation_condition: "Unexpected diff, impossible timestamp acceptance, mixed full read, false post-commit failure, integrity/FK failure, or runtime routing evidence below the R4 floor."
+```

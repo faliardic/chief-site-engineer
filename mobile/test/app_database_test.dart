@@ -179,6 +179,18 @@ void main() {
         }),
         throwsA(isA<sqflite.DatabaseException>()),
       );
+      for (final invalidGeneratedAt in const [
+        '2026-13-19T09:00:00Z',
+        '2026-07-19T25:00:00Z',
+      ]) {
+        await expectLater(
+          db.insert('project_schedule_snapshots', {
+            ...snapshotRow('snapshot-impossible-generated'),
+            'generated_at': invalidGeneratedAt,
+          }),
+          throwsA(isA<sqflite.DatabaseException>()),
+        );
+      }
       await db.insert('project_schedule_snapshots', snapshotRow('snapshot-1'));
       await expectLater(
         db.insert('project_schedule_snapshots', snapshotRow('snapshot-2')),
@@ -247,6 +259,20 @@ void main() {
         ),
         throwsA(isA<sqflite.DatabaseException>()),
       );
+      for (final invalidSupersededAt in const [
+        '2026-13-19T10:00:00Z',
+        '2026-07-19T25:00:00Z',
+      ]) {
+        await expectLater(
+          db.update(
+            'project_schedule_snapshots',
+            {'superseded_at': invalidSupersededAt},
+            where: 'id = ?',
+            whereArgs: ['snapshot-1'],
+          ),
+          throwsA(isA<sqflite.DatabaseException>()),
+        );
+      }
       await expectLater(
         db.update(
           'project_schedule_snapshots',

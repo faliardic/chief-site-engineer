@@ -200,3 +200,106 @@ değişikliği veya repeated blocker fail-closed stop'tur; correction commit/pus
 yapılmaz. PASS halinde mevcut PR branch'ine tek intentional correction commit ve
 normal push yetkilidir. PR #459 Draft kalır; Ready, merge, deploy, living 7-day
 plan ve başka Slice yasaktır.
+
+---
+
+## Post-publication review correction authorization #2 — PR #459
+
+- Owner correction authorization:
+  https://github.com/faliardic/chief-site-engineer/pull/459#issuecomment-5306342000
+- Reviewed branch head: `4814fec8e8eea25b12e812591dabb6fb81c08cc5`
+- Existing branch: `codex/issue-458-schedule-snapshot-foundation`
+- Validation class: `persistence`
+- Task risk: `R4`
+- Cumulative `review_correction_runs: 2`
+
+```yaml
+model_routing:
+  policy_version: "CSE-MRP-1.0"
+  task_risk: "R4"
+  orchestrator:
+    chatgpt_model: "gpt-5.6-sol"
+    chatgpt_reasoning_effort: "max"
+  codex_model: "gpt-5.6-sol"
+  codex_reasoning_effort: "max"
+  execution_mode: "standard"
+  orchestration: "single-agent"
+  selection_reason: "The correction changes schema-14 fail-closed timestamp enforcement and linearizable current-snapshot read/write result semantics."
+  routing_request_evidence: "https://github.com/faliardic/chief-site-engineer/pull/459#issuecomment-5306342000"
+  allowed_fallback: null
+  review_floor:
+    chatgpt_model: "gpt-5.6-sol"
+    chatgpt_reasoning_effort: "max"
+  fail_closed_if_mismatch: true
+```
+
+Invocation/runtime metadata görünmediği için correction #2 result kaydında
+canonical `unknown / null / unverified` semantiği kullanılacaktır. Otomatik
+fallback veya downgrade yoktur; görünür mismatch fail-closed stop koşuludur.
+
+### Correction #2 changed contracts
+
+1. Schema version `14` kalır; migration 14 içindeki `generated_at`, non-null
+   `superseded_at` ve supersede-only trigger canonicality ifadeleri SQLite
+   `NULL` sonucunu açıkça reddeder.
+2. Invalid month/hour gibi shape-valid fakat impossible timestamp değerleri
+   database boundary'de reddedilir; fractional-second, monotonicity ve mevcut
+   immutability kuralları korunur.
+3. Full current ve by-id reconstruction metadata ile activity satırlarını tek
+   `DatabaseExecutor`/transaction snapshot'ından okur.
+4. Persist verification/reconstruction aynı write transaction içinde, commit
+   öncesinde tamamlanır ve transaction doğrulanmış snapshot sonucunu döndürür;
+   post-commit current olma şartı kaldırılır.
+5. Atomic replacement, immutable history, full projection SHA, row seal,
+   one-current invariant ve mevcut window transaction davranışı değişmez.
+
+### Exact correction #2 allowlist
+
+- `mobile/lib/storage/app_database.dart`
+- `mobile/lib/application/construction_schedule_snapshot_repository.dart`
+- `mobile/test/app_database_test.dart`
+- `mobile/test/construction_schedule_snapshot_repository_test.dart`
+- `.cse/tasks/458_task.md`
+- `.cse/results/458_result.md`
+
+Domain modelleri, Schedule Date Engine, backup production/test kodu,
+stale-schema testleri, corpus/dependency/seed assetleri, pubspec/lock,
+platform/config, UI ve diğer bütün dosyaların drift'i `0` kalacaktır. Schema
+`14`, Backup format `1` kalır; önceki execution ve transient-failure kanıtları
+yeniden yazılmaz.
+
+### Required correction #2 regressions
+
+- Database invalid month ve invalid hour `generated_at` değerlerini reddeder.
+- Valid row sonrasında invalid month ve invalid hour `superseded_at` değerleri
+  reddedilir; fractional-second ve earlier-than-generated regresyonları korunur.
+- Full `loadCurrentSnapshot` metadata seçimi sonrası pause edildiğinde
+  replacement interleave edemez; read tam eski veya tam yeni snapshot döndürür.
+- Aynı project için koordine edilen iki valid persist çağrısı kendi transaction
+  linearization noktalarında başarıyla tamamlanır; final durumda bir current ve
+  bir immutable superseded snapshot bulunur, ikisi de fingerprint-valid ve tam
+  loadable kalır.
+- Mevcut window read/replacement consistency regresyonu korunur.
+
+### Correction #2 validation and publication boundary
+
+1. Changed Dart format, already-proven exact SDK path.
+2. Focused database/migration tests.
+3. Focused snapshot repository tests.
+4. Schedule Date Engine regression/parity.
+5. Backup/restore focused tests.
+6. `flutter analyze --no-pub`.
+7. `git diff --check`.
+8. Exact six-file allowlist, protected/asset/config/UI drift `0`, schema `14`,
+   backup format `1`, SQLite integrity/FK checks.
+9. Yalnız bütün focused gate'ler PASS olduktan sonra final revision üzerinde
+   tek `flutter test --no-pub`.
+
+İlk tool-discovery hatası veya yeni testin yanlış expectation'ı exact fix
+sonrası bir kez düzeltilebilir ve açıkça kaydedilir. Production/integrity
+failure, aynı failure tekrarı, scope expansion, schema/backup version değişimi
+veya final gate failure fail-closed stop'tur.
+
+PASS halinde mevcut branch'e tek intentional correction commit ve normal push;
+Issue #458 ile PR #459'a exact evidence publication yetkilidir. PR #459 Draft
+kalır. Ready, merge, deploy, UI/APK, living 7-day plan ve başka Slice yasaktır.

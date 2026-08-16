@@ -593,6 +593,137 @@ void main() {
   });
 
   test(
+    'full current read and replacement share one consistent database boundary',
+    () async {
+      final firstRepository = _repository(
+        database,
+        snapshotId: 'snapshot-a',
+        generatedAt: DateTime.utc(2026, 8, 16, 8),
+      );
+      await _persist(firstRepository, scenario);
+      final replacementScenario = _scheduleScenario(
+        scheduleStart: '2026-10-02',
+      );
+
+      final metadataRead = Completer<void>();
+      final releaseFullRead = Completer<void>();
+      final replacementEnteredMutation = Completer<void>();
+      final readRepository = ConstructionScheduleSnapshotRepository(
+        database: database,
+        clock: () => DateTime.utc(2026, 8, 16, 8),
+        idFactory: () => 'unused-read-id',
+        afterFullSnapshotMetadataRead: () async {
+          metadataRead.complete();
+          await releaseFullRead.future;
+        },
+      );
+      final replacementRepository = ConstructionScheduleSnapshotRepository(
+        database: database,
+        clock: () => DateTime.utc(2026, 8, 16, 9),
+        idFactory: () => 'snapshot-b',
+        beforeActivityInsert: (_, _) async {
+          if (!replacementEnteredMutation.isCompleted) {
+            replacementEnteredMutation.complete();
+          }
+        },
+      );
+
+      final oldSnapshotFuture = readRepository.loadCurrentSnapshot(
+        scenario.profile.projectId,
+      );
+      await metadataRead.future;
+      final replacementFuture = _persist(
+        replacementRepository,
+        replacementScenario,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(replacementEnteredMutation.isCompleted, isFalse);
+      releaseFullRead.complete();
+
+      final oldSnapshot = await oldSnapshotFuture;
+      await replacementFuture;
+      expect(oldSnapshot?.metadata.snapshotId, 'snapshot-a');
+      expect(oldSnapshot?.metadata.isCurrent, isTrue);
+      expect(
+        _activityProjection(oldSnapshot!.activities),
+        _activityProjection(scenario.schedule.scheduledActivities),
+      );
+      expect(replacementEnteredMutation.isCompleted, isTrue);
+
+      final newSnapshot = await replacementRepository.loadCurrentSnapshot(
+        scenario.profile.projectId,
+      );
+      expect(newSnapshot?.metadata.snapshotId, 'snapshot-b');
+      expect(
+        _activityProjection(newSnapshot!.activities),
+        _activityProjection(replacementScenario.schedule.scheduledActivities),
+      );
+    },
+  );
+
+  test(
+    'concurrent valid persists both succeed at their transaction boundaries',
+    () async {
+      final firstCommitted = Completer<void>();
+      final releaseFirstReturn = Completer<void>();
+      final firstRepository = ConstructionScheduleSnapshotRepository(
+        database: database,
+        clock: () => DateTime.utc(2026, 8, 16, 8),
+        idFactory: () => 'snapshot-a',
+        afterPersistCommit: () async {
+          firstCommitted.complete();
+          await releaseFirstReturn.future;
+        },
+      );
+      final secondRepository = _repository(
+        database,
+        snapshotId: 'snapshot-b',
+        generatedAt: DateTime.utc(2026, 8, 16, 9),
+      );
+
+      final firstFuture = _persist(firstRepository, scenario);
+      await firstCommitted.future;
+      final second = await _persist(secondRepository, scenario);
+      releaseFirstReturn.complete();
+      final first = await firstFuture;
+
+      expect(first.metadata.snapshotId, 'snapshot-a');
+      expect(first.metadata.isCurrent, isTrue);
+      expect(second.metadata.snapshotId, 'snapshot-b');
+      expect(second.metadata.isCurrent, isTrue);
+
+      final storedFirst = await secondRepository.loadSnapshotById('snapshot-a');
+      final storedSecond = await secondRepository.loadSnapshotById(
+        'snapshot-b',
+      );
+      expect(storedFirst?.metadata.isCurrent, isFalse);
+      expect(storedSecond?.metadata.isCurrent, isTrue);
+      expect(
+        storedFirst?.metadata.projectionSha256,
+        first.metadata.projectionSha256,
+      );
+      expect(
+        storedSecond?.metadata.projectionSha256,
+        second.metadata.projectionSha256,
+      );
+      expect(
+        _activityProjection(storedFirst!.activities),
+        _activityProjection(first.activities),
+      );
+      expect(
+        _activityProjection(storedSecond!.activities),
+        _activityProjection(second.activities),
+      );
+      expect(
+        (await secondRepository.listSnapshotHistory(
+          scenario.profile.projectId,
+        )).map((item) => item.snapshotId),
+        orderedEquals(const ['snapshot-b', 'snapshot-a']),
+      );
+    },
+  );
+
+  test(
     'window read and replacement share one consistent database boundary',
     () async {
       final firstRepository = _repository(
