@@ -9,11 +9,12 @@ kaynakları sırayla oku:
 
 1. `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
 2. `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
-3. `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`
-4. Ürün işi ise `docs/v2/CSE_V2_SCOPE.md`
-5. `ROADMAP.md`
-6. current GitHub Issue ve bütün scope/izin yorumları
-7. `.cse/tasks/<issue_no>_task.md` varsa
+3. `docs/protocols/CSE_MODEL_REASONING_ROUTING_POLICY.md`
+4. `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`
+5. Ürün işi ise `docs/v2/CSE_V2_SCOPE.md`
+6. `ROADMAP.md`
+7. current GitHub Issue ve bütün scope/izin yorumları
+8. `.cse/tasks/<issue_no>_task.md` varsa
 
 Yeni sohbet, handoff veya kaynak-otoritesi işinde ayrıca:
 
@@ -32,6 +33,8 @@ okunur.
   `ROADMAP.md`
 - Operasyon ve güvenlik:
   `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
+- Model, reasoning, execution mode ve orchestration seçimi:
+  `docs/protocols/CSE_MODEL_REASONING_ROUTING_POLICY.md`
 - Doğrulama genişliği ve bütçesi:
   `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`
 - Aktif teknik kapsam:
@@ -109,6 +112,11 @@ tutulur.
 Current Issue veya task dosyasında şu alanlar bulunmalıdır:
 
 - V2 item ve parent Epic
+- `CSE-MRP-1.0` policy version ve task risk (`R0..R4`)
+- ChatGPT/orchestrator model ve reasoning seçimi
+- Codex/executor model ve reasoning seçimi
+- execution mode (`standard | pro`) ve orchestration (`single-agent | Ultra`)
+- seçim nedeni, allowed fallback, review floor ve fail-closed-if-mismatch
 - validation class: `docs | narrow-ui | domain | persistence | release-critical`
 - değişen sözleşmeler
 - izin verilen dosya listesi
@@ -161,6 +169,14 @@ Final rapor şunları açıkça ayırır:
 - süre ve tekrar bütçesi
 - kapsam dışı altyapı sorunları
 - commit, push, Draft PR, Ready ve merge durumu
+- `execution_record` YAML bloğu
+- `review_recommendation` YAML bloğu
+
+Runtime actual model veya reasoning görünmüyorsa tahmin edilmez;
+`actual_model: unknown`, `actual_reasoning_effort: unknown`,
+`mismatch_detected: null` ve `runtime_verification_status: unverified` yazılır.
+`mismatch_detected: false` yalnız iki actual değer de görünür ve requested
+değerlerle exact eşitse kullanılabilir.
 
 Issue #383 truth-sync işi production davranışı değiştirmez. Bu iş merge
 edilmeden V2.1 Proje ve Mahal implementation'ı başlatılmaz.

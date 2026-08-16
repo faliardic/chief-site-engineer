@@ -1,8 +1,8 @@
 # CSE Project Source Register
 
 **Belge türü:** Proje kaynak kaydı
-**Güncelleme Issue:** #383
-**Güncelleme tarihi:** 8 Ağustos 2026
+**Güncelleme Issue:** #455
+**Güncelleme tarihi:** 16 Ağustos 2026
 
 Bu dosya CSE için kalıcı ürün kaynaklarını, güncel V2 yürütme kaynaklarını,
 destekleyici tarihsel kaynakları ve otorite sınırlarını kaydeder.
@@ -15,6 +15,7 @@ destekleyici tarihsel kaynakları ve otorite sınırlarını kaydeder.
 | CSE V2 Kanonik Kapsamı | `docs/v2/CSE_V2_SCOPE.md` | Güncel 13 maddelik V2 kapsamı, bağımlılıklar, V2 dışı alanlar ve DoD | Aktif güncel yürütme kaynağı |
 | CSE V2 Roadmap | `ROADMAP.md` | Güncel dalga, sıra, geçiş kapısı ve ilk production yönü | Aktif güncel sıra |
 | Proje Talimatları | `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` | Git/GitHub/execution güvenliği ve operasyon protokolü | Aktif operasyon kaynağı |
+| Model ve Reasoning Routing Policy | `docs/protocols/CSE_MODEL_REASONING_ROUTING_POLICY.md` | Model, reasoning effort, execution mode, orchestration, runtime kanıtı ve review floor sözleşmesi | Aktif routing kaynağı |
 | Minimum Yeterli Doğrulama | `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md` | Validation class, evidence reuse, retry/time budget ve gate genişliği | Aktif doğrulama kaynağı |
 | Repository giriş talimatı | `AGENTS.md` | Zorunlu pre-read ve kısa enforcement | Aktif |
 | New Chat Bootstrap | `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md` | Yeni sohbetin GitHub'dan güncel V2 bağlamıyla devamı | Aktif |
@@ -27,12 +28,15 @@ destekleyici tarihsel kaynakları ve otorite sınırlarını kaydeder.
    kaynaktır.
 3. Güncel sıra ve dalga durumunda `ROADMAP.md` esas alınır.
 4. Aktif teknik kapsam current GitHub Issue tarafından daraltılır.
-5. Current Issue V2 kapsamını sessizce genişletemez ve safety kurallarını
+5. Model/reasoning/execution/orchestration seçimi
+   `docs/protocols/CSE_MODEL_REASONING_ROUTING_POLICY.md` ile current Issue'nun
+   daha yüksek review floor'u birlikte uygulanarak belirlenir.
+6. Current Issue V2 kapsamını sessizce genişletemez ve safety kurallarını
    zayıflatamaz.
-6. `.cse/state`, README, podcast, handoff, ZIP veya sohbet hafızası current Git
+7. `.cse/state`, README, podcast, handoff, ZIP veya sohbet hafızası current Git
    ve GitHub gerçeğini override edemez.
-7. Geçmiş Issue/PR/test/podcast kaydı geriye dönük yeniden yazılmaz.
-8. V1 saha kullanımı, store/public release iddiası değildir.
+8. Geçmiş Issue/PR/test/podcast kaydı geriye dönük yeniden yazılmaz.
+9. V1 saha kullanımı, store/public release iddiası değildir.
 
 ## 3. V1 kapanış kaynağı
 
