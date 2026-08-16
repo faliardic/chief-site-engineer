@@ -148,3 +148,61 @@ PASS halinde yalnız:
 yetkilidir. PR Ready yapılmayacak ve merge edilmeyecektir. Post-merge local
 master sync bu execution'ın parçası değildir; merge ayrıca yetkilendirildikten
 sonraki Codex-required run'a bırakılır.
+
+## Post-review correction yetkisi — PR #461
+
+- Yetki kaynağı:
+  https://github.com/faliardic/chief-site-engineer/pull/461#issuecomment-5306606086
+- Correction parent/head:
+  `d3ee6630f2ecba0860d3d7c85f855564f764f493`
+- Mevcut branch ve Draft PR korunur; yeni branch veya PR açılmaz.
+- `review_correction_runs: 1`; original primary run ve scanner/parser retry
+  tarihçesi değiştirilmez.
+- Correction allowlist'i exact dokuz dosyadır: `AGENTS.md`,
+  `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md`,
+  `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`,
+  `.github/ISSUE_TEMPLATE/v2_feature_slice.yml`, `ROADMAP.md`,
+  `docs/v2/CSE_V2_SCOPE.md`, `docs/v2/CSE_V2_TRANSITION_DECISION.md`,
+  `.cse/tasks/460_task.md`, `.cse/results/460_result.md`.
+- Total PR diff'i master'a göre exact `15` unique dosya olacaktır. Kaynak
+  register, production/test/schema/backup/platform/dependency/workflow yolları
+  değiştirilmeyecektir.
+- Dört aktif zorunlu yüzey revised contiguous Items `1..13`, yalnız Items
+  `1..4` complete, Item `5` current/not complete, schema `14`, backup `1`, safe
+  merge `447916be0b3ddd2af75b0fe85f8c7f710f29c1cd` ve henüz Living Plan
+  UI/APK/device acceptance bulunmadığı gerçeğiyle hizalanacaktır.
+- Issue #383'ün V2.1 ön kapısı ve Epic #105'in current bağlayıcı üst-roadmap
+  iddiası kaldırılacak; korunurlarsa yalnız açık tarihsel bağlamda kalacaktır.
+- Actual quantity/progress/reforecast ve project-specific productivity learning,
+  ilk usable UI/device pilotundan sonraki Living Plan evolution'ıdır: MVP Core
+  veya ilk UI kapsamı değildir, fakat current direction'dan kategorik olarak
+  çıkarılmaz. İlk UI tek başına Item 5'i complete yapmaz; final completion
+  sınırı sonraki owner kararı ve executable evidence'a bağlıdır.
+- PASS halinde tek intentional correction commit, normal push ve Issue #460 ile
+  Draft PR #461'e exact evidence yayını yetkilidir. Ready, merge, Issue #385
+  mutation, production implementation, UI/deploy veya sonraki Slice yasaktır.
+
+Correction routing sözleşmesi:
+
+```yaml
+model_routing:
+  policy_version: "CSE-MRP-1.0"
+  task_risk: "R3"
+  orchestrator:
+    chatgpt_model: "gpt-5.6-sol"
+    chatgpt_reasoning_effort: "xhigh"
+  codex_model: "gpt-5.6-sol"
+  codex_reasoning_effort: "xhigh"
+  execution_mode: "standard"
+  orchestration: "single-agent"
+  selection_reason: "The correction reconciles mandatory pre-read authorities, the active V2 Issue template, and the later Living Plan scope boundary without changing production behavior."
+  routing_request_evidence: "this PR #461 correction comment"
+  allowed_fallback: null
+  review_floor:
+    chatgpt_model: "gpt-5.6-sol"
+    chatgpt_reasoning_effort: "xhigh"
+  fail_closed_if_mismatch: true
+```
+
+Invocation/runtime actual metadata görünür değildir; `unknown / null /
+unverified` olarak kaydedilir. Fallback veya downgrade uygulanmaz.

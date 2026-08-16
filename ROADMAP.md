@@ -193,6 +193,13 @@ Tek bir dar Living Plan MVP Core dilimi UI'dan önce gelebilir. Hemen sonraki
 dilim 7-day UI + APK/gerçek cihaz kabulü olmalıdır; araya yeni geniş backend
 programı eklenmez.
 
+İlk usable UI/device pilotundan sonra actual quantity/progress/reforecast ve
+project-specific productivity learning, Living Plan'ın sonraki evolution'ı
+olarak ayrıca owner kararıyla ele alınabilir. Bunlar MVP Core veya ilk UI
+kapsamı değildir; bu roadmap düzeltmesi onları başlatmaz, tamamlamaz ya da
+Items 6–13'ü yeniden sıralamaz. İlk UI tek başına Item 5'i complete yapmaz;
+final completion sınırı sonraki owner kararı ve executable evidence'a bağlıdır.
+
 ### V2.6 — Günlük Log Çıktısı v1
 
 Öncelik: `P1 reporting after usable living plan`
@@ -289,8 +296,7 @@ Aşağıdaki başlıklar V2 milestone'una alınmaz:
 - Gömülü AI ve semantik arama
 - Full-project Gantt editing ve Primavera replacement
 - Approved/contractual baseline, critical path ve float hesapları
-- Actuals tabanlı automatic dependency reforecast
-- Quantity/productivity learning ve resource/material/machine optimization
+- Resource/material/machine optimization
 - PC senkronizasyonu
 - Multi-user, tenant, firma portalı ve SaaS
 - Orchestrator, Bridge ve Work Mode geliştirmeleri
@@ -328,7 +334,10 @@ Date Engine ve immutable persistent reference-schedule snapshots PR #444, #446,
 İlk sonraki production işi yalnız **Living 7-Day Plan MVP Core** olabilir.
 Onun immediate successor'ı **7-day UI + APK/device acceptance** olmalıdır.
 Actual quantity/progress/reforecast ve project-specific productivity learning
-ilk usable UI/device pilotundan sonradır.
+ilk usable UI/device pilotundan sonraki Living Plan evolution'ıdır; current
+direction içinde kalır, fakat MVP Core veya ilk UI kapsamında değildir. İlk UI
+Item 5'in final completion'ı değildir; bu sınır sonraki owner kararı ve
+executable evidence ile belirlenir. Items 6–13'ün sırası değişmez.
 
 ## 13. Tarihsel roadmap sınırı
 

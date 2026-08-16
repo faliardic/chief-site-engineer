@@ -202,3 +202,135 @@ review_recommendation:
   residual_uncertainty: "Invocation/runtime actual model and effort metadata are not exposed; bootstrap embedded summary remains outside the exact Issue #460 path allowlist."
   escalation_condition: "Unexpected diff, current-source contradiction, Item 5 completion claim, additional path need, production drift, or visible routing evidence below the R3 floor."
 ```
+
+## Post-review correction sonucu — PR #461
+
+`PASS — owner-authorized source-authority correction; independent re-review required`
+
+Bu append, PR #461 owner correction comment'ındaki iki blocker'ı kapatır; üstteki
+primary execution ve parser/scanner retry tarihçesini yeniden yazmaz.
+
+### Correction zemini ve exact dosya kümeleri
+
+- Yetki:
+  https://github.com/faliardic/chief-site-engineer/pull/461#issuecomment-5306606086
+- Correction parent/head:
+  `d3ee6630f2ecba0860d3d7c85f855564f764f493`
+- Branch: `docs/issue-460-v2-living-plan-truth-sync`
+- Review correction runs: `1` (`review_correction_runs: 1`).
+- Exact correction diff, dokuz dosya:
+  1. `.cse/results/460_result.md`
+  2. `.cse/tasks/460_task.md`
+  3. `.github/ISSUE_TEMPLATE/v2_feature_slice.yml`
+  4. `AGENTS.md`
+  5. `ROADMAP.md`
+  6. `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md`
+  7. `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
+  8. `docs/v2/CSE_V2_SCOPE.md`
+  9. `docs/v2/CSE_V2_TRANSITION_DECISION.md`
+- Total PR diff, master'a göre exact on beş unique dosya: original on bir dosya
+  ile yeni dört aktif yüzeyin birleşimidir.
+- `docs/protocols/CSE_PROJECT_SOURCE_REGISTER.md` değişmedi.
+- Production, mobile production/test, schema/migration, backup implementation,
+  platform, dependency, config ve workflow drift'i: `0`.
+
+### Kapatılan source-authority blocker'ları
+
+- `AGENTS.md`, Project Instructions, New Chat Bootstrap ve V2 Issue template,
+  revised contiguous Items `1..13` ile hizalandı. Yalnız Items `1..4` complete,
+  Item `5` current/not complete'tir.
+- Dört yüzeyde current safe merge
+  `447916be0b3ddd2af75b0fe85f8c7f710f29c1cd`, schema `14`, backup format `1`
+  ve Living Plan UI/APK/device acceptance'ın henüz bulunmadığı kaydedildi.
+- Issue #383'ün eski V2.1 ön kapısı aktif gate olmaktan çıkarıldı. Epic #105
+  yalnız açık tarihsel roadmap kanıtı olarak tutuldu; current work'ü
+  yönlendiremez.
+- Bootstrap mandatory pre-read; V2 scope, roadmap, current GitHub Issue ve tüm
+  izin yorumları, task kaydı ve current `master` gerçeğine yönlendirildi.
+- Issue template YAML parse edildi; seçenekler exact revised ve contiguous
+  `V2.1..V2.13` oldu.
+- Actual quantity/progress/reforecast ve project-specific productivity learning,
+  ilk usable UI/device pilotundan sonraki Living Plan evolution'ı olarak
+  korundu. MVP Core veya ilk UI kapsamına alınmadı ve kategorik V2-dışı
+  bırakılmadı.
+- İlk UI'nın Item 5 final completion'ı olmadığı; son sınırın sonraki owner kararı
+  ve executable evidence'a bağlı olduğu kaydedildi. Items `6..13` yeniden
+  sıralanmadı; bu correction hiçbir evolution/production işini başlatmadı.
+
+### Correction focused validation
+
+- Local, tracking ve direct-remote pre-correction head:
+  `d3ee6630f2ecba0860d3d7c85f855564f764f493`; divergence `0 0`.
+- Correction parent ve current remote `master`:
+  `447916be0b3ddd2af75b0fe85f8c7f710f29c1cd`.
+- Correction changed-file set exact `9`; total PR changed-file set exact `15`.
+- Issue template `PyYAML safe_load`: `PASS`; options exact `1..13`.
+- `.cse/state/project_state.json` parse ve canonical item/status/baseline
+  assertions: `PASS`.
+- Aktif mandatory sources stale-current scan: old Item 5/6 labels, categorical
+  Look-ahead exclusion, Epic #105 current binding, Issue #383 active gate ve
+  old first/current Proje–Mahal yönü: `0`.
+- Schema `10` eşleşmeleri yalnız açık V1 historical baseline context'indedir.
+- Current authority agreement: Items `1..13`, complete exact `1..4`, Item 5
+  current/not complete, schema `14`, backup `1`, safe SHA ve no UI/APK/device:
+  `PASS`.
+- Later-evolution boundary ve Items `6..13` order: `PASS`.
+- Markdown/readability/local-link, YAML/JSON parse ve `git diff --check`:
+  `PASS`.
+- Protected drift ve unexpected untracked/staged path: `0`.
+- Flutter/Python test suite, build, APK/AAB, device, backup roundtrip, release ve
+  full gate çalıştırılmadı; correction yalnız docs/template/task/result
+  sözleşmelerini değiştirdi ve owner contract bunları yasakladı.
+- Reused merged evidence: PR #459 / safe merge `447916be...`; database `22/22`,
+  snapshot repository `11/11`, Schedule Engine `23/23`, backup/restore `36/36`,
+  full Flutter `663/663`, analyze/integrity/FK `PASS`.
+- Correction çalışma süresi: yaklaşık `12` dakika; `25` dakika hard stop içinde.
+- Bir atomik multi-file patch context eşleşmedi ve hiçbir hunk uygulanmadı; exact
+  context/sıra düzeltmesiyle izinli tek retry PASS verdi. İlk YAML validation
+  parser'ı PASS ettikten sonra yalnız terminal output encoding'inde durdu; UTF-8
+  output düzeltmesiyle aynı parser exact bir kez tekrarlandı. Bunlar original
+  primary/scanner retry history'yi değiştirmez.
+- Final read-only validation harness'ı; bir PowerShell parser ifadesi, JSON
+  dizisinde implicit property projection ve multiline/scoped regex varsayımları
+  nedeniyle kaynak contradiction'ı üretmeden dar assertion'lara bölündü. Her
+  başarısız assertion exact parser/projection/scope düzeltmesiyle bir kez
+  doğrulandı; repository içeriği bu harness düzeltmeleri için değiştirilmedi.
+
+Final correction commit SHA, push sonrası local/tracking/direct-remote eşitliği
+ve Draft PR durumu; result dosyasının kendi SHA'sını yazan yeni metadata commit'i
+üretmemek için Issue #460 ve PR #461 publication evidence yorumlarında
+kaydedilecektir.
+
+```yaml
+execution_record:
+  requested_model: "gpt-5.6-sol"
+  actual_model: "unknown"
+  requested_reasoning_effort: "xhigh"
+  actual_reasoning_effort: "unknown"
+  execution_mode: "standard"
+  orchestration: "single-agent"
+  routing_request_evidence: "https://github.com/faliardic/chief-site-engineer/pull/461#issuecomment-5306606086"
+  invocation_evidence: null
+  invocation_verification_status: "unverified"
+  mismatch_detected: null
+  runtime_verification_status: "unverified"
+  fallback_used: null
+  review_correction_runs: 1
+
+review_recommendation:
+  risk_observed: "R3"
+  recommended_chatgpt_model: "gpt-5.6-sol"
+  recommended_reasoning_effort: "xhigh"
+  recommended_mode: "standard"
+  recommendation_reason: "Mandatory pre-read authorities, the active Issue template, and the later Living Plan evolution boundary changed together and require independent source-authority re-review."
+  must_review:
+    - "exact nine-file correction diff and exact fifteen-file total PR diff"
+    - "revised contiguous Items 1..13 with only Items 1..4 complete and Item 5 current/not complete"
+    - "Issue #383 and Epic #105 retained only as non-directive historical context"
+    - "schema 14, backup 1, safe merge and no Living Plan UI/APK/device agreement"
+    - "reforecast/productivity learning after first usable UI but not categorically removed from current direction"
+    - "first UI not sufficient for Item 5 completion and Items 6..13 not reordered"
+    - "runtime model/reasoning verification uncertainty"
+  residual_uncertainty: "Invocation/runtime actual model and effort metadata are not exposed; final correction commit identity is recorded in publication comments."
+  escalation_condition: "Any extra path, active source contradiction, Item 5 completion claim, later-evolution scope start, production drift, routing mismatch, Ready transition, or merge."
+```

@@ -86,7 +86,7 @@ baseline değildir.
 | 1 | Proje ve Mahal omurgası | Complete |
 | 2 | Sicil / Puantaj V2 / Saha Rehberi | Complete |
 | 3 | Attachment / Fotoğraf / Medya V2 | Complete |
-| 4 | Ajanda V2 + kontrollü Ajanda–Hatırlatıcı senkronu | Complete |
+| 4 | Ajanda V2 + Ajanda–Hatırlatıcı kontrollü senkron | Complete |
 | 5 | 7 Günlük Yaşayan İş Programı / İş ve Gün Planı | Current — not complete |
 | 6 | Günlük Log Çıktısı v1 | Planned |
 | 7 | İş Zinciri / Bağlı Log v1 | Planned |
@@ -195,7 +195,13 @@ Kapanış kapısı:
   not kullanıcıya sade biçimde sunulur.
 - Reopen sonrasında plan offline korunur ve normal backup/restore ile geri gelir.
 - User decision/reference schedule ayrımı test ve review ile doğrulanır.
-- İlk usable UI/APK/device kabulü tamamlanmadan Item 5 complete sayılmaz.
+- İlk usable UI/APK/device kabulü Item 5 için gerekli ilk kullanıcı kapısıdır,
+  fakat tek başına final completion değildir.
+- Actual quantity/progress/reforecast ve project-specific productivity learning,
+  ilk usable UI/device pilotundan sonraki Living Plan evolution'ıdır; MVP Core
+  veya ilk UI kapsamı değildir.
+- Bu evolution'ın kapsamı ve Item 5 final completion'ı sonraki owner kararı ve
+  executable evidence ile belirlenir; bu belge Items 6–13'ü yeniden sıralamaz.
 
 ### 6. Günlük Log Çıktısı v1
 
@@ -357,13 +363,18 @@ Aşağıdaki başlıklar silinmez; V2 sonrasına taşınır:
 - Gömülü AI ve semantik arama
 - Full-project Gantt editing ve Primavera replacement
 - Approved/contractual baseline, critical path ve float hesapları
-- Actuals tabanlı automatic dependency reforecast
-- Quantity/productivity learning ve resource/material/machine optimization
+- Resource/material/machine optimization
 - PC senkronizasyonu
 - Çok kullanıcılı, tenant veya firma portalı yaklaşımları
 - Orchestrator, Bridge ve Work Mode'un aktif ürün roadmap'i hâline gelmesi
 
 Bu başlıklar V2 child Issue'larına yan kapsam olarak eklenemez.
+
+Actual quantity/progress/reforecast ve project-specific productivity learning
+yukarıdaki kategorik V2-dışı listede değildir. Bunlar ilk usable UI/device
+pilotundan sonraki Living Plan evolution'ı olarak current direction içinde
+kalır; MVP Core veya ilk UI kapsamında başlatılmaz ve Item 5'in final completion
+sınırı sonraki owner kararı ile executable evidence'a bağlıdır.
 
 ## 7. V2 çalışma kuralları
 
@@ -416,3 +427,8 @@ sözleşmesini kurar. Immediate successor **7-day UI + APK/device acceptance**
 olur. İlk usable UI/device pilotundan önce critical path/float, full Gantt,
 approved baseline, automatic reforecast, productivity learning, resource
 optimization, Primavera replacement veya AI/cloud planning başlatılmaz.
+Pilot sonrasında actual quantity/progress/reforecast ve project-specific
+productivity learning daha sonraki Living Plan evolution'ı olarak current
+direction içinde kalır. İlk UI tek başına Item 5'i complete yapmaz; final sınır
+sonraki owner kararı ve executable evidence'a bağlıdır. Items 6–13 yeniden
+sıralanmaz.

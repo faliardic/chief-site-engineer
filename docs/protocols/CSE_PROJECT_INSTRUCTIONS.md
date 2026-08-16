@@ -85,7 +85,11 @@ Cevap hayırsa özellik ertelenir veya kapsam dışı bırakılır.
 6. Günlük export
 7. Haftalık özet
 
-Merge edilmiş Local Field MVP; SQLite persistence, managed attachment store, local Flask web akışı, proje/gözlem create-list-detail-update, revision conflict koruması, arama, günlük export, backup/verify/izole restore ve Windows launcher içerir.
+Tarihsel Local Field MVP; SQLite persistence, managed attachment store, local
+Flask web akışı, proje/gözlem create-list-detail-update, revision conflict
+koruması, arama, günlük export, backup/verify/izole restore ve Windows launcher
+içerir. Aşağıdaki Local Field MVP ayrıntıları tarihsel bağlamdır; güncel V2
+işini yönlendirmez.
 
 Saha Takibi domain/recurrence, schema v4 repository/event persistence,
 transactional application service, yedi günlük lazy backfill, Backup/Restore
@@ -94,27 +98,35 @@ Scope field/conversion, archive/unarchive, MemoryIndex/Hafıza UI,
 Hafızayı İndir, Proje Paketi, mobile/offline ve owner-only security
 implementation'ları henüz tamamlanmamıştır.
 
-Epic #105 bağlayıcı üst yol haritasıdır:
+Epic #105 ve onun eski faz listesi tarihsel roadmap kanıtıdır; current bağlayıcı
+üst roadmap veya aktif gate değildir. Güncel ürün kapsamını
+`docs/v2/CSE_V2_SCOPE.md`, yürütme sırasını `ROADMAP.md`, görev yetkisini current
+GitHub Issue ve bütün scope/izin yorumları, repository gerçeğini current
+`master` belirler.
 
-```text
-0. Issue #103 tek kullanıcılı yön düzeltmesi
-1. Transactional application service ve 7 günlük lazy backfill
-2. Backup/restore compatibility ve resmî export izolasyonu
-3. Mobil runtime ve veri sahipliği ADR
-4. Mobil-first Kâğıdı Bırakma Sürümü
-5. Offline ve bildirim güvenilirliği
-6. 7 günlük gerçek saha pilotu
-7. 30 günlük ana uygulama pilotu
-8. Gelişmiş mühendislik hesap defteri
-9. Günlük log yayınlama/revizyon zinciri
-10. Canlı Proje Haritası
-11. Kanıtlanmış kişisel yardımcı araçlar
-12. Kişisel AI asistanı
-```
+Güncel revised V2 paketi:
 
-Kâğıdı Bırakma Sürümü takip görünümleri, rutin, attachment, arama ve backup görünürlüğüne ek olarak minimum hızlı hesap şeridi ile günlük zaman çizelgesi/düzenlenebilir taslağı da ilk pilot öncesinde içerir.
+1. Proje ve Mahal omurgası — complete
+2. Sicil / Puantaj V2 / Saha Rehberi — complete
+3. Attachment / Fotoğraf / Medya V2 — complete
+4. Ajanda V2 + Ajanda–Hatırlatıcı kontrollü senkron — complete
+5. 7 Günlük Yaşayan İş Programı / İş ve Gün Planı — current, not complete
+6. Günlük Log Çıktısı v1
+7. İş Zinciri / Bağlı Log v1
+8. İstenecek Malzemeler
+9. Deterministik kişi/firma/etiket önerileri
+10. Telefon görüşmesi sonucu → Ajanda
+11. Proje fotoğraf/video albümü
+12. Günlük Log Çıktısı v2
+13. Mini hesap makinesi
 
-Multi-user/role/tenant/SaaS/kurumsal portal hedefleri “daha sonra” listesine alınmaz. `local-first`, `Windows-first` değildir; mobil, offline, notification ve owner-only sync gerçek saha pilotlarından önce ele alınır.
+Güncel teknik zemin; safe merge
+`447916be0b3ddd2af75b0fe85f8c7f710f29c1cd`, mobile version `0.1.0+1`,
+SQLite schema `14` ve backup format `1`dir. Living Plan UI/APK/device acceptance
+henüz uygulanmadığı için Item 5 complete değildir.
+
+Multi-user/role/tenant/SaaS/kurumsal portal hedefleri aktif ürün hedefi
+değildir. CSE mobile-first, local-first, offline ve owner-only kalır.
 
 ### Faz 0 kanonik karar belgeleri
 

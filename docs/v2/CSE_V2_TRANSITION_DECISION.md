@@ -120,11 +120,15 @@ korunabilir:
 - gömülü AI
 - full-project Gantt editing / Primavera replacement
 - approved/contractual baseline ve critical path/float
-- automatic dependency reforecast
-- quantity/productivity learning ve resource optimization
+- resource optimization
 - PC sync
 
 Bunlar V2 item'larını bloke etmez.
+
+Actual quantity/progress/reforecast ve project-specific productivity learning
+yukarıdaki kategorik V2-dışı listede değildir. İlk usable UI/device pilotundan
+sonraki Living Plan evolution'ı olarak current direction içinde kalır; MVP Core
+veya ilk UI kapsamında değildir.
 
 ## 6. GitHub yürütme kararı
 
@@ -157,7 +161,11 @@ UI'dan önce yalnız Living Plan'ın kullanıcı kararı/reference-schedule ayr�
 stable referanslarını, minimum durumlarını ve offline persistence sınırını kuran
 tek dar core slice açılabilir. Immediate successor 7-day UI + APK/device
 acceptance olmalıdır. Progress/reforecast ve project-specific productivity
-learning, gerçek veri üreten usable UI/device pilotundan sonra gelir.
+learning, gerçek veri üreten usable UI/device pilotundan sonraki Living Plan
+evolution'ıdır; MVP Core veya ilk UI kapsamı değildir. Bu evrim bu kararla
+başlatılmaz ya da tamamlanmaz ve Items 6–13 yeniden sıralanmaz. İlk UI tek
+başına Item 5'i complete yapmaz; final completion sınırı sonraki owner kararı
+ve executable evidence'a bağlıdır.
 
 ## 8. Kalıcı güvenlik sınırı
 

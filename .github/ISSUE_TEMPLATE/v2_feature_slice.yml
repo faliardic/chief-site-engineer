@@ -8,6 +8,9 @@ body:
     attributes:
       value: |
         Parent ürün Epic'i #385'tir. Bir Issue tek dar production sonucuna odaklanmalıdır.
+        Güncel durum: V2.1–V2.4 complete; V2.5 current ve not complete'tir.
+        Safe merge 447916be0b3ddd2af75b0fe85f8c7f710f29c1cd, SQLite schema 14,
+        backup formatı 1'dir; Living Plan UI/APK/device acceptance henüz yoktur.
   - type: dropdown
     id: v2_item
     attributes:
@@ -16,9 +19,9 @@ body:
         - "V2.1 — Proje ve Mahal omurgası"
         - "V2.2 — Sicil / Puantaj V2 / Saha Rehberi"
         - "V2.3 — Attachment / Fotoğraf / Medya V2"
-        - "V2.4 — Ajanda V2 + Ajanda–Hatırlatıcı senkronu"
-        - "V2.5 — Günlük Log Çıktısı v1"
-        - "V2.6 — İş / Yapılacaklar / Gün Planı"
+        - "V2.4 — Ajanda V2 + Ajanda–Hatırlatıcı kontrollü senkron"
+        - "V2.5 — 7 Günlük Yaşayan İş Programı / İş ve Gün Planı"
+        - "V2.6 — Günlük Log Çıktısı v1"
         - "V2.7 — İş Zinciri / Bağlı Log v1"
         - "V2.8 — İstenecek Malzemeler"
         - "V2.9 — Deterministik kişi/firma/etiket önerileri"
