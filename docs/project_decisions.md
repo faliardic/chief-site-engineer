@@ -1,5 +1,36 @@
 # Proje Kararlari
 
+## Issue 462 — Living Plan ayrı mutable/evented kullanıcı kararı katmanıdır
+
+- Schema 15'te `project_living_plan_items`, immutable reference schedule'ı
+  değiştirmeyen güncel kullanıcı projection'ıdır. Exact
+  `snapshot + project + instance + activity` composite foreign key'i origin
+  schedule satırını korur; aynı `project + activity instance` ikinci Living
+  Plan item'ı olamaz.
+- Item'ın activity adı, typed context JSON'u ve doğal birimi offline/handover
+  gösterim snapshot'ıdır; stable kimliklerin veya bundled corpus'un yerine yeni
+  bir katalog değildir. Origin/display kolonları immutable ve physical delete
+  yasaktır.
+- Her gerçek lifecycle değişikliği projection update ile append-only eventi tek
+  SQLite transaction içinde üretir. Event `sequence`, sonuç revision'ına eşit;
+  payload'ın canonical `intent/change/result` ayrımı exact event-id replay'ini
+  sonradan başka mutation yapılmış olsa da doğrulanabilir kılar.
+- Stale revision, stale current snapshot, clock regression, invalid transition,
+  event-id conflict veya event insert failure partial projection/event bırakmaz.
+  Aynı etkili status/date/note yeni event kimliğiyle no-op'tur.
+- Yedi günlük suggestion yolu persisted snapshot'ın dar trusted date-window
+  boundary'sini kullanır; explicit search current full snapshot'ı yükleyebilir.
+  Snapshot, graph ve corpus project/version/instance/activity kimlikleri exact
+  uyuşmazsa read/create fail closed olur; context instance ID metninden parse
+  edilmez, typed graph context'ten alınır.
+- Living Plan sorgusunda overdue open önce, sonra pencere içi open, sonra
+  pencere içi completed sıralanır. Open item `windowEnd` sonrasındaysa ve
+  completed item pencere dışındaysa görünmez; origin current/superseded marker
+  yalnız read-model bilgisidir ve silent rebind yapmaz.
+- Backup envelope format `1` kalır. Tam SQLite image schema-15 projection/event
+  geçmişini taşır; format-1 schema-14 image restore sırasında additive schema
+  15 migration'ını izler. Backup production/crypto semantiği değişmez.
+
 ## Issue 367 — Work Mode yönetir, yerel loop yalnız açık handoff alır
 
 - GitHub Issue/PR koordinasyonu ve uzaktan yapılabilen geliştirme/test işleri

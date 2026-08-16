@@ -27,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 14;
+  static const schemaVersion = 15;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2886,6 +2886,10 @@ class AppDatabase {
       version: 14,
       apply: _applyConstructionScheduleSnapshotMigration,
     ),
+    DatabaseMigration(
+      version: 15,
+      apply: _applyConstructionLivingPlanMigration,
+    ),
   ];
 
   final String path;
@@ -3190,6 +3194,216 @@ Future<void> _applyConstructionScheduleSnapshotMigration(
       SELECT RAISE(ABORT, 'schedule snapshot metadata is immutable');
     END
   ''');
+}
+
+Future<void> _applyConstructionLivingPlanMigration(
+  Transaction transaction,
+) async {
+  await transaction.execute('''
+    CREATE UNIQUE INDEX project_schedule_snapshot_activities_living_plan_ref
+    ON project_schedule_snapshot_activities(
+      snapshot_id, project_id, instance_id, activity_id
+    )
+  ''');
+
+  await transaction.execute('''
+    CREATE TABLE project_living_plan_items (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      reference_snapshot_id TEXT NOT NULL,
+      activity_instance_id TEXT NOT NULL CHECK (
+        length(activity_instance_id) > 0
+        AND activity_instance_id = trim(activity_instance_id)
+      ),
+      activity_id TEXT NOT NULL CHECK (
+        length(activity_id) > 0 AND activity_id = trim(activity_id)
+      ),
+      activity_name_snapshot TEXT NOT NULL CHECK (
+        length(activity_name_snapshot) > 0
+        AND activity_name_snapshot = trim(activity_name_snapshot)
+      ),
+      activity_context_json TEXT NOT NULL CHECK (
+        length(activity_context_json) > 0
+        AND json_valid(activity_context_json) = 1
+        AND json_type(activity_context_json) = 'object'
+      ),
+      natural_unit_snapshot TEXT NOT NULL CHECK (
+        length(natural_unit_snapshot) > 0
+        AND natural_unit_snapshot = trim(natural_unit_snapshot)
+      ),
+      planned_date TEXT NOT NULL CHECK (
+        length(planned_date) = 10
+        AND planned_date GLOB
+          '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+        AND date(planned_date) IS NOT NULL
+        AND date(planned_date) = planned_date
+      ),
+      status TEXT NOT NULL CHECK (
+        status IN ('PLANNED', 'STARTED', 'COMPLETED', 'DEFERRED')
+      ),
+      note TEXT CHECK (
+        note IS NULL OR (
+          length(note) BETWEEN 1 AND 1000
+          AND note = trim(note)
+        )
+      ),
+      revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1),
+      created_at TEXT NOT NULL CHECK (
+        length(created_at) = 20
+        AND created_at GLOB
+          '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+        AND strftime('%Y-%m-%dT%H:%M:%SZ', created_at, '+0 seconds')
+          IS NOT NULL
+        AND strftime('%Y-%m-%dT%H:%M:%SZ', created_at, '+0 seconds')
+          = created_at
+      ),
+      updated_at TEXT NOT NULL CHECK (
+        length(updated_at) = 20
+        AND updated_at GLOB
+          '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+        AND strftime('%Y-%m-%dT%H:%M:%SZ', updated_at, '+0 seconds')
+          IS NOT NULL
+        AND strftime('%Y-%m-%dT%H:%M:%SZ', updated_at, '+0 seconds')
+          = updated_at
+        AND updated_at >= created_at
+      ),
+      status_changed_at TEXT NOT NULL CHECK (
+        length(status_changed_at) = 20
+        AND status_changed_at GLOB
+          '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+        AND strftime(
+          '%Y-%m-%dT%H:%M:%SZ', status_changed_at, '+0 seconds'
+        ) IS NOT NULL
+        AND strftime(
+          '%Y-%m-%dT%H:%M:%SZ', status_changed_at, '+0 seconds'
+        ) = status_changed_at
+        AND status_changed_at <= updated_at
+      ),
+      UNIQUE (id, project_id),
+      UNIQUE (project_id, activity_instance_id),
+      FOREIGN KEY (
+        reference_snapshot_id,
+        project_id,
+        activity_instance_id,
+        activity_id
+      ) REFERENCES project_schedule_snapshot_activities(
+        snapshot_id,
+        project_id,
+        instance_id,
+        activity_id
+      )
+    )
+  ''');
+
+  await transaction.execute('''
+    CREATE TABLE project_living_plan_events (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      living_plan_item_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      sequence INTEGER NOT NULL CHECK (sequence >= 1),
+      event_type TEXT NOT NULL CHECK (
+        event_type IN (
+          'CREATED', 'STARTED', 'COMPLETED',
+          'DEFERRED', 'REOPENED', 'NOTE_UPDATED'
+        )
+      ),
+      occurred_at TEXT NOT NULL CHECK (
+        length(occurred_at) = 20
+        AND occurred_at GLOB
+          '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+        AND strftime('%Y-%m-%dT%H:%M:%SZ', occurred_at, '+0 seconds')
+          IS NOT NULL
+        AND strftime('%Y-%m-%dT%H:%M:%SZ', occurred_at, '+0 seconds')
+          = occurred_at
+      ),
+      payload_json TEXT NOT NULL CHECK (
+        length(payload_json) > 0
+        AND json_valid(payload_json) = 1
+        AND json_type(payload_json) = 'object'
+      ),
+      UNIQUE (living_plan_item_id, sequence),
+      FOREIGN KEY (living_plan_item_id, project_id)
+        REFERENCES project_living_plan_items(id, project_id)
+    )
+  ''');
+
+  await transaction.execute('''
+    CREATE INDEX project_living_plan_items_window
+    ON project_living_plan_items(
+      project_id, planned_date, status, activity_name_snapshot, id
+    )
+  ''');
+  await transaction.execute('''
+    CREATE INDEX project_living_plan_items_reference
+    ON project_living_plan_items(
+      reference_snapshot_id, project_id, activity_instance_id, activity_id
+    )
+  ''');
+  await transaction.execute('''
+    CREATE INDEX project_living_plan_events_history
+    ON project_living_plan_events(living_plan_item_id, sequence)
+  ''');
+
+  await transaction.execute('''
+    CREATE TRIGGER project_living_plan_items_guarded_update
+    BEFORE UPDATE ON project_living_plan_items
+    WHEN NOT (
+      NEW.id IS OLD.id
+      AND NEW.project_id IS OLD.project_id
+      AND NEW.reference_snapshot_id IS OLD.reference_snapshot_id
+      AND NEW.activity_instance_id IS OLD.activity_instance_id
+      AND NEW.activity_id IS OLD.activity_id
+      AND NEW.activity_name_snapshot IS OLD.activity_name_snapshot
+      AND NEW.activity_context_json IS OLD.activity_context_json
+      AND NEW.natural_unit_snapshot IS OLD.natural_unit_snapshot
+      AND NEW.created_at IS OLD.created_at
+      AND NEW.revision = OLD.revision + 1
+      AND NEW.updated_at >= OLD.updated_at
+      AND (
+        (
+          NEW.status IS OLD.status
+          AND NEW.status_changed_at IS OLD.status_changed_at
+        ) OR (
+          NEW.status IS NOT OLD.status
+          AND NEW.status_changed_at IS NEW.updated_at
+        )
+      )
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'living plan item update contract violated');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_living_plan_items_no_physical_delete
+    BEFORE DELETE ON project_living_plan_items
+    BEGIN
+      SELECT RAISE(ABORT, 'living plan items cannot be deleted');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_living_plan_events_revision_match
+    BEFORE INSERT ON project_living_plan_events
+    WHEN NOT EXISTS (
+      SELECT 1
+      FROM project_living_plan_items item
+      WHERE item.id = NEW.living_plan_item_id
+        AND item.project_id = NEW.project_id
+        AND item.revision = NEW.sequence
+        AND item.updated_at = NEW.occurred_at
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'living plan event revision mismatch');
+    END
+  ''');
+  for (final operation in ['update', 'delete']) {
+    await transaction.execute('''
+      CREATE TRIGGER project_living_plan_events_append_only_$operation
+      BEFORE ${operation.toUpperCase()} ON project_living_plan_events
+      BEGIN
+        SELECT RAISE(ABORT, 'living plan events are append-only');
+      END
+    ''');
+  }
 }
 
 Future<void> _applyAttachmentFoundationMigration(
