@@ -178,5 +178,28 @@ Runtime actual model veya reasoning görünmüyorsa tahmin edilmez;
 `mismatch_detected: false` yalnız iki actual değer de görünür ve requested
 değerlerle exact eşitse kullanılabilir.
 
-Issue #383 truth-sync işi production davranışı değiştirmez. Bu iş merge
-edilmeden V2.1 Proje ve Mahal implementation'ı başlatılmaz.
+## Güncel V2 yürütme özeti
+
+Güncel ürün kapsamını `docs/v2/CSE_V2_SCOPE.md`, yürütme sırasını `ROADMAP.md`,
+görev yetkisini current GitHub Issue ve tüm kapsam/izin yorumları, repository
+gerçeğini current `master` belirler. Revised V2 paketi şudur:
+
+1. Proje ve Mahal omurgası — complete
+2. Sicil / Puantaj V2 / Saha Rehberi — complete
+3. Attachment / Fotoğraf / Medya V2 — complete
+4. Ajanda V2 + Ajanda–Hatırlatıcı kontrollü senkron — complete
+5. 7 Günlük Yaşayan İş Programı / İş ve Gün Planı — current, not complete
+6. Günlük Log Çıktısı v1
+7. İş Zinciri / Bağlı Log v1
+8. İstenecek Malzemeler
+9. Deterministik kişi/firma/etiket önerileri
+10. Telefon görüşmesi sonucu → Ajanda
+11. Proje fotoğraf/video albümü
+12. Günlük Log Çıktısı v2
+13. Mini hesap makinesi
+
+Güncel güvenli teknik zemin `447916be0b3ddd2af75b0fe85f8c7f710f29c1cd`,
+SQLite schema `14` ve backup format `1`dir. Living Plan UI/APK/device acceptance
+henüz yoktur; Item 5 complete değildir. Issue #383 ve eski V2.1 ön kapısı
+tarihsel repository truth-sync bağlamıdır; güncel işi yönlendiren aktif gate
+değildir.

@@ -1,5 +1,24 @@
 # Changelog
 
+## Issue #460 - Living 7-Day Plan canonical truth-sync
+
+- V2'nin 13 maddelik paketi korunarak Items 1–4 complete, revised Item 5
+  `7 Günlük Yaşayan İş Programı / İş ve Gün Planı` current direction ve Günlük
+  Log Çıktısı v1 Item 6 olarak hizalandı.
+- PR #444/#446/#448/#456/#459 ile merged schedule runtime ve persistent
+  immutable reference-schedule snapshot foundation; safe merge
+  `447916be0b3ddd2af75b0fe85f8c7f710f29c1cd`, schema `14`, backup format `1`
+  ve mobile version `0.1.0+1` canonical kaynaklara işlendi.
+- Living Plan'ın immutable reference schedule'dan ayrı mutable/evented kullanıcı
+  kararı katmanı olduğu; UI'dan önce yalnız tek dar core slice gelebileceği ve
+  immediate successor'ın 7-day UI + APK/device acceptance olacağı kaydedildi.
+- Full Gantt/Primavera replacement, approved baseline, critical path/float,
+  automatic reforecast, productivity learning ve resource optimization ilk
+  usable UI/device pilotundan sonraya bırakıldı.
+- Bu değişiklik yalnız documentation/state truth-sync'tir; production source,
+  test, schema/migration, backup behavior, UI, APK veya device acceptance
+  değiştirilmedi.
+
 ## Issue #367 - Work Mode local gate handoff sınırı
 
 - Work Mode, GitHub ve uzaktan yürütülebilen CSE geliştirme işlerinin birincil

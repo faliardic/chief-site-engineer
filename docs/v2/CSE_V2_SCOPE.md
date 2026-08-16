@@ -2,9 +2,9 @@
 
 **Belge türü:** Güncel ürün yürütme kapsamı
 **Durum:** Kanonik V2 kapsam ve sıra kaynağı
-**Tarih:** 8 Ağustos 2026
-**Kaynak Issue:** #383
-**Başlangıç `master`:** `7c9f65a811c9f4bca561adab6bd1f8e64e6908cc`
+**Tarih:** 16 Ağustos 2026
+**Güncel yön kaynağı:** Issue #460
+**Güncel güvenli `master`:** `447916be0b3ddd2af75b0fe85f8c7f710f29c1cd`
 
 ## 1. Belgenin rolü
 
@@ -49,6 +49,13 @@ CSE V1, proje sahibinin kararıyla tamamlanmış ürün fazıdır.
 V1 tarihsel baseline'dır. V2, aynı offline-first mobil ürünü yeniden yazmak
 yerine bu baseline üzerinde ilerler.
 
+Güncel V2 teknik baseline'ı V1 metadata'sından ayrıdır: mobile version
+`0.1.0+1`, SQLite schema `14`, backup format `1` ve son güvenli merge
+`447916be0b3ddd2af75b0fe85f8c7f710f29c1cd` değeridir. Bu baseline,
+schedule runtime ve persistent immutable reference-schedule snapshot temelini
+içerir; Living Plan UI/APK/device kabulü veya public/store release iddiası
+değildir.
+
 ## 3. V2'nin amacı
 
 V2'nin amacı yeni modül sayısını büyütmek değil, sahadaki bilgiyi bir kez
@@ -58,15 +65,37 @@ kullanılabilir hâle getirmektir.
 Ana yön:
 
 ```text
-Proje bağlamını kur
-→ Kişi ve saha kimliklerini birleştir
-→ Dosya ve medyayı ortaklaştır
-→ Ajanda ve Hatırlatıcı ilişkisini güvenilirleştir
-→ Günlük işi ve iş zincirini görünür kıl
-→ Günlük çıktıyı kaynaklardan üret
+Proje/Mahal, Saha Rehberi, Attachment ve Ajanda omurgası — complete
+→ schedule runtime + persistent reference snapshots — merged
+→ Living 7-Day Plan MVP Core
+→ 7-day UI + APK/device acceptance
+→ actual quantity/progress/reforecast
+→ project-specific productivity learning
 ```
 
+CSE teknik olarak derin, operasyonel olarak sade kalır: binlerce inşaat
+aktivitesi ve deterministik bağımlılık içeride bulunabilir; şantiye şefi
+aktiviteyi arar, yakın plana birkaç işlemle ekler ve yalnız önündeki yedi günü
+güncel tutar. Bu living site plan, Primavera klonu veya resmî/kontratsal
+baseline değildir.
+
 ## 4. Kanonik 13 maddelik V2 paketi
+
+| No | Ürün ailesi | Durum |
+| ---: | --- | --- |
+| 1 | Proje ve Mahal omurgası | Complete |
+| 2 | Sicil / Puantaj V2 / Saha Rehberi | Complete |
+| 3 | Attachment / Fotoğraf / Medya V2 | Complete |
+| 4 | Ajanda V2 + Ajanda–Hatırlatıcı kontrollü senkron | Complete |
+| 5 | 7 Günlük Yaşayan İş Programı / İş ve Gün Planı | Current — not complete |
+| 6 | Günlük Log Çıktısı v1 | Planned |
+| 7 | İş Zinciri / Bağlı Log v1 | Planned |
+| 8 | İstenecek Malzemeler | Planned |
+| 9 | Deterministik kişi/firma/etiket önerileri | Planned |
+| 10 | Telefon görüşmesi sonucu → Ajanda | Planned |
+| 11 | Proje fotoğraf/video albümü | Planned |
+| 12 | Günlük Log Çıktısı v2 | Planned |
+| 13 | Mini hesap makinesi | Planned |
 
 ### 1. Proje ve Mahal omurgası
 
@@ -136,12 +165,50 @@ Kapanış kapısı:
 - Duplicate oluşturma ve stale revision kısmi mutation bırakmaz.
 - Arşiv/çöp durumunda kaynak bağlantısı kaybolmaz.
 
-### 5. Günlük Log Çıktısı v1
+### 5. 7 Günlük Yaşayan İş Programı / İş ve Gün Planı
 
 Amaç:
 
-- Seçili gün ve proje için Ajanda, Puantaj, Beton ve açık Hatırlatıcı
-  kayıtlarından kaynaklı bir günlük taslağı üretmek.
+- Projeye özgü güncel yedi günlük pencereyi göstermek.
+- İnşaat aktivite kataloğunda arama yapıp ilgili aktiviteyi birkaç işlemle
+  yakın plana eklemek.
+- Aktivite adı ile blok/kat/mahal bağlamını birlikte göstermek.
+- Öneri tarih ve süreyi onaylı baseline gibi sunmamak.
+- `Planlandı`, `Başladı`, `Tamamlandı`, `Ertelendi` durumlarını ve kısa saha
+  notunu offline korumak.
+- Normal backup/restore zincirinde Living Plan verisini geri getirmek.
+
+Mimari sınır:
+
+- Immutable reference schedule suggestion/history olarak kalır.
+- Living-plan kullanıcı kararları ayrı mutable/evented katmanda tutulur.
+- Living plan stable project/activity-instance/snapshot kimliklerine referans
+  verir; kullanıcı işlemi reference schedule'ı sessizce yeniden yazmaz.
+- Düşük güvenli/test-seed süreleri yalnız öneridir, resmî süre değildir.
+- Güncel tarih penceresi trusted snapshot repository sınırını yeniden kullanır.
+- UI'dan önce yalnız tek dar MVP Core dilimi gelebilir; hemen sonraki dilim
+  UI/APK/device-oriented olmalıdır.
+
+Kapanış kapısı:
+
+- Yedi günlük pencere, arama/ekleme, konum bağlamı, minimum durum seti ve kısa
+  not kullanıcıya sade biçimde sunulur.
+- Reopen sonrasında plan offline korunur ve normal backup/restore ile geri gelir.
+- User decision/reference schedule ayrımı test ve review ile doğrulanır.
+- İlk usable UI/APK/device kabulü Item 5 için gerekli ilk kullanıcı kapısıdır,
+  fakat tek başına final completion değildir.
+- Actual quantity/progress/reforecast ve project-specific productivity learning,
+  ilk usable UI/device pilotundan sonraki Living Plan evolution'ıdır; MVP Core
+  veya ilk UI kapsamı değildir.
+- Bu evolution'ın kapsamı ve Item 5 final completion'ı sonraki owner kararı ve
+  executable evidence ile belirlenir; bu belge Items 6–13'ü yeniden sıralamaz.
+
+### 6. Günlük Log Çıktısı v1
+
+Amaç:
+
+- Seçili gün ve proje için Ajanda, Puantaj, Beton, açık takip ve living-plan /
+  progress kayıtlarından kaynaklı bir günlük taslağı üretmek.
 - Kişisel ve resmî kapsamı karıştırmamak.
 - İlk sürümde sade, insan okunabilir ve doğrulanabilir çıktı vermek.
 
@@ -151,22 +218,6 @@ Kapanış kapısı:
 - Kullanıcı seçimi olmadan private kayıt resmî çıktıya girmez.
 - Çıktı deterministik sıra ve tarih kullanır.
 - Aynı veri tekrar yazılmadan günlük taslağı hazırlanır.
-
-### 6. İş / Yapılacaklar / Gün Planı
-
-Amaç:
-
-- Hatırlatıcıdan farklı olarak süresi, önceliği, durumu ve gün planındaki yeri
-  bulunan iş kaydı oluşturmak.
-- Bugün, yaklaşan, geciken ve tamamlanan işleri sade biçimde göstermek.
-- İşleri proje, mahal, kişi, dosya ve Ajanda kayıtlarıyla bağlamak.
-
-Kapanış kapısı:
-
-- İş ve reminder semantiği karışmaz.
-- İş durumu revision ve event geçmişiyle izlenir.
-- Gün planı 30 saniye içinde kritik işleri gösterir.
-- Fiziksel silme yerine geri alınabilir yaşam döngüsü kullanılır.
 
 ### 7. İş Zinciri / Bağlı Log v1
 
@@ -287,7 +338,7 @@ Kapanış kapısı:
 | --- | --- | --- |
 | 1 | Proje/Mahal; Sicil/Puantaj/Saha Rehberi | Stable kimlik ve migration güveni |
 | 2 | Attachment/Medya V2; Ajanda V2 | Ortak dosya ve kaynak bağlantısı |
-| 3 | Günlük Log v1; İş/Gün Planı; İş Zinciri | Günlük saha akışının tek bağlamda çalışması |
+| 3 | Living 7-Day Plan; Günlük Log v1; İş Zinciri | Yaşayan yakın plan ve kaynaklı günlük akışı |
 | 4 | İstenecek Malzemeler; öneriler; telefon görüşmesi | Yardımcı akışların ana omurgaya bağlanması |
 | 5 | Proje albümü; Günlük Log v2 | Medya ve yayımlanmış snapshot güveni |
 | 6 | Mini hesap makinesi | Dar saha aracı kabulü |
@@ -310,12 +361,20 @@ Aşağıdaki başlıklar silinmez; V2 sonrasına taşınır:
 - Doküman Hafızası
 - Şantiye krokisi/haritası
 - Gömülü AI ve semantik arama
-- Look-ahead, WBS ve Gantt-lite
+- Full-project Gantt editing ve Primavera replacement
+- Approved/contractual baseline, critical path ve float hesapları
+- Resource/material/machine optimization
 - PC senkronizasyonu
 - Çok kullanıcılı, tenant veya firma portalı yaklaşımları
 - Orchestrator, Bridge ve Work Mode'un aktif ürün roadmap'i hâline gelmesi
 
 Bu başlıklar V2 child Issue'larına yan kapsam olarak eklenemez.
+
+Actual quantity/progress/reforecast ve project-specific productivity learning
+yukarıdaki kategorik V2-dışı listede değildir. Bunlar ilk usable UI/device
+pilotundan sonraki Living Plan evolution'ı olarak current direction içinde
+kalır; MVP Core veya ilk UI kapsamında başlatılmaz ve Item 5'in final completion
+sınırı sonraki owner kararı ile executable evidence'a bağlıdır.
 
 ## 7. V2 çalışma kuralları
 
@@ -349,19 +408,27 @@ Bu başlıklar V2 child Issue'larına yan kapsam olarak eklenemez.
 - Dokümantasyon uygulanan davranışı planlardan ayırıyor.
 - Draft PR review ve açık kullanıcı merge kararı bulunuyor.
 
-## 9. İlk production yönü
+## 9. Güncel production yönü
 
-V2'nin ilk production maddesi **Proje ve Mahal omurgasıdır**.
+V2 Items 1–4 complete'tir. Activity Catalog Runtime, typed Project Profile ve
+Dependency Catalog, Project Activity Instance Graph, deterministic Schedule
+Date Engine ve persistent immutable reference-schedule snapshots PR #444,
+#446, #448, #456 ve #459 ile merged temeldir.
 
-Önerilen child sıra:
+Güncel canonical faz:
 
-1. Proje düzenleme/arşivleme ve stable mahal sözleşmesi
-2. Mahal schema ve migration planı
-3. Repository/application implementation
-4. Proje/Mahal yönetim UI'sı
-5. Ajanda, Hatırlatıcı, Puantaj ve Beton adoption/migration
-6. Backup/restore compatibility
-7. Saha kabulü
+```text
+truth-sync complete
+→ Living 7-Day Plan MVP Core ready
+```
 
-Issue #383 yalnız repository truth-sync işidir. Bu Issue merge edilmeden V2
-production implementation'ı başlamaz.
+İlk sonraki production Issue yalnız dar **Living 7-Day Plan MVP Core**
+sözleşmesini kurar. Immediate successor **7-day UI + APK/device acceptance**
+olur. İlk usable UI/device pilotundan önce critical path/float, full Gantt,
+approved baseline, automatic reforecast, productivity learning, resource
+optimization, Primavera replacement veya AI/cloud planning başlatılmaz.
+Pilot sonrasında actual quantity/progress/reforecast ve project-specific
+productivity learning daha sonraki Living Plan evolution'ı olarak current
+direction içinde kalır. İlk UI tek başına Item 5'i complete yapmaz; final sınır
+sonraki owner kararı ve executable evidence'a bağlıdır. Items 6–13 yeniden
+sıralanmaz.

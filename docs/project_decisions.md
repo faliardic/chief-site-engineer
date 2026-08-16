@@ -3994,3 +3994,33 @@
 - Issue #439 closure PR'ı merge edilmeden Epic #385 içindeki V2.4 tamamlandı
   sayılmaz ve V2.5 current direction yapılmaz; Ready ve merge owner/review
   kapılarına bağlıdır.
+
+## Issue 460 — Güncel ürün yönü 7 Günlük Yaşayan İş Programıdır
+
+- V2 13 maddelik paket olarak kalır; Items 1–4 complete, revised Item 5
+  `7 Günlük Yaşayan İş Programı / İş ve Gün Planı` current ve not complete'tir.
+  Eski Item 6 iş/gün planı semantiği Item 5'e alınır; Günlük Log Çıktısı v1
+  Item 6'ya taşınır.
+- CSE teknik olarak binlerce inşaat aktivitesi ve deterministik bağımlılık
+  taşıyabilir; şantiye şefi aktiviteyi arar, yakın plana birkaç işlemle ekler ve
+  yalnız önündeki yedi günü güncel tutar. Living Plan, Primavera klonu veya
+  approved/contractual baseline değildir.
+- PR #444/#446/#448/#456/#459 zincirindeki Activity Catalog, typed Project
+  Profile/Dependency Catalog, Project Activity Instance Graph, Schedule Date
+  Engine ve persistent immutable reference snapshots merged technical
+  foundation'dır. Safe merge
+  `447916be0b3ddd2af75b0fe85f8c7f710f29c1cd`, schema `14`, backup format `1`
+  ve mobile version `0.1.0+1` current'tır.
+- Reference schedule suggestion/history olarak immutable kalır. Living-plan
+  kullanıcı kararları stable project/activity-instance/snapshot kimliklerine
+  referans veren ayrı mutable/evented katmanda tutulur; user action reference
+  schedule'ı sessizce yeniden yazmaz.
+- UI'dan önce yalnız tek dar Living Plan MVP Core slice'ı gelebilir. Immediate
+  successor 7-day UI + APK/device acceptance'tır; araya broad backend programı
+  girmez.
+- Critical path/float, full Gantt/Primavera replacement, approved baseline,
+  automatic reforecast, productivity learning, resource optimization ve
+  AI/cloud planning ilk usable UI/device pilotundan sonradır.
+- Bu karar source/state truth-sync'tir; Living Plan production behavior,
+  UI/APK/device acceptance, public/store release veya production readiness
+  iddiası üretmez.

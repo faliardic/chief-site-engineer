@@ -447,31 +447,43 @@ gerektirir. Project bağlantısı, link, AI veya routine işlemi scope değişti
 
 ## 11. Modül Yol Haritasının Güncel Yorumu
 
-Eski yol haritalarındaki 001-034 modül listesi tarihsel referanstır. Yalnız gerçek kullanımın kanıtladığı kişisel yardımcı araç adayları Epic #105 Faz 11'de yeniden değerlendirilir; kurumsal ürün hedefleri geri dönmez.
+Eski yol haritalarındaki 001-034 modül listesi tarihsel referanstır. Güncel V2
+ürün paketi ve sırası `docs/v2/CSE_V2_SCOPE.md` ile `ROADMAP.md` içindedir.
+Kurumsal/multi-user ürün hedefleri geri dönmez.
 
 ### Güncel öncelik sırası
 
 ```text
-0. Tek kullanıcılı kişisel saha asistanı yönünü kanonikleştir — Issue #103
-1. Saha Takibi transactional application service ve 7 günlük lazy backfill
-2. Backup/restore compatibility ve resmî export izolasyonu
-3. Mobil runtime ve veri sahipliği ADR
-4. Mobil-first Kâğıdı Bırakma Sürümü
-5. Offline ve bildirim güvenilirliği
-6. 7 günlük gerçek saha pilotu
-7. 30 günlük ana uygulama pilotu
-8. Gelişmiş mühendislik hesap defteri
-9. Günlük şantiye logu yayınlama/revizyon zinciri
-10. Canlı Proje Haritası
-11. Gerçek kullanımın kanıtladığı kişisel yardımcı araçlar
-12. Kişisel AI asistanı
+1. Proje/Mahal — complete
+2. Sicil/Puantaj V2/Saha Rehberi — complete
+3. Attachment/Fotoğraf/Medya V2 — complete
+4. Ajanda V2 + kontrollü sync — complete
+5. 7 Günlük Yaşayan İş Programı / İş ve Gün Planı — current
+6. Günlük Log Çıktısı v1
+7. İş Zinciri / Bağlı Log v1
+8. İstenecek Malzemeler
+9. Deterministik kişi/firma/etiket önerileri
+10. Telefon görüşmesi sonucu → Ajanda
+11. Proje fotoğraf/video albümü
+12. Günlük Log Çıktısı v2
+13. Mini hesap makinesi
 ```
 
-Henüz yapılmayan application service, backup compatibility, export isolation ve UI tamamlanmış gösterilemez.
+Teknik sistem binlerce inşaat aktivitesi ve deterministik bağımlılık taşıyabilir;
+şantiye şefinin kullanıcı akışı aktiviteyi bulup yakın plana birkaç işlemle
+eklemek ve yalnız önündeki yedi günü güncel tutmak kadar sade kalır. Bu living
+site plan bir Primavera klonu veya approved/contractual baseline değildir.
 
-### Mobil-first Kâğıdı Bırakma Sürümü
+Activity Catalog Runtime, typed Project Profile ve Dependency Catalog, Project
+Activity Instance Graph, deterministic Schedule Date Engine ve immutable
+persistent reference-schedule snapshots merged temeldir. UI'dan önce yalnız
+tek dar Living Plan MVP Core slice'ı gelebilir; immediate successor 7-day UI +
+APK/device acceptance olmalıdır.
 
-İlk gerçek saha pilotundan önce aşağıdaki minimum bütünleşik yüzey aynı ürün diliminde bulunmalıdır:
+### Tarihsel Mobil-first Kâğıdı Bırakma çerçevesi
+
+Bu çerçeve geçmiş ürün yönünü açıklar; güncel V2 Item 5 sırasını override etmez.
+İlk gerçek saha pilotu için tariflenen minimum bütünleşik yüzey şunlardı:
 
 - `+ Yakala` / `+ Unutma`;
 - Bugün / Şimdi ilgilen / Geciken;
@@ -503,7 +515,9 @@ Kişisel hesap otomatik resmî metraj değildir. Resmî aktarma açık kullanıc
 
 ### Günlük şantiye logu
 
-İlk Kâğıdı Bırakma Sürümü gün içindeki kayıtları gösteren zaman çizelgesi ve düzenlenebilir günlük taslağı taşır.
+Günlük Log Çıktısı v1, ilk usable Living Plan sonrasında gelir ve gerçek
+plan/progress/source kayıtlarını tüketir; primary saha-yönetimi döngüsünü
+geciktirmez.
 
 Gelişmiş günlük zincirinde taslak akşam kontrol edilip yayımlanan bir snapshot olur. Yayımlanmış günlük sessizce değişmez; düzeltme yeni revizyon veya ek ile yapılır.
 
@@ -574,35 +588,29 @@ Uzun vadeli mimari katmanlı olmalıdır:
 
 ### Güncel gerçeklik
 
-Merge edilmiş Local Field MVP'de şunlar vardır:
+Güncel ürün Flutter tabanlı, offline-first ve tek sahipli mobil uygulamadır.
+Mobile version `0.1.0+1`, SQLite schema `14`, backup format `1` ve safe merge
+`447916be0b3ddd2af75b0fe85f8c7f710f29c1cd` değeridir.
 
-- SQLite persistence ve migration runner;
-- managed attachment store ve bütünlük doğrulaması;
-- local Flask web akışı;
-- proje/gözlem create-list-detail-update;
-- revision conflict koruması ve arama;
-- günlük export;
-- backup/verify/izole restore;
-- Windows tek tık launcher;
-- Saha Takibi domain/recurrence;
-- schema v4 ve Saha Takibi repository/event persistence;
-- Saha Takibi transactional application service ve yedi günlük lazy backfill;
-- `/today`, hızlı `+ Unutma`, follow-up/routine/occurrence web yüzeyleri;
-- schema 2/3 Backup'larını schema 4'e izole Restore ve tracking round-trip;
-- personal tracking'i Günlük Çıktı v1 dışında tutan executable izolasyon.
+V2 Items 1–4 complete'tir. Merged schedule foundation şunları içerir:
 
-Mevcut sınırlar:
+- Activity Catalog Runtime;
+- typed Project Profile ve Dependency Catalog Runtime;
+- Project Activity Instance Graph;
+- deterministic Schedule Date Engine;
+- immutable persistent reference-schedule snapshots;
+- trusted date-window query.
 
-- local ve tek kullanıcı odaklıdır;
-- public internet için uygun değildir;
-- auth, authorization ve TLS yoktur;
-- mobile runtime, offline kayıt ve owner-only cihaz senkronizasyonu yoktur;
-- background notification ve scheduler yoktur;
-- scope field/conversion, archive/unarchive ve MemoryIndex/Hafıza UI yoktur;
-- Hafızayı İndir ve Proje Paketi artifact'ları yoktur;
-- app lock, güvenli session ve encryption yoktur.
+Reference snapshot öneri/history olarak immutable kalır. Living-plan kullanıcı
+kararları bunun üzerinde değil, ayrı mutable/evented katmanda saklanacaktır.
+Item 5 Living 7-Day Plan current direction'dır fakat complete değildir. UI/APK/
+device acceptance, actual quantity/progress/reforecast ve project-specific
+productivity learning henüz uygulanmamıştır.
 
-Bu nedenle “field-ready” veya “production-ready” iddiası yapılmaz.
+V1 owner saha kullanımı vardır; public/store release ve genel production
+readiness ilan edilmemiştir. Python/Flask çekirdeği tarihsel ürün omurgası ve
+sözleşme referansı olarak repository içinde korunur; güncel mobil runtime bir
+Python sunucusuna bağlanmaz.
 
 ---
 
@@ -1084,32 +1092,35 @@ Gerçek şantiye
 
 Bu bölüm kalıcı ürün politikasından ayrı bir factual snapshot'tır. Güncel durum her yeni görev başında GitHub ve yerel Git kanıtıyla yeniden doğrulanır; bu metin yeni kanıtı override etmez.
 
-### 2026-07-17 doğrulanmış merged nokta
+### 2026-08-16 doğrulanmış merged nokta
 
-- Tamamlanan Faz 0 closure görevi: Issue **#171**
-- Squash-merge PR: **#172**
+- Son schedule foundation görevi: Issue **#458**
+- Squash-merge PR: **#459**
 - `master` commit:
 
 ```text
-16dfec0e0eec76bea2370781c52f63c74ae91b96
+447916be0b3ddd2af75b0fe85f8c7f710f29c1cd
 ```
 
-- İlk PC Saha Takibi production yüzeyi Issue #119 / PR #126 ile merge edildi.
-- SQLite schema 4, Backup format 1 ve Günlük Çıktı format 1 current'tır.
-- P0.01–P0.10 repository truth, dört ADR, legacy envanteri, pilot protokolü,
-  owner-only security threat model ve closure kapısı olarak merge edildi.
-- Scope field, archive/unarchive, MemoryIndex, Hafıza UI, yeni artifact aileleri,
-  mobile/offline, app lock ve encryption uygulanmadı.
+- Mobile version `0.1.0+1`, SQLite schema `14` ve Backup format `1` current'tır.
+- V2 Items 1–4 complete'tir.
+- Activity Catalog, typed Project Profile/Dependency Catalog, Project Activity
+  Instance Graph, Schedule Date Engine ve persistent immutable reference
+  snapshots merged schedule foundation'dır.
+- Latest merged validation authority: database `22/22`, snapshot repository
+  `11/11`, Schedule Engine `23/23`, backup/restore `36/36`, full Flutter
+  `663/663`, analyze/integrity/FK PASS.
+- Living Plan UI/APK/device kabulü, progress/reforecast ve productivity learning
+  uygulanmadı.
+- Public/store release ve production readiness ilan edilmedi.
 - GitHub Actions hesabın runner/billing sınırı nedeniyle manuel olarak devre dışı kalır; yerel doğrulama zorunludur.
 
 ### Aktif production işi
 
-Issue #173, `codex/issue-173-p1-01-time-contract-migration-preflight` branch'inde
-Faz 1'in ilk dar işidir. Olay/entry/update anlamlarını, canonical UTC storage,
-`Europe/Istanbul` presentation ve yalnız explicit temp/test database için
-salt-okunur preflight'ı uygular. Schema migration, gerçek data root, P1.02 form,
-archive/unarchive ve MemoryIndex başlatmaz; merge edilene kadar current safe
-point sayılmaz.
+Issue #460 source-authority truth-sync'i production davranışı değiştirmez.
+Güncel canonical faz `truth-sync complete / Living Plan MVP Core ready`dir.
+Sonraki production işi yalnız dar Living 7-Day Plan MVP Core olabilir; onun
+immediate successor'ı 7-day UI + APK/device acceptance olmalıdır.
 
 ### Current-state doğrulama sırası
 
@@ -1210,16 +1221,30 @@ Dünya örnekleri raporunda önerilen otomatik CI ve branch protection uzun vade
 
 ## 31. Bir Sonraki Ürün Yönü
 
-Issue #171 / PR #172 merge'i sonrasında sıradaki tek faz Issue #129 Güvenilir
-Hafıza yaşam döngüsüdür. İlk dar iş Issue #173 / P1.01 olay zamanı sözleşmesi ve
-migration preflight'tır:
-`observed/occurred`, `created` ve `updated` anlamı; UTC storage;
-Europe/Istanbul presentation; geçmiş/future/DST kuralları ve mevcut satırların
-geriye uyumluluğu önce kesinleştirilir.
+Güncel 13 maddelik V2 paketinde Items 1–4 complete'tir. Revised Item 5,
+**7 Günlük Yaşayan İş Programı / İş ve Gün Planı**, current direction'dır.
 
-P1.01 tamamlanmadan geriye dönük create formu, archive/unarchive, MemoryIndex
-ve birleşik Hafıza implementation sırası atlanmaz. Her aşama ayrı ve açık GitHub
-Issue ile sınırlandırılır; henüz uygulanmayan aşama tamamlanmış gösterilmez.
+Hedef kullanıcı döngüsü:
+
+```text
+Reference schedule suggests
+→ site manager selects/adds to the seven-day plan
+→ Planlandı / Başladı / Tamamlandı / Ertelendi
+→ actual field evidence is recorded
+→ dependent planning can later be recalculated
+→ project-specific productivity learning follows real data
+```
+
+Reference schedule immutable suggestion/history olarak kalır; living-plan user
+decisions ayrı mutable/evented layer'da stable project/activity-instance/
+snapshot kimliklerine referans verir. İlk sonraki production Issue yalnız dar
+Living Plan MVP Core'dur. Immediate successor 7-day UI + APK/device acceptance
+olmalıdır; başka geniş backend fazı araya giremez.
+
+Critical path/float, full Gantt/Primavera replacement, approved baseline,
+automatic reforecast, productivity learning, resource optimization ve AI/cloud
+planning ilk usable UI/device pilotundan sonradır. Item 5 UI/APK/device kabulü
+olmadan complete sayılmaz.
 
 ---
 
@@ -1276,9 +1301,8 @@ docs/protocols/CSE_PROJECT_INSTRUCTIONS.md
 ## 33. Saha Takibi v0.1 Bağlayıcı Sözleşme Kaydı
 
 Issue #98 ve Epic #97 Saha Takibi domain sözleşmesini belirler. Bu bölüm
-uygulanmış çekirdeğin bağlayıcı kurallarını korur; güncel ürün işi §31'deki
-Issue #173 / Faz 1 / P1.01'dir. Üst ürün yönü ve faz sırası için bağlayıcı
-kaynak Epic #105 ve yürütme programı Issue #127'dir.
+uygulanmış çekirdeğin tarihsel bağlayıcı kurallarını korur; güncel ürün işi ve
+faz sırası §31, `docs/v2/CSE_V2_SCOPE.md` ve `ROADMAP.md` içindedir.
 
 İlk kapsam üç ayrı domain kaydıdır:
 
@@ -1326,7 +1350,7 @@ Kesin domain, recurrence, persistence, backup/restore ve export exclusion sözle
 docs/field_tracking_v0_1_contract.md
 ```
 
-Implementation durumu ve sırası:
+Bu sözleşme kaydedildiğindeki tarihsel implementation durumu ve sırası:
 
 1. Domain/recurrence — tamamlandı.
 2. Schema v3/repository/event persistence — PR #104 ile tamamlandı.
@@ -1335,5 +1359,7 @@ Implementation durumu ve sırası:
 5. Mobil runtime ve veri sahipliği ADR — bekliyor.
 6. Mobil-first Kâğıdı Bırakma Sürümü — bekliyor.
 7. Offline ve bildirim güvenilirliği — bekliyor.
+
+Bu tarihsel liste current V2 completion veya next-work kaynağı değildir.
 
 Mobil runtime, offline ve notification; auth/multi-user/cloud ile aynı uzak hedef değildir ve gerçek saha pilotlarından önce gelir. Kişisel AI, temiz veri omurgası ve saha pilotlarından sonra gelir.

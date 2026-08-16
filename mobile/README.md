@@ -8,16 +8,18 @@ kullanır. Mobil runtime Python/Flask sunucusuna bağlanmaz.
 
 | Alan | Değer |
 | --- | --- |
-| Ürün fazı | V1 tamamlandı; V2 planlama başladı |
+| Ürün fazı | V1 tamamlandı; V2 Items 1–4 complete; Living Plan Item 5 current |
 | V1 baseline | `7c9f65a811c9f4bca561adab6bd1f8e64e6908cc` |
 | Son baseline PR | `#382` |
+| Güncel güvenli merge | `447916be0b3ddd2af75b0fe85f8c7f710f29c1cd` |
+| Son schedule foundation PR | `#459` |
 | Flutter proje adı | `chief_site_engineer` |
 | Uygulama sürümü | `0.1.0+1` |
 | Android release ID | `com.faliardic.chiefsiteengineer` |
 | Android debug ID | `com.faliardic.chiefsiteengineer.debug` |
 | iOS release ID | `com.faliardic.chiefsiteengineer` |
 | iOS debug ID | `com.faliardic.chiefsiteengineer.debug` |
-| Mobil schema | `10` |
+| Mobil schema | `14` |
 | Backup formatı | `1` |
 | Canonical timezone | `Europe/Istanbul` |
 | Android compile/target SDK | `36 / 36` |
@@ -61,6 +63,10 @@ sunumu ve local-date kararları `Europe/Istanbul` kullanır.
 | `8` | All-day reminder, sade lifecycle vocabulary ve source constraints |
 | `9` | Reminder çöp/geri yükleme yaşam döngüsü |
 | `10` | Proje Beton sınıfı kataloğu ve paket–Ajanda bağı |
+| `11` | Stable Proje/Mahal kimliği ve adoption migration'ları |
+| `12` | Canonical sicil/kişi/firma kimlik grafiği |
+| `13` | Ortak managed attachment ve entity-link omurgası |
+| `14` | Immutable persistent reference-schedule snapshots ve window-read bütünlüğü |
 
 Migration'lar atomiktir. Hata yarım tablo veya yarım event bırakmadan rollback
 olur. Physical delete ana aggregate'lerde kullanılmaz; event tabloları
@@ -98,8 +104,8 @@ append-only, mutation'lar expected revision ve idempotent event ID kullanır.
 - Kaynağa bağlı çalışma günü reminder'ı
 
 V2 içinde aynı kişi ve firma kimlikleri ortak Saha Rehberi omurgasına
-taşınacaktır. Bu plan henüz yeni schema veya migration uygulanmış olduğu
-anlamına gelmez.
+taşınmıştır. Items 1–4 complete'tir; geçmiş Puantaj ve Sicil bağları canonical
+kimliklerle korunur.
 
 ## Beton paketi
 
@@ -133,23 +139,30 @@ manifest içine yazılmaz.
 
 ## CSE V2 veri yönü
 
-V2'nin ilk temel zinciri:
+V2'nin güncel temel zinciri:
 
 ```text
-Stable Proje/Mahal ID
-→ Ortak kişi/firma ID
-→ Ortak attachment/link
-→ Ajanda ve Hatırlatıcı kaynak ilişkisi
-→ İş ve günlük log read-modeli
+Stable Proje/Mahal ID — complete
+→ Ortak kişi/firma ID — complete
+→ Ortak attachment/link — complete
+→ Ajanda ve Hatırlatıcı kaynak ilişkisi — complete
+→ schedule runtime + persistent reference snapshots — merged
+→ Living 7-Day Plan MVP Core — ready
+→ 7-day UI + APK/device acceptance — next
 ```
 
 Kanonik kapsam:
 
 [`../docs/v2/CSE_V2_SCOPE.md`](../docs/v2/CSE_V2_SCOPE.md)
 
-İlk production maddesi Proje ve Mahal omurgasıdır. V2 planning çalışması yeni
-schema numarası ilan etmez; schema ancak migration implementation'ı ve testleri
-tamamlandığında yükseltilir.
+Reference schedule immutable suggestion/history olarak kalır. Living Plan
+kullanıcı kararları stable project/activity-instance/snapshot kimliklerine
+referans veren ayrı mutable/evented katmanda tutulacaktır; user action reference
+schedule'ı sessizce yeniden yazmayacaktır. UI'dan önce yalnız tek dar core slice
+açılabilir ve immediate successor 7-day UI + APK/device acceptance olmalıdır.
+
+Item 5 henüz complete değildir; Living Plan UI/APK/device acceptance,
+actual/progress/reforecast ve productivity learning uygulanmış sayılmaz.
 
 ## Geliştirici komutları
 
@@ -184,6 +197,8 @@ Ayrıntılar:
 
 - V1 owner saha kullanımı vardır.
 - Kamuya açık production/store release ilan edilmemiştir.
-- V2 planlama ve repository truth-sync aşamasındadır.
+- V2 Items 1–4 complete'tir; Item 5 Living 7-Day Plan current direction'dır.
+- Schedule runtime ve persistent immutable snapshot foundation merged'dür.
+- Living Plan UI/APK/device kabulü ve production readiness ilan edilmemiştir.
 - Eski #279, PR #259, Orchestrator, Bridge ve Work Mode kayıtları güncel mobil
   capability veya V2 blocker'ı değildir.
