@@ -13,6 +13,7 @@ import 'package:sqflite/sqflite.dart';
 typedef ConstructionScheduleSnapshotIdFactory = String Function();
 typedef ConstructionScheduleActivityInsertHook =
     Future<void> Function(int index, ConstructionScheduledActivity activity);
+typedef ConstructionScheduleWindowIntegrityHook = Future<void> Function();
 
 class ConstructionScheduleSnapshotRepository {
   ConstructionScheduleSnapshotRepository({
@@ -21,6 +22,7 @@ class ConstructionScheduleSnapshotRepository {
     ConstructionScheduleDateEngine? dateEngine,
     ConstructionScheduleSnapshotIdFactory? idFactory,
     this.beforeActivityInsert,
+    this.afterWindowIntegrityCheck,
   }) : _dateEngine = dateEngine ?? ConstructionScheduleDateEngine(),
        _idFactory = idFactory ?? RecordId.randomUuid;
 
@@ -51,6 +53,7 @@ class ConstructionScheduleSnapshotRepository {
   final ConstructionScheduleDateEngine _dateEngine;
   final ConstructionScheduleSnapshotIdFactory _idFactory;
   final ConstructionScheduleActivityInsertHook? beforeActivityInsert;
+  final ConstructionScheduleWindowIntegrityHook? afterWindowIntegrityCheck;
 
   Future<ConstructionScheduleSnapshot> persistCurrentSnapshot({
     required ConstructionProjectReferenceSchedule schedule,
@@ -104,7 +107,7 @@ class ConstructionScheduleSnapshotRepository {
 
       final current = await transaction.query(
         'project_schedule_snapshots',
-        columns: const ['id'],
+        columns: const ['id', 'generated_at'],
         where: 'project_id = ? AND superseded_at IS NULL',
         whereArgs: [schedule.projectId],
         limit: 2,
@@ -115,6 +118,15 @@ class ConstructionScheduleSnapshotRepository {
         );
       }
       if (current.isNotEmpty) {
+        final currentGeneratedAt = _parseStoredTimestamp(
+          current.single['generated_at'],
+        );
+        final proposedGeneratedAt = _parseStoredTimestamp(generatedAt);
+        if (proposedGeneratedAt.isBefore(currentGeneratedAt)) {
+          throw const ConstructionScheduleSnapshotFailure(
+            'schedule_snapshot_clock_regression',
+          );
+        }
         final updated = await transaction.update(
           'project_schedule_snapshots',
           {'superseded_at': generatedAt},
@@ -271,40 +283,58 @@ class ConstructionScheduleSnapshotRepository {
         'invalid_schedule_snapshot_window',
       );
     }
-    final current = await database.database.query(
-      'project_schedule_snapshots',
-      columns: _metadataColumns,
-      where: 'project_id = ? AND superseded_at IS NULL',
-      whereArgs: [projectId],
-      limit: 2,
-    );
-    if (current.length > 1) {
-      throw const ConstructionScheduleSnapshotFailure(
-        'multiple_current_schedule_snapshots',
+    return database.database.transaction((transaction) async {
+      final current = await transaction.query(
+        'project_schedule_snapshots',
+        columns: _metadataColumns,
+        where: 'project_id = ? AND superseded_at IS NULL',
+        whereArgs: [projectId],
+        limit: 2,
       );
-    }
-    if (current.isEmpty) {
-      return const [];
-    }
-    final metadata = _metadataAndProfile(current.single).$1;
-    final rows = await database.database.query(
-      'project_schedule_snapshot_activities',
-      where: '''
-        project_id = ? AND snapshot_id = ?
-        AND start_date <= ? AND finish_date >= ?
-      ''',
-      whereArgs: [projectId, metadata.snapshotId, finish, start],
-      orderBy: 'start_date ASC, finish_date ASC, instance_id ASC',
-    );
-    return List.unmodifiable(
-      rows.map(
-        (row) => _activityFromRow(
-          row,
-          expectedProjectId: projectId,
-          expectedSnapshotId: metadata.snapshotId,
+      if (current.length > 1) {
+        throw const ConstructionScheduleSnapshotFailure(
+          'multiple_current_schedule_snapshots',
+        );
+      }
+      if (current.isEmpty) {
+        return const <ConstructionScheduledActivity>[];
+      }
+      final metadata = _metadataAndProfile(current.single).$1;
+      final storedActivityCount = Sqflite.firstIntValue(
+        await transaction.rawQuery(
+          '''
+          SELECT count(*)
+          FROM project_schedule_snapshot_activities
+          WHERE snapshot_id = ?
+        ''',
+          [metadata.snapshotId],
         ),
-      ),
-    );
+      );
+      if (storedActivityCount != metadata.activityCount) {
+        throw const ConstructionScheduleSnapshotFailure(
+          'schedule_snapshot_activity_count_mismatch',
+        );
+      }
+      await afterWindowIntegrityCheck?.call();
+      final rows = await transaction.query(
+        'project_schedule_snapshot_activities',
+        where: '''
+          project_id = ? AND snapshot_id = ?
+          AND start_date <= ? AND finish_date >= ?
+        ''',
+        whereArgs: [projectId, metadata.snapshotId, finish, start],
+        orderBy: 'start_date ASC, finish_date ASC, instance_id ASC',
+      );
+      return List.unmodifiable(
+        rows.map(
+          (row) => _activityFromRow(
+            row,
+            expectedProjectId: projectId,
+            expectedSnapshotId: metadata.snapshotId,
+          ),
+        ),
+      );
+    });
   }
 
   Future<ConstructionScheduleSnapshot> _loadSnapshot(
@@ -382,19 +412,7 @@ String constructionScheduleSnapshotProjectionJson(
       );
     }
     previousInstanceId = activity.instanceId;
-    projection.add(<String, Object?>{
-      'activity_id': activity.activityId,
-      'duration_calendar_type': activity.durationCalendarType.jsonValue,
-      'duration_confidence': activity.durationConfidence.jsonValue,
-      'duration_days': activity.durationDays,
-      'duration_status': activity.durationStatus.jsonValue,
-      'finish_date': formatCanonicalConstructionDate(activity.finishDate),
-      'instance_id': activity.instanceId,
-      'is_isolated': activity.isIsolated,
-      'is_milestone': activity.isMilestone,
-      'rounded_scheduling_days': activity.roundedSchedulingDays,
-      'start_date': formatCanonicalConstructionDate(activity.startDate),
-    });
+    projection.add(_activityProjection(activity));
   }
   return jsonEncode(projection);
 }
@@ -406,6 +424,34 @@ String constructionScheduleSnapshotProjectionSha256(
       utf8.encode(constructionScheduleSnapshotProjectionJson(activities)),
     )
     .toString();
+
+String constructionScheduleSnapshotActivityProjectionJson(
+  ConstructionScheduledActivity activity,
+) => jsonEncode(_activityProjection(activity));
+
+String constructionScheduleSnapshotActivitySha256(
+  ConstructionScheduledActivity activity,
+) => sha256
+    .convert(
+      utf8.encode(constructionScheduleSnapshotActivityProjectionJson(activity)),
+    )
+    .toString();
+
+Map<String, Object?> _activityProjection(
+  ConstructionScheduledActivity activity,
+) => <String, Object?>{
+  'activity_id': activity.activityId,
+  'duration_calendar_type': activity.durationCalendarType.jsonValue,
+  'duration_confidence': activity.durationConfidence.jsonValue,
+  'duration_days': activity.durationDays,
+  'duration_status': activity.durationStatus.jsonValue,
+  'finish_date': formatCanonicalConstructionDate(activity.finishDate),
+  'instance_id': activity.instanceId,
+  'is_isolated': activity.isIsolated,
+  'is_milestone': activity.isMilestone,
+  'rounded_scheduling_days': activity.roundedSchedulingDays,
+  'start_date': formatCanonicalConstructionDate(activity.startDate),
+};
 
 Map<String, Object?> _activityRow({
   required String snapshotId,
@@ -425,6 +471,7 @@ Map<String, Object?> _activityRow({
   'duration_confidence': activity.durationConfidence.jsonValue,
   'is_milestone': activity.isMilestone ? 1 : 0,
   'is_isolated': activity.isIsolated ? 1 : 0,
+  'row_sha256': constructionScheduleSnapshotActivitySha256(activity),
 };
 
 ConstructionScheduledActivity _activityFromRow(
@@ -464,8 +511,9 @@ ConstructionScheduledActivity _activityFromRow(
       'invalid_schedule_snapshot_activity_dates',
     );
   }
+  late ConstructionScheduledActivity activity;
   try {
-    return ConstructionScheduledActivity(
+    activity = ConstructionScheduledActivity(
       instanceId: instanceId,
       activityId: activityId,
       startDate: start,
@@ -489,6 +537,15 @@ ConstructionScheduledActivity _activityFromRow(
       'invalid_schedule_snapshot_activity_enum',
     );
   }
+  final storedRowSha256 = row['row_sha256'];
+  if (storedRowSha256 is! String ||
+      !RegExp(r'^[0-9a-f]{64}$').hasMatch(storedRowSha256) ||
+      constructionScheduleSnapshotActivitySha256(activity) != storedRowSha256) {
+    throw const ConstructionScheduleSnapshotFailure(
+      'schedule_snapshot_activity_fingerprint_mismatch',
+    );
+  }
+  return activity;
 }
 
 (ConstructionScheduleSnapshotMetadata, ConstructionProjectProfile)

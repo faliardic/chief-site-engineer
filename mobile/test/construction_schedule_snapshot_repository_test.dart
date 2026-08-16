@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:chief_site_engineer/application/construction_schedule_date_engine.dart';
@@ -101,6 +102,22 @@ void main() {
           scenario.schedule.scheduledActivities.reversed,
         ),
         stored.metadata.projectionSha256,
+      );
+      final persistedRows = await database.database.query(
+        'project_schedule_snapshot_activities',
+        where: 'snapshot_id = ?',
+        whereArgs: ['snapshot-a'],
+        orderBy: 'instance_id ASC',
+      );
+      expect(
+        persistedRows.map((row) => row['row_sha256']),
+        orderedEquals(
+          stored.activities.map(constructionScheduleSnapshotActivitySha256),
+        ),
+      );
+      expect(
+        persistedRows.map((row) => row['row_sha256']),
+        everyElement(matches(r'^[0-9a-f]{64}$')),
       );
       expect(
         stored.activities
@@ -239,6 +256,79 @@ void main() {
   );
 
   test(
+    'backward clock fails before mutation and preserves current snapshot',
+    () async {
+      final firstRepository = _repository(
+        database,
+        snapshotId: 'snapshot-a',
+        generatedAt: DateTime.utc(2026, 8, 16, 8),
+      );
+      final first = await _persist(firstRepository, scenario);
+      final metadataBefore = await database.database.query(
+        'project_schedule_snapshots',
+        orderBy: 'id ASC',
+      );
+      final activitiesBefore = await database.database.query(
+        'project_schedule_snapshot_activities',
+        orderBy: 'snapshot_id ASC, instance_id ASC',
+      );
+
+      final regressedRepository = _repository(
+        database,
+        snapshotId: 'snapshot-b',
+        generatedAt: DateTime.utc(2026, 8, 16, 7),
+      );
+      await expectLater(
+        _persist(regressedRepository, scenario),
+        throwsA(
+          isA<ConstructionScheduleSnapshotFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'schedule_snapshot_clock_regression',
+          ),
+        ),
+      );
+
+      expect(
+        await database.database.query(
+          'project_schedule_snapshots',
+          orderBy: 'id ASC',
+        ),
+        metadataBefore,
+      );
+      expect(
+        await database.database.query(
+          'project_schedule_snapshot_activities',
+          orderBy: 'snapshot_id ASC, instance_id ASC',
+        ),
+        activitiesBefore,
+      );
+      final current = await firstRepository.loadCurrentSnapshot(
+        scenario.profile.projectId,
+      );
+      expect(current?.metadata.snapshotId, 'snapshot-a');
+      expect(current?.metadata.supersededAt, isNull);
+      expect(
+        current?.metadata.projectionSha256,
+        first.metadata.projectionSha256,
+      );
+      expect(
+        _activityProjection(current!.activities),
+        _activityProjection(first.activities),
+      );
+      expect(await firstRepository.loadSnapshotById('snapshot-b'), isNull);
+      expect(
+        await database.database.query(
+          'project_schedule_snapshot_activities',
+          where: 'snapshot_id = ?',
+          whereArgs: ['snapshot-b'],
+        ),
+        isEmpty,
+      );
+    },
+  );
+
+  test(
     'invalid schedule is rejected before any persistence mutation',
     () async {
       final repository = _repository(
@@ -307,6 +397,43 @@ void main() {
       Future<void> expectCorruptLoad() => expectLater(
         repository.loadSnapshotById('snapshot-a'),
         throwsA(isA<ConstructionScheduleSnapshotFailure>()),
+      );
+
+      await db.update(
+        'project_schedule_snapshot_activities',
+        {'activity_id': 'ACT-B-CORRUPTED'},
+        where: 'snapshot_id = ? AND instance_id = ?',
+        whereArgs: ['snapshot-a', 'ACT-B@PROJECT'],
+      );
+      await expectLater(
+        repository.loadCurrentSnapshot(scenario.profile.projectId),
+        throwsA(
+          isA<ConstructionScheduleSnapshotFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'schedule_snapshot_activity_fingerprint_mismatch',
+          ),
+        ),
+      );
+      await expectLater(
+        repository.queryCurrentActivities(
+          projectId: scenario.profile.projectId,
+          windowStart: _date('2026-09-08'),
+          windowEnd: _date('2026-09-09'),
+        ),
+        throwsA(
+          isA<ConstructionScheduleSnapshotFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'schedule_snapshot_activity_fingerprint_mismatch',
+          ),
+        ),
+      );
+      await db.update(
+        'project_schedule_snapshot_activities',
+        {'activity_id': 'ACT-B'},
+        where: 'snapshot_id = ? AND instance_id = ?',
+        whereArgs: ['snapshot-a', 'ACT-B@PROJECT'],
       );
 
       await db.update(
@@ -406,6 +533,20 @@ void main() {
         repository.loadSnapshotById('snapshot-a'),
         throwsA(isA<ConstructionScheduleSnapshotFailure>()),
       );
+      await expectLater(
+        repository.queryCurrentActivities(
+          projectId: scenario.profile.projectId,
+          windowStart: _date('2026-09-08'),
+          windowEnd: _date('2026-09-09'),
+        ),
+        throwsA(
+          isA<ConstructionScheduleSnapshotFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'schedule_snapshot_activity_count_mismatch',
+          ),
+        ),
+      );
 
       await db.execute('DROP INDEX project_schedule_snapshots_one_current');
       final metadataRow = (await db.query(
@@ -450,6 +591,84 @@ void main() {
       throwsA(isA<ConstructionCorpusFailure>()),
     );
   });
+
+  test(
+    'window read and replacement share one consistent database boundary',
+    () async {
+      final firstRepository = _repository(
+        database,
+        snapshotId: 'snapshot-a',
+        generatedAt: DateTime.utc(2026, 8, 16, 8),
+      );
+      await _persist(firstRepository, scenario);
+      final replacementScenario = _scheduleScenario(
+        scheduleStart: '2026-10-02',
+      );
+
+      final integrityChecked = Completer<void>();
+      final releaseWindowRead = Completer<void>();
+      final replacementEnteredMutation = Completer<void>();
+      final readRepository = ConstructionScheduleSnapshotRepository(
+        database: database,
+        clock: () => DateTime.utc(2026, 8, 16, 8),
+        idFactory: () => 'unused-read-id',
+        afterWindowIntegrityCheck: () async {
+          integrityChecked.complete();
+          await releaseWindowRead.future;
+        },
+      );
+      final replacementRepository = ConstructionScheduleSnapshotRepository(
+        database: database,
+        clock: () => DateTime.utc(2026, 8, 16, 9),
+        idFactory: () => 'snapshot-b',
+        beforeActivityInsert: (_, _) async {
+          if (!replacementEnteredMutation.isCompleted) {
+            replacementEnteredMutation.complete();
+          }
+        },
+      );
+
+      final oldWindowFuture = readRepository.queryCurrentActivities(
+        projectId: scenario.profile.projectId,
+        windowStart: _date('2026-09-01'),
+        windowEnd: _date('2026-09-30'),
+      );
+      await integrityChecked.future;
+      final replacementFuture = _persist(
+        replacementRepository,
+        replacementScenario,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(replacementEnteredMutation.isCompleted, isFalse);
+      releaseWindowRead.complete();
+
+      final oldWindow = await oldWindowFuture;
+      await replacementFuture;
+      expect(
+        _activityProjection(oldWindow),
+        _activityProjection(
+          _windowOrdered(scenario.schedule.scheduledActivities),
+        ),
+      );
+      expect(replacementEnteredMutation.isCompleted, isTrue);
+
+      final newWindow = await replacementRepository.queryCurrentActivities(
+        projectId: scenario.profile.projectId,
+        windowStart: _date('2026-10-01'),
+        windowEnd: _date('2026-10-31'),
+      );
+      expect(
+        _activityProjection(newWindow),
+        _activityProjection(
+          _windowOrdered(replacementScenario.schedule.scheduledActivities),
+        ),
+      );
+      expect(
+        formatCanonicalConstructionDate(oldWindow.first.startDate),
+        isNot(formatCanonicalConstructionDate(newWindow.first.startDate)),
+      );
+    },
+  );
 }
 
 ConstructionScheduleSnapshotRepository _repository(
@@ -480,12 +699,12 @@ Future<void> _insertProject(AppDatabase database, String projectId) =>
       'updated_at': '2026-08-16T06:00:00Z',
     });
 
-_ScheduleScenario _scheduleScenario() {
+_ScheduleScenario _scheduleScenario({String scheduleStart = '2026-09-04'}) {
   final profile = validConstructionProjectProfile(
     overrides: {
       'project_id': 'PRJ-SNAPSHOT',
       'calendar': <String, Object?>{
-        'start_date': '2026-09-04',
+        'start_date': scheduleStart,
         'working_weekdays': <Object?>[0, 1, 2, 3, 4, 5],
         'holidays': <Object?>['2026-09-07'],
         'workday_hours': 8,
@@ -613,6 +832,21 @@ ConstructionResolvedDependencyEdge _edge(
 );
 
 DateTime _date(String value) => parseCanonicalConstructionDate(value);
+
+List<ConstructionScheduledActivity> _windowOrdered(
+  Iterable<ConstructionScheduledActivity> activities,
+) => activities.toList(growable: false)
+  ..sort((left, right) {
+    final start = left.startDate.compareTo(right.startDate);
+    if (start != 0) {
+      return start;
+    }
+    final finish = left.finishDate.compareTo(right.finishDate);
+    if (finish != 0) {
+      return finish;
+    }
+    return left.instanceId.compareTo(right.instanceId);
+  });
 
 List<Map<String, Object?>> _activityProjection(
   Iterable<ConstructionScheduledActivity> activities,

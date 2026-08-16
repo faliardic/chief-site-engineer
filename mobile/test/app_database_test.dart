@@ -172,6 +172,13 @@ void main() {
         'generated_at': '2026-07-19T09:00:00Z',
       };
 
+      await expectLater(
+        db.insert('project_schedule_snapshots', {
+          ...snapshotRow('snapshot-noncanonical-generated'),
+          'generated_at': '2026-07-19T09:00:00.000Z',
+        }),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
       await db.insert('project_schedule_snapshots', snapshotRow('snapshot-1'));
       await expectLater(
         db.insert('project_schedule_snapshots', snapshotRow('snapshot-2')),
@@ -191,7 +198,27 @@ void main() {
         'duration_confidence': 'E_UNKNOWN',
         'is_milestone': 1,
         'is_isolated': 1,
+        'row_sha256': '1' * 64,
       });
+      await expectLater(
+        db.insert('project_schedule_snapshot_activities', {
+          'snapshot_id': 'snapshot-1',
+          'project_id': 'schedule-project',
+          'instance_id': 'invalid-row-seal',
+          'activity_id': 'activity-1',
+          'start_date': '2026-09-01',
+          'finish_date': '2026-09-01',
+          'duration_days': 0.0,
+          'rounded_scheduling_days': 0,
+          'duration_calendar_type': 'WORKING_DAY',
+          'duration_status': 'UNKNOWN',
+          'duration_confidence': 'E_UNKNOWN',
+          'is_milestone': 1,
+          'is_isolated': 1,
+          'row_sha256': 'A' * 64,
+        }),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
       await expectLater(
         db.update('project_schedule_snapshot_activities', {
           'activity_id': 'changed',
@@ -200,6 +227,24 @@ void main() {
       );
       await expectLater(
         db.delete('project_schedule_snapshot_activities'),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.update(
+          'project_schedule_snapshots',
+          {'superseded_at': '2026-07-19T10:00:00.000Z'},
+          where: 'id = ?',
+          whereArgs: ['snapshot-1'],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.update(
+          'project_schedule_snapshots',
+          {'superseded_at': '2026-07-19T08:59:59Z'},
+          where: 'id = ?',
+          whereArgs: ['snapshot-1'],
+        ),
         throwsA(isA<sqflite.DatabaseException>()),
       );
       await expectLater(
@@ -253,6 +298,7 @@ void main() {
           'duration_confidence': 'E_UNKNOWN',
           'is_milestone': 1,
           'is_isolated': 1,
+          'row_sha256': '2' * 64,
         }),
         throwsA(isA<sqflite.DatabaseException>()),
       );

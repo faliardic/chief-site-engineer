@@ -142,3 +142,143 @@ review_recommendation:
   residual_uncertainty: "Runtime actual model/effort metadata görünmüyor; invocation ve runtime unverified."
   escalation_condition: "Unexpected production diff, schema/backup evidence contradiction, fingerprint incompatibility veya review sırasında yeni R4 bütünlük riski."
 ```
+
+---
+
+## PR #459 post-review correction run #1 — fail-closed publication stop
+
+### Durum
+
+`LOCAL CORRECTION VERIFIED / NOT PUBLISHED` — Owner correction sözleşmesindeki
+“Any failure ... no correction commit/push or publication claim” stop sınırı
+uygulandı. Local correction source bütün final kapılardan geçse de bu run içinde
+iki komut önce non-zero sonuç verdiği için correction commit/push yapılmadı.
+
+- Correction authorization:
+  https://github.com/faliardic/chief-site-engineer/pull/459#issuecomment-5305964581
+- Reviewed branch head: `d1354344229835e267bd3d48a3320d87eea0207d`
+- Existing branch: `codex/issue-458-schedule-snapshot-foundation`
+- `review_correction_runs: 1`
+- Local correction changes: uncommitted
+- Remote branch / Draft PR head: değiştirilmedi; `d1354344229835e267bd3d48a3320d87eea0207d`
+- Ready/merge/deploy/next Slice: yapılmadı
+
+### Uygulanan local correction
+
+- Schema version `14` kaldı; migration 14 içine canonical UTC-second
+  `generated_at` / non-null `superseded_at` CHECK'leri ve
+  `superseded_at >= generated_at` durable sınırı eklendi.
+- Supersede-only trigger aynı canonical/monotonic timestamp sınırını ayrıca
+  uyguluyor.
+- Replacement transaction current snapshot'ın `generated_at` değerini okuyor;
+  daha erken proposed time, mutation öncesinde
+  `schedule_snapshot_clock_regression` üretiyor.
+- Activity tablosuna exact mevcut persisted row projection'dan üretilen,
+  lowercase 64-char SHA-256 `row_sha256` seal'i eklendi; full load ve window
+  read her dönen satırda seal'i doğruluyor.
+- Window read current metadata, total stored row count ve overlap row sorgusunu
+  tek SQLite read transaction/database snapshot içinde çalıştırıyor; bütün
+  snapshot satırlarını materialize etmiyor.
+- Full-snapshot canonical projection alanları ve hard-coded
+  `e3fa78d2aa8eebd238d8b2320e35fce6f15d4bc2988caab447057b591d35d617`
+  projection SHA semantiği değişmedi.
+
+### Fail-closed stop'u tetikleyen komutlar
+
+1. İlk formatter çağrısı PATH'te `dart` bulunmadığı için komut çözümleme
+   hatasıyla non-zero döndü; repository mutation üretmedi. Exact cached Flutter
+   SDK Dart yolu doğrulanıp format kapısı başarıyla çalıştırıldı.
+2. İlk repository focused run `8 PASS / 1 FAIL` döndü. Yeni consistency testinin
+   expected listesi instance sırasındaydı; window API'nin sözleşmeli
+   `start_date, finish_date, instance_id` sırasıyla karşılaştırma yapıyordu.
+   Yalnız test expectation sırası düzeltildi; final repository focused run
+   `9/9 PASS` oldu.
+
+Bu iki sonuç giderilmiş olsa da owner correction yorumunun stricter stop
+sınırı nedeniyle aşağıdaki PASS kanıtları commit/push yetkisi olarak
+yorumlanmadı.
+
+### Final local validation evidence
+
+- Changed Dart format: PASS; exact cached SDK kullanıldı.
+- Database/migration: `22/22 PASS`.
+  - canonical olmayan generated/superseded timestamp reddi;
+  - `superseded_at < generated_at` reddi;
+  - invalid row-seal reddi;
+  - SQLite `integrity_check = ok`;
+  - SQLite `foreign_key_check = empty`.
+- Snapshot repository final: `9/9 PASS`.
+  - `08:00` A sonrası `07:00` B stable clock regression;
+  - A metadata/activity rows exact unchanged, sole current/loadable,
+    `superseded_at == null`, same full projection SHA; B row yok;
+  - syntactically valid overlapping-row corruption full/window fail closed;
+  - non-window row deletion cheap total-count mismatch ile fail closed;
+  - deterministic read/replacement interleave tam eski veya tam yeni window
+    gözlemliyor; replacement read transaction bitmeden mutation'a girmiyor.
+- Schedule Date Engine regression/parity: `23/23 PASS`; P01/P02/P03 ve
+  Sunday/holiday/synthetic `0 / 0 / 0` değişmedi.
+- Backup/restore: final affected source üzerinde `36/36 PASS`; format `1`,
+  schema-14 roundtrip ve schema-13 restore/migrate-to-14 PASS.
+- `flutter analyze --no-pub`: PASS, no issues.
+- `git diff --check`: PASS.
+- Exact correction changed-file set: aşağıdaki altı dosya; unexpected `0`.
+- Final full `flutter test --no-pub`: tek run, `661/661 PASS`.
+- Protected production/test paths, domain model, backup code/test,
+  stale-schema testleri, Schedule Date Engine, UI/platform/config,
+  `.gitattributes`, pubspec/lock drift: `0`.
+- Corpus/dependency/schedule-seed asset drift: `0`; SHA-256 değerleri original
+  Issue #458 result kanıtıyla aynıdır.
+- Schema `14`; Backup format `1`.
+- APK/AAB/device/release/notification gates çalıştırılmadı; değişen contract
+  bunları etkilemiyor.
+
+Correction local changed-file set:
+
+- `.cse/tasks/458_task.md`
+- `.cse/results/458_result.md`
+- `mobile/lib/storage/app_database.dart`
+- `mobile/lib/application/construction_schedule_snapshot_repository.dart`
+- `mobile/test/app_database_test.dart`
+- `mobile/test/construction_schedule_snapshot_repository_test.dart`
+
+### Publication boundary
+
+- Correction commit: yapılmadı.
+- Push: yapılmadı.
+- PR #459: mevcut remote head'de Draft kalır.
+- Issue/PR completion publication: yapılmadı.
+- Remaining blocker: owner'ın transient/pre-publication failures sonrasında
+  verified local correction'ın commit/push edilmesine yeni açık izin vermesi.
+
+```yaml
+execution_record:
+  requested_model: "gpt-5.6-sol"
+  actual_model: "unknown"
+  requested_reasoning_effort: "max"
+  actual_reasoning_effort: "unknown"
+  execution_mode: "standard"
+  orchestration: "single-agent"
+  routing_request_evidence: "https://github.com/faliardic/chief-site-engineer/pull/459#issuecomment-5305964581"
+  invocation_evidence: null
+  invocation_verification_status: "unverified"
+  mismatch_detected: null
+  runtime_verification_status: "unverified"
+```
+
+```yaml
+review_recommendation:
+  risk_observed: "R4"
+  recommended_chatgpt_model: "gpt-5.6-sol"
+  recommended_reasoning_effort: "max"
+  recommended_mode: "standard"
+  recommendation_reason: "Schema-14 integrity and current-window trust corrections are locally verified, but the explicit any-failure publication stop requires owner review."
+  must_review:
+    - "canonical and monotonic timestamp CHECK/trigger boundaries"
+    - "pre-mutation schedule_snapshot_clock_regression rollback evidence"
+    - "per-row seal generation/verification and unchanged full projection SHA"
+    - "single-transaction current/count/window read consistency"
+    - "initial command failures versus explicit publication stop semantics"
+    - "runtime model/reasoning verification uncertainty"
+  residual_uncertainty: "Runtime actual model/effort is hidden; correction remains uncommitted and unpushed pending new owner authorization."
+  escalation_condition: "No correction commit/push without explicit owner authorization that acknowledges the recorded transient command failures."
+```

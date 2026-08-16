@@ -3035,8 +3035,25 @@ Future<void> _applyConstructionScheduleSnapshotMigration(
         length(projection_sha256) = 64
         AND projection_sha256 NOT GLOB '*[^0-9a-f]*'
       ),
-      generated_at TEXT NOT NULL CHECK (length(generated_at) > 0),
-      superseded_at TEXT,
+      generated_at TEXT NOT NULL CHECK (
+        length(generated_at) = 20
+        AND generated_at GLOB
+          '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+        AND strftime(
+          '%Y-%m-%dT%H:%M:%SZ', generated_at, '+0 seconds'
+        ) = generated_at
+      ),
+      superseded_at TEXT CHECK (
+        superseded_at IS NULL OR (
+          length(superseded_at) = 20
+          AND superseded_at GLOB
+            '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+          AND strftime(
+            '%Y-%m-%dT%H:%M:%SZ', superseded_at, '+0 seconds'
+          ) = superseded_at
+          AND superseded_at >= generated_at
+        )
+      ),
       UNIQUE (id, project_id)
     )
   ''');
@@ -3080,6 +3097,10 @@ Future<void> _applyConstructionScheduleSnapshotMigration(
       ),
       is_milestone INTEGER NOT NULL CHECK (is_milestone IN (0, 1)),
       is_isolated INTEGER NOT NULL CHECK (is_isolated IN (0, 1)),
+      row_sha256 TEXT NOT NULL CHECK (
+        length(row_sha256) = 64
+        AND row_sha256 NOT GLOB '*[^0-9a-f]*'
+      ),
       PRIMARY KEY (snapshot_id, instance_id),
       FOREIGN KEY (snapshot_id, project_id)
         REFERENCES project_schedule_snapshots(id, project_id),
@@ -3130,6 +3151,13 @@ Future<void> _applyConstructionScheduleSnapshotMigration(
     WHEN NOT (
       OLD.superseded_at IS NULL
       AND NEW.superseded_at IS NOT NULL
+      AND length(NEW.superseded_at) = 20
+      AND NEW.superseded_at GLOB
+        '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+      AND strftime(
+        '%Y-%m-%dT%H:%M:%SZ', NEW.superseded_at, '+0 seconds'
+      ) = NEW.superseded_at
+      AND NEW.superseded_at >= OLD.generated_at
       AND NEW.id IS OLD.id
       AND NEW.project_id IS OLD.project_id
       AND NEW.profile_json IS OLD.profile_json
