@@ -13,11 +13,13 @@ bir Python sunucusuna bağlanmaz.
 
 | Alan | Değer |
 | --- | --- |
-| Ürün fazı | V1 tamamlandı; V2 planlama/truth-sync başladı |
+| Ürün fazı | V1 tamamlandı; V2 Items 1–4 complete; Living Plan Item 5 current |
 | V1 baseline commit | `7c9f65a811c9f4bca561adab6bd1f8e64e6908cc` |
 | Son V1 baseline PR | `#382` |
+| Güncel güvenli merge | `447916be0b3ddd2af75b0fe85f8c7f710f29c1cd` |
+| Son schedule foundation PR | `#459` |
 | Mobil sürüm | `0.1.0+1` |
-| SQLite schema | `10` |
+| SQLite schema | `14` |
 | `.csebackup` formatı | `1` |
 | Canonical timezone | `Europe/Istanbul` |
 | Android compile/target SDK | `36 / 36` |
@@ -84,12 +86,12 @@ Güncel kanonik kapsam:
 
 V2 paketi 13 maddeden oluşur:
 
-1. Proje ve Mahal omurgası
-2. Sicil / Puantaj V2 / Saha Rehberi
-3. Attachment / Fotoğraf / Medya V2
-4. Ajanda V2 ve kontrollü Ajanda–Hatırlatıcı senkronu
-5. Günlük Log Çıktısı v1
-6. İş / Yapılacaklar / Gün Planı
+1. Proje ve Mahal omurgası — complete
+2. Sicil / Puantaj V2 / Saha Rehberi — complete
+3. Attachment / Fotoğraf / Medya V2 — complete
+4. Ajanda V2 ve kontrollü Ajanda–Hatırlatıcı senkronu — complete
+5. 7 Günlük Yaşayan İş Programı / İş ve Gün Planı — current, not complete
+6. Günlük Log Çıktısı v1
 7. İş Zinciri / Bağlı Log v1
 8. İstenecek Malzemeler
 9. Deterministik kişi/firma/etiket önerileri
@@ -105,13 +107,22 @@ Proje/Mahal
 → Saha Rehberi
 → Attachment v2
 → Ajanda v2
-→ İş/Yapılacak
+→ schedule runtime + persistent reference snapshots
+→ 7 Günlük Yaşayan İş Programı
+→ Günlük Log v1
 → İş Zinciri
 → Günlük Log v2
 ```
 
-İlk production yönü **Proje ve Mahal omurgasıdır**. Issue #383 yalnız
-documentation/state truth-sync işidir; production davranışı değiştirmez.
+Activity Catalog Runtime, typed Project Profile ve Dependency Catalog, Project
+Activity Instance Graph, deterministic Schedule Date Engine ve immutable
+persistent reference-schedule snapshots merged durumdadır. Güncel canonical
+faz `truth-sync complete / Living Plan MVP Core ready`dir.
+
+Living Plan, reference schedule'ın öneri/history niteliğini koruyan ayrı
+mutable/evented kullanıcı kararı katmanıdır. İlk sonraki dar core slice'ın
+immediate successor'ı 7-day UI + APK/device acceptance olmalıdır; araya geniş
+backend programı eklenmez. Item 5 UI/APK/device kabulü henüz uygulanmamıştır.
 
 ## Kaynak otoritesi
 
@@ -186,7 +197,9 @@ Ayrıntılar:
 
 - **V1 ürün fazı:** tamamlandı
 - **Owner saha kullanımı:** yaklaşık bir ay
-- **V2:** planlama ve repository truth-sync
+- **V2:** Items 1–4 complete; Item 5 Living 7-Day Plan current direction
+- **Schedule foundation:** runtime ve persistent immutable snapshots merged
+- **Living Plan UI/APK/device kabulü:** henüz uygulanmadı
 - **Kamuya açık production release:** ilan edilmedi
 - **Google Play/App Store yayını:** ilan edilmedi
 - **Çok kullanıcılı/SaaS ürün:** kapsam dışı

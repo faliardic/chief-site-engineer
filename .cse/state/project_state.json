@@ -1,21 +1,21 @@
 {
   "active_work": {
-    "issue": 385,
-    "kind": "v2_product_epic",
+    "issue": 460,
+    "kind": "canonical_source_authority_truth_sync",
     "merge_claim": false,
     "production_behavior_changed": false,
-    "state": "v2_item_1_ready_for_planning"
+    "state": "draft_pr_review_pending"
   },
   "base_branch": "master",
   "current_safe_point": {
-    "issue": 277,
-    "local_test_summary": "Issue #277: focused lifecycle 48/48, widget 46/46, concrete 1/1, full Flutter 333/333 and analyze 0; Samsung SM-X610 tablet wide smoke PASS.",
-    "merge_commit": "c72f6bc55fc658996a546d9833b85a2614b99327",
+    "issue": 458,
+    "local_test_summary": "PR #459: database 22/22, snapshot repository 11/11, Schedule Engine 23/23, backup/restore 36/36, full Flutter 663/663, analyze/integrity/FK PASS.",
+    "merge_commit": "447916be0b3ddd2af75b0fe85f8c7f710f29c1cd",
     "mobile_backup_format_version": 1,
-    "mobile_schema_version": 10,
+    "mobile_schema_version": 14,
     "mobile_version": "0.1.0+1",
-    "pull_request": 278,
-    "semantics": "latest_issue_based_mobile_validation_checkpoint"
+    "pull_request": 459,
+    "semantics": "latest_merged_schedule_runtime_and_persistent_snapshot_foundation"
   },
   "legacy_last_numbered_step": 225,
   "mobile": {
@@ -23,7 +23,7 @@
     "android_target_sdk": 36,
     "backup_format_version": 1,
     "canonical_timezone": "Europe/Istanbul",
-    "schema_version": 10,
+    "schema_version": 14,
     "version": "0.1.0+1"
   },
   "podcast": {
@@ -36,33 +36,127 @@
   },
   "product_maturity": {
     "field_ready_application": true,
+    "living_plan_device_acceptance": false,
+    "living_plan_ui_implemented": false,
     "owner_field_use": "approximately_one_month",
     "production_ready_application": false,
     "public_release": false,
     "state": "v1_completed_owner_field_used_v2_active",
     "store_released": false
   },
-  "state_version": 3,
+  "state_version": 4,
   "v1": {
     "baseline_commit": "7c9f65a811c9f4bca561adab6bd1f8e64e6908cc",
     "baseline_pull_request": 382,
-    "baseline_validation_summary": "PR #382 reports focused application, widget and backup tests, flutter analyze and git diff check PASS; schema and backup format unchanged.",
+    "baseline_validation_summary": "PR #382 reports focused application, widget and backup tests, flutter analyze and git diff check PASS; V1 baseline schema 10 and backup format 1.",
     "field_use": "approximately_one_month",
     "status": "completed_field_used"
   },
   "v2": {
     "canonical_scope": "docs/v2/CSE_V2_SCOPE.md",
-    "current_item": 1,
-    "current_item_name": "Proje ve Mahal omurgası",
-    "current_phase": "item_1_ready_for_planning",
+    "completed_items": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "current_item": 5,
+    "current_item_name": "7 Günlük Yaşayan İş Programı / İş ve Gün Planı",
+    "current_phase": "truth_sync_complete_living_plan_mvp_core_ready",
+    "initial_truth_sync_merge_commit": "78ad9245331398994ce0f47a5380d65a23189572",
+    "initial_truth_sync_pull_request": 384,
+    "item_statuses": [
+      {
+        "item": 1,
+        "name": "Proje ve Mahal omurgası",
+        "status": "complete"
+      },
+      {
+        "item": 2,
+        "name": "Sicil / Puantaj V2 / Saha Rehberi",
+        "status": "complete"
+      },
+      {
+        "item": 3,
+        "name": "Attachment / Fotoğraf / Medya V2",
+        "status": "complete"
+      },
+      {
+        "item": 4,
+        "name": "Ajanda V2 + Ajanda–Hatırlatıcı kontrollü senkron",
+        "status": "complete"
+      },
+      {
+        "item": 5,
+        "name": "7 Günlük Yaşayan İş Programı / İş ve Gün Planı",
+        "status": "current_not_complete"
+      },
+      {
+        "item": 6,
+        "name": "Günlük Log Çıktısı v1",
+        "status": "planned"
+      },
+      {
+        "item": 7,
+        "name": "İş Zinciri / Bağlı Log v1",
+        "status": "planned"
+      },
+      {
+        "item": 8,
+        "name": "İstenecek Malzemeler",
+        "status": "planned"
+      },
+      {
+        "item": 9,
+        "name": "Deterministik kişi/firma/etiket önerileri",
+        "status": "planned"
+      },
+      {
+        "item": 10,
+        "name": "Telefon görüşmesi sonucu → Ajanda",
+        "status": "planned"
+      },
+      {
+        "item": 11,
+        "name": "Proje fotoğraf/video albümü",
+        "status": "planned"
+      },
+      {
+        "item": 12,
+        "name": "Günlük Log Çıktısı v2",
+        "status": "planned"
+      },
+      {
+        "item": 13,
+        "name": "Mini hesap makinesi",
+        "status": "planned"
+      }
+    ],
+    "next_delivery": [
+      "living_plan_mvp_core",
+      "living_plan_7_day_ui_apk_device_acceptance",
+      "actual_quantity_progress_reforecast",
+      "project_specific_productivity_learning"
+    ],
     "parent_issue": 385,
     "roadmap": "ROADMAP.md",
+    "schedule_foundation": {
+      "merge_commit": "447916be0b3ddd2af75b0fe85f8c7f710f29c1cd",
+      "pull_requests": [
+        444,
+        446,
+        448,
+        456,
+        459
+      ],
+      "reference_schedule_mutability": "immutable",
+      "status": "merged"
+    },
     "status": "active",
-    "truth_sync_merge_commit": "78ad9245331398994ce0f47a5380d65a23189572",
-    "truth_sync_pull_request": 384
+    "truth_sync_issue": 460
   },
   "validation_policy": {
-    "current_issue": "v2_item_specific",
+    "current_issue": "issue_460_docs_canonical_truth_sync",
     "production_behavior_changed": false,
     "reuse_merged_mobile_evidence": true
   }
