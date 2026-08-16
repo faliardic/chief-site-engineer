@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:chief_site_engineer/application/construction_living_plan_application.dart';
@@ -462,9 +463,46 @@ void main() {
         ),
       );
       expect(noOpStart.revision, 2);
+      final immediateNoOpReplay = await application.startLivingPlanItem(
+        StartConstructionLivingPlanItemCommand(
+          itemId: item.id,
+          eventId: _uuid(208),
+          expectedRevision: 2,
+        ),
+      );
+      expect(immediateNoOpReplay.revision, 2);
+      expect(immediateNoOpReplay.updatedAt, noOpStart.updatedAt);
       expect(
         await application.listLivingPlanEventHistory(item.id),
         hasLength(2),
+      );
+      expect(
+        await database.database.query(
+          'project_living_plan_command_receipts',
+          where: 'id = ? AND is_no_op = 1 AND event_sequence IS NULL',
+          whereArgs: [_uuid(208)],
+        ),
+        hasLength(1),
+      );
+      await expectLater(
+        application.completeLivingPlanItem(
+          CompleteConstructionLivingPlanItemCommand(
+            itemId: item.id,
+            eventId: _uuid(208),
+            expectedRevision: 2,
+          ),
+        ),
+        _failure('living_plan_event_id_conflict'),
+      );
+      await expectLater(
+        application.startLivingPlanItem(
+          StartConstructionLivingPlanItemCommand(
+            itemId: item.id,
+            eventId: _uuid(208),
+            expectedRevision: 3,
+          ),
+        ),
+        _failure('living_plan_event_id_conflict'),
       );
       await expectLater(
         application.completeLivingPlanItem(
@@ -506,6 +544,16 @@ void main() {
       );
       expect(oldReplay.status, ConstructionLivingPlanStatus.started);
       expect(oldReplay.revision, 2);
+      final oldNoOpReplay = await application.startLivingPlanItem(
+        StartConstructionLivingPlanItemCommand(
+          itemId: item.id,
+          eventId: _uuid(208),
+          expectedRevision: 2,
+        ),
+      );
+      expect(oldNoOpReplay.status, ConstructionLivingPlanStatus.started);
+      expect(oldNoOpReplay.revision, 2);
+      expect(oldNoOpReplay.updatedAt, noOpStart.updatedAt);
       expect((await application.loadLivingPlanItem(item.id))?.revision, 3);
       await expectLater(
         application.startLivingPlanItem(
@@ -615,11 +663,40 @@ void main() {
         plannedDate: '2026-09-08',
       );
       now = DateTime.utc(2026, 8, 16, 9, 0, 7);
-      final directComplete = await application.completeLivingPlanItem(
-        CompleteConstructionLivingPlanItemCommand(
+      await expectLater(
+        application.startLivingPlanItem(
+          StartConstructionLivingPlanItemCommand(
+            itemId: direct.id,
+            eventId: _uuid(208),
+            expectedRevision: 1,
+          ),
+        ),
+        _failure('living_plan_event_id_conflict'),
+      );
+      final directStarted = await application.startLivingPlanItem(
+        StartConstructionLivingPlanItemCommand(
           itemId: direct.id,
           eventId: _uuid(218),
           expectedRevision: 1,
+        ),
+      );
+      expect(directStarted.status, ConstructionLivingPlanStatus.started);
+      await expectLater(
+        application.startLivingPlanItem(
+          StartConstructionLivingPlanItemCommand(
+            itemId: direct.id,
+            eventId: _uuid(207),
+            expectedRevision: 2,
+          ),
+        ),
+        _failure('living_plan_event_id_conflict'),
+      );
+      now = DateTime.utc(2026, 8, 16, 9, 0, 8);
+      final directComplete = await application.completeLivingPlanItem(
+        CompleteConstructionLivingPlanItemCommand(
+          itemId: direct.id,
+          eventId: _uuid(225),
+          expectedRevision: 2,
         ),
       );
       expect(directComplete.status, ConstructionLivingPlanStatus.completed);
@@ -654,6 +731,14 @@ void main() {
         await application.listLivingPlanEventHistory(item.id),
         hasLength(1),
       );
+      expect(
+        await database.database.query(
+          'project_living_plan_command_receipts',
+          where: 'id = ?',
+          whereArgs: [_uuid(220)],
+        ),
+        isEmpty,
+      );
 
       now = DateTime.utc(2026, 8, 16, 9, 0, 1);
       final failingMutation = _application(
@@ -680,6 +765,14 @@ void main() {
       expect(
         await application.listLivingPlanEventHistory(item.id),
         hasLength(1),
+      );
+      expect(
+        await database.database.query(
+          'project_living_plan_command_receipts',
+          where: 'id = ?',
+          whereArgs: [_uuid(220)],
+        ),
+        isEmpty,
       );
 
       final failingCreate = _application(
@@ -709,6 +802,231 @@ void main() {
           whereArgs: [_uuid(110)],
         ),
         isEmpty,
+      );
+      expect(
+        await database.database.query(
+          'project_living_plan_command_receipts',
+          where: 'id = ?',
+          whereArgs: [_uuid(110)],
+        ),
+        isEmpty,
+      );
+    },
+  );
+
+  test(
+    'item history and seven-day reads stay coherent with queued mutations',
+    () async {
+      final first = await _create(
+        application,
+        scenario,
+        activityId: 'ACT-A',
+        itemNumber: 30,
+        eventNumber: 130,
+        plannedDate: '2026-09-05',
+      );
+      final second = await _create(
+        application,
+        scenario,
+        activityId: 'ACT-B',
+        itemNumber: 31,
+        eventNumber: 131,
+        plannedDate: '2026-09-06',
+      );
+
+      final itemProjectionRead = Completer<void>();
+      final releaseItemRead = Completer<void>();
+      final startEnteredMutation = Completer<void>();
+      final itemReader = _application(
+        database: database,
+        repository: snapshotRepository,
+        scenario: scenario,
+        clock: () => now,
+        afterLoadItemProjectionRead: () async {
+          itemProjectionRead.complete();
+          await releaseItemRead.future;
+        },
+      );
+      final startWriter = _application(
+        database: database,
+        repository: snapshotRepository,
+        scenario: scenario,
+        clock: () => now,
+        beforeEventInsert: () async {
+          if (!startEnteredMutation.isCompleted) {
+            startEnteredMutation.complete();
+          }
+        },
+      );
+      final oldItemFuture = itemReader.loadLivingPlanItem(first.id);
+      await itemProjectionRead.future;
+      now = DateTime.utc(2026, 8, 16, 9, 0, 1);
+      final startFuture = startWriter.startLivingPlanItem(
+        StartConstructionLivingPlanItemCommand(
+          itemId: first.id,
+          eventId: _uuid(230),
+          expectedRevision: 1,
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(startEnteredMutation.isCompleted, isFalse);
+      releaseItemRead.complete();
+      final oldItem = await oldItemFuture;
+      final started = await startFuture;
+      expect(oldItem?.revision, 1);
+      expect(oldItem?.status, ConstructionLivingPlanStatus.planned);
+      expect(started.revision, 2);
+      expect(startEnteredMutation.isCompleted, isTrue);
+
+      final historyItemRead = Completer<void>();
+      final releaseHistoryRead = Completer<void>();
+      final completeEnteredMutation = Completer<void>();
+      final historyReader = _application(
+        database: database,
+        repository: snapshotRepository,
+        scenario: scenario,
+        clock: () => now,
+        afterEventHistoryItemProjectionRead: () async {
+          historyItemRead.complete();
+          await releaseHistoryRead.future;
+        },
+      );
+      final completeWriter = _application(
+        database: database,
+        repository: snapshotRepository,
+        scenario: scenario,
+        clock: () => now,
+        beforeEventInsert: () async {
+          if (!completeEnteredMutation.isCompleted) {
+            completeEnteredMutation.complete();
+          }
+        },
+      );
+      final oldHistoryFuture = historyReader.listLivingPlanEventHistory(
+        first.id,
+      );
+      await historyItemRead.future;
+      now = DateTime.utc(2026, 8, 16, 9, 0, 2);
+      final completeFuture = completeWriter.completeLivingPlanItem(
+        CompleteConstructionLivingPlanItemCommand(
+          itemId: first.id,
+          eventId: _uuid(231),
+          expectedRevision: 2,
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(completeEnteredMutation.isCompleted, isFalse);
+      releaseHistoryRead.complete();
+      final oldHistory = await oldHistoryFuture;
+      final completed = await completeFuture;
+      expect(oldHistory.map((event) => event.sequence), orderedEquals([1, 2]));
+      expect(completed.revision, 3);
+      expect(completeEnteredMutation.isCompleted, isTrue);
+
+      final planProjectionRead = Completer<void>();
+      final releasePlanRead = Completer<void>();
+      final secondStartEnteredMutation = Completer<void>();
+      final planReader = _application(
+        database: database,
+        repository: snapshotRepository,
+        scenario: scenario,
+        clock: () => now,
+        afterSevenDayPlanProjectionRead: () async {
+          planProjectionRead.complete();
+          await releasePlanRead.future;
+        },
+      );
+      final secondWriter = _application(
+        database: database,
+        repository: snapshotRepository,
+        scenario: scenario,
+        clock: () => now,
+        beforeEventInsert: () async {
+          if (!secondStartEnteredMutation.isCompleted) {
+            secondStartEnteredMutation.complete();
+          }
+        },
+      );
+      final oldPlanFuture = planReader.loadSevenDayPlan(
+        projectId: scenario.profile.projectId,
+        windowStart: _date('2026-09-04'),
+      );
+      await planProjectionRead.future;
+      now = DateTime.utc(2026, 8, 16, 9, 0, 3);
+      final secondStartFuture = secondWriter.startLivingPlanItem(
+        StartConstructionLivingPlanItemCommand(
+          itemId: second.id,
+          eventId: _uuid(232),
+          expectedRevision: 1,
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(secondStartEnteredMutation.isCompleted, isFalse);
+      releasePlanRead.complete();
+      final oldPlan = await oldPlanFuture;
+      final secondStarted = await secondStartFuture;
+      expect(
+        {for (final entry in oldPlan) entry.item.id: entry.item.revision},
+        {first.id: 3, second.id: 1},
+      );
+      expect(secondStarted.revision, 2);
+      expect(secondStartEnteredMutation.isCompleted, isTrue);
+    },
+  );
+
+  test(
+    'genuine history count and sequence corruption still fail closed',
+    () async {
+      final countCorrupt = await _create(
+        application,
+        scenario,
+        activityId: 'ACT-C',
+        itemNumber: 32,
+        eventNumber: 132,
+        plannedDate: '2026-09-05',
+      );
+      final sequenceCorrupt = await _create(
+        application,
+        scenario,
+        activityId: 'ACT-D',
+        itemNumber: 33,
+        eventNumber: 133,
+        plannedDate: '2026-09-06',
+      );
+      await database.database.execute(
+        'DROP TRIGGER project_living_plan_events_append_only_delete',
+      );
+      await database.database.delete(
+        'project_living_plan_events',
+        where: 'id = ?',
+        whereArgs: [_uuid(132)],
+      );
+      await database.database.execute('PRAGMA foreign_keys = OFF');
+      await database.database.execute(
+        'DROP TRIGGER project_living_plan_events_append_only_update',
+      );
+      await database.database.update(
+        'project_living_plan_events',
+        {'sequence': 2},
+        where: 'id = ?',
+        whereArgs: [_uuid(133)],
+      );
+      await database.database.execute('PRAGMA foreign_keys = ON');
+
+      await expectLater(
+        application.loadLivingPlanItem(countCorrupt.id),
+        _failure('living_plan_history_integrity_failed'),
+      );
+      await expectLater(
+        application.listLivingPlanEventHistory(sequenceCorrupt.id),
+        _failure('living_plan_history_integrity_failed'),
+      );
+      await expectLater(
+        application.loadSevenDayPlan(
+          projectId: scenario.profile.projectId,
+          windowStart: _date('2026-09-04'),
+        ),
+        _failure('living_plan_history_integrity_failed'),
       );
     },
   );
@@ -845,6 +1163,9 @@ ConstructionLivingPlanApplication _application({
   required DateTime Function() clock,
   ConstructionLivingPlanBeforeEventInsertHook? beforeEventInsert,
   ConstructionLivingPlanBeforeCreateTransactionHook? beforeCreateTransaction,
+  ConstructionLivingPlanReadBoundaryHook? afterLoadItemProjectionRead,
+  ConstructionLivingPlanReadBoundaryHook? afterEventHistoryItemProjectionRead,
+  ConstructionLivingPlanReadBoundaryHook? afterSevenDayPlanProjectionRead,
 }) => ConstructionLivingPlanApplication(
   database: database,
   snapshotRepository: repository,
@@ -853,6 +1174,9 @@ ConstructionLivingPlanApplication _application({
   corpusLoader: () async => scenario.corpus,
   beforeEventInsert: beforeEventInsert,
   beforeCreateTransaction: beforeCreateTransaction,
+  afterLoadItemProjectionRead: afterLoadItemProjectionRead,
+  afterEventHistoryItemProjectionRead: afterEventHistoryItemProjectionRead,
+  afterSevenDayPlanProjectionRead: afterSevenDayPlanProjectionRead,
 );
 
 ConstructionScheduleSnapshotRepository _snapshotRepository(

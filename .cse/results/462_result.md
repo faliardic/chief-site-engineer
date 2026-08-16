@@ -211,3 +211,161 @@ review_recommendation:
   residual_uncertainty: "Invocation/runtime actual model and reasoning metadata are not exposed; first UI/device behavior remains intentionally unimplemented and must be a later owner-authorized Slice."
   escalation_condition: "Any additional path, schema/backup semantic drift, reference rebind, partial projection/event behavior, focused/full/analyze/integrity failure, non-Draft publication, or visible routing evidence below the R4 floor."
 ```
+
+---
+
+## Owner-authorized post-review correction — pre-full gate kaydı
+
+Bu bölüm ilk implementation/result kanıtını değiştirmez; PR #463 owner review
+yorumuyla yetkilendirilen tek correction run'ının append-only ara kaydıdır.
+
+- Correction authority:
+  https://github.com/faliardic/chief-site-engineer/pull/463#issuecomment-5307016099
+- Correction parent:
+  `5d352acec41f65df6d92a56908f043301e65993b`
+- Branch: `codex/issue-462-living-plan-mvp-core`
+- PR: `#463`; Draft/Ready yapılmayacak/merge edilmeyecek.
+- Review correction run: `1/1`.
+- Correction full-suite run: `0/1` — bu ara kayıt anında henüz
+  başlatılmadı; exact pre-full kapısına bağlı.
+
+### Düzeltilen review blocker'ları
+
+1. Her kabul edilen command için, etkili değişiklik üretmeyen no-op dahil,
+   schema-15 içinde immutable ve durable command receipt saklanıyor.
+2. Receipt, item/project/event-type/canonical intent ile dönen exact sonucu
+   ayırıyor; aynı kimlik+aynı intent geç replay'de özgün sonucu döndürüyor,
+   farklı reuse `living_plan_event_id_conflict` ile fail closed oluyor.
+3. Mutating event ile no-op receipt aynı kimlik namespace'ini paylaşıyor;
+   receipt/projection/event/result doğrulaması tek SQLite transaction içinde.
+4. Receipt update/delete trigger ile yasak; schema version `15`, backup format
+   version `1` olarak korundu.
+5. `loadLivingPlanItem`, `listLivingPlanEventHistory` ve `loadSevenDayPlan`
+   çağrılarının her biri tek SQLite read transaction ve aynı
+   `DatabaseExecutor` üzerinde coherent snapshot okuyor.
+
+### Correction focused evidence
+
+1. Dart format: ilk preflight parser denemesi yalnız SQL JSON path içindeki
+   Dart `$` escape eksikliğini buldu; yetkili exact-fix retry sonrası
+   `Formatted 5 files (1 changed)` PASS. Bu operation retry bütçesi tüketildi.
+2. Database/migration: `23/23 PASS`.
+3. Living Plan application: `9/9 PASS`.
+4. Schedule Date Engine: `23/23 PASS`.
+5. Snapshot repository: `11/11 PASS`.
+6. Backup/restore: `36/36 PASS`.
+7. `flutter analyze --no-pub`: `PASS`, `No issues found`.
+8. Parent-relative `git diff --check`: `PASS`.
+
+Regresyonlar immediate/late no-op replay'i, exact-result preservation'ı,
+payload/type/item ve cross-namespace conflict'lerini, transaction rollback'i,
+üç coherent read boundary'sini, gerçek event-count/sequence corruption'ını,
+schema-14→15 migration'ını ve format-1 backup/restore sonrasındaki replay'i
+kapsıyor. Database focused gate içindeki final assertions
+`integrity_check = ok` ve `foreign_key_check = empty` sonucunu doğruladı.
+
+### Pre-full stop durumu
+
+Bu ara kayıttan sonra exact yedi correction path'i, toplam PR on üç path'i,
+protected drift `0`, schema `15`, backup format `1`, integrity/FK ve temiz
+stage/worktree sınırları ayrıca doğrulanacaktır. Bunlardan biri başarısızsa
+correction full suite, commit, push ve evidence publication yapılmadan
+fail-closed durulacaktır.
+
+## Owner-authorized post-review correction — completion evidence
+
+`PASS — correction publication authorized; independent R4 re-review required`
+
+Pre-full kapısı geçtikten sonra final corrected source/test revision üzerinde
+izinli tek additional full suite çalıştırıldı:
+
+- `flutter test --no-pub`: `673/673 PASS`.
+- Correction full-suite runs: `1/1`.
+- Branch total full-suite runs: primary `1` + correction `1` = `2`.
+- Third full-suite run: `0`; yasak gereği başlatılmadı.
+
+Correction implementation, receipt ve applicable event/projection write'ını
+aynı transaction'da tutuyor; exact returned result receipt'e canonical olarak
+bağlanıyor. No-op receipt revision/event count değiştirmiyor. Immediate ve
+later replay özgün sonucu döndürüyor; item/type/payload veya mutating/no-op
+namespace collision'ı deterministic conflict veriyor. Injected failure
+receipt/projection/event bırakmadan rollback oluyor. Üç read boundary'sinin
+her biri aynı executor üzerindeki tek read transaction snapshot'ını kullanıyor;
+queued mutation regresyonları coherent sonucu ve gerçek corruption regresyonları
+fail-closed davranışı kanıtladı.
+
+Final correction evidence özeti:
+
+1. Database/migration `23/23 PASS`; receipt constraint/immutability/delete
+   guard, shared namespace, result-match, integrity/FK dahil.
+2. Living Plan application `9/9 PASS`; replay/conflict/rollback/coherent-read/
+   corruption dahil.
+3. Unchanged Schedule Date Engine `23/23 PASS` ve snapshot repository
+   `11/11 PASS`.
+4. Backup/restore `36/36 PASS`; format-1 schema-15 receipt roundtrip/replay ve
+   schema-14→15 empty-receipt migration dahil.
+5. Analyze `PASS`, diff check `PASS`, pre-full exact correction paths `7/7`,
+   total PR paths `13/13`, protected/extra drift `0`, staged `0`, untracked `0`.
+6. Schema version `15`, backup format `1`, `integrity_check = ok`,
+   `foreign_key_check = empty`.
+
+Correction retry/bütçe kaydı:
+
+- Review correction implementation run: `1/1`.
+- Format parser preflight exact-fix retry: `1/1`; `$` escape düzeltildi ve
+  retry PASS oldu.
+- Focused test retry: `0`.
+- Correction full-suite retry: `0`; yalnız tek run PASS.
+- Correction ilk local edit `2026-08-16 13:51 +03`; completion validation
+  `2026-08-16 14:14 +03`; yaklaşık `23` dakika.
+- Yeni çözüm zinciri, successor Slice veya persistence/UI genişlemesi açılmadı.
+
+APK/AAB, signing, physical device, notification, reboot, release/store ve
+deployment kapıları çalıştırılmadı; correction yalnız schema-15 durable command
+receipt ve transaction-coherent read sözleşmelerini değiştiriyor. UI/platform/
+notification/release sözleşmeleri protected ve scope dışı kaldı. Primary merged
+base kanıtları ile primary Issue #462 evidence'i korunuyor; correction tarafından
+değişen database/application/backup alanları yukarıdaki focused ve full kapılarla
+yeniden doğrulandı.
+
+Bu kayıt anında correction commit/push ve GitHub evidence publication henüz
+yapılmadı. Final yedi-path/stage kontrolü PASS olursa tek intentional correction
+commit ve normal push yapılacak; gerçek correction head SHA Issue/PR evidence
+yorumlarına yazılacak. PR #463 Draft kalacak; Ready ve merge yapılmayacak.
+
+```yaml
+execution_record:
+  phase: "owner-authorized-post-review-correction"
+  requested_model: "gpt-5.6-sol"
+  actual_model: "unknown"
+  requested_reasoning_effort: "max"
+  actual_reasoning_effort: "unknown"
+  execution_mode: "standard"
+  orchestration: "single-agent"
+  routing_request_evidence: "https://github.com/faliardic/chief-site-engineer/pull/463#issuecomment-5307016099"
+  invocation_evidence: null
+  invocation_verification_status: "unverified"
+  mismatch_detected: null
+  runtime_verification_status: "unverified"
+  allowed_fallback: null
+  review_correction_runs: 1
+  review_correction_full_suite_runs: 1
+
+review_recommendation:
+  risk_observed: "R4"
+  recommended_chatgpt_model: "gpt-5.6-sol"
+  recommended_reasoning_effort: "max"
+  recommended_mode: "standard"
+  recommendation_reason: "Schema-15 now adds durable shared-namespace command receipts and transaction-coherent Living Plan reads; independent R4 re-review must verify exact replay, atomicity, corruption handling and backup compatibility before any UI/device successor."
+  must_review:
+    - "schema-15 receipt constraints, event composite FK, immutable triggers and canonical exact-result guard"
+    - "immediate/late no-op replay, original-result preservation and every item/type/payload/cross-namespace conflict"
+    - "receipt/projection/event/result atomicity and injected-failure rollback"
+    - "single-transaction same-executor loadLivingPlanItem, listLivingPlanEventHistory and loadSevenDayPlan reads"
+    - "genuine event-count/sequence corruption fail-closed behavior"
+    - "format-1 schema-15 receipt roundtrip/replay and schema-14 to schema-15 migration"
+    - "exact seven-file correction allowlist, total thirteen-file PR set and protected drift 0"
+    - "runtime model/reasoning verification uncertainty"
+  residual_uncertainty: "Invocation/runtime actual model and reasoning metadata are not exposed; UI/device behavior remains intentionally unimplemented and requires a later owner-authorized Slice."
+  escalation_condition: "Any receipt mutability or namespace gap, non-exact late replay, partial transaction result, torn read snapshot, backup/schema drift, additional path, failing gate, non-Draft publication, or visible routing evidence below the R4 floor."
+```

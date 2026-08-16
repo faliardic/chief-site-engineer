@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/application/construction_living_plan_application.dart';
 import 'package:chief_site_engineer/application/construction_schedule_date_engine.dart';
 import 'package:chief_site_engineer/application/construction_schedule_snapshot_repository.dart';
 import 'package:chief_site_engineer/application/mobile_backup_application.dart';
@@ -13,6 +14,7 @@ import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attachment_models.dart';
 import 'package:chief_site_engineer/domain/construction_corpus_models.dart';
+import 'package:chief_site_engineer/domain/construction_living_plan_models.dart';
 import 'package:chief_site_engineer/domain/construction_project_graph_models.dart';
 import 'package:chief_site_engineer/domain/construction_schedule_models.dart';
 import 'package:chief_site_engineer/domain/mobile_backup_models.dart';
@@ -259,82 +261,93 @@ void main() {
       const createdEventId = '44444444-4444-4444-8444-444444444444';
       const startedEventId = '55555555-5555-4555-8555-555555555555';
       const noteEventId = '66666666-6666-4666-8666-666666666666';
-      const createdPayload =
-          '{"change":{"reference_snapshot_id":"backup-schedule-snapshot-a","status":"PLANNED"},"intent":{"activity_instance_id":"ACT-BACKUP@PROJECT"},"result":{"revision":1}}';
-      const startedPayload =
-          '{"change":{"previous_status":"PLANNED","status":"STARTED"},"intent":{"expected_revision":1},"result":{"revision":2}}';
-      const notePayload =
-          '{"change":{"new_note":"Ekip teslimi tamamlandı","old_note":"İlk saha notu"},"intent":{"expected_revision":2},"result":{"revision":3}}';
-      await sourceDatabase.database.insert('project_living_plan_items', {
-        'id': livingItemId,
-        'project_id': scenario.profile.projectId,
-        'reference_snapshot_id': sourceSnapshotA.metadata.snapshotId,
-        'activity_instance_id': 'ACT-BACKUP@PROJECT',
-        'activity_id': 'ACT-BACKUP',
-        'activity_name_snapshot': 'Backup milestone',
-        'activity_context_json': '{}',
-        'natural_unit_snapshot': 'TEST',
-        'planned_date': '2026-09-04',
-        'status': 'PLANNED',
-        'note': 'İlk saha notu',
-        'revision': 1,
-        'created_at': _now,
-        'updated_at': _now,
-        'status_changed_at': _now,
-      });
-      await sourceDatabase.database.insert('project_living_plan_events', {
-        'id': createdEventId,
-        'living_plan_item_id': livingItemId,
-        'project_id': scenario.profile.projectId,
-        'sequence': 1,
-        'event_type': 'CREATED',
-        'occurred_at': _now,
-        'payload_json': createdPayload,
-      });
-      await sourceDatabase.database.update(
-        'project_living_plan_items',
-        {
-          'planned_date': '2026-09-04',
-          'status': 'STARTED',
-          'note': 'İlk saha notu',
-          'revision': 2,
-          'updated_at': '2026-07-19T09:31:00Z',
-          'status_changed_at': '2026-07-19T09:31:00Z',
-        },
-        where: 'id = ? AND revision = 1',
-        whereArgs: [livingItemId],
+      const noOpEventId = '77777777-7777-4777-8777-777777777777';
+      var livingNow = DateTime.parse(_now);
+      final sourceLivingApplication = ConstructionLivingPlanApplication(
+        database: sourceDatabase,
+        snapshotRepository: sourceRepository,
+        clock: () => livingNow,
+        graphLoader: (_) async => scenario.graph,
+        corpusLoader: () async => scenario.corpus,
       );
-      await sourceDatabase.database.insert('project_living_plan_events', {
-        'id': startedEventId,
-        'living_plan_item_id': livingItemId,
-        'project_id': scenario.profile.projectId,
-        'sequence': 2,
-        'event_type': 'STARTED',
-        'occurred_at': '2026-07-19T09:31:00Z',
-        'payload_json': startedPayload,
-      });
-      await sourceDatabase.database.update(
-        'project_living_plan_items',
-        {
-          'planned_date': '2026-09-04',
-          'status': 'STARTED',
-          'note': 'Ekip teslimi tamamlandı',
-          'revision': 3,
-          'updated_at': '2026-07-19T09:32:00Z',
-          'status_changed_at': '2026-07-19T09:31:00Z',
-        },
-        where: 'id = ? AND revision = 2',
-        whereArgs: [livingItemId],
+      final createdLivingItem = await sourceLivingApplication
+          .createLivingPlanItem(
+            CreateConstructionLivingPlanItemCommand(
+              itemId: livingItemId,
+              eventId: createdEventId,
+              projectId: scenario.profile.projectId,
+              expectedReferenceSnapshotId: sourceSnapshotA.metadata.snapshotId,
+              activityInstanceId: 'ACT-BACKUP@PROJECT',
+              plannedDate: parseCanonicalConstructionDate('2026-09-04'),
+              note: 'İlk saha notu',
+            ),
+          );
+      expect(createdLivingItem.revision, 1);
+      livingNow = DateTime.parse('2026-07-19T09:31:00Z');
+      final startedLivingItem = await sourceLivingApplication
+          .startLivingPlanItem(
+            const StartConstructionLivingPlanItemCommand(
+              itemId: livingItemId,
+              eventId: startedEventId,
+              expectedRevision: 1,
+            ),
+          );
+      expect(startedLivingItem.revision, 2);
+      final noOpResult = await sourceLivingApplication.startLivingPlanItem(
+        const StartConstructionLivingPlanItemCommand(
+          itemId: livingItemId,
+          eventId: noOpEventId,
+          expectedRevision: 2,
+        ),
       );
-      await sourceDatabase.database.insert('project_living_plan_events', {
-        'id': noteEventId,
-        'living_plan_item_id': livingItemId,
-        'project_id': scenario.profile.projectId,
-        'sequence': 3,
-        'event_type': 'NOTE_UPDATED',
-        'occurred_at': '2026-07-19T09:32:00Z',
-        'payload_json': notePayload,
-      });
+      final immediateNoOpReplay = await sourceLivingApplication
+          .startLivingPlanItem(
+            const StartConstructionLivingPlanItemCommand(
+              itemId: livingItemId,
+              eventId: noOpEventId,
+              expectedRevision: 2,
+            ),
+          );
+      expect(immediateNoOpReplay.revision, noOpResult.revision);
+      expect(immediateNoOpReplay.updatedAt, noOpResult.updatedAt);
+      livingNow = DateTime.parse('2026-07-19T09:32:00Z');
+      final notedLivingItem = await sourceLivingApplication
+          .updateLivingPlanNote(
+            const UpdateConstructionLivingPlanNoteCommand(
+              itemId: livingItemId,
+              eventId: noteEventId,
+              expectedRevision: 2,
+              note: 'Ekip teslimi tamamlandı',
+            ),
+          );
+      expect(notedLivingItem.revision, 3);
+      final lateNoOpReplay = await sourceLivingApplication.startLivingPlanItem(
+        const StartConstructionLivingPlanItemCommand(
+          itemId: livingItemId,
+          eventId: noOpEventId,
+          expectedRevision: 2,
+        ),
+      );
+      expect(lateNoOpReplay.revision, 2);
+      expect(lateNoOpReplay.note, 'İlk saha notu');
+      final sourceEvents = await sourceDatabase.database.query(
+        'project_living_plan_events',
+        where: 'living_plan_item_id = ?',
+        whereArgs: [livingItemId],
+        orderBy: 'sequence ASC',
+      );
+      final sourceReceipts = await sourceDatabase.database.query(
+        'project_living_plan_command_receipts',
+        where: 'living_plan_item_id = ?',
+        whereArgs: [livingItemId],
+        orderBy: 'result_revision ASC, id ASC',
+      );
+      expect(sourceEvents, hasLength(3));
+      expect(sourceReceipts, hasLength(4));
+      expect(
+        sourceReceipts.singleWhere((row) => row['id'] == noOpEventId),
+        containsPair('is_no_op', 1),
+      );
       final sourceSnapshotB =
           await ConstructionScheduleSnapshotRepository(
             database: sourceDatabase,
@@ -463,11 +476,61 @@ void main() {
         'STARTED',
         'NOTE_UPDATED',
       ]);
-      expect(restoredEvents.map((row) => row['payload_json']), [
-        createdPayload,
-        startedPayload,
-        notePayload,
-      ]);
+      expect(
+        restoredEvents.map((row) => row['payload_json']),
+        sourceEvents.map((row) => row['payload_json']),
+      );
+      final restoredReceipts = await reopened.database.query(
+        'project_living_plan_command_receipts',
+        where: 'living_plan_item_id = ?',
+        whereArgs: [livingItemId],
+        orderBy: 'result_revision ASC, id ASC',
+      );
+      expect(restoredReceipts, sourceReceipts);
+      expect(
+        restoredReceipts.singleWhere((row) => row['id'] == noOpEventId),
+        containsPair('event_sequence', isNull),
+      );
+      final restoredLivingApplication = ConstructionLivingPlanApplication(
+        database: reopened,
+        snapshotRepository: restoredRepository,
+        clock: () => DateTime.parse('2026-07-19T09:34:00Z'),
+        graphLoader: (_) async => scenario.graph,
+        corpusLoader: () async => scenario.corpus,
+      );
+      final restoredNoOpReplay = await restoredLivingApplication
+          .startLivingPlanItem(
+            const StartConstructionLivingPlanItemCommand(
+              itemId: livingItemId,
+              eventId: noOpEventId,
+              expectedRevision: 2,
+            ),
+          );
+      expect(restoredNoOpReplay.revision, 2);
+      expect(restoredNoOpReplay.status, ConstructionLivingPlanStatus.started);
+      expect(restoredNoOpReplay.note, 'İlk saha notu');
+      expect(
+        (await restoredLivingApplication.loadLivingPlanItem(
+          livingItemId,
+        ))?.revision,
+        3,
+      );
+      await expectLater(
+        restoredLivingApplication.completeLivingPlanItem(
+          const CompleteConstructionLivingPlanItemCommand(
+            itemId: livingItemId,
+            eventId: noOpEventId,
+            expectedRevision: 3,
+          ),
+        ),
+        throwsA(
+          isA<ConstructionLivingPlanFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'living_plan_event_id_conflict',
+          ),
+        ),
+      );
       await expectLater(
         reopened.database.insert('project_living_plan_items', {
           ...restoredItem,
@@ -602,6 +665,10 @@ void main() {
       );
       expect(
         await reopened.database.query('project_living_plan_items'),
+        isEmpty,
+      );
+      expect(
+        await reopened.database.query('project_living_plan_command_receipts'),
         isEmpty,
       );
       expect(
@@ -2921,6 +2988,44 @@ _BackupScheduleScenario _backupScheduleScenario() {
   );
   const activityId = 'ACT-BACKUP';
   const instanceId = '$activityId@PROJECT';
+  final activity = ConstructionActivity(
+    activityId: activityId,
+    wbsCode: 'TEST',
+    packageId: 'TEST',
+    activityNameTr: 'Backup milestone',
+    aliasesTr: const ['backup'],
+    applicability: const ConstructionAlwaysRule(),
+    repeatDimension: ConstructionActivityRepeatDimension.project,
+    naturalUnit: 'TEST',
+    durationStatus: 'UNKNOWN',
+    durationConfidence: 'E_UNKNOWN',
+    testSeedDurationDays: 0,
+    sequenceConfidence: 'TEST',
+    sequenceIndex: 1,
+  );
+  final corpus = ConstructionCorpus(
+    metadata: const ConstructionCorpusMetadata(
+      name: 'BACKUP LIVING PLAN TEST CORPUS',
+      corpusVersion: '0.3-yfk-resource-seed',
+      sourcePublicationStatus: 'RESEARCH_RESOURCE_SEED',
+      sourceProductionStatus: 'NOT_FOR_PRODUCTION',
+      warning: 'test',
+      runtimeScope: 'ACTIVITY_CATALOG_READ_ONLY_NO_YFK_RESOURCE_COEFFICIENTS',
+      wbsCount: 1,
+      activityCount: 1,
+    ),
+    profileFields: const <String>[],
+    wbsPackages: const [
+      ConstructionWbsPackage(
+        wbsCode: 'TEST',
+        packageId: 'TEST',
+        packageNameTr: 'Test',
+        packageNameEn: 'Test',
+        frequencyClass: 'TEST',
+      ),
+    ],
+    activities: [activity],
+  );
   final graph = ConstructionProjectActivityGraph(
     projectId: profile.projectId,
     activityInstances: const [
@@ -2980,7 +3085,7 @@ _BackupScheduleScenario _backupScheduleScenario() {
     graph: graph,
     seedCatalog: catalog,
   );
-  return _BackupScheduleScenario(profile, graph, catalog, schedule);
+  return _BackupScheduleScenario(profile, corpus, graph, catalog, schedule);
 }
 
 List<Map<String, Object?>> _backupActivityProjection(
@@ -3005,12 +3110,14 @@ List<Map<String, Object?>> _backupActivityProjection(
 class _BackupScheduleScenario {
   const _BackupScheduleScenario(
     this.profile,
+    this.corpus,
     this.graph,
     this.catalog,
     this.schedule,
   );
 
   final ConstructionProjectProfile profile;
+  final ConstructionCorpus corpus;
   final ConstructionProjectActivityGraph graph;
   final ConstructionScheduleSeedCatalog catalog;
   final ConstructionProjectReferenceSchedule schedule;

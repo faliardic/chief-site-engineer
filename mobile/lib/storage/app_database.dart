@@ -3296,6 +3296,53 @@ Future<void> _applyConstructionLivingPlanMigration(
   ''');
 
   await transaction.execute('''
+    CREATE TABLE project_living_plan_command_receipts (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      living_plan_item_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      event_type TEXT NOT NULL CHECK (
+        event_type IN (
+          'CREATED', 'STARTED', 'COMPLETED',
+          'DEFERRED', 'REOPENED', 'NOTE_UPDATED'
+        )
+      ),
+      intent_json TEXT NOT NULL CHECK (
+        length(intent_json) > 0
+        AND json_valid(intent_json) = 1
+        AND json_type(intent_json) = 'object'
+      ),
+      result_json TEXT NOT NULL CHECK (
+        length(result_json) > 0
+        AND json_valid(result_json) = 1
+        AND json_type(result_json) = 'object'
+      ),
+      result_revision INTEGER NOT NULL CHECK (result_revision >= 1),
+      is_no_op INTEGER NOT NULL CHECK (is_no_op IN (0, 1)),
+      event_sequence INTEGER CHECK (
+        event_sequence IS NULL OR event_sequence >= 1
+      ),
+      CHECK (
+        (
+          is_no_op = 1
+          AND event_sequence IS NULL
+        ) OR (
+          is_no_op = 0
+          AND event_sequence = result_revision
+        )
+      ),
+      UNIQUE (
+        id,
+        living_plan_item_id,
+        project_id,
+        event_type,
+        event_sequence
+      ),
+      FOREIGN KEY (living_plan_item_id, project_id)
+        REFERENCES project_living_plan_items(id, project_id)
+    )
+  ''');
+
+  await transaction.execute('''
     CREATE TABLE project_living_plan_events (
       id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
       living_plan_item_id TEXT NOT NULL,
@@ -3323,7 +3370,20 @@ Future<void> _applyConstructionLivingPlanMigration(
       ),
       UNIQUE (living_plan_item_id, sequence),
       FOREIGN KEY (living_plan_item_id, project_id)
-        REFERENCES project_living_plan_items(id, project_id)
+        REFERENCES project_living_plan_items(id, project_id),
+      FOREIGN KEY (
+        id,
+        living_plan_item_id,
+        project_id,
+        event_type,
+        sequence
+      ) REFERENCES project_living_plan_command_receipts(
+        id,
+        living_plan_item_id,
+        project_id,
+        event_type,
+        event_sequence
+      )
     )
   ''');
 
@@ -3340,9 +3400,77 @@ Future<void> _applyConstructionLivingPlanMigration(
     )
   ''');
   await transaction.execute('''
+    CREATE INDEX project_living_plan_command_receipts_item
+    ON project_living_plan_command_receipts(
+      living_plan_item_id, result_revision, id
+    )
+  ''');
+  await transaction.execute('''
     CREATE INDEX project_living_plan_events_history
     ON project_living_plan_events(living_plan_item_id, sequence)
   ''');
+
+  await transaction.execute('''
+    CREATE TRIGGER project_living_plan_command_receipts_result_match
+    BEFORE INSERT ON project_living_plan_command_receipts
+    WHEN NOT EXISTS (
+      SELECT 1
+      FROM project_living_plan_items item
+      WHERE item.id = NEW.living_plan_item_id
+        AND item.project_id = NEW.project_id
+        AND item.revision = NEW.result_revision
+        AND json_extract(NEW.result_json, '\$.id') IS item.id
+        AND json_extract(NEW.result_json, '\$.project_id') IS item.project_id
+        AND json_extract(
+          NEW.result_json, '\$.reference_snapshot_id'
+        ) IS item.reference_snapshot_id
+        AND json_extract(
+          NEW.result_json, '\$.activity_instance_id'
+        ) IS item.activity_instance_id
+        AND json_extract(
+          NEW.result_json, '\$.activity_id'
+        ) IS item.activity_id
+        AND json_extract(
+          NEW.result_json, '\$.activity_name_snapshot'
+        ) IS item.activity_name_snapshot
+        AND json_extract(
+          NEW.result_json, '\$.activity_context_json'
+        ) IS item.activity_context_json
+        AND json_extract(
+          NEW.result_json, '\$.natural_unit_snapshot'
+        ) IS item.natural_unit_snapshot
+        AND json_extract(
+          NEW.result_json, '\$.planned_date'
+        ) IS item.planned_date
+        AND json_extract(NEW.result_json, '\$.status') IS item.status
+        AND json_extract(NEW.result_json, '\$.note') IS item.note
+        AND json_extract(
+          NEW.result_json, '\$.revision'
+        ) IS item.revision
+        AND json_extract(
+          NEW.result_json, '\$.created_at'
+        ) IS item.created_at
+        AND json_extract(
+          NEW.result_json, '\$.updated_at'
+        ) IS item.updated_at
+        AND json_extract(
+          NEW.result_json, '\$.status_changed_at'
+        ) IS item.status_changed_at
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'living plan receipt result mismatch');
+    END
+  ''');
+  for (final operation in ['update', 'delete']) {
+    await transaction.execute('''
+      CREATE TRIGGER project_living_plan_command_receipts_append_only_$operation
+      BEFORE ${operation.toUpperCase()}
+      ON project_living_plan_command_receipts
+      BEGIN
+        SELECT RAISE(ABORT, 'living plan command receipts are append-only');
+      END
+    ''');
+  }
 
   await transaction.execute('''
     CREATE TRIGGER project_living_plan_items_guarded_update

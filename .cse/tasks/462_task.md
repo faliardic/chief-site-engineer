@@ -152,3 +152,114 @@ sayılarını, transition matrixini, snapshot-replacement davranışını, backu
 round-trip'i, allowlist/drift'i ve zorunlu `execution_record` ile
 `review_recommendation` bloklarını içerecektir. PR Ready yapılmayacak, merge
 edilmeyecek ve sonraki Slice başlatılmayacaktır.
+
+---
+
+## Owner-authorized post-review correction — PR #463
+
+Yetki kaynağı:
+https://github.com/faliardic/chief-site-engineer/pull/463#issuecomment-5307016099
+
+Correction parent:
+`5d352acec41f65df6d92a56908f043301e65993b`
+
+Owner review iki blocking R4 sözleşme boşluğunu tek dar correction run içinde
+kapatma yetkisi vermiştir. PR #463 `Draft` kalacaktır. Bu bölüm original primary
+run/task tarihçesini değiştirmez; correction ayrı kaydedilir:
+
+- `review_correction_runs: 1`
+- `review_correction_full_suite_runs`: focused kapılar PASS olursa en fazla `1`
+- orchestration: `single-agent`
+- fallback/downgrade: yok
+
+### Correction routing
+
+```yaml
+model_routing:
+  policy_version: "CSE-MRP-1.0"
+  task_risk: "R4"
+  orchestrator:
+    chatgpt_model: "gpt-5.6-sol"
+    chatgpt_reasoning_effort: "max"
+  codex_model: "gpt-5.6-sol"
+  codex_reasoning_effort: "max"
+  execution_mode: "standard"
+  orchestration: "single-agent"
+  selection_reason: "The correction changes durable idempotency semantics and transactional read consistency for the Living Plan source-of-truth immediately before UI/device integration."
+  routing_request_evidence: "https://github.com/faliardic/chief-site-engineer/pull/463#issuecomment-5307016099"
+  allowed_fallback: null
+  review_floor:
+    chatgpt_model: "gpt-5.6-sol"
+    chatgpt_reasoning_effort: "max"
+  fail_closed_if_mismatch: true
+```
+
+Invocation/runtime actual model ve reasoning metadata görünür değildir;
+canonical `unknown / null / unverified` değerleri kullanılacak, tahmin veya
+downgrade yapılmayacaktır.
+
+### Değişen correction sözleşmeleri
+
+1. Her kabul edilen command, no-op dahil, immutable/append-only durable receipt
+   ile event ID'sini aynı shared conflict namespace içinde rezerve eder.
+2. Exact receipt replay, current projection daha sonra ilerlese bile original
+   exact returned result'i mutation olmadan döndürür; farklı item/type/intent
+   aynı ID ile `living_plan_event_id_conflict` verir.
+3. No-op projection revision'ını ve lifecycle-event sayısını değiştirmez.
+4. Receipt, applicable projection/event mutation ve returned-result
+   doğrulaması tek SQLite transaction içinde atomiktir.
+5. `loadLivingPlanItem`, `listLivingPlanEventHistory` ve `loadSevenDayPlan`
+   projection/history okumalarını aynı `DatabaseExecutor` kullanan minimum read
+   transaction içinde tek coherent SQLite snapshot'tan üretir.
+6. Schema `15`, backup format `1`, public domain contracts ve immutable
+   reference-schedule davranışı değişmez.
+
+### Exact correction allowlist
+
+Correction parent'e göre yalnız şu yedi yol değişebilir:
+
+1. `mobile/lib/storage/app_database.dart`
+2. `mobile/lib/application/construction_living_plan_application.dart`
+3. `mobile/test/app_database_test.dart`
+4. `mobile/test/construction_living_plan_application_test.dart`
+5. `mobile/test/mobile_backup_application_test.dart`
+6. `.cse/tasks/462_task.md`
+7. `.cse/results/462_result.md`
+
+Sekizinci yol gerekirse edit/commit/push yapılmadan fail-closed durulacaktır.
+Schedule snapshot repository/engine, public Living Plan domain modeli, backup
+production/envelope/crypto, UI/platform/config/dependency/workflow, canonical
+docs/learning/roadmap, Issue #385 ve successor Slice protected kalır.
+
+### Correction validation ve stop sınırı
+
+Final corrected source revision üzerinde bağlayıcı sıra:
+
+1. Changed Dart format.
+2. Focused database/migration; receipt constraint/immutability/delete guard,
+   cross-namespace conflict, integrity/FK dahil.
+3. Focused Living Plan; no-op receipt/replay/conflict/rollback ve coherent
+   concurrent-read regressions dahil.
+4. Unchanged Schedule Date Engine `23/23` ve snapshot repository `11/11`.
+5. Real backup/restore; schema-14 → 15 ve no-op receipt roundtrip/replay dahil.
+6. `flutter analyze --no-pub`.
+7. `git diff --check`.
+8. Exact seven-file correction allowlist, protected/extra drift `0`, schema
+   `15`, backup format `1`, integrity `ok`, empty FK check.
+9. Yalnız bütün focused kapılar PASS olursa bir additional correction full
+   `flutter test --no-pub`; üçüncü full run yasaktır.
+
+Aynı failed operation exact fix sonrasında en fazla bir kez retry edilebilir.
+Focused failure, tekrar bütçesi aşımı, sekizinci path ihtiyacı, schema/version/
+envelope drift'i veya yeni R4 contradiction durumunda correction commit/push
+yapılmadan durulur.
+
+### Correction publication sınırı
+
+PASS halinde existing branch üzerinde tek intentional correction commit ve
+normal push yetkilidir. Exact Issue/PR evidence; correction parent/head,
+seven-file correction set, total PR set, focused/full counts, receipt/replay/
+conflict/rollback, coherent reads, backup/schema-14 migration, integrity/FK,
+protected drift ile zorunlu `execution_record` ve `review_recommendation`
+bloklarını taşıyacaktır. PR Draft kalacak; Ready, merge, UI/APK/device, Item 5
+completion veya başka Slice yapılmayacaktır.

@@ -22,6 +22,7 @@ typedef ConstructionLivingPlanCorpusLoader =
 typedef ConstructionLivingPlanBeforeEventInsertHook = Future<void> Function();
 typedef ConstructionLivingPlanBeforeCreateTransactionHook =
     Future<void> Function();
+typedef ConstructionLivingPlanReadBoundaryHook = Future<void> Function();
 
 class ConstructionLivingPlanApplication {
   ConstructionLivingPlanApplication({
@@ -34,6 +35,9 @@ class ConstructionLivingPlanApplication {
     ConstructionLivingPlanCorpusLoader? corpusLoader,
     this.beforeEventInsert,
     this.beforeCreateTransaction,
+    this.afterLoadItemProjectionRead,
+    this.afterEventHistoryItemProjectionRead,
+    this.afterSevenDayPlanProjectionRead,
   }) : _graphLoader =
            graphLoader ??
            (graphBuilder ?? ConstructionProjectActivityGraphBuilder()).build,
@@ -52,6 +56,10 @@ class ConstructionLivingPlanApplication {
   final ConstructionLivingPlanBeforeEventInsertHook? beforeEventInsert;
   final ConstructionLivingPlanBeforeCreateTransactionHook?
   beforeCreateTransaction;
+  final ConstructionLivingPlanReadBoundaryHook? afterLoadItemProjectionRead;
+  final ConstructionLivingPlanReadBoundaryHook?
+  afterEventHistoryItemProjectionRead;
+  final ConstructionLivingPlanReadBoundaryHook? afterSevenDayPlanProjectionRead;
 
   Future<List<ConstructionLivingPlanReferenceCandidate>>
   loadSevenDayReferenceSuggestions({
@@ -263,6 +271,14 @@ class ConstructionLivingPlanApplication {
         },
         result: inserted,
       );
+      await _insertReceipt(
+        transaction,
+        eventId: command.eventId,
+        item: inserted,
+        eventType: ConstructionLivingPlanEventType.created,
+        intent: intent,
+        isNoOp: false,
+      );
       await beforeEventInsert?.call();
       await _insertEvent(
         transaction,
@@ -272,7 +288,13 @@ class ConstructionLivingPlanApplication {
         occurredAt: timestamp,
         payload: payload,
       );
-      final stored = await _loadItem(transaction, command.itemId);
+      final stored = await _tryReplay(
+        transaction,
+        eventId: command.eventId,
+        itemId: command.itemId,
+        eventType: ConstructionLivingPlanEventType.created,
+        expectedIntent: intent,
+      );
       if (stored == null || !_sameItemState(stored, inserted)) {
         throw const ConstructionLivingPlanFailure(
           'living_plan_write_verification_failed',
@@ -479,77 +501,93 @@ class ConstructionLivingPlanApplication {
     _requireIdentity(projectId, 'living_plan_invalid_project_id');
     final start = _canonicalDate(windowStart);
     final finish = _canonicalDate(windowStart.add(const Duration(days: 6)));
-    final rows = await database.database.rawQuery(
-      '''
-      SELECT item.*, snapshot.superseded_at AS origin_superseded_at
-      FROM project_living_plan_items item
-      JOIN project_schedule_snapshots snapshot
-        ON snapshot.id = item.reference_snapshot_id
-       AND snapshot.project_id = item.project_id
-      WHERE item.project_id = ?
-        AND (
-          (item.status != 'COMPLETED' AND item.planned_date <= ?)
-          OR (
-            item.status = 'COMPLETED'
-            AND item.planned_date >= ?
-            AND item.planned_date <= ?
+    final result = await database.database.transaction((transaction) async {
+      final rows = await transaction.rawQuery(
+        '''
+        SELECT item.*, snapshot.superseded_at AS origin_superseded_at
+        FROM project_living_plan_items item
+        JOIN project_schedule_snapshots snapshot
+          ON snapshot.id = item.reference_snapshot_id
+         AND snapshot.project_id = item.project_id
+        WHERE item.project_id = ?
+          AND (
+            (item.status != 'COMPLETED' AND item.planned_date <= ?)
+            OR (
+              item.status = 'COMPLETED'
+              AND item.planned_date >= ?
+              AND item.planned_date <= ?
+            )
           )
-        )
-      ''',
-      [projectId, finish, start, finish],
-    );
-    final result = <ConstructionLivingPlanWindowItem>[];
-    for (final row in rows) {
-      final item = await _itemFromRowAndVerify(database.database, row);
-      final itemDate = formatCanonicalConstructionDate(item.plannedDate);
-      result.add(
-        ConstructionLivingPlanWindowItem(
-          item: item,
-          isOverdue:
-              item.status != ConstructionLivingPlanStatus.completed &&
-              itemDate.compareTo(start) < 0,
-          originSnapshotIsCurrent: row['origin_superseded_at'] == null,
-        ),
+        ''',
+        [projectId, finish, start, finish],
       );
-    }
+      await afterSevenDayPlanProjectionRead?.call();
+      final window = <ConstructionLivingPlanWindowItem>[];
+      for (final row in rows) {
+        final item = await _itemFromRowAndVerify(transaction, row);
+        final itemDate = formatCanonicalConstructionDate(item.plannedDate);
+        window.add(
+          ConstructionLivingPlanWindowItem(
+            item: item,
+            isOverdue:
+                item.status != ConstructionLivingPlanStatus.completed &&
+                itemDate.compareTo(start) < 0,
+            originSnapshotIsCurrent: row['origin_superseded_at'] == null,
+          ),
+        );
+      }
+      return window;
+    });
     result.sort(_compareWindowItems);
     return List.unmodifiable(result);
   }
 
   Future<ConstructionLivingPlanItem?> loadLivingPlanItem(String itemId) async {
     _requireUuid(itemId, 'living_plan_invalid_item_id');
-    return _loadItem(database.database, itemId);
+    return database.database.transaction(
+      (transaction) => _loadItem(
+        transaction,
+        itemId,
+        afterProjectionRead: afterLoadItemProjectionRead,
+      ),
+    );
   }
 
   Future<List<ConstructionLivingPlanEvent>> listLivingPlanEventHistory(
     String itemId,
   ) async {
     _requireUuid(itemId, 'living_plan_invalid_item_id');
-    final item = await _loadItem(database.database, itemId);
-    if (item == null) {
-      return const <ConstructionLivingPlanEvent>[];
-    }
-    final rows = await database.database.query(
-      'project_living_plan_events',
-      where: 'living_plan_item_id = ?',
-      whereArgs: [itemId],
-      orderBy: 'sequence ASC',
-    );
-    final events = rows.map(_eventFromRow).toList(growable: false);
-    if (events.length != item.revision) {
-      throw const ConstructionLivingPlanFailure(
-        'living_plan_history_integrity_failed',
+    return database.database.transaction((transaction) async {
+      final item = await _loadItem(
+        transaction,
+        itemId,
+        afterProjectionRead: afterEventHistoryItemProjectionRead,
       );
-    }
-    for (var index = 0; index < events.length; index += 1) {
-      if (events[index].sequence != index + 1 ||
-          events[index].projectId != item.projectId) {
+      if (item == null) {
+        return const <ConstructionLivingPlanEvent>[];
+      }
+      final rows = await transaction.query(
+        'project_living_plan_events',
+        where: 'living_plan_item_id = ?',
+        whereArgs: [itemId],
+        orderBy: 'sequence ASC',
+      );
+      final events = rows.map(_eventFromRow).toList(growable: false);
+      if (events.length != item.revision) {
         throw const ConstructionLivingPlanFailure(
           'living_plan_history_integrity_failed',
         );
       }
-    }
-    return List.unmodifiable(events);
+      for (var index = 0; index < events.length; index += 1) {
+        if (events[index].sequence != index + 1 ||
+            events[index].projectId != item.projectId) {
+          throw const ConstructionLivingPlanFailure(
+            'living_plan_history_integrity_failed',
+          );
+        }
+      }
+      return List.unmodifiable(events);
+    });
   }
 
   Future<ConstructionLivingPlanItem> _mutate({
@@ -585,7 +623,27 @@ class ConstructionLivingPlanApplication {
       }
       final decision = decide(current);
       if (decision.isNoOp) {
-        return current;
+        await _insertReceipt(
+          transaction,
+          eventId: eventId,
+          item: current,
+          eventType: eventType,
+          intent: intent,
+          isNoOp: true,
+        );
+        final stored = await _tryReplay(
+          transaction,
+          eventId: eventId,
+          itemId: itemId,
+          eventType: eventType,
+          expectedIntent: intent,
+        );
+        if (stored == null || !_sameItemState(stored, current)) {
+          throw const ConstructionLivingPlanFailure(
+            'living_plan_write_verification_failed',
+          );
+        }
+        return stored;
       }
       final occurred = _canonicalNow();
       if (occurred.isBefore(current.updatedAt)) {
@@ -637,6 +695,14 @@ class ConstructionLivingPlanApplication {
         change: decision.change,
         result: resulting,
       );
+      await _insertReceipt(
+        transaction,
+        eventId: eventId,
+        item: resulting,
+        eventType: eventType,
+        intent: intent,
+        isNoOp: false,
+      );
       await beforeEventInsert?.call();
       await _insertEvent(
         transaction,
@@ -646,7 +712,13 @@ class ConstructionLivingPlanApplication {
         occurredAt: occurredAt,
         payload: payload,
       );
-      final stored = await _loadItem(transaction, itemId);
+      final stored = await _tryReplay(
+        transaction,
+        eventId: eventId,
+        itemId: itemId,
+        eventType: eventType,
+        expectedIntent: intent,
+      );
       if (stored == null || !_sameItemState(stored, resulting)) {
         throw const ConstructionLivingPlanFailure(
           'living_plan_write_verification_failed',
@@ -875,7 +947,7 @@ class ConstructionLivingPlanApplication {
     required Map<String, Object?> expectedIntent,
   }) async {
     final rows = await executor.query(
-      'project_living_plan_events',
+      'project_living_plan_command_receipts',
       where: 'id = ?',
       whereArgs: [eventId],
       limit: 2,
@@ -888,30 +960,54 @@ class ConstructionLivingPlanApplication {
         'living_plan_history_integrity_failed',
       );
     }
-    final event = _eventFromRow(rows.single);
-    final storedIntent = event.payload['intent'];
-    if (event.livingPlanItemId != itemId ||
-        event.eventType != eventType ||
-        storedIntent is! Map ||
-        encodeConstructionLivingPlanJson(storedIntent) !=
+    final receipt = _receiptFromRow(rows.single);
+    if (receipt.livingPlanItemId != itemId ||
+        receipt.eventType != eventType ||
+        encodeConstructionLivingPlanJson(receipt.intent) !=
             encodeConstructionLivingPlanJson(expectedIntent)) {
       throw const ConstructionLivingPlanFailure(
         'living_plan_event_id_conflict',
       );
     }
     final current = await _loadItem(executor, itemId);
-    if (current == null || current.projectId != event.projectId) {
+    if (current == null || current.projectId != receipt.projectId) {
       throw const ConstructionLivingPlanFailure(
         'living_plan_history_integrity_failed',
       );
     }
-    return _itemAtEventResult(current, event);
+    final eventRows = await executor.query(
+      'project_living_plan_events',
+      where: 'id = ?',
+      whereArgs: [eventId],
+      limit: 2,
+    );
+    if (receipt.isNoOp) {
+      if (eventRows.isNotEmpty) {
+        throw const ConstructionLivingPlanFailure(
+          'living_plan_history_integrity_failed',
+        );
+      }
+    } else {
+      if (eventRows.length != 1) {
+        throw const ConstructionLivingPlanFailure(
+          'living_plan_history_integrity_failed',
+        );
+      }
+      final event = _eventFromRow(eventRows.single);
+      if (!_eventMatchesReceipt(event, receipt)) {
+        throw const ConstructionLivingPlanFailure(
+          'living_plan_history_integrity_failed',
+        );
+      }
+    }
+    return _itemAtReceiptResult(current, receipt);
   }
 
   Future<ConstructionLivingPlanItem?> _loadItem(
     DatabaseExecutor executor,
-    String itemId,
-  ) async {
+    String itemId, {
+    ConstructionLivingPlanReadBoundaryHook? afterProjectionRead,
+  }) async {
     final rows = await executor.query(
       'project_living_plan_items',
       where: 'id = ?',
@@ -926,6 +1022,7 @@ class ConstructionLivingPlanApplication {
         'living_plan_projection_integrity_failed',
       );
     }
+    await afterProjectionRead?.call();
     return _itemFromRowAndVerify(executor, rows.single);
   }
 
@@ -973,6 +1070,27 @@ class ConstructionLivingPlanApplication {
     });
   }
 
+  Future<void> _insertReceipt(
+    DatabaseExecutor executor, {
+    required String eventId,
+    required ConstructionLivingPlanItem item,
+    required ConstructionLivingPlanEventType eventType,
+    required Map<String, Object?> intent,
+    required bool isNoOp,
+  }) async {
+    await executor.insert('project_living_plan_command_receipts', {
+      'id': eventId,
+      'living_plan_item_id': item.id,
+      'project_id': item.projectId,
+      'event_type': eventType.storageValue,
+      'intent_json': encodeConstructionLivingPlanJson(intent),
+      'result_json': encodeConstructionLivingPlanJson(_receiptResult(item)),
+      'result_revision': item.revision,
+      'is_no_op': isNoOp ? 1 : 0,
+      'event_sequence': isNoOp ? null : item.revision,
+    });
+  }
+
   DateTime _canonicalNow() {
     try {
       return CseTimeCodec.decodeCanonicalUtc(CseTimeCodec.encodeUtc(clock()));
@@ -994,6 +1112,30 @@ class _ExistingMarker {
 
   final String itemId;
   final ConstructionLivingPlanStatus status;
+}
+
+class _StoredReceipt {
+  const _StoredReceipt({
+    required this.id,
+    required this.livingPlanItemId,
+    required this.projectId,
+    required this.eventType,
+    required this.intent,
+    required this.result,
+    required this.resultRevision,
+    required this.isNoOp,
+    required this.eventSequence,
+  });
+
+  final String id;
+  final String livingPlanItemId;
+  final String projectId;
+  final ConstructionLivingPlanEventType eventType;
+  final Map<String, Object?> intent;
+  final Map<String, Object?> result;
+  final int resultRevision;
+  final bool isNoOp;
+  final int? eventSequence;
 }
 
 class _MutationDecision {
@@ -1043,57 +1185,130 @@ Map<String, Object?> _eventPayload({
   },
 };
 
-ConstructionLivingPlanItem _itemAtEventResult(
+Map<String, Object?> _receiptResult(ConstructionLivingPlanItem item) =>
+    <String, Object?>{
+      'activity_context_json': encodeConstructionLivingPlanContext(
+        item.activityContext,
+      ),
+      'activity_id': item.activityId,
+      'activity_instance_id': item.activityInstanceId,
+      'activity_name_snapshot': item.activityNameSnapshot,
+      'created_at': CseTimeCodec.encodeUtc(item.createdAt),
+      'id': item.id,
+      'natural_unit_snapshot': item.naturalUnitSnapshot,
+      'note': item.note,
+      'planned_date': formatCanonicalConstructionDate(item.plannedDate),
+      'project_id': item.projectId,
+      'reference_snapshot_id': item.referenceSnapshotId,
+      'revision': item.revision,
+      'status': item.status.storageValue,
+      'status_changed_at': CseTimeCodec.encodeUtc(item.statusChangedAt),
+      'updated_at': CseTimeCodec.encodeUtc(item.updatedAt),
+    };
+
+ConstructionLivingPlanItem _itemAtReceiptResult(
   ConstructionLivingPlanItem current,
-  ConstructionLivingPlanEvent event,
+  _StoredReceipt receipt,
 ) {
-  final rawResult = event.payload['result'];
-  if (rawResult is! Map) {
-    throw const ConstructionLivingPlanFailure(
-      'living_plan_history_integrity_failed',
-    );
-  }
-  final result = rawResult.cast<String, Object?>();
-  final revision = result['revision'];
-  final note = result['note'];
-  if (revision != event.sequence ||
-      (note != null && note is! String) ||
-      result['updated_at'] != CseTimeCodec.encodeUtc(event.occurredAt)) {
-    throw const ConstructionLivingPlanFailure(
-      'living_plan_history_integrity_failed',
-    );
-  }
   try {
-    return ConstructionLivingPlanItem(
-      id: current.id,
-      projectId: current.projectId,
-      referenceSnapshotId: current.referenceSnapshotId,
-      activityInstanceId: current.activityInstanceId,
-      activityId: current.activityId,
-      activityNameSnapshot: current.activityNameSnapshot,
-      activityContext: current.activityContext,
-      naturalUnitSnapshot: current.naturalUnitSnapshot,
-      plannedDate: parseCanonicalConstructionDate(
-        _requiredStoredString(result, 'planned_date'),
-      ),
-      status: ConstructionLivingPlanStatus.fromStorage(result['status']),
-      note: note as String?,
-      revision: revision as int,
-      createdAt: current.createdAt,
-      updatedAt: CseTimeCodec.decodeCanonicalUtc(
-        _requiredStoredString(result, 'updated_at'),
-      ),
-      statusChangedAt: CseTimeCodec.decodeCanonicalUtc(
-        _requiredStoredString(result, 'status_changed_at'),
-      ),
-    );
-  } on ConstructionLivingPlanFailure {
-    rethrow;
+    final result = _itemFromRow(receipt.result);
+    if (receipt.resultRevision != result.revision ||
+        result.revision > current.revision ||
+        result.id != current.id ||
+        result.projectId != current.projectId ||
+        result.referenceSnapshotId != current.referenceSnapshotId ||
+        result.activityInstanceId != current.activityInstanceId ||
+        result.activityId != current.activityId ||
+        result.activityNameSnapshot != current.activityNameSnapshot ||
+        encodeConstructionLivingPlanContext(result.activityContext) !=
+            encodeConstructionLivingPlanContext(current.activityContext) ||
+        result.naturalUnitSnapshot != current.naturalUnitSnapshot ||
+        result.createdAt != current.createdAt) {
+      throw const FormatException();
+    }
+    return result;
   } on Object {
     throw const ConstructionLivingPlanFailure(
       'living_plan_history_integrity_failed',
     );
   }
+}
+
+_StoredReceipt _receiptFromRow(Map<String, Object?> row) {
+  try {
+    String requiredString(String key, {bool trim = true}) {
+      final value = row[key];
+      if (value is! String ||
+          value.isEmpty ||
+          (trim && value.trim() != value)) {
+        throw const FormatException();
+      }
+      return value;
+    }
+
+    Map<String, Object?> canonicalObject(String key) {
+      final encoded = requiredString(key, trim: false);
+      final decoded = jsonDecode(encoded);
+      if (decoded is! Map ||
+          encodeConstructionLivingPlanJson(decoded) != encoded) {
+        throw const FormatException();
+      }
+      return decoded.cast<String, Object?>();
+    }
+
+    final resultRevision = row['result_revision'];
+    final noOpValue = row['is_no_op'];
+    final eventSequence = row['event_sequence'];
+    if (resultRevision is! int ||
+        resultRevision < 1 ||
+        (noOpValue != 0 && noOpValue != 1) ||
+        (eventSequence != null &&
+            (eventSequence is! int || eventSequence < 1)) ||
+        (noOpValue == 1 && eventSequence != null) ||
+        (noOpValue == 0 && eventSequence != resultRevision)) {
+      throw const FormatException();
+    }
+    return _StoredReceipt(
+      id: requiredString('id'),
+      livingPlanItemId: requiredString('living_plan_item_id'),
+      projectId: requiredString('project_id'),
+      eventType: ConstructionLivingPlanEventType.fromStorage(row['event_type']),
+      intent: canonicalObject('intent_json'),
+      result: canonicalObject('result_json'),
+      resultRevision: resultRevision,
+      isNoOp: noOpValue == 1,
+      eventSequence: eventSequence as int?,
+    );
+  } on Object {
+    throw const ConstructionLivingPlanFailure(
+      'living_plan_history_integrity_failed',
+    );
+  }
+}
+
+bool _eventMatchesReceipt(
+  ConstructionLivingPlanEvent event,
+  _StoredReceipt receipt,
+) {
+  final eventIntent = event.payload['intent'];
+  final eventResult = event.payload['result'];
+  if (eventIntent is! Map || eventResult is! Map) {
+    return false;
+  }
+  final receiptResult = receipt.result;
+  return event.id == receipt.id &&
+      event.livingPlanItemId == receipt.livingPlanItemId &&
+      event.projectId == receipt.projectId &&
+      event.eventType == receipt.eventType &&
+      event.sequence == receipt.eventSequence &&
+      encodeConstructionLivingPlanJson(eventIntent) ==
+          encodeConstructionLivingPlanJson(receipt.intent) &&
+      eventResult['note'] == receiptResult['note'] &&
+      eventResult['planned_date'] == receiptResult['planned_date'] &&
+      eventResult['revision'] == receiptResult['revision'] &&
+      eventResult['status'] == receiptResult['status'] &&
+      eventResult['status_changed_at'] == receiptResult['status_changed_at'] &&
+      eventResult['updated_at'] == receiptResult['updated_at'];
 }
 
 ConstructionLivingPlanItem _itemFromRow(Map<String, Object?> row) {
