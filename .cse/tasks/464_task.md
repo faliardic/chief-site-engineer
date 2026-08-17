@@ -1371,3 +1371,461 @@ Correction #11 completed in approximately 35 minutes, below its inherited
 no further run is needed. One intentional commit, normal push and one Draft PR
 are now authorized. Ready, merge, production Şefim install, V2.5 completion
 and successor work remain forbidden.
+
+## Owner-authorized correction #12 — 2026-08-16
+
+- Authority:
+  https://github.com/faliardic/chief-site-engineer/issues/464#issuecomment-5308577150
+- Verified author: `faliardic`; Issue author/owner and latest Issue comment.
+- PR review cluster: Draft PR #465 top-level `COMMENTED` review; inline review
+  thread count `0`; head
+  `3b071e183e7b7c4130da1921681269ed3972ef40`.
+- PR remains Draft/open/unmerged. The correction addresses the single blocking
+  add-flow consistency cluster; no Ready or merge authority exists.
+- Every earlier fail-closed result and Correction #11 PASS remains append-only.
+
+```yaml
+post_failure_correction_runs: 12
+independent_review_blockers: 1
+add_modal_dismissal_consistency_correction_runs: 1
+model_routing:
+  policy_version: CSE-MRP-1.0
+  task_risk: R4
+  codex_model: gpt-5.6-sol
+  codex_reasoning_effort: max
+  execution_mode: standard
+  orchestration: single-agent
+  routing_request_evidence: https://github.com/faliardic/chief-site-engineer/issues/464#issuecomment-5308577150
+  allowed_fallback: null
+  fail_closed_if_mismatch: true
+```
+
+Runtime invocation/model/effort metadata is not exposed. New Correction #12
+records use canonical `actual_model: unknown`,
+`actual_reasoning_effort: unknown`, `mismatch_detected: null` and
+`runtime_verification_status: unverified`; no guess, fallback or downgrade is
+allowed.
+
+### Exact correction contract
+
+1. Parent-owned durable-change signaling must be set immediately after
+   `createLivingPlanItem(...)` succeeds and must trigger parent `_reload()`
+   after every modal dismissal path, independent of the route result.
+2. Durable create success and post-write candidate refresh are separate truth
+   boundaries. A refresh failure after create must report persisted success
+   plus refresh failure and must never claim `plan değişmedi`.
+3. Widget regressions must prove system-back dismissal reloads the parent and
+   a one-shot post-create candidate refresh failure preserves truthful feedback,
+   exactly one create and subsequent parent visibility.
+4. The physical runner must dismiss the successful add sheet with Android/
+   system back and then prove main-list visibility, exact target lifecycle,
+   neighbor stability and relaunch persistence on the final corrected source.
+
+Correction edits are limited to the smallest required subset of exactly these
+six paths:
+
+1. `mobile/lib/features/living_plan/living_plan_page.dart`
+2. `mobile/test/living_plan_widget_test.dart`
+3. `mobile/test/support/fake_living_plan_application.dart` — only if required;
+   prefer a test-local one-shot failure fake
+4. `scripts/run_living_plan_device_acceptance.ps1`
+5. `.cse/tasks/464_task.md` — append-only
+6. `.cse/results/464_result.md` — append-only
+
+Any seventh path is fail-closed. Core/domain/schema/migration, adapter,
+bootstrap, Agenda, Android/iOS identities, Gradle/Manifest/receiver,
+pubspec/lock, backup, signing/release, every legacy/production package/data
+surface, Issue #385 and successor slices remain protected. Schema `15`, backup
+format `1` and app version `0.1.0+1` remain fixed.
+
+### Correction #12 read-only preflight
+
+- Exact worktree/branch/head:
+  `issue-464-living-plan-ui-device` /
+  `codex/issue-464-living-plan-ui-device` /
+  `3b071e183e7b7c4130da1921681269ed3972ef40`.
+- Local/remote branch divergence: `0 0`; remote master/base:
+  `318f9077b750e54f551f31dffde3dae6220b8e73`.
+- Non-ignored tracked/staged/untracked status: clean; staged paths `0`.
+- Exact accumulated Issue diff: `29` paths. Full pre-correction size/SHA-256
+  manifest is appended to `.cse/results/464_result.md`.
+- Planned correction edit subset is page, widget test, runner and append-only
+  task/result. The other `24` accumulated WIP paths are protected by their
+  pre-correction hashes; shared fake stays protected unless executable evidence
+  proves it is required.
+- `gh` authentication is valid. PR #465 is open, mergeable, Draft, unmerged,
+  base `master`, exact head above; the thread-aware review fetch reports zero
+  inline review threads and one actionable top-level behavior cluster.
+- The first ADB enumeration started a stopped daemon but returned no device;
+  a second read-only enumeration also returned no attached device. No device,
+  package or repository mutation occurred. Host correction/gates may proceed;
+  the physical stage remains fail-closed until exactly one authorized device
+  is visible again.
+
+Correction #12 validation budget remains exact: one affected Living Plan/Home
+focused run, one runner/static run, one analyze, one diff/drift gate, one full
+suite, one host APK build (environment-only retry if evidenced), one authorized
+acceptance-only clear and one physical run (selector/runner/environment-only
+retry if evidenced). Product/test failure, add/back inconsistency, safe-read,
+integrity, crash or non-target drift has no retry.
+
+## Correction #12 fail-closed stop — 2026-08-16
+
+- The parent-owned durable-change callback, system-back reload behavior and
+  post-create refresh truth boundary were implemented in the five-path allowed
+  subset; the optional shared fake and every protected path stayed unchanged.
+- Focused Living Plan/Home tests passed `26/26`; runner parser/static passed;
+  platform/release static tests passed `12/12`; release validator passed `7/7`;
+  repository analyze passed; the single full suite passed `690/690`.
+- A PATH-only pre-invocation failed before the runner started. The primary host
+  build then failed while Flutter tried to remove the Git-ignored, read-only
+  `mobile/ios/Flutter/ephemeral/Packages/.packages` directory. After exact
+  ignored/worktree containment and source-drift checks, only that directory's
+  read-only attribute was cleared.
+- The one authorized environment-only build retry reached Gradle but failed
+  because Gradle could not remove the Git-ignored
+  `mobile/build/app/intermediates/assets/debug/mergeDebugAssets` tree. No fresh
+  acceptance APK completed. The existing release-gate APK is the stale
+  Correction #11 artifact from `2026-08-16T19:18:06+03:00` and is not accepted
+  as Correction #12 evidence.
+- Build retry budget is exhausted. Physical clear/install/flow counts are `0`;
+  commit/push/GitHub publication counts are `0`. PR #465 remains Draft at the
+  pre-correction head. No Ready, merge, AAB/signing, production install,
+  successor slice or Item 5 completion action is authorized or performed.
+- Stop condition: fail closed at host packaging. A later owner instruction is
+  required before any new packaging attempt or continuation.
+
+## Correction #13 host-packaging-only recovery authority — 2026-08-16
+
+Authority:
+https://github.com/faliardic/chief-site-engineer/issues/464#issuecomment-5309211860
+(`faliardic`, Issue owner/author).
+
+Correction #12 is accepted as an append-only fail-closed result. Correction
+#13 grants exactly one deterministic ignored/generated cleanup and exactly one
+fresh host arm64 APK build on the unchanged tested WIP source. It grants no
+product/test/runner/platform source edit, no ADB command, no device inventory,
+clear/install/launch, no commit/push/PR completion publication, Ready or merge.
+
+Hard tracked boundary:
+
+- Only this task record and `.cse/results/464_result.md` may receive append-only
+  evidence.
+- The other `27` tracked PR paths must remain byte-identical to the
+  pre-cleanup manifest in the result record. Any third tracked correction path
+  is fail-closed before build.
+- Current isolated worktree/branch/head:
+  `issue-464-living-plan-ui-device` /
+  `codex/issue-464-living-plan-ui-device` /
+  `3b071e183e7b7c4130da1921681269ed3972ef40`.
+- Remote head is exact and divergence is `0 0`; PR #465 is open, mergeable,
+  Draft and unmerged; base is
+  `318f9077b750e54f551f31dffde3dae6220b8e73`.
+- Current Correction #12 WIP diff has `5` paths, staged `0`, non-ignored
+  untracked `0`; accumulated PR diff has `29` paths. Deterministic current diff
+  blob identity is `f46242a8f63361cd71a45f0f921f12e934b347eb`.
+- Pre-cleanup pubspec SHA-256 is
+  `704ee4a64b534d14264984f68b8275570b8f87c06190ee48340830d971eabfa7`;
+  lockfile SHA-256 is
+  `2b75e59a051a8cfcfec3d6883b04779205c63678b0f4814a4535e50db77dc441`.
+
+Authorized generated roots are restricted to `mobile/build/`,
+`mobile/ios/Flutter/ephemeral/`, and only if needed `mobile/.dart_tool/` or
+`mobile/android/.gradle/`. Required order is exact containment and ignored
+proof, worktree-local Gradle `--stop`, descendant read-only removal using
+`attrib`, complete deletion of the first two roots, offline pub metadata
+preparation with pubspec/lock equality, then one direct fresh build. No build
+retry is authorized.
+
+Correction #12 focused `26/26`, static `12/12`, validator `7/7`, analyze PASS
+and full `690/690` are reused. They must not be rerun. On host-build PASS,
+append artifact evidence and stop uncommitted/unpushed with PR #465 Draft while
+awaiting separate physical-only authority.
+
+```yaml
+post_failure_correction_runs: 13
+host_generated_state_cleanup_runs: 1
+fresh_host_packaging_runs: 1
+physical_runs_under_correction_13: 0
+model_routing:
+  policy_version: CSE-MRP-1.0
+  task_risk: R4
+  codex_model: gpt-5.6-sol
+  codex_reasoning_effort: max
+  execution_mode: standard
+  orchestration: single-agent
+  routing_request_evidence: https://github.com/faliardic/chief-site-engineer/issues/464#issuecomment-5309211860
+  allowed_fallback: null
+  fail_closed_if_mismatch: true
+```
+
+## Correction #13 host packaging PASS and stop — 2026-08-16
+
+- Exact ignored/generated containment and Git-ignore checks passed for
+  `mobile/build/` and `mobile/ios/Flutter/ephemeral/`.
+- The worktree-local Gradle wrapper stopped exactly one daemon. Read-only
+  attributes were removed from both roots and descendants with `attrib`; only
+  those two roots were deleted. `mobile/.dart_tool/` and
+  `mobile/android/.gradle/` were not deleted because they were not required.
+- Host execution policy rejected two combined cleanup command preflights and
+  one `Remove-Item` process before execution. No operation occurred in those
+  rejected calls. The already verified exact roots were then deleted one at a
+  time through the PowerShell/.NET directory API without changing scope.
+- Pinned Flutter `pub get --offline` passed; pubspec and lockfile hashes stayed
+  exact and tracked drift remained zero.
+- The single authorized fresh build invocation passed:
+  `flutter build apk --debug --no-pub --target
+  integration_test/living_plan_acceptance_main.dart --target-platform
+  android-arm64`. Build interval was
+  `2026-08-16T22:03:01.5854689+03:00`–
+  `2026-08-16T22:05:24.5566894+03:00`; output mtime was
+  `2026-08-16T22:05:19.6173887+03:00`.
+- Fresh ignored artifact:
+  `mobile/build/release_gate/sefim-0.1.0-issue464-living-plan-acceptance-debug.apk`;
+  size `96837167`; SHA-256
+  `1d94fb97ec5ec0e98d24f4a063ecd1d91061ac898d8a39a9bb7b38b720040a68`.
+- APK contract PASS: package `com.faliardic.sefim.acceptance`, label `Şefim`,
+  marker `CSE_ENTRYPOINT_LIVING_PLAN_ACCEPTANCE_V1` present, normal/background/
+  reboot markers absent, launchable activity
+  `com.faliardic.chiefsiteengineer.MainActivity`, four `arm64-v8a` native
+  libraries, protected identity collision `false`, and artifact/output SHA
+  equality `true`.
+- Post-build protected tracked hashes `27/27`, correction paths `5/5`, total PR
+  paths `29/29`, staged/non-ignored untracked `0/0`, pubspec/lock exact and
+  `git diff --check` PASS. Correction #12 source remained byte-identical.
+- Reused validation only: focused `26/26`, static `12/12`, validator `7/7`,
+  analyze PASS, full `690/690`. None was rerun.
+- ADB/device operations `0`, commit/push/GitHub publication `0`. PR #465
+  remains open, mergeable and Draft at
+  `3b071e183e7b7c4130da1921681269ed3972ef40`; divergence `0 0`.
+- Required stop: host packaging is complete; await explicit owner confirmation
+  that the physical device is reconnected and a separate physical-only
+  authority. Do not commit or push Correction #12 yet.
+
+## Correction #13 resume audit — 2026-08-17
+
+Yeni sohbet bootstrap'i sırasında Issue #464 gövdesi ve bütün `20` yorum,
+özellikle owner comment `5309211860`, yeniden okundu. Yerel append-only kayıt,
+Correction #13 cleanup ve tek fresh build bütçesinin daha önce PASS olarak
+tüketildiğini kanıtladığı için build, test, analyze, validator veya offline pub
+işlemi tekrar edilmedi.
+
+Read-only audit sonucu:
+
+- exact worktree/branch/head:
+  `issue-464-living-plan-ui-device` /
+  `codex/issue-464-living-plan-ui-device` /
+  `3b071e183e7b7c4130da1921681269ed3972ef40`;
+- upstream divergence `0 0`, staged path `0`, current WIP `5`, full PR path
+  seti `29`;
+- protected tracked hash `27/27`, mismatch `0`;
+- Correction #13 öncesindeki task/result prefixleri exact korunmuş;
+- pubspec/lock hashleri exact;
+- `git diff --check` exit `0` (yalnız mevcut LF→CRLF uyarıları);
+- fresh output ve release-gate copy: `96837167` byte, SHA-256
+  `1d94fb97ec5ec0e98d24f4a063ecd1d91061ac898d8a39a9bb7b38b720040a68`,
+  copy equality `true`;
+- package/label/marker/forbidden-marker/ABI/launchable-activity contractı
+  read-only yeniden doğrulandı;
+- schema / backup / version: `15 / 1 / 0.1.0+1`;
+- GitHub PR #465: open, mergeable, Draft, unmerged, remote head exact.
+
+Bu resume audit sırasında ADB/device, build, cleanup, pub get, source edit,
+commit, push, Issue/PR write, Ready veya merge işlemi yapılmadı. Correction #13
+PASS ve ayrı physical-only authority bekleme stop'u değişmedi.
+
+```yaml
+correction_13_resume_audit:
+  requested_model: gpt-5.6-sol
+  actual_model: unknown
+  requested_reasoning_effort: max
+  actual_reasoning_effort: null
+  invocation_verification_status: unverified
+  runtime_verification_status: unverified
+  single_build_repeated: false
+  protected_tracked_paths: 27/27_pass
+  total_pr_paths: 29/29_pass
+  fresh_apk_sha256: 1d94fb97ec5ec0e98d24f4a063ecd1d91061ac898d8a39a9bb7b38b720040a68
+  physical_commands: 0
+  commit: null
+  push: false
+  draft_pr: 465
+  ready: false
+  merged: false
+  status: host_packaging_pass_awaiting_physical_only_authority
+```
+
+## Owner-authorized physical-only acceptance — preflight fail-closed — 2026-08-17
+
+Authority:
+https://github.com/faliardic/chief-site-engineer/issues/464#issuecomment-5318565513
+(`faliardic`, Issue owner/author).
+
+Correction #13 host artifact authority was revalidated read-only before the
+first device mutation. Exact worktree/branch/head and upstream divergence,
+the five-path current WIP, staged `0`, full PR path set `29/29`, protected
+tracked hashes `27/27`, append-only prefixes and `git diff --check` all passed.
+PR #465 remained open, mergeable, Draft and unmerged at remote head
+`3b071e183e7b7c4130da1921681269ed3972ef40`.
+
+The release-gate APK remained exactly `96837167` bytes with SHA-256
+`1d94fb97ec5ec0e98d24f4a063ecd1d91061ac898d8a39a9bb7b38b720040a68`.
+Read-only APK verification reconfirmed package
+`com.faliardic.sefim.acceptance`, label `Şefim`, Living Plan marker present,
+all three forbidden markers absent, launchable activity
+`com.faliardic.chiefsiteengineer.MainActivity` and four `arm64-v8a` native
+libraries. No test, validator, analyze, pub, Gradle or Flutter build ran.
+
+The primary read-only ADB preflight then found exactly one enumerated target,
+masked `sha256:c68cbe516264`, but its state was `unauthorized`. Usable `device`
+targets were `0`; unauthorized/offline targets were `1`. Model/API/ABI/space
+and the six-package inventory could not be queried through the unauthorized
+transport. The authority requires exactly one usable target and permits a
+transport retry only after package isolation is proven; package isolation
+could not be proven. Execution therefore stopped fail-closed before the first
+device mutation and no retry was used.
+
+No `pm clear`, install/update, launch, force-stop, `run-as`, sandbox access,
+screenshot/UI dump, logcat, package mutation, source edit, commit, push, PR
+metadata transition, Ready or merge occurred.
+
+```yaml
+physical_only_authority_result:
+  post_failure_correction_runs: 13
+  physical_only_authority_runs: 1
+  physical_primary_runs: 1
+  physical_primary_result: fail_adb_preflight_unauthorized
+  physical_exact_retries: 0
+  acceptance_sandbox_reset_runs: 0
+  acceptance_install_runs: 0
+  host_build_runs_under_this_authority: 0
+  source_edit_runs_under_this_authority: 0
+  commit_push_runs_under_this_authority: 0
+  adb_targets_enumerated: 1
+  adb_usable_targets: 0
+  adb_unauthorized_or_offline_targets: 1
+  masked_device_identity: sha256:c68cbe516264
+  six_package_pre_inventory: not_captured_device_unauthorized
+  protected_device_mutations: 0
+  acceptance_package_mutations: 0
+  status: fail_closed_device_unauthorized_before_mutation
+```
+
+Final append-only verification preserved the exact pre-authority task prefix
+(`82115` bytes, SHA-256
+`a3008d2cf207a54c54e6fa23b0ab8526db19b76c2ff43d02914f2f6a6d097dd7`)
+and result prefix (`126887` bytes, SHA-256
+`9c429d04920c6defe94ed53d923d958c43b8b7dbb4578694d751405c4c5b2ce1`).
+The five-path WIP, staged/non-ignored untracked `0/0`, accumulated PR paths
+`29/29`, protected hashes `27/27`, upstream divergence `0 0` and
+`git diff --check` exit `0` remained exact after evidence append.
+
+## Owner-authorized physical-only rerun — PASS — 2026-08-17
+
+Authority:
+https://github.com/faliardic/chief-site-engineer/issues/464#issuecomment-5318760101.
+
+The independent rerun used the already verified Correction #13 artifact only:
+`mobile/build/release_gate/sefim-0.1.0-issue464-living-plan-acceptance-debug.apk`,
+`96837167` bytes, SHA-256
+`1d94fb97ec5ec0e98d24f4a063ecd1d91061ac898d8a39a9bb7b38b720040a68`,
+package `com.faliardic.sefim.acceptance`, label `Şefim`, arm64-v8a and
+launchable activity `com.faliardic.chiefsiteengineer.MainActivity`. No tracked
+product/test/runner/platform file changed; no test, validator, analyze, pub,
+Gradle or Flutter build ran.
+
+The single fresh `adb devices -l` resolved exactly one authorized device:
+`sha256:c68cbe516264`, model `SM-S938B`, Android `16`, API `36`, ABI
+`arm64-v8a`, with `44151188 KiB` free under `/data`. The six-package baseline
+was captured. Only `com.faliardic.chiefsiteengineer.debug` was present among
+the five non-target identities; its version/timestamps remained exact through
+the run. Non-target inventory mismatches were `0` at every enforced boundary.
+
+Acceptance-only mutation budgets were consumed exactly once: target `pm clear`
+`1`, verified APK install `1`. The installed base APK SHA matched the host
+artifact. The primary flow stopped at the acceptance banner UIAutomator lookup.
+A direct screen capture proved the exact visible banner
+`Kabul ortamı · sentetik veri`; the same banner was absent only from the
+UIAutomator XML despite source-visible semantics. This was classified as the
+explicitly retryable selector/UIAutomator defect. The one authorized retry ran
+without another clear/install and passed the full add/system-back/lifecycle/
+neighbor-isolation/relaunch-persistence flow.
+
+Final physical projection: target item
+`cb502e04-1a84-4acd-8b40-738766785bb0`, status `Planlandı` / DB `PLANNED`,
+revision `6`, planned date `17.08.2026`, note
+`Acceptance persistence notu guncellendi`. Neighbor fixtures remained
+`Planlandı/1/16.08.2026` and `Başladı/2/17.08.2026`. Fatal diagnostics were
+absent. The acceptance activity was left installed, top-resumed and showing
+the Living Plan identity.
+
+The force-stopped acceptance-only database was copied read-only through
+`run-as`. Host copy size/SHA-256 was `1699840` /
+`6f762f349752c954e8ea4fabe8ddab8647d5d352905fb86e2dea0f0bf5176043`.
+SQLite evidence passed: user_version `15`, integrity `ok`, foreign-key
+violations `0`, one target activity row, exact current snapshot reference,
+events and command receipts `1..6` with
+`CREATED, STARTED, NOTE_UPDATED, DEFERRED, COMPLETED, REOPENED`, all receipts
+non-no-op and aligned with result revision.
+
+Final host boundary before this append: exact five tracked WIP paths, staged
+`0`, non-ignored untracked `0`, accumulated PR paths `29/29`, protected
+Correction #13 manifest `27/27` with mismatches `0`, pubspec/lock drift `0`,
+`git diff --check` exit `0`, schema/backup/version `15 / 1 / 0.1.0+1`.
+The pre-authority task prefix was `85230` bytes with SHA-256
+`fbc86d215c97d1bde611cacff29b61b7428145a9d0f618f262ebff7d6be7aba1`;
+the pre-authority result prefix was `133445` bytes with SHA-256
+`1ce23f2503043db0b63bedddac6960ccc9d0da21212964d00c20d31afd8af276`.
+
+```yaml
+execution_record:
+  issue: 464
+  authority_comment_id: 5318760101
+  task_risk: R4
+  validation_class: release-critical
+  requested_model: gpt-5.6-sol
+  actual_model: unknown
+  requested_reasoning_effort: max
+  actual_reasoning_effort: null
+  execution_mode: standard
+  orchestration: single-agent
+  routing_request_evidence: https://github.com/faliardic/chief-site-engineer/issues/464#issuecomment-5318760101
+  invocation_evidence: null
+  invocation_verification_status: unverified
+  mismatch_detected: null
+  runtime_verification_status: unverified
+  adb_devices_invocations: 1
+  authorized_device_count: 1
+  masked_device_identity: sha256:c68cbe516264
+  physical_primary_runs: 1
+  physical_exact_retries: 1
+  acceptance_sandbox_reset_runs: 1
+  acceptance_install_runs: 1
+  host_build_runs_under_this_authority: 0
+  test_analyze_validator_runs_under_this_authority: 0
+  source_edit_runs_under_this_authority: 0
+  non_target_inventory_mismatches: 0
+  target_item_id: cb502e04-1a84-4acd-8b40-738766785bb0
+  target_final_revision: 6
+  target_final_status: PLANNED
+  fatal_diagnostics: false
+  protected_tracked_paths: 27
+  protected_hash_mismatches: 0
+  effective_pr_paths: 29
+  staged_paths: 0
+  nonignored_untracked_paths: 0
+  commit: null
+  push: false
+  draft_pr: 465
+  ready: false
+  merged: false
+  status: pass
+```
+
+Final append-only verification preserved the exact pre-authority task/result
+prefixes. Before this verification append, task/result were `89804` / `143038`
+bytes with SHA-256
+`3e1abbabe5033946b0f5ca320dba017a6d903ef954a434478b2f83cd6c7d29e6` /
+`6a02a84c6ba6bdbbfa4cdb9efd223b2c54e448e89cffd91e781ed9681846526c`.
+The five-path WIP, staged/untracked `0/0`, accumulated paths `29/29`, protected
+hashes `27/27` with mismatch `0` and `git diff --check` exit `0` remained exact.

@@ -756,7 +756,10 @@ function Run-LivingPlanAcceptanceFlow {
         $inPlan.GetAttribute('enabled') -ne 'false') {
         throw "Acceptance candidate duplicate action was not disabled: $candidateName"
     }
-    Tap-UiText -Text 'Kapat' -Contains -RequireClickable -ExpectedInventory $ExpectedInventory
+    Invoke-IsolatedDeviceMutation -Arguments @(
+        'shell', 'input', 'keyevent', 'KEYCODE_BACK'
+    ) -ExpectedInventory $ExpectedInventory | Out-Null
+    Start-Sleep -Seconds 1
 
     $identityAction = Get-LifecycleAction `
         -ActivityName $candidateName `

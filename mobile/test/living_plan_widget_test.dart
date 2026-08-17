@@ -308,7 +308,7 @@ void main() {
   );
 
   testWidgets(
-    'suggestion and Turkish alias search create once then show Planda',
+    'system back after create reloads the parent and preserves Planda',
     (tester) async {
       final candidate = _candidate();
       final fake = _StrictDateLivingPlanApplication(
@@ -370,7 +370,7 @@ void main() {
         isNull,
       );
 
-      await tester.tap(find.byTooltip('Kapat'));
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       final createdItemId = fake.lastCreateCommand!.itemId;
       await _scrollLivingPlanTo(
@@ -403,6 +403,61 @@ void main() {
             )
             .onPressed,
         isNull,
+      );
+      expect(fake.createCalls, 1);
+    },
+  );
+
+  testWidgets(
+    'post-create candidate refresh failure keeps durable success truthful',
+    (tester) async {
+      final candidate = _candidate();
+      final fake = _PostCreateRefreshFailureLivingPlanApplication(
+        suggestions: [candidate],
+        searchResults: [candidate],
+      );
+      await _pumpPage(
+        tester,
+        agenda: FakeAgendaApplication(projects: [_project('PRJ-A', 'A Blok')]),
+        livingPlan: fake,
+      );
+
+      await tester.tap(find.byKey(const Key('add-living-plan-item')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('living-plan-search')),
+        'BETONAJ',
+      );
+      await tester.tap(find.byKey(const Key('living-plan-search-submit')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('add-candidate-ACT-B@B-A')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('select-candidate-date')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('18'));
+      await tester.tap(find.text('Tamam'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('confirm-add-candidate')));
+      await tester.pumpAndSettle();
+
+      expect(fake.createCalls, 1);
+      expect(fake.postCreateRefreshFailures, 1);
+      expect(
+        find.text('İmalat plana eklendi; aday listesi yenilenemedi.'),
+        findsOneWidget,
+      );
+      expect(find.text('İmalat eklenemedi; plan değişmedi.'), findsNothing);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      final createdItemId = fake.lastCreateCommand!.itemId;
+      await _scrollLivingPlanTo(
+        tester,
+        find.byKey(Key('living-plan-item-$createdItemId')),
+      );
+      expect(
+        find.byKey(Key('living-plan-item-$createdItemId')),
+        findsOneWidget,
       );
       expect(fake.createCalls, 1);
     },
@@ -739,6 +794,45 @@ class _StrictDateLivingPlanApplication extends FakeLivingPlanApplication {
   ) {
     reopenDates.add(_requireCanonicalDate(command.plannedDate));
     return super.reopenLivingPlanItem(command);
+  }
+}
+
+class _PostCreateRefreshFailureLivingPlanApplication
+    extends _StrictDateLivingPlanApplication {
+  _PostCreateRefreshFailureLivingPlanApplication({
+    super.suggestions,
+    super.searchResults,
+  });
+
+  bool _failNextSearchRefresh = false;
+  int postCreateRefreshFailures = 0;
+
+  @override
+  Future<ConstructionLivingPlanItem> createLivingPlanItem(
+    CreateConstructionLivingPlanItemCommand command,
+  ) async {
+    final item = await super.createLivingPlanItem(command);
+    _failNextSearchRefresh = true;
+    return item;
+  }
+
+  @override
+  Future<List<ConstructionLivingPlanReferenceCandidate>>
+  searchCurrentReferenceCandidates({
+    required String projectId,
+    required String query,
+    int limit = 50,
+  }) {
+    if (_failNextSearchRefresh) {
+      _failNextSearchRefresh = false;
+      postCreateRefreshFailures += 1;
+      throw StateError('one-shot post-create candidate refresh failure');
+    }
+    return super.searchCurrentReferenceCandidates(
+      projectId: projectId,
+      query: query,
+      limit: limit,
+    );
   }
 }
 

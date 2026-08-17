@@ -146,7 +146,8 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
     if (projectId == null || !_hasTrustedSnapshot || _mutating || _loading) {
       return;
     }
-    final changed = await showModalBottomSheet<bool>(
+    var didPersistChange = false;
+    await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -155,9 +156,10 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
         projectId: projectId,
         windowStart: _canonicalCalendarDay(_windowStart),
         initialSuggestions: _suggestions,
+        onPersistedChange: () => didPersistChange = true,
       ),
     );
-    if (changed == true) await _reload();
+    if (didPersistChange && mounted) await _reload();
   }
 
   Future<void> _runMutation(
@@ -733,12 +735,14 @@ class _AddLivingPlanSheet extends StatefulWidget {
     required this.projectId,
     required this.windowStart,
     required this.initialSuggestions,
+    required this.onPersistedChange,
   });
 
   final ConstructionLivingPlanApplicationPort livingPlan;
   final String projectId;
   final DateTime windowStart;
   final List<ConstructionLivingPlanReferenceCandidate> initialSuggestions;
+  final VoidCallback onPersistedChange;
 
   @override
   State<_AddLivingPlanSheet> createState() => _AddLivingPlanSheetState();
@@ -810,34 +814,57 @@ class _AddLivingPlanSheetState extends State<_AddLivingPlanSheet> {
       _message = null;
     });
     try {
-      await widget.livingPlan.createLivingPlanItem(
-        CreateConstructionLivingPlanItemCommand(
-          itemId: RecordId.randomUuid(),
-          eventId: RecordId.randomUuid(),
-          projectId: widget.projectId,
-          expectedReferenceSnapshotId: candidate.referenceSnapshotId,
-          activityInstanceId: candidate.activityInstanceId,
-          plannedDate: _canonicalCalendarDay(input.date),
-          note: input.note,
-        ),
-      );
-      _changed = true;
-      await _refreshCandidates();
-      if (mounted) setState(() => _message = 'İmalat plana eklendi.');
-    } on ConstructionLivingPlanFailure catch (failure) {
-      if (!mounted) return;
-      setState(() => _message = _mutationFailureMessage(failure.code));
-      if (failure.code == 'living_plan_item_already_exists' ||
-          failure.code == 'living_plan_reference_snapshot_stale') {
-        await _refreshCandidates();
+      try {
+        await widget.livingPlan.createLivingPlanItem(
+          CreateConstructionLivingPlanItemCommand(
+            itemId: RecordId.randomUuid(),
+            eventId: RecordId.randomUuid(),
+            projectId: widget.projectId,
+            expectedReferenceSnapshotId: candidate.referenceSnapshotId,
+            activityInstanceId: candidate.activityInstanceId,
+            plannedDate: _canonicalCalendarDay(input.date),
+            note: input.note,
+          ),
+        );
+      } on ConstructionLivingPlanFailure catch (failure) {
+        if (!mounted) return;
+        setState(() => _message = _mutationFailureMessage(failure.code));
+        if (failure.code == 'living_plan_item_already_exists' ||
+            failure.code == 'living_plan_reference_snapshot_stale') {
+          try {
+            await _refreshCandidates();
+          } on Object {
+            // The mutation failure above remains the authoritative result.
+          }
+        }
+        return;
+      } on Object {
+        if (mounted) {
+          setState(() => _message = 'İmalat eklenemedi; plan değişmedi.');
+        }
+        return;
       }
-    } on Object {
-      if (mounted) {
-        setState(() => _message = 'İmalat eklenemedi; plan değişmedi.');
+
+      _markPersistedChange();
+      try {
+        await _refreshCandidates();
+        if (mounted) setState(() => _message = 'İmalat plana eklendi.');
+      } on Object {
+        if (mounted) {
+          setState(
+            () => _message = 'İmalat plana eklendi; aday listesi yenilenemedi.',
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _adding = false);
     }
+  }
+
+  void _markPersistedChange() {
+    if (_changed) return;
+    _changed = true;
+    widget.onPersistedChange();
   }
 
   Future<void> _refreshCandidates() async {
