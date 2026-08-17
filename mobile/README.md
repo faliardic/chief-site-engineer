@@ -1,6 +1,6 @@
-# CSE mobil uygulaması
+# Şefim mobil uygulaması
 
-`mobile/`, Chief Site Engineer'ın Flutter Android/iOS ürünüdür. Uygulama
+`mobile/`, Şefim'in Flutter Android/iOS ürünüdür. Uygulama
 offline-first çalışır; cihaz-içi SQLite ve uygulamaya özel yerel dosya alanını
 kullanır. Mobil runtime Python/Flask sunucusuna bağlanmaz.
 
@@ -15,11 +15,12 @@ kullanır. Mobil runtime Python/Flask sunucusuna bağlanmaz.
 | Son schedule foundation PR | `#459` |
 | Flutter proje adı | `chief_site_engineer` |
 | Uygulama sürümü | `0.1.0+1` |
-| Android release ID | `com.faliardic.chiefsiteengineer` |
-| Android debug ID | `com.faliardic.chiefsiteengineer.debug` |
-| iOS release ID | `com.faliardic.chiefsiteengineer` |
-| iOS debug ID | `com.faliardic.chiefsiteengineer.debug` |
-| Mobil schema | `14` |
+| Android release ID | `com.faliardic.sefim` |
+| Android debug ID | `com.faliardic.sefim.debug` |
+| Android acceptance ID | `com.faliardic.sefim.acceptance` |
+| iOS release ID | `com.faliardic.sefim` |
+| iOS debug ID | `com.faliardic.sefim.debug` |
+| Mobil schema | `15` |
 | Backup formatı | `1` |
 | Canonical timezone | `Europe/Istanbul` |
 | Android compile/target SDK | `36 / 36` |
@@ -42,7 +43,11 @@ cse_mobile/<debug|release>/
 └── restore_journal.json
 ```
 
-Debug ve release farklı uygulama kimlikleri ve veri kökleri kullanır. Child
+Debug ve release farklı uygulama kimlikleri ve veri kökleri kullanır.
+Şefim kimlikleri yeni OS sandbox'larıdır; dondurulmuş
+`com.faliardic.chiefsiteengineer`, `.debug` ve `.acceptance` paketlerinden
+otomatik veri migration'ı, ortak data root veya legacy database fallback'i
+yoktur. Child
 yollar environment kökü altında doğrulanır; relative traversal, absolute
 kullanıcı yolu ve kök dışına kaçış fail-closed reddedilir.
 

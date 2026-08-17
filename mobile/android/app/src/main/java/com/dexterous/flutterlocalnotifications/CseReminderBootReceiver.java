@@ -22,7 +22,7 @@ public final class CseReminderBootReceiver extends BroadcastReceiver {
     }
     String state = "completed";
     try {
-      FlutterLocalNotificationsPlugin.rescheduleNotifications(context);
+      new ScheduledNotificationBootReceiver().onReceive(context, intent);
     } catch (RuntimeException error) {
       state = "failed";
     }

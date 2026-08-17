@@ -4,10 +4,17 @@
 
 | Alan | Release | Debug |
 |---|---|---|
-| Görünür ad | Chief Site Engineer | Chief Site Engineer (Debug) |
-| Android application ID | `com.faliardic.chiefsiteengineer` | `com.faliardic.chiefsiteengineer.debug` |
-| iOS bundle ID | `com.faliardic.chiefsiteengineer` | `com.faliardic.chiefsiteengineer.debug` |
+| Görünür ad | Şefim | Şefim (Debug) |
+| Android application ID | `com.faliardic.sefim` | `com.faliardic.sefim.debug` |
+| iOS bundle ID | `com.faliardic.sefim` | `com.faliardic.sefim.debug` |
 | Uygulama sürümü | `0.1.0+1` | `0.1.0+1-debug` davranışı |
+
+Sentetik Android kabul paketi `com.faliardic.sefim.acceptance` kimliğini ve
+cihaz etiketinde tam `Şefim` adını kullanır; uygulama içinde
+`Kabul ortamı · sentetik veri` uyarısı görünür. Eski
+`com.faliardic.chiefsiteengineer`, `.debug` ve `.acceptance` kimlikleri
+dondurulmuştur. Şefim bu paketleri kurmaz, açmaz, değiştirmez veya veri
+köklerini paylaşmaz; yeni OS sandbox'ında temiz yerel veritabanıyla başlar.
 
 Release tabanı Flutter `3.44.6`, Dart `3.12.2`, Java 17 bytecode, Android
 compile/target API 36 ve NDK `28.2.13676358`'dir. İlk Apple sürümü iPhone
@@ -71,7 +78,7 @@ Windows üzerinde iOS archive/signing taklit edilmez. Gönderimden önce macOS't
 
 1. Xcode 26 ve iOS 26 SDK kurulu olmalı (`xcodebuild -version`,
    `xcodebuild -showsdks`).
-2. Apple Developer hesabı, `com.faliardic.chiefsiteengineer` kaydı, distribution
+2. Apple Developer hesabı, `com.faliardic.sefim` kaydı, distribution
    certificate ve provisioning profile hesap sahibi tarafından sağlanmalı.
 3. `flutter pub get` ve `flutter build ios --release --no-codesign` statik
    compile kapısını geçmeli.

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:chief_site_engineer/application/construction_corpus_repository.dart';
@@ -24,7 +25,279 @@ typedef ConstructionLivingPlanBeforeCreateTransactionHook =
     Future<void> Function();
 typedef ConstructionLivingPlanReadBoundaryHook = Future<void> Function();
 
-class ConstructionLivingPlanApplication {
+abstract interface class ConstructionLivingPlanApplicationPort {
+  Future<List<ConstructionLivingPlanReferenceCandidate>>
+  loadSevenDayReferenceSuggestions({
+    required String projectId,
+    required DateTime windowStart,
+  });
+
+  Future<List<ConstructionLivingPlanReferenceCandidate>>
+  searchCurrentReferenceCandidates({
+    required String projectId,
+    required String query,
+    int limit = ConstructionLivingPlanApplication.defaultSearchLimit,
+  });
+
+  Future<ConstructionLivingPlanItem> createLivingPlanItem(
+    CreateConstructionLivingPlanItemCommand command,
+  );
+
+  Future<ConstructionLivingPlanItem> startLivingPlanItem(
+    StartConstructionLivingPlanItemCommand command,
+  );
+
+  Future<ConstructionLivingPlanItem> completeLivingPlanItem(
+    CompleteConstructionLivingPlanItemCommand command,
+  );
+
+  Future<ConstructionLivingPlanItem> deferLivingPlanItem(
+    DeferConstructionLivingPlanItemCommand command,
+  );
+
+  Future<ConstructionLivingPlanItem> reopenLivingPlanItem(
+    ReopenConstructionLivingPlanItemCommand command,
+  );
+
+  Future<ConstructionLivingPlanItem> updateLivingPlanNote(
+    UpdateConstructionLivingPlanNoteCommand command,
+  );
+
+  Future<List<ConstructionLivingPlanWindowItem>> loadSevenDayPlan({
+    required String projectId,
+    required DateTime windowStart,
+  });
+
+  Future<ConstructionLivingPlanItem?> loadLivingPlanItem(String itemId);
+
+  Future<List<ConstructionLivingPlanEvent>> listLivingPlanEventHistory(
+    String itemId,
+  );
+}
+
+/// Opens the active SQLite truth for one complete operation and always closes
+/// it afterwards. Backup/restore can therefore replace the database between
+/// calls without leaving this application port attached to a stale handle.
+class SqliteConstructionLivingPlanApplication
+    implements ConstructionLivingPlanApplicationPort {
+  SqliteConstructionLivingPlanApplication({
+    required this.databasePath,
+    required this.databaseFactory,
+    required this.clock,
+    this.graphLoader,
+    this.corpusLoader,
+  });
+
+  final String databasePath;
+  final DatabaseFactory databaseFactory;
+  final UtcClock clock;
+  final ConstructionLivingPlanGraphLoader? graphLoader;
+  final ConstructionLivingPlanCorpusLoader? corpusLoader;
+  Future<void> _operationTail = Future<void>.value();
+
+  Future<T> _withApplication<T>(
+    Future<T> Function(ConstructionLivingPlanApplication application) operation,
+  ) {
+    final completer = Completer<T>();
+    _operationTail = _operationTail.then((_) async {
+      try {
+        completer.complete(await _runOperation(operation));
+      } on Object catch (error, stackTrace) {
+        completer.completeError(error, stackTrace);
+      }
+    });
+    return completer.future;
+  }
+
+  Future<T> _runOperation<T>(
+    Future<T> Function(ConstructionLivingPlanApplication application) operation,
+  ) async {
+    final database = AppDatabase(
+      path: databasePath,
+      factory: databaseFactory,
+      clock: clock,
+    );
+    await database.open();
+    try {
+      final application = ConstructionLivingPlanApplication(
+        database: database,
+        snapshotRepository: ConstructionScheduleSnapshotRepository(
+          database: database,
+          clock: clock,
+        ),
+        clock: clock,
+        graphLoader: graphLoader,
+        corpusLoader: corpusLoader,
+      );
+      return await operation(application);
+    } finally {
+      await database.close();
+    }
+  }
+
+  @override
+  Future<List<ConstructionLivingPlanReferenceCandidate>>
+  loadSevenDayReferenceSuggestions({
+    required String projectId,
+    required DateTime windowStart,
+  }) => _withApplication(
+    (application) => application.loadSevenDayReferenceSuggestions(
+      projectId: projectId,
+      windowStart: windowStart,
+    ),
+  );
+
+  @override
+  Future<List<ConstructionLivingPlanReferenceCandidate>>
+  searchCurrentReferenceCandidates({
+    required String projectId,
+    required String query,
+    int limit = ConstructionLivingPlanApplication.defaultSearchLimit,
+  }) => _withApplication(
+    (application) => application.searchCurrentReferenceCandidates(
+      projectId: projectId,
+      query: query,
+      limit: limit,
+    ),
+  );
+
+  @override
+  Future<ConstructionLivingPlanItem> createLivingPlanItem(
+    CreateConstructionLivingPlanItemCommand command,
+  ) => _withApplication(
+    (application) => application.createLivingPlanItem(command),
+  );
+
+  @override
+  Future<ConstructionLivingPlanItem> startLivingPlanItem(
+    StartConstructionLivingPlanItemCommand command,
+  ) => _withApplication(
+    (application) => application.startLivingPlanItem(command),
+  );
+
+  @override
+  Future<ConstructionLivingPlanItem> completeLivingPlanItem(
+    CompleteConstructionLivingPlanItemCommand command,
+  ) => _withApplication(
+    (application) => application.completeLivingPlanItem(command),
+  );
+
+  @override
+  Future<ConstructionLivingPlanItem> deferLivingPlanItem(
+    DeferConstructionLivingPlanItemCommand command,
+  ) => _withApplication(
+    (application) => application.deferLivingPlanItem(command),
+  );
+
+  @override
+  Future<ConstructionLivingPlanItem> reopenLivingPlanItem(
+    ReopenConstructionLivingPlanItemCommand command,
+  ) => _withApplication(
+    (application) => application.reopenLivingPlanItem(command),
+  );
+
+  @override
+  Future<ConstructionLivingPlanItem> updateLivingPlanNote(
+    UpdateConstructionLivingPlanNoteCommand command,
+  ) => _withApplication(
+    (application) => application.updateLivingPlanNote(command),
+  );
+
+  @override
+  Future<List<ConstructionLivingPlanWindowItem>> loadSevenDayPlan({
+    required String projectId,
+    required DateTime windowStart,
+  }) => _withApplication(
+    (application) => application.loadSevenDayPlan(
+      projectId: projectId,
+      windowStart: windowStart,
+    ),
+  );
+
+  @override
+  Future<ConstructionLivingPlanItem?> loadLivingPlanItem(String itemId) =>
+      _withApplication((application) => application.loadLivingPlanItem(itemId));
+
+  @override
+  Future<List<ConstructionLivingPlanEvent>> listLivingPlanEventHistory(
+    String itemId,
+  ) => _withApplication(
+    (application) => application.listLivingPlanEventHistory(itemId),
+  );
+}
+
+/// Safe default for hand-built bootstrap results in narrow widget tests.
+/// Production bootstrap always replaces this with the path-backed adapter.
+class UnavailableConstructionLivingPlanApplication
+    implements ConstructionLivingPlanApplicationPort {
+  const UnavailableConstructionLivingPlanApplication();
+
+  Never _fail() =>
+      throw const ConstructionLivingPlanFailure('living_plan_unavailable');
+
+  @override
+  Future<List<ConstructionLivingPlanReferenceCandidate>>
+  loadSevenDayReferenceSuggestions({
+    required String projectId,
+    required DateTime windowStart,
+  }) async => _fail();
+
+  @override
+  Future<List<ConstructionLivingPlanReferenceCandidate>>
+  searchCurrentReferenceCandidates({
+    required String projectId,
+    required String query,
+    int limit = ConstructionLivingPlanApplication.defaultSearchLimit,
+  }) async => _fail();
+
+  @override
+  Future<ConstructionLivingPlanItem> createLivingPlanItem(
+    CreateConstructionLivingPlanItemCommand command,
+  ) async => _fail();
+
+  @override
+  Future<ConstructionLivingPlanItem> startLivingPlanItem(
+    StartConstructionLivingPlanItemCommand command,
+  ) async => _fail();
+
+  @override
+  Future<ConstructionLivingPlanItem> completeLivingPlanItem(
+    CompleteConstructionLivingPlanItemCommand command,
+  ) async => _fail();
+
+  @override
+  Future<ConstructionLivingPlanItem> deferLivingPlanItem(
+    DeferConstructionLivingPlanItemCommand command,
+  ) async => _fail();
+
+  @override
+  Future<ConstructionLivingPlanItem> reopenLivingPlanItem(
+    ReopenConstructionLivingPlanItemCommand command,
+  ) async => _fail();
+
+  @override
+  Future<ConstructionLivingPlanItem> updateLivingPlanNote(
+    UpdateConstructionLivingPlanNoteCommand command,
+  ) async => _fail();
+
+  @override
+  Future<List<ConstructionLivingPlanWindowItem>> loadSevenDayPlan({
+    required String projectId,
+    required DateTime windowStart,
+  }) async => _fail();
+
+  @override
+  Future<ConstructionLivingPlanItem?> loadLivingPlanItem(String itemId) async =>
+      _fail();
+
+  @override
+  Future<List<ConstructionLivingPlanEvent>> listLivingPlanEventHistory(
+    String itemId,
+  ) async => _fail();
+}
+
+class ConstructionLivingPlanApplication
+    implements ConstructionLivingPlanApplicationPort {
   ConstructionLivingPlanApplication({
     required this.database,
     required this.snapshotRepository,
@@ -61,6 +334,7 @@ class ConstructionLivingPlanApplication {
   afterEventHistoryItemProjectionRead;
   final ConstructionLivingPlanReadBoundaryHook? afterSevenDayPlanProjectionRead;
 
+  @override
   Future<List<ConstructionLivingPlanReferenceCandidate>>
   loadSevenDayReferenceSuggestions({
     required String projectId,
@@ -97,6 +371,7 @@ class ConstructionLivingPlanApplication {
     }
   }
 
+  @override
   Future<List<ConstructionLivingPlanReferenceCandidate>>
   searchCurrentReferenceCandidates({
     required String projectId,
@@ -143,6 +418,7 @@ class ConstructionLivingPlanApplication {
     }
   }
 
+  @override
   Future<ConstructionLivingPlanItem> createLivingPlanItem(
     CreateConstructionLivingPlanItemCommand command,
   ) async {
@@ -304,6 +580,7 @@ class ConstructionLivingPlanApplication {
     });
   }
 
+  @override
   Future<ConstructionLivingPlanItem> startLivingPlanItem(
     StartConstructionLivingPlanItemCommand command,
   ) {
@@ -340,6 +617,7 @@ class ConstructionLivingPlanApplication {
     );
   }
 
+  @override
   Future<ConstructionLivingPlanItem> completeLivingPlanItem(
     CompleteConstructionLivingPlanItemCommand command,
   ) {
@@ -377,6 +655,7 @@ class ConstructionLivingPlanApplication {
     );
   }
 
+  @override
   Future<ConstructionLivingPlanItem> deferLivingPlanItem(
     DeferConstructionLivingPlanItemCommand command,
   ) {
@@ -421,6 +700,7 @@ class ConstructionLivingPlanApplication {
     );
   }
 
+  @override
   Future<ConstructionLivingPlanItem> reopenLivingPlanItem(
     ReopenConstructionLivingPlanItemCommand command,
   ) {
@@ -463,6 +743,7 @@ class ConstructionLivingPlanApplication {
     );
   }
 
+  @override
   Future<ConstructionLivingPlanItem> updateLivingPlanNote(
     UpdateConstructionLivingPlanNoteCommand command,
   ) {
@@ -494,6 +775,7 @@ class ConstructionLivingPlanApplication {
     );
   }
 
+  @override
   Future<List<ConstructionLivingPlanWindowItem>> loadSevenDayPlan({
     required String projectId,
     required DateTime windowStart,
@@ -542,6 +824,7 @@ class ConstructionLivingPlanApplication {
     return List.unmodifiable(result);
   }
 
+  @override
   Future<ConstructionLivingPlanItem?> loadLivingPlanItem(String itemId) async {
     _requireUuid(itemId, 'living_plan_invalid_item_id');
     return database.database.transaction(
@@ -553,6 +836,7 @@ class ConstructionLivingPlanApplication {
     );
   }
 
+  @override
   Future<List<ConstructionLivingPlanEvent>> listLivingPlanEventHistory(
     String itemId,
   ) async {

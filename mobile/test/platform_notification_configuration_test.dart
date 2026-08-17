@@ -34,7 +34,18 @@ void main() {
         'android/app/src/main/java/com/dexterous/flutterlocalnotifications/'
         'CseReminderBootReceiver.java',
       ).readAsStringSync();
-      expect(receiver, contains('rescheduleNotifications(context)'));
+      expect(
+        receiver,
+        contains(
+          'new ScheduledNotificationBootReceiver().onReceive(context, intent)',
+        ),
+      );
+      expect(
+        receiver,
+        isNot(
+          contains('FlutterLocalNotificationsPlugin.rescheduleNotifications'),
+        ),
+      );
       expect(receiver, contains('cse_reminder_boot_audit'));
       expect(receiver, isNot(contains('title')));
       expect(receiver, isNot(contains('body')));
@@ -81,7 +92,7 @@ void main() {
       expect(gateway, contains('Clock.fixed(instant)'));
       expect(gateway, contains('rollingRepeatOccurrenceCount = 24'));
       expect(project, contains('IPHONEOS_DEPLOYMENT_TARGET = 13.0'));
-      expect(project, contains('com.faliardic.chiefsiteengineer'));
+      expect(project, contains('com.faliardic.sefim'));
       expect(plist, contains('UIApplicationSceneManifest'));
       expect(plist, contains('NSCameraUsageDescription'));
       expect(plist, contains('NSPhotoLibraryUsageDescription'));

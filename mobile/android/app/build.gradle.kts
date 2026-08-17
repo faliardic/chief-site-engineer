@@ -49,7 +49,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.faliardic.chiefsiteengineer"
+        applicationId = "com.faliardic.sefim"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
         versionCode = flutter.versionCode
@@ -81,13 +81,13 @@ android {
             applicationIdSuffix = if (acceptanceHarnessBuild) ".acceptance" else ".debug"
             versionNameSuffix = if (acceptanceHarnessBuild) "-acceptance" else "-debug"
             manifestPlaceholders["appLabel"] = if (acceptanceHarnessBuild) {
-                "CSE Synthetic Acceptance"
+                "Şefim"
             } else {
-                "Chief Site Engineer (Debug)"
+                "Şefim (Debug)"
             }
         }
         release {
-            manifestPlaceholders["appLabel"] = "Chief Site Engineer"
+            manifestPlaceholders["appLabel"] = "Şefim"
             signingConfig = if (hasCompleteReleaseSigning) {
                 signingConfigs.getByName("cseRelease")
             } else {

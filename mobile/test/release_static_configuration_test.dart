@@ -46,6 +46,8 @@ void main() {
     expect(gradle, contains('ndkVersion = "28.2.13676358"'));
     expect(gradle, contains('CSE_ACCEPTANCE_HARNESS'));
     expect(gradle, contains('".acceptance" else ".debug"'));
+    expect(gradle, contains('applicationId = "com.faliardic.sefim"'));
+    expect(gradle, contains('"Şefim"'));
     expect(gradle, contains('CSE_KEY_PROPERTIES_FILE'));
     expect(permissions, {
       'android.permission.CAMERA',
@@ -59,6 +61,62 @@ void main() {
     expect(manifest, isNot(contains('USE_EXACT_ALARM')));
     expect(manifest, isNot(contains('FOREGROUND_SERVICE')));
     expect(manifest, isNot(contains('android.permission.INTERNET')));
+  });
+
+  test('Şefim identity split and host-only acceptance are fail-closed', () {
+    final gradle = File('android/app/build.gradle.kts').readAsStringSync();
+    final environment = File('lib/core/environment.dart').readAsStringSync();
+    final app = File('lib/app.dart').readAsStringSync();
+    final acceptanceMain = File(
+      'integration_test/living_plan_acceptance_main.dart',
+    ).readAsStringSync();
+    final runner = File(
+      '../scripts/run_living_plan_device_acceptance.ps1',
+    ).readAsStringSync();
+    final acceptanceBuild = File(
+      '../scripts/build_mobile_acceptance_apks.ps1',
+    ).readAsStringSync();
+    final validator = File(
+      '../scripts/validate_mobile_release.py',
+    ).readAsStringSync();
+    final releaseGate = File('../scripts/release_gate.ps1').readAsStringSync();
+
+    expect(gradle, contains('applicationId = "com.faliardic.sefim"'));
+    expect(
+      environment,
+      contains("releaseApplicationId = 'com.faliardic.sefim'"),
+    );
+    expect(app, contains("static const productName = 'Şefim'"));
+    expect(app, contains("title: productName"));
+    expect(acceptanceMain, contains("'Kabul ortamı · sentetik veri'"));
+    expect(
+      acceptanceMain,
+      contains('environmentLabel: livingPlanAcceptanceEnvironmentLabel'),
+    );
+    expect(acceptanceBuild, contains('com.faliardic.sefim.acceptance'));
+    expect(validator, contains('applicationId = "com.faliardic.sefim"'));
+    expect(releaseGate, contains('com.faliardic.sefim.debug'));
+
+    for (final package in [
+      'com.faliardic.chiefsiteengineer',
+      'com.faliardic.chiefsiteengineer.debug',
+      'com.faliardic.chiefsiteengineer.acceptance',
+      'com.faliardic.sefim',
+      'com.faliardic.sefim.debug',
+      'com.faliardic.sefim.acceptance',
+    ]) {
+      expect(runner, contains(package));
+    }
+    expect(runner, contains("[ValidateSet('Build', 'Device')]"));
+    expect(runner, contains('Invoke-HostFlutterBuild'));
+    expect(runner, contains("'install', '-r', \$artifact"));
+    expect(runner, contains("'uiautomator', 'dump', '/dev/tty'"));
+    expect(runner, contains('Assert-AllPackageInventory'));
+    expect(runner, contains("label=\$acceptanceLabel"));
+    expect(runner, isNot(contains('living_plan_device_acceptance_test.dart')));
+    expect(runner, isNot(contains("'-d', \$DeviceSerial")));
+    expect(runner, isNot(matches(RegExp(r"'input', 'tap', '\d"))));
+    expect(runner, isNot(matches(RegExp(r"'input', 'swipe', '\d"))));
   });
 
   test('field sidecar and synthetic entrypoints are fail-closed isolated', () {
@@ -101,8 +159,10 @@ void main() {
     expect(project, contains('PrivacyInfo.xcprivacy in Resources'));
     expect(project, isNot(contains('TARGETED_DEVICE_FAMILY = "1,2"')));
     expect('TARGETED_DEVICE_FAMILY = 1;'.allMatches(project).length, 3);
-    expect(project, contains('com.faliardic.chiefsiteengineer.debug'));
+    expect(project, contains('com.faliardic.sefim.debug'));
+    expect(project, contains('APP_DISPLAY_NAME = "Şefim"'));
     expect(info, contains(r'<string>$(APP_DISPLAY_NAME)</string>'));
+    expect(info, contains('<string>Şefim</string>'));
   });
 
   test('all declared iOS AppIcons have exact dimensions and no alpha', () {

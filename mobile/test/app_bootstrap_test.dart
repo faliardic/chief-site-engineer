@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/attachment_catalog_application.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
+import 'package:chief_site_engineer/application/construction_living_plan_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/platform/agenda_attachment_gateway.dart';
@@ -56,6 +57,11 @@ void main() {
       );
       expect(first.backup, isNotNull);
       expect(restarted.backup, isNotNull);
+      expect(first.livingPlan, isA<SqliteConstructionLivingPlanApplication>());
+      expect(
+        restarted.livingPlan,
+        isA<SqliteConstructionLivingPlanApplication>(),
+      );
       expect(first.projectLocations, same(first.agenda));
       expect(restarted.projectLocations, same(restarted.agenda));
       final agendaStore =

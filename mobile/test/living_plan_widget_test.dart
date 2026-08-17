@@ -1,0 +1,926 @@
+import 'dart:async';
+
+import 'package:chief_site_engineer/app.dart';
+import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
+import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/domain/construction_living_plan_models.dart';
+import 'package:chief_site_engineer/domain/construction_project_graph_models.dart';
+import 'package:chief_site_engineer/domain/construction_schedule_models.dart';
+import 'package:chief_site_engineer/features/living_plan/living_plan_page.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'support/fake_agenda_application.dart';
+import 'support/fake_living_plan_application.dart';
+
+void main() {
+  testWidgets('home card opens the project-local seven-day plan', (
+    tester,
+  ) async {
+    final agenda = FakeAgendaApplication(
+      projects: [_project('PRJ-A', 'A Blok')],
+    );
+    final livingPlan = FakeLivingPlanApplication(suggestions: [_candidate()]);
+    await tester.pumpWidget(
+      CseApp(
+        bootstrap: Future.value(
+          BootstrapSuccess(
+            environmentLabel: 'Kabul',
+            smokeRecordId: 'smoke',
+            smokeRecordCreatedAt: '2026-08-16T06:00:00Z',
+            agenda: agenda,
+            livingPlan: livingPlan,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final entry = find.byKey(const Key('open-living-plan'));
+    await tester.ensureVisible(entry);
+    await tester.tap(entry);
+    await tester.pumpAndSettle();
+
+    expect(find.text('7 Günlük Plan'), findsWidgets);
+    expect(
+      find.byKey(const Key('living-plan-project-selector')),
+      findsOneWidget,
+    );
+    expect(find.text('A Blok'), findsOneWidget);
+  });
+
+  testWidgets('no project and missing snapshot stay fail-closed', (
+    tester,
+  ) async {
+    await _pumpPage(
+      tester,
+      agenda: FakeAgendaApplication(),
+      livingPlan: FakeLivingPlanApplication(),
+    );
+    expect(find.text('Önce bir proje oluşturun.'), findsOneWidget);
+    expect(
+      tester
+          .widget<FloatingActionButton>(
+            find.byKey(const Key('add-living-plan-item')),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    await _pumpPage(
+      tester,
+      agenda: FakeAgendaApplication(projects: [_project('PRJ-A', 'A Blok')]),
+      livingPlan: FakeLivingPlanApplication(snapshotAvailable: false),
+    );
+    expect(
+      find.text('Bu proje için güvenilir öneri programı henüz hazırlanmadı.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('generic'), findsNothing);
+    expect(
+      tester
+          .widget<FloatingActionButton>(
+            find.byKey(const Key('add-living-plan-item')),
+          )
+          .onPressed,
+      isNull,
+    );
+  });
+
+  testWidgets(
+    'local calendar source and window navigation stay canonical UTC midnight',
+    (tester) async {
+      final localSource = DateTime(2026, 8, 16, 12);
+      final fake = _StrictDateLivingPlanApplication(
+        suggestions: [_candidate()],
+      );
+
+      expect(localSource.isUtc, isFalse);
+      await _pumpPage(
+        tester,
+        agenda: FakeAgendaApplication(projects: [_project('PRJ-A', 'A Blok')]),
+        livingPlan: fake,
+        clock: () => localSource,
+      );
+
+      expect(fake.planWindowStarts, [DateTime.utc(2026, 8, 16)]);
+      expect(fake.suggestionWindowStarts, [DateTime.utc(2026, 8, 16)]);
+      expect(
+        find.text('Plan güvenli biçimde okunamadı. Kayıtlar değiştirilmedi.'),
+        findsNothing,
+      );
+
+      await tester.tap(find.byKey(const Key('living-plan-next-window')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('living-plan-previous-window')));
+      await tester.pumpAndSettle();
+
+      expect(fake.planWindowStarts, [
+        DateTime.utc(2026, 8, 16),
+        DateTime.utc(2026, 8, 23),
+        DateTime.utc(2026, 8, 16),
+      ]);
+      expect(fake.suggestionWindowStarts, [
+        DateTime.utc(2026, 8, 16),
+        DateTime.utc(2026, 8, 23),
+        DateTime.utc(2026, 8, 16),
+      ]);
+    },
+  );
+
+  for (final width in [320.0, 360.0]) {
+    for (final themeMode in [ThemeMode.light, ThemeMode.dark]) {
+      testWidgets(
+        'header controls fit ${width.toInt()} px in ${themeMode.name} at 1.6x',
+        (tester) async {
+          tester.view.physicalSize = Size(width, 900);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+
+          await _pumpPage(
+            tester,
+            agenda: FakeAgendaApplication(
+              projects: [
+                _project(
+                  'PRJ-A',
+                  'CSE Çok Uzun Sentetik Şantiye Projesi A Blok Etabı',
+                ),
+              ],
+            ),
+            livingPlan: FakeLivingPlanApplication(suggestions: [_candidate()]),
+            themeMode: themeMode,
+            textScaler: const TextScaler.linear(1.6),
+          );
+
+          for (final key in const [
+            'living-plan-project-selector',
+            'living-plan-previous-window',
+            'living-plan-pick-window-start',
+            'living-plan-next-window',
+            'living-plan-refresh',
+            'add-living-plan-item',
+          ]) {
+            final finder = find.byKey(Key(key));
+            expect(finder, findsOneWidget);
+            expect(
+              tester.getRect(finder).overlaps(Rect.fromLTWH(0, 0, width, 900)),
+              isTrue,
+              reason: '$key must remain on-screen at $width px.',
+            );
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  testWidgets(
+    'grouped projection shows overdue, statuses, typed context and old source',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final semantics = tester.ensureSemantics();
+      try {
+        final fake = FakeLivingPlanApplication(
+          suggestions: [_candidate()],
+          items: [
+            _windowItem(
+              id: 'overdue',
+              name: 'Temel Kalıbı',
+              date: DateTime.utc(2026, 8, 15),
+              status: ConstructionLivingPlanStatus.planned,
+              overdue: true,
+            ),
+            _windowItem(
+              id: 'today',
+              name: 'Beton Dökümü',
+              date: DateTime.utc(2026, 8, 16),
+              status: ConstructionLivingPlanStatus.started,
+              note: 'Pompa yolu hazır',
+            ),
+            _windowItem(
+              id: 'completed',
+              name: 'Duvar İmalatı',
+              date: DateTime.utc(2026, 8, 17),
+              status: ConstructionLivingPlanStatus.completed,
+              currentOrigin: false,
+            ),
+            _windowItem(
+              id: 'outside',
+              name: 'Sekizinci Gün',
+              date: DateTime.utc(2026, 8, 23),
+              status: ConstructionLivingPlanStatus.planned,
+            ),
+          ],
+        );
+        await _pumpPage(
+          tester,
+          agenda: FakeAgendaApplication(
+            projects: [_project('PRJ-A', 'Dar Ekran Projesi')],
+          ),
+          livingPlan: fake,
+          themeMode: ThemeMode.dark,
+          textScaler: const TextScaler.linear(1.6),
+        );
+
+        expect(
+          find.textContaining('resmî iş programı değildir'),
+          findsOneWidget,
+        );
+
+        await _scrollLivingPlanTo(
+          tester,
+          find.byKey(const Key('living-plan-section-overdue')),
+        );
+        expect(find.text('Geciken'), findsOneWidget);
+        await _scrollLivingPlanTo(
+          tester,
+          find.byKey(const Key('living-plan-item-overdue')),
+        );
+        final overdueCard = find.byKey(const Key('living-plan-item-overdue'));
+        expect(overdueCard, findsOneWidget);
+        expect(
+          find.descendant(of: overdueCard, matching: find.text('Temel Kalıbı')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: overdueCard, matching: find.text('Planlandı')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: overdueCard,
+            matching: find.text('Blok A • 2. kat • Kuzey cephe'),
+          ),
+          findsOneWidget,
+        );
+
+        await _scrollLivingPlanTo(
+          tester,
+          find.byKey(const Key('living-plan-section-day-0')),
+        );
+        expect(find.textContaining('Bugün'), findsOneWidget);
+        await _scrollLivingPlanTo(
+          tester,
+          find.byKey(const Key('living-plan-item-today')),
+        );
+        final todayCard = find.byKey(const Key('living-plan-item-today'));
+        expect(todayCard, findsOneWidget);
+        expect(
+          find.descendant(of: todayCard, matching: find.text('Beton Dökümü')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: todayCard, matching: find.text('Başladı')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: todayCard,
+            matching: find.text('Pompa yolu hazır'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: todayCard,
+            matching: find.text('Blok A • 2. kat • Kuzey cephe'),
+          ),
+          findsOneWidget,
+        );
+
+        await _scrollLivingPlanTo(
+          tester,
+          find.byKey(const Key('living-plan-item-completed')),
+        );
+        expect(find.text('Tamamlandı'), findsOneWidget);
+        expect(find.text('Eski öneri kaynağı'), findsOneWidget);
+        expect(find.text('Duvar İmalatı'), findsOneWidget);
+        expect(find.text('Sekizinci Gün'), findsNothing);
+        expect(tester.takeException(), isNull);
+      } finally {
+        semantics.dispose();
+      }
+    },
+  );
+
+  testWidgets(
+    'system back after create reloads the parent and preserves Planda',
+    (tester) async {
+      final candidate = _candidate();
+      final fake = _StrictDateLivingPlanApplication(
+        suggestions: [candidate],
+        searchResults: [candidate],
+      );
+      await _pumpPage(
+        tester,
+        agenda: FakeAgendaApplication(projects: [_project('PRJ-A', 'A Blok')]),
+        livingPlan: fake,
+      );
+
+      await tester.tap(find.byKey(const Key('add-living-plan-item')));
+      await tester.pumpAndSettle();
+      expect(find.text('Bu haftaya önerilenler'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const Key('living-plan-search')),
+        'BETONAJ',
+      );
+      await tester.tap(find.byKey(const Key('living-plan-search-submit')));
+      await tester.pumpAndSettle();
+      expect(find.text('Arama sonuçları'), findsOneWidget);
+      expect(find.text('Beton Dökümü'), findsOneWidget);
+      expect(find.text('Düşük güvenli test-seed önerisi'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('add-candidate-ACT-B@B-A')));
+      await tester.pumpAndSettle();
+      expect(find.text('Plan gününü belirle'), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(const Key('confirm-add-candidate')),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.byKey(const Key('select-candidate-date')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('18'));
+      await tester.tap(find.text('Tamam'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('candidate-note-field')),
+        'Kalıp kontrolünden sonra',
+      );
+      await tester.tap(find.byKey(const Key('confirm-add-candidate')));
+      await tester.pumpAndSettle();
+
+      expect(fake.createCalls, 1);
+      expect(fake.lastCreateCommand?.note, 'Kalıp kontrolünden sonra');
+      expect(fake.lastCreateCommand?.plannedDate, DateTime.utc(2026, 8, 18));
+      expect(find.text('Planda'), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(const Key('add-candidate-ACT-B@B-A')),
+            )
+            .onPressed,
+        isNull,
+      );
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      final createdItemId = fake.lastCreateCommand!.itemId;
+      await _scrollLivingPlanTo(
+        tester,
+        find.byKey(Key('living-plan-item-$createdItemId')),
+      );
+      expect(
+        find.byKey(Key('living-plan-item-$createdItemId')),
+        findsOneWidget,
+      );
+
+      await _scrollLivingPlanTo(
+        tester,
+        find.byKey(const Key('add-living-plan-item')),
+      );
+      await tester.tap(find.byKey(const Key('add-living-plan-item')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('living-plan-search')),
+        'BETONAJ',
+      );
+      await tester.tap(find.byKey(const Key('living-plan-search-submit')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Planda'), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(const Key('add-candidate-ACT-B@B-A')),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(fake.createCalls, 1);
+    },
+  );
+
+  testWidgets(
+    'post-create candidate refresh failure keeps durable success truthful',
+    (tester) async {
+      final candidate = _candidate();
+      final fake = _PostCreateRefreshFailureLivingPlanApplication(
+        suggestions: [candidate],
+        searchResults: [candidate],
+      );
+      await _pumpPage(
+        tester,
+        agenda: FakeAgendaApplication(projects: [_project('PRJ-A', 'A Blok')]),
+        livingPlan: fake,
+      );
+
+      await tester.tap(find.byKey(const Key('add-living-plan-item')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('living-plan-search')),
+        'BETONAJ',
+      );
+      await tester.tap(find.byKey(const Key('living-plan-search-submit')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('add-candidate-ACT-B@B-A')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('select-candidate-date')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('18'));
+      await tester.tap(find.text('Tamam'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('confirm-add-candidate')));
+      await tester.pumpAndSettle();
+
+      expect(fake.createCalls, 1);
+      expect(fake.postCreateRefreshFailures, 1);
+      expect(
+        find.text('İmalat plana eklendi; aday listesi yenilenemedi.'),
+        findsOneWidget,
+      );
+      expect(find.text('İmalat eklenemedi; plan değişmedi.'), findsNothing);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      final createdItemId = fake.lastCreateCommand!.itemId;
+      await _scrollLivingPlanTo(
+        tester,
+        find.byKey(Key('living-plan-item-$createdItemId')),
+      );
+      expect(
+        find.byKey(Key('living-plan-item-$createdItemId')),
+        findsOneWidget,
+      );
+      expect(fake.createCalls, 1);
+    },
+  );
+
+  testWidgets('quick actions use revision commands and persist safe feedback', (
+    tester,
+  ) async {
+    final fake = _StrictDateLivingPlanApplication(
+      suggestions: [_candidate()],
+      items: [
+        _windowItem(
+          id: 'planned',
+          name: 'Beton Dökümü',
+          date: DateTime.utc(2026, 8, 16),
+          status: ConstructionLivingPlanStatus.planned,
+        ),
+        _windowItem(
+          id: 'completed',
+          name: 'Duvar İmalatı',
+          date: DateTime.utc(2026, 8, 17),
+          status: ConstructionLivingPlanStatus.completed,
+        ),
+      ],
+    );
+    await _pumpPage(
+      tester,
+      agenda: FakeAgendaApplication(projects: [_project('PRJ-A', 'A Blok')]),
+      livingPlan: fake,
+    );
+
+    await tester.tap(find.byKey(const Key('start-living-plan-planned')));
+    await tester.pumpAndSettle();
+    expect(find.text('İmalat başlatıldı.'), findsOneWidget);
+    expect(find.text('Başladı'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('note-living-plan-planned')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('living-plan-note-field')),
+      'Vardiya teyit edildi',
+    );
+    await tester.tap(find.byKey(const Key('save-living-plan-note')));
+    await tester.pumpAndSettle();
+    expect(find.text('Vardiya teyit edildi'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('complete-living-plan-planned')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('reopen-living-plan-planned')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('reopen-living-plan-planned')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tamam'));
+    await tester.pumpAndSettle();
+    expect(find.text('İmalat yeniden açıldı.'), findsOneWidget);
+    expect(fake.reopenDates, [DateTime.utc(2026, 8, 16)]);
+
+    await tester.tap(find.byKey(const Key('defer-living-plan-planned')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tamam'));
+    await tester.pumpAndSettle();
+    expect(find.text('İmalat ertelendi.'), findsOneWidget);
+    expect(find.text('Ertelendi'), findsOneWidget);
+    expect(fake.deferDates, [DateTime.utc(2026, 8, 17)]);
+    expect(fake.mutationCalls, 5);
+  });
+
+  testWidgets('adjacent cards expose unique human-readable lifecycle semantics', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final semantics = tester.ensureSemantics();
+    try {
+      final fake = FakeLivingPlanApplication(
+        suggestions: [_candidate()],
+        items: [
+          _windowItem(
+            id: 'target-a',
+            name: 'Mobilizasyon planı',
+            date: DateTime.utc(2026, 8, 16),
+            status: ConstructionLivingPlanStatus.planned,
+          ),
+          _windowItem(
+            id: 'target-b',
+            name: 'Mobilizasyon planı',
+            date: DateTime.utc(2026, 8, 16),
+            status: ConstructionLivingPlanStatus.planned,
+          ),
+        ],
+      );
+      await _pumpPage(
+        tester,
+        agenda: FakeAgendaApplication(projects: [_project('PRJ-A', 'A Blok')]),
+        livingPlan: fake,
+      );
+
+      const contextLabel = 'Blok A • 2. kat • Kuzey cephe';
+      const identityA =
+          'Yaşayan plan öğesi · Mobilizasyon planı · $contextLabel · target-a';
+      const identityB =
+          'Yaşayan plan öğesi · Mobilizasyon planı · $contextLabel · target-b';
+      final cardA = find.byKey(const Key('living-plan-item-target-a'));
+      final cardB = find.byKey(const Key('living-plan-item-target-b'));
+      final startA = find.bySemanticsLabel('$identityA · Eylem · Başlat');
+      final startB = find.bySemanticsLabel('$identityB · Eylem · Başlat');
+
+      expect(find.text('Başlat'), findsNWidgets(2));
+      expect(startA, findsOneWidget);
+      expect(startB, findsOneWidget);
+      expect(find.descendant(of: cardA, matching: startA), findsOneWidget);
+      expect(find.descendant(of: cardB, matching: startA), findsNothing);
+      expect(find.descendant(of: cardB, matching: startB), findsOneWidget);
+      expect(find.descendant(of: cardA, matching: startB), findsNothing);
+
+      await tester.tap(startA);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsLabel(
+          '$identityA · Durum · Başladı · Kayıt sürümü · 2',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel(
+          '$identityB · Durum · Planlandı · Kayıt sürümü · 1',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel('$identityA · Eylem · Başlat'),
+        findsNothing,
+      );
+      expect(
+        find.bySemanticsLabel('$identityB · Eylem · Başlat'),
+        findsOneWidget,
+      );
+      expect(fake.mutationCalls, 1);
+    } finally {
+      semantics.dispose();
+    }
+  });
+
+  testWidgets(
+    'note dialog cancel back keyboard remove and double submit are safe',
+    (tester) async {
+      final fake = FakeLivingPlanApplication(
+        suggestions: [_candidate()],
+        items: [
+          _windowItem(
+            id: 'note-safe',
+            name: 'Beton Dökümü',
+            date: DateTime.utc(2026, 8, 16),
+            status: ConstructionLivingPlanStatus.planned,
+            note: 'Mevcut not',
+          ),
+        ],
+      );
+      await _pumpPage(
+        tester,
+        agenda: FakeAgendaApplication(projects: [_project('PRJ-A', 'A Blok')]),
+        livingPlan: fake,
+      );
+
+      final noteAction = find.byKey(const Key('note-living-plan-note-safe'));
+      await tester.tap(noteAction);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('living-plan-note-field')),
+        'Kaydedilmemeli',
+      );
+      await tester.tap(find.byKey(const Key('cancel-living-plan-note')));
+      await tester.pumpAndSettle();
+      expect(fake.mutationCalls, 0);
+
+      await tester.tap(noteAction);
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(fake.mutationCalls, 0);
+
+      await tester.tap(noteAction);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('living-plan-note-field')),
+        '',
+      );
+      tester.testTextInput.hide();
+      await tester.pump();
+      final save = find.byKey(const Key('save-living-plan-note'));
+      await tester.tap(save);
+      await tester.tap(save, warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      expect(fake.mutationCalls, 1);
+      expect(find.text('Not silindi.'), findsOneWidget);
+      expect(find.text('Mevcut not'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('stale revision reloads safely and duplicate taps stay guarded', (
+    tester,
+  ) async {
+    final gate = Completer<void>();
+    final fake = FakeLivingPlanApplication(
+      suggestions: [_candidate()],
+      items: [
+        _windowItem(
+          id: 'guarded',
+          name: 'Beton Dökümü',
+          date: DateTime.utc(2026, 8, 16),
+          status: ConstructionLivingPlanStatus.planned,
+        ),
+      ],
+    )..mutationGate = gate;
+    await _pumpPage(
+      tester,
+      agenda: FakeAgendaApplication(projects: [_project('PRJ-A', 'A Blok')]),
+      livingPlan: fake,
+    );
+
+    final start = find.byKey(const Key('start-living-plan-guarded'));
+    await tester.tap(start);
+    await tester.pump();
+    await tester.tap(start, warnIfMissed: false);
+    expect(fake.mutationCalls, 1);
+    gate.complete();
+    await tester.pumpAndSettle();
+
+    fake.nextMutationFailure = const ConstructionLivingPlanFailure(
+      'living_plan_stale_revision',
+    );
+    await tester.tap(find.byKey(const Key('complete-living-plan-guarded')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Kayıt başka bir işlemde değişti; plan yenilendi.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('living_plan_stale_revision'), findsNothing);
+  });
+}
+
+Future<void> _pumpPage(
+  WidgetTester tester, {
+  required FakeAgendaApplication agenda,
+  required FakeLivingPlanApplication livingPlan,
+  ThemeMode themeMode = ThemeMode.light,
+  TextScaler textScaler = TextScaler.noScaling,
+  DateTime Function()? clock,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      locale: CseApp.locale,
+      supportedLocales: CseApp.supportedLocales,
+      localizationsDelegates: CseApp.localizationsDelegates,
+      theme: ThemeData(useMaterial3: true),
+      darkTheme: ThemeData.dark(useMaterial3: true),
+      themeMode: themeMode,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+        child: child!,
+      ),
+      home: LivingPlanPage(
+        key: UniqueKey(),
+        agenda: agenda,
+        livingPlan: livingPlan,
+        clock: clock ?? () => DateTime.utc(2026, 8, 16, 6),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+class _StrictDateLivingPlanApplication extends FakeLivingPlanApplication {
+  _StrictDateLivingPlanApplication({
+    super.suggestions,
+    super.searchResults,
+    super.items,
+  });
+
+  final List<DateTime> planWindowStarts = [];
+  final List<DateTime> suggestionWindowStarts = [];
+  final List<DateTime> deferDates = [];
+  final List<DateTime> reopenDates = [];
+
+  @override
+  Future<List<ConstructionLivingPlanWindowItem>> loadSevenDayPlan({
+    required String projectId,
+    required DateTime windowStart,
+  }) {
+    planWindowStarts.add(_requireCanonicalDate(windowStart));
+    return super.loadSevenDayPlan(
+      projectId: projectId,
+      windowStart: windowStart,
+    );
+  }
+
+  @override
+  Future<List<ConstructionLivingPlanReferenceCandidate>>
+  loadSevenDayReferenceSuggestions({
+    required String projectId,
+    required DateTime windowStart,
+  }) {
+    suggestionWindowStarts.add(_requireCanonicalDate(windowStart));
+    return super.loadSevenDayReferenceSuggestions(
+      projectId: projectId,
+      windowStart: windowStart,
+    );
+  }
+
+  @override
+  Future<ConstructionLivingPlanItem> createLivingPlanItem(
+    CreateConstructionLivingPlanItemCommand command,
+  ) {
+    _requireCanonicalDate(command.plannedDate);
+    return super.createLivingPlanItem(command);
+  }
+
+  @override
+  Future<ConstructionLivingPlanItem> deferLivingPlanItem(
+    DeferConstructionLivingPlanItemCommand command,
+  ) {
+    deferDates.add(_requireCanonicalDate(command.plannedDate));
+    return super.deferLivingPlanItem(command);
+  }
+
+  @override
+  Future<ConstructionLivingPlanItem> reopenLivingPlanItem(
+    ReopenConstructionLivingPlanItemCommand command,
+  ) {
+    reopenDates.add(_requireCanonicalDate(command.plannedDate));
+    return super.reopenLivingPlanItem(command);
+  }
+}
+
+class _PostCreateRefreshFailureLivingPlanApplication
+    extends _StrictDateLivingPlanApplication {
+  _PostCreateRefreshFailureLivingPlanApplication({
+    super.suggestions,
+    super.searchResults,
+  });
+
+  bool _failNextSearchRefresh = false;
+  int postCreateRefreshFailures = 0;
+
+  @override
+  Future<ConstructionLivingPlanItem> createLivingPlanItem(
+    CreateConstructionLivingPlanItemCommand command,
+  ) async {
+    final item = await super.createLivingPlanItem(command);
+    _failNextSearchRefresh = true;
+    return item;
+  }
+
+  @override
+  Future<List<ConstructionLivingPlanReferenceCandidate>>
+  searchCurrentReferenceCandidates({
+    required String projectId,
+    required String query,
+    int limit = 50,
+  }) {
+    if (_failNextSearchRefresh) {
+      _failNextSearchRefresh = false;
+      postCreateRefreshFailures += 1;
+      throw StateError('one-shot post-create candidate refresh failure');
+    }
+    return super.searchCurrentReferenceCandidates(
+      projectId: projectId,
+      query: query,
+      limit: limit,
+    );
+  }
+}
+
+DateTime _requireCanonicalDate(DateTime value) {
+  if (!value.isUtc ||
+      value.hour != 0 ||
+      value.minute != 0 ||
+      value.second != 0 ||
+      value.millisecond != 0 ||
+      value.microsecond != 0) {
+    throw const ConstructionLivingPlanFailure('living_plan_invalid_date');
+  }
+  return value;
+}
+
+Future<void> _scrollLivingPlanTo(WidgetTester tester, Finder target) async {
+  final scrollable = find.descendant(
+    of: find.byKey(const Key('living-plan-scroll')),
+    matching: find.byType(Scrollable),
+  );
+  expect(scrollable, findsOneWidget);
+  await tester.scrollUntilVisible(target, 160, scrollable: scrollable);
+  await tester.pumpAndSettle();
+}
+
+MobileProject _project(String id, String name) => MobileProject(
+  id: id,
+  name: name,
+  createdAt: '2026-08-16T06:00:00Z',
+  updatedAt: '2026-08-16T06:00:00Z',
+  revision: 1,
+);
+
+ConstructionLivingPlanReferenceCandidate _candidate() =>
+    ConstructionLivingPlanReferenceCandidate(
+      referenceSnapshotId: 'snapshot-a',
+      projectId: 'PRJ-A',
+      activityInstanceId: 'ACT-B@B-A',
+      activityId: 'ACT-B',
+      activityName: 'Beton Dökümü',
+      activityContext: const ConstructionProjectActivityContext(
+        blockId: 'A',
+        floorIndex: 2,
+        facadeElevation: 'NORTH',
+      ),
+      naturalUnit: 'm³',
+      suggestedStartDate: DateTime.utc(2026, 8, 16),
+      suggestedFinishDate: DateTime.utc(2026, 8, 17),
+      durationStatus: ConstructionScheduleDurationStatus.aiSeedEstimate,
+      durationConfidence: ConstructionScheduleDurationConfidence.aiSeed,
+      activitySequence: 2,
+      existingLivingPlanItemId: null,
+      existingLivingPlanStatus: null,
+    );
+
+ConstructionLivingPlanWindowItem _windowItem({
+  required String id,
+  required String name,
+  required DateTime date,
+  required ConstructionLivingPlanStatus status,
+  bool overdue = false,
+  bool currentOrigin = true,
+  String? note,
+}) {
+  final now = DateTime.utc(2026, 8, 16, 6);
+  return ConstructionLivingPlanWindowItem(
+    item: ConstructionLivingPlanItem(
+      id: id,
+      projectId: 'PRJ-A',
+      referenceSnapshotId: 'snapshot-a',
+      activityInstanceId: 'instance-$id',
+      activityId: 'activity-$id',
+      activityNameSnapshot: name,
+      activityContext: const ConstructionProjectActivityContext(
+        blockId: 'A',
+        floorIndex: 2,
+        facadeElevation: 'NORTH',
+      ),
+      naturalUnitSnapshot: 'm²',
+      plannedDate: date,
+      status: status,
+      note: note,
+      revision: 1,
+      createdAt: now,
+      updatedAt: now,
+      statusChangedAt: now,
+    ),
+    isOverdue: overdue,
+    originSnapshotIsCurrent: currentOrigin,
+  );
+}

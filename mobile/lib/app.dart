@@ -9,6 +9,7 @@ import 'package:chief_site_engineer/features/attachments/attachment_catalog_page
 import 'package:chief_site_engineer/features/attachments/attachment_health_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
+import 'package:chief_site_engineer/features/living_plan/living_plan_page.dart';
 import 'package:chief_site_engineer/features/memory/memory_backup_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
@@ -17,8 +18,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 class CseApp extends StatelessWidget {
-  const CseApp({required this.bootstrap, this.fatalErrors, super.key});
+  const CseApp({
+    required this.bootstrap,
+    this.fatalErrors,
+    this.environmentLabel,
+    super.key,
+  });
 
+  static const productName = 'Şefim';
   static const locale = Locale('tr');
   static const supportedLocales = <Locale>[locale];
   static const localizationsDelegates = <LocalizationsDelegate<dynamic>>[
@@ -29,6 +36,7 @@ class CseApp extends StatelessWidget {
 
   final Future<BootstrapResult> bootstrap;
   final ValueListenable<String?>? fatalErrors;
+  final String? environmentLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +54,7 @@ class CseApp extends StatelessWidget {
     const seed = Color(0xFF1E5D4E);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Chief Site Engineer',
+      title: productName,
       locale: locale,
       supportedLocales: supportedLocales,
       localizationsDelegates: localizationsDelegates,
@@ -66,6 +74,38 @@ class CseApp extends StatelessWidget {
         useMaterial3: true,
       ),
       themeMode: ThemeMode.system,
+      builder: (context, child) {
+        final label = environmentLabel;
+        if (label == null) return child ?? const SizedBox.shrink();
+        return Column(
+          children: [
+            Material(
+              color: Theme.of(context).colorScheme.errorContainer,
+              child: SafeArea(
+                bottom: false,
+                child: Semantics(
+                  container: true,
+                  label: label,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: Center(
+                      child: Text(
+                        label,
+                        key: const Key('acceptance-environment-label'),
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(child: child ?? const SizedBox.shrink()),
+          ],
+        );
+      },
       home: fatalErrorCode == null
           ? BootstrapGate(bootstrap: bootstrap)
           : SafeDiagnosticScreen(code: fatalErrorCode),
@@ -424,6 +464,23 @@ class _HomePageState extends State<_HomePage> {
             title: Text('Veri sınırı'),
             subtitle: Text(
               'Bulut eşitleme ve kullanıcı hesabı bu sürümde yoktur.',
+            ),
+          ),
+        ),
+        Card(
+          child: ListTile(
+            key: const Key('open-living-plan'),
+            leading: const Icon(Icons.calendar_view_week_outlined),
+            title: const Text('7 Günlük Plan'),
+            subtitle: const Text('Geciken işleri ve önündeki yedi günü yönet.'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(
+                builder: (_) => LivingPlanPage(
+                  agenda: widget.bootstrap.agenda,
+                  livingPlan: widget.bootstrap.livingPlan,
+                ),
+              ),
             ),
           ),
         ),

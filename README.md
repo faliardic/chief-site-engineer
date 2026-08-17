@@ -180,8 +180,11 @@ tarafından belirlenir.
 
 ## Android ve iOS sınırı
 
-Android release kimliği `com.faliardic.chiefsiteengineer`, debug kimliği
-`com.faliardic.chiefsiteengineer.debug`dır. Android uygulaması camera,
+Şefim'in Android release kimliği `com.faliardic.sefim`, debug kimliği
+`com.faliardic.sefim.debug` ve sentetik kabul kimliği
+`com.faliardic.sefim.acceptance`tır. Dondurulmuş legacy CSE paketleri
+yan yana korunur; Şefim onlarla veri kökü paylaşmaz ve otomatik migration
+yapmaz. Android uygulaması camera,
 notification, reboot ve user-managed exact alarm erişimini dar sözleşmeleri
 için kullanır; broad storage/media ve `INTERNET` izni merged manifestte yoktur.
 
