@@ -719,3 +719,79 @@ review_recommendation:
   merge_allowed: false
   successor_work_allowed: false
 ```
+
+## Post-publication Correction #5 — canonical V2 scope truth-sync PASS
+
+Authority: https://github.com/faliardic/chief-site-engineer/issues/466#issuecomment-5368835536
+
+Independent review blocker yalnız canonical V2 scope drift'iydi. `docs/v2/CSE_V2_SCOPE.md` narrow current-state truth-sync ile safe merged master/PR #465/schema 15, merged Living Plan MVP Core ve UI/device predecessor'ları, current Issue #466 Draft schema-16 Actual Progress Core candidate'ı ve not-started follow-on alanları birbirinden ayrıldı. PR #467 merged, Item 5 complete veya production/store ready gösterilmedi.
+
+Validation evidence:
+
+- V2 scope `17769 → 18625` byte; SHA-256 `35b483a4eb4e6979e6136e8f27519ff27c9b9500c273df4990fbeb688fd49b38 → b7f8c574fa779ed54566bec6aaaf8180018484b9eaee0ebb6445c428fc56af04`;
+- UTF-8 BOM `false`, CRLF `0`; unrelated EOL/whitespace normalization `0`;
+- 13-item table exact hash unchanged: `4b24c80fd704e064171c6fe5de0cbe0b0e529009b335747e6deea2b1b31fdaee`;
+- `git diff --check` PASS;
+- final PR path set exact `14/14`, unexpected/15th path `0`;
+- all mobile production/test/platform bytes identical to published head `e6bf7fcf37b0ebcf987364df48ab24d1584053d4`;
+- deterministic protected manifest: `207` tracked file / SHA-256 `f85d72a5aa02a169b8998b805e22ad99705eac27d59bfcb320e2a783f2bbf7cc`, unchanged;
+- schema source `16`, backup format `1`, app version `0.1.0+1`;
+- pubspec/lock/platform-production drift `0`;
+- schema/application/backup/analyze/full Flutter rerun `0`; prior `24/24`, `12/12`, `36/36`, analyze PASS ve `692/692` evidence geçerlidir.
+
+```yaml
+execution_record:
+  issue: 466
+  correction: 5
+  authority_comment_id: 5368835536
+  task_risk: R2_docs_truth_sync
+  requested_model: gpt-5.6-sol
+  requested_reasoning_effort: high
+  actual_model: unknown
+  actual_reasoning_effort: null
+  invocation_evidence: null
+  invocation_verification_status: unverified
+  mismatch_detected: null
+  runtime_verification_status: unverified
+  published_head_before_correction: e6bf7fcf37b0ebcf987364df48ab24d1584053d4
+  correction_paths:
+    - docs/v2/CSE_V2_SCOPE.md
+    - .cse/tasks/466_task.md
+    - .cse/results/466_result.md
+  validation_class: docs
+  validation:
+    git_diff_check: PASS
+    final_authorized_pr_paths: "14/14"
+    unexpected_paths: 0
+    protected_file_count: 207
+    protected_manifest_sha256: f85d72a5aa02a169b8998b805e22ad99705eac27d59bfcb320e2a783f2bbf7cc
+    code_test_platform_bytes_vs_published_head: identical
+    schema_version: 16
+    backup_format: 1
+    app_version: 0.1.0+1
+    pubspec_lock_platform_production_drift: 0
+    schema_application_backup_analyze_full_reruns: 0
+  executable_evidence_reused:
+    schema_focused: "24/24 PASS"
+    application_focused: "12/12 PASS"
+    backup_focused: "36/36 PASS"
+    flutter_analyze_no_pub: PASS
+    full_flutter: "692/692 PASS"
+  publication_boundary: "one additional commit and normal push; Draft remains Draft"
+```
+
+```yaml
+review_recommendation:
+  disposition: independent_chatgpt_rereview
+  recommended_chatgpt_model: gpt-5.6-sol
+  recommended_reasoning_effort: high
+  must_review:
+    - narrow V2 scope truth-sync only
+    - merged schema 15 versus Draft candidate schema 16 distinction
+    - PR #463/#465 predecessor truth and PR #467 non-merged state
+    - exact 14-path set and unchanged protected manifest
+  ready_allowed: false
+  merge_allowed: false
+  issue_close_allowed: false
+  successor_work_allowed: false
+```

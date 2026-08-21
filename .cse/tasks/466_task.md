@@ -501,3 +501,35 @@ Correction #3 dışındaki altı WIP path hash'i değişmedi; WIP exact `9`, sta
 - Ek full retry bütçesi `0`; başka test invocation yok.
 - APK/AAB/ADB/device, release/signing/store, Ready/merge/Issue close, progress UI/quantity/reforecast/productivity/successor işlemi yok.
 - Bütün #466 gate'leri PASS; tek commit, normal push ve tek Draft PR publication boundary açıldı.
+
+## Post-publication correction #5 — canonical V2 scope truth-sync
+
+- Authority: https://github.com/faliardic/chief-site-engineer/issues/466#issuecomment-5368835536
+- Classification: `R2_docs_truth_sync`; production/schema/application/backup source review PASS, blocker yalnız canonical `docs/v2/CSE_V2_SCOPE.md` drift'i.
+- Requested routing: `gpt-5.6-sol / high`; runtime metadata görünmüyor, actual `unknown / null`, verification `unverified`.
+- Published head ve upstream: `e6bf7fcf37b0ebcf987364df48ab24d1584053d4`; divergence `0/0`.
+- Draft PR #467: open, Draft, merged `false`, base `42207034635f1836a80e2357a1398f2e6004d5d4`, published changed path `13`.
+- Pre-edit worktree/stage: clean / `0`.
+- Correction edit allowlist yalnız `docs/v2/CSE_V2_SCOPE.md`, `.cse/tasks/466_task.md`, `.cse/results/466_result.md`.
+- Task append prefix: `25912` byte, SHA-256 `d27cee31cad4070e2811a9e208f3ab03480ad9d1c79e88a144164526e3b84e98`.
+- Result append prefix: `28763` byte, SHA-256 `8bf99311be53c9f63a7382f94c439a93e1c5405833fafe8b036a0b3409fd7627`.
+- V2 scope pre-edit: `17769` byte, SHA-256 `35b483a4eb4e6979e6136e8f27519ff27c9b9500c273df4990fbeb688fd49b38`, UTF-8 BOM `false`, CRLF `0`, LF `434`.
+- Published-head mobile code/test/platform deterministic manifest: `207` tracked file, SHA-256 `f85d72a5aa02a169b8998b805e22ad99705eac27d59bfcb320e2a783f2bbf7cc`.
+- Narrow truth-sync yalnız metadata, merged technical baseline/dependency chain, Item 5 current evolution ve final current-direction bölümleriyle sınırlıdır; Items 6–13 ve unrelated historical/product sections değişmeyecektir.
+- Schema/application/backup/analyze/full Flutter yeniden çalıştırılmayacaktır. Code/test manifest değişirse veya 15. path gerekirse publication öncesi fail-closed durulacaktır.
+### Correction #5 validation sonucu
+
+- `docs/v2/CSE_V2_SCOPE.md` narrow truth-sync pre/post: `17769` / `18625` byte; SHA-256 `35b483a4eb4e6979e6136e8f27519ff27c9b9500c273df4990fbeb688fd49b38` → `b7f8c574fa779ed54566bec6aaaf8180018484b9eaee0ebb6445c428fc56af04`.
+- Candidate exact apply PASS; UTF-8 BOM `false → false`, CRLF `0 → 0`, LF `434 → 443`; unrelated EOL/whitespace normalization yok.
+- Scope diff `49 insertions / 40 deletions`; yalnız metadata, merged baseline/dependency chain, Item 5 evolution sınırı ve güncel production yönü değişti.
+- Kanonik 13-item table byte hash'i korundu: `4b24c80fd704e064171c6fe5de0cbe0b0e529009b335747e6deea2b1b31fdaee`.
+- Güncel safe merged master `42207034635f1836a80e2357a1398f2e6004d5d4` / PR #465 ve merged schema `15`, Issue #466 Draft PR #467 candidate schema `16` olarak ayrıldı; PR #467 merged gösterilmedi.
+- Living Plan MVP Core PR #463 ve 7-day UI/APK/device acceptance PR #465 merged predecessor; Issue #466 Actual Progress Core current evolution olarak kaydedildi.
+- `NULL`, açık `0..99`, completed exact `100`, optimistic revision, durable idempotency/no-op receipt ve append-only event semantics kaydedildi.
+- Progress UI, actual quantity, reforecast ve productivity learning `not started`; Item 5 `Current — not complete`; Items 6–13 unchanged; production/store readiness ilanı yok.
+- `git diff --check`: PASS.
+- Final PR changed path: exact `14/14`; 15. path yok.
+- Published-head code/test/platform manifest: `207` file, SHA-256 `f85d72a5aa02a169b8998b805e22ad99705eac27d59bfcb320e2a783f2bbf7cc`, exact unchanged.
+- Schema source `16`; backup format `1`; app version `0.1.0+1`; pubspec/lock/platform-production drift `0`.
+- Schema/application/backup/analyze/full Flutter çalıştırılmadı; Correction #4 executable evidence geçerlidir.
+- Publication next: yalnız correction üç path'i, one additional commit `Sync V2 scope for actual progress`, normal push; amend/rebase/force yok; PR #467 Draft kalır.
