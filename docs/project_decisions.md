@@ -1,5 +1,24 @@
 # Proje Kararlari
 
+## Issue 466 — Actual progress ayrı ve nullable source-of-truth'tur
+
+- Mobil schema `15 → 16` migration'ı Living Plan item'ına nullable
+  `progress_percent` ekler. `NULL` ilerlemenin raporlanmadığı/bilinmediği,
+  açık item'da explicit `0..99` ve `COMPLETED` item'da exact `100` anlamındadır;
+  NULL-safe database guard'ları direct insert/update'te de bu eşleşmeyi korur.
+- `PROGRESS_UPDATED` mutation'ı optimistic revision, durable idempotency ve
+  no-op receipt sözleşmesini kullanır. Aynı progress event veya revision bump
+  üretmez; değişen progress tek revision, tek event ve aligned receipt üretir.
+- Complete status ve progress `100`ü; reopen `PLANNED` ve progress `NULL`ı aynı
+  transaction/revision/event içinde yazar. Start, defer ve note mevcut progress'i
+  korur.
+- Schema-15 completed satırları migration'da `100`, diğer eski satırlar `NULL`
+  olur. Backup format `1`, mobile version `0.1.0+1` ve immutable reference
+  schedule korunur.
+- Progress UI, actual quantity, reforecast, productivity learning, Gantt, AI,
+  notification, platform ve device davranışı bu kararın kapsamı değildir.
+
+
 ## Issue 462 — Living Plan ayrı mutable/evented kullanıcı kararı katmanıdır
 
 - Schema 15'te `project_living_plan_items`, immutable reference schedule'ı

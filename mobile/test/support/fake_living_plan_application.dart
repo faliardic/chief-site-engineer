@@ -92,6 +92,7 @@ class FakeLivingPlanApplication
       naturalUnitSnapshot: candidate.naturalUnit,
       plannedDate: command.plannedDate,
       status: ConstructionLivingPlanStatus.planned,
+      progressPercent: null,
       note: command.note,
       revision: 1,
       createdAt: now,
@@ -129,6 +130,8 @@ class FakeLivingPlanApplication
     command.itemId,
     command.expectedRevision,
     status: ConstructionLivingPlanStatus.completed,
+    progressPercent: 100,
+    replaceProgress: true,
   );
 
   @override
@@ -151,6 +154,8 @@ class FakeLivingPlanApplication
     command.expectedRevision,
     status: ConstructionLivingPlanStatus.planned,
     date: command.plannedDate,
+    progressPercent: null,
+    replaceProgress: true,
   );
 
   @override
@@ -164,6 +169,17 @@ class FakeLivingPlanApplication
     replaceNote: true,
   );
 
+  @override
+  Future<ConstructionLivingPlanItem> updateLivingPlanProgress(
+    UpdateConstructionLivingPlanProgressCommand command,
+  ) => _mutate(
+    command,
+    command.itemId,
+    command.expectedRevision,
+    progressPercent: command.progressPercent,
+    replaceProgress: true,
+  );
+
   Future<ConstructionLivingPlanItem> _mutate(
     Object command,
     String itemId,
@@ -172,6 +188,8 @@ class FakeLivingPlanApplication
     DateTime? date,
     String? note,
     bool replaceNote = false,
+    int? progressPercent,
+    bool replaceProgress = false,
   }) async {
     mutationCalls += 1;
     lastMutationCommand = command;
@@ -196,6 +214,9 @@ class FakeLivingPlanApplication
       naturalUnitSnapshot: current.item.naturalUnitSnapshot,
       plannedDate: date ?? current.item.plannedDate,
       status: status ?? current.item.status,
+      progressPercent: replaceProgress
+          ? progressPercent
+          : current.item.progressPercent,
       note: replaceNote ? note : current.item.note,
       revision: current.item.revision + 1,
       createdAt: current.item.createdAt,

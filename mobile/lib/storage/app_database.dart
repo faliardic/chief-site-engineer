@@ -27,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 15;
+  static const schemaVersion = 16;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2890,6 +2890,10 @@ class AppDatabase {
       version: 15,
       apply: _applyConstructionLivingPlanMigration,
     ),
+    DatabaseMigration(
+      version: 16,
+      apply: _applyConstructionLivingPlanProgressMigration,
+    ),
   ];
 
   final String path;
@@ -3508,6 +3512,333 @@ Future<void> _applyConstructionLivingPlanMigration(
       SELECT RAISE(ABORT, 'living plan items cannot be deleted');
     END
   ''');
+  await transaction.execute('''
+    CREATE TRIGGER project_living_plan_events_revision_match
+    BEFORE INSERT ON project_living_plan_events
+    WHEN NOT EXISTS (
+      SELECT 1
+      FROM project_living_plan_items item
+      WHERE item.id = NEW.living_plan_item_id
+        AND item.project_id = NEW.project_id
+        AND item.revision = NEW.sequence
+        AND item.updated_at = NEW.occurred_at
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'living plan event revision mismatch');
+    END
+  ''');
+  for (final operation in ['update', 'delete']) {
+    await transaction.execute('''
+      CREATE TRIGGER project_living_plan_events_append_only_$operation
+      BEFORE ${operation.toUpperCase()} ON project_living_plan_events
+      BEGIN
+        SELECT RAISE(ABORT, 'living plan events are append-only');
+      END
+    ''');
+  }
+}
+
+Future<void> _applyConstructionLivingPlanProgressMigration(
+  Transaction transaction,
+) async {
+  await transaction.execute('''
+    ALTER TABLE project_living_plan_items
+    ADD COLUMN progress_percent INTEGER CHECK (
+      progress_percent IS NULL OR progress_percent BETWEEN 0 AND 100
+    )
+  ''');
+  await transaction.execute(
+    'DROP TRIGGER project_living_plan_items_guarded_update',
+  );
+  await transaction.execute('''
+    UPDATE project_living_plan_items
+    SET progress_percent = 100
+    WHERE status = 'COMPLETED'
+  ''');
+
+  await transaction.execute('''
+    CREATE TABLE project_living_plan_command_receipts_v16 (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      living_plan_item_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      event_type TEXT NOT NULL CHECK (
+        event_type IN (
+          'CREATED', 'STARTED', 'COMPLETED',
+          'DEFERRED', 'REOPENED', 'NOTE_UPDATED', 'PROGRESS_UPDATED'
+        )
+      ),
+      intent_json TEXT NOT NULL CHECK (
+        length(intent_json) > 0
+        AND json_valid(intent_json) = 1
+        AND json_type(intent_json) = 'object'
+      ),
+      result_json TEXT NOT NULL CHECK (
+        length(result_json) > 0
+        AND json_valid(result_json) = 1
+        AND json_type(result_json) = 'object'
+      ),
+      result_revision INTEGER NOT NULL CHECK (result_revision >= 1),
+      is_no_op INTEGER NOT NULL CHECK (is_no_op IN (0, 1)),
+      event_sequence INTEGER CHECK (
+        event_sequence IS NULL OR event_sequence >= 1
+      ),
+      CHECK (
+        (
+          is_no_op = 1
+          AND event_sequence IS NULL
+        ) OR (
+          is_no_op = 0
+          AND event_sequence = result_revision
+        )
+      ),
+      UNIQUE (
+        id,
+        living_plan_item_id,
+        project_id,
+        event_type,
+        event_sequence
+      ),
+      FOREIGN KEY (living_plan_item_id, project_id)
+        REFERENCES project_living_plan_items(id, project_id)
+    )
+  ''');
+  await transaction.execute('''
+    INSERT INTO project_living_plan_command_receipts_v16 (
+      id,
+      living_plan_item_id,
+      project_id,
+      event_type,
+      intent_json,
+      result_json,
+      result_revision,
+      is_no_op,
+      event_sequence
+    )
+    SELECT
+      id,
+      living_plan_item_id,
+      project_id,
+      event_type,
+      intent_json,
+      result_json,
+      result_revision,
+      is_no_op,
+      event_sequence
+    FROM project_living_plan_command_receipts
+  ''');
+
+  await transaction.execute('''
+    CREATE TABLE project_living_plan_events_v16 (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      living_plan_item_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      sequence INTEGER NOT NULL CHECK (sequence >= 1),
+      event_type TEXT NOT NULL CHECK (
+        event_type IN (
+          'CREATED', 'STARTED', 'COMPLETED',
+          'DEFERRED', 'REOPENED', 'NOTE_UPDATED', 'PROGRESS_UPDATED'
+        )
+      ),
+      occurred_at TEXT NOT NULL CHECK (
+        length(occurred_at) = 20
+        AND occurred_at GLOB
+          '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+        AND strftime('%Y-%m-%dT%H:%M:%SZ', occurred_at, '+0 seconds')
+          IS NOT NULL
+        AND strftime('%Y-%m-%dT%H:%M:%SZ', occurred_at, '+0 seconds')
+          = occurred_at
+      ),
+      payload_json TEXT NOT NULL CHECK (
+        length(payload_json) > 0
+        AND json_valid(payload_json) = 1
+        AND json_type(payload_json) = 'object'
+      ),
+      UNIQUE (living_plan_item_id, sequence),
+      FOREIGN KEY (living_plan_item_id, project_id)
+        REFERENCES project_living_plan_items(id, project_id),
+      FOREIGN KEY (
+        id,
+        living_plan_item_id,
+        project_id,
+        event_type,
+        sequence
+      ) REFERENCES project_living_plan_command_receipts_v16(
+        id,
+        living_plan_item_id,
+        project_id,
+        event_type,
+        event_sequence
+      )
+    )
+  ''');
+  await transaction.execute('''
+    INSERT INTO project_living_plan_events_v16 (
+      id,
+      living_plan_item_id,
+      project_id,
+      sequence,
+      event_type,
+      occurred_at,
+      payload_json
+    )
+    SELECT
+      id,
+      living_plan_item_id,
+      project_id,
+      sequence,
+      event_type,
+      occurred_at,
+      payload_json
+    FROM project_living_plan_events
+  ''');
+
+  for (final trigger in [
+    'project_living_plan_command_receipts_result_match',
+    'project_living_plan_command_receipts_append_only_update',
+    'project_living_plan_command_receipts_append_only_delete',
+    'project_living_plan_events_revision_match',
+    'project_living_plan_events_append_only_update',
+    'project_living_plan_events_append_only_delete',
+  ]) {
+    await transaction.execute('DROP TRIGGER $trigger');
+  }
+  await transaction.execute('DROP TABLE project_living_plan_events');
+  await transaction.execute('DROP TABLE project_living_plan_command_receipts');
+  await transaction.execute('''
+    ALTER TABLE project_living_plan_command_receipts_v16
+    RENAME TO project_living_plan_command_receipts
+  ''');
+  await transaction.execute('''
+    ALTER TABLE project_living_plan_events_v16
+    RENAME TO project_living_plan_events
+  ''');
+
+  await transaction.execute('''
+    CREATE INDEX project_living_plan_command_receipts_item
+    ON project_living_plan_command_receipts(
+      living_plan_item_id, result_revision, id
+    )
+  ''');
+  await transaction.execute('''
+    CREATE INDEX project_living_plan_events_history
+    ON project_living_plan_events(living_plan_item_id, sequence)
+  ''');
+
+  await transaction.execute('''
+    CREATE TRIGGER project_living_plan_command_receipts_result_match
+    BEFORE INSERT ON project_living_plan_command_receipts
+    WHEN NOT EXISTS (
+      SELECT 1
+      FROM project_living_plan_items item
+      WHERE item.id = NEW.living_plan_item_id
+        AND item.project_id = NEW.project_id
+        AND item.revision = NEW.result_revision
+        AND json_extract(NEW.result_json, '\$.id') IS item.id
+        AND json_extract(NEW.result_json, '\$.project_id') IS item.project_id
+        AND json_extract(
+          NEW.result_json, '\$.reference_snapshot_id'
+        ) IS item.reference_snapshot_id
+        AND json_extract(
+          NEW.result_json, '\$.activity_instance_id'
+        ) IS item.activity_instance_id
+        AND json_extract(
+          NEW.result_json, '\$.activity_id'
+        ) IS item.activity_id
+        AND json_extract(
+          NEW.result_json, '\$.activity_name_snapshot'
+        ) IS item.activity_name_snapshot
+        AND json_extract(
+          NEW.result_json, '\$.activity_context_json'
+        ) IS item.activity_context_json
+        AND json_extract(
+          NEW.result_json, '\$.natural_unit_snapshot'
+        ) IS item.natural_unit_snapshot
+        AND json_extract(
+          NEW.result_json, '\$.planned_date'
+        ) IS item.planned_date
+        AND json_extract(NEW.result_json, '\$.status') IS item.status
+        AND json_type(
+          NEW.result_json, '\$.progress_percent'
+        ) IS NOT NULL
+        AND json_extract(
+          NEW.result_json, '\$.progress_percent'
+        ) IS item.progress_percent
+        AND json_extract(NEW.result_json, '\$.note') IS item.note
+        AND json_extract(
+          NEW.result_json, '\$.revision'
+        ) IS item.revision
+        AND json_extract(
+          NEW.result_json, '\$.created_at'
+        ) IS item.created_at
+        AND json_extract(
+          NEW.result_json, '\$.updated_at'
+        ) IS item.updated_at
+        AND json_extract(
+          NEW.result_json, '\$.status_changed_at'
+        ) IS item.status_changed_at
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'living plan receipt result mismatch');
+    END
+  ''');
+  for (final operation in ['update', 'delete']) {
+    await transaction.execute('''
+      CREATE TRIGGER project_living_plan_command_receipts_append_only_$operation
+      BEFORE ${operation.toUpperCase()}
+      ON project_living_plan_command_receipts
+      BEGIN
+        SELECT RAISE(ABORT, 'living plan command receipts are append-only');
+      END
+    ''');
+  }
+
+  await transaction.execute('''
+    CREATE TRIGGER project_living_plan_items_guarded_update
+    BEFORE UPDATE ON project_living_plan_items
+    WHEN NOT (
+      NEW.id IS OLD.id
+      AND NEW.project_id IS OLD.project_id
+      AND NEW.reference_snapshot_id IS OLD.reference_snapshot_id
+      AND NEW.activity_instance_id IS OLD.activity_instance_id
+      AND NEW.activity_id IS OLD.activity_id
+      AND NEW.activity_name_snapshot IS OLD.activity_name_snapshot
+      AND NEW.activity_context_json IS OLD.activity_context_json
+      AND NEW.natural_unit_snapshot IS OLD.natural_unit_snapshot
+      AND NEW.created_at IS OLD.created_at
+      AND NEW.revision = OLD.revision + 1
+      AND NEW.updated_at >= OLD.updated_at
+      AND (
+        (
+          NEW.status IS OLD.status
+          AND NEW.status_changed_at IS OLD.status_changed_at
+        ) OR (
+          NEW.status IS NOT OLD.status
+          AND NEW.status_changed_at IS NEW.updated_at
+        )
+      )
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'living plan item update contract violated');
+    END
+  ''');
+  for (final operation in ['insert', 'update']) {
+    await transaction.execute('''
+      CREATE TRIGGER project_living_plan_items_progress_consistency_$operation
+      BEFORE ${operation.toUpperCase()} ON project_living_plan_items
+      WHEN (
+        (
+          NEW.status = 'COMPLETED'
+          AND NEW.progress_percent IS NOT 100
+        ) OR (
+          NEW.status != 'COMPLETED'
+          AND NEW.progress_percent IS 100
+        )
+      )
+      BEGIN
+        SELECT RAISE(ABORT, 'living plan progress consistency violated');
+      END
+    ''');
+  }
   await transaction.execute('''
     CREATE TRIGGER project_living_plan_events_revision_match
     BEFORE INSERT ON project_living_plan_events

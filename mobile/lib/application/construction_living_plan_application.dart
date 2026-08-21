@@ -63,6 +63,10 @@ abstract interface class ConstructionLivingPlanApplicationPort {
     UpdateConstructionLivingPlanNoteCommand command,
   );
 
+  Future<ConstructionLivingPlanItem> updateLivingPlanProgress(
+    UpdateConstructionLivingPlanProgressCommand command,
+  );
+
   Future<List<ConstructionLivingPlanWindowItem>> loadSevenDayPlan({
     required String projectId,
     required DateTime windowStart,
@@ -204,6 +208,13 @@ class SqliteConstructionLivingPlanApplication
   );
 
   @override
+  Future<ConstructionLivingPlanItem> updateLivingPlanProgress(
+    UpdateConstructionLivingPlanProgressCommand command,
+  ) => _withApplication(
+    (application) => application.updateLivingPlanProgress(command),
+  );
+
+  @override
   Future<List<ConstructionLivingPlanWindowItem>> loadSevenDayPlan({
     required String projectId,
     required DateTime windowStart,
@@ -278,6 +289,11 @@ class UnavailableConstructionLivingPlanApplication
   @override
   Future<ConstructionLivingPlanItem> updateLivingPlanNote(
     UpdateConstructionLivingPlanNoteCommand command,
+  ) async => _fail();
+
+  @override
+  Future<ConstructionLivingPlanItem> updateLivingPlanProgress(
+    UpdateConstructionLivingPlanProgressCommand command,
   ) async => _fail();
 
   @override
@@ -516,6 +532,7 @@ class ConstructionLivingPlanApplication
         'natural_unit_snapshot': candidate.candidate.naturalUnit,
         'planned_date': plannedDate,
         'status': ConstructionLivingPlanStatus.planned.storageValue,
+        'progress_percent': null,
         'note': note,
         'revision': 1,
         'created_at': timestamp,
@@ -533,6 +550,7 @@ class ConstructionLivingPlanApplication
         naturalUnitSnapshot: candidate.candidate.naturalUnit,
         plannedDate: parseCanonicalConstructionDate(plannedDate),
         status: ConstructionLivingPlanStatus.planned,
+        progressPercent: null,
         note: note,
         revision: 1,
         createdAt: occurredAt,
@@ -543,6 +561,7 @@ class ConstructionLivingPlanApplication
         intent: intent,
         change: <String, Object?>{
           'reference_snapshot_id': candidate.candidate.referenceSnapshotId,
+          'progress_percent': null,
           'status': ConstructionLivingPlanStatus.planned.storageValue,
         },
         result: inserted,
@@ -606,6 +625,7 @@ class ConstructionLivingPlanApplication
         }
         return _MutationDecision(
           status: ConstructionLivingPlanStatus.started,
+          progressPercent: item.progressPercent,
           plannedDate: item.plannedDate,
           note: item.note,
           change: {
@@ -644,9 +664,12 @@ class ConstructionLivingPlanApplication
         }
         return _MutationDecision(
           status: ConstructionLivingPlanStatus.completed,
+          progressPercent: 100,
           plannedDate: item.plannedDate,
           note: item.note,
           change: {
+            'new_progress_percent': 100,
+            'previous_progress_percent': item.progressPercent,
             'previous_status': item.status.storageValue,
             'status': ConstructionLivingPlanStatus.completed.storageValue,
           },
@@ -687,6 +710,7 @@ class ConstructionLivingPlanApplication
         }
         return _MutationDecision(
           status: ConstructionLivingPlanStatus.deferred,
+          progressPercent: item.progressPercent,
           plannedDate: parseCanonicalConstructionDate(plannedDate),
           note: item.note,
           change: {
@@ -731,10 +755,13 @@ class ConstructionLivingPlanApplication
         }
         return _MutationDecision(
           status: ConstructionLivingPlanStatus.planned,
+          progressPercent: null,
           plannedDate: parseCanonicalConstructionDate(plannedDate),
           note: item.note,
           change: {
             'new_planned_date': plannedDate,
+            'new_progress_percent': null,
+            'previous_progress_percent': item.progressPercent,
             'previous_status': item.status.storageValue,
             'status': ConstructionLivingPlanStatus.planned.storageValue,
           },
@@ -767,9 +794,53 @@ class ConstructionLivingPlanApplication
         }
         return _MutationDecision(
           status: item.status,
+          progressPercent: item.progressPercent,
           plannedDate: item.plannedDate,
           note: note,
           change: {'new_note': note, 'old_note': item.note},
+        );
+      },
+    );
+  }
+
+  @override
+  Future<ConstructionLivingPlanItem> updateLivingPlanProgress(
+    UpdateConstructionLivingPlanProgressCommand command,
+  ) async {
+    if (command.progressPercent < 0 || command.progressPercent > 99) {
+      throw const ConstructionLivingPlanFailure('living_plan_invalid_progress');
+    }
+    final intent = <String, Object?>{
+      ..._revisionIntent(
+        ConstructionLivingPlanEventType.progressUpdated,
+        command.expectedRevision,
+      ),
+      'progress_percent': command.progressPercent,
+    };
+    return _mutate(
+      itemId: command.itemId,
+      eventId: command.eventId,
+      expectedRevision: command.expectedRevision,
+      eventType: ConstructionLivingPlanEventType.progressUpdated,
+      intent: intent,
+      decide: (item) {
+        if (item.status == ConstructionLivingPlanStatus.completed) {
+          throw const ConstructionLivingPlanFailure(
+            'living_plan_invalid_transition',
+          );
+        }
+        if (item.progressPercent == command.progressPercent) {
+          return _MutationDecision.noOp(item);
+        }
+        return _MutationDecision(
+          status: item.status,
+          progressPercent: command.progressPercent,
+          plannedDate: item.plannedDate,
+          note: item.note,
+          change: {
+            'new_progress_percent': command.progressPercent,
+            'previous_progress_percent': item.progressPercent,
+          },
         );
       },
     );
@@ -950,6 +1021,7 @@ class ConstructionLivingPlanApplication
         naturalUnitSnapshot: current.naturalUnitSnapshot,
         plannedDate: decision.plannedDate,
         status: decision.status,
+        progressPercent: decision.progressPercent,
         note: decision.note,
         revision: current.revision + 1,
         createdAt: current.createdAt,
@@ -963,6 +1035,7 @@ class ConstructionLivingPlanApplication
             resulting.plannedDate,
           ),
           'status': resulting.status.storageValue,
+          'progress_percent': resulting.progressPercent,
           'note': resulting.note,
           'revision': resulting.revision,
           'updated_at': occurredAt,
@@ -1425,6 +1498,7 @@ class _StoredReceipt {
 class _MutationDecision {
   const _MutationDecision({
     required this.status,
+    required this.progressPercent,
     required this.plannedDate,
     required this.note,
     required this.change,
@@ -1432,12 +1506,14 @@ class _MutationDecision {
 
   _MutationDecision.noOp(ConstructionLivingPlanItem item)
     : status = item.status,
+      progressPercent = item.progressPercent,
       plannedDate = item.plannedDate,
       note = item.note,
       change = const <String, Object?>{},
       isNoOp = true;
 
   final ConstructionLivingPlanStatus status;
+  final int? progressPercent;
   final DateTime plannedDate;
   final String? note;
   final Map<String, Object?> change;
@@ -1462,6 +1538,7 @@ Map<String, Object?> _eventPayload({
   'result': <String, Object?>{
     'note': result.note,
     'planned_date': formatCanonicalConstructionDate(result.plannedDate),
+    'progress_percent': result.progressPercent,
     'revision': result.revision,
     'status': result.status.storageValue,
     'status_changed_at': CseTimeCodec.encodeUtc(result.statusChangedAt),
@@ -1482,6 +1559,7 @@ Map<String, Object?> _receiptResult(ConstructionLivingPlanItem item) =>
       'natural_unit_snapshot': item.naturalUnitSnapshot,
       'note': item.note,
       'planned_date': formatCanonicalConstructionDate(item.plannedDate),
+      'progress_percent': item.progressPercent,
       'project_id': item.projectId,
       'reference_snapshot_id': item.referenceSnapshotId,
       'revision': item.revision,
@@ -1589,10 +1667,21 @@ bool _eventMatchesReceipt(
           encodeConstructionLivingPlanJson(receipt.intent) &&
       eventResult['note'] == receiptResult['note'] &&
       eventResult['planned_date'] == receiptResult['planned_date'] &&
+      _storedResultProgress(eventResult) ==
+          _storedResultProgress(receiptResult) &&
       eventResult['revision'] == receiptResult['revision'] &&
       eventResult['status'] == receiptResult['status'] &&
       eventResult['status_changed_at'] == receiptResult['status_changed_at'] &&
       eventResult['updated_at'] == receiptResult['updated_at'];
+}
+
+Object? _storedResultProgress(Map<Object?, Object?> result) {
+  if (result.containsKey('progress_percent')) {
+    return result['progress_percent'];
+  }
+  return result['status'] == ConstructionLivingPlanStatus.completed.storageValue
+      ? 100
+      : null;
 }
 
 ConstructionLivingPlanItem _itemFromRow(Map<String, Object?> row) {
@@ -1618,6 +1707,8 @@ ConstructionLivingPlanItem _itemFromRow(Map<String, Object?> row) {
     if (updatedAt.isBefore(createdAt) || statusChangedAt.isAfter(updatedAt)) {
       throw const FormatException();
     }
+    final status = ConstructionLivingPlanStatus.fromStorage(row['status']);
+    final progressPercent = _progressFromStoredRow(row, status);
     return ConstructionLivingPlanItem(
       id: _requiredStoredString(row, 'id'),
       projectId: _requiredStoredString(row, 'project_id'),
@@ -1635,7 +1726,8 @@ ConstructionLivingPlanItem _itemFromRow(Map<String, Object?> row) {
       plannedDate: parseCanonicalConstructionDate(
         _requiredStoredString(row, 'planned_date'),
       ),
-      status: ConstructionLivingPlanStatus.fromStorage(row['status']),
+      status: status,
+      progressPercent: progressPercent,
       note: parsedNote,
       revision: revision,
       createdAt: createdAt,
@@ -1649,6 +1741,29 @@ ConstructionLivingPlanItem _itemFromRow(Map<String, Object?> row) {
       'living_plan_projection_integrity_failed',
     );
   }
+}
+
+int? _progressFromStoredRow(
+  Map<String, Object?> row,
+  ConstructionLivingPlanStatus status,
+) {
+  final stored = row.containsKey('progress_percent')
+      ? row['progress_percent']
+      : status == ConstructionLivingPlanStatus.completed
+      ? 100
+      : null;
+  if (stored != null && stored is! int) {
+    throw const FormatException();
+  }
+  final progress = stored as int?;
+  if (progress != null && (progress < 0 || progress > 100)) {
+    throw const FormatException();
+  }
+  if ((status == ConstructionLivingPlanStatus.completed && progress != 100) ||
+      (status != ConstructionLivingPlanStatus.completed && progress == 100)) {
+    throw const FormatException();
+  }
+  return progress;
 }
 
 ConstructionLivingPlanEvent _eventFromRow(Map<String, Object?> row) {
@@ -1813,6 +1928,7 @@ bool _sameItemState(
     left.naturalUnitSnapshot == right.naturalUnitSnapshot &&
     left.plannedDate == right.plannedDate &&
     left.status == right.status &&
+    left.progressPercent == right.progressPercent &&
     left.note == right.note &&
     left.revision == right.revision &&
     left.createdAt == right.createdAt &&
