@@ -189,16 +189,15 @@ Durum: `current direction — not complete`
 - Stable project/activity-instance/snapshot kimliklerine referans
 - Kullanıcı işlemiyle reference schedule'ı sessizce yeniden yazmama
 
-Tek bir dar Living Plan MVP Core dilimi UI'dan önce gelebilir. Hemen sonraki
-dilim 7-day UI + APK/gerçek cihaz kabulü olmalıdır; araya yeni geniş backend
-programı eklenmez.
+Issue #466, schema 16 actual-progress source-of-truth temelini UI eklemeden
+kurar: `NULL` raporlanmamış/bilinmeyen ilerleme, açık item için explicit
+`0..99`, tamamlanan item için exact `100` anlamındadır. Optimistic revision,
+durable idempotency/no-op receipt ve append-only event sözleşmesi korunur.
 
-İlk usable UI/device pilotundan sonra actual quantity/progress/reforecast ve
-project-specific productivity learning, Living Plan'ın sonraki evolution'ı
-olarak ayrıca owner kararıyla ele alınabilir. Bunlar MVP Core veya ilk UI
-kapsamı değildir; bu roadmap düzeltmesi onları başlatmaz, tamamlamaz ya da
-Items 6–13'ü yeniden sıralamaz. İlk UI tek başına Item 5'i complete yapmaz;
-final completion sınırı sonraki owner kararı ve executable evidence'a bağlıdır.
+Progress UI, actual quantity, reforecast ve project-specific productivity
+learning bu dilimde başlatılmaz. Item 5 not complete kalır; final completion
+sınırı sonraki owner kararı ve executable evidence'a bağlıdır. Items 6–13'ün
+sırası değişmez.
 
 ### V2.6 — Günlük Log Çıktısı v1
 
@@ -322,8 +321,8 @@ Bu başlıklar ayrı post-V2 backlog'da tarihsel olarak korunur.
 Güncel canonical faz:
 
 ```text
-Issue #460 truth-sync complete
-→ Living 7-Day Plan MVP Core ready
+Living 7-Day Plan — current, not complete
+→ Issue #466 actual-progress source-of-truth core
 ```
 
 Items 1–4 complete'tir. Activity Catalog Runtime, typed Project Profile ve
@@ -331,13 +330,11 @@ Dependency Catalog, Project Activity Instance Graph, deterministic Schedule
 Date Engine ve immutable persistent reference-schedule snapshots PR #444, #446,
 #448, #456 ve #459 zinciriyle merged temeldir.
 
-İlk sonraki production işi yalnız **Living 7-Day Plan MVP Core** olabilir.
-Onun immediate successor'ı **7-day UI + APK/device acceptance** olmalıdır.
-Actual quantity/progress/reforecast ve project-specific productivity learning
-ilk usable UI/device pilotundan sonraki Living Plan evolution'ıdır; current
-direction içinde kalır, fakat MVP Core veya ilk UI kapsamında değildir. İlk UI
-Item 5'in final completion'ı değildir; bu sınır sonraki owner kararı ve
-executable evidence ile belirlenir. Items 6–13'ün sırası değişmez.
+Issue #466 yalnız nullable actual-progress source-of-truth foundation'ını,
+optimistic revision ve durable idempotency/no-op receipt sözleşmesini ekler.
+Progress UI, quantity, reforecast ve productivity learning başlamaz. Item 5'in
+final completion sınırı sonraki owner kararı ve executable evidence ile
+belirlenir; Items 6–13'ün sırası değişmez.
 
 ## 13. Tarihsel roadmap sınırı
 

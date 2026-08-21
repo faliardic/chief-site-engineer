@@ -1,5 +1,22 @@
 # Changelog
 
+## Issue #466 - Living Plan actual progress core
+
+- Mobil schema `15 → 16` ile nullable `progress_percent` eklendi: `NULL`
+  raporlanmamış/bilinmeyen ilerleme, açık item explicit `0..99`, tamamlanan item
+  exact `100` değerini taşır. Schema-15 completed satırları `100`, diğerleri
+  `NULL` olarak migrate edilir.
+- `PROGRESS_UPDATED` command/application yolu optimistic revision, durable
+  idempotency ve no-op receipt sözleşmesini korur. Aynı değer event/revision
+  üretmez; değişen değer exact tek event ve aligned receipt üretir.
+- Complete progress'i `100`, reopen `NULL` yapar; start/defer/note progress'i
+  korur. Database NULL-safe insert/update guard'ları direct SQL drift'ini
+  fail-closed reddeder.
+- Backup format `1`, mobile version `0.1.0+1` ve immutable reference schedule
+  korunur. Progress UI, quantity, reforecast, productivity learning, platform,
+  notification, APK/device ve release/store kapsam dışıdır.
+
+
 ## Issue #464 - Şefim kimlik ayrımı ve Living Plan cihaz kabulü
 
 - Owner A3 sonucunu kabul etti; kayıp legacy production paketi bu Issue'da

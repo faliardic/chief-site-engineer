@@ -29,7 +29,8 @@ enum ConstructionLivingPlanEventType {
   completed('COMPLETED'),
   deferred('DEFERRED'),
   reopened('REOPENED'),
-  noteUpdated('NOTE_UPDATED');
+  noteUpdated('NOTE_UPDATED'),
+  progressUpdated('PROGRESS_UPDATED');
 
   const ConstructionLivingPlanEventType(this.storageValue);
 
@@ -96,6 +97,7 @@ class ConstructionLivingPlanItem {
     required this.createdAt,
     required this.updatedAt,
     required this.statusChangedAt,
+    this.progressPercent,
   });
 
   final String id;
@@ -108,6 +110,7 @@ class ConstructionLivingPlanItem {
   final String naturalUnitSnapshot;
   final DateTime plannedDate;
   final ConstructionLivingPlanStatus status;
+  final int? progressPercent;
   final String? note;
   final int revision;
   final DateTime createdAt;
@@ -233,6 +236,20 @@ class UpdateConstructionLivingPlanNoteCommand {
   final String eventId;
   final int expectedRevision;
   final String? note;
+}
+
+class UpdateConstructionLivingPlanProgressCommand {
+  const UpdateConstructionLivingPlanProgressCommand({
+    required this.itemId,
+    required this.eventId,
+    required this.expectedRevision,
+    required this.progressPercent,
+  });
+
+  final String itemId;
+  final String eventId;
+  final int expectedRevision;
+  final int progressPercent;
 }
 
 class ConstructionLivingPlanFailure implements Exception {

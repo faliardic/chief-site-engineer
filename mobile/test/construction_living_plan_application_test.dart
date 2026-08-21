@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:chief_site_engineer/application/construction_living_plan_application.dart';
@@ -445,6 +446,7 @@ void main() {
         ),
       );
       expect(started.status, ConstructionLivingPlanStatus.started);
+      expect(started.progressPercent, isNull);
       expect(started.revision, 2);
       final replayedStart = await application.startLivingPlanItem(
         StartConstructionLivingPlanItemCommand(
@@ -534,6 +536,7 @@ void main() {
         ),
       );
       expect(completed.status, ConstructionLivingPlanStatus.completed);
+      expect(completed.progressPercent, 100);
       expect(completed.revision, 3);
       final oldReplay = await application.startLivingPlanItem(
         StartConstructionLivingPlanItemCommand(
@@ -576,6 +579,7 @@ void main() {
         ),
       );
       expect(reopened.status, ConstructionLivingPlanStatus.planned);
+      expect(reopened.progressPercent, isNull);
       expect(reopened.plannedDate, _date('2026-09-06'));
       expect(reopened.revision, 4);
       final noOpReopen = await application.reopenLivingPlanItem(
@@ -609,6 +613,7 @@ void main() {
         ),
       );
       expect(deferred.status, ConstructionLivingPlanStatus.deferred);
+      expect(deferred.progressPercent, isNull);
       expect(deferred.revision, 5);
       final deferEvent = (await application.listLivingPlanEventHistory(
         item.id,
@@ -632,6 +637,7 @@ void main() {
         completedAfterDefer.status,
         ConstructionLivingPlanStatus.completed,
       );
+      expect(completedAfterDefer.progressPercent, 100);
       now = DateTime.utc(2026, 8, 16, 9, 0, 6);
       final noted = await application.updateLivingPlanNote(
         UpdateConstructionLivingPlanNoteCommand(
@@ -643,6 +649,7 @@ void main() {
       );
       expect(noted.note, 'Tamamlandı, teslim bekleniyor');
       expect(noted.status, ConstructionLivingPlanStatus.completed);
+      expect(noted.progressPercent, 100);
       expect(noted.revision, 7);
       final events = await application.listLivingPlanEventHistory(item.id);
       expect(
@@ -700,6 +707,314 @@ void main() {
         ),
       );
       expect(directComplete.status, ConstructionLivingPlanStatus.completed);
+    },
+  );
+
+  test(
+    'actual progress is optimistic evented durable and lifecycle atomic',
+    () async {
+      final created = await _create(
+        application,
+        scenario,
+        activityId: 'ACT-C',
+        itemNumber: 30,
+        eventNumber: 330,
+        plannedDate: '2026-09-03',
+        note: 'İlerleme çekirdeği',
+      );
+      expect(created.progressPercent, isNull);
+
+      now = DateTime.utc(2026, 8, 16, 9, 10, 1);
+      final zero = await application.updateLivingPlanProgress(
+        UpdateConstructionLivingPlanProgressCommand(
+          itemId: created.id,
+          eventId: _uuid(331),
+          expectedRevision: 1,
+          progressPercent: 0,
+        ),
+      );
+      expect(zero.progressPercent, 0);
+      expect(zero.revision, 2);
+      final zeroReplay = await application.updateLivingPlanProgress(
+        UpdateConstructionLivingPlanProgressCommand(
+          itemId: created.id,
+          eventId: _uuid(331),
+          expectedRevision: 1,
+          progressPercent: 0,
+        ),
+      );
+      expect(zeroReplay.progressPercent, 0);
+      expect(zeroReplay.revision, 2);
+      expect(zeroReplay.updatedAt, zero.updatedAt);
+      await expectLater(
+        application.updateLivingPlanProgress(
+          UpdateConstructionLivingPlanProgressCommand(
+            itemId: created.id,
+            eventId: _uuid(331),
+            expectedRevision: 1,
+            progressPercent: 1,
+          ),
+        ),
+        _failure('living_plan_event_id_conflict'),
+      );
+      await expectLater(
+        application.updateLivingPlanProgress(
+          UpdateConstructionLivingPlanProgressCommand(
+            itemId: created.id,
+            eventId: _uuid(332),
+            expectedRevision: 1,
+            progressPercent: 47,
+          ),
+        ),
+        _failure('living_plan_stale_revision'),
+      );
+
+      now = DateTime.utc(2026, 8, 16, 9, 10, 2);
+      final middle = await application.updateLivingPlanProgress(
+        UpdateConstructionLivingPlanProgressCommand(
+          itemId: created.id,
+          eventId: _uuid(333),
+          expectedRevision: 2,
+          progressPercent: 47,
+        ),
+      );
+      expect(middle.progressPercent, 47);
+      expect(middle.revision, 3);
+
+      now = DateTime.utc(2026, 8, 16, 9, 10, 3);
+      final started = await application.startLivingPlanItem(
+        StartConstructionLivingPlanItemCommand(
+          itemId: created.id,
+          eventId: _uuid(334),
+          expectedRevision: 3,
+        ),
+      );
+      expect(started.status, ConstructionLivingPlanStatus.started);
+      expect(started.progressPercent, 47);
+      expect(started.revision, 4);
+
+      now = DateTime.utc(2026, 8, 16, 9, 10, 4);
+      final ninetyNine = await application.updateLivingPlanProgress(
+        UpdateConstructionLivingPlanProgressCommand(
+          itemId: created.id,
+          eventId: _uuid(335),
+          expectedRevision: 4,
+          progressPercent: 99,
+        ),
+      );
+      expect(ninetyNine.progressPercent, 99);
+      expect(ninetyNine.revision, 5);
+      final sameProgress = await application.updateLivingPlanProgress(
+        UpdateConstructionLivingPlanProgressCommand(
+          itemId: created.id,
+          eventId: _uuid(336),
+          expectedRevision: 5,
+          progressPercent: 99,
+        ),
+      );
+      expect(sameProgress.progressPercent, 99);
+      expect(sameProgress.revision, 5);
+      expect(sameProgress.updatedAt, ninetyNine.updatedAt);
+      final sameProgressReplay = await application.updateLivingPlanProgress(
+        UpdateConstructionLivingPlanProgressCommand(
+          itemId: created.id,
+          eventId: _uuid(336),
+          expectedRevision: 5,
+          progressPercent: 99,
+        ),
+      );
+      expect(sameProgressReplay.revision, 5);
+      expect(sameProgressReplay.updatedAt, ninetyNine.updatedAt);
+
+      now = DateTime.utc(2026, 8, 16, 9, 10, 5);
+      final deferred = await application.deferLivingPlanItem(
+        DeferConstructionLivingPlanItemCommand(
+          itemId: created.id,
+          eventId: _uuid(337),
+          expectedRevision: 5,
+          plannedDate: _date('2026-09-06'),
+        ),
+      );
+      expect(deferred.status, ConstructionLivingPlanStatus.deferred);
+      expect(deferred.progressPercent, 99);
+      expect(deferred.revision, 6);
+
+      now = DateTime.utc(2026, 8, 16, 9, 10, 6);
+      final noted = await application.updateLivingPlanNote(
+        UpdateConstructionLivingPlanNoteCommand(
+          itemId: created.id,
+          eventId: _uuid(338),
+          expectedRevision: 6,
+          note: 'İlerleme korunuyor',
+        ),
+      );
+      expect(noted.progressPercent, 99);
+      expect(noted.revision, 7);
+
+      for (final invalid in [-1, 100, 101]) {
+        await expectLater(
+          application.updateLivingPlanProgress(
+            UpdateConstructionLivingPlanProgressCommand(
+              itemId: created.id,
+              eventId: _uuid(340 + invalid),
+              expectedRevision: 7,
+              progressPercent: invalid,
+            ),
+          ),
+          _failure('living_plan_invalid_progress'),
+        );
+      }
+      expect((await application.loadLivingPlanItem(created.id))?.revision, 7);
+
+      now = DateTime.utc(2026, 8, 16, 9, 10, 7);
+      final completed = await application.completeLivingPlanItem(
+        CompleteConstructionLivingPlanItemCommand(
+          itemId: created.id,
+          eventId: _uuid(339),
+          expectedRevision: 7,
+        ),
+      );
+      expect(completed.status, ConstructionLivingPlanStatus.completed);
+      expect(completed.progressPercent, 100);
+      expect(completed.revision, 8);
+      final completedProjection = (await database.database.query(
+        'project_living_plan_items',
+        where: 'id = ?',
+        whereArgs: [created.id],
+      )).single;
+      expect(completedProjection['status'], 'COMPLETED');
+      expect(completedProjection['progress_percent'], 100);
+      expect(completedProjection['revision'], 8);
+      await expectLater(
+        application.updateLivingPlanProgress(
+          UpdateConstructionLivingPlanProgressCommand(
+            itemId: created.id,
+            eventId: _uuid(341),
+            expectedRevision: 8,
+            progressPercent: 50,
+          ),
+        ),
+        _failure('living_plan_invalid_transition'),
+      );
+
+      now = DateTime.utc(2026, 8, 16, 9, 10, 8);
+      final reopened = await application.reopenLivingPlanItem(
+        ReopenConstructionLivingPlanItemCommand(
+          itemId: created.id,
+          eventId: _uuid(342),
+          expectedRevision: 8,
+          plannedDate: _date('2026-09-07'),
+        ),
+      );
+      expect(reopened.status, ConstructionLivingPlanStatus.planned);
+      expect(reopened.progressPercent, isNull);
+      expect(reopened.revision, 9);
+      final reopenedProjection = (await database.database.query(
+        'project_living_plan_items',
+        where: 'id = ?',
+        whereArgs: [created.id],
+      )).single;
+      expect(reopenedProjection['status'], 'PLANNED');
+      expect(reopenedProjection['progress_percent'], isNull);
+      expect(reopenedProjection['revision'], 9);
+
+      final loaded = await application.loadLivingPlanItem(created.id);
+      expect(loaded?.progressPercent, isNull);
+      final window = await application.loadSevenDayPlan(
+        projectId: scenario.profile.projectId,
+        windowStart: _date('2026-09-01'),
+      );
+      expect(
+        window
+            .singleWhere((entry) => entry.item.id == created.id)
+            .item
+            .progressPercent,
+        isNull,
+      );
+      final historicalReplay = await application.updateLivingPlanProgress(
+        UpdateConstructionLivingPlanProgressCommand(
+          itemId: created.id,
+          eventId: _uuid(335),
+          expectedRevision: 4,
+          progressPercent: 99,
+        ),
+      );
+      expect(historicalReplay.progressPercent, 99);
+      expect(historicalReplay.revision, 5);
+      expect((await application.loadLivingPlanItem(created.id))?.revision, 9);
+
+      final events = await application.listLivingPlanEventHistory(created.id);
+      expect(
+        events.map((event) => event.sequence),
+        orderedEquals([1, 2, 3, 4, 5, 6, 7, 8, 9]),
+      );
+      final progressEvents = events
+          .where(
+            (event) =>
+                event.eventType ==
+                ConstructionLivingPlanEventType.progressUpdated,
+          )
+          .toList(growable: false);
+      expect(progressEvents, hasLength(3));
+      expect(progressEvents.map((event) => event.payload['change']), [
+        {'new_progress_percent': 0, 'previous_progress_percent': null},
+        {'new_progress_percent': 47, 'previous_progress_percent': 0},
+        {'new_progress_percent': 99, 'previous_progress_percent': 47},
+      ]);
+      final completionEvent = events.singleWhere(
+        (event) => event.eventType == ConstructionLivingPlanEventType.completed,
+      );
+      expect(
+        completionEvent.payload['change'],
+        containsPair('previous_progress_percent', 99),
+      );
+      expect(
+        completionEvent.payload['change'],
+        containsPair('new_progress_percent', 100),
+      );
+      final reopenEvent = events.singleWhere(
+        (event) => event.eventType == ConstructionLivingPlanEventType.reopened,
+      );
+      expect(
+        reopenEvent.payload['change'],
+        containsPair('previous_progress_percent', 100),
+      );
+      expect(
+        reopenEvent.payload['change'],
+        containsPair('new_progress_percent', null),
+      );
+
+      final changedReceipt = (await database.database.query(
+        'project_living_plan_command_receipts',
+        where: 'id = ?',
+        whereArgs: [_uuid(333)],
+      )).single;
+      expect(changedReceipt['event_type'], 'PROGRESS_UPDATED');
+      expect(changedReceipt['result_revision'], 3);
+      expect(changedReceipt['event_sequence'], 3);
+      expect(changedReceipt['is_no_op'], 0);
+      expect(
+        (jsonDecode(changedReceipt['result_json']! as String)
+            as Map<String, Object?>)['progress_percent'],
+        47,
+      );
+      final noOpReceipt = (await database.database.query(
+        'project_living_plan_command_receipts',
+        where: 'id = ?',
+        whereArgs: [_uuid(336)],
+      )).single;
+      expect(noOpReceipt['event_type'], 'PROGRESS_UPDATED');
+      expect(noOpReceipt['result_revision'], 5);
+      expect(noOpReceipt['event_sequence'], isNull);
+      expect(noOpReceipt['is_no_op'], 1);
+      expect(
+        await database.database.query(
+          'project_living_plan_events',
+          where: 'id = ?',
+          whereArgs: [_uuid(336)],
+        ),
+        isEmpty,
+      );
     },
   );
 

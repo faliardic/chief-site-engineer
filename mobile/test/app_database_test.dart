@@ -75,6 +75,7 @@ void main() {
       {'version': 13, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 14, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 15, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 16, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
   });
 
@@ -434,6 +435,7 @@ void main() {
         path: directories.databaseFile,
         factory: databaseFactoryFfi,
         clock: () => DateTime.utc(2026, 7, 19, 9),
+        migrations: AppDatabase.foundationMigrations.take(15).toList(),
       );
       await upgraded.open();
       final db = upgraded.database;
@@ -867,6 +869,325 @@ void main() {
         db.delete('project_living_plan_events'),
         throwsA(isA<sqflite.DatabaseException>()),
       );
+      expect(await db.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      expect(
+        (await db.rawQuery('PRAGMA integrity_check')).single['integrity_check'],
+        'ok',
+      );
+      await upgraded.close();
+    },
+  );
+
+  test(
+    'schema 15 to 16 backfills progress atomically and preserves history',
+    () async {
+      final schemaFifteen = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+        migrations: AppDatabase.foundationMigrations.take(15).toList(),
+      );
+      await schemaFifteen.open();
+      final old = schemaFifteen.database;
+      await old.insert('projects', {
+        'id': 'progress-project',
+        'name': 'İlerleme migration projesi',
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await old.insert('project_schedule_snapshots', {
+        'id': 'progress-snapshot',
+        'project_id': 'progress-project',
+        'profile_json': '{}',
+        'corpus_version': 'corpus-v1',
+        'schedule_seed_version': 'seed-v1',
+        'schedule_seed_provenance': 'seed-catalog',
+        'production_status': 'NOT_FOR_PRODUCTION',
+        'duration_source': 'TEST_SEED_ONLY',
+        'baseline_status': 'NOT_A_BASELINE',
+        'schedule_start': '2026-09-01',
+        'schedule_finish': '2026-09-04',
+        'activity_count': 4,
+        'root_count': 1,
+        'leaf_count': 1,
+        'isolated_count': 4,
+        'milestone_count': 0,
+        'projection_sha256': '0' * 64,
+        'generated_at': '2026-07-19T08:00:00Z',
+      });
+      const states = <Map<String, String>>[
+        {'suffix': 'planned', 'status': 'PLANNED', 'event_type': 'CREATED'},
+        {'suffix': 'started', 'status': 'STARTED', 'event_type': 'STARTED'},
+        {
+          'suffix': 'completed',
+          'status': 'COMPLETED',
+          'event_type': 'COMPLETED',
+        },
+        {'suffix': 'deferred', 'status': 'DEFERRED', 'event_type': 'DEFERRED'},
+      ];
+      for (var index = 0; index < states.length; index += 1) {
+        final state = states[index];
+        final activityNumber = index + 1;
+        final activityId = 'PROGRESS-ACT-$activityNumber';
+        final instanceId = '$activityId@PROJECT';
+        await old.insert('project_schedule_snapshot_activities', {
+          'snapshot_id': 'progress-snapshot',
+          'project_id': 'progress-project',
+          'instance_id': instanceId,
+          'activity_id': activityId,
+          'start_date': '2026-09-0$activityNumber',
+          'finish_date': '2026-09-0$activityNumber',
+          'duration_days': 1.0,
+          'rounded_scheduling_days': 1,
+          'duration_calendar_type': 'WORKING_DAY',
+          'duration_status': 'SOURCE_BACKED',
+          'duration_confidence': 'A_AUTHORITATIVE',
+          'is_milestone': 0,
+          'is_isolated': 1,
+          'row_sha256': '$activityNumber' * 64,
+        });
+        final itemId = 'progress-item-${state['suffix']}';
+        final eventId = 'progress-event-${state['suffix']}';
+        final item = <String, Object?>{
+          'id': itemId,
+          'project_id': 'progress-project',
+          'reference_snapshot_id': 'progress-snapshot',
+          'activity_instance_id': instanceId,
+          'activity_id': activityId,
+          'activity_name_snapshot': 'İlerleme işi $activityNumber',
+          'activity_context_json': '{}',
+          'natural_unit_snapshot': 'm²',
+          'planned_date': '2026-09-0$activityNumber',
+          'status': state['status'],
+          'note': 'Schema 15 ${state['suffix']} notu',
+          'revision': 1,
+          'created_at': '2026-07-19T08:00:00Z',
+          'updated_at': '2026-07-19T08:00:00Z',
+          'status_changed_at': '2026-07-19T08:00:00Z',
+        };
+        await old.insert('project_living_plan_items', item);
+        final resultJson = jsonEncode({
+          'activity_context_json': item['activity_context_json'],
+          'activity_id': item['activity_id'],
+          'activity_instance_id': item['activity_instance_id'],
+          'activity_name_snapshot': item['activity_name_snapshot'],
+          'created_at': item['created_at'],
+          'id': item['id'],
+          'natural_unit_snapshot': item['natural_unit_snapshot'],
+          'note': item['note'],
+          'planned_date': item['planned_date'],
+          'project_id': item['project_id'],
+          'reference_snapshot_id': item['reference_snapshot_id'],
+          'revision': item['revision'],
+          'status': item['status'],
+          'status_changed_at': item['status_changed_at'],
+          'updated_at': item['updated_at'],
+        });
+        await old.insert('project_living_plan_command_receipts', {
+          'id': eventId,
+          'living_plan_item_id': itemId,
+          'project_id': 'progress-project',
+          'event_type': state['event_type'],
+          'intent_json': jsonEncode({
+            'operation': state['event_type'],
+            'schema': 15,
+          }),
+          'result_json': resultJson,
+          'result_revision': 1,
+          'is_no_op': 0,
+          'event_sequence': 1,
+        });
+        await old.insert('project_living_plan_events', {
+          'id': eventId,
+          'living_plan_item_id': itemId,
+          'project_id': 'progress-project',
+          'sequence': 1,
+          'event_type': state['event_type'],
+          'occurred_at': '2026-07-19T08:00:00Z',
+          'payload_json': jsonEncode({'schema': 15, 'status': state['status']}),
+        });
+      }
+      final oldItems = await old.query(
+        'project_living_plan_items',
+        orderBy: 'id ASC',
+      );
+      final oldActivities = await old.query(
+        'project_schedule_snapshot_activities',
+        orderBy: 'instance_id ASC',
+      );
+      final oldReceipts = await old.query(
+        'project_living_plan_command_receipts',
+        orderBy: 'id ASC',
+      );
+      final oldEvents = await old.query(
+        'project_living_plan_events',
+        orderBy: 'id ASC',
+      );
+      await schemaFifteen.close();
+
+      final failing = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 9),
+        migrations: [
+          ...AppDatabase.foundationMigrations.take(15),
+          DatabaseMigration(
+            version: 16,
+            apply: (transaction) async {
+              await AppDatabase.foundationMigrations[15].apply(transaction);
+              throw StateError('intentional schema 16 rollback');
+            },
+          ),
+        ],
+      );
+      await expectLater(failing.open(), throwsA(isA<DatabaseOpenFailure>()));
+      final afterFailure = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: sqflite.OpenDatabaseOptions(singleInstance: false),
+      );
+      expect(
+        sqflite.Sqflite.firstIntValue(
+          await afterFailure.rawQuery('PRAGMA user_version'),
+        ),
+        15,
+      );
+      expect(
+        (await afterFailure.rawQuery(
+          'PRAGMA table_info(project_living_plan_items)',
+        )).where((row) => row['name'] == 'progress_percent'),
+        isEmpty,
+      );
+      expect(
+        await afterFailure.query(
+          'project_living_plan_items',
+          orderBy: 'id ASC',
+        ),
+        oldItems,
+      );
+      expect(
+        await afterFailure.query(
+          'project_living_plan_command_receipts',
+          orderBy: 'id ASC',
+        ),
+        oldReceipts,
+      );
+      expect(
+        await afterFailure.query(
+          'project_living_plan_events',
+          orderBy: 'id ASC',
+        ),
+        oldEvents,
+      );
+      expect(await afterFailure.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      await afterFailure.close();
+
+      final upgraded = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 9),
+      );
+      await upgraded.open();
+      final db = upgraded.database;
+      expect(
+        sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
+        16,
+      );
+      expect(
+        (await db.query(
+          'schema_versions',
+          orderBy: 'version DESC',
+          limit: 1,
+        )).single['version'],
+        16,
+      );
+      final progressColumn = (await db.rawQuery(
+        'PRAGMA table_info(project_living_plan_items)',
+      )).singleWhere((row) => row['name'] == 'progress_percent');
+      expect(progressColumn['type'], 'INTEGER');
+      expect(progressColumn['notnull'], 0);
+
+      final upgradedItems = await db.query(
+        'project_living_plan_items',
+        orderBy: 'id ASC',
+      );
+      Map<String, Object?> withoutProgress(Map<String, Object?> row) =>
+          Map<String, Object?>.of(row)..remove('progress_percent');
+      expect(upgradedItems.map(withoutProgress).toList(), oldItems);
+      expect(
+        {
+          for (final row in upgradedItems)
+            row['status']: row['progress_percent'],
+        },
+        {'PLANNED': null, 'STARTED': null, 'COMPLETED': 100, 'DEFERRED': null},
+      );
+      expect(
+        await db.query(
+          'project_schedule_snapshot_activities',
+          orderBy: 'instance_id ASC',
+        ),
+        oldActivities,
+      );
+      expect(
+        await db.query(
+          'project_living_plan_command_receipts',
+          orderBy: 'id ASC',
+        ),
+        oldReceipts,
+      );
+      expect(
+        await db.query('project_living_plan_events', orderBy: 'id ASC'),
+        oldEvents,
+      );
+      final eventTable =
+          (await db.query(
+                'sqlite_master',
+                columns: ['sql'],
+                where: "type = 'table' AND name = 'project_living_plan_events'",
+              )).single['sql']!
+              as String;
+      final receiptTable =
+          (await db.query(
+                'sqlite_master',
+                columns: ['sql'],
+                where:
+                    "type = 'table' AND name = "
+                    "'project_living_plan_command_receipts'",
+              )).single['sql']!
+              as String;
+      expect(eventTable, contains('PROGRESS_UPDATED'));
+      expect(receiptTable, contains('PROGRESS_UPDATED'));
+      expect(
+        (await db.rawQuery(
+          'PRAGMA foreign_key_list(project_living_plan_events)',
+        )).map((row) => row['table']).toSet(),
+        contains('project_living_plan_command_receipts'),
+      );
+
+      Future<void> expectProgressUpdateRejected(
+        String itemId,
+        Object? progress,
+      ) async {
+        await expectLater(
+          db.update(
+            'project_living_plan_items',
+            {
+              'progress_percent': progress,
+              'revision': 2,
+              'updated_at': '2026-07-19T08:00:01Z',
+            },
+            where: 'id = ? AND revision = 1',
+            whereArgs: [itemId],
+          ),
+          throwsA(isA<sqflite.DatabaseException>()),
+        );
+      }
+
+      await expectProgressUpdateRejected('progress-item-planned', -1);
+      await expectProgressUpdateRejected('progress-item-planned', 101);
+      await expectProgressUpdateRejected('progress-item-planned', 100);
+      await expectProgressUpdateRejected('progress-item-completed', null);
+      await expectProgressUpdateRejected('progress-item-completed', 0);
+      await expectProgressUpdateRejected('progress-item-completed', 99);
       expect(await db.rawQuery('PRAGMA foreign_key_check'), isEmpty);
       expect(
         (await db.rawQuery('PRAGMA integrity_check')).single['integrity_check'],

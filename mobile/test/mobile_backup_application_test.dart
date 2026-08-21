@@ -231,7 +231,7 @@ void main() {
   );
 
   test(
-    'format 1 schema 15 backup restores living plan history and superseded origin',
+    'format 1 schema 16 backup restores progress history receipt and origin',
     () async {
       final scenario = _backupScheduleScenario();
       final sourceDatabase = AppDatabase(
@@ -260,6 +260,7 @@ void main() {
       const livingItemId = '33333333-3333-4333-8333-333333333333';
       const createdEventId = '44444444-4444-4444-8444-444444444444';
       const startedEventId = '55555555-5555-4555-8555-555555555555';
+      const progressEventId = '88888888-8888-4888-8888-888888888888';
       const noteEventId = '66666666-6666-4666-8666-666666666666';
       const noOpEventId = '77777777-7777-4777-8777-777777777777';
       var livingNow = DateTime.parse(_now);
@@ -293,11 +294,23 @@ void main() {
             ),
           );
       expect(startedLivingItem.revision, 2);
+      livingNow = DateTime.parse('2026-07-19T09:31:30Z');
+      final progressedLivingItem = await sourceLivingApplication
+          .updateLivingPlanProgress(
+            const UpdateConstructionLivingPlanProgressCommand(
+              itemId: livingItemId,
+              eventId: progressEventId,
+              expectedRevision: 2,
+              progressPercent: 48,
+            ),
+          );
+      expect(progressedLivingItem.progressPercent, 48);
+      expect(progressedLivingItem.revision, 3);
       final noOpResult = await sourceLivingApplication.startLivingPlanItem(
         const StartConstructionLivingPlanItemCommand(
           itemId: livingItemId,
           eventId: noOpEventId,
-          expectedRevision: 2,
+          expectedRevision: 3,
         ),
       );
       final immediateNoOpReplay = await sourceLivingApplication
@@ -305,7 +318,7 @@ void main() {
             const StartConstructionLivingPlanItemCommand(
               itemId: livingItemId,
               eventId: noOpEventId,
-              expectedRevision: 2,
+              expectedRevision: 3,
             ),
           );
       expect(immediateNoOpReplay.revision, noOpResult.revision);
@@ -316,19 +329,21 @@ void main() {
             const UpdateConstructionLivingPlanNoteCommand(
               itemId: livingItemId,
               eventId: noteEventId,
-              expectedRevision: 2,
+              expectedRevision: 3,
               note: 'Ekip teslimi tamamlandı',
             ),
           );
-      expect(notedLivingItem.revision, 3);
+      expect(notedLivingItem.progressPercent, 48);
+      expect(notedLivingItem.revision, 4);
       final lateNoOpReplay = await sourceLivingApplication.startLivingPlanItem(
         const StartConstructionLivingPlanItemCommand(
           itemId: livingItemId,
           eventId: noOpEventId,
-          expectedRevision: 2,
+          expectedRevision: 3,
         ),
       );
-      expect(lateNoOpReplay.revision, 2);
+      expect(lateNoOpReplay.revision, 3);
+      expect(lateNoOpReplay.progressPercent, 48);
       expect(lateNoOpReplay.note, 'İlk saha notu');
       final sourceEvents = await sourceDatabase.database.query(
         'project_living_plan_events',
@@ -342,8 +357,27 @@ void main() {
         whereArgs: [livingItemId],
         orderBy: 'result_revision ASC, id ASC',
       );
-      expect(sourceEvents, hasLength(3));
-      expect(sourceReceipts, hasLength(4));
+      expect(sourceEvents, hasLength(4));
+      expect(sourceReceipts, hasLength(5));
+      final sourceProgressEvent = sourceEvents.singleWhere(
+        (row) => row['id'] == progressEventId,
+      );
+      expect(sourceProgressEvent['event_type'], 'PROGRESS_UPDATED');
+      expect(
+        (jsonDecode(sourceProgressEvent['payload_json']! as String)
+            as Map<String, Object?>)['change'],
+        {'new_progress_percent': 48, 'previous_progress_percent': null},
+      );
+      final sourceProgressReceipt = sourceReceipts.singleWhere(
+        (row) => row['id'] == progressEventId,
+      );
+      expect(sourceProgressReceipt['event_type'], 'PROGRESS_UPDATED');
+      expect(sourceProgressReceipt['event_sequence'], 3);
+      expect(
+        (jsonDecode(sourceProgressReceipt['result_json']! as String)
+            as Map<String, Object?>)['progress_percent'],
+        48,
+      );
       expect(
         sourceReceipts.singleWhere((row) => row['id'] == noOpEventId),
         containsPair('is_no_op', 1),
@@ -378,12 +412,12 @@ void main() {
       final targetGateway = DeviceMobileBackupFileGateway(
         directories: targetDirectories,
         picker: () async => PlatformFile(
-          name: 'schedule-v15.csebackup',
+          name: 'schedule-v16.csebackup',
           size: created.summary.packageByteSize,
           readStream: packageFile.openRead(),
         ),
         clock: () => DateTime.parse(_now),
-        importIdFactory: (_) => 'schedule-v15-clean-target',
+        importIdFactory: (_) => 'schedule-v16-clean-target',
       );
       final targetApplication = _application(
         targetDirectories,
@@ -403,10 +437,10 @@ void main() {
       );
 
       expect(preflight.manifest.formatVersion, 1);
-      expect(preflight.manifest.mobileSchemaVersion, 15);
-      expect(preflight.migratedSchemaVersion, 15);
+      expect(preflight.manifest.mobileSchemaVersion, 16);
+      expect(preflight.migratedSchemaVersion, 16);
       expect(restored.restoredManifest.formatVersion, 1);
-      expect(restored.activeSchemaVersion, 15);
+      expect(restored.activeSchemaVersion, 16);
       final reopened = AppDatabase(
         path: targetDirectories.databaseFile,
         factory: databaseFactoryFfi,
@@ -458,8 +492,9 @@ void main() {
         'natural_unit_snapshot': 'TEST',
         'planned_date': '2026-09-04',
         'status': 'STARTED',
+        'progress_percent': 48,
         'note': 'Ekip teslimi tamamlandı',
-        'revision': 3,
+        'revision': 4,
         'created_at': _now,
         'updated_at': '2026-07-19T09:32:00Z',
         'status_changed_at': '2026-07-19T09:31:00Z',
@@ -470,10 +505,11 @@ void main() {
         whereArgs: [livingItemId],
         orderBy: 'sequence ASC',
       );
-      expect(restoredEvents.map((row) => row['sequence']), [1, 2, 3]);
+      expect(restoredEvents.map((row) => row['sequence']), [1, 2, 3, 4]);
       expect(restoredEvents.map((row) => row['event_type']), [
         'CREATED',
         'STARTED',
+        'PROGRESS_UPDATED',
         'NOTE_UPDATED',
       ]);
       expect(
@@ -503,24 +539,25 @@ void main() {
             const StartConstructionLivingPlanItemCommand(
               itemId: livingItemId,
               eventId: noOpEventId,
-              expectedRevision: 2,
+              expectedRevision: 3,
             ),
           );
-      expect(restoredNoOpReplay.revision, 2);
+      expect(restoredNoOpReplay.revision, 3);
       expect(restoredNoOpReplay.status, ConstructionLivingPlanStatus.started);
+      expect(restoredNoOpReplay.progressPercent, 48);
       expect(restoredNoOpReplay.note, 'İlk saha notu');
       expect(
         (await restoredLivingApplication.loadLivingPlanItem(
           livingItemId,
         ))?.revision,
-        3,
+        4,
       );
       await expectLater(
         restoredLivingApplication.completeLivingPlanItem(
           const CompleteConstructionLivingPlanItemCommand(
             itemId: livingItemId,
             eventId: noOpEventId,
-            expectedRevision: 3,
+            expectedRevision: 4,
           ),
         ),
         throwsA(
@@ -570,18 +607,18 @@ void main() {
   );
 
   test(
-    'format 1 schema 14 backup restores and migrates normally to 15',
+    'format 1 schema 15 backup restores and migrates normally to 16',
     () async {
-      final oldRoot = await Directory.systemTemp.createTemp('cse_schema14_');
+      final oldRoot = await Directory.systemTemp.createTemp('cse_schema15_');
       addTearDown(() async {
         if (await oldRoot.exists()) await oldRoot.delete(recursive: true);
       });
-      final oldFile = path.join(oldRoot.path, 'schema14.sqlite3');
+      final oldFile = path.join(oldRoot.path, 'schema15.sqlite3');
       final oldDatabase = AppDatabase(
         path: oldFile,
         factory: databaseFactoryFfi,
         clock: () => DateTime.parse(_now),
-        migrations: AppDatabase.foundationMigrations.take(14).toList(),
+        migrations: AppDatabase.foundationMigrations.take(15).toList(),
       );
       await oldDatabase.open();
       await SmokeRecordRepository(
@@ -591,7 +628,7 @@ void main() {
       final legacyScenario = _backupScheduleScenario();
       await oldDatabase.database.insert('projects', {
         'id': legacyScenario.profile.projectId,
-        'name': 'Schema 14 project',
+        'name': 'Schema 15 project',
         'created_at': _now,
         'updated_at': _now,
       });
@@ -599,7 +636,7 @@ void main() {
           await ConstructionScheduleSnapshotRepository(
             database: oldDatabase,
             clock: () => DateTime.parse(_now),
-            idFactory: () => 'schema14-snapshot',
+            idFactory: () => 'schema15-snapshot',
           ).persistCurrentSnapshot(
             schedule: legacyScenario.schedule,
             profile: legacyScenario.profile,
@@ -609,11 +646,11 @@ void main() {
       await oldDatabase.close();
       final databaseBytes = await File(oldFile).readAsBytes();
       final archive = const CseBackupArchiveCodec().encode(
-        manifest: _manifest(databaseBytes, schemaVersion: 14),
+        manifest: _manifest(databaseBytes, schemaVersion: 15),
         databaseBytes: databaseBytes,
         attachments: const {},
       );
-      final package = File(path.join(oldRoot.path, 'schema14.csebackup'));
+      final package = File(path.join(oldRoot.path, 'schema15.csebackup'));
       await package.writeAsBytes(
         await _testEncryptionCodec().encrypt(archive, _password),
         flush: true,
@@ -630,9 +667,9 @@ void main() {
       );
 
       expect(preflight.manifest.formatVersion, 1);
-      expect(preflight.manifest.mobileSchemaVersion, 14);
-      expect(preflight.migratedSchemaVersion, 15);
-      expect(restored.activeSchemaVersion, 15);
+      expect(preflight.manifest.mobileSchemaVersion, 15);
+      expect(preflight.migratedSchemaVersion, 16);
+      expect(restored.activeSchemaVersion, 16);
       final reopened = AppDatabase(
         path: directories.databaseFile,
         factory: databaseFactoryFfi,
@@ -645,7 +682,7 @@ void main() {
           where: 'id = ?',
           whereArgs: [legacyScenario.profile.projectId],
         )).single['name'],
-        'Schema 14 project',
+        'Schema 15 project',
       );
       expect(
         await reopened.database.query('project_schedule_snapshots'),
