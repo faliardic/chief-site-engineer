@@ -148,7 +148,18 @@ void main() {
                 ),
               ],
             ),
-            livingPlan: FakeLivingPlanApplication(suggestions: [_candidate()]),
+            livingPlan: FakeLivingPlanApplication(
+              suggestions: [_candidate()],
+              items: [
+                _windowItem(
+                  id: 'layout-progress',
+                  name: 'Uzun ilerleme kartı',
+                  date: DateTime.utc(2026, 8, 16),
+                  status: ConstructionLivingPlanStatus.started,
+                  progressPercent: 47,
+                ),
+              ],
+            ),
             themeMode: themeMode,
             textScaler: const TextScaler.linear(1.6),
           );
@@ -306,6 +317,355 @@ void main() {
       }
     },
   );
+
+  testWidgets('progress presentation actions and semantics are status-scoped', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final semantics = tester.ensureSemantics();
+    try {
+      final fake = FakeLivingPlanApplication(
+        suggestions: [_candidate()],
+        items: [
+          _windowItem(
+            id: 'progress-planned',
+            name: 'Planlanan imalat',
+            date: DateTime.utc(2026, 8, 16),
+            status: ConstructionLivingPlanStatus.planned,
+          ),
+          _windowItem(
+            id: 'progress-started',
+            name: 'Başlayan imalat',
+            date: DateTime.utc(2026, 8, 16),
+            status: ConstructionLivingPlanStatus.started,
+            progressPercent: 47,
+          ),
+          _windowItem(
+            id: 'progress-deferred',
+            name: 'Ertelenen imalat',
+            date: DateTime.utc(2026, 8, 16),
+            status: ConstructionLivingPlanStatus.deferred,
+            progressPercent: 0,
+          ),
+          _windowItem(
+            id: 'progress-completed',
+            name: 'Tamamlanan imalat',
+            date: DateTime.utc(2026, 8, 16),
+            status: ConstructionLivingPlanStatus.completed,
+            progressPercent: 100,
+          ),
+        ],
+      );
+      await _pumpPage(
+        tester,
+        agenda: FakeAgendaApplication(projects: [_project('PRJ-A', 'A Blok')]),
+        livingPlan: fake,
+      );
+
+      const contextLabel = 'Blok A • 2. kat • Kuzey cephe';
+      for (final expectation in const [
+        (
+          id: 'progress-planned',
+          name: 'Planlanan imalat',
+          text: 'İlerleme girilmedi',
+          semanticsValue: 'Raporlanmadı',
+          action: false,
+        ),
+        (
+          id: 'progress-started',
+          name: 'Başlayan imalat',
+          text: 'İlerleme %47',
+          semanticsValue: '%47',
+          action: true,
+        ),
+        (
+          id: 'progress-deferred',
+          name: 'Ertelenen imalat',
+          text: 'İlerleme %0',
+          semanticsValue: '%0',
+          action: true,
+        ),
+        (
+          id: 'progress-completed',
+          name: 'Tamamlanan imalat',
+          text: 'İlerleme %100',
+          semanticsValue: '%100',
+          action: false,
+        ),
+      ]) {
+        final card = find.byKey(Key('living-plan-item-${expectation.id}'));
+        await _scrollLivingPlanTo(tester, card);
+        expect(
+          find.descendant(of: card, matching: find.text(expectation.text)),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(Key('living-plan-progress-${expectation.id}')),
+          findsOneWidget,
+        );
+        expect(
+          find.bySemanticsLabel(
+            'Yaşayan plan öğesi · ${expectation.name} · $contextLabel · '
+            '${expectation.id} · İlerleme · ${expectation.semanticsValue}',
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(Key('progress-living-plan-${expectation.id}')),
+          expectation.action ? findsOneWidget : findsNothing,
+        );
+      }
+      expect(tester.takeException(), isNull);
+    } finally {
+      semantics.dispose();
+    }
+  });
+
+  testWidgets(
+    'progress dialog is fail-closed and saves 0 middle and 99 with revision',
+    (tester) async {
+      final fake = FakeLivingPlanApplication(
+        suggestions: [_candidate()],
+        items: [
+          _windowItem(
+            id: 'progress-edit',
+            name: 'Beton Dökümü',
+            date: DateTime.utc(2026, 8, 16),
+            status: ConstructionLivingPlanStatus.started,
+            progressPercent: 47,
+            revision: 7,
+          ),
+        ],
+      );
+      await _pumpPage(
+        tester,
+        agenda: FakeAgendaApplication(projects: [_project('PRJ-A', 'A Blok')]),
+        livingPlan: fake,
+      );
+
+      Future<void> openDialog() async {
+        await tester.tap(
+          find.byKey(const Key('progress-living-plan-progress-edit')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('İlerlemeyi güncelle'), findsOneWidget);
+      }
+
+      FilledButton saveButton() => tester.widget<FilledButton>(
+        find.byKey(const Key('save-living-plan-progress')),
+      );
+
+      await openDialog();
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const Key('living-plan-progress-field')),
+            )
+            .controller!
+            .text,
+        '47',
+      );
+      expect(saveButton().onPressed, isNull);
+      for (final invalid in ['', '-1', '47.5', 'letters', '100']) {
+        await tester.enterText(
+          find.byKey(const Key('living-plan-progress-field')),
+          invalid,
+        );
+        await tester.pump();
+        expect(
+          saveButton().onPressed,
+          isNull,
+          reason: '$invalid must not create a progress command.',
+        );
+      }
+      expect(fake.mutationCalls, 0);
+      await tester.tap(find.byKey(const Key('cancel-living-plan-progress')));
+      await tester.pumpAndSettle();
+      expect(fake.mutationCalls, 0);
+
+      await openDialog();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(fake.mutationCalls, 0);
+
+      for (final expectation in const [
+        (value: '0', expectedRevision: 7),
+        (value: '47', expectedRevision: 8),
+        (value: '99', expectedRevision: 9),
+      ]) {
+        await openDialog();
+        await tester.enterText(
+          find.byKey(const Key('living-plan-progress-field')),
+          expectation.value,
+        );
+        await tester.pump();
+        expect(saveButton().onPressed, isNotNull);
+        await tester.tap(find.byKey(const Key('save-living-plan-progress')));
+        await tester.pumpAndSettle();
+
+        final command =
+            fake.lastMutationCommand!
+                as UpdateConstructionLivingPlanProgressCommand;
+        expect(command.itemId, 'progress-edit');
+        expect(command.expectedRevision, expectation.expectedRevision);
+        expect(command.progressPercent, int.parse(expectation.value));
+        expect(
+          command.eventId,
+          matches(
+            RegExp(
+              r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+            ),
+          ),
+        );
+        expect(
+          find.text('İlerleme %${expectation.value} olarak kaydedildi.'),
+          findsOneWidget,
+        );
+        expect(find.text('İlerleme %${expectation.value}'), findsOneWidget);
+      }
+      expect(fake.mutationCalls, 3);
+
+      await openDialog();
+      expect(saveButton().onPressed, isNull);
+      await tester.tap(find.byKey(const Key('cancel-living-plan-progress')));
+      await tester.pumpAndSettle();
+      expect(fake.mutationCalls, 3);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('note defer complete and reopen preserve progress lifecycle', (
+    tester,
+  ) async {
+    final fake = _StrictDateLivingPlanApplication(
+      suggestions: [_candidate()],
+      items: [
+        _windowItem(
+          id: 'progress-lifecycle',
+          name: 'Beton Dökümü',
+          date: DateTime.utc(2026, 8, 16),
+          status: ConstructionLivingPlanStatus.started,
+          progressPercent: 47,
+          note: 'İlk not',
+        ),
+      ],
+    );
+    await _pumpPage(
+      tester,
+      agenda: FakeAgendaApplication(projects: [_project('PRJ-A', 'A Blok')]),
+      livingPlan: fake,
+    );
+
+    await _scrollLivingPlanTo(
+      tester,
+      find.byKey(const Key('note-living-plan-progress-lifecycle')),
+    );
+    await tester.tap(
+      find.byKey(const Key('note-living-plan-progress-lifecycle')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('living-plan-note-field')),
+      'Progress korunmalı',
+    );
+    await tester.tap(find.byKey(const Key('save-living-plan-note')));
+    await tester.pumpAndSettle();
+    expect(find.text('İlerleme %47'), findsOneWidget);
+
+    await _scrollLivingPlanTo(
+      tester,
+      find.byKey(const Key('defer-living-plan-progress-lifecycle')),
+    );
+    await tester.tap(
+      find.byKey(const Key('defer-living-plan-progress-lifecycle')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tamam'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ertelendi'), findsOneWidget);
+    expect(find.text('İlerleme %47'), findsOneWidget);
+
+    await _scrollLivingPlanTo(
+      tester,
+      find.byKey(const Key('complete-living-plan-progress-lifecycle')),
+    );
+    await tester.tap(
+      find.byKey(const Key('complete-living-plan-progress-lifecycle')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('İlerleme %100'), findsOneWidget);
+    expect(
+      find.byKey(const Key('progress-living-plan-progress-lifecycle')),
+      findsNothing,
+    );
+
+    await _scrollLivingPlanTo(
+      tester,
+      find.byKey(const Key('reopen-living-plan-progress-lifecycle')),
+    );
+    await tester.tap(
+      find.byKey(const Key('reopen-living-plan-progress-lifecycle')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tamam'));
+    await tester.pumpAndSettle();
+
+    final reopenedEntries = fake.items
+        .where((entry) => entry.item.id == 'progress-lifecycle')
+        .toList(growable: false);
+    expect(reopenedEntries, hasLength(1));
+    final reopenedItem = reopenedEntries.single.item;
+    expect(reopenedItem.status, ConstructionLivingPlanStatus.planned);
+    expect(reopenedItem.progressPercent, isNull);
+    expect(reopenedItem.plannedDate, DateTime.utc(2026, 8, 16));
+    expect(reopenedItem.revision, 5);
+
+    final reopenedCard = find.byKey(
+      const Key('living-plan-item-progress-lifecycle'),
+    );
+    await _scrollLivingPlanTo(tester, reopenedCard);
+    expect(reopenedCard, findsOneWidget);
+    expect(
+      find.descendant(of: reopenedCard, matching: find.text('Planlandı')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: reopenedCard,
+        matching: find.text('İlerleme girilmedi'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: reopenedCard,
+        matching: find.byKey(
+          const Key('living-plan-progress-progress-lifecycle'),
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: reopenedCard,
+        matching: find.text('Progress korunmalı'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: reopenedCard,
+        matching: find.byKey(
+          const Key('progress-living-plan-progress-lifecycle'),
+        ),
+      ),
+      findsNothing,
+    );
+    expect(fake.mutationCalls, 4);
+  });
 
   testWidgets(
     'system back after create reloads the parent and preserves Planda',
@@ -574,6 +934,22 @@ void main() {
       expect(find.descendant(of: cardB, matching: startA), findsNothing);
       expect(find.descendant(of: cardB, matching: startB), findsOneWidget);
       expect(find.descendant(of: cardA, matching: startB), findsNothing);
+      expect(
+        find.bySemanticsLabel('$identityA · İlerleme · Raporlanmadı'),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel('$identityB · İlerleme · Raporlanmadı'),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('living-plan-progress-target-a')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('living-plan-progress-target-b')),
+        findsOneWidget,
+      );
 
       await tester.tap(startA);
       await tester.pumpAndSettle();
@@ -854,7 +1230,15 @@ Future<void> _scrollLivingPlanTo(WidgetTester tester, Finder target) async {
     matching: find.byType(Scrollable),
   );
   expect(scrollable, findsOneWidget);
-  await tester.scrollUntilVisible(target, 160, scrollable: scrollable);
+  final position = tester.state<ScrollableState>(scrollable).position;
+  position.jumpTo(position.minScrollExtent);
+  await tester.pumpAndSettle();
+  await tester.scrollUntilVisible(
+    target,
+    160,
+    scrollable: scrollable,
+    maxScrolls: 50,
+  );
   await tester.pumpAndSettle();
 }
 
@@ -896,6 +1280,8 @@ ConstructionLivingPlanWindowItem _windowItem({
   bool overdue = false,
   bool currentOrigin = true,
   String? note,
+  int? progressPercent,
+  int revision = 1,
 }) {
   final now = DateTime.utc(2026, 8, 16, 6);
   return ConstructionLivingPlanWindowItem(
@@ -914,8 +1300,9 @@ ConstructionLivingPlanWindowItem _windowItem({
       naturalUnitSnapshot: 'm²',
       plannedDate: date,
       status: status,
+      progressPercent: progressPercent,
       note: note,
-      revision: 1,
+      revision: revision,
       createdAt: now,
       updatedAt: now,
       statusChangedAt: now,
