@@ -4094,3 +4094,19 @@
   `Kabul ortamı · sentetik veri`dir. APK host-side build edilir; exact package,
   label, marker, ABI ve SHA doğrulanmadan ADB mutation yapılmaz ve fiziksel
   package lifecycle Flutter tooling'e verilmez.
+
+## Issue 468 — Actual progress UI yalnız açık item ve isolated acceptance sınırındadır
+
+- Her Living Plan kartı nullable actual-progress gerçeğini gösterir: `NULL` için
+  `İlerleme girilmedi`, açık item explicit değerinde `%0..%99`, tamamlananda
+  exact `%100`. Item-scoped key ve insan okunabilir semantik kimliği korunur.
+- `İlerleme` eylemi yalnız `STARTED` ve `DEFERRED` item'larda görünür. Dialog
+  yalnız integer `0..99` kabul eder; invalid, cancel, system-back ve aynı değer
+  mutation üretmez.
+- Geçerli kayıt current item ID/revision, caller UUID ve progress ile merged
+  `UpdateConstructionLivingPlanProgressCommand` yolunu kullanır; optimistic
+  revision, durable idempotency/event ve parent reload sözleşmeleri değişmez.
+- Cihaz kabulü yalnız `com.faliardic.sefim.acceptance` sentetik sandbox'ında
+  progress lifecycle'ını ve relaunch persistence'ı doğrular. Actual quantity,
+  reforecast, productivity learning, reference-schedule mutation ve production/
+  store readiness bu kararla başlamaz; Item 5 current ve not complete kalır.

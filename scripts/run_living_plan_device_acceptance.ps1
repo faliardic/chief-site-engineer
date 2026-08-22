@@ -25,7 +25,7 @@ $aapt2 = Join-Path $androidSdk 'build-tools\36.0.0\aapt2.exe'
 $verifier = Join-Path $repositoryRoot 'scripts\verify_flutter_apk_entrypoint.py'
 $sharedApk = Join-Path $mobileRoot 'build\app\outputs\flutter-apk\app-debug.apk'
 $artifactRoot = Join-Path $mobileRoot 'build\release_gate'
-$artifact = Join-Path $artifactRoot 'sefim-0.1.0-issue464-living-plan-acceptance-debug.apk'
+$artifact = Join-Path $artifactRoot 'sefim-0.1.0-issue468-living-plan-progress-acceptance-debug.apk'
 $acceptancePackage = 'com.faliardic.sefim.acceptance'
 $acceptanceLabel = 'Şefim'
 $acceptanceEnvironmentLabel = 'Kabul ortamı · sentetik veri'
@@ -496,12 +496,120 @@ function Scroll-UntilUiDescriptionPattern {
     throw "Acceptance semantics selector was not visible: $Pattern"
 }
 
+function Convert-CanonicalDateToDisplay {
+    param([Parameter(Mandatory = $true)][string]$Value)
+    return [DateTime]::ParseExact(
+        $Value,
+        'yyyy-MM-dd',
+        [Globalization.CultureInfo]::InvariantCulture
+    ).ToString('dd.MM.yyyy', [Globalization.CultureInfo]::InvariantCulture)
+}
+
+function Convert-DurableStatusToUi {
+    param([Parameter(Mandatory = $true)][string]$Status)
+    switch ($Status) {
+        'PLANNED' { return 'Planlandı' }
+        'STARTED' { return 'Başladı' }
+        'COMPLETED' { return 'Tamamlandı' }
+        'DEFERRED' { return 'Ertelendi' }
+        default { throw "Unsupported durable Living Plan status: $Status" }
+    }
+}
+
+function Convert-DurableProgressToUi {
+    param([AllowNull()][object]$Progress)
+    if ($null -eq $Progress) { return 'Raporlanmadı' }
+    return "%$([int]$Progress)"
+}
+
+function Find-LivingPlanWindowStartInHierarchy {
+    param([Parameter(Mandatory = $true)][xml]$Hierarchy)
+    $pattern = [regex]::new('^([0-9]{2}\.[0-9]{2}\.[0-9]{4}) başlangıç$')
+    $values = @()
+    foreach ($node in $Hierarchy.SelectNodes('//node')) {
+        foreach ($attribute in @('text', 'content-desc')) {
+            $match = $pattern.Match($node.GetAttribute($attribute))
+            if ($match.Success) { $values += $match.Groups[1].Value }
+        }
+    }
+    $unique = @($values | Sort-Object -Unique)
+    if ($unique.Count -gt 1) { throw 'Acceptance UI exposed multiple Living Plan window starts.' }
+    if ($unique.Count -eq 0) { return $null }
+    return [DateTime]::ParseExact(
+        $unique[0],
+        'dd.MM.yyyy',
+        [Globalization.CultureInfo]::InvariantCulture
+    )
+}
+
+function Get-LivingPlanWindowStart {
+    param(
+        [Parameter(Mandatory = $true)][object]$ExpectedInventory,
+        [int]$AttemptsPerDirection = 12
+    )
+    foreach ($direction in @('Backward', 'Forward')) {
+        for ($attempt = 0; $attempt -lt $AttemptsPerDirection; $attempt++) {
+            [xml]$hierarchy = Get-UiHierarchy
+            $windowStart = Find-LivingPlanWindowStartInHierarchy -Hierarchy $hierarchy
+            if ($null -ne $windowStart) { return $windowStart }
+            Invoke-SelectorScroll -ExpectedInventory $ExpectedInventory -Direction $direction
+        }
+    }
+    throw 'Acceptance Living Plan window-start control was not visible.'
+}
+
+function Invoke-LivingPlanWindowShift {
+    param(
+        [Parameter(Mandatory = $true)][ValidateSet('Previous', 'Next')][string]$Direction,
+        [Parameter(Mandatory = $true)][object]$ExpectedInventory
+    )
+    $before = Get-LivingPlanWindowStart -ExpectedInventory $ExpectedInventory
+    $description = if ($Direction -eq 'Previous') { 'Önceki yedi gün' } else { 'Sonraki yedi gün' }
+    $node = Scroll-UntilUiDescriptionPattern -Pattern ("^" + [regex]::Escape($description) + "$") -ExpectedInventory $ExpectedInventory -RequireClickable
+    Invoke-UiTap -Node $node -ExpectedInventory $ExpectedInventory
+    $expected = $before.AddDays($(if ($Direction -eq 'Previous') { -7 } else { 7 }))
+    for ($attempt = 0; $attempt -lt 30; $attempt++) {
+        [xml]$hierarchy = Get-UiHierarchy
+        $observed = Find-LivingPlanWindowStartInHierarchy -Hierarchy $hierarchy
+        if ($null -ne $observed) {
+            if ($observed -eq $expected) { return $observed }
+            if ($observed -ne $before) {
+                throw "Acceptance Living Plan window shifted unexpectedly: $($observed.ToString('dd.MM.yyyy'))"
+            }
+        }
+        Start-Sleep -Milliseconds 300
+    }
+    throw "Acceptance Living Plan window did not shift $Direction."
+}
+
+function Set-LivingPlanWindowForDate {
+    param(
+        [Parameter(Mandatory = $true)][string]$PlannedDate,
+        [Parameter(Mandatory = $true)][object]$ExpectedInventory,
+        [int]$MaxWindowShifts = 110
+    )
+    $target = [DateTime]::ParseExact(
+        $PlannedDate,
+        'dd.MM.yyyy',
+        [Globalization.CultureInfo]::InvariantCulture
+    )
+    $current = Get-LivingPlanWindowStart -ExpectedInventory $ExpectedInventory
+    for ($shift = 0; $shift -le $MaxWindowShifts; $shift++) {
+        if ($target -ge $current -and $target -le $current.AddDays(6)) { return $current }
+        if ($shift -eq $MaxWindowShifts) { break }
+        $direction = if ($target -lt $current) { 'Previous' } else { 'Next' }
+        $current = Invoke-LivingPlanWindowShift -Direction $direction -ExpectedInventory $ExpectedInventory
+    }
+    throw "Acceptance could not resolve a bounded Living Plan window for: $PlannedDate"
+}
+
 function Get-LifecycleAction {
     param(
         [Parameter(Mandatory = $true)][string]$Action,
         [Parameter(Mandatory = $true)][object]$ExpectedInventory,
         [string]$ActivityName,
-        [string]$ItemId
+        [string]$ItemId,
+        [int]$AttemptsPerDirection = 10
     )
     if ([string]::IsNullOrWhiteSpace($ActivityName) -eq
         [string]::IsNullOrWhiteSpace($ItemId)) {
@@ -514,25 +622,50 @@ function Get-LifecycleAction {
     } else {
         "^$prefix · $([regex]::Escape($ActivityName)) · .+ · (?<itemId>[0-9A-Za-z-]+) · Eylem · $actionPattern$"
     }
-    $node = Scroll-UntilUiDescriptionPattern `
-        -Pattern $pattern `
-        -ExpectedInventory $ExpectedInventory `
-        -RequireClickable
+    $node = Scroll-UntilUiDescriptionPattern -Pattern $pattern -ExpectedInventory $ExpectedInventory -RequireClickable -AttemptsPerDirection $AttemptsPerDirection
     $description = $node.GetAttribute('content-desc')
     $match = [regex]::Match($description, $pattern)
-    if (-not $match.Success) {
-        throw "Acceptance lifecycle selector contract could not be parsed: $description"
+    if (-not $match.Success) { throw "Acceptance lifecycle selector contract could not be parsed: $description" }
+    $resolvedItemId = if (-not [string]::IsNullOrWhiteSpace($ItemId)) { $ItemId } else { $match.Groups['itemId'].Value }
+    return [pscustomobject]@{ node=$node; itemId=$resolvedItemId; description=$description }
+}
+
+function Get-LifecycleActionAcrossWindows {
+    param(
+        [Parameter(Mandatory = $true)][string]$Action,
+        [Parameter(Mandatory = $true)][object]$ExpectedInventory,
+        [string]$ActivityName,
+        [string]$ItemId,
+        [int]$MaxWindowsPerDirection = 110
+    )
+    $origin = Get-LivingPlanWindowStart -ExpectedInventory $ExpectedInventory
+    $lastMissing = $null
+    try {
+        return Get-LifecycleAction -Action $Action -ExpectedInventory $ExpectedInventory -ActivityName $ActivityName -ItemId $ItemId -AttemptsPerDirection 3
+    } catch {
+        if ($_.Exception.Message -notlike 'Acceptance semantics selector was not visible:*') { throw }
+        $lastMissing = $_
     }
-    $resolvedItemId = if (-not [string]::IsNullOrWhiteSpace($ItemId)) {
-        $ItemId
-    } else {
-        $match.Groups['itemId'].Value
+    for ($window = 0; $window -lt $MaxWindowsPerDirection; $window++) {
+        Invoke-LivingPlanWindowShift -Direction Previous -ExpectedInventory $ExpectedInventory | Out-Null
+        try {
+            return Get-LifecycleAction -Action $Action -ExpectedInventory $ExpectedInventory -ActivityName $ActivityName -ItemId $ItemId -AttemptsPerDirection 3
+        } catch {
+            if ($_.Exception.Message -notlike 'Acceptance semantics selector was not visible:*') { throw }
+            $lastMissing = $_
+        }
     }
-    return [pscustomobject]@{
-        node = $node
-        itemId = $resolvedItemId
-        description = $description
+    Set-LivingPlanWindowForDate -PlannedDate $origin.ToString('dd.MM.yyyy') -ExpectedInventory $ExpectedInventory | Out-Null
+    for ($window = 0; $window -lt $MaxWindowsPerDirection; $window++) {
+        Invoke-LivingPlanWindowShift -Direction Next -ExpectedInventory $ExpectedInventory | Out-Null
+        try {
+            return Get-LifecycleAction -Action $Action -ExpectedInventory $ExpectedInventory -ActivityName $ActivityName -ItemId $ItemId -AttemptsPerDirection 3
+        } catch {
+            if ($_.Exception.Message -notlike 'Acceptance semantics selector was not visible:*') { throw }
+            $lastMissing = $_
+        }
     }
+    throw "Acceptance lifecycle action was not found in bounded windows: $Action. $($lastMissing.Exception.Message)"
 }
 
 function Get-LifecycleProjectionSnapshot {
@@ -543,8 +676,10 @@ function Get-LifecycleProjectionSnapshot {
     )
     $statusDescriptions = @{}
     $dateDescriptions = @{}
+    $progressDescriptions = @{}
     $statusPatterns = @{}
     $datePatterns = @{}
+    $progressPatterns = @{}
     $prefix = [regex]::Escape($livingPlanSemanticsPrefix)
     foreach ($itemId in $ItemIds) {
         $escapedId = [regex]::Escape($itemId)
@@ -553,6 +688,9 @@ function Get-LifecycleProjectionSnapshot {
         )
         $datePatterns[$itemId] = [regex]::new(
             "^$prefix · .+ · $escapedId · Plan günü · ([0-9]{2}\.[0-9]{2}\.[0-9]{4})$"
+        )
+        $progressPatterns[$itemId] = [regex]::new(
+            "^$prefix · .+ · $escapedId · İlerleme · (Raporlanmadı|%[0-9]{1,3})$"
         )
     }
 
@@ -589,17 +727,35 @@ function Get-LifecycleProjectionSnapshot {
                     }
                     $dateDescriptions[$itemId] = $description
                 }
+
+                $progressNodes = @($hierarchy.SelectNodes('//node') | Where-Object {
+                    $progressPatterns[$itemId].IsMatch($_.GetAttribute('content-desc'))
+                })
+                if ($progressNodes.Count -gt 1) {
+                    throw "Acceptance item progress semantics was not unique: $itemId"
+                }
+                if ($progressNodes.Count -eq 1) {
+                    $description = $progressNodes[0].GetAttribute('content-desc')
+                    if ($progressDescriptions.ContainsKey($itemId) -and
+                        $progressDescriptions[$itemId] -ne $description) {
+                        throw "Acceptance item progress changed during one checkpoint scan: $itemId"
+                    }
+                    $progressDescriptions[$itemId] = $description
+                }
             }
             if ($statusDescriptions.Count -eq $ItemIds.Count -and
-                $dateDescriptions.Count -eq $ItemIds.Count) {
+                $dateDescriptions.Count -eq $ItemIds.Count -and
+                $progressDescriptions.Count -eq $ItemIds.Count) {
                 $snapshot = [ordered]@{}
                 foreach ($itemId in $ItemIds) {
                     $statusMatch = $statusPatterns[$itemId].Match($statusDescriptions[$itemId])
                     $dateMatch = $datePatterns[$itemId].Match($dateDescriptions[$itemId])
+                    $progressMatch = $progressPatterns[$itemId].Match($progressDescriptions[$itemId])
                     $snapshot[$itemId] = [pscustomobject]@{
                         status = $statusMatch.Groups[1].Value
                         revision = [int]$statusMatch.Groups[2].Value
                         plannedDate = $dateMatch.Groups[1].Value
+                        progress = $progressMatch.Groups[1].Value
                     }
                 }
                 return $snapshot
@@ -611,9 +767,164 @@ function Get-LifecycleProjectionSnapshot {
     }
     $missing = @($ItemIds | Where-Object {
         -not $statusDescriptions.ContainsKey($_) -or
-        -not $dateDescriptions.ContainsKey($_)
+        -not $dateDescriptions.ContainsKey($_) -or
+        -not $progressDescriptions.ContainsKey($_)
     })
     throw "Acceptance lifecycle projection was incomplete for item IDs: $($missing -join ', ')"
+}
+
+function Get-DurableLivingPlanSnapshot {
+    param([Parameter(Mandatory = $true)][string]$ItemId)
+
+    $databasePath = 'files/cse_mobile/debug/database/cse_mobile.sqlite3'
+    $encoded = Invoke-Adb -Arguments @(
+        'exec-out', 'run-as', $acceptancePackage, 'base64', $databasePath
+    )
+    $bytes = [Convert]::FromBase64String(($encoded -replace '\s', ''))
+    $tempDatabase = Join-Path `
+        ([IO.Path]::GetTempPath()) `
+        "cse-living-plan-$([guid]::NewGuid().ToString('N')).sqlite3"
+    [IO.File]::WriteAllBytes($tempDatabase, $bytes)
+    try {
+        $query = @"
+import json, sqlite3, sys
+p, item_id = sys.argv[1:3]
+c = sqlite3.connect('file:' + p.replace('\\', '/') + '?mode=ro&immutable=1', uri=True)
+c.row_factory = sqlite3.Row
+def one(sql):
+    row = c.execute(sql, (item_id,)).fetchone()
+    return dict(row) if row is not None else None
+def rows(sql): return [dict(row) for row in c.execute(sql, (item_id,))]
+item = one('''SELECT id,status,progress_percent,planned_date,note,revision,
+ updated_at,status_changed_at FROM project_living_plan_items WHERE id=?''')
+history = one('''SELECT count(*) event_count,min(sequence) first_sequence,
+ max(sequence) last_sequence FROM project_living_plan_events
+ WHERE living_plan_item_id=?''')
+receipts = rows('''SELECT id,event_type,intent_json,result_json,result_revision,
+ is_no_op,event_sequence FROM project_living_plan_command_receipts
+ WHERE living_plan_item_id=? ORDER BY rowid''')
+events = rows('''SELECT id,sequence,event_type FROM project_living_plan_events
+ WHERE living_plan_item_id=? ORDER BY sequence''')
+incoherent = one('''SELECT count(*) count
+ FROM project_living_plan_command_receipts r
+ LEFT JOIN project_living_plan_events e ON e.id=r.id
+ WHERE r.living_plan_item_id=? AND (
+ (r.is_no_op=1 AND (r.event_sequence IS NOT NULL OR e.id IS NOT NULL)) OR
+ (r.is_no_op=0 AND (e.id IS NULL OR r.event_sequence!=r.result_revision OR
+ e.sequence!=r.result_revision OR e.event_type!=r.event_type)))''')
+for receipt in receipts:
+    receipt['intent'] = json.loads(receipt.pop('intent_json'))
+    receipt['result'] = json.loads(receipt.pop('result_json'))
+print(json.dumps({'item':item,'history':history,'receipts':receipts,
+ 'events':events,'incoherent_receipt_count':incoherent['count']},
+ ensure_ascii=True,separators=(',',':')))
+"@
+        $json = Invoke-Checked `
+            -Command 'py' `
+            -Arguments @('-c', $query, $tempDatabase, $ItemId)
+        return $json | ConvertFrom-Json
+    } finally {
+        Remove-Item -LiteralPath $tempDatabase -Force
+    }
+}
+
+function Assert-DurableLivingPlanSnapshot {
+    param([Parameter(Mandatory = $true)][object]$Snapshot)
+    if ($null -eq $Snapshot.item) { throw 'Acceptance durable projection item was missing.' }
+    $revision = [int]$Snapshot.item.revision
+    if ([int]$Snapshot.history.event_count -ne $revision -or
+        [int]$Snapshot.history.first_sequence -ne 1 -or
+        [int]$Snapshot.history.last_sequence -ne $revision -or
+        [int]$Snapshot.incoherent_receipt_count -ne 0) {
+        throw 'Acceptance durable projection, receipt and event history were incoherent.'
+    }
+    $progress = $Snapshot.item.progress_percent
+    if (($Snapshot.item.status -eq 'COMPLETED' -and
+            ($null -eq $progress -or [int]$progress -ne 100)) -or
+        ($Snapshot.item.status -ne 'COMPLETED' -and
+            $null -ne $progress -and
+            ([int]$progress -lt 0 -or [int]$progress -gt 99))) {
+        throw 'Acceptance durable status/progress invariant was incoherent.'
+    }
+    return $Snapshot.item
+}
+
+function Resolve-DurableLivingPlanMutationRevision {
+    param(
+        [Parameter(Mandatory = $true)][object]$Before,
+        [Parameter(Mandatory = $true)][object]$After,
+        [Parameter(Mandatory = $true)][string]$ExpectedEventType,
+        [Parameter(Mandatory = $true)][string]$ExpectedStatus,
+        [Parameter(Mandatory = $true)][AllowNull()][object]$ExpectedProgress,
+        [Parameter(Mandatory = $true)][string]$ExpectedDate,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$ExpectedNote,
+        [string]$ExpectedIntentField,
+        [AllowNull()][object]$ExpectedIntentValue
+    )
+    $beforeItem = Assert-DurableLivingPlanSnapshot -Snapshot $Before
+    $afterItem = Assert-DurableLivingPlanSnapshot -Snapshot $After
+    $beforeReceiptIds = [Collections.Generic.HashSet[string]]::new()
+    foreach ($receipt in @($Before.receipts)) { [void]$beforeReceiptIds.Add([string]$receipt.id) }
+    $newReceipts = @($After.receipts | Where-Object { -not $beforeReceiptIds.Contains([string]$_.id) })
+    if ((@($After.receipts).Count) -ne ((@($Before.receipts).Count) + 1) -or $newReceipts.Count -ne 1) {
+        throw 'Acceptance mutation did not append exactly one durable receipt.'
+    }
+    $receipt = $newReceipts[0]
+    if ($receipt.event_type -ne $ExpectedEventType -or
+        $receipt.intent.operation -ne $ExpectedEventType -or
+        [int]$receipt.intent.expected_revision -ne [int]$beforeItem.revision) {
+        throw 'Acceptance durable receipt intent did not match the operation.'
+    }
+    if ($ExpectedEventType -eq 'NOTE_UPDATED' -and $receipt.intent.note -ne $ExpectedNote) {
+        throw 'Acceptance durable note intent did not match the operation.'
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedIntentField)) {
+        $intentProperty = $receipt.intent.PSObject.Properties[$ExpectedIntentField]
+        if ($null -eq $intentProperty -or $intentProperty.Value -ne $ExpectedIntentValue) {
+            throw "Acceptance durable receipt intent field did not match: $ExpectedIntentField"
+        }
+    }
+    $beforeEventIds = [Collections.Generic.HashSet[string]]::new()
+    foreach ($event in @($Before.events)) { [void]$beforeEventIds.Add([string]$event.id) }
+    $newEvents = @($After.events | Where-Object { -not $beforeEventIds.Contains([string]$_.id) })
+    $beforeRevision = [int]$beforeItem.revision
+    $afterRevision = [int]$afterItem.revision
+    $isNoOp = [int]$receipt.is_no_op -eq 1
+    if ($isNoOp) {
+        if ($afterRevision -ne $beforeRevision -or $null -ne $receipt.event_sequence -or
+            $newEvents.Count -ne 0 -or (@($After.events).Count) -ne (@($Before.events).Count)) {
+            throw 'Acceptance durable no-op changed revision or appended an event.'
+        }
+        foreach ($field in @('status','progress_percent','planned_date','note','revision','updated_at','status_changed_at')) {
+            if ($afterItem.$field -ne $beforeItem.$field) { throw "Acceptance durable no-op changed projection field: $field" }
+        }
+    } else {
+        if ($afterRevision -ne ($beforeRevision + 1) -or
+            [int]$receipt.event_sequence -ne $afterRevision -or $newEvents.Count -ne 1 -or
+            (@($After.events).Count) -ne ((@($Before.events).Count) + 1)) {
+            throw 'Acceptance changed mutation did not advance exactly one revision/event.'
+        }
+        $event = $newEvents[0]
+        if ($event.id -ne $receipt.id -or $event.event_type -ne $ExpectedEventType -or
+            [int]$event.sequence -ne $afterRevision) {
+            throw 'Acceptance changed mutation event was not aligned with its receipt.'
+        }
+    }
+    if ([int]$receipt.result_revision -ne $afterRevision -or
+        [int]$receipt.result.revision -ne $afterRevision -or
+        $receipt.result.status -ne $afterItem.status -or
+        $receipt.result.progress_percent -ne $afterItem.progress_percent -or
+        $receipt.result.planned_date -ne $afterItem.planned_date -or
+        $receipt.result.note -ne $afterItem.note -or
+        $receipt.result.updated_at -ne $afterItem.updated_at -or
+        $receipt.result.status_changed_at -ne $afterItem.status_changed_at -or
+        $afterItem.status -ne $ExpectedStatus -or
+        $afterItem.progress_percent -ne $ExpectedProgress -or
+        $afterItem.planned_date -ne $ExpectedDate -or
+        $afterItem.note -ne $ExpectedNote) {
+        throw 'Acceptance durable receipt result did not align with the projection.'
+    }
+    return $afterRevision
 }
 
 function Assert-LifecycleCheckpoint {
@@ -621,33 +932,61 @@ function Assert-LifecycleCheckpoint {
         [Parameter(Mandatory = $true)][string]$TargetItemId,
         [Parameter(Mandatory = $true)][string]$ExpectedStatus,
         [Parameter(Mandatory = $true)][int]$ExpectedRevision,
+        [Parameter(Mandatory = $true)][string]$ExpectedProgress,
         [Parameter(Mandatory = $true)][object]$NeighborSnapshot,
         [Parameter(Mandatory = $true)][object]$ExpectedInventory,
         [string]$ExpectedDate
     )
-    $itemIds = @($TargetItemId) + @($NeighborSnapshot.Keys)
-    $current = Get-LifecycleProjectionSnapshot `
-        -ItemIds $itemIds `
-        -ExpectedInventory $ExpectedInventory
-    $target = $current[$TargetItemId]
-    if ($target.status -ne $ExpectedStatus -or
-        $target.revision -ne $ExpectedRevision) {
+    if ([string]::IsNullOrWhiteSpace($ExpectedDate)) {
+        $durable = Get-DurableLivingPlanSnapshot -ItemId $TargetItemId
+        $item = Assert-DurableLivingPlanSnapshot -Snapshot $durable
+        $ExpectedDate = Convert-CanonicalDateToDisplay -Value $item.planned_date
+    }
+    Set-LivingPlanWindowForDate -PlannedDate $ExpectedDate -ExpectedInventory $ExpectedInventory | Out-Null
+    $currentTarget = Get-LifecycleProjectionSnapshot -ItemIds @($TargetItemId) -ExpectedInventory $ExpectedInventory
+    $target = $currentTarget[$TargetItemId]
+    if ($target.status -ne $ExpectedStatus -or $target.revision -ne $ExpectedRevision) {
         throw "Acceptance target lifecycle mismatch: expected $ExpectedStatus/$ExpectedRevision, got $($target.status)/$($target.revision)"
     }
-    if (-not [string]::IsNullOrWhiteSpace($ExpectedDate) -and
-        $target.plannedDate -ne $ExpectedDate) {
-        throw "Acceptance target planned date mismatch: expected $ExpectedDate, got $($target.plannedDate)"
-    }
+    if ($target.progress -ne $ExpectedProgress) { throw "Acceptance target progress mismatch: expected $ExpectedProgress, got $($target.progress)" }
+    if ($target.plannedDate -ne $ExpectedDate) { throw "Acceptance target planned date mismatch: expected $ExpectedDate, got $($target.plannedDate)" }
     foreach ($itemId in $NeighborSnapshot.Keys) {
         $before = $NeighborSnapshot[$itemId]
-        $after = $current[$itemId]
-        if ($after.status -ne $before.status -or
-            $after.revision -ne $before.revision -or
-            $after.plannedDate -ne $before.plannedDate) {
+        Set-LivingPlanWindowForDate -PlannedDate $before.plannedDate -ExpectedInventory $ExpectedInventory | Out-Null
+        $currentNeighbor = Get-LifecycleProjectionSnapshot -ItemIds @($itemId) -ExpectedInventory $ExpectedInventory
+        $after = $currentNeighbor[$itemId]
+        if ($after.status -ne $before.status -or $after.revision -ne $before.revision -or
+            $after.plannedDate -ne $before.plannedDate -or $after.progress -ne $before.progress) {
             throw "Adjacent fixture item changed unexpectedly: $itemId"
         }
     }
+    Set-LivingPlanWindowForDate -PlannedDate $ExpectedDate -ExpectedInventory $ExpectedInventory | Out-Null
     return $target
+}
+
+function Assert-LifecycleActionAbsent {
+    param(
+        [Parameter(Mandatory = $true)][string]$ItemId,
+        [Parameter(Mandatory = $true)][string]$Action,
+        [Parameter(Mandatory = $true)][object]$ExpectedInventory,
+        [int]$AttemptsPerDirection = 8
+    )
+    $prefix = [regex]::Escape($livingPlanSemanticsPrefix)
+    $pattern = "^$prefix · .+ · $([regex]::Escape($ItemId)) · Eylem · $([regex]::Escape($Action))$"
+    foreach ($direction in @('Forward', 'Backward')) {
+        for ($attempt = 0; $attempt -lt $AttemptsPerDirection; $attempt++) {
+            [xml]$hierarchy = Get-UiHierarchy
+            $node = Find-UniqueUiNodeByDescriptionPattern `
+                -Hierarchy $hierarchy `
+                -Pattern $pattern
+            if ($null -ne $node) {
+                throw "Acceptance action must be absent for ${ItemId}: $Action"
+            }
+            Invoke-SelectorScroll `
+                -ExpectedInventory $ExpectedInventory `
+                -Direction $direction
+        }
+    }
 }
 
 function Enter-UiText {
@@ -761,42 +1100,112 @@ function Run-LivingPlanAcceptanceFlow {
     ) -ExpectedInventory $ExpectedInventory | Out-Null
     Start-Sleep -Seconds 1
 
-    $identityAction = Get-LifecycleAction `
-        -ActivityName $candidateName `
-        -Action 'Not' `
-        -ExpectedInventory $ExpectedInventory
+    $identityAction = Get-LifecycleActionAcrossWindows -ActivityName $candidateName -Action 'Not' -ExpectedInventory $ExpectedInventory
     $targetItemId = $identityAction.itemId
-    $initialSnapshot = Get-LifecycleProjectionSnapshot `
-        -ItemIds (@($targetItemId) + $neighborItemIds) `
-        -ExpectedInventory $ExpectedInventory
-    $initialTarget = $initialSnapshot[$targetItemId]
-    if ($initialTarget.status -notin @('Planlandı', 'Başladı')) {
-        throw "Acceptance target must resume from Planlandı or Başladı, got $($initialTarget.status)."
-    }
+    $durable = Get-DurableLivingPlanSnapshot -ItemId $targetItemId
+    $durableItem = Assert-DurableLivingPlanSnapshot -Snapshot $durable
+    $targetRevision = [int]$durableItem.revision
+    $initialDate = Convert-CanonicalDateToDisplay -Value $durableItem.planned_date
+    $targetNote = [string]$durableItem.note
+
     $neighborSnapshot = [ordered]@{}
     foreach ($neighborItemId in $neighborItemIds) {
-        $neighborSnapshot[$neighborItemId] = $initialSnapshot[$neighborItemId]
-    }
-    $targetRevision = $initialTarget.revision
-    $initialDate = $initialTarget.plannedDate
-
-    if ($initialTarget.status -eq 'Planlandı') {
-        $startAction = Get-LifecycleAction `
-            -ItemId $targetItemId `
-            -Action 'Başlat' `
-            -ExpectedInventory $ExpectedInventory
-        Invoke-UiTap -Node $startAction.node -ExpectedInventory $ExpectedInventory
-        Wait-UiNode -Text 'İmalat başlatıldı.' -Contains | Out-Null
-        $targetRevision += 1
-        Assert-LifecycleCheckpoint `
-            -TargetItemId $targetItemId `
-            -ExpectedStatus 'Başladı' `
-            -ExpectedRevision $targetRevision `
-            -ExpectedDate $initialDate `
-            -NeighborSnapshot $neighborSnapshot `
-            -ExpectedInventory $ExpectedInventory | Out-Null
+        $neighborDurable = Get-DurableLivingPlanSnapshot -ItemId $neighborItemId
+        $neighborItem = Assert-DurableLivingPlanSnapshot -Snapshot $neighborDurable
+        $neighborDate = Convert-CanonicalDateToDisplay -Value $neighborItem.planned_date
+        Set-LivingPlanWindowForDate -PlannedDate $neighborDate -ExpectedInventory $ExpectedInventory | Out-Null
+        $neighborCurrent = Get-LifecycleProjectionSnapshot -ItemIds @($neighborItemId) -ExpectedInventory $ExpectedInventory
+        $neighborUi = $neighborCurrent[$neighborItemId]
+        if ($neighborUi.status -ne (Convert-DurableStatusToUi -Status $neighborItem.status) -or
+            $neighborUi.progress -ne (Convert-DurableProgressToUi -Progress $neighborItem.progress_percent) -or
+            $neighborUi.revision -ne [int]$neighborItem.revision -or $neighborUi.plannedDate -ne $neighborDate) {
+            throw "Acceptance neighbor UI/durable projection mismatch: $neighborItemId"
+        }
+        $neighborSnapshot[$neighborItemId] = $neighborUi
     }
 
+    Assert-LifecycleCheckpoint -TargetItemId $targetItemId -ExpectedStatus (Convert-DurableStatusToUi -Status $durableItem.status) -ExpectedRevision $targetRevision -ExpectedProgress (Convert-DurableProgressToUi -Progress $durableItem.progress_percent) -ExpectedDate $initialDate -NeighborSnapshot $neighborSnapshot -ExpectedInventory $ExpectedInventory | Out-Null
+
+    if ($durableItem.status -ne 'PLANNED' -or $null -ne $durableItem.progress_percent) {
+        if ($durableItem.status -ne 'COMPLETED') {
+            $beforeNormalizeComplete = $durable
+            $normalizeComplete = Get-LifecycleAction -ItemId $targetItemId -Action 'Tamamla' -ExpectedInventory $ExpectedInventory
+            Invoke-UiTap -Node $normalizeComplete.node -ExpectedInventory $ExpectedInventory
+            Wait-UiNode -Text 'İmalat tamamlandı.' -Contains | Out-Null
+            $afterNormalizeComplete = Get-DurableLivingPlanSnapshot -ItemId $targetItemId
+            $targetRevision = Resolve-DurableLivingPlanMutationRevision -Before $beforeNormalizeComplete -After $afterNormalizeComplete -ExpectedEventType 'COMPLETED' -ExpectedStatus 'COMPLETED' -ExpectedProgress 100 -ExpectedDate $beforeNormalizeComplete.item.planned_date -ExpectedNote $targetNote
+            if ($targetRevision -ne ([int]$beforeNormalizeComplete.item.revision + 1)) { throw 'Acceptance normalization Complete was not an observed state change.' }
+            $durable = $afterNormalizeComplete
+            $durableItem = Assert-DurableLivingPlanSnapshot -Snapshot $durable
+            $initialDate = Convert-CanonicalDateToDisplay -Value $durableItem.planned_date
+        }
+        Assert-LifecycleCheckpoint -TargetItemId $targetItemId -ExpectedStatus 'Tamamlandı' -ExpectedRevision $targetRevision -ExpectedProgress '%100' -ExpectedDate $initialDate -NeighborSnapshot $neighborSnapshot -ExpectedInventory $ExpectedInventory | Out-Null
+        Assert-LifecycleActionAbsent -ItemId $targetItemId -Action 'İlerleme' -ExpectedInventory $ExpectedInventory
+
+        $beforeNormalizeReopen = $durable
+        $normalizeReopen = Get-LifecycleAction -ItemId $targetItemId -Action 'Yeniden aç' -ExpectedInventory $ExpectedInventory
+        Invoke-UiTap -Node $normalizeReopen.node -ExpectedInventory $ExpectedInventory
+        Tap-UiText -Text 'Tamam' -RequireClickable -ExpectedInventory $ExpectedInventory
+        Wait-UiNode -Text 'İmalat yeniden açıldı.' -Contains | Out-Null
+        $afterNormalizeReopen = Get-DurableLivingPlanSnapshot -ItemId $targetItemId
+        $targetRevision = Resolve-DurableLivingPlanMutationRevision -Before $beforeNormalizeReopen -After $afterNormalizeReopen -ExpectedEventType 'REOPENED' -ExpectedStatus 'PLANNED' -ExpectedProgress $null -ExpectedDate $afterNormalizeReopen.item.planned_date -ExpectedNote $targetNote -ExpectedIntentField 'new_planned_date' -ExpectedIntentValue $afterNormalizeReopen.item.planned_date
+        if ($targetRevision -ne ([int]$beforeNormalizeReopen.item.revision + 1)) { throw 'Acceptance normalization Reopen was not an observed state change.' }
+        $durable = $afterNormalizeReopen
+        $durableItem = Assert-DurableLivingPlanSnapshot -Snapshot $durable
+        $initialDate = Convert-CanonicalDateToDisplay -Value $durableItem.planned_date
+        Assert-LifecycleCheckpoint -TargetItemId $targetItemId -ExpectedStatus 'Planlandı' -ExpectedRevision $targetRevision -ExpectedProgress 'Raporlanmadı' -ExpectedDate $initialDate -NeighborSnapshot $neighborSnapshot -ExpectedInventory $ExpectedInventory | Out-Null
+    }
+
+    Assert-LifecycleCheckpoint `
+        -TargetItemId $targetItemId `
+        -ExpectedStatus 'Planlandı' `
+        -ExpectedRevision $targetRevision `
+        -ExpectedProgress 'Raporlanmadı' `
+        -ExpectedDate $initialDate `
+        -NeighborSnapshot $neighborSnapshot `
+        -ExpectedInventory $ExpectedInventory | Out-Null
+    Assert-LifecycleActionAbsent `
+        -ItemId $targetItemId `
+        -Action 'İlerleme' `
+        -ExpectedInventory $ExpectedInventory
+
+    $startAction = Get-LifecycleAction `
+        -ItemId $targetItemId `
+        -Action 'Başlat' `
+        -ExpectedInventory $ExpectedInventory
+    Invoke-UiTap -Node $startAction.node -ExpectedInventory $ExpectedInventory
+    Wait-UiNode -Text 'İmalat başlatıldı.' -Contains | Out-Null
+    $targetRevision += 1
+    Assert-LifecycleCheckpoint `
+        -TargetItemId $targetItemId `
+        -ExpectedStatus 'Başladı' `
+        -ExpectedRevision $targetRevision `
+        -ExpectedProgress 'Raporlanmadı' `
+        -ExpectedDate $initialDate `
+        -NeighborSnapshot $neighborSnapshot `
+        -ExpectedInventory $ExpectedInventory | Out-Null
+
+    $progress47Action = Get-LifecycleAction `
+        -ItemId $targetItemId `
+        -Action 'İlerleme' `
+        -ExpectedInventory $ExpectedInventory
+    Invoke-UiTap -Node $progress47Action.node -ExpectedInventory $ExpectedInventory
+    Wait-UiNode -Text 'İlerlemeyi güncelle' -Contains | Out-Null
+    Replace-OnlyEditableText -Value '47' -ExpectedInventory $ExpectedInventory
+    Hide-Keyboard -ExpectedInventory $ExpectedInventory
+    Tap-UiText -Text 'Kaydet' -RequireClickable -ExpectedInventory $ExpectedInventory
+    Wait-UiNode -Text 'İlerleme %47 olarak kaydedildi.' -Contains | Out-Null
+    $targetRevision += 1
+    Assert-LifecycleCheckpoint `
+        -TargetItemId $targetItemId `
+        -ExpectedStatus 'Başladı' `
+        -ExpectedRevision $targetRevision `
+        -ExpectedProgress '%47' `
+        -ExpectedDate $initialDate `
+        -NeighborSnapshot $neighborSnapshot `
+        -ExpectedInventory $ExpectedInventory | Out-Null
+
+    $beforeNoteMutation = Get-DurableLivingPlanSnapshot -ItemId $targetItemId
     $noteAction = Get-LifecycleAction `
         -ItemId $targetItemId `
         -Action 'Not' `
@@ -809,11 +1218,20 @@ function Run-LivingPlanAcceptanceFlow {
     Tap-UiText -Text 'Kaydet' -RequireClickable -ExpectedInventory $ExpectedInventory
     Wait-UiNode -Text 'Not kaydedildi.' -Contains | Out-Null
     Scroll-UntilUiText -Text $updatedAcceptanceNote -Contains -ExpectedInventory $ExpectedInventory | Out-Null
-    $targetRevision += 1
+    $afterNoteMutation = Get-DurableLivingPlanSnapshot -ItemId $targetItemId
+    $targetRevision = Resolve-DurableLivingPlanMutationRevision `
+        -Before $beforeNoteMutation `
+        -After $afterNoteMutation `
+        -ExpectedEventType 'NOTE_UPDATED' `
+        -ExpectedStatus 'STARTED' `
+        -ExpectedProgress 47 `
+        -ExpectedDate $beforeNoteMutation.item.planned_date `
+        -ExpectedNote $updatedAcceptanceNote
     Assert-LifecycleCheckpoint `
         -TargetItemId $targetItemId `
         -ExpectedStatus 'Başladı' `
         -ExpectedRevision $targetRevision `
+        -ExpectedProgress '%47' `
         -ExpectedDate $initialDate `
         -NeighborSnapshot $neighborSnapshot `
         -ExpectedInventory $ExpectedInventory | Out-Null
@@ -830,6 +1248,7 @@ function Run-LivingPlanAcceptanceFlow {
         -TargetItemId $targetItemId `
         -ExpectedStatus 'Ertelendi' `
         -ExpectedRevision $targetRevision `
+        -ExpectedProgress '%47' `
         -NeighborSnapshot $neighborSnapshot `
         -ExpectedInventory $ExpectedInventory
     if ($deferredTarget.plannedDate -eq $initialDate) {
@@ -847,9 +1266,14 @@ function Run-LivingPlanAcceptanceFlow {
         -TargetItemId $targetItemId `
         -ExpectedStatus 'Tamamlandı' `
         -ExpectedRevision $targetRevision `
+        -ExpectedProgress '%100' `
         -ExpectedDate $deferredTarget.plannedDate `
         -NeighborSnapshot $neighborSnapshot `
         -ExpectedInventory $ExpectedInventory | Out-Null
+    Assert-LifecycleActionAbsent `
+        -ItemId $targetItemId `
+        -Action 'İlerleme' `
+        -ExpectedInventory $ExpectedInventory
 
     $reopenAction = Get-LifecycleAction `
         -ItemId $targetItemId `
@@ -863,14 +1287,56 @@ function Run-LivingPlanAcceptanceFlow {
         -TargetItemId $targetItemId `
         -ExpectedStatus 'Planlandı' `
         -ExpectedRevision $targetRevision `
+        -ExpectedProgress 'Raporlanmadı' `
         -NeighborSnapshot $neighborSnapshot `
         -ExpectedInventory $ExpectedInventory
     Scroll-UntilUiText -Text $updatedAcceptanceNote -Contains -ExpectedInventory $ExpectedInventory | Out-Null
+    Assert-LifecycleActionAbsent `
+        -ItemId $targetItemId `
+        -Action 'İlerleme' `
+        -ExpectedInventory $ExpectedInventory
+
+    $restartAction = Get-LifecycleAction `
+        -ItemId $targetItemId `
+        -Action 'Başlat' `
+        -ExpectedInventory $ExpectedInventory
+    Invoke-UiTap -Node $restartAction.node -ExpectedInventory $ExpectedInventory
+    Wait-UiNode -Text 'İmalat başlatıldı.' -Contains | Out-Null
+    $targetRevision += 1
+    Assert-LifecycleCheckpoint `
+        -TargetItemId $targetItemId `
+        -ExpectedStatus 'Başladı' `
+        -ExpectedRevision $targetRevision `
+        -ExpectedProgress 'Raporlanmadı' `
+        -ExpectedDate $reopenedTarget.plannedDate `
+        -NeighborSnapshot $neighborSnapshot `
+        -ExpectedInventory $ExpectedInventory | Out-Null
+
+    $progress63Action = Get-LifecycleAction `
+        -ItemId $targetItemId `
+        -Action 'İlerleme' `
+        -ExpectedInventory $ExpectedInventory
+    Invoke-UiTap -Node $progress63Action.node -ExpectedInventory $ExpectedInventory
+    Wait-UiNode -Text 'İlerlemeyi güncelle' -Contains | Out-Null
+    Replace-OnlyEditableText -Value '63' -ExpectedInventory $ExpectedInventory
+    Hide-Keyboard -ExpectedInventory $ExpectedInventory
+    Tap-UiText -Text 'Kaydet' -RequireClickable -ExpectedInventory $ExpectedInventory
+    Wait-UiNode -Text 'İlerleme %63 olarak kaydedildi.' -Contains | Out-Null
+    $targetRevision += 1
+    Assert-LifecycleCheckpoint `
+        -TargetItemId $targetItemId `
+        -ExpectedStatus 'Başladı' `
+        -ExpectedRevision $targetRevision `
+        -ExpectedProgress '%63' `
+        -ExpectedDate $reopenedTarget.plannedDate `
+        -NeighborSnapshot $neighborSnapshot `
+        -ExpectedInventory $ExpectedInventory | Out-Null
 
     return [pscustomobject]@{
         targetItemId = $targetItemId
         finalRevision = $targetRevision
         finalPlannedDate = $reopenedTarget.plannedDate
+        finalProgress = 63
         neighborSnapshot = $neighborSnapshot
     }
 }
@@ -895,8 +1361,9 @@ function Assert-RelaunchPersistence {
     Scroll-UntilUiText -Text $updatedAcceptanceNote -Contains -ExpectedInventory $ExpectedInventory | Out-Null
     Assert-LifecycleCheckpoint `
         -TargetItemId $FlowResult.targetItemId `
-        -ExpectedStatus 'Planlandı' `
+        -ExpectedStatus 'Başladı' `
         -ExpectedRevision $FlowResult.finalRevision `
+        -ExpectedProgress '%63' `
         -ExpectedDate $FlowResult.finalPlannedDate `
         -NeighborSnapshot $FlowResult.neighborSnapshot `
         -ExpectedInventory $ExpectedInventory | Out-Null
@@ -990,7 +1457,7 @@ try {
 
     Write-Output "PASS acceptance_package=$acceptancePackage label=$acceptanceLabel"
     Write-Output "PASS artifact=$([IO.Path]::GetFileName($artifact)) sha256=$($artifactContract.sha256) abi=arm64-v8a"
-    Write-Output "PASS target_item=$($flowResult.targetItemId) final_revision=$($flowResult.finalRevision) final_date=$($flowResult.finalPlannedDate)"
+    Write-Output "PASS target_item=$($flowResult.targetItemId) final_revision=$($flowResult.finalRevision) final_progress=$($flowResult.finalProgress) final_date=$($flowResult.finalPlannedDate)"
     Write-Output 'PASS six_package_isolation=true full_flow=true persistence_after_relaunch=true fatal_diagnostics=false'
 } finally {
     $env:CSE_ACCEPTANCE_HARNESS = $previousAcceptanceHarness

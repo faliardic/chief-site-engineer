@@ -271,6 +271,26 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
     );
   }
 
+  Future<void> _editProgress(ConstructionLivingPlanItem item) async {
+    final progress = await showDialog<int>(
+      context: context,
+      builder: (_) =>
+          _ProgressEditorDialog(initialProgress: item.progressPercent),
+    );
+    if (progress == null || progress == item.progressPercent) return;
+    await _runMutation(
+      () => widget.livingPlan.updateLivingPlanProgress(
+        UpdateConstructionLivingPlanProgressCommand(
+          itemId: item.id,
+          eventId: RecordId.randomUuid(),
+          expectedRevision: item.revision,
+          progressPercent: progress,
+        ),
+      ),
+      successMessage: 'İlerleme %$progress olarak kaydedildi.',
+    );
+  }
+
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -453,6 +473,7 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
           onDefer: () => _defer(entry.item),
           onReopen: () => _reopen(entry.item),
           onNote: () => _editNote(entry.item),
+          onProgress: () => _editProgress(entry.item),
         ),
   ];
 }
@@ -518,6 +539,7 @@ class _LivingPlanItemCard extends StatelessWidget {
     required this.onDefer,
     required this.onReopen,
     required this.onNote,
+    required this.onProgress,
   });
 
   final ConstructionLivingPlanWindowItem entry;
@@ -527,6 +549,7 @@ class _LivingPlanItemCard extends StatelessWidget {
   final VoidCallback onDefer;
   final VoidCallback onReopen;
   final VoidCallback onNote;
+  final VoidCallback onProgress;
 
   @override
   Widget build(BuildContext context) {
@@ -535,7 +558,12 @@ class _LivingPlanItemCard extends StatelessWidget {
     final canStart =
         item.status == ConstructionLivingPlanStatus.planned ||
         item.status == ConstructionLivingPlanStatus.deferred;
+    final canEditProgress =
+        item.status == ConstructionLivingPlanStatus.started ||
+        item.status == ConstructionLivingPlanStatus.deferred;
     final semanticsIdentity = _livingPlanItemSemanticsIdentity(item);
+    final progressLabel = _progressLabel(item);
+    final progressSemanticsValue = _progressSemanticsValue(item);
 
     Widget actionSemantics({
       required String action,
@@ -581,6 +609,14 @@ class _LivingPlanItemCard extends StatelessWidget {
                       '$semanticsIdentity · Plan günü · ${_displayDate(item.plannedDate)}',
                   excludeSemantics: true,
                   child: Text(_displayDate(item.plannedDate)),
+                ),
+                Semantics(
+                  key: Key('living-plan-progress-${item.id}'),
+                  container: true,
+                  label:
+                      '$semanticsIdentity · İlerleme · $progressSemanticsValue',
+                  excludeSemantics: true,
+                  child: Chip(label: Text(progressLabel)),
                 ),
                 if (!entry.originSnapshotIsCurrent)
                   const Chip(
@@ -649,6 +685,17 @@ class _LivingPlanItemCard extends StatelessWidget {
                       label: const Text('Yeniden aç'),
                     ),
                   ),
+                if (canEditProgress)
+                  actionSemantics(
+                    action: 'İlerleme',
+                    onPressed: busy ? null : onProgress,
+                    child: OutlinedButton.icon(
+                      key: Key('progress-living-plan-${item.id}'),
+                      onPressed: busy ? null : onProgress,
+                      icon: const Icon(Icons.percent_rounded),
+                      label: const Text('İlerleme'),
+                    ),
+                  ),
                 actionSemantics(
                   action: 'Not',
                   onPressed: busy ? null : onNote,
@@ -668,6 +715,86 @@ class _LivingPlanItemCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ProgressEditorDialog extends StatefulWidget {
+  const _ProgressEditorDialog({required this.initialProgress});
+
+  final int? initialProgress;
+
+  @override
+  State<_ProgressEditorDialog> createState() => _ProgressEditorDialogState();
+}
+
+class _ProgressEditorDialogState extends State<_ProgressEditorDialog> {
+  late final TextEditingController _controller;
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: widget.initialProgress?.toString() ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  int? get _validProgress {
+    final value = _controller.text;
+    if (!RegExp(r'^(0|[1-9][0-9]?)$').hasMatch(value)) return null;
+    return int.parse(value);
+  }
+
+  bool get _canSubmit {
+    final progress = _validProgress;
+    return !_submitting &&
+        progress != null &&
+        progress != widget.initialProgress;
+  }
+
+  void _submit() {
+    final progress = _validProgress;
+    if (!_canSubmit || progress == null) return;
+    setState(() => _submitting = true);
+    Navigator.of(context).pop(progress);
+  }
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: !_submitting,
+    child: AlertDialog(
+      title: const Text('İlerlemeyi güncelle'),
+      content: TextField(
+        key: const Key('living-plan-progress-field'),
+        controller: _controller,
+        autofocus: true,
+        keyboardType: TextInputType.number,
+        onChanged: (_) => setState(() {}),
+        decoration: const InputDecoration(
+          labelText: 'Yüzde',
+          hintText: '0–99',
+          suffixText: '%',
+        ),
+      ),
+      actions: [
+        TextButton(
+          key: const Key('cancel-living-plan-progress'),
+          onPressed: _submitting ? null : () => Navigator.pop(context),
+          child: const Text('İptal'),
+        ),
+        FilledButton(
+          key: const Key('save-living-plan-progress'),
+          onPressed: _canSubmit ? _submit : null,
+          child: const Text('Kaydet'),
+        ),
+      ],
+    ),
+  );
 }
 
 class _NoteEditorDialog extends StatefulWidget {
@@ -1181,6 +1308,20 @@ String _statusLabel(ConstructionLivingPlanStatus status) => switch (status) {
   ConstructionLivingPlanStatus.completed => 'Tamamlandı',
   ConstructionLivingPlanStatus.deferred => 'Ertelendi',
 };
+
+String _progressLabel(ConstructionLivingPlanItem item) {
+  if (item.status == ConstructionLivingPlanStatus.completed) {
+    return 'İlerleme %100';
+  }
+  final progress = item.progressPercent;
+  return progress == null ? 'İlerleme girilmedi' : 'İlerleme %$progress';
+}
+
+String _progressSemanticsValue(ConstructionLivingPlanItem item) {
+  if (item.status == ConstructionLivingPlanStatus.completed) return '%100';
+  final progress = item.progressPercent;
+  return progress == null ? 'Raporlanmadı' : '%$progress';
+}
 
 String _livingPlanItemSemanticsIdentity(ConstructionLivingPlanItem item) =>
     'Yaşayan plan öğesi · ${item.activityNameSnapshot} · '

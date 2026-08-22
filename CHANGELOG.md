@@ -1,5 +1,20 @@
 # Changelog
 
+## Issue #468 - Living Plan progress UI and isolated device acceptance
+
+- Living Plan kartları nullable actual progress'i görünür kılar; item-scoped
+  semantik/key ile raporlanmamış değer, açık item `%0..%99` ve completed `%100`
+  contract'ı ayrıştırılır.
+- Yalnız started/deferred item'larda görünen ilerleme dialogu integer `0..99`
+  kabul eder; invalid/cancel/back/no-change mutation üretmez, geçerli save current
+  revision ve caller UUID ile merged application command yolunu kullanır.
+- Sentetik acceptance runner'ı progress update'in note/defer ile korunmasını,
+  complete/reopen dönüşümünü, edit-action sınırını ve relaunch persistence'ı
+  yalnız isolated acceptance package içinde doğrular.
+- Schema `16`, backup format `1`, mobile version `0.1.0+1`, immutable reference
+  schedule ve production package sınırları değişmez; quantity, reforecast,
+  productivity learning ve public/store release kapsam dışıdır.
+
 ## Issue #466 - Living Plan actual progress core
 
 - Mobil schema `15 → 16` ile nullable `progress_percent` eklendi: `NULL`

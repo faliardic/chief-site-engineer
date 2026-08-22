@@ -3,8 +3,8 @@
 **Belge türü:** Güncel ürün yürütme kapsamı
 **Durum:** Kanonik V2 kapsam ve sıra kaynağı
 **Tarih:** 21 Ağustos 2026
-**Güncel yön kaynağı:** Issue #466 / Draft PR #467 (merge edilmedi)
-**Güncel güvenli `master`:** `42207034635f1836a80e2357a1398f2e6004d5d4` / PR #465
+**Güncel yön kaynağı:** Issue #468 — Progress UI + Isolated Device Acceptance
+**Güncel güvenli `master`:** `3eca007c34951095b24b1b0791146a533b3a8a6d` / PR #467
 
 ## 1. Belgenin rolü
 
@@ -50,12 +50,12 @@ V1 tarihsel baseline'dır. V2, aynı offline-first mobil ürünü yeniden yazmak
 yerine bu baseline üzerinde ilerler.
 
 Güncel merged V2 teknik baseline'ı V1 metadata'sından ayrıdır: mobile version
-`0.1.0+1`, SQLite schema `15`, backup format `1` ve son güvenli merge
-`42207034635f1836a80e2357a1398f2e6004d5d4` / PR #465 değeridir. Bu baseline,
+`0.1.0+1`, SQLite schema `16`, backup format `1` ve son güvenli merge
+`3eca007c34951095b24b1b0791146a533b3a8a6d` / PR #467 değeridir. Bu baseline,
 schedule runtime ve persistent immutable reference-schedule snapshot temeliyle
-Living Plan MVP Core ve 7-day UI/APK/device acceptance'ı içerir. Issue #466 /
-Draft PR #467 schema `16` actual-progress candidate'ıdır ve henüz merged
-değildir; public/store release veya genel production readiness ilanı değildir.
+Living Plan MVP Core, 7-day UI/APK/device acceptance ve Actual Progress Core'u
+içerir. Issue #468 Progress UI + Isolated Device Acceptance current evolution'dır;
+public/store release veya genel production readiness ilanı değildir.
 
 ## 3. V2'nin amacı
 
@@ -70,8 +70,9 @@ Proje/Mahal, Saha Rehberi, Attachment ve Ajanda omurgası — complete
 → schedule runtime + persistent reference snapshots — merged
 → Living 7-Day Plan MVP Core — merged / PR #463
 → 7-day UI + APK/device acceptance — merged / PR #465
-→ Issue #466 Actual Progress Core — current / Draft PR #467
-→ progress UI, actual quantity, reforecast ve productivity learning — not started
+→ Issue #466 Actual Progress Core — merged / PR #467
+→ Issue #468 Progress UI + Isolated Device Acceptance — current
+→ actual quantity, reforecast ve productivity learning — not started
 ```
 
 CSE teknik olarak derin, operasyonel olarak sade kalır: binlerce inşaat
@@ -198,13 +199,16 @@ Kapanış kapısı:
 - User decision/reference schedule ayrımı test ve review ile doğrulanır.
 - PR #465 ile merged ilk usable UI/APK/device kabulü Item 5'in ilk kullanıcı
   kapısıdır; tek başına final completion değildir.
-- Issue #466 / Draft PR #467 current evolution olarak nullable actual-progress
-  source-of-truth foundation'ını taşır: `NULL` bilinmeyen/raporlanmamış,
-  açık item explicit progress `0..99`, `COMPLETED` exact `100`dür.
+- Issue #466 / PR #467 merged nullable actual-progress source-of-truth
+  foundation'ını taşır: `NULL` bilinmeyen/raporlanmamış, açık item explicit
+  progress `0..99`, `COMPLETED` exact `100`dür.
 - Optimistic revision, durable idempotency/no-op receipt ve append-only event
   sözleşmesi korunur.
-- Progress UI, actual quantity, reforecast ve project-specific productivity
-  learning başlamamıştır.
+- Issue #468 current evolution olarak bu gerçeği kartlarda görünür kılar, yalnız
+  `STARTED`/`DEFERRED` item için `0..99` editini açar ve isolated acceptance
+  paketinde lifecycle/relaunch persistence kanıtını hedefler.
+- Actual quantity, reforecast ve project-specific productivity learning
+  başlamamıştır.
 - Item 5 final completion'ı sonraki owner kararı ve executable evidence ile
   belirlenir; bu belge Items 6–13'ü yeniden sıralamaz.
 
@@ -376,11 +380,11 @@ Aşağıdaki başlıklar silinmez; V2 sonrasına taşınır:
 Bu başlıklar V2 child Issue'larına yan kapsam olarak eklenemez.
 
 Issue #466 Actual Progress Core yukarıdaki kategorik V2-dışı listede değildir;
-current Living Plan evolution'ı olarak nullable/evented/idempotent source-of-
-truth foundation'ını kuran Draft PR #467 candidate'ıdır. Progress UI, actual
-quantity, reforecast ve project-specific productivity learning başlamamıştır.
-Item 5'in final completion sınırı sonraki owner kararı ile executable evidence'a
-bağlıdır.
+nullable/evented/idempotent source-of-truth foundation'ını kuran merged
+PR #467'dir. Issue #468 progress UI + isolated device acceptance current Living
+Plan evolution'ıdır. Actual quantity, reforecast ve project-specific productivity
+learning başlamamıştır. Item 5'in final completion sınırı sonraki owner kararı
+ile executable evidence'a bağlıdır.
 
 ## 7. V2 çalışma kuralları
 
@@ -420,24 +424,27 @@ V2 Items 1–4 complete'tir. Activity Catalog Runtime, typed Project Profile ve
 Dependency Catalog, Project Activity Instance Graph, deterministic Schedule
 Date Engine ve persistent immutable reference-schedule snapshots PR #444,
 #446, #448, #456 ve #459 ile merged temeldir. Living Plan MVP Core PR #463 ve
-7-day UI/APK/device acceptance PR #465 ile merged predecessor zinciridir.
-Güncel güvenli `master` `42207034635f1836a80e2357a1398f2e6004d5d4`, schema
-`15` ve backup format `1`dir.
+7-day UI/APK/device acceptance PR #465 ve Actual Progress Core PR #467 ile
+merged predecessor zinciridir. Güncel güvenli `master`
+`3eca007c34951095b24b1b0791146a533b3a8a6d`, schema `16` ve backup format
+`1`dir.
 
 Güncel canonical faz:
 
 ```text
 Living Plan MVP Core — merged / PR #463
 → 7-day UI + APK/device acceptance — merged / PR #465
-→ Issue #466 Actual Progress Core — current / Draft PR #467
+→ Issue #466 Actual Progress Core — merged / PR #467
+→ Issue #468 Progress UI + Isolated Device Acceptance — current
 ```
 
-Issue #466 yalnız nullable actual-progress source-of-truth foundation'ını
-schema `16` candidate'ı olarak ekler: `NULL` bilinmeyen/raporlanmamış, açık item
+Issue #466 / PR #467 nullable actual-progress source-of-truth foundation'ını
+schema `16` merged temeline ekler: `NULL` bilinmeyen/raporlanmamış, açık item
 explicit progress `0..99`, `COMPLETED` exact `100`dür. Optimistic revision,
 durable idempotency/no-op receipt ve append-only event sözleşmesi korunur.
-Draft PR #467 merged değildir. Progress UI, actual quantity, reforecast ve
-project-specific productivity learning başlamamıştır. Item 5 `Current — not
-complete` kalır; public/store release veya genel production readiness ilan
-edilmez. Final completion sonraki owner kararı ve executable evidence'a bağlıdır;
-Items 6–13'ün sırası ve durumu değişmez.
+Issue #468 bu progress gerçeğinin dar UI/edit ve isolated device acceptance current
+evolution'ıdır; merged değildir. Actual quantity, reforecast ve project-specific
+productivity learning başlamamıştır. Item 5 `Current — not complete` kalır;
+public/store release veya genel production readiness ilan edilmez. Final
+completion sonraki owner kararı ve executable evidence'a bağlıdır; Items 6–13'ün
+sırası ve durumu değişmez.

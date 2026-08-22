@@ -1,25 +1,25 @@
 # CSE V2 — Kanonik Ürün Yol Haritası
 
 **Durum:** Güncel yürütme sırası
-**Tarih:** 16 Ağustos 2026
+**Tarih:** 21 Ağustos 2026
 **V2 kapsam kaynağı:** `docs/v2/CSE_V2_SCOPE.md`
-**Güncel yön truth-sync:** Issue #460
-**Güncel güvenli `master`:** `447916be0b3ddd2af75b0fe85f8c7f710f29c1cd`
+**Güncel yön truth-sync:** Issue #468
+**Güncel güvenli `master`:** `3eca007c34951095b24b1b0791146a533b3a8a6d` / PR #467
 
 ## 1. Güncel ürün durumu
 
 CSE V1 tamamlanmış ve proje sahibi tarafından yaklaşık bir ay gerçek sahada
-kullanılmıştır. V2 Items 1–4 tamamlanmış; schedule runtime ve immutable
-reference-schedule snapshot persistence temeli PR #459 ile merge edilmiştir.
-Güncel teknik ve ürün durumu:
+kullanılmıştır. V2 Items 1–4 tamamlanmış; schedule runtime, immutable
+reference-schedule snapshots, Living Plan MVP/ilk cihaz kabulü ve actual-progress
+core PR #467'ye kadar merge edilmiştir. Güncel teknik ve ürün durumu:
 
 | Alan | Değer |
 | --- | --- |
 | V1 baseline commit | `7c9f65a811c9f4bca561adab6bd1f8e64e6908cc` |
-| Güncel güvenli merge | `447916be0b3ddd2af75b0fe85f8c7f710f29c1cd` |
-| Son schedule foundation PR | `#459` |
+| Güncel güvenli merge | `3eca007c34951095b24b1b0791146a533b3a8a6d` |
+| Son Living Plan predecessor PR | `#467` |
 | Mobil sürüm | `0.1.0+1` |
-| SQLite schema | `14` |
+| SQLite schema | `16` |
 | `.csebackup` formatı | `1` |
 | Canonical timezone | `Europe/Istanbul` |
 | Android compile/target SDK | `36 / 36` |
@@ -27,8 +27,9 @@ Güncel teknik ve ürün durumu:
 | Store/public release | İlan edilmedi |
 
 V1'in tamamlanması, modüllerin dondurulduğu anlamına gelmez. V2 aynı
-offline-first mobil ürün üzerinde ilerler. Living Plan UI/APK/device kabulü ve
-public/store production release henüz ilan edilmemiştir.
+offline-first mobil ürün üzerinde ilerler. Living Plan progress UI ve isolated
+device acceptance Issue #468'in current işidir; public/store production release
+ilan edilmemiştir.
 
 ## 2. Kaynak otoritesi
 
@@ -189,15 +190,17 @@ Durum: `current direction — not complete`
 - Stable project/activity-instance/snapshot kimliklerine referans
 - Kullanıcı işlemiyle reference schedule'ı sessizce yeniden yazmama
 
-Issue #466, schema 16 actual-progress source-of-truth temelini UI eklemeden
-kurar: `NULL` raporlanmamış/bilinmeyen ilerleme, açık item için explicit
+Issue #466 / PR #467 ile merged schema 16 actual-progress source-of-truth
+temelinde `NULL` raporlanmamış/bilinmeyen ilerleme, açık item için explicit
 `0..99`, tamamlanan item için exact `100` anlamındadır. Optimistic revision,
 durable idempotency/no-op receipt ve append-only event sözleşmesi korunur.
 
-Progress UI, actual quantity, reforecast ve project-specific productivity
-learning bu dilimde başlatılmaz. Item 5 not complete kalır; final completion
-sınırı sonraki owner kararı ve executable evidence'a bağlıdır. Items 6–13'ün
-sırası değişmez.
+Issue #468 current evolution olarak bu progress gerçeğini kartlarda görünür
+kılar, yalnız `STARTED`/`DEFERRED` item için `0..99` editini açar ve isolated
+acceptance paketinde lifecycle/relaunch persistence kanıtını hedefler. Actual
+quantity, reforecast ve project-specific productivity learning başlamaz. Item 5
+not complete kalır; final completion sonraki owner kararı ve executable evidence'a
+bağlıdır. Items 6–13'ün sırası değişmez.
 
 ### V2.6 — Günlük Log Çıktısı v1
 
@@ -322,7 +325,8 @@ Güncel canonical faz:
 
 ```text
 Living 7-Day Plan — current, not complete
-→ Issue #466 actual-progress source-of-truth core
+→ Issue #466 / PR #467 actual-progress source-of-truth core — merged
+→ Issue #468 progress UI + isolated device acceptance — current
 ```
 
 Items 1–4 complete'tir. Activity Catalog Runtime, typed Project Profile ve
@@ -330,11 +334,12 @@ Dependency Catalog, Project Activity Instance Graph, deterministic Schedule
 Date Engine ve immutable persistent reference-schedule snapshots PR #444, #446,
 #448, #456 ve #459 zinciriyle merged temeldir.
 
-Issue #466 yalnız nullable actual-progress source-of-truth foundation'ını,
-optimistic revision ve durable idempotency/no-op receipt sözleşmesini ekler.
-Progress UI, quantity, reforecast ve productivity learning başlamaz. Item 5'in
-final completion sınırı sonraki owner kararı ve executable evidence ile
-belirlenir; Items 6–13'ün sırası değişmez.
+Issue #466 / PR #467 nullable actual-progress source-of-truth foundation'ını,
+optimistic revision ve durable idempotency/no-op receipt sözleşmesini merged
+temele ekler. Issue #468 yalnız progress UI ve isolated device acceptance current
+evolution'ıdır; actual quantity, reforecast ve productivity learning başlamaz.
+Item 5'in final completion sınırı sonraki owner kararı ve executable evidence
+ile belirlenir; Items 6–13'ün sırası değişmez.
 
 ## 13. Tarihsel roadmap sınırı
 
