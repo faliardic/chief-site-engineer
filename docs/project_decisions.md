@@ -4110,3 +4110,24 @@
   progress lifecycle'ını ve relaunch persistence'ı doğrular. Actual quantity,
   reforecast, productivity learning, reference-schedule mutation ve production/
   store readiness bu kararla başlamaz; Item 5 current ve not complete kalır.
+## Issue 470 — Deterministic Living Plan forecast exact origin snapshot read-modelidir
+
+- Forecast yalnız item'ın `referenceSnapshotId`, `projectId`, `activityInstanceId`
+  ve `activityId` exact binding'i üzerinden hesaplanır; newer/current snapshot'a
+  sessiz rebind fail-closed yasaktır.
+- `STARTED + progress 0..99` için exact reference duration'ın kalan yüzdesi
+  hesaplanır, `ceil` ile scheduling day'e yuvarlanır ve caller-supplied canonical
+  UTC-midnight `asOfDate` existing `constructionDurationFinishDate` ile exact
+  snapshot project calendar'ında değerlendirilir. Engine kendi saatini okumaz.
+- `PLANNED`, `STARTED + NULL`, `DEFERRED` ve `COMPLETED` future finish uydurmaz;
+  deferred paused kalır. Variance yalnız forecast finish ile immutable reference
+  finish arasındaki signed calendar-day karşılaştırmasıdır, contractual delay
+  değildir.
+- Duration status/confidence ile snapshot production/duration/baseline
+  provenance exact korunur; `TEST_SEED_ONLY` veya düşük güvenli süre upgrade
+  edilmez.
+- Forecast read-only ve yeniden hesaplanan bir result'tır. Living Plan item,
+  planned date, reference schedule, downstream işler, schema `16`, backup format
+  `1` ve app version `0.1.0+1` değişmez. Forecast UI, actual quantity, dependency
+  reforecast ve productivity learning başlamaz; Item 5 current ve not complete
+  kalır.
