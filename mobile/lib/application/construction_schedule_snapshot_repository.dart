@@ -5,6 +5,7 @@ import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/construction_corpus_models.dart';
 import 'package:chief_site_engineer/domain/construction_project_graph_models.dart';
+import 'package:chief_site_engineer/domain/construction_schedule_dependency_snapshot_models.dart';
 import 'package:chief_site_engineer/domain/construction_schedule_models.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:crypto/crypto.dart';
@@ -13,6 +14,8 @@ import 'package:sqflite/sqflite.dart';
 typedef ConstructionScheduleSnapshotIdFactory = String Function();
 typedef ConstructionScheduleActivityInsertHook =
     Future<void> Function(int index, ConstructionScheduledActivity activity);
+typedef ConstructionScheduleDependencyInsertHook =
+    Future<void> Function(int index, ConstructionResolvedDependencyEdge edge);
 typedef ConstructionScheduleWindowIntegrityHook = Future<void> Function();
 typedef ConstructionScheduleFullSnapshotMetadataHook = Future<void> Function();
 typedef ConstructionSchedulePersistCommitHook = Future<void> Function();
@@ -36,6 +39,7 @@ class ConstructionScheduleSnapshotRepository {
     ConstructionScheduleDateEngine? dateEngine,
     ConstructionScheduleSnapshotIdFactory? idFactory,
     this.beforeActivityInsert,
+    this.beforeDependencyInsert,
     this.afterWindowIntegrityCheck,
     this.afterFullSnapshotMetadataRead,
     this.afterPersistCommit,
@@ -69,6 +73,7 @@ class ConstructionScheduleSnapshotRepository {
   final ConstructionScheduleDateEngine _dateEngine;
   final ConstructionScheduleSnapshotIdFactory _idFactory;
   final ConstructionScheduleActivityInsertHook? beforeActivityInsert;
+  final ConstructionScheduleDependencyInsertHook? beforeDependencyInsert;
   final ConstructionScheduleWindowIntegrityHook? afterWindowIntegrityCheck;
   final ConstructionScheduleFullSnapshotMetadataHook?
   afterFullSnapshotMetadataRead;
@@ -102,6 +107,10 @@ class ConstructionScheduleSnapshotRepository {
     final projectionSha256 = constructionScheduleSnapshotProjectionSha256(
       schedule.scheduledActivities,
     );
+    final dependencyEdges = graph.dependencyEdges.toList(growable: false)
+      ..sort((left, right) => left.edgeKey.compareTo(right.edgeKey));
+    final dependencyProjectionSha256 =
+        constructionScheduleSnapshotDependencyProjectionSha256(dependencyEdges);
     final generatedAt = CseTimeCodec.encodeUtc(clock());
     final scheduleStart = formatCanonicalConstructionDate(
       schedule.scheduleStart,
@@ -198,11 +207,41 @@ class ConstructionScheduleSnapshotRepository {
         );
       }
 
+      await transaction
+          .insert('project_schedule_snapshot_dependency_manifests', {
+            'snapshot_id': snapshotId,
+            'project_id': schedule.projectId,
+            'dependency_count': dependencyEdges.length,
+            'projection_sha256': dependencyProjectionSha256,
+          });
+      for (var index = 0; index < dependencyEdges.length; index++) {
+        final edge = dependencyEdges[index];
+        await beforeDependencyInsert?.call(index, edge);
+        await transaction.insert(
+          'project_schedule_snapshot_dependencies',
+          _dependencyRow(
+            snapshotId: snapshotId,
+            projectId: schedule.projectId,
+            edge: edge,
+          ),
+        );
+      }
+
       final insertedCount = Sqflite.firstIntValue(
         await transaction.rawQuery(
           '''
           SELECT count(*)
           FROM project_schedule_snapshot_activities
+          WHERE snapshot_id = ?
+        ''',
+          [snapshotId],
+        ),
+      );
+      final insertedDependencyCount = Sqflite.firstIntValue(
+        await transaction.rawQuery(
+          '''
+          SELECT count(*)
+          FROM project_schedule_snapshot_dependencies
           WHERE snapshot_id = ?
         ''',
           [snapshotId],
@@ -219,6 +258,7 @@ class ConstructionScheduleSnapshotRepository {
         ),
       );
       if (insertedCount != schedule.scheduledActivities.length ||
+          insertedDependencyCount != dependencyEdges.length ||
           currentCount != 1) {
         throw const ConstructionScheduleSnapshotFailure(
           'schedule_snapshot_write_verification_failed',
@@ -241,6 +281,18 @@ class ConstructionScheduleSnapshotRepository {
       if (!stored.metadata.isCurrent) {
         throw const ConstructionScheduleSnapshotFailure(
           'schedule_snapshot_commit_verification_failed',
+        );
+      }
+      final storedDependencyGraph = await _loadDependencyGraph(
+        transaction,
+        snapshotId: snapshotId,
+        projectId: schedule.projectId,
+      );
+      if (storedDependencyGraph.dependencyCount != dependencyEdges.length ||
+          storedDependencyGraph.projectionSha256 !=
+              dependencyProjectionSha256) {
+        throw const ConstructionScheduleSnapshotFailure(
+          'schedule_snapshot_dependency_write_verification_failed',
         );
       }
       return stored;
@@ -287,6 +339,31 @@ class ConstructionScheduleSnapshotRepository {
           return null;
         }
         return _loadSnapshot(transaction, rows.single);
+      });
+
+  Future<ConstructionScheduleSnapshotDependencyGraph?>
+  loadDependencyGraphBySnapshotId(String snapshotId) =>
+      database.database.transaction((transaction) async {
+        final snapshots = await transaction.query(
+          'project_schedule_snapshots',
+          columns: const ['id', 'project_id'],
+          where: 'id = ?',
+          whereArgs: [snapshotId],
+          limit: 2,
+        );
+        if (snapshots.length > 1) {
+          throw const ConstructionScheduleSnapshotFailure(
+            'duplicate_schedule_snapshot_id',
+          );
+        }
+        if (snapshots.isEmpty) {
+          return null;
+        }
+        return _loadDependencyGraph(
+          transaction,
+          snapshotId: snapshotId,
+          projectId: _requiredString(snapshots.single, 'project_id'),
+        );
       });
 
   Future<List<ConstructionScheduleSnapshotMetadata>> listSnapshotHistory(
@@ -444,6 +521,107 @@ class ConstructionScheduleSnapshotRepository {
       activities: activities,
     );
   }
+
+  Future<ConstructionScheduleSnapshotDependencyGraph> _loadDependencyGraph(
+    DatabaseExecutor executor, {
+    required String snapshotId,
+    required String projectId,
+  }) async {
+    final manifests = await executor.query(
+      'project_schedule_snapshot_dependency_manifests',
+      where: 'snapshot_id = ?',
+      whereArgs: [snapshotId],
+      limit: 2,
+    );
+    if (manifests.isEmpty) {
+      throw const ConstructionScheduleSnapshotFailure(
+        'schedule_snapshot_dependency_graph_unavailable',
+      );
+    }
+    if (manifests.length != 1) {
+      throw const ConstructionScheduleSnapshotFailure(
+        'duplicate_schedule_snapshot_dependency_manifest',
+      );
+    }
+    final manifest = manifests.single;
+    if (_requiredDependencyString(manifest, 'snapshot_id') != snapshotId ||
+        _requiredDependencyString(manifest, 'project_id') != projectId) {
+      throw const ConstructionScheduleSnapshotFailure(
+        'schedule_snapshot_dependency_project_mismatch',
+      );
+    }
+    final dependencyCount = manifest['dependency_count'];
+    final projectionSha256 = manifest['projection_sha256'];
+    if (dependencyCount is! int || dependencyCount < 0) {
+      throw const ConstructionScheduleSnapshotFailure(
+        'invalid_schedule_snapshot_dependency_count',
+      );
+    }
+    if (projectionSha256 is! String ||
+        !RegExp(r'^[0-9a-f]{64}$').hasMatch(projectionSha256)) {
+      throw const ConstructionScheduleSnapshotFailure(
+        'invalid_schedule_snapshot_dependency_fingerprint',
+      );
+    }
+
+    final rows = await executor.query(
+      'project_schedule_snapshot_dependencies',
+      where: 'snapshot_id = ?',
+      whereArgs: [snapshotId],
+      orderBy: 'edge_key ASC',
+    );
+    if (rows.length != dependencyCount) {
+      throw const ConstructionScheduleSnapshotFailure(
+        'schedule_snapshot_dependency_count_mismatch',
+      );
+    }
+    final activityRows = await executor.query(
+      'project_schedule_snapshot_activities',
+      columns: const ['instance_id'],
+      where: 'snapshot_id = ?',
+      whereArgs: [snapshotId],
+    );
+    final activityInstanceIds = {
+      for (final row in activityRows)
+        _requiredDependencyString(row, 'instance_id'),
+    };
+    final edges = <ConstructionResolvedDependencyEdge>[];
+    String? previousEdgeKey;
+    for (final row in rows) {
+      final edge = _dependencyFromRow(
+        row,
+        expectedSnapshotId: snapshotId,
+        expectedProjectId: projectId,
+      );
+      if (previousEdgeKey != null &&
+          previousEdgeKey.compareTo(edge.edgeKey) >= 0) {
+        throw const ConstructionScheduleSnapshotFailure(
+          'unordered_schedule_snapshot_dependencies',
+        );
+      }
+      previousEdgeKey = edge.edgeKey;
+      if (!activityInstanceIds.contains(edge.predecessorInstanceId) ||
+          !activityInstanceIds.contains(edge.successorInstanceId)) {
+        throw const ConstructionScheduleSnapshotFailure(
+          'schedule_snapshot_dependency_endpoint_mismatch',
+        );
+      }
+      edges.add(edge);
+    }
+    if (constructionScheduleSnapshotDependencyProjectionSha256(edges) !=
+        projectionSha256) {
+      throw const ConstructionScheduleSnapshotFailure(
+        'schedule_snapshot_dependency_graph_fingerprint_mismatch',
+      );
+    }
+    return ConstructionScheduleSnapshotDependencyGraph(
+      snapshotId: snapshotId,
+      projectId: projectId,
+      dependencyCount: dependencyCount,
+      projectionSha256: projectionSha256,
+      edges: edges,
+    );
+  }
 }
 
 String constructionScheduleSnapshotProjectionJson(
@@ -484,6 +662,190 @@ String constructionScheduleSnapshotActivitySha256(
       utf8.encode(constructionScheduleSnapshotActivityProjectionJson(activity)),
     )
     .toString();
+
+String constructionScheduleSnapshotDependencyProjectionJson(
+  Iterable<ConstructionResolvedDependencyEdge> source,
+) {
+  final edges = source.toList(growable: false)
+    ..sort((left, right) => left.edgeKey.compareTo(right.edgeKey));
+  String? previousEdgeKey;
+  final projection = <Map<String, Object?>>[];
+  for (final edge in edges) {
+    if (previousEdgeKey == edge.edgeKey) {
+      throw const ConstructionScheduleSnapshotFailure(
+        'duplicate_schedule_snapshot_dependency_edge',
+      );
+    }
+    previousEdgeKey = edge.edgeKey;
+    projection.add(_dependencyProjection(edge));
+  }
+  return jsonEncode(projection);
+}
+
+String constructionScheduleSnapshotDependencyProjectionSha256(
+  Iterable<ConstructionResolvedDependencyEdge> edges,
+) => sha256
+    .convert(
+      utf8.encode(constructionScheduleSnapshotDependencyProjectionJson(edges)),
+    )
+    .toString();
+
+String constructionScheduleSnapshotDependencyRowProjectionJson(
+  ConstructionResolvedDependencyEdge edge,
+) => jsonEncode(_dependencyProjection(edge));
+
+String constructionScheduleSnapshotDependencyRowSha256(
+  ConstructionResolvedDependencyEdge edge,
+) => sha256
+    .convert(
+      utf8.encode(
+        constructionScheduleSnapshotDependencyRowProjectionJson(edge),
+      ),
+    )
+    .toString();
+
+Map<String, Object?> _dependencyProjection(
+  ConstructionResolvedDependencyEdge edge,
+) {
+  final edgeKey = _canonicalDependencyString(edge.edgeKey);
+  final templateDependencyId = _canonicalDependencyString(
+    edge.templateDependencyId,
+  );
+  final predecessorInstanceId = _canonicalDependencyString(
+    edge.predecessorInstanceId,
+  );
+  final successorInstanceId = _canonicalDependencyString(
+    edge.successorInstanceId,
+  );
+  if (predecessorInstanceId == successorInstanceId) {
+    throw const ConstructionScheduleSnapshotFailure(
+      'self_schedule_snapshot_dependency',
+    );
+  }
+  return <String, Object?>{
+    'confidence': edge.confidence.jsonValue,
+    'edge_key': edgeKey,
+    'is_mandatory': edge.isMandatory,
+    'lag_unit': edge.lagUnit.jsonValue,
+    'lag_value': edge.lagValue,
+    'predecessor_instance_id': predecessorInstanceId,
+    'relationship_type': edge.relationshipType.jsonValue,
+    'review_status': edge.reviewStatus.jsonValue,
+    'scope_rule': edge.scopeRule.jsonValue,
+    'successor_instance_id': successorInstanceId,
+    'template_dependency_id': templateDependencyId,
+  };
+}
+
+Map<String, Object?> _dependencyRow({
+  required String snapshotId,
+  required String projectId,
+  required ConstructionResolvedDependencyEdge edge,
+}) => <String, Object?>{
+  'snapshot_id': snapshotId,
+  'project_id': projectId,
+  'edge_key': edge.edgeKey,
+  'template_dependency_id': edge.templateDependencyId,
+  'predecessor_instance_id': edge.predecessorInstanceId,
+  'successor_instance_id': edge.successorInstanceId,
+  'relationship_type': edge.relationshipType.jsonValue,
+  'lag_value': edge.lagValue,
+  'lag_unit': edge.lagUnit.jsonValue,
+  'scope_rule': edge.scopeRule.jsonValue,
+  'is_mandatory': edge.isMandatory ? 1 : 0,
+  'confidence': edge.confidence.jsonValue,
+  'review_status': edge.reviewStatus.jsonValue,
+  'row_sha256': constructionScheduleSnapshotDependencyRowSha256(edge),
+};
+
+ConstructionResolvedDependencyEdge _dependencyFromRow(
+  Map<String, Object?> row, {
+  required String expectedSnapshotId,
+  required String expectedProjectId,
+}) {
+  final snapshotId = _requiredDependencyString(row, 'snapshot_id');
+  final projectId = _requiredDependencyString(row, 'project_id');
+  if (snapshotId != expectedSnapshotId || projectId != expectedProjectId) {
+    throw const ConstructionScheduleSnapshotFailure(
+      'schedule_snapshot_dependency_project_mismatch',
+    );
+  }
+  final edgeKey = _requiredDependencyString(row, 'edge_key');
+  final templateDependencyId = _requiredDependencyString(
+    row,
+    'template_dependency_id',
+  );
+  final predecessorInstanceId = _requiredDependencyString(
+    row,
+    'predecessor_instance_id',
+  );
+  final successorInstanceId = _requiredDependencyString(
+    row,
+    'successor_instance_id',
+  );
+  final lagValue = row['lag_value'];
+  final storedMandatory = row['is_mandatory'];
+  if (lagValue is! int ||
+      (storedMandatory != 0 && storedMandatory != 1) ||
+      predecessorInstanceId == successorInstanceId) {
+    throw const ConstructionScheduleSnapshotFailure(
+      'invalid_schedule_snapshot_dependency_row',
+    );
+  }
+  late ConstructionResolvedDependencyEdge edge;
+  try {
+    edge = ConstructionResolvedDependencyEdge(
+      edgeKey: edgeKey,
+      templateDependencyId: templateDependencyId,
+      predecessorInstanceId: predecessorInstanceId,
+      successorInstanceId: successorInstanceId,
+      relationshipType: ConstructionDependencyRelationshipType.fromJson(
+        row['relationship_type'],
+      ),
+      lagValue: lagValue,
+      lagUnit: ConstructionDependencyLagUnit.fromJson(row['lag_unit']),
+      scopeRule: ConstructionDependencyScopeRule.fromJson(row['scope_rule']),
+      isMandatory: storedMandatory == 1,
+      confidence: ConstructionDependencyConfidence.fromJson(row['confidence']),
+      reviewStatus: ConstructionDependencyReviewStatus.fromJson(
+        row['review_status'],
+      ),
+    );
+  } on ConstructionCorpusFailure {
+    throw const ConstructionScheduleSnapshotFailure(
+      'invalid_schedule_snapshot_dependency_enum',
+    );
+  }
+  final storedRowSha256 = row['row_sha256'];
+  if (storedRowSha256 is! String ||
+      !RegExp(r'^[0-9a-f]{64}$').hasMatch(storedRowSha256) ||
+      constructionScheduleSnapshotDependencyRowSha256(edge) !=
+          storedRowSha256) {
+    throw const ConstructionScheduleSnapshotFailure(
+      'schedule_snapshot_dependency_row_fingerprint_mismatch',
+    );
+  }
+  return edge;
+}
+
+String _canonicalDependencyString(String value) {
+  if (value.isEmpty || value.trim() != value) {
+    throw const ConstructionScheduleSnapshotFailure(
+      'invalid_schedule_snapshot_dependency_metadata',
+    );
+  }
+  return value;
+}
+
+String _requiredDependencyString(Map<String, Object?> row, String key) {
+  final value = row[key];
+  if (value is! String || value.isEmpty || value.trim() != value) {
+    throw const ConstructionScheduleSnapshotFailure(
+      'invalid_schedule_snapshot_dependency_metadata',
+    );
+  }
+  return value;
+}
 
 Map<String, Object?> _activityProjection(
   ConstructionScheduledActivity activity,

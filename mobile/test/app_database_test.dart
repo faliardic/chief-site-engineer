@@ -76,6 +76,7 @@ void main() {
       {'version': 14, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 15, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 16, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 17, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
   });
 
@@ -1085,6 +1086,7 @@ void main() {
         path: directories.databaseFile,
         factory: databaseFactoryFfi,
         clock: () => DateTime.utc(2026, 7, 19, 9),
+        migrations: AppDatabase.foundationMigrations.take(16).toList(),
       );
       await upgraded.open();
       final db = upgraded.database;
@@ -1188,6 +1190,283 @@ void main() {
       await expectProgressUpdateRejected('progress-item-completed', null);
       await expectProgressUpdateRejected('progress-item-completed', 0);
       await expectProgressUpdateRejected('progress-item-completed', 99);
+      expect(await db.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      expect(
+        (await db.rawQuery('PRAGMA integrity_check')).single['integrity_check'],
+        'ok',
+      );
+      await upgraded.close();
+    },
+  );
+
+  test(
+    'schema 16 to 17 adds immutable dependency storage without backfill',
+    () async {
+      final schemaSixteen = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => firstClock,
+        migrations: AppDatabase.foundationMigrations.take(16).toList(),
+      );
+      await schemaSixteen.open();
+      final old = schemaSixteen.database;
+      await old.insert('projects', {
+        'id': 'dependency-project',
+        'name': 'Dependency migration project',
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:00:00Z',
+      });
+      await old.insert('project_schedule_snapshots', {
+        'id': 'legacy-dependency-snapshot',
+        'project_id': 'dependency-project',
+        'profile_json': '{}',
+        'corpus_version': 'corpus-v1',
+        'schedule_seed_version': 'seed-v1',
+        'schedule_seed_provenance': 'seed-catalog',
+        'production_status': 'NOT_FOR_PRODUCTION',
+        'duration_source': 'TEST_SEED_ONLY',
+        'baseline_status': 'NOT_A_BASELINE',
+        'schedule_start': '2026-09-01',
+        'schedule_finish': '2026-09-02',
+        'activity_count': 2,
+        'root_count': 1,
+        'leaf_count': 1,
+        'isolated_count': 0,
+        'milestone_count': 0,
+        'projection_sha256': '1' * 64,
+        'generated_at': '2026-07-19T08:00:00Z',
+      });
+      for (final activity in const [
+        ('ACT-A@PROJECT', 'ACT-A', '2026-09-01', '2'),
+        ('ACT-B@PROJECT', 'ACT-B', '2026-09-02', '3'),
+      ]) {
+        await old.insert('project_schedule_snapshot_activities', {
+          'snapshot_id': 'legacy-dependency-snapshot',
+          'project_id': 'dependency-project',
+          'instance_id': activity.$1,
+          'activity_id': activity.$2,
+          'start_date': activity.$3,
+          'finish_date': activity.$3,
+          'duration_days': 1.0,
+          'rounded_scheduling_days': 1,
+          'duration_calendar_type': 'WORKING_DAY',
+          'duration_status': 'SOURCE_BACKED',
+          'duration_confidence': 'A_AUTHORITATIVE',
+          'is_milestone': 0,
+          'is_isolated': 0,
+          'row_sha256': activity.$4 * 64,
+        });
+      }
+      await old.insert('project_living_plan_items', {
+        'id': 'legacy-dependency-living-item',
+        'project_id': 'dependency-project',
+        'reference_snapshot_id': 'legacy-dependency-snapshot',
+        'activity_instance_id': 'ACT-A@PROJECT',
+        'activity_id': 'ACT-A',
+        'activity_name_snapshot': 'Legacy dependency activity',
+        'activity_context_json': '{}',
+        'natural_unit_snapshot': 'm²',
+        'planned_date': '2026-09-01',
+        'status': 'STARTED',
+        'progress_percent': 37,
+        'note': 'Legacy progress is preserved',
+        'revision': 4,
+        'created_at': '2026-07-19T08:00:00Z',
+        'updated_at': '2026-07-19T08:03:00Z',
+        'status_changed_at': '2026-07-19T08:01:00Z',
+      });
+      final oldSchema = await old.rawQuery('''
+        SELECT type, name, tbl_name, sql
+        FROM sqlite_master
+        WHERE sql IS NOT NULL
+        ORDER BY type, name
+      ''');
+      final oldSnapshots = await old.query('project_schedule_snapshots');
+      final oldActivities = await old.query(
+        'project_schedule_snapshot_activities',
+        orderBy: 'instance_id ASC',
+      );
+      final oldLivingItems = await old.query('project_living_plan_items');
+      await schemaSixteen.close();
+
+      final failing = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 9),
+        migrations: [
+          ...AppDatabase.foundationMigrations.take(16),
+          DatabaseMigration(
+            version: 17,
+            apply: (transaction) async {
+              await AppDatabase.foundationMigrations[16].apply(transaction);
+              throw StateError('intentional schema 17 rollback');
+            },
+          ),
+        ],
+      );
+      await expectLater(failing.open(), throwsA(isA<DatabaseOpenFailure>()));
+      final afterFailure = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: sqflite.OpenDatabaseOptions(singleInstance: false),
+      );
+      expect(
+        sqflite.Sqflite.firstIntValue(
+          await afterFailure.rawQuery('PRAGMA user_version'),
+        ),
+        16,
+      );
+      expect(
+        await afterFailure.query(
+          'sqlite_master',
+          where: "name LIKE 'project_schedule_snapshot_dependenc%'",
+        ),
+        isEmpty,
+      );
+      expect(
+        await afterFailure.query('project_schedule_snapshots'),
+        oldSnapshots,
+      );
+      expect(
+        await afterFailure.query(
+          'project_schedule_snapshot_activities',
+          orderBy: 'instance_id ASC',
+        ),
+        oldActivities,
+      );
+      expect(
+        await afterFailure.query('project_living_plan_items'),
+        oldLivingItems,
+      );
+      await afterFailure.close();
+
+      final upgraded = AppDatabase(
+        path: directories.databaseFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.utc(2026, 7, 19, 9),
+      );
+      await upgraded.open();
+      final db = upgraded.database;
+      const newNames = <String>{
+        'project_schedule_snapshot_dependency_manifests',
+        'project_schedule_snapshot_dependencies',
+        'project_schedule_snapshot_dependency_manifests_project',
+        'project_schedule_snapshot_dependencies_predecessor',
+        'project_schedule_snapshot_dependencies_successor',
+        'project_schedule_snapshot_dependency_manifests_immutable_update',
+        'project_schedule_snapshot_dependency_manifests_immutable_delete',
+        'project_schedule_snapshot_dependencies_immutable_update',
+        'project_schedule_snapshot_dependencies_immutable_delete',
+      };
+      final newSchema = await db.rawQuery('''
+        SELECT type, name, tbl_name, sql
+        FROM sqlite_master
+        WHERE sql IS NOT NULL
+        ORDER BY type, name
+      ''');
+      expect(
+        newSchema.where((row) => !newNames.contains(row['name'])).toList(),
+        oldSchema,
+      );
+      expect(
+        newSchema
+            .where((row) => newNames.contains(row['name']))
+            .map((row) => row['name'])
+            .toSet(),
+        newNames,
+      );
+      expect(
+        sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
+        17,
+      );
+      expect(await db.query('project_schedule_snapshots'), oldSnapshots);
+      expect(
+        await db.query(
+          'project_schedule_snapshot_activities',
+          orderBy: 'instance_id ASC',
+        ),
+        oldActivities,
+      );
+      expect(await db.query('project_living_plan_items'), oldLivingItems);
+      expect(
+        await db.query('project_schedule_snapshot_dependency_manifests'),
+        isEmpty,
+      );
+      expect(await db.query('project_schedule_snapshot_dependencies'), isEmpty);
+
+      await db.insert('project_schedule_snapshot_dependency_manifests', {
+        'snapshot_id': 'legacy-dependency-snapshot',
+        'project_id': 'dependency-project',
+        'dependency_count': 1,
+        'projection_sha256': '4' * 64,
+      });
+      final validDependency = <String, Object?>{
+        'snapshot_id': 'legacy-dependency-snapshot',
+        'project_id': 'dependency-project',
+        'edge_key': 'EDGE-1',
+        'template_dependency_id': 'DEP-1',
+        'predecessor_instance_id': 'ACT-A@PROJECT',
+        'successor_instance_id': 'ACT-B@PROJECT',
+        'relationship_type': 'FS',
+        'lag_value': 0,
+        'lag_unit': 'WORKING_DAY',
+        'scope_rule': 'PROJECT',
+        'is_mandatory': 1,
+        'confidence': 'C_SUPPORTED_INFERENCE',
+        'review_status': 'REVIEW_REQUIRED',
+        'row_sha256': '5' * 64,
+      };
+      for (final invalid in [
+        {
+          ...validDependency,
+          'edge_key': 'INVALID-ENUM',
+          'relationship_type': 'BROKEN',
+        },
+        {
+          ...validDependency,
+          'edge_key': 'SELF-EDGE',
+          'successor_instance_id': 'ACT-A@PROJECT',
+        },
+        {
+          ...validDependency,
+          'edge_key': 'ORPHAN-EDGE',
+          'successor_instance_id': 'MISSING@PROJECT',
+        },
+      ]) {
+        await expectLater(
+          db.insert('project_schedule_snapshot_dependencies', invalid),
+          throwsA(isA<sqflite.DatabaseException>()),
+        );
+      }
+      await db.insert(
+        'project_schedule_snapshot_dependencies',
+        validDependency,
+      );
+      await expectLater(
+        db.update(
+          'project_schedule_snapshot_dependencies',
+          {'lag_value': 1},
+          where: 'edge_key = ?',
+          whereArgs: ['EDGE-1'],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.delete('project_schedule_snapshot_dependencies'),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.update(
+          'project_schedule_snapshot_dependency_manifests',
+          {'dependency_count': 0},
+          where: 'snapshot_id = ?',
+          whereArgs: ['legacy-dependency-snapshot'],
+        ),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
+      await expectLater(
+        db.delete('project_schedule_snapshot_dependency_manifests'),
+        throwsA(isA<sqflite.DatabaseException>()),
+      );
       expect(await db.rawQuery('PRAGMA foreign_key_check'), isEmpty);
       expect(
         (await db.rawQuery('PRAGMA integrity_check')).single['integrity_check'],

@@ -27,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 16;
+  static const schemaVersion = 17;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2894,6 +2894,10 @@ class AppDatabase {
       version: 16,
       apply: _applyConstructionLivingPlanProgressMigration,
     ),
+    DatabaseMigration(
+      version: 17,
+      apply: _applyConstructionScheduleSnapshotDependencyMigration,
+    ),
   ];
 
   final String path;
@@ -3860,6 +3864,131 @@ Future<void> _applyConstructionLivingPlanProgressMigration(
       BEFORE ${operation.toUpperCase()} ON project_living_plan_events
       BEGIN
         SELECT RAISE(ABORT, 'living plan events are append-only');
+      END
+    ''');
+  }
+}
+
+Future<void> _applyConstructionScheduleSnapshotDependencyMigration(
+  Transaction transaction,
+) async {
+  await transaction.execute('''
+    CREATE TABLE project_schedule_snapshot_dependency_manifests (
+      snapshot_id TEXT PRIMARY KEY CHECK (
+        length(snapshot_id) > 0 AND snapshot_id = trim(snapshot_id)
+      ),
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      dependency_count INTEGER NOT NULL CHECK (dependency_count >= 0),
+      projection_sha256 TEXT NOT NULL CHECK (
+        length(projection_sha256) = 64
+        AND projection_sha256 NOT GLOB '*[^0-9a-f]*'
+      ),
+      UNIQUE (snapshot_id, project_id),
+      FOREIGN KEY (snapshot_id, project_id)
+        REFERENCES project_schedule_snapshots(id, project_id)
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE project_schedule_snapshot_dependencies (
+      snapshot_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      edge_key TEXT NOT NULL CHECK (
+        length(edge_key) > 0 AND edge_key = trim(edge_key)
+      ),
+      template_dependency_id TEXT NOT NULL CHECK (
+        length(template_dependency_id) > 0
+        AND template_dependency_id = trim(template_dependency_id)
+      ),
+      predecessor_instance_id TEXT NOT NULL CHECK (
+        length(predecessor_instance_id) > 0
+        AND predecessor_instance_id = trim(predecessor_instance_id)
+      ),
+      successor_instance_id TEXT NOT NULL CHECK (
+        length(successor_instance_id) > 0
+        AND successor_instance_id = trim(successor_instance_id)
+      ),
+      relationship_type TEXT NOT NULL CHECK (
+        relationship_type IN ('FS', 'SS')
+      ),
+      lag_value INTEGER NOT NULL,
+      lag_unit TEXT NOT NULL CHECK (lag_unit = 'WORKING_DAY'),
+      scope_rule TEXT NOT NULL CHECK (
+        scope_rule IN (
+          'ALL_TO_BLOCK',
+          'ALL_TO_PROJECT',
+          'ANY_ZONE_TO_PROJECT',
+          'AUTO',
+          'BLOCK_TO_FIRST_BASEMENT',
+          'BLOCK_TO_FIRST_FLOOR',
+          'BLOCK_TO_FIRST_FLOOR_IF_NO_BASEMENT',
+          'FLOOR_THRESHOLD_TO_FACADE',
+          'LAST_BASEMENT_TO_FIRST_FLOOR',
+          'NEXT_BASEMENT',
+          'NEXT_FLOOR',
+          'PROJECT',
+          'PROJECT_TO_ALL',
+          'SAME_BASEMENT',
+          'SAME_BLOCK',
+          'SAME_FACADE',
+          'SAME_FLOOR',
+          'SAME_ROOF',
+          'SAME_SYSTEM',
+          'TOP_FLOOR_TO_ROOF'
+        )
+      ),
+      is_mandatory INTEGER NOT NULL CHECK (is_mandatory IN (0, 1)),
+      confidence TEXT NOT NULL CHECK (confidence = 'C_SUPPORTED_INFERENCE'),
+      review_status TEXT NOT NULL CHECK (review_status = 'REVIEW_REQUIRED'),
+      row_sha256 TEXT NOT NULL CHECK (
+        length(row_sha256) = 64
+        AND row_sha256 NOT GLOB '*[^0-9a-f]*'
+      ),
+      PRIMARY KEY (snapshot_id, edge_key),
+      FOREIGN KEY (snapshot_id, project_id)
+        REFERENCES project_schedule_snapshot_dependency_manifests(
+          snapshot_id, project_id
+        ),
+      FOREIGN KEY (snapshot_id, predecessor_instance_id)
+        REFERENCES project_schedule_snapshot_activities(snapshot_id, instance_id),
+      FOREIGN KEY (snapshot_id, successor_instance_id)
+        REFERENCES project_schedule_snapshot_activities(snapshot_id, instance_id),
+      CHECK (predecessor_instance_id != successor_instance_id)
+    )
+  ''');
+
+  await transaction.execute('''
+    CREATE INDEX project_schedule_snapshot_dependency_manifests_project
+    ON project_schedule_snapshot_dependency_manifests(project_id, snapshot_id)
+  ''');
+  await transaction.execute('''
+    CREATE INDEX project_schedule_snapshot_dependencies_predecessor
+    ON project_schedule_snapshot_dependencies(
+      snapshot_id, predecessor_instance_id, edge_key
+    )
+  ''');
+  await transaction.execute('''
+    CREATE INDEX project_schedule_snapshot_dependencies_successor
+    ON project_schedule_snapshot_dependencies(
+      snapshot_id, successor_instance_id, edge_key
+    )
+  ''');
+
+  for (final table in [
+    'project_schedule_snapshot_dependency_manifests',
+    'project_schedule_snapshot_dependencies',
+  ]) {
+    await transaction.execute('''
+      CREATE TRIGGER ${table}_immutable_update
+      BEFORE UPDATE ON $table
+      BEGIN
+        SELECT RAISE(ABORT, 'schedule snapshot dependency graph is immutable');
+      END
+    ''');
+    await transaction.execute('''
+      CREATE TRIGGER ${table}_immutable_delete
+      BEFORE DELETE ON $table
+      BEGIN
+        SELECT RAISE(ABORT, 'schedule snapshot dependency graph is immutable');
       END
     ''');
   }
