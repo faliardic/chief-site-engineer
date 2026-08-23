@@ -55,7 +55,7 @@ class ConstructionScheduleDateEngine {
               'invalid_schedule_topological_order',
             );
           }
-          final candidate = _dependencyCandidateStart(
+          final candidate = constructionDependencyCandidateStart(
             predecessor: predecessor,
             successorCalendarType: seed.durationCalendarType,
             edge: edge,
@@ -237,7 +237,7 @@ class ConstructionScheduleDateEngine {
     for (final edge in graph.dependencyEdges) {
       final predecessor = scheduledById[edge.predecessorInstanceId]!;
       final successor = scheduledById[edge.successorInstanceId]!;
-      final minimumStart = _dependencyCandidateStart(
+      final minimumStart = constructionDependencyCandidateStart(
         predecessor: predecessor,
         successorCalendarType: successor.durationCalendarType,
         edge: edge,
@@ -258,7 +258,7 @@ class ConstructionScheduleDateEngine {
       final successor = scheduledById[successorId]!;
       DateTime? exactStart;
       for (final edge in incoming) {
-        final candidate = _dependencyCandidateStart(
+        final candidate = constructionDependencyCandidateStart(
           predecessor: scheduledById[edge.predecessorInstanceId]!,
           successorCalendarType: successor.durationCalendarType,
           edge: edge,
@@ -441,7 +441,7 @@ DateTime constructionDurationFinishDate({
   };
 }
 
-DateTime _dependencyCandidateStart({
+DateTime constructionDependencyCandidateStart({
   required ConstructionScheduledActivity predecessor,
   required ConstructionActivityDurationCalendarType successorCalendarType,
   required ConstructionResolvedDependencyEdge edge,

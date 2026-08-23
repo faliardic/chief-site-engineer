@@ -1,5 +1,22 @@
 # Changelog
 
+## Issue #474 - Read-only downstream dependency impact core
+
+- Pure impact engine, Living Plan forecast'unu exact project/snapshot/activity
+  binding'iyle aynı immutable snapshot ve verified dependency graph'a bağlar;
+  integrity/binding/orphan/duplicate/self-edge/cycle drift'ini fail-closed
+  reddeder ve newer/current snapshot'a sessiz rebind yapmaz.
+- Successor projected start, reference start ile bütün incoming dependency
+  candidate'larının maksimumudur; işler erkene çekilmez. Source effective start
+  reference start kalır, böylece finish-only gecikme outgoing SS'i yanlış
+  kaydırmaz.
+- Existing schedule date math public pure helper üzerinden reuse edilir.
+  Deterministic topological order, immutable input/output ve working/calendar-day
+  lag/holiday davranışı korunur.
+- Bu read-model schedule/Living Plan/reference/storage mutation veya reforecast
+  yapmaz. Schema `17`, backup format `1` ve version `0.1.0+1` değişmez; UI,
+  quantity, productivity learning, APK ve device kapsam dışıdır.
+
 ## Issue #472 - Immutable schedule snapshot dependency graph persistence
 
 - Mobil schema `16 → 17`, yalnız yeni immutable schedule snapshot'ların snapshot

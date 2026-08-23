@@ -4149,3 +4149,21 @@
 - Backup format `1` ve app version `0.1.0+1` değişmez. Dependency impact engine,
   reforecast, Living Plan/reference mutation, UI ve device kapsamı başlamaz;
   Item 5 current ve not complete kalır.
+
+## Issue 474 — Downstream dependency impact salt-okunur ve exact origin-bound'dur
+
+- Impact yalnız Living Plan forecast'unun exact project/snapshot/activity
+  binding'i ile aynı immutable snapshot ve fingerprint'i doğrulanmış dependency
+  graph'ından hesaplanır; unavailable/tamper/orphan/duplicate/self-edge/cycle
+  durumları fail-closed'dur ve newer/current snapshot'a sessiz rebind yapılmaz.
+- Successor projected start, kendi reference start'ı ile bütün incoming
+  constraint candidate'larının maksimumudur; aktivite reference tarihinden
+  erkene çekilmez. Source effective start reference start'tır ve yalnız finish
+  gecikmesi source outgoing SS constraint'ini kaydırmaz.
+- Deterministic topological sırada yalnız gerçekten daha geç başlayan downstream
+  activity'ler projected result'a girer. Date math public pure schedule helper'ı
+  reuse eder; input ve sonuçlar immutable'dır.
+- Bu engine salt-okunur read-model'dir. Schedule, Living Plan, reference snapshot,
+  event/receipt ve storage mutation yapmaz; schema `17`, backup format `1` ve
+  app version `0.1.0+1` değişmez. Reforecast, UI, quantity ve productivity
+  learning başlamaz; Item 5 current ve not complete kalır.
