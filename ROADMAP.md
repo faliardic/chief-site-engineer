@@ -3,25 +3,25 @@
 **Durum:** Güncel yürütme sırası
 **Tarih:** 23 Ağustos 2026
 **V2 kapsam kaynağı:** `docs/v2/CSE_V2_SCOPE.md`
-**Güncel yön truth-sync:** Issue #472
-**Güncel güvenli `master`:** `92fa66c48af99e693688d4cc1ca5d2dae1b0828c` / PR #471
+**Güncel yön truth-sync:** Issue #474
+**Güncel güvenli `master`:** `9fc53da006689ff4c1e5e5c8a134cef3f35e8e77` / PR #473
 
 ## 1. Güncel ürün durumu
 
 CSE V1 tamamlanmış ve proje sahibi tarafından yaklaşık bir ay gerçek sahada
 kullanılmıştır. V2 Items 1–4 tamamlanmış; schedule runtime, immutable
 reference-schedule snapshots, Living Plan MVP/ilk cihaz kabulü, actual-progress
-core, progress UI/isolated cihaz kabulü ve deterministic forecast core PR #471'e
-kadar merge edilmiştir.
+core, progress UI/isolated cihaz kabulü, deterministic forecast core ve
+immutable snapshot dependency graph persistence PR #473'e kadar merge edilmiştir.
 Güncel teknik ve ürün durumu:
 
 | Alan | Değer |
 | --- | --- |
 | V1 baseline commit | `7c9f65a811c9f4bca561adab6bd1f8e64e6908cc` |
-| Güncel güvenli merge | `92fa66c48af99e693688d4cc1ca5d2dae1b0828c` |
-| Son Living Plan predecessor PR | `#471` |
+| Güncel güvenli merge | `9fc53da006689ff4c1e5e5c8a134cef3f35e8e77` |
+| Son Living Plan predecessor PR | `#473` |
 | Mobil sürüm | `0.1.0+1` |
-| SQLite schema | `16` |
+| SQLite schema | `17` |
 | `.csebackup` formatı | `1` |
 | Canonical timezone | `Europe/Istanbul` |
 | Android compile/target SDK | `36 / 36` |
@@ -29,11 +29,12 @@ Güncel teknik ve ürün durumu:
 | Store/public release | İlan edilmedi |
 
 V1'in tamamlanması, modüllerin dondurulduğu anlamına gelmez. V2 aynı
-offline-first mobil ürün üzerinde ilerler. Issue #472 yalnız bundan sonra
-oluşturulan immutable schedule snapshot'ların resolved dependency edge setini
-aynı transaction içinde manifest/count/hash ile saklayan current iştir; schema
-17 candidate'dır, merged `master` schema 16 kalır ve public/store production
-release ilan edilmemiştir.
+offline-first mobil ürün üzerinde ilerler. Issue #472 / PR #473 yalnız bundan
+sonra oluşturulan immutable schedule snapshot'ların resolved dependency edge
+setini manifest/count/hash ile saklayan merged schema 17 temelidir. Issue #474
+exact forecast/snapshot/dependency-graph binding'inden salt-okunur downstream
+impact üreten current iştir; schedule mutation/reforecast değildir ve
+public/store production release ilan edilmemiştir.
 
 ## 2. Kaynak otoritesi
 
@@ -203,13 +204,17 @@ Issue #468 / PR #469 bu progress gerçeğini kartlarda görünür kılan, yalnı
 `STARTED`/`DEFERRED` item için `0..99` editini açan ve isolated acceptance
 paketinde lifecycle/relaunch persistence'ı kanıtlayan merged predecessor'dır.
 Issue #470 / PR #471 item'ın exact bound reference snapshot süresinden read-only
-deterministic kalan süre/finish tahmini üreten merged predecessor'dır. Issue #472
-current evolution olarak yalnız yeni schedule snapshot'ların exact resolved
-dependency graph'ını immutable ve fingerprint'li saklar. Schema-16 historical
-snapshot'lara graph backfill yapılmaz; manifest yokluğu zero-edge değil typed
-unavailable'dır. Downstream dependency impact/reforecast, actual quantity ve
-project-specific productivity learning başlamaz. Item 5 not complete kalır;
-Items 6–13'ün sırası değişmez.
+deterministic kalan süre/finish tahmini üreten, Issue #472 / PR #473 ise yalnız
+yeni schedule snapshot'ların exact resolved dependency graph'ını immutable ve
+fingerprint'li saklayan merged predecessor'lardır. Historical snapshot'lara
+graph backfill yapılmaz; manifest yokluğu zero-edge değil typed unavailable'dır.
+Issue #474 exact origin forecast/snapshot/graph binding'iyle deterministic
+topological sırada bütün incoming constraint'lerin maksimumunu uygulayan
+salt-okunur downstream impact current evolution'dır. Aktiviteyi reference
+tarihinden erkene çekmez; source finish-only gecikmesi outgoing SS constraint'ini
+yanlış kaydırmaz. Schedule/Living Plan/reference mutation ve reforecast, actual
+quantity ile project-specific productivity learning başlamaz. Item 5 not
+complete kalır; Items 6–13'ün sırası değişmez.
 
 ### V2.6 — Günlük Log Çıktısı v1
 
@@ -337,7 +342,8 @@ Living 7-Day Plan — current, not complete
 → Issue #466 / PR #467 actual-progress source-of-truth core — merged
 → Issue #468 / PR #469 progress UI + isolated device acceptance — merged
 → Issue #470 / PR #471 deterministic read-only forecast core — merged
-→ Issue #472 immutable snapshot dependency graph persistence — current
+→ Issue #472 / PR #473 immutable snapshot dependency graph persistence — merged
+→ Issue #474 read-only downstream dependency impact core — current
 ```
 
 Items 1–4 complete'tir. Activity Catalog Runtime, typed Project Profile ve
@@ -349,12 +355,13 @@ Issue #466 / PR #467 nullable actual-progress source-of-truth foundation'ını,
 optimistic revision ve durable idempotency/no-op receipt sözleşmesini merged
 temele ekler. Issue #468 / PR #469 progress UI ve isolated device acceptance,
 Issue #470 / PR #471 exact origin snapshot duration'ını progress ile read-only
-yorumlayan deterministic forecast core merged predecessor'lardır. Issue #472
-yalnız yeni snapshot'ların exact dependency graph'ını immutable saklayan current
-evolution'dır; legacy graph backfill, dependency impact/reforecast, actual
-quantity ve productivity learning başlamaz. Item 5'in final completion sınırı
-sonraki owner kararı ve executable evidence ile belirlenir; Items 6–13'ün sırası
-değişmez.
+yorumlayan deterministic forecast core, Issue #472 / PR #473 ise yalnız yeni
+snapshot'ların exact dependency graph'ını immutable saklayan merged
+predecessor'lardır; legacy graph backfill yapılmaz. Issue #474 bu exact immutable
+girdilerden schedule mutation üretmeden downstream projected impact hesaplayan
+current evolution'dır. Reforecast, actual quantity ve productivity learning
+başlamaz. Item 5'in final completion sınırı sonraki owner kararı ve executable
+evidence ile belirlenir; Items 6–13'ün sırası değişmez.
 
 ## 13. Tarihsel roadmap sınırı
 

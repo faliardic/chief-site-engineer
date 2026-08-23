@@ -270,6 +270,39 @@ void main() {
       expect(_start(ss1, 'B'), '2026-09-05');
     });
 
+    test('public dependency candidate helper preserves engine semantics', () {
+      for (final specification in [
+        _edge('A', 'B', relationship: 'FS', lag: 0),
+        _edge('A', 'B', relationship: 'SS', lag: 1),
+      ]) {
+        final scenario = _microScenario(
+          seeds: [_seed('A', 3), _seed('B', 1)],
+          edges: [specification],
+        );
+        final schedule = scenario.engine.build(
+          profile: scenario.profile,
+          graph: scenario.graph,
+          seedCatalog: scenario.catalog,
+        );
+        final predecessor = schedule.scheduledActivities.singleWhere(
+          (activity) => activity.activityId == 'A',
+        );
+        final successor = schedule.scheduledActivities.singleWhere(
+          (activity) => activity.activityId == 'B',
+        );
+
+        expect(
+          constructionDependencyCandidateStart(
+            predecessor: predecessor,
+            successorCalendarType: successor.durationCalendarType,
+            edge: scenario.graph.dependencyEdges.single,
+            calendar: scenario.profile.calendar,
+          ),
+          successor.startDate,
+        );
+      }
+    });
+
     test('multiple predecessors use the maximum candidate', () {
       final result = _microSchedule(
         seeds: [
