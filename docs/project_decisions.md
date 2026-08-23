@@ -4131,3 +4131,21 @@
   `1` ve app version `0.1.0+1` değişmez. Forecast UI, actual quantity, dependency
   reforecast ve productivity learning başlamaz; Item 5 current ve not complete
   kalır.
+
+## Issue 472 — Yeni schedule snapshot dependency graph'ı immutable saklanır
+
+- Yalnız schema `17` altında bundan sonra persist edilen schedule snapshot'lar,
+  snapshot oluşturulurken resolve edilmiş dependency edge setini aynı transaction
+  içinde explicit manifest, deterministic count/hash ve immutable row fingerprint
+  ile saklar. Zero-edge graph explicit count `0` manifest taşır.
+- Edge projection `edge_key` ile deterministic sıralanır; stable JSON ve SHA-256
+  exact snapshot graph bütünlüğünü korur. Endpoint'ler aynı snapshot activity
+  setine bağlıdır; metadata/activity/manifest/edge write veya verification hatası
+  bütün transaction'ı rollback eder ve önceki current snapshot'ı bozmaz.
+- Schema-16 historical snapshot'lara current graph/corpus üzerinden dependency
+  backfill yapılmaz. Manifest yokluğu zero dependency anlamına gelmez ve typed
+  `schedule_snapshot_dependency_graph_unavailable` ile fail-closed sonuçlanır;
+  newer/current snapshot'a sessiz rebind yasaktır.
+- Backup format `1` ve app version `0.1.0+1` değişmez. Dependency impact engine,
+  reforecast, Living Plan/reference mutation, UI ve device kapsamı başlamaz;
+  Item 5 current ve not complete kalır.

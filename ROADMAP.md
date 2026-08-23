@@ -3,22 +3,23 @@
 **Durum:** Güncel yürütme sırası
 **Tarih:** 23 Ağustos 2026
 **V2 kapsam kaynağı:** `docs/v2/CSE_V2_SCOPE.md`
-**Güncel yön truth-sync:** Issue #470
-**Güncel güvenli `master`:** `a5298556c14653bf590f65d1f67b2866a5e58298` / PR #469
+**Güncel yön truth-sync:** Issue #472
+**Güncel güvenli `master`:** `92fa66c48af99e693688d4cc1ca5d2dae1b0828c` / PR #471
 
 ## 1. Güncel ürün durumu
 
 CSE V1 tamamlanmış ve proje sahibi tarafından yaklaşık bir ay gerçek sahada
 kullanılmıştır. V2 Items 1–4 tamamlanmış; schedule runtime, immutable
 reference-schedule snapshots, Living Plan MVP/ilk cihaz kabulü, actual-progress
-core ve progress UI/isolated cihaz kabulü PR #469'a kadar merge edilmiştir.
+core, progress UI/isolated cihaz kabulü ve deterministic forecast core PR #471'e
+kadar merge edilmiştir.
 Güncel teknik ve ürün durumu:
 
 | Alan | Değer |
 | --- | --- |
 | V1 baseline commit | `7c9f65a811c9f4bca561adab6bd1f8e64e6908cc` |
-| Güncel güvenli merge | `a5298556c14653bf590f65d1f67b2866a5e58298` |
-| Son Living Plan predecessor PR | `#469` |
+| Güncel güvenli merge | `92fa66c48af99e693688d4cc1ca5d2dae1b0828c` |
+| Son Living Plan predecessor PR | `#471` |
 | Mobil sürüm | `0.1.0+1` |
 | SQLite schema | `16` |
 | `.csebackup` formatı | `1` |
@@ -28,10 +29,11 @@ Güncel teknik ve ürün durumu:
 | Store/public release | İlan edilmedi |
 
 V1'in tamamlanması, modüllerin dondurulduğu anlamına gelmez. V2 aynı
-offline-first mobil ürün üzerinde ilerler. Issue #470 exact bound reference
-duration ve current progress'ten read-only deterministic remaining/finish
-forecast core'unu kuran current iştir; public/store production release ilan
-edilmemiştir.
+offline-first mobil ürün üzerinde ilerler. Issue #472 yalnız bundan sonra
+oluşturulan immutable schedule snapshot'ların resolved dependency edge setini
+aynı transaction içinde manifest/count/hash ile saklayan current iştir; schema
+17 candidate'dır, merged `master` schema 16 kalır ve public/store production
+release ilan edilmemiştir.
 
 ## 2. Kaynak otoritesi
 
@@ -200,12 +202,14 @@ durable idempotency/no-op receipt ve append-only event sözleşmesi korunur.
 Issue #468 / PR #469 bu progress gerçeğini kartlarda görünür kılan, yalnız
 `STARTED`/`DEFERRED` item için `0..99` editini açan ve isolated acceptance
 paketinde lifecycle/relaunch persistence'ı kanıtlayan merged predecessor'dır.
-Issue #470 current evolution olarak item'ın exact bound reference snapshot
-süresinden read-only deterministic kalan süre/finish tahmini üretir; item,
-planned date, reference schedule ve downstream işler değişmez. Actual quantity,
-dependency reforecast ve project-specific productivity learning başlamaz. Item
-5 not complete kalır; final completion sonraki owner kararı ve executable
-evidence'a bağlıdır. Items 6–13'ün sırası değişmez.
+Issue #470 / PR #471 item'ın exact bound reference snapshot süresinden read-only
+deterministic kalan süre/finish tahmini üreten merged predecessor'dır. Issue #472
+current evolution olarak yalnız yeni schedule snapshot'ların exact resolved
+dependency graph'ını immutable ve fingerprint'li saklar. Schema-16 historical
+snapshot'lara graph backfill yapılmaz; manifest yokluğu zero-edge değil typed
+unavailable'dır. Downstream dependency impact/reforecast, actual quantity ve
+project-specific productivity learning başlamaz. Item 5 not complete kalır;
+Items 6–13'ün sırası değişmez.
 
 ### V2.6 — Günlük Log Çıktısı v1
 
@@ -332,7 +336,8 @@ Güncel canonical faz:
 Living 7-Day Plan — current, not complete
 → Issue #466 / PR #467 actual-progress source-of-truth core — merged
 → Issue #468 / PR #469 progress UI + isolated device acceptance — merged
-→ Issue #470 deterministic read-only forecast core — current
+→ Issue #470 / PR #471 deterministic read-only forecast core — merged
+→ Issue #472 immutable snapshot dependency graph persistence — current
 ```
 
 Items 1–4 complete'tir. Activity Catalog Runtime, typed Project Profile ve
@@ -342,12 +347,14 @@ Date Engine ve immutable persistent reference-schedule snapshots PR #444, #446,
 
 Issue #466 / PR #467 nullable actual-progress source-of-truth foundation'ını,
 optimistic revision ve durable idempotency/no-op receipt sözleşmesini merged
-temele ekler. Issue #468 / PR #469 progress UI ve isolated device acceptance
-merged predecessor'dır. Issue #470 exact origin snapshot duration'ını progress
-ile read-only yorumlayan deterministic forecast core current evolution'ıdır;
-actual quantity, dependency reforecast ve productivity learning başlamaz. Item
-5'in final completion sınırı sonraki owner kararı ve executable evidence ile
-belirlenir; Items 6–13'ün sırası değişmez.
+temele ekler. Issue #468 / PR #469 progress UI ve isolated device acceptance,
+Issue #470 / PR #471 exact origin snapshot duration'ını progress ile read-only
+yorumlayan deterministic forecast core merged predecessor'lardır. Issue #472
+yalnız yeni snapshot'ların exact dependency graph'ını immutable saklayan current
+evolution'dır; legacy graph backfill, dependency impact/reforecast, actual
+quantity ve productivity learning başlamaz. Item 5'in final completion sınırı
+sonraki owner kararı ve executable evidence ile belirlenir; Items 6–13'ün sırası
+değişmez.
 
 ## 13. Tarihsel roadmap sınırı
 

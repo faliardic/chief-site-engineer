@@ -119,6 +119,85 @@ void main() {
         persistedRows.map((row) => row['row_sha256']),
         everyElement(matches(r'^[0-9a-f]{64}$')),
       );
+      final dependencyGraph = await repository.loadDependencyGraphBySnapshotId(
+        'snapshot-a',
+      );
+      expect(dependencyGraph, isNotNull);
+      expect(dependencyGraph!.snapshotId, 'snapshot-a');
+      expect(dependencyGraph.projectId, scenario.profile.projectId);
+      expect(dependencyGraph.dependencyCount, 2);
+      expect(
+        dependencyGraph.edges.map((edge) => edge.edgeKey),
+        orderedEquals(const ['EDGE-0', 'EDGE-1']),
+      );
+      expect(
+        dependencyGraph.edges.map(
+          (edge) => <String, Object?>{
+            'template_dependency_id': edge.templateDependencyId,
+            'predecessor_instance_id': edge.predecessorInstanceId,
+            'successor_instance_id': edge.successorInstanceId,
+            'relationship_type': edge.relationshipType.jsonValue,
+            'lag_value': edge.lagValue,
+            'lag_unit': edge.lagUnit.jsonValue,
+            'scope_rule': edge.scopeRule.jsonValue,
+            'is_mandatory': edge.isMandatory,
+            'confidence': edge.confidence.jsonValue,
+            'review_status': edge.reviewStatus.jsonValue,
+          },
+        ),
+        equals(const [
+          {
+            'template_dependency_id': 'DEP-0',
+            'predecessor_instance_id': 'ACT-A@PROJECT',
+            'successor_instance_id': 'ACT-B@PROJECT',
+            'relationship_type': 'FS',
+            'lag_value': 0,
+            'lag_unit': 'WORKING_DAY',
+            'scope_rule': 'PROJECT',
+            'is_mandatory': true,
+            'confidence': 'C_SUPPORTED_INFERENCE',
+            'review_status': 'REVIEW_REQUIRED',
+          },
+          {
+            'template_dependency_id': 'DEP-1',
+            'predecessor_instance_id': 'ACT-B@PROJECT',
+            'successor_instance_id': 'ACT-C@PROJECT',
+            'relationship_type': 'FS',
+            'lag_value': 0,
+            'lag_unit': 'WORKING_DAY',
+            'scope_rule': 'PROJECT',
+            'is_mandatory': true,
+            'confidence': 'C_SUPPORTED_INFERENCE',
+            'review_status': 'REVIEW_REQUIRED',
+          },
+        ]),
+      );
+      expect(
+        dependencyGraph.projectionSha256,
+        constructionScheduleSnapshotDependencyProjectionSha256(
+          scenario.graph.dependencyEdges,
+        ),
+      );
+      expect(
+        constructionScheduleSnapshotDependencyProjectionSha256(
+          scenario.graph.dependencyEdges.reversed,
+        ),
+        dependencyGraph.projectionSha256,
+      );
+      final persistedDependencies = await database.database.query(
+        'project_schedule_snapshot_dependencies',
+        where: 'snapshot_id = ?',
+        whereArgs: ['snapshot-a'],
+        orderBy: 'edge_key ASC',
+      );
+      expect(
+        persistedDependencies.map((row) => row['row_sha256']),
+        orderedEquals(
+          dependencyGraph.edges.map(
+            constructionScheduleSnapshotDependencyRowSha256,
+          ),
+        ),
+      );
       expect(
         stored.activities
             .where(
@@ -211,6 +290,14 @@ void main() {
         ),
         hasLength(4),
       );
+      expect(
+        await database.database.query(
+          'project_schedule_snapshot_dependencies',
+          where: 'snapshot_id = ?',
+          whereArgs: ['snapshot-a'],
+        ),
+        hasLength(2),
+      );
     },
   );
 
@@ -251,6 +338,269 @@ void main() {
       expect(
         await database.database.query('project_schedule_snapshot_activities'),
         hasLength(4),
+      );
+    },
+  );
+
+  test(
+    'dependency insert failure rolls back metadata activities manifest and supersede',
+    () async {
+      final firstRepository = _repository(
+        database,
+        snapshotId: 'snapshot-a',
+        generatedAt: DateTime.utc(2026, 8, 16, 7),
+      );
+      await _persist(firstRepository, scenario);
+      final failingRepository = ConstructionScheduleSnapshotRepository(
+        database: database,
+        clock: () => DateTime.utc(2026, 8, 16, 8),
+        idFactory: () => 'snapshot-b',
+        beforeDependencyInsert: (index, _) async {
+          if (index == 1) {
+            throw StateError('injected dependency insert failure');
+          }
+        },
+      );
+
+      await expectLater(
+        _persist(failingRepository, scenario),
+        throwsA(isA<StateError>()),
+      );
+      expect(
+        (await firstRepository.loadCurrentSnapshot(
+          scenario.profile.projectId,
+        ))?.metadata.snapshotId,
+        'snapshot-a',
+      );
+      expect(await firstRepository.loadSnapshotById('snapshot-b'), isNull);
+      for (final table in const [
+        'project_schedule_snapshot_activities',
+        'project_schedule_snapshot_dependency_manifests',
+        'project_schedule_snapshot_dependencies',
+      ]) {
+        expect(
+          await database.database.query(
+            table,
+            where: 'snapshot_id = ?',
+            whereArgs: ['snapshot-b'],
+          ),
+          isEmpty,
+        );
+      }
+      expect(
+        await database.database.query(
+          'project_schedule_snapshot_dependencies',
+          where: 'snapshot_id = ?',
+          whereArgs: ['snapshot-a'],
+        ),
+        hasLength(2),
+      );
+    },
+  );
+
+  test('zero-edge graph persists an explicit verified manifest', () async {
+    final zeroEdgeScenario = _scheduleScenario(zeroDependencies: true);
+    final repository = _repository(
+      database,
+      snapshotId: 'snapshot-zero',
+      generatedAt: DateTime.utc(2026, 8, 16, 7),
+    );
+
+    await _persist(repository, zeroEdgeScenario);
+    final graph = await repository.loadDependencyGraphBySnapshotId(
+      'snapshot-zero',
+    );
+    expect(graph, isNotNull);
+    expect(graph!.dependencyCount, 0);
+    expect(graph.edges, isEmpty);
+    expect(
+      graph.projectionSha256,
+      constructionScheduleSnapshotDependencyProjectionSha256(const []),
+    );
+    expect(
+      await database.database.query(
+        'project_schedule_snapshot_dependency_manifests',
+        where: 'snapshot_id = ?',
+        whereArgs: ['snapshot-zero'],
+      ),
+      hasLength(1),
+    );
+    expect(
+      await database.database.query(
+        'project_schedule_snapshot_dependencies',
+        where: 'snapshot_id = ?',
+        whereArgs: ['snapshot-zero'],
+      ),
+      isEmpty,
+    );
+  });
+
+  test(
+    'dependency integrity fails closed on count hash and row tamper',
+    () async {
+      final repository = _repository(
+        database,
+        snapshotId: 'snapshot-a',
+        generatedAt: DateTime.utc(2026, 8, 16, 7),
+      );
+      await _persist(repository, scenario);
+      final originalManifest = (await database.database.query(
+        'project_schedule_snapshot_dependency_manifests',
+        where: 'snapshot_id = ?',
+        whereArgs: ['snapshot-a'],
+      )).single;
+      final originalRow = (await database.database.query(
+        'project_schedule_snapshot_dependencies',
+        where: 'snapshot_id = ? AND edge_key = ?',
+        whereArgs: ['snapshot-a', 'EDGE-0'],
+      )).single;
+      await database.database.execute(
+        'DROP TRIGGER project_schedule_snapshot_dependency_manifests_immutable_update',
+      );
+      await database.database.execute(
+        'DROP TRIGGER project_schedule_snapshot_dependencies_immutable_update',
+      );
+
+      await database.database.update(
+        'project_schedule_snapshot_dependency_manifests',
+        {'dependency_count': 3},
+        where: 'snapshot_id = ?',
+        whereArgs: ['snapshot-a'],
+      );
+      await expectLater(
+        repository.loadDependencyGraphBySnapshotId('snapshot-a'),
+        throwsA(
+          isA<ConstructionScheduleSnapshotFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'schedule_snapshot_dependency_count_mismatch',
+          ),
+        ),
+      );
+      await database.database.update(
+        'project_schedule_snapshot_dependency_manifests',
+        {'dependency_count': originalManifest['dependency_count']},
+        where: 'snapshot_id = ?',
+        whereArgs: ['snapshot-a'],
+      );
+
+      await database.database.update(
+        'project_schedule_snapshot_dependency_manifests',
+        {'projection_sha256': 'f' * 64},
+        where: 'snapshot_id = ?',
+        whereArgs: ['snapshot-a'],
+      );
+      await expectLater(
+        repository.loadDependencyGraphBySnapshotId('snapshot-a'),
+        throwsA(
+          isA<ConstructionScheduleSnapshotFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'schedule_snapshot_dependency_graph_fingerprint_mismatch',
+          ),
+        ),
+      );
+      await database.database.update(
+        'project_schedule_snapshot_dependency_manifests',
+        {'projection_sha256': originalManifest['projection_sha256']},
+        where: 'snapshot_id = ?',
+        whereArgs: ['snapshot-a'],
+      );
+
+      await database.database.update(
+        'project_schedule_snapshot_dependencies',
+        {'lag_value': 1},
+        where: 'snapshot_id = ? AND edge_key = ?',
+        whereArgs: ['snapshot-a', 'EDGE-0'],
+      );
+      await expectLater(
+        repository.loadDependencyGraphBySnapshotId('snapshot-a'),
+        throwsA(
+          isA<ConstructionScheduleSnapshotFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'schedule_snapshot_dependency_row_fingerprint_mismatch',
+          ),
+        ),
+      );
+      await database.database.update(
+        'project_schedule_snapshot_dependencies',
+        {
+          'lag_value': originalRow['lag_value'],
+          'row_sha256': originalRow['row_sha256'],
+        },
+        where: 'snapshot_id = ? AND edge_key = ?',
+        whereArgs: ['snapshot-a', 'EDGE-0'],
+      );
+      expect(
+        (await repository.loadDependencyGraphBySnapshotId(
+          'snapshot-a',
+        ))?.dependencyCount,
+        2,
+      );
+    },
+  );
+
+  test(
+    'legacy snapshot graph is unavailable without newer snapshot rebind',
+    () async {
+      final firstRepository = _repository(
+        database,
+        snapshotId: 'snapshot-a',
+        generatedAt: DateTime.utc(2026, 8, 16, 7),
+      );
+      await _persist(firstRepository, scenario);
+      await database.database.execute(
+        'DROP TRIGGER project_schedule_snapshot_dependencies_immutable_delete',
+      );
+      await database.database.execute(
+        'DROP TRIGGER project_schedule_snapshot_dependency_manifests_immutable_delete',
+      );
+      await database.database.delete(
+        'project_schedule_snapshot_dependencies',
+        where: 'snapshot_id = ?',
+        whereArgs: ['snapshot-a'],
+      );
+      await database.database.delete(
+        'project_schedule_snapshot_dependency_manifests',
+        where: 'snapshot_id = ?',
+        whereArgs: ['snapshot-a'],
+      );
+
+      final secondRepository = _repository(
+        database,
+        snapshotId: 'snapshot-b',
+        generatedAt: DateTime.utc(2026, 8, 16, 8),
+      );
+      await _persist(secondRepository, scenario);
+
+      await expectLater(
+        secondRepository.loadDependencyGraphBySnapshotId('snapshot-a'),
+        throwsA(
+          isA<ConstructionScheduleSnapshotFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'schedule_snapshot_dependency_graph_unavailable',
+          ),
+        ),
+      );
+      expect(
+        (await secondRepository.loadSnapshotById(
+          'snapshot-a',
+        ))?.metadata.isCurrent,
+        isFalse,
+      );
+      expect(
+        (await secondRepository.loadDependencyGraphBySnapshotId(
+          'snapshot-b',
+        ))?.dependencyCount,
+        2,
+      );
+      expect(
+        await secondRepository.loadDependencyGraphBySnapshotId(
+          'missing-snapshot',
+        ),
+        isNull,
       );
     },
   );
@@ -830,7 +1180,10 @@ Future<void> _insertProject(AppDatabase database, String projectId) =>
       'updated_at': '2026-08-16T06:00:00Z',
     });
 
-_ScheduleScenario _scheduleScenario({String scheduleStart = '2026-09-04'}) {
+_ScheduleScenario _scheduleScenario({
+  String scheduleStart = '2026-09-04',
+  bool zeroDependencies = false,
+}) {
   final profile = validConstructionProjectProfile(
     overrides: {
       'project_id': 'PRJ-SNAPSHOT',
@@ -871,15 +1224,20 @@ _ScheduleScenario _scheduleScenario({String scheduleStart = '2026-09-04'}) {
     ),
   ];
   final instances = [for (final seed in seeds) _instance(seed.activityId)];
-  final edges = [
+  final candidateEdges = [
     _edge(0, 'ACT-A@PROJECT', 'ACT-B@PROJECT'),
     _edge(1, 'ACT-B@PROJECT', 'ACT-C@PROJECT'),
   ];
+  final edges = zeroDependencies
+      ? const <ConstructionResolvedDependencyEdge>[]
+      : candidateEdges;
   final graph = ConstructionProjectActivityGraph(
     projectId: profile.projectId,
     activityInstances: instances,
     dependencyEdges: edges,
-    isolatedInstanceIds: const ['ACT-D@PROJECT'],
+    isolatedInstanceIds: zeroDependencies
+        ? instances.map((item) => item.instanceId).toList(growable: false)
+        : const ['ACT-D@PROJECT'],
     corpusVersion: '0.3-yfk-resource-seed',
     selectedActivityTemplateCount: instances.length,
     selectedDependencyTemplateCount: edges.length,

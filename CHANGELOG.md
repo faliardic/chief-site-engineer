@@ -1,5 +1,23 @@
 # Changelog
 
+## Issue #472 - Immutable schedule snapshot dependency graph persistence
+
+- Mobil schema `16 → 17`, yalnız yeni immutable schedule snapshot'ların snapshot
+  anında resolve edilmiş dependency graph'ını explicit manifest, count ve stable
+  SHA-256 ile aynı transaction içinde saklar; her edge kendi integrity fingerprint
+  değerini taşır ve aynı snapshot activity endpoint'lerine bağlıdır.
+- Zero-edge graph explicit manifest ile ayrılır. Manifest/edge update-delete,
+  invalid enum, self-edge, orphan endpoint, count/hash/row tamper fail-closed
+  reddedilir; dependency insert/verification hatası metadata, activity ve önceki
+  current snapshot supersede işlemini birlikte rollback eder.
+- Schema-16 historical snapshot'lara dependency backfill yapılmaz; missing
+  manifest typed unavailable'dır ve newer/current snapshot'a sessiz rebind
+  yapılmaz. Format-1 backup schema17 graph'ı korur; schema16 restore sahte graph
+  üretmeden schema17'ye yükselir.
+- Backup format `1` ve version `0.1.0+1` değişmez. Dependency impact/reforecast,
+  Living Plan/reference mutation, UI, platform davranışı, APK ve device kapsam
+  dışıdır; Item 5 current ve not complete kalır.
+
 ## Issue #470 - Deterministic Living Plan forecast core
 
 - Pure forecast engine, Living Plan item'ını exact bound reference snapshot/
