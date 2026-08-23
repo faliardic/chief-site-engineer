@@ -1,5 +1,19 @@
 # Changelog
 
+## Issue #470 - Deterministic Living Plan forecast core
+
+- Pure forecast engine, Living Plan item'ını exact bound reference snapshot/
+  project/activity instance ile fail-closed bağlar; newer/current snapshot'a
+  sessiz rebind yapmaz.
+- `STARTED + progress 0..99` kalan reference duration'ı deterministik hesaplar,
+  `ceil` ile scheduling day'e yuvarlar ve caller-supplied canonical UTC-midnight
+  `asOfDate` ile existing construction calendar finish helper'ını kullanır.
+- `PLANNED`, unknown progress, `DEFERRED` ve `COMPLETED` future finish üretmez;
+  signed variance yalnız immutable reference finish karşılaştırmasıdır.
+- Duration status/confidence ve snapshot production/duration/baseline provenance
+  exact korunur. Forecast persistence/mutation değildir; schema `16`, backup
+  format `1`, version `0.1.0+1`, UI, quantity, dependency reforecast,
+  productivity learning ve platform/device sınırları değişmez.
 ## Issue #468 - Living Plan progress UI and isolated device acceptance
 
 - Living Plan kartları nullable actual progress'i görünür kılar; item-scoped
