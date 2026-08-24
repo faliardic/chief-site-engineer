@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:chief_site_engineer/application/construction_corpus_repository.dart';
 import 'package:chief_site_engineer/application/construction_living_plan_dependency_impact.dart';
 import 'package:chief_site_engineer/application/construction_living_plan_forecast.dart';
+import 'package:chief_site_engineer/application/construction_schedule_date_engine.dart';
 import 'package:chief_site_engineer/application/construction_schedule_snapshot_repository.dart';
 import 'package:chief_site_engineer/domain/construction_corpus_models.dart';
+import 'package:chief_site_engineer/domain/construction_living_plan_forecast_models.dart';
 import 'package:chief_site_engineer/domain/construction_living_plan_intelligence_models.dart';
 import 'package:chief_site_engineer/domain/construction_living_plan_models.dart';
 import 'package:chief_site_engineer/domain/construction_schedule_dependency_snapshot_models.dart';
@@ -77,9 +79,9 @@ class ConstructionLivingPlanIntelligenceApplication
           snapshots[item.referenceSnapshotId] ??
           await _loadSnapshot(item.referenceSnapshotId);
       snapshots[item.referenceSnapshotId] = snapshot;
-      final forecast = _forecastEngine.forecast(
+      final forecast = _forecastForItem(
         item: item,
-        exactSnapshot: snapshot,
+        snapshot: snapshot,
         asOfDate: asOfDate,
       );
       final graphRead =
@@ -138,6 +140,77 @@ class ConstructionLivingPlanIntelligenceApplication
       );
     }
     return Map.unmodifiable(result);
+  }
+
+  ConstructionLivingPlanForecast _forecastForItem({
+    required ConstructionLivingPlanItem item,
+    required ConstructionScheduleSnapshot snapshot,
+    required DateTime asOfDate,
+  }) {
+    try {
+      return _forecastEngine.forecast(
+        item: item,
+        exactSnapshot: snapshot,
+        asOfDate: asOfDate,
+      );
+    } on ConstructionLivingPlanForecastFailure catch (failure) {
+      if (failure.code != 'forecast_invalid_as_of_calendar' ||
+          item.status != ConstructionLivingPlanStatus.started ||
+          item.progressPercent == null) {
+        rethrow;
+      }
+      final activities = snapshot.activities
+          .where((activity) => activity.instanceId == item.activityInstanceId)
+          .toList(growable: false);
+      final calendar = snapshot.profile.calendar;
+      if (activities.length != 1 ||
+          activities.single.durationCalendarType !=
+              ConstructionActivityDurationCalendarType.workingDay ||
+          isConstructionWorkday(asOfDate, calendar)) {
+        rethrow;
+      }
+      final calculationDate = nextConstructionWorkday(
+        asOfDate,
+        calendar,
+        includeCurrent: false,
+      );
+      final calculated = _forecastEngine.forecast(
+        item: item,
+        exactSnapshot: snapshot,
+        asOfDate: calculationDate,
+      );
+      return ConstructionLivingPlanForecast(
+        itemId: calculated.itemId,
+        projectId: calculated.projectId,
+        referenceSnapshotId: calculated.referenceSnapshotId,
+        activityInstanceId: calculated.activityInstanceId,
+        status: calculated.status,
+        progressPercent: calculated.progressPercent,
+        asOfDate: asOfDate,
+        referenceStartDate: calculated.referenceStartDate,
+        referenceFinishDate: calculated.referenceFinishDate,
+        referenceDurationDays: calculated.referenceDurationDays,
+        referenceRoundedSchedulingDays:
+            calculated.referenceRoundedSchedulingDays,
+        referenceDurationCalendarType: calculated.referenceDurationCalendarType,
+        referenceDurationStatus: calculated.referenceDurationStatus,
+        referenceDurationConfidence: calculated.referenceDurationConfidence,
+        referenceCorpusVersion: calculated.referenceCorpusVersion,
+        referenceScheduleSeedVersion: calculated.referenceScheduleSeedVersion,
+        referenceScheduleSeedProvenance:
+            calculated.referenceScheduleSeedProvenance,
+        referenceProductionStatus: calculated.referenceProductionStatus,
+        referenceDurationSource: calculated.referenceDurationSource,
+        referenceBaselineStatus: calculated.referenceBaselineStatus,
+        referenceProjectionSha256: calculated.referenceProjectionSha256,
+        remainingDurationDays: calculated.remainingDurationDays,
+        remainingRoundedSchedulingDays:
+            calculated.remainingRoundedSchedulingDays,
+        forecastFinishDate: calculated.forecastFinishDate,
+        varianceCalendarDays: calculated.varianceCalendarDays,
+        basis: calculated.basis,
+      );
+    }
   }
 
   Future<ConstructionScheduleSnapshot> _loadSnapshot(String snapshotId) async {

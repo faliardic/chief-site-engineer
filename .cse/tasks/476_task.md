@@ -868,3 +868,32 @@ were not reused as an owner manual PASS and do not support a `VERIFIED`,
 Publication is authorized next as one minimal intentional commit, normal push
 and one Draft PR against current master. Ready, merge, Issue/Epic closure,
 V2.5 completion and V2.6 work remain forbidden.
+
+## PR #480 independent source review correction
+
+Review: https://github.com/faliardic/chief-site-engineer/pull/480#issuecomment-5396342094
+
+Status remains `IMPLEMENTED — MANUAL TEST PENDING`.
+
+Two and only two source blockers were corrected:
+
+1. `ConstructionLivingPlanIntelligenceApplication` keeps the caller-supplied
+   canonical `asOfDate`. If the exact forecast failure is
+   `forecast_invalid_as_of_calendar` for a `STARTED` item with explicit
+   progress whose exact snapshot activity is `WORKING_DAY`, and that caller
+   date is not a workday in the exact snapshot calendar, calculation retries
+   from that same calendar's next valid workday. All other failures rethrow;
+   no clock, current snapshot, graph rebuild or persistence mutation is used.
+2. The zero-variance UI copy is exact `Referansla aynı gün`. Positive and
+   early wording is unchanged.
+
+Touched Dart formatting completed. One permitted static analyzer invocation
+PASSed with `No issues found`. Exact correction diff/allowlist, protected
+drift, `git diff --check`, schema `17`, backup `1`, version `0.1.0+1`,
+pubspec/lock drift `0` and platform-production drift `0` all PASSed.
+
+No Flutter test, unit/widget/integration/full suite, build, emulator/ADB/device
+flow, scripted acceptance, install, launch or package clear was run.
+
+Manual Test Register #479 keeps `MT-476-014` and `MT-476-015` as `PENDING`.
+Ready, merge, Issue closure, V2.5 completion and V2.6 remain forbidden.

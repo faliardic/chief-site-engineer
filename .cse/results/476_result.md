@@ -2247,3 +2247,103 @@ review_recommendation:
   merge: false
   next_step: minimal_commit_push_draft_pr_then_independent_chatgpt_review
 ```
+
+## PR #480 source correction evidence
+
+Independent review:
+https://github.com/faliardic/chief-site-engineer/pull/480#issuecomment-5396342094
+
+```text
+base head: c9f798275c1992a516cb71584c3be137ebdc4d86
+implementation status: IMPLEMENTED — MANUAL TEST PENDING
+source blockers corrected: 2
+new path required: no
+17th path required: no
+```
+
+Non-working-day forecast correction:
+
+- The initial forecast call remains unchanged and fail-closed.
+- Recovery is limited to exact `forecast_invalid_as_of_calendar` for
+  `STARTED + explicit progress` and an exact-snapshot `WORKING_DAY` activity.
+- The caller date must be non-working in that exact snapshot calendar.
+- The calculation anchor becomes `nextConstructionWorkday` from the same
+  immutable snapshot calendar.
+- The returned forecast preserves the original caller-supplied canonical
+  `asOfDate`; downstream provenance/binding fields are copied unchanged.
+- Other binding, integrity, calendar and forecast failures rethrow.
+- No application clock, newer/current snapshot, graph rebuild, planned-date
+  mutation, persistence, event, receipt or revision change was introduced.
+
+Zero-variance copy correction:
+
+```text
+old: Referansa göre: aynı gün
+new: Referansla aynı gün
+positive wording: unchanged
+early wording: unchanged
+```
+
+Source-level verification:
+
+```text
+touched Dart formatting: PASS / 2 files, 1 reformatted
+flutter analyze --no-pub: PASS / one invocation / No issues found
+correction changed paths before evidence: exact 2
+existing 16-path allowlist: preserved
+protected forecast/date/impact/storage/domain drift: 0
+git diff --check: PASS
+schema: 17
+backup format: 1
+version: 0.1.0+1
+pubspec/lock drift: 0
+platform-production drift: 0
+```
+
+No Flutter test of any scope, APK/AAB build, emulator/ADB/device acceptance,
+scripted UI acceptance, package install, launch, force-stop or clear was run.
+
+Manual Test Register: https://github.com/faliardic/chief-site-engineer/issues/479
+
+```text
+MT-476-014: PENDING
+MT-476-015: PENDING
+```
+
+```yaml
+execution_record:
+  policy_version: CSE-MRP-1.0
+  task_risk: R4
+  requested_model: gpt-5.6-sol
+  requested_reasoning_effort: max
+  actual_model: unknown
+  actual_reasoning_effort: null
+  runtime_verification_status: unverified
+  execution_mode: standard
+  orchestration: single-agent
+  verification_mode: owner_led_manual_testing
+  correction_base: c9f798275c1992a516cb71584c3be137ebdc4d86
+  blockers_corrected: 2
+  static_analyzer_invocations: 1
+  automated_application_tests: not_run_owner_policy
+  build: not_run_owner_policy
+  device_acceptance: not_run_owner_policy
+  implementation_status: IMPLEMENTED
+  manual_test_status: PENDING
+  manual_test_ids: MT-476-014..015
+  correction_commit: pending_authorized_next_step
+  push: pending_authorized_next_step
+  draft_pr: 480
+  ready: false
+  merge: false
+```
+
+```yaml
+review_recommendation:
+  decision: independent_source_diff_rereview
+  pr: 480
+  manual_test_ids: MT-476-014..015
+  verified_claim_allowed: false
+  production_ready_claim_allowed: false
+  next_step: minimal_correction_commit_normal_push_then_rereview
+```

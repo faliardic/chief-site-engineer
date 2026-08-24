@@ -1472,7 +1472,7 @@ String _forecastVarianceLabel(int varianceCalendarDays) {
   if (varianceCalendarDays < 0) {
     return 'Referansa göre: ${-varianceCalendarDays} gün erken';
   }
-  return 'Referansa göre: aynı gün';
+  return 'Referansla aynı gün';
 }
 
 String _livingPlanItemSemanticsIdentity(ConstructionLivingPlanItem item) =>
