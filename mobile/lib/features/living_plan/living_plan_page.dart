@@ -1,9 +1,12 @@
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/construction_living_plan_application.dart';
+import 'package:chief_site_engineer/application/construction_living_plan_intelligence_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/construction_living_plan_models.dart';
+import 'package:chief_site_engineer/domain/construction_living_plan_forecast_models.dart';
+import 'package:chief_site_engineer/domain/construction_living_plan_intelligence_models.dart';
 import 'package:chief_site_engineer/domain/construction_project_graph_models.dart';
 import 'package:chief_site_engineer/domain/construction_schedule_models.dart';
 import 'package:flutter/material.dart';
@@ -12,12 +15,15 @@ class LivingPlanPage extends StatefulWidget {
   const LivingPlanPage({
     required this.agenda,
     required this.livingPlan,
+    this.intelligence =
+        const UnavailableConstructionLivingPlanIntelligenceApplication(),
     DateTime Function()? clock,
     super.key,
   }) : clock = clock ?? _systemUtcClock;
 
   final AgendaApplication agenda;
   final ConstructionLivingPlanApplicationPort livingPlan;
+  final ConstructionLivingPlanIntelligenceApplicationPort intelligence;
   final DateTime Function() clock;
 
   @override
@@ -30,6 +36,7 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
   List<MobileProject> _projects = const [];
   List<ConstructionLivingPlanWindowItem> _items = const [];
   List<ConstructionLivingPlanReferenceCandidate> _suggestions = const [];
+  Map<String, ConstructionLivingPlanIntelligence> _intelligence = const {};
   String? _projectId;
   late DateTime _windowStart;
   bool _loading = true;
@@ -68,6 +75,7 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
           _projectId = null;
           _items = const [];
           _suggestions = const [];
+          _intelligence = const {};
           _hasTrustedSnapshot = false;
           _loading = false;
         });
@@ -93,12 +101,22 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
         suggestions = const [];
         hasTrustedSnapshot = false;
       }
+      Map<String, ConstructionLivingPlanIntelligence> intelligence;
+      try {
+        intelligence = await widget.intelligence.loadForItems(
+          items: items.map((entry) => entry.item),
+          asOfDate: _istanbulToday(widget.clock()),
+        );
+      } on Object {
+        intelligence = const {};
+      }
       if (!mounted) return;
       setState(() {
         _projects = projects;
         _projectId = selected;
         _items = items;
         _suggestions = suggestions;
+        _intelligence = intelligence;
         _hasTrustedSnapshot = hasTrustedSnapshot;
         _loading = false;
       });
@@ -291,6 +309,16 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
     );
   }
 
+  Future<void> _openIntelligenceImpact(
+    ConstructionLivingPlanIntelligence intelligence,
+  ) => showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    isScrollControlled: true,
+    builder: (_) =>
+        _LivingPlanIntelligenceImpactSheet(intelligence: intelligence),
+  );
+
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -467,6 +495,7 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
       for (final entry in entries)
         _LivingPlanItemCard(
           entry: entry,
+          intelligence: _intelligence[entry.item.id],
           busy: _mutating,
           onStart: () => _start(entry.item),
           onComplete: () => _complete(entry.item),
@@ -474,6 +503,7 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
           onReopen: () => _reopen(entry.item),
           onNote: () => _editNote(entry.item),
           onProgress: () => _editProgress(entry.item),
+          onImpact: (intelligence) => _openIntelligenceImpact(intelligence),
         ),
   ];
 }
@@ -533,6 +563,7 @@ class _WindowControls extends StatelessWidget {
 class _LivingPlanItemCard extends StatelessWidget {
   const _LivingPlanItemCard({
     required this.entry,
+    required this.intelligence,
     required this.busy,
     required this.onStart,
     required this.onComplete,
@@ -540,9 +571,11 @@ class _LivingPlanItemCard extends StatelessWidget {
     required this.onReopen,
     required this.onNote,
     required this.onProgress,
+    required this.onImpact,
   });
 
   final ConstructionLivingPlanWindowItem entry;
+  final ConstructionLivingPlanIntelligence? intelligence;
   final bool busy;
   final VoidCallback onStart;
   final VoidCallback onComplete;
@@ -550,6 +583,7 @@ class _LivingPlanItemCard extends StatelessWidget {
   final VoidCallback onReopen;
   final VoidCallback onNote;
   final VoidCallback onProgress;
+  final ValueChanged<ConstructionLivingPlanIntelligence> onImpact;
 
   @override
   Widget build(BuildContext context) {
@@ -564,6 +598,13 @@ class _LivingPlanItemCard extends StatelessWidget {
     final semanticsIdentity = _livingPlanItemSemanticsIdentity(item);
     final progressLabel = _progressLabel(item);
     final progressSemanticsValue = _progressSemanticsValue(item);
+    final activeIntelligence =
+        item.status == ConstructionLivingPlanStatus.started &&
+            item.progressPercent != null &&
+            intelligence?.forecast.basis ==
+                ConstructionLivingPlanForecastBasis.startedReferenceRemaining
+        ? intelligence
+        : null;
 
     Widget actionSemantics({
       required String action,
@@ -627,6 +668,10 @@ class _LivingPlanItemCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(_contextLabel(item.activityContext)),
+            if (activeIntelligence case final value?) ...[
+              const SizedBox(height: 8),
+              _LivingPlanForecastSummary(itemId: item.id, intelligence: value),
+            ],
             if (item.note case final note?) ...[
               const SizedBox(height: 8),
               Semantics(
@@ -696,6 +741,21 @@ class _LivingPlanItemCard extends StatelessWidget {
                       label: const Text('İlerleme'),
                     ),
                   ),
+                if (activeIntelligence case final value?
+                    when value.hasPositiveDownstreamImpact)
+                  actionSemantics(
+                    action:
+                        '${value.impactedActivities.length} sonraki iş etkilenebilir',
+                    onPressed: busy ? null : () => onImpact(value),
+                    child: OutlinedButton.icon(
+                      key: Key('living-plan-impact-${item.id}'),
+                      onPressed: busy ? null : () => onImpact(value),
+                      icon: const Icon(Icons.account_tree_outlined),
+                      label: Text(
+                        '${value.impactedActivities.length} sonraki iş etkilenebilir',
+                      ),
+                    ),
+                  ),
                 actionSemantics(
                   action: 'Not',
                   onPressed: busy ? null : onNote,
@@ -715,6 +775,81 @@ class _LivingPlanItemCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _LivingPlanForecastSummary extends StatelessWidget {
+  const _LivingPlanForecastSummary({
+    required this.itemId,
+    required this.intelligence,
+  });
+
+  final String itemId;
+  final ConstructionLivingPlanIntelligence intelligence;
+
+  @override
+  Widget build(BuildContext context) {
+    final forecast = intelligence.forecast;
+    final remaining = forecast.remainingRoundedSchedulingDays!;
+    final finish = forecast.forecastFinishDate!;
+    final remainingLabel =
+        'Tahmini kalan: $remaining ${_schedulingDayLabel(forecast.referenceDurationCalendarType)}';
+    final finishLabel = 'Tahmini bitiş: ${_displayDate(finish)}';
+    final varianceLabel = _forecastVarianceLabel(
+      forecast.varianceCalendarDays!,
+    );
+    return Semantics(
+      key: Key('living-plan-intelligence-$itemId'),
+      container: true,
+      label: '$itemId · $remainingLabel · $finishLabel · $varianceLabel',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(remainingLabel),
+          Text(finishLabel),
+          Text(varianceLabel),
+        ],
+      ),
+    );
+  }
+}
+
+class _LivingPlanIntelligenceImpactSheet extends StatelessWidget {
+  const _LivingPlanIntelligenceImpactSheet({required this.intelligence});
+
+  final ConstructionLivingPlanIntelligence intelligence;
+
+  @override
+  Widget build(BuildContext context) => DraggableScrollableSheet(
+    expand: false,
+    initialChildSize: 0.65,
+    minChildSize: 0.4,
+    maxChildSize: 0.9,
+    builder: (context, controller) => ListView(
+      key: const Key('living-plan-impact-detail'),
+      controller: controller,
+      padding: const EdgeInsets.all(20),
+      children: [
+        Text('Tahmini etki', style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 8),
+        const Text('Bu bir önizlemedir; plan tarihleri değişmedi.'),
+        const SizedBox(height: 16),
+        for (final activity in intelligence.impactedActivities)
+          Card(
+            key: Key(
+              'living-plan-impact-activity-${activity.activityInstanceId}',
+            ),
+            child: ListTile(
+              title: Text(activity.displayName),
+              subtitle: Text(
+                'Tahmini başlangıç: ${_displayDate(activity.projectedStartDate)}\n'
+                'Tahmini bitiş: ${_displayDate(activity.projectedFinishDate)}',
+              ),
+              trailing: Text('+${activity.finishShiftCalendarDays} gün'),
+            ),
+          ),
+      ],
+    ),
+  );
 }
 
 class _ProgressEditorDialog extends StatefulWidget {
@@ -1321,6 +1456,23 @@ String _progressSemanticsValue(ConstructionLivingPlanItem item) {
   if (item.status == ConstructionLivingPlanStatus.completed) return '%100';
   final progress = item.progressPercent;
   return progress == null ? 'Raporlanmadı' : '%$progress';
+}
+
+String _schedulingDayLabel(
+  ConstructionActivityDurationCalendarType calendarType,
+) => switch (calendarType) {
+  ConstructionActivityDurationCalendarType.workingDay => 'iş günü',
+  ConstructionActivityDurationCalendarType.calendarDay => 'takvim günü',
+};
+
+String _forecastVarianceLabel(int varianceCalendarDays) {
+  if (varianceCalendarDays > 0) {
+    return 'Referansa göre: +$varianceCalendarDays gün';
+  }
+  if (varianceCalendarDays < 0) {
+    return 'Referansa göre: ${-varianceCalendarDays} gün erken';
+  }
+  return 'Referansa göre: aynı gün';
 }
 
 String _livingPlanItemSemanticsIdentity(ConstructionLivingPlanItem item) =>

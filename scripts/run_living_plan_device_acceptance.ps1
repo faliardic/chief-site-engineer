@@ -5,6 +5,9 @@ param(
 
     [string]$DeviceSerial,
 
+    [ValidateSet('Full', 'CleanRelaunch')]
+    [string]$DeviceScenario = 'Full',
+
     [string]$FlutterCommand = $(
         if ($env:CSE_FLUTTER_COMMAND) { $env:CSE_FLUTTER_COMMAND } else { 'flutter' }
     )
@@ -25,13 +28,14 @@ $aapt2 = Join-Path $androidSdk 'build-tools\36.0.0\aapt2.exe'
 $verifier = Join-Path $repositoryRoot 'scripts\verify_flutter_apk_entrypoint.py'
 $sharedApk = Join-Path $mobileRoot 'build\app\outputs\flutter-apk\app-debug.apk'
 $artifactRoot = Join-Path $mobileRoot 'build\release_gate'
-$artifact = Join-Path $artifactRoot 'sefim-0.1.0-issue468-living-plan-progress-acceptance-debug.apk'
+$artifact = Join-Path $artifactRoot 'sefim-0.1.0-issue476-living-plan-intelligence-acceptance-debug.apk'
 $acceptancePackage = 'com.faliardic.sefim.acceptance'
 $acceptanceLabel = 'Şefim'
 $acceptanceEnvironmentLabel = 'Kabul ortamı · sentetik veri'
 $acceptanceNote = 'Acceptance persistence notu'
 $updatedAcceptanceNote = "$acceptanceNote guncellendi"
 $livingPlanSemanticsPrefix = 'Yaşayan plan öğesi'
+$intelligenceItemId = '47600000-0000-4000-8000-000000000041'
 $neighborItemIds = @(
     '46400000-0000-4000-8000-000000000011',
     '46400000-0000-4000-8000-000000000021'
@@ -46,6 +50,8 @@ $allPackages = @(
 )
 $nonTargetPackages = @($allPackages | Where-Object { $_ -ne $acceptancePackage })
 $previousAcceptanceHarness = $env:CSE_ACCEPTANCE_HARNESS
+$script:activeAcceptanceCheckpoint = 'not_started'
+$script:lastSuccessfulAcceptanceStep = 'not_started'
 
 function Invoke-Checked {
     param(
@@ -161,8 +167,10 @@ function Invoke-IsolatedDeviceMutation {
         [Parameter(Mandatory = $true)][string[]]$Arguments,
         [Parameter(Mandatory = $true)][object]$ExpectedInventory
     )
+    $script:activeAcceptanceCheckpoint = "device_mutation:$($Arguments -join ' ')"
     $output = Invoke-Adb -Arguments $Arguments
     Assert-AllPackageInventory -Expected $ExpectedInventory
+    $script:lastSuccessfulAcceptanceStep = $script:activeAcceptanceCheckpoint
     return $output
 }
 
@@ -344,12 +352,16 @@ function Wait-UiDescendant {
         [switch]$RequireClickable,
         [int]$Attempts = 30
     )
+    $script:activeAcceptanceCheckpoint = "wait_ui_descendant:${AnchorText}:$Text"
     for ($attempt = 0; $attempt -lt $Attempts; $attempt++) {
         [xml]$hierarchy = Get-UiHierarchy
         $anchor = Find-UiNode -Hierarchy $hierarchy -Text $AnchorText -Contains
         if ($null -ne $anchor) {
             $node = Find-UiDescendant -Root $anchor -Text $Text -Contains:$Contains -RequireClickable:$RequireClickable
-            if ($null -ne $node) { return $node }
+            if ($null -ne $node) {
+                $script:lastSuccessfulAcceptanceStep = $script:activeAcceptanceCheckpoint
+                return $node
+            }
         }
         Start-Sleep -Milliseconds 300
     }
@@ -363,10 +375,14 @@ function Wait-UiNode {
         [switch]$RequireClickable,
         [int]$Attempts = 30
     )
+    $script:activeAcceptanceCheckpoint = "wait_ui_node:$Text"
     for ($attempt = 0; $attempt -lt $Attempts; $attempt++) {
         [xml]$hierarchy = Get-UiHierarchy
         $node = Find-UiNode -Hierarchy $hierarchy -Text $Text -Contains:$Contains -RequireClickable:$RequireClickable
-        if ($null -ne $node) { return $node }
+        if ($null -ne $node) {
+            $script:lastSuccessfulAcceptanceStep = $script:activeAcceptanceCheckpoint
+            return $node
+        }
         Start-Sleep -Milliseconds 300
     }
     throw "Acceptance UI text was not found: $Text"
@@ -394,6 +410,112 @@ function Tap-UiText {
         [switch]$RequireClickable
     )
     $node = Wait-UiNode -Text $Text -Contains:$Contains -RequireClickable:$RequireClickable
+    Invoke-UiTap -Node $node -ExpectedInventory $ExpectedInventory
+}
+
+function ConvertTo-BoundedUiHierarchyEvidence {
+    param(
+        [Parameter(Mandatory = $true)][xml]$Hierarchy,
+        [int]$MaximumNodes = 80
+    )
+    $eligible = @()
+    $ordinal = 0
+    foreach ($node in $Hierarchy.SelectNodes('//node')) {
+        $text = $node.GetAttribute('text')
+        $description = $node.GetAttribute('content-desc')
+        $resourceId = $node.GetAttribute('resource-id')
+        $hint = $node.GetAttribute('hint')
+        $clickable = $node.GetAttribute('clickable')
+        $focusable = $node.GetAttribute('focusable')
+        $meaningful = -not [string]::IsNullOrWhiteSpace($text) -or
+            -not [string]::IsNullOrWhiteSpace($description) -or
+            -not [string]::IsNullOrWhiteSpace($resourceId) -or
+            -not [string]::IsNullOrWhiteSpace($hint) -or
+            $clickable -eq 'true' -or $focusable -eq 'true'
+        if (-not $meaningful) { continue }
+        $containsSave = $text.Contains('Kaydet') -or
+            $description.Contains('Kaydet') -or $hint.Contains('Kaydet')
+        $interactive = $clickable -eq 'true' -or $focusable -eq 'true'
+        $priority = if ($containsSave) { 0 } elseif ($interactive) { 1 } else { 2 }
+        $eligible += [pscustomobject]@{
+            ordinal = $ordinal
+            priority = $priority
+            text = $text
+            contentDesc = $description
+            resourceId = $resourceId
+            hint = $hint
+            className = $node.GetAttribute('class')
+            clickable = $clickable
+            enabled = $node.GetAttribute('enabled')
+            focusable = $focusable
+            focused = $node.GetAttribute('focused')
+            bounds = $node.GetAttribute('bounds')
+        }
+        $ordinal += 1
+    }
+    $captured = @($eligible |
+        Sort-Object -Property priority, ordinal |
+        Select-Object -First $MaximumNodes)
+    return [pscustomobject]@{
+        totalMeaningfulNodes = $eligible.Count
+        maximumNodes = $MaximumNodes
+        capturedNodes = $captured.Count
+        truncated = $eligible.Count -gt $MaximumNodes
+        nodes = $captured
+    }
+}
+
+function Tap-KaydetWithObservability {
+    param(
+        [Parameter(Mandatory = $true)][string]$CallerLabel,
+        [Parameter(Mandatory = $true)][string]$FlowLabel,
+        [Parameter(Mandatory = $true)][string]$PrecedingCheckpoint,
+        [Parameter(Mandatory = $true)][object]$ExpectedInventory
+    )
+    $checkpoint = [ordered]@{
+        event = 'kaydet_lookup_checkpoint'
+        caller = $CallerLabel
+        flow = $FlowLabel
+        precedingCheckpoint = $PrecedingCheckpoint
+    }
+    Write-Output "DIAGNOSTIC_KAYDET_CHECKPOINT $($checkpoint | ConvertTo-Json -Compress)"
+    try {
+        $node = Wait-UiNode -Text 'Kaydet' -RequireClickable
+    } catch {
+        $lookupError = $_
+        $failure = [ordered]@{
+            event = 'kaydet_lookup_failure'
+            caller = $CallerLabel
+            flow = $FlowLabel
+            precedingCheckpoint = $PrecedingCheckpoint
+            error = $lookupError.Exception.Message
+        }
+        Write-Output "DIAGNOSTIC_KAYDET_FAILURE $($failure | ConvertTo-Json -Compress)"
+        try {
+            [xml]$failureHierarchy = Get-UiHierarchy
+            $snapshot = ConvertTo-BoundedUiHierarchyEvidence `
+                -Hierarchy $failureHierarchy `
+                -MaximumNodes 80
+            $hierarchyEvidence = [ordered]@{
+                event = 'kaydet_failure_hierarchy'
+                caller = $CallerLabel
+                flow = $FlowLabel
+                precedingCheckpoint = $PrecedingCheckpoint
+                snapshot = $snapshot
+            }
+            Write-Output "DIAGNOSTIC_KAYDET_HIERARCHY $($hierarchyEvidence | ConvertTo-Json -Compress -Depth 10)"
+        } catch {
+            $captureFailure = [ordered]@{
+                event = 'kaydet_failure_hierarchy_capture_failed'
+                caller = $CallerLabel
+                flow = $FlowLabel
+                precedingCheckpoint = $PrecedingCheckpoint
+                error = $_.Exception.Message
+            }
+            Write-Output "DIAGNOSTIC_KAYDET_HIERARCHY_FAILURE $($captureFailure | ConvertTo-Json -Compress)"
+        }
+        throw $lookupError
+    }
     Invoke-UiTap -Node $node -ExpectedInventory $ExpectedInventory
 }
 
@@ -622,7 +744,37 @@ function Get-LifecycleAction {
     } else {
         "^$prefix · $([regex]::Escape($ActivityName)) · .+ · (?<itemId>[0-9A-Za-z-]+) · Eylem · $actionPattern$"
     }
-    $node = Scroll-UntilUiDescriptionPattern -Pattern $pattern -ExpectedInventory $ExpectedInventory -RequireClickable -AttemptsPerDirection $AttemptsPerDirection
+    $node = $null
+    $tapPointBlocked = $false
+    for ($tapAttempt = 0; $tapAttempt -lt $AttemptsPerDirection; $tapAttempt++) {
+        $node = Scroll-UntilUiDescriptionPattern `
+            -Pattern $pattern `
+            -ExpectedInventory $ExpectedInventory `
+            -RequireClickable `
+            -AttemptsPerDirection $AttemptsPerDirection
+        $targetBounds = Get-NodeBounds $node
+        $targetX = [int](($targetBounds.left + $targetBounds.right) / 2)
+        $targetY = [int](($targetBounds.top + $targetBounds.bottom) / 2)
+        [xml]$hierarchy = $node.OwnerDocument
+        $addButton = Find-UiNode `
+            -Hierarchy $hierarchy `
+            -Text 'İmalat ekle' `
+            -Contains `
+            -RequireClickable
+        $tapPointBlocked = $false
+        if ($null -ne $addButton) {
+            $addBounds = Get-NodeBounds $addButton
+            $tapPointBlocked = $targetX -ge $addBounds.left -and
+                $targetX -le $addBounds.right -and
+                $targetY -ge $addBounds.top -and
+                $targetY -le $addBounds.bottom
+        }
+        if (-not $tapPointBlocked) { break }
+        Invoke-SelectorScroll -ExpectedInventory $ExpectedInventory -Direction Forward
+    }
+    if ($tapPointBlocked) {
+        throw "Acceptance lifecycle action tap point remained occluded: $Action"
+    }
     $description = $node.GetAttribute('content-desc')
     $match = [regex]::Match($description, $pattern)
     if (-not $match.Success) { throw "Acceptance lifecycle selector contract could not be parsed: $description" }
@@ -1052,6 +1204,394 @@ function Hide-Keyboard {
     Start-Sleep -Milliseconds 300
 }
 
+function Assert-LivingPlanIntelligenceReadOnly {
+    param([Parameter(Mandatory = $true)][object]$ExpectedInventory)
+
+    $before = Get-DurableLivingPlanSnapshot -ItemId $intelligenceItemId
+    $item = Assert-DurableLivingPlanSnapshot -Snapshot $before
+    if ($item.status -ne 'STARTED' -or $null -eq $item.progress_percent -or
+        [int]$item.progress_percent -lt 0 -or [int]$item.progress_percent -gt 99) {
+        throw 'Acceptance intelligence source was not STARTED with explicit progress.'
+    }
+    $plannedDate = Convert-CanonicalDateToDisplay -Value $item.planned_date
+    Set-LivingPlanWindowForDate -PlannedDate $plannedDate -ExpectedInventory $ExpectedInventory | Out-Null
+    $summaryPattern = [regex]::Escape($intelligenceItemId) +
+        '.*Tahmini kalan:.*Tahmini bitiş:.*Referansa göre:'
+    Scroll-UntilUiDescriptionPattern `
+        -Pattern $summaryPattern `
+        -ExpectedInventory $ExpectedInventory | Out-Null
+    $actionPattern = [regex]::Escape($intelligenceItemId) +
+        '.*Eylem.*\d+ sonraki iş etkilenebilir'
+    $action = Scroll-UntilUiDescriptionPattern `
+        -Pattern $actionPattern `
+        -RequireClickable `
+        -ExpectedInventory $ExpectedInventory
+    Invoke-UiTap -Node $action -ExpectedInventory $ExpectedInventory
+
+    Wait-UiNode -Text 'Tahmini etki' | Out-Null
+    Wait-UiNode -Text 'Bu bir önizlemedir; plan tarihleri değişmedi.' | Out-Null
+    Wait-UiNode -Text 'Tahmini başlangıç:' -Contains | Out-Null
+    Wait-UiNode -Text 'Tahmini bitiş:' -Contains | Out-Null
+    [xml]$detailHierarchy = Get-UiHierarchy
+    $positiveShift = @($detailHierarchy.SelectNodes('//node') | Where-Object {
+        $text = $_.GetAttribute('text')
+        $description = $_.GetAttribute('content-desc')
+        $text -match '^\+[1-9][0-9]* gün$' -or (
+            $description -match '(?m)^Tahmini başlangıç: [0-9]{2}\.[0-9]{2}\.[0-9]{4}\r?$' -and
+            $description -match '(?m)^Tahmini bitiş: [0-9]{2}\.[0-9]{2}\.[0-9]{4}\r?$' -and
+            $description -match '(?m)^\+[1-9][0-9]* gün\r?$'
+        )
+    })
+    if ($positiveShift.Count -lt 1) {
+        throw 'Acceptance impact detail did not expose a positive impacted activity shift.'
+    }
+
+    $after = Get-DurableLivingPlanSnapshot -ItemId $intelligenceItemId
+    $beforeJson = $before | ConvertTo-Json -Compress -Depth 30
+    $afterJson = $after | ConvertTo-Json -Compress -Depth 30
+    if ($afterJson -ne $beforeJson) {
+        throw 'Acceptance impact detail mutated item/revision/event/receipt/progress/plannedDate truth.'
+    }
+    Assert-AllPackageInventory -Expected $ExpectedInventory
+    Invoke-IsolatedDeviceMutation -Arguments @(
+        'shell', 'input', 'keyevent', 'KEYCODE_BACK'
+    ) -ExpectedInventory $ExpectedInventory | Out-Null
+    Start-Sleep -Milliseconds 500
+    return [pscustomobject]@{
+        itemId = $intelligenceItemId
+        revision = [int]$item.revision
+        progress = [int]$item.progress_percent
+        plannedDate = [string]$item.planned_date
+    }
+}
+
+function Get-AcceptanceFixtureState {
+    $databasePath = 'files/cse_mobile/debug/database/cse_mobile.sqlite3'
+    $encoded = Invoke-Adb -Arguments @(
+        'exec-out', 'run-as', $acceptancePackage, 'base64', $databasePath
+    )
+    $bytes = [Convert]::FromBase64String(($encoded -replace '\s', ''))
+    $tempDatabase = Join-Path `
+        ([IO.Path]::GetTempPath()) `
+        "cse-fixture-state-$([guid]::NewGuid().ToString('N')).sqlite3"
+    [IO.File]::WriteAllBytes($tempDatabase, $bytes)
+    try {
+        $query = @"
+import json, sqlite3, sys
+p = sys.argv[1]
+c = sqlite3.connect('file:' + p.replace('\\', '/') + '?mode=ro&immutable=1', uri=True)
+c.row_factory = sqlite3.Row
+project_id = '46400000-0000-4000-8000-000000000001'
+items = [dict(row) for row in c.execute('''SELECT id,reference_snapshot_id,
+ activity_instance_id,activity_id,planned_date,status,progress_percent,note,
+ revision FROM project_living_plan_items WHERE project_id=? ORDER BY id''',
+ (project_id,))]
+snapshots = [dict(row) for row in c.execute('''SELECT s.id,s.generated_at,
+ s.superseded_at,s.activity_count,m.dependency_count,m.projection_sha256
+ FROM project_schedule_snapshots s
+ LEFT JOIN project_schedule_snapshot_dependency_manifests m
+ ON m.snapshot_id=s.id WHERE s.project_id=? ORDER BY s.generated_at,s.id''',
+ (project_id,))]
+print(json.dumps({'project_id': project_id, 'items': items,
+ 'snapshots': snapshots}, ensure_ascii=True, separators=(',', ':')))
+"@
+        return Invoke-Checked `
+            -Command 'py' `
+            -Arguments @('-c', $query, $tempDatabase)
+    } finally {
+        Remove-Item -LiteralPath $tempDatabase -Force
+    }
+}
+
+function Assert-CleanAcceptanceFixtureState {
+    param(
+        [Parameter(Mandatory = $true)][int]$ExpectedTargetProgress,
+        [Parameter(Mandatory = $true)][int]$ExpectedTargetRevision,
+        [Parameter(Mandatory = $true)][object]$ExpectedInventory
+    )
+
+    $fixture = Get-AcceptanceFixtureState | ConvertFrom-Json
+    $items = @($fixture.items)
+    $expectedItemIds = @(
+        $neighborItemIds[0],
+        $neighborItemIds[1],
+        $intelligenceItemId
+    ) | Sort-Object
+    $actualItemIds = @($items | ForEach-Object { [string]$_.id } | Sort-Object)
+    if (@(Compare-Object -ReferenceObject $expectedItemIds -DifferenceObject $actualItemIds).Count -ne 0) {
+        throw "CleanAcceptance fixture item set was not exact: $($actualItemIds -join ', ')"
+    }
+
+    $byId = @{}
+    foreach ($item in $items) { $byId[[string]$item.id] = $item }
+    $target = $byId[$intelligenceItemId]
+    $planned = $byId[$neighborItemIds[0]]
+    $started = $byId[$neighborItemIds[1]]
+    if ($target.status -ne 'STARTED' -or
+        [int]$target.progress_percent -ne $ExpectedTargetProgress -or
+        [int]$target.revision -ne $ExpectedTargetRevision) {
+        throw "CleanAcceptance target baseline mismatch: $($target.status)/$($target.progress_percent)/$($target.revision)"
+    }
+    if ($planned.status -ne 'PLANNED' -or $null -ne $planned.progress_percent -or
+        [int]$planned.revision -ne 1) {
+        throw 'CleanAcceptance planned neighbor baseline was not deterministic.'
+    }
+    if ($started.status -ne 'STARTED' -or $null -ne $started.progress_percent -or
+        [int]$started.revision -ne 2) {
+        throw 'CleanAcceptance started neighbor baseline was not deterministic.'
+    }
+
+    $targetDate = [DateTime]::ParseExact(
+        [string]$target.planned_date,
+        'yyyy-MM-dd',
+        [Globalization.CultureInfo]::InvariantCulture
+    )
+    $plannedDate = [DateTime]::ParseExact(
+        [string]$planned.planned_date,
+        'yyyy-MM-dd',
+        [Globalization.CultureInfo]::InvariantCulture
+    )
+    $startedDate = [DateTime]::ParseExact(
+        [string]$started.planned_date,
+        'yyyy-MM-dd',
+        [Globalization.CultureInfo]::InvariantCulture
+    )
+    if ($plannedDate -ne $targetDate.AddDays(-1) -or $startedDate -ne $targetDate) {
+        throw 'CleanAcceptance fixture dates were not deterministic.'
+    }
+
+    $visibleWindowStart = Get-LivingPlanWindowStart -ExpectedInventory $ExpectedInventory
+    if ($targetDate -lt $visibleWindowStart -or $targetDate -gt $visibleWindowStart.AddDays(6)) {
+        throw "CleanAcceptance target date was outside the active window: $($target.planned_date) / $($visibleWindowStart.ToString('yyyy-MM-dd'))"
+    }
+
+    $neighborSnapshot = [ordered]@{}
+    foreach ($neighborId in $neighborItemIds) {
+        $neighbor = $byId[$neighborId]
+        $neighborSnapshot[$neighborId] = [pscustomobject]@{
+            status = Convert-DurableStatusToUi -Status ([string]$neighbor.status)
+            progress = Convert-DurableProgressToUi -Progress $neighbor.progress_percent
+            revision = [int]$neighbor.revision
+            plannedDate = Convert-CanonicalDateToDisplay -Value ([string]$neighbor.planned_date)
+        }
+    }
+    $targetDisplayDate = Convert-CanonicalDateToDisplay -Value ([string]$target.planned_date)
+    Assert-LifecycleCheckpoint `
+        -TargetItemId $intelligenceItemId `
+        -ExpectedStatus 'Başladı' `
+        -ExpectedRevision $ExpectedTargetRevision `
+        -ExpectedProgress "%$ExpectedTargetProgress" `
+        -ExpectedDate $targetDisplayDate `
+        -NeighborSnapshot $neighborSnapshot `
+        -ExpectedInventory $ExpectedInventory | Out-Null
+
+    return [pscustomobject]@{
+        target = $target
+        targetDisplayDate = $targetDisplayDate
+        activeWindowStart = $visibleWindowStart.ToString('yyyy-MM-dd')
+        neighborSnapshot = $neighborSnapshot
+        fixtureState = $fixture
+    }
+}
+
+function Run-CleanAcceptanceRelaunchScenario {
+    param(
+        [Parameter(Mandatory = $true)][string]$LaunchableActivity,
+        [Parameter(Mandatory = $true)][object]$ExpectedInventory
+    )
+
+    $script:activeAcceptanceCheckpoint = 'clean_fixture_boot'
+    Wait-UiNode -Text 'Başlangıç' -Contains | Out-Null
+    Tap-UiText -Text '7 Günlük Plan' -Contains -RequireClickable -ExpectedInventory $ExpectedInventory
+    Wait-UiNode -Text 'CSE 7 Günlük Plan Pilot' -Contains | Out-Null
+    $baseline = Assert-CleanAcceptanceFixtureState `
+        -ExpectedTargetProgress 47 `
+        -ExpectedTargetRevision 3 `
+        -ExpectedInventory $ExpectedInventory
+    $script:lastSuccessfulAcceptanceStep = $script:activeAcceptanceCheckpoint
+
+    $script:activeAcceptanceCheckpoint = 'clean_relaunch_mutation'
+    $beforeMutation = Get-DurableLivingPlanSnapshot -ItemId $intelligenceItemId
+    $beforeItem = Assert-DurableLivingPlanSnapshot -Snapshot $beforeMutation
+    $progressAction = Get-LifecycleAction `
+        -ItemId $intelligenceItemId `
+        -Action 'İlerleme' `
+        -ExpectedInventory $ExpectedInventory
+    Invoke-UiTap -Node $progressAction.node -ExpectedInventory $ExpectedInventory
+    Wait-UiNode -Text 'İlerlemeyi güncelle' -Contains | Out-Null
+    Replace-OnlyEditableText -Value '63' -ExpectedInventory $ExpectedInventory
+    Hide-Keyboard -ExpectedInventory $ExpectedInventory
+    Tap-KaydetWithObservability `
+        -CallerLabel 'clean_relaunch_progress_63_save' `
+        -FlowLabel 'Run-CleanAcceptanceRelaunchScenario' `
+        -PrecedingCheckpoint 'clean_relaunch_progress_63_value_entered_keyboard_dismissed' `
+        -ExpectedInventory $ExpectedInventory
+    Wait-UiNode -Text 'İlerleme %63 olarak kaydedildi.' -Contains | Out-Null
+    $afterMutation = Get-DurableLivingPlanSnapshot -ItemId $intelligenceItemId
+    $mutationRevision = Resolve-DurableLivingPlanMutationRevision `
+        -Before $beforeMutation `
+        -After $afterMutation `
+        -ExpectedEventType 'PROGRESS_UPDATED' `
+        -ExpectedStatus 'STARTED' `
+        -ExpectedProgress 63 `
+        -ExpectedDate $beforeItem.planned_date `
+        -ExpectedNote $beforeItem.note
+    if ($mutationRevision -ne 4) {
+        throw "CleanAcceptance mutation revision was not deterministic: $mutationRevision"
+    }
+    Assert-CleanAcceptanceFixtureState `
+        -ExpectedTargetProgress 63 `
+        -ExpectedTargetRevision 4 `
+        -ExpectedInventory $ExpectedInventory | Out-Null
+    $script:lastSuccessfulAcceptanceStep = $script:activeAcceptanceCheckpoint
+
+    $script:activeAcceptanceCheckpoint = 'clean_relaunch_persistence'
+    Invoke-IsolatedDeviceMutation -Arguments @(
+        'shell', 'am', 'force-stop', $acceptancePackage
+    ) -ExpectedInventory $ExpectedInventory | Out-Null
+    Invoke-IsolatedDeviceMutation -Arguments @(
+        'shell', 'am', 'start', '-W', '-n',
+        "$acceptancePackage/$LaunchableActivity"
+    ) -ExpectedInventory $ExpectedInventory | Out-Null
+    Start-Sleep -Seconds 2
+    Wait-UiNode -Text 'Başlangıç' -Contains | Out-Null
+    Tap-UiText -Text '7 Günlük Plan' -Contains -RequireClickable -ExpectedInventory $ExpectedInventory
+    Wait-UiNode -Text 'CSE 7 Günlük Plan Pilot' -Contains | Out-Null
+    $relaunch = Assert-CleanAcceptanceFixtureState `
+        -ExpectedTargetProgress 63 `
+        -ExpectedTargetRevision 4 `
+        -ExpectedInventory $ExpectedInventory
+    if ($relaunch.target.planned_date -ne $baseline.target.planned_date) {
+        throw 'CleanAcceptance relaunch changed the target planned date.'
+    }
+    $script:lastSuccessfulAcceptanceStep = $script:activeAcceptanceCheckpoint
+    return [pscustomobject]@{
+        targetItemId = $intelligenceItemId
+        status = [string]$relaunch.target.status
+        progress = [int]$relaunch.target.progress_percent
+        revision = [int]$relaunch.target.revision
+        plannedDate = [string]$relaunch.target.planned_date
+        activeWindowStart = [string]$relaunch.activeWindowStart
+        itemCount = @($relaunch.fixtureState.items).Count
+    }
+}
+function Get-AcceptanceDigestEvidence {
+    $sourcePaths = @(
+        $artifact,
+        (Join-Path $mobileRoot 'integration_test\living_plan_acceptance_main.dart'),
+        (Join-Path $mobileRoot 'integration_test\support\living_plan_acceptance_fixture.dart'),
+        (Join-Path $mobileRoot 'lib\app.dart'),
+        (Join-Path $mobileRoot 'lib\bootstrap\app_bootstrap.dart'),
+        (Join-Path $mobileRoot 'lib\features\living_plan\living_plan_page.dart'),
+        (Join-Path $mobileRoot 'lib\application\construction_living_plan_intelligence_application.dart'),
+        (Join-Path $mobileRoot 'lib\domain\construction_living_plan_intelligence_models.dart'),
+        $PSCommandPath
+    )
+    $digests = @()
+    foreach ($pathValue in $sourcePaths) {
+        if (-not (Test-Path -LiteralPath $pathValue)) { continue }
+        $item = Get-Item -LiteralPath $pathValue
+        $relative = if ($item.FullName.StartsWith($repositoryRoot, [StringComparison]::OrdinalIgnoreCase)) {
+            $item.FullName.Substring($repositoryRoot.Length).TrimStart('\')
+        } else {
+            $item.FullName
+        }
+        $digests += [pscustomobject]@{
+            path = $relative
+            bytes = $item.Length
+            sha256 = (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        }
+    }
+    return $digests
+}
+
+function Write-DeviceFailureDiagnostics {
+    param([Parameter(Mandatory = $true)][System.Management.Automation.ErrorRecord]$Failure)
+
+    $summary = [ordered]@{
+        event = 'device_acceptance_failure'
+        caller = [string]$Failure.InvocationInfo.MyCommand
+        line = $Failure.InvocationInfo.ScriptLineNumber
+        activeCheckpoint = $script:activeAcceptanceCheckpoint
+        lastSuccessfulStep = $script:lastSuccessfulAcceptanceStep
+        errorType = $Failure.Exception.GetType().FullName
+        error = $Failure.Exception.Message
+        scriptStackTrace = $Failure.ScriptStackTrace
+    }
+    Write-Output "DIAGNOSTIC_DEVICE_FAILURE $($summary | ConvertTo-Json -Compress)"
+
+    try {
+        [xml]$failureHierarchy = Get-UiHierarchy
+        $snapshot = ConvertTo-BoundedUiHierarchyEvidence `
+            -Hierarchy $failureHierarchy `
+            -MaximumNodes 80
+        Write-Output "DIAGNOSTIC_DEVICE_HIERARCHY $($snapshot | ConvertTo-Json -Compress -Depth 10)"
+    } catch {
+        Write-Output "DIAGNOSTIC_DEVICE_HIERARCHY_FAILURE $($_.Exception.Message)"
+    }
+
+    try {
+        $screenshot = Join-Path `
+            ([IO.Path]::GetTempPath()) `
+            "cse-device-failure-$([guid]::NewGuid().ToString('N')).png"
+        $screenshotProcess = Start-Process `
+            -FilePath $adb `
+            -ArgumentList @('-s', $DeviceSerial, 'exec-out', 'screencap', '-p') `
+            -NoNewWindow `
+            -Wait `
+            -PassThru `
+            -RedirectStandardOutput $screenshot
+        if ($screenshotProcess.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $screenshot)) {
+            throw "Acceptance screenshot failed with exit code $($screenshotProcess.ExitCode)."
+        }
+        $screenshotEvidence = [ordered]@{
+            path = $screenshot
+            bytes = (Get-Item -LiteralPath $screenshot).Length
+            sha256 = (Get-FileHash -LiteralPath $screenshot -Algorithm SHA256).Hash.ToLowerInvariant()
+        }
+        Write-Output "DIAGNOSTIC_DEVICE_SCREENSHOT $($screenshotEvidence | ConvertTo-Json -Compress)"
+    } catch {
+        Write-Output "DIAGNOSTIC_DEVICE_SCREENSHOT_FAILURE $($_.Exception.Message)"
+    }
+    try {
+        $windowLines = Invoke-Adb -Arguments @('shell', 'dumpsys', 'window', 'windows')
+        $currentWindow = @($windowLines -split "`r?`n" | Where-Object {
+            $_ -match 'mCurrentFocus|mFocusedApp|com\.faliardic\.sefim\.acceptance'
+        } | Select-Object -Last 40)
+        Write-Output "DIAGNOSTIC_DEVICE_WINDOW $($currentWindow | ConvertTo-Json -Compress)"
+    } catch {
+        Write-Output "DIAGNOSTIC_DEVICE_WINDOW_FAILURE $($_.Exception.Message)"
+    }
+
+    try {
+        $acceptancePid = (Invoke-Adb -Arguments @('shell', 'pidof', $acceptancePackage)).Trim()
+        if ([string]::IsNullOrWhiteSpace($acceptancePid)) {
+            throw 'Acceptance package PID was unavailable.'
+        }
+        $log = Invoke-Adb -Arguments @('logcat', '--pid', $acceptancePid, '-d', '-t', '1500')
+        $filteredLog = @($log -split "`r?`n" | Where-Object {
+            $_ -match 'CSE_ENTRYPOINT|acceptance|living_plan|flutter|FATAL|Exception|Error'
+        } | Select-Object -Last 120)
+        Write-Output "DIAGNOSTIC_DEVICE_LOGCAT $($filteredLog | ConvertTo-Json -Compress)"
+    } catch {
+        Write-Output "DIAGNOSTIC_DEVICE_LOGCAT_FAILURE $($_.Exception.Message)"
+    }
+
+    try {
+        $fixtureState = Get-AcceptanceFixtureState
+        Write-Output "DIAGNOSTIC_DEVICE_FIXTURE_STATE $fixtureState"
+    } catch {
+        Write-Output "DIAGNOSTIC_DEVICE_FIXTURE_STATE_FAILURE $($_.Exception.Message)"
+    }
+
+    try {
+        $digests = Get-AcceptanceDigestEvidence
+        Write-Output "DIAGNOSTIC_DEVICE_DIGESTS $($digests | ConvertTo-Json -Compress -Depth 5)"
+    } catch {
+        Write-Output "DIAGNOSTIC_DEVICE_DIGESTS_FAILURE $($_.Exception.Message)"
+    }
+}
+
 function Run-LivingPlanAcceptanceFlow {
     param([Parameter(Mandatory = $true)][object]$ExpectedInventory)
     Wait-UiNode -Text 'Başlangıç' -Contains | Out-Null
@@ -1059,6 +1599,8 @@ function Run-LivingPlanAcceptanceFlow {
     Wait-UiNode -Text 'CSE 7 Günlük Plan Pilot' -Contains | Out-Null
     Wait-UiNode -Text 'Geciken' -Contains | Out-Null
     Wait-UiNode -Text 'Önerilen tarihler tahmin niteliğindedir' -Contains | Out-Null
+    $intelligenceProof = Assert-LivingPlanIntelligenceReadOnly `
+        -ExpectedInventory $ExpectedInventory
 
     $add = Scroll-UntilUiText -Text 'İmalat ekle' -Contains -ExpectedInventory $ExpectedInventory
     Invoke-UiTap -Node $add -ExpectedInventory $ExpectedInventory
@@ -1193,7 +1735,11 @@ function Run-LivingPlanAcceptanceFlow {
     Wait-UiNode -Text 'İlerlemeyi güncelle' -Contains | Out-Null
     Replace-OnlyEditableText -Value '47' -ExpectedInventory $ExpectedInventory
     Hide-Keyboard -ExpectedInventory $ExpectedInventory
-    Tap-UiText -Text 'Kaydet' -RequireClickable -ExpectedInventory $ExpectedInventory
+    Tap-KaydetWithObservability `
+        -CallerLabel 'progress_47_save' `
+        -FlowLabel 'Run-LivingPlanAcceptanceFlow' `
+        -PrecedingCheckpoint 'progress_47_value_entered_keyboard_dismissed' `
+        -ExpectedInventory $ExpectedInventory
     Wait-UiNode -Text 'İlerleme %47 olarak kaydedildi.' -Contains | Out-Null
     $targetRevision += 1
     Assert-LifecycleCheckpoint `
@@ -1215,7 +1761,11 @@ function Run-LivingPlanAcceptanceFlow {
         -Value $updatedAcceptanceNote `
         -ExpectedInventory $ExpectedInventory
     Hide-Keyboard -ExpectedInventory $ExpectedInventory
-    Tap-UiText -Text 'Kaydet' -RequireClickable -ExpectedInventory $ExpectedInventory
+    Tap-KaydetWithObservability `
+        -CallerLabel 'note_update_save' `
+        -FlowLabel 'Run-LivingPlanAcceptanceFlow' `
+        -PrecedingCheckpoint 'note_value_entered_keyboard_dismissed' `
+        -ExpectedInventory $ExpectedInventory
     Wait-UiNode -Text 'Not kaydedildi.' -Contains | Out-Null
     Scroll-UntilUiText -Text $updatedAcceptanceNote -Contains -ExpectedInventory $ExpectedInventory | Out-Null
     $afterNoteMutation = Get-DurableLivingPlanSnapshot -ItemId $targetItemId
@@ -1320,7 +1870,11 @@ function Run-LivingPlanAcceptanceFlow {
     Wait-UiNode -Text 'İlerlemeyi güncelle' -Contains | Out-Null
     Replace-OnlyEditableText -Value '63' -ExpectedInventory $ExpectedInventory
     Hide-Keyboard -ExpectedInventory $ExpectedInventory
-    Tap-UiText -Text 'Kaydet' -RequireClickable -ExpectedInventory $ExpectedInventory
+    Tap-KaydetWithObservability `
+        -CallerLabel 'progress_63_save' `
+        -FlowLabel 'Run-LivingPlanAcceptanceFlow' `
+        -PrecedingCheckpoint 'progress_63_value_entered_keyboard_dismissed' `
+        -ExpectedInventory $ExpectedInventory
     Wait-UiNode -Text 'İlerleme %63 olarak kaydedildi.' -Contains | Out-Null
     $targetRevision += 1
     Assert-LifecycleCheckpoint `
@@ -1338,6 +1892,7 @@ function Run-LivingPlanAcceptanceFlow {
         finalPlannedDate = $reopenedTarget.plannedDate
         finalProgress = 63
         neighborSnapshot = $neighborSnapshot
+        intelligenceProof = $intelligenceProof
     }
 }
 
@@ -1426,14 +1981,23 @@ try {
     if (-not (Test-Path -LiteralPath $artifact)) {
         throw 'Verified host-built Şefim acceptance APK is missing.'
     }
+    $script:activeAcceptanceCheckpoint = 'apk_contract'
     $artifactContract = Assert-ApkContract -Apk $artifact
+    $script:lastSuccessfulAcceptanceStep = $script:activeAcceptanceCheckpoint
+    $script:activeAcceptanceCheckpoint = 'device_preflight'
     Assert-DevicePreflight
+    $script:lastSuccessfulAcceptanceStep = $script:activeAcceptanceCheckpoint
+    $script:activeAcceptanceCheckpoint = 'six_package_baseline'
     $beforeInstall = Get-SixPackageInventory
     foreach ($packageName in $allPackages) {
         Write-Output "BASELINE $(Convert-InventoryToJson $beforeInstall[$packageName])"
     }
+    $script:lastSuccessfulAcceptanceStep = $script:activeAcceptanceCheckpoint
 
+    $script:activeAcceptanceCheckpoint = 'acceptance_install_r'
     Invoke-Adb -Arguments @('install', '-r', $artifact) | Write-Output
+    $script:lastSuccessfulAcceptanceStep = $script:activeAcceptanceCheckpoint
+    $script:activeAcceptanceCheckpoint = 'post_install_isolation'
     $afterInstall = Get-SixPackageInventory
     Assert-NonTargetInventory -Expected $beforeInstall -Actual $afterInstall
     if (-not $afterInstall[$acceptancePackage].installed) {
@@ -1441,24 +2005,67 @@ try {
     }
     $expectedInventory = $afterInstall
     Assert-AllPackageInventory -Expected $expectedInventory
+    $script:lastSuccessfulAcceptanceStep = $script:activeAcceptanceCheckpoint
 
     Invoke-IsolatedDeviceMutation -Arguments @(
         'shell', 'am', 'start', '-W', '-n',
         "$acceptancePackage/$($artifactContract.launchableActivity)"
     ) -ExpectedInventory $expectedInventory | Out-Null
     Start-Sleep -Seconds 2
+    if ($DeviceScenario -eq 'CleanRelaunch') {
+        $stageAResult = @(
+            Run-CleanAcceptanceRelaunchScenario `
+                -LaunchableActivity $artifactContract.launchableActivity `
+                -ExpectedInventory $expectedInventory
+        )[-1]
+        $script:activeAcceptanceCheckpoint = 'clean_relaunch_fatal_diagnostics'
+        Assert-NoFatalDiagnostics
+        $script:lastSuccessfulAcceptanceStep = $script:activeAcceptanceCheckpoint
+        $script:activeAcceptanceCheckpoint = 'clean_relaunch_final_isolation'
+        Assert-AllPackageInventory -Expected $expectedInventory
+        $script:lastSuccessfulAcceptanceStep = $script:activeAcceptanceCheckpoint
+        Write-Output "PASS clean_acceptance_stage_a=true target_item=$($stageAResult.targetItemId) status=$($stageAResult.status) progress=$($stageAResult.progress) revision=$($stageAResult.revision) planned_date=$($stageAResult.plannedDate) active_window_start=$($stageAResult.activeWindowStart) item_count=$($stageAResult.itemCount)"
+        Write-Output "PASS artifact=$([IO.Path]::GetFileName($artifact)) sha256=$($artifactContract.sha256) abi=arm64-v8a"
+        return
+    }    $script:activeAcceptanceCheckpoint = 'living_plan_full_flow'
+
+
     $flowResult = Run-LivingPlanAcceptanceFlow -ExpectedInventory $expectedInventory
+    $script:lastSuccessfulAcceptanceStep = $script:activeAcceptanceCheckpoint
+    $script:activeAcceptanceCheckpoint = 'relaunch_persistence'
     Assert-RelaunchPersistence `
         -LaunchableActivity $artifactContract.launchableActivity `
         -ExpectedInventory $expectedInventory `
         -FlowResult $flowResult
+    $script:lastSuccessfulAcceptanceStep = $script:activeAcceptanceCheckpoint
+    $script:activeAcceptanceCheckpoint = 'relaunch_intelligence'
+    $relaunchIntelligenceProof = Assert-LivingPlanIntelligenceReadOnly `
+        -ExpectedInventory $expectedInventory
+    if ($relaunchIntelligenceProof.itemId -ne $flowResult.intelligenceProof.itemId -or
+        $relaunchIntelligenceProof.revision -ne $flowResult.intelligenceProof.revision -or
+        $relaunchIntelligenceProof.progress -ne $flowResult.intelligenceProof.progress -or
+        $relaunchIntelligenceProof.plannedDate -ne $flowResult.intelligenceProof.plannedDate) {
+        throw 'Acceptance intelligence source progress/persistence changed after relaunch.'
+    }
+    $script:lastSuccessfulAcceptanceStep = $script:activeAcceptanceCheckpoint
+    $script:activeAcceptanceCheckpoint = 'fatal_diagnostics'
     Assert-NoFatalDiagnostics
+    $script:lastSuccessfulAcceptanceStep = $script:activeAcceptanceCheckpoint
+    $script:activeAcceptanceCheckpoint = 'final_six_package_isolation'
     Assert-AllPackageInventory -Expected $expectedInventory
+    $script:lastSuccessfulAcceptanceStep = $script:activeAcceptanceCheckpoint
 
     Write-Output "PASS acceptance_package=$acceptancePackage label=$acceptanceLabel"
     Write-Output "PASS artifact=$([IO.Path]::GetFileName($artifact)) sha256=$($artifactContract.sha256) abi=arm64-v8a"
     Write-Output "PASS target_item=$($flowResult.targetItemId) final_revision=$($flowResult.finalRevision) final_progress=$($flowResult.finalProgress) final_date=$($flowResult.finalPlannedDate)"
-    Write-Output 'PASS six_package_isolation=true full_flow=true persistence_after_relaunch=true fatal_diagnostics=false'
+    Write-Output "PASS intelligence_item=$($relaunchIntelligenceProof.itemId) progress=$($relaunchIntelligenceProof.progress) read_only_detail=true"
+    Write-Output 'PASS six_package_isolation=true full_flow=true persistence_after_relaunch=true intelligence_after_relaunch=true fatal_diagnostics=false'
+} catch {
+    $deviceFailure = $_
+    if ($Mode -eq 'Device') {
+        Write-DeviceFailureDiagnostics -Failure $deviceFailure
+    }
+    throw $deviceFailure
 } finally {
     $env:CSE_ACCEPTANCE_HARNESS = $previousAcceptanceHarness
 }

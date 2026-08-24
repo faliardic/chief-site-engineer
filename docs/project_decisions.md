@@ -4167,3 +4167,23 @@
   event/receipt ve storage mutation yapmaz; schema `17`, backup format `1` ve
   app version `0.1.0+1` değişmez. Reforecast, UI, quantity ve productivity
   learning başlamaz; Item 5 current ve not complete kalır.
+
+## Issue 476 — Living Plan intelligence exact snapshot-bound ve salt-okunurdur
+
+- Ayrı `ConstructionLivingPlanIntelligenceApplicationPort`, her item için yalnız
+  `referenceSnapshotId` ile exact snapshot/graph okur; aynı batch içindeki read'leri
+  cache eder ve caller-supplied canonical UTC-midnight `asOfDate` kullanır.
+- Legacy snapshot graph manifesti unavailable ise exact snapshot forecast'u
+  korunabilir; downstream impact, current/newer graph rebind veya backfill
+  üretilmez. Türkçe downstream adı yalnız snapshot ve bundled corpus version'ı
+  exact eşitse kullanılır, aksi durumda raw `activityId` gösterilir.
+- UI yalnız `STARTED + explicit progress` için kalan scheduling day, forecast
+  finish ve signed reference variance gösterir. Positive impact detail açıkça
+  önizlemedir; item, planned date, revision, event, receipt veya reference
+  schedule mutation yapmaz ve intelligence read hatası lifecycle/progress
+  işlemlerini bloke etmez.
+- Isolated acceptance yalnız `com.faliardic.sefim.acceptance` sentetik verisinde
+  dependency-capable yeni snapshot targetını, semantic UI discovery'yi, exact
+  read-only durable proof'u ve relaunch persistence'ı doğrular. Schema `17`,
+  backup format `1`, version `0.1.0+1` değişmez; reforecast, quantity,
+  productivity learning, Ready/merge ve Item 5 completion başlamaz.

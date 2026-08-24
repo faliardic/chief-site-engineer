@@ -4,8 +4,11 @@ import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/attachment_catalog_application.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/application/construction_living_plan_application.dart';
+import 'package:chief_site_engineer/application/construction_living_plan_intelligence_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/core/environment.dart';
+import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
+import 'package:chief_site_engineer/domain/construction_living_plan_models.dart';
 import 'package:chief_site_engineer/platform/agenda_attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/agenda_photo_export_gateway.dart';
 import 'package:chief_site_engineer/platform/concrete_attachment_gateway.dart';
@@ -14,7 +17,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as path;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import '../integration_test/support/living_plan_acceptance_fixture.dart';
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late Directory temporaryRoot;
 
   setUpAll(sqfliteFfiInit);
@@ -62,6 +69,21 @@ void main() {
         restarted.livingPlan,
         isA<SqliteConstructionLivingPlanApplication>(),
       );
+      expect(
+        first.livingPlanIntelligence,
+        isA<SqliteConstructionLivingPlanIntelligenceApplication>(),
+      );
+      expect(
+        restarted.livingPlanIntelligence,
+        isA<SqliteConstructionLivingPlanIntelligenceApplication>(),
+      );
+      expect(
+        await first.livingPlanIntelligence.loadForItems(
+          items: const [],
+          asOfDate: DateTime.utc(2026, 7, 19),
+        ),
+        isEmpty,
+      );
       expect(first.projectLocations, same(first.agenda));
       expect(restarted.projectLocations, same(restarted.agenda));
       final agendaStore =
@@ -99,6 +121,99 @@ void main() {
     expect(result, const TypeMatcher<BootstrapFailure>());
     expect(result.toString(), isNot(contains('sensitive path')));
   });
+
+  test(
+    'acceptance fixture recovers the runner item at later revisions',
+    () async {
+      CseTimeCodec.initialize();
+      final now = DateTime.utc(2026, 8, 23, 12);
+      final directories = AppDirectories.fromSupportRoot(
+        temporaryRoot,
+        AppEnvironment.debug,
+      );
+      final fixture = await ensureLivingPlanAcceptanceFixture(
+        directories: directories,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+      );
+      final livingPlan = SqliteConstructionLivingPlanApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+      );
+      var runnerItem = await livingPlan.createLivingPlanItem(
+        CreateConstructionLivingPlanItemCommand(
+          itemId: '47610000-0000-4000-8000-000000000001',
+          eventId: '47610000-0000-4000-8000-000000000002',
+          projectId: fixture.projectId,
+          expectedReferenceSnapshotId:
+              fixture.addCandidate.referenceSnapshotId,
+          activityInstanceId: fixture.addCandidate.activityInstanceId,
+          plannedDate: fixture.windowStart,
+          note: 'Acceptance persistence notu',
+        ),
+      );
+      runnerItem = await livingPlan.startLivingPlanItem(
+        StartConstructionLivingPlanItemCommand(
+          itemId: runnerItem.id,
+          eventId: '47610000-0000-4000-8000-000000000003',
+          expectedRevision: runnerItem.revision,
+        ),
+      );
+      runnerItem = await livingPlan.updateLivingPlanProgress(
+        UpdateConstructionLivingPlanProgressCommand(
+          itemId: runnerItem.id,
+          eventId: '47610000-0000-4000-8000-000000000004',
+          expectedRevision: runnerItem.revision,
+          progressPercent: 47,
+        ),
+      );
+
+      await ensureLivingPlanAcceptanceFixture(
+        directories: directories,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+      );
+      runnerItem = (await livingPlan.loadLivingPlanItem(runnerItem.id))!;
+      expect(runnerItem.status, ConstructionLivingPlanStatus.completed);
+      expect(runnerItem.progressPercent, 100);
+
+      runnerItem = await livingPlan.reopenLivingPlanItem(
+        ReopenConstructionLivingPlanItemCommand(
+          itemId: runnerItem.id,
+          eventId: '47610000-0000-4000-8000-000000000005',
+          expectedRevision: runnerItem.revision,
+          plannedDate: fixture.windowStart,
+        ),
+      );
+      runnerItem = await livingPlan.startLivingPlanItem(
+        StartConstructionLivingPlanItemCommand(
+          itemId: runnerItem.id,
+          eventId: '47610000-0000-4000-8000-000000000006',
+          expectedRevision: runnerItem.revision,
+        ),
+      );
+      runnerItem = await livingPlan.updateLivingPlanProgress(
+        UpdateConstructionLivingPlanProgressCommand(
+          itemId: runnerItem.id,
+          eventId: '47610000-0000-4000-8000-000000000007',
+          expectedRevision: runnerItem.revision,
+          progressPercent: 63,
+        ),
+      );
+
+      await ensureLivingPlanAcceptanceFixture(
+        directories: directories,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+      );
+      final recovered = await livingPlan.loadLivingPlanItem(runnerItem.id);
+      expect(recovered, isNotNull);
+      expect(recovered!.status, ConstructionLivingPlanStatus.completed);
+      expect(recovered.progressPercent, 100);
+      expect(recovered.revision, runnerItem.revision + 1);
+    },
+  );
 
   test('bootstrap reconciles only verified incoming backup orphans', () async {
     final now = DateTime.utc(2026, 7, 20, 12);
