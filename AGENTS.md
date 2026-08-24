@@ -2,204 +2,305 @@
 
 Bu dosya repository kökünde bütün CSE çalışmalarına uygulanır.
 
-## Zorunlu ön okuma
+## 1. Kaynak otoritesi
 
-Her plan, edit, test, build, cihaz işlemi, commit veya push öncesinde şu
-kaynakları sırayla oku:
+Bilgi türüne göre yetkili kaynaklar:
 
-1. `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
-2. `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
-3. `docs/protocols/CSE_MODEL_REASONING_ROUTING_POLICY.md`
-4. `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`
-5. Ürün işi ise `docs/v2/CSE_V2_SCOPE.md`
-6. `ROADMAP.md`
-7. current GitHub Issue ve bütün scope/izin yorumları
-8. `.cse/tasks/<issue_no>_task.md` varsa
+1. Kalıcı ürün amacı ve veri ilkeleri:
+   `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
+2. Operasyon ve Git/Codex güvenliği:
+   `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
+3. Model ve reasoning routing:
+   `docs/protocols/CSE_MODEL_REASONING_ROUTING_POLICY.md`
+4. Risk-temelli validation:
+   `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`
+5. Hızlandırılmış çalışma, owner-led manual test ve test-erteleme kuralları:
+   `docs/protocols/CSE_WORKFLOW_ACCELERATION_PROTOCOL.md`
+6. Güncel ürün kapsamı ve sıra:
+   `docs/v2/CSE_V2_SCOPE.md` ve `ROADMAP.md`
+7. Aktif görev ve owner authority:
+   current GitHub Issue ve bütün kapsam/izin yorumları
+8. Kalıcı manuel test backlog'u:
+   GitHub Issue `#479 — CSE Manual Test Register`
+9. Yerel yürütme kanıtı:
+   `.cse/tasks/<issue_no>_task.md` ve `.cse/results/<issue_no>_result.md`
 
-Yeni sohbet, handoff veya kaynak-otoritesi işinde ayrıca:
+README, eski roadmap/Epic, ZIP, handoff, podcast, `.cse/state`, Orchestrator,
+Bridge, Work Mode veya sohbet hafızası current GitHub ve kanonik kaynak
+gerçeğini override edemez.
 
-- `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md`
-- `docs/protocols/CSE_PROJECT_SOURCE_REGISTER.md`
+Bu kalıcı dosyada sabit master SHA, schema, aktif Issue/PR veya test sayısı
+tutulmaz. Değişken durum her görevde GitHub/repository üzerinden okunur.
 
-okunur.
+## 2. Yeni sohbet ve resume
 
-## Kaynak otoritesi
+### Yeni sohbet / yeni görev
 
-- Kalıcı ürün amacı ve veri ilkeleri:
-  `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
-- Güncel V2 kapsamı:
-  `docs/v2/CSE_V2_SCOPE.md`
-- Güncel yürütme sırası:
-  `ROADMAP.md`
-- Operasyon ve güvenlik:
-  `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
-- Model, reasoning, execution mode ve orchestration seçimi:
-  `docs/protocols/CSE_MODEL_REASONING_ROUTING_POLICY.md`
-- Doğrulama genişliği ve bütçesi:
-  `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`
-- Aktif teknik kapsam:
-  current GitHub Issue
+Bir kez tam oku:
 
-Stale state, README, eski roadmap, Epic, Orchestrator, Bridge, Work Mode, ZIP,
-handoff veya sohbet hafızası current GitHub ve V2 kapsam gerçeğini override
-edemez.
+1. `AGENTS.md`
+2. `CSE_UNIFIED_PROJECT_SOURCE.md`
+3. `CSE_PROJECT_INSTRUCTIONS.md`
+4. `CSE_MODEL_REASONING_ROUTING_POLICY.md`
+5. `CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`
+6. `CSE_WORKFLOW_ACCELERATION_PROTOCOL.md`
+7. `CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md`
+8. `CSE_PROJECT_SOURCE_REGISTER.md`
+9. Ürün işi ise `CSE_V2_SCOPE.md`
+10. `ROADMAP.md`
+11. current Issue, owner-authority yorumları, açık PR/branch/diff
+12. GitHub Issue #479 içindeki ilgili manuel test kayıtları
+13. ilgili task/result ve son failure evidence
 
-## Temel ürün ve geliştirme ilkeleri
+Kanonik kaynakların blob/hash manifestini task kaydına yaz.
 
-- Gereksiz karmaşık yapı kurulmaz.
-- Her adım küçük, anlaşılır, test edilebilir ve geri alınabilir olmalıdır.
+### Aynı görevde resume/correction
+
+Ruleset hashleri değişmediyse bütün uzun belgeleri tekrar okuma. Yalnız:
+
+- yeni Issue/authority yorumları;
+- task/result EOF;
+- branch/head/diff/staged;
+- kalan implementation/correction bütçesi;
+- Issue #479 içindeki ilgili test durum değişiklikleri
+
+okunur. Hash değişmişse yalnız değişen kanonik kaynak yeniden okunur.
+
+Kullanıcı yeni sohbette yalnız `devam` veya `GitHub'dan devam et` diyebilmelidir;
+daha önce verdiği instruction/result bloklarını tekrar taşıması beklenmez.
+
+## 3. Yeni workflow kuralının önceliği
+
+`CSE_WORKFLOW_ACCELERATION_PROTOCOL.md`, workflow, retry, automated testing,
+manuel test listesi ve test erteleme konularında eski zorunlu full-test/build/
+device veya `one correction / one retry` kurallarıyla çelişirse daha yeni ve
+daha özel kural olarak uygulanır.
+
+Bu öncelik şunları gevşetmez:
+
+- ürün/veri güvenliği;
+- current Issue allowlist ve changed-contract sınırı;
+- schema/migration/backup/version/permission/platform authority;
+- production/debug/gerçek kullanıcı verisi koruması;
+- Ready, merge, release ve owner onayı.
+
+## 4. Değişmez güvenlik ilkeleri
+
+- CSE tek sahipli, owner-only, local-first ve mobile-first kalır.
 - Aynı anda yalnız bir production implementation Issue'su aktiftir.
-- Her production Issue tek V2 maddesine ve dar değişen sözleşmeye bağlıdır.
-- Framework, veritabanı veya servis bağımlılığı ancak ihtiyaç netleştiğinde
-  eklenir.
-- Kullanıcının ve önceki görevlerin değişiklikleri korunur.
-- Kod okunabilir, sade ve proje standartlarına uygun yazılır.
-- Production kodu değiştiyse uygun seviyede test eklenir.
-- Kullanıcıya dönük dokümanlar Türkçe; kod, modül ve fonksiyon adları sade
-  İngilizce tutulur.
-- Teknik kararlar `docs/project_decisions.md` içinde kısa ve olgusal maddelerle
-  kaydedilir.
-- Gerçek kullanıcı data root'u current Issue açıkça izin vermedikçe okunmaz veya
-  değiştirilmez.
-- Offline-first, owner-only, append-only event, optimistic revision ve
-  recoverable archive ilkeleri korunur.
-- Kullanıcı onayı olmadan resmî karar, otomatik kapatma veya private→project
-  dönüşümü yapılmaz.
-- Yeni teknik terimler ilk geçtiği learning belgesinde açıklanır; kalıcı terim
-  `learning/GLOSSARY.md` içine eklenir.
-- Learning belgesi yalnız kısa özet değildir. Gerçek uygulama kodu, test amacı,
-  çalışma akışı, teknik karar ve “Şunu şöyle yaptık ki...” açıklaması içerir.
+- Gerçek kullanıcı data root'u açık authority olmadan okunmaz/değiştirilmez.
+- Production/debug paketleri acceptance veya otomasyon tarafından okunmaz,
+  başlatılmaz, temizlenmez veya mutate edilmez.
+- Stable identity, optimistic revision, append-only event/history, transaction,
+  backup/restore ve attachment bütünlüğü korunur.
+- Force-push, destructive reset/clean/stash, hard-delete ve beklenmeyen kullanıcı
+  değişikliğinin üzerine yazma varsayılan yasaktır.
+- Ready, merge, Issue/Epic closure, release/store ve sonraki ürün maddesi açık
+  owner onayı gerektirir.
 
-## Ana yürütme kuralı
+## 5. Owner-led manuel uygulama testi — bağlayıcı varsayılan
 
-> Maksimum mümkün doğrulama değil, riski karşılayan minimum yeterli doğrulama
-> uygulanır.
+> Uygulama davranışını varsayılan olarak Codex değil, owner test eder.
 
-Güvenlik kapıları azaltılmaz; doğrulama yalnız değişen sözleşmeyle orantılı
-tutulur.
+Codex, owner'ın ayrıca ve açıkça belirli bir gate için istemediği sürece
+uygulamayı test etmez.
 
-### Varsayılan doğrulama davranışı
+### Varsayılan olarak çalıştırılmayacaklar
 
-- Dar UI, metin, filtre veya read-model değişikliğinde odaklı unit/widget
-  testleri kullan.
-- Production kodu değiştiyse etkilenen paket/suite'i çalıştır.
-- Full mobile release gate, AAB/signing, ARM64/16 KiB, background/reboot,
-  backup/restore veya fiziksel cihaz zincirini yalnız ilgili sözleşme değiştiyse
-  ya da Issue açıkça zorunlu tuttuysa çalıştır.
-- Değişmeyen sözleşmeler için son geçerli merged kanıtı yeniden kullan.
-- Aynı source revision üzerinde aynı full gate'i ikinci kez çalıştırma.
-- Ortam veya kabul otomasyonu hatasında tüm zinciri değil yalnız başarısız
-  aşamayı tekrar et.
-- Feature Issue içinde keşfedilen toolchain/release sorununu sessizce kapsamına
-  alma; ayrı Issue olarak raporla.
+- `flutter test` ve diğer unit/widget testleri;
+- integration testleri veya full Flutter suite;
+- emülatör testi;
+- ADB/device acceptance;
+- scripted UI/selector testleri;
+- acceptance package install/launch/clear-data akışı;
+- uygulamayı davranış doğrulaması amacıyla çalıştırma;
+- APK/AAB build — yalnız owner artifact veya manuel test build'i istediğinde.
 
-## Bütçe ve stop kuralları
+### Codex'in varsayılan source-level kontrolleri
 
-- Bir teknik adım: 1 primary execution.
-- Blocking correction: en fazla 1 correction.
-- Aynı başarısız aşama: en fazla 1 düzeltme denemesi.
-- Dar UI/read-model işi hedefi 30 dakika, hard stop 45 dakikadır.
-- 45 dakika sonunda iş tamamlanmadıysa yeni çözüm zinciri veya yeni full gate
-  başlatma; exact blocker, tamamlanan kanıt ve kalan tek adımı raporla.
-- Kaynak kod değişmeden full gate tekrar başlatılmaz.
-- Test veya build kesildiyse yalnız kalan aşama sürdürülür; geçerli kanıtlar
-  sıfırlanmaz.
-- P0 veri kaybı, yanlış bağlama veya backup bozulması yeni kapsamdan önce
-  çözülür.
+- exact allowlist ve diff/scope kontrolü;
+- yalnız değişen dosyalarda format/syntax kontrolü;
+- gerekli ve makul ise static analysis;
+- `git diff --check`;
+- protected/schema/backup/version/platform drift kontrolü;
+- commit/push/Draft PR kanıtı.
 
-## Issue talimatı zorunlu alanları
+Bu kontroller manuel uygulama testinin yerine geçtiği iddiasını taşımaz.
 
-Current Issue veya task dosyasında şu alanlar bulunmalıdır:
+### Her özellikte zorunlu manuel test listesi
 
-- V2 item ve parent Epic
-- `CSE-MRP-1.0` policy version ve task risk (`R0..R4`)
-- ChatGPT/orchestrator model ve reasoning seçimi
-- Codex/executor model ve reasoning seçimi
-- execution mode (`standard | pro`) ve orchestration (`single-agent | Ultra`)
-- seçim nedeni, allowed fallback, review floor ve fail-closed-if-mismatch
-- validation class: `docs | narrow-ui | domain | persistence | release-critical`
-- değişen sözleşmeler
-- izin verilen dosya listesi
-- focused testler
-- izin verilen geniş gate'ler
-- yeniden kullanılacak kanıtlar
-- schema/migration/backup/attachment/notification etkisi
-- minimum fiziksel cihaz kabulü
-- retry budget
-- time budget
-- açık kapsam dışı alanlar
-- stop conditions
+Her feature implementation sonunda ChatGPT:
 
-## Yerel ve Git güvenliği
+1. GitHub Issue #479'a numaralı testler ekler;
+2. ID biçimini `MT-<FEATURE_ISSUE>-<NNN>` olarak korur;
+3. adım ve beklenen sonucu kısa yazar;
+4. feature/PR/build referansını kaydeder;
+5. owner'ın bildirdiği sonuçlara göre listeyi günceller.
 
+Durumlar:
+
+```text
+PENDING
+PASS
+FAIL
+DEFERRED
+PARTIAL
+N/A
+```
+
+Owner yalnız `MT-476-003 PASS` gibi kısa bir bildirim verebilir. ChatGPT kayıt
+yüzeyini günceller; owner'ın rapor veya YAML hazırlaması gerekmez.
+
+### Testi sonraya bırakma
+
+Owner test etmek istemezse ilgili testler `DEFERRED` olarak kalır ve sonraki
+özelliğe geçilebilir. Bu durum:
+
+- implementation'ı veya Draft PR publication'ını otomatik bloke etmez;
+- merge kararını owner'a bırakır;
+- feature'ın `VERIFIED`, `FIELD_ACCEPTED` veya `RELEASE_READY` sayılmasına izin
+  vermez;
+- durumun `IMPLEMENTED — MANUAL TEST PENDING/DEFERRED` olarak yazılmasını
+  gerektirir.
+
+Owner daha sonra test sonucu bildirirse aynı stable test ID'leri güncellenir.
+`FAIL` sonucu çıkarsa test ID'sine bağlı dar correction Issue'su açılır.
+
+## 6. Konsolide implementation/stabilizasyon penceresi
+
+Her Slice/correction phase tek bounded implementation window içinde yürütülür:
+
+```text
+primary implementation: 1
+same-scope narrow corrections: en fazla 3
+environment-only recovery: exact root cause sonrası en fazla 1
+automated application tests: 0 unless owner explicitly opts in
+manual test checklist: every feature
+```
+
+Dar correction için:
+
+- current Issue/allowlist/changed-contract içinde kal;
+- exact root cause kanıtla;
+- yalnız source-level invalidated kontrolü çalıştır;
+- correction ve kalan bütçeyi evidence'a yaz;
+- yeni ürün/tasarım kararı üretme.
+
+Her dar blocker için yeni owner authority istenmez.
+
+### Anında fail-closed / owner escalation
+
+- allowlist veya kapsam genişlemesi;
+- yeni ürün/tasarım kararı;
+- schema/migration/backup/version/permission/signing/platform değişimi;
+- production/debug/gerçek kullanıcı verisi riski;
+- stable identity/transaction/event/history/integrity/security değişimi;
+- kök nedenin kanıtlanamaması;
+- üç correction bütçesinin tükenmesi;
+- destructive/force/uninstall/production clear-data ihtiyacı.
+
+Testlerin owner tarafından `PENDING` veya `DEFERRED` bırakılması fail-closed
+nedeni değildir.
+
+## 7. Test listesi ve implementation durumunun ayrılması
+
+Implementation ve manuel doğrulama iki ayrı durumdur:
+
+```text
+implementation_status:
+  NOT_STARTED | IN_PROGRESS | IMPLEMENTED | MERGED
+manual_test_status:
+  PENDING | PARTIAL | PASS | FAIL | DEFERRED
+```
+
+Codex completion raporu otomatik test yapılmadığını açıkça belirtir. PASS test
+uydurmaz ve daha önceki farklı source revision'a ait sonucu current davranışın
+kanıtı gibi sunmaz.
+
+Test listesi değişiklikten etkilenirse yalnız ilgili MT satırları yeniden
+`PENDING` yapılır; geçmiş owner sonuçları not olarak korunur.
+
+## 8. Build ve artifact davranışı
+
+APK/AAB varsayılan olarak her feature sonunda üretilmez.
+
+Build yalnız:
+
+- owner `test edeceğim` veya artifact istediğinde;
+- release/milestone build kararı verildiğinde;
+- owner belirli bir compile gate'i açıkça yetkilendirdiğinde
+
+çalıştırılır.
+
+Build istenmezse implementation commit/push/Draft PR aşamasına geçebilir.
+Build üretilirse package, size, SHA-256 ve ilgili source commit kaydedilir.
+
+## 9. GitHub ve publication
+
+- Production branch: `codex/issue-<issue_no>-<slug>`
+- Documentation branch: `docs/issue-<issue_no>-<slug>`
 - Yeni teknik iş doğrudan `master` üzerinde geliştirilmez.
-- Branch standardı:
-  `codex/issue-<issue_no>-<slug>` veya documentation için
-  `docs/issue-<issue_no>-<slug>`.
-- Branch değişikliği, pull, edit, commit veya push öncesi tracked, staged,
-  untracked ve ignored durum incelenir.
-- Beklenmeyen kullanıcı değişikliği varsa reset, clean, stash, silme veya
-  üzerine yazma yapılmaz.
-- Force-push varsayılan yasaktır.
-- Ignored ZIP, device backup, reports ve gerçek kullanıcı alanlarına dokunulmaz.
-- Merge kullanıcı onayı gerektirir.
-- Merge sonrasında sonraki işe başlamadan local `master` fast-forward edilir.
+- PR önce Draft açılır.
+- Source-level kontroller PASS olduktan sonra Draft PR açılabilir.
+- Manual testler `PENDING` veya `DEFERRED` iken Draft publication ve sonraki
+  development başlayabilir.
+- `PENDING/DEFERRED` durumunda PR ve completion açıkça
+  `IMPLEMENTED — MANUAL TEST PENDING/DEFERRED` yazar.
+- Merge varsayılan squash merge'dir ve owner onayı gerektirir.
+- Açık owner talebiyle documentation-only canonical rule güncellemesi ayrı docs
+  branch/Draft PR üzerinde GitHub-native hazırlanabilir; production dosyası
+  içeremez ve merge öncesi independent review ister.
 
-## Fiziksel cihaz ilkesi
+## 10. Yerel yürütme
 
-- Yalnız değişen kullanıcı yolunu doğrula.
-- Uninstall, data clear, gerçek içerik okuma veya production package mutation
-  current Issue açıkça izin vermedikçe yapılmaz.
-- UI/read-model değişikliği backup, reboot veya notification motorunu
-  değiştirmiyorsa bu kapıları yeniden çalıştırma.
-- ADB otomasyonu minimum, veri koruyan ve exact cihazla sınırlı olmalıdır.
-- Koordinat veya selector otomasyonu hata verirse bir kez düzelt; ikinci aynı
-  başarısızlıkta kör otomasyonu genişletme ve açık kullanıcı ekran doğrulamasına
-  dön.
+Resmî yerel repo:
 
-## Completion evidence
+```text
+V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer
+```
+
+Local execution gereken işte doğru root, master/origin divergence ve bütün Git
+durumu doğrulanır. Beklenmeyen değişiklikte reset/clean/stash uygulanmaz. İlk
+substantive local edit `.cse/tasks/<issue_no>_task.md` olmalıdır.
+
+## 11. Issue/task zorunlu alanları
+
+```text
+Parent / V2 item:
+Expected base:
+Risk ve model routing:
+Changed contracts:
+Allowed/protected paths:
+Source-level checks:
+Automated application tests: disabled unless owner explicitly requests
+Manual test IDs / register link:
+Manual test status:
+Build/artifact authority:
+Stabilization/correction budget:
+Immediate escalation conditions:
+Publication authority:
+```
+
+## 12. Completion evidence
 
 Final rapor şunları açıkça ayırır:
 
-- çalıştırılan focused testler
-- çalıştırılmayan geniş gate'ler ve neden gerekmediği
-- yeniden kullanılan merged kanıtlar
-- schema/migration/backup/attachment/notification etkisi
-- saha kabul sonucu
-- süre ve tekrar bütçesi
-- kapsam dışı altyapı sorunları
-- commit, push, Draft PR, Ready ve merge durumu
-- `execution_record` YAML bloğu
-- `review_recommendation` YAML bloğu
+- source/head ve exact changed paths;
+- implementation ve correction durumu;
+- source-level kontroller;
+- Codex tarafından çalıştırılmayan application testleri;
+- Issue #479'daki manuel test ID'leri ve durumları;
+- artifact varsa package/size/SHA-256;
+- schema/backup/version/platform etkisi;
+- commit/push/Draft/Ready/merge durumu.
 
-Runtime actual model veya reasoning görünmüyorsa tahmin edilmez;
-`actual_model: unknown`, `actual_reasoning_effort: unknown`,
-`mismatch_detected: null` ve `runtime_verification_status: unverified` yazılır.
-`mismatch_detected: false` yalnız iki actual değer de görünür ve requested
-değerlerle exact eşitse kullanılabilir.
+`execution_record` ve `review_recommendation` zorunludur. Runtime actual
+model/effort görünmüyorsa `unknown / null / unverified` kullanılır.
 
-## Güncel V2 yürütme özeti
+## 13. Ana karar
 
-Güncel ürün kapsamını `docs/v2/CSE_V2_SCOPE.md`, yürütme sırasını `ROADMAP.md`,
-görev yetkisini current GitHub Issue ve tüm kapsam/izin yorumları, repository
-gerçeğini current `master` belirler. Revised V2 paketi şudur:
-
-1. Proje ve Mahal omurgası — complete
-2. Sicil / Puantaj V2 / Saha Rehberi — complete
-3. Attachment / Fotoğraf / Medya V2 — complete
-4. Ajanda V2 + Ajanda–Hatırlatıcı kontrollü senkron — complete
-5. 7 Günlük Yaşayan İş Programı / İş ve Gün Planı — current, not complete
-6. Günlük Log Çıktısı v1
-7. İş Zinciri / Bağlı Log v1
-8. İstenecek Malzemeler
-9. Deterministik kişi/firma/etiket önerileri
-10. Telefon görüşmesi sonucu → Ajanda
-11. Proje fotoğraf/video albümü
-12. Günlük Log Çıktısı v2
-13. Mini hesap makinesi
-
-Güncel güvenli teknik zemin `447916be0b3ddd2af75b0fe85f8c7f710f29c1cd`,
-SQLite schema `14` ve backup format `1`dir. Living Plan UI/APK/device acceptance
-henüz yoktur; Item 5 complete değildir. Issue #383 ve eski V2.1 ön kapısı
-tarihsel repository truth-sync bağlamıdır; güncel işi yönlendiren aktif gate
-değildir.
+> Codex özelliği uygular, source-level kalite ve scope kontrollerini yapar,
+> numaralı manuel test listesini ChatGPT'ye devreder ve geliştirmeye devam eder.
+> Uygulama davranışını owner isterse test eder; istemezse testler kayıtlı şekilde
+> ertelenir. Test yapılmaması başarı kanıtı değildir, fakat sonraki feature'a
+> geçişi otomatik olarak durdurmaz.
