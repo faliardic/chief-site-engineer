@@ -5,6 +5,7 @@ import 'package:chief_site_engineer/application/attendance_application.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/application/construction_living_plan_application.dart';
 import 'package:chief_site_engineer/application/construction_living_plan_intelligence_application.dart';
+import 'package:chief_site_engineer/application/daily_log_application.dart';
 import 'package:chief_site_engineer/application/mobile_backup_application.dart';
 import 'package:chief_site_engineer/application/restore_recovery_application.dart';
 import 'package:chief_site_engineer/core/environment.dart';
@@ -39,6 +40,7 @@ class BootstrapSuccess extends BootstrapResult {
     this.livingPlan = const UnavailableConstructionLivingPlanApplication(),
     this.livingPlanIntelligence =
         const UnavailableConstructionLivingPlanIntelligenceApplication(),
+    this.dailyLog,
     this.projectLocations,
     this.attendance,
     this.concrete,
@@ -55,6 +57,7 @@ class BootstrapSuccess extends BootstrapResult {
   final ConstructionLivingPlanApplicationPort livingPlan;
   final ConstructionLivingPlanIntelligenceApplicationPort
   livingPlanIntelligence;
+  final DailyLogApplicationPort? dailyLog;
   final ProjectLocationApplication? projectLocations;
   final AttendanceApplication? attendance;
   final ConcreteApplication? concrete;
@@ -178,6 +181,10 @@ class AppBootstrap {
             databasePath: directories.databaseFile,
             databaseFactory: databaseFactory,
           );
+      final dailyLog = SqliteDailyLogApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactory,
+      );
       final attendance = SqliteAttendanceApplication(
         databasePath: directories.databaseFile,
         databaseFactory: databaseFactory,
@@ -240,6 +247,7 @@ class AppBootstrap {
         agenda: agenda,
         livingPlan: livingPlan,
         livingPlanIntelligence: livingPlanIntelligence,
+        dailyLog: dailyLog,
         projectLocations: agenda,
         attendance: attendance,
         concrete: concrete,

@@ -9,6 +9,7 @@ import 'package:chief_site_engineer/features/attachments/attachment_catalog_page
 import 'package:chief_site_engineer/features/attachments/attachment_health_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
+import 'package:chief_site_engineer/features/daily_log/daily_log_page.dart';
 import 'package:chief_site_engineer/features/living_plan/living_plan_page.dart';
 import 'package:chief_site_engineer/features/memory/memory_backup_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
@@ -485,6 +486,23 @@ class _HomePageState extends State<_HomePage> {
             ),
           ),
         ),
+        if (widget.bootstrap.dailyLog case final dailyLog?)
+          Card(
+            child: ListTile(
+              key: const Key('open-daily-log'),
+              leading: const Icon(Icons.summarize_outlined),
+              title: const Text('Günlük Log'),
+              subtitle: const Text(
+                'Seçilen günün kaynak kayıtlarından salt-okunur taslak hazırla.',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => DailyLogPage(dailyLog: dailyLog),
+                ),
+              ),
+            ),
+          ),
         Card(
           key: const Key('home-field-tip-card'),
           child: Padding(
