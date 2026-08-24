@@ -1,5 +1,25 @@
 # Changelog
 
+## Issue #476 - Living Plan intelligence UI and isolated device acceptance
+
+- Ayrı read-only intelligence application, her item'ın exact historical
+  `referenceSnapshotId` snapshot'ından deterministic forecast ve varsa immutable
+  dependency graph impact'ini batch/cache ile yükler; current/newer snapshot'a
+  sessiz rebind yapmaz.
+- Living Plan `STARTED + explicit progress` kartları kalan iş/takvim günü,
+  forecast finish ve signed reference variance gösterir. Positive downstream
+  impact, tarihlerin değişmediğini açıklayan salt-okunur detail'de Türkçe
+  activity adı veya version-safe raw `activityId` fallback ile görünür.
+- Legacy graph unavailable forecast'u engellemez ama sahte impact/backfill
+  üretmez. Intelligence read failure lifecycle/progress mutationlarını bloke
+  etmez.
+- Acceptance fixture/runner ayrı dependency-capable synthetic target, semantic
+  UI discovery, detail öncesi/sonrası exact item/revision/event/receipt/progress/
+  planned-date equality ve relaunch persistence'ı yalnız isolated acceptance
+  package içinde doğrular. Schema `17`, backup format `1`, version `0.1.0+1`
+  değişmez; reforecast, quantity, productivity learning ve public/store release
+  kapsam dışıdır.
+
 ## Issue #474 - Read-only downstream dependency impact core
 
 - Pure impact engine, Living Plan forecast'unu exact project/snapshot/activity

@@ -3,23 +3,24 @@
 **Durum:** Güncel yürütme sırası
 **Tarih:** 23 Ağustos 2026
 **V2 kapsam kaynağı:** `docs/v2/CSE_V2_SCOPE.md`
-**Güncel yön truth-sync:** Issue #474
-**Güncel güvenli `master`:** `9fc53da006689ff4c1e5e5c8a134cef3f35e8e77` / PR #473
+**Güncel yön truth-sync:** Issue #476
+**Güncel güvenli `master`:** `cc7c49fa30b50aae09b349eb0bfa1161c5cdc814` / PR #475
 
 ## 1. Güncel ürün durumu
 
 CSE V1 tamamlanmış ve proje sahibi tarafından yaklaşık bir ay gerçek sahada
 kullanılmıştır. V2 Items 1–4 tamamlanmış; schedule runtime, immutable
 reference-schedule snapshots, Living Plan MVP/ilk cihaz kabulü, actual-progress
-core, progress UI/isolated cihaz kabulü, deterministic forecast core ve
-immutable snapshot dependency graph persistence PR #473'e kadar merge edilmiştir.
+core, progress UI/isolated cihaz kabulü, deterministic forecast core, immutable
+snapshot dependency graph persistence ve read-only downstream impact PR #475'e
+kadar merge edilmiştir.
 Güncel teknik ve ürün durumu:
 
 | Alan | Değer |
 | --- | --- |
 | V1 baseline commit | `7c9f65a811c9f4bca561adab6bd1f8e64e6908cc` |
-| Güncel güvenli merge | `9fc53da006689ff4c1e5e5c8a134cef3f35e8e77` |
-| Son Living Plan predecessor PR | `#473` |
+| Güncel güvenli merge | `cc7c49fa30b50aae09b349eb0bfa1161c5cdc814` |
+| Son Living Plan predecessor PR | `#475` |
 | Mobil sürüm | `0.1.0+1` |
 | SQLite schema | `17` |
 | `.csebackup` formatı | `1` |
@@ -31,9 +32,11 @@ Güncel teknik ve ürün durumu:
 V1'in tamamlanması, modüllerin dondurulduğu anlamına gelmez. V2 aynı
 offline-first mobil ürün üzerinde ilerler. Issue #472 / PR #473 yalnız bundan
 sonra oluşturulan immutable schedule snapshot'ların resolved dependency edge
-setini manifest/count/hash ile saklayan merged schema 17 temelidir. Issue #474
-exact forecast/snapshot/dependency-graph binding'inden salt-okunur downstream
-impact üreten current iştir; schedule mutation/reforecast değildir ve
+setini manifest/count/hash ile saklayan merged schema 17 temelidir. Issue #474 /
+PR #475 exact forecast/snapshot/dependency-graph binding'inden salt-okunur
+downstream impact üreten merged predecessor'dır. Issue #476 bu exact read-only
+intelligence katmanlarını Living Plan UI ve isolated acceptance'ta görünür kılan
+current iştir; schedule mutation/reforecast değildir ve
 public/store production release ilan edilmemiştir.
 
 ## 2. Kaynak otoritesi
@@ -208,11 +211,13 @@ deterministic kalan süre/finish tahmini üreten, Issue #472 / PR #473 ise yaln�
 yeni schedule snapshot'ların exact resolved dependency graph'ını immutable ve
 fingerprint'li saklayan merged predecessor'lardır. Historical snapshot'lara
 graph backfill yapılmaz; manifest yokluğu zero-edge değil typed unavailable'dır.
-Issue #474 exact origin forecast/snapshot/graph binding'iyle deterministic
+Issue #474 / PR #475 exact origin forecast/snapshot/graph binding'iyle deterministic
 topological sırada bütün incoming constraint'lerin maksimumunu uygulayan
-salt-okunur downstream impact current evolution'dır. Aktiviteyi reference
+salt-okunur downstream impact merged predecessor'dır. Aktiviteyi reference
 tarihinden erkene çekmez; source finish-only gecikmesi outgoing SS constraint'ini
-yanlış kaydırmaz. Schedule/Living Plan/reference mutation ve reforecast, actual
+yanlış kaydırmaz. Issue #476 exact historical binding'i koruyarak forecast ve
+positive downstream impact'i sade kart/detail UI olarak gösteren current
+evolution'dır. Schedule/Living Plan/reference mutation ve reforecast, actual
 quantity ile project-specific productivity learning başlamaz. Item 5 not
 complete kalır; Items 6–13'ün sırası değişmez.
 
@@ -343,7 +348,8 @@ Living 7-Day Plan — current, not complete
 → Issue #468 / PR #469 progress UI + isolated device acceptance — merged
 → Issue #470 / PR #471 deterministic read-only forecast core — merged
 → Issue #472 / PR #473 immutable snapshot dependency graph persistence — merged
-→ Issue #474 read-only downstream dependency impact core — current
+→ Issue #474 / PR #475 read-only downstream dependency impact core — merged
+→ Issue #476 Living Plan intelligence UI + isolated device acceptance — current
 ```
 
 Items 1–4 complete'tir. Activity Catalog Runtime, typed Project Profile ve
@@ -357,9 +363,11 @@ temele ekler. Issue #468 / PR #469 progress UI ve isolated device acceptance,
 Issue #470 / PR #471 exact origin snapshot duration'ını progress ile read-only
 yorumlayan deterministic forecast core, Issue #472 / PR #473 ise yalnız yeni
 snapshot'ların exact dependency graph'ını immutable saklayan merged
-predecessor'lardır; legacy graph backfill yapılmaz. Issue #474 bu exact immutable
-girdilerden schedule mutation üretmeden downstream projected impact hesaplayan
-current evolution'dır. Reforecast, actual quantity ve productivity learning
+predecessor'lardır; legacy graph backfill yapılmaz. Issue #474 / PR #475 bu exact
+immutable girdilerden schedule mutation üretmeden downstream projected impact
+hesaplayan merged predecessor'dır. Issue #476 exact item snapshot'ından forecast/
+impact'i read-only gösteren current UI/device acceptance evolution'dır. Reforecast,
+actual quantity ve productivity learning
 başlamaz. Item 5'in final completion sınırı sonraki owner kararı ve executable
 evidence ile belirlenir; Items 6–13'ün sırası değişmez.
 

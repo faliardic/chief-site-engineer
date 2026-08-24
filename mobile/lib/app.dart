@@ -479,6 +479,7 @@ class _HomePageState extends State<_HomePage> {
                 builder: (_) => LivingPlanPage(
                   agenda: widget.bootstrap.agenda,
                   livingPlan: widget.bootstrap.livingPlan,
+                  intelligence: widget.bootstrap.livingPlanIntelligence,
                 ),
               ),
             ),

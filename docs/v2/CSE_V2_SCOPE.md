@@ -3,8 +3,8 @@
 **Belge türü:** Güncel ürün yürütme kapsamı
 **Durum:** Kanonik V2 kapsam ve sıra kaynağı
 **Tarih:** 23 Ağustos 2026
-**Güncel yön kaynağı:** Issue #474 — Read-only Downstream Dependency Impact Core
-**Güncel güvenli `master`:** `9fc53da006689ff4c1e5e5c8a134cef3f35e8e77` / PR #473
+**Güncel yön kaynağı:** Issue #476 — Living Plan Intelligence UI + Isolated Device Acceptance
+**Güncel güvenli `master`:** `cc7c49fa30b50aae09b349eb0bfa1161c5cdc814` / PR #475
 
 ## 1. Belgenin rolü
 
@@ -51,12 +51,13 @@ yerine bu baseline üzerinde ilerler.
 
 Güncel merged V2 teknik baseline'ı V1 metadata'sından ayrıdır: mobile version
 `0.1.0+1`, SQLite schema `17`, backup format `1` ve son güvenli merge
-`9fc53da006689ff4c1e5e5c8a134cef3f35e8e77` / PR #473 değeridir. Bu baseline,
+`cc7c49fa30b50aae09b349eb0bfa1161c5cdc814` / PR #475 değeridir. Bu baseline,
 schedule runtime ve persistent immutable reference-schedule snapshot temeliyle
 Living Plan MVP Core, 7-day UI/APK/device acceptance, Actual Progress Core ve
 progress UI/isolated device acceptance, deterministic forecast core ve immutable
-snapshot dependency graph persistence'ı içerir. Issue #474 read-only downstream
-dependency impact current evolution'dır; schedule mutation/reforecast değildir
+snapshot dependency graph persistence ve read-only downstream dependency impact
+core'u içerir. Issue #476 exact item snapshot intelligence'ını Living Plan UI ve
+isolated acceptance'ta görünür kılan current evolution'dır; mutation/reforecast değildir
 ve public/store release veya genel production readiness ilanı değildir.
 
 ## 3. V2'nin amacı
@@ -76,8 +77,9 @@ Proje/Mahal, Saha Rehberi, Attachment ve Ajanda omurgası — complete
 → Issue #468 Progress UI + Isolated Device Acceptance — merged / PR #469
 → Issue #470 Deterministic Living Plan Forecast Core — merged / PR #471
 → Issue #472 Immutable Snapshot Dependency Graph Persistence — merged / PR #473
-→ Issue #474 Read-only Downstream Dependency Impact Core — current
-→ schedule mutation/reforecast, forecast UI, actual quantity ve productivity learning — not started
+→ Issue #474 Read-only Downstream Dependency Impact Core — merged / PR #475
+→ Issue #476 Living Plan Intelligence UI + Isolated Device Acceptance — current
+→ schedule mutation/reforecast, actual quantity ve productivity learning — not started
 ```
 
 CSE teknik olarak derin, operasyonel olarak sade kalır: binlerce inşaat
@@ -218,12 +220,15 @@ Kapanış kapısı:
   dependency graph'ını immutable manifest/count/hash ile saklayan merged
   predecessor'dır. Historical snapshot'lara backfill yapılmaz; manifest yokluğu
   zero-edge değil typed unavailable'dır.
-- Issue #474 exact origin forecast/snapshot/graph binding'inden deterministic
+- Issue #474 / PR #475 exact origin forecast/snapshot/graph binding'inden deterministic
   topological sırada bütün incoming constraint'lerin maksimumunu uygulayan
-  salt-okunur downstream impact current evolution'dır. Aktiviteyi reference
+  salt-okunur downstream impact merged predecessor'dır. Aktiviteyi reference
   tarihinden erkene çekmez ve source finish-only gecikmesini outgoing SS'e
   yanlış taşımaz.
-- Schedule/Living Plan/reference mutation ve reforecast, forecast UI, actual
+- Issue #476 bu exact forecast/impact bilgisini yalnız `STARTED + explicit
+  progress` item kartında ve read-only detail'de gösteren current UI/device
+  acceptance evolution'dır; legacy unavailable graph için impact uydurmaz.
+- Schedule/Living Plan/reference mutation ve reforecast, actual
   quantity ile project-specific productivity learning başlamamıştır.
 - Item 5 final completion'ı sonraki owner kararı ve executable evidence ile
   belirlenir; bu belge Items 6–13'ü yeniden sıralamaz.
@@ -400,8 +405,10 @@ nullable/evented/idempotent source-of-truth foundation'ını kuran merged
 PR #467'dir. Issue #468 progress UI + isolated device acceptance merged PR
 #469, Issue #470 deterministic read-only forecast core merged PR #471 ve Issue
 #472 immutable snapshot dependency graph persistence merged PR #473'tür. Issue
-#474 exact bağlı immutable girdilerden schedule mutation üretmeden downstream
-projected impact hesaplayan current evolution'dır; legacy graph backfill ve
+#474 / PR #475 exact bağlı immutable girdilerden schedule mutation üretmeden
+downstream projected impact hesaplayan merged predecessor'dır. Issue #476 bunu
+exact historical binding ile read-only UI/device acceptance'a taşıyan current
+evolution'dır; legacy graph backfill ve
 reforecast başlamamıştır. Item 5'in final completion sınırı sonraki owner kararı
 ile executable evidence'a bağlıdır.
 
@@ -446,8 +453,9 @@ Date Engine ve persistent immutable reference-schedule snapshots PR #444,
 7-day UI/APK/device acceptance PR #465 ve Actual Progress Core PR #467 ile
 merged predecessor zinciridir. Progress UI + isolated device acceptance PR
 #469 ile merged predecessor'a eklenmiş, deterministic forecast core PR #471 ve
-immutable snapshot dependency graph persistence PR #473 ile merge edilmiştir.
-Güncel güvenli `master` `9fc53da006689ff4c1e5e5c8a134cef3f35e8e77`,
+immutable snapshot dependency graph persistence PR #473 ve downstream impact
+core PR #475 ile merge edilmiştir. Güncel güvenli `master`
+`cc7c49fa30b50aae09b349eb0bfa1161c5cdc814`,
 schema `17` ve backup format `1`dir.
 
 Güncel canonical faz:
@@ -459,7 +467,8 @@ Living Plan MVP Core — merged / PR #463
 → Issue #468 Progress UI + Isolated Device Acceptance — merged / PR #469
 → Issue #470 Deterministic Living Plan Forecast Core — merged / PR #471
 → Issue #472 Immutable Snapshot Dependency Graph Persistence — merged / PR #473
-→ Issue #474 Read-only Downstream Dependency Impact Core — current
+→ Issue #474 Read-only Downstream Dependency Impact Core — merged / PR #475
+→ Issue #476 Living Plan Intelligence UI + Isolated Device Acceptance — current
 ```
 
 Issue #466 / PR #467 nullable actual-progress source-of-truth foundation'ını
@@ -470,9 +479,11 @@ Issue #468 / PR #469 bu progress gerçeğinin dar UI/edit ve isolated device
 acceptance, Issue #470 / PR #471 exact origin snapshot duration'ını progress ile
 read-only yorumlayan forecast core ve Issue #472 / PR #473 yalnız yeni schedule
 snapshot'ın exact resolved dependency graph'ını immutable saklayan merged
-predecessor'lardır; legacy graph backfill yapılmaz. Issue #474 bu exact
+predecessor'lardır; legacy graph backfill yapılmaz. Issue #474 / PR #475 bu exact
 forecast/snapshot/graph binding'inden salt-okunur downstream projected impact
-hesaplayan current evolution'dır. Schedule mutation/reforecast, forecast UI,
+hesaplayan merged predecessor'dır. Issue #476 exact bound forecast/impact'i
+Living Plan kart/detail UI ve isolated acceptance'ta gösteren current evolution'dır.
+Schedule mutation/reforecast,
 actual quantity ve project-specific productivity learning başlamamıştır.
 Item 5 `Current — not complete` kalır; public/store release veya genel production
 readiness ilan edilmez. Final completion sonraki owner kararı ve executable

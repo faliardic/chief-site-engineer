@@ -1,9 +1,13 @@
 import 'dart:async';
 
 import 'package:chief_site_engineer/app.dart';
+import 'package:chief_site_engineer/application/construction_living_plan_intelligence_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/construction_living_plan_models.dart';
+import 'package:chief_site_engineer/domain/construction_living_plan_dependency_impact_models.dart';
+import 'package:chief_site_engineer/domain/construction_living_plan_forecast_models.dart';
+import 'package:chief_site_engineer/domain/construction_living_plan_intelligence_models.dart';
 import 'package:chief_site_engineer/domain/construction_project_graph_models.dart';
 import 'package:chief_site_engineer/domain/construction_schedule_models.dart';
 import 'package:chief_site_engineer/features/living_plan/living_plan_page.dart';
@@ -317,6 +321,143 @@ void main() {
       }
     },
   );
+
+  testWidgets(
+    'exact intelligence renders forecast and read-only impact detail',
+    (tester) async {
+      final source = _windowItem(
+        id: 'intelligence-source',
+        name: 'Radye demiri',
+        date: DateTime.utc(2026, 8, 16),
+        status: ConstructionLivingPlanStatus.started,
+        progressPercent: 47,
+        revision: 9,
+      );
+      final legacy = _windowItem(
+        id: 'intelligence-legacy',
+        name: 'Eski snapshot işi',
+        date: DateTime.utc(2026, 8, 16),
+        status: ConstructionLivingPlanStatus.started,
+        progressPercent: 20,
+      );
+      final livingPlan = FakeLivingPlanApplication(
+        suggestions: [_candidate()],
+        items: [source, legacy],
+      );
+      final intelligence = _FakeIntelligenceApplication({
+        source.item.id: _intelligenceFor(source.item),
+        legacy.item.id: _intelligenceFor(
+          legacy.item,
+          dependencyGraphUnavailable: true,
+        ),
+      });
+
+      await _pumpPage(
+        tester,
+        agenda: FakeAgendaApplication(projects: [_project('PRJ-A', 'A Blok')]),
+        livingPlan: livingPlan,
+        intelligence: intelligence,
+      );
+
+      expect(intelligence.asOfDates, [DateTime.utc(2026, 8, 16)]);
+      expect(intelligence.itemIds.single, [
+        'intelligence-source',
+        'intelligence-legacy',
+      ]);
+      final sourceCard = find.byKey(
+        const Key('living-plan-item-intelligence-source'),
+      );
+      await _scrollLivingPlanTo(tester, sourceCard);
+      for (final text in const [
+        'İlerleme %47',
+        'Tahmini kalan: 6 iş günü',
+        'Tahmini bitiş: 24.08.2026',
+        'Referansa göre: +3 gün',
+        '1 sonraki iş etkilenebilir',
+      ]) {
+        expect(
+          find.descendant(of: sourceCard, matching: find.text(text)),
+          findsOneWidget,
+        );
+      }
+
+      await tester.tap(
+        find.byKey(const Key('living-plan-impact-intelligence-source')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Tahmini etki'), findsOneWidget);
+      expect(
+        find.text('Bu bir önizlemedir; plan tarihleri değişmedi.'),
+        findsOneWidget,
+      );
+      expect(find.text('Radye kalıbı'), findsOneWidget);
+      expect(
+        find.textContaining('Tahmini başlangıç: 25.08.2026'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Tahmini bitiş: 27.08.2026'), findsOneWidget);
+      expect(find.text('+3 gün'), findsOneWidget);
+      expect(livingPlan.mutationCalls, 0);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(livingPlan.mutationCalls, 0);
+
+      final legacyCard = find.byKey(
+        const Key('living-plan-item-intelligence-legacy'),
+      );
+      await _scrollLivingPlanTo(tester, legacyCard);
+      expect(
+        find.descendant(
+          of: legacyCard,
+          matching: find.text('Tahmini kalan: 6 iş günü'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('living-plan-impact-intelligence-legacy')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('intelligence read failure cannot block lifecycle mutations', (
+    tester,
+  ) async {
+    final livingPlan = FakeLivingPlanApplication(
+      suggestions: [_candidate()],
+      items: [
+        _windowItem(
+          id: 'intelligence-failure',
+          name: 'Güvenli lifecycle',
+          date: DateTime.utc(2026, 8, 16),
+          status: ConstructionLivingPlanStatus.planned,
+        ),
+      ],
+    );
+    await _pumpPage(
+      tester,
+      agenda: FakeAgendaApplication(projects: [_project('PRJ-A', 'A Blok')]),
+      livingPlan: livingPlan,
+      intelligence: _FakeIntelligenceApplication.failure(),
+    );
+
+    expect(
+      find.text('Plan güvenli biçimde okunamadı. Kayıtlar değiştirilmedi.'),
+      findsNothing,
+    );
+    await _scrollLivingPlanTo(
+      tester,
+      find.byKey(const Key('start-living-plan-intelligence-failure')),
+    );
+    await tester.tap(
+      find.byKey(const Key('start-living-plan-intelligence-failure')),
+    );
+    await tester.pumpAndSettle();
+    expect(livingPlan.mutationCalls, 1);
+    expect(find.text('İmalat başlatıldı.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('progress presentation actions and semantics are status-scoped', (
     tester,
@@ -1084,6 +1225,7 @@ Future<void> _pumpPage(
   WidgetTester tester, {
   required FakeAgendaApplication agenda,
   required FakeLivingPlanApplication livingPlan,
+  ConstructionLivingPlanIntelligenceApplicationPort? intelligence,
   ThemeMode themeMode = ThemeMode.light,
   TextScaler textScaler = TextScaler.noScaling,
   DateTime Function()? clock,
@@ -1104,11 +1246,134 @@ Future<void> _pumpPage(
         key: UniqueKey(),
         agenda: agenda,
         livingPlan: livingPlan,
+        intelligence:
+            intelligence ??
+            const UnavailableConstructionLivingPlanIntelligenceApplication(),
         clock: clock ?? () => DateTime.utc(2026, 8, 16, 6),
       ),
     ),
   );
   await tester.pumpAndSettle();
+}
+
+class _FakeIntelligenceApplication
+    implements ConstructionLivingPlanIntelligenceApplicationPort {
+  _FakeIntelligenceApplication(this.values) : _failure = null;
+
+  _FakeIntelligenceApplication.failure()
+    : values = const {},
+      _failure = StateError('synthetic intelligence read failure');
+
+  final Map<String, ConstructionLivingPlanIntelligence> values;
+  final Object? _failure;
+  final List<DateTime> asOfDates = [];
+  final List<List<String>> itemIds = [];
+
+  @override
+  Future<Map<String, ConstructionLivingPlanIntelligence>> loadForItems({
+    required Iterable<ConstructionLivingPlanItem> items,
+    required DateTime asOfDate,
+  }) async {
+    final source = items.toList(growable: false);
+    asOfDates.add(asOfDate);
+    itemIds.add(source.map((item) => item.id).toList(growable: false));
+    if (_failure case final failure?) throw failure;
+    final result = <String, ConstructionLivingPlanIntelligence>{};
+    for (final item in source) {
+      final intelligence = values[item.id];
+      if (intelligence != null) result[item.id] = intelligence;
+    }
+    return Map.unmodifiable(result);
+  }
+}
+
+ConstructionLivingPlanIntelligence _intelligenceFor(
+  ConstructionLivingPlanItem item, {
+  bool dependencyGraphUnavailable = false,
+}) {
+  final forecast = ConstructionLivingPlanForecast(
+    itemId: item.id,
+    projectId: item.projectId,
+    referenceSnapshotId: item.referenceSnapshotId,
+    activityInstanceId: item.activityInstanceId,
+    status: item.status,
+    progressPercent: item.progressPercent,
+    asOfDate: DateTime.utc(2026, 8, 16),
+    referenceStartDate: DateTime.utc(2026, 8, 10),
+    referenceFinishDate: DateTime.utc(2026, 8, 21),
+    referenceDurationDays: 10,
+    referenceRoundedSchedulingDays: 10,
+    referenceDurationCalendarType:
+        ConstructionActivityDurationCalendarType.workingDay,
+    referenceDurationStatus: ConstructionScheduleDurationStatus.aiSeedEstimate,
+    referenceDurationConfidence: ConstructionScheduleDurationConfidence.aiSeed,
+    referenceCorpusVersion: 'corpus-a',
+    referenceScheduleSeedVersion: 'seed-a',
+    referenceScheduleSeedProvenance: 'TEST',
+    referenceProductionStatus: 'NOT_FOR_PRODUCTION',
+    referenceDurationSource: 'TEST_SEED_ONLY',
+    referenceBaselineStatus: 'NOT_A_BASELINE',
+    referenceProjectionSha256: 'snapshot-sha',
+    remainingDurationDays: 5.3,
+    remainingRoundedSchedulingDays: 6,
+    forecastFinishDate: DateTime.utc(2026, 8, 24),
+    varianceCalendarDays: 3,
+    basis: ConstructionLivingPlanForecastBasis.startedReferenceRemaining,
+  );
+  if (dependencyGraphUnavailable) {
+    return ConstructionLivingPlanIntelligence(
+      itemId: item.id,
+      forecast: forecast,
+      impactAvailability: ConstructionLivingPlanIntelligenceImpactAvailability
+          .dependencyGraphUnavailable,
+      dependencyImpact: null,
+      impactedActivities: const [],
+    );
+  }
+  final impact = ConstructionLivingPlanDependencyImpact(
+    itemId: item.id,
+    projectId: item.projectId,
+    referenceSnapshotId: item.referenceSnapshotId,
+    sourceActivityInstanceId: item.activityInstanceId,
+    asOfDate: forecast.asOfDate,
+    sourceReferenceStartDate: forecast.referenceStartDate,
+    sourceReferenceFinishDate: forecast.referenceFinishDate,
+    sourceForecastFinishDate: forecast.forecastFinishDate,
+    sourceVarianceCalendarDays: forecast.varianceCalendarDays,
+    propagatedPositiveSourceDelayCalendarDays: 3,
+    dependencyProjectionSha256:
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    basis: ConstructionLivingPlanDependencyImpactBasis.downstreamDelayProjected,
+    impactedActivities: [
+      ConstructionLivingPlanDependencyImpactItem(
+        activityInstanceId: 'successor@PRJ-A',
+        activityId: 'successor',
+        referenceStartDate: DateTime.utc(2026, 8, 22),
+        referenceFinishDate: DateTime.utc(2026, 8, 24),
+        projectedStartDate: DateTime.utc(2026, 8, 25),
+        projectedFinishDate: DateTime.utc(2026, 8, 27),
+        startShiftCalendarDays: 3,
+        finishShiftCalendarDays: 3,
+      ),
+    ],
+  );
+  return ConstructionLivingPlanIntelligence(
+    itemId: item.id,
+    forecast: forecast,
+    impactAvailability:
+        ConstructionLivingPlanIntelligenceImpactAvailability.available,
+    dependencyImpact: impact,
+    impactedActivities: [
+      ConstructionLivingPlanIntelligenceImpactActivity(
+        activityInstanceId: 'successor@PRJ-A',
+        activityId: 'successor',
+        displayName: 'Radye kalıbı',
+        projectedStartDate: DateTime.utc(2026, 8, 25),
+        projectedFinishDate: DateTime.utc(2026, 8, 27),
+        finishShiftCalendarDays: 3,
+      ),
+    ],
+  );
 }
 
 class _StrictDateLivingPlanApplication extends FakeLivingPlanApplication {
