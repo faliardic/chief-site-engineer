@@ -1,5 +1,20 @@
 # Changelog
 
+## Issue #481 - Deterministic Günlük Log v1 read model and text preview
+
+- Exact project ve caller-selected İstanbul günü için mevcut Ajanda, Puantaj,
+  Beton, project-scope açık takip ve Living Plan event/history kayıtlarını
+  read-only SQLite handle üzerinde deterministic projekte eder; `ensureDay`,
+  migration, repair, event veya receipt mutation çağırmaz.
+- Canonical section/timestamp/source-ID sırası, stable source refs, typed
+  section-unavailable izolasyonu ve event payload'ından geçmişe sadık Living Plan
+  açıklaması korunur. Private/projesiz takipler project çıktısına girmez.
+- Home'dan proje/gün seçicili `Günlük Log` ekranı açılır; insan-okunur bölümler,
+  birleşik plain-text preview ve yalnız clipboard'a yazan `Metni kopyala` aksiyonu
+  sunulur. PDF/file/share artifact, AI summary ve new persistence yoktur.
+- Schema `17`, backup format `1`, version `0.1.0+1` değişmez. Automated app/device
+  testleri owner policy gereği çalıştırılmaz; manual test durumu `PENDING`dir.
+
 ## Issue #476 - Living Plan intelligence UI and isolated device acceptance
 
 - Ayrı read-only intelligence application, her item'ın exact historical

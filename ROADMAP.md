@@ -1,10 +1,10 @@
 # CSE V2 — Kanonik Ürün Yol Haritası
 
 **Durum:** Güncel yürütme sırası
-**Tarih:** 23 Ağustos 2026
+**Tarih:** 24 Ağustos 2026
 **V2 kapsam kaynağı:** `docs/v2/CSE_V2_SCOPE.md`
-**Güncel yön truth-sync:** Issue #476
-**Güncel güvenli `master`:** `cc7c49fa30b50aae09b349eb0bfa1161c5cdc814` / PR #475
+**Güncel yön truth-sync:** Issue #481
+**Güncel güvenli `master`:** `bce486c92604ee38ec74c9d5300c3157794f7924` / PR #480
 
 ## 1. Güncel ürün durumu
 
@@ -13,14 +13,14 @@ kullanılmıştır. V2 Items 1–4 tamamlanmış; schedule runtime, immutable
 reference-schedule snapshots, Living Plan MVP/ilk cihaz kabulü, actual-progress
 core, progress UI/isolated cihaz kabulü, deterministic forecast core, immutable
 snapshot dependency graph persistence ve read-only downstream impact PR #475'e
-kadar merge edilmiştir.
+kadar, Living Plan intelligence UI ise PR #480'e kadar merge edilmiştir.
 Güncel teknik ve ürün durumu:
 
 | Alan | Değer |
 | --- | --- |
 | V1 baseline commit | `7c9f65a811c9f4bca561adab6bd1f8e64e6908cc` |
-| Güncel güvenli merge | `cc7c49fa30b50aae09b349eb0bfa1161c5cdc814` |
-| Son Living Plan predecessor PR | `#475` |
+| Güncel güvenli merge | `bce486c92604ee38ec74c9d5300c3157794f7924` |
+| Son merged ürün PR'ı | `#480` |
 | Mobil sürüm | `0.1.0+1` |
 | SQLite schema | `17` |
 | `.csebackup` formatı | `1` |
@@ -34,10 +34,12 @@ offline-first mobil ürün üzerinde ilerler. Issue #472 / PR #473 yalnız bunda
 sonra oluşturulan immutable schedule snapshot'ların resolved dependency edge
 setini manifest/count/hash ile saklayan merged schema 17 temelidir. Issue #474 /
 PR #475 exact forecast/snapshot/dependency-graph binding'inden salt-okunur
-downstream impact üreten merged predecessor'dır. Issue #476 bu exact read-only
-intelligence katmanlarını Living Plan UI ve isolated acceptance'ta görünür kılan
-current iştir; schedule mutation/reforecast değildir ve
-public/store production release ilan edilmemiştir.
+downstream impact üreten merged predecessor'dır. Issue #476 / PR #480 bu exact
+read-only intelligence katmanlarını Living Plan UI'da görünür kılan merged
+`IMPLEMENTED — MANUAL TEST PENDING` predecessor'dır; Item 5 final completion
+ilanı değildir. Issue #481, mevcut source kayıtlarından salt-okunur ve
+deterministik Günlük Log v1 projection'ını kuran current iştir; public/store
+production release ilan edilmemiştir.
 
 ## 2. Kaynak otoritesi
 
@@ -64,8 +66,8 @@ Proje/Mahal — complete
 → Attachment v2 — complete
 → Ajanda v2 — complete
 → schedule runtime + persistent reference snapshots — merged foundation
-→ 7 Günlük Yaşayan İş Programı — current
-→ Günlük Log v1
+→ 7 Günlük Yaşayan İş Programı — implemented / manual test pending
+→ Günlük Log v1 — current
 → İş Zinciri
 → Günlük Log v2
 ```
@@ -186,7 +188,7 @@ Kapanış durumu:
 
 Öncelik: `P0 current site-management loop`
 
-Durum: `current direction — not complete`
+Durum: `implemented — manual test pending; final completion ilan edilmedi`
 
 - Projeye özgü güncel yedi günlük pencere
 - İnşaat aktivite kataloğunda arama ve birkaç işlemle plana ekleme
@@ -215,15 +217,17 @@ Issue #474 / PR #475 exact origin forecast/snapshot/graph binding'iyle determini
 topological sırada bütün incoming constraint'lerin maksimumunu uygulayan
 salt-okunur downstream impact merged predecessor'dır. Aktiviteyi reference
 tarihinden erkene çekmez; source finish-only gecikmesi outgoing SS constraint'ini
-yanlış kaydırmaz. Issue #476 exact historical binding'i koruyarak forecast ve
-positive downstream impact'i sade kart/detail UI olarak gösteren current
-evolution'dır. Schedule/Living Plan/reference mutation ve reforecast, actual
-quantity ile project-specific productivity learning başlamaz. Item 5 not
-complete kalır; Items 6–13'ün sırası değişmez.
+yanlış kaydırmaz. Issue #476 / PR #480 exact historical binding'i koruyarak
+forecast ve positive downstream impact'i sade kart/detail UI olarak gösteren
+merged implementation'dır. Manual Test Register #479 borcu görünür kalır;
+V2.5 final completion ilan edilmez. Schedule/Living Plan/reference mutation ve
+reforecast, actual quantity ile project-specific productivity learning başlamaz.
 
 ### V2.6 — Günlük Log Çıktısı v1
 
 Öncelik: `P1 reporting after usable living plan`
+
+Durum: `current — not complete`
 
 - Ajanda, Puantaj, Beton, açık takip ve living-plan/progress kaynaklı günlük
   taslak
@@ -232,6 +236,12 @@ complete kalır; Items 6–13'ün sırası değişmez.
 - Private/project kapsam kontrolü
 - Kaynak kayda geri bağlantı
 - İlk insan okunabilir çıktı
+- Issue #481 yalnız read-only projection, typed section-unavailable davranışı,
+  deterministic plain-text preview ve `Metni kopyala` yüzeyini kapsar
+- Yeni persistence table, migration, event/receipt, PDF/file/share artifact,
+  AI summary veya source mutation yoktur
+- Publication durumu yalnız `IMPLEMENTED — MANUAL TEST PENDING` olabilir;
+  V2.6 completion ayrı owner kararı gerektirir
 
 ### V2.7 — İş Zinciri / Bağlı Log v1
 
@@ -343,13 +353,14 @@ Bu başlıklar ayrı post-V2 backlog'da tarihsel olarak korunur.
 Güncel canonical faz:
 
 ```text
-Living 7-Day Plan — current, not complete
+Living 7-Day Plan — implemented / manual test pending; final completion yok
 → Issue #466 / PR #467 actual-progress source-of-truth core — merged
 → Issue #468 / PR #469 progress UI + isolated device acceptance — merged
 → Issue #470 / PR #471 deterministic read-only forecast core — merged
 → Issue #472 / PR #473 immutable snapshot dependency graph persistence — merged
 → Issue #474 / PR #475 read-only downstream dependency impact core — merged
-→ Issue #476 Living Plan intelligence UI + isolated device acceptance — current
+→ Issue #476 / PR #480 Living Plan intelligence UI — merged / manual test pending
+→ Issue #481 Deterministic Günlük Log v1 — current
 ```
 
 Items 1–4 complete'tir. Activity Catalog Runtime, typed Project Profile ve
@@ -365,11 +376,13 @@ yorumlayan deterministic forecast core, Issue #472 / PR #473 ise yalnız yeni
 snapshot'ların exact dependency graph'ını immutable saklayan merged
 predecessor'lardır; legacy graph backfill yapılmaz. Issue #474 / PR #475 bu exact
 immutable girdilerden schedule mutation üretmeden downstream projected impact
-hesaplayan merged predecessor'dır. Issue #476 exact item snapshot'ından forecast/
-impact'i read-only gösteren current UI/device acceptance evolution'dır. Reforecast,
-actual quantity ve productivity learning
-başlamaz. Item 5'in final completion sınırı sonraki owner kararı ve executable
-evidence ile belirlenir; Items 6–13'ün sırası değişmez.
+hesaplayan merged predecessor'dır. Issue #476 / PR #480 exact item snapshot'ından
+forecast/impact'i read-only gösteren merged implementation'dır; manual testleri
+#479'da pending kalır. Issue #481 exact project ve İstanbul günü için mevcut
+source-of-truth kayıtlarından read-only, deterministic Günlük Log v1 projection'ı
+üreten current dilimdir. Reforecast, actual quantity, productivity learning,
+daily-log persistence ve yayımlanmış artifact başlamaz. V2.5 ve V2.6 completion
+ilanları ayrı owner kararına bağlıdır; V2.7 başlamaz.
 
 ## 13. Tarihsel roadmap sınırı
 

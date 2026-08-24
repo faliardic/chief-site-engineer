@@ -4187,3 +4187,17 @@
   read-only durable proof'u ve relaunch persistence'ı doğrular. Schema `17`,
   backup format `1`, version `0.1.0+1` değişmez; reforecast, quantity,
   productivity learning, Ready/merge ve Item 5 completion başlamaz.
+
+## Issue 481 — Günlük Log v1 source-of-truth kayıtların salt-okunur projection'ıdır
+
+- Exact project ve caller-selected Europe/Istanbul local day, Ajanda, mevcut
+  Puantaj günü, Beton, project-scope açık takipler ve append-only Living Plan
+  event/history kaynaklarından deterministic sıra ile okunur. Puantaj okumak
+  `ensureDay(...)` veya başka mutation çağırmaz.
+- Her entry stable source ref taşır; Living Plan günlük satırı item + event ID'yi
+  ve event payload'ındaki mutation-time sonucu korur. Bir source section hatası
+  diğer sağlıklı section'ları silmez; typed ve okunabilir unavailable durumudur.
+- Plain-text preview ve clipboard yalnız projection'dır. Yeni persistence table,
+  migration, event/receipt, PDF/file/share artifact, AI summary veya source
+  mutation yoktur. Schema `17`, backup format `1`, version `0.1.0+1` değişmez;
+  durum `IMPLEMENTED — MANUAL TEST PENDING` ile sınırlıdır.
