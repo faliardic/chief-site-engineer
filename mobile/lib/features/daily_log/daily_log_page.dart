@@ -1,13 +1,16 @@
 import 'package:chief_site_engineer/application/daily_log_application.dart';
+import 'package:chief_site_engineer/application/work_chain_application.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/daily_log_models.dart';
+import 'package:chief_site_engineer/features/work_chain/work_chain_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class DailyLogPage extends StatefulWidget {
-  const DailyLogPage({required this.dailyLog, super.key});
+  const DailyLogPage({required this.dailyLog, this.workChain, super.key});
 
   final DailyLogApplicationPort dailyLog;
+  final WorkChainApplicationPort? workChain;
 
   @override
   State<DailyLogPage> createState() => _DailyLogPageState();
@@ -199,7 +202,10 @@ class _DailyLogPageState extends State<DailyLogPage> {
               ),
               const SizedBox(height: 12),
               for (final section in day.sections)
-                _DailyLogSectionCard(section: section),
+                _DailyLogSectionCard(
+                  section: section,
+                  workChain: widget.workChain,
+                ),
               const SizedBox(height: 12),
               ExpansionTile(
                 key: const Key('daily-log-text-preview'),
@@ -222,9 +228,10 @@ class _DailyLogPageState extends State<DailyLogPage> {
 }
 
 class _DailyLogSectionCard extends StatelessWidget {
-  const _DailyLogSectionCard({required this.section});
+  const _DailyLogSectionCard({required this.section, required this.workChain});
 
   final DailyLogSection section;
+  final WorkChainApplicationPort? workChain;
 
   @override
   Widget build(BuildContext context) {
@@ -270,6 +277,7 @@ class _DailyLogSectionCard extends StatelessWidget {
               for (var index = 0; index < section.entries.length; index += 1)
                 _DailyLogEntryTile(
                   entry: section.entries[index],
+                  workChain: workChain,
                   showDivider: index < section.entries.length - 1,
                 ),
           ],
@@ -280,14 +288,21 @@ class _DailyLogSectionCard extends StatelessWidget {
 }
 
 class _DailyLogEntryTile extends StatelessWidget {
-  const _DailyLogEntryTile({required this.entry, required this.showDivider});
+  const _DailyLogEntryTile({
+    required this.entry,
+    required this.workChain,
+    required this.showDivider,
+  });
 
   final DailyLogEntry entry;
+  final WorkChainApplicationPort? workChain;
   final bool showDivider;
 
   @override
   Widget build(BuildContext context) {
     final occurredAt = entry.occurredAt;
+    final source = _workChainSource(entry);
+    final application = workChain;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -314,6 +329,25 @@ class _DailyLogEntryTile extends StatelessWidget {
               )
               .toList(growable: false),
         ),
+        if (application != null && source != null)
+          TextButton.icon(
+            key: Key('daily-log-work-chain-${entry.id}'),
+            onPressed: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(
+                builder: (_) => source.fromFollowUp
+                    ? WorkChainPage.fromFollowUp(
+                        application: application,
+                        followUpId: source.id,
+                      )
+                    : WorkChainPage.fromAgendaLog(
+                        application: application,
+                        agendaLogId: source.id,
+                      ),
+              ),
+            ),
+            icon: const Icon(Icons.account_tree_outlined),
+            label: const Text('İş Zincirini aç'),
+          ),
         if (showDivider) const Divider(height: 24),
       ],
     );
@@ -363,6 +397,18 @@ class _DailyLogEmptyProjects extends StatelessWidget {
       ),
     );
   }
+}
+
+({bool fromFollowUp, String id})? _workChainSource(DailyLogEntry entry) {
+  for (final source in entry.sourceRefs) {
+    if (source.kind == DailyLogSourceKind.reminder) {
+      return (fromFollowUp: true, id: source.sourceId);
+    }
+    if (source.kind == DailyLogSourceKind.agendaLog) {
+      return (fromFollowUp: false, id: source.sourceId);
+    }
+  }
+  return null;
 }
 
 IconData _sectionIcon(DailyLogSectionKind kind) => switch (kind) {

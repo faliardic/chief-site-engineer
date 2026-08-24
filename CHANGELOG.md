@@ -1,5 +1,22 @@
 # Changelog
 
+## Issue #483 - Read-only Agenda–Takip İş Zinciri v1
+
+- Exact Agenda root, explicit linked follow-up set, meaningful append-only
+  lifecycle history ve current result tek deterministic Work Chain projection'ı
+  olarak okunur. Agenda ve follow-up entry point'leri aynı canonical zincire
+  gider; private/projesiz kayıt veya newer/başka source ile inference yapılmaz.
+- Same-project/source identity, duplicate relation, event order ve terminal
+  projection çelişkileri typed diagnostics ile görünür kalır. SQLite yalnız
+  read-only açılır; repair, migration, reconcile, notification/sync veya source
+  mutation çağrılmaz.
+- Read-only İş Zinciri ekranı başlangıç, takip, geçmiş, archive/trash ve sonuç
+  alanlarını gösterir. Daily Log stable Agenda/Reminder source ref'i için dar
+  `İş Zincirini aç` aksiyonu eklenir; generic navigation framework kurulmaz.
+- Schema `17`, backup format `1`, version `0.1.0+1` değişmez. Automated
+  app/device testleri owner policy gereği çalıştırılmaz; durum
+  `IMPLEMENTED — MANUAL TEST PENDING`dir.
+
 ## Issue #481 - Deterministic Günlük Log v1 read model and text preview
 
 - Exact project ve caller-selected İstanbul günü için mevcut Ajanda, Puantaj,
