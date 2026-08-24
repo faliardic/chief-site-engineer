@@ -400,15 +400,20 @@ class _DailyLogEmptyProjects extends StatelessWidget {
 }
 
 ({bool fromFollowUp, String id})? _workChainSource(DailyLogEntry entry) {
+  String? followUpId;
+  String? agendaLogId;
   for (final source in entry.sourceRefs) {
     if (source.kind == DailyLogSourceKind.reminder) {
-      return (fromFollowUp: true, id: source.sourceId);
+      followUpId = source.sourceId;
     }
     if (source.kind == DailyLogSourceKind.agendaLog) {
-      return (fromFollowUp: false, id: source.sourceId);
+      agendaLogId = source.sourceId;
     }
   }
-  return null;
+  if (agendaLogId == null) return null;
+  return followUpId == null
+      ? (fromFollowUp: false, id: agendaLogId)
+      : (fromFollowUp: true, id: followUpId);
 }
 
 IconData _sectionIcon(DailyLogSectionKind kind) => switch (kind) {

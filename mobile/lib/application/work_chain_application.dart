@@ -105,13 +105,6 @@ class SqliteWorkChainApplication implements WorkChainApplicationPort {
     final root = _mapRoot(rootRows.single);
     final rows = await _followUpRows(database, observationId: logId);
     final diagnostics = <WorkChainDiagnostic>[];
-    if (rows.isEmpty) {
-      diagnostics.add(
-        const WorkChainDiagnostic(
-          code: WorkChainDiagnosticCode.followUpMissing,
-        ),
-      );
-    }
     final seenIds = <String>{};
     final followUps = <WorkChainFollowUp>[];
     for (final row in rows) {

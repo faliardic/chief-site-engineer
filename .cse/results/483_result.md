@@ -132,3 +132,40 @@ review_recommendation:
   manual_test_register: "#479"
   ready_or_merge_recommended: false
 ~~~
+
+## Owner correction — comment 5399511793
+
+Status remains `IMPLEMENTED — MANUAL TEST PENDING`.
+
+### Corrected source boundaries
+
+- Open Daily Log follow-up projection reads the existing nullable
+  `observation_id` and adds an Agenda source ref only when it is explicit.
+- Reminder-origin Work Chain navigation now requires both the reminder ref and
+  its explicit Agenda root ref. Agenda-root Daily Log entries remain valid
+  direct entry points; unrelated reminders expose no false action.
+- A valid Agenda root with zero related follow-ups returns an empty chain without
+  `followUpMissing`. Missing follow-up identity and other integrity diagnostics
+  remain fail-closed.
+- Diagnostic UI shows exactly `Bağlantının bir kısmı okunamadı.` and
+  `Kaynak kayıt değiştirilmedi.` No source record is repaired or mutated.
+
+### Correction source-level verification
+
+- Resume HEAD: `232522a6816b6c326d916ccacd15d77a06e255e2`.
+- Touched Dart formatting: PASS, 4 files checked, 0 formatter changes.
+- Exactly one correction `flutter analyze --no-pub`: PASS,
+  `No issues found! (ran in 5.3s)`; correction analyzer budget consumed, no retry.
+- `git diff --check`: PASS.
+- Exact authorized PR changed paths: PASS, 13/13.
+- Missing authorized paths: 0; unexpected changed paths: 0; staged paths: 0.
+- Protected tracked and Agenda/Reminder/storage drift outside the allowlist: 0.
+- Platform-production drift: 0.
+- Schema: `17`; backup format: `1`; version: `0.1.0+1`.
+- `mobile/pubspec.yaml` drift: 0; blob
+  `db98edf573813302a0b1be5f763abfa562f96825`.
+- `mobile/pubspec.lock` drift: 0; blob
+  `0ca1109b3b029510e41c13e930bda79578fe05be`.
+- Flutter tests, APK/AAB build, emulator/ADB/device and scripted acceptance:
+  NOT RUN — owner-led manual testing policy and correction authority.
+- Ready, merge, Issue close, V2.7 completion and V2.8 work remain forbidden.

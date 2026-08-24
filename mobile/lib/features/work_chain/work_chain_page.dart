@@ -122,6 +122,9 @@ class _WorkChainDiagnostics extends StatelessWidget {
               'Bağlantı tanıları',
               style: Theme.of(context).textTheme.titleMedium,
             ),
+            const SizedBox(height: 4),
+            const Text('Bağlantının bir kısmı okunamadı.'),
+            const Text('Kaynak kayıt değiştirilmedi.'),
             const SizedBox(height: 8),
             for (final diagnostic in diagnostics)
               Padding(

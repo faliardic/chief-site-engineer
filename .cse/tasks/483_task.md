@@ -153,3 +153,27 @@ Implemented within the authorized boundary:
 Touched Dart formatting completed. The exactly one authorized final
 `flutter analyze --no-pub` invocation passed with `No issues found`.
 No Flutter test, APK/build, ADB/device or scripted acceptance was run.
+
+## Owner correction — comment 5399511793
+
+Correction resumed from published head
+`232522a6816b6c326d916ccacd15d77a06e255e2` with a clean worktree and
+staged path count 0. Owner authority added only
+`mobile/lib/application/daily_log_application.dart` as the thirteenth allowed
+path; the original twelve-path boundary otherwise remains unchanged.
+
+The narrow correction projects `follow_up_items.observation_id` into the Daily
+Log reminder entry only when that explicit Agenda root exists. Daily Log now
+exposes the Work Chain action for a reminder only when the same entry carries
+that Agenda root; independent, Attendance and Concrete reminders keep no false
+Work Chain action. A valid Agenda root with zero follow-ups is a normal empty
+chain and no longer produces `followUpMissing`. Diagnostic UI displays the exact
+safety copy:
+
+- `Bağlantının bir kısmı okunamadı.`
+- `Kaynak kayıt değiştirilmedi.`
+
+Touched Dart formatting completed with 0 formatter changes. The exactly one
+authorized correction `flutter analyze --no-pub` invocation passed with
+`No issues found! (ran in 5.3s)`. No Flutter test, APK/build, ADB/device or
+scripted acceptance was run.
