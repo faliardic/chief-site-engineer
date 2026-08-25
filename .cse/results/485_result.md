@@ -466,3 +466,197 @@ merge: false
 Commit and normally push this four-path local correction/evidence set, update
 Issue #485 and Draft PR #486, then use only the verified APK above for the
 authorized user-0 device preflight/install/launch handoff.
+
+## Device handoff result — FAIL-CLOSED at preflight
+
+The verified artifact and published correction are valid, but no physical
+device was visible to ADB at the authorized preflight.
+
+- Device entries: `0`.
+- ADB state `device`: `0`.
+- Offline: `0`.
+- Unauthorized: `0`.
+- Device model / Android / API / ABI / users: unavailable.
+- Protected package inventory: not opened.
+- User-0 install: not run.
+- Launch / foreground / immediate-crash check: not run.
+- Production/debug/acceptance/Secure Folder mutation: none.
+- Fresh APK remains at the verified host path with SHA-256
+  `F6CC0D8365F7FD62C618352FFC960A8C248244A9A3035EC3D62528FC84BD23C2`.
+
+### execution_record
+
+~~~yaml
+policy_version: CSE-MRP-1.0
+task_risk: R4
+requested_model: gpt-5.6-sol
+requested_reasoning_effort: max
+actual_model: unknown
+actual_reasoning_effort: null
+invocation_verification_status: unverified
+verification_mode: owner_led_manual_testing
+source_commit: dc87f1980dbc79069317134c6c0cdf94c3e1bc6a
+source_static_gate_status: PASS
+fresh_build_status: PASS
+artifact_sha256: F6CC0D8365F7FD62C618352FFC960A8C248244A9A3035EC3D62528FC84BD23C2
+device_preflight_invocations: 1
+device_preflight_status: FAIL
+device_entries: 0
+install_run: false
+launch_run: false
+manual_test_status: PENDING
+manual_test_ids: MT-485-001..019
+ready: false
+merge: false
+~~~
+
+### review_recommendation
+
+Preserve the verified APK and published Draft PR. Resume only after one physical
+ADB device is connected and a new owner authority permits a fresh device
+preflight/install/launch attempt. Do not rebuild, reinstall, clear, uninstall or
+modify protected packages from this failed preflight state.
+
+## Existing frozen APK install/launch authority result — FAIL-CLOSED
+
+Owner authority: Issue #485 comment `5413680219`.
+
+### Artifact preflight
+
+- Path: exact expected acceptance APK.
+- Size: `93036159` bytes — PASS.
+- SHA-256:
+  `F6CC0D8365F7FD62C618352FFC960A8C248244A9A3035EC3D62528FC84BD23C2`
+  — PASS.
+- Rebuild: not run.
+
+### Device preflight
+
+- Total ADB device entries: `0`.
+- Usable state `device`: `0`.
+- Offline: `0`.
+- Unauthorized: `0`.
+- Physical-device cardinality requirement: FAIL.
+- Device model / Android / API / ABI / users: unavailable.
+- Protected package inventory: not opened.
+- Install invocation: `0`.
+- Launch invocation: `0`.
+- Production/debug/acceptance/Secure Folder mutation: none.
+
+### execution_record
+
+~~~yaml
+policy_version: CSE-MRP-1.0
+task_risk: R2
+requested_model: gpt-5.6-sol
+requested_reasoning_effort: high
+actual_model: unknown
+actual_reasoning_effort: null
+invocation_verification_status: unverified
+verification_mode: owner_led_manual_testing
+rebuild_authorized: false
+automated_tests_authorized: false
+artifact_preflight_status: PASS
+artifact_sha256: F6CC0D8365F7FD62C618352FFC960A8C248244A9A3035EC3D62528FC84BD23C2
+device_preflight_status: FAIL
+device_entries: 0
+install_run: false
+launch_run: false
+manual_test_status: PENDING
+manual_test_ids: MT-485-001..019
+ready: false
+merge: false
+issue_close: false
+v2_8_complete: false
+v2_9: not_started
+~~~
+
+### review_recommendation
+
+Connect, unlock and authorize exactly one physical Android device before any
+new authority is used. Preserve the frozen APK and avoid rebuild. Do not retry
+install/launch without a passing fresh device preflight.
+
+## Final device installation and launch handoff — PASS
+
+### Frozen artifact
+
+- Path: exact verified acceptance APK.
+- Size: `93036159` bytes.
+- SHA-256:
+  `F6CC0D8365F7FD62C618352FFC960A8C248244A9A3035EC3D62528FC84BD23C2`.
+- Rebuild: not run.
+
+### Device and user scope
+
+- Serial: `R5CY21WKZFX`.
+- Manufacturer/model: Samsung `SM-S938B`.
+- Android/API: `16` / `36`.
+- Physical device count: `1`.
+- State: `device`.
+- ABI: `arm64-v8a`.
+- Owner user: `0`.
+- Secure Folder user `150`: present; inventory request was read-only and
+  platform-denied; mutation `0`.
+
+### Install and launch
+
+- Install command scope: acceptance package, user 0, replacement install.
+- Install result: PASS — `Success`.
+- Install retries: `0`.
+- Uninstall / clear / downgrade: `0`.
+- Launch invocations: exactly `1`.
+- Launch result: PASS.
+- Foreground:
+  `com.faliardic.sefim.acceptance/com.faliardic.chiefsiteengineer.MainActivity`.
+- Acceptance PID after launch: `8402`.
+- Immediate fatal crash in bounded PID/package-filtered observation: `0`.
+- Application left installed and foreground.
+- Production/debug package mutation: `0`.
+- Scripted UI acceptance, fixture, form automation and user-data inspection:
+  `0`.
+
+### execution_record
+
+~~~yaml
+policy_version: CSE-MRP-1.0
+task_risk: R2
+requested_model: gpt-5.6-sol
+requested_reasoning_effort: high
+actual_model: unknown
+actual_reasoning_effort: null
+invocation_verification_status: unverified
+verification_mode: owner_led_manual_testing
+source_head: dc87f1980dbc79069317134c6c0cdf94c3e1bc6a
+artifact_preflight_status: PASS
+artifact_sha256: F6CC0D8365F7FD62C618352FFC960A8C248244A9A3035EC3D62528FC84BD23C2
+device_preflight_status: PASS
+device_serial: R5CY21WKZFX
+device_model: SM-S938B
+android_version: 16
+api_level: 36
+install_invocations: 1
+install_status: PASS
+launch_invocations: 1
+launch_status: PASS
+foreground_status: PASS
+immediate_fatal_crash: false
+acceptance_left_installed: true
+production_package_mutated: false
+debug_package_mutated: false
+secure_folder_mutated: false
+manual_test_status: PENDING
+manual_test_ids: MT-485-001..019
+ready: false
+merge: false
+issue_close: false
+v2_8_complete: false
+v2_9: not_started
+~~~
+
+### review_recommendation
+
+Commit and normally push only these two final evidence files, update Issue #485
+and Draft PR #486, then stop for owner-led manual tests and independent review.
+Keep the PR Draft; do not mark Ready, merge, close the Issue, declare V2.8
+complete or begin V2.9.

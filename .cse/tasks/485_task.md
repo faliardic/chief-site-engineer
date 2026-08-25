@@ -363,3 +363,76 @@ Authority: Issue #485 owner comment `5413546078`.
   - ABI: exact `arm64-v8a`
 - Device preflight/install/launch remain unopened until this correction is
   committed and pushed.
+
+## Device preflight — FAIL / no connected device
+
+- Published receiver correction head:
+  `dc87f1980dbc79069317134c6c0cdf94c3e1bc6a`.
+- Verified acceptance APK remained byte-identical with SHA-256
+  `F6CC0D8365F7FD62C618352FFC960A8C248244A9A3035EC3D62528FC84BD23C2`.
+- The first device preflight started the local ADB host daemon and returned an
+  empty device inventory.
+- Exact counts: total `0`, usable `0`, offline `0`, unauthorized `0`.
+- The exactly-one physical-device precondition therefore failed.
+- No package inventory command, install, launch, clear, uninstall, downgrade,
+  scripted acceptance or user-data inspection ran.
+- Production, normal debug, acceptance and Secure Folder package state was not
+  accessed or mutated.
+- Fail-closed stop before install/launch. Manual tests
+  `MT-485-001..019` remain `PENDING`.
+
+## Device install authority 5413680219 — preflight FAIL / no device
+
+- Source edit, analyzer, Flutter test and APK build were not run.
+- Frozen APK preflight: PASS; exact path, `93036159` bytes and SHA-256
+  `F6CC0D8365F7FD62C618352FFC960A8C248244A9A3035EC3D62528FC84BD23C2`.
+- Published head remained
+  `dc87f1980dbc79069317134c6c0cdf94c3e1bc6a`; only the two prior append-only
+  evidence files were locally changed and staged remained `0`.
+- The newly authorized physical-device preflight again returned an empty ADB
+  inventory: total `0`, usable `0`, offline `0`, unauthorized `0`.
+- The no-device stop condition was applied immediately.
+- No protected package inventory, install, launch, clear, uninstall, downgrade,
+  fixture, scripted acceptance or user-data access ran.
+- Frozen APK and all package/user state remain untouched.
+- `MT-485-001..019` remain `PENDING`.
+
+## Frozen acceptance APK user-0 install and launch-only handoff — PASS
+
+Authority: Issue #485 comment `5413680219`; external blocker resolution was
+confirmed by the owner with the phone connected.
+
+- No source edit, analyzer, Flutter test, scripted acceptance or APK rebuild ran.
+- Frozen artifact preflight remained exact:
+  - bytes: `93036159`
+  - SHA-256:
+    `F6CC0D8365F7FD62C618352FFC960A8C248244A9A3035EC3D62528FC84BD23C2`
+  - package: `com.faliardic.sefim.acceptance`
+- Device preflight PASS:
+  - exactly one physical device, serial `R5CY21WKZFX`
+  - Samsung `SM-S938B`
+  - Android `16`, API `36`
+  - state `device`; offline/unauthorized/emulator `0`
+  - ABI exact `arm64-v8a`
+  - owner user `0`
+  - users `10` and Secure Folder `150` were observed read-only
+- User-150 package inventory was denied by Android with `SecurityException`;
+  no Secure Folder mutation was attempted or performed.
+- User-0 protected inventory before install contained only the acceptance
+  package; production and normal debug packages were absent from that inventory.
+- Exact one install:
+  `adb -s R5CY21WKZFX install --user 0 -r <frozen-apk>` — PASS,
+  `Success`.
+- Exact one launch:
+  `com.faliardic.sefim.acceptance/com.faliardic.chiefsiteengineer.MainActivity`
+  — PASS.
+- Foreground:
+  exact acceptance package and `MainActivity`.
+- Current acceptance PID: `8402`.
+- Bounded PID/package-filtered diagnostics: immediate fatal crash `0`.
+  The launch was not repeated when the first observability script encountered a
+  reserved PowerShell variable; only a read-only PID observation was corrected.
+- Production/debug packages and Secure Folder were untouched.
+- Acceptance application remains installed on user 0 and foreground for
+  owner-led manual testing.
+- `MT-485-001..019` remain `PENDING`.
