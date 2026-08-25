@@ -4131,9 +4131,9 @@ Future<void> _applyMaterialRequestMigration(Transaction transaction) async {
         length(NEW.$columnName) != 20
         OR NEW.$columnName NOT GLOB
           '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
-        OR strftime('%Y-%m-%dT%H:%M:%SZ', NEW., '+0 seconds')
+        OR strftime('%Y-%m-%dT%H:%M:%SZ', NEW.$columnName, '+0 seconds')
           IS NULL
-        OR strftime('%Y-%m-%dT%H:%M:%SZ', NEW., '+0 seconds')
+        OR strftime('%Y-%m-%dT%H:%M:%SZ', NEW.$columnName, '+0 seconds')
           != NEW.$columnName
       )
       BEGIN
@@ -4147,9 +4147,9 @@ Future<void> _applyMaterialRequestMigration(Transaction transaction) async {
         length(NEW.$columnName) != 20
         OR NEW.$columnName NOT GLOB
           '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
-        OR strftime('%Y-%m-%dT%H:%M:%SZ', NEW., '+0 seconds')
+        OR strftime('%Y-%m-%dT%H:%M:%SZ', NEW.$columnName, '+0 seconds')
           IS NULL
-        OR strftime('%Y-%m-%dT%H:%M:%SZ', NEW., '+0 seconds')
+        OR strftime('%Y-%m-%dT%H:%M:%SZ', NEW.$columnName, '+0 seconds')
           != NEW.$columnName
       )
       BEGIN

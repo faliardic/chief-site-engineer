@@ -233,3 +233,61 @@ All entries are `PENDING` and will be registered in Issue #479:
 - `MT-485-015`: Offline relaunch persistence.
 - `MT-485-016`: Backup/restore preservation without format change.
 - `MT-485-017`: No automatic reminder/notification or Living Plan mutation.
+
+## Independent-review correction authority 5413025911 — analyzer FAIL / fail-closed
+
+- Resume preflight verified exact published head
+  `a53c88ec869b1465023313ba30a4543c6cf38541`, branch
+  `codex/issue-485-material-requests-v1`, clean worktree and staged `0`.
+- The frozen pre-correction SHA-256 manifest covered all existing 12 authorized
+  paths.
+- The three independent review blockers were corrected only in the four
+  authorized Dart source files:
+  - four malformed dynamic Material Request timestamp references now resolve
+    the loop-selected column; the separate event timestamp trigger was not
+    changed;
+  - Material Request database open/action/close now runs inside the existing
+    shared `MobileOperationCoordinator`, supplied by bootstrap;
+  - quantity validation and submit use one comma/point normalizer, while display
+    preserves the stored double text instead of fixed two-decimal rounding.
+- Touched Dart formatting ran for exactly those four files and reported
+  `4 files / 0 changed`.
+- The authority's exactly one new `flutter analyze --no-pub` invocation exited
+  `1`. It reported four `unnecessary_brace_in_string_interps` info findings,
+  all at the newly corrected dynamic timestamp expressions:
+  `app_database.dart:4134:47`, `:4136:47`, `:4150:47`, and `:4152:47`.
+- These findings are directly related to the correction, but the exactly-one
+  analyzer budget is consumed. No second source edit, analyzer retry,
+  application test, build, APK, emulator, ADB, device or scripted acceptance
+  was performed.
+- Publication is blocked at the analyzer gate. No correction commit, push,
+  Issue/PR evidence update, Ready, merge, closure or roadmap successor action is
+  authorized from this state.
+- `MT-485-001..019` remain `PENDING`.
+
+## Final lint correction authority 5413317956 — source gates PASS
+
+- Canonical owner authority was read from GitHub in full.
+- Resume point: published head
+  `a53c88ec869b1465023313ba30a4543c6cf38541`, exact branch, existing local
+  6-path correction WIP, staged `0`, total allowlist `12/12`.
+- Only the four authorized `NEW.$columnName` semantic-no-op brace removals
+  were applied in `mobile/lib/storage/app_database.dart`.
+- Generated SQL continues to resolve each loop-selected timestamp column:
+  `created_at`, `updated_at`, `status_changed_at`, `requested_at`,
+  `received_at`, and `cancelled_at`.
+- The other five local WIP files remained byte-identical to the frozen resume
+  manifest during this source correction.
+- Touched Dart formatting: PASS, `1 file / 0 changed`.
+- Exactly one newly authorized `flutter analyze --no-pub`: PASS, exit `0`,
+  `No issues found`.
+- Final source gates: exact `12/12` allowlist, unexpected/protected drift
+  `0`, staged `0`, `git diff --check` PASS, schema `18`,
+  additive-only migration with existing table rename/rebuild and existing
+  user-row rewrite statements `0`, backup format `1`, version
+  `0.1.0+1`, pubspec/lock drift `0`, platform-production drift `0`.
+- No Flutter tests, integration tests, scripted acceptance, APK build, emulator
+  or ADB/device action ran during source validation.
+- Source publication is authorized. The acceptance-only APK build and user-0
+  install/launch remain the next owner-authorized stages after commit/push.
+- `MT-485-001..019` remain `PENDING`.

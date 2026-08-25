@@ -171,3 +171,145 @@ Publish as one Draft PR and request independent ChatGPT source/diff review.
 Keep the PR Draft and retain all MT-485 tests as PENDING until owner-reported
 manual results. Do not mark Ready, merge, close Issue #485, declare V2.8
 complete, update the Epic checkbox or begin V2.9.
+
+## Independent-review correction result — FAIL / fail-closed
+
+Owner authority: Issue #485 comment `5413025911`.
+
+### Applied source correction
+
+- Exact published starting head:
+  `a53c88ec869b1465023313ba30a4543c6cf38541`.
+- Source edits remained within the existing 12-path allowlist:
+  `app_database.dart`, `material_request_application.dart`,
+  `app_bootstrap.dart`, and `material_requests_page.dart`.
+- Timestamp correction count: exactly four dynamic Material Request row
+  references. The event timestamp trigger remained outside the diff.
+- Shared coordinator correction: bootstrap passes its existing coordinator and
+  the complete database open/action/close boundary is queued by
+  `coordinator.run(...)`.
+- Quantity correction: validation and submit share one parser accepting decimal
+  comma or point; positive finite and quantity/unit pairing checks remain;
+  display no longer performs lossy fixed-two-decimal rounding.
+- Touched Dart formatting: PASS, `4 files / 0 changed`.
+
+### Source gate failure
+
+The single authorized `flutter analyze --no-pub` invocation returned exit
+code `1`:
+
+- `app_database.dart:4134:47` —
+  `unnecessary_brace_in_string_interps`
+- `app_database.dart:4136:47` —
+  `unnecessary_brace_in_string_interps`
+- `app_database.dart:4150:47` —
+  `unnecessary_brace_in_string_interps`
+- `app_database.dart:4152:47` —
+  `unnecessary_brace_in_string_interps`
+
+No unrelated analyzer diagnostic was reported. Nevertheless, the required
+analyzer gate did not PASS and its exactly-one invocation budget is exhausted.
+No second edit or retry was made. Downstream publication gates were not used.
+
+### execution_record
+
+~~~yaml
+policy_version: CSE-MRP-1.0
+task_risk: R4
+requested_model: gpt-5.6-sol
+requested_reasoning_effort: max
+actual_model: unknown
+actual_reasoning_effort: null
+invocation_verification_status: unverified
+execution_mode: standard
+orchestration: single-agent
+verification_mode: owner_led_manual_testing
+implementation_status: IN_PROGRESS
+manual_test_status: PENDING
+manual_test_ids: MT-485-001..019
+source_gate_status: FAIL
+failure_code: correction_analyzer_unnecessary_interpolation_braces
+analyzer_invocations_this_authority: 1
+analyzer_retry_authorized: false
+application_tests_run: false
+build_run: false
+device_run: false
+publication_status: BLOCKED
+published_head_unchanged: a53c88ec869b1465023313ba30a4543c6cf38541
+~~~
+
+### review_recommendation
+
+Preserve the exact correction WIP and request a narrow owner authority for the
+four semantic-no-op interpolation brace removals plus one new analyzer
+invocation. Keep Draft PR #486 unchanged and all manual tests PENDING. Do not
+mark Ready, merge, close Issue #485, declare V2.8 complete, update the Epic
+checkbox or begin V2.9.
+
+## Final lint correction and source publication gates — PASS
+
+Owner authority: Issue #485 comment `5413317956`.
+
+### Correction proof
+
+- Starting published head:
+  `a53c88ec869b1465023313ba30a4543c6cf38541`.
+- Exact correction: four
+  `unnecessary_brace_in_string_interps` sites changed from braced to simple
+  Dart interpolation in `app_database.dart`.
+- Source meaning is unchanged: each trigger template emits a valid
+  `NEW.<timestamp_column>` SQLite reference.
+- No other migration, SQL, application, coordinator, UI, validation, quantity
+  or lifecycle behavior was changed in this lint pass.
+- Touched formatting: `1 file / 0 changed`.
+- Single authorized analyzer invocation: PASS, exit `0`,
+  `No issues found`.
+
+### Final source-level verification
+
+- Exact changed paths against master: `12/12`.
+- Unexpected/protected drift: `0`.
+- Staged before publication: `0`.
+- `git diff --check`: PASS.
+- Schema: exact `18`.
+- Migration: additive-only; two new material tables; existing table
+  rename/rebuild and existing user-row rewrite statements: `0`.
+- Backup format: exact `1`.
+- Version: exact `0.1.0+1`.
+- Pubspec/lock drift: `0`.
+- Platform-production drift: `0`.
+- Flutter application tests and scripted acceptance: not run.
+- Manual tests `MT-485-001..019`: `PENDING`.
+
+### execution_record
+
+~~~yaml
+policy_version: CSE-MRP-1.0
+task_risk: R4
+requested_model: gpt-5.6-sol
+requested_reasoning_effort: max
+actual_model: unknown
+actual_reasoning_effort: null
+invocation_verification_status: unverified
+execution_mode: standard
+orchestration: single-agent
+verification_mode: owner_led_manual_testing
+implementation_status: IMPLEMENTED
+manual_test_status: PENDING
+manual_test_ids: MT-485-001..019
+source_gate_status: PASS
+analyzer_invocations_this_authority: 1
+application_tests_run: false
+scripted_acceptance_run: false
+artifact_stage_status: PENDING
+device_stage_status: PENDING
+publication_status: AUTHORIZED_PENDING_COMMIT
+ready: false
+merge: false
+~~~
+
+### review_recommendation
+
+Create and push the single correction commit, update Draft PR #486 and Issue
+#485 evidence, then proceed only with the owner-authorized acceptance debug
+arm64 APK build and user-0 install/launch handoff. Keep the PR Draft.

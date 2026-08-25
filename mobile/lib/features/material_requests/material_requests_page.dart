@@ -413,13 +413,12 @@ class _CreateMaterialRequestDialogState
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-    final quantityText = _quantity.text.trim();
     Navigator.of(context).pop(
       _CreateValue(
         materialName: _name.text.trim(),
         locationId: _locationId,
         livingPlanItemId: _livingPlanItemId,
-        quantity: quantityText.isEmpty ? null : double.parse(quantityText),
+        quantity: _parseQuantity(_quantity.text),
         unit: _emptyToNull(_unit.text),
         neededOn: _neededOn,
         priority: _priority,
@@ -583,7 +582,7 @@ class _CreateMaterialRequestDialogState
     if (quantity.isEmpty || unit.isEmpty) {
       return 'Miktar ve birim birlikte girilmeli.';
     }
-    final parsed = double.tryParse(quantity);
+    final parsed = _parseQuantity(quantity);
     if (parsed == null || !parsed.isFinite || parsed <= 0) {
       return 'Pozitif bir miktar girin.';
     }
@@ -673,7 +672,16 @@ String? _emptyToNull(String value) {
   return exact.isEmpty ? null : exact;
 }
 
+double? _parseQuantity(String value) {
+  final exact = value.trim();
+  if (exact.isEmpty) return null;
+  return double.tryParse(exact.replaceAll(',', '.'));
+}
+
 String _quantityLabel(double value, String unit) {
-  final decimals = value == value.roundToDouble() ? 0 : 2;
-  return '${value.toStringAsFixed(decimals)} $unit';
+  final exact = value.toString();
+  final displayValue = exact.endsWith('.0')
+      ? exact.substring(0, exact.length - 2)
+      : exact;
+  return '$displayValue $unit';
 }

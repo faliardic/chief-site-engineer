@@ -199,6 +199,7 @@ class AppBootstrap {
         databasePath: directories.databaseFile,
         databaseFactory: databaseFactory,
         clock: clock,
+        coordinator: coordinator,
       );
       final attendance = SqliteAttendanceApplication(
         databasePath: directories.databaseFile,

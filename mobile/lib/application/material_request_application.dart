@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/material_request_models.dart';
@@ -37,11 +38,13 @@ class SqliteMaterialRequestApplication
     required this.databasePath,
     required this.databaseFactory,
     required this.clock,
+    required this.coordinator,
   });
 
   final String databasePath;
   final DatabaseFactory databaseFactory;
   final UtcClock clock;
+  final MobileOperationCoordinator coordinator;
 
   @override
   Future<List<MaterialRequestProject>> listProjects() =>
@@ -444,7 +447,7 @@ class SqliteMaterialRequestApplication
   Future<T> _database<T>(
     Future<T> Function(Database database) action, {
     required bool readOnly,
-  }) async {
+  }) => coordinator.run(() async {
     Database? database;
     try {
       database = await databaseFactory.openDatabase(
@@ -468,7 +471,7 @@ class SqliteMaterialRequestApplication
     } finally {
       await database?.close();
     }
-  }
+  });
 
   String _now() {
     final value = clock();
