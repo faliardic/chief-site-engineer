@@ -498,7 +498,10 @@ class _HomePageState extends State<_HomePage> {
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: () => Navigator.of(context).push<void>(
                 MaterialPageRoute(
-                  builder: (_) => DailyLogPage(dailyLog: dailyLog),
+                  builder: (_) => DailyLogPage(
+                    dailyLog: dailyLog,
+                    workChain: widget.bootstrap.workChain,
+                  ),
                 ),
               ),
             ),

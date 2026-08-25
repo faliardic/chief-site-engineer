@@ -407,7 +407,14 @@ class SqliteDailyLogApplication implements DailyLogApplicationPort {
   ) async {
     final rows = await database.query(
       'follow_up_items',
-      columns: ['id', 'title', 'status', 'next_attention_at', 'created_at'],
+      columns: [
+        'id',
+        'title',
+        'status',
+        'observation_id',
+        'next_attention_at',
+        'created_at',
+      ],
       where: '''
         project_id = ? AND trashed_at IS NULL
         AND status IN ('inbox', 'active')
@@ -418,6 +425,7 @@ class SqliteDailyLogApplication implements DailyLogApplicationPort {
     return List.unmodifiable(
       rows.map((row) {
         final id = _requiredText(row, 'id');
+        final observationId = _optionalText(row['observation_id']);
         final nextAttentionAt = _optionalText(row['next_attention_at']);
         if (nextAttentionAt != null) {
           CseTimeCodec.decodeCanonicalUtc(nextAttentionAt);
@@ -431,6 +439,11 @@ class SqliteDailyLogApplication implements DailyLogApplicationPort {
               '${_followUpStatusLabel(_requiredText(row, 'status'))}',
           sourceRefs: [
             DailyLogSourceRef(kind: DailyLogSourceKind.reminder, sourceId: id),
+            if (observationId != null)
+              DailyLogSourceRef(
+                kind: DailyLogSourceKind.agendaLog,
+                sourceId: observationId,
+              ),
           ],
         );
       }),

@@ -7,6 +7,7 @@ import 'package:chief_site_engineer/application/construction_living_plan_applica
 import 'package:chief_site_engineer/application/construction_living_plan_intelligence_application.dart';
 import 'package:chief_site_engineer/application/daily_log_application.dart';
 import 'package:chief_site_engineer/application/mobile_backup_application.dart';
+import 'package:chief_site_engineer/application/work_chain_application.dart';
 import 'package:chief_site_engineer/application/restore_recovery_application.dart';
 import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
@@ -41,6 +42,7 @@ class BootstrapSuccess extends BootstrapResult {
     this.livingPlanIntelligence =
         const UnavailableConstructionLivingPlanIntelligenceApplication(),
     this.dailyLog,
+    this.workChain,
     this.projectLocations,
     this.attendance,
     this.concrete,
@@ -58,6 +60,7 @@ class BootstrapSuccess extends BootstrapResult {
   final ConstructionLivingPlanIntelligenceApplicationPort
   livingPlanIntelligence;
   final DailyLogApplicationPort? dailyLog;
+  final WorkChainApplicationPort? workChain;
   final ProjectLocationApplication? projectLocations;
   final AttendanceApplication? attendance;
   final ConcreteApplication? concrete;
@@ -185,6 +188,10 @@ class AppBootstrap {
         databasePath: directories.databaseFile,
         databaseFactory: databaseFactory,
       );
+      final workChain = SqliteWorkChainApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactory,
+      );
       final attendance = SqliteAttendanceApplication(
         databasePath: directories.databaseFile,
         databaseFactory: databaseFactory,
@@ -248,6 +255,7 @@ class AppBootstrap {
         livingPlan: livingPlan,
         livingPlanIntelligence: livingPlanIntelligence,
         dailyLog: dailyLog,
+        workChain: workChain,
         projectLocations: agenda,
         attendance: attendance,
         concrete: concrete,

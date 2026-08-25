@@ -4201,3 +4201,22 @@
   migration, event/receipt, PDF/file/share artifact, AI summary veya source
   mutation yoktur. Schema `17`, backup format `1`, version `0.1.0+1` değişmez;
   durum `IMPLEMENTED — MANUAL TEST PENDING` ile sınırlıdır.
+
+## Issue 483 — İş Zinciri v1 yalnız explicit Agenda–takip bağını salt-okunur projekte eder
+
+- Canonical kök exact `field_observations.id`, takip bağı exact
+  `follow_up_items.observation_id` ve lifecycle exact append-only
+  `follow_up_events` kayıtlarıdır. `loadFromAgendaLog(...)` ile
+  `loadFromFollowUp(...)` aynı root altındaki deterministic canonical zinciri
+  üretir; private/projesiz veya dangling kayıt başka kayda uydurulmaz.
+- Project/source identity, duplicate relation, event sequence/order ve terminal
+  event/current projection çelişkileri typed diagnostic'tir. Read model repair,
+  reconcile, migration, source/event/revision mutation veya current clock
+  kullanmaz; read-only SQLite handle her sonuçta kapatılır.
+- UI başlangıç, takip, meaningful lifecycle geçmişi, archive/trash durumu ve
+  exact current sonucu gösterir. Günlük Log yalnız stable Agenda/Reminder
+  `DailyLogSourceRef` üzerinden dar `İş Zincirini aç` girişini sunar; generic
+  navigation/workflow framework kurulmaz.
+- Schema `17`, backup format `1` ve version `0.1.0+1` değişmez. Durum
+  `IMPLEMENTED — MANUAL TEST PENDING` ile sınırlıdır; V2.7 completion,
+  production readiness ve V2.8 başlamaz.
