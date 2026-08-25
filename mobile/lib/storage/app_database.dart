@@ -27,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 17;
+  static const schemaVersion = 18;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2898,6 +2898,7 @@ class AppDatabase {
       version: 17,
       apply: _applyConstructionScheduleSnapshotDependencyMigration,
     ),
+    DatabaseMigration(version: 18, apply: _applyMaterialRequestMigration),
   ];
 
   final String path;
@@ -3989,6 +3990,280 @@ Future<void> _applyConstructionScheduleSnapshotDependencyMigration(
       BEFORE DELETE ON $table
       BEGIN
         SELECT RAISE(ABORT, 'schedule snapshot dependency graph is immutable');
+      END
+    ''');
+  }
+}
+
+Future<void> _applyMaterialRequestMigration(Transaction transaction) async {
+  await transaction.execute('''
+    CREATE TABLE material_requests (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      location_id TEXT,
+      living_plan_item_id TEXT,
+      material_name TEXT NOT NULL CHECK (
+        length(material_name) > 0 AND material_name = trim(material_name)
+      ),
+      quantity REAL CHECK (
+        quantity IS NULL OR (
+          quantity > 0 AND quantity <= 1.7976931348623157e308
+        )
+      ),
+      unit TEXT CHECK (
+        unit IS NULL OR (length(unit) > 0 AND unit = trim(unit))
+      ),
+      needed_on TEXT CHECK (
+        needed_on IS NULL OR (
+          length(needed_on) = 10
+          AND needed_on GLOB
+            '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+          AND date(needed_on) = needed_on
+        )
+      ),
+      priority TEXT NOT NULL CHECK (
+        priority IN ('normal', 'high', 'urgent')
+      ),
+      description TEXT CHECK (
+        description IS NULL OR (
+          length(description) > 0 AND description = trim(description)
+        )
+      ),
+      status TEXT NOT NULL CHECK (
+        status IN ('needed', 'requested', 'received', 'cancelled')
+      ),
+      revision INTEGER NOT NULL CHECK (revision >= 1),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      status_changed_at TEXT NOT NULL,
+      requested_at TEXT,
+      received_at TEXT,
+      cancelled_at TEXT,
+      UNIQUE (id, project_id),
+      FOREIGN KEY (location_id, project_id)
+        REFERENCES project_locations(id, project_id),
+      FOREIGN KEY (living_plan_item_id, project_id)
+        REFERENCES project_living_plan_items(id, project_id),
+      CHECK (
+        (quantity IS NULL AND unit IS NULL)
+        OR (quantity IS NOT NULL AND unit IS NOT NULL)
+      ),
+      CHECK (
+        updated_at >= created_at
+        AND status_changed_at >= created_at
+        AND status_changed_at <= updated_at
+      ),
+      CHECK (
+        status != 'needed'
+        OR (
+          requested_at IS NULL
+          AND received_at IS NULL
+          AND cancelled_at IS NULL
+        )
+      ),
+      CHECK (
+        status != 'requested'
+        OR (
+          requested_at IS NOT NULL
+          AND requested_at = status_changed_at
+          AND received_at IS NULL
+          AND cancelled_at IS NULL
+        )
+      ),
+      CHECK (
+        status != 'received'
+        OR (
+          requested_at IS NOT NULL
+          AND received_at IS NOT NULL
+          AND received_at = status_changed_at
+          AND cancelled_at IS NULL
+        )
+      ),
+      CHECK (
+        status != 'cancelled'
+        OR (
+          received_at IS NULL
+          AND cancelled_at IS NOT NULL
+          AND cancelled_at = status_changed_at
+        )
+      )
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE material_request_events (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      material_request_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      sequence INTEGER NOT NULL CHECK (sequence >= 1),
+      event_type TEXT NOT NULL CHECK (
+        event_type IN (
+          'material_request.created',
+          'material_request.updated',
+          'material_request.requested',
+          'material_request.received',
+          'material_request.cancelled',
+          'material_request.reopened'
+        )
+      ),
+      occurred_at TEXT NOT NULL,
+      payload_json TEXT NOT NULL CHECK (
+        json_valid(payload_json)
+        AND json_type(payload_json) = 'object'
+      ),
+      UNIQUE (material_request_id, sequence),
+      FOREIGN KEY (material_request_id, project_id)
+        REFERENCES material_requests(id, project_id)
+    )
+  ''');
+
+  for (final columnName in [
+    'created_at',
+    'updated_at',
+    'status_changed_at',
+    'requested_at',
+    'received_at',
+    'cancelled_at',
+  ]) {
+    await transaction.execute('''
+      CREATE TRIGGER material_requests_${columnName}_canonical_insert
+      BEFORE INSERT ON material_requests
+      WHEN NEW.$columnName IS NOT NULL AND (
+        length(NEW.$columnName) != 20
+        OR NEW.$columnName NOT GLOB
+          '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+        OR strftime('%Y-%m-%dT%H:%M:%SZ', NEW., '+0 seconds')
+          IS NULL
+        OR strftime('%Y-%m-%dT%H:%M:%SZ', NEW., '+0 seconds')
+          != NEW.$columnName
+      )
+      BEGIN
+        SELECT RAISE(ABORT, 'material request timestamp must be canonical UTC');
+      END
+    ''');
+    await transaction.execute('''
+      CREATE TRIGGER material_requests_${columnName}_canonical_update
+      BEFORE UPDATE OF $columnName ON material_requests
+      WHEN NEW.$columnName IS NOT NULL AND (
+        length(NEW.$columnName) != 20
+        OR NEW.$columnName NOT GLOB
+          '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+        OR strftime('%Y-%m-%dT%H:%M:%SZ', NEW., '+0 seconds')
+          IS NULL
+        OR strftime('%Y-%m-%dT%H:%M:%SZ', NEW., '+0 seconds')
+          != NEW.$columnName
+      )
+      BEGIN
+        SELECT RAISE(ABORT, 'material request timestamp must be canonical UTC');
+      END
+    ''');
+  }
+  await transaction.execute('''
+    CREATE TRIGGER material_request_events_timestamp_canonical
+    BEFORE INSERT ON material_request_events
+    WHEN length(NEW.occurred_at) != 20
+      OR NEW.occurred_at NOT GLOB
+        '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+      OR strftime('%Y-%m-%dT%H:%M:%SZ', NEW.occurred_at, '+0 seconds')
+        IS NULL
+      OR strftime('%Y-%m-%dT%H:%M:%SZ', NEW.occurred_at, '+0 seconds')
+        != NEW.occurred_at
+    BEGIN
+      SELECT RAISE(ABORT, 'material request event timestamp must be canonical UTC');
+    END
+  ''');
+
+  await transaction.execute('''
+    CREATE INDEX material_requests_project_open
+    ON material_requests(project_id, status, priority, needed_on, id)
+  ''');
+  await transaction.execute('''
+    CREATE INDEX material_requests_project_history
+    ON material_requests(project_id, status_changed_at DESC, id)
+  ''');
+  await transaction.execute('''
+    CREATE INDEX material_requests_location
+    ON material_requests(project_id, location_id, status)
+  ''');
+  await transaction.execute('''
+    CREATE INDEX material_requests_living_plan_item
+    ON material_requests(project_id, living_plan_item_id, status)
+  ''');
+  await transaction.execute('''
+    CREATE INDEX material_request_events_history
+    ON material_request_events(material_request_id, sequence)
+  ''');
+
+  await transaction.execute('''
+    CREATE TRIGGER material_requests_no_delete
+    BEFORE DELETE ON material_requests
+    BEGIN
+      SELECT RAISE(ABORT, 'material requests cannot be deleted');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER material_requests_guarded_update
+    BEFORE UPDATE ON material_requests
+    BEGIN
+      SELECT CASE
+        WHEN NEW.id != OLD.id
+          OR NEW.project_id != OLD.project_id
+          OR NEW.created_at != OLD.created_at
+        THEN RAISE(ABORT, 'material request identity is immutable')
+      END;
+      SELECT CASE
+        WHEN NEW.revision != OLD.revision + 1
+        THEN RAISE(ABORT, 'material request revision mismatch')
+      END;
+      SELECT CASE
+        WHEN NEW.updated_at < OLD.updated_at
+          OR NEW.status_changed_at < OLD.status_changed_at
+        THEN RAISE(ABORT, 'material request timestamp regression')
+      END;
+      SELECT CASE
+        WHEN NEW.status = OLD.status
+          AND NEW.status_changed_at != OLD.status_changed_at
+        THEN RAISE(ABORT, 'material request status timestamp mismatch')
+      END;
+      SELECT CASE
+        WHEN NEW.status != OLD.status
+          AND NEW.status_changed_at != NEW.updated_at
+        THEN RAISE(ABORT, 'material request status timestamp mismatch')
+      END;
+      SELECT CASE
+        WHEN NEW.status != OLD.status
+          AND NOT (
+            (OLD.status = 'needed'
+              AND NEW.status IN ('requested', 'cancelled'))
+            OR (OLD.status = 'requested'
+              AND NEW.status IN ('received', 'cancelled'))
+            OR (OLD.status IN ('received', 'cancelled')
+              AND NEW.status = 'needed')
+          )
+        THEN RAISE(ABORT, 'material request transition not allowed')
+      END;
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER material_request_events_revision_match
+    BEFORE INSERT ON material_request_events
+    BEGIN
+      SELECT CASE
+        WHEN NEW.sequence != (
+          SELECT revision
+          FROM material_requests
+          WHERE id = NEW.material_request_id
+            AND project_id = NEW.project_id
+        )
+        THEN RAISE(ABORT, 'material request event revision mismatch')
+      END;
+    END
+  ''');
+  for (final operation in ['update', 'delete']) {
+    await transaction.execute('''
+      CREATE TRIGGER material_request_events_append_only_$operation
+      BEFORE ${operation.toUpperCase()} ON material_request_events
+      BEGIN
+        SELECT RAISE(ABORT, 'material request events are append-only');
       END
     ''');
   }

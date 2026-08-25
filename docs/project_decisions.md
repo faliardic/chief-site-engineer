@@ -4220,3 +4220,24 @@
 - Schema `17`, backup format `1` ve version `0.1.0+1` değişmez. Durum
   `IMPLEMENTED — MANUAL TEST PENDING` ile sınırlıdır; V2.7 completion,
   production readiness ve V2.8 başlamaz.
+## Issue 485 — İstenecek Malzemeler v1 ayrı source-of-truth ve append-only lifecycle kullanır
+
+- Schema `18` yalnız additive `material_requests`,
+  `material_request_events`, index ve trigger ekler; schema 1–17 tablolarını
+  rebuild/rename etmez ve mevcut satırları yeniden yazmaz.
+- Request stable UUID, exact project ve nullable same-project mahal/Living Plan
+  item bağlarını korur. Quantity/unit pair, canonical İstanbul ihtiyaç günü,
+  priority, lifecycle timestamps ve optimistic revision fail-closed doğrulanır.
+- Her gerçek create/update/transition aynı SQLite transaction içinde source row
+  ile exact bir `material_request.*` append-only event üretir. No-op event
+  veya revision üretmez; event-ID replay farklı request/type/intent ile
+  çakışırsa mutation yapılmaz.
+- Canonical lifecycle `needed → requested/cancelled`,
+  `requested → received/cancelled` ve yalnız explicit
+  `received/cancelled → needed` reopen akışıdır. Physical delete yoktur.
+- Home yüzeyi exact proje seçimi, hızlı `+ Malzeme`, açık/geçmiş listeleri,
+  `İstendi`, `Geldi`, `İptal`, `Yeniden aç` aksiyonları ve
+  deterministic event detayını sunar.
+- Backup format `1` ve version `0.1.0+1` değişmez. Satın alma/ERP,
+  tedarikçi, fiyat, stok, kısmi teslim, notification, attachment, AI ve V2.9
+  kapsam dışıdır. Durum `IMPLEMENTED — MANUAL TEST PENDING` ile sınırlıdır.

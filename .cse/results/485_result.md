@@ -1,0 +1,173 @@
+# Issue #485 — Execution Result
+
+## Outcome
+
+`FAIL-CLOSED — FINAL SOURCE ANALYZER FAILED`
+
+Implementation source is present as uncommitted WIP on
+`codex/issue-485-material-requests-v1` at exact base
+`dbe370e61b5ece843238c35e049bbaa4e7df19cb`, but publication gates did not
+all pass. The implementation must not be described as verified, published or
+production-ready.
+
+## Implemented WIP
+
+- Additive schema `17 → 18` introduces only
+  `material_requests`, `material_request_events`, indexes and triggers.
+- Canonical lifecycle is `needed → requested/cancelled`,
+  `requested → received/cancelled` and explicit
+  `received/cancelled → needed` reopen.
+- Optimistic revision, source-row/event transaction, append-only event guards,
+  event-ID replay/collision checks, physical-delete rejection and exact
+  same-project mahal/Living Plan validation are implemented.
+- Home includes exact project selection, `+ Malzeme` capture,
+  open/history lists, quick lifecycle actions and append-only detail history.
+- Backup format and application version were not changed.
+
+## Final source gate evidence
+
+- Touched Dart format: completed for six authorized Dart files.
+- Generated metadata preparation: the official worktree and isolated worktree
+  `pubspec.lock` SHA-256 were both
+  `2B75E59A051A8CFCFEC3D6883B04779205C63678B0F4814A4535E50DB77DC441`.
+  Three ignored `.dart_tool` metadata files were copied byte-identically;
+  no tracked dependency file changed.
+- Exactly one `flutter analyze --no-pub`: exit `1`,
+  `13 issues found`.
+- All 13 diagnostics were
+  `prefer_interpolation_to_compose_strings` info lints:
+  one in `material_request_application.dart` and twelve in
+  `material_requests_page.dart`.
+- Compile errors: `0` reported.
+- `git diff --check`: PASS.
+- Pre-result changed paths: `11/12`; unexpected paths `0`.
+- Staged paths: `0`.
+- Schema source: exact `18`.
+- Additive migration audit: no added `ALTER TABLE`, `DROP TABLE`,
+  table rename, existing-row `UPDATE` or `DELETE FROM` statement.
+  Added UPDATE/DELETE tokens are only immutability/guard trigger clauses on the
+  two new material tables.
+- Backup format: exact `1`.
+- Version: exact `0.1.0+1`.
+- `pubspec.yaml` / `pubspec.lock` drift: `0`.
+- Android/iOS platform-production drift: `0`.
+
+## Explicitly not run
+
+- Flutter unit, widget, integration or full tests
+- APK/AAB build
+- emulator, ADB or device acceptance
+- scripted UI acceptance
+- application launch
+- real user data access
+
+This follows the owner-led manual testing policy; no PASS result was invented.
+
+## Publication status
+
+- Commit: not created
+- Push: not performed
+- Draft PR: not created
+- Issue #485 completion evidence: not posted
+- Issue #479 MT-485 register entries: not posted
+- Ready / merge / Issue close / V2.8 complete / V2.9: not performed
+
+## execution_record
+
+```yaml
+policy_version: CSE-MRP-1.0
+task_risk: R4
+requested_model: gpt-5.6-sol
+requested_reasoning_effort: max
+actual_model: unknown
+actual_reasoning_effort: null
+invocation_verification_status: unverified
+execution_mode: standard
+orchestration: single-agent
+verification_mode: owner_led_manual_testing
+implementation_status: IN_PROGRESS
+manual_test_status: PENDING
+source_gate_status: FAIL
+publication_status: NOT_PUBLISHED
+failure_code: final_flutter_analyze_info_lints
+analyzer_invocations: 1
+analyzer_retry_authorized: false
+```
+
+## review_recommendation
+
+Do not publish or request independent source review from this revision. Preserve
+the exact WIP and request owner authority for the narrow interpolation-only
+source correction plus a new analyzer invocation. The application tests remain
+owner-led and were not opened.
+## Owner-authorized correction result — PASS
+
+Owner authority `5412555097` authorized only the exact 13 analyzer-reported
+interpolation lints and one analyzer retry. The earlier FAIL record above remains
+historical evidence and is superseded for publication by this correction result.
+
+### Correction proof
+
+- Preflight: exact `12/12` WIP, staged `0`, unexpected path `0`.
+- Corrected paths:
+  - `mobile/lib/application/material_request_application.dart`
+  - `mobile/lib/features/material_requests/material_requests_page.dart`
+- Change type: string composition to Dart interpolation only.
+- Exact analyzer sites corrected: `13`.
+- Other ten WIP paths: byte-identical to the frozen pre-correction SHA-256
+  manifest.
+- Touched-file format: `2 files / 0 changed`.
+- Single authorized analyzer retry: `PASS`, exit `0`,
+  `No issues found`.
+
+### Final source-level verification
+
+- Exact changed paths: `12/12`.
+- Unexpected/protected drift: `0`.
+- `git diff --check`: PASS.
+- Schema: exact `18`.
+- Migration: additive-only; no existing-table rename/rebuild and no
+  existing-user-row rewrite.
+- Backup format: exact `1`.
+- Version: exact `0.1.0+1`.
+- Pubspec/lock drift: `0`.
+- Platform-production drift: `0`.
+- Flutter application tests/build/device/scripted acceptance: not run by
+  explicit owner-led manual testing policy.
+
+### Publication classification
+
+`IMPLEMENTED — MANUAL TEST PENDING`
+
+Stable `MT-485-001..017` tests are PENDING for Issue #479 registration.
+This is not VERIFIED, FIELD_ACCEPTED, PRODUCTION_READY or RELEASE_READY.
+
+### execution_record
+
+```yaml
+policy_version: CSE-MRP-1.0
+task_risk: R4
+requested_model: gpt-5.6-sol
+requested_reasoning_effort: max
+actual_model: unknown
+actual_reasoning_effort: null
+invocation_verification_status: unverified
+execution_mode: standard
+orchestration: single-agent
+verification_mode: owner_led_manual_testing
+implementation_status: IMPLEMENTED
+manual_test_status: PENDING
+source_gate_status: PASS
+analyzer_retry_invocations: 1
+application_tests_run: false
+build_run: false
+device_run: false
+publication_status: AUTHORIZED
+```
+
+### review_recommendation
+
+Publish as one Draft PR and request independent ChatGPT source/diff review.
+Keep the PR Draft and retain all MT-485 tests as PENDING until owner-reported
+manual results. Do not mark Ready, merge, close Issue #485, declare V2.8
+complete, update the Epic checkbox or begin V2.9.
