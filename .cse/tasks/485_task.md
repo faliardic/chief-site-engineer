@@ -436,3 +436,74 @@ confirmed by the owner with the phone connected.
 - Acceptance application remains installed on user 0 and foreground for
   owner-led manual testing.
 - `MT-485-001..019` remain `PENDING`.
+
+## MT-485-020 startup FAIL diagnosis — exact root cause / fail-closed
+
+Authority: Issue #485 comment `5413945033`.
+
+- Device preflight PASS on exact physical Samsung `SM-S938B`, Android
+  `16` / API `36`, serial `R5CY21WKZFX`, owner user `0`, ABI
+  `arm64-v8a`.
+- Read-only acceptance inventory confirmed version
+  `0.1.0-acceptance` / `1`. Production/debug packages were not launched,
+  mutated or inspected beyond the permitted package inventory.
+- Log boundary: `08-25 20:09:05.000`.
+- Acceptance-only force-stop PASS; exact MainActivity diagnosis launch count
+  `1`, launch PASS, PID `19755`, foreground exact acceptance activity.
+- Exact native error:
+  `java.lang.ClassNotFoundException: io.flutter.plugins.GeneratedPluginRegistrant`.
+- Stack:
+  `GeneratedPluginRegister.registerGeneratedPlugins` →
+  `FlutterActivity.configureFlutterEngine` →
+  `MainActivity.configureFlutterEngine(MainActivity.kt:27)`.
+- Build/source inspection confirms:
+  - no `GeneratedPluginRegistrant` source or build output exists;
+  - `mobile/.flutter-plugins-dependencies` is absent;
+  - pinned platform plugin packages exist in package config/cache.
+- First failing bootstrap stage is before all SQLite work:
+  `AppBootstrap.start() → directoriesProvider() →
+  getApplicationSupportDirectory()`.
+  Because Android plugins were not registered, this first platform-plugin call
+  cannot complete; the outer `on Object` maps it to default
+  `BootstrapFailure(code: startup_failed)`.
+- Filtered bounded logs contained no SQLiteLog/sqflite/DatabaseException,
+  migration, schema, foreign-key or trigger failure. AppDatabase open,
+  schema-18 material migration, attendance, agenda and restore/recovery stages
+  were not reached.
+- Root-cause classification: `F — Android/plugin/platform`.
+- This is outside the Issue #485 product-path correction window and requires
+  generated plugin-registration/build preparation authority. No source edit,
+  analyzer, Flutter test, build, reinstall, clear or uninstall was performed.
+- `MT-485-020 = FAIL`; `MT-485-001..019` remain unchanged.
+## Plugin registrant generated-state recovery — PASS
+
+Authority: Issue #485 comment `5414057108`.
+
+- Head stayed `fe9fc26c6f0aff250d9ccd93e15c17ad49d36ff0`; staged `0`;
+  only task/result evidence was tracked WIP.
+- Pre/post SHA-256 remained byte-identical: pubspec
+  `704EE4A64B534D14264984F68B8275570B8F87C06190EE48340830D971EABFA7`;
+  lock `2B75E59A051A8CFCFEC3D6883B04779205C63678B0F4814A4535E50DB77DC441`.
+- Generated roots resolved inside the worktree; read-only entries `0`.
+- A shell-form `flutter clean` failed before launching Flutter because PATH did
+  not contain the executable. The pinned SDK then ran the single real clean:
+  exit `0`; `build/` and `.dart_tool/` removed.
+- Exactly one offline pub get: exit `0`; no network fallback.
+- Plugin metadata and generated registrant exist. Required plugin result:
+  `6/6 PASS` (`FilePickerPlugin`, `FlutterLocalNotificationsPlugin`,
+  `ImagePickerPlugin`, `PermissionHandlerPlugin`, `SharePlusPlugin`,
+  `SqflitePlugin`). Registrant helper: exit `0`, PASS.
+- Exactly one fresh build: exit `0`, PASS. APK path
+  `mobile/build/app/outputs/flutter-apk/app-debug.apk`, size `96992107`, SHA-256
+  `4E9514C7224DDD7C7B6EB81A93EF1F5189FE713A14905FD5C4576B3939589D4F`,
+  written `2026-08-25T17:22:50.0030358Z` UTC.
+- APK package/label/version/activity/arm64 contract PASS; Dex contains exact
+  `io.flutter.plugins.GeneratedPluginRegistrant`.
+- Device preflight PASS: one physical `SM-S938B`, Android 16/API 36,
+  `R5CY21WKZFX`, user 0, `arm64-v8a`; offline/unauthorized/emulator `0`.
+- Exactly one user-0 `-r` install: `Success`; exactly one launch: PASS.
+  Foreground and hierarchy proved normal MobileShell/Home with `Başlangıç`,
+  `7 Günlük Plan`, `Günlük Log`, and `İstenecek Malzemeler`; no startup-failure
+  panel was present.
+- `MT-485-020` returned to `PENDING` for owner visual confirmation; automated
+  bootstrap observation was not recorded as manual `PASS`.

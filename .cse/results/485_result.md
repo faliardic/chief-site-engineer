@@ -660,3 +660,176 @@ Commit and normally push only these two final evidence files, update Issue #485
 and Draft PR #486, then stop for owner-led manual tests and independent review.
 Keep the PR Draft; do not mark Ready, merge, close the Issue, declare V2.8
 complete or begin V2.9.
+
+## Startup failure diagnosis result — exact platform root cause
+
+### Device reproduction
+
+- Device: Samsung `SM-S938B`, Android `16`, API `36`,
+  `arm64-v8a`, owner user `0`.
+- Package: `com.faliardic.sefim.acceptance`,
+  `0.1.0-acceptance` / `1`.
+- Force-stop: acceptance process only, PASS.
+- Diagnosis launch: exactly `1`, PASS.
+- Foreground activity: exact acceptance `MainActivity`.
+- Owner-visible result retained without UI automation:
+  `Uygulama güvenli biçimde başlatılamadı.`
+
+### Exact error and first failing operation
+
+Observed native exception:
+
+`java.lang.ClassNotFoundException:
+io.flutter.plugins.GeneratedPluginRegistrant`
+
+Observed stack:
+
+1. `GeneratedPluginRegister.registerGeneratedPlugins`
+2. `FlutterActivity.configureFlutterEngine`
+3. `MainActivity.configureFlutterEngine(MainActivity.kt:27)`
+
+Static/build proof:
+
+- generated registrant files: `0`;
+- `.flutter-plugins-dependencies`: absent;
+- pinned path_provider/sqflite plugin packages: present.
+
+AppBootstrap order proves the first application operation requiring a plugin is
+`directoriesProvider()`, whose production implementation calls
+`getApplicationSupportDirectory()`. Plugin registration has already failed,
+so bootstrap exits through the generic `on Object` as
+`BootstrapFailure(code: startup_failed)` before database creation/open.
+
+Negative evidence in the bounded PID/package log window:
+
+- SQLiteLog/sqflite DatabaseException: `0`;
+- material migration/schema/foreign-key/trigger failure: `0`;
+- attendance/agenda/restore stage failure: `0`.
+
+Classification: **F — Android/plugin/platform**.
+
+### Correction decision
+
+No correction was applied. The defect is not schema-18 Material Request SQL or
+current #485 bootstrap wiring; resolving missing generated plugin registration
+requires a generated metadata/build-pipeline action outside the currently
+authorized product paths. Per authority, diagnosis stopped fail-closed.
+
+No source edit, analyzer, Flutter test, fresh build, reinstall, clear, uninstall
+or production/debug/Secure Folder mutation was performed.
+
+### execution_record
+
+~~~yaml
+policy_version: CSE-MRP-1.0
+task_risk: R4
+requested_model: gpt-5.6-sol
+requested_reasoning_effort: max
+actual_model: unknown
+actual_reasoning_effort: null
+invocation_verification_status: unverified
+verification_mode: owner_led_manual_testing
+diagnosis_status: PASS
+root_cause_class: F_android_plugin_platform
+exact_exception: java.lang.ClassNotFoundException_io.flutter.plugins.GeneratedPluginRegistrant
+first_failing_bootstrap_stage: directoriesProvider_getApplicationSupportDirectory
+database_open_reached: false
+schema18_migration_reached: false
+same_scope_correction_applied: false
+fresh_build_run: false
+reinstall_run: false
+mt_485_020: FAIL
+mt_485_001_019: unchanged
+ready: false
+merge: false
+issue_close: false
+v2_8_complete: false
+~~~
+
+### review_recommendation
+
+Request a narrow owner authority for deterministic offline Flutter plugin
+metadata preparation and a fresh acceptance build. Preserve source unless that
+preparation still fails to generate `GeneratedPluginRegistrant`. Do not
+change schema, backup, version, product behavior, permissions or dependencies,
+and do not reinstall the current broken artifact.
+## Plugin registrant recovery — PASS / normal Home reached
+
+Authority: Issue #485 comment `5414057108`.
+
+### Recovery and artifact
+
+- Product source correction: none. Initial head
+  `fe9fc26c6f0aff250d9ccd93e15c17ad49d36ff0`; staged `0`.
+- Pubspec SHA-256
+  `704EE4A64B534D14264984F68B8275570B8F87C06190EE48340830D971EABFA7`
+  and lock SHA-256
+  `2B75E59A051A8CFCFEC3D6883B04779205C63678B0F4814A4535E50DB77DC441`
+  were byte-identical before/after recovery; tracked dependency drift `0`.
+- Authorized generated roots were inside the worktree; read-only entries `0`.
+  A preliminary PATH lookup failed before Flutter launched. Pinned SDK single
+  real clean: exit `0`. Exactly one offline pub get: exit `0`; no network fetch.
+- `.flutter-plugins-dependencies` and
+  `mobile/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java`
+  exist. Required plugin result `6/6 PASS`: FilePicker, local notifications,
+  image picker, permission handler, share plus and sqflite.
+- `python scripts/prepare_flutter_release_registrant.py`: exit `0`, PASS.
+- Exactly one fresh build: exit `0`, PASS.
+- APK: `mobile/build/app/outputs/flutter-apk/app-debug.apk`; `96992107` bytes;
+  SHA-256 `4E9514C7224DDD7C7B6EB81A93EF1F5189FE713A14905FD5C4576B3939589D4F`;
+  written `2026-08-25T17:22:50.0030358Z` UTC.
+- Contract PASS: `com.faliardic.sefim.acceptance`, `Şefim`,
+  `0.1.0-acceptance` / `1`, exact MainActivity, arm64 native libraries.
+  Android SDK Dex inspection found exact class
+  `io.flutter.plugins.GeneratedPluginRegistrant` and `registerWith`.
+
+### Device bootstrap
+
+- Preflight PASS: one physical Samsung `SM-S938B`, Android 16/API 36, serial
+  `R5CY21WKZFX`, user 0, `arm64-v8a`; emulator/offline/unauthorized `0`.
+- User-150 read-only inventory attempt was denied by Android `SecurityException`;
+  no mutation. Production/debug packages were untouched.
+- Exactly one user-0 `-r` install: `Success`.
+- Exactly one MainActivity launch: `Status: ok`; foreground exact acceptance.
+- Read-only hierarchy showed normal MobileShell/Home: `Başlangıç`,
+  `Saha hafızanız cihazınızda.`, `7 Günlük Plan`, `Günlük Log`, and
+  `İstenecek Malzemeler`. Prior safe-start failure surface was absent.
+- Bootstrap result: **PASS — normal Home reached**. Failure logcat was not needed.
+- `MT-485-020`: `PENDING` pending explicit owner visual confirmation; no manual
+  PASS was inferred.
+
+### execution_record
+
+~~~yaml
+policy_version: CSE-MRP-1.0
+task_risk: R4
+requested_model: gpt-5.6-sol
+requested_reasoning_effort: max
+actual_model: unknown
+actual_reasoning_effort: null
+invocation_verification_status: unverified
+verification_mode: owner_led_manual_testing
+recovery_class: android_plugin_generated_metadata
+product_source_edit_applied: false
+flutter_clean_real_invocations: 1
+offline_pub_get_invocations: 1
+pubspec_lock_drift: 0
+registrant_plugins: 6/6_PASS
+helper: PASS
+fresh_build_invocations: 1
+fresh_apk_sha256: 4E9514C7224DDD7C7B6EB81A93EF1F5189FE713A14905FD5C4576B3939589D4F
+device_install_invocations: 1
+device_launch_invocations: 1
+bootstrap_home: PASS
+mt_485_020: PENDING
+ready: false
+merge: false
+issue_close: false
+v2_8_complete: false
+v2_9: not_started
+~~~
+
+### review_recommendation
+
+Keep PR #486 Draft. Owner should visually confirm normal Home and report
+`MT-485-020 PASS` if satisfied. Generated metadata/registrant/APK remain ignored.
