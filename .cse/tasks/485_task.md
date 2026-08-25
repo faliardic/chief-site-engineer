@@ -291,3 +291,75 @@ All entries are `PENDING` and will be registered in Issue #479:
 - Source publication is authorized. The acceptance-only APK build and user-0
   install/launch remain the next owner-authorized stages after commit/push.
 - `MT-485-001..019` remain `PENDING`.
+
+## Acceptance debug arm64 primary build — FAIL / fail-closed
+
+- Source correction was committed as
+  `bf5120989193a315da100d32cefd50451d6d4d74`, normally pushed, and published
+  to Draft PR #486 / Issue #485 evidence.
+- One primary build invocation ran with
+  `CSE_ACCEPTANCE_HARNESS=true`, debug, `--no-pub`,
+  `--target-platform android-arm64`, Gradle worker `1`, parallel disabled,
+  and persistent daemon disabled through invocation-local options.
+- Build result: FAIL, exit `1`, task `:app:compileDebugJavaWithJavac`.
+- Exact compiler failure:
+  `CseReminderBootReceiver.java:25: cannot find symbol
+  ScheduledNotificationBootReceiver`.
+- Read-only diagnosis found the public class in the pinned
+  `flutter_local_notifications 22.1.0` plugin source, while the app-module
+  compilation did not resolve it on its compile surface.
+- This is a tracked source/dependency compile integration blocker, not a
+  worktree-local stale/read-only generated-state failure in the two
+  cleanup-authorized roots. No cleanup or build retry was performed.
+- Fresh expected output
+  `mobile/build/app/outputs/flutter-apk/app-debug.apk` does not exist.
+- Device preflight, package inventory, install, launch and diagnostics were not
+  opened. Production, normal debug, acceptance and Secure Folder packages were
+  untouched.
+- No Flutter tests, integration tests or scripted acceptance ran.
+- Fail-closed stop: no APK identity/hash is available and no device handoff is
+  permitted from this build result.
+
+## Android receiver reflection correction and fresh acceptance build — PASS
+
+Authority: Issue #485 owner comment `5413546078`.
+
+- Resume point preserved published head
+  `bf5120989193a315da100d32cefd50451d6d4d74`, existing two append-only
+  evidence paths, staged `0`, and all prior source-correction bytes.
+- Allowlist expanded only by the authorized receiver Java source and its
+  platform static-contract test; total PR path set is exact `14/14`.
+- Receiver now loads exact runtime class
+  `com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver`
+  with `Class.forName`, constrains it with
+  `asSubclass(BroadcastReceiver.class)`, performs no-arg reflective
+  construction, and delegates `onReceive(context, intent)`.
+- Audit state becomes `completed` only after normal delegation return.
+  `ReflectiveOperationException` or `RuntimeException` records `failed`.
+- Supported boot filters, `cse_reminder_boot_audit`, `at_utc`, privacy-safe
+  fields, and the direct-reschedule prohibition are preserved.
+- Static contract now asserts exact runtime class, subclass constraint, no-arg
+  construction and delegation; existing audit/no-title/no-body/no-direct-
+  reschedule assertions remain.
+- Touched Dart test formatting: PASS, `1 file / 1 changed`.
+- Flutter tests and full analyzer were not run. Prior analyzer PASS evidence
+  remains current for unchanged Dart production source.
+- Source/static gates: `git diff --check` PASS, exact `14/14`, unexpected
+  drift `0`, only authorized Android Java platform drift, manifest/Gradle
+  drift `0`, schema `18`, backup `1`, version `0.1.0+1`,
+  pubspec/lock drift `0`.
+- Single fresh acceptance debug arm64 build: PASS.
+- Artifact:
+  - path:
+    `mobile/build/app/outputs/flutter-apk/app-debug.apk`
+  - bytes: `93036159`
+  - SHA-256:
+    `F6CC0D8365F7FD62C618352FFC960A8C248244A9A3035EC3D62528FC84BD23C2`
+  - package: `com.faliardic.sefim.acceptance`
+  - label: `Şefim`
+  - versionName/versionCode: `0.1.0-acceptance` / `1`
+  - launchable activity:
+    `com.faliardic.chiefsiteengineer.MainActivity`
+  - ABI: exact `arm64-v8a`
+- Device preflight/install/launch remain unopened until this correction is
+  committed and pushed.

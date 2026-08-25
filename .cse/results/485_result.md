@@ -313,3 +313,156 @@ merge: false
 Create and push the single correction commit, update Draft PR #486 and Issue
 #485 evidence, then proceed only with the owner-authorized acceptance debug
 arm64 APK build and user-0 install/launch handoff. Keep the PR Draft.
+
+## Owner-requested acceptance artifact result — FAIL / no artifact
+
+### Published source state
+
+- Correction commit:
+  `bf5120989193a315da100d32cefd50451d6d4d74`
+- Normal push: PASS.
+- Draft PR #486: open and Draft.
+- Source analyzer and all source publication gates: PASS.
+
+### Primary build evidence
+
+Invocation contract:
+
+- acceptance harness: enabled
+- build type: debug
+- target ABI: android-arm64
+- dependency resolution: `--no-pub`
+- Gradle workers: `1`
+- parallel build: disabled
+- persistent daemon: disabled through invocation-local options
+
+Result:
+
+- Gradle task: `:app:compileDebugJavaWithJavac`
+- exit code: `1`
+- failure source:
+  `mobile/android/app/src/main/java/com/dexterous/flutterlocalnotifications/CseReminderBootReceiver.java:25`
+- diagnostic:
+  `cannot find symbol: class ScheduledNotificationBootReceiver`
+- pinned plugin: `flutter_local_notifications 22.1.0`
+- read-only plugin-source proof: the referenced public class exists in the
+  pinned plugin source, but was not resolved by the app-module compile surface.
+- generated-state classification: not an authorized stale/read-only
+  `mobile/build/` or `mobile/ios/Flutter/ephemeral/` blocker.
+- cleanup used: none.
+- build retry used: none.
+- fresh APK: absent.
+- APK path/size/SHA/package/label/version/activity/ABI: unavailable.
+
+### Device safety result
+
+Device preflight and ADB were not opened because the host build gate failed.
+No install, uninstall, clear, launch, package inventory or user-data access
+occurred. Production package, normal debug package, acceptance package and
+Secure Folder user 150 were untouched.
+
+### execution_record
+
+~~~yaml
+policy_version: CSE-MRP-1.0
+task_risk: R4
+requested_model: gpt-5.6-sol
+requested_reasoning_effort: max
+actual_model: unknown
+actual_reasoning_effort: null
+invocation_verification_status: unverified
+execution_mode: standard
+orchestration: single-agent
+verification_mode: owner_led_manual_testing
+phone_connection_required: true
+artifact_mode: acceptance_debug_arm64
+source_gate_status: PASS
+source_commit: bf5120989193a315da100d32cefd50451d6d4d74
+primary_build_invocations: 1
+primary_build_status: FAIL
+build_retry_authorized_for_failure: false
+fresh_artifact_available: false
+device_preflight_run: false
+install_run: false
+launch_run: false
+manual_test_status: PENDING
+manual_test_ids: MT-485-001..019
+ready: false
+merge: false
+~~~
+
+### review_recommendation
+
+Keep Draft PR #486 at the published source correction. Request a narrow owner
+correction authority for the Android notification receiver compile integration
+blocker before any new build. Do not use generated-state cleanup or retry this
+build, and do not enter device install/launch without a fresh verified
+acceptance APK.
+
+## Android receiver linkage correction and artifact verification — PASS
+
+### Source/static correction
+
+- Exact reflection delegation contract: PASS.
+- Obsolete compile-time constructor reference: absent.
+- Direct
+  `FlutterLocalNotificationsPlugin.rescheduleNotifications` call: absent.
+- Static source contract updated within the newly authorized test path.
+- Existing task/result evidence prefix preserved append-only.
+- Exact total allowlist: `14/14`; unexpected/protected drift: `0`.
+- Manifest, Gradle, dependency, pubspec/lock and unauthorized platform edits:
+  `0`.
+- Schema: `18`; backup format: `1`; version: `0.1.0+1`.
+- `git diff --check`: PASS.
+- Flutter tests and analyzer invocations in this authority: `0`.
+
+### Fresh acceptance artifact
+
+- Build invocation count: `1`.
+- Build status: PASS.
+- Build mode: acceptance debug, android-arm64, `--no-pub`.
+- APK:
+  `V:\1_PROJECTS\2_ACTIVE\Python\CSE-Worktrees\issue-485-material-requests-v1\mobile\build\app\outputs\flutter-apk\app-debug.apk`
+- Size: `93036159` bytes.
+- SHA-256:
+  `F6CC0D8365F7FD62C618352FFC960A8C248244A9A3035EC3D62528FC84BD23C2`.
+- Package: `com.faliardic.sefim.acceptance`.
+- Label: `Şefim`.
+- versionName/versionCode: `0.1.0-acceptance` / `1`.
+- Launchable activity:
+  `com.faliardic.chiefsiteengineer.MainActivity`.
+- Native ABI: exact `arm64-v8a`.
+
+### execution_record
+
+~~~yaml
+policy_version: CSE-MRP-1.0
+task_risk: R4
+requested_model: gpt-5.6-sol
+requested_reasoning_effort: max
+actual_model: unknown
+actual_reasoning_effort: null
+invocation_verification_status: unverified
+execution_mode: standard
+orchestration: single-agent
+verification_mode: owner_led_manual_testing
+source_static_gate_status: PASS
+flutter_tests_run: false
+analyzer_rerun: false
+fresh_build_invocations: 1
+fresh_build_status: PASS
+artifact_package: com.faliardic.sefim.acceptance
+artifact_sha256: F6CC0D8365F7FD62C618352FFC960A8C248244A9A3035EC3D62528FC84BD23C2
+artifact_bytes: 93036159
+device_stage_status: PENDING
+manual_test_status: PENDING
+manual_test_ids: MT-485-001..019
+ready: false
+merge: false
+~~~
+
+### review_recommendation
+
+Commit and normally push this four-path local correction/evidence set, update
+Issue #485 and Draft PR #486, then use only the verified APK above for the
+authorized user-0 device preflight/install/launch handoff.

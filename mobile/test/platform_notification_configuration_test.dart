@@ -37,9 +37,13 @@ void main() {
       expect(
         receiver,
         contains(
-          'new ScheduledNotificationBootReceiver().onReceive(context, intent)',
+          'com.dexterous.flutterlocalnotifications.'
+          'ScheduledNotificationBootReceiver',
         ),
       );
+      expect(receiver, contains('.asSubclass(BroadcastReceiver.class)'));
+      expect(receiver, contains('.getDeclaredConstructor().newInstance()'));
+      expect(receiver, contains('receiver.onReceive(context, intent)'));
       expect(
         receiver,
         isNot(

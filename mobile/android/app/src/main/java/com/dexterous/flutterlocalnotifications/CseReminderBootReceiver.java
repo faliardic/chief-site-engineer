@@ -13,6 +13,8 @@ import java.time.Instant;
 @Keep
 public final class CseReminderBootReceiver extends BroadcastReceiver {
   private static final String PREFS = "cse_reminder_boot_audit";
+  private static final String SCHEDULED_BOOT_RECEIVER_CLASS =
+      "com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver";
 
   @Override
   public void onReceive(Context context, Intent intent) {
@@ -20,10 +22,16 @@ public final class CseReminderBootReceiver extends BroadcastReceiver {
     if (!isSupported(action)) {
       return;
     }
-    String state = "completed";
+    String state;
     try {
-      new ScheduledNotificationBootReceiver().onReceive(context, intent);
-    } catch (RuntimeException error) {
+      Class<? extends BroadcastReceiver> receiverClass =
+          Class.forName(SCHEDULED_BOOT_RECEIVER_CLASS)
+              .asSubclass(BroadcastReceiver.class);
+      BroadcastReceiver receiver =
+          receiverClass.getDeclaredConstructor().newInstance();
+      receiver.onReceive(context, intent);
+      state = "completed";
+    } catch (ReflectiveOperationException | RuntimeException error) {
       state = "failed";
     }
     SharedPreferences preferences =
