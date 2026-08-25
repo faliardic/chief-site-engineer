@@ -507,3 +507,28 @@ Authority: Issue #485 comment `5414057108`.
   panel was present.
 - `MT-485-020` returned to `PENDING` for owner visual confirmation; automated
   bootstrap observation was not recorded as manual `PASS`.
+
+## Final test-source truth-sync — source gates PASS
+
+Authority: Issue #485 comment `5414655592`.
+
+- Starting head `a834fb0f62e0e3345bed4572b01a0e16d77ce5d0`; worktree and
+  staged state clean.
+- Exact corrections only:
+  - `mobile/test/platform_notification_configuration_test.dart`: stale
+    `schemaVersion = 17` source expectation updated to `18`;
+  - `mobile/test/app_database_test.dart`: current migration-history expectation
+    appended exact version `18` / `2026-07-19T08:00:00Z` entry.
+- Dart format ran only on the two touched test files. Final semantic diff is one
+  literal replacement plus one expected-list entry; product source edit `0`.
+- Current PR allowlist is the existing 14 paths plus newly authorized
+  `mobile/test/app_database_test.dart`: exact `15/15`; unexpected paths `0`.
+- `git diff --check`: PASS; schema `18`; backup format `1`; app version
+  `0.1.0+1`; pubspec/lock drift `0`; production platform drift `0`.
+- Per authority, Flutter tests, analyzer, build, ADB/device and install/launch
+  were not run. Prior valid analyzer evidence remains source-current for product
+  source; this test-source sync does not claim automated application verification.
+- Recovery APK was not rebuilt/reinstalled. Its SHA-256 remains
+  `4E9514C7224DDD7C7B6EB81A93EF1F5189FE713A14905FD5C4576B3939589D4F`.
+- Owner manual result: `MT-485-020 = PASS`; `MT-485-001..019` retain their
+  existing statuses. Overall manual test status: `PARTIAL`.

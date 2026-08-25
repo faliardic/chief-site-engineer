@@ -833,3 +833,67 @@ v2_9: not_started
 
 Keep PR #486 Draft. Owner should visually confirm normal Home and report
 `MT-485-020 PASS` if satisfied. Generated metadata/registrant/APK remain ignored.
+
+## Final test-source truth-sync — PASS
+
+Authority: Issue #485 comment `5414655592`.
+
+### Exact correction
+
+- `mobile/test/platform_notification_configuration_test.dart`: only
+  `static const schemaVersion = 17` expectation changed to exact `18`.
+- `mobile/test/app_database_test.dart`: only current migration-history expected
+  list gained `{'version': 18, 'applied_at': '2026-07-19T08:00:00Z'},`.
+- Touched Dart format completed. Exact diff review confirmed no test refactor and
+  no product-source change.
+
+### Source-level gates
+
+- Authorized PR changed paths: exact `15/15`; unexpected paths `0`.
+- `git diff --check`: PASS.
+- Schema source: `18`; backup format: `1`; version: `0.1.0+1`.
+- Pubspec/lock drift: `0`; production platform drift: `0`.
+- Flutter tests, analyzer, build, ADB/device, install and launch were not run, as
+  required. Prior product-source analyzer PASS remains the recorded valid gate.
+- Recovery APK was not rebuilt or reinstalled; SHA-256 remains
+  `4E9514C7224DDD7C7B6EB81A93EF1F5189FE713A14905FD5C4576B3939589D4F`.
+- Owner manual result `MT-485-020 = PASS`; `MT-485-001..019` retain their
+  existing statuses. Overall manual test status: `PARTIAL`.
+
+### execution_record
+
+~~~yaml
+policy_version: CSE-MRP-1.0
+task_risk: R4
+requested_model: gpt-5.6-sol
+requested_reasoning_effort: max
+actual_model: unknown
+actual_reasoning_effort: null
+invocation_verification_status: unverified
+verification_mode: owner_led_manual_testing
+correction_class: test_source_truth_sync
+product_source_changed: false
+changed_path_count_expected: 15
+source_gates: PASS
+flutter_tests_run: false
+analyzer_rerun: false
+build_run: false
+device_run: false
+recovery_apk_sha256: 4E9514C7224DDD7C7B6EB81A93EF1F5189FE713A14905FD5C4576B3939589D4F
+mt_485_020: PASS
+manual_test_status: PARTIAL
+verified_claim: false
+field_accepted_claim: false
+production_ready_claim: false
+release_ready_claim: false
+ready: false
+merge: false
+issue_close: false
+v2_8_complete: false
+v2_9: not_started
+~~~
+
+### review_recommendation
+
+Keep PR #486 Draft and request independent final source/diff review. Do not infer
+full manual verification or release readiness from MT-485-020 alone.
