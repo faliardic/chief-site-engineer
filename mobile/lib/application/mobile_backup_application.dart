@@ -126,7 +126,18 @@ class CseBackupCodec {
       nonce: nonce,
       aad: aad,
     );
-    return Uint8List.fromList([...aad, ...box.cipherText, ...box.mac.bytes]);
+    final cipherText = box.cipherText;
+    final macBytes = box.mac.bytes;
+    final packageBytes = Uint8List(
+      aad.length + cipherText.length + macBytes.length,
+    );
+    var offset = 0;
+    packageBytes.setRange(offset, offset + aad.length, aad);
+    offset += aad.length;
+    packageBytes.setRange(offset, offset + cipherText.length, cipherText);
+    offset += cipherText.length;
+    packageBytes.setRange(offset, offset + macBytes.length, macBytes);
+    return packageBytes;
   }
 
   Future<Uint8List> decrypt(List<int> packageBytes, String password) async {
