@@ -215,6 +215,21 @@ class MobileBackupSummary {
   }
 }
 
+class MobileSafetyBackupMetadata {
+  const MobileSafetyBackupMetadata({
+    required this.fileName,
+    required this.byteSize,
+    required this.sha256,
+    required this.createdAtUtc,
+  });
+
+  /// Basename-only stable identity; never an absolute or relative private path.
+  final String fileName;
+  final int byteSize;
+  final String sha256;
+  final DateTime createdAtUtc;
+}
+
 class MobileBackupCreationResult {
   const MobileBackupCreationResult({
     required this.absolutePath,
