@@ -4260,6 +4260,35 @@
   `tag_source_unavailable` normal durumdur. Suggestion persistence, schema,
   event/history, notification, backup, platform veya dependency contractı
   eklenmez.
-- Schema `18`, backup format `1` ve version `0.1.0+1` değişmez. Durum
-  `IMPLEMENTED — MANUAL TEST PENDING` ile sınırlıdır; Issue #490 / candidate PR
-  merged, Ready veya V2.9 complete sayılmaz.
+- Schema `18`, backup format `1` ve version `0.1.0+1` değişmez. Issue
+  #490 / PR #491 merged Slice'tır; manual testleri pending kalır ve V2.9
+  complete sayılmaz.
+
+## Issue 492 — Manuel telefon görüşmesi sonucu canonical Ajanda kaydıdır
+
+- Kullanıcının Home'dan açıkça başlattığı `Görüşme sonucu` kaydı
+  `meeting_decision` kategorili canonical Agenda observation'dır. Olay zamanı
+  carrier çağrı zamanı değil, application boundary'de bir kez okunan canonical
+  UTC save zamanıdır.
+- Candidate schema `19` yalnız additive
+  `agenda_phone_call_contexts` tablosunu ekler. Existing schema 1–18 tabloları
+  rebuild/rename edilmez ve mevcut kullanıcı satırları yeniden yazılmaz.
+- Agenda row, `created` observation event ve varsa immutable görüşme tarafı
+  context'i shared mobile operation coordinator altında exact bir SQLite
+  transaction içinde atomik yazılır. Context/event insert failure bütün
+  source write'ı rollback eder; ID collision farklı intent ile fail-closed'dur.
+- Canonical kişi veya firma yalnız exact seçili projenin aktif Saha Rehberi
+  source'u olarak stable ID ve exact display snapshot taşır. Historical öneri
+  veya canonical seçimden sonra manuel değiştirilen metin `free_text` olur;
+  stale, archived veya cross-project canonical source sessizce downgrade
+  edilmez.
+- Mahal yalnız exact projenin aktif stable location kaydıdır. Suggestion read
+  failure serbest metin capture'ı engellemez; proje read failure save'i bloke
+  eder.
+- Hatırlatıcı, kayıt detayındaki mevcut ayrı kullanıcı işlemidir. Otomatik
+  Reminder/notification/call integration, çağrı geçmişi/rehber izni, call
+  duration/direction/phone/OS identity veya yeni platform capability eklenmez.
+- Backup format `1`, version `0.1.0+1` ve Android/iOS permission/platform
+  contractı değişmez. Durum `IMPLEMENTED — MANUAL TEST PENDING` ile
+  sınırlıdır; Issue #492 candidate branch merged, Ready veya V2.10 complete
+  sayılmaz.

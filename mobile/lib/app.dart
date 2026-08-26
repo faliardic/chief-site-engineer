@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
+import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
+import 'package:chief_site_engineer/features/agenda/phone_call_result_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_day_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_page.dart';
 import 'package:chief_site_engineer/features/attendance/workforce_directory_page.dart';
@@ -468,6 +470,41 @@ class _HomePageState extends State<_HomePage> {
             subtitle: Text(
               'Bulut eşitleme ve kullanıcı hesabı bu sürümde yoktur.',
             ),
+          ),
+        ),
+        Card(
+          child: ListTile(
+            key: const Key('open-phone-call-result'),
+            leading: const Icon(Icons.phone_in_talk_outlined),
+            title: const Text('Görüşme sonucu'),
+            subtitle: const Text(
+              'Telefon görüşmesinin sonucunu Ajanda’ya hızlıca kaydet.',
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () async {
+              final logId = await Navigator.of(context).push<String>(
+                MaterialPageRoute(
+                  builder: (_) => PhoneCallResultPage(
+                    agenda: widget.bootstrap.agenda,
+                    contextSuggestions: widget.bootstrap.contextSuggestions,
+                    projectLocations: widget.bootstrap.projectLocations,
+                  ),
+                ),
+              );
+              if (!context.mounted || logId == null) return;
+              await Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => LogDetailPage(
+                    agenda: widget.bootstrap.agenda,
+                    projectLocations: widget.bootstrap.projectLocations,
+                    attachments: widget.bootstrap.concreteAttachments,
+                    concrete: widget.bootstrap.concrete,
+                    concreteAttachments: widget.bootstrap.concreteAttachments,
+                    logId: logId,
+                  ),
+                ),
+              );
+            },
           ),
         ),
         Card(
