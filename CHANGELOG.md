@@ -1,5 +1,23 @@
 # Changelog
 
+## Issue #492 - Manual phone-call result to Agenda v1
+
+- Adds a Home quick capture for a user-entered phone-call result with required
+  exact project and result, optional exact-project location, optional party
+  snapshot and optional note.
+- Additive schema `19` stores immutable phone-call party context. Canonical
+  active person/company sources retain exact project-scoped stable identity;
+  historical or manually edited values remain explicit free text.
+- Agenda source row, create event and optional context are written atomically
+  in one SQLite transaction. Context/source failures and identity collisions
+  fail closed without partial Agenda persistence.
+- Reuses the read-only deterministic suggestion boundary without phone,
+  contacts or call-log access. Reminder creation remains a separate explicit
+  Agenda-detail action; no automatic notification or call integration exists.
+- Backup format `1` and version `0.1.0+1` remain unchanged. Automated
+  application/build/device tests are disabled by owner authority; status is
+  `IMPLEMENTED — MANUAL TEST PENDING`.
+
 ## Issue #490 - Deterministic person/company suggestions v1
 
 - Adds a reusable, read-only suggestion boundary over active people and

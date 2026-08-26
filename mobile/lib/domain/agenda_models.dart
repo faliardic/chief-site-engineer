@@ -297,6 +297,45 @@ class AgendaLog {
   String? get displayLocation => stableLocationName ?? location;
 }
 
+enum AgendaPhoneCallPartyKind {
+  person('person', 'Kişi'),
+  company('company', 'Firma'),
+  freeText('free_text', 'Serbest metin');
+
+  const AgendaPhoneCallPartyKind(this.storageValue, this.label);
+
+  final String storageValue;
+  final String label;
+
+  static AgendaPhoneCallPartyKind fromStorage(String value) =>
+      values.firstWhere(
+        (item) => item.storageValue == value,
+        orElse: () => throw const AgendaValidationFailure(
+          'Görüşme tarafı türü desteklenmiyor.',
+        ),
+      );
+}
+
+class AgendaPhoneCallContext {
+  const AgendaPhoneCallContext({
+    required this.agendaLogId,
+    required this.projectId,
+    required this.partyKind,
+    required this.partyDisplayText,
+    required this.createdAt,
+    this.workforceMemberId,
+    this.subcontractorId,
+  });
+
+  final String agendaLogId;
+  final String projectId;
+  final AgendaPhoneCallPartyKind partyKind;
+  final String? workforceMemberId;
+  final String? subcontractorId;
+  final String partyDisplayText;
+  final String createdAt;
+}
+
 enum AgendaArchiveFilter { active, archived }
 
 enum AgendaSortOrder {
@@ -617,6 +656,8 @@ class AgendaLogDetail {
     this.photos = const [],
     this.events = const [],
     this.managedConcretePourId,
+    this.phoneCallContext,
+    this.isPhoneCallResult = false,
   });
 
   final AgendaLog log;
@@ -625,6 +666,8 @@ class AgendaLogDetail {
   final List<AgendaLogPhoto> photos;
   final List<AppendOnlyEvent> events;
   final String? managedConcretePourId;
+  final AgendaPhoneCallContext? phoneCallContext;
+  final bool isPhoneCallResult;
 }
 
 class AgendaPhotoDraft {
@@ -704,6 +747,32 @@ class CreateAgendaLogCommand {
   final String? locationId;
   final String? notes;
   final List<AgendaPhotoDraft> photos;
+}
+
+class CreatePhoneCallAgendaLogCommand {
+  const CreatePhoneCallAgendaLogCommand({
+    required this.id,
+    required this.eventId,
+    required this.projectId,
+    required this.result,
+    this.location,
+    this.locationId,
+    this.notes,
+    this.partyKind,
+    this.partySourceId,
+    this.partyDisplayText,
+  });
+
+  final String id;
+  final String eventId;
+  final String projectId;
+  final String result;
+  final String? location;
+  final String? locationId;
+  final String? notes;
+  final AgendaPhoneCallPartyKind? partyKind;
+  final String? partySourceId;
+  final String? partyDisplayText;
 }
 
 class UpdateAgendaLogCommand {

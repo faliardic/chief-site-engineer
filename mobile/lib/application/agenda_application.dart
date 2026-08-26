@@ -177,6 +177,12 @@ abstract interface class AgendaPhotoBatchApplication {
   Future<AgendaLogDetail> attachAgendaPhotos(AttachAgendaPhotosCommand command);
 }
 
+abstract interface class AgendaPhoneCallCaptureApplication {
+  Future<AgendaLog> createPhoneCallAgendaLog(
+    CreatePhoneCallAgendaLogCommand command,
+  );
+}
+
 abstract interface class AgendaPhotoExportApplication {
   Future<bool> saveAgendaPhoto(String photoId);
 
@@ -270,6 +276,7 @@ class SqliteAgendaApplication
     implements
         AgendaApplication,
         AgendaPhotoBatchApplication,
+        AgendaPhoneCallCaptureApplication,
         AgendaPhotoExportApplication,
         ProjectLifecycleApplication,
         ProjectLocationApplication,
@@ -1026,49 +1033,19 @@ class SqliteAgendaApplication
       }
       return await _withDatabase(now, (database) {
         return database.transaction((transaction) async {
-          final projects = await transaction.query(
-            'projects',
-            where: 'id = ? AND archived_at IS NULL',
-            whereArgs: [command.projectId],
-            limit: 1,
+          final log = await _insertAgendaLogBase(
+            transaction,
+            id: command.id,
+            eventId: command.eventId,
+            projectId: command.projectId,
+            observedAt: command.observedAt,
+            createdAt: createdAt,
+            category: command.category,
+            description: description,
+            location: location,
+            locationId: locationId,
+            notes: notes,
           );
-          if (projects.isEmpty) {
-            throw const AgendaValidationFailure('Seçilen proje bulunamadı.');
-          }
-          final project = _projectFromRow(projects.single);
-          final stableLocation = locationId == null
-              ? null
-              : await _requireActiveAgendaLocation(
-                  transaction,
-                  projectId: command.projectId,
-                  locationId: locationId,
-                );
-          final storedLocation = stableLocation?.displayName ?? location;
-          await transaction.insert('field_observations', {
-            'id': command.id,
-            'project_id': command.projectId,
-            'observed_at': command.observedAt,
-            'created_at': createdAt,
-            'updated_at': createdAt,
-            'category': command.category.storageValue,
-            'description': description,
-            'location': storedLocation,
-            'location_id': locationId,
-            'notes': notes,
-            'revision': 1,
-          });
-          await transaction.insert('observation_events', {
-            'id': command.eventId,
-            'observation_id': command.id,
-            'project_id': command.projectId,
-            'event_type': 'created',
-            'occurred_at': createdAt,
-            'payload_json': jsonEncode({
-              'category': command.category.storageValue,
-              'description': description,
-              'observed_at': command.observedAt,
-            }),
-          });
           for (final item in staged) {
             final photo = item.$1;
             final file = item.$2;
@@ -1106,23 +1083,7 @@ class SqliteAgendaApplication
               }),
             });
           }
-          return AgendaLog(
-            id: command.id,
-            projectId: command.projectId,
-            projectName: project.name,
-            observedAt: command.observedAt,
-            createdAt: createdAt,
-            updatedAt: createdAt,
-            category: command.category,
-            description: description,
-            location: storedLocation,
-            notes: notes,
-            revision: 1,
-            locationId: locationId,
-            stableLocationName: stableLocation?.displayName,
-            stableLocationArchivedAt: stableLocation?.archivedAt,
-            archivedAt: null,
-          );
+          return log;
         });
       });
     } on Object {
@@ -1136,6 +1097,104 @@ class SqliteAgendaApplication
       }
       rethrow;
     }
+  }
+
+  @override
+  Future<AgendaLog> createPhoneCallAgendaLog(
+    CreatePhoneCallAgendaLogCommand command,
+  ) async {
+    validateUuid(command.id, 'Log kimliği');
+    validateUuid(command.eventId, 'Event kimliği');
+    validateUuid(command.projectId, 'Proje kimliği');
+    final locationId = command.locationId;
+    if (locationId != null) validateUuid(locationId, 'Mahal kimliği');
+    final description = requiredTrimmed(
+      command.result,
+      'Görüşme sonucu',
+      maxLength: 500,
+    );
+    final location = optionalTrimmed(command.location, 'Mahal', maxLength: 200);
+    final notes = optionalTrimmed(command.notes, 'Ayrıntılı not');
+    final party = _phoneCallPartyDraft(command);
+    final now = _readClockOnce();
+    final createdAt = CseTimeCodec.encodeUtc(now);
+    return _withDatabase(now, (database) {
+      return database.transaction((transaction) async {
+        final existingRows = await transaction.query(
+          'field_observations',
+          columns: ['id'],
+          where: 'id = ?',
+          whereArgs: [command.id],
+          limit: 1,
+        );
+        if (existingRows.isNotEmpty) {
+          final existing = await _requireAgendaLog(transaction, command.id);
+          final context = await _loadPhoneCallContext(transaction, command.id);
+          final createEvents = await transaction.query(
+            'observation_events',
+            columns: ['id', 'payload_json'],
+            where:
+                'id = ? AND observation_id = ? AND project_id = ? '
+                "AND event_type = 'created'",
+            whereArgs: [command.eventId, command.id, command.projectId],
+            limit: 1,
+          );
+          if (!_samePhoneCallCreate(
+            existing,
+            context,
+            command,
+            description,
+            location,
+            notes,
+            party,
+            hasCreateEvent:
+                createEvents.isNotEmpty &&
+                _isPhoneCallCreateEvent(createEvents.single),
+          )) {
+            throw const AgendaValidationFailure(
+              'Görüşme sonucu kimliği başka bir içerikle kullanılıyor.',
+            );
+          }
+          return existing;
+        }
+
+        final context = party == null
+            ? null
+            : await _resolvePhoneCallContext(
+                transaction,
+                agendaLogId: command.id,
+                projectId: command.projectId,
+                party: party,
+                createdAt: createdAt,
+              );
+        final log = await _insertAgendaLogBase(
+          transaction,
+          id: command.id,
+          eventId: command.eventId,
+          projectId: command.projectId,
+          observedAt: createdAt,
+          createdAt: createdAt,
+          category: AgendaCategory.meetingDecision,
+          description: description,
+          location: location,
+          locationId: locationId,
+          notes: notes,
+          eventPayloadExtras: const {'capture_source': 'phone_call_result'},
+        );
+        if (context != null) {
+          await transaction.insert('agenda_phone_call_contexts', {
+            'agenda_log_id': context.agendaLogId,
+            'project_id': context.projectId,
+            'party_kind': context.partyKind.storageValue,
+            'workforce_member_id': context.workforceMemberId,
+            'subcontractor_id': context.subcontractorId,
+            'party_display_text': context.partyDisplayText,
+            'created_at': context.createdAt,
+          });
+        }
+        return log;
+      });
+    });
   }
 
   @override
@@ -1175,6 +1234,18 @@ class SqliteAgendaApplication
         if (current.revision != command.expectedRevision) {
           throw const AgendaValidationFailure(
             'Ajanda kaydı başka bir işlemde değişti; yeniden açın.',
+          );
+        }
+        final createEvents = await transaction.query(
+          'observation_events',
+          columns: ['payload_json'],
+          where: "observation_id = ? AND event_type = 'created'",
+          whereArgs: [current.id],
+        );
+        if (command.category != AgendaCategory.meetingDecision &&
+            createEvents.any(_isPhoneCallCreateEvent)) {
+          throw const AgendaValidationFailure(
+            'Görüşme sonucu kategorisi değiştirilemez.',
           );
         }
         final priorEvent = await transaction.query(
@@ -3888,6 +3959,215 @@ class SqliteAgendaApplication
     );
   }
 
+  Future<AgendaLog> _insertAgendaLogBase(
+    Transaction transaction, {
+    required String id,
+    required String eventId,
+    required String projectId,
+    required String observedAt,
+    required String createdAt,
+    required AgendaCategory category,
+    required String description,
+    required String? location,
+    required String? locationId,
+    required String? notes,
+    Map<String, Object?> eventPayloadExtras = const {},
+  }) async {
+    final projects = await transaction.query(
+      'projects',
+      where: 'id = ? AND archived_at IS NULL',
+      whereArgs: [projectId],
+      limit: 1,
+    );
+    if (projects.isEmpty) {
+      throw const AgendaValidationFailure('Seçilen proje bulunamadı.');
+    }
+    final project = _projectFromRow(projects.single);
+    final stableLocation = locationId == null
+        ? null
+        : await _requireActiveAgendaLocation(
+            transaction,
+            projectId: projectId,
+            locationId: locationId,
+          );
+    final storedLocation = stableLocation?.displayName ?? location;
+    await transaction.insert('field_observations', {
+      'id': id,
+      'project_id': projectId,
+      'observed_at': observedAt,
+      'created_at': createdAt,
+      'updated_at': createdAt,
+      'category': category.storageValue,
+      'description': description,
+      'location': storedLocation,
+      'location_id': locationId,
+      'notes': notes,
+      'revision': 1,
+    });
+    await transaction.insert('observation_events', {
+      'id': eventId,
+      'observation_id': id,
+      'project_id': projectId,
+      'event_type': 'created',
+      'occurred_at': createdAt,
+      'payload_json': jsonEncode({
+        'category': category.storageValue,
+        'description': description,
+        'observed_at': observedAt,
+        ...eventPayloadExtras,
+      }),
+    });
+    return AgendaLog(
+      id: id,
+      projectId: projectId,
+      projectName: project.name,
+      observedAt: observedAt,
+      createdAt: createdAt,
+      updatedAt: createdAt,
+      category: category,
+      description: description,
+      location: storedLocation,
+      notes: notes,
+      revision: 1,
+      locationId: locationId,
+      stableLocationName: stableLocation?.displayName,
+      stableLocationArchivedAt: stableLocation?.archivedAt,
+      archivedAt: null,
+    );
+  }
+
+  Future<AgendaPhoneCallContext?> _loadPhoneCallContext(
+    DatabaseExecutor database,
+    String logId,
+  ) async {
+    final rows = await database.query(
+      'agenda_phone_call_contexts',
+      where: 'agenda_log_id = ?',
+      whereArgs: [logId],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : _phoneCallContextFromRow(rows.single);
+  }
+
+  Future<AgendaPhoneCallContext> _resolvePhoneCallContext(
+    DatabaseExecutor database, {
+    required String agendaLogId,
+    required String projectId,
+    required _PhoneCallPartyDraft party,
+    required String createdAt,
+  }) async {
+    switch (party.kind) {
+      case AgendaPhoneCallPartyKind.person:
+        final rows = await database.query(
+          'workforce_members',
+          columns: ['id', 'project_id', 'full_name'],
+          where: 'id = ? AND project_id = ? AND is_active = 1',
+          whereArgs: [party.sourceId, projectId],
+          limit: 1,
+        );
+        if (rows.isEmpty) {
+          throw const AgendaValidationFailure(
+            'Seçilen kişi aktif ve aynı projeye ait olmalıdır.',
+          );
+        }
+        final display = requiredTrimmed(
+          rows.single['full_name']! as String,
+          'Görüşülen kişi',
+          maxLength: 200,
+        );
+        if (display != party.displayText) {
+          throw const AgendaValidationFailure(
+            'Seçilen kişi bilgisi değişti; tarafı yeniden seçin.',
+          );
+        }
+        return AgendaPhoneCallContext(
+          agendaLogId: agendaLogId,
+          projectId: projectId,
+          partyKind: party.kind,
+          workforceMemberId: party.sourceId,
+          partyDisplayText: display,
+          createdAt: createdAt,
+        );
+      case AgendaPhoneCallPartyKind.company:
+        final rows = await database.query(
+          'subcontractors',
+          columns: ['id', 'project_id', 'name'],
+          where: "id = ? AND project_id = ? AND status = 'active'",
+          whereArgs: [party.sourceId, projectId],
+          limit: 1,
+        );
+        if (rows.isEmpty) {
+          throw const AgendaValidationFailure(
+            'Seçilen firma aktif ve aynı projeye ait olmalıdır.',
+          );
+        }
+        final display = requiredTrimmed(
+          rows.single['name']! as String,
+          'Görüşülen firma',
+          maxLength: 200,
+        );
+        if (display != party.displayText) {
+          throw const AgendaValidationFailure(
+            'Seçilen firma bilgisi değişti; tarafı yeniden seçin.',
+          );
+        }
+        return AgendaPhoneCallContext(
+          agendaLogId: agendaLogId,
+          projectId: projectId,
+          partyKind: party.kind,
+          subcontractorId: party.sourceId,
+          partyDisplayText: display,
+          createdAt: createdAt,
+        );
+      case AgendaPhoneCallPartyKind.freeText:
+        return AgendaPhoneCallContext(
+          agendaLogId: agendaLogId,
+          projectId: projectId,
+          partyKind: party.kind,
+          partyDisplayText: party.displayText,
+          createdAt: createdAt,
+        );
+    }
+  }
+
+  bool _samePhoneCallCreate(
+    AgendaLog log,
+    AgendaPhoneCallContext? context,
+    CreatePhoneCallAgendaLogCommand command,
+    String description,
+    String? location,
+    String? notes,
+    _PhoneCallPartyDraft? party, {
+    required bool hasCreateEvent,
+  }) {
+    if (!hasCreateEvent ||
+        log.projectId != command.projectId ||
+        log.category != AgendaCategory.meetingDecision ||
+        log.description != description ||
+        log.locationId != command.locationId ||
+        (command.locationId == null && log.location != location) ||
+        log.notes != notes) {
+      return false;
+    }
+    if (party == null) return context == null;
+    if (context == null ||
+        context.projectId != command.projectId ||
+        context.partyKind != party.kind ||
+        context.partyDisplayText != party.displayText) {
+      return false;
+    }
+    return switch (party.kind) {
+      AgendaPhoneCallPartyKind.person =>
+        context.workforceMemberId == party.sourceId &&
+            context.subcontractorId == null,
+      AgendaPhoneCallPartyKind.company =>
+        context.workforceMemberId == null &&
+            context.subcontractorId == party.sourceId,
+      AgendaPhoneCallPartyKind.freeText =>
+        context.workforceMemberId == null && context.subcontractorId == null,
+    };
+  }
+
   Future<AgendaLog> _requireAgendaLog(
     DatabaseExecutor database,
     String logId,
@@ -3951,6 +4231,10 @@ class SqliteAgendaApplication
       whereArgs: [logId],
       limit: 1,
     );
+    final phoneCallContext = await _loadPhoneCallContext(database, logId);
+    final observationEvents = events
+        .map(_observationEventFromRow)
+        .toList(growable: false);
     return AgendaLogDetail(
       log: log,
       reminders: allReminders
@@ -3960,10 +4244,13 @@ class SqliteAgendaApplication
           .where((reminder) => reminder.trashedAt != null)
           .toList(growable: false),
       photos: photos.map(_agendaPhotoFromRow).toList(growable: false),
-      events: events.map(_observationEventFromRow).toList(growable: false),
+      events: observationEvents,
       managedConcretePourId: managedLinks.isEmpty
           ? null
           : managedLinks.single['concrete_pour_id']! as String,
+      phoneCallContext: phoneCallContext,
+      isPhoneCallResult:
+          phoneCallContext != null || events.any(_isPhoneCallCreateEvent),
     );
   }
 
@@ -3978,6 +4265,8 @@ class SqliteAgendaApplication
       photos: photos,
       events: detail.events,
       managedConcretePourId: detail.managedConcretePourId,
+      phoneCallContext: detail.phoneCallContext,
+      isPhoneCallResult: detail.isPhoneCallResult,
     );
   }
 
@@ -4233,6 +4522,62 @@ class SqliteAgendaApplication
         reminder.deadlineAt == command.deadlineAt &&
         reminder.conditionText == conditionText;
   }
+}
+
+class _PhoneCallPartyDraft {
+  const _PhoneCallPartyDraft({
+    required this.kind,
+    required this.sourceId,
+    required this.displayText,
+  });
+
+  final AgendaPhoneCallPartyKind kind;
+  final String? sourceId;
+  final String displayText;
+}
+
+_PhoneCallPartyDraft? _phoneCallPartyDraft(
+  CreatePhoneCallAgendaLogCommand command,
+) {
+  final display = optionalTrimmed(
+    command.partyDisplayText,
+    'Görüşülen taraf',
+    maxLength: 200,
+  );
+  final requestedKind = command.partyKind;
+  final sourceId = command.partySourceId;
+  if (display == null) {
+    if (requestedKind != null || sourceId != null) {
+      throw const AgendaValidationFailure(
+        'Görüşülen taraf bilgisi eksik veya tutarsız.',
+      );
+    }
+    return null;
+  }
+  final kind = requestedKind ?? AgendaPhoneCallPartyKind.freeText;
+  switch (kind) {
+    case AgendaPhoneCallPartyKind.person:
+    case AgendaPhoneCallPartyKind.company:
+      if (sourceId == null) {
+        throw const AgendaValidationFailure(
+          'Seçilen görüşme tarafının sabit kimliği eksik.',
+        );
+      }
+      validateUuid(sourceId, 'Görüşme tarafı kimliği');
+      break;
+    case AgendaPhoneCallPartyKind.freeText:
+      if (sourceId != null) {
+        throw const AgendaValidationFailure(
+          'Serbest metin görüşme tarafı sabit kimlik taşıyamaz.',
+        );
+      }
+      break;
+  }
+  return _PhoneCallPartyDraft(
+    kind: kind,
+    sourceId: sourceId,
+    displayText: display,
+  );
 }
 
 void _validateAgendaPhotoDrafts(
@@ -4917,6 +5262,64 @@ AgendaLog _logFromRow(Map<String, Object?> row) {
     stableLocationArchivedAt: stableLocationArchivedAt,
     archivedAt: archivedAt,
   );
+}
+
+AgendaPhoneCallContext _phoneCallContextFromRow(Map<String, Object?> row) {
+  final agendaLogId = row['agenda_log_id']! as String;
+  final projectId = row['project_id']! as String;
+  final workforceMemberId = row['workforce_member_id'] as String?;
+  final subcontractorId = row['subcontractor_id'] as String?;
+  final createdAt = row['created_at']! as String;
+  final partyKind = AgendaPhoneCallPartyKind.fromStorage(
+    row['party_kind']! as String,
+  );
+  validateUuid(agendaLogId, 'Görüşme Ajanda kimliği');
+  validateUuid(projectId, 'Görüşme proje kimliği');
+  if (workforceMemberId != null) {
+    validateUuid(workforceMemberId, 'Görüşülen kişi kimliği');
+  }
+  if (subcontractorId != null) {
+    validateUuid(subcontractorId, 'Görüşülen firma kimliği');
+  }
+  validateCanonicalTimestamp(createdAt, 'Görüşme bağlamı oluşturma zamanı');
+  final validIdentity = switch (partyKind) {
+    AgendaPhoneCallPartyKind.person =>
+      workforceMemberId != null && subcontractorId == null,
+    AgendaPhoneCallPartyKind.company =>
+      workforceMemberId == null && subcontractorId != null,
+    AgendaPhoneCallPartyKind.freeText =>
+      workforceMemberId == null && subcontractorId == null,
+  };
+  if (!validIdentity) {
+    throw const AgendaValidationFailure(
+      'Görüşme tarafı kimliği güvenli biçimde okunamadı.',
+    );
+  }
+  return AgendaPhoneCallContext(
+    agendaLogId: agendaLogId,
+    projectId: projectId,
+    partyKind: partyKind,
+    workforceMemberId: workforceMemberId,
+    subcontractorId: subcontractorId,
+    partyDisplayText: requiredTrimmed(
+      row['party_display_text']! as String,
+      'Görüşülen taraf',
+      maxLength: 200,
+    ),
+    createdAt: createdAt,
+  );
+}
+
+bool _isPhoneCallCreateEvent(Map<String, Object?> row) {
+  final payloadJson = row['payload_json'];
+  if (payloadJson is! String) return false;
+  try {
+    final payload = jsonDecode(payloadJson);
+    return payload is Map<String, dynamic> &&
+        payload['capture_source'] == 'phone_call_result';
+  } on FormatException {
+    return false;
+  }
 }
 
 Future<void> _insertAgendaAttachment(

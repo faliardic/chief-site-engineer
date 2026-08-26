@@ -27,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 18;
+  static const schemaVersion = 19;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2899,6 +2899,7 @@ class AppDatabase {
       apply: _applyConstructionScheduleSnapshotDependencyMigration,
     ),
     DatabaseMigration(version: 18, apply: _applyMaterialRequestMigration),
+    DatabaseMigration(version: 19, apply: _applyAgendaPhoneCallMigration),
   ];
 
   final String path;
@@ -4267,6 +4268,131 @@ Future<void> _applyMaterialRequestMigration(Transaction transaction) async {
       END
     ''');
   }
+}
+
+Future<void> _applyAgendaPhoneCallMigration(Transaction transaction) async {
+  await transaction.execute('''
+    CREATE TABLE agenda_phone_call_contexts (
+      agenda_log_id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      party_kind TEXT NOT NULL CHECK (
+        party_kind IN ('person', 'company', 'free_text')
+      ),
+      workforce_member_id TEXT,
+      subcontractor_id TEXT,
+      party_display_text TEXT NOT NULL CHECK (
+        length(trim(party_display_text)) > 0
+        AND party_display_text = trim(party_display_text)
+      ),
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (agenda_log_id, project_id)
+        REFERENCES field_observations(id, project_id),
+      FOREIGN KEY (workforce_member_id, project_id)
+        REFERENCES workforce_members(id, project_id),
+      FOREIGN KEY (subcontractor_id, project_id)
+        REFERENCES subcontractors(id, project_id),
+      CHECK (
+        (
+          party_kind = 'person'
+          AND workforce_member_id IS NOT NULL
+          AND subcontractor_id IS NULL
+        )
+        OR (
+          party_kind = 'company'
+          AND workforce_member_id IS NULL
+          AND subcontractor_id IS NOT NULL
+        )
+        OR (
+          party_kind = 'free_text'
+          AND workforce_member_id IS NULL
+          AND subcontractor_id IS NULL
+        )
+      )
+    )
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_agenda_phone_call_contexts_project
+    ON agenda_phone_call_contexts(project_id, created_at DESC, agenda_log_id)
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_agenda_phone_call_contexts_workforce
+    ON agenda_phone_call_contexts(
+      project_id, workforce_member_id, created_at DESC
+    )
+    WHERE workforce_member_id IS NOT NULL
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_agenda_phone_call_contexts_subcontractor
+    ON agenda_phone_call_contexts(
+      project_id, subcontractor_id, created_at DESC
+    )
+    WHERE subcontractor_id IS NOT NULL
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER agenda_phone_call_contexts_source_insert
+    BEFORE INSERT ON agenda_phone_call_contexts
+    WHEN NOT EXISTS (
+      SELECT 1
+      FROM field_observations observation
+      WHERE observation.id = NEW.agenda_log_id
+        AND observation.project_id = NEW.project_id
+        AND observation.category = 'meeting_decision'
+    )
+    BEGIN
+      SELECT RAISE(
+        ABORT,
+        'phone call context requires meeting decision agenda source'
+      );
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER agenda_phone_call_contexts_source_category_update
+    BEFORE UPDATE OF category ON field_observations
+    WHEN NEW.category != 'meeting_decision'
+      AND EXISTS (
+        SELECT 1
+        FROM agenda_phone_call_contexts context
+        WHERE context.agenda_log_id = OLD.id
+          AND context.project_id = OLD.project_id
+      )
+    BEGIN
+      SELECT RAISE(
+        ABORT,
+        'phone call agenda category must remain meeting decision'
+      );
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER agenda_phone_call_contexts_timestamp_insert
+    BEFORE INSERT ON agenda_phone_call_contexts
+    WHEN length(NEW.created_at) != 20
+      OR NEW.created_at NOT GLOB
+        '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+      OR strftime('%Y-%m-%dT%H:%M:%SZ', NEW.created_at, '+0 seconds')
+        IS NULL
+      OR strftime('%Y-%m-%dT%H:%M:%SZ', NEW.created_at, '+0 seconds')
+        != NEW.created_at
+    BEGIN
+      SELECT RAISE(
+        ABORT,
+        'phone call context timestamp must be canonical UTC'
+      );
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER agenda_phone_call_contexts_immutable_update
+    BEFORE UPDATE ON agenda_phone_call_contexts
+    BEGIN
+      SELECT RAISE(ABORT, 'phone call context is immutable');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER agenda_phone_call_contexts_immutable_delete
+    BEFORE DELETE ON agenda_phone_call_contexts
+    BEGIN
+      SELECT RAISE(ABORT, 'phone call context cannot be deleted');
+    END
+  ''');
 }
 
 Future<void> _applyAttachmentFoundationMigration(

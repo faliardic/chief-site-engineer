@@ -435,11 +435,14 @@ class _LogDetailPageState extends State<LogDetailPage> {
             openConcreteKey: const Key('agenda-concrete-detail-open'),
           ),
         Text(
-          log.category.label,
+          detail.isPhoneCallResult ? 'Telefon görüşmesi' : log.category.label,
           style: Theme.of(context).textTheme.headlineSmall,
         ),
         const SizedBox(height: 8),
-        Text(log.description, style: Theme.of(context).textTheme.titleMedium),
+        if (detail.isPhoneCallResult)
+          _DetailRow(label: 'Görüşme sonucu', value: log.description)
+        else
+          Text(log.description, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 16),
         _DetailRow(label: 'Proje', value: log.projectName),
         _DetailRow(
@@ -450,6 +453,17 @@ class _LogDetailPageState extends State<LogDetailPage> {
           label: 'CSE’ye giriş',
           value: CseTimeCodec.formatIstanbul(log.createdAt),
         ),
+        if (detail.phoneCallContext case final context?) ...[
+          _DetailRow(label: 'Görüşülen taraf', value: context.partyDisplayText),
+          _DetailRow(
+            label: 'Taraf kaynağı',
+            value: switch (context.partyKind) {
+              AgendaPhoneCallPartyKind.person => 'Sicil kişi kaydı',
+              AgendaPhoneCallPartyKind.company => 'Sicil firma kaydı',
+              AgendaPhoneCallPartyKind.freeText => 'Serbest metin',
+            },
+          ),
+        ],
         if (log.displayLocation != null)
           _DetailRow(label: 'Mahal', value: log.displayLocation!),
         if (log.stableLocationArchivedAt != null)
