@@ -9,6 +9,7 @@ import 'package:chief_site_engineer/features/attendance/attendance_page.dart';
 import 'package:chief_site_engineer/features/attendance/workforce_directory_page.dart';
 import 'package:chief_site_engineer/features/attachments/attachment_catalog_page.dart';
 import 'package:chief_site_engineer/features/attachments/attachment_health_page.dart';
+import 'package:chief_site_engineer/features/attachments/project_media_album_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
 import 'package:chief_site_engineer/features/daily_log/daily_log_page.dart';
@@ -631,6 +632,30 @@ class _HomePageState extends State<_HomePage> {
               onTap: () => Navigator.of(context).push<void>(
                 MaterialPageRoute(
                   builder: (_) => MemoryBackupPage(backup: backup),
+                ),
+              ),
+            ),
+          ),
+        if (widget.bootstrap.attachmentCatalog case final catalog?)
+          Card(
+            child: ListTile(
+              key: const Key('open-project-media-album'),
+              minVerticalPadding: 12,
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Proje Albümü'),
+              subtitle: const Text(
+                'Projedeki fotoğraf ve videoları kaynak kayıtlarıyla görüntüle.',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => ProjectMediaAlbumPage(
+                    catalog: catalog,
+                    agenda: widget.bootstrap.agenda,
+                    concrete: widget.bootstrap.concrete,
+                    attachments: widget.bootstrap.concreteAttachments,
+                    projectLocations: widget.bootstrap.projectLocations,
+                  ),
                 ),
               ),
             ),

@@ -16,8 +16,16 @@ abstract interface class AttachmentCatalogApplication {
   );
 }
 
+abstract interface class AttachmentCatalogMediaAccess {
+  Future<ManagedAttachmentContent> readAttachment(
+    ProjectAttachmentCatalogItem item,
+  );
+
+  Future<void> openAttachment(ProjectAttachmentCatalogItem item);
+}
+
 class SqliteAttachmentCatalogApplication
-    implements AttachmentCatalogApplication {
+    implements AttachmentCatalogApplication, AttachmentCatalogMediaAccess {
   const SqliteAttachmentCatalogApplication({
     required this.databasePath,
     required this.databaseFactory,
@@ -27,6 +35,34 @@ class SqliteAttachmentCatalogApplication
   final String databasePath;
   final DatabaseFactory databaseFactory;
   final ManagedAttachmentStore managedStore;
+
+  @override
+  Future<ManagedAttachmentContent> readAttachment(
+    ProjectAttachmentCatalogItem item,
+  ) => managedStore.read(
+    relativePath: item.relativePath,
+    originalFileName: item.displayFileName,
+    expectedSha256: item.sha256Value,
+    expectedMimeType: item.mimeType,
+    expectedByteSize: item.byteSize,
+  );
+
+  @override
+  Future<void> openAttachment(ProjectAttachmentCatalogItem item) async {
+    final integrity = await managedStore.inspect(
+      relativePath: item.relativePath,
+      expectedSha256: item.sha256Value,
+      expectedMimeType: item.mimeType,
+      expectedByteSize: item.byteSize,
+    );
+    if (integrity != ManagedAttachmentIntegrity.healthy) {
+      throw AttachmentCatalogFailure('attachment_${integrity.code}');
+    }
+    await managedStore.open(
+      relativePath: item.relativePath,
+      expectedMimeType: item.mimeType,
+    );
+  }
 
   @override
   Future<List<AttachmentCatalogProject>> listProjects() async {
@@ -82,12 +118,52 @@ class SqliteAttachmentCatalogApplication
               'Ajanda • ' || COALESCE(o.description, l.source_id)
             WHEN 'concrete_pour' THEN
               'Beton • ' || COALESCE(c.pour_code, l.source_id)
-          END AS source_label
+          END AS source_label,
+          CASE
+            WHEN l.source_type = 'agenda_observation' AND o.id IS NOT NULL
+              THEN 1
+            WHEN l.source_type = 'concrete_pour' AND c.id IS NOT NULL
+              THEN 1
+            ELSE 0
+          END AS source_available,
+          CASE l.source_type
+            WHEN 'agenda_observation' THEN o.archived_at
+          END AS source_archived_at,
+          COALESCE(ol.id, cl.id) AS stable_location_id,
+          COALESCE(ol.display_name, cl.display_name) AS stable_location_name,
+          CASE l.context_type
+            WHEN 'concrete_truck' THEN
+              'Mikser #' || t.sequence_no || ' • ' || t.vehicle_plate
+            WHEN 'concrete_sample_set' THEN
+              'Numune • ' || s.sample_code
+            WHEN 'concrete_check_item' THEN
+              'Checklist • ' || ci.label
+          END AS context_label
         FROM attachment_links l
         LEFT JOIN field_observations o
-          ON l.source_type = 'agenda_observation' AND o.id = l.source_id
+          ON l.source_type = 'agenda_observation'
+          AND o.id = l.source_id
+          AND o.project_id = l.project_id
         LEFT JOIN concrete_pours c
-          ON l.source_type = 'concrete_pour' AND c.id = l.source_id
+          ON l.source_type = 'concrete_pour'
+          AND c.id = l.source_id
+          AND c.project_id = l.project_id
+        LEFT JOIN project_locations ol
+          ON ol.id = o.location_id AND ol.project_id = l.project_id
+        LEFT JOIN project_locations cl
+          ON cl.id = c.location_id AND cl.project_id = l.project_id
+        LEFT JOIN concrete_trucks t
+          ON l.context_type = 'concrete_truck'
+          AND t.id = l.context_id
+          AND t.concrete_pour_id = l.source_id
+        LEFT JOIN concrete_sample_sets s
+          ON l.context_type = 'concrete_sample_set'
+          AND s.id = l.context_id
+          AND s.concrete_pour_id = l.source_id
+        LEFT JOIN concrete_check_items ci
+          ON l.context_type = 'concrete_check_item'
+          AND ci.id = l.context_id
+          AND ci.concrete_pour_id = l.source_id
         WHERE l.project_id = ?
         ORDER BY l.created_at ASC, l.id ASC
         ''',
@@ -106,8 +182,15 @@ class SqliteAttachmentCatalogApplication
           originalFileName: row['original_file_name']! as String,
           contextType: row['context_type'] as String?,
           contextId: row['context_id'] as String?,
+          description: row['description'] as String?,
+          capturedAt: row['captured_at'] as String?,
+          stableLocationId: row['stable_location_id'] as String?,
+          stableLocationName: row['stable_location_name'] as String?,
+          contextLabel: row['context_label'] as String?,
           createdAt: row['created_at']! as String,
           archivedAt: row['archived_at'] as String?,
+          sourceArchivedAt: row['source_archived_at'] as String?,
+          sourceAvailable: row['source_available'] == 1,
         );
         linksByPhysical
             .putIfAbsent(

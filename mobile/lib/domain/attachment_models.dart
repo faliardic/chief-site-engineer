@@ -100,6 +100,13 @@ class AttachmentCatalogLink {
     required this.archivedAt,
     this.contextType,
     this.contextId,
+    this.description,
+    this.capturedAt,
+    this.stableLocationId,
+    this.stableLocationName,
+    this.contextLabel,
+    this.sourceArchivedAt,
+    this.sourceAvailable = true,
   });
 
   final String id;
@@ -110,10 +117,19 @@ class AttachmentCatalogLink {
   final String originalFileName;
   final String? contextType;
   final String? contextId;
+  final String? description;
+  final String? capturedAt;
+  final String? stableLocationId;
+  final String? stableLocationName;
+  final String? contextLabel;
   final String createdAt;
   final String? archivedAt;
+  final String? sourceArchivedAt;
+  final bool sourceAvailable;
 
   bool get isActive => archivedAt == null;
+
+  bool get isSourceArchived => sourceArchivedAt != null;
 }
 
 class ProjectAttachmentCatalogItem {
@@ -141,6 +157,13 @@ class ProjectAttachmentCatalogItem {
 
   bool get isImage =>
       const {'image/jpeg', 'image/png', 'image/heic'}.contains(mimeType);
+
+  bool get isVideo => mimeType == 'video/mp4';
+
+  bool get isAlbumMedia => isImage || isVideo;
+
+  bool get supportsInlinePreview =>
+      const {'image/jpeg', 'image/png'}.contains(mimeType);
 
   bool isActivelyLinkedTo(AttachmentCatalogSourceType type, String sourceId) =>
       links.any(

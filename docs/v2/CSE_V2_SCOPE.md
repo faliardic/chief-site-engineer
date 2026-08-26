@@ -3,8 +3,8 @@
 **Belge türü:** Güncel ürün yürütme kapsamı
 **Durum:** Kanonik V2 kapsam ve sıra kaynağı
 **Tarih:** 26 Ağustos 2026
-**Güncel yön kaynağı:** Issue #492 — Telefon görüşmesi sonucu → Ajanda Slice 1
-**Güncel güvenli `master`:** `55dd01bbe55e0059f2544a04aa884a744de45496` / PR #491
+**Güncel yön kaynağı:** Issue #497 — Proje fotoğraf/video albümü Slice 1
+**Güncel güvenli `master`:** `155e2e028b3a357fd3e158fd0779da0646c36a08` / PR #493
 
 ## 1. Belgenin rolü
 
@@ -50,8 +50,8 @@ V1 tarihsel baseline'dır. V2, aynı offline-first mobil ürünü yeniden yazmak
 yerine bu baseline üzerinde ilerler.
 
 Güncel merged V2 teknik baseline'ı V1 metadata'sından ayrıdır: mobile version
-`0.1.0+1`, SQLite schema `18`, backup format `1` ve son güvenli merge
-`55dd01bbe55e0059f2544a04aa884a744de45496` / PR #491 değeridir. Bu baseline,
+`0.1.0+1`, SQLite schema `19`, backup format `1` ve son güvenli merge
+`155e2e028b3a357fd3e158fd0779da0646c36a08` / PR #493 değeridir. Bu baseline,
 schedule runtime ve persistent immutable reference-schedule snapshot temeliyle
 Living Plan MVP Core, 7-day UI/APK/device acceptance, Actual Progress Core ve
 progress UI/isolated device acceptance, deterministic forecast core ve immutable
@@ -60,7 +60,8 @@ core'u, Issue #476 / PR #480 Living Plan intelligence UI implementation'ını ve
 Issue #481 / PR #482 Deterministic Günlük Log v1 read modelini, Issue #483 /
 PR #484 read-only İş Zinciri v1'i, Issue #485 / PR #486 İstenecek Malzemeler
 v1'i, Issue #488 / PR #489 bounded-memory backup package correction'ını ve
-Issue #490 / PR #491 deterministic kişi/firma önerileri Slice 1'i içerir.
+Issue #490 / PR #491 deterministic kişi/firma önerileri Slice 1'i ve Issue #492 /
+PR #493 manuel telefon görüşmesi sonucu Slice 1'i içerir.
 Living Plan, Material Request ve kişi/firma önerileri manual testleri pending, Günlük Log ve
 İş Zinciri manual testleri deferred kalır; mutation/reforecast, public/store
 release veya genel production readiness ilanı değildir.
@@ -89,7 +90,8 @@ Proje/Mahal, Saha Rehberi, Attachment ve Ajanda omurgası — complete
 → Issue #485 / PR #486 İstenecek Malzemeler v1 — merged / manual test pending
 → Issue #488 / PR #489 bounded-memory backup package correction — merged
 → Issue #490 / PR #491 Deterministic kişi/firma önerileri Slice 1 — merged / manual test pending
-→ Issue #492 Telefon görüşmesi sonucu → Ajanda Slice 1 — current / not merged
+→ Issue #492 / PR #493 Telefon görüşmesi sonucu → Ajanda Slice 1 — merged / manual test deferred
+→ Issue #497 Proje fotoğraf/video albümü Slice 1 — current / not merged
 → schedule mutation/reforecast, actual quantity ve productivity learning — not started
 ```
 
@@ -112,8 +114,8 @@ baseline değildir.
 | 7 | İş Zinciri / Bağlı Log v1 | Implemented — manual test deferred; completion not declared |
 | 8 | İstenecek Malzemeler | Implemented — manual test pending |
 | 9 | Deterministik kişi/firma/etiket önerileri | Implemented — Slice 1 merged; manual test pending; not complete |
-| 10 | Telefon görüşmesi sonucu → Ajanda | Current — Slice 1; not complete |
-| 11 | Proje fotoğraf/video albümü | Planned |
+| 10 | Telefon görüşmesi sonucu → Ajanda | Implemented — Slice 1 merged; manual test deferred; not complete |
+| 11 | Proje fotoğraf/video albümü | Current — Slice 1; not complete |
 | 12 | Günlük Log Çıktısı v2 | Planned |
 | 13 | Mini hesap makinesi | Planned |
 
@@ -347,12 +349,11 @@ Amaç:
 - Arama kaydı, rehber veya çağrı geçmişini izinsiz okumamak.
 - İlgili kişi/firma, proje, mahal ve takip gereksinimini kullanıcı seçimiyle
   bağlamak.
-- Issue #492 current Slice 1 Home'dan açıkça başlatılan `Görüşme sonucu`
+- Issue #492 / PR #493 merged Slice 1 Home'dan açıkça başlatılan `Görüşme sonucu`
   formunu, exact proje/mahal seçimini ve #490'ın read-only kişi/firma
   önerilerini kullanır.
-- Candidate schema `19`, Agenda row + create event + opsiyonel immutable
-  görüşme tarafı bağlamını tek SQLite transaction içinde yazar; merged master
-  schema `18` olarak kalır.
+- Schema `19`, Agenda row + create event + opsiyonel immutable görüşme tarafı
+  bağlamını tek SQLite transaction içinde yazar.
 - Taraf seçilmezse görüşme sonucu yine canonical Agenda kaydıdır. Canonical
   kişi/firma seçimi same-project stable identity ve exact display snapshot
   taşır; historical veya düzenlenmiş değer açık serbest metindir.
@@ -373,6 +374,16 @@ Amaç:
   kayda göre göstermek.
 - Galeri ile kayıt ekranı arasında duplicate dosya üretmemek.
 - Büyük medya, thumbnail ve depolama kullanımını görünür kılmak.
+- Issue #497 current Slice 1 yalnız `managed_attachments + attachment_links`
+  truth'undan exact project-scoped ve physical-deduplicated album üretir.
+- Albüm MIME sınırı `image/jpeg`, `image/png`, `image/heic`, `video/mp4`dür;
+  PDF/audio mevcut Dosya Kataloğu'nda kalır.
+- Fiziksel `created_at` İstanbul günü, gerçek stable mahal/context ve herhangi
+  active/historical Ajanda/Beton linki üzerinden kombinlenebilir filtreler sunar.
+- JPEG/PNG preview ve MP4/HEIC external-open yalnız seçilen item için lazy,
+  bounded ve action-time integrity-gated'dir. Kırık medya görünür fakat açılmaz.
+- Source/link availability ile archive durumu görünür; source kaydı yoksa ID
+  korunur ve sahte detail navigation yapılmaz.
 
 Kapanış kapısı:
 
@@ -380,6 +391,8 @@ Kapanış kapısı:
 - Kaynak kayda tek dokunuşla gidilebilir.
 - Arşiv ve broken-media davranışı açıktır.
 - Backup boyutu ve medya sınırları kullanıcıdan gizlenmez.
+- Schema `19`, backup format `1`, version `0.1.0+1` değişmez; duplicate binary,
+  album persistence/cache, capture/import veya source/link mutation yoktur.
 
 ### 12. Günlük Log Çıktısı v2
 
@@ -511,7 +524,7 @@ core PR #475 ve Living Plan intelligence UI PR #480 ile merge edilmiştir.
 Issue #485 / PR #486 İstenecek Malzemeler v1'i schema `18` additive temeline
 eklemiş, Issue #488 / PR #489 ise backup formatını değiştirmeden final package
 buffer'ındaki kanıtlanmış ekstra büyük kopyayı kaldırmıştır. Güncel güvenli
-`master` `55dd01bbe55e0059f2544a04aa884a744de45496`, schema `18` ve backup
+`master` `155e2e028b3a357fd3e158fd0779da0646c36a08`, schema `19` ve backup
 format `1`dir.
 
 Güncel canonical faz:
@@ -530,7 +543,8 @@ Living Plan MVP Core — merged / PR #463
 → Issue #485 / PR #486 İstenecek Malzemeler v1 — merged / manual test pending
 → Issue #488 / PR #489 bounded-memory backup package correction — merged
 → Issue #490 / PR #491 Deterministic kişi/firma önerileri Slice 1 — merged / manual test pending
-→ Issue #492 Telefon görüşmesi sonucu → Ajanda Slice 1 — current / not merged
+→ Issue #492 / PR #493 Telefon görüşmesi sonucu → Ajanda Slice 1 — merged / manual test deferred
+→ Issue #497 Proje fotoğraf/video albümü Slice 1 — current / not merged
 ```
 
 Issue #466 / PR #467 nullable actual-progress source-of-truth foundation'ını
@@ -554,8 +568,12 @@ lifecycle UI'yı schema `18` additive temeline ekleyen merged V2.8 Slice'ıdır;
 manual testleri pending kalır. Issue #490 / PR #491 V2.9 Slice 1'de seçili proje
 için read-only deterministic kişi/firma öneri sınırını ve ilk Reminder
 consumer'ını merged temele eklemiştir; V2.9 completion ilanı değildir.
-Issue #492 current V2.10 Slice 1 bu kaynağı manual phone-call result capture'da
-yeniden kullanır; candidate schema `19`dur ve merge ilanı değildir. Schedule
-mutation/reforecast, actual quantity, productivity learning,
+Issue #492 / PR #493 V2.10 Slice 1 bu kaynağı manual phone-call result capture'da
+yeniden kullanarak schema `19` temeline merge edilmiştir; manual testleri
+deferred ve V2.10 completion kararı ayrıdır. Issue #497 current V2.11 Slice 1
+existing attachment/link truth'tan salt-okunur project media album ve exact
+source navigation kurar; merge ilanı değildir. Schedule mutation/reforecast,
+actual quantity, productivity learning,
 daily-log/work-chain persistence ve public/store release başlamaz. V2.5,
-V2.6, V2.7, V2.8 ve V2.9 final completion ilanları ayrı owner kararına bağlıdır.
+V2.6, V2.7, V2.8, V2.9, V2.10 ve V2.11 final completion ilanları ayrı owner
+kararına bağlıdır.
