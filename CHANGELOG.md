@@ -1,5 +1,24 @@
 # Changelog
 
+## Issue #497 - Read-only project photo/video album v1
+
+- Adds a Home `Proje Albümü` entry over the existing exact-project attachment
+  catalog, with one row per distinct physical JPEG/PNG/HEIC/MP4 attachment.
+- Combines media type, physical CSE-added date, real stable location/context and
+  Agenda/Concrete source filters without creating album persistence, cache or a
+  duplicate binary.
+- Shows every active/historical link with source availability/archive state and
+  opens only the exact readable Agenda or Concrete detail. Missing sources keep
+  their stable IDs and fail closed.
+- JPEG/PNG preview and MP4/HEIC external-open are lazy selected-item operations;
+  size/hash/MIME/path integrity is checked again at the action boundary. Broken
+  media remains diagnostic and cannot be previewed/opened.
+- Distinct project media count/bytes are visible and explicitly not labeled as
+  backup package size. Schema `19`, backup format `1`, version `0.1.0+1`,
+  dependency and platform/permission contracts remain unchanged.
+- Automated application/build/device tests are disabled by owner authority;
+  status is `IMPLEMENTED — MANUAL TEST PENDING`.
+
 ## Issue #492 - Manual phone-call result to Agenda v1
 
 - Adds a Home quick capture for a user-entered phone-call result with required

@@ -3,8 +3,8 @@
 **Durum:** Güncel yürütme sırası
 **Tarih:** 26 Ağustos 2026
 **V2 kapsam kaynağı:** `docs/v2/CSE_V2_SCOPE.md`
-**Güncel yön truth-sync:** Issue #492
-**Güncel güvenli `master`:** `55dd01bbe55e0059f2544a04aa884a744de45496` / PR #491
+**Güncel yön truth-sync:** Issue #497
+**Güncel güvenli `master`:** `155e2e028b3a357fd3e158fd0779da0646c36a08` / PR #493
 
 ## 1. Güncel ürün durumu
 
@@ -15,17 +15,18 @@ core, progress UI/isolated cihaz kabulü, deterministic forecast core, immutable
 snapshot dependency graph persistence ve read-only downstream impact PR #475'e
 kadar, Living Plan intelligence UI PR #480'e, Deterministic Günlük Log v1 ise
 PR #482'ye, İş Zinciri v1 PR #484'e, İstenecek Malzemeler v1 PR #486'ya
-bounded-memory backup package correction PR #489'a ve deterministic
-kişi/firma önerileri Slice 1 PR #491'e kadar merge edilmiştir.
+bounded-memory backup package correction PR #489'a, deterministic kişi/firma
+önerileri Slice 1 PR #491'e ve manuel telefon görüşmesi sonucu Slice 1 PR
+#493'e kadar merge edilmiştir.
 Güncel teknik ve ürün durumu:
 
 | Alan | Değer |
 | --- | --- |
 | V1 baseline commit | `7c9f65a811c9f4bca561adab6bd1f8e64e6908cc` |
-| Güncel güvenli merge | `55dd01bbe55e0059f2544a04aa884a744de45496` |
-| Son merged PR | `#491` |
+| Güncel güvenli merge | `155e2e028b3a357fd3e158fd0779da0646c36a08` |
+| Son merged PR | `#493` |
 | Mobil sürüm | `0.1.0+1` |
-| SQLite schema | `18` |
+| SQLite schema | `19` |
 | `.csebackup` formatı | `1` |
 | Canonical timezone | `Europe/Istanbul` |
 | Android compile/target SDK | `36 / 36` |
@@ -47,8 +48,10 @@ Zinciri projection'ını, Issue #485 / PR #486 additive schema `18` material
 request source-of-truth ve lifecycle UI'yı merged temele eklemiştir. Issue #488 /
 PR #489 backup formatını değiştirmeyen bounded-memory package correction'ıdır.
 Issue #490 / PR #491 deterministic kişi/firma önerileri Slice 1'i merged temele
-eklemiştir; V2.9 complete değildir. Issue #492 Telefon görüşmesi sonucu →
-Ajanda Slice 1 current işidir; merged veya V2.10 complete değildir.
+eklemiştir; V2.9 complete değildir. Issue #492 / PR #493 Telefon görüşmesi
+sonucu → Ajanda Slice 1'i schema `19` temeline merge etmiştir; manual testleri
+deferred kalır ve V2.10 complete değildir. Issue #497 Proje fotoğraf/video
+albümü Slice 1 current işidir; merged veya V2.11 complete değildir.
 Public/store production release ilan edilmemiştir.
 
 ## 2. Kaynak otoritesi
@@ -313,14 +316,14 @@ Dalga 3 kapanış kapısı:
 - Hatırlatıcı yalnız kayıt detayındaki ayrı mevcut kullanıcı işlemi
 - Çağrı geçmişi ve rehber için gereksiz izin yok
 - Gönderildi/okundu iddiası yok
-- Issue #492 current Slice 1 Agenda row, create event ve opsiyonel immutable
+- Issue #492 / PR #493 merged Slice 1 Agenda row, create event ve opsiyonel immutable
   phone-call taraf context'ini exact bir SQLite transaction içinde yazar
-- Candidate schema `19` yalnız additive `agenda_phone_call_contexts`
-  tablosunu ekler; merged master schema `18`, backup format `1` ve version
-  `0.1.0+1` olarak kalır
+- Schema `19` yalnız additive `agenda_phone_call_contexts` tablosunu ekler;
+  backup format `1` ve version `0.1.0+1` olarak kalır
 - Canonical kişi/firma exact project ve active source ile fail-closed
   doğrulanır; manual edit veya historical değer serbest metindir
 - Otomatik Reminder, notification veya çağrı entegrasyonu yoktur
+- Manual testler #479'da deferred kalır; V2.10 completion ilanı değildir
 
 ## 8. Dalga 5 — Medya ve yayımlanmış günlük
 
@@ -331,6 +334,16 @@ Dalga 3 kapanış kapısı:
 - Thumbnail/player sınırı
 - Depolama ve backup boyutu görünürlüğü
 - Kaynak kayda hızlı geçiş
+- Issue #497 current Slice 1 mevcut `managed_attachments + attachment_links`
+  gerçeğini exact project-scoped ve physical-deduplicated read-model olarak
+  projekte eder; yalnız JPEG/PNG/HEIC/MP4 albüme girer
+- CSE'ye eklenme tarihi, stable mahal/context ve Ajanda/Beton source filtreleri
+  kombinlenebilir; JPEG/PNG preview ve MP4/HEIC open seçilen item için lazy ve
+  integrity-gated'dir
+- Kırık medya ve okunamayan/arşivli source/link görünür kalır; preview/open veya
+  sahte source navigation yapılmaz
+- Schema `19`, backup format `1`, version `0.1.0+1` değişmez; yeni binary,
+  persistence, cache, capture/import veya source/link mutation yoktur
 
 ### V2.12 — Günlük Log Çıktısı v2
 
@@ -405,7 +418,8 @@ Living 7-Day Plan — implemented / manual test pending; final completion yok
 → Issue #485 / PR #486 İstenecek Malzemeler v1 — merged / manual test pending
 → Issue #488 / PR #489 bounded-memory backup package correction — merged
 → Issue #490 / PR #491 deterministic kişi/firma önerileri Slice 1 — merged / manual test pending
-→ Issue #492 Telefon görüşmesi sonucu → Ajanda Slice 1 — current / not merged
+→ Issue #492 / PR #493 Telefon görüşmesi sonucu → Ajanda Slice 1 — merged / manual test deferred
+→ Issue #497 Proje fotoğraf/video albümü Slice 1 — current / not merged
 ```
 
 Items 1–4 complete'tir. Activity Catalog Runtime, typed Project Profile ve
@@ -430,12 +444,14 @@ Ajanda–takip bağını lifecycle ve sonuçla read-only görünür kılan merge
 Slice'ıdır. Issue #485 / PR #486 material request source-of-truth ve lifecycle
 UI'yı schema `18` additive temeline eklemiştir; manual testleri pending kalır.
 Issue #490 / PR #491 V2.9 Slice 1 yalnız read-only deterministic kişi/firma öneri
-sınırını ve Reminder first-consumer wiring'ini merged temele ekler. Issue #492
-current V2.10 Slice 1 manual phone-call result capture ve immutable taraf
-provenance'ını candidate schema `19` ile kurar; merge ilanı değildir. Reforecast, actual
-quantity, productivity learning, daily-log/work-chain persistence, V2.9 Slice 2
-ve yayımlanmış artifact başlamaz. V2.5–V2.9 completion ilanları ayrı owner
-kararına bağlıdır.
+sınırını ve Reminder first-consumer wiring'ini merged temele ekler. Issue #492 /
+PR #493 V2.10 Slice 1 manual phone-call result capture ve immutable taraf
+provenance'ını schema `19` ile merged temele eklemiştir; manual testleri deferred
+ve V2.10 completion kararı ayrıdır. Issue #497 current V2.11 Slice 1 existing
+attachment truth'tan salt-okunur project media album ve source navigation kurar;
+merge ilanı değildir. Reforecast, actual quantity, productivity learning,
+daily-log/work-chain persistence, V2.9 Slice 2 ve yayımlanmış artifact başlamaz.
+V2.5–V2.11 completion ilanları ayrı owner kararına bağlıdır.
 
 ## 13. Tarihsel roadmap sınırı
 

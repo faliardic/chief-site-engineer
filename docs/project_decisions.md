@@ -4292,3 +4292,27 @@
   contractı değişmez. Durum `IMPLEMENTED — MANUAL TEST PENDING` ile
   sınırlıdır; Issue #492 candidate branch merged, Ready veya V2.10 complete
   sayılmaz.
+
+## Issue 497 — Proje albümü existing attachment truth'un salt-okunur projection'ıdır
+
+- Albüm yeni media table/file/cache veya binary kopyası üretmez. Exact seçili
+  project için mevcut `managed_attachments + attachment_links` projection'ını
+  physical attachment ID ile deduplicate ederek kullanır.
+- Slice 1 album MIME sınırı JPEG, PNG, HEIC ve MP4'tür. Fiziksel
+  `managed_attachments.created_at` canonical `Europe/Istanbul` gününde
+  `CSE'ye eklenme tarihi` olarak filtrelenir; EXIF/camera zamanı iddiası yoktur.
+- Mahal yalnız source'un gerçekten bağlı olduğu stable `project_locations`
+  kimliğinden, Concrete context yalnız exact source/context FK kimliğinden
+  resolve edilir. Missing source/context için isim uydurulmaz veya link rebind
+  edilmez.
+- JPEG/PNG in-app preview ve MP4/HEIC external-open yalnız seçilen item için
+  lazy/bounded çalışır ve action boundary'de size/hash/MIME/path integrity tekrar
+  doğrulanır. Broken medya görünür, preview/open fail-closed'dur.
+- Bir physical item'ın bütün active/historical Ajanda/Beton linkleri archive ve
+  availability durumuyla görünür. Existing Agenda/Concrete detail navigation
+  yalnız exact okunabilir source ID'ye gider; source/link/archive mutation yoktur.
+- Proje medya adedi ve byte toplamı distinct physical item'lar üzerinden verilir
+  ve backup paket boyutu olarak sunulmaz. Schema `19`, backup format `1`, version
+  `0.1.0+1`, dependency ve platform/permission contractları değişmez.
+- Durum `IMPLEMENTED — MANUAL TEST PENDING` ile sınırlıdır; Ready, merge ve
+  V2.11 completion ayrı owner kararlarıdır.
