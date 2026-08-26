@@ -24,8 +24,12 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
   PickedBackupPackage? _selectedPackage;
   String? _backupMessage;
   String? _restoreMessage;
+  List<MobileSafetyBackupMetadata> _safetyBackups = const [];
+  String? _safetyBackupMessage;
+  String? _sharingSafetyBackupFileName;
   bool _backupBusy = false;
   bool _restoreBusy = false;
+  bool _safetyBackupsLoading = true;
   MobileBackupCreationStage? _backupStage;
   bool _replacementAcknowledged = false;
 
@@ -33,6 +37,7 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
   void initState() {
     super.initState();
     _loadLastBackup();
+    unawaited(_loadSafetyBackups());
   }
 
   @override
@@ -60,8 +65,74 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
     }
   }
 
+  MobileSafetyBackupRecoveryApplication? get _safetyBackupRecovery {
+    final Object backup = widget.backup;
+    return backup is MobileSafetyBackupRecoveryApplication ? backup : null;
+  }
+
+  bool get _safetyBackupShareBusy => _sharingSafetyBackupFileName != null;
+
+  bool get _anyOperationBusy =>
+      _backupBusy || _restoreBusy || _safetyBackupShareBusy;
+
+  Future<void> _loadSafetyBackups() async {
+    final recovery = _safetyBackupRecovery;
+    if (recovery == null) {
+      if (mounted) {
+        setState(() {
+          _safetyBackups = const [];
+          _safetyBackupsLoading = false;
+        });
+      }
+      return;
+    }
+    if (mounted) {
+      setState(() {
+        _safetyBackupsLoading = true;
+        _safetyBackupMessage = null;
+      });
+    }
+    try {
+      final backups = await recovery.listSafetyBackups();
+      if (!mounted) return;
+      setState(() => _safetyBackups = backups);
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _safetyBackups = const [];
+        _safetyBackupMessage = _safeMessage(error);
+      });
+    } finally {
+      if (mounted) setState(() => _safetyBackupsLoading = false);
+    }
+  }
+
+  Future<void> _shareSafetyBackup(MobileSafetyBackupMetadata backup) async {
+    final recovery = _safetyBackupRecovery;
+    if (recovery == null || _anyOperationBusy || _safetyBackupsLoading) return;
+    setState(() {
+      _sharingSafetyBackupFileName = backup.fileName;
+      _safetyBackupMessage = null;
+    });
+    try {
+      await recovery.shareSafetyBackup(backup);
+      if (mounted) {
+        setState(
+          () => _safetyBackupMessage =
+              'Kurtarma yedeği için paylaşım ekranı açıldı.',
+        );
+      }
+    } on Object catch (error) {
+      if (mounted) {
+        setState(() => _safetyBackupMessage = _safeMessage(error));
+      }
+    } finally {
+      if (mounted) setState(() => _sharingSafetyBackupFileName = null);
+    }
+  }
+
   Future<void> _createBackup() async {
-    if (_backupBusy || _restoreBusy) return;
+    if (_anyOperationBusy) return;
     setState(() {
       _backupBusy = true;
       _backupStage = null;
@@ -100,7 +171,7 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
 
   Future<void> _shareBackup() async {
     final created = _created;
-    if (created == null || _backupBusy || _restoreBusy) return;
+    if (created == null || _anyOperationBusy) return;
     setState(() {
       _backupBusy = true;
       _backupMessage = null;
@@ -116,7 +187,7 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
   }
 
   Future<void> _pickPackage() async {
-    if (_backupBusy || _restoreBusy) return;
+    if (_anyOperationBusy) return;
     setState(() {
       _restoreBusy = true;
       _restoreMessage = null;
@@ -139,7 +210,7 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
 
   Future<void> _preflightPackage() async {
     final selected = _selectedPackage;
-    if (selected == null || _backupBusy || _restoreBusy) return;
+    if (selected == null || _anyOperationBusy) return;
     setState(() {
       _restoreBusy = true;
       _restoreMessage = null;
@@ -165,10 +236,7 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
 
   Future<void> _askFinalRestoreConfirmation() async {
     final preflight = _preflight;
-    if (preflight == null ||
-        !_replacementAcknowledged ||
-        _backupBusy ||
-        _restoreBusy) {
+    if (preflight == null || !_replacementAcknowledged || _anyOperationBusy) {
       return;
     }
     final confirmed = await showDialog<bool>(
@@ -219,6 +287,7 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
         _restoreMessage =
             'Geri yükleme tamamlandı. Şema ${result.activeSchemaVersion} etkin.';
       });
+      unawaited(_loadSafetyBackups());
     } on Object catch (error) {
       if (mounted) setState(() => _restoreMessage = _safeMessage(error));
     } finally {
@@ -279,9 +348,7 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
                     height: 48,
                     child: FilledButton.icon(
                       key: const Key('create-backup'),
-                      onPressed: _backupBusy || _restoreBusy
-                          ? null
-                          : _createBackup,
+                      onPressed: _anyOperationBusy ? null : _createBackup,
                       icon: _backupBusy
                           ? const SizedBox.square(
                               dimension: 20,
@@ -297,9 +364,7 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
                       height: 48,
                       child: OutlinedButton.icon(
                         key: const Key('share-backup'),
-                        onPressed: _backupBusy || _restoreBusy
-                            ? null
-                            : _shareBackup,
+                        onPressed: _anyOperationBusy ? null : _shareBackup,
                         icon: const Icon(Icons.ios_share_outlined),
                         label: const Text('Yedeği paylaş / kaydet'),
                       ),
@@ -316,6 +381,57 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
                   const SizedBox(height: 28),
                   const Divider(),
                   const SizedBox(height: 20),
+                  Text('Kurtarma yedekleri', style: theme.textTheme.titleLarge),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Tam geri yüklemeden hemen önce otomatik oluşturulan '
+                    'güvenlik kopyalarıdır. Paylaşmak veya kaydetmek bu yedeği '
+                    'geri yüklemez, mevcut kayıtlarla birleştirmez ve uygulama '
+                    'verisini değiştirmez.',
+                  ),
+                  const SizedBox(height: 12),
+                  if (_safetyBackupsLoading)
+                    const LinearProgressIndicator(
+                      key: Key('safety-backups-loading'),
+                    )
+                  else if (_safetyBackups.isEmpty &&
+                      _safetyBackupMessage == null)
+                    const Text(
+                      'Otomatik kurtarma yedeği bulunamadı.',
+                      key: Key('safety-backups-empty'),
+                    ),
+                  for (final backup in _safetyBackups) ...[
+                    _SafetyBackupCard(
+                      backup: backup,
+                      sharing: _sharingSafetyBackupFileName == backup.fileName,
+                      onShare: _anyOperationBusy || _safetyBackupsLoading
+                          ? null
+                          : () => _shareSafetyBackup(backup),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (_safetyBackupMessage != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _safetyBackupMessage!,
+                      key: const Key('safety-backups-message'),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      key: const Key('refresh-safety-backups'),
+                      onPressed: _anyOperationBusy || _safetyBackupsLoading
+                          ? null
+                          : _loadSafetyBackups,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Listeyi yenile'),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 20),
                   Text('Tam geri yükleme', style: theme.textTheme.titleLarge),
                   const SizedBox(height: 8),
                   const Text(
@@ -327,9 +443,7 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
                     height: 48,
                     child: OutlinedButton.icon(
                       key: const Key('pick-backup'),
-                      onPressed: _backupBusy || _restoreBusy
-                          ? null
-                          : _pickPackage,
+                      onPressed: _anyOperationBusy ? null : _pickPackage,
                       icon: const Icon(Icons.folder_open_outlined),
                       label: Text(
                         _selectedPackage == null
@@ -358,9 +472,7 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
                       height: 48,
                       child: FilledButton.tonalIcon(
                         key: const Key('preflight-backup'),
-                        onPressed: _backupBusy || _restoreBusy
-                            ? null
-                            : _preflightPackage,
+                        onPressed: _anyOperationBusy ? null : _preflightPackage,
                         icon: const Icon(Icons.verified_outlined),
                         label: const Text('Ön kontrolü çalıştır'),
                       ),
@@ -374,7 +486,7 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
                       contentPadding: EdgeInsets.zero,
                       minVerticalPadding: 12,
                       value: _replacementAcknowledged,
-                      onChanged: _restoreBusy
+                      onChanged: _anyOperationBusy
                           ? null
                           : (value) => setState(
                               () => _replacementAcknowledged = value ?? false,
@@ -389,9 +501,7 @@ class _MemoryBackupPageState extends State<MemoryBackupPage> {
                       child: FilledButton.icon(
                         key: const Key('restore-backup'),
                         onPressed:
-                            _replacementAcknowledged &&
-                                !_restoreBusy &&
-                                !_backupBusy
+                            _replacementAcknowledged && !_anyOperationBusy
                             ? _askFinalRestoreConfirmation
                             : null,
                         icon: const Icon(Icons.restore_rounded),
@@ -494,6 +604,57 @@ class _BackupCreationProgressSurface extends StatelessWidget {
   }
 }
 
+class _SafetyBackupCard extends StatelessWidget {
+  const _SafetyBackupCard({
+    required this.backup,
+    required this.sharing,
+    required this.onShare,
+  });
+
+  final MobileSafetyBackupMetadata backup;
+  final bool sharing;
+  final VoidCallback? onShare;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _formatUtcTimestamp(backup.createdAtUtc),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 6),
+            Text('Dosya: ${backup.fileName}'),
+            Text('Boyut: ${_formatBytes(backup.byteSize)}'),
+            SelectableText('SHA-256: ${backup.sha256}'),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                key: ValueKey('share-safety-backup-${backup.fileName}'),
+                onPressed: onShare,
+                icon: sharing
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.ios_share_outlined),
+                label: Text(
+                  sharing ? 'Paylaşım hazırlanıyor' : 'Paylaş / kaydet',
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({required this.title, required this.summary});
 
@@ -555,4 +716,12 @@ String _formatBytes(int bytes) {
   if (bytes < 1024) return '$bytes B';
   if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
   return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+}
+
+String _formatUtcTimestamp(DateTime value) {
+  final utc = value.toUtc();
+  String twoDigits(int number) => number.toString().padLeft(2, '0');
+  return '${twoDigits(utc.day)}.${twoDigits(utc.month)}.${utc.year} '
+      '${twoDigits(utc.hour)}:${twoDigits(utc.minute)}:${twoDigits(utc.second)} '
+      'UTC';
 }

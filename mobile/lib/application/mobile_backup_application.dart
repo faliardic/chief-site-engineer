@@ -56,6 +56,12 @@ abstract interface class MobileBackupApplication {
   Future<MobileBackupSummary?> lastSuccessfulBackup();
 }
 
+abstract interface class MobileSafetyBackupRecoveryApplication {
+  Future<List<MobileSafetyBackupMetadata>> listSafetyBackups();
+
+  Future<void> shareSafetyBackup(MobileSafetyBackupMetadata backup);
+}
+
 class MobileRestoreHooks {
   const MobileRestoreHooks({
     this.beforeSwap,
@@ -611,7 +617,8 @@ class CseBackupArchiveCodec {
   }
 }
 
-class SqliteMobileBackupApplication implements MobileBackupApplication {
+class SqliteMobileBackupApplication
+    implements MobileBackupApplication, MobileSafetyBackupRecoveryApplication {
   SqliteMobileBackupApplication({
     required this.directories,
     required this.databaseFactory,
@@ -662,6 +669,86 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
   @override
   Future<void> shareBackup(String absolutePath) =>
       fileGateway.sharePackage(absolutePath);
+
+  @override
+  Future<List<MobileSafetyBackupMetadata>> listSafetyBackups() async {
+    try {
+      final root = await _resolvedSafetyBackupRootOrNull();
+      if (root == null) return const [];
+      final backups = <MobileSafetyBackupMetadata>[];
+      await for (final entity in directories.exportsBackups.list(
+        followLinks: false,
+      )) {
+        final type = await FileSystemEntity.type(
+          entity.path,
+          followLinks: false,
+        );
+        if (type != FileSystemEntityType.file) {
+          throw const MobileBackupFailure(
+            'unsupported_safety_backup_object',
+            'Kurtarma yedekleri güvenli biçimde okunamadı.',
+          );
+        }
+        final fileName = path.basename(entity.path);
+        if (!fileName.startsWith('safety_before_restore_') ||
+            path.extension(fileName).toLowerCase() != '.csebackup') {
+          continue;
+        }
+        if (_parseSafetyBackupTimestamp(fileName) == null) {
+          throw const MobileBackupFailure(
+            'invalid_safety_backup_identity',
+            'Kurtarma yedeği kimliği güvenli değil.',
+          );
+        }
+        backups.add(await _inspectSafetyBackup(root, fileName));
+      }
+      backups.sort((left, right) {
+        final byCreated = right.createdAtUtc.compareTo(left.createdAtUtc);
+        if (byCreated != 0) return byCreated;
+        return left.fileName.compareTo(right.fileName);
+      });
+      return List<MobileSafetyBackupMetadata>.unmodifiable(backups);
+    } on MobileBackupFailure {
+      rethrow;
+    } on Object {
+      throw const MobileBackupFailure(
+        'safety_backup_list_failed',
+        'Kurtarma yedekleri güvenli biçimde okunamadı.',
+      );
+    }
+  }
+
+  @override
+  Future<void> shareSafetyBackup(MobileSafetyBackupMetadata backup) async {
+    try {
+      final root = await _resolvedSafetyBackupRootOrNull();
+      if (root == null) {
+        throw const MobileBackupFailure(
+          'safety_backup_unavailable',
+          'Kurtarma yedeği artık kullanılamıyor.',
+        );
+      }
+      final inspected = await _inspectSafetyBackup(root, backup.fileName);
+      if (inspected.byteSize != backup.byteSize ||
+          inspected.sha256 != backup.sha256 ||
+          inspected.createdAtUtc != backup.createdAtUtc) {
+        throw const MobileBackupFailure(
+          'safety_backup_changed',
+          'Kurtarma yedeği listelendikten sonra değişti; paylaşım durduruldu.',
+        );
+      }
+      final candidate = File(path.join(root, inspected.fileName));
+      await _requireResolvedSafetyBackupFile(root, candidate);
+      await fileGateway.sharePackage(candidate.path);
+    } on MobileBackupFailure {
+      rethrow;
+    } on Object {
+      throw const MobileBackupFailure(
+        'safety_backup_share_failed',
+        'Kurtarma yedeği güvenli biçimde paylaşılamadı.',
+      );
+    }
+  }
 
   @override
   Future<PickedBackupPackage?> pickBackupPackage([
@@ -1106,6 +1193,172 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
   Future<String> _sha256File(File source) async =>
       (await hashes.sha256.bind(source.openRead()).first).toString();
 
+  Future<String?> _resolvedSafetyBackupRootOrNull() async {
+    directories.validate();
+    final applicationRoot = directories.root;
+    final backupRoot = directories.exportsBackups;
+    final applicationRootType = await FileSystemEntity.type(
+      applicationRoot.path,
+      followLinks: false,
+    );
+    final backupRootType = await FileSystemEntity.type(
+      backupRoot.path,
+      followLinks: false,
+    );
+    if (backupRootType == FileSystemEntityType.notFound) return null;
+    if (applicationRootType != FileSystemEntityType.directory ||
+        backupRootType != FileSystemEntityType.directory) {
+      throw const MobileBackupFailure(
+        'unsafe_safety_backup_root',
+        'Kurtarma yedeği alanı güvenli değil.',
+      );
+    }
+    final resolvedApplicationRoot = path.normalize(
+      path.absolute(await applicationRoot.resolveSymbolicLinks()),
+    );
+    final resolvedBackupRoot = path.normalize(
+      path.absolute(await backupRoot.resolveSymbolicLinks()),
+    );
+    if (!path.equals(
+          path.dirname(resolvedBackupRoot),
+          resolvedApplicationRoot,
+        ) ||
+        path.basename(resolvedBackupRoot) !=
+            path.basename(directories.exportsBackups.path)) {
+      throw const MobileBackupFailure(
+        'unsafe_safety_backup_root',
+        'Kurtarma yedeği alanı güvenli değil.',
+      );
+    }
+    return resolvedBackupRoot;
+  }
+
+  Future<MobileSafetyBackupMetadata> _inspectSafetyBackup(
+    String resolvedRoot,
+    String fileName,
+  ) async {
+    final createdAt = _parseSafetyBackupTimestamp(fileName);
+    if (createdAt == null || path.basename(fileName) != fileName) {
+      throw const MobileBackupFailure(
+        'invalid_safety_backup_identity',
+        'Kurtarma yedeği kimliği güvenli değil.',
+      );
+    }
+    final candidate = File(path.join(resolvedRoot, fileName));
+    await _requireResolvedSafetyBackupFile(resolvedRoot, candidate);
+    final before = await candidate.stat();
+    if (before.type != FileSystemEntityType.file ||
+        before.size <= 0 ||
+        before.size > maximumPackageBytes) {
+      throw const MobileBackupFailure(
+        'invalid_safety_backup_file',
+        'Kurtarma yedeği güvenli biçimde okunamadı.',
+      );
+    }
+    var streamedBytes = 0;
+    final digest =
+        (await hashes.sha256
+                .bind(
+                  candidate.openRead().map((chunk) {
+                    streamedBytes += chunk.length;
+                    if (streamedBytes > maximumPackageBytes) {
+                      throw const MobileBackupFailure(
+                        'invalid_safety_backup_file',
+                        'Kurtarma yedeği güvenli biçimde okunamadı.',
+                      );
+                    }
+                    return chunk;
+                  }),
+                )
+                .first)
+            .toString();
+    await _requireResolvedSafetyBackupFile(resolvedRoot, candidate);
+    final after = await candidate.stat();
+    if (after.type != FileSystemEntityType.file ||
+        after.size != before.size ||
+        after.size != streamedBytes ||
+        after.modified != before.modified) {
+      throw const MobileBackupFailure(
+        'safety_backup_changed',
+        'Kurtarma yedeği okunurken değişti; işlem durduruldu.',
+      );
+    }
+    return MobileSafetyBackupMetadata(
+      fileName: fileName,
+      byteSize: after.size,
+      sha256: digest,
+      createdAtUtc: createdAt,
+    );
+  }
+
+  Future<void> _requireResolvedSafetyBackupFile(
+    String resolvedRoot,
+    File candidate,
+  ) async {
+    final normalizedCandidate = path.normalize(path.absolute(candidate.path));
+    if (!path.equals(path.dirname(normalizedCandidate), resolvedRoot) ||
+        !path.isWithin(resolvedRoot, normalizedCandidate) ||
+        path.basename(normalizedCandidate) != path.basename(candidate.path)) {
+      throw const MobileBackupFailure(
+        'unsafe_safety_backup_path',
+        'Kurtarma yedeği yolu güvenli değil.',
+      );
+    }
+    final type = await FileSystemEntity.type(
+      normalizedCandidate,
+      followLinks: false,
+    );
+    if (type != FileSystemEntityType.file) {
+      throw const MobileBackupFailure(
+        'safety_backup_unavailable',
+        'Kurtarma yedeği artık kullanılamıyor.',
+      );
+    }
+    final resolvedCandidate = path.normalize(
+      path.absolute(await candidate.resolveSymbolicLinks()),
+    );
+    if (!path.equals(path.dirname(resolvedCandidate), resolvedRoot) ||
+        !path.isWithin(resolvedRoot, resolvedCandidate) ||
+        path.basename(resolvedCandidate) !=
+            path.basename(normalizedCandidate)) {
+      throw const MobileBackupFailure(
+        'unsafe_safety_backup_path',
+        'Kurtarma yedeği yolu güvenli değil.',
+      );
+    }
+  }
+
+  DateTime? _parseSafetyBackupTimestamp(String fileName) {
+    final match = _safetyBackupFileName.firstMatch(fileName);
+    if (match == null) return null;
+    final values = [
+      for (var index = 1; index <= 6; index++) int.parse(match[index]!),
+    ];
+    final timestamp = DateTime.utc(
+      values[0],
+      values[1],
+      values[2],
+      values[3],
+      values[4],
+      values[5],
+    );
+    if (timestamp.year != values[0] ||
+        timestamp.month != values[1] ||
+        timestamp.day != values[2] ||
+        timestamp.hour != values[3] ||
+        timestamp.minute != values[4] ||
+        timestamp.second != values[5]) {
+      return null;
+    }
+    final operationMicros = int.tryParse(match[7]!);
+    if (operationMicros == null) return null;
+    final operationTime = DateTime.fromMicrosecondsSinceEpoch(
+      operationMicros,
+      isUtc: true,
+    );
+    return operationTime == timestamp ? timestamp : null;
+  }
+
   bool _isSafeBackupFileName(String value) {
     final trimmed = value.trim();
     return trimmed.isNotEmpty &&
@@ -1114,6 +1367,10 @@ class SqliteMobileBackupApplication implements MobileBackupApplication {
         !RegExp(r'[\x00-\x1f\x7f/\\]').hasMatch(trimmed) &&
         path.extension(trimmed).toLowerCase() == '.csebackup';
   }
+
+  static final RegExp _safetyBackupFileName = RegExp(
+    r'^safety_before_restore_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})_(\d+)-([0-9a-f]{12})\.csebackup$',
+  );
 
   Future<void> _activatePreparedRestore(
     _PreparedRestore prepared,
