@@ -210,3 +210,104 @@ review_recommendation:
     - quick_capture_and_detail_ui
     - no_automatic_reminder_notification_or_platform_integration
 ```
+
+## Category invariant correction authority 5427661054
+
+- Owner correction authority:
+  `https://github.com/faliardic/chief-site-engineer/issues/492#issuecomment-5427661054`.
+- Execution handoff:
+  `https://github.com/faliardic/chief-site-engineer/issues/492#issuecomment-5427801847`.
+- Independent review blocker: normal Agenda edit could change a phone-call
+  result category away from `meeting_decision` while immutable phone-call
+  identity/context remained attached.
+- Correction start branch: `codex/issue-492-phone-call-agenda-v1`.
+- Correction start HEAD: `7683eb1df006a5b59a061763b2f9da7f2f7b5483`.
+- Pre-edit worktree state: clean; staged, unstaged and untracked paths `0`.
+- Exact correction allowlist:
+  `mobile/lib/application/agenda_application.dart`,
+  `mobile/lib/storage/app_database.dart`, and this append-only result file.
+- Manual tests `MT-492-001..012` remain `DEFERRED`; no test execution or PASS
+  claim is authorized.
+- Authorized validation budget: touched Dart formatting, exactly one
+  additional `flutter analyze --no-pub`, `git diff --check`, and the bounded
+  source/drift audits recorded by the owner authority.
+
+## Category invariant correction result
+
+- Application invariant: `updateAgendaLog()` now reads the existing
+  observation's append-only `created` event before the idempotent event lookup
+  or any persistent update/event mutation. It reuses
+  `_isPhoneCallCreateEvent(...)` and rejects a requested category other than
+  `AgendaCategory.meetingDecision` only when the exact payload marker is
+  `capture_source = phone_call_result`.
+- Existing description, notes, observed time and mahal update flow remains
+  after the invariant guard and is otherwise unchanged.
+- Database invariant: the existing schema-19 additive migration now creates a
+  `BEFORE UPDATE OF category ON field_observations` trigger. The trigger
+  rejects a non-`meeting_decision` category when the exact old Agenda
+  identity/project has an `agenda_phone_call_contexts` row.
+- Party-less phone-call results remain protected by the application create
+  event invariant; no new marker/context semantics were added.
+
+### Correction validation
+
+- Touched Dart formatting: PASS; exact touched Dart paths `2/2`.
+- Exactly one additional `flutter analyze --no-pub` invocation: PASS;
+  `No issues found` in 9.9 seconds.
+- Analyzer correction budget: `1/1` used; no retry.
+- `git diff --check`: PASS before final evidence append; final check follows
+  this append without another source mutation.
+- Exact correction paths: `3/3`; unexpected paths: `0`.
+- Schema source: exact `19`; version-19 migration registration remains exact.
+- Migration correction: one additive `CREATE TRIGGER`; schema bump, existing
+  table rebuild/rename/drop and existing user-row UPDATE/DELETE: `0`.
+- Backup format: exact `1`.
+- Mobile version: exact `0.1.0+1`.
+- `pubspec.yaml` / `pubspec.lock` drift: `0`.
+- Android/iOS/Linux/macOS/Windows/web production drift: `0`.
+- `READ_CALL_LOG`, `READ_CONTACTS`, phone-state/call permission additions:
+  `0`.
+- Automatic Reminder, notification, Work Chain or background mutation: `0`.
+- Flutter unit/widget/integration/full tests, APK/AAB build, emulator,
+  ADB/device and scripted UI acceptance: not run.
+- Manual tests `MT-492-001..012`: `DEFERRED`; no PASS claim.
+- Publication boundary remains one narrow correction commit and normal push to
+  Draft PR #493. Ready, merge, Issue closure, V2.10 completion and V2.11 remain
+  unauthorized.
+
+```yaml
+execution_record:
+  policy_version: CSE-MRP-1.0
+  task_risk: R4
+  requested_model: gpt-5.6-sol
+  requested_reasoning_effort: max
+  actual_model: unknown
+  actual_reasoning_effort: null
+  invocation_verification_status: unverified
+  execution_mode: standard
+  orchestration: single-agent
+  verification_mode: owner_led_manual_testing
+  correction_authority: 5427661054
+  execution_handoff: 5427801847
+  correction_start_head: 7683eb1df006a5b59a061763b2f9da7f2f7b5483
+  analyzer_additional_budget: 1
+  analyzer_additional_used: 1
+  analyzer_result: PASS
+  application_tests_run: false
+  build_run: false
+  device_run: false
+  implementation_status: IMPLEMENTED
+  manual_test_status: DEFERRED
+  final_status: implemented_manual_test_deferred_pending_independent_re_review
+```
+
+```yaml
+review_recommendation:
+  status: independent_source_diff_re_review_required
+  scope:
+    - phone_call_create_event_category_guard
+    - schema_19_context_category_trigger
+    - no_persistent_mutation_before_application_failure
+    - unchanged_description_notes_observed_time_location_edit_semantics
+  publication_state: draft_only
+```

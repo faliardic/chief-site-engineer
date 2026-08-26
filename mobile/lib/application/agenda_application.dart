@@ -1236,6 +1236,18 @@ class SqliteAgendaApplication
             'Ajanda kaydı başka bir işlemde değişti; yeniden açın.',
           );
         }
+        final createEvents = await transaction.query(
+          'observation_events',
+          columns: ['payload_json'],
+          where: "observation_id = ? AND event_type = 'created'",
+          whereArgs: [current.id],
+        );
+        if (command.category != AgendaCategory.meetingDecision &&
+            createEvents.any(_isPhoneCallCreateEvent)) {
+          throw const AgendaValidationFailure(
+            'Görüşme sonucu kategorisi değiştirilemez.',
+          );
+        }
         final priorEvent = await transaction.query(
           'observation_events',
           where: 'id = ?',

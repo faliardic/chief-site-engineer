@@ -4346,6 +4346,23 @@ Future<void> _applyAgendaPhoneCallMigration(Transaction transaction) async {
     END
   ''');
   await transaction.execute('''
+    CREATE TRIGGER agenda_phone_call_contexts_source_category_update
+    BEFORE UPDATE OF category ON field_observations
+    WHEN NEW.category != 'meeting_decision'
+      AND EXISTS (
+        SELECT 1
+        FROM agenda_phone_call_contexts context
+        WHERE context.agenda_log_id = OLD.id
+          AND context.project_id = OLD.project_id
+      )
+    BEGIN
+      SELECT RAISE(
+        ABORT,
+        'phone call agenda category must remain meeting decision'
+      );
+    END
+  ''');
+  await transaction.execute('''
     CREATE TRIGGER agenda_phone_call_contexts_timestamp_insert
     BEFORE INSERT ON agenda_phone_call_contexts
     WHEN length(NEW.created_at) != 20
