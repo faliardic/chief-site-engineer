@@ -1,5 +1,6 @@
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/attendance_application.dart';
+import 'package:chief_site_engineer/application/context_suggestion_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
@@ -15,12 +16,14 @@ class RemindersPage extends StatefulWidget {
   const RemindersPage({
     required this.agenda,
     this.attendance,
+    this.contextSuggestions,
     this.projectLocations,
     super.key,
   });
 
   final AgendaApplication agenda;
   final AttendanceApplication? attendance;
+  final ContextSuggestionApplication? contextSuggestions;
   final ProjectLocationApplication? projectLocations;
 
   @override
@@ -282,6 +285,7 @@ class _RemindersPageState extends State<RemindersPage> {
                       MaterialPageRoute(
                         builder: (_) => ReminderFormPage(
                           agenda: widget.agenda,
+                          contextSuggestions: widget.contextSuggestions,
                           projectLocations: widget.projectLocations,
                         ),
                       ),

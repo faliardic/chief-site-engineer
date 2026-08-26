@@ -5,6 +5,7 @@ import 'package:chief_site_engineer/application/attendance_application.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/application/construction_living_plan_application.dart';
 import 'package:chief_site_engineer/application/construction_living_plan_intelligence_application.dart';
+import 'package:chief_site_engineer/application/context_suggestion_application.dart';
 import 'package:chief_site_engineer/application/daily_log_application.dart';
 import 'package:chief_site_engineer/application/material_request_application.dart';
 import 'package:chief_site_engineer/application/mobile_backup_application.dart';
@@ -45,6 +46,7 @@ class BootstrapSuccess extends BootstrapResult {
     this.dailyLog,
     this.workChain,
     this.materialRequests,
+    this.contextSuggestions,
     this.projectLocations,
     this.attendance,
     this.concrete,
@@ -64,6 +66,7 @@ class BootstrapSuccess extends BootstrapResult {
   final DailyLogApplicationPort? dailyLog;
   final WorkChainApplicationPort? workChain;
   final MaterialRequestApplicationPort? materialRequests;
+  final ContextSuggestionApplication? contextSuggestions;
   final ProjectLocationApplication? projectLocations;
   final AttendanceApplication? attendance;
   final ConcreteApplication? concrete;
@@ -201,6 +204,11 @@ class AppBootstrap {
         clock: clock,
         coordinator: coordinator,
       );
+      final contextSuggestions = SqliteContextSuggestionApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactory,
+        coordinator: coordinator,
+      );
       final attendance = SqliteAttendanceApplication(
         databasePath: directories.databaseFile,
         databaseFactory: databaseFactory,
@@ -266,6 +274,7 @@ class AppBootstrap {
         dailyLog: dailyLog,
         workChain: workChain,
         materialRequests: materialRequests,
+        contextSuggestions: contextSuggestions,
         projectLocations: agenda,
         attendance: attendance,
         concrete: concrete,

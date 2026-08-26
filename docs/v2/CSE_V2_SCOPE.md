@@ -2,9 +2,9 @@
 
 **Belge türü:** Güncel ürün yürütme kapsamı
 **Durum:** Kanonik V2 kapsam ve sıra kaynağı
-**Tarih:** 25 Ağustos 2026
-**Güncel yön kaynağı:** Issue #485 — İstenecek Malzemeler v1 source-of-truth + lifecycle UI
-**Güncel güvenli `master`:** `dbe370e61b5ece843238c35e049bbaa4e7df19cb` / PR #484
+**Tarih:** 26 Ağustos 2026
+**Güncel yön kaynağı:** Issue #490 — Deterministic kişi/firma önerileri Slice 1
+**Güncel güvenli `master`:** `ffff4010499bb8c31cbe4679cd2e0e4c5f2816fc` / PR #489
 
 ## 1. Belgenin rolü
 
@@ -50,17 +50,19 @@ V1 tarihsel baseline'dır. V2, aynı offline-first mobil ürünü yeniden yazmak
 yerine bu baseline üzerinde ilerler.
 
 Güncel merged V2 teknik baseline'ı V1 metadata'sından ayrıdır: mobile version
-`0.1.0+1`, SQLite schema `17`, backup format `1` ve son güvenli merge
-`dbe370e61b5ece843238c35e049bbaa4e7df19cb` / PR #484 değeridir. Bu baseline,
+`0.1.0+1`, SQLite schema `18`, backup format `1` ve son güvenli merge
+`ffff4010499bb8c31cbe4679cd2e0e4c5f2816fc` / PR #489 değeridir. Bu baseline,
 schedule runtime ve persistent immutable reference-schedule snapshot temeliyle
 Living Plan MVP Core, 7-day UI/APK/device acceptance, Actual Progress Core ve
 progress UI/isolated device acceptance, deterministic forecast core ve immutable
 snapshot dependency graph persistence ve read-only downstream dependency impact
 core'u, Issue #476 / PR #480 Living Plan intelligence UI implementation'ını ve
-Issue #481 / PR #482 Deterministic Günlük Log v1 read modelini ve Issue #483 /
-PR #484 read-only İş Zinciri v1'i içerir. Living
-Plan UI manual testleri pending, Günlük Log manual testleri deferred kalır; mutation/
-reforecast, public/store release veya genel production readiness ilanı değildir.
+Issue #481 / PR #482 Deterministic Günlük Log v1 read modelini, Issue #483 /
+PR #484 read-only İş Zinciri v1'i, Issue #485 / PR #486 İstenecek Malzemeler
+v1'i ve Issue #488 / PR #489 bounded-memory backup package correction'ını
+içerir. Living Plan ve Material Request manual testleri pending, Günlük Log ve
+İş Zinciri manual testleri deferred kalır; mutation/reforecast, public/store
+release veya genel production readiness ilanı değildir.
 
 ## 3. V2'nin amacı
 
@@ -83,7 +85,9 @@ Proje/Mahal, Saha Rehberi, Attachment ve Ajanda omurgası — complete
 → Issue #476 Living Plan Intelligence UI — merged / PR #480 / manual test pending
 → Issue #481 / PR #482 Deterministic Günlük Log v1 — merged / manual test deferred
 → Issue #483 / PR #484 Agenda–Takip İş Zinciri v1 — merged / manual test deferred
-→ Issue #485 İstenecek Malzemeler v1 — current
+→ Issue #485 / PR #486 İstenecek Malzemeler v1 — merged / manual test pending
+→ Issue #488 / PR #489 bounded-memory backup package correction — merged
+→ Issue #490 Deterministic kişi/firma önerileri Slice 1 — current / not merged
 → schedule mutation/reforecast, actual quantity ve productivity learning — not started
 ```
 
@@ -104,8 +108,8 @@ baseline değildir.
 | 5 | 7 Günlük Yaşayan İş Programı / İş ve Gün Planı | Implemented — manual test pending |
 | 6 | Günlük Log Çıktısı v1 | Implemented — manual test deferred; completion not declared |
 | 7 | İş Zinciri / Bağlı Log v1 | Implemented — manual test deferred; completion not declared |
-| 8 | İstenecek Malzemeler | Current — not complete |
-| 9 | Deterministik kişi/firma/etiket önerileri | Planned |
+| 8 | İstenecek Malzemeler | Implemented — manual test pending |
+| 9 | Deterministik kişi/firma/etiket önerileri | Current — Slice 1; not complete |
 | 10 | Telefon görüşmesi sonucu → Ajanda | Planned |
 | 11 | Proje fotoğraf/video albümü | Planned |
 | 12 | Günlük Log Çıktısı v2 | Planned |
@@ -292,7 +296,7 @@ Amaç:
 - Tam satın alma veya ERP sistemi kurmadan sahadaki malzeme ihtiyacını izlemek.
 - Malzeme, miktar/birim, ihtiyaç tarihi, öncelik, açıklama ve durum tutmak.
 - İlk durum zincirini `İhtiyaç var → İstendi → Geldi / İptal` ile sınırlamak.
-- Issue #485 yalnız additive schema 18 material request source-of-truth,
+- Issue #485 / PR #486 yalnız additive schema 18 material request source-of-truth,
   append-only events, optimistic revision, same-project mahal/Living Plan
   linkleri ve sade Home UI'yı kapsar.
 - Backup format 1 ve version 0.1.0+1 değişmez; satın alma/ERP, tedarikçi,
@@ -313,6 +317,17 @@ Amaç:
 - Yeni kişi, firma veya etiket uydurmamak.
 - Kullanıcı seçmeden kalıcı mutation yapmamak.
 - Offline ve deterministik kalmak.
+- Issue #490 current Slice 1, exact seçili projedeki aktif Saha Rehberi
+  kişilerini ve aktif firma/işveren kayıtlarını canonical kaynak olarak okur.
+- Aynı projedeki Reminder `related_person` geçmişi yalnız exact-string,
+  provenance'ı görünür secondary source olabilir; başka projeden veya private
+  kayıttan öneri üretilmez.
+- Sıralama match kalitesi, canonical-source önceliği, güvenli kullanım/recency
+  sinyali ve stable tie-breaker ile bounded ve deterministiktir.
+- Slice 1'de canonical reusable tag kaynağı yoktur; `tag_source_unavailable`
+  normal sonuçtur. Tag üretimi veya etiket icadı yapılmaz.
+- Öneri seçimi yalnız form alanını doldurur; Save ayrı mutation sınırıdır.
+  Query/read hatası capture akışını engellemez.
 
 Kapanış kapısı:
 
@@ -482,8 +497,11 @@ merged predecessor zinciridir. Progress UI + isolated device acceptance PR
 #469 ile merged predecessor'a eklenmiş, deterministic forecast core PR #471 ve
 immutable snapshot dependency graph persistence PR #473 ve downstream impact
 core PR #475 ve Living Plan intelligence UI PR #480 ile merge edilmiştir.
-Güncel güvenli `master` `bce486c92604ee38ec74c9d5300c3157794f7924`,
-schema `17` ve backup format `1`dir.
+Issue #485 / PR #486 İstenecek Malzemeler v1'i schema `18` additive temeline
+eklemiş, Issue #488 / PR #489 ise backup formatını değiştirmeden final package
+buffer'ındaki kanıtlanmış ekstra büyük kopyayı kaldırmıştır. Güncel güvenli
+`master` `ffff4010499bb8c31cbe4679cd2e0e4c5f2816fc`, schema `18` ve backup
+format `1`dir.
 
 Güncel canonical faz:
 
@@ -498,7 +516,9 @@ Living Plan MVP Core — merged / PR #463
 → Issue #476 Living Plan Intelligence UI — merged / PR #480 / manual test pending
 → Issue #481 / PR #482 Deterministic Günlük Log v1 — merged / manual test deferred
 → Issue #483 / PR #484 Agenda–Takip İş Zinciri v1 — merged / manual test deferred
-→ Issue #485 İstenecek Malzemeler v1 — current
+→ Issue #485 / PR #486 İstenecek Malzemeler v1 — merged / manual test pending
+→ Issue #488 / PR #489 bounded-memory backup package correction — merged
+→ Issue #490 Deterministic kişi/firma önerileri Slice 1 — current / not merged
 ```
 
 Issue #466 / PR #467 nullable actual-progress source-of-truth foundation'ını
@@ -515,8 +535,13 @@ hesaplayan merged predecessor'dır. Issue #476 / PR #480 exact bound forecast/
 impact'i Living Plan kart/detail UI'da gösteren merged implementation'dır;
 manual testleri #479'da pending kalır. Issue #481 / PR #482 exact project ve
 İstanbul günü için salt-okunur deterministic Günlük Log v1 projection'ını
-`IMPLEMENTED — MANUAL TEST DEFERRED` olarak merge etmiştir. Issue #483 yalnız
+`IMPLEMENTED — MANUAL TEST DEFERRED` olarak merge etmiştir. Issue #483 / PR #484
 explicit stable Ajanda–takip bağını lifecycle ve sonuçla read-only görünür kılan
-current V2.7 Slice'ıdır. Schedule mutation/reforecast, actual quantity,
-productivity learning, daily-log/work-chain persistence ve public/store release
-başlamaz. V2.5, V2.6 ve V2.7 final completion ilanları ayrı owner kararına bağlıdır.
+merged V2.7 Slice'ıdır. Issue #485 / PR #486 material request source-of-truth ve
+lifecycle UI'yı schema `18` additive temeline ekleyen merged V2.8 Slice'ıdır;
+manual testleri pending kalır. Issue #490 current V2.9 Slice 1'de seçili proje
+için read-only deterministic kişi/firma öneri sınırını ve ilk Reminder
+consumer'ını kurar; merge veya V2.9 completion ilanı değildir. Schedule
+mutation/reforecast, actual quantity, productivity learning,
+daily-log/work-chain persistence ve public/store release başlamaz. V2.5,
+V2.6, V2.7, V2.8 ve V2.9 final completion ilanları ayrı owner kararına bağlıdır.

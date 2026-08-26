@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/application/context_suggestion_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/domain/context_suggestion_models.dart';
 import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/features/agenda/project_location_catalog_page.dart';
 import 'package:clock/clock.dart';
@@ -12,12 +14,14 @@ import 'package:flutter/material.dart';
 class ReminderFormPage extends StatefulWidget {
   const ReminderFormPage({
     required this.agenda,
+    this.contextSuggestions,
     this.projectLocations,
     this.log,
     super.key,
   });
 
   final AgendaApplication agenda;
+  final ContextSuggestionApplication? contextSuggestions;
   final ProjectLocationApplication? projectLocations;
   final AgendaLog? log;
 
@@ -41,6 +45,9 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   bool _loadingLocations = false;
   String? _locationError;
   int _locationLoadGeneration = 0;
+  List<ContextSuggestion> _contextSuggestions = const [];
+  Timer? _suggestionDebounce;
+  int _suggestionLoadGeneration = 0;
   ReminderKind _kind = ReminderKind.action;
   ReminderScheduleKind _schedule = ReminderScheduleKind.in15Minutes;
   String? _quickSchedulePreviewAt;
@@ -72,7 +79,10 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
     _projectSubscription = widget.agenda.projectChanges.listen(
       (_) => _loadProjects(),
     );
-    _loadProjects().then((_) => _loadLocations());
+    _loadProjects().then((_) async {
+      await _loadLocations();
+      _scheduleSuggestionLoad();
+    });
   }
 
   Future<void> _loadProjects() async {
@@ -128,8 +138,44 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
       _projectId = projectId;
       _locationId = null;
       _location.clear();
+      _contextSuggestions = const [];
     });
     await _loadLocations();
+    _scheduleSuggestionLoad();
+  }
+
+  void _scheduleSuggestionLoad([String? rawQuery]) {
+    _suggestionDebounce?.cancel();
+    final generation = ++_suggestionLoadGeneration;
+    final application = widget.contextSuggestions;
+    final projectId = widget.log?.projectId ?? _projectId;
+    if (application == null || projectId == null) {
+      if (mounted && _contextSuggestions.isNotEmpty) {
+        setState(() => _contextSuggestions = const []);
+      }
+      return;
+    }
+    final query = rawQuery ?? _relatedPerson.text;
+    _suggestionDebounce = Timer(const Duration(milliseconds: 200), () async {
+      try {
+        final suggestions = await application.suggestPeopleAndCompanies(
+          ContextSuggestionQuery(projectId: projectId, query: query),
+        );
+        if (!mounted || generation != _suggestionLoadGeneration) return;
+        setState(() => _contextSuggestions = suggestions);
+      } on Object {
+        if (!mounted || generation != _suggestionLoadGeneration) return;
+        setState(() => _contextSuggestions = const []);
+      }
+    });
+  }
+
+  void _selectContextSuggestion(ContextSuggestion suggestion) {
+    _relatedPerson.text = suggestion.displayValue;
+    _relatedPerson.selection = TextSelection.collapsed(
+      offset: suggestion.displayValue.length,
+    );
+    _scheduleSuggestionLoad(suggestion.displayValue);
   }
 
   Future<void> _openLocationCatalog() async {
@@ -150,6 +196,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   @override
   void dispose() {
     _projectSubscription?.cancel();
+    _suggestionDebounce?.cancel();
     _title.dispose();
     _description.dispose();
     _location.dispose();
@@ -509,11 +556,50 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
                 TextField(
                   key: const Key('reminder-related-person'),
                   controller: _relatedPerson,
+                  onChanged: _scheduleSuggestionLoad,
                   decoration: const InputDecoration(
-                    labelText: 'İlgili kişi',
+                    labelText: 'İlgili kişi / Firma',
                     border: OutlineInputBorder(),
                   ),
                 ),
+                if (_contextSuggestions.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Öneriler',
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Column(
+                    key: const Key('reminder-context-suggestions'),
+                    children: [
+                      for (final suggestion in _contextSuggestions)
+                        Card(
+                          margin: const EdgeInsets.only(bottom: 6),
+                          child: ListTile(
+                            key: ValueKey(
+                              'reminder-context-suggestion-'
+                              '${suggestion.sourceType.name}-'
+                              '${suggestion.sourceId ?? suggestion.displayValue}',
+                            ),
+                            dense: true,
+                            leading: Icon(
+                              suggestion.kind == ContextSuggestionKind.person
+                                  ? Icons.person_outline
+                                  : Icons.business_outlined,
+                            ),
+                            title: Text(suggestion.displayValue),
+                            subtitle: Text(
+                              _contextSuggestionSourceLabel(suggestion),
+                            ),
+                            onTap: () => _selectContextSuggestion(suggestion),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 12),
                 TextField(
                   key: const Key('reminder-condition'),
@@ -695,6 +781,21 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
       ],
     );
   }
+}
+
+String _contextSuggestionSourceLabel(ContextSuggestion suggestion) {
+  final base = switch (suggestion.sourceType) {
+    ContextSuggestionSourceType.workforceMember => 'Saha Rehberi • aktif kişi',
+    ContextSuggestionSourceType.subcontractor => 'Firma / İşveren • aktif',
+    ContextSuggestionSourceType.historicalRelatedPerson =>
+      'Bu projedeki önceki kullanım',
+  };
+  if (suggestion.sourceType ==
+          ContextSuggestionSourceType.historicalRelatedPerson ||
+      suggestion.historicalUsageCount == 0) {
+    return base;
+  }
+  return '$base • önceki kullanım';
 }
 
 class _ReminderLocationOption {
