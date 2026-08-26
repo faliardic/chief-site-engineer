@@ -118,3 +118,52 @@ read-only/coordinator/handle-close behavior, deterministic ranking and stable
 tie-breakers, explicit historical provenance, Reminder select-versus-Save
 separation, non-blocking failure behavior and exact 12-path scope. Keep the PR
 Draft; do not infer manual-test PASS, Ready, merge or V2.9 completion.
+
+## Correction — project-switch suggestion isolation
+
+Owner authority:
+`https://github.com/faliardic/chief-site-engineer/issues/490#issuecomment-5425133761`
+
+- Resume head/upstream: `2b757e4701b7eb440179b0b9134f9efd293d4a2a`.
+- Resume branch: `codex/issue-490-context-suggestions-v1` / Draft PR #491.
+- Resume worktree/stage: clean / `0`.
+- Exact root cause: a real project change cleared visible suggestions but did
+  not cancel a pending debounce or invalidate the current suggestion generation
+  until after the awaited location reload. An old-project completion could
+  therefore repopulate stale suggestions during that await.
+- Narrow correction: `_selectProject()` now synchronously cancels the pending
+  suggestion debounce and increments `_suggestionLoadGeneration` immediately
+  after the same-project no-op guard and before `setState` or any `await`.
+  Existing visible-clear, location reload, new exact-project scheduling and
+  in-flight generation guard remain unchanged.
+- Production correction diff against the published PR head: exactly one file
+  and two added statements in
+  `mobile/lib/features/reminders/reminder_form_page.dart`.
+- Touched Dart format: PASS, `0` formatter changes after the correction.
+- Exactly one authorized correction `flutter analyze --no-pub` retry: PASS,
+  `No issues found`.
+- Pre-evidence `git diff --check`: PASS.
+- Schema `18`, backup format `1`, version `0.1.0+1`: unchanged.
+- Pubspec/lock, Android/iOS platform-production and protected source drift: `0`.
+- New write/mutation path: `0`.
+- Ranking, source, model/application, Reminder Save/notification and all other
+  product semantics: unchanged.
+- Flutter unit/widget/integration/full tests, build, emulator, ADB/device and
+  scripted UI acceptance: not run by exact authority.
+- `MT-490-001..010` remain `PENDING`; implementation classification remains
+  `IMPLEMENTED — MANUAL TEST PENDING`.
+- Correction publication target: one correction commit, normal push to the
+  existing branch, PR #491 remains Draft, then independent re-review.
+
+```yaml
+correction_execution_record:
+  task_risk: R4
+  requested_model: gpt-5.6-sol
+  requested_reasoning_effort: max
+  assistant_reasoning_recommendation: Extra High
+  actual_model: unknown
+  actual_reasoning_effort: null
+  invocation_verification_status: unverified
+  phone_connection_required: false
+  correction_scope: project_switch_suggestion_generation_invalidation
+```

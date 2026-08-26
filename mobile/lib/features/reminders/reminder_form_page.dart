@@ -134,6 +134,8 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
 
   Future<void> _selectProject(String? projectId) async {
     if (projectId == _projectId) return;
+    _suggestionDebounce?.cancel();
+    _suggestionLoadGeneration += 1;
     setState(() {
       _projectId = projectId;
       _locationId = null;
