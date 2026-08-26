@@ -16,6 +16,7 @@ repository gerçeğinden devam etme yöntemini tanımlar.
 | Güncel V2 kapsamı ve bağımlılıkları | `docs/v2/CSE_V2_SCOPE.md` |
 | Güncel yürütme sırası | `ROADMAP.md` |
 | Operasyon ve Git/Codex güvenliği | `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` |
+| Codex execution handoff / GitHub comment standardı | `docs/protocols/CSE_CODEX_INSTRUCTION_COMMENT_PROTOCOL.md` |
 | Doğrulama genişliği ve bütçesi | `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md` |
 | Kaynak rolleri ve tarihsel otorite kaydı | `docs/protocols/CSE_PROJECT_SOURCE_REGISTER.md` |
 | Repository-level kısa talimat | `AGENTS.md` |
@@ -50,18 +51,20 @@ edemez.
 1. `AGENTS.md`
 2. `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
 3. `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
-4. `docs/protocols/CSE_MODEL_REASONING_ROUTING_POLICY.md`
-5. `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`
-6. Bu bootstrap belgesi
-7. `docs/protocols/CSE_PROJECT_SOURCE_REGISTER.md`
-8. `docs/v2/CSE_V2_SCOPE.md`
-9. `ROADMAP.md`
-10. current GitHub Issue ve bütün scope/izin yorumları
-11. aktif `.cse/tasks/<issue_no>_task.md`
-12. current `origin/master` HEAD, son merge durumu ve açık PR'lar
-13. ilgili branch/commit diff'i ve completion evidence
-14. `.cse/state/project_state.json`
-15. aktif `.cse/results/<issue_no>_result.md`
+4. `docs/protocols/CSE_CODEX_INSTRUCTION_COMMENT_PROTOCOL.md`
+5. `docs/protocols/CSE_MODEL_REASONING_ROUTING_POLICY.md`
+6. `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`
+7. Bu bootstrap belgesi
+8. `docs/protocols/CSE_PROJECT_SOURCE_REGISTER.md`
+9. `docs/v2/CSE_V2_SCOPE.md`
+10. `ROADMAP.md`
+11. current GitHub Issue ve bütün scope/izin yorumları
+12. aktif `.cse/tasks/<issue_no>_task.md`
+13. current `origin/master` HEAD, son merge durumu ve açık PR'lar
+14. ilgili branch/commit diff'i ve completion evidence
+15. `.cse/state/project_state.json`
+16. aktif `.cse/results/<issue_no>_result.md`
+17. Manual Test Register `#479`, current feature için ilgiliyse
 
 Bu sıra kalıcı politika, güncel ürün kapsamı ve değişken repository durumunu
 birbirine karıştırmaz.
@@ -95,6 +98,44 @@ Yeni işlem öncesinde şu bilgiler doğrulanır:
 
 Kullanıcının uzun instruction veya completion bloklarını tekrar taşıması
 beklenmez.
+
+Codex'in sıradaki execution/correction/review handoff'u gerekiyorsa ChatGPT,
+`CSE_CODEX_INSTRUCTION_COMMENT_PROTOCOL.md` standardına göre eksiksiz talimatı
+**önce ilgili GitHub Issue veya PR'a comment olarak yazar**. Kullanıcıya chat
+üzerinden uzun prompt taşıma yükü verilmez; comment oluşturulduktan sonra Issue
+veya PR numarası, comment ID ve doğrudan link verilir.
+
+## Codex handoff comment standardı
+
+Yeni sohbet dahil bütün CSE oturumlarında şu kural varsayılandır:
+
+```text
+current GitHub truth'u doğrula
+→ Codex instruction'ı ilgili Issue/PR'a self-contained comment olarak yaz
+→ comment ID/link'i doğrula
+→ kullanıcıya yalnız referansı ver
+→ Codex sonucu gelince source/diff/evidence review yap
+```
+
+`Codex nereye bakacak?`, `Codex'e talimat hazırla`, `correction ver`, `devam et`
+ve eşdeğer execution handoff isteklerinde current GitHub context yeterliyse
+chat-only uzun talimat yerine GitHub comment oluşturulur.
+
+Comment en az şu sınırları açıkça taşır:
+
+- okunacak kaynaklar ve sıra
+- expected base / branch / HEAD
+- amaç veya blocker
+- exact allowlist
+- required behavior
+- değişmemesi gereken contractlar
+- validation/test/build authority
+- stop conditions
+- commit/push/Draft/Ready/merge sınırı
+- final evidence beklentisi
+
+GitHub write gerçekten kullanılamıyorsa comment'in oluşturulduğu iddia edilmez;
+chat taslağı yalnız geçici fallback'tir ve canonical handoff sayılmaz.
 
 ## Minimum yeterli doğrulama
 
@@ -138,6 +179,7 @@ GitHub:
 - Issue ve PR
 - branch ve merge durumu
 - scope ve authorization
+- Codex execution/correction/review instruction comment'leri
 - review ve completion kanıtı
 - current repository truth
 
