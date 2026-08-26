@@ -4241,3 +4241,25 @@
 - Backup format `1` ve version `0.1.0+1` değişmez. Satın alma/ERP,
   tedarikçi, fiyat, stok, kısmi teslim, notification, attachment, AI ve V2.9
   kapsam dışıdır. Durum `IMPLEMENTED — MANUAL TEST PENDING` ile sınırlıdır.
+
+## Issue 490 — Kişi/firma önerileri exact proje kaynaklarından salt-okunur üretilir
+
+- Reusable suggestion application yalnız caller-selected exact project için
+  aktif `workforce_members` kişi ve aktif `subcontractors` firma kayıtlarını
+  canonical source olarak okur. Aynı projenin exact-string Reminder
+  `related_person` geçmişi yalnız açık historical provenance ile secondary
+  source olabilir; project/private kapsamı aşılmaz.
+- Deterministic bounded sıra match kalitesi, canonical-source önceliği, güvenli
+  project-local kullanım/recency sinyali, normalized display, source kind ve
+  stable source identity tie-breaker'larıyla oluşur. Stored display text
+  değiştirilmez; kişi, firma veya etiket uydurulmaz.
+- Reminder first consumer öneriyi yalnız mevcut form controller'ına taşır.
+  Kalıcı mutation yalnız mevcut Save akışında kalır; suggestion query/read
+  failure veya boş sonuç capture'ı engellemez.
+- Slice 1'de reusable canonical tag kaynağı yoktur ve
+  `tag_source_unavailable` normal durumdur. Suggestion persistence, schema,
+  event/history, notification, backup, platform veya dependency contractı
+  eklenmez.
+- Schema `18`, backup format `1` ve version `0.1.0+1` değişmez. Durum
+  `IMPLEMENTED — MANUAL TEST PENDING` ile sınırlıdır; Issue #490 / candidate PR
+  merged, Ready veya V2.9 complete sayılmaz.

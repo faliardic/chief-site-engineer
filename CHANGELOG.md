@@ -1,5 +1,21 @@
 # Changelog
 
+## Issue #490 - Deterministic person/company suggestions v1
+
+- Adds a reusable, read-only suggestion boundary over active people and
+  companies in the exact selected project, with exact-string Reminder history
+  as an explicitly historical secondary source.
+- Applies deterministic bounded ranking by match quality, canonical source,
+  safe project-local usage/recency signals and stable tie-breakers. Stored
+  display text and source provenance remain visible; no person, company or tag
+  is invented.
+- Reminder capture can select a suggestion into the existing related-person
+  field, while Save remains the only mutation boundary. Empty or failed reads
+  do not block capture, and no-project state yields no project suggestion.
+- Schema `18`, backup format `1` and version `0.1.0+1` remain unchanged.
+  Automated application/build/device tests are disabled by owner authority;
+  status is `IMPLEMENTED — MANUAL TEST PENDING`.
+
 ## Issue #485 - İstenecek Malzemeler v1
 
 - Additive schema `18`, exact project-scope `material_requests`

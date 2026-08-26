@@ -343,6 +343,7 @@ class _MobileShellState extends State<MobileShell> {
             RemindersPage(
               agenda: widget.bootstrap.agenda,
               attendance: widget.bootstrap.attendance,
+              contextSuggestions: widget.bootstrap.contextSuggestions,
               projectLocations: widget.bootstrap.projectLocations,
             ),
             AgendaPage(

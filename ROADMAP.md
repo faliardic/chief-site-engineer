@@ -1,10 +1,10 @@
 # CSE V2 — Kanonik Ürün Yol Haritası
 
 **Durum:** Güncel yürütme sırası
-**Tarih:** 25 Ağustos 2026
+**Tarih:** 26 Ağustos 2026
 **V2 kapsam kaynağı:** `docs/v2/CSE_V2_SCOPE.md`
-**Güncel yön truth-sync:** Issue #485
-**Güncel güvenli `master`:** `dbe370e61b5ece843238c35e049bbaa4e7df19cb` / PR #484
+**Güncel yön truth-sync:** Issue #490
+**Güncel güvenli `master`:** `ffff4010499bb8c31cbe4679cd2e0e4c5f2816fc` / PR #489
 
 ## 1. Güncel ürün durumu
 
@@ -14,16 +14,17 @@ reference-schedule snapshots, Living Plan MVP/ilk cihaz kabulü, actual-progress
 core, progress UI/isolated cihaz kabulü, deterministic forecast core, immutable
 snapshot dependency graph persistence ve read-only downstream impact PR #475'e
 kadar, Living Plan intelligence UI PR #480'e, Deterministic Günlük Log v1 ise
-PR #482'ye, İş Zinciri v1 ise PR #484'e kadar merge edilmiştir.
+PR #482'ye, İş Zinciri v1 PR #484'e, İstenecek Malzemeler v1 PR #486'ya
+ve bounded-memory backup package correction PR #489'a kadar merge edilmiştir.
 Güncel teknik ve ürün durumu:
 
 | Alan | Değer |
 | --- | --- |
 | V1 baseline commit | `7c9f65a811c9f4bca561adab6bd1f8e64e6908cc` |
-| Güncel güvenli merge | `dbe370e61b5ece843238c35e049bbaa4e7df19cb` |
-| Son merged ürün PR'ı | `#484` |
+| Güncel güvenli merge | `ffff4010499bb8c31cbe4679cd2e0e4c5f2816fc` |
+| Son merged PR | `#489` |
 | Mobil sürüm | `0.1.0+1` |
-| SQLite schema | `17` |
+| SQLite schema | `18` |
 | `.csebackup` formatı | `1` |
 | Canonical timezone | `Europe/Istanbul` |
 | Android compile/target SDK | `36 / 36` |
@@ -40,9 +41,12 @@ read-only intelligence katmanlarını Living Plan UI'da görünür kılan merged
 `IMPLEMENTED — MANUAL TEST PENDING` predecessor'dır; Item 5 final completion
 ilanı değildir. Issue #481 / PR #482 mevcut source kayıtlarından salt-okunur
 Deterministic Günlük Log v1'i `IMPLEMENTED — MANUAL TEST DEFERRED` olarak
-merge etmiştir. Issue #483, exact Ajanda–takip bağından read-only İş Zinciri
-projection'ını kuran current iştir; public/store production release ilan
-edilmemiştir.
+merge etmiştir. Issue #483 / PR #484 exact Ajanda–takip bağından read-only İş
+Zinciri projection'ını, Issue #485 / PR #486 additive schema `18` material
+request source-of-truth ve lifecycle UI'yı merged temele eklemiştir. Issue #488 /
+PR #489 backup formatını değiştirmeyen bounded-memory package correction'ıdır.
+Issue #490 deterministic kişi/firma önerileri Slice 1 current işidir; merged veya
+V2.9 complete değildir. Public/store production release ilan edilmemiştir.
 
 ## 2. Kaynak otoritesi
 
@@ -277,9 +281,9 @@ Dalga 3 kapanış kapısı:
 - `İhtiyaç var → İstendi → Geldi / İptal`
 - Proje/mahal/iş bağlantısı
 - Tam satın alma, teklif, sipariş ve ERP kapsam dışı
-- Issue #485 schema `17 → 18` additive migration ile material request
+- Issue #485 / PR #486 schema `17 → 18` additive migration ile material request
   source-of-truth, optimistic revision, atomic append-only lifecycle
-  eventleri ve Home'dan sade açık/geçmiş UI kuran current Slice'tır
+  eventleri ve Home'dan sade açık/geçmiş UI kuran merged Slice'tır
 - Backup format `1` ve version `0.1.0+1` değişmez; manual testler #479'da PENDING izlenir
 
 ### V2.9 — Deterministik kişi/firma/etiket önerileri
@@ -288,6 +292,16 @@ Dalga 3 kapanış kapısı:
 - Offline, deterministik ve kullanıcı onaylı
 - Yeni kişi/firma uydurmama
 - Kalıcı mutation öncesi açık seçim
+- Issue #490 current Slice 1 exact seçili projedeki aktif Saha Rehberi kişileri
+  ve aktif firma/işveren kayıtlarını canonical source olarak kullanır
+- Aynı projedeki exact-string Reminder geçmişi yalnız provenance'ı görünür
+  secondary source'tur; cross-project/private leakage yoktur
+- Bounded sıra match kalitesi, canonical öncelik, güvenli usage/recency ve stable
+  tie-breaker ile deterministiktir
+- Öneri seçimi yalnız mevcut form alanını doldurur; Save ayrı mutation
+  sınırıdır ve query/read failure capture'ı bloke etmez
+- Reusable canonical tag kaynağı henüz yoktur; Slice 1 tag üretmez ve V2.9'u
+  complete ilan etmez
 
 ### V2.10 — Telefon görüşmesi sonucu → Ajanda
 
@@ -377,7 +391,9 @@ Living 7-Day Plan — implemented / manual test pending; final completion yok
 → Issue #476 / PR #480 Living Plan intelligence UI — merged / manual test pending
 → Issue #481 / PR #482 Deterministic Günlük Log v1 — merged / manual test deferred
 → Issue #483 / PR #484 Agenda–Takip İş Zinciri v1 — merged / manual test deferred
-→ Issue #485 İstenecek Malzemeler v1 — current
+→ Issue #485 / PR #486 İstenecek Malzemeler v1 — merged / manual test pending
+→ Issue #488 / PR #489 bounded-memory backup package correction — merged
+→ Issue #490 deterministic kişi/firma önerileri Slice 1 — current / not merged
 ```
 
 Items 1–4 complete'tir. Activity Catalog Runtime, typed Project Profile ve
@@ -397,11 +413,15 @@ hesaplayan merged predecessor'dır. Issue #476 / PR #480 exact item snapshot'ın
 forecast/impact'i read-only gösteren merged implementation'dır; manual testleri
 #479'da pending kalır. Issue #481 / PR #482 exact project ve İstanbul günü için
 read-only, deterministic Günlük Log v1 projection'ını `IMPLEMENTED — MANUAL
-TEST DEFERRED` olarak merge etmiştir. Issue #483 yalnız explicit stable Ajanda–takip
-bağını lifecycle ve sonuçla read-only görünür kılan current V2.7 Slice'ıdır.
-Reforecast, actual quantity, productivity learning, daily-log/work-chain
-persistence ve yayımlanmış artifact başlamaz. V2.5, V2.6 ve V2.7 completion
-ilanları ayrı owner kararına bağlıdır.
+TEST DEFERRED` olarak merge etmiştir. Issue #483 / PR #484 explicit stable
+Ajanda–takip bağını lifecycle ve sonuçla read-only görünür kılan merged V2.7
+Slice'ıdır. Issue #485 / PR #486 material request source-of-truth ve lifecycle
+UI'yı schema `18` additive temeline eklemiştir; manual testleri pending kalır.
+Issue #490 current V2.9 Slice 1 yalnız read-only deterministic kişi/firma öneri
+sınırını ve Reminder first-consumer wiring'ini kurar. Reforecast, actual
+quantity, productivity learning, daily-log/work-chain persistence, V2.9 Slice 2
+ve yayımlanmış artifact başlamaz. V2.5–V2.9 completion ilanları ayrı owner
+kararına bağlıdır.
 
 ## 13. Tarihsel roadmap sınırı
 
