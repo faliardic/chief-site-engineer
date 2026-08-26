@@ -77,6 +77,7 @@ void main() {
       {'version': 15, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 16, 'applied_at': '2026-07-19T08:00:00Z'},
       {'version': 17, 'applied_at': '2026-07-19T08:00:00Z'},
+      {'version': 18, 'applied_at': '2026-07-19T08:00:00Z'},
     ]);
   });
 

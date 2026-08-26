@@ -1,5 +1,20 @@
 # Changelog
 
+## Issue #485 - İstenecek Malzemeler v1
+
+- Additive schema `18`, exact project-scope `material_requests`
+  source-of-truth ile append-only `material_request_events`, optimistic
+  revision ve atomic source-row/event transaction contractını ekler. Existing
+  schema 1–17 tabloları veya satırları yeniden yazılmaz.
+- Home'dan exact proje seçicili açık/geçmiş malzeme ekranı açılır. Yalnız proje
+  ve malzeme adı zorunludur; miktar/birim, ihtiyaç günü, öncelik, mahal, Living
+  Plan işi ve açıklama opsiyoneldir.
+- Lifecycle `İhtiyaç var → İstendi → Geldi / İptal` ve explicit
+  `Yeniden aç` ile sınırlıdır. Event-ID collision/replay, same-project
+  links, quantity/unit ve timestamp bütünlüğü fail-closed doğrulanır.
+- Backup format `1`, version `0.1.0+1` değişmez. Automated
+  application/build/device testleri owner policy gereği çalıştırılmaz; durum
+  `IMPLEMENTED — MANUAL TEST PENDING`dir.
 ## Issue #483 - Read-only Agenda–Takip İş Zinciri v1
 
 - Exact Agenda root, explicit linked follow-up set, meaningful append-only

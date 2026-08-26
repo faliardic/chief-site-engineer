@@ -2,9 +2,9 @@
 
 **Belge türü:** Güncel ürün yürütme kapsamı
 **Durum:** Kanonik V2 kapsam ve sıra kaynağı
-**Tarih:** 24 Ağustos 2026
-**Güncel yön kaynağı:** Issue #483 — Agenda–Takip İş Zinciri v1 read model + bağlı log detail
-**Güncel güvenli `master`:** `317fbfa66738eac21994abd824d9eda49ad70e0e` / PR #482
+**Tarih:** 25 Ağustos 2026
+**Güncel yön kaynağı:** Issue #485 — İstenecek Malzemeler v1 source-of-truth + lifecycle UI
+**Güncel güvenli `master`:** `dbe370e61b5ece843238c35e049bbaa4e7df19cb` / PR #484
 
 ## 1. Belgenin rolü
 
@@ -51,13 +51,14 @@ yerine bu baseline üzerinde ilerler.
 
 Güncel merged V2 teknik baseline'ı V1 metadata'sından ayrıdır: mobile version
 `0.1.0+1`, SQLite schema `17`, backup format `1` ve son güvenli merge
-`317fbfa66738eac21994abd824d9eda49ad70e0e` / PR #482 değeridir. Bu baseline,
+`dbe370e61b5ece843238c35e049bbaa4e7df19cb` / PR #484 değeridir. Bu baseline,
 schedule runtime ve persistent immutable reference-schedule snapshot temeliyle
 Living Plan MVP Core, 7-day UI/APK/device acceptance, Actual Progress Core ve
 progress UI/isolated device acceptance, deterministic forecast core ve immutable
 snapshot dependency graph persistence ve read-only downstream dependency impact
 core'u, Issue #476 / PR #480 Living Plan intelligence UI implementation'ını ve
-Issue #481 / PR #482 Deterministic Günlük Log v1 read modelini içerir. Living
+Issue #481 / PR #482 Deterministic Günlük Log v1 read modelini ve Issue #483 /
+PR #484 read-only İş Zinciri v1'i içerir. Living
 Plan UI manual testleri pending, Günlük Log manual testleri deferred kalır; mutation/
 reforecast, public/store release veya genel production readiness ilanı değildir.
 
@@ -81,7 +82,8 @@ Proje/Mahal, Saha Rehberi, Attachment ve Ajanda omurgası — complete
 → Issue #474 Read-only Downstream Dependency Impact Core — merged / PR #475
 → Issue #476 Living Plan Intelligence UI — merged / PR #480 / manual test pending
 → Issue #481 / PR #482 Deterministic Günlük Log v1 — merged / manual test deferred
-→ Issue #483 Agenda–Takip İş Zinciri v1 — current
+→ Issue #483 / PR #484 Agenda–Takip İş Zinciri v1 — merged / manual test deferred
+→ Issue #485 İstenecek Malzemeler v1 — current
 → schedule mutation/reforecast, actual quantity ve productivity learning — not started
 ```
 
@@ -101,8 +103,8 @@ baseline değildir.
 | 4 | Ajanda V2 + Ajanda–Hatırlatıcı kontrollü senkron | Complete |
 | 5 | 7 Günlük Yaşayan İş Programı / İş ve Gün Planı | Implemented — manual test pending |
 | 6 | Günlük Log Çıktısı v1 | Implemented — manual test deferred; completion not declared |
-| 7 | İş Zinciri / Bağlı Log v1 | Current — not complete |
-| 8 | İstenecek Malzemeler | Planned |
+| 7 | İş Zinciri / Bağlı Log v1 | Implemented — manual test deferred; completion not declared |
+| 8 | İstenecek Malzemeler | Current — not complete |
 | 9 | Deterministik kişi/firma/etiket önerileri | Planned |
 | 10 | Telefon görüşmesi sonucu → Ajanda | Planned |
 | 11 | Proje fotoğraf/video albümü | Planned |
@@ -290,6 +292,11 @@ Amaç:
 - Tam satın alma veya ERP sistemi kurmadan sahadaki malzeme ihtiyacını izlemek.
 - Malzeme, miktar/birim, ihtiyaç tarihi, öncelik, açıklama ve durum tutmak.
 - İlk durum zincirini `İhtiyaç var → İstendi → Geldi / İptal` ile sınırlamak.
+- Issue #485 yalnız additive schema 18 material request source-of-truth,
+  append-only events, optimistic revision, same-project mahal/Living Plan
+  linkleri ve sade Home UI'yı kapsar.
+- Backup format 1 ve version 0.1.0+1 değişmez; satın alma/ERP, tedarikçi,
+  fiyat, stok, kısmi teslim, notification, attachment ve AI kapsam dışıdır.
 
 Kapanış kapısı:
 
@@ -490,7 +497,8 @@ Living Plan MVP Core — merged / PR #463
 → Issue #474 Read-only Downstream Dependency Impact Core — merged / PR #475
 → Issue #476 Living Plan Intelligence UI — merged / PR #480 / manual test pending
 → Issue #481 / PR #482 Deterministic Günlük Log v1 — merged / manual test deferred
-→ Issue #483 Agenda–Takip İş Zinciri v1 — current
+→ Issue #483 / PR #484 Agenda–Takip İş Zinciri v1 — merged / manual test deferred
+→ Issue #485 İstenecek Malzemeler v1 — current
 ```
 
 Issue #466 / PR #467 nullable actual-progress source-of-truth foundation'ını

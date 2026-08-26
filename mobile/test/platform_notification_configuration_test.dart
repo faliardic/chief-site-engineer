@@ -37,9 +37,13 @@ void main() {
       expect(
         receiver,
         contains(
-          'new ScheduledNotificationBootReceiver().onReceive(context, intent)',
+          'com.dexterous.flutterlocalnotifications.'
+          'ScheduledNotificationBootReceiver',
         ),
       );
+      expect(receiver, contains('.asSubclass(BroadcastReceiver.class)'));
+      expect(receiver, contains('.getDeclaredConstructor().newInstance()'));
+      expect(receiver, contains('receiver.onReceive(context, intent)'));
       expect(
         receiver,
         isNot(
@@ -116,7 +120,7 @@ void main() {
       final pubspec = File('pubspec.yaml').readAsStringSync();
       final lock = File('pubspec.lock').readAsStringSync();
 
-      expect(schema, contains('static const schemaVersion = 17'));
+      expect(schema, contains('static const schemaVersion = 18'));
       expect(schema, contains('CREATE TABLE workforce_members'));
       expect(schema, contains('CREATE TABLE attendance_days'));
       expect(schema, contains('CREATE TABLE attendance_entries'));

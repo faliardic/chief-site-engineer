@@ -1,10 +1,10 @@
 # CSE V2 — Kanonik Ürün Yol Haritası
 
 **Durum:** Güncel yürütme sırası
-**Tarih:** 24 Ağustos 2026
+**Tarih:** 25 Ağustos 2026
 **V2 kapsam kaynağı:** `docs/v2/CSE_V2_SCOPE.md`
-**Güncel yön truth-sync:** Issue #483
-**Güncel güvenli `master`:** `317fbfa66738eac21994abd824d9eda49ad70e0e` / PR #482
+**Güncel yön truth-sync:** Issue #485
+**Güncel güvenli `master`:** `dbe370e61b5ece843238c35e049bbaa4e7df19cb` / PR #484
 
 ## 1. Güncel ürün durumu
 
@@ -14,14 +14,14 @@ reference-schedule snapshots, Living Plan MVP/ilk cihaz kabulü, actual-progress
 core, progress UI/isolated cihaz kabulü, deterministic forecast core, immutable
 snapshot dependency graph persistence ve read-only downstream impact PR #475'e
 kadar, Living Plan intelligence UI PR #480'e, Deterministic Günlük Log v1 ise
-PR #482'ye kadar merge edilmiştir.
+PR #482'ye, İş Zinciri v1 ise PR #484'e kadar merge edilmiştir.
 Güncel teknik ve ürün durumu:
 
 | Alan | Değer |
 | --- | --- |
 | V1 baseline commit | `7c9f65a811c9f4bca561adab6bd1f8e64e6908cc` |
-| Güncel güvenli merge | `317fbfa66738eac21994abd824d9eda49ad70e0e` |
-| Son merged ürün PR'ı | `#482` |
+| Güncel güvenli merge | `dbe370e61b5ece843238c35e049bbaa4e7df19cb` |
+| Son merged ürün PR'ı | `#484` |
 | Mobil sürüm | `0.1.0+1` |
 | SQLite schema | `17` |
 | `.csebackup` formatı | `1` |
@@ -277,6 +277,10 @@ Dalga 3 kapanış kapısı:
 - `İhtiyaç var → İstendi → Geldi / İptal`
 - Proje/mahal/iş bağlantısı
 - Tam satın alma, teklif, sipariş ve ERP kapsam dışı
+- Issue #485 schema `17 → 18` additive migration ile material request
+  source-of-truth, optimistic revision, atomic append-only lifecycle
+  eventleri ve Home'dan sade açık/geçmiş UI kuran current Slice'tır
+- Backup format `1` ve version `0.1.0+1` değişmez; manual testler #479'da PENDING izlenir
 
 ### V2.9 — Deterministik kişi/firma/etiket önerileri
 
@@ -372,7 +376,8 @@ Living 7-Day Plan — implemented / manual test pending; final completion yok
 → Issue #474 / PR #475 read-only downstream dependency impact core — merged
 → Issue #476 / PR #480 Living Plan intelligence UI — merged / manual test pending
 → Issue #481 / PR #482 Deterministic Günlük Log v1 — merged / manual test deferred
-→ Issue #483 Agenda–Takip İş Zinciri v1 — current
+→ Issue #483 / PR #484 Agenda–Takip İş Zinciri v1 — merged / manual test deferred
+→ Issue #485 İstenecek Malzemeler v1 — current
 ```
 
 Items 1–4 complete'tir. Activity Catalog Runtime, typed Project Profile ve

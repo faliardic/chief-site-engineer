@@ -11,6 +11,7 @@ import 'package:chief_site_engineer/features/concrete/concrete_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
 import 'package:chief_site_engineer/features/daily_log/daily_log_page.dart';
 import 'package:chief_site_engineer/features/living_plan/living_plan_page.dart';
+import 'package:chief_site_engineer/features/material_requests/material_requests_page.dart';
 import 'package:chief_site_engineer/features/memory/memory_backup_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
@@ -502,6 +503,24 @@ class _HomePageState extends State<_HomePage> {
                     dailyLog: dailyLog,
                     workChain: widget.bootstrap.workChain,
                   ),
+                ),
+              ),
+            ),
+          ),
+        if (widget.bootstrap.materialRequests case final materialRequests?)
+          Card(
+            child: ListTile(
+              key: const Key('open-material-requests'),
+              leading: const Icon(Icons.inventory_2_outlined),
+              title: const Text('İstenecek Malzemeler'),
+              subtitle: const Text(
+                'Malzeme ihtiyaçlarını İhtiyaç var, İstendi ve Geldi akışında takip et.',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      MaterialRequestsPage(application: materialRequests),
                 ),
               ),
             ),
