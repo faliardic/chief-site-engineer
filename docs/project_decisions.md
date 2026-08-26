@@ -4316,3 +4316,58 @@
   `0.1.0+1`, dependency ve platform/permission contractları değişmez.
 - Durum `IMPLEMENTED — MANUAL TEST PENDING` ile sınırlıdır; Ready, merge ve
   V2.11 completion ayrı owner kararlarıdır.
+
+## Issue 507 — Inventory Map v1 exact schematic-geometry and persistence contract
+
+- Owner kararıyla V2.12 ve sonraki planlı ürün işleri paused; current ürün
+  geliştirme önceliği Epic #506 altındaki Inventory Map v1'dir. Issue #507
+  docs-only Slice 0'dır ve Inventory implementation iddiası üretmez.
+- `Envanter` direct top-level destination olacaktır. Mevcut altı-destination
+  sınırı `Başlangıç / Hatırlatıcı / Ajanda / Envanter / Puantaj / Daha` ile
+  korunur; `Daha` yalnız mevcut Beton Paketi ve Sicil entry point'lerini taşır.
+- Envanter exact aktif `project_id` altında çalışır. Birden çok aktif projede
+  kullanıcı seçimi olmadan read/mutation başlamaz; project değişiminde bütün
+  route-local focus/cache temizlenir ve cross-project ilişki fail-closed'dur.
+- User-visible drawing `şematik kroki`dir. Geometry version `1`, immutable
+  virtual canvas `4096 x 3072`, inclusive integer bounds, vertex grid step `64`
+  ve placement quantization `4` kullanır. Screen pixel, scale, CAD veya gerçek
+  coordinate source truth değildir.
+- Geometri fixed-key-order, whitespace'siz canonical JSON olarak revision
+  satırında tutulur; exact UTF-8 byte'ının lowercase SHA-256'sı bağlanır. Open
+  ve closed polylines desteklenir; zero-length/consecutive duplicate reddedilir.
+  Bir revision en çok `64` polyline, polyline başına `1024` point, toplam `4096`
+  point ve `4096` segment taşır.
+- Stable sketch identity revision kimliğinden ayrıdır. Exact revision states
+  `DRAFT`, `ACTIVE`, `SUPERSEDED`, `ABANDONED`dır. Draft `500 ms` debounce ile
+  optimistic autosave olur; finalized geometry immutable'dır. Edit active row'u
+  overwrite etmez, yeni draft oluşturur; physical delete yoktur.
+- Asset source kaydı stored `total_quantity` `1..1000000`, exact category/status,
+  metadata revision ve ayrı archive lifecycle taşır. Active placement quantity
+  toplamı asset totalini aşamaz; v1 tek placement kullanır, schema future
+  multiple placement keys'i destekler.
+- Placement coordinate'i overwrite edilmez. Move predecessor'ı terminal yapıp
+  aynı stable `placement_key` altında successor version ekler; provenance sketch
+  revision korunur. Kroki ve Liste aynı asset/active-placement source query'sini
+  projekte eder.
+- Proposed additive migration exact `19 -> 20`dir ve yalnız
+  `inventory_sketches`, `inventory_sketch_revisions`, `inventory_assets`,
+  `inventory_asset_placements`, `inventory_command_receipts`,
+  `inventory_events`, `inventory_asset_attachment_links` tablolarını ekler.
+  Existing table rebuild/rename/drop, legacy backfill invention veya user-row
+  mutation yoktur.
+- Backup format `1` kalır. Backup DB smoke bütün yedi tabloyu adopt eder;
+  round-trip geometry/checksum, asset, placement chain, receipt/event ve photo
+  relation/byte integrity'sini doğrular.
+- Inventory photo existing `managed_attachments` physical identity/store'unu
+  reuse eder. Existing `attachment_links` rebuild edilmez; additive Inventory
+  relation katalog/albüm/reconciliation ve backup query'lerine explicit union
+  edilir. Bir link için binary copy üretilmez; SHA equality pre-existing
+  physical identity'leri sessizce merge etmez.
+- Slice 4 ilk internally usable integrated flow'dur. Owner-phone MAIN install
+  en erken Slice 6'da; yalnız Issue #502 exact external verified backup gate'i
+  PASS, package/signer/update safety kanıtı ve ayrı owner authority sonrasında
+  eligible olabilir.
+- Issue #501 recovery owner verification'a kadar unresolved, Issue #503 restore
+  newer live data'yı unavailable bırakamaz ve Issue #499 owner telefonunda
+  debug/acceptance package'ı yasaklar. Bu P0 kurallar source/Draft PR çalışması
+  sürse de bütün phone operation'larından önce gelir.
