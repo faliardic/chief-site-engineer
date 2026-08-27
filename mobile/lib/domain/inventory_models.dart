@@ -115,6 +115,11 @@ class InventoryPolyline {
     if (closed && points.length < 3) {
       throw const InventoryGeometryFailure('closed_polyline_too_short');
     }
+    if (closed && points.toSet().length < 3) {
+      throw const InventoryGeometryFailure(
+        'closed_polyline_distinct_points_too_few',
+      );
+    }
     for (var index = 1; index < points.length; index += 1) {
       if (points[index] == points[index - 1]) {
         throw const InventoryGeometryFailure('zero_length_segment');
@@ -256,7 +261,8 @@ class InventoryGeometry {
       throw const InventoryGeometryFailure('polyline_limit_exceeded');
     }
     final incomplete = polylines.where((item) => item.isIncompleteDraft).length;
-    if (incomplete > 1 || (incomplete == 1 && polylines.length != 1)) {
+    if (incomplete > 1 ||
+        (incomplete == 1 && !polylines.last.isIncompleteDraft)) {
       throw const InventoryGeometryFailure('incomplete_draft_invalid');
     }
     if (pointCount > InventoryGeometryContract.maximumTotalPoints) {

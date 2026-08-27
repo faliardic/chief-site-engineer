@@ -147,6 +147,29 @@ void main() {
       geometry.validateFinalizable();
     });
 
+    test(
+      'closed polylines require three distinct points but permit repeats',
+      () {
+        final pointA = InventorySketchPoint(x: 0, y: 0);
+        final pointB = InventorySketchPoint(x: 64, y: 0);
+        final pointC = InventorySketchPoint(x: 64, y: 64);
+
+        expect(
+          () => InventoryPolyline(
+            closed: true,
+            points: [pointA, pointB, pointA, pointB],
+          ),
+          _geometryFailure('closed_polyline_distinct_points_too_few'),
+        );
+
+        final accepted = InventoryPolyline(
+          closed: true,
+          points: [pointA, pointB, pointA, pointC],
+        );
+        expect(accepted.segmentCount, 4);
+      },
+    );
+
     test('one incomplete open polyline is DRAFT-only', () {
       final geometry = InventoryGeometry(
         polylines: [
@@ -159,13 +182,49 @@ void main() {
         geometry.validateFinalizable,
         _geometryFailure('geometry_not_finalizable'),
       );
+    });
+
+    test('completed geometry plus a final working point is recoverable', () {
+      final geometry = InventoryGeometry(
+        polylines: [
+          InventoryPolyline(closed: false, points: _boundedPoints(2)),
+          InventoryPolyline(closed: true, points: _boundedPoints(3)),
+          InventoryPolyline(
+            closed: false,
+            points: [InventorySketchPoint(x: 128, y: 128)],
+          ),
+        ],
+      );
+      final decoded = InventoryGeometry.decode(geometry.canonicalJson);
+
+      expect(decoded.polylines, hasLength(3));
+      expect(decoded.polylines.last.isIncompleteDraft, isTrue);
       expect(
-        () => InventoryGeometry(
-          polylines: [
-            InventoryPolyline(closed: false, points: _boundedPoints(1)),
-            InventoryPolyline(closed: false, points: _boundedPoints(2)),
-          ],
-        ),
+        decoded.validateFinalizable,
+        _geometryFailure('geometry_not_finalizable'),
+      );
+    });
+
+    test('multiple or non-final working polylines fail closed', () {
+      final workingA = InventoryPolyline(
+        closed: false,
+        points: [InventorySketchPoint(x: 0, y: 0)],
+      );
+      final workingB = InventoryPolyline(
+        closed: false,
+        points: [InventorySketchPoint(x: 64, y: 64)],
+      );
+      final completed = InventoryPolyline(
+        closed: false,
+        points: _boundedPoints(2),
+      );
+
+      expect(
+        () => InventoryGeometry(polylines: [workingA, workingB]),
+        _geometryFailure('incomplete_draft_invalid'),
+      );
+      expect(
+        () => InventoryGeometry(polylines: [workingA, completed]),
         _geometryFailure('incomplete_draft_invalid'),
       );
     });

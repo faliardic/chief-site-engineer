@@ -193,7 +193,7 @@ The earlier primary/retry failure evidence remains unchanged above.
 
 Final status:
 
-`SLICE_1A_IMPLEMENTED"��y��y� SYNTHETIC PERSISTENCE TESTS PASS �w^~)�t INDEPENDENT REVIEW REQUIRED`
+`SLICE_1A_IMPLEMENTED — SYNTHETIC PERSISTENCE TESTS PASS — INDEPENDENT REVIEW REQUIRED`
 
 ### Resume and correction audit
 
@@ -205,7 +205,7 @@ Final status:
 - Existing WIP changed paths: exact 8; unexpected path 0
 - Reset/restore/clean/stash/worktree recreation: 0
 - Manual Test Register `MT-509` entries: none; status remains
-  `N/A"��y��y� synthetic persistence child`
+  `N/A — synthetic persistence child`
 
 The current-schema backup round-trip test received only the authorized
 mechanical correction:
@@ -311,6 +311,130 @@ review_recommendation: INDEPENDENT R4 SOURCE/DIFF/TEST REVIEW
 Review canonical geometry encoding and limits, the additive schema-20 SQL and
 trigger invariants, schema-19 rollback/preservation evidence, backup table-smoke
 adoption, and the bounded current-schema test correction. Keep the publication
+Draft; do not Ready, merge, close issues, begin Slice 1B, build, install, or use
+an owner device.
+```
+
+---
+
+## PR #511 geometry contract blocker correction
+
+Authority:
+`https://github.com/faliardic/chief-site-engineer/issues/509#issuecomment-5435813660`
+
+Independent review: `5038288885`
+
+Correction base HEAD:
+`40083443d873a8dc5f52bb630e569a2607e36253`
+
+Status remains:
+
+`SLICE_1A_IMPLEMENTED — SYNTHETIC PERSISTENCE TESTS PASS — INDEPENDENT REVIEW REQUIRED`
+
+### Exact correction delta
+
+Only these three paths changed after the reviewed head:
+
+1. `mobile/lib/domain/inventory_models.dart`
+2. `mobile/test/inventory_geometry_test.dart`
+3. `.cse/results/509_result.md`
+
+Full PR path set remains the exact original eight paths. Schema, backup
+application, migration test, backup test, task, bootstrap, UI, platform,
+pubspec, package, and signing correction delta is 0.
+
+### Geometry corrections
+
+- Closed polylines now require at least three distinct
+  `InventorySketchPoint` values.
+- Alternating two-point input such as `[A, B, A, B]` fails with the typed safe
+  reason `closed_polyline_distinct_points_too_few` under the unchanged
+  `inventory_geometry_corrupt` public failure code.
+- Non-consecutive repeats remain valid when at least three distinct points
+  exist.
+- At most one incomplete open one-point working polyline may coexist with zero
+  or more completed polylines, and it must be the final/current polyline.
+- Multiple incomplete polylines and a non-final incomplete polyline fail closed.
+- `validateFinalizable()` still rejects every incomplete working polyline.
+- Canonical encoding, checksum, immutable output, canvas/quantization, point,
+  segment, and polyline limits are unchanged.
+
+The two corrupted correction-continuation status strings were replaced with
+their exact clean UTF-8 forms. The earlier fail-closed and correction history
+was preserved.
+
+### Validation
+
+Touched Dart format: PASS.
+
+Exact focused invocation:
+
+```text
+flutter test --no-pub test/inventory_geometry_test.dart test/inventory_schema_migration_test.dart test/mobile_backup_application_test.dart
+```
+
+- Result: PASS, `65/65`
+- Process exit code: 0
+- New distinct-point acceptance/rejection tests: PASS
+- Completed geometry plus final working point construct/decode test: PASS
+- Multiple/non-final incomplete working polyline rejection tests: PASS
+- Existing canonical/checksum/limit/schema-migration/backup regressions: PASS
+- Focused retry used: 0
+
+`flutter analyze --no-pub`:
+
+- Result: PASS — `No issues found!`
+- Analyzer correction used: 0
+- Analyzer retry used: 0
+
+Final source audits before this evidence append:
+
+- `git diff --check`: PASS
+- Correction paths: exact 3/3; unexpected path 0
+- Full PR paths: exact 8; unexpected path 0
+- Result evidence UTF-8 validation: PASS
+- Schema remains exact 20; correction SQL delta 0
+- Backup application and format 1 correction delta 0
+- Version `0.1.0+1` and package `com.faliardic.sefim` unchanged
+- Pubspec/lock/platform/permission/signing correction drift 0
+- Build, full suite, widget/integration, APK/AAB, emulator, ADB/device,
+  owner-data, and owner-phone operations: 0
+- Manual test status: `N/A — synthetic persistence child`
+
+The narrow correction commit, push, updated Draft PR head, and Issue/PR
+evidence are recorded externally after this append enters the correction
+commit.
+
+```yaml
+execution_record:
+  issue: 509
+  correction_authority: geometry_contract_blockers
+  review_id: 5038288885
+  correction_base_head: 40083443d873a8dc5f52bb630e569a2607e36253
+  correction_paths: 3
+  full_pr_paths: 8
+  task_risk: R4
+  requested_model: gpt-5.6-sol
+  requested_reasoning_effort: max
+  runtime_actual_model: unknown
+  runtime_actual_effort: null
+  runtime_verification: unverified
+  validation_class: persistence
+  focused_test: PASS_65_OF_65
+  focused_retry: NOT_USED
+  analyzer: PASS_NO_ISSUES
+  analyzer_retry: NOT_USED
+  owner_phone_install_authorized: false
+  owner_phone_operations: 0
+  publication_target: existing_draft_pr_511
+```
+
+```text
+review_recommendation: INDEPENDENT R4 RE-REVIEW
+
+Re-review the closed-polyline distinct-point invariant, recoverable final
+one-point working polyline ordering, finalization rejection, unchanged
+canonical/checksum/limits, and exact three-path correction delta. Keep PR #511
 Draft; do not Ready, merge, close issues, begin Slice 1B, build, install, or use
 an owner device.
 ```
