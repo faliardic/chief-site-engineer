@@ -151,6 +151,26 @@ void main() {
   });
 
   test(
+    'current database smoke requires every schema 20 Inventory table',
+    () async {
+      final raw = await _openRaw(directories);
+      await raw.execute('DROP TABLE inventory_events');
+      await raw.close();
+      final application = _application(directories, gateway: gateway);
+
+      await expectLater(
+        application.createBackup(
+          const CreateMobileBackupCommand(
+            password: _password,
+            passwordConfirmation: _password,
+          ),
+        ),
+        _failureCode('corrupt_database'),
+      );
+    },
+  );
+
+  test(
     'format 1 backup round-trips current schema trashed all-day reminder and audit',
     () async {
       final agenda = SqliteAgendaApplication(
@@ -231,7 +251,7 @@ void main() {
   );
 
   test(
-    'format 1 schema 17 backup restores dependency graph progress history receipt and origin',
+    'format 1 current schema backup restores dependency graph progress history receipt and origin',
     () async {
       final scenario = _backupScheduleScenario();
       final sourceDatabase = AppDatabase(
@@ -423,12 +443,12 @@ void main() {
       final targetGateway = DeviceMobileBackupFileGateway(
         directories: targetDirectories,
         picker: () async => PlatformFile(
-          name: 'schedule-v17.csebackup',
+          name: 'schedule-current.csebackup',
           size: created.summary.packageByteSize,
           readStream: packageFile.openRead(),
         ),
         clock: () => DateTime.parse(_now),
-        importIdFactory: (_) => 'schedule-v17-clean-target',
+        importIdFactory: (_) => 'schedule-current-clean-target',
       );
       final targetApplication = _application(
         targetDirectories,
@@ -448,10 +468,10 @@ void main() {
       );
 
       expect(preflight.manifest.formatVersion, 1);
-      expect(preflight.manifest.mobileSchemaVersion, 17);
-      expect(preflight.migratedSchemaVersion, 17);
+      expect(preflight.manifest.mobileSchemaVersion, AppDatabase.schemaVersion);
+      expect(preflight.migratedSchemaVersion, AppDatabase.schemaVersion);
       expect(restored.restoredManifest.formatVersion, 1);
-      expect(restored.activeSchemaVersion, 17);
+      expect(restored.activeSchemaVersion, AppDatabase.schemaVersion);
       final reopened = AppDatabase(
         path: targetDirectories.databaseFile,
         factory: databaseFactoryFfi,
@@ -648,7 +668,7 @@ void main() {
   );
 
   test(
-    'format 1 schema 16 backup migrates to 17 without dependency backfill',
+    'format 1 schema 16 backup migrates through current without dependency backfill',
     () async {
       final oldRoot = await Directory.systemTemp.createTemp('cse_schema16_');
       addTearDown(() async {
@@ -722,19 +742,38 @@ void main() {
           );
       expect(legacyProgress.revision, 3);
       expect(legacyProgress.progressPercent, 37);
-      await oldDatabase.database.execute(
-        'DROP TABLE project_schedule_snapshot_dependencies',
+      await oldDatabase.close();
+      final legacyRaw = await databaseFactoryFfi.openDatabase(
+        oldFile,
+        options: OpenDatabaseOptions(singleInstance: false),
       );
-      await oldDatabase.database.execute(
-        'DROP TABLE project_schedule_snapshot_dependency_manifests',
+      await legacyRaw.execute('PRAGMA foreign_keys = OFF');
+      await legacyRaw.execute(
+        'DROP TRIGGER agenda_phone_call_contexts_source_category_update',
       );
-      await oldDatabase.database.delete(
+      for (final table in const [
+        'inventory_events',
+        'inventory_command_receipts',
+        'inventory_asset_attachment_links',
+        'inventory_asset_placements',
+        'inventory_sketch_revisions',
+        'inventory_assets',
+        'inventory_sketches',
+        'agenda_phone_call_contexts',
+        'material_request_events',
+        'material_requests',
+        'project_schedule_snapshot_dependencies',
+        'project_schedule_snapshot_dependency_manifests',
+      ]) {
+        await legacyRaw.execute('DROP TABLE $table');
+      }
+      await legacyRaw.delete(
         'schema_versions',
-        where: 'version = ?',
+        where: 'version >= ?',
         whereArgs: [17],
       );
-      await oldDatabase.database.execute('PRAGMA user_version = 16');
-      await oldDatabase.close();
+      await legacyRaw.execute('PRAGMA user_version = 16');
+      await legacyRaw.close();
       final databaseBytes = await File(oldFile).readAsBytes();
       final archive = const CseBackupArchiveCodec().encode(
         manifest: _manifest(databaseBytes, schemaVersion: 16),
@@ -759,8 +798,8 @@ void main() {
 
       expect(preflight.manifest.formatVersion, 1);
       expect(preflight.manifest.mobileSchemaVersion, 16);
-      expect(preflight.migratedSchemaVersion, 17);
-      expect(restored.activeSchemaVersion, 17);
+      expect(preflight.migratedSchemaVersion, AppDatabase.schemaVersion);
+      expect(restored.activeSchemaVersion, AppDatabase.schemaVersion);
       final reopened = AppDatabase(
         path: directories.databaseFile,
         factory: databaseFactoryFfi,
