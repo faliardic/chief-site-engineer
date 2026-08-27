@@ -1592,6 +1592,13 @@ class SqliteMobileBackupApplication
         'managed_attachments',
         'attachment_links',
         'attachment_link_events',
+        'inventory_sketches',
+        'inventory_sketch_revisions',
+        'inventory_assets',
+        'inventory_asset_placements',
+        'inventory_command_receipts',
+        'inventory_events',
+        'inventory_asset_attachment_links',
       ]) {
         await current.database.rawQuery('SELECT count(*) FROM $table');
       }

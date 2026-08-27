@@ -27,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 19;
+  static const schemaVersion = 20;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2900,6 +2900,7 @@ class AppDatabase {
     ),
     DatabaseMigration(version: 18, apply: _applyMaterialRequestMigration),
     DatabaseMigration(version: 19, apply: _applyAgendaPhoneCallMigration),
+    DatabaseMigration(version: 20, apply: _applyInventoryFoundationMigration),
   ];
 
   final String path;
@@ -4391,6 +4392,1020 @@ Future<void> _applyAgendaPhoneCallMigration(Transaction transaction) async {
     BEFORE DELETE ON agenda_phone_call_contexts
     BEGIN
       SELECT RAISE(ABORT, 'phone call context cannot be deleted');
+    END
+  ''');
+}
+
+Future<void> _applyInventoryFoundationMigration(Transaction transaction) async {
+  await transaction.execute('''
+    CREATE TABLE inventory_sketches (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      display_name TEXT NOT NULL CHECK (
+        length(display_name) BETWEEN 1 AND 80
+        AND display_name = trim(display_name)
+      ),
+      is_primary INTEGER NOT NULL CHECK (is_primary IN (0, 1)),
+      active_revision_id TEXT,
+      draft_revision_id TEXT,
+      revision INTEGER NOT NULL CHECK (revision >= 1),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      archived_at TEXT,
+      UNIQUE (id, project_id),
+      FOREIGN KEY (active_revision_id, project_id, id)
+        REFERENCES inventory_sketch_revisions(id, project_id, sketch_id)
+        DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY (draft_revision_id, project_id, id)
+        REFERENCES inventory_sketch_revisions(id, project_id, sketch_id)
+        DEFERRABLE INITIALLY DEFERRED,
+      CHECK (
+        active_revision_id IS NULL
+        OR draft_revision_id IS NULL
+        OR active_revision_id != draft_revision_id
+      ),
+      CHECK (updated_at >= created_at),
+      CHECK (archived_at IS NULL OR archived_at = updated_at),
+      CHECK (archived_at IS NULL OR is_primary = 0)
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE inventory_sketch_revisions (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      sketch_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      revision_number INTEGER NOT NULL CHECK (revision_number >= 1),
+      base_revision_id TEXT,
+      state TEXT NOT NULL CHECK (
+        state IN ('DRAFT', 'ACTIVE', 'SUPERSEDED', 'ABANDONED')
+      ),
+      geometry_version INTEGER NOT NULL CHECK (geometry_version = 1),
+      canvas_width INTEGER NOT NULL CHECK (canvas_width = 4096),
+      canvas_height INTEGER NOT NULL CHECK (canvas_height = 3072),
+      geometry_json TEXT NOT NULL CHECK (
+        length(geometry_json) > 0
+        AND json_valid(geometry_json)
+        AND json_type(geometry_json) = 'object'
+      ),
+      geometry_sha256 TEXT NOT NULL CHECK (
+        length(geometry_sha256) = 64
+        AND geometry_sha256 = lower(geometry_sha256)
+        AND geometry_sha256 NOT GLOB '*[^0-9a-f]*'
+      ),
+      content_revision INTEGER NOT NULL CHECK (content_revision >= 1),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      finalized_at TEXT,
+      superseded_at TEXT,
+      abandoned_at TEXT,
+      UNIQUE (id, project_id, sketch_id),
+      UNIQUE (sketch_id, revision_number),
+      FOREIGN KEY (sketch_id, project_id)
+        REFERENCES inventory_sketches(id, project_id)
+        DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY (base_revision_id, project_id, sketch_id)
+        REFERENCES inventory_sketch_revisions(id, project_id, sketch_id)
+        DEFERRABLE INITIALLY DEFERRED,
+      CHECK (base_revision_id IS NULL OR base_revision_id != id),
+      CHECK (updated_at >= created_at),
+      CHECK (
+        (
+          state = 'DRAFT'
+          AND finalized_at IS NULL
+          AND superseded_at IS NULL
+          AND abandoned_at IS NULL
+        )
+        OR (
+          state = 'ACTIVE'
+          AND finalized_at = updated_at
+          AND superseded_at IS NULL
+          AND abandoned_at IS NULL
+        )
+        OR (
+          state = 'SUPERSEDED'
+          AND finalized_at IS NOT NULL
+          AND superseded_at = updated_at
+          AND superseded_at >= finalized_at
+          AND abandoned_at IS NULL
+        )
+        OR (
+          state = 'ABANDONED'
+          AND finalized_at IS NULL
+          AND superseded_at IS NULL
+          AND abandoned_at = updated_at
+        )
+      )
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE inventory_assets (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      display_name TEXT NOT NULL CHECK (
+        length(display_name) BETWEEN 1 AND 120
+        AND display_name = trim(display_name)
+      ),
+      normalized_name TEXT NOT NULL CHECK (
+        length(normalized_name) BETWEEN 1 AND 120
+        AND normalized_name = trim(normalized_name)
+      ),
+      category_code TEXT NOT NULL CHECK (
+        category_code IN (
+          'EQUIPMENT', 'POWER_TOOL', 'HAND_TOOL', 'MEASUREMENT_DEVICE',
+          'SAFETY_EQUIPMENT', 'TEMPORARY_WORKS', 'SITE_FACILITY', 'OTHER'
+        )
+      ),
+      other_category_label TEXT CHECK (
+        other_category_label IS NULL OR (
+          length(other_category_label) BETWEEN 1 AND 80
+          AND other_category_label = trim(other_category_label)
+        )
+      ),
+      total_quantity INTEGER NOT NULL CHECK (
+        total_quantity BETWEEN 1 AND 1000000
+      ),
+      status TEXT NOT NULL CHECK (
+        status IN ('AVAILABLE', 'IN_USE', 'OUT_OF_SERVICE', 'MISSING')
+      ),
+      note TEXT CHECK (
+        note IS NULL OR (
+          length(note) BETWEEN 1 AND 1000
+          AND note = trim(note)
+        )
+      ),
+      revision INTEGER NOT NULL CHECK (revision >= 1),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      status_changed_at TEXT NOT NULL,
+      archived_at TEXT,
+      UNIQUE (id, project_id),
+      CHECK (
+        (category_code = 'OTHER' AND other_category_label IS NOT NULL)
+        OR (category_code != 'OTHER' AND other_category_label IS NULL)
+      ),
+      CHECK (
+        updated_at >= created_at
+        AND status_changed_at >= created_at
+        AND status_changed_at <= updated_at
+      ),
+      CHECK (archived_at IS NULL OR archived_at = updated_at)
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE inventory_asset_placements (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      placement_key TEXT NOT NULL CHECK (
+        length(placement_key) > 0 AND placement_key = trim(placement_key)
+      ),
+      project_id TEXT NOT NULL,
+      asset_id TEXT NOT NULL,
+      sketch_id TEXT NOT NULL,
+      provenance_revision_id TEXT NOT NULL,
+      sequence INTEGER NOT NULL CHECK (sequence >= 1),
+      x INTEGER NOT NULL CHECK (x BETWEEN 0 AND 4096 AND x % 4 = 0),
+      y INTEGER NOT NULL CHECK (y BETWEEN 0 AND 3072 AND y % 4 = 0),
+      quantity INTEGER NOT NULL CHECK (quantity BETWEEN 1 AND 1000000),
+      created_at TEXT NOT NULL,
+      ended_at TEXT,
+      end_reason TEXT CHECK (
+        end_reason IS NULL
+        OR end_reason IN ('MOVED', 'QUANTITY_CHANGED', 'ASSET_ARCHIVED')
+      ),
+      supersedes_placement_id TEXT UNIQUE,
+      UNIQUE (id, project_id),
+      UNIQUE (placement_key, sequence),
+      FOREIGN KEY (asset_id, project_id)
+        REFERENCES inventory_assets(id, project_id)
+        DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY (sketch_id, project_id)
+        REFERENCES inventory_sketches(id, project_id)
+        DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY (provenance_revision_id, project_id, sketch_id)
+        REFERENCES inventory_sketch_revisions(id, project_id, sketch_id)
+        DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY (supersedes_placement_id, project_id)
+        REFERENCES inventory_asset_placements(id, project_id)
+        DEFERRABLE INITIALLY DEFERRED,
+      CHECK (
+        (ended_at IS NULL AND end_reason IS NULL)
+        OR (
+          ended_at IS NOT NULL
+          AND end_reason IS NOT NULL
+          AND ended_at >= created_at
+        )
+      ),
+      CHECK (supersedes_placement_id IS NULL OR supersedes_placement_id != id)
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE inventory_command_receipts (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      command_type TEXT NOT NULL CHECK (
+        command_type IN (
+          'sketch_create',
+          'sketch_draft_autosave',
+          'sketch_edit_start',
+          'sketch_finalize',
+          'sketch_draft_abandon',
+          'sketch_archive',
+          'sketch_unarchive',
+          'asset_create_with_placement',
+          'asset_update',
+          'asset_status_change',
+          'asset_quantity_change',
+          'asset_archive',
+          'asset_unarchive_with_placement',
+          'placement_move',
+          'photo_link',
+          'photo_archive',
+          'photo_restore'
+        )
+      ),
+      primary_aggregate_type TEXT NOT NULL CHECK (
+        primary_aggregate_type IN (
+          'sketch', 'asset', 'placement', 'attachment_link'
+        )
+      ),
+      primary_aggregate_id TEXT NOT NULL CHECK (
+        length(primary_aggregate_id) > 0
+        AND primary_aggregate_id = trim(primary_aggregate_id)
+      ),
+      intent_sha256 TEXT NOT NULL CHECK (
+        length(intent_sha256) = 64
+        AND intent_sha256 = lower(intent_sha256)
+        AND intent_sha256 NOT GLOB '*[^0-9a-f]*'
+      ),
+      result_json TEXT NOT NULL CHECK (
+        length(result_json) > 0
+        AND json_valid(result_json)
+        AND json_type(result_json) = 'object'
+      ),
+      result_sha256 TEXT NOT NULL CHECK (
+        length(result_sha256) = 64
+        AND result_sha256 = lower(result_sha256)
+        AND result_sha256 NOT GLOB '*[^0-9a-f]*'
+      ),
+      is_no_op INTEGER NOT NULL CHECK (is_no_op IN (0, 1)),
+      event_count INTEGER NOT NULL CHECK (event_count >= 0),
+      created_at TEXT NOT NULL,
+      UNIQUE (id, project_id),
+      CHECK (
+        (is_no_op = 1 AND event_count = 0)
+        OR (is_no_op = 0 AND event_count >= 1)
+      )
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE inventory_events (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      operation_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      aggregate_type TEXT NOT NULL CHECK (
+        aggregate_type IN ('sketch', 'asset', 'placement', 'attachment_link')
+      ),
+      aggregate_id TEXT NOT NULL CHECK (
+        length(aggregate_id) > 0 AND aggregate_id = trim(aggregate_id)
+      ),
+      sequence INTEGER NOT NULL CHECK (sequence >= 1),
+      event_type TEXT NOT NULL CHECK (
+        event_type IN (
+          'inventory.sketch_created',
+          'inventory.sketch_draft_autosaved',
+          'inventory.sketch_edit_started',
+          'inventory.sketch_finalized',
+          'inventory.sketch_draft_abandoned',
+          'inventory.sketch_archived',
+          'inventory.sketch_unarchived',
+          'inventory.asset_created',
+          'inventory.asset_updated',
+          'inventory.asset_status_changed',
+          'inventory.asset_archived',
+          'inventory.asset_unarchived',
+          'inventory.placement_created',
+          'inventory.placement_moved',
+          'inventory.placement_quantity_changed',
+          'inventory.placement_retired',
+          'inventory.photo_linked',
+          'inventory.photo_archived',
+          'inventory.photo_restored'
+        )
+      ),
+      occurred_at TEXT NOT NULL,
+      payload_json TEXT NOT NULL CHECK (
+        length(payload_json) > 0
+        AND json_valid(payload_json)
+        AND json_type(payload_json) = 'object'
+      ),
+      payload_sha256 TEXT NOT NULL CHECK (
+        length(payload_sha256) = 64
+        AND payload_sha256 = lower(payload_sha256)
+        AND payload_sha256 NOT GLOB '*[^0-9a-f]*'
+      ),
+      UNIQUE (aggregate_type, aggregate_id, sequence),
+      UNIQUE (operation_id, aggregate_type, aggregate_id),
+      FOREIGN KEY (operation_id, project_id)
+        REFERENCES inventory_command_receipts(id, project_id)
+        DEFERRABLE INITIALLY DEFERRED,
+      CHECK (
+        (aggregate_type = 'sketch'
+          AND event_type LIKE 'inventory.sketch_%')
+        OR (aggregate_type = 'asset'
+          AND event_type LIKE 'inventory.asset_%')
+        OR (aggregate_type = 'placement'
+          AND event_type LIKE 'inventory.placement_%')
+        OR (aggregate_type = 'attachment_link'
+          AND event_type LIKE 'inventory.photo_%')
+      )
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE inventory_asset_attachment_links (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      attachment_id TEXT NOT NULL REFERENCES managed_attachments(id),
+      asset_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      role TEXT NOT NULL CHECK (role = 'inventory_photo'),
+      original_file_name TEXT NOT NULL CHECK (
+        length(original_file_name) BETWEEN 1 AND 255
+        AND original_file_name = trim(original_file_name)
+      ),
+      description TEXT CHECK (
+        description IS NULL OR (
+          length(description) BETWEEN 1 AND 1000
+          AND description = trim(description)
+        )
+      ),
+      revision INTEGER NOT NULL CHECK (revision >= 1),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      archived_at TEXT,
+      UNIQUE (id, project_id),
+      FOREIGN KEY (asset_id, project_id)
+        REFERENCES inventory_assets(id, project_id)
+        DEFERRABLE INITIALLY DEFERRED,
+      CHECK (updated_at >= created_at),
+      CHECK (archived_at IS NULL OR archived_at = updated_at)
+    )
+  ''');
+
+  await transaction.execute('''
+    CREATE UNIQUE INDEX uq_inventory_sketches_primary
+    ON inventory_sketches(project_id)
+    WHERE is_primary = 1 AND archived_at IS NULL
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_inventory_sketches_project
+    ON inventory_sketches(project_id, archived_at, is_primary, id)
+  ''');
+  await transaction.execute('''
+    CREATE UNIQUE INDEX uq_inventory_sketch_revisions_draft
+    ON inventory_sketch_revisions(sketch_id)
+    WHERE state = 'DRAFT'
+  ''');
+  await transaction.execute('''
+    CREATE UNIQUE INDEX uq_inventory_sketch_revisions_active
+    ON inventory_sketch_revisions(sketch_id)
+    WHERE state = 'ACTIVE'
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_inventory_sketch_revisions_history
+    ON inventory_sketch_revisions(
+      project_id, sketch_id, revision_number DESC, id
+    )
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_inventory_assets_project_name
+    ON inventory_assets(project_id, normalized_name, id)
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_inventory_assets_project_filter
+    ON inventory_assets(project_id, archived_at, category_code, status, id)
+  ''');
+  await transaction.execute('''
+    CREATE UNIQUE INDEX uq_inventory_asset_placements_active_key
+    ON inventory_asset_placements(placement_key)
+    WHERE ended_at IS NULL
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_inventory_asset_placements_map
+    ON inventory_asset_placements(project_id, sketch_id, ended_at, y, x, id)
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_inventory_asset_placements_asset
+    ON inventory_asset_placements(project_id, asset_id, ended_at, id)
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_inventory_command_receipts_aggregate
+    ON inventory_command_receipts(
+      project_id, primary_aggregate_type, primary_aggregate_id, created_at, id
+    )
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_inventory_events_history
+    ON inventory_events(aggregate_type, aggregate_id, sequence, id)
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_inventory_events_operation
+    ON inventory_events(operation_id, project_id, id)
+  ''');
+  await transaction.execute('''
+    CREATE UNIQUE INDEX uq_inventory_asset_attachment_links_active
+    ON inventory_asset_attachment_links(attachment_id, asset_id, role)
+    WHERE archived_at IS NULL
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_inventory_asset_attachment_links_asset
+    ON inventory_asset_attachment_links(
+      project_id, asset_id, archived_at, created_at, id
+    )
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_inventory_asset_attachment_links_attachment
+    ON inventory_asset_attachment_links(
+      attachment_id, archived_at, created_at, id
+    )
+  ''');
+
+  await _addInventoryTimestampGuards(transaction, 'inventory_sketches', const [
+    'created_at',
+    'updated_at',
+    'archived_at',
+  ]);
+  await _addInventoryTimestampGuards(
+    transaction,
+    'inventory_sketch_revisions',
+    const [
+      'created_at',
+      'updated_at',
+      'finalized_at',
+      'superseded_at',
+      'abandoned_at',
+    ],
+  );
+  await _addInventoryTimestampGuards(transaction, 'inventory_assets', const [
+    'created_at',
+    'updated_at',
+    'status_changed_at',
+    'archived_at',
+  ]);
+  await _addInventoryTimestampGuards(
+    transaction,
+    'inventory_asset_placements',
+    const ['created_at', 'ended_at'],
+  );
+  await _addInventoryTimestampGuards(
+    transaction,
+    'inventory_command_receipts',
+    const ['created_at'],
+  );
+  await _addInventoryTimestampGuards(transaction, 'inventory_events', const [
+    'occurred_at',
+  ]);
+  await _addInventoryTimestampGuards(
+    transaction,
+    'inventory_asset_attachment_links',
+    const ['created_at', 'updated_at', 'archived_at'],
+  );
+
+  await _addInventoryInvariantTriggers(transaction);
+}
+
+Future<void> _addInventoryTimestampGuards(
+  Transaction transaction,
+  String table,
+  List<String> columns,
+) async {
+  for (final column in columns) {
+    for (final operation in ['insert', 'update']) {
+      final action = operation == 'insert' ? 'INSERT' : 'UPDATE OF $column';
+      await transaction.execute('''
+        CREATE TRIGGER ${table}_${column}_canonical_$operation
+        BEFORE $action ON $table
+        WHEN NEW.$column IS NOT NULL AND (
+          length(NEW.$column) != 20
+          OR NEW.$column NOT GLOB
+            '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+          OR strftime('%Y-%m-%dT%H:%M:%SZ', NEW.$column, '+0 seconds')
+            IS NULL
+          OR strftime('%Y-%m-%dT%H:%M:%SZ', NEW.$column, '+0 seconds')
+            != NEW.$column
+        )
+        BEGIN
+          SELECT RAISE(ABORT, 'inventory timestamp must be canonical UTC');
+        END
+      ''');
+    }
+  }
+}
+
+Future<void> _addInventoryInvariantTriggers(Transaction transaction) async {
+  for (final table in const [
+    'inventory_sketches',
+    'inventory_sketch_revisions',
+    'inventory_assets',
+    'inventory_asset_placements',
+    'inventory_command_receipts',
+    'inventory_events',
+    'inventory_asset_attachment_links',
+  ]) {
+    await transaction.execute('''
+      CREATE TRIGGER ${table}_project_available_insert
+      BEFORE INSERT ON $table
+      WHEN NOT EXISTS (
+        SELECT 1
+        FROM projects project
+        WHERE project.id = NEW.project_id
+          AND project.archived_at IS NULL
+      )
+      BEGIN
+        SELECT RAISE(ABORT, 'inventory project is unavailable');
+      END
+    ''');
+  }
+  for (final table in const [
+    'inventory_sketches',
+    'inventory_sketch_revisions',
+    'inventory_assets',
+    'inventory_asset_placements',
+    'inventory_asset_attachment_links',
+  ]) {
+    await transaction.execute('''
+      CREATE TRIGGER ${table}_project_available_update
+      BEFORE UPDATE ON $table
+      WHEN NOT EXISTS (
+        SELECT 1
+        FROM projects project
+        WHERE project.id = NEW.project_id
+          AND project.archived_at IS NULL
+      )
+      BEGIN
+        SELECT RAISE(ABORT, 'inventory project is unavailable');
+      END
+    ''');
+  }
+
+  for (final operation in ['insert', 'update']) {
+    final action = operation == 'insert'
+        ? 'INSERT'
+        : 'UPDATE OF active_revision_id, draft_revision_id, project_id';
+    await transaction.execute('''
+      CREATE TRIGGER inventory_sketches_pointer_state_$operation
+      BEFORE $action ON inventory_sketches
+      BEGIN
+        SELECT CASE
+          WHEN NEW.active_revision_id IS NOT NULL
+            AND NOT EXISTS (
+              SELECT 1
+              FROM inventory_sketch_revisions revision
+              WHERE revision.id = NEW.active_revision_id
+                AND revision.project_id = NEW.project_id
+                AND revision.sketch_id = NEW.id
+                AND revision.state = 'ACTIVE'
+            )
+          THEN RAISE(ABORT, 'inventory active revision pointer is invalid')
+        END;
+        SELECT CASE
+          WHEN NEW.draft_revision_id IS NOT NULL
+            AND NOT EXISTS (
+              SELECT 1
+              FROM inventory_sketch_revisions revision
+              WHERE revision.id = NEW.draft_revision_id
+                AND revision.project_id = NEW.project_id
+                AND revision.sketch_id = NEW.id
+                AND revision.state = 'DRAFT'
+            )
+          THEN RAISE(ABORT, 'inventory draft revision pointer is invalid')
+        END;
+      END
+    ''');
+  }
+  await transaction.execute('''
+    CREATE TRIGGER inventory_sketches_guarded_update
+    BEFORE UPDATE ON inventory_sketches
+    BEGIN
+      SELECT CASE
+        WHEN NEW.id != OLD.id
+          OR NEW.project_id != OLD.project_id
+          OR NEW.created_at != OLD.created_at
+        THEN RAISE(ABORT, 'inventory sketch identity is immutable')
+      END;
+      SELECT CASE
+        WHEN NEW.revision != OLD.revision + 1
+        THEN RAISE(ABORT, 'inventory sketch revision mismatch')
+      END;
+      SELECT CASE
+        WHEN NEW.updated_at < OLD.updated_at
+        THEN RAISE(ABORT, 'inventory sketch timestamp regression')
+      END;
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER inventory_sketches_archive_without_placements
+    BEFORE UPDATE OF archived_at ON inventory_sketches
+    WHEN OLD.archived_at IS NULL
+      AND NEW.archived_at IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+        FROM inventory_asset_placements placement
+        WHERE placement.project_id = OLD.project_id
+          AND placement.sketch_id = OLD.id
+          AND placement.ended_at IS NULL
+      )
+    BEGIN
+      SELECT RAISE(ABORT, 'inventory sketch has active placements');
+    END
+  ''');
+
+  await transaction.execute('''
+    CREATE TRIGGER inventory_sketch_revisions_insert_state
+    BEFORE INSERT ON inventory_sketch_revisions
+    BEGIN
+      SELECT CASE
+        WHEN NEW.state != 'DRAFT'
+        THEN RAISE(ABORT, 'inventory revision must start as draft')
+      END;
+      SELECT CASE
+        WHEN NEW.revision_number != (
+          SELECT COALESCE(MAX(existing.revision_number), 0) + 1
+          FROM inventory_sketch_revisions existing
+          WHERE existing.sketch_id = NEW.sketch_id
+        )
+        THEN RAISE(ABORT, 'inventory revision number is not contiguous')
+      END;
+      SELECT CASE
+        WHEN NEW.base_revision_id IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM inventory_sketch_revisions base
+            WHERE base.id = NEW.base_revision_id
+              AND base.project_id = NEW.project_id
+              AND base.sketch_id = NEW.sketch_id
+              AND base.revision_number < NEW.revision_number
+              AND base.state IN ('ACTIVE', 'SUPERSEDED')
+          )
+        THEN RAISE(ABORT, 'inventory base revision is invalid')
+      END;
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER inventory_sketch_revisions_guarded_update
+    BEFORE UPDATE ON inventory_sketch_revisions
+    BEGIN
+      SELECT CASE
+        WHEN NEW.id != OLD.id
+          OR NEW.sketch_id != OLD.sketch_id
+          OR NEW.project_id != OLD.project_id
+          OR NEW.revision_number != OLD.revision_number
+          OR NEW.base_revision_id IS NOT OLD.base_revision_id
+          OR NEW.geometry_version != OLD.geometry_version
+          OR NEW.canvas_width != OLD.canvas_width
+          OR NEW.canvas_height != OLD.canvas_height
+          OR NEW.created_at != OLD.created_at
+        THEN RAISE(ABORT, 'inventory revision identity is immutable')
+      END;
+      SELECT CASE
+        WHEN NEW.updated_at < OLD.updated_at
+        THEN RAISE(ABORT, 'inventory revision timestamp regression')
+      END;
+      SELECT CASE
+        WHEN NOT (
+          (
+            OLD.state = 'DRAFT'
+            AND NEW.state = 'DRAFT'
+            AND NEW.content_revision = OLD.content_revision + 1
+            AND (
+              NEW.geometry_json != OLD.geometry_json
+              OR NEW.geometry_sha256 != OLD.geometry_sha256
+            )
+            AND NEW.finalized_at IS OLD.finalized_at
+            AND NEW.superseded_at IS OLD.superseded_at
+            AND NEW.abandoned_at IS OLD.abandoned_at
+          )
+          OR (
+            OLD.state = 'DRAFT'
+            AND NEW.state IN ('ACTIVE', 'ABANDONED')
+            AND NEW.content_revision = OLD.content_revision
+            AND NEW.geometry_json = OLD.geometry_json
+            AND NEW.geometry_sha256 = OLD.geometry_sha256
+          )
+          OR (
+            OLD.state = 'ACTIVE'
+            AND NEW.state = 'SUPERSEDED'
+            AND NEW.content_revision = OLD.content_revision
+            AND NEW.geometry_json = OLD.geometry_json
+            AND NEW.geometry_sha256 = OLD.geometry_sha256
+            AND NEW.finalized_at = OLD.finalized_at
+            AND NEW.abandoned_at IS OLD.abandoned_at
+          )
+        )
+        THEN RAISE(ABORT, 'inventory revision transition is not allowed')
+      END;
+    END
+  ''');
+
+  await transaction.execute('''
+    CREATE TRIGGER inventory_assets_guarded_update
+    BEFORE UPDATE ON inventory_assets
+    BEGIN
+      SELECT CASE
+        WHEN NEW.id != OLD.id
+          OR NEW.project_id != OLD.project_id
+          OR NEW.created_at != OLD.created_at
+        THEN RAISE(ABORT, 'inventory asset identity is immutable')
+      END;
+      SELECT CASE
+        WHEN NEW.revision != OLD.revision + 1
+        THEN RAISE(ABORT, 'inventory asset revision mismatch')
+      END;
+      SELECT CASE
+        WHEN NEW.updated_at < OLD.updated_at
+          OR NEW.status_changed_at < OLD.status_changed_at
+        THEN RAISE(ABORT, 'inventory asset timestamp regression')
+      END;
+      SELECT CASE
+        WHEN NEW.status = OLD.status
+          AND NEW.status_changed_at != OLD.status_changed_at
+        THEN RAISE(ABORT, 'inventory asset status timestamp mismatch')
+      END;
+      SELECT CASE
+        WHEN NEW.status != OLD.status
+          AND NEW.status_changed_at != NEW.updated_at
+        THEN RAISE(ABORT, 'inventory asset status timestamp mismatch')
+      END;
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER inventory_assets_quantity_sum_update
+    BEFORE UPDATE OF total_quantity ON inventory_assets
+    WHEN NEW.total_quantity < (
+      SELECT COALESCE(SUM(placement.quantity), 0)
+      FROM inventory_asset_placements placement
+      WHERE placement.project_id = OLD.project_id
+        AND placement.asset_id = OLD.id
+        AND placement.ended_at IS NULL
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'inventory active placement quantity exceeds asset');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER inventory_assets_archive_without_active_placements
+    BEFORE UPDATE OF archived_at ON inventory_assets
+    WHEN OLD.archived_at IS NULL
+      AND NEW.archived_at IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+        FROM inventory_asset_placements placement
+        WHERE placement.project_id = OLD.project_id
+          AND placement.asset_id = OLD.id
+          AND placement.ended_at IS NULL
+      )
+    BEGIN
+      SELECT RAISE(ABORT, 'inventory asset has active placements');
+    END
+  ''');
+
+  await transaction.execute('''
+    CREATE TRIGGER inventory_asset_placements_source_insert
+    BEFORE INSERT ON inventory_asset_placements
+    BEGIN
+      SELECT CASE
+        WHEN NOT EXISTS (
+          SELECT 1
+          FROM inventory_sketches sketch
+          JOIN inventory_sketch_revisions revision
+            ON revision.id = NEW.provenance_revision_id
+            AND revision.project_id = NEW.project_id
+            AND revision.sketch_id = NEW.sketch_id
+          WHERE sketch.id = NEW.sketch_id
+            AND sketch.project_id = NEW.project_id
+            AND sketch.active_revision_id = NEW.provenance_revision_id
+            AND sketch.archived_at IS NULL
+            AND revision.state = 'ACTIVE'
+        )
+        THEN RAISE(ABORT, 'inventory placement revision source is invalid')
+      END;
+      SELECT CASE
+        WHEN NEW.ended_at IS NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM inventory_assets asset
+            WHERE asset.id = NEW.asset_id
+              AND asset.project_id = NEW.project_id
+              AND asset.archived_at IS NULL
+          )
+        THEN RAISE(ABORT, 'inventory placement asset is unavailable')
+      END;
+      SELECT CASE
+        WHEN NEW.supersedes_placement_id IS NULL AND NEW.sequence != 1
+        THEN RAISE(ABORT, 'inventory placement initial sequence is invalid')
+      END;
+      SELECT CASE
+        WHEN NEW.supersedes_placement_id IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM inventory_asset_placements predecessor
+            WHERE predecessor.id = NEW.supersedes_placement_id
+              AND predecessor.project_id = NEW.project_id
+              AND predecessor.placement_key = NEW.placement_key
+              AND predecessor.asset_id = NEW.asset_id
+              AND predecessor.sketch_id = NEW.sketch_id
+              AND predecessor.sequence + 1 = NEW.sequence
+              AND predecessor.ended_at IS NOT NULL
+          )
+        THEN RAISE(ABORT, 'inventory placement predecessor is invalid')
+      END;
+      SELECT CASE
+        WHEN NEW.ended_at IS NULL
+          AND NEW.quantity + (
+            SELECT COALESCE(SUM(placement.quantity), 0)
+            FROM inventory_asset_placements placement
+            WHERE placement.project_id = NEW.project_id
+              AND placement.asset_id = NEW.asset_id
+              AND placement.ended_at IS NULL
+          ) > (
+            SELECT asset.total_quantity
+            FROM inventory_assets asset
+            WHERE asset.id = NEW.asset_id
+              AND asset.project_id = NEW.project_id
+          )
+        THEN RAISE(ABORT, 'inventory active placement quantity exceeds asset')
+      END;
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER inventory_asset_placements_terminal_update
+    BEFORE UPDATE ON inventory_asset_placements
+    BEGIN
+      SELECT CASE
+        WHEN NEW.id != OLD.id
+          OR NEW.placement_key != OLD.placement_key
+          OR NEW.project_id != OLD.project_id
+          OR NEW.asset_id != OLD.asset_id
+          OR NEW.sketch_id != OLD.sketch_id
+          OR NEW.provenance_revision_id != OLD.provenance_revision_id
+          OR NEW.sequence != OLD.sequence
+          OR NEW.x != OLD.x
+          OR NEW.y != OLD.y
+          OR NEW.quantity != OLD.quantity
+          OR NEW.created_at != OLD.created_at
+          OR NEW.supersedes_placement_id IS NOT OLD.supersedes_placement_id
+        THEN RAISE(ABORT, 'inventory placement source is immutable')
+      END;
+      SELECT CASE
+        WHEN OLD.ended_at IS NOT NULL
+          OR OLD.end_reason IS NOT NULL
+          OR NEW.ended_at IS NULL
+          OR NEW.end_reason IS NULL
+        THEN RAISE(ABORT, 'inventory placement terminal transition is invalid')
+      END;
+    END
+  ''');
+
+  for (final table in const [
+    'inventory_sketches',
+    'inventory_sketch_revisions',
+    'inventory_assets',
+    'inventory_asset_placements',
+    'inventory_asset_attachment_links',
+  ]) {
+    await transaction.execute('''
+      CREATE TRIGGER ${table}_no_physical_delete
+      BEFORE DELETE ON $table
+      BEGIN
+        SELECT RAISE(ABORT, 'inventory source cannot be physically deleted');
+      END
+    ''');
+  }
+
+  await transaction.execute('''
+    CREATE TRIGGER inventory_command_receipts_aggregate_insert
+    BEFORE INSERT ON inventory_command_receipts
+    WHEN (
+      NEW.primary_aggregate_type = 'sketch'
+      AND NOT EXISTS (
+        SELECT 1 FROM inventory_sketches source
+        WHERE source.id = NEW.primary_aggregate_id
+          AND source.project_id = NEW.project_id
+      )
+    ) OR (
+      NEW.primary_aggregate_type = 'asset'
+      AND NOT EXISTS (
+        SELECT 1 FROM inventory_assets source
+        WHERE source.id = NEW.primary_aggregate_id
+          AND source.project_id = NEW.project_id
+      )
+    ) OR (
+      NEW.primary_aggregate_type = 'placement'
+      AND NOT EXISTS (
+        SELECT 1 FROM inventory_asset_placements source
+        WHERE source.placement_key = NEW.primary_aggregate_id
+          AND source.project_id = NEW.project_id
+      )
+    ) OR (
+      NEW.primary_aggregate_type = 'attachment_link'
+      AND NOT EXISTS (
+        SELECT 1 FROM inventory_asset_attachment_links source
+        WHERE source.id = NEW.primary_aggregate_id
+          AND source.project_id = NEW.project_id
+      )
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'inventory receipt aggregate is invalid');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER inventory_events_aggregate_insert
+    BEFORE INSERT ON inventory_events
+    WHEN (
+      NEW.aggregate_type = 'sketch'
+      AND NOT EXISTS (
+        SELECT 1 FROM inventory_sketches source
+        WHERE source.id = NEW.aggregate_id
+          AND source.project_id = NEW.project_id
+      )
+    ) OR (
+      NEW.aggregate_type = 'asset'
+      AND NOT EXISTS (
+        SELECT 1 FROM inventory_assets source
+        WHERE source.id = NEW.aggregate_id
+          AND source.project_id = NEW.project_id
+      )
+    ) OR (
+      NEW.aggregate_type = 'placement'
+      AND NOT EXISTS (
+        SELECT 1 FROM inventory_asset_placements source
+        WHERE source.placement_key = NEW.aggregate_id
+          AND source.project_id = NEW.project_id
+      )
+    ) OR (
+      NEW.aggregate_type = 'attachment_link'
+      AND NOT EXISTS (
+        SELECT 1 FROM inventory_asset_attachment_links source
+        WHERE source.id = NEW.aggregate_id
+          AND source.project_id = NEW.project_id
+      )
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'inventory event aggregate is invalid');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER inventory_events_contiguous_sequence
+    BEFORE INSERT ON inventory_events
+    WHEN NEW.sequence != (
+      SELECT COALESCE(MAX(event.sequence), 0) + 1
+      FROM inventory_events event
+      WHERE event.aggregate_type = NEW.aggregate_type
+        AND event.aggregate_id = NEW.aggregate_id
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'inventory event sequence is not contiguous');
+    END
+  ''');
+  for (final table in const [
+    'inventory_command_receipts',
+    'inventory_events',
+  ]) {
+    for (final operation in ['update', 'delete']) {
+      await transaction.execute('''
+        CREATE TRIGGER ${table}_append_only_$operation
+        BEFORE ${operation.toUpperCase()} ON $table
+        BEGIN
+          SELECT RAISE(ABORT, 'inventory history is append-only');
+        END
+      ''');
+    }
+  }
+
+  await transaction.execute('''
+    CREATE TRIGGER inventory_asset_attachment_links_guarded_update
+    BEFORE UPDATE ON inventory_asset_attachment_links
+    BEGIN
+      SELECT CASE
+        WHEN NEW.id != OLD.id
+          OR NEW.attachment_id != OLD.attachment_id
+          OR NEW.asset_id != OLD.asset_id
+          OR NEW.project_id != OLD.project_id
+          OR NEW.role != OLD.role
+          OR NEW.created_at != OLD.created_at
+        THEN RAISE(ABORT, 'inventory photo link identity is immutable')
+      END;
+      SELECT CASE
+        WHEN NEW.revision != OLD.revision + 1
+        THEN RAISE(ABORT, 'inventory photo link revision mismatch')
+      END;
+      SELECT CASE
+        WHEN NEW.updated_at < OLD.updated_at
+        THEN RAISE(ABORT, 'inventory photo link timestamp regression')
+      END;
+      SELECT CASE
+        WHEN NEW.original_file_name = OLD.original_file_name
+          AND NEW.description IS OLD.description
+          AND NEW.archived_at IS OLD.archived_at
+        THEN RAISE(ABORT, 'inventory photo link no-op update')
+      END;
     END
   ''');
 }
