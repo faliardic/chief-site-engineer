@@ -7,6 +7,7 @@ import 'package:chief_site_engineer/application/construction_living_plan_applica
 import 'package:chief_site_engineer/application/construction_living_plan_intelligence_application.dart';
 import 'package:chief_site_engineer/application/context_suggestion_application.dart';
 import 'package:chief_site_engineer/application/daily_log_application.dart';
+import 'package:chief_site_engineer/application/inventory_application.dart';
 import 'package:chief_site_engineer/application/material_request_application.dart';
 import 'package:chief_site_engineer/application/mobile_backup_application.dart';
 import 'package:chief_site_engineer/application/work_chain_application.dart';
@@ -40,6 +41,7 @@ class BootstrapSuccess extends BootstrapResult {
     required this.smokeRecordId,
     required this.smokeRecordCreatedAt,
     required this.agenda,
+    this.inventory = const UnavailableInventoryApplication(),
     this.livingPlan = const UnavailableConstructionLivingPlanApplication(),
     this.livingPlanIntelligence =
         const UnavailableConstructionLivingPlanIntelligenceApplication(),
@@ -60,6 +62,7 @@ class BootstrapSuccess extends BootstrapResult {
   final String smokeRecordId;
   final String smokeRecordCreatedAt;
   final AgendaApplication agenda;
+  final InventoryApplicationPort inventory;
   final ConstructionLivingPlanApplicationPort livingPlan;
   final ConstructionLivingPlanIntelligenceApplicationPort
   livingPlanIntelligence;
@@ -185,6 +188,11 @@ class AppBootstrap {
         databaseFactory: databaseFactory,
         clock: clock,
       );
+      final inventory = SqliteInventoryApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactory,
+        clock: clock,
+      );
       final livingPlanIntelligence =
           SqliteConstructionLivingPlanIntelligenceApplication(
             databasePath: directories.databaseFile,
@@ -269,6 +277,7 @@ class AppBootstrap {
         smokeRecordId: smoke.id,
         smokeRecordCreatedAt: smoke.createdAt,
         agenda: agenda,
+        inventory: inventory,
         livingPlan: livingPlan,
         livingPlanIntelligence: livingPlanIntelligence,
         dailyLog: dailyLog,
