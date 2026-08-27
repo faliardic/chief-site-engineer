@@ -2042,27 +2042,27 @@ class InventoryApplication implements InventoryApplicationPort {
           asset: asset,
         );
       }
+      if (placement == null) {
+        throw const InventoryFailure('inventory_projection_integrity_failed');
+      }
       final occurredAt = _canonicalNowAfter(
         asset.updatedAt,
-        placement?.createdAt,
+        placement.createdAt,
       );
       final timestamp = CseTimeCodec.encodeUtc(occurredAt);
-      if (placement != null) {
-        final ended = await transaction.update(
-          'inventory_asset_placements',
-          {
-            'ended_at': timestamp,
-            'end_reason':
-                InventoryPlacementEndReason.assetArchived.storageValue,
-          },
-          where:
-              'id = ? AND project_id = ? AND asset_id = ? '
-              'AND ended_at IS NULL',
-          whereArgs: [placement.id, command.projectId, command.assetId],
-        );
-        if (ended != 1) {
-          throw const InventoryFailure('inventory_stale_placement_sequence');
-        }
+      final ended = await transaction.update(
+        'inventory_asset_placements',
+        {
+          'ended_at': timestamp,
+          'end_reason': InventoryPlacementEndReason.assetArchived.storageValue,
+        },
+        where:
+            'id = ? AND project_id = ? AND asset_id = ? '
+            'AND ended_at IS NULL',
+        whereArgs: [placement.id, command.projectId, command.assetId],
+      );
+      if (ended != 1) {
+        throw const InventoryFailure('inventory_stale_placement_sequence');
       }
       final updated = await transaction.update(
         'inventory_assets',
@@ -2077,15 +2077,14 @@ class InventoryApplication implements InventoryApplicationPort {
       if (updated != 1) {
         throw const InventoryFailure('inventory_stale_revision');
       }
-      final eventCount = placement == null ? 1 : 2;
       final result = _result(
         command: command,
         sourceId: command.assetId,
         sourceRevision: asset.revision + 1,
-        supportingId: placement?.id,
-        supportingRevision: placement?.sequence,
+        supportingId: placement.id,
+        supportingRevision: placement.sequence,
         isNoOp: false,
-        eventCount: eventCount,
+        eventCount: 2,
         resultAt: occurredAt,
       );
       final events = <_PendingInventoryEvent>[
@@ -2097,30 +2096,28 @@ class InventoryApplication implements InventoryApplicationPort {
             result,
             values: <String, Object?>{
               'archived_at': timestamp,
-              'retired_placement_key': placement?.placementKey,
+              'retired_placement_key': placement.placementKey,
             },
           ),
         ),
       ];
-      if (placement != null) {
-        events.add(
-          _PendingInventoryEvent(
-            aggregateType: InventoryAggregateType.placement,
-            aggregateId: placement.placementKey,
-            eventType: InventoryEventType.placementRetired,
-            payload: _eventPayload(
-              result,
-              values: <String, Object?>{
-                'asset_id': command.assetId,
-                'end_reason':
-                    InventoryPlacementEndReason.assetArchived.storageValue,
-                'placement_id': placement.id,
-                'sequence': placement.sequence,
-              },
-            ),
+      events.add(
+        _PendingInventoryEvent(
+          aggregateType: InventoryAggregateType.placement,
+          aggregateId: placement.placementKey,
+          eventType: InventoryEventType.placementRetired,
+          payload: _eventPayload(
+            result,
+            values: <String, Object?>{
+              'asset_id': command.assetId,
+              'end_reason':
+                  InventoryPlacementEndReason.assetArchived.storageValue,
+              'placement_id': placement.id,
+              'sequence': placement.sequence,
+            },
           ),
-        );
-      }
+        ),
+      );
       return _finishMutation(
         transaction,
         command: command,
@@ -2653,10 +2650,26 @@ class InventoryApplication implements InventoryApplicationPort {
         sketchId: command.sketchId,
         revisionId: command.draftRevisionId,
       );
-      if (draft.state != InventorySketchRevisionState.draft) {
-        throw const InventoryFailure('inventory_sketch_draft_unavailable');
+      final activeRevisionId = sketch.activeRevisionId;
+      if (activeRevisionId == null) {
+        throw const InventoryFailure('inventory_sketch_edit_lifecycle_invalid');
       }
-      final occurredAt = _canonicalNowAfter(sketch.updatedAt, draft.updatedAt);
+      final active = await _requireSketchRevision(
+        transaction,
+        projectId: command.projectId,
+        sketchId: command.sketchId,
+        revisionId: activeRevisionId,
+      );
+      if (active.state != InventorySketchRevisionState.active ||
+          draft.state != InventorySketchRevisionState.draft ||
+          draft.baseRevisionId != activeRevisionId) {
+        throw const InventoryFailure('inventory_sketch_edit_lifecycle_invalid');
+      }
+      final occurredAt = _canonicalNowAfter(
+        sketch.updatedAt,
+        draft.updatedAt,
+        active.updatedAt,
+      );
       final timestamp = CseTimeCodec.encodeUtc(occurredAt);
       final abandoned = await transaction.update(
         'inventory_sketch_revisions',

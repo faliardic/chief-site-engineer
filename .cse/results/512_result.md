@@ -171,3 +171,122 @@ deterministic projection/history integrity, and the exact five-path delta.
 Keep the PR Draft. Do not Ready, merge, close #512, begin Slice 1C or Slice 2,
 build, install, release, or use an owner device.
 ```
+
+---
+
+## PR #513 R4 lifecycle blocker correction
+
+Authority:
+`https://github.com/faliardic/chief-site-engineer/issues/512#issuecomment-5440176254`
+
+Independent review:
+`https://github.com/faliardic/chief-site-engineer/pull/513#pullrequestreview-5041601249`
+
+Correction base HEAD:
+`6e7e9a2d50bf342f5e2b9ab3a8648a60ec4d77e9`
+
+Status remains:
+
+`SLICE_1B_IMPLEMENTED — TRANSACTIONAL PERSISTENCE TESTS PASS — INDEPENDENT REVIEW REQUIRED`
+
+### Exact correction delta
+
+Only these three paths are authorized and used:
+
+1. `mobile/lib/application/inventory_application.dart`
+2. `mobile/test/inventory_application_test.dart`
+3. `.cse/results/512_result.md`
+
+Full PR path set remains the exact original five paths. Domain models, schema,
+backup, bootstrap, UI, attachment, pubspec, platform and task-file correction
+delta is `0`.
+
+### Lifecycle corrections
+
+- `sketch_draft_abandon` now requires a non-null current ACTIVE pointer, the
+  exact pointed revision in ACTIVE state, an exact DRAFT pointer and
+  `draft.base_revision_id == sketch.active_revision_id` before mutation.
+- The initial creation DRAFT is rejected with stable typed
+  `inventory_sketch_edit_lifecycle_invalid`; source, receipt and events remain
+  unchanged.
+- A valid ACTIVE-backed edit DRAFT still transitions to ABANDONED, clears only
+  the draft pointer, preserves ACTIVE, increments the sketch revision once and
+  appends one event plus receipt atomically.
+- A synthetically valid DRAFT whose base is not the current ACTIVE fails the
+  same lifecycle guard without mutation.
+- `archiveAsset` now requires exactly one active placement when the asset is
+  unarchived. Zero active placements fail
+  `inventory_projection_integrity_failed`; multiple active placements retain
+  their existing typed v1 failure.
+- Already archived plus zero active placement remains the valid receipt-only
+  archive no-op. The normal exact-one-placement retirement and two-event atomic
+  archive behavior is preserved.
+
+### Correction validation
+
+- Initial correction path audit: exact `2/3` before evidence append; unexpected
+  path `0`.
+- Full PR path audit: exact `5`; unexpected path `0`.
+- Touched Dart format: PASS.
+- Exact focused invocation:
+  `flutter test --no-pub test/inventory_application_test.dart`
+- Focused result: PASS, `6/6`, process exit `0`, `All tests passed!`.
+- Focused correction/retry used: `0`.
+- Exact `flutter analyze --no-pub` primary: one mechanical
+  `invalid_null_aware_operator` warning after the new non-null guard.
+- Analyzer correction: replaced the proven redundant `?.` with `.` only;
+  budget used `1/1`.
+- Single analyzer retry: PASS, `No issues found! (ran in 42.7s)`; retry budget
+  used `1/1`.
+- `git diff --check`: PASS.
+- Schema remains exact `20`; exact seven Inventory tables; database correction
+  diff `0`.
+- Backup format remains exact `1`; backup application correction diff `0`.
+- Version remains `0.1.0+1`; MAIN package remains `com.faliardic.sefim`.
+- Domain model, bootstrap, UI, attachment, pubspec/lock, Android/iOS, platform,
+  permission and signing correction drift: `0`.
+- Owner-phone/build/device operations: `0`.
+- Full suite, widget/integration tests, build/APK/AAB, emulator, ADB/device and
+  owner-data operations: NOT RUN.
+- Manual test status remains `N/A — synthetic persistence child`; no MT-512
+  records exist.
+
+The narrow correction commit, normal push, updated Draft PR head and Issue/PR
+evidence are recorded externally after this append enters the correction
+commit.
+
+```yaml
+execution_record:
+  issue: 512
+  correction_authority: r4_lifecycle_fail_closed_blockers
+  review_id: 5041601249
+  correction_base_head: 6e7e9a2d50bf342f5e2b9ab3a8648a60ec4d77e9
+  correction_paths: 3
+  full_pr_paths: 5
+  task_risk: R4
+  requested_model: gpt-5.6-sol
+  requested_reasoning_effort: max
+  runtime_actual_model: unknown
+  runtime_actual_reasoning_effort: null
+  validation_class: persistence
+  focused_test: PASS_6_OF_6
+  focused_retry: NOT_USED
+  analyzer_primary: FAIL_1_MECHANICAL_FINDING
+  analyzer_correction: USED_1_OF_1
+  analyzer_retry: PASS_NO_ISSUES
+  schema: 20
+  backup_format: 1
+  owner_phone_install_authorized: false
+  owner_phone_operations: 0
+  publication_target: existing_draft_pr_513
+```
+
+```text
+review_recommendation: INDEPENDENT R4 RE-REVIEW
+
+Re-review the edit-draft/current-ACTIVE/base lifecycle guard, initial-draft and
+mismatched-base rollback evidence, zero-placement unarchived-asset archive
+rejection, preserved archived no-op, and exact three-path correction delta.
+Keep PR #513 Draft. Do not Ready, merge, close #512, begin Slice 1C/Slice 2,
+build, install, release, or use an owner device.
+```

@@ -175,6 +175,54 @@ void main() {
       expect(projection, isNotNull);
       expect(projection!.activeRevision, isNull);
       expect(projection.draftRevision!.geometry.polylines, isEmpty);
+      final initialSketchBefore = (await fixture.db.database.query(
+        'inventory_sketches',
+        where: 'id = ?',
+        whereArgs: [sketchId],
+      )).single;
+      final initialDraftBefore = (await fixture.db.database.query(
+        'inventory_sketch_revisions',
+        where: 'id = ?',
+        whereArgs: [firstDraft],
+      )).single;
+      final initialCountsBefore = await _counts(fixture.db.database);
+      await expectLater(
+        fixture.app.abandonSketchDraft(
+          AbandonInventorySketchDraftCommand(
+            operationId: _uuid(221),
+            projectId: _projectA,
+            sketchId: sketchId,
+            draftRevisionId: firstDraft,
+            expectedSketchRevision: 1,
+          ),
+        ),
+        _fails('inventory_sketch_edit_lifecycle_invalid'),
+      );
+      expect(await _counts(fixture.db.database), initialCountsBefore);
+      expect(
+        (await fixture.db.database.query(
+          'inventory_sketches',
+          where: 'id = ?',
+          whereArgs: [sketchId],
+        )).single,
+        initialSketchBefore,
+      );
+      expect(
+        (await fixture.db.database.query(
+          'inventory_sketch_revisions',
+          where: 'id = ?',
+          whereArgs: [firstDraft],
+        )).single,
+        initialDraftBefore,
+      );
+      expect(
+        await fixture.db.database.query(
+          'inventory_command_receipts',
+          where: 'id = ?',
+          whereArgs: [_uuid(221)],
+        ),
+        isEmpty,
+      );
 
       final changed = await fixture.app.autosaveSketchDraft(
         AutosaveInventorySketchDraftCommand(
@@ -298,6 +346,9 @@ void main() {
           expectedSketchRevision: 6,
         ),
       );
+      projection = await fixture.app.loadPrimarySketch(_projectA);
+      expect(projection!.activeRevision!.id, secondDraft);
+      expect(projection.draftRevision!.baseRevisionId, secondDraft);
       await fixture.app.abandonSketchDraft(
         AbandonInventorySketchDraftCommand(
           operationId: _uuid(213),
@@ -339,6 +390,92 @@ void main() {
       expect(
         (await fixture.app.loadPrimarySketch(_projectA))!.sketch.revision,
         10,
+      );
+
+      final mismatchedDraft = _uuid(222);
+      final mismatchGeometry = _geometry(128);
+      final currentSketchRow = (await fixture.db.database.query(
+        'inventory_sketches',
+        where: 'id = ?',
+        whereArgs: [sketchId],
+      )).single;
+      final mismatchTimestamp = currentSketchRow['updated_at'];
+      await fixture.db.database.insert('inventory_sketch_revisions', {
+        'id': mismatchedDraft,
+        'sketch_id': sketchId,
+        'project_id': _projectA,
+        'revision_number': 4,
+        'base_revision_id': firstDraft,
+        'state': InventorySketchRevisionState.draft.storageValue,
+        'geometry_version': InventoryGeometryContract.geometryVersion,
+        'canvas_width': InventoryGeometryContract.canvasWidth,
+        'canvas_height': InventoryGeometryContract.canvasHeight,
+        'geometry_json': mismatchGeometry.canonicalJson,
+        'geometry_sha256': mismatchGeometry.sha256,
+        'content_revision': 1,
+        'created_at': mismatchTimestamp,
+        'updated_at': mismatchTimestamp,
+        'finalized_at': null,
+        'superseded_at': null,
+        'abandoned_at': null,
+      });
+      await fixture.db.database.update(
+        'inventory_sketches',
+        {
+          'draft_revision_id': mismatchedDraft,
+          'revision': 11,
+          'updated_at': mismatchTimestamp,
+        },
+        where: 'id = ? AND revision = 10',
+        whereArgs: [sketchId],
+      );
+      final mismatchCountsBefore = await _counts(fixture.db.database);
+      final mismatchSketchBefore = (await fixture.db.database.query(
+        'inventory_sketches',
+        where: 'id = ?',
+        whereArgs: [sketchId],
+      )).single;
+      final mismatchDraftBefore = (await fixture.db.database.query(
+        'inventory_sketch_revisions',
+        where: 'id = ?',
+        whereArgs: [mismatchedDraft],
+      )).single;
+      await expectLater(
+        fixture.app.abandonSketchDraft(
+          AbandonInventorySketchDraftCommand(
+            operationId: _uuid(223),
+            projectId: _projectA,
+            sketchId: sketchId,
+            draftRevisionId: mismatchedDraft,
+            expectedSketchRevision: 11,
+          ),
+        ),
+        _fails('inventory_sketch_edit_lifecycle_invalid'),
+      );
+      expect(await _counts(fixture.db.database), mismatchCountsBefore);
+      expect(
+        (await fixture.db.database.query(
+          'inventory_sketches',
+          where: 'id = ?',
+          whereArgs: [sketchId],
+        )).single,
+        mismatchSketchBefore,
+      );
+      expect(
+        (await fixture.db.database.query(
+          'inventory_sketch_revisions',
+          where: 'id = ?',
+          whereArgs: [mismatchedDraft],
+        )).single,
+        mismatchDraftBefore,
+      );
+      expect(
+        await fixture.db.database.query(
+          'inventory_command_receipts',
+          where: 'id = ?',
+          whereArgs: [_uuid(223)],
+        ),
+        isEmpty,
       );
 
       await expectLater(
@@ -581,6 +718,23 @@ void main() {
       );
       expect(archivedProjection.asset.archivedAt, isNotNull);
       expect(archivedProjection.activePlacement, isNull);
+      final archivedEventCount = (await fixture.db.database.query(
+        'inventory_events',
+      )).length;
+      final archivedNoOp = await fixture.app.archiveAsset(
+        ArchiveInventoryAssetCommand(
+          operationId: _uuid(334),
+          projectId: _projectA,
+          assetId: assetId,
+          expectedAssetRevision: 5,
+        ),
+      );
+      expect(archivedNoOp.isNoOp, isTrue);
+      expect(archivedNoOp.sourceRevision, 5);
+      expect(
+        (await fixture.db.database.query('inventory_events')).length,
+        archivedEventCount,
+      );
 
       final placement4 = _uuid(332);
       final unarchived = await fixture.app.unarchiveAsset(
@@ -809,6 +963,85 @@ void main() {
       await expectLater(
         fixture.app.loadPrimarySketch(_projectA),
         _fails(InventoryGeometryFailure.safeCode),
+      );
+    },
+  );
+
+  test(
+    'archive rejects an unarchived asset with zero active placements',
+    () async {
+      final fixture = await _Fixture.create('zero_placement_archive');
+      addTearDown(fixture.close);
+      final sketch = await _createFinalizedSketch(fixture, seed: 600);
+      final assetId = _uuid(610);
+      final placementId = _uuid(611);
+      await fixture.app.createAsset(
+        CreateInventoryAssetCommand(
+          operationId: _uuid(612),
+          projectId: _projectA,
+          assetId: assetId,
+          placementId: placementId,
+          placementKey: _uuid(613),
+          sketchId: sketch.sketchId,
+          activeRevisionId: sketch.activeRevisionId,
+          displayName: 'Bozuk yerleşim fixture',
+          category: InventoryCategory.equipment,
+          totalQuantity: 1,
+          x: 64,
+          y: 64,
+        ),
+      );
+      final placementBefore = (await fixture.db.database.query(
+        'inventory_asset_placements',
+        where: 'id = ?',
+        whereArgs: [placementId],
+      )).single;
+      await fixture.db.database.update(
+        'inventory_asset_placements',
+        {
+          'ended_at': placementBefore['created_at'],
+          'end_reason': InventoryPlacementEndReason.moved.storageValue,
+        },
+        where: 'id = ? AND ended_at IS NULL',
+        whereArgs: [placementId],
+      );
+      await expectLater(
+        fixture.app.loadAsset(projectId: _projectA, assetId: assetId),
+        _fails('inventory_projection_integrity_failed'),
+      );
+      final assetBefore = (await fixture.db.database.query(
+        'inventory_assets',
+        where: 'id = ?',
+        whereArgs: [assetId],
+      )).single;
+      final countsBefore = await _counts(fixture.db.database);
+      await expectLater(
+        fixture.app.archiveAsset(
+          ArchiveInventoryAssetCommand(
+            operationId: _uuid(614),
+            projectId: _projectA,
+            assetId: assetId,
+            expectedAssetRevision: 1,
+          ),
+        ),
+        _fails('inventory_projection_integrity_failed'),
+      );
+      expect(await _counts(fixture.db.database), countsBefore);
+      expect(
+        (await fixture.db.database.query(
+          'inventory_assets',
+          where: 'id = ?',
+          whereArgs: [assetId],
+        )).single,
+        assetBefore,
+      );
+      expect(
+        await fixture.db.database.query(
+          'inventory_command_receipts',
+          where: 'id = ?',
+          whereArgs: [_uuid(614)],
+        ),
+        isEmpty,
       );
     },
   );
