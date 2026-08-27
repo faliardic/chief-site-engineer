@@ -2,9 +2,9 @@
 
 **Belge türü:** Güncel ürün yürütme kapsamı
 **Durum:** Kanonik V2 kapsam ve sıra kaynağı
-**Tarih:** 26 Ağustos 2026
-**Güncel yön kaynağı:** Issue #497 — Proje fotoğraf/video albümü Slice 1
-**Güncel güvenli `master`:** `155e2e028b3a357fd3e158fd0779da0646c36a08` / PR #493
+**Tarih:** 27 Ağustos 2026
+**Güncel yön kaynağı:** Epic #506 / Issue #507 — Inventory Map v1
+**Değişken repository gerçeği:** Güncel SHA/PR durumu GitHub `master` ve current Issue üzerinden doğrulanır.
 
 ## 1. Belgenin rolü
 
@@ -50,8 +50,9 @@ V1 tarihsel baseline'dır. V2, aynı offline-first mobil ürünü yeniden yazmak
 yerine bu baseline üzerinde ilerler.
 
 Güncel merged V2 teknik baseline'ı V1 metadata'sından ayrıdır: mobile version
-`0.1.0+1`, SQLite schema `19`, backup format `1` ve son güvenli merge
-`155e2e028b3a357fd3e158fd0779da0646c36a08` / PR #493 değeridir. Bu baseline,
+`0.1.0+1`, SQLite schema `19` ve backup format `1`dir. Exact güncel merge SHA'sı
+kalıcı bu kapsam belgesine sabitlenmez; GitHub `master` üzerinden doğrulanır. Bu
+baseline,
 schedule runtime ve persistent immutable reference-schedule snapshot temeliyle
 Living Plan MVP Core, 7-day UI/APK/device acceptance, Actual Progress Core ve
 progress UI/isolated device acceptance, deterministic forecast core ve immutable
@@ -60,11 +61,14 @@ core'u, Issue #476 / PR #480 Living Plan intelligence UI implementation'ını ve
 Issue #481 / PR #482 Deterministic Günlük Log v1 read modelini, Issue #483 /
 PR #484 read-only İş Zinciri v1'i, Issue #485 / PR #486 İstenecek Malzemeler
 v1'i, Issue #488 / PR #489 bounded-memory backup package correction'ını ve
-Issue #490 / PR #491 deterministic kişi/firma önerileri Slice 1'i ve Issue #492 /
-PR #493 manuel telefon görüşmesi sonucu Slice 1'i içerir.
-Living Plan, Material Request ve kişi/firma önerileri manual testleri pending, Günlük Log ve
-İş Zinciri manual testleri deferred kalır; mutation/reforecast, public/store
-release veya genel production readiness ilanı değildir.
+Issue #490 / PR #491 deterministic kişi/firma önerileri Slice 1'i, Issue #492 /
+PR #493 manuel telefon görüşmesi sonucu Slice 1'i ve Issue #497 / PR #498 proje
+fotoğraf/video albümü Slice 1'i içerir. Issue #504 / PR #505 recovery surface'i
+merge edilmiştir; bu, Issue #501 owner recovery verification'ı anlamına gelmez.
+Living Plan, Material Request, kişi/firma önerileri ve Proje Albümü manual
+testleri pending; Günlük Log, İş Zinciri ve Telefon görüşmesi sonucu manual
+testleri deferred kalır. Bunlar mutation/reforecast, public/store release veya
+genel production readiness ilanı değildir.
 
 ## 3. V2'nin amacı
 
@@ -91,8 +95,10 @@ Proje/Mahal, Saha Rehberi, Attachment ve Ajanda omurgası — complete
 → Issue #488 / PR #489 bounded-memory backup package correction — merged
 → Issue #490 / PR #491 Deterministic kişi/firma önerileri Slice 1 — merged / manual test pending
 → Issue #492 / PR #493 Telefon görüşmesi sonucu → Ajanda Slice 1 — merged / manual test deferred
-→ Issue #497 Proje fotoğraf/video albümü Slice 1 — current / not merged
-→ schedule mutation/reforecast, actual quantity ve productivity learning — not started
+→ Issue #497 / PR #498 Proje fotoğraf/video albümü Slice 1 — merged / manual test pending
+→ Issue #504 / PR #505 pre-restore safety-backup recovery surface — merged / owner recovery verification pending
+→ Epic #506 / Issue #507 Inventory Map v1 Slice 0 contract — current / production implementation not started
+→ V2.12 and later planned product work — paused by owner decision
 ```
 
 CSE teknik olarak derin, operasyonel olarak sade kalır: binlerce inşaat
@@ -115,9 +121,9 @@ baseline değildir.
 | 8 | İstenecek Malzemeler | Implemented — manual test pending |
 | 9 | Deterministik kişi/firma/etiket önerileri | Implemented — Slice 1 merged; manual test pending; not complete |
 | 10 | Telefon görüşmesi sonucu → Ajanda | Implemented — Slice 1 merged; manual test deferred; not complete |
-| 11 | Proje fotoğraf/video albümü | Current — Slice 1; not complete |
-| 12 | Günlük Log Çıktısı v2 | Planned |
-| 13 | Mini hesap makinesi | Planned |
+| 11 | Proje fotoğraf/video albümü | Implemented — Slice 1 merged; manual test pending; not complete |
+| 12 | Günlük Log Çıktısı v2 | Paused by owner decision |
+| 13 | Mini hesap makinesi | Paused by owner decision |
 
 ### 1. Proje ve Mahal omurgası
 
@@ -374,7 +380,7 @@ Amaç:
   kayda göre göstermek.
 - Galeri ile kayıt ekranı arasında duplicate dosya üretmemek.
 - Büyük medya, thumbnail ve depolama kullanımını görünür kılmak.
-- Issue #497 current Slice 1 yalnız `managed_attachments + attachment_links`
+- Issue #497 / PR #498 merged Slice 1 yalnız `managed_attachments + attachment_links`
   truth'undan exact project-scoped ve physical-deduplicated album üretir.
 - Albüm MIME sınırı `image/jpeg`, `image/png`, `image/heic`, `video/mp4`dür;
   PDF/audio mevcut Dosya Kataloğu'nda kalır.
@@ -394,7 +400,41 @@ Kapanış kapısı:
 - Schema `19`, backup format `1`, version `0.1.0+1` değişmez; duplicate binary,
   album persistence/cache, capture/import veya source/link mutation yoktur.
 
+Durum:
+
+- Slice 1 merged ve manual testleri Issue #479'da pending'dir.
+- V2.11 complete, verified veya release-ready ilan edilmemiştir.
+
+### Current priority — Inventory Map v1 (Epic #506)
+
+Owner kararıyla V2.12 ve sonraki planlı ürün işleri bekletilmiş; current ürün
+geliştirme önceliği Epic #506 altındaki kroki tabanlı dayanıklı saha envanteri
+olmuştur. Bu karar tarihsel 13 maddelik numaraları yeniden adlandırmaz.
+
+Kanonik Slice 0 sözleşmesi:
+
+`docs/v2/CSE_INVENTORY_MAP_V1_CONTRACT.md`
+
+Inventory Map v1:
+
+- direct top-level `Envanter` yüzeyi;
+- sabit integer virtual canvas üzerinde şematik kroki;
+- autosaved draft ve immutable finalized revision;
+- exact project-isolated asset, placement, event ve receipt gerçeği;
+- Kroki/Liste ortak source projection'ı;
+- additive persistence ve normal backup/restore adoption'ı
+
+hedefler. Issue #507 yalnız docs/source-authority Slice'ıdır. Inventory schema,
+source, UI, test, build veya cihaz davranışı uygulanmış değildir. Production
+Slices 1–6 ayrı Issue, authority, validation ve review gerektirir.
+
+Issue #501, #502, #503 ve #499 P0 veri/owner-phone güvenlik kuralları bu ürün
+önceliğinden üstündür. Source geliştirme ve Draft PR devam edebilir; owner-phone
+MAIN kurulum yetkisi oluşmaz.
+
 ### 12. Günlük Log Çıktısı v2
+
+Durum: `paused by owner decision`
 
 Amaç:
 
@@ -411,6 +451,8 @@ Kapanış kapısı:
 - Private veri sızıntısı regresyonla engellenir.
 
 ### 13. Mini hesap makinesi
+
+Durum: `paused by owner decision`
 
 Amaç:
 
@@ -434,8 +476,9 @@ Kapanış kapısı:
 | 2 | Attachment/Medya V2; Ajanda V2 | Ortak dosya ve kaynak bağlantısı |
 | 3 | Living 7-Day Plan; Günlük Log v1; İş Zinciri | Yaşayan yakın plan ve kaynaklı günlük akışı |
 | 4 | İstenecek Malzemeler; öneriler; telefon görüşmesi | Yardımcı akışların ana omurgaya bağlanması |
-| 5 | Proje albümü; Günlük Log v2 | Medya ve yayımlanmış snapshot güveni |
-| 6 | Mini hesap makinesi | Dar saha aracı kabulü |
+| 5 | Proje albümü Slice 1 merged; Günlük Log v2 paused | V2.11 manual test/closure ve ayrı owner resume kararı |
+| Current priority | Inventory Map v1 Slices 0–6 | Exact geometry/persistence, usable UI ve P0-safe backup/update evidence |
+| 6 | Mini hesap makinesi — paused | Ayrı owner resume kararı ve dar saha aracı kabulü |
 
 Aynı anda yalnız bir production implementation Issue'su aktif olur. Bir dalga
 içindeki maddeler dahi bağımlılık sırasına göre ayrı child Issue'larla
@@ -453,7 +496,7 @@ Aşağıdaki başlıklar silinmez; V2 sonrasına taşınır:
 - Beton Paketi V2
 - Kalite ve İSG özel dikeyleri
 - Doküman Hafızası
-- Şantiye krokisi/haritası
+- Inventory Map v1 dışındaki ölçülü CAD/GIS/full saha haritası
 - Gömülü AI ve semantik arama
 - Full-project Gantt editing ve Primavera replacement
 - Approved/contractual baseline, critical path ve float hesapları
@@ -523,9 +566,15 @@ immutable snapshot dependency graph persistence PR #473 ve downstream impact
 core PR #475 ve Living Plan intelligence UI PR #480 ile merge edilmiştir.
 Issue #485 / PR #486 İstenecek Malzemeler v1'i schema `18` additive temeline
 eklemiş, Issue #488 / PR #489 ise backup formatını değiştirmeden final package
-buffer'ındaki kanıtlanmış ekstra büyük kopyayı kaldırmıştır. Güncel güvenli
-`master` `155e2e028b3a357fd3e158fd0779da0646c36a08`, schema `19` ve backup
-format `1`dir.
+buffer'ındaki kanıtlanmış ekstra büyük kopyayı kaldırmıştır. Issue #497 / PR
+#498 Proje fotoğraf/video albümü Slice 1'i merge etmiştir; manual testleri
+pending ve V2.11 complete değildir. Issue #504 / PR #505 recovery surface'i
+mergedir; owner recovery doğrulaması ve P0 Issues #501–#503 açık kalır.
+
+Güncel teknik facts schema `19`, backup format `1` ve version `0.1.0+1`dir.
+Exact current SHA ve son PR kalıcı burada dondurulmaz; GitHub `master` current
+repository truth'udur. Issue #507 task başlangıç snapshot'ı kendi task/result
+kanıtında ayrıca bağlanır.
 
 Güncel canonical faz:
 
@@ -544,7 +593,11 @@ Living Plan MVP Core — merged / PR #463
 → Issue #488 / PR #489 bounded-memory backup package correction — merged
 → Issue #490 / PR #491 Deterministic kişi/firma önerileri Slice 1 — merged / manual test pending
 → Issue #492 / PR #493 Telefon görüşmesi sonucu → Ajanda Slice 1 — merged / manual test deferred
-→ Issue #497 Proje fotoğraf/video albümü Slice 1 — current / not merged
+→ Issue #497 / PR #498 Proje fotoğraf/video albümü Slice 1 — merged / manual test pending
+→ Issue #504 / PR #505 recovery surface — merged / owner recovery verification pending
+→ Epic #506 / Issue #507 Inventory Map v1 Slice 0 canonical contract — current / docs only
+→ Inventory Map v1 Slices 1–6 — not started
+→ V2.12 and later planned product work — paused by owner decision
 ```
 
 Issue #466 / PR #467 nullable actual-progress source-of-truth foundation'ını
@@ -570,10 +623,20 @@ için read-only deterministic kişi/firma öneri sınırını ve ilk Reminder
 consumer'ını merged temele eklemiştir; V2.9 completion ilanı değildir.
 Issue #492 / PR #493 V2.10 Slice 1 bu kaynağı manual phone-call result capture'da
 yeniden kullanarak schema `19` temeline merge edilmiştir; manual testleri
-deferred ve V2.10 completion kararı ayrıdır. Issue #497 current V2.11 Slice 1
+deferred ve V2.10 completion kararı ayrıdır. Issue #497 / PR #498 V2.11 Slice 1
 existing attachment/link truth'tan salt-okunur project media album ve exact
-source navigation kurar; merge ilanı değildir. Schedule mutation/reforecast,
-actual quantity, productivity learning,
-daily-log/work-chain persistence ve public/store release başlamaz. V2.5,
-V2.6, V2.7, V2.8, V2.9, V2.10 ve V2.11 final completion ilanları ayrı owner
-kararına bağlıdır.
+source navigation kurar; manual testleri pending'dir ve V2.11 completion ilanı
+değildir.
+
+Epic #506 altındaki Inventory Map v1 current ürün geliştirme önceliğidir.
+Issue #507 yalnız normative contract ve truth-sync üretir; production code,
+schema 20, editor, Envanter destination, test, build veya cihaz behavior'ı
+uygulanmış sayılmaz. `docs/v2/CSE_INVENTORY_MAP_V1_CONTRACT.md` Slices 1–6'nın
+ayrı authority ile uygulayacağı exact sınırdır.
+
+Issue #501 recovery verification, Issue #502 external verified backup/update
+gate'i, Issue #503 newer-live-data-safe restore yönü ve Issue #499 owner-phone
+MAIN-only identity kuralı bütün owner-phone operasyonlarından önce gelir.
+Inventory source development ve Draft PR bunları kapatmaz. V2.12 ve sonraki
+planlı ürün işleri owner resume kararına kadar paused kalır. V2.5–V2.11 final
+completion ilanları ve public/store release ayrı owner kararlarına bağlıdır.
