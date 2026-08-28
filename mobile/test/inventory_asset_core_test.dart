@@ -628,6 +628,59 @@ void main() {
     },
   );
 
+  testWidgets(
+    '20b metadata dialog survives dismissal, reload, reopen, and cancel',
+    (tester) async {
+      final fake = _FakeInventoryApplication.standard();
+      final controller = await _loadedDetail(fake, ids: _SequentialIds(1775));
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: InventoryAssetDetailSheet(controller: controller),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('inventory-detail-edit-metadata')));
+      await tester.pumpAndSettle();
+      expect(find.text('Envanter bilgileri'), findsWidgets);
+      expect(find.byType(TextField), findsNWidgets(2));
+      await tester.enterText(find.byType(TextField).first, 'Kule vinç B');
+      await tester.enterText(find.byType(TextField).last, 'Kuzey cephe');
+      await tester.tap(find.text('Kaydet'));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+
+      expect(find.byType(InventoryAssetDetailSheet), findsOneWidget);
+      expect(controller.asset!.displayName, 'Kule vinç B');
+      expect(controller.asset!.category, InventoryCategory.equipment);
+      expect(controller.asset!.otherCategoryLabel, isNull);
+      expect(controller.asset!.note, 'Kuzey cephe');
+      expect(controller.asset!.revision, 2);
+      expect(fake.projections[_assetId]!.asset.displayName, 'Kule vinç B');
+      expect(fake.projections[_assetId]!.asset.note, 'Kuzey cephe');
+      expect(fake.updateCalls, 1);
+      expect(fake.lastUpdate!.displayName, 'Kule vinç B');
+      expect(fake.lastUpdate!.category, InventoryCategory.equipment);
+      expect(fake.lastUpdate!.otherCategoryLabel, isNull);
+      expect(fake.lastUpdate!.note, 'Kuzey cephe');
+
+      await tester.tap(find.byKey(const Key('inventory-detail-edit-metadata')));
+      await tester.pumpAndSettle();
+      expect(find.text('Envanter bilgileri'), findsWidgets);
+      await tester.tap(find.text('Vazgeç'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text('Kule vinç B'), findsOneWidget);
+      expect(find.text('Kuzey cephe'), findsOneWidget);
+      expect(fake.updateCalls, 1);
+    },
+  );
+
   test(
     '21 stale overflow and multiple placement failures never patch state',
     () async {

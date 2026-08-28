@@ -739,6 +739,82 @@ Validation and publication:
 
 - Pending at this evidence checkpoint.
 
+Implemented correction:
+
+- _editMetadata now captures the current canonical asset and opens a dedicated
+  _InventoryMetadataDialog.
+- The dialog State owns the name, OTHER-label and note controllers, initializes
+  them from that canonical snapshot and disposes them only from State dispose,
+  after route content actually unmounts.
+- Save returns an immutable metadata result to the existing
+  InventoryAssetDetailController.updateMetadata path. The controller's
+  trimming, no-op, stale OTHER clearing and canonical mutation/reload behavior
+  remains unchanged.
+- Cancel returns no result and starts no mutation.
+- Quantity, move, archive and unarchive code paths were not changed.
+- Real widget regression 20b performs a metadata edit, Save, reverse transition
+  plus reload, verifies no Flutter exception and canonical persistence, reopens
+  the dialog, cancels, settles and verifies no exception or second mutation.
+
+Validation:
+
+- Touched Dart formatting: PASS; exact two Dart paths.
+- Exact focused gate:
+  flutter test --no-pub test/inventory_application_test.dart
+  test/inventory_asset_core_test.dart.
+- Focused result: PASS, +42, All tests passed; invocation 1, retry 0.
+- New widget regression 20b: PASS.
+- flutter analyze --no-pub: PASS, No issues found; invocation 1, retry 0.
+- git diff --check: PASS, exit 0, no output.
+- Exact correction paths: 3/3:
+  1. .cse/results/518_result.md
+  2. mobile/lib/features/inventory/inventory_asset_detail_sheet.dart
+  3. mobile/test/inventory_asset_core_test.dart
+- Unexpected correction path: 0.
+- Schema: 20; backup format: 1; mobile version: 0.1.0+1.
+- Application/domain/storage/pubspec/lock protected drift: 0.
+- Android/iOS/other platform and permission drift: 0.
+- Automated device, emulator, APK/AAB and full phone acceptance work in this
+  correction: not run.
+
+Manual acceptance policy:
+
+- MT-518-001..010: owner-reported PASS.
+- MT-518-011: DEFERRED / NOT RUN.
+- MT-518-012..014: owner-reported PASS.
+- Another full phone test cycle is neither run nor requested for this
+  correction.
+
+Pre-publication status:
+
+- Validated starting source:
+  dc0ac5ed891c8e9afcfb10878d7ca7a832576d05.
+- Minimal correction commit and normal same-branch push: pending.
+- PR #519 must remain OPEN / DRAFT; Ready false; merge false.
+- Next gate after publication: fresh independent R4 rereview.
+
+execution_record_same_class_metadata_dialog_correction:
+
+starting_head: dc0ac5ed891c8e9afcfb10878d7ca7a832576d05
+blocker: SAME_CLASS_METADATA_DIALOG_CONTROLLER_LIFECYCLE_DEFECT
+focused: PASS_42
+analyzer: PASS_NO_ISSUES
+git_diff_check: PASS
+schema_backup_version: 20_1_0.1.0+1
+protected_platform_permission_drift: 0
+manual_tests: MT-518-001..010_PASS_011_DEFERRED_012..014_PASS
+correction_commit: pending_at_precommit_evidence
+draft_pr: 519_OPEN_DRAFT
+ready: false
+merge: false
+
+review_recommendation_same_class_metadata_dialog_correction:
+
+decision: PUBLISH_NARROW_CORRECTION_THEN_FRESH_INDEPENDENT_R4_REREVIEW
+manual_retest: NO_NEW_FULL_PHONE_CYCLE
+ready: false
+merge: false
+
 Host validation:
 
 - Touched Dart formatting: PASS; exact two Dart paths.
@@ -788,3 +864,38 @@ decision: PUBLISH_NARROW_CORRECTION_THEN_FRESH_INDEPENDENT_R4_REREVIEW
 device_recheck: REBUILD_INSTALL_SMOKE_THEN_OWNER_RETEST_MT_518_009
 ready: false
 merge: false
+
+## 2026-08-28 — same-class metadata-dialog lifecycle correction
+
+Authority and bounded scope:
+
+- Mode: NARROW_R4_CORRECTION; Issue #518 / Draft PR #519.
+- Exact starting HEAD:
+  dc0ac5ed891c8e9afcfb10878d7ca7a832576d05.
+- Sole blocker:
+  SAME_CLASS_METADATA_DIALOG_CONTROLLER_LIFECYCLE_DEFECT.
+- Writable paths are restricted to the metadata detail widget, its core widget
+  regression and this append-only evidence file.
+
+Read-only root-cause evidence:
+
+- `_editMetadata` created the name, OTHER-label and note
+  `TextEditingController` instances outside the dialog route.
+- It awaited `showDialog`, then disposed all three controllers as soon as that
+  Future completed, although the reverse transition could still own mounted
+  `TextField` widgets.
+- This is the same lifecycle class as the already-corrected quantity dialog:
+  controller disposal was tied to Future completion instead of dialog-widget
+  unmount.
+
+Correction intent:
+
+- Transfer metadata controller ownership to a dedicated Stateful dialog.
+- Dispose controllers only from that dialog State's `dispose` lifecycle.
+- Preserve no-op, category/OTHER-label clearing, note/name and canonical
+  update/reload behavior.
+- Add a real save/reverse-transition/reload/reopen/cancel widget regression.
+
+Validation and publication:
+
+- Pending at this evidence checkpoint.

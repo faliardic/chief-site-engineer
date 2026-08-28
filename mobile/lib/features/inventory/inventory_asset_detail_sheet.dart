@@ -736,79 +736,18 @@ class _InventoryAssetDetailSheetState extends State<InventoryAssetDetailSheet> {
     InventoryAssetDetailController controller,
   ) async {
     final current = controller.asset!;
-    final name = TextEditingController(text: current.displayName);
-    final other = TextEditingController(text: current.otherCategoryLabel);
-    final note = TextEditingController(text: current.note);
-    var category = current.category;
-    final submitted = await showDialog<bool>(
+    final updated = await showDialog<_InventoryMetadataDialogResult>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Envanter bilgileri'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: name,
-                  decoration: const InputDecoration(labelText: 'Ad'),
-                ),
-                DropdownButtonFormField<InventoryCategory>(
-                  initialValue: category,
-                  decoration: const InputDecoration(labelText: 'Kategori'),
-                  items: [
-                    for (final value in InventoryCategory.values)
-                      DropdownMenuItem(
-                        value: value,
-                        child: Text(inventoryCategoryLabel(value)),
-                      ),
-                  ],
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setDialogState(() {
-                      category = value;
-                      if (value != InventoryCategory.other) other.clear();
-                    });
-                  },
-                ),
-                if (category == InventoryCategory.other)
-                  TextField(
-                    controller: other,
-                    decoration: const InputDecoration(
-                      labelText: 'Diğer kategori',
-                    ),
-                  ),
-                TextField(
-                  controller: note,
-                  decoration: const InputDecoration(labelText: 'Not'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Vazgeç'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Kaydet'),
-            ),
-          ],
-        ),
-      ),
+      builder: (_) => _InventoryMetadataDialog(asset: current),
     );
-    if (submitted == true) {
+    if (updated != null) {
       await controller.updateMetadata(
-        displayName: name.text,
-        category: category,
-        otherCategoryLabel: other.text,
-        note: note.text,
+        displayName: updated.displayName,
+        category: updated.category,
+        otherCategoryLabel: updated.otherCategoryLabel,
+        note: updated.note,
       );
     }
-    name.dispose();
-    other.dispose();
-    note.dispose();
   }
 
   Future<void> _editQuantity(
@@ -825,6 +764,115 @@ class _InventoryAssetDetailSheetState extends State<InventoryAssetDetailSheet> {
       await controller.changeQuantity(quantity);
     }
   }
+}
+
+class _InventoryMetadataDialogResult {
+  const _InventoryMetadataDialogResult({
+    required this.displayName,
+    required this.category,
+    required this.otherCategoryLabel,
+    required this.note,
+  });
+
+  final String displayName;
+  final InventoryCategory category;
+  final String otherCategoryLabel;
+  final String note;
+}
+
+class _InventoryMetadataDialog extends StatefulWidget {
+  const _InventoryMetadataDialog({required this.asset});
+
+  final InventoryAssetRecord asset;
+
+  @override
+  State<_InventoryMetadataDialog> createState() =>
+      _InventoryMetadataDialogState();
+}
+
+class _InventoryMetadataDialogState extends State<_InventoryMetadataDialog> {
+  late final TextEditingController _name;
+  late final TextEditingController _other;
+  late final TextEditingController _note;
+  late InventoryCategory _category;
+
+  @override
+  void initState() {
+    super.initState();
+    _name = TextEditingController(text: widget.asset.displayName);
+    _other = TextEditingController(text: widget.asset.otherCategoryLabel);
+    _note = TextEditingController(text: widget.asset.note);
+    _category = widget.asset.category;
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _other.dispose();
+    _note.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Envanter bilgileri'),
+    content: SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _name,
+            decoration: const InputDecoration(labelText: 'Ad'),
+          ),
+          DropdownButtonFormField<InventoryCategory>(
+            initialValue: _category,
+            decoration: const InputDecoration(labelText: 'Kategori'),
+            items: [
+              for (final value in InventoryCategory.values)
+                DropdownMenuItem(
+                  value: value,
+                  child: Text(inventoryCategoryLabel(value)),
+                ),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() {
+                _category = value;
+                if (value != InventoryCategory.other) _other.clear();
+              });
+            },
+          ),
+          if (_category == InventoryCategory.other)
+            TextField(
+              controller: _other,
+              decoration: const InputDecoration(labelText: 'Diğer kategori'),
+            ),
+          TextField(
+            controller: _note,
+            decoration: const InputDecoration(labelText: 'Not'),
+          ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Vazgeç'),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.pop(
+          context,
+          _InventoryMetadataDialogResult(
+            displayName: _name.text,
+            category: _category,
+            otherCategoryLabel: _other.text,
+            note: _note.text,
+          ),
+        ),
+        child: const Text('Kaydet'),
+      ),
+    ],
+  );
 }
 
 class _InventoryQuantityDialog extends StatefulWidget {
