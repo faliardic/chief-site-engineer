@@ -132,3 +132,28 @@ correction_execution_record:
   backup_format: 1
   publication_status: PENDING_DRAFT_PUBLICATION
 ```
+
+## Draft publication evidence
+
+- Success status: `SLICE_2_IMPLEMENTED — EDITOR DOMAIN/WIDGET TESTS PASS — MANUAL ACCEPTANCE PENDING — INDEPENDENT REVIEW REQUIRED`.
+- Implementation commit: `fbbfb59cbd438bfb6a292f3ef55df624389cec4f`.
+- Normal push: completed to `origin/codex/issue-516-inventory-landscape-sketch-editor`.
+- Draft PR: https://github.com/faliardic/chief-site-engineer/pull/517.
+- Manual Test Register: https://github.com/faliardic/chief-site-engineer/issues/479#issuecomment-5448958829.
+- `MT-516-001..012`: `PENDING`; registered only, not run or marked PASS.
+- Build/artifact: not created and not authorized.
+- Ready / merge / Issue #516 close / Epic #506 close / Slice 3: not performed.
+
+```yaml
+publication_record:
+  implementation_commit: fbbfb59cbd438bfb6a292f3ef55df624389cec4f
+  draft_pr: 517
+  draft_pr_url: https://github.com/faliardic/chief-site-engineer/pull/517
+  manual_test_register_comment: 5448958829
+  manual_test_status: PENDING
+  ready: false
+  merged: false
+  issue_closed: false
+  next_slice_started: false
+  review_recommendation: INDEPENDENT_R4_SOURCE_DIFF_FOCUSED_TEST_REVIEW
+```
