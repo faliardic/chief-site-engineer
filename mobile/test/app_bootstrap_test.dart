@@ -68,10 +68,31 @@ void main() {
       expect(restarted.backup, isNotNull);
       expect(first.inventory, isA<SqliteInventoryApplication>());
       expect(restarted.inventory, isA<SqliteInventoryApplication>());
-      final inventoryAvailability = await first.inventory.loadAvailability(
-        '51400000-0000-4000-8000-000000000001',
+      final firstInventory = first.inventory as SqliteInventoryApplication;
+      final restartedInventory =
+          restarted.inventory as SqliteInventoryApplication;
+      expect(firstInventory.databasePath, directories.databaseFile);
+      expect(restartedInventory.databasePath, directories.databaseFile);
+
+      const knownProjectId = '51400000-0000-4000-8000-000000000001';
+      final activeDatabase = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
       );
-      expect(inventoryAvailability.projectAvailable, isFalse);
+      try {
+        await activeDatabase.insert('projects', {
+          'id': knownProjectId,
+          'name': 'Bootstrap Inventory aktif DB kanıtı',
+          'created_at': '2026-07-19T09:15:00.000Z',
+          'updated_at': '2026-07-19T09:15:00.000Z',
+          'revision': 1,
+        });
+      } finally {
+        await activeDatabase.close();
+      }
+      final inventoryAvailability = await firstInventory.loadAvailability(
+        knownProjectId,
+      );
+      expect(inventoryAvailability.projectAvailable, isTrue);
       expect(inventoryAvailability.hasPrimarySketch, isFalse);
 
       final handBuilt = BootstrapSuccess(
@@ -88,9 +109,7 @@ void main() {
                 .toList()
             ..sort();
       await expectLater(
-        handBuilt.inventory.loadAvailability(
-          '51400000-0000-4000-8000-000000000001',
-        ),
+        handBuilt.inventory.loadAvailability(knownProjectId),
         throwsA(
           isA<InventoryFailure>().having(
             (failure) => failure.code,
