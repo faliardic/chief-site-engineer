@@ -336,3 +336,85 @@ review_recommendation:
     mode: GITHUB_REVIEW
     floor: gpt-5.6-sol/max
     recommendation: FRESH_INDEPENDENT_R4_SOURCE_DIFF_FOCUSED_TEST_REREVIEW
+
+## Narrow R4 project-switch target isolation correction
+
+### Authority and blocker
+
+- Exact blocked HEAD: `b389a6c277d620d33408b7ef2f89096e1d1c47d6`.
+- Independent review:
+  `https://github.com/faliardic/chief-site-engineer/pull/521#pullrequestreview-5053898882`.
+- Fixed only
+  `SLICE4_PROJECT_SWITCH_PENDING_TARGET_ISOLATION_GAP`.
+
+### Correction
+
+- Before an explicit selector-driven project switch, the page completes the
+  pending target selection with `null`, clears the page-level target request,
+  and cancels the exact retained detail controller's move/unarchive selection.
+- The same shared cancellation path runs from controller notifications when
+  the selected project changes externally or becomes unavailable.
+- Controller disposal remains owned by the existing async/finally detail flow;
+  the boundary helper never disposes it directly.
+- Detail-flow continuation and final canonical reload are now guarded against
+  a changed or unavailable selected project.
+- Project B cannot render project A's target-selection prompt or remain blocked
+  by project A's retained detail controller.
+- No Inventory domain/application/storage mutation semantics changed.
+
+### Real widget regression
+
+Command:
+
+    flutter test --no-pub test/inventory_page_test.dart
+
+- PASS, 13/13, invocation 1.
+- Projects A and B were loaded through the real production page.
+- A marker -> real detail -> `Taşı` -> target-selection was started.
+- Before target choice, the production project selector switched to B.
+- The stale target prompt disappeared; A move calls and total persistent
+  mutations remained zero.
+- B canonical assets/map/list loaded; the B marker and exact real B detail
+  opened successfully.
+- `tester.takeException()` returned null.
+
+### Validation and boundary
+
+- Touched Dart formatting: PASS, two files.
+- `flutter analyze --no-pub`: PASS — `No issues found`, invocation 1.
+- `git diff --check`: PASS.
+- Exact correction paths: 3/3 after this append-only evidence update.
+- Schema 20, backup format 1, mobile version 0.1.0+1, unchanged.
+- Protected/application/storage/bootstrap/pubspec/platform/permission drift: 0.
+- Full suite, build, APK/AAB, emulator, ADB/device, and manual phone testing
+  were not run.
+- MT-520-001..005 remain PENDING.
+- PR #521 must remain OPEN / DRAFT; Ready=false, merge=false, Slice 5=false.
+
+execution_record:
+
+    issue: 520
+    correction_review: 5053898882
+    base_sha: 1f92da6e330d69f9554db9e07d260919e77c20ea
+    blocked_head: b389a6c277d620d33408b7ef2f89096e1d1c47d6
+    branch: codex/issue-520-inventory-destination-kroki-list
+    focused: PASS 13/13
+    analyzer: PASS
+    git_diff_check: PASS
+    correction_changed_paths: 3
+    schema: 20
+    backup_format: 1
+    mobile_version: 0.1.0+1
+    protected_drift: 0
+    platform_permission_drift: 0
+    manual_smoke: MT-520-001..005 PENDING
+    draft_pr: 521
+    ready: false
+    merged: false
+    next_slice_started: false
+
+review_recommendation:
+
+    mode: GITHUB_REVIEW
+    floor: gpt-5.6-sol/max
+    recommendation: FRESH_INDEPENDENT_R4_PROJECT_SWITCH_ISOLATION_REREVIEW

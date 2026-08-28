@@ -386,6 +386,79 @@ void main() {
   });
 
   testWidgets(
+    'project switch cancels pending real-detail target and isolates new project',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches.addAll({
+          _projectA: _sketch(_projectA),
+          _projectB: _sketch(_projectB),
+        })
+        ..assets.addAll({
+          _projectA: [_asset(_projectA, _assetA, name: 'Kule vinç A')],
+          _projectB: [_asset(_projectB, _assetB, name: 'Lazer metre B')],
+        });
+      final source = _ProjectSource()
+        ..projects = [
+          _project(_projectA, 'Proje A'),
+          _project(_projectB, 'Proje B'),
+        ];
+      final controller = _controller(inventory, source);
+      addTearDown(controller.dispose);
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        controller: controller,
+      );
+      await controller.selectProject(_projectA);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('inventory-marker-$_assetA')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('inventory-detail-move')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('inventory-target-selection')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('inventory-project-$_projectA-2')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Proje B').last);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('inventory-target-selection')), findsNothing);
+      expect(inventory.moveCalls, 0);
+      expect(inventory.mutations, 0);
+      expect(controller.selectedProjectId, _projectB);
+      expect(controller.assets.single.asset.id, _assetB);
+      final pageState = tester.state<InventoryPageState>(
+        find.byType(InventoryPage),
+      );
+      expect(pageState.mapController?.projections.single.asset.id, _assetB);
+      expect(find.byKey(const Key('inventory-marker-$_assetA')), findsNothing);
+      expect(
+        find.byKey(const Key('inventory-marker-$_assetB')),
+        findsOneWidget,
+      );
+
+      controller.setView(InventoryPageView.list);
+      await tester.pump();
+      expect(find.byKey(const Key('inventory-list-$_assetB')), findsOneWidget);
+      expect(find.byKey(const Key('inventory-list-$_assetA')), findsNothing);
+      controller.setView(InventoryPageView.map);
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('inventory-marker-$_assetB')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('inventory-asset-detail')), findsOneWidget);
+      expect(find.text('Lazer metre B'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await _dismissDetail(tester);
+    },
+  );
+
+  testWidgets(
     'archived row opens real detail and unarchives through map target',
     (tester) async {
       final inventory = _FakeInventory()

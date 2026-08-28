@@ -501,6 +501,7 @@ class InventoryPageState extends State<InventoryPage> {
 
   void _refresh() {
     if (!mounted) return;
+    _cancelPendingTargetForProjectBoundary();
     if (_search.text != controller.search) {
       _search.value = TextEditingValue(
         text: controller.search,
@@ -613,6 +614,7 @@ class InventoryPageState extends State<InventoryPage> {
             ? null
             : (value) {
                 if (value != null && value != controller.selectedProjectId) {
+                  _cancelPendingDetailTargetSelection();
                   unawaited(controller.selectProject(value));
                 }
               },
@@ -1040,11 +1042,9 @@ class InventoryPageState extends State<InventoryPage> {
     );
     _activeDetailController = detailController;
     try {
-      while (mounted && controller.selectedProjectId == projectId) {
+      while (_canContinueDetailFlow(projectId)) {
         final request = await _showAssetDetail(detailController);
-        if (!mounted ||
-            controller.selectedProjectId != projectId ||
-            request == null) {
+        if (!_canContinueDetailFlow(projectId) || request == null) {
           break;
         }
         await _selectTargetForDetail(detailController, request);
@@ -1061,7 +1061,7 @@ class InventoryPageState extends State<InventoryPage> {
       _targetSelectionRequest = null;
       detailController.dispose();
     }
-    if (mounted && controller.selectedProjectId == projectId) {
+    if (_canContinueDetailFlow(projectId)) {
       await controller.reloadSelected();
     }
   }
@@ -1161,6 +1161,44 @@ class InventoryPageState extends State<InventoryPage> {
     if (selection == null || selection.isCompleted) return;
     selection.complete(null);
   }
+
+  void _cancelPendingTargetForProjectBoundary() {
+    final detailController = _activeDetailController;
+    final selection = _targetSelectionCompleter;
+    if (detailController == null ||
+        selection == null ||
+        selection.isCompleted ||
+        _targetSelectionRequest == null) {
+      return;
+    }
+    final projectChanged =
+        controller.selectedProjectId != detailController.projectId;
+    final projectUnavailable =
+        controller.loadStatus == InventoryPageLoadStatus.failed &&
+        controller.lastErrorCode == 'inventory_project_unavailable';
+    if (projectChanged || projectUnavailable) {
+      _cancelPendingDetailTargetSelection();
+    }
+  }
+
+  void _cancelPendingDetailTargetSelection() {
+    final detailController = _activeDetailController;
+    final request = _targetSelectionRequest;
+    final selection = _targetSelectionCompleter;
+    if (selection == null || selection.isCompleted || request == null) return;
+    selection.complete(null);
+    _targetSelectionCompleter = null;
+    _targetSelectionRequest = null;
+    if (detailController != null) {
+      _cancelDetailControllerSelection(detailController, request);
+    }
+  }
+
+  bool _canContinueDetailFlow(String projectId) =>
+      mounted &&
+      controller.selectedProjectId == projectId &&
+      !(controller.loadStatus == InventoryPageLoadStatus.failed &&
+          controller.lastErrorCode == 'inventory_project_unavailable');
 
   void _cancelDetailControllerSelection(
     InventoryAssetDetailController detailController,
