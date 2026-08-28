@@ -540,6 +540,58 @@ next_review: INDEPENDENT_R4_SOURCE_DIFF_FOCUSED_TEST_REREVIEW
 ready: false
 merge: false
 
+Correction publication appendix:
+
+- Final git diff check before commit: PASS, exit 0, no output.
+- Exact correction paths: 3/3:
+  1. .cse/results/518_result.md
+  2. mobile/lib/features/inventory/inventory_asset_quick_form.dart
+  3. mobile/test/inventory_asset_core_test.dart
+- Full PR paths remained the original exact 6/6.
+- Protected and platform drift remained 0.
+- Validated narrow correction commit:
+  aadde99ebd80011fcd43e2689796599a2e26bbae.
+- Normal push to codex/issue-518-inventory-asset-placement-core: PASS.
+- Local / remote divergence after the correction push: 0/0.
+- PR #519 post-push verification:
+  OPEN / DRAFT, merged false, head
+  aadde99ebd80011fcd43e2689796599a2e26bbae, base master at
+  d3cad2e3ab74b9ab285efa0bfa8900cb541cad16.
+- MT-518-001..014 remained PENDING and were neither executed nor marked PASS.
+- Ready, merge, Issue/Epic closure and Slice 4 were not performed.
+- This append-only publication appendix is committed separately from the
+  validated narrow correction; its exact final evidence HEAD is published in
+  the Issue and PR evidence comments.
+
+execution_record_committed_refresh_publication:
+
+authority_comment: 5451941952
+validated_correction_commit: aadde99ebd80011fcd43e2689796599a2e26bbae
+focused_result: PASS_40
+analyzer_result: PASS_NO_ISSUES
+git_diff_check: PASS
+correction_paths: 3_OF_3
+full_pr_paths: 6_OF_6
+schema: 20
+backup_format: 1
+mobile_version: 0.1.0+1
+main_package: com.faliardic.sefim
+protected_platform_permission_drift: 0
+push: PASS
+draft_pr: 519_OPEN_DRAFT
+manual_tests: MT-518-001..014_PENDING
+ready: false
+merge: false
+
+review_recommendation_committed_refresh_publication:
+
+decision: INDEPENDENT_R4_REREVIEW
+candidate_status: IMPLEMENTED_MANUAL_ACCEPTANCE_PENDING
+blocker_target: POST_COMMIT_CANONICAL_REFRESH_DUPLICATE_CREATE
+expected_result: BLOCKER_FIXED_SOURCE_REVIEW_REQUIRED
+ready: false
+merge: false
+
 Manual Test Register publication:
 
 - MT-518-001..014 registered in Issue #479.
@@ -579,5 +631,44 @@ focused_status: PASS_39
 analyzer_status: PASS_NO_ISSUES
 manual_test_status: PENDING
 draft_pr: 519
+ready: false
+merge: false
+
+## 2026-08-28 — correction publication closure 5451941952
+
+- Validated correction commit:
+  aadde99ebd80011fcd43e2689796599a2e26bbae.
+- Exact correction paths: 3/3; full PR paths: original 6/6.
+- Focused gate: PASS, +40, All tests passed; invocation 1, retry 0.
+- Analyzer: PASS, No issues found; invocation 1, retry 0.
+- git diff --check: PASS.
+- Schema / backup / version / MAIN package:
+  20 / 1 / 0.1.0+1 / com.faliardic.sefim.
+- Protected / platform / permission / pubspec / lock / artifact drift: 0.
+- Normal correction push: PASS; post-push divergence 0/0.
+- PR #519 remained OPEN / DRAFT; Ready and merge were not performed.
+- MT-518-001..014 remained PENDING; no manual test was run or marked PASS.
+- This EOF closure is an evidence-only follow-up commit. Its exact SHA and the
+  final PR head are published in the Issue and PR correction comments.
+
+execution_record:
+
+authority_comment: 5451941952
+validated_correction_commit: aadde99ebd80011fcd43e2689796599a2e26bbae
+focused: PASS_40
+analyzer: PASS_NO_ISSUES
+git_diff_check: PASS
+schema_backup_version_package: 20_1_0.1.0+1_com.faliardic.sefim
+drift: 0
+manual_tests: MT-518-001..014_PENDING
+draft_pr: 519_OPEN_DRAFT
+ready: false
+merge: false
+
+review_recommendation:
+
+decision: INDEPENDENT_R4_REREVIEW
+reason: narrow committed-refresh duplicate-create blocker corrected
+manual_acceptance: PENDING
 ready: false
 merge: false
