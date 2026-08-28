@@ -417,3 +417,35 @@ Manual Test Register publication:
 - Manual tests executed by Codex: 0.
 - PASS claims: 0.
 - Build/artifact: not produced.
+
+Publication record:
+
+- Validated source commit:
+  bce7d5f954f02d23b206541a9fe139033ab87901.
+- Commit paths: exact six Issue-518 files.
+- Normal push: PASS.
+- Remote branch:
+  codex/issue-518-inventory-asset-placement-core.
+- Draft PR:
+  https://github.com/faliardic/chief-site-engineer/pull/519
+- PR state at creation: OPEN / DRAFT.
+- PR base: master at
+  d3cad2e3ab74b9ab285efa0bfa8900cb541cad16.
+- PR source head at creation:
+  bce7d5f954f02d23b206541a9fe139033ab87901.
+- Ready: false.
+- Merge: false.
+- Issue #518 / Epic #506 closure: false.
+- Slice 4 started: false.
+- Next action: independent R4 source/diff/focused-test/evidence review.
+
+review_recommendation_final:
+
+decision: INDEPENDENT_R4_REVIEW
+candidate_status: IMPLEMENTED_MANUAL_ACCEPTANCE_PENDING
+focused_status: PASS_39
+analyzer_status: PASS_NO_ISSUES
+manual_test_status: PENDING
+draft_pr: 519
+ready: false
+merge: false
