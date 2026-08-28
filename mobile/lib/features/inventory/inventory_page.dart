@@ -11,7 +11,11 @@ import 'package:flutter/material.dart';
 
 typedef InventoryProjectLoader = Future<List<MobileProject>> Function();
 typedef InventorySketchEditorLauncher =
-    Future<bool?> Function(BuildContext context, String projectId);
+    Future<bool?> Function(
+      BuildContext context,
+      String projectId,
+      InventorySketchLaunchIntent launchIntent,
+    );
 typedef InventoryAssetDetailLauncher =
     Future<void> Function(
       BuildContext context,
@@ -651,7 +655,9 @@ class InventoryPageState extends State<InventoryPage> {
     title: 'Bu projede henüz şematik kroki yok.',
     action: FilledButton.icon(
       key: const Key('inventory-add-sketch'),
-      onPressed: _openSketchEditor,
+      onPressed: () => unawaited(
+        _openSketchEditor(InventorySketchLaunchIntent.createOrRecover),
+      ),
       icon: const Icon(Icons.add_rounded),
       label: const Text('Kroki ekle'),
     ),
@@ -662,6 +668,21 @@ class InventoryPageState extends State<InventoryPage> {
     return Column(
       children: [
         _filters(),
+        if (controller.sketch != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton.icon(
+                key: const Key('inventory-update-sketch'),
+                onPressed: () => unawaited(
+                  _openSketchEditor(InventorySketchLaunchIntent.editActive),
+                ),
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('Krokiyi güncelle'),
+              ),
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
           child: SegmentedButton<InventoryPageView>(
@@ -986,21 +1007,27 @@ class InventoryPageState extends State<InventoryPage> {
     ),
   );
 
-  Future<void> _openSketchEditor() async {
+  Future<void> _openSketchEditor(
+    InventorySketchLaunchIntent launchIntent,
+  ) async {
     final projectId = controller.selectedProjectId;
     if (projectId == null) return;
     final result = widget.sketchEditorLauncher != null
-        ? await widget.sketchEditorLauncher!(context, projectId)
+        ? await widget.sketchEditorLauncher!(context, projectId, launchIntent)
         : await Navigator.of(context).push<bool>(
             MaterialPageRoute(
               builder: (_) => InventorySketchEditorPage(
                 application: widget.application,
                 projectId: projectId,
-                launchIntent: InventorySketchLaunchIntent.createOrRecover,
+                launchIntent: launchIntent,
               ),
             ),
           );
-    if (result == true && mounted) await controller.reloadSelected();
+    if (result == true &&
+        mounted &&
+        controller.selectedProjectId == projectId) {
+      await controller.reloadSelected();
+    }
   }
 
   Future<void> _openQuickCreate(InventoryPlacementTarget target) async {

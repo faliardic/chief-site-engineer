@@ -617,6 +617,62 @@ void main() {
   });
 
   group('page back, lifecycle and orientation boundary', () {
+    testWidgets('create/recover final action copy is Oluştur', (tester) async {
+      final fake = _FakeInventoryApplication.withDraft(_openGeometry());
+      final orientations = _OrientationRecorder();
+      final pageKey = GlobalKey<InventorySketchEditorPageState>();
+      await _openEditor(tester, fake, orientations, pageKey);
+
+      expect(find.widgetWithText(FilledButton, 'Oluştur'), findsOneWidget);
+      expect(find.text('Güncelle'), findsNothing);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(InventorySketchEditorPage), findsNothing);
+    });
+
+    testWidgets(
+      'edit-active loads existing base, finalizes successor, and returns true',
+      (tester) async {
+        final fake = _FakeInventoryApplication.withActive(_openGeometry());
+        final orientations = _OrientationRecorder();
+        final pageKey = GlobalKey<InventorySketchEditorPageState>();
+        bool? result;
+        await _openEditor(
+          tester,
+          fake,
+          orientations,
+          pageKey,
+          intent: InventorySketchLaunchIntent.editActive,
+          onResult: (value) => result = value,
+        );
+
+        expect(fake.createCalls, 0);
+        expect(fake.editCalls, 1);
+        expect(
+          pageKey.currentState!.controller.editor!.geometry.canonicalJson,
+          _openGeometry().canonicalJson,
+        );
+        expect(find.widgetWithText(FilledButton, 'Güncelle'), findsOneWidget);
+        expect(find.text('Oluştur'), findsNothing);
+
+        await tester.tap(find.byKey(const Key('inventory-editor-finalize')));
+        await tester.pumpAndSettle();
+
+        expect(result, isTrue);
+        expect(fake.finalizeCalls, 1);
+        expect(fake.projection!.sketch.id, _sketchId);
+        expect(fake.projection!.activeRevision!.id, isNot(_activeId));
+        expect(fake.projection!.activeRevision!.baseRevisionId, _activeId);
+        expect(
+          fake.projection!.activeRevision!.geometry.canonicalJson,
+          _openGeometry().canonicalJson,
+        );
+        expect(fake.projection!.draftRevision, isNull);
+        expect(find.byType(InventorySketchEditorPage), findsNothing);
+      },
+    );
+
     testWidgets('save label is hidden during loading and shown after ack', (
       tester,
     ) async {
@@ -803,6 +859,9 @@ Future<void> _openEditor(
   _OrientationRecorder orientations,
   GlobalKey<InventorySketchEditorPageState> pageKey, {
   bool settle = true,
+  InventorySketchLaunchIntent intent =
+      InventorySketchLaunchIntent.createOrRecover,
+  ValueChanged<bool?>? onResult,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -811,22 +870,21 @@ Future<void> _openEditor(
           body: Center(
             child: FilledButton(
               key: const Key('open-editor-test-host'),
-              onPressed: () => Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => InventorySketchEditorPage(
-                    key: pageKey,
-                    application: fake,
-                    projectId: _projectId,
-                    launchIntent:
-                        fake.projection?.activeRevision != null &&
-                            fake.projection?.draftRevision?.baseRevisionId !=
-                                null
-                        ? InventorySketchLaunchIntent.editActive
-                        : InventorySketchLaunchIntent.createOrRecover,
-                    idFactory: _SequentialIds(5000).call,
-                    orientationSetter: orientations.call,
-                  ),
-                ),
+              onPressed: () => unawaited(
+                Navigator.of(context)
+                    .push<bool>(
+                      MaterialPageRoute(
+                        builder: (_) => InventorySketchEditorPage(
+                          key: pageKey,
+                          application: fake,
+                          projectId: _projectId,
+                          launchIntent: intent,
+                          idFactory: _SequentialIds(5000).call,
+                          orientationSetter: orientations.call,
+                        ),
+                      ),
+                    )
+                    .then((value) => onResult?.call(value)),
               ),
               child: const Text('Editor aç'),
             ),

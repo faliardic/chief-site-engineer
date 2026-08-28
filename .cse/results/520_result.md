@@ -418,3 +418,109 @@ review_recommendation:
     mode: GITHUB_REVIEW
     floor: gpt-5.6-sol/max
     recommendation: FRESH_INDEPENDENT_R4_PROJECT_SWITCH_ISOLATION_REREVIEW
+
+## Merge-blocking Krokiyi güncelle correction
+
+### Authority and baseline
+
+- Canonical authority: Issue #520 comment `5456611922`.
+- Exact blocked/production HEAD:
+  `822750623ac32b3a7a9ef77460b2a55c172c0ad3`.
+- Draft PR: #521; preceding independent R4 PASS review: `5053973102`.
+- Requested routing: `gpt-5.6-sol / max`; runtime model and effort are not
+  exposed and remain `unknown / null / unverified`.
+- This correction is the merge-blocking Slice-4 sketch-update entry only;
+  Ready=false, merge=false, Slice 5=false.
+
+### Correction
+
+- READY Inventory now exposes exact `Krokiyi güncelle` copy whenever the
+  selected project has a verified canonical ACTIVE primary sketch.
+- The action remains available from both Kroki and Liste views.
+- The existing page launcher now receives an
+  `InventorySketchLaunchIntent`: no-sketch `Kroki ekle` preserves
+  `createOrRecover`, while `Krokiyi güncelle` uses `editActive`.
+- The existing `InventorySketchEditorPage` and
+  `InventorySketchEditorController` remain the sole editor/revision flow.
+  No application, persistence, storage, or schema semantics changed.
+- Successful finalization reloads only if the exact originally selected
+  project remains selected; the existing project-switch/unavailable boundary
+  remains fail-closed.
+- Editor final action copy is intent-specific: `Oluştur` for create/recover
+  and `Güncelle` for edit-active. Finalize behavior is unchanged.
+
+### Focused regression
+
+Command:
+
+    flutter test --no-pub test/inventory_page_test.dart test/inventory_sketch_editor_test.dart
+
+- Invocation 1 stopped at a mechanical test compilation error: a non-const
+  `InventorySketchPoint` constructor was used in a const assertion. The
+  production code was not reached; the editor file's 27 tests passed during
+  that invocation.
+- The authority-permitted same-scope mechanical retry removed only the invalid
+  `const` marker.
+- Invocation 2: PASS, 41/41.
+- Proof covers READY visibility in Kroki and Liste, exact selected project and
+  `editActive` intent, canonical successor reload, existing geometry as edit
+  base, same sketch identity with successor ACTIVE revision, true finalize
+  result, exact `Oluştur` / `Güncelle` copy, unchanged no-sketch intent,
+  and the existing project-switch target-isolation regression.
+
+### Validation and boundary
+
+- Touched Dart formatting: PASS, exact four Dart paths.
+- `flutter analyze --no-pub`: PASS — `No issues found`, invocation 1;
+  analyzer retry not used.
+- `git diff --check`: PASS.
+- Exact correction allowlist: PASS, 5/5 paths after this append-only evidence.
+- Schema: 20, unchanged; database/migration drift: 0.
+- Backup format: 1, unchanged.
+- Mobile version: 0.1.0+1, unchanged.
+- Protected application/storage/bootstrap/pubspec/platform/permission drift: 0.
+- No full suite, APK/AAB, MAIN install, emulator, ADB, device, or scripted
+  acceptance operation was run for this production correction.
+
+### Manual status and publication boundary
+
+- MT-520-001..003: OWNER-REPORTED PASS, preserved.
+- MT-520-004..005: PENDING.
+- MT-520-006: PENDING; no updated acceptance APK is authorized before fresh
+  independent R4 PASS.
+- After gates PASS: one minimal correction commit and normal push to the same
+  Draft PR #521 branch; correction evidence is published on GitHub.
+- PR remains OPEN / DRAFT. Ready=false, merge=false, Slice 5=false.
+- The resulting commit SHA is recorded in GitHub publication evidence because
+  a commit cannot contain its own SHA.
+
+execution_record:
+
+    issue: 520
+    authority_comment: 5456611922
+    preceding_review: 5053973102
+    blocked_head: 822750623ac32b3a7a9ef77460b2a55c172c0ad3
+    branch: codex/issue-520-inventory-destination-kroki-list
+    runtime_model: unknown
+    runtime_reasoning_effort: null
+    focused: PASS 41/41 (final invocation 2)
+    focused_retry: MECHANICAL_CONST_ASSERTION_ONLY
+    analyzer: PASS (invocation 1)
+    git_diff_check: PASS
+    correction_changed_paths: 5
+    schema: 20
+    backup_format: 1
+    mobile_version: 0.1.0+1
+    protected_drift: 0
+    platform_permission_drift: 0
+    manual_smoke: MT-520-001..003 OWNER_PASS; MT-520-004..006 PENDING
+    draft_pr: 521
+    ready: false
+    merged: false
+    next_slice_started: false
+
+review_recommendation:
+
+    mode: GITHUB_REVIEW
+    floor: gpt-5.6-sol/max
+    recommendation: FRESH_INDEPENDENT_R4_SOURCE_DIFF_FOCUSED_TEST_REREVIEW

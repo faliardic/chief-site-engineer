@@ -5,6 +5,7 @@ import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/features/inventory/inventory_map_view.dart';
 import 'package:chief_site_engineer/features/inventory/inventory_page.dart';
+import 'package:chief_site_engineer/features/inventory/inventory_sketch_editor_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -14,6 +15,7 @@ const _sketchA = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
 const _sketchB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
 const _revisionA = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1';
 const _revisionB = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2';
+const _revisionUpdated = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc3';
 const _assetA = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1';
 const _assetB = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd2';
 const _assetArchived = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd3';
@@ -121,9 +123,10 @@ void main() {
         tester,
         inventory: inventory,
         source: source,
-        sketchEditorLauncher: (context, projectId) async {
+        sketchEditorLauncher: (context, projectId, launchIntent) async {
           launches += 1;
           expect(projectId, _projectA);
+          expect(launchIntent, InventorySketchLaunchIntent.createOrRecover);
           inventory
             ..sketches[_projectA] = _sketch(_projectA)
             ..assets[_projectA] = [];
@@ -141,6 +144,69 @@ void main() {
       expect(inventory.primaryReads, 2);
       expect(inventory.listReads, 1);
       expect(find.byType(InventoryMapView), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'ready sketch update stays visible in Liste, launches edit-active, and reloads successor',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _sketch(_projectA)
+        ..assets[_projectA] = [];
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      final controller = _controller(inventory, source);
+      addTearDown(controller.dispose);
+      addTearDown(source.dispose);
+      var launches = 0;
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        controller: controller,
+        sketchEditorLauncher: (context, projectId, launchIntent) async {
+          launches += 1;
+          expect(projectId, _projectA);
+          expect(launchIntent, InventorySketchLaunchIntent.editActive);
+          inventory.sketches[_projectA] = _sketch(
+            _projectA,
+            revisionId: _revisionUpdated,
+            sketchRevision: 2,
+            revisionNumber: 2,
+            endpointX: 2048,
+          );
+          return true;
+        },
+      );
+
+      expect(find.text('Krokiyi güncelle'), findsOneWidget);
+      expect(controller.view, InventoryPageView.map);
+      expect(inventory.primaryReads, 1);
+
+      await tester.tap(find.text('Liste'));
+      await tester.pumpAndSettle();
+      expect(controller.view, InventoryPageView.list);
+      expect(find.text('Krokiyi güncelle'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('inventory-update-sketch')));
+      await tester.pumpAndSettle();
+
+      expect(launches, 1);
+      expect(controller.selectedProjectId, _projectA);
+      expect(inventory.primaryReads, 2);
+      expect(inventory.listReads, 2);
+      expect(controller.sketch!.activeRevision!.id, _revisionUpdated);
+      expect(
+        controller
+            .sketch!
+            .activeRevision!
+            .geometry
+            .polylines
+            .single
+            .points
+            .last,
+        InventorySketchPoint(x: 2048, y: 3072),
+      );
     },
   );
 
@@ -1022,16 +1088,23 @@ MobileProject _project(String id, String name) => MobileProject(
   revision: 1,
 );
 
-InventoryPrimarySketchProjection _sketch(String projectId) {
+InventoryPrimarySketchProjection _sketch(
+  String projectId, {
+  String? revisionId,
+  int sketchRevision = 1,
+  int revisionNumber = 1,
+  int endpointX = 4096,
+}) {
   final sketchId = projectId == _projectA ? _sketchA : _sketchB;
-  final revisionId = projectId == _projectA ? _revisionA : _revisionB;
+  final activeRevisionId =
+      revisionId ?? (projectId == _projectA ? _revisionA : _revisionB);
   final geometry = InventoryGeometry(
     polylines: [
       InventoryPolyline(
         closed: false,
         points: [
           InventorySketchPoint(x: 0, y: 0),
-          InventorySketchPoint(x: 4096, y: 3072),
+          InventorySketchPoint(x: endpointX, y: 3072),
         ],
       ),
     ],
@@ -1042,18 +1115,18 @@ InventoryPrimarySketchProjection _sketch(String projectId) {
       projectId: projectId,
       displayName: 'Saha krokisi',
       isPrimary: true,
-      activeRevisionId: revisionId,
+      activeRevisionId: activeRevisionId,
       draftRevisionId: null,
-      revision: 1,
+      revision: sketchRevision,
       createdAt: _now,
       updatedAt: _now,
       archivedAt: null,
     ),
     activeRevision: InventorySketchRevisionRecord(
-      id: revisionId,
+      id: activeRevisionId,
       sketchId: sketchId,
       projectId: projectId,
-      revisionNumber: 1,
+      revisionNumber: revisionNumber,
       baseRevisionId: null,
       state: InventorySketchRevisionState.active,
       geometry: geometry,
