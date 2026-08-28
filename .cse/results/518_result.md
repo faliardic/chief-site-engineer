@@ -408,6 +408,138 @@ next_review: INDEPENDENT_R4_SOURCE_DIFF_FOCUSED_TEST_REVIEW
 ready: false
 merge: false
 
+## 2026-08-28 — committed-refresh correction 5451941952
+
+Authority and blocker:
+
+- Canonical correction execution authority: Issue #518 comment 5451941952.
+- Owner authorization: Issue #518 comment 5451938213.
+- Independent R4 blocker: PR #519 comment 5451934310.
+- Exact reviewed and starting HEAD:
+  91d817ba0acbae3066f43c6230ec21add97297e5.
+- Base and origin/master:
+  d3cad2e3ab74b9ab285efa0bfa8900cb541cad16.
+- PR #519 was re-verified OPEN / DRAFT on the exact starting HEAD before
+  any local write.
+- Local branch, remote branch and starting HEAD matched; remote divergence was
+  0/0. Tracked, staged, untracked and protected drift were 0.
+
+Source-first root cause:
+
+- InventoryAssetQuickCreateController.submit wrapped the durable
+  application.createAsset mutation and the later canonical reload in the same
+  failure path.
+- lastCreatedAssetId was assigned only after reload success.
+- A verified committed asset could therefore be reported as an uncommitted
+  create failure, and a retry could allocate four new identities and issue a
+  duplicate durable create.
+
+Narrow correction:
+
+- mobile/lib/features/inventory/inventory_asset_quick_form.dart:
+  - separates pre-commit create failure from post-commit canonical-refresh
+    failure;
+  - retains the verified committed asset ID before canonical reload;
+  - exposes a distinct committedRefreshFailed recoverable state;
+  - rejects a different submit intent while the committed result awaits
+    reconciliation;
+  - provides reload-only retry without allocating an operation, asset,
+    placement or placement-key ID;
+  - completes with the original committed asset ID after reload succeeds;
+  - locks create-intent fields while reconciliation is pending and presents a
+    dedicated refresh action and committed-refresh diagnostic copy.
+- mobile/test/inventory_asset_core_test.dart:
+  - adds one focused post-commit reload regression;
+  - proves the fake create mutates once, the first reload fails, committed
+    identity/state survive, a different create submit is rejected, recovery
+    reload succeeds, createCalls remains exactly 1, and the original four IDs
+    remain the only generated IDs;
+  - preserves the pre-commit mutation failure assertion and adds exact
+    createCalls evidence.
+- No marker, detail, move, archive, unarchive, application, domain, database,
+  migration, backup, bootstrap, attachment, app-shell, pubspec, platform or
+  permission behavior was changed.
+
+Formatting:
+
+- The repository Flutter SDK formatter ran on exactly the two touched Dart
+  files.
+- Result: PASS; 2 files formatted.
+
+Exact focused invocation:
+
+flutter test --no-pub test/inventory_application_test.dart test/inventory_asset_core_test.dart
+
+Result: PASS, exit 0, +40, All tests passed.
+
+- Existing Inventory application tests: 6.
+- Prior Inventory asset core tests: 33.
+- New committed-refresh regression: 1.
+- Focused invocations under comment 5451941952: 1.
+- Focused retries: 0.
+
+Exact analyzer invocation:
+
+flutter analyze --no-pub
+
+Result: PASS, exit 0, No issues found, 35.7 seconds.
+
+- Analyzer invocations under comment 5451941952: 1.
+- Analyzer retries: 0.
+
+Pre-publication contract audit:
+
+- Correction source/test paths before this append: exact 2/2.
+- Full PR paths: exact original 6/6.
+- Protected drift: 0.
+- Schema: exact 20; database and migration drift 0.
+- Backup format: exact 1; backup drift 0.
+- Mobile version: exact 0.1.0+1.
+- MAIN package: exact com.faliardic.sefim.
+- pubspec.yaml / pubspec.lock drift: 0.
+- Android / iOS / mobile/lib/platform / permission / signing drift: 0.
+- Forbidden call-log, contacts and phone-state permission additions: 0.
+- Changed tracked SQLite/test DB/backup/APK/AAB/generated artifacts: 0.
+- Reminder, notification, Agenda, Living Plan, Work Chain, Puantaj, Beton,
+  attachment and owner-data operations: 0.
+- MT-518-001..014 remain PENDING; Codex executed 0 manual tests and made 0 PASS
+  claims.
+- No full or unrelated suite, integration test, build, APK/AAB, emulator,
+  ADB/device, scripted acceptance or owner-data operation was run.
+
+The final git diff check, exact three-path correction audit, commit, push and
+post-push Draft PR verification are recorded by the publication appendix after
+those actions complete.
+
+execution_record_committed_refresh_correction:
+
+authority_comment: 5451941952
+mode: SINGLE_AGENT
+runtime_model: unknown
+runtime_reasoning_effort: null
+runtime_metadata_verified: false
+starting_head: 91d817ba0acbae3066f43c6230ec21add97297e5
+focused_invocations: 1
+focused_result: PASS_40
+focused_retries: 0
+analyzer_invocations: 1
+analyzer_result: PASS_NO_ISSUES
+analyzer_retries: 0
+manual_tests: MT-518-001..014_PENDING
+commit: pending
+push: pending
+draft_pr: 519_OPEN_DRAFT
+ready: false
+merge: false
+
+review_recommendation_committed_refresh_correction:
+
+decision: PUBLISH_NARROW_CORRECTION_THEN_INDEPENDENT_R4_REREVIEW
+candidate_status: IMPLEMENTED_MANUAL_ACCEPTANCE_PENDING
+next_review: INDEPENDENT_R4_SOURCE_DIFF_FOCUSED_TEST_REREVIEW
+ready: false
+merge: false
+
 Manual Test Register publication:
 
 - MT-518-001..014 registered in Issue #479.

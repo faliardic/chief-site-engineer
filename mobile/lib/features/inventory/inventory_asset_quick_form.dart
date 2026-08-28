@@ -48,7 +48,13 @@ String inventoryAssetStatusLabel(InventoryAssetStatus status) =>
       InventoryAssetStatus.missing => 'Kayıp',
     };
 
-enum InventoryQuickCreateStatus { idle, submitting, succeeded, failed }
+enum InventoryQuickCreateStatus {
+  idle,
+  submitting,
+  succeeded,
+  failed,
+  committedRefreshFailed,
+}
 
 class InventoryAssetQuickCreateController extends ChangeNotifier {
   InventoryAssetQuickCreateController({
@@ -67,6 +73,10 @@ class InventoryAssetQuickCreateController extends ChangeNotifier {
   String? lastErrorCode;
   String? lastCreatedAssetId;
 
+  bool get hasCommittedAssetAwaitingRefresh =>
+      status == InventoryQuickCreateStatus.committedRefreshFailed &&
+      lastCreatedAssetId != null;
+
   Future<bool> submit({
     required InventoryPlacementTarget target,
     required String displayName,
@@ -76,7 +86,10 @@ class InventoryAssetQuickCreateController extends ChangeNotifier {
     InventoryAssetStatus assetStatus = InventoryAssetStatus.available,
     String? note,
   }) async {
-    if (status == InventoryQuickCreateStatus.submitting) return false;
+    if (status == InventoryQuickCreateStatus.submitting ||
+        hasCommittedAssetAwaitingRefresh) {
+      return false;
+    }
     lastCreatedAssetId = null;
     lastErrorCode = null;
     try {
@@ -145,16 +158,39 @@ class InventoryAssetQuickCreateController extends ChangeNotifier {
           'inventory_asset_create_verification_failed',
         );
       }
-      await reloadCanonical();
       lastCreatedAssetId = assetId;
-      status = InventoryQuickCreateStatus.succeeded;
-      notifyListeners();
-      return true;
+      return _refreshCommittedAsset();
     } on Object catch (error) {
       status = InventoryQuickCreateStatus.failed;
       lastErrorCode = _safeInventoryCode(
         error,
         fallback: 'inventory_asset_create_failed',
+      );
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> retryCommittedRefresh() async {
+    if (!hasCommittedAssetAwaitingRefresh) return false;
+    return _refreshCommittedAsset();
+  }
+
+  Future<bool> _refreshCommittedAsset() async {
+    if (lastCreatedAssetId == null) return false;
+    status = InventoryQuickCreateStatus.submitting;
+    lastErrorCode = null;
+    notifyListeners();
+    try {
+      await reloadCanonical();
+      status = InventoryQuickCreateStatus.succeeded;
+      notifyListeners();
+      return true;
+    } on Object catch (error) {
+      status = InventoryQuickCreateStatus.committedRefreshFailed;
+      lastErrorCode = _safeInventoryCode(
+        error,
+        fallback: 'inventory_asset_committed_refresh_failed',
       );
       notifyListeners();
       return false;
@@ -233,8 +269,16 @@ class _InventoryAssetQuickFormState extends State<InventoryAssetQuickForm> {
   }
 
   Future<void> _submit() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    final succeeded = await widget.controller.submit(
+    final succeeded = widget.controller.hasCommittedAssetAwaitingRefresh
+        ? await widget.controller.retryCommittedRefresh()
+        : await _submitNewIntent();
+    final createdId = widget.controller.lastCreatedAssetId;
+    if (succeeded && createdId != null) widget.onCreated?.call(createdId);
+  }
+
+  Future<bool> _submitNewIntent() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return false;
+    return widget.controller.submit(
       target: widget.target,
       displayName: _name.text,
       category: _category,
@@ -243,8 +287,6 @@ class _InventoryAssetQuickFormState extends State<InventoryAssetQuickForm> {
       assetStatus: _status,
       note: _note.text,
     );
-    final createdId = widget.controller.lastCreatedAssetId;
-    if (succeeded && createdId != null) widget.onCreated?.call(createdId);
   }
 
   @override
@@ -261,6 +303,8 @@ class _InventoryAssetQuickFormState extends State<InventoryAssetQuickForm> {
   Widget build(BuildContext context) {
     final submitting =
         widget.controller.status == InventoryQuickCreateStatus.submitting;
+    final awaitingRefresh = widget.controller.hasCommittedAssetAwaitingRefresh;
+    final lockNewIntent = submitting || awaitingRefresh;
     return Form(
       key: _formKey,
       child: ListView(
@@ -275,6 +319,7 @@ class _InventoryAssetQuickFormState extends State<InventoryAssetQuickForm> {
           TextFormField(
             key: const Key('inventory-quick-name'),
             controller: _name,
+            enabled: !lockNewIntent,
             decoration: const InputDecoration(labelText: 'Ad'),
             validator: (value) =>
                 value == null || value.trim().isEmpty ? 'Ad gerekli' : null,
@@ -291,7 +336,7 @@ class _InventoryAssetQuickFormState extends State<InventoryAssetQuickForm> {
                   child: Text(inventoryCategoryLabel(category)),
                 ),
             ],
-            onChanged: submitting
+            onChanged: lockNewIntent
                 ? null
                 : (value) {
                     setState(() {
@@ -306,6 +351,7 @@ class _InventoryAssetQuickFormState extends State<InventoryAssetQuickForm> {
             TextFormField(
               key: const Key('inventory-quick-other-category'),
               controller: _other,
+              enabled: !lockNewIntent,
               decoration: const InputDecoration(labelText: 'Diğer kategori'),
               validator: (value) => value == null || value.trim().isEmpty
                   ? 'Diğer kategori gerekli'
@@ -316,6 +362,7 @@ class _InventoryAssetQuickFormState extends State<InventoryAssetQuickForm> {
           TextFormField(
             key: const Key('inventory-quick-quantity'),
             controller: _quantity,
+            enabled: !lockNewIntent,
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(labelText: 'Adet'),
             validator: (value) {
@@ -337,7 +384,7 @@ class _InventoryAssetQuickFormState extends State<InventoryAssetQuickForm> {
                   child: Text(inventoryAssetStatusLabel(status)),
                 ),
             ],
-            onChanged: submitting
+            onChanged: lockNewIntent
                 ? null
                 : (value) {
                     if (value != null) setState(() => _status = value);
@@ -347,13 +394,17 @@ class _InventoryAssetQuickFormState extends State<InventoryAssetQuickForm> {
           TextFormField(
             key: const Key('inventory-quick-note'),
             controller: _note,
+            enabled: !lockNewIntent,
             maxLines: 3,
             decoration: const InputDecoration(labelText: 'Not (isteğe bağlı)'),
           ),
           if (widget.controller.lastErrorCode case final code?) ...[
             const SizedBox(height: 12),
             Text(
-              'Kayıt oluşturulamadı. Tanı kodu: $code',
+              awaitingRefresh
+                  ? 'Kayıt oluşturuldu ancak görünüm yenilenemedi. '
+                        'Tanı kodu: $code'
+                  : 'Kayıt oluşturulamadı. Tanı kodu: $code',
               key: const Key('inventory-quick-error'),
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
@@ -367,8 +418,12 @@ class _InventoryAssetQuickFormState extends State<InventoryAssetQuickForm> {
                     dimension: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(Icons.add_location_alt_outlined),
-            label: const Text('Kaydet'),
+                : Icon(
+                    awaitingRefresh
+                        ? Icons.refresh
+                        : Icons.add_location_alt_outlined,
+                  ),
+            label: Text(awaitingRefresh ? 'Görünümü yenile' : 'Kaydet'),
           ),
         ],
       ),

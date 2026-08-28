@@ -288,8 +288,87 @@ void main() {
       expect(controller.status, InventoryQuickCreateStatus.failed);
       expect(controller.lastCreatedAssetId, isNull);
       expect(controller.lastErrorCode, 'inventory_persistence_failed');
+      expect(fake.createCalls, 1);
       expect(reloads, 0);
       expect(fake.projections, before);
+    },
+  );
+
+  test(
+    '11a committed create retries canonical refresh without duplicate mutation',
+    () async {
+      final fake = _FakeInventoryApplication.standard();
+      final generatedIds = <String>[];
+      var nextIdValue = 1250;
+      String nextId() {
+        final id = _uuid(nextIdValue++);
+        generatedIds.add(id);
+        return id;
+      }
+
+      var reloads = 0;
+      final controller = InventoryAssetQuickCreateController(
+        application: fake,
+        projectId: _projectId,
+        reloadCanonical: () async {
+          reloads += 1;
+          if (reloads == 1) {
+            throw const InventoryFailure('inventory_canonical_reload_failed');
+          }
+        },
+        idFactory: nextId,
+      );
+
+      expect(
+        await controller.submit(
+          target: const InventoryPlacementTarget(x: 100, y: 100),
+          displayName: 'Committed varlık',
+          category: InventoryCategory.handTool,
+          quantityText: '1',
+        ),
+        isFalse,
+      );
+      final committedCommand = fake.lastCreate!;
+      expect(fake.createCalls, 1);
+      expect(reloads, 1);
+      expect(
+        controller.status,
+        InventoryQuickCreateStatus.committedRefreshFailed,
+      );
+      expect(controller.hasCommittedAssetAwaitingRefresh, isTrue);
+      expect(controller.lastCreatedAssetId, committedCommand.assetId);
+      expect(controller.lastErrorCode, 'inventory_canonical_reload_failed');
+      expect(fake.projections, contains(committedCommand.assetId));
+      expect(generatedIds, [
+        _uuid(1250),
+        _uuid(1251),
+        _uuid(1252),
+        _uuid(1253),
+      ]);
+
+      expect(
+        await controller.submit(
+          target: const InventoryPlacementTarget(x: 200, y: 200),
+          displayName: 'Farklı yeni intent',
+          category: InventoryCategory.equipment,
+          quantityText: '2',
+        ),
+        isFalse,
+      );
+      expect(fake.createCalls, 1);
+      expect(reloads, 1);
+      expect(fake.lastCreate, same(committedCommand));
+      expect(generatedIds, hasLength(4));
+
+      expect(await controller.retryCommittedRefresh(), isTrue);
+      expect(fake.createCalls, 1);
+      expect(reloads, 2);
+      expect(controller.status, InventoryQuickCreateStatus.succeeded);
+      expect(controller.hasCommittedAssetAwaitingRefresh, isFalse);
+      expect(controller.lastCreatedAssetId, committedCommand.assetId);
+      expect(controller.lastErrorCode, isNull);
+      expect(fake.lastCreate, same(committedCommand));
+      expect(generatedIds, hasLength(4));
     },
   );
 
