@@ -226,3 +226,31 @@ review_recommendation:
     - fail-closed stale sketch/content revision finalization
     - acknowledgement-gated save-status visibility
 ```
+
+## Correction publication evidence
+
+- Narrow correction commit: `c0f0af7545fb2c760e75fb2657d26977b91aa9af`.
+- Normal push completed to `origin/codex/issue-516-inventory-landscape-sketch-editor`.
+- Issue evidence: https://github.com/faliardic/chief-site-engineer/issues/516#issuecomment-5449595520.
+- Draft PR evidence: https://github.com/faliardic/chief-site-engineer/pull/517#issuecomment-5449597823.
+- Existing PR #517 body was updated in place; GitHub reported `OPEN`, `draft: true`, `merged: false`, base `master`, and correction head `c0f0af7545fb2c760e75fb2657d26977b91aa9af`.
+- Ready, merge, Issue #516/Epic #506 closure and Slice 3 were not performed.
+
+```yaml
+correction_publication_record:
+  correction_commit: c0f0af7545fb2c760e75fb2657d26977b91aa9af
+  branch: codex/issue-516-inventory-landscape-sketch-editor
+  issue_evidence_comment: 5449595520
+  pr: 517
+  pr_evidence_comment: 5449597823
+  pr_state: OPEN
+  pr_draft: true
+  pr_merged: false
+  manual_test_ids: MT-516-001..012
+  manual_test_status: PENDING
+  ready: false
+  merged: false
+  issue_closed: false
+  next_slice_started: false
+  review_recommendation: INDEPENDENT_R4_RE_REVIEW
+```
