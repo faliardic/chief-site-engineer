@@ -392,6 +392,71 @@ void main() {
         );
       },
     );
+
+    testWidgets('normal in-flight save preserves the newer 500 ms debounce', (
+      tester,
+    ) async {
+      final gate = Completer<void>();
+      final fake = _FakeInventoryApplication.withDraft(
+        InventoryGeometry.emptyDraft(),
+      )..saveGates.add(gate);
+      final controller = _controller(fake);
+      addTearDown(controller.dispose);
+      await controller.initialize();
+
+      controller.drawPoint(_point(0, 0));
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump();
+      expect(fake.saveCalls, hasLength(1));
+
+      controller.drawPoint(_point(64, 0));
+      gate.complete();
+      await tester.pump();
+      expect(fake.saveCalls, hasLength(1));
+      await tester.pump(const Duration(milliseconds: 499));
+      expect(fake.saveCalls, hasLength(1));
+      await tester.pump(const Duration(milliseconds: 1));
+      await tester.pump();
+
+      expect(fake.saveCalls, hasLength(2));
+      expect(fake.maximumConcurrentSaves, 1);
+      expect(
+        controller.acknowledgedGeometry!.canonicalJson,
+        controller.editor!.geometry.canonicalJson,
+      );
+    });
+
+    testWidgets(
+      'explicit force during an in-flight save drains latest immediately',
+      (tester) async {
+        final gate = Completer<void>();
+        final fake = _FakeInventoryApplication.withDraft(
+          InventoryGeometry.emptyDraft(),
+        )..saveGates.add(gate);
+        final controller = _controller(fake);
+        addTearDown(controller.dispose);
+        await controller.initialize();
+
+        controller.drawPoint(_point(0, 0));
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pump();
+        expect(fake.saveCalls, hasLength(1));
+
+        controller.drawPoint(_point(64, 0));
+        final forced = controller.forceSave();
+        gate.complete();
+        await tester.pump();
+        await tester.pump();
+
+        expect(await forced, isTrue);
+        expect(fake.saveCalls, hasLength(2));
+        expect(fake.maximumConcurrentSaves, 1);
+        expect(
+          controller.acknowledgedGeometry!.canonicalJson,
+          controller.editor!.geometry.canonicalJson,
+        );
+      },
+    );
   });
 
   group('launch, finalize and durable recovery', () {
@@ -495,9 +560,112 @@ void main() {
         expect(await recovered.finalizeDraft(), isTrue);
       },
     );
+
+    test('finalize rejects externally advanced sketch revision', () async {
+      final fake = _FakeInventoryApplication.withDraft(_openGeometry());
+      final controller = _controller(fake);
+      addTearDown(controller.dispose);
+      await controller.initialize();
+      final before = fake.projection!;
+
+      fake.projection = _projection(
+        sketchId: before.sketch.id,
+        sketchRevision: before.sketch.revision + 1,
+        active: before.activeRevision,
+        draft: before.draftRevision,
+      );
+
+      expect(await controller.finalizeDraft(), isFalse);
+      expect(controller.lastErrorCode, 'inventory_stale_revision');
+      expect(controller.expectedSketchRevision, before.sketch.revision);
+      expect(controller.finalizePersisted, isFalse);
+      expect(controller.editor, isNotNull);
+      expect(controller.isFinalizeEnabled, isFalse);
+      expect(fake.finalizeCalls, 0);
+    });
+
+    test('finalize rejects externally advanced content revision', () async {
+      final fake = _FakeInventoryApplication.withDraft(_openGeometry());
+      final controller = _controller(fake);
+      addTearDown(controller.dispose);
+      await controller.initialize();
+      final before = fake.projection!;
+      final draft = before.draftRevision!;
+
+      fake.projection = _projection(
+        sketchId: before.sketch.id,
+        sketchRevision: before.sketch.revision,
+        active: before.activeRevision,
+        draft: _revision(
+          id: draft.id,
+          sketchId: draft.sketchId,
+          state: draft.state,
+          geometry: draft.geometry,
+          contentRevision: draft.contentRevision + 1,
+          baseRevisionId: draft.baseRevisionId,
+        ),
+      );
+
+      expect(await controller.finalizeDraft(), isFalse);
+      expect(controller.lastErrorCode, 'inventory_stale_content_revision');
+      expect(controller.expectedContentRevision, draft.contentRevision);
+      expect(controller.finalizePersisted, isFalse);
+      expect(controller.editor, isNotNull);
+      expect(controller.isFinalizeEnabled, isFalse);
+      expect(fake.finalizeCalls, 0);
+    });
   });
 
   group('page back, lifecycle and orientation boundary', () {
+    testWidgets('save label is hidden during loading and shown after ack', (
+      tester,
+    ) async {
+      final loadGate = Completer<void>();
+      final loadingFake = _FakeInventoryApplication.withDraft(_openGeometry())
+        ..loadGates.add(loadGate);
+      final loadingOrientations = _OrientationRecorder();
+      final loadingPageKey = GlobalKey<InventorySketchEditorPageState>();
+      await _openEditor(
+        tester,
+        loadingFake,
+        loadingOrientations,
+        loadingPageKey,
+        settle: false,
+      );
+      await tester.pump();
+      expect(
+        find.byKey(const Key('inventory-editor-save-status')),
+        findsNothing,
+      );
+      expect(find.text('Kaydedildi'), findsNothing);
+
+      loadGate.complete();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('inventory-editor-save-status')),
+        findsOneWidget,
+      );
+      expect(find.text('Kaydedildi'), findsOneWidget);
+    });
+
+    testWidgets('save label stays hidden after load failure', (tester) async {
+      final failingFake = _FakeInventoryApplication.withDraft(_openGeometry())
+        ..failLoadCount = 1;
+      final failingOrientations = _OrientationRecorder();
+      final failingPageKey = GlobalKey<InventorySketchEditorPageState>();
+      await _openEditor(
+        tester,
+        failingFake,
+        failingOrientations,
+        failingPageKey,
+      );
+      expect(
+        find.byKey(const Key('inventory-editor-save-status')),
+        findsNothing,
+      );
+      expect(find.text('Kaydedildi'), findsNothing);
+    });
+
     testWidgets('back awaits save, blocks failure, and retry exits', (
       tester,
     ) async {
@@ -793,6 +961,7 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
   int maximumConcurrentSaves = 0;
   final saveCalls = <AutosaveInventorySketchDraftCommand>[];
   final saveGates = <Completer<void>>[];
+  final loadGates = <Completer<void>>[];
   final operationOrder = <String>[];
   final _receipts = <String, InventoryMutationResult>{};
 
@@ -800,6 +969,7 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
   Future<InventoryPrimarySketchProjection?> loadPrimarySketch(
     String projectId,
   ) async {
+    if (loadGates.isNotEmpty) await loadGates.removeAt(0).future;
     if (failLoadCount > 0) {
       failLoadCount -= 1;
       throw const InventoryFailure('inventory_persistence_failed');

@@ -49,6 +49,10 @@ class InventorySketchEditorController extends ChangeNotifier {
   Timer? _autosaveTimer;
   Future<bool>? _saveDrain;
   _PendingDraftSave? _pendingSave;
+  int _geometryGeneration = 0;
+  int? _normalSaveEligibleGeneration;
+  bool _forceDrainRequested = false;
+  bool _finalizeBlockedByStaleRevision = false;
   bool _disposed = false;
 
   String? get sketchId => _sketchId;
@@ -65,11 +69,14 @@ class InventorySketchEditorController extends ChangeNotifier {
             candidate.canonicalJson != acknowledged.canonicalJson);
   }
 
-  String get saveLabel => switch (saveStatus) {
-    InventorySketchSaveStatus.saved => 'Kaydedildi',
-    InventorySketchSaveStatus.saving => 'Kaydediliyor…',
-    InventorySketchSaveStatus.failed => 'Kaydedilemedi',
-  };
+  String? get saveLabel {
+    if (acknowledgedGeometry == null) return null;
+    return switch (saveStatus) {
+      InventorySketchSaveStatus.saved => 'Kaydedildi',
+      InventorySketchSaveStatus.saving => 'Kaydediliyor…',
+      InventorySketchSaveStatus.failed => 'Kaydedilemedi',
+    };
+  }
 
   bool get isFinalizeEnabled {
     final candidate = editor?.geometry;
@@ -77,6 +84,7 @@ class InventorySketchEditorController extends ChangeNotifier {
         candidate == null ||
         finalizing ||
         finalizePersisted ||
+        _finalizeBlockedByStaleRevision ||
         saveStatus != InventorySketchSaveStatus.saved ||
         hasUnacknowledgedGeometry ||
         !_hasDraftIdentity) {
@@ -222,17 +230,27 @@ class InventorySketchEditorController extends ChangeNotifier {
 
   void _scheduleAutosave() {
     _autosaveTimer?.cancel();
+    _geometryGeneration += 1;
+    final scheduledGeneration = _geometryGeneration;
+    _normalSaveEligibleGeneration = null;
     saveStatus = InventorySketchSaveStatus.saving;
     lastErrorCode = null;
     _autosaveTimer = Timer(autosaveDelay, () {
       _autosaveTimer = null;
-      unawaited(forceSave());
+      if (_geometryGeneration != scheduledGeneration) return;
+      _normalSaveEligibleGeneration = scheduledGeneration;
+      unawaited(_ensureSaveDrain());
     });
   }
 
   Future<bool> forceSave() {
     _autosaveTimer?.cancel();
     _autosaveTimer = null;
+    _forceDrainRequested = true;
+    return _ensureSaveDrain();
+  }
+
+  Future<bool> _ensureSaveDrain() {
     final running = _saveDrain;
     if (running != null) return running;
     late final Future<bool> tracked;
@@ -245,12 +263,20 @@ class InventorySketchEditorController extends ChangeNotifier {
 
   Future<bool> _drainSaves() async {
     if (!_hasDraftIdentity || editor == null || acknowledgedGeometry == null) {
+      _forceDrainRequested = false;
       saveStatus = InventorySketchSaveStatus.failed;
       lastErrorCode = 'inventory_sketch_draft_unavailable';
       _notify();
       return false;
     }
     while (hasUnacknowledgedGeometry) {
+      if (_pendingSave == null &&
+          !_forceDrainRequested &&
+          _normalSaveEligibleGeneration != _geometryGeneration) {
+        saveStatus = InventorySketchSaveStatus.saving;
+        _notify();
+        return true;
+      }
       final pending = _pendingSave ?? _createPendingSave();
       _pendingSave = pending;
       saveStatus = InventorySketchSaveStatus.saving;
@@ -277,14 +303,19 @@ class InventorySketchEditorController extends ChangeNotifier {
         _expectedSketchRevision = projection.sketch.revision;
         _expectedContentRevision = draft.contentRevision;
         _pendingSave = null;
+        if (_normalSaveEligibleGeneration == pending.geometryGeneration) {
+          _normalSaveEligibleGeneration = null;
+        }
         _notify();
       } on Object catch (error) {
+        _forceDrainRequested = false;
         saveStatus = InventorySketchSaveStatus.failed;
         lastErrorCode = _safeCode(error);
         _notify();
         return false;
       }
     }
+    _forceDrainRequested = false;
     saveStatus = InventorySketchSaveStatus.saved;
     lastErrorCode = null;
     _notify();
@@ -295,6 +326,7 @@ class InventorySketchEditorController extends ChangeNotifier {
     final current = editor!.geometry;
     return _PendingDraftSave(
       geometry: current,
+      geometryGeneration: _geometryGeneration,
       command: AutosaveInventorySketchDraftCommand(
         operationId: _nextId(),
         projectId: projectId,
@@ -313,6 +345,8 @@ class InventorySketchEditorController extends ChangeNotifier {
     if (acknowledged == null || current == null) return;
     _autosaveTimer?.cancel();
     _autosaveTimer = null;
+    _normalSaveEligibleGeneration = null;
+    _forceDrainRequested = false;
     _pendingSave = null;
     editor = InventorySketchEditorSnapshot.recover(
       acknowledged,
@@ -324,7 +358,12 @@ class InventorySketchEditorController extends ChangeNotifier {
   }
 
   Future<bool> finalizeDraft() async {
-    if (finalizing || finalizePersisted || !_hasDraftIdentity) return false;
+    if (finalizing ||
+        finalizePersisted ||
+        _finalizeBlockedByStaleRevision ||
+        !_hasDraftIdentity) {
+      return false;
+    }
     final candidate = editor?.geometry;
     if (candidate == null) return false;
     try {
@@ -341,10 +380,16 @@ class InventorySketchEditorController extends ChangeNotifier {
       if (!await forceSave()) return false;
       final intended = editor!.geometry;
       intended.validateFinalizable();
+      final expectedSketchRevision = _expectedSketchRevision!;
+      final expectedContentRevision = _expectedContentRevision!;
       final before = await application.loadPrimarySketch(projectId);
       final draft = _verifiedDraft(before, expectedGeometry: intended);
-      _expectedSketchRevision = before!.sketch.revision;
-      _expectedContentRevision = draft.contentRevision;
+      if (before!.sketch.revision != expectedSketchRevision) {
+        throw const InventoryFailure('inventory_stale_revision');
+      }
+      if (draft.contentRevision != expectedContentRevision) {
+        throw const InventoryFailure('inventory_stale_content_revision');
+      }
       final targetDraftId = draft.id;
       final result = await application.finalizeSketch(
         FinalizeInventorySketchCommand(
@@ -352,8 +397,8 @@ class InventorySketchEditorController extends ChangeNotifier {
           projectId: projectId,
           sketchId: before.sketch.id,
           draftRevisionId: targetDraftId,
-          expectedSketchRevision: before.sketch.revision,
-          expectedContentRevision: draft.contentRevision,
+          expectedSketchRevision: expectedSketchRevision,
+          expectedContentRevision: expectedContentRevision,
         ),
       );
       final after = await application.loadPrimarySketch(projectId);
@@ -376,7 +421,12 @@ class InventorySketchEditorController extends ChangeNotifier {
       lastErrorCode = null;
       return true;
     } on Object catch (error) {
-      lastErrorCode = _safeCode(error);
+      final errorCode = _safeCode(error);
+      lastErrorCode = errorCode;
+      if (errorCode == 'inventory_stale_revision' ||
+          errorCode == 'inventory_stale_content_revision') {
+        _finalizeBlockedByStaleRevision = true;
+      }
       return false;
     } finally {
       finalizing = false;
@@ -434,6 +484,12 @@ class InventorySketchEditorController extends ChangeNotifier {
     _expectedContentRevision = draft.contentRevision;
     acknowledgedGeometry = draft.geometry;
     editor = InventorySketchEditorSnapshot.recover(draft.geometry);
+    _autosaveTimer?.cancel();
+    _autosaveTimer = null;
+    _geometryGeneration = 0;
+    _normalSaveEligibleGeneration = null;
+    _forceDrainRequested = false;
+    _finalizeBlockedByStaleRevision = false;
     _pendingSave = null;
   }
 
@@ -677,18 +733,19 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
           ),
           title: const Text('Şematik kroki'),
           actions: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Center(
-                child: Semantics(
-                  liveRegion: true,
-                  child: Text(
-                    controller.saveLabel,
-                    key: const Key('inventory-editor-save-status'),
+            if (controller.saveLabel != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Center(
+                  child: Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      controller.saveLabel!,
+                      key: const Key('inventory-editor-save-status'),
+                    ),
                   ),
                 ),
               ),
-            ),
             Padding(
               padding: const EdgeInsets.only(right: 12),
               child: FilledButton.icon(
@@ -948,8 +1005,13 @@ class _EditorFailurePanel extends StatelessWidget {
 }
 
 class _PendingDraftSave {
-  const _PendingDraftSave({required this.geometry, required this.command});
+  const _PendingDraftSave({
+    required this.geometry,
+    required this.geometryGeneration,
+    required this.command,
+  });
 
   final InventoryGeometry geometry;
+  final int geometryGeneration;
   final AutosaveInventorySketchDraftCommand command;
 }

@@ -157,3 +157,72 @@ publication_record:
   next_slice_started: false
   review_recommendation: INDEPENDENT_R4_SOURCE_DIFF_FOCUSED_TEST_REVIEW
 ```
+
+## Independent review correction — authorities 5449025124 / 5449389866
+
+- Owner correction authority: https://github.com/faliardic/chief-site-engineer/issues/516#issuecomment-5449025124.
+- Canonical execution authority: https://github.com/faliardic/chief-site-engineer/issues/516#issuecomment-5449389866.
+- Independent blocker evidence: https://github.com/faliardic/chief-site-engineer/pull/517#issuecomment-5449016093.
+- Previous Draft PR HEAD: `49d2705ad304005da035a03afe99ed3c0d152805`.
+- Exact correction paths: `mobile/lib/features/inventory/inventory_sketch_editor_page.dart`, `mobile/test/inventory_sketch_editor_test.dart`, and this append-only result evidence.
+- Normal autosave and explicit force-save now use distinct drain authority. A newer geometry created while a normal save is in flight retains its own 500 ms debounce; timer expiry during the older save queues it immediately afterward. Explicit back/lifecycle/finalize force paths cancel the timer and drain the latest geometry immediately after the serialized in-flight save.
+- Finalization preserves the already acknowledged sketch/content expectations. It verifies draft identity and exact geometry, then rejects external revision advancement with `inventory_stale_revision` or `inventory_stale_content_revision` before `finalizeSketch`; the editor remains open and finalization remains disabled until a legitimate reload/recovery establishes new expectations.
+- The existing three-value save-status contract is unchanged. The AppBar status is absent during idle/loading/load failure and appears only after a durable geometry acknowledgement; existing exact labels remain unchanged.
+- Touched Dart formatting: `PASS`. The repository Flutter SDK formatted both touched Dart files; the mechanical test split was formatted again. One preliminary PATH-only formatter lookup returned command-not-found and changed no file.
+- Focused primary invocation: exact authorized command, exit `1` at `+44 -1`. All new production-behavior regressions reached PASS; the only failure was the new combined UI test reusing the same `MaterialApp`/Navigator state and therefore not exposing a second host button.
+- Narrow mechanical correction/retry: `1/1`. The combined loading/failure UI assertion was split into two independent widget tests; production source was unchanged by this correction.
+- Focused retry invocation: exact authorized command, `PASS`, exit `0`, `+50`, `All tests passed!`.
+- Focused invocations: `2` total (one primary plus the single authorized mechanical retry).
+- Downstream analyzer invocations: exactly `1`; `flutter analyze --no-pub` — `PASS`, exit `0`, `No issues found!`.
+- `git diff --check`: `PASS`, exit `0`; only line-ending notices were emitted.
+- Static contract/drift audit: schema `20`; backup format `1`; mobile version `0.1.0+1`; MAIN application ID `com.faliardic.sefim`. App database/migrations, backup source, pubspec/lock, domain/bootstrap/app shell/attachment, Android/iOS/platform/permission/signing, Reminder/notification/Work Chain and other protected production surfaces have correction drift `0`.
+- Forbidden phone/call/contact permissions introduced: `0`; `READ_CALL_LOG`, `READ_CONTACTS`, phone-state/phone-number/call permissions remain absent from the production manifests.
+- Tracked test DB, backup, APK, AAB or generated artifact introduced: `0`.
+- Full/unrelated Flutter suite, integration tests, build, APK/AAB, emulator, ADB/device, scripted acceptance and owner data operations: `NOT RUN`.
+- `MT-516-001..012`: `PENDING`; not run and not marked PASS.
+- Publication boundary: correction commit/push and Draft PR evidence publication follow this local gate. Ready, merge, Issue #516/Epic #506 closure and Slice 3 remain forbidden.
+
+```yaml
+correction_execution_record:
+  owner_correction_authority_comment: 5449025124
+  canonical_execution_authority_comment: 5449389866
+  independent_blocker_comment: 5449016093
+  runtime_actual_model: unknown
+  runtime_actual_effort: null
+  runtime_actual_verified: false
+  orchestration: single-agent
+  previous_head: 49d2705ad304005da035a03afe99ed3c0d152805
+  correction_paths:
+    - mobile/lib/features/inventory/inventory_sketch_editor_page.dart
+    - mobile/test/inventory_sketch_editor_test.dart
+    - .cse/results/516_result.md
+  focused_primary_result: FAIL_TEST_HARNESS_ONLY
+  focused_retry_result: PASS
+  focused_invocations: 2
+  focused_test_count: 50
+  narrow_mechanical_retries_used: 1
+  analyzer_invocations: 1
+  analyzer_result: PASS
+  schema: 20
+  backup_format: 1
+  mobile_version: 0.1.0+1
+  main_application_id: com.faliardic.sefim
+  manual_test_ids: MT-516-001..012
+  manual_test_status: PENDING
+  publication_authority: UPDATE_EXISTING_DRAFT_ONLY
+  ready: false
+  merged: false
+  issue_closed: false
+  next_slice_started: false
+```
+
+```yaml
+review_recommendation:
+  mode: GITHUB_REVIEW
+  recommendation: INDEPENDENT_R4_RE_REVIEW
+  reason: three independent blockers are corrected with focused source/widget PASS and static-analysis PASS
+  review_focus:
+    - normal debounce versus explicit force drain timing
+    - fail-closed stale sketch/content revision finalization
+    - acknowledgement-gated save-status visibility
+```
