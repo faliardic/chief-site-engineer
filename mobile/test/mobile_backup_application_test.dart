@@ -8,6 +8,7 @@ import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/construction_living_plan_application.dart';
 import 'package:chief_site_engineer/application/construction_schedule_date_engine.dart';
 import 'package:chief_site_engineer/application/construction_schedule_snapshot_repository.dart';
+import 'package:chief_site_engineer/application/inventory_application.dart';
 import 'package:chief_site_engineer/application/mobile_backup_application.dart';
 import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
@@ -17,6 +18,7 @@ import 'package:chief_site_engineer/domain/construction_corpus_models.dart';
 import 'package:chief_site_engineer/domain/construction_living_plan_models.dart';
 import 'package:chief_site_engineer/domain/construction_project_graph_models.dart';
 import 'package:chief_site_engineer/domain/construction_schedule_models.dart';
+import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/domain/mobile_backup_models.dart';
 import 'package:chief_site_engineer/platform/managed_attachment_store.dart';
 import 'package:chief_site_engineer/platform/mobile_backup_gateway.dart';
@@ -167,6 +169,336 @@ void main() {
         ),
         _failureCode('corrupt_database'),
       );
+    },
+  );
+
+  test(
+    'format 1 backup restores populated Inventory with exact replayable truth',
+    () async {
+      final fixture = await _seedPopulatedInventory(directories);
+      final sourceInventory = fixture.application;
+      final sourceRows = await _inventoryRowsSnapshot(directories);
+      _expectInventoryStoredIntegrity(sourceRows);
+      expect(
+        sourceRows['inventory_sketch_revisions']!
+            .map((row) => row['state'])
+            .toSet(),
+        {
+          InventorySketchRevisionState.superseded.storageValue,
+          InventorySketchRevisionState.active.storageValue,
+          InventorySketchRevisionState.abandoned.storageValue,
+        },
+      );
+      expect(sourceRows['inventory_assets'], hasLength(2));
+      expect(sourceRows['inventory_asset_placements'], hasLength(5));
+      expect(
+        sourceRows['inventory_command_receipts']!.any(
+          (row) => row['is_no_op'] == 1 && row['event_count'] == 0,
+        ),
+        isTrue,
+      );
+      expect(sourceRows['inventory_asset_attachment_links'], isEmpty);
+
+      final sourcePrimary = await sourceInventory.loadPrimarySketch(
+        fixture.projectId,
+      );
+      expect(sourcePrimary, isNotNull);
+      expect(sourcePrimary!.sketch.id, fixture.sketchId);
+      expect(sourcePrimary.activeRevision!.id, fixture.activeRevisionId);
+      expect(sourcePrimary.draftRevision, isNull);
+      sourcePrimary.activeRevision!.geometry.validateFinalizable();
+      final sourceAssets = await sourceInventory.listAssets(
+        projectId: fixture.projectId,
+        includeArchived: true,
+      );
+      expect(sourceAssets.map((item) => item.asset.id), [
+        fixture.assetBId,
+        fixture.assetAId,
+      ]);
+      expect(
+        (await sourceInventory.listPlacementVersions(
+          projectId: fixture.projectId,
+          assetId: fixture.assetAId,
+          placementKey: fixture.assetAPlacementKey,
+        )).map((row) => row.sequence),
+        [1, 2, 3, 4],
+      );
+      expect(
+        await sourceInventory.listAssetHistory(
+          projectId: fixture.projectId,
+          assetId: fixture.assetAId,
+        ),
+        isNotEmpty,
+      );
+
+      final backup = _application(directories, gateway: gateway);
+      final created = await backup.createBackup(
+        const CreateMobileBackupCommand(
+          password: _password,
+          passwordConfirmation: _password,
+        ),
+      );
+      expect(created.summary.mobileSchemaVersion, AppDatabase.schemaVersion);
+      final imported = await _stageIncomingPackage(
+        directories,
+        File(created.absolutePath),
+      );
+      gateway.pickedPackage = imported;
+      final picked = await backup.pickBackupPackage();
+      expect(picked?.stablePath, imported.stablePath);
+      final preflight = await backup.preflightBackup(picked!, _password);
+      expect(preflight.manifest.formatVersion, CseBackupCodec.formatVersion);
+      expect(preflight.manifest.mobileSchemaVersion, AppDatabase.schemaVersion);
+      expect(preflight.manifest.attachments, isEmpty);
+
+      await sourceInventory.changeAssetStatus(
+        ChangeInventoryAssetStatusCommand(
+          operationId: _inventoryUuid(130),
+          projectId: fixture.projectId,
+          assetId: fixture.assetAId,
+          expectedAssetRevision: 6,
+          status: InventoryAssetStatus.missing,
+        ),
+      );
+      expect(
+        await _inventoryRowsSnapshot(directories),
+        isNot(equals(sourceRows)),
+      );
+
+      final restored = await backup.restoreBackup(
+        RestoreMobileBackupCommand(
+          package: picked,
+          password: _password,
+          expectedPackageSha256: preflight.packageSha256,
+        ),
+      );
+      expect(restored.activeSchemaVersion, AppDatabase.schemaVersion);
+      expect(await File(restored.safetyBackupPath).exists(), isTrue);
+
+      final restoredRows = await _inventoryRowsSnapshot(directories);
+      expect(restoredRows, sourceRows);
+      _expectInventoryStoredIntegrity(restoredRows);
+      final restoredInventory = SqliteInventoryApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: _InventoryClock(DateTime.parse('2026-08-27T15:00:00Z')).call,
+        idFactory: _InventoryIds(9000).call,
+      );
+      final availability = await restoredInventory.loadAvailability(
+        fixture.projectId,
+      );
+      expect(availability.projectAvailable, isTrue);
+      expect(availability.hasPrimarySketch, isTrue);
+      final restoredPrimary = await restoredInventory.loadPrimarySketch(
+        fixture.projectId,
+      );
+      expect(restoredPrimary!.sketch.id, fixture.sketchId);
+      expect(restoredPrimary.activeRevision!.id, fixture.activeRevisionId);
+      expect(
+        restoredPrimary.activeRevision!.geometry.canonicalJson,
+        sourcePrimary.activeRevision!.geometry.canonicalJson,
+      );
+      expect(
+        restoredPrimary.activeRevision!.geometry.sha256,
+        sourcePrimary.activeRevision!.geometry.sha256,
+      );
+      restoredPrimary.activeRevision!.geometry.validateFinalizable();
+      final restoredAssets = await restoredInventory.listAssets(
+        projectId: fixture.projectId,
+        includeArchived: true,
+      );
+      expect(
+        restoredAssets.map((item) => item.asset.id),
+        sourceAssets.map((item) => item.asset.id),
+      );
+      final restoredAssetA = await restoredInventory.loadAsset(
+        projectId: fixture.projectId,
+        assetId: fixture.assetAId,
+      );
+      expect(restoredAssetA.asset.revision, 6);
+      expect(restoredAssetA.asset.status, InventoryAssetStatus.inUse);
+      expect(restoredAssetA.activePlacement!.sequence, 4);
+      expect(
+        (await restoredInventory.listPlacementVersions(
+          projectId: fixture.projectId,
+          assetId: fixture.assetAId,
+          placementKey: fixture.assetAPlacementKey,
+        )).map((row) => row.sequence),
+        [1, 2, 3, 4],
+      );
+      expect(
+        await restoredInventory.listAssetHistory(
+          projectId: fixture.projectId,
+          assetId: fixture.assetAId,
+        ),
+        isNotEmpty,
+      );
+
+      final beforeReplay = await _inventoryRowsSnapshot(directories);
+      final replay = await restoredInventory.createAsset(
+        fixture.assetBCreateCommand,
+      );
+      expect(
+        _inventoryMutationValues(replay),
+        _inventoryMutationValues(fixture.assetBCreateResult),
+      );
+      expect(await _inventoryRowsSnapshot(directories), beforeReplay);
+      await expectLater(
+        restoredInventory.createAsset(
+          CreateInventoryAssetCommand(
+            operationId: fixture.assetBCreateCommand.operationId,
+            projectId: fixture.assetBCreateCommand.projectId,
+            assetId: fixture.assetBCreateCommand.assetId,
+            placementId: fixture.assetBCreateCommand.placementId,
+            placementKey: fixture.assetBCreateCommand.placementKey,
+            sketchId: fixture.assetBCreateCommand.sketchId,
+            activeRevisionId: fixture.assetBCreateCommand.activeRevisionId,
+            displayName: 'Değiştirilmiş intent',
+            category: fixture.assetBCreateCommand.category,
+            totalQuantity: fixture.assetBCreateCommand.totalQuantity,
+            x: fixture.assetBCreateCommand.x,
+            y: fixture.assetBCreateCommand.y,
+          ),
+        ),
+        _inventoryFailureCode('inventory_operation_id_conflict'),
+      );
+      expect(await _inventoryRowsSnapshot(directories), beforeReplay);
+
+      final active = await _openRaw(directories);
+      expect(
+        Sqflite.firstIntValue(await active.rawQuery('PRAGMA user_version')),
+        AppDatabase.schemaVersion,
+      );
+      for (final table in _inventoryTables) {
+        expect(
+          await active.query(
+            'sqlite_master',
+            where: "type = 'table' AND name = ?",
+            whereArgs: [table],
+          ),
+          hasLength(1),
+        );
+      }
+      expect(
+        (await active.rawQuery('PRAGMA integrity_check')).single.values.single,
+        'ok',
+      );
+      expect(await active.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      expect(await active.query('inventory_asset_attachment_links'), isEmpty);
+      await active.close();
+      expect(await directories.staging.list().toList(), isEmpty);
+    },
+  );
+
+  test(
+    'format 1 schema 19 restore migrates to empty Inventory without fabrication',
+    () async {
+      final legacyRoot = await Directory.systemTemp.createTemp(
+        'cse_schema19_inventory_',
+      );
+      addTearDown(() async {
+        if (await legacyRoot.exists()) {
+          await legacyRoot.delete(recursive: true);
+        }
+      });
+      final legacyFile = path.join(legacyRoot.path, 'schema19.sqlite3');
+      final legacyDatabase = AppDatabase(
+        path: legacyFile,
+        factory: databaseFactoryFfi,
+        clock: () => DateTime.parse(_now),
+        migrations: AppDatabase.foundationMigrations.take(19).toList(),
+      );
+      await legacyDatabase.open();
+      await SmokeRecordRepository(
+        database: legacyDatabase,
+        clock: () => DateTime.parse(_now),
+      ).ensureFoundationRecord();
+      await legacyDatabase.database.insert('projects', {
+        'id': 'schema19-project',
+        'name': 'Schema 19 legacy proje',
+        'created_at': _now,
+        'updated_at': _now,
+        'revision': 1,
+      });
+      await legacyDatabase.database.insert('field_observations', {
+        'id': 'schema19-observation',
+        'project_id': 'schema19-project',
+        'observed_at': '2026-07-18T07:00:00Z',
+        'created_at': _now,
+        'updated_at': _now,
+        'category': 'inspection',
+        'description': 'Schema 19 korunacak gözlem',
+        'revision': 1,
+      });
+      await legacyDatabase.database.insert('observation_events', {
+        'id': 'schema19-observation-event',
+        'observation_id': 'schema19-observation',
+        'project_id': 'schema19-project',
+        'event_type': 'observation.created',
+        'occurred_at': _now,
+        'payload_json': '{}',
+      });
+      await legacyDatabase.close();
+
+      final databaseBytes = await File(legacyFile).readAsBytes();
+      final archive = const CseBackupArchiveCodec().encode(
+        manifest: _manifest(databaseBytes, schemaVersion: 19),
+        databaseBytes: databaseBytes,
+        attachments: const {},
+      );
+      final package = File(path.join(legacyRoot.path, 'schema19.csebackup'));
+      await package.writeAsBytes(
+        await _testEncryptionCodec().encrypt(archive, _password),
+        flush: true,
+      );
+      final imported = await _stageIncomingPackage(directories, package);
+      final application = _application(directories, gateway: gateway);
+      final preflight = await application.preflightBackup(imported, _password);
+      expect(preflight.manifest.mobileSchemaVersion, 19);
+      expect(preflight.migratedSchemaVersion, AppDatabase.schemaVersion);
+
+      await application.restoreBackup(
+        RestoreMobileBackupCommand(
+          package: imported,
+          password: _password,
+          expectedPackageSha256: preflight.packageSha256,
+        ),
+      );
+
+      final inventoryRows = await _inventoryRowsSnapshot(directories);
+      for (final table in _inventoryTables) {
+        expect(inventoryRows[table], isEmpty, reason: table);
+      }
+      final restored = await _openRaw(directories);
+      expect(
+        Sqflite.firstIntValue(await restored.rawQuery('PRAGMA user_version')),
+        AppDatabase.schemaVersion,
+      );
+      expect(
+        (await restored.query(
+          'projects',
+          where: 'id = ?',
+          whereArgs: ['schema19-project'],
+        )).single['name'],
+        'Schema 19 legacy proje',
+      );
+      expect(
+        (await restored.query(
+          'field_observations',
+          where: 'id = ?',
+          whereArgs: ['schema19-observation'],
+        )).single['description'],
+        'Schema 19 korunacak gözlem',
+      );
+      expect(
+        (await restored.rawQuery(
+          'PRAGMA integrity_check',
+        )).single.values.single,
+        'ok',
+      );
+      expect(await restored.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      await restored.close();
+      expect(await directories.staging.list().toList(), isEmpty);
     },
   );
 
@@ -1530,11 +1862,16 @@ void main() {
       final active = await _openRaw(directories);
       await active.update(
         'projects',
-        {'name': 'Rollbackta korunacak aktif değer'},
+        {'name': 'Rollbackta korunacak aktif değer', 'archived_at': null},
         where: 'id = ?',
         whereArgs: ['project-1'],
       );
       await active.close();
+      final rollbackAssetId = await _seedRollbackInventory(
+        directories,
+        projectId: 'project-1',
+      );
+      final rollbackInventoryBefore = await _inventoryRowsSnapshot(directories);
       final afterBackup = await _fixtureSnapshot(directories);
       expect(afterBackup, isNot(before));
       final failing = _application(
@@ -1561,6 +1898,22 @@ void main() {
       );
 
       expect(await _fixtureSnapshot(directories), afterBackup);
+      expect(
+        await _inventoryRowsSnapshot(directories),
+        rollbackInventoryBefore,
+      );
+      final rolledBackInventory = SqliteInventoryApplication(
+        databasePath: directories.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => DateTime.parse(_now),
+      );
+      expect(
+        (await rolledBackInventory.loadAsset(
+          projectId: 'project-1',
+          assetId: rollbackAssetId,
+        )).asset.displayName,
+        'Rollbackta korunacak envanter',
+      );
       expect(
         await directories.staging.list().toList(),
         isEmpty,
@@ -2149,6 +2502,514 @@ void main() {
     },
   );
 }
+
+const _inventoryTables = <String>[
+  'inventory_sketches',
+  'inventory_sketch_revisions',
+  'inventory_assets',
+  'inventory_asset_placements',
+  'inventory_command_receipts',
+  'inventory_events',
+  'inventory_asset_attachment_links',
+];
+
+class _InventoryRoundTripFixture {
+  const _InventoryRoundTripFixture({
+    required this.projectId,
+    required this.sketchId,
+    required this.activeRevisionId,
+    required this.assetAId,
+    required this.assetBId,
+    required this.assetAPlacementKey,
+    required this.application,
+    required this.assetBCreateCommand,
+    required this.assetBCreateResult,
+  });
+
+  final String projectId;
+  final String sketchId;
+  final String activeRevisionId;
+  final String assetAId;
+  final String assetBId;
+  final String assetAPlacementKey;
+  final SqliteInventoryApplication application;
+  final CreateInventoryAssetCommand assetBCreateCommand;
+  final InventoryMutationResult assetBCreateResult;
+}
+
+class _InventoryClock {
+  _InventoryClock(this.value);
+
+  DateTime value;
+
+  DateTime call() {
+    final result = value;
+    value = value.add(const Duration(seconds: 1));
+    return result;
+  }
+}
+
+class _InventoryIds {
+  _InventoryIds(this.value);
+
+  int value;
+
+  String call() => _inventoryUuid(value++);
+}
+
+String _inventoryUuid(int value) =>
+    '51400000-0000-4000-8000-${value.toString().padLeft(12, '0')}';
+
+InventoryGeometry _inventoryGeometry([int offset = 0]) => InventoryGeometry(
+  polylines: [
+    InventoryPolyline(
+      closed: false,
+      points: [
+        InventorySketchPoint(x: offset, y: 0),
+        InventorySketchPoint(x: offset + 64, y: 64),
+      ],
+    ),
+  ],
+);
+
+Future<_InventoryRoundTripFixture> _seedPopulatedInventory(
+  AppDirectories directories,
+) async {
+  final projectId = _inventoryUuid(1);
+  final raw = await _openRaw(directories);
+  await raw.insert('projects', {
+    'id': projectId,
+    'name': 'Inventory backup projesi',
+    'created_at': _now,
+    'updated_at': _now,
+    'revision': 1,
+  });
+  await raw.close();
+
+  final clock = _InventoryClock(DateTime.parse('2026-08-27T10:00:00Z'));
+  final application = SqliteInventoryApplication(
+    databasePath: directories.databaseFile,
+    databaseFactory: databaseFactoryFfi,
+    clock: clock.call,
+    idFactory: _InventoryIds(5000).call,
+  );
+  final sketchId = _inventoryUuid(10);
+  final firstRevisionId = _inventoryUuid(11);
+  final activeRevisionId = _inventoryUuid(12);
+  final abandonedRevisionId = _inventoryUuid(13);
+  await application.createSketch(
+    CreateInventorySketchCommand(
+      operationId: _inventoryUuid(100),
+      projectId: projectId,
+      sketchId: sketchId,
+      draftRevisionId: firstRevisionId,
+      displayName: 'Inventory ana krokisi',
+    ),
+  );
+  await application.autosaveSketchDraft(
+    AutosaveInventorySketchDraftCommand(
+      operationId: _inventoryUuid(101),
+      projectId: projectId,
+      sketchId: sketchId,
+      draftRevisionId: firstRevisionId,
+      expectedSketchRevision: 1,
+      expectedContentRevision: 1,
+      geometry: _inventoryGeometry(),
+    ),
+  );
+  await application.finalizeSketch(
+    FinalizeInventorySketchCommand(
+      operationId: _inventoryUuid(102),
+      projectId: projectId,
+      sketchId: sketchId,
+      draftRevisionId: firstRevisionId,
+      expectedSketchRevision: 2,
+      expectedContentRevision: 2,
+    ),
+  );
+  await application.startSketchEdit(
+    StartInventorySketchEditCommand(
+      operationId: _inventoryUuid(103),
+      projectId: projectId,
+      sketchId: sketchId,
+      activeRevisionId: firstRevisionId,
+      newDraftRevisionId: activeRevisionId,
+      expectedSketchRevision: 3,
+    ),
+  );
+  await application.autosaveSketchDraft(
+    AutosaveInventorySketchDraftCommand(
+      operationId: _inventoryUuid(104),
+      projectId: projectId,
+      sketchId: sketchId,
+      draftRevisionId: activeRevisionId,
+      expectedSketchRevision: 4,
+      expectedContentRevision: 1,
+      geometry: _inventoryGeometry(64),
+    ),
+  );
+  await application.finalizeSketch(
+    FinalizeInventorySketchCommand(
+      operationId: _inventoryUuid(105),
+      projectId: projectId,
+      sketchId: sketchId,
+      draftRevisionId: activeRevisionId,
+      expectedSketchRevision: 5,
+      expectedContentRevision: 2,
+    ),
+  );
+  await application.startSketchEdit(
+    StartInventorySketchEditCommand(
+      operationId: _inventoryUuid(106),
+      projectId: projectId,
+      sketchId: sketchId,
+      activeRevisionId: activeRevisionId,
+      newDraftRevisionId: abandonedRevisionId,
+      expectedSketchRevision: 6,
+    ),
+  );
+  await application.abandonSketchDraft(
+    AbandonInventorySketchDraftCommand(
+      operationId: _inventoryUuid(107),
+      projectId: projectId,
+      sketchId: sketchId,
+      draftRevisionId: abandonedRevisionId,
+      expectedSketchRevision: 7,
+    ),
+  );
+
+  final assetAId = _inventoryUuid(20);
+  final assetAPlacementKey = _inventoryUuid(21);
+  await application.createAsset(
+    CreateInventoryAssetCommand(
+      operationId: _inventoryUuid(110),
+      projectId: projectId,
+      assetId: assetAId,
+      placementId: _inventoryUuid(22),
+      placementKey: assetAPlacementKey,
+      sketchId: sketchId,
+      activeRevisionId: activeRevisionId,
+      displayName: 'Zincir Vinç',
+      category: InventoryCategory.equipment,
+      totalQuantity: 2,
+      x: 17,
+      y: 21,
+    ),
+  );
+  await application.updateAsset(
+    UpdateInventoryAssetCommand(
+      operationId: _inventoryUuid(111),
+      projectId: projectId,
+      assetId: assetAId,
+      expectedAssetRevision: 1,
+      displayName: 'Zincir Vinç',
+      category: InventoryCategory.other,
+      otherCategoryLabel: 'Kaldırma',
+      note: 'Kontrol edildi',
+    ),
+  );
+  await application.updateAsset(
+    UpdateInventoryAssetCommand(
+      operationId: _inventoryUuid(112),
+      projectId: projectId,
+      assetId: assetAId,
+      expectedAssetRevision: 2,
+      displayName: 'Zincir Vinç',
+      category: InventoryCategory.other,
+      otherCategoryLabel: 'Kaldırma',
+      note: 'Kontrol edildi',
+    ),
+  );
+  await application.changeAssetStatus(
+    ChangeInventoryAssetStatusCommand(
+      operationId: _inventoryUuid(113),
+      projectId: projectId,
+      assetId: assetAId,
+      expectedAssetRevision: 2,
+      status: InventoryAssetStatus.inUse,
+    ),
+  );
+  await application.changeAssetQuantity(
+    ChangeInventoryAssetQuantityCommand(
+      operationId: _inventoryUuid(114),
+      projectId: projectId,
+      assetId: assetAId,
+      placementKey: assetAPlacementKey,
+      successorPlacementId: _inventoryUuid(23),
+      expectedAssetRevision: 3,
+      expectedPlacementSequence: 1,
+      totalQuantity: 3,
+    ),
+  );
+  await application.movePlacement(
+    MoveInventoryPlacementCommand(
+      operationId: _inventoryUuid(115),
+      projectId: projectId,
+      assetId: assetAId,
+      placementKey: assetAPlacementKey,
+      successorPlacementId: _inventoryUuid(24),
+      sketchId: sketchId,
+      activeRevisionId: activeRevisionId,
+      expectedPlacementSequence: 2,
+      x: 37,
+      y: 45,
+    ),
+  );
+  await application.movePlacement(
+    MoveInventoryPlacementCommand(
+      operationId: _inventoryUuid(116),
+      projectId: projectId,
+      assetId: assetAId,
+      placementKey: assetAPlacementKey,
+      successorPlacementId: _inventoryUuid(25),
+      sketchId: sketchId,
+      activeRevisionId: activeRevisionId,
+      expectedPlacementSequence: 3,
+      x: 36,
+      y: 44,
+    ),
+  );
+  await application.archiveAsset(
+    ArchiveInventoryAssetCommand(
+      operationId: _inventoryUuid(117),
+      projectId: projectId,
+      assetId: assetAId,
+      expectedAssetRevision: 4,
+    ),
+  );
+  await application.unarchiveAsset(
+    UnarchiveInventoryAssetCommand(
+      operationId: _inventoryUuid(118),
+      projectId: projectId,
+      assetId: assetAId,
+      placementKey: assetAPlacementKey,
+      successorPlacementId: _inventoryUuid(26),
+      sketchId: sketchId,
+      activeRevisionId: activeRevisionId,
+      expectedAssetRevision: 5,
+      expectedPreviousPlacementSequence: 3,
+      x: 80,
+      y: 84,
+    ),
+  );
+
+  final assetBCreateCommand = CreateInventoryAssetCommand(
+    operationId: _inventoryUuid(119),
+    projectId: projectId,
+    assetId: _inventoryUuid(30),
+    placementId: _inventoryUuid(31),
+    placementKey: _inventoryUuid(32),
+    sketchId: sketchId,
+    activeRevisionId: activeRevisionId,
+    displayName: 'Akülü Matkap',
+    category: InventoryCategory.powerTool,
+    totalQuantity: 1,
+    x: 128,
+    y: 128,
+  );
+  final assetBCreateResult = await application.createAsset(assetBCreateCommand);
+  return _InventoryRoundTripFixture(
+    projectId: projectId,
+    sketchId: sketchId,
+    activeRevisionId: activeRevisionId,
+    assetAId: assetAId,
+    assetBId: assetBCreateCommand.assetId,
+    assetAPlacementKey: assetAPlacementKey,
+    application: application,
+    assetBCreateCommand: assetBCreateCommand,
+    assetBCreateResult: assetBCreateResult,
+  );
+}
+
+Future<String> _seedRollbackInventory(
+  AppDirectories directories, {
+  required String projectId,
+}) async {
+  final clock = _InventoryClock(DateTime.parse('2026-08-27T16:00:00Z'));
+  final application = SqliteInventoryApplication(
+    databasePath: directories.databaseFile,
+    databaseFactory: databaseFactoryFfi,
+    clock: clock.call,
+    idFactory: _InventoryIds(7000).call,
+  );
+  final sketchId = _inventoryUuid(6001);
+  final revisionId = _inventoryUuid(6002);
+  await application.createSketch(
+    CreateInventorySketchCommand(
+      operationId: _inventoryUuid(6003),
+      projectId: projectId,
+      sketchId: sketchId,
+      draftRevisionId: revisionId,
+      displayName: 'Rollback Inventory krokisi',
+    ),
+  );
+  await application.autosaveSketchDraft(
+    AutosaveInventorySketchDraftCommand(
+      operationId: _inventoryUuid(6004),
+      projectId: projectId,
+      sketchId: sketchId,
+      draftRevisionId: revisionId,
+      expectedSketchRevision: 1,
+      expectedContentRevision: 1,
+      geometry: _inventoryGeometry(),
+    ),
+  );
+  await application.finalizeSketch(
+    FinalizeInventorySketchCommand(
+      operationId: _inventoryUuid(6005),
+      projectId: projectId,
+      sketchId: sketchId,
+      draftRevisionId: revisionId,
+      expectedSketchRevision: 2,
+      expectedContentRevision: 2,
+    ),
+  );
+  final assetId = _inventoryUuid(6006);
+  await application.createAsset(
+    CreateInventoryAssetCommand(
+      operationId: _inventoryUuid(6009),
+      projectId: projectId,
+      assetId: assetId,
+      placementId: _inventoryUuid(6007),
+      placementKey: _inventoryUuid(6008),
+      sketchId: sketchId,
+      activeRevisionId: revisionId,
+      displayName: 'Rollbackta korunacak envanter',
+      category: InventoryCategory.handTool,
+      totalQuantity: 1,
+      x: 20,
+      y: 24,
+    ),
+  );
+  return assetId;
+}
+
+Future<Map<String, List<Map<String, Object?>>>> _inventoryRowsSnapshot(
+  AppDirectories directories,
+) async {
+  const ordering = <String, String>{
+    'inventory_sketches': 'id ASC',
+    'inventory_sketch_revisions': 'sketch_id ASC, revision_number ASC, id ASC',
+    'inventory_assets': 'normalized_name ASC, id ASC',
+    'inventory_asset_placements': 'placement_key ASC, sequence ASC, id ASC',
+    'inventory_command_receipts': 'id ASC',
+    'inventory_events':
+        'aggregate_type ASC, aggregate_id ASC, sequence ASC, id ASC',
+    'inventory_asset_attachment_links': 'id ASC',
+  };
+  final database = await _openRaw(directories);
+  try {
+    return {
+      for (final table in _inventoryTables)
+        table: await database.query(table, orderBy: ordering[table]),
+    };
+  } finally {
+    await database.close();
+  }
+}
+
+void _expectInventoryStoredIntegrity(
+  Map<String, List<Map<String, Object?>>> rows,
+) {
+  final shaPattern = RegExp(r'^[0-9a-f]{64}$');
+  final revisions = rows['inventory_sketch_revisions']!;
+  for (final row in revisions) {
+    final geometryJson = row['geometry_json']! as String;
+    final geometrySha256 = row['geometry_sha256']! as String;
+    expect(geometrySha256, matches(shaPattern));
+    final geometry = InventoryGeometry.decode(
+      geometryJson,
+      expectedSha256: geometrySha256,
+    );
+    if (row['state'] != InventorySketchRevisionState.draft.storageValue) {
+      geometry.validateFinalizable();
+    }
+  }
+
+  final events = rows['inventory_events']!;
+  final eventCountsByOperation = <String, int>{};
+  final eventsByAggregate = <String, List<Map<String, Object?>>>{};
+  for (final row in events) {
+    final payloadJson = row['payload_json']! as String;
+    final payloadSha256 = row['payload_sha256']! as String;
+    expect(payloadSha256, matches(shaPattern));
+    expect(sha256.convert(utf8.encode(payloadJson)).toString(), payloadSha256);
+    final operationId = row['operation_id']! as String;
+    eventCountsByOperation.update(
+      operationId,
+      (value) => value + 1,
+      ifAbsent: () => 1,
+    );
+    final aggregateKey = '${row['aggregate_type']}/${row['aggregate_id']}';
+    eventsByAggregate.putIfAbsent(aggregateKey, () => []).add(row);
+  }
+  for (final aggregateEvents in eventsByAggregate.values) {
+    aggregateEvents.sort(
+      (left, right) =>
+          (left['sequence']! as int).compareTo(right['sequence']! as int),
+    );
+    expect(
+      aggregateEvents.map((row) => row['sequence']),
+      List<int>.generate(aggregateEvents.length, (index) => index + 1),
+    );
+  }
+
+  for (final row in rows['inventory_command_receipts']!) {
+    final resultJson = row['result_json']! as String;
+    final resultSha256 = row['result_sha256']! as String;
+    expect(row['intent_sha256'], matches(shaPattern));
+    expect(resultSha256, matches(shaPattern));
+    expect(sha256.convert(utf8.encode(resultJson)).toString(), resultSha256);
+    final eventCount = row['event_count']! as int;
+    expect(eventCountsByOperation[row['id']] ?? 0, eventCount);
+    expect(row['is_no_op'] == 1, eventCount == 0);
+  }
+
+  final placementsByKey = <String, List<Map<String, Object?>>>{};
+  for (final row in rows['inventory_asset_placements']!) {
+    placementsByKey
+        .putIfAbsent(row['placement_key']! as String, () => [])
+        .add(row);
+  }
+  for (final placements in placementsByKey.values) {
+    placements.sort(
+      (left, right) =>
+          (left['sequence']! as int).compareTo(right['sequence']! as int),
+    );
+    expect(
+      placements.map((row) => row['sequence']),
+      List<int>.generate(placements.length, (index) => index + 1),
+    );
+    expect(placements.first['supersedes_placement_id'], isNull);
+    for (var index = 1; index < placements.length; index += 1) {
+      expect(
+        placements[index]['supersedes_placement_id'],
+        placements[index - 1]['id'],
+      );
+    }
+    expect(placements.where((row) => row['ended_at'] == null), hasLength(1));
+  }
+}
+
+Map<String, Object?> _inventoryMutationValues(InventoryMutationResult value) =>
+    {
+      'operation': value.operationId,
+      'command': value.commandType,
+      'project': value.projectId,
+      'aggregate_type': value.primaryAggregateType,
+      'aggregate_id': value.primaryAggregateId,
+      'source': value.sourceId,
+      'source_revision': value.sourceRevision,
+      'supporting': value.supportingId,
+      'supporting_revision': value.supportingRevision,
+      'no_op': value.isNoOp,
+      'event_count': value.eventCount,
+      'at': value.resultAt,
+    };
+
+Matcher _inventoryFailureCode(String code) => throwsA(
+  isA<InventoryFailure>().having((failure) => failure.code, 'code', code),
+);
 
 var _stagedPackageSequence = 0;
 

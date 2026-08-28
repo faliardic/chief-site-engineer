@@ -226,6 +226,118 @@ class SqliteInventoryApplication implements InventoryApplicationPort {
   );
 }
 
+/// Safe zero-I/O default for hand-built bootstrap results.
+/// Production bootstrap replaces this with the path-backed SQLite adapter.
+class UnavailableInventoryApplication implements InventoryApplicationPort {
+  const UnavailableInventoryApplication();
+
+  Never _fail() => throw const InventoryFailure('inventory_unavailable');
+
+  @override
+  Future<InventoryMutationResult> createSketch(
+    CreateInventorySketchCommand command,
+  ) async => _fail();
+
+  @override
+  Future<InventoryMutationResult> autosaveSketchDraft(
+    AutosaveInventorySketchDraftCommand command,
+  ) async => _fail();
+
+  @override
+  Future<InventoryMutationResult> startSketchEdit(
+    StartInventorySketchEditCommand command,
+  ) async => _fail();
+
+  @override
+  Future<InventoryMutationResult> finalizeSketch(
+    FinalizeInventorySketchCommand command,
+  ) async => _fail();
+
+  @override
+  Future<InventoryMutationResult> abandonSketchDraft(
+    AbandonInventorySketchDraftCommand command,
+  ) async => _fail();
+
+  @override
+  Future<InventoryMutationResult> archiveSketch(
+    ArchiveInventorySketchCommand command,
+  ) async => _fail();
+
+  @override
+  Future<InventoryMutationResult> unarchiveSketch(
+    UnarchiveInventorySketchCommand command,
+  ) async => _fail();
+
+  @override
+  Future<InventoryMutationResult> createAsset(
+    CreateInventoryAssetCommand command,
+  ) async => _fail();
+
+  @override
+  Future<InventoryMutationResult> updateAsset(
+    UpdateInventoryAssetCommand command,
+  ) async => _fail();
+
+  @override
+  Future<InventoryMutationResult> changeAssetStatus(
+    ChangeInventoryAssetStatusCommand command,
+  ) async => _fail();
+
+  @override
+  Future<InventoryMutationResult> changeAssetQuantity(
+    ChangeInventoryAssetQuantityCommand command,
+  ) async => _fail();
+
+  @override
+  Future<InventoryMutationResult> archiveAsset(
+    ArchiveInventoryAssetCommand command,
+  ) async => _fail();
+
+  @override
+  Future<InventoryMutationResult> unarchiveAsset(
+    UnarchiveInventoryAssetCommand command,
+  ) async => _fail();
+
+  @override
+  Future<InventoryMutationResult> movePlacement(
+    MoveInventoryPlacementCommand command,
+  ) async => _fail();
+
+  @override
+  Future<InventoryAvailability> loadAvailability(String projectId) async =>
+      _fail();
+
+  @override
+  Future<InventoryPrimarySketchProjection?> loadPrimarySketch(
+    String projectId,
+  ) async => _fail();
+
+  @override
+  Future<InventoryAssetProjection> loadAsset({
+    required String projectId,
+    required String assetId,
+  }) async => _fail();
+
+  @override
+  Future<List<InventoryAssetProjection>> listAssets({
+    required String projectId,
+    bool includeArchived = false,
+  }) async => _fail();
+
+  @override
+  Future<List<InventoryPlacementRecord>> listPlacementVersions({
+    required String projectId,
+    required String assetId,
+    required String placementKey,
+  }) async => _fail();
+
+  @override
+  Future<List<InventoryEventRecord>> listAssetHistory({
+    required String projectId,
+    required String assetId,
+  }) async => _fail();
+}
+
 class InventoryApplication implements InventoryApplicationPort {
   InventoryApplication({
     required this.database,

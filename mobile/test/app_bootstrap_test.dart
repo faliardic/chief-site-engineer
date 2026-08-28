@@ -5,10 +5,12 @@ import 'package:chief_site_engineer/application/attachment_catalog_application.d
 import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/application/construction_living_plan_application.dart';
 import 'package:chief_site_engineer/application/construction_living_plan_intelligence_application.dart';
+import 'package:chief_site_engineer/application/inventory_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/construction_living_plan_models.dart';
+import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/platform/agenda_attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/agenda_photo_export_gateway.dart';
 import 'package:chief_site_engineer/platform/concrete_attachment_gateway.dart';
@@ -64,6 +66,65 @@ void main() {
       );
       expect(first.backup, isNotNull);
       expect(restarted.backup, isNotNull);
+      expect(first.inventory, isA<SqliteInventoryApplication>());
+      expect(restarted.inventory, isA<SqliteInventoryApplication>());
+      final firstInventory = first.inventory as SqliteInventoryApplication;
+      final restartedInventory =
+          restarted.inventory as SqliteInventoryApplication;
+      expect(firstInventory.databasePath, directories.databaseFile);
+      expect(restartedInventory.databasePath, directories.databaseFile);
+
+      const knownProjectId = '51400000-0000-4000-8000-000000000001';
+      final activeDatabase = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+      );
+      try {
+        await activeDatabase.insert('projects', {
+          'id': knownProjectId,
+          'name': 'Bootstrap Inventory aktif DB kanıtı',
+          'created_at': '2026-07-19T09:15:00.000Z',
+          'updated_at': '2026-07-19T09:15:00.000Z',
+          'revision': 1,
+        });
+      } finally {
+        await activeDatabase.close();
+      }
+      final inventoryAvailability = await firstInventory.loadAvailability(
+        knownProjectId,
+      );
+      expect(inventoryAvailability.projectAvailable, isTrue);
+      expect(inventoryAvailability.hasPrimarySketch, isFalse);
+
+      final handBuilt = BootstrapSuccess(
+        environmentLabel: 'synthetic',
+        smokeRecordId: 'synthetic-smoke',
+        smokeRecordCreatedAt: '2026-08-27T00:00:00Z',
+        agenda: first.agenda,
+      );
+      expect(handBuilt.inventory, isA<UnavailableInventoryApplication>());
+      final pathsBeforeUnavailableRead =
+          await temporaryRoot
+                .list(recursive: true)
+                .map((entity) => entity.path)
+                .toList()
+            ..sort();
+      await expectLater(
+        handBuilt.inventory.loadAvailability(knownProjectId),
+        throwsA(
+          isA<InventoryFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'inventory_unavailable',
+          ),
+        ),
+      );
+      final pathsAfterUnavailableRead =
+          await temporaryRoot
+                .list(recursive: true)
+                .map((entity) => entity.path)
+                .toList()
+            ..sort();
+      expect(pathsAfterUnavailableRead, pathsBeforeUnavailableRead);
       expect(first.livingPlan, isA<SqliteConstructionLivingPlanApplication>());
       expect(
         restarted.livingPlan,
@@ -146,8 +207,7 @@ void main() {
           itemId: '47610000-0000-4000-8000-000000000001',
           eventId: '47610000-0000-4000-8000-000000000002',
           projectId: fixture.projectId,
-          expectedReferenceSnapshotId:
-              fixture.addCandidate.referenceSnapshotId,
+          expectedReferenceSnapshotId: fixture.addCandidate.referenceSnapshotId,
           activityInstanceId: fixture.addCandidate.activityInstanceId,
           plannedDate: fixture.windowStart,
           note: 'Acceptance persistence notu',
