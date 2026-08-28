@@ -60,6 +60,47 @@ class InventoryMapController extends ChangeNotifier {
   bool get canMutateMap =>
       loadStatus == InventoryMapLoadStatus.ready && activeRevision != null;
 
+  bool useCanonicalSnapshot({
+    required InventoryPrimarySketchProjection activeSketch,
+    required Iterable<InventoryAssetProjection> assets,
+  }) {
+    try {
+      _verifyActiveSketch(activeSketch);
+      final verified = <InventoryAssetProjection>[];
+      final assetIds = <String>{};
+      for (final projection in assets) {
+        if (!assetIds.add(projection.asset.id)) {
+          throw const InventoryFailure(
+            'inventory_multiple_placements_not_supported_in_v1',
+          );
+        }
+        _verifyMarkerProjection(projection, activeSketch);
+        verified.add(projection);
+      }
+      sketch = activeSketch;
+      projections = List<InventoryAssetProjection>.unmodifiable(verified);
+      pendingCreateTarget = null;
+      loadStatus = InventoryMapLoadStatus.ready;
+      lastErrorCode = null;
+      _notify();
+      return true;
+    } on Object catch (error) {
+      _failSnapshot(_safeCode(error));
+      return false;
+    }
+  }
+
+  void clearSession() {
+    sketch = null;
+    projections = const [];
+    pendingCreateTarget = null;
+    movingAssetId = null;
+    pendingMoveTarget = null;
+    loadStatus = InventoryMapLoadStatus.idle;
+    lastErrorCode = null;
+    _notify();
+  }
+
   Future<bool> reload() async {
     loadStatus = InventoryMapLoadStatus.loading;
     lastErrorCode = null;
@@ -71,28 +112,25 @@ class InventoryMapController extends ChangeNotifier {
         projectId: projectId,
         includeArchived: false,
       );
-      final assetIds = <String>{};
-      for (final projection in loadedAssets) {
-        if (!assetIds.add(projection.asset.id)) {
-          throw const InventoryFailure(
-            'inventory_multiple_placements_not_supported_in_v1',
-          );
-        }
-        _verifyMarkerProjection(projection, loadedSketch!);
-      }
-      sketch = loadedSketch;
-      projections = List<InventoryAssetProjection>.unmodifiable(loadedAssets);
-      pendingCreateTarget = null;
-      loadStatus = InventoryMapLoadStatus.ready;
-      lastErrorCode = null;
-      _notify();
-      return true;
+      return useCanonicalSnapshot(
+        activeSketch: loadedSketch!,
+        assets: loadedAssets,
+      );
     } on Object catch (error) {
-      loadStatus = InventoryMapLoadStatus.failed;
-      lastErrorCode = _safeCode(error);
-      _notify();
+      _failSnapshot(_safeCode(error));
       return false;
     }
+  }
+
+  void _failSnapshot(String code) {
+    sketch = null;
+    projections = const [];
+    pendingCreateTarget = null;
+    movingAssetId = null;
+    pendingMoveTarget = null;
+    loadStatus = InventoryMapLoadStatus.failed;
+    lastErrorCode = code;
+    _notify();
   }
 
   InventoryPlacementTarget? captureEmptyMapTap(
@@ -243,8 +281,11 @@ class InventoryMapViewState extends State<InventoryMapView> {
   Offset _gestureStartFocal = Offset.zero;
   Offset _lastFocal = Offset.zero;
   bool _multiTouchGesture = false;
+  Timer? _highlightTimer;
+  String? _highlightedAssetId;
 
   InventoryViewport? get viewport => _viewport;
+  String? get highlightedAssetId => _highlightedAssetId;
 
   @override
   void initState() {
@@ -263,6 +304,10 @@ class InventoryMapViewState extends State<InventoryMapView> {
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeListener(_refresh);
       widget.controller.addListener(_refresh);
+      _highlightTimer?.cancel();
+      _highlightTimer = null;
+      _highlightedAssetId = null;
+      _viewport = null;
     }
   }
 
@@ -276,6 +321,49 @@ class InventoryMapViewState extends State<InventoryMapView> {
   void fitCanvas() {
     final current = _viewport;
     if (current != null) setState(() => _viewport = current.reset());
+  }
+
+  bool focusAsset(
+    String assetId, {
+    Duration highlightDuration = const Duration(seconds: 2),
+  }) {
+    final current = _viewport;
+    if (current == null) return false;
+    InventoryPlacementRecord? placement;
+    for (final projection in widget.controller.projections) {
+      if (projection.asset.id == assetId) {
+        placement = projection.activePlacement;
+        break;
+      }
+    }
+    if (placement == null) return false;
+    final initialPoint = _placementToView(placement, current);
+    var focused = current.zoom < 2 ? current.zoomAt(2, initialPoint) : current;
+    final focusedPoint = _placementToView(placement, focused);
+    focused = focused.panBy(
+      focused.viewSize.center(Offset.zero) - focusedPoint,
+    );
+    _highlightTimer?.cancel();
+    setState(() {
+      _viewport = focused;
+      _highlightedAssetId = assetId;
+    });
+    _highlightTimer = Timer(highlightDuration, () {
+      if (mounted && _highlightedAssetId == assetId) {
+        setState(() => _highlightedAssetId = null);
+      }
+    });
+    return true;
+  }
+
+  void clearFocus() {
+    _highlightTimer?.cancel();
+    _highlightTimer = null;
+    if (_highlightedAssetId != null && mounted) {
+      setState(() => _highlightedAssetId = null);
+    } else {
+      _highlightedAssetId = null;
+    }
   }
 
   void _changeZoom(double factor) {
@@ -344,6 +432,7 @@ class InventoryMapViewState extends State<InventoryMapView> {
 
   @override
   void dispose() {
+    _highlightTimer?.cancel();
     widget.controller.removeListener(_refresh);
     super.dispose();
   }
@@ -399,6 +488,7 @@ class InventoryMapViewState extends State<InventoryMapView> {
                   _InventoryMarker(
                     projection: projection,
                     viewport: viewport,
+                    highlighted: _highlightedAssetId == projection.asset.id,
                     onTap: () => widget.onOpenAsset(projection.asset.id),
                   ),
               ],
@@ -414,11 +504,13 @@ class _InventoryMarker extends StatelessWidget {
   const _InventoryMarker({
     required this.projection,
     required this.viewport,
+    required this.highlighted,
     required this.onTap,
   });
 
   final InventoryAssetProjection projection;
   final InventoryViewport viewport;
+  final bool highlighted;
   final VoidCallback onTap;
 
   @override
@@ -427,7 +519,8 @@ class _InventoryMarker extends StatelessWidget {
     final center = _placementToView(placement, viewport);
     final status = inventoryAssetStatusLabel(projection.asset.status);
     final label =
-        '${projection.asset.displayName}, ${projection.asset.totalQuantity} adet, $status';
+        '${projection.asset.displayName}, ${projection.asset.totalQuantity} adet, $status'
+        '${highlighted ? ', odaklandı' : ''}';
     return Positioned(
       left: center.dx - 24,
       top: center.dy - 24,
@@ -436,21 +529,38 @@ class _InventoryMarker extends StatelessWidget {
       child: Semantics(
         container: true,
         excludeSemantics: true,
+        liveRegion: highlighted,
         button: true,
         label: label,
         onTap: onTap,
         child: Material(
           color: Theme.of(context).colorScheme.primaryContainer,
-          shape: const CircleBorder(),
+          shape: CircleBorder(
+            side: highlighted
+                ? BorderSide(
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    width: 3,
+                  )
+                : BorderSide.none,
+          ),
           child: InkWell(
             key: Key('inventory-marker-${projection.asset.id}'),
             customBorder: const CircleBorder(),
             onTap: onTap,
-            child: Center(
-              child: Text(
-                projection.asset.totalQuantity.toString(),
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Text(
+                  projection.asset.totalQuantity.toString(),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                if (highlighted)
+                  const Positioned(
+                    right: 1,
+                    top: 1,
+                    child: Icon(Icons.center_focus_strong, size: 16),
+                  ),
+              ],
             ),
           ),
         ),
