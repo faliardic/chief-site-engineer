@@ -184,3 +184,155 @@ review_recommendation:
     mode: GITHUB_REVIEW
     floor: gpt-5.6-sol/max
     recommendation: INDEPENDENT_R4_SOURCE_DIFF_FOCUSED_TEST_REVIEW
+
+## Narrow R4 correction — review 5053677408
+
+### Authority and baseline
+
+- Correction authority: Issue #520 narrow R4 correction supplied by owner.
+- Independent blocker review:
+  `https://github.com/faliardic/chief-site-engineer/pull/521#pullrequestreview-5053677408`
+- Additional analyzer retry authority:
+  `https://github.com/faliardic/chief-site-engineer/issues/520#issuecomment-5456100417`
+- Exact blocked HEAD: `81ed0b02ae4a63cfc1880b5bcf4e4b932dbba631`
+- Branch: `codex/issue-520-inventory-destination-kroki-list`
+- Remote divergence before correction publication: `0/0`
+- Ruleset hashes recorded in the task remain unchanged.
+
+### Exact correction paths
+
+1. `mobile/lib/features/inventory/inventory_page.dart`
+2. `mobile/lib/features/inventory/inventory_map_view.dart`
+3. `mobile/test/inventory_page_test.dart`
+4. `.cse/results/520_result.md`
+
+No application/domain/storage/schema/migration/backup/bootstrap, attachment,
+pubspec/lock, Android/iOS/platform/permission, package, or version path changed.
+`app.dart`, `inventory_asset_core_test.dart`, and `widget_test.dart` were proven
+unnecessary and remain unchanged.
+
+### Corrected behavior
+
+- The production `InventoryPage` now retains the exact
+  `project_id + asset_id + InventoryAssetDetailController` identity while a
+  real detail sheet transitions into move or unarchive target selection.
+- Detail-sheet controllers remain alive across modal reverse transitions and
+  are disposed only after the route-host widget has actually unmounted.
+- During target selection, valid map taps call the exact detail controller's
+  `previewMove` or `previewUnarchive`; marker and empty-map taps cannot open
+  quick-create in this mode.
+- A page-level cancel returns to the same detail without persistent mutation.
+  A selected target returns to the same detail with the existing Slice-3
+  confirmation action enabled.
+- Existing `confirmMove` and `confirmUnarchive` mutation/domain/storage
+  semantics remain unchanged and their existing canonical reload callback
+  refreshes page/map truth after success.
+- Active list rows preserve list-to-map exact focus. Archived list rows now
+  deterministically open their exact archived detail for recoverable
+  unarchive.
+- The full canonical non-archived projection set is validated before
+  search/filter presentation selection. Any invalid active projection clears
+  the map snapshot, forces Liste-safe presentation, and exposes a typed
+  diagnostic instead of rendering a partial healthy marker subset.
+- Archived assets remain valid list-only records. Search/category/status/archive
+  filtering remains presentation-only and mutation-free.
+
+### Focused regression evidence
+
+Command:
+
+    flutter test --no-pub test/inventory_page_test.dart
+
+- Invocation 1: FAIL at 11/12. Exact root cause: the new full-set map
+  validation re-ran during a list-row focus diagnostic and replaced the more
+  specific `inventory_active_placement_unavailable` code with the general
+  projection-integrity code. Persistent mutation count remained zero.
+- Narrow correction: fail-closed map state now preserves an already-recorded
+  more-specific Liste diagnostic.
+- Invocation 2: PASS, 12/12.
+- A test-only null-aware collection lint was then corrected without changing
+  production semantics.
+- Final focused invocation 3: PASS, 12/12.
+- Real production widget regressions cover:
+  - marker -> real detail -> move -> map target -> enabled confirmation ->
+    canonical reload;
+  - move target cancel -> zero persistent mutation;
+  - archived list row -> exact real archived detail -> unarchive -> map target
+    -> enabled confirmation -> canonical reload;
+  - move/unarchive target-mode map taps -> no `InventoryAssetQuickForm`;
+  - one valid active projection plus one invalid active projection -> no
+    partial marker subset, Liste-safe typed diagnostic, zero mutation.
+- No injected `assetDetailLauncher` was used for the correction proofs.
+- `inventory_asset_core_test.dart` was not touched and therefore was not added
+  to the minimum focused command. `app.dart` was unchanged, so `widget_test.dart`
+  was not run.
+
+### Analyzer and source gates
+
+Command:
+
+    flutter analyze --no-pub
+
+- Invocation 1: FAIL only on one test-only `use_null_aware_elements` info lint.
+- Exact mechanical lint correction applied.
+- The initial retry attempt was blocked before process creation because no
+  additional analyzer authority was then available; it was not an analyzer
+  invocation.
+- Issue #520 comment `5456100417` granted exactly one additional invocation.
+- Authorized analyzer invocation 2: PASS — `No issues found`.
+- Touched Dart formatting: PASS, exact three Dart paths only.
+- `git diff --check`: PASS.
+- Exact correction allowlist: PASS, 4/5 authorized paths used.
+- Schema: 20, unchanged; database/migration drift: 0.
+- Backup format: 1, unchanged.
+- Mobile version: 0.1.0+1, unchanged.
+- `pubspec.yaml` / `pubspec.lock` drift: 0.
+- Android/iOS/platform/permission/signing drift: 0.
+- `READ_CALL_LOG`, `READ_CONTACTS`, phone-state/call permission additions: 0.
+- Protected application/domain/bootstrap/storage drift: 0.
+- Full suite, build, APK/AAB, emulator, ADB/device, scripted UI acceptance, and
+  manual phone test cycle were not run.
+
+### Manual test and publication boundary
+
+- MT-520-001..005 remain PENDING; no manual test status was changed.
+- No new phone test cycle was requested or run.
+- Same-scope stabilization budget: final authorized correction used; 0 remains.
+- Publication authority after all gates PASS: one minimal correction commit,
+  normal push to the existing PR #521 branch, correction evidence comments.
+- PR #521 must remain OPEN / DRAFT. Ready=false, merge=false, Issue
+  closure=false, Slice 5 start=false.
+- The correction commit SHA and GitHub evidence URLs are recorded in the
+  publication comments because a commit cannot contain its own resulting SHA.
+
+execution_record:
+
+    issue: 520
+    parent_epic: 506
+    correction_review: 5053677408
+    analyzer_retry_authority: 5456100417
+    base_sha: 1f92da6e330d69f9554db9e07d260919e77c20ea
+    blocked_head: 81ed0b02ae4a63cfc1880b5bcf4e4b932dbba631
+    branch: codex/issue-520-inventory-destination-kroki-list
+    runtime_model: unknown
+    runtime_reasoning_effort: null
+    focused: PASS 12/12 (final invocation 3)
+    analyzer: PASS (actual invocations 2)
+    git_diff_check: PASS
+    correction_changed_paths: 4
+    schema: 20
+    backup_format: 1
+    mobile_version: 0.1.0+1
+    protected_drift: 0
+    platform_permission_drift: 0
+    manual_smoke: MT-520-001..005 PENDING
+    draft_pr: 521
+    ready: false
+    merged: false
+    next_slice_started: false
+
+review_recommendation:
+
+    mode: GITHUB_REVIEW
+    floor: gpt-5.6-sol/max
+    recommendation: FRESH_INDEPENDENT_R4_SOURCE_DIFF_FOCUSED_TEST_REREVIEW

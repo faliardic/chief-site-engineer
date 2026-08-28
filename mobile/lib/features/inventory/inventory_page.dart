@@ -32,6 +32,8 @@ enum InventoryPageLoadStatus {
 
 enum InventoryPageView { map, list }
 
+enum _InventoryDetailTargetRequest { move, unarchive }
+
 enum InventoryArchiveFilter {
   active('Aktif'),
   archived('Arşivli'),
@@ -95,9 +97,16 @@ class InventoryPageController extends ChangeNotifier {
     );
   }
 
+  List<InventoryAssetProjection> get canonicalActiveMapAssets =>
+      List<InventoryAssetProjection>.unmodifiable(
+        assets.where((projection) => projection.asset.archivedAt == null),
+      );
+
   List<InventoryAssetProjection> get visibleMapAssets =>
       List<InventoryAssetProjection>.unmodifiable(
-        visibleAssets.where(canFocus),
+        visibleAssets.where(
+          (projection) => projection.asset.archivedAt == null,
+        ),
       );
 
   Future<void> initialize() async {
@@ -279,8 +288,18 @@ class InventoryPageController extends ChangeNotifier {
   }
 
   void recordPresentationFailure(String code) {
+    if (lastDiagnosticCode == code) return;
     lastDiagnosticCode = code;
     _notify();
+  }
+
+  void recordMapProjectionFailure(String code) {
+    final diagnostic = lastDiagnosticCode ?? code;
+    final changed =
+        view != InventoryPageView.list || lastDiagnosticCode != diagnostic;
+    view = InventoryPageView.list;
+    lastDiagnosticCode = diagnostic;
+    if (changed) _notify();
   }
 
   void clearDiagnostic() {
@@ -435,6 +454,9 @@ class InventoryPageState extends State<InventoryPage> {
   late bool _ownsController;
   InventoryMapController? _mapController;
   String? _mapProjectId;
+  InventoryAssetDetailController? _activeDetailController;
+  Completer<InventoryPlacementTarget?>? _targetSelectionCompleter;
+  _InventoryDetailTargetRequest? _targetSelectionRequest;
 
   InventoryMapController? get mapController => _mapController;
   InventoryMapViewState? get mapViewState => _mapKey.currentState;
@@ -508,9 +530,12 @@ class InventoryPageState extends State<InventoryPage> {
         sketch != null) {
       if (!map.useCanonicalSnapshot(
         activeSketch: sketch,
-        assets: controller.visibleMapAssets,
+        assets: controller.canonicalActiveMapAssets,
+        visibleAssetIds: controller.visibleMapAssets.map(
+          (projection) => projection.asset.id,
+        ),
       )) {
-        controller.recordPresentationFailure(
+        controller.recordMapProjectionFailure(
           map.lastErrorCode ?? 'inventory_map_failed',
         );
       }
@@ -534,6 +559,10 @@ class InventoryPageState extends State<InventoryPage> {
 
   @override
   void dispose() {
+    final pendingTarget = _targetSelectionCompleter;
+    if (pendingTarget != null && !pendingTarget.isCompleted) {
+      pendingTarget.complete(null);
+    }
     controller.removeListener(_refresh);
     if (_ownsController) controller.dispose();
     _mapController?.dispose();
@@ -793,8 +822,41 @@ class InventoryPageState extends State<InventoryPage> {
             autoLoad: false,
             onCreateTarget: _openQuickCreate,
             onOpenAsset: _openAssetDetail,
+            onSelectTarget: _targetSelectionRequest == null
+                ? null
+                : _acceptDetailTarget,
           ),
         ),
+        if (_targetSelectionRequest case final request?)
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: 12,
+            child: Card(
+              key: const Key('inventory-target-selection'),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.touch_app_outlined),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        request == _InventoryDetailTargetRequest.move
+                            ? 'Taşınacak yeni konumu kroki üzerinde seçin.'
+                            : 'Yeni aktif konumu kroki üzerinde seçin.',
+                      ),
+                    ),
+                    TextButton(
+                      key: const Key('inventory-target-selection-cancel'),
+                      onPressed: _cancelDetailTargetSelection,
+                      child: const Text('Vazgeç'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         Positioned(
           right: 12,
           top: 12,
@@ -864,8 +926,14 @@ class InventoryPageState extends State<InventoryPage> {
               '${asset.totalQuantity} adet'
               '${asset.archivedAt == null ? '' : ' • Arşivli'}',
             ),
-            trailing: const Icon(Icons.my_location_rounded),
-            onTap: () => _focusFromList(projection),
+            trailing: Icon(
+              asset.archivedAt == null
+                  ? Icons.my_location_rounded
+                  : Icons.chevron_right_rounded,
+            ),
+            onTap: asset.archivedAt == null
+                ? () => _focusFromList(projection)
+                : () => unawaited(_openAssetDetail(asset.id)),
           ),
         );
       },
@@ -963,22 +1031,146 @@ class InventoryPageState extends State<InventoryPage> {
       await launcher(context, projectId, assetId);
       return;
     }
+    if (_activeDetailController != null) return;
     final detailController = InventoryAssetDetailController(
       application: widget.application,
       projectId: projectId,
       assetId: assetId,
       reloadMapCanonical: controller.reloadSelected,
     );
-    await showModalBottomSheet<void>(
+    _activeDetailController = detailController;
+    try {
+      while (mounted && controller.selectedProjectId == projectId) {
+        final request = await _showAssetDetail(detailController);
+        if (!mounted ||
+            controller.selectedProjectId != projectId ||
+            request == null) {
+          break;
+        }
+        await _selectTargetForDetail(detailController, request);
+      }
+    } finally {
+      if (identical(_activeDetailController, detailController)) {
+        _activeDetailController = null;
+      }
+      final pendingTarget = _targetSelectionCompleter;
+      if (pendingTarget != null && !pendingTarget.isCompleted) {
+        pendingTarget.complete(null);
+      }
+      _targetSelectionCompleter = null;
+      _targetSelectionRequest = null;
+      detailController.dispose();
+    }
+    if (mounted && controller.selectedProjectId == projectId) {
+      await controller.reloadSelected();
+    }
+  }
+
+  Future<_InventoryDetailTargetRequest?> _showAssetDetail(
+    InventoryAssetDetailController detailController,
+  ) async {
+    final unmounted = Completer<void>();
+    var routeBuilt = false;
+    final request = await showModalBottomSheet<_InventoryDetailTargetRequest>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => FractionallySizedBox(
-        heightFactor: 0.9,
-        child: InventoryAssetDetailSheet(controller: detailController),
-      ),
+      builder: (sheetContext) {
+        routeBuilt = true;
+        return _InventoryDetailRouteHost(
+          onDisposed: () {
+            if (!unmounted.isCompleted) unmounted.complete();
+          },
+          child: FractionallySizedBox(
+            heightFactor: 0.9,
+            child: InventoryAssetDetailSheet(
+              controller: detailController,
+              onMoveTargetRequested: () => Navigator.of(
+                sheetContext,
+              ).pop(_InventoryDetailTargetRequest.move),
+              onUnarchiveTargetRequested: () => Navigator.of(
+                sheetContext,
+              ).pop(_InventoryDetailTargetRequest.unarchive),
+            ),
+          ),
+        );
+      },
     );
-    detailController.dispose();
-    if (mounted) await controller.reloadSelected();
+    if (routeBuilt && !unmounted.isCompleted) await unmounted.future;
+    return request;
+  }
+
+  Future<void> _selectTargetForDetail(
+    InventoryAssetDetailController detailController,
+    _InventoryDetailTargetRequest request,
+  ) async {
+    if (!mounted ||
+        controller.selectedProjectId != detailController.projectId ||
+        !identical(_activeDetailController, detailController)) {
+      _cancelDetailControllerSelection(detailController, request);
+      return;
+    }
+    controller.setView(InventoryPageView.map);
+    final map = _mapController;
+    if (controller.view != InventoryPageView.map ||
+        map == null ||
+        map.loadStatus != InventoryMapLoadStatus.ready) {
+      _cancelDetailControllerSelection(detailController, request);
+      controller.recordMapProjectionFailure(
+        map?.lastErrorCode ?? 'inventory_map_failed',
+      );
+      return;
+    }
+    final selection = Completer<InventoryPlacementTarget?>();
+    _targetSelectionCompleter = selection;
+    _targetSelectionRequest = request;
+    setState(() {});
+    final target = await selection.future;
+    if (identical(_targetSelectionCompleter, selection)) {
+      _targetSelectionCompleter = null;
+      _targetSelectionRequest = null;
+    }
+    if (!mounted ||
+        controller.selectedProjectId != detailController.projectId ||
+        !identical(_activeDetailController, detailController) ||
+        target == null) {
+      _cancelDetailControllerSelection(detailController, request);
+    } else if (request == _InventoryDetailTargetRequest.move) {
+      if (!detailController.previewMove(target)) {
+        detailController.cancelMove();
+        controller.recordPresentationFailure(
+          'inventory_move_target_unavailable',
+        );
+      }
+    } else if (!detailController.previewUnarchive(target)) {
+      detailController.cancelUnarchive();
+      controller.recordPresentationFailure(
+        'inventory_unarchive_target_unavailable',
+      );
+    }
+    if (mounted) setState(() {});
+  }
+
+  void _acceptDetailTarget(InventoryPlacementTarget target) {
+    final selection = _targetSelectionCompleter;
+    if (selection == null || selection.isCompleted) return;
+    selection.complete(target);
+  }
+
+  void _cancelDetailTargetSelection() {
+    final selection = _targetSelectionCompleter;
+    if (selection == null || selection.isCompleted) return;
+    selection.complete(null);
+  }
+
+  void _cancelDetailControllerSelection(
+    InventoryAssetDetailController detailController,
+    _InventoryDetailTargetRequest request,
+  ) {
+    if (request == _InventoryDetailTargetRequest.move) {
+      detailController.cancelMove();
+    } else {
+      detailController.cancelUnarchive();
+    }
   }
 
   void _focusFromList(InventoryAssetProjection projection) {
@@ -996,6 +1188,31 @@ class InventoryPageState extends State<InventoryPage> {
       }
     });
   }
+}
+
+class _InventoryDetailRouteHost extends StatefulWidget {
+  const _InventoryDetailRouteHost({
+    required this.child,
+    required this.onDisposed,
+  });
+
+  final Widget child;
+  final VoidCallback onDisposed;
+
+  @override
+  State<_InventoryDetailRouteHost> createState() =>
+      _InventoryDetailRouteHostState();
+}
+
+class _InventoryDetailRouteHostState extends State<_InventoryDetailRouteHost> {
+  @override
+  void dispose() {
+    widget.onDisposed();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 String _normalizeName(String value) => value

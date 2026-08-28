@@ -308,6 +308,147 @@ void main() {
   });
 
   testWidgets(
+    'real detail move selects map target confirms and canonical reloads',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _sketch(_projectA)
+        ..assets[_projectA] = [_asset(_projectA, _assetA)];
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      await _pumpPage(tester, inventory: inventory, source: source);
+      final readsBeforeMutation = inventory.listReads;
+
+      await tester.tap(find.byKey(const Key('inventory-marker-$_assetA')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('inventory-asset-detail')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('inventory-detail-move')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('inventory-target-selection')),
+        findsOneWidget,
+      );
+
+      await _tapMapTarget(tester);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('inventory-quick-form')), findsNothing);
+      expect(find.byKey(const Key('inventory-asset-detail')), findsOneWidget);
+      final confirm = tester.widget<FilledButton>(
+        find.byKey(const Key('inventory-detail-move-confirm')),
+      );
+      expect(confirm.onPressed, isNotNull);
+
+      await tester.tap(find.byKey(const Key('inventory-detail-move-confirm')));
+      await tester.pumpAndSettle();
+      expect(inventory.moveCalls, 1);
+      expect(inventory.lastMove?.projectId, _projectA);
+      expect(inventory.lastMove?.assetId, _assetA);
+      expect(inventory.mutations, 1);
+      expect(inventory.listReads, greaterThan(readsBeforeMutation));
+      final moved = inventory.assets[_projectA]!.single.activePlacement!;
+      expect(moved.x, inventory.lastMove!.x);
+      expect(moved.y, inventory.lastMove!.y);
+      expect(moved.x == 100 && moved.y == 100, isFalse);
+      expect(tester.takeException(), isNull);
+
+      await _dismissDetail(tester);
+    },
+  );
+
+  testWidgets('real detail move target cancellation performs no mutation', (
+    tester,
+  ) async {
+    final inventory = _FakeInventory()
+      ..sketches[_projectA] = _sketch(_projectA)
+      ..assets[_projectA] = [_asset(_projectA, _assetA)];
+    final source = _ProjectSource()
+      ..projects = [_project(_projectA, 'Proje A')];
+    await _pumpPage(tester, inventory: inventory, source: source);
+
+    await tester.tap(find.byKey(const Key('inventory-marker-$_assetA')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('inventory-detail-move')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('inventory-target-selection-cancel')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inventory-asset-detail')), findsOneWidget);
+    expect(
+      find.byKey(const Key('inventory-detail-move-confirm')),
+      findsNothing,
+    );
+    expect(inventory.moveCalls, 0);
+    expect(inventory.mutations, 0);
+    expect(tester.takeException(), isNull);
+
+    await _dismissDetail(tester);
+  });
+
+  testWidgets(
+    'archived row opens real detail and unarchives through map target',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _sketch(_projectA)
+        ..assets[_projectA] = [
+          _asset(_projectA, _assetArchived, archived: true),
+        ]
+        ..seedArchivedPlacement(_projectA, _assetArchived);
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      final controller = _controller(inventory, source);
+      addTearDown(controller.dispose);
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        controller: controller,
+      );
+      controller
+        ..setArchiveFilter(InventoryArchiveFilter.archived)
+        ..setView(InventoryPageView.list);
+      await tester.pump();
+      final readsBeforeMutation = inventory.listReads;
+
+      await tester.tap(find.byKey(const Key('inventory-list-$_assetArchived')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('inventory-asset-detail')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('inventory-detail-unarchive')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('inventory-target-selection')),
+        findsOneWidget,
+      );
+
+      await _tapMapTarget(tester);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('inventory-quick-form')), findsNothing);
+      final confirm = tester.widget<FilledButton>(
+        find.byKey(const Key('inventory-detail-unarchive-confirm')),
+      );
+      expect(confirm.onPressed, isNotNull);
+      await tester.tap(
+        find.byKey(const Key('inventory-detail-unarchive-confirm')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(inventory.unarchiveCalls, 1);
+      expect(inventory.lastUnarchive?.projectId, _projectA);
+      expect(inventory.lastUnarchive?.assetId, _assetArchived);
+      expect(inventory.mutations, 1);
+      expect(inventory.listReads, greaterThan(readsBeforeMutation));
+      final recovered = inventory.assets[_projectA]!.single;
+      expect(recovered.asset.archivedAt, isNull);
+      expect(recovered.activePlacement, isNotNull);
+      expect(recovered.activePlacement!.x, inventory.lastUnarchive!.x);
+      expect(recovered.activePlacement!.y, inventory.lastUnarchive!.y);
+      expect(tester.takeException(), isNull);
+
+      await _dismissDetail(tester);
+    },
+  );
+
+  testWidgets(
     'list row centers exact placement and highlights for two seconds',
     (tester) async {
       final inventory = _FakeInventory()
@@ -372,6 +513,61 @@ void main() {
 
       await tester.pump(const Duration(milliseconds: 2100));
       expect(pageState.mapViewState?.highlightedAssetId, isNull);
+      expect(inventory.mutations, 0);
+    },
+  );
+
+  testWidgets(
+    'invalid full active projection fails Kroki closed without partial markers',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _sketch(_projectA)
+        ..assets[_projectA] = [
+          _asset(_projectA, _assetA),
+          _asset(_projectA, _assetMissing, placement: false),
+        ];
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      final controller = _controller(inventory, source);
+      addTearDown(controller.dispose);
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        controller: controller,
+      );
+      final pageState = tester.state<InventoryPageState>(
+        find.byType(InventoryPage),
+      );
+
+      expect(controller.view, InventoryPageView.list);
+      expect(
+        controller.lastDiagnosticCode,
+        'inventory_projection_integrity_failed',
+      );
+      expect(
+        pageState.mapController?.loadStatus,
+        InventoryMapLoadStatus.failed,
+      );
+      expect(pageState.mapController?.projections, isEmpty);
+      expect(find.byKey(const Key('inventory-list-$_assetA')), findsOneWidget);
+      expect(
+        find.byKey(const Key('inventory-list-$_assetMissing')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('inventory-marker-$_assetA')), findsNothing);
+      expect(
+        find.byKey(const Key('inventory-typed-diagnostic')),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('inventory_projection_integrity_failed'),
+        findsOneWidget,
+      );
+
+      controller.setSearch('Kule vinç');
+      await tester.pump();
+      expect(pageState.mapController?.projections, isEmpty);
       expect(inventory.mutations, 0);
     },
   );
@@ -479,6 +675,18 @@ Future<void> _pumpPage(
   await tester.pumpAndSettle();
 }
 
+Future<void> _tapMapTarget(WidgetTester tester) async {
+  final gesture = find.byKey(const Key('inventory-map-gesture'));
+  expect(gesture, findsOneWidget);
+  await tester.tapAt(tester.getCenter(gesture));
+}
+
+Future<void> _dismissDetail(WidgetTester tester) async {
+  await tester.tapAt(const Offset(4, 4));
+  await tester.pumpAndSettle();
+  expect(find.byKey(const Key('inventory-asset-detail')), findsNothing);
+}
+
 class _ProjectSource {
   List<MobileProject> projects = const [];
   final _changes = StreamController<void>.broadcast();
@@ -491,13 +699,29 @@ class _ProjectSource {
 class _FakeInventory extends UnavailableInventoryApplication {
   final Map<String, InventoryPrimarySketchProjection?> sketches = {};
   final Map<String, List<InventoryAssetProjection>> assets = {};
+  final Map<String, List<InventoryPlacementRecord>> placementVersions = {};
   Object? primaryFailure;
   Object? listFailure;
   int primaryReads = 0;
   int listReads = 0;
   int mutations = 0;
+  int moveCalls = 0;
+  int unarchiveCalls = 0;
+  MoveInventoryPlacementCommand? lastMove;
+  UnarchiveInventoryAssetCommand? lastUnarchive;
 
   int get reads => primaryReads + listReads;
+
+  void seedArchivedPlacement(String projectId, String assetId) {
+    placementVersions[assetId] = [
+      _placement(
+        projectId,
+        assetId,
+        endedAt: _now.add(const Duration(minutes: 1)),
+        endReason: InventoryPlacementEndReason.assetArchived,
+      ),
+    ];
+  }
 
   @override
   Future<InventoryPrimarySketchProjection?> loadPrimarySketch(
@@ -521,6 +745,199 @@ class _FakeInventory extends UnavailableInventoryApplication {
           ? values
           : values.where((item) => item.asset.archivedAt == null),
     );
+  }
+
+  @override
+  Future<InventoryAssetProjection> loadAsset({
+    required String projectId,
+    required String assetId,
+  }) async {
+    final projection = _projection(projectId, assetId);
+    if (projection == null) {
+      throw const InventoryFailure('inventory_asset_not_found');
+    }
+    return projection;
+  }
+
+  @override
+  Future<List<InventoryEventRecord>> listAssetHistory({
+    required String projectId,
+    required String assetId,
+  }) async {
+    final projection = _projection(projectId, assetId);
+    if (projection == null) {
+      throw const InventoryFailure('inventory_asset_not_found');
+    }
+    final key =
+        projection.activePlacement?.placementKey ??
+        placementVersions[assetId]?.last.placementKey;
+    if (key == null) {
+      throw const InventoryFailure('inventory_placement_history_unavailable');
+    }
+    return [_placementEvent(projectId, assetId, key)];
+  }
+
+  @override
+  Future<List<InventoryPlacementRecord>> listPlacementVersions({
+    required String projectId,
+    required String assetId,
+    required String placementKey,
+  }) async {
+    final projection = _projection(projectId, assetId);
+    if (projection == null) {
+      throw const InventoryFailure('inventory_asset_not_found');
+    }
+    final stored = placementVersions[assetId];
+    final values =
+        stored ?? <InventoryPlacementRecord>[?projection.activePlacement];
+    if (values.isEmpty ||
+        values.any(
+          (placement) =>
+              placement.projectId != projectId ||
+              placement.assetId != assetId ||
+              placement.placementKey != placementKey,
+        )) {
+      throw const InventoryFailure('inventory_placement_not_found');
+    }
+    return List.unmodifiable(values);
+  }
+
+  @override
+  Future<InventoryMutationResult> movePlacement(
+    MoveInventoryPlacementCommand command,
+  ) async {
+    moveCalls += 1;
+    mutations += 1;
+    lastMove = command;
+    final current = _projection(command.projectId, command.assetId);
+    final placement = current?.activePlacement;
+    if (current == null ||
+        placement == null ||
+        placement.placementKey != command.placementKey ||
+        placement.sequence != command.expectedPlacementSequence) {
+      throw const InventoryFailure('inventory_stale_revision');
+    }
+    final ended = _copyPlacement(
+      placement,
+      endedAt: _now.add(const Duration(minutes: 1)),
+      endReason: InventoryPlacementEndReason.moved,
+    );
+    final successor = InventoryPlacementRecord(
+      id: command.successorPlacementId,
+      placementKey: placement.placementKey,
+      projectId: placement.projectId,
+      assetId: placement.assetId,
+      sketchId: command.sketchId,
+      provenanceRevisionId: command.activeRevisionId,
+      sequence: placement.sequence + 1,
+      x: command.x,
+      y: command.y,
+      quantity: placement.quantity,
+      createdAt: _now.add(const Duration(minutes: 1)),
+      endedAt: null,
+      endReason: null,
+      supersedesPlacementId: placement.id,
+    );
+    final previous = placementVersions[command.assetId] ?? [placement];
+    placementVersions[command.assetId] = [
+      ...previous.take(previous.length - 1),
+      ended,
+      successor,
+    ];
+    _replaceProjection(
+      command.projectId,
+      InventoryAssetProjection(
+        asset: current.asset,
+        activePlacement: successor,
+      ),
+    );
+    return _mutationResult(
+      command,
+      sourceId: command.placementKey,
+      sourceRevision: successor.sequence,
+      supportingId: successor.id,
+      supportingRevision: successor.sequence,
+    );
+  }
+
+  @override
+  Future<InventoryMutationResult> unarchiveAsset(
+    UnarchiveInventoryAssetCommand command,
+  ) async {
+    unarchiveCalls += 1;
+    mutations += 1;
+    lastUnarchive = command;
+    final current = _projection(command.projectId, command.assetId);
+    final previous = placementVersions[command.assetId];
+    if (current == null ||
+        current.asset.archivedAt == null ||
+        current.activePlacement != null ||
+        previous == null ||
+        previous.isEmpty) {
+      throw const InventoryFailure('inventory_asset_state_invalid');
+    }
+    final predecessor = previous.last;
+    if (predecessor.isActive ||
+        predecessor.placementKey != command.placementKey ||
+        predecessor.sequence != command.expectedPreviousPlacementSequence ||
+        current.asset.revision != command.expectedAssetRevision) {
+      throw const InventoryFailure('inventory_stale_revision');
+    }
+    final successor = InventoryPlacementRecord(
+      id: command.successorPlacementId,
+      placementKey: predecessor.placementKey,
+      projectId: predecessor.projectId,
+      assetId: predecessor.assetId,
+      sketchId: command.sketchId,
+      provenanceRevisionId: command.activeRevisionId,
+      sequence: predecessor.sequence + 1,
+      x: command.x,
+      y: command.y,
+      quantity: current.asset.totalQuantity,
+      createdAt: _now.add(const Duration(minutes: 2)),
+      endedAt: null,
+      endReason: null,
+      supersedesPlacementId: predecessor.id,
+    );
+    placementVersions[command.assetId] = [...previous, successor];
+    _replaceProjection(
+      command.projectId,
+      InventoryAssetProjection(
+        asset: _copyAsset(
+          current.asset,
+          revision: current.asset.revision + 1,
+          archivedAt: null,
+        ),
+        activePlacement: successor,
+      ),
+    );
+    return _mutationResult(
+      command,
+      sourceId: command.assetId,
+      sourceRevision: current.asset.revision + 1,
+      supportingId: successor.id,
+      supportingRevision: successor.sequence,
+    );
+  }
+
+  InventoryAssetProjection? _projection(String projectId, String assetId) {
+    for (final projection in assets[projectId] ?? const []) {
+      if (projection.asset.id == assetId) return projection;
+    }
+    return null;
+  }
+
+  void _replaceProjection(
+    String projectId,
+    InventoryAssetProjection replacement,
+  ) {
+    assets[projectId] = [
+      for (final projection in assets[projectId] ?? const [])
+        if (projection.asset.id == replacement.asset.id)
+          replacement
+        else
+          projection,
+    ];
   }
 }
 
@@ -633,3 +1050,118 @@ InventoryAssetProjection _asset(
           ),
   );
 }
+
+InventoryPlacementRecord _placement(
+  String projectId,
+  String assetId, {
+  int sequence = 1,
+  int x = 100,
+  int y = 100,
+  DateTime? endedAt,
+  InventoryPlacementEndReason? endReason,
+  String? supersedesPlacementId,
+}) {
+  final sketchId = projectId == _projectA ? _sketchA : _sketchB;
+  final revisionId = projectId == _projectA ? _revisionA : _revisionB;
+  return InventoryPlacementRecord(
+    id: 'eeeeeeee-eeee-4eee-8eee-${assetId.substring(24)}',
+    placementKey: 'ffffffff-ffff-4fff-8fff-${assetId.substring(24)}',
+    projectId: projectId,
+    assetId: assetId,
+    sketchId: sketchId,
+    provenanceRevisionId: revisionId,
+    sequence: sequence,
+    x: x,
+    y: y,
+    quantity: 2,
+    createdAt: _now,
+    endedAt: endedAt,
+    endReason: endReason,
+    supersedesPlacementId: supersedesPlacementId,
+  );
+}
+
+InventoryPlacementRecord _copyPlacement(
+  InventoryPlacementRecord current, {
+  required DateTime? endedAt,
+  required InventoryPlacementEndReason? endReason,
+}) => InventoryPlacementRecord(
+  id: current.id,
+  placementKey: current.placementKey,
+  projectId: current.projectId,
+  assetId: current.assetId,
+  sketchId: current.sketchId,
+  provenanceRevisionId: current.provenanceRevisionId,
+  sequence: current.sequence,
+  x: current.x,
+  y: current.y,
+  quantity: current.quantity,
+  createdAt: current.createdAt,
+  endedAt: endedAt,
+  endReason: endReason,
+  supersedesPlacementId: current.supersedesPlacementId,
+);
+
+InventoryEventRecord _placementEvent(
+  String projectId,
+  String assetId,
+  String placementKey,
+) => InventoryEventRecord(
+  id: '11111111-1111-4111-8111-${assetId.substring(24)}',
+  operationId: '22222222-2222-4222-8222-${assetId.substring(24)}',
+  projectId: projectId,
+  aggregateType: InventoryAggregateType.placement,
+  aggregateId: placementKey,
+  sequence: 1,
+  eventType: InventoryEventType.placementCreated,
+  occurredAt: _now,
+  payload: <String, Object?>{'asset_id': assetId},
+  payloadJson: '{"asset_id":"$assetId"}',
+  payloadSha256: 'a'.padRight(64, 'a'),
+);
+
+InventoryMutationResult _mutationResult(
+  InventoryMutationCommand command, {
+  required String sourceId,
+  required int sourceRevision,
+  required String supportingId,
+  required int supportingRevision,
+}) => InventoryMutationResult(
+  operationId: command.operationId,
+  commandType: command.commandType,
+  projectId: command.projectId,
+  primaryAggregateType: command.primaryAggregateType,
+  primaryAggregateId: command.primaryAggregateId,
+  sourceId: sourceId,
+  sourceRevision: sourceRevision,
+  supportingId: supportingId,
+  supportingRevision: supportingRevision,
+  isNoOp: false,
+  eventCount: 2,
+  resultAt: _now,
+);
+
+const _notProvided = Object();
+
+InventoryAssetRecord _copyAsset(
+  InventoryAssetRecord current, {
+  int? revision,
+  Object? archivedAt = _notProvided,
+}) => InventoryAssetRecord(
+  id: current.id,
+  projectId: current.projectId,
+  displayName: current.displayName,
+  normalizedName: current.normalizedName,
+  category: current.category,
+  otherCategoryLabel: current.otherCategoryLabel,
+  totalQuantity: current.totalQuantity,
+  status: current.status,
+  note: current.note,
+  revision: revision ?? current.revision,
+  createdAt: current.createdAt,
+  updatedAt: _now.add(const Duration(minutes: 2)),
+  statusChangedAt: current.statusChangedAt,
+  archivedAt: identical(archivedAt, _notProvided)
+      ? current.archivedAt
+      : archivedAt as DateTime?,
+);

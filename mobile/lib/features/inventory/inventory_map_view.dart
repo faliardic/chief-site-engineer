@@ -63,6 +63,7 @@ class InventoryMapController extends ChangeNotifier {
   bool useCanonicalSnapshot({
     required InventoryPrimarySketchProjection activeSketch,
     required Iterable<InventoryAssetProjection> assets,
+    Iterable<String>? visibleAssetIds,
   }) {
     try {
       _verifyActiveSketch(activeSketch);
@@ -77,8 +78,21 @@ class InventoryMapController extends ChangeNotifier {
         _verifyMarkerProjection(projection, activeSketch);
         verified.add(projection);
       }
+      final requestedVisibleIds = visibleAssetIds?.toList(growable: false);
+      final visibleIds = requestedVisibleIds?.toSet();
+      if (requestedVisibleIds != null &&
+          (visibleIds!.length != requestedVisibleIds.length ||
+              !assetIds.containsAll(visibleIds))) {
+        throw const InventoryFailure('inventory_projection_integrity_failed');
+      }
       sketch = activeSketch;
-      projections = List<InventoryAssetProjection>.unmodifiable(verified);
+      projections = List<InventoryAssetProjection>.unmodifiable(
+        visibleIds == null
+            ? verified
+            : verified.where(
+                (projection) => visibleIds.contains(projection.asset.id),
+              ),
+      );
       pendingCreateTarget = null;
       loadStatus = InventoryMapLoadStatus.ready;
       lastErrorCode = null;
@@ -262,6 +276,7 @@ class InventoryMapView extends StatefulWidget {
     required this.controller,
     required this.onCreateTarget,
     required this.onOpenAsset,
+    this.onSelectTarget,
     this.autoLoad = true,
     super.key,
   });
@@ -269,6 +284,7 @@ class InventoryMapView extends StatefulWidget {
   final InventoryMapController controller;
   final ValueChanged<InventoryPlacementTarget> onCreateTarget;
   final ValueChanged<String> onOpenAsset;
+  final ValueChanged<InventoryPlacementTarget>? onSelectTarget;
   final bool autoLoad;
 
   @override
@@ -384,6 +400,15 @@ class InventoryMapViewState extends State<InventoryMapView> {
     }
     final current = _viewport;
     if (current == null) return;
+    final selectTarget = widget.onSelectTarget;
+    if (selectTarget != null) {
+      final target = captureInventoryPlacementTarget(
+        details.localPosition,
+        current,
+      );
+      if (target != null) selectTarget(target);
+      return;
+    }
     if (widget.controller.movingAssetId != null) {
       widget.controller.previewMoveTarget(details.localPosition, current);
       return;
@@ -489,7 +514,20 @@ class InventoryMapViewState extends State<InventoryMapView> {
                     projection: projection,
                     viewport: viewport,
                     highlighted: _highlightedAssetId == projection.asset.id,
-                    onTap: () => widget.onOpenAsset(projection.asset.id),
+                    onTap: () {
+                      final selectTarget = widget.onSelectTarget;
+                      if (selectTarget != null) {
+                        final placement = projection.activePlacement!;
+                        selectTarget(
+                          InventoryPlacementTarget(
+                            x: placement.x,
+                            y: placement.y,
+                          ),
+                        );
+                        return;
+                      }
+                      widget.onOpenAsset(projection.asset.id);
+                    },
                   ),
               ],
             ),
