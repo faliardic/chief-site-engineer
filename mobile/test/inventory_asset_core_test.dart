@@ -570,6 +570,64 @@ void main() {
     },
   );
 
+  testWidgets(
+    '20a quantity dialog survives dismissal and reloads one successor',
+    (tester) async {
+      final fake = _FakeInventoryApplication.standard();
+      final controller = await _loadedDetail(fake, ids: _SequentialIds(1750));
+      addTearDown(controller.dispose);
+      final before = controller.activePlacement!;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: InventoryAssetDetailSheet(controller: controller),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('inventory-detail-quantity')));
+      await tester.pumpAndSettle();
+      expect(find.text('Adedi değiştir'), findsNWidgets(2));
+      await tester.enterText(find.byType(TextField), '7');
+      await tester.tap(find.text('Kaydet'));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+
+      final after = controller.activePlacement!;
+      expect(find.byType(InventoryAssetDetailSheet), findsOneWidget);
+      expect(find.text('7 adet'), findsOneWidget);
+      expect(controller.asset!.totalQuantity, 7);
+      expect(controller.asset!.revision, 2);
+      expect(after.id, _uuid(1751));
+      expect(after.quantity, controller.asset!.totalQuantity);
+      expect(after.placementKey, before.placementKey);
+      expect(after.sequence, before.sequence + 1);
+      expect(after.x, before.x);
+      expect(after.y, before.y);
+      expect(after.supersedesPlacementId, before.id);
+      expect(fake.quantityCalls, 1);
+      final predecessor = controller.placementVersions.singleWhere(
+        (placement) => placement.id == before.id,
+      );
+      expect(
+        predecessor.endReason,
+        InventoryPlacementEndReason.quantityChanged,
+      );
+
+      await tester.tap(find.byKey(const Key('inventory-detail-quantity')));
+      await tester.pumpAndSettle();
+      expect(find.text('Adedi değiştir'), findsNWidgets(2));
+      await tester.tap(find.text('Vazgeç'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text('7 adet'), findsOneWidget);
+      expect(fake.quantityCalls, 1);
+    },
+  );
+
   test(
     '21 stale overflow and multiple placement failures never patch state',
     () async {

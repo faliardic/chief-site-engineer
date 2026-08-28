@@ -672,3 +672,119 @@ reason: narrow committed-refresh duplicate-create blocker corrected
 manual_acceptance: PENDING
 ready: false
 merge: false
+
+## 2026-08-28 — MT-518-009 quantity-dialog lifecycle investigation
+
+Authority and observed owner result:
+
+- Mode: GITHUB_CORRECTION_INVESTIGATION; risk R4; single-agent execution.
+- Issue #518 / Draft PR #519.
+- Exact reviewed and starting source HEAD:
+  c18335434071f65be6e6f13687d73115b8b1b238.
+- Owner results: MT-518-001..007 PASS; MT-518-008 not finalized;
+  MT-518-009 FAIL; MT-518-010..014 stopped and not marked PASS.
+- Exact visible diagnostic:
+  `Kabul ortamı · sentetik Inventory verisi` /
+  `Tanı kodu: widget_render_error`.
+
+Read-only root-cause evidence:
+
+- The installed acceptance harness replaces FlutterError.onError with a
+  diagnostic-code notifier and does not persist FlutterErrorDetails, so the
+  owner-event exception and stack were no longer present in logcat.
+- Production `_editQuantity` created a TextEditingController, awaited
+  showDialog, read the text, disposed the controller immediately, then awaited
+  the canonical quantity mutation.
+- An ignored, repository-source-external lifecycle probe using the same Flutter
+  SDK and exact ordering reproduced:
+  `A TextEditingController was used after being disposed. Once you have called
+  dispose() on a TextEditingController, it can no longer be used.`
+- Exact leading stack:
+  `ChangeNotifier.debugAssertNotDisposed` ->
+  `ChangeNotifier.addListener` ->
+  `_MergingListenable.addListener` ->
+  `_AnimatedState.didUpdateWidget` ->
+  `StatefulElement.update`.
+- This proves that the dialog reverse transition still rebuilds/listens to the
+  TextField controller after the showDialog Future completes.
+- The acceptance fixture does not override quantity mutation behavior. It
+  creates seed rows through SqliteInventoryApplication and the detail
+  controller calls the same canonical changeAssetQuantity command.
+- Existing focused source proof confirms atomic asset/placement quantity
+  successor semantics, stable placement key, sequence advancement, unchanged
+  coordinates, predecessor QUANTITY_CHANGED termination and exact successor
+  linkage.
+
+Root-cause classification:
+
+`A. PRODUCTION_WIDGET_LIFECYCLE_DEFECT`
+
+Narrow correction:
+
+- Writable production path:
+  mobile/lib/features/inventory/inventory_asset_detail_sheet.dart.
+- The quantity dialog now owns its TextEditingController in a dedicated
+  StatefulWidget and disposes it only when the dialog route content is actually
+  unmounted after reverse transition.
+- `_editQuantity` receives the parsed integer result and preserves the existing
+  canonical controller mutation/reload behavior.
+- Required widget regression added to
+  mobile/test/inventory_asset_core_test.dart. It opens the real detail quantity
+  dialog, enters a valid quantity, saves, pumps dismissal/mutation/reload, checks
+  no framework exception, verifies the exact asset/placement successor
+  invariants and reopens/cancels the dialog to prove continued usability and no
+  duplicate mutation.
+
+Validation and publication:
+
+- Pending at this evidence checkpoint.
+
+Host validation:
+
+- Touched Dart formatting: PASS; exact two Dart paths.
+- Exact focused gate:
+  `flutter test --no-pub test/inventory_application_test.dart
+  test/inventory_asset_core_test.dart`.
+- Focused result: PASS, +41, All tests passed. The count increased from +40
+  through the required real-widget quantity-dialog regression.
+- `flutter analyze --no-pub`: PASS, No issues found.
+- `git diff --check`: PASS, exit 0, no output.
+- Exact correction paths: 3/3:
+  1. .cse/results/518_result.md
+  2. mobile/lib/features/inventory/inventory_asset_detail_sheet.dart
+  3. mobile/test/inventory_asset_core_test.dart
+- Protected application/domain/storage/app-shell/platform diff: 0.
+- Schema: 20; backup format: 1; mobile version: 0.1.0+1;
+  MAIN package: com.faliardic.sefim.
+- pubspec/lock, Android/iOS/platform, permission and signing drift: 0.
+- Forbidden call/contact/phone-state permission matches: 0.
+- Changed tracked SQLite/test DB/backup/APK/AAB/generated artifacts: 0.
+
+Pre-publication status:
+
+- Production correction validated.
+- Minimal correction commit and normal same-branch push pending.
+- PR #519 must remain OPEN / DRAFT; Ready false; merge false.
+- Prior independent R4 PASS becomes stale when the source HEAD changes.
+- MT-518-009 remains pending owner retest; no PASS claim is made.
+
+execution_record_mt_518_009_correction:
+
+observed_manual_failure: MT-518-009
+diagnostic: widget_render_error
+root_cause_classification: PRODUCTION_WIDGET_LIFECYCLE_DEFECT
+focused: PASS_41
+analyzer: PASS_NO_ISSUES
+git_diff_check: PASS
+correction_commit: pending
+acceptance_apk: pending_rebuild
+manual_retest: MT-518-009_PENDING
+ready: false
+merge: false
+
+review_recommendation_mt_518_009_correction:
+
+decision: PUBLISH_NARROW_CORRECTION_THEN_FRESH_INDEPENDENT_R4_REREVIEW
+device_recheck: REBUILD_INSTALL_SMOKE_THEN_OWNER_RETEST_MT_518_009
+ready: false
+merge: false

@@ -815,36 +815,63 @@ class _InventoryAssetDetailSheetState extends State<InventoryAssetDetailSheet> {
     BuildContext context,
     InventoryAssetDetailController controller,
   ) async {
-    final text = TextEditingController(
-      text: controller.asset!.totalQuantity.toString(),
-    );
-    final submitted = await showDialog<bool>(
+    final quantity = await showDialog<int>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Adedi değiştir'),
-        content: TextField(
-          controller: text,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Adet'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Vazgeç'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Kaydet'),
-          ),
-        ],
+      builder: (_) => _InventoryQuantityDialog(
+        initialQuantity: controller.asset!.totalQuantity,
       ),
     );
-    final quantity = int.tryParse(text.text.trim());
-    text.dispose();
-    if (submitted == true && quantity != null) {
+    if (quantity != null) {
       await controller.changeQuantity(quantity);
     }
   }
+}
+
+class _InventoryQuantityDialog extends StatefulWidget {
+  const _InventoryQuantityDialog({required this.initialQuantity});
+
+  final int initialQuantity;
+
+  @override
+  State<_InventoryQuantityDialog> createState() =>
+      _InventoryQuantityDialogState();
+}
+
+class _InventoryQuantityDialogState extends State<_InventoryQuantityDialog> {
+  late final TextEditingController _text;
+
+  @override
+  void initState() {
+    super.initState();
+    _text = TextEditingController(text: widget.initialQuantity.toString());
+  }
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Adedi değiştir'),
+    content: TextField(
+      controller: _text,
+      keyboardType: TextInputType.number,
+      decoration: const InputDecoration(labelText: 'Adet'),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Vazgeç'),
+      ),
+      FilledButton(
+        onPressed: () =>
+            Navigator.pop(context, int.tryParse(_text.text.trim())),
+        child: const Text('Kaydet'),
+      ),
+    ],
+  );
 }
 
 String? _cleanOptional(String? value) {
