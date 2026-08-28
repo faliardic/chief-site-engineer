@@ -759,7 +759,11 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.check_rounded),
-                label: const Text('Oluştur'),
+                label: Text(
+                  widget.launchIntent == InventorySketchLaunchIntent.editActive
+                      ? 'Güncelle'
+                      : 'Oluştur',
+                ),
               ),
             ),
           ],

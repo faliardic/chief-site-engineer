@@ -212,39 +212,68 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('mobile shell exposes all release 0.1 navigation entries', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      CseApp(
-        bootstrap: Future<BootstrapResult>.value(
-          BootstrapSuccess(
-            environmentLabel: 'Geliştirme',
-            smokeRecordId: 'mobile-foundation-v1',
-            smokeRecordCreatedAt: '2026-07-19T08:00:00Z',
-            agenda: FakeAgendaApplication(),
+  testWidgets(
+    'mobile shell exposes exact six Slice 4 destinations and Daha hub',
+    (tester) async {
+      await tester.pumpWidget(
+        CseApp(
+          bootstrap: Future<BootstrapResult>.value(
+            BootstrapSuccess(
+              environmentLabel: 'Geliştirme',
+              smokeRecordId: 'mobile-foundation-v1',
+              smokeRecordCreatedAt: '2026-07-19T08:00:00Z',
+              agenda: FakeAgendaApplication(),
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('Saha hafızanız cihazınızda.'), findsOneWidget);
-    for (final label in [
-      'Başlangıç',
-      'Hatırlatıcı',
-      'Ajanda',
-      'Puantaj',
-      'Beton Paketi',
-    ]) {
-      expect(find.text(label), findsWidgets);
-    }
+      expect(find.text('Saha hafızanız cihazınızda.'), findsOneWidget);
+      const expectedLabels = [
+        'Başlangıç',
+        'Hatırlatıcı',
+        'Ajanda',
+        'Envanter',
+        'Puantaj',
+        'Daha',
+      ];
+      final navigation = tester.widget<NavigationBar>(
+        find.byType(NavigationBar),
+      );
+      expect(navigation.destinations, hasLength(6));
+      expect(
+        navigation.destinations
+            .cast<NavigationDestination>()
+            .map((destination) => destination.label)
+            .toList(),
+        expectedLabels,
+      );
+      for (final label in expectedLabels) {
+        expect(find.text(label), findsWidgets);
+      }
 
-    await tester.tap(find.text('Ajanda').last);
-    await tester.pumpAndSettle();
-    expect(find.text('Bu günde Ajanda kaydı yok.'), findsOneWidget);
-    expect(find.byKey(const Key('create-agenda-log')), findsOneWidget);
-  });
+      await tester.tap(find.text('Envanter').last);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('inventory-project-required')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Daha').last);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('more-page')), findsOneWidget);
+      expect(find.byKey(const Key('more-concrete-package')), findsOneWidget);
+      expect(find.byKey(const Key('more-workforce-directory')), findsOneWidget);
+      expect(find.text('Beton Paketi'), findsOneWidget);
+      expect(find.text('Sicil'), findsOneWidget);
+
+      await tester.tap(find.text('Ajanda').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Bu günde Ajanda kaydı yok.'), findsOneWidget);
+      expect(find.byKey(const Key('create-agenda-log')), findsOneWidget);
+    },
+  );
 
   testWidgets('home field tips stay single cycle manually and remain accessible', (
     tester,

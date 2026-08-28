@@ -13,6 +13,7 @@ import 'package:chief_site_engineer/features/attachments/project_media_album_pag
 import 'package:chief_site_engineer/features/concrete/concrete_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
 import 'package:chief_site_engineer/features/daily_log/daily_log_page.dart';
+import 'package:chief_site_engineer/features/inventory/inventory_page.dart';
 import 'package:chief_site_engineer/features/living_plan/living_plan_page.dart';
 import 'package:chief_site_engineer/features/material_requests/material_requests_page.dart';
 import 'package:chief_site_engineer/features/memory/memory_backup_page.dart';
@@ -264,7 +265,7 @@ class _MobileShellState extends State<MobileShell> {
       final attendance = widget.bootstrap.attendance;
       if (reminder.attendanceDayId != null && attendance != null) {
         if (!mounted) return;
-        setState(() => _selectedIndex = 3);
+        setState(() => _selectedIndex = 4);
         await Navigator.of(context).push<void>(
           MaterialPageRoute(
             builder: (_) => AttendanceDayPage(
@@ -282,7 +283,7 @@ class _MobileShellState extends State<MobileShell> {
           concrete != null &&
           attachments != null) {
         if (!mounted) return;
-        setState(() => _selectedIndex = 4);
+        setState(() => _selectedIndex = 5);
         await Navigator.of(context).push<void>(
           MaterialPageRoute(
             builder: (_) => ConcretePourDetailPage(
@@ -325,12 +326,12 @@ class _MobileShellState extends State<MobileShell> {
       icon: Icon(Icons.event_note_outlined),
       label: 'Ajanda',
     ),
-    NavigationDestination(icon: Icon(Icons.badge_outlined), label: 'Puantaj'),
     NavigationDestination(
-      icon: Icon(Icons.foundation_outlined),
-      label: 'Beton Paketi',
+      icon: Icon(Icons.inventory_2_outlined),
+      label: 'Envanter',
     ),
-    NavigationDestination(icon: Icon(Icons.contacts_outlined), label: 'Sicil'),
+    NavigationDestination(icon: Icon(Icons.badge_outlined), label: 'Puantaj'),
+    NavigationDestination(icon: Icon(Icons.more_horiz_rounded), label: 'Daha'),
   ];
 
   @override
@@ -356,6 +357,11 @@ class _MobileShellState extends State<MobileShell> {
               concrete: widget.bootstrap.concrete,
               concreteAttachments: widget.bootstrap.concreteAttachments,
             ),
+            InventoryPage(
+              application: widget.bootstrap.inventory,
+              listProjects: widget.bootstrap.agenda.listProjects,
+              projectChanges: widget.bootstrap.agenda.projectChanges,
+            ),
             if (widget.bootstrap.attendance case final attendance?)
               AttendancePage(
                 attendance: attendance,
@@ -366,34 +372,7 @@ class _MobileShellState extends State<MobileShell> {
                 icon: Icons.badge_outlined,
                 title: 'Puantaj',
               ),
-            if (widget.bootstrap.concrete case final concrete?)
-              if (widget.bootstrap.concreteAttachments case final attachments?)
-                ConcretePage(
-                  concrete: concrete,
-                  agenda: widget.bootstrap.agenda,
-                  attachments: attachments,
-                  projectLocations: widget.bootstrap.projectLocations,
-                )
-              else
-                const _PreparingPage(
-                  icon: Icons.foundation_outlined,
-                  title: 'Beton Paketi',
-                )
-            else
-              const _PreparingPage(
-                icon: Icons.foundation_outlined,
-                title: 'Beton Paketi',
-              ),
-            if (widget.bootstrap.attendance case final attendance?)
-              WorkforceDirectoryPage(
-                attendance: attendance,
-                agenda: widget.bootstrap.agenda,
-              )
-            else
-              const _PreparingPage(
-                icon: Icons.contacts_outlined,
-                title: 'Sicil',
-              ),
+            _MorePage(bootstrap: widget.bootstrap),
           ],
         ),
       ),
@@ -403,6 +382,83 @@ class _MobileShellState extends State<MobileShell> {
         onDestinationSelected: (index) =>
             setState(() => _selectedIndex = index),
       ),
+    );
+  }
+}
+
+class _MorePage extends StatelessWidget {
+  const _MorePage({required this.bootstrap});
+
+  final BootstrapSuccess bootstrap;
+
+  @override
+  Widget build(BuildContext context) {
+    final concrete = bootstrap.concrete;
+    final attachments = bootstrap.concreteAttachments;
+    final attendance = bootstrap.attendance;
+    return ListView(
+      key: const Key('more-page'),
+      padding: const EdgeInsets.all(16),
+      children: [
+        Card(
+          child: ListTile(
+            key: const Key('more-concrete-package'),
+            leading: const Icon(Icons.foundation_outlined),
+            title: const Text('Beton Paketi'),
+            subtitle: Text(
+              concrete != null && attachments != null
+                  ? 'Beton dökümü kayıtlarını aç.'
+                  : 'Hazırlanıyor',
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: concrete != null && attachments != null
+                ? () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => Scaffold(
+                        appBar: AppBar(title: const Text('Beton Paketi')),
+                        body: SafeArea(
+                          child: ConcretePage(
+                            concrete: concrete,
+                            agenda: bootstrap.agenda,
+                            attachments: attachments,
+                            projectLocations: bootstrap.projectLocations,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                : null,
+          ),
+        ),
+        Card(
+          child: ListTile(
+            key: const Key('more-workforce-directory'),
+            leading: const Icon(Icons.contacts_outlined),
+            title: const Text('Sicil'),
+            subtitle: Text(
+              attendance != null
+                  ? 'Saha Rehberi ve sicili aç.'
+                  : 'Hazırlanıyor',
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: attendance != null
+                ? () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => Scaffold(
+                        appBar: AppBar(title: const Text('Sicil')),
+                        body: SafeArea(
+                          child: WorkforceDirectoryPage(
+                            attendance: attendance,
+                            agenda: bootstrap.agenda,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                : null,
+          ),
+        ),
+      ],
     );
   }
 }
