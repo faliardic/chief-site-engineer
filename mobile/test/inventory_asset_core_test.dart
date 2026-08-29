@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:chief_site_engineer/application/inventory_application.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/features/inventory/inventory_asset_detail_sheet.dart';
@@ -15,6 +18,10 @@ const _activeRevisionId = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1';
 const _placementId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1';
 const _placementKey = 'ffffffff-ffff-4fff-8fff-fffffffffff1';
 final _t0 = DateTime.parse('2026-08-28T06:00:00Z');
+final _pixelPng = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8'
+  '/x8AAusB9Wl2nWQAAAAASUVORK5CYII=',
+);
 
 void main() {
   test('01 inverse transform captures placement on step 4', () {
@@ -420,7 +427,7 @@ void main() {
     tester,
   ) async {
     final fake = _FakeInventoryApplication.standard()
-      ..addAsset(assetId: _uuid(1300), x: 300, y: 300);
+      ..addAsset(assetId: _uuid(1300), x: 800, y: 800);
     final controller = InventoryMapController(
       application: fake,
       projectId: _projectId,
@@ -435,6 +442,224 @@ void main() {
 
     expect(opened, [_uuid(1300)]);
   });
+
+  test('14a overlap groups are deterministic and dissolve at higher zoom', () {
+    final first = _projection(
+      assetId: _uuid(1310),
+      displayName: 'Beta',
+      x: 20,
+      y: 20,
+    );
+    final second = _projection(
+      assetId: _uuid(1311),
+      displayName: 'Alfa',
+      x: 120,
+      y: 120,
+    );
+    final third = _projection(
+      assetId: _uuid(1312),
+      displayName: 'Alfa',
+      x: 220,
+      y: 220,
+    );
+    final fitted = InventoryViewport.fit(const Size(800, 600));
+    final grouped = buildInventoryMarkerGroups([first, third, second], fitted);
+
+    expect(grouped, hasLength(1));
+    expect(grouped.single.isCluster, isTrue);
+    expect(grouped.single.projections.map((item) => item.asset.id), [
+      _uuid(1311),
+      _uuid(1312),
+      _uuid(1310),
+    ]);
+    final zoomed = fitted.zoomAt(4, const Offset(400, 300));
+    expect(
+      buildInventoryMarkerGroups([first, second, third], zoomed).length,
+      greaterThan(1),
+    );
+    expect(
+      buildInventoryMarkerGroups([second], fitted).single.isCluster,
+      isFalse,
+    );
+    final boundaryLeft = _projection(
+      assetId: _uuid(1313),
+      displayName: 'Sinir A',
+      x: 245,
+      y: 100,
+    );
+    final boundaryRight = _projection(
+      assetId: _uuid(1314),
+      displayName: 'Sinir B',
+      x: 251,
+      y: 100,
+    );
+    final acrossBoundary = buildInventoryMarkerGroups([
+      boundaryLeft,
+      boundaryRight,
+    ], fitted);
+    expect(acrossBoundary, hasLength(1));
+    expect(acrossBoundary.single.isCluster, isTrue);
+  });
+
+  testWidgets(
+    '14b cluster chooser has exact identities and target mode bypasses it',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        final fake = _FakeInventoryApplication.standard()
+          ..addAsset(assetId: _uuid(1320), x: 220, y: 220)
+          ..addAsset(assetId: _uuid(1321), x: 240, y: 240);
+        final controller = InventoryMapController(
+          application: fake,
+          projectId: _projectId,
+        );
+        addTearDown(controller.dispose);
+        expect(await controller.reload(), isTrue);
+        final opened = <String>[];
+
+        await _pumpMap(tester, controller, onOpenAsset: opened.add);
+        final mapState = tester.state<InventoryMapViewState>(
+          find.byType(InventoryMapView),
+        );
+        var cluster = find.bySemanticsLabel('3 envanter kaydı içeren küme');
+        expect(cluster, findsOneWidget);
+        expect(tester.getSize(cluster), const Size(48, 48));
+        final initialViewport = mapState.viewport!;
+        await tester.tap(cluster);
+        await tester.pump();
+        final zoomedViewport = mapState.viewport!;
+        expect(zoomedViewport.zoom, initialViewport.zoom * 1.25);
+        expect(
+          find.byKey(const Key('inventory-cluster-chooser')),
+          findsNothing,
+        );
+        final centeredGroup = buildInventoryMarkerGroups(
+          controller.projections,
+          zoomedViewport,
+        ).singleWhere((group) => group.projections.length == 3);
+        expect(
+          centeredGroup.center.dx,
+          closeTo(zoomedViewport.viewSize.width / 2, 0.01),
+        );
+        expect(
+          centeredGroup.center.dy,
+          closeTo(zoomedViewport.viewSize.height / 2, 0.01),
+        );
+
+        while (mapState.viewport!.zoom < InventoryViewport.maximumZoom) {
+          mapState.zoomIn();
+          await tester.pump();
+        }
+        expect(mapState.viewport!.zoom, InventoryViewport.maximumZoom);
+        cluster = find.bySemanticsLabel('3 envanter kaydı içeren küme');
+        expect(cluster, findsOneWidget);
+        await tester.tap(cluster);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('inventory-cluster-chooser')),
+          findsOneWidget,
+        );
+        for (final assetId in [_assetId, _uuid(1320), _uuid(1321)]) {
+          expect(
+            find.byKey(Key('inventory-cluster-item-$assetId')),
+            findsOneWidget,
+          );
+        }
+        await tester.tap(
+          find.byKey(Key('inventory-cluster-item-${_uuid(1321)}')),
+        );
+        await tester.pumpAndSettle();
+        expect(opened, [_uuid(1321)]);
+
+        final selectedTargets = <InventoryPlacementTarget>[];
+        final quickCreates = <InventoryPlacementTarget>[];
+        await _pumpMap(
+          tester,
+          controller,
+          onOpenAsset: opened.add,
+          onCreateTarget: quickCreates.add,
+          onSelectTarget: selectedTargets.add,
+        );
+        await tester.tap(find.bySemanticsLabel('3 envanter kaydı içeren küme'));
+        await tester.pump();
+        expect(
+          find.byKey(const Key('inventory-cluster-chooser')),
+          findsNothing,
+        );
+        expect(selectedTargets, hasLength(1));
+        expect(quickCreates, isEmpty);
+        expect(opened, [_uuid(1321)]);
+      } finally {
+        semantics.dispose();
+      }
+    },
+  );
+
+  testWidgets(
+    '14c clustered list focus centers exact placement with a two-second cue',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        final focusedAssetId = _uuid(1321);
+        final fake = _FakeInventoryApplication.standard()
+          ..addAsset(assetId: _uuid(1320), x: 220, y: 220)
+          ..addAsset(assetId: focusedAssetId, x: 240, y: 240);
+        final controller = InventoryMapController(
+          application: fake,
+          projectId: _projectId,
+        );
+        addTearDown(controller.dispose);
+        expect(await controller.reload(), isTrue);
+
+        await _pumpMap(tester, controller);
+        final mapState = tester.state<InventoryMapViewState>(
+          find.byType(InventoryMapView),
+        );
+        expect(mapState.focusAsset(focusedAssetId), isTrue);
+        await tester.pump();
+
+        final cue = find.byKey(Key('inventory-cluster-focus-$focusedAssetId'));
+        expect(cue, findsOneWidget);
+        expect(
+          find.bySemanticsLabel('Ek varlık, kesin konumda odaklandı'),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: cue,
+            matching: find.byIcon(Icons.center_focus_strong),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.bySemanticsLabel('3 envanter kaydı içeren küme'),
+          findsOneWidget,
+        );
+        final viewport = mapState.viewport!;
+        final projection = controller.projections.firstWhere(
+          (item) => item.asset.id == focusedAssetId,
+        );
+        final placement = projection.activePlacement!;
+        final exactCenter =
+            viewport.origin +
+            Offset(placement.x * viewport.scale, placement.y * viewport.scale);
+        final cueCenter = tester.getCenter(cue);
+        final viewCenter = viewport.viewSize.center(Offset.zero);
+        expect(cueCenter.dx, closeTo(exactCenter.dx, 0.01));
+        expect(cueCenter.dy, closeTo(exactCenter.dy, 0.01));
+        expect(exactCenter.dx, closeTo(viewCenter.dx, 0.01));
+        expect(exactCenter.dy, closeTo(viewCenter.dy, 0.01));
+
+        await tester.pump(const Duration(milliseconds: 1999));
+        expect(cue, findsOneWidget);
+        await tester.pump(const Duration(milliseconds: 2));
+        expect(cue, findsNothing);
+        expect(mapState.highlightedAssetId, isNull);
+      } finally {
+        semantics.dispose();
+      }
+    },
+  );
 
   test('15 archived assets are absent from canonical map markers', () async {
     final fake = _FakeInventoryApplication.standard(archived: true);
@@ -678,6 +903,167 @@ void main() {
       expect(find.text('Kule vinç B'), findsOneWidget);
       expect(find.text('Kuzey cephe'), findsOneWidget);
       expect(fake.updateCalls, 1);
+    },
+  );
+
+  testWidgets(
+    '20c photo add replace cancel remove and safe preview use real detail flow',
+    (tester) async {
+      final fake = _FakeInventoryApplication.standard();
+      var mapReloads = 0;
+      final photoController = InventoryAssetDetailController(
+        application: fake,
+        projectId: _projectId,
+        assetId: _assetId,
+        reloadMapCanonical: () async {
+          mapReloads += 1;
+        },
+        idFactory: _SequentialIds(1790).call,
+      );
+      addTearDown(photoController.dispose);
+      expect(await photoController.reload(), isTrue);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: InventoryAssetDetailSheet(
+              controller: photoController,
+              autoLoad: false,
+            ),
+          ),
+        ),
+      );
+      expect(find.byKey(const Key('inventory-photo-add')), findsOneWidget);
+
+      fake.nextPhotoPick = InventoryPhotoPickResult(
+        outcome: InventoryPhotoPickOutcome.selected,
+        selection: InventoryPhotoSelection(
+          originalFileName: 'library.png',
+          bytes: _pixelPng,
+          source: InventoryPhotoSource.photoLibrary,
+        ),
+      );
+      await tester.tap(find.byKey(const Key('inventory-photo-add')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('inventory-photo-library')));
+      await tester.pumpAndSettle();
+      expect(fake.photoAddCalls, 1);
+      expect(fake.photo?.originalFileName, 'library.png');
+      expect(find.byKey(const Key('inventory-photo-preview')), findsOneWidget);
+      expect(mapReloads, 1);
+      expect(tester.takeException(), isNull);
+
+      fake.nextPhotoPick = InventoryPhotoPickResult(
+        outcome: InventoryPhotoPickOutcome.selected,
+        selection: InventoryPhotoSelection(
+          originalFileName: 'camera.png',
+          bytes: _pixelPng,
+          source: InventoryPhotoSource.camera,
+        ),
+      );
+      await tester.tap(find.byKey(const Key('inventory-photo-replace')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('inventory-photo-camera')));
+      await tester.pumpAndSettle();
+      expect(fake.photoAddCalls, 2);
+      expect(fake.photo?.originalFileName, 'camera.png');
+      expect(mapReloads, 2);
+
+      fake.nextPhotoPick = const InventoryPhotoPickResult(
+        outcome: InventoryPhotoPickOutcome.cancelled,
+      );
+      await tester.tap(find.byKey(const Key('inventory-photo-replace')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('inventory-photo-library')));
+      await tester.pumpAndSettle();
+      expect(fake.photoAddCalls, 2);
+      expect(fake.photo?.originalFileName, 'camera.png');
+      expect(mapReloads, 2);
+
+      await tester.tap(find.byKey(const Key('inventory-photo-remove')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('inventory-photo-remove-confirm')));
+      await tester.pumpAndSettle();
+      expect(fake.photoRemoveCalls, 1);
+      expect(fake.photo, isNull);
+      expect(find.byKey(const Key('inventory-photo-add')), findsOneWidget);
+      expect(mapReloads, 3);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('20d archived and corrupt photo states stay safe at large text', (
+    tester,
+  ) async {
+    final archived = _FakeInventoryApplication.standard(archived: true)
+      ..setPhoto();
+    final archivedController = await _loadedDetail(
+      archived,
+      ids: _SequentialIds(1795),
+    );
+    addTearDown(archivedController.dispose);
+    await _pumpDetailWithTextScale(tester, archivedController, textScale: 2.5);
+    expect(find.byKey(const Key('inventory-photo-card')), findsOneWidget);
+    expect(find.byKey(const Key('inventory-photo-preview')), findsOneWidget);
+    expect(find.byKey(const Key('inventory-photo-replace')), findsNothing);
+    expect(find.byKey(const Key('inventory-photo-remove')), findsNothing);
+    expect(find.byKey(const Key('inventory-photo-add')), findsNothing);
+    expect(tester.takeException(), isNull);
+
+    final corrupt = _FakeInventoryApplication.standard()
+      ..setPhoto(integrity: InventoryPhotoIntegrity.hashMismatch);
+    final corruptController = await _loadedDetail(
+      corrupt,
+      ids: _SequentialIds(1798),
+    );
+    addTearDown(corruptController.dispose);
+    await _pumpDetailWithTextScale(tester, corruptController, textScale: 2.5);
+    expect(find.byKey(const Key('inventory-photo-failure')), findsOneWidget);
+    expect(
+      corruptController.photoDiagnosticCode,
+      'inventory_photo_hash_mismatch',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  test(
+    '20e project context change during picker performs zero photo mutation',
+    () async {
+      final fake = _FakeInventoryApplication.standard();
+      final pending = Completer<InventoryPhotoPickResult>();
+      fake.pendingPhotoPick = pending;
+      var contextCurrent = true;
+      final controller = InventoryAssetDetailController(
+        application: fake,
+        projectId: _projectId,
+        assetId: _assetId,
+        reloadMapCanonical: _noReload,
+        isProjectContextCurrent: () => contextCurrent,
+        idFactory: _SequentialIds(1799).call,
+      );
+      addTearDown(controller.dispose);
+      expect(await controller.reload(), isTrue);
+
+      final result = controller.addOrReplacePhoto(
+        InventoryPhotoSource.photoLibrary,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(fake.photoPickCalls, 1);
+      contextCurrent = false;
+      pending.complete(
+        InventoryPhotoPickResult(
+          outcome: InventoryPhotoPickOutcome.selected,
+          selection: InventoryPhotoSelection(
+            originalFileName: 'late.png',
+            bytes: _pixelPng,
+            source: InventoryPhotoSource.photoLibrary,
+          ),
+        ),
+      );
+
+      expect(await result, isFalse);
+      expect(fake.photoAddCalls, 0);
+      expect(controller.lastErrorCode, 'inventory_project_context_changed');
     },
   );
 
@@ -1022,6 +1408,7 @@ Future<void> _pumpMap(
   InventoryMapController controller, {
   ValueChanged<InventoryPlacementTarget>? onCreateTarget,
   ValueChanged<String>? onOpenAsset,
+  ValueChanged<InventoryPlacementTarget>? onSelectTarget,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -1034,12 +1421,37 @@ Future<void> _pumpMap(
             autoLoad: false,
             onCreateTarget: onCreateTarget ?? (_) {},
             onOpenAsset: onOpenAsset ?? (_) {},
+            onSelectTarget: onSelectTarget,
           ),
         ),
       ),
     ),
   );
   await tester.pump();
+}
+
+Future<void> _pumpDetailWithTextScale(
+  WidgetTester tester,
+  InventoryAssetDetailController controller, {
+  required double textScale,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
+      home: Scaffold(
+        body: InventoryAssetDetailSheet(
+          controller: controller,
+          autoLoad: false,
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
 }
 
 InventoryAssetQuickCreateController _quickController(
@@ -1235,7 +1647,8 @@ class _SequentialIds {
   String call() => _uuid(_next++);
 }
 
-class _FakeInventoryApplication implements InventoryApplicationPort {
+class _FakeInventoryApplication
+    implements InventoryApplicationPort, InventoryPhotoApplicationPort {
   _FakeInventoryApplication({
     required this.primarySketch,
     required this.projections,
@@ -1279,6 +1692,15 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
   int loadAssetCalls = 0;
   int historyCalls = 0;
   int placementVersionCalls = 0;
+  int photoPickCalls = 0;
+  int photoAddCalls = 0;
+  int photoRemoveCalls = 0;
+  InventoryPhotoPickResult nextPhotoPick = const InventoryPhotoPickResult(
+    outcome: InventoryPhotoPickOutcome.cancelled,
+  );
+  Completer<InventoryPhotoPickResult>? pendingPhotoPick;
+  InventoryAssetPhotoRecord? photo;
+  InventoryPhotoContent? photoContent;
   CreateInventoryAssetCommand? lastCreate;
   UpdateInventoryAssetCommand? lastUpdate;
   ChangeInventoryAssetStatusCommand? lastStatus;
@@ -1287,6 +1709,35 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
   UnarchiveInventoryAssetCommand? lastUnarchive;
   MoveInventoryPlacementCommand? lastMove;
   InventoryMutationResult? lastResult;
+
+  void setPhoto({
+    InventoryPhotoIntegrity integrity = InventoryPhotoIntegrity.healthy,
+    String fileName = 'asset.png',
+    List<int>? bytes,
+  }) {
+    final contentBytes = bytes ?? _pixelPng;
+    photo = InventoryAssetPhotoRecord(
+      linkId: _uuid(3900),
+      attachmentId: _uuid(3901),
+      assetId: _assetId,
+      projectId: _projectId,
+      originalFileName: fileName,
+      revision: 1,
+      createdAt: _t0,
+      updatedAt: _t0,
+      archivedAt: null,
+      relativePath: 'managed/${_uuid(3901)}.png',
+      mimeType: 'image/png',
+      byteSize: contentBytes.length,
+      sha256Value: 'a'.padRight(64, 'a'),
+      integrity: integrity,
+    );
+    photoContent = InventoryPhotoContent(
+      fileName: fileName,
+      mimeType: 'image/png',
+      bytes: contentBytes,
+    );
+  }
 
   void addAsset({required String assetId, required int x, required int y}) {
     final index = projections.length;
@@ -1378,6 +1829,104 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
       throw const InventoryFailure('inventory_asset_not_found');
     }
     return List<InventoryEventRecord>.of(result);
+  }
+
+  @override
+  Future<InventoryPhotoPickResult> pickAssetPhoto(
+    InventoryPhotoSource source,
+  ) async {
+    photoPickCalls += 1;
+    return pendingPhotoPick?.future ?? nextPhotoPick;
+  }
+
+  @override
+  Future<InventoryAssetPhotoRecord?> loadActiveAssetPhoto({
+    required String projectId,
+    required String assetId,
+  }) async {
+    _current(projectId, assetId);
+    return photo;
+  }
+
+  @override
+  Future<InventoryPhotoContent> readAssetPhoto({
+    required String projectId,
+    required String assetId,
+    required String linkId,
+  }) async {
+    _current(projectId, assetId);
+    final current = photo;
+    if (current == null || current.linkId != linkId || photoContent == null) {
+      throw const InventoryFailure('inventory_photo_unavailable');
+    }
+    if (current.integrity != InventoryPhotoIntegrity.healthy) {
+      throw const InventoryFailure('inventory_photo_integrity_failed');
+    }
+    return photoContent!;
+  }
+
+  @override
+  Future<InventoryMutationResult> addOrReplaceAssetPhoto(
+    AddOrReplaceInventoryAssetPhotoCommand command,
+  ) async {
+    photoAddCalls += 1;
+    _throwIfNeeded();
+    final current = _current(command.projectId, command.assetId);
+    _expectAssetRevision(current, command.expectedAssetRevision);
+    setPhoto(
+      fileName: command.selection.originalFileName,
+      bytes: command.selection.bytes,
+    );
+    photo = InventoryAssetPhotoRecord(
+      linkId: command.linkId,
+      attachmentId: command.attachmentId,
+      assetId: command.assetId,
+      projectId: command.projectId,
+      originalFileName: command.selection.originalFileName,
+      revision: 1,
+      createdAt: _t0,
+      updatedAt: _t0,
+      archivedAt: null,
+      relativePath: 'managed/${command.attachmentId}.png',
+      mimeType: 'image/png',
+      byteSize: command.selection.bytes.length,
+      sha256Value: 'b'.padRight(64, 'b'),
+      integrity: InventoryPhotoIntegrity.healthy,
+    );
+    return _remember(
+      _result(
+        command: command,
+        sourceId: command.linkId,
+        sourceRevision: 1,
+        supportingId: command.attachmentId,
+      ),
+    );
+  }
+
+  @override
+  Future<InventoryMutationResult> removeAssetPhoto(
+    RemoveInventoryAssetPhotoCommand command,
+  ) async {
+    photoRemoveCalls += 1;
+    _throwIfNeeded();
+    final current = _current(command.projectId, command.assetId);
+    _expectAssetRevision(current, command.expectedAssetRevision);
+    final active = photo;
+    if (active == null ||
+        active.linkId != command.linkId ||
+        active.revision != command.expectedLinkRevision) {
+      throw const InventoryFailure('inventory_stale_revision');
+    }
+    photo = null;
+    photoContent = null;
+    return _remember(
+      _result(
+        command: command,
+        sourceId: command.linkId,
+        sourceRevision: active.revision + 1,
+        supportingId: active.attachmentId,
+      ),
+    );
   }
 
   @override

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:chief_site_engineer/application/inventory_application.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
+import 'package:crypto/crypto.dart' as hashes;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart' as sqflite;
@@ -1126,6 +1127,407 @@ void main() {
       );
     },
   );
+
+  test(
+    'inventory photo add replace remove replay and relaunch preserve history',
+    () async {
+      final fixture = await _Fixture.create('photo_lifecycle');
+      addTearDown(fixture.close);
+      final sketch = await _createFinalizedSketch(fixture, seed: 600);
+      final assetId = _uuid(610);
+      await _createAsset(fixture, sketch: sketch, assetId: assetId, seed: 611);
+      final gateway = _MemoryInventoryAttachmentGateway();
+      final app = InventoryApplication(
+        database: fixture.db,
+        clock: fixture.clock.call,
+        idFactory: fixture.ids.call,
+        attachmentGateway: gateway,
+      );
+      final first = AddOrReplaceInventoryAssetPhotoCommand(
+        operationId: _uuid(620),
+        projectId: _projectA,
+        assetId: assetId,
+        linkId: _uuid(621),
+        attachmentId: _uuid(622),
+        expectedAssetRevision: 1,
+        selection: InventoryPhotoSelection(
+          originalFileName: 'first.jpg',
+          bytes: _jpeg(1),
+          source: InventoryPhotoSource.camera,
+        ),
+      );
+
+      final added = await app.addOrReplaceAssetPhoto(first);
+      final replay = await app.addOrReplaceAssetPhoto(first);
+      expect(_resultValues(replay), _resultValues(added));
+      expect(gateway.stageCalls, 1);
+      var active = await app.loadActiveAssetPhoto(
+        projectId: _projectA,
+        assetId: assetId,
+      );
+      expect(active?.linkId, first.linkId);
+      expect(active?.integrity, InventoryPhotoIntegrity.healthy);
+      expect(
+        (await app.readAssetPhoto(
+          projectId: _projectA,
+          assetId: assetId,
+          linkId: first.linkId,
+        )).bytes,
+        _jpeg(1),
+      );
+
+      final replacement = AddOrReplaceInventoryAssetPhotoCommand(
+        operationId: _uuid(623),
+        projectId: _projectA,
+        assetId: assetId,
+        linkId: _uuid(624),
+        attachmentId: _uuid(625),
+        expectedAssetRevision: 1,
+        selection: InventoryPhotoSelection(
+          originalFileName: 'replacement.png',
+          bytes: _png(2),
+          source: InventoryPhotoSource.photoLibrary,
+        ),
+      );
+      await app.addOrReplaceAssetPhoto(replacement);
+      active = await app.loadActiveAssetPhoto(
+        projectId: _projectA,
+        assetId: assetId,
+      );
+      expect(active?.linkId, replacement.linkId);
+      final links = await fixture.db.database.query(
+        'inventory_asset_attachment_links',
+        where: 'asset_id = ?',
+        whereArgs: [assetId],
+        orderBy: 'created_at ASC, id ASC',
+      );
+      expect(links, hasLength(2));
+      expect(links.first['archived_at'], isNotNull);
+      expect(links.last['archived_at'], isNull);
+      expect(gateway.files, hasLength(2));
+
+      final activeRelaunch = InventoryApplication(
+        database: fixture.db,
+        clock: fixture.clock.call,
+        idFactory: fixture.ids.call,
+        attachmentGateway: gateway,
+      );
+      expect(
+        (await activeRelaunch.loadActiveAssetPhoto(
+          projectId: _projectA,
+          assetId: assetId,
+        ))?.linkId,
+        replacement.linkId,
+      );
+      expect(
+        (await activeRelaunch.readAssetPhoto(
+          projectId: _projectA,
+          assetId: assetId,
+          linkId: replacement.linkId,
+        )).bytes,
+        _png(2),
+      );
+
+      await app.removeAssetPhoto(
+        RemoveInventoryAssetPhotoCommand(
+          operationId: _uuid(626),
+          projectId: _projectA,
+          assetId: assetId,
+          linkId: replacement.linkId,
+          expectedAssetRevision: 1,
+          expectedLinkRevision: 1,
+        ),
+      );
+      expect(
+        await app.loadActiveAssetPhoto(projectId: _projectA, assetId: assetId),
+        isNull,
+      );
+      expect(gateway.files, hasLength(2));
+      expect(gateway.cleanedPaths, isEmpty);
+      final history = await app.listAssetHistory(
+        projectId: _projectA,
+        assetId: assetId,
+      );
+      expect(
+        history.map((event) => event.eventType),
+        containsAll(<InventoryEventType>[
+          InventoryEventType.photoLinked,
+          InventoryEventType.photoArchived,
+        ]),
+      );
+
+      final relaunched = InventoryApplication(
+        database: fixture.db,
+        clock: fixture.clock.call,
+        idFactory: fixture.ids.call,
+        attachmentGateway: gateway,
+      );
+      expect(
+        (await relaunched.loadAsset(
+          projectId: _projectA,
+          assetId: assetId,
+        )).activePlacement,
+        isNotNull,
+      );
+      expect(
+        await relaunched.loadActiveAssetPhoto(
+          projectId: _projectA,
+          assetId: assetId,
+        ),
+        isNull,
+      );
+      expect(
+        await fixture.db.database.rawQuery('PRAGMA foreign_key_check'),
+        isEmpty,
+      );
+    },
+  );
+
+  test(
+    'inventory photo failures clean only new bytes and reject unsafe identity',
+    () async {
+      final fixture = await _Fixture.create('photo_failure');
+      addTearDown(fixture.close);
+      final sketch = await _createFinalizedSketch(fixture, seed: 650);
+      final assetId = _uuid(660);
+      await _createAsset(fixture, sketch: sketch, assetId: assetId, seed: 661);
+      final gateway = _MemoryInventoryAttachmentGateway();
+      final healthy = InventoryApplication(
+        database: fixture.db,
+        clock: fixture.clock.call,
+        idFactory: fixture.ids.call,
+        attachmentGateway: gateway,
+      );
+      await healthy.addOrReplaceAssetPhoto(
+        AddOrReplaceInventoryAssetPhotoCommand(
+          operationId: _uuid(670),
+          projectId: _projectA,
+          assetId: assetId,
+          linkId: _uuid(671),
+          attachmentId: _uuid(672),
+          expectedAssetRevision: 1,
+          selection: InventoryPhotoSelection(
+            originalFileName: 'retained.jpg',
+            bytes: _jpeg(3),
+            source: InventoryPhotoSource.camera,
+          ),
+        ),
+      );
+      final retainedPath = gateway.files.keys.single;
+      final stageCallsBeforeGuards = gateway.stageCalls;
+      await expectLater(
+        healthy.addOrReplaceAssetPhoto(
+          AddOrReplaceInventoryAssetPhotoCommand(
+            operationId: _uuid(673),
+            projectId: _projectB,
+            assetId: assetId,
+            linkId: _uuid(674),
+            attachmentId: _uuid(675),
+            expectedAssetRevision: 1,
+            selection: InventoryPhotoSelection(
+              originalFileName: 'wrong-project.jpg',
+              bytes: _jpeg(4),
+              source: InventoryPhotoSource.camera,
+            ),
+          ),
+        ),
+        _fails('inventory_asset_unavailable'),
+      );
+      await expectLater(
+        healthy.addOrReplaceAssetPhoto(
+          AddOrReplaceInventoryAssetPhotoCommand(
+            operationId: _uuid(676),
+            projectId: _projectA,
+            assetId: assetId,
+            linkId: _uuid(677),
+            attachmentId: _uuid(678),
+            expectedAssetRevision: 2,
+            selection: InventoryPhotoSelection(
+              originalFileName: 'stale.jpg',
+              bytes: _jpeg(5),
+              source: InventoryPhotoSource.camera,
+            ),
+          ),
+        ),
+        _fails('inventory_stale_revision'),
+      );
+      expect(gateway.stageCalls, stageCallsBeforeGuards);
+
+      final failing = InventoryApplication(
+        database: fixture.db,
+        clock: fixture.clock.call,
+        idFactory: fixture.ids.call,
+        attachmentGateway: gateway,
+        afterSourceWritesBeforeHistory: () async {
+          throw StateError('injected photo DB failure');
+        },
+      );
+      await expectLater(
+        failing.addOrReplaceAssetPhoto(
+          AddOrReplaceInventoryAssetPhotoCommand(
+            operationId: _uuid(679),
+            projectId: _projectA,
+            assetId: assetId,
+            linkId: _uuid(680),
+            attachmentId: _uuid(681),
+            expectedAssetRevision: 1,
+            selection: InventoryPhotoSelection(
+              originalFileName: 'rollback.png',
+              bytes: _png(6),
+              source: InventoryPhotoSource.photoLibrary,
+            ),
+          ),
+        ),
+        _fails('inventory_persistence_failed'),
+      );
+      expect(gateway.cleanedPaths, hasLength(1));
+      expect(gateway.files.keys, [retainedPath]);
+      expect(
+        (await healthy.loadActiveAssetPhoto(
+          projectId: _projectA,
+          assetId: assetId,
+        ))?.originalFileName,
+        'retained.jpg',
+      );
+
+      await fixture.app.archiveAsset(
+        ArchiveInventoryAssetCommand(
+          operationId: _uuid(682),
+          projectId: _projectA,
+          assetId: assetId,
+          expectedAssetRevision: 1,
+        ),
+      );
+      expect(
+        await healthy.readAssetPhoto(
+          projectId: _projectA,
+          assetId: assetId,
+          linkId: _uuid(671),
+        ),
+        isA<InventoryPhotoContent>(),
+      );
+      final callsBeforeArchived = gateway.stageCalls;
+      await expectLater(
+        healthy.addOrReplaceAssetPhoto(
+          AddOrReplaceInventoryAssetPhotoCommand(
+            operationId: _uuid(683),
+            projectId: _projectA,
+            assetId: assetId,
+            linkId: _uuid(684),
+            attachmentId: _uuid(685),
+            expectedAssetRevision: 2,
+            selection: InventoryPhotoSelection(
+              originalFileName: 'archived.jpg',
+              bytes: _jpeg(7),
+              source: InventoryPhotoSource.camera,
+            ),
+          ),
+        ),
+        _fails('inventory_asset_archived'),
+      );
+      expect(gateway.stageCalls, callsBeforeArchived);
+    },
+  );
+
+  test(
+    'first and edit-active drafts recover exact durable identity after recreation',
+    () async {
+      final fixture = await _Fixture.create('draft_relaunch');
+      addTearDown(fixture.close);
+      final sketchId = _uuid(700);
+      final firstDraftId = _uuid(701);
+      await fixture.app.createSketch(
+        CreateInventorySketchCommand(
+          operationId: _uuid(702),
+          projectId: _projectA,
+          sketchId: sketchId,
+          draftRevisionId: firstDraftId,
+        ),
+      );
+      await fixture.app.autosaveSketchDraft(
+        AutosaveInventorySketchDraftCommand(
+          operationId: _uuid(703),
+          projectId: _projectA,
+          sketchId: sketchId,
+          draftRevisionId: firstDraftId,
+          expectedSketchRevision: 1,
+          expectedContentRevision: 1,
+          geometry: _geometry(64),
+        ),
+      );
+      final firstRelaunch = InventoryApplication(
+        database: fixture.db,
+        clock: fixture.clock.call,
+        idFactory: fixture.ids.call,
+      );
+      var recovered = await firstRelaunch.loadPrimarySketch(_projectA);
+      expect(recovered?.activeRevision, isNull);
+      expect(recovered?.draftRevision?.id, firstDraftId);
+      expect(
+        recovered?.draftRevision?.geometry.canonicalJson,
+        _geometry(64).canonicalJson,
+      );
+
+      await firstRelaunch.finalizeSketch(
+        FinalizeInventorySketchCommand(
+          operationId: _uuid(704),
+          projectId: _projectA,
+          sketchId: sketchId,
+          draftRevisionId: firstDraftId,
+          expectedSketchRevision: 2,
+          expectedContentRevision: 2,
+        ),
+      );
+      final editDraftId = _uuid(705);
+      await firstRelaunch.startSketchEdit(
+        StartInventorySketchEditCommand(
+          operationId: _uuid(706),
+          projectId: _projectA,
+          sketchId: sketchId,
+          activeRevisionId: firstDraftId,
+          newDraftRevisionId: editDraftId,
+          expectedSketchRevision: 3,
+        ),
+      );
+      await firstRelaunch.autosaveSketchDraft(
+        AutosaveInventorySketchDraftCommand(
+          operationId: _uuid(707),
+          projectId: _projectA,
+          sketchId: sketchId,
+          draftRevisionId: editDraftId,
+          expectedSketchRevision: 4,
+          expectedContentRevision: 1,
+          geometry: _geometry(128),
+        ),
+      );
+
+      final editRelaunch = InventoryApplication(
+        database: fixture.db,
+        clock: fixture.clock.call,
+        idFactory: fixture.ids.call,
+      );
+      recovered = await editRelaunch.loadPrimarySketch(_projectA);
+      expect(recovered?.activeRevision?.id, firstDraftId);
+      expect(recovered?.draftRevision?.id, editDraftId);
+      expect(recovered?.draftRevision?.baseRevisionId, firstDraftId);
+      expect(
+        recovered?.draftRevision?.geometry.canonicalJson,
+        _geometry(128).canonicalJson,
+      );
+      expect(
+        (await fixture.db.database.query(
+          'inventory_sketch_revisions',
+          where: 'sketch_id = ?',
+          whereArgs: [sketchId],
+          orderBy: 'revision_number ASC',
+        )).map((row) => row['state']),
+        [
+          InventorySketchRevisionState.active.storageValue,
+          InventorySketchRevisionState.draft.storageValue,
+        ],
+      );
+    },
+  );
 }
 
 class _Fixture {
@@ -1250,6 +1652,126 @@ Future<_FinalizedSketch> _createFinalizedSketch(
     activeRevisionId: draftId,
     sketchRevision: 3,
   );
+}
+
+Future<void> _createAsset(
+  _Fixture fixture, {
+  required _FinalizedSketch sketch,
+  required String assetId,
+  required int seed,
+}) => fixture.app
+    .createAsset(
+      CreateInventoryAssetCommand(
+        operationId: _uuid(seed),
+        projectId: _projectA,
+        assetId: assetId,
+        placementId: _uuid(seed + 1),
+        placementKey: _uuid(seed + 2),
+        sketchId: sketch.sketchId,
+        activeRevisionId: sketch.activeRevisionId,
+        displayName: 'Photo asset',
+        category: InventoryCategory.equipment,
+        totalQuantity: 1,
+        x: 128,
+        y: 128,
+      ),
+    )
+    .then((_) {});
+
+List<int> _jpeg(int suffix) => <int>[0xff, 0xd8, 0xff, suffix];
+
+List<int> _png(int suffix) => <int>[
+  0x89,
+  0x50,
+  0x4e,
+  0x47,
+  0x0d,
+  0x0a,
+  0x1a,
+  0x0a,
+  suffix,
+];
+
+class _MemoryInventoryAttachmentGateway implements InventoryAttachmentGateway {
+  final Map<String, List<int>> files = <String, List<int>>{};
+  final List<String> cleanedPaths = <String>[];
+  int stageCalls = 0;
+
+  @override
+  Future<InventoryPhotoPickResult> pick(InventoryPhotoSource source) async =>
+      const InventoryPhotoPickResult(
+        outcome: InventoryPhotoPickOutcome.cancelled,
+      );
+
+  @override
+  Future<StagedInventoryPhoto> stage({
+    required String assetId,
+    required String attachmentId,
+    required String originalFileName,
+    required List<int> bytes,
+  }) async {
+    stageCalls += 1;
+    final mimeType = bytes.length >= 8 && bytes[0] == 0x89
+        ? 'image/png'
+        : 'image/jpeg';
+    final extension = mimeType == 'image/png' ? 'png' : 'jpg';
+    final relativePath = 'managed/$attachmentId.$extension';
+    files[relativePath] = List<int>.of(bytes);
+    return StagedInventoryPhoto(
+      relativePath: relativePath,
+      mimeType: mimeType,
+      byteSize: bytes.length,
+      sha256Value: hashes.sha256.convert(bytes).toString(),
+    );
+  }
+
+  @override
+  Future<InventoryPhotoIntegrity> inspect({
+    required String relativePath,
+    required String expectedSha256,
+    required String expectedMimeType,
+    required int expectedByteSize,
+  }) async {
+    final bytes = files[relativePath];
+    if (bytes == null) return InventoryPhotoIntegrity.missingFile;
+    if (bytes.length != expectedByteSize) {
+      return InventoryPhotoIntegrity.sizeMismatch;
+    }
+    if (hashes.sha256.convert(bytes).toString() != expectedSha256) {
+      return InventoryPhotoIntegrity.hashMismatch;
+    }
+    return InventoryPhotoIntegrity.healthy;
+  }
+
+  @override
+  Future<InventoryPhotoContent> read({
+    required String relativePath,
+    required String originalFileName,
+    required String expectedSha256,
+    required String expectedMimeType,
+    required int expectedByteSize,
+  }) async {
+    if (await inspect(
+          relativePath: relativePath,
+          expectedSha256: expectedSha256,
+          expectedMimeType: expectedMimeType,
+          expectedByteSize: expectedByteSize,
+        ) !=
+        InventoryPhotoIntegrity.healthy) {
+      throw const InventoryFailure('inventory_photo_integrity_failed');
+    }
+    return InventoryPhotoContent(
+      fileName: originalFileName,
+      mimeType: expectedMimeType,
+      bytes: files[relativePath]!,
+    );
+  }
+
+  @override
+  Future<void> cleanup(String relativePath) async {
+    cleanedPaths.add(relativePath);
+    files.remove(relativePath);
+  }
 }
 
 InventoryGeometry _geometry([int offset = 0]) => InventoryGeometry(

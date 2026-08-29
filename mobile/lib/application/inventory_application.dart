@@ -75,20 +75,42 @@ abstract interface class InventoryApplicationPort {
   });
 }
 
+abstract interface class InventoryPhotoApplicationPort {
+  Future<InventoryPhotoPickResult> pickAssetPhoto(InventoryPhotoSource source);
+  Future<InventoryAssetPhotoRecord?> loadActiveAssetPhoto({
+    required String projectId,
+    required String assetId,
+  });
+  Future<InventoryPhotoContent> readAssetPhoto({
+    required String projectId,
+    required String assetId,
+    required String linkId,
+  });
+  Future<InventoryMutationResult> addOrReplaceAssetPhoto(
+    AddOrReplaceInventoryAssetPhotoCommand command,
+  );
+  Future<InventoryMutationResult> removeAssetPhoto(
+    RemoveInventoryAssetPhotoCommand command,
+  );
+}
+
 /// Opens the active SQLite database for one complete operation and closes it
 /// afterwards so backup/restore replacement cannot leave a stale handle.
-class SqliteInventoryApplication implements InventoryApplicationPort {
+class SqliteInventoryApplication
+    implements InventoryApplicationPort, InventoryPhotoApplicationPort {
   SqliteInventoryApplication({
     required this.databasePath,
     required this.databaseFactory,
     required this.clock,
     RecordIdFactory? idFactory,
+    this.attachmentGateway = const UnavailableInventoryAttachmentGateway(),
   }) : idFactory = idFactory ?? RecordId.randomUuid;
 
   final String databasePath;
   final DatabaseFactory databaseFactory;
   final UtcClock clock;
   final RecordIdFactory idFactory;
+  final InventoryAttachmentGateway attachmentGateway;
   Future<void> _operationTail = Future<void>.value();
 
   Future<T> _withApplication<T>(
@@ -120,6 +142,7 @@ class SqliteInventoryApplication implements InventoryApplicationPort {
           database: database,
           clock: clock,
           idFactory: idFactory,
+          attachmentGateway: attachmentGateway,
         ),
       );
     } finally {
@@ -224,6 +247,42 @@ class SqliteInventoryApplication implements InventoryApplicationPort {
   }) => _withApplication(
     (app) => app.listAssetHistory(projectId: projectId, assetId: assetId),
   );
+
+  @override
+  Future<InventoryPhotoPickResult> pickAssetPhoto(
+    InventoryPhotoSource source,
+  ) => _withApplication((app) => app.pickAssetPhoto(source));
+
+  @override
+  Future<InventoryAssetPhotoRecord?> loadActiveAssetPhoto({
+    required String projectId,
+    required String assetId,
+  }) => _withApplication(
+    (app) => app.loadActiveAssetPhoto(projectId: projectId, assetId: assetId),
+  );
+
+  @override
+  Future<InventoryPhotoContent> readAssetPhoto({
+    required String projectId,
+    required String assetId,
+    required String linkId,
+  }) => _withApplication(
+    (app) => app.readAssetPhoto(
+      projectId: projectId,
+      assetId: assetId,
+      linkId: linkId,
+    ),
+  );
+
+  @override
+  Future<InventoryMutationResult> addOrReplaceAssetPhoto(
+    AddOrReplaceInventoryAssetPhotoCommand command,
+  ) => _withApplication((app) => app.addOrReplaceAssetPhoto(command));
+
+  @override
+  Future<InventoryMutationResult> removeAssetPhoto(
+    RemoveInventoryAssetPhotoCommand command,
+  ) => _withApplication((app) => app.removeAssetPhoto(command));
 }
 
 /// Safe zero-I/O default for hand-built bootstrap results.
@@ -338,17 +397,20 @@ class UnavailableInventoryApplication implements InventoryApplicationPort {
   }) async => _fail();
 }
 
-class InventoryApplication implements InventoryApplicationPort {
+class InventoryApplication
+    implements InventoryApplicationPort, InventoryPhotoApplicationPort {
   InventoryApplication({
     required this.database,
     required this.clock,
     RecordIdFactory? idFactory,
+    this.attachmentGateway = const UnavailableInventoryAttachmentGateway(),
     this.afterSourceWritesBeforeHistory,
   }) : idFactory = idFactory ?? RecordId.randomUuid;
 
   final AppDatabase database;
   final UtcClock clock;
   final RecordIdFactory idFactory;
+  final InventoryAttachmentGateway attachmentGateway;
   final InventoryWriteBoundaryHook? afterSourceWritesBeforeHistory;
 
   @override
@@ -666,6 +728,9 @@ class InventoryApplication implements InventoryApplicationPort {
     InventoryAggregateType.placement => eventType.storageValue.startsWith(
       'inventory.placement_',
     ),
+    InventoryAggregateType.attachmentLink => eventType.storageValue.startsWith(
+      'inventory.photo_',
+    ),
   };
 
   Future<InventoryMutationResult> _runMutation(
@@ -943,20 +1008,42 @@ class InventoryApplication implements InventoryApplicationPort {
       InventoryCommandType.sketchUnarchive => true,
       _ => false,
     };
+    final photoCommand = switch (result.commandType) {
+      InventoryCommandType.photoLink ||
+      InventoryCommandType.photoArchive ||
+      InventoryCommandType.photoRestore => true,
+      _ => false,
+    };
     final sourceExistsForCommand = await sourceExists(
-      sketchCommand ? 'inventory_sketches' : 'inventory_assets',
+      sketchCommand
+          ? 'inventory_sketches'
+          : photoCommand
+          ? 'inventory_asset_attachment_links'
+          : 'inventory_assets',
       result.sourceId,
     );
     if (!sourceExistsForCommand) {
       throw const InventoryFailure('inventory_receipt_corrupt');
     }
     if (result.supportingId != null) {
-      final supportingExists = await sourceExists(
-        sketchCommand
-            ? 'inventory_sketch_revisions'
-            : 'inventory_asset_placements',
-        result.supportingId!,
-      );
+      final bool supportingExists;
+      if (photoCommand) {
+        final rows = await transaction.query(
+          'managed_attachments',
+          columns: const ['id'],
+          where: 'id = ?',
+          whereArgs: [result.supportingId],
+          limit: 2,
+        );
+        supportingExists = rows.length == 1;
+      } else {
+        supportingExists = await sourceExists(
+          sketchCommand
+              ? 'inventory_sketch_revisions'
+              : 'inventory_asset_placements',
+          result.supportingId!,
+        );
+      }
       if (!supportingExists) {
         throw const InventoryFailure('inventory_receipt_corrupt');
       }
@@ -1076,6 +1163,8 @@ class InventoryApplication implements InventoryApplicationPort {
       'inventory_sketch_revisions',
       'inventory_assets',
       'inventory_asset_placements',
+      'inventory_asset_attachment_links',
+      'managed_attachments',
     };
     if (!allowedTables.contains(table)) {
       throw const InventoryFailure('inventory_persistence_failed');
@@ -1355,6 +1444,120 @@ class InventoryApplication implements InventoryApplicationPort {
       }
     }
     return events;
+  }
+
+  Future<List<Map<String, Object?>>> _loadPhotoRows(
+    Transaction transaction, {
+    required String projectId,
+    required String assetId,
+    String? linkId,
+    bool activeOnly = false,
+  }) {
+    final linkClause = linkId == null ? '' : ' AND link.id = ?';
+    final activeClause = activeOnly ? ' AND link.archived_at IS NULL' : '';
+    return transaction.rawQuery(
+      '''
+      SELECT
+        link.id AS link_id,
+        link.attachment_id AS attachment_id,
+        link.asset_id AS asset_id,
+        link.project_id AS project_id,
+        link.role AS role,
+        link.original_file_name AS original_file_name,
+        link.revision AS link_revision,
+        link.created_at AS link_created_at,
+        link.updated_at AS link_updated_at,
+        link.archived_at AS link_archived_at,
+        attachment.relative_path AS relative_path,
+        attachment.mime_type AS mime_type,
+        attachment.byte_size AS byte_size,
+        attachment.sha256 AS sha256
+      FROM inventory_asset_attachment_links link
+      JOIN managed_attachments attachment
+        ON attachment.id = link.attachment_id
+      WHERE link.project_id = ?
+        AND link.asset_id = ?
+        AND link.role = 'inventory_photo'
+        $linkClause
+        $activeClause
+      ORDER BY link.created_at ASC, link.id ASC
+      ''',
+      [projectId, assetId, ?linkId],
+    );
+  }
+
+  Future<InventoryAssetPhotoRecord> _photoFromJoinedRow(
+    Map<String, Object?> row,
+  ) async {
+    final linkId = _requiredStoredUuid(row, 'link_id');
+    final attachmentId = _requiredStoredUuid(row, 'attachment_id');
+    final assetId = _requiredStoredUuid(row, 'asset_id');
+    final projectId = _requiredStoredString(row, 'project_id');
+    final role = _requiredStoredString(row, 'role');
+    final originalFileName = _requiredStoredString(row, 'original_file_name');
+    final revision = _requiredPositiveStoredInt(row, 'link_revision');
+    final createdAt = _storedTimestamp(row, 'link_created_at');
+    final updatedAt = _storedTimestamp(row, 'link_updated_at');
+    final archivedAt = _optionalStoredTimestamp(row, 'link_archived_at');
+    final relativePath = _requiredStoredString(row, 'relative_path');
+    final mimeType = _requiredStoredString(row, 'mime_type');
+    final byteSize = _requiredPositiveStoredInt(row, 'byte_size');
+    final sha256Value = _requiredSha256(row, 'sha256');
+    if (role != 'inventory_photo' ||
+        originalFileName.length > 255 ||
+        originalFileName.contains('/') ||
+        originalFileName.contains('\\') ||
+        !const {'image/jpeg', 'image/png', 'image/heic'}.contains(mimeType) ||
+        updatedAt.isBefore(createdAt) ||
+        (archivedAt != null && archivedAt != updatedAt)) {
+      throw const InventoryFailure('inventory_photo_integrity_failed');
+    }
+    final integrity = await attachmentGateway.inspect(
+      relativePath: relativePath,
+      expectedSha256: sha256Value,
+      expectedMimeType: mimeType,
+      expectedByteSize: byteSize,
+    );
+    return InventoryAssetPhotoRecord(
+      linkId: linkId,
+      attachmentId: attachmentId,
+      assetId: assetId,
+      projectId: projectId,
+      originalFileName: originalFileName,
+      revision: revision,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      archivedAt: archivedAt,
+      relativePath: relativePath,
+      mimeType: mimeType,
+      byteSize: byteSize,
+      sha256Value: sha256Value,
+      integrity: integrity,
+    );
+  }
+
+  Future<InventoryAssetPhotoRecord?> _loadActivePhoto(
+    Transaction transaction, {
+    required String projectId,
+    required String assetId,
+  }) async {
+    final rows = await _loadPhotoRows(
+      transaction,
+      projectId: projectId,
+      assetId: assetId,
+      activeOnly: true,
+    );
+    if (rows.length > 1) {
+      throw const InventoryFailure('inventory_photo_cardinality_invalid');
+    }
+    if (rows.isEmpty) return null;
+    final photo = await _photoFromJoinedRow(rows.single);
+    if (photo.projectId != projectId ||
+        photo.assetId != assetId ||
+        !photo.isActive) {
+      throw const InventoryFailure('inventory_photo_integrity_failed');
+    }
+    return photo;
   }
 
   InventorySketchRecord _sketchFromRow(Map<String, Object?> row) {
@@ -2013,6 +2216,90 @@ class InventoryApplication implements InventoryApplicationPort {
   }
 
   @override
+  Future<InventoryPhotoPickResult> pickAssetPhoto(
+    InventoryPhotoSource source,
+  ) async {
+    try {
+      final result = await attachmentGateway.pick(source);
+      if ((result.outcome == InventoryPhotoPickOutcome.selected) !=
+          (result.selection != null)) {
+        throw const InventoryFailure('inventory_photo_picker_invalid');
+      }
+      return result;
+    } on InventoryFailure {
+      rethrow;
+    } on Object {
+      throw const InventoryFailure('inventory_photo_picker_unavailable');
+    }
+  }
+
+  @override
+  Future<InventoryAssetPhotoRecord?> loadActiveAssetPhoto({
+    required String projectId,
+    required String assetId,
+  }) {
+    _requireIdentity(projectId, 'inventory_invalid_project_id');
+    _requireUuid(assetId, 'inventory_invalid_asset_id');
+    return _guardRead(
+      () => database.database.transaction((transaction) async {
+        await _requireProjectAvailable(transaction, projectId);
+        await _requireAsset(
+          transaction,
+          projectId: projectId,
+          assetId: assetId,
+        );
+        return _loadActivePhoto(
+          transaction,
+          projectId: projectId,
+          assetId: assetId,
+        );
+      }),
+    );
+  }
+
+  @override
+  Future<InventoryPhotoContent> readAssetPhoto({
+    required String projectId,
+    required String assetId,
+    required String linkId,
+  }) {
+    _requireIdentity(projectId, 'inventory_invalid_project_id');
+    _requireUuid(assetId, 'inventory_invalid_asset_id');
+    _requireUuid(linkId, 'inventory_invalid_photo_link_id');
+    return _guardRead(
+      () => database.database.transaction((transaction) async {
+        await _requireProjectAvailable(transaction, projectId);
+        await _requireAsset(
+          transaction,
+          projectId: projectId,
+          assetId: assetId,
+        );
+        final rows = await _loadPhotoRows(
+          transaction,
+          projectId: projectId,
+          assetId: assetId,
+          linkId: linkId,
+          activeOnly: true,
+        );
+        if (rows.length != 1) {
+          throw const InventoryFailure('inventory_photo_unavailable');
+        }
+        final photo = await _photoFromJoinedRow(rows.single);
+        if (photo.integrity != InventoryPhotoIntegrity.healthy) {
+          throw InventoryFailure('inventory_photo_${photo.integrity.code}');
+        }
+        return attachmentGateway.read(
+          relativePath: photo.relativePath,
+          originalFileName: photo.originalFileName,
+          expectedSha256: photo.sha256Value,
+          expectedMimeType: photo.mimeType,
+          expectedByteSize: photo.byteSize,
+        );
+      }),
+    );
+  }
+
+  @override
   Future<List<InventoryPlacementRecord>> listPlacementVersions({
     required String projectId,
     required String assetId,
@@ -2083,6 +2370,14 @@ class InventoryApplication implements InventoryApplicationPort {
           whereArgs: [projectId, assetId],
           orderBy: 'placement_key ASC',
         );
+        final linkRows = await transaction.query(
+          'inventory_asset_attachment_links',
+          distinct: true,
+          columns: const ['id'],
+          where: 'project_id = ? AND asset_id = ?',
+          whereArgs: [projectId, assetId],
+          orderBy: 'id ASC',
+        );
         final result = <InventoryEventRecord>[
           ...await _loadAggregateEvents(
             transaction,
@@ -2099,6 +2394,17 @@ class InventoryApplication implements InventoryApplicationPort {
               projectId: projectId,
               aggregateType: InventoryAggregateType.placement,
               aggregateId: key,
+            ),
+          );
+        }
+        for (final row in linkRows) {
+          final linkId = _requiredStoredUuid(row, 'id');
+          result.addAll(
+            await _loadAggregateEvents(
+              transaction,
+              projectId: projectId,
+              aggregateType: InventoryAggregateType.attachmentLink,
+              aggregateId: linkId,
             ),
           );
         }
@@ -2972,6 +3278,352 @@ class InventoryApplication implements InventoryApplicationPort {
             payload: _eventPayload(
               result,
               values: <String, Object?>{'archived': archive},
+            ),
+          ),
+        ],
+      );
+    });
+  }
+
+  Future<InventoryMutationResult?> _preflightPhotoStage(
+    AddOrReplaceInventoryAssetPhotoCommand command, {
+    required String intentSha256,
+  }) async {
+    try {
+      return await database.database.transaction((transaction) async {
+        final replay = await _tryReplay(
+          transaction,
+          command: command,
+          intentSha256: intentSha256,
+        );
+        if (replay != null) return replay;
+        await _requireProjectAvailable(transaction, command.projectId);
+        final asset = await _requireAsset(
+          transaction,
+          projectId: command.projectId,
+          assetId: command.assetId,
+        );
+        _requireCurrentAssetRevision(asset, command.expectedAssetRevision);
+        _requireUnarchivedAsset(asset);
+        await _loadActivePhoto(
+          transaction,
+          projectId: command.projectId,
+          assetId: command.assetId,
+        );
+        await _requireUnusedId(
+          transaction,
+          table: 'inventory_asset_attachment_links',
+          id: command.linkId,
+          code: 'inventory_photo_link_id_conflict',
+        );
+        await _requireUnusedId(
+          transaction,
+          table: 'managed_attachments',
+          id: command.attachmentId,
+          code: 'inventory_attachment_id_conflict',
+        );
+        return null;
+      });
+    } on InventoryFailure {
+      rethrow;
+    } on InventoryGeometryFailure {
+      throw const InventoryFailure(InventoryGeometryFailure.safeCode);
+    } on DatabaseException {
+      throw const InventoryFailure('inventory_persistence_failed');
+    } on Object {
+      throw const InventoryFailure('inventory_persistence_failed');
+    }
+  }
+
+  @override
+  Future<InventoryMutationResult> addOrReplaceAssetPhoto(
+    AddOrReplaceInventoryAssetPhotoCommand command,
+  ) async {
+    _requireUuid(command.assetId, 'inventory_invalid_asset_id');
+    _requireUuid(command.linkId, 'inventory_invalid_photo_link_id');
+    _requireUuid(command.attachmentId, 'inventory_invalid_attachment_id');
+    _requirePositiveRevision(command.expectedAssetRevision);
+    final originalFileName = _boundedText(
+      command.selection.originalFileName,
+      maximum: 255,
+      code: 'inventory_photo_invalid_file_name',
+    );
+    if (originalFileName.contains('/') || originalFileName.contains('\\')) {
+      throw const InventoryFailure('inventory_photo_invalid_file_name');
+    }
+    final bytes = command.selection.bytes;
+    if (bytes.isEmpty) {
+      throw const InventoryFailure('inventory_photo_invalid_file_size');
+    }
+    final source = switch (command.selection.source) {
+      InventoryPhotoSource.camera => 'camera',
+      InventoryPhotoSource.photoLibrary => 'photo_library',
+    };
+    final selectedSha256 = hashes.sha256.convert(bytes).toString();
+    final intent = <String, Object?>{
+      'asset_id': command.assetId,
+      'attachment_id': command.attachmentId,
+      'byte_size': bytes.length,
+      'content_sha256': selectedSha256,
+      'expected_asset_revision': command.expectedAssetRevision,
+      'link_id': command.linkId,
+      'original_file_name': originalFileName,
+      'project_id': command.projectId,
+      'source': source,
+    };
+    _requireUuid(command.operationId, 'inventory_invalid_operation_id');
+    _requireIdentity(command.projectId, 'inventory_invalid_project_id');
+    final intentSha256 = _sha256(_canonicalJson(intent));
+    StagedInventoryPhoto? staged;
+    try {
+      final replay = await _preflightPhotoStage(
+        command,
+        intentSha256: intentSha256,
+      );
+      if (replay != null) return replay;
+      staged = await attachmentGateway.stage(
+        assetId: command.assetId,
+        attachmentId: command.attachmentId,
+        originalFileName: originalFileName,
+        bytes: bytes,
+      );
+      final stagedPhoto = staged;
+      if (stagedPhoto.byteSize != bytes.length ||
+          stagedPhoto.sha256Value != selectedSha256 ||
+          stagedPhoto.relativePath.isEmpty ||
+          stagedPhoto.relativePath != stagedPhoto.relativePath.trim() ||
+          !const {
+            'image/jpeg',
+            'image/png',
+            'image/heic',
+          }.contains(stagedPhoto.mimeType)) {
+        throw const InventoryFailure('inventory_photo_stage_invalid');
+      }
+      return await _runMutation(command, intent, (
+        transaction,
+        intentSha256,
+      ) async {
+        final asset = await _requireAsset(
+          transaction,
+          projectId: command.projectId,
+          assetId: command.assetId,
+        );
+        _requireCurrentAssetRevision(asset, command.expectedAssetRevision);
+        _requireUnarchivedAsset(asset);
+        final current = await _loadActivePhoto(
+          transaction,
+          projectId: command.projectId,
+          assetId: command.assetId,
+        );
+        await _requireUnusedId(
+          transaction,
+          table: 'inventory_asset_attachment_links',
+          id: command.linkId,
+          code: 'inventory_photo_link_id_conflict',
+        );
+        await _requireUnusedId(
+          transaction,
+          table: 'managed_attachments',
+          id: command.attachmentId,
+          code: 'inventory_attachment_id_conflict',
+        );
+        final occurredAt = _canonicalNowAfter(
+          asset.updatedAt,
+          current?.updatedAt,
+        );
+        final timestamp = CseTimeCodec.encodeUtc(occurredAt);
+        await transaction.insert('managed_attachments', {
+          'id': command.attachmentId,
+          'relative_path': stagedPhoto.relativePath,
+          'mime_type': stagedPhoto.mimeType,
+          'byte_size': stagedPhoto.byteSize,
+          'sha256': stagedPhoto.sha256Value,
+          'created_at': timestamp,
+        });
+        if (current != null) {
+          final archived = await transaction.update(
+            'inventory_asset_attachment_links',
+            {
+              'revision': current.revision + 1,
+              'updated_at': timestamp,
+              'archived_at': timestamp,
+            },
+            where:
+                'id = ? AND project_id = ? AND asset_id = ? '
+                'AND revision = ? AND archived_at IS NULL',
+            whereArgs: [
+              current.linkId,
+              command.projectId,
+              command.assetId,
+              current.revision,
+            ],
+          );
+          if (archived != 1) {
+            throw const InventoryFailure('inventory_stale_revision');
+          }
+        }
+        await transaction.insert('inventory_asset_attachment_links', {
+          'id': command.linkId,
+          'attachment_id': command.attachmentId,
+          'asset_id': command.assetId,
+          'project_id': command.projectId,
+          'role': 'inventory_photo',
+          'original_file_name': originalFileName,
+          'description': null,
+          'revision': 1,
+          'created_at': timestamp,
+          'updated_at': timestamp,
+          'archived_at': null,
+        });
+        final eventCount = current == null ? 1 : 2;
+        final result = _result(
+          command: command,
+          sourceId: command.linkId,
+          sourceRevision: 1,
+          supportingId: command.attachmentId,
+          supportingRevision: null,
+          isNoOp: false,
+          eventCount: eventCount,
+          resultAt: occurredAt,
+        );
+        return _finishMutation(
+          transaction,
+          command: command,
+          intentSha256: intentSha256,
+          result: result,
+          events: [
+            if (current != null)
+              _PendingInventoryEvent(
+                aggregateType: InventoryAggregateType.attachmentLink,
+                aggregateId: current.linkId,
+                eventType: InventoryEventType.photoArchived,
+                payload: _eventPayload(
+                  result,
+                  values: <String, Object?>{
+                    'asset_id': command.assetId,
+                    'attachment_id': current.attachmentId,
+                    'link_revision': current.revision + 1,
+                    'replacement_link_id': command.linkId,
+                  },
+                ),
+              ),
+            _PendingInventoryEvent(
+              aggregateType: InventoryAggregateType.attachmentLink,
+              aggregateId: command.linkId,
+              eventType: InventoryEventType.photoLinked,
+              payload: _eventPayload(
+                result,
+                values: <String, Object?>{
+                  'asset_id': command.assetId,
+                  'attachment_id': command.attachmentId,
+                  'byte_size': stagedPhoto.byteSize,
+                  'mime_type': stagedPhoto.mimeType,
+                  'replaced_link_id': current?.linkId,
+                  'sha256': stagedPhoto.sha256Value,
+                  'source': source,
+                },
+              ),
+            ),
+          ],
+        );
+      });
+    } on Object catch (error, stackTrace) {
+      final operationOwned = staged;
+      if (operationOwned != null) {
+        try {
+          await attachmentGateway.cleanup(operationOwned.relativePath);
+        } on Object {
+          throw const InventoryFailure('inventory_photo_cleanup_failed');
+        }
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
+  @override
+  Future<InventoryMutationResult> removeAssetPhoto(
+    RemoveInventoryAssetPhotoCommand command,
+  ) {
+    _requireUuid(command.assetId, 'inventory_invalid_asset_id');
+    _requireUuid(command.linkId, 'inventory_invalid_photo_link_id');
+    _requirePositiveRevision(command.expectedAssetRevision);
+    _requirePositiveRevision(command.expectedLinkRevision);
+    final intent = <String, Object?>{
+      'asset_id': command.assetId,
+      'expected_asset_revision': command.expectedAssetRevision,
+      'expected_link_revision': command.expectedLinkRevision,
+      'link_id': command.linkId,
+      'project_id': command.projectId,
+    };
+    return _runMutation(command, intent, (transaction, intentSha256) async {
+      final asset = await _requireAsset(
+        transaction,
+        projectId: command.projectId,
+        assetId: command.assetId,
+      );
+      _requireCurrentAssetRevision(asset, command.expectedAssetRevision);
+      _requireUnarchivedAsset(asset);
+      final active = await _loadActivePhoto(
+        transaction,
+        projectId: command.projectId,
+        assetId: command.assetId,
+      );
+      if (active == null || active.linkId != command.linkId) {
+        throw const InventoryFailure('inventory_photo_unavailable');
+      }
+      if (active.revision != command.expectedLinkRevision) {
+        throw const InventoryFailure('inventory_stale_revision');
+      }
+      final occurredAt = _canonicalNowAfter(asset.updatedAt, active.updatedAt);
+      final timestamp = CseTimeCodec.encodeUtc(occurredAt);
+      final updated = await transaction.update(
+        'inventory_asset_attachment_links',
+        {
+          'revision': active.revision + 1,
+          'updated_at': timestamp,
+          'archived_at': timestamp,
+        },
+        where:
+            'id = ? AND project_id = ? AND asset_id = ? '
+            'AND revision = ? AND archived_at IS NULL',
+        whereArgs: [
+          command.linkId,
+          command.projectId,
+          command.assetId,
+          active.revision,
+        ],
+      );
+      if (updated != 1) {
+        throw const InventoryFailure('inventory_stale_revision');
+      }
+      final result = _result(
+        command: command,
+        sourceId: command.linkId,
+        sourceRevision: active.revision + 1,
+        supportingId: active.attachmentId,
+        supportingRevision: null,
+        isNoOp: false,
+        eventCount: 1,
+        resultAt: occurredAt,
+      );
+      return _finishMutation(
+        transaction,
+        command: command,
+        intentSha256: intentSha256,
+        result: result,
+        events: [
+          _PendingInventoryEvent(
+            aggregateType: InventoryAggregateType.attachmentLink,
+            aggregateId: command.linkId,
+            eventType: InventoryEventType.photoArchived,
+            payload: _eventPayload(
+              result,
+              values: <String, Object?>{
+                'asset_id': command.assetId,
+                'attachment_id': active.attachmentId,
+                'link_revision': active.revision + 1,
+                'reason': 'owner_removed',
+              },
             ),
           ),
         ],

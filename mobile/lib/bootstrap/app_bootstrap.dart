@@ -22,6 +22,7 @@ import 'package:chief_site_engineer/platform/capabilities.dart';
 import 'package:chief_site_engineer/platform/concrete_attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/concrete_export_gateway.dart';
 import 'package:chief_site_engineer/platform/export_gateway.dart';
+import 'package:chief_site_engineer/platform/inventory_attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/managed_attachment_store.dart';
 import 'package:chief_site_engineer/platform/mobile_backup_gateway.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
@@ -159,6 +160,14 @@ class AppBootstrap {
       final managedAttachmentStore = DeviceManagedAttachmentStore(
         directories: directories,
       );
+      final safeAttachmentPicker = SafeAttachmentPicker(
+        permissions: const SafeCapabilityService(DevicePermissionGateway()),
+        picker: FlutterAttachmentPickerPort(),
+      );
+      final safeInventoryAttachmentPicker = SafeAttachmentPicker(
+        permissions: const SafeCapabilityService(DevicePermissionGateway()),
+        picker: FlutterInventoryAttachmentPickerPort(),
+      );
       final attachmentCatalog = SqliteAttachmentCatalogApplication(
         databasePath: directories.databaseFile,
         databaseFactory: databaseFactory,
@@ -192,6 +201,10 @@ class AppBootstrap {
         databasePath: directories.databaseFile,
         databaseFactory: databaseFactory,
         clock: clock,
+        attachmentGateway: DeviceInventoryAttachmentGateway(
+          picker: safeInventoryAttachmentPicker,
+          managedStore: managedAttachmentStore,
+        ),
       );
       final livingPlanIntelligence =
           SqliteConstructionLivingPlanIntelligenceApplication(
@@ -241,10 +254,7 @@ class AppBootstrap {
         ),
         coordinator: coordinator,
       );
-      final concreteAttachments = SafeAttachmentPicker(
-        permissions: const SafeCapabilityService(DevicePermissionGateway()),
-        picker: FlutterAttachmentPickerPort(),
-      );
+      final concreteAttachments = safeAttachmentPicker;
       try {
         await notificationGateway.initialize();
       } on Object {

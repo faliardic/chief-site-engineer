@@ -850,6 +850,40 @@ class InventoryPageState extends State<InventoryPage> {
                 : _acceptDetailTarget,
           ),
         ),
+        if (controller.canonicalActiveMapAssets.isEmpty ||
+            controller.visibleMapAssets.isEmpty)
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: _targetSelectionRequest == null ? 12 : 92,
+            child: IgnorePointer(
+              child: Card(
+                key: controller.canonicalActiveMapAssets.isEmpty
+                    ? const Key('inventory-map-empty')
+                    : const Key('inventory-map-empty-filter'),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Icon(
+                        controller.canonicalActiveMapAssets.isEmpty
+                            ? Icons.inventory_2_outlined
+                            : Icons.search_off_rounded,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          controller.canonicalActiveMapAssets.isEmpty
+                              ? 'Bu projede henüz envanter kaydı yok. Krokiye dokunarak ekleyebilirsiniz.'
+                              : 'Arama ve filtrelerle eşleşen kroki kaydı yok.',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         if (_targetSelectionRequest case final request?)
           Positioned(
             left: 12,
@@ -1066,6 +1100,7 @@ class InventoryPageState extends State<InventoryPage> {
       projectId: projectId,
       assetId: assetId,
       reloadMapCanonical: controller.reloadSelected,
+      isProjectContextCurrent: () => _canContinueDetailFlow(projectId),
     );
     _activeDetailController = detailController;
     try {
