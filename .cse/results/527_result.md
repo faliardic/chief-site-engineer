@@ -286,3 +286,58 @@ execution_record:
   runtime_routing_verified: false
 review_recommendation: FRESH_INDEPENDENT_R4_REREVIEW
 ```
+
+## Narrow acceptance-label correction — isolated harness
+
+- Authority: Issue #527 narrow acceptance-label correction authority.
+- Exact parent: `d00284bd10bfff8b38006a557b9a8af0ecb57457`.
+- Target: existing PR `#528`, retained `OPEN/DRAFT`.
+- Source correction: only the `CSE_ACCEPTANCE_HARNESS=true` debug
+  `appLabel` changed from `Şefim` to `Şefim (Acceptance)`.
+- Release `appLabel` remains `Şefim`; package/application ID, permissions,
+  signing, SDK levels, version, dependencies, manifests, and MAIN behavior are
+  unchanged.
+
+Validation evidence:
+
+- Pre-build `git diff --check`: `PASS`.
+- Acceptance debug APK build invocation count: exactly `1`.
+- Build command:
+  `CSE_ACCEPTANCE_HARNESS=true flutter build apk --debug --no-pub --target lib/main.dart --target-platform android-arm64`.
+- Build result: `PASS`.
+- Artifact: `mobile/build/app/outputs/flutter-apk/app-debug.apk`.
+- Package: `com.faliardic.sefim.acceptance`.
+- Application label: `Şefim (Acceptance)`.
+- Version name: `0.1.0-acceptance`; version code: `1`.
+- APK size: `127407944` bytes.
+- APK SHA-256:
+  `50e8f5d34ceb9126d72363d21c05bbe6c924cdee8316199280d66e38b860b8bd`.
+- AAPT metadata verification: `PASS`; APK signature verification: `PASS`
+  (APK Signature Scheme v2, one signer).
+- Install/uninstall/clear-data/device migration/launch/ADB/MAIN: `NOT RUN`.
+- Flutter tests and analyzer: `NOT RUN` under this narrow authority.
+- Manual tests `MT-527-001..010`: remain `PENDING / NOT RUN`.
+
+```yaml
+execution_record:
+  issue: 527
+  correction: ACCEPTANCE_DEBUG_APP_LABEL
+  exact_parent: d00284bd10bfff8b38006a557b9a8af0ecb57457
+  build_invocations: 1
+  build_result: PASS
+  package: com.faliardic.sefim.acceptance
+  label: Şefim (Acceptance)
+  version_name: 0.1.0-acceptance
+  apk_bytes: 127407944
+  apk_sha256: 50e8f5d34ceb9126d72363d21c05bbe6c924cdee8316199280d66e38b860b8bd
+  install: NOT_RUN
+  device_launch: NOT_RUN
+  main_touched: false
+  manual_test_status: PENDING
+  ready: false
+  merged: false
+  runtime_model: unknown
+  runtime_reasoning_effort: null
+  runtime_routing_verified: false
+review_recommendation: FRESH_INDEPENDENT_R4_REREVIEW
+```
