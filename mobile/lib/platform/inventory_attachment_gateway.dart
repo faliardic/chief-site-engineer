@@ -3,6 +3,39 @@ import 'package:chief_site_engineer/domain/attachment_models.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/managed_attachment_store.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as path;
+
+typedef InventoryOriginalImagePick =
+    Future<XFile?> Function({required ImageSource source});
+
+class FlutterInventoryAttachmentPickerPort implements AttachmentPickerPort {
+  FlutterInventoryAttachmentPickerPort({InventoryOriginalImagePick? pickImage})
+    : _pickImage = pickImage ?? _pickOriginalImage;
+
+  final InventoryOriginalImagePick _pickImage;
+
+  static Future<XFile?> _pickOriginalImage({required ImageSource source}) =>
+      ImagePicker().pickImage(source: source);
+
+  @override
+  Future<SelectedAttachment?> pick(AttachmentSource source) async {
+    final imageSource = switch (source) {
+      AttachmentSource.camera => ImageSource.camera,
+      AttachmentSource.photoLibrary => ImageSource.gallery,
+      AttachmentSource.filePicker => throw UnsupportedError(
+        'inventory_file_picker_not_supported',
+      ),
+    };
+    final selected = await _pickImage(source: imageSource);
+    if (selected == null) return null;
+    return SelectedAttachment(
+      name: path.basename(selected.name),
+      bytes: await selected.readAsBytes(),
+      source: source,
+    );
+  }
+}
 
 class DeviceInventoryAttachmentGateway implements InventoryAttachmentGateway {
   const DeviceInventoryAttachmentGateway({

@@ -164,6 +164,10 @@ class AppBootstrap {
         permissions: const SafeCapabilityService(DevicePermissionGateway()),
         picker: FlutterAttachmentPickerPort(),
       );
+      final safeInventoryAttachmentPicker = SafeAttachmentPicker(
+        permissions: const SafeCapabilityService(DevicePermissionGateway()),
+        picker: FlutterInventoryAttachmentPickerPort(),
+      );
       final attachmentCatalog = SqliteAttachmentCatalogApplication(
         databasePath: directories.databaseFile,
         databaseFactory: databaseFactory,
@@ -198,7 +202,7 @@ class AppBootstrap {
         databaseFactory: databaseFactory,
         clock: clock,
         attachmentGateway: DeviceInventoryAttachmentGateway(
-          picker: safeAttachmentPicker,
+          picker: safeInventoryAttachmentPicker,
           managedStore: managedAttachmentStore,
         ),
       );

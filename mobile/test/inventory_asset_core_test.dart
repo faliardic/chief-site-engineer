@@ -518,9 +518,41 @@ void main() {
         final opened = <String>[];
 
         await _pumpMap(tester, controller, onOpenAsset: opened.add);
-        final cluster = find.bySemanticsLabel('3 envanter kaydı içeren küme');
+        final mapState = tester.state<InventoryMapViewState>(
+          find.byType(InventoryMapView),
+        );
+        var cluster = find.bySemanticsLabel('3 envanter kaydı içeren küme');
         expect(cluster, findsOneWidget);
         expect(tester.getSize(cluster), const Size(48, 48));
+        final initialViewport = mapState.viewport!;
+        await tester.tap(cluster);
+        await tester.pump();
+        final zoomedViewport = mapState.viewport!;
+        expect(zoomedViewport.zoom, initialViewport.zoom * 1.25);
+        expect(
+          find.byKey(const Key('inventory-cluster-chooser')),
+          findsNothing,
+        );
+        final centeredGroup = buildInventoryMarkerGroups(
+          controller.projections,
+          zoomedViewport,
+        ).singleWhere((group) => group.projections.length == 3);
+        expect(
+          centeredGroup.center.dx,
+          closeTo(zoomedViewport.viewSize.width / 2, 0.01),
+        );
+        expect(
+          centeredGroup.center.dy,
+          closeTo(zoomedViewport.viewSize.height / 2, 0.01),
+        );
+
+        while (mapState.viewport!.zoom < InventoryViewport.maximumZoom) {
+          mapState.zoomIn();
+          await tester.pump();
+        }
+        expect(mapState.viewport!.zoom, InventoryViewport.maximumZoom);
+        cluster = find.bySemanticsLabel('3 envanter kaydı içeren küme');
+        expect(cluster, findsOneWidget);
         await tester.tap(cluster);
         await tester.pumpAndSettle();
         expect(
@@ -540,10 +572,12 @@ void main() {
         expect(opened, [_uuid(1321)]);
 
         final selectedTargets = <InventoryPlacementTarget>[];
+        final quickCreates = <InventoryPlacementTarget>[];
         await _pumpMap(
           tester,
           controller,
           onOpenAsset: opened.add,
+          onCreateTarget: quickCreates.add,
           onSelectTarget: selectedTargets.add,
         );
         await tester.tap(find.bySemanticsLabel('3 envanter kaydı içeren küme'));
@@ -553,7 +587,74 @@ void main() {
           findsNothing,
         );
         expect(selectedTargets, hasLength(1));
+        expect(quickCreates, isEmpty);
         expect(opened, [_uuid(1321)]);
+      } finally {
+        semantics.dispose();
+      }
+    },
+  );
+
+  testWidgets(
+    '14c clustered list focus centers exact placement with a two-second cue',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        final focusedAssetId = _uuid(1321);
+        final fake = _FakeInventoryApplication.standard()
+          ..addAsset(assetId: _uuid(1320), x: 220, y: 220)
+          ..addAsset(assetId: focusedAssetId, x: 240, y: 240);
+        final controller = InventoryMapController(
+          application: fake,
+          projectId: _projectId,
+        );
+        addTearDown(controller.dispose);
+        expect(await controller.reload(), isTrue);
+
+        await _pumpMap(tester, controller);
+        final mapState = tester.state<InventoryMapViewState>(
+          find.byType(InventoryMapView),
+        );
+        expect(mapState.focusAsset(focusedAssetId), isTrue);
+        await tester.pump();
+
+        final cue = find.byKey(Key('inventory-cluster-focus-$focusedAssetId'));
+        expect(cue, findsOneWidget);
+        expect(
+          find.bySemanticsLabel('Ek varlık, kesin konumda odaklandı'),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: cue,
+            matching: find.byIcon(Icons.center_focus_strong),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.bySemanticsLabel('3 envanter kaydı içeren küme'),
+          findsOneWidget,
+        );
+        final viewport = mapState.viewport!;
+        final projection = controller.projections.firstWhere(
+          (item) => item.asset.id == focusedAssetId,
+        );
+        final placement = projection.activePlacement!;
+        final exactCenter =
+            viewport.origin +
+            Offset(placement.x * viewport.scale, placement.y * viewport.scale);
+        final cueCenter = tester.getCenter(cue);
+        final viewCenter = viewport.viewSize.center(Offset.zero);
+        expect(cueCenter.dx, closeTo(exactCenter.dx, 0.01));
+        expect(cueCenter.dy, closeTo(exactCenter.dy, 0.01));
+        expect(exactCenter.dx, closeTo(viewCenter.dx, 0.01));
+        expect(exactCenter.dy, closeTo(viewCenter.dy, 0.01));
+
+        await tester.pump(const Duration(milliseconds: 1999));
+        expect(cue, findsOneWidget);
+        await tester.pump(const Duration(milliseconds: 2));
+        expect(cue, findsNothing);
+        expect(mapState.highlightedAssetId, isNull);
       } finally {
         semantics.dispose();
       }

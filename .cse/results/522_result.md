@@ -300,3 +300,103 @@ merge: false
 ## review_recommendation — publication authorized
 
 `PUBLISH_ONE_IMPLEMENTATION_COMMIT_AND_DRAFT_PR_THEN_FRESH_INDEPENDENT_R4_REVIEW`
+
+## Canonical R4 correction — comment 5459790117
+
+Fresh independent review `5056417941` blocked PR #524 at exact parent head `7145e1b84fdc46fbd1a232a2899bfc188446b38b` on two narrow contract families. Owner comment `5459790117` authorized one correction pass across six exact paths.
+
+### Correction A — canonical cluster interaction and exact focus
+
+- A normal cluster tap below `4.0x` now uses the existing `1.25` map zoom step, anchors the tapped group and centers it; the chooser is not opened by that tap.
+- At `4.0x`, the same cluster tap opens the existing bounded deterministic exact-identity chooser.
+- Target-selection remains the first branch and opens neither chooser nor quick-create.
+- When `focusAsset(assetId)` targets an asset inside a cluster, the exact placement stays centered and receives a two-second exact-ID keyed focus overlay with an outline plus `center_focus_strong` icon and live semantics. The cluster count/semantics remain present and source coordinates are not mutated.
+
+### Correction B — original Inventory photo bytes
+
+- Added `FlutterInventoryAttachmentPickerPort` inside the authorized Inventory gateway path.
+- It maps Inventory camera/gallery to `ImageSource.camera` / `ImageSource.gallery` and calls `ImagePicker.pickImage(source: source)` without `imageQuality`, resize or transcode arguments.
+- The returned `XFile.readAsBytes()` sequence passes unchanged through `SelectedAttachment`, Inventory selection and existing managed-store stage/read input.
+- Bootstrap now gives Inventory its own `SafeAttachmentPicker` using this original-byte port.
+- Concrete retains the shared `FlutterAttachmentPickerPort` and its existing behavior; `concrete_attachment_gateway.dart` drift is `0`.
+- Existing capability permission and managed-store MIME/hash/size/path contracts are unchanged.
+
+### Exact correction paths
+
+1. `mobile/lib/features/inventory/inventory_map_view.dart`
+2. `mobile/lib/platform/inventory_attachment_gateway.dart`
+3. `mobile/lib/bootstrap/app_bootstrap.dart`
+4. `mobile/test/inventory_asset_core_test.dart`
+5. `mobile/test/inventory_attachment_gateway_test.dart`
+6. `.cse/results/522_result.md` (append-only)
+
+No seventh correction path was used.
+
+### Narrow focused gate
+
+Exact command only:
+
+```text
+flutter test --no-pub test/inventory_asset_core_test.dart test/inventory_attachment_gateway_test.dart
+```
+
+- Invocation 1: `45 PASS / 1 FAIL`.
+- The only failure was a test-harness fixture defect: IO `XFile.fromData` ignores `name`, leaving an empty filename. Production behavior was not implicated.
+- Mechanical correction: the fixture supplies `path: nextName`; only `mobile/test/inventory_attachment_gateway_test.dart` changed.
+- Authorized mechanical retry: `46 PASS / 0 FAIL` — `All tests passed!`.
+- Narrow focused retry budget remaining: `0`.
+- The historical full `95/95` set was not rerun.
+
+### Analyzer and final audits
+
+- `flutter analyze --no-pub`: PASS — `No issues found!`.
+- `git diff --check`: PASS.
+- Correction allowlist: PASS (`5` production/test paths before evidence, `0` unexpected; `6/6` with append-only evidence).
+- Full Issue #522 allowlist: PASS (`13` changed paths, `0` unexpected).
+- Protected source drift: `0`.
+- Schema: `20`; schema/migration drift `0`.
+- Backup format: `1`; backup/restore production drift `0`.
+- Mobile version: `0.1.0+1`.
+- MAIN package: `com.faliardic.sefim`.
+- `pubspec.yaml` / `pubspec.lock`: drift `0`.
+- Android/iOS/platform/permission/signing: drift `0`; prohibited phone/contact permission matches `0`.
+- Generic managed-store/catalog/reconciliation/media-album and Concrete picker source drift: `0`.
+- Inventory picker transform requests (`imageQuality`, resize, transcode, max dimensions): `0`.
+- Tracked SQLite/test DB/backup/APK/AAB/generated-artifact drift: `0`.
+- Source untracked paths: `0`; staging before correction commit: empty.
+- Pre-commit branch/head: `codex/issue-522-inventory-attachment-overlap-resilience` at `7145e1b84fdc46fbd1a232a2899bfc188446b38b`.
+- Pre-commit upstream divergence: `0/0`; `origin/master...HEAD`: `0/1`.
+
+Manual `MT-522-001..003` remain `PENDING / NOT RUN`; no manual PASS is claimed. No full-suite, build, APK/AAB, emulator, ADB, device or MAIN operation was performed.
+
+## execution_record — canonical R4 correction
+
+```yaml
+issue: 522
+pr: 524
+authority_comment: 5459790117
+review: 5056417941
+parent_head: 7145e1b84fdc46fbd1a232a2899bfc188446b38b
+branch: codex/issue-522-inventory-attachment-overlap-resilience
+runtime_requested_model: gpt-5.6-sol
+runtime_requested_reasoning_effort: max
+runtime_actual_model: unknown
+runtime_actual_reasoning_effort: null
+runtime_verification: unverified
+implementation_status: CORRECTED_PENDING_COMMIT
+manual_test_status: PENDING_NOT_RUN
+historical_focused_gate: PASS_95_OF_95_NOT_RERUN
+correction_focused_gate: PASS_46_OF_46_AFTER_ONE_MECHANICAL_FIXTURE_RETRY
+analyzer: PASS_NO_ISSUES
+diff_check: PASS
+correction_allowlist_audit: PASS_6_OF_6_MAX
+full_allowlist_audit: PASS_13_CHANGED_0_UNEXPECTED
+protected_contract_audit: PASS
+publication_authority: SAME_DRAFT_PR_BRANCH_ONLY
+ready: false
+merge: false
+```
+
+## review_recommendation — canonical R4 correction
+
+`PUSH_CORRECTION_TO_DRAFT_PR_524_THEN_FRESH_INDEPENDENT_R4_REREVIEW`

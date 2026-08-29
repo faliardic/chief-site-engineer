@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:chief_site_engineer/core/environment.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
@@ -8,6 +9,7 @@ import 'package:chief_site_engineer/platform/inventory_attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/managed_attachment_store.dart';
 import 'package:chief_site_engineer/storage/app_directories.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
 
 const _assetId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
@@ -40,6 +42,84 @@ void main() {
       expect(library.outcome, InventoryPhotoPickOutcome.selected);
       expect(library.selection?.source, InventoryPhotoSource.photoLibrary);
       expect(pickerPort.lastSource, AttachmentSource.photoLibrary);
+    },
+  );
+
+  test(
+    'inventory picker preserves original camera and library bytes through stage',
+    () async {
+      final root = await Directory.systemTemp.createTemp(
+        'cse_inv_original_picker',
+      );
+      addTearDown(() => root.delete(recursive: true));
+      final pickedSources = <ImageSource>[];
+      Uint8List? nextBytes;
+      var nextName = 'original.jpg';
+      final picker = FlutterInventoryAttachmentPickerPort(
+        pickImage: ({required source}) async {
+          pickedSources.add(source);
+          final bytes = nextBytes;
+          nextBytes = null;
+          if (bytes == null) return null;
+          return XFile.fromData(bytes, path: nextName);
+        },
+      );
+      final gateway = _gateway(root, picker: picker);
+
+      final cameraBytes = Uint8List.fromList(_jpeg(91));
+      nextBytes = cameraBytes;
+      final camera = await gateway.pick(InventoryPhotoSource.camera);
+      expect(pickedSources, [ImageSource.camera]);
+      expect(camera.outcome, InventoryPhotoPickOutcome.selected);
+      expect(camera.selection?.source, InventoryPhotoSource.camera);
+      expect(camera.selection?.bytes, cameraBytes);
+
+      final libraryBytes = Uint8List.fromList(_png(92));
+      nextBytes = libraryBytes;
+      nextName = 'original.png';
+      final library = await gateway.pick(InventoryPhotoSource.photoLibrary);
+      expect(pickedSources, [ImageSource.camera, ImageSource.gallery]);
+      expect(library.outcome, InventoryPhotoPickOutcome.selected);
+      expect(library.selection?.source, InventoryPhotoSource.photoLibrary);
+      expect(library.selection?.bytes, libraryBytes);
+
+      final selection = library.selection!;
+      final staged = await gateway.stage(
+        assetId: _assetId,
+        attachmentId: _attachmentId,
+        originalFileName: selection.originalFileName,
+        bytes: selection.bytes,
+      );
+      expect(staged.byteSize, libraryBytes.length);
+      expect(
+        (await gateway.read(
+          relativePath: staged.relativePath,
+          originalFileName: selection.originalFileName,
+          expectedSha256: staged.sha256Value,
+          expectedMimeType: staged.mimeType,
+          expectedByteSize: staged.byteSize,
+        )).bytes,
+        libraryBytes,
+      );
+
+      final cancelled = await gateway.pick(InventoryPhotoSource.camera);
+      expect(cancelled.outcome, InventoryPhotoPickOutcome.cancelled);
+      expect(cancelled.selection, isNull);
+      expect(pickedSources, [
+        ImageSource.camera,
+        ImageSource.gallery,
+        ImageSource.camera,
+      ]);
+      expect(
+        (await gateway.read(
+          relativePath: staged.relativePath,
+          originalFileName: selection.originalFileName,
+          expectedSha256: staged.sha256Value,
+          expectedMimeType: staged.mimeType,
+          expectedByteSize: staged.byteSize,
+        )).bytes,
+        libraryBytes,
+      );
     },
   );
 
@@ -156,7 +236,7 @@ void main() {
 
 DeviceInventoryAttachmentGateway _gateway(
   Directory root, {
-  _Picker? picker,
+  AttachmentPickerPort? picker,
   AppDirectories? directories,
 }) {
   final resolvedDirectories =

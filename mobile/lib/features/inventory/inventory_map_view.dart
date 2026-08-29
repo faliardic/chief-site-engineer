@@ -525,6 +525,27 @@ class InventoryMapViewState extends State<InventoryMapView> {
     });
   }
 
+  void _handleClusterTap(
+    InventoryMarkerGroup group,
+    InventoryViewport viewport,
+  ) {
+    final selectTarget = widget.onSelectTarget;
+    if (selectTarget != null) {
+      final target = captureInventoryPlacementTarget(group.center, viewport);
+      if (target != null) selectTarget(target);
+      return;
+    }
+    if (viewport.zoom < InventoryViewport.maximumZoom) {
+      final zoomed = viewport.zoomAt(viewport.zoom * 1.25, group.center);
+      final centered = zoomed.panBy(
+        zoomed.viewSize.center(Offset.zero) - group.center,
+      );
+      setState(() => _viewport = centered);
+      return;
+    }
+    unawaited(_openClusterChooser(group));
+  }
+
   void _handleTap(TapUpDetails details) {
     if (_multiTouchGesture) {
       _multiTouchGesture = false;
@@ -649,18 +670,7 @@ class InventoryMapViewState extends State<InventoryMapView> {
                   if (group.isCluster)
                     _InventoryCluster(
                       group: group,
-                      onTap: () {
-                        final selectTarget = widget.onSelectTarget;
-                        if (selectTarget != null) {
-                          final target = captureInventoryPlacementTarget(
-                            group.center,
-                            viewport,
-                          );
-                          if (target != null) selectTarget(target);
-                          return;
-                        }
-                        unawaited(_openClusterChooser(group));
-                      },
+                      onTap: () => _handleClusterTap(group, viewport),
                     )
                   else
                     _InventoryMarker(
@@ -685,6 +695,14 @@ class InventoryMapViewState extends State<InventoryMapView> {
                         widget.onOpenAsset(projection.asset.id);
                       },
                     ),
+                for (final group in groups)
+                  if (group.isCluster)
+                    for (final projection in group.projections)
+                      if (projection.asset.id == _highlightedAssetId)
+                        _InventoryClusterFocusIndicator(
+                          projection: projection,
+                          viewport: viewport,
+                        ),
               ],
             ),
           ),
@@ -727,6 +745,53 @@ class InventoryMapViewState extends State<InventoryMapView> {
       ),
     );
     if (selected != null && mounted) widget.onOpenAsset(selected);
+  }
+}
+
+class _InventoryClusterFocusIndicator extends StatelessWidget {
+  const _InventoryClusterFocusIndicator({
+    required this.projection,
+    required this.viewport,
+  });
+
+  final InventoryAssetProjection projection;
+  final InventoryViewport viewport;
+
+  @override
+  Widget build(BuildContext context) {
+    final placement = projection.activePlacement!;
+    final center = _placementToView(placement, viewport);
+    final colorScheme = Theme.of(context).colorScheme;
+    return Positioned(
+      left: center.dx - 28,
+      top: center.dy - 28,
+      width: 56,
+      height: 56,
+      child: IgnorePointer(
+        child: Semantics(
+          container: true,
+          excludeSemantics: true,
+          liveRegion: true,
+          label: '${projection.asset.displayName}, kesin konumda odaklandı',
+          child: SizedBox.expand(
+            key: Key('inventory-cluster-focus-${projection.asset.id}'),
+            child: DecoratedBox(
+              decoration: ShapeDecoration(
+                color: colorScheme.surface,
+                shape: CircleBorder(
+                  side: BorderSide(color: colorScheme.onSurface, width: 3),
+                ),
+              ),
+              child: Icon(
+                Icons.center_focus_strong,
+                color: colorScheme.onSurface,
+                size: 30,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
