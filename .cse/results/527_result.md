@@ -209,6 +209,91 @@ execution_record:
 review_recommendation: FRESH_INDEPENDENT_R4_REREVIEW
 ```
 
+## 2026-08-29 — owner-acceptance orthogonal drawing correction
+
+Authorities:
+
+- Canonical owner-acceptance correction: Issue #527 comment `5462090995`.
+- Narrow analyzer continuation: Issue #527 comment `5462274022`.
+- Exact parent/head before this correction:
+  `53a5606098cfa074d1b396c3e261de8a05b8aa1f`.
+- Branch: `codex/issue-527-inventory-spatial-foundation`.
+
+Implemented behavior:
+
+- Normal new drawing commits only horizontal or vertical segments.
+- The first segment uses the pointer-dominant axis; following segments alternate
+  by 90 degrees.
+- Smart alignment uses eligible prior working-polyline vertex coordinates and
+  exposes a non-color-only alignment-guide Semantics surface.
+- `Serbest uzunluk` bypasses vertex-length alignment for exactly one next
+  segment, keeps that segment orthogonal, and restores smart alignment after
+  commit.
+- Persisted legacy diagonal geometry remains readable and unchanged; no global
+  domain or schema rejection was introduced.
+- `editActive` rejects finalized/base geometry mutation locally before autosave
+  and exposes the explicit safe UI message. Base-preserving orthogonal block
+  append continues through autosave, reload, and finalize.
+- Existing A+B whole-polygon delete, metadata identity, undo/redo, and finalize
+  mapping coverage remains active.
+- `mobile/lib/application/inventory_application.dart` was not changed: the
+  real regression proved its existing immutable-prefix and append/finalize
+  contracts sufficient.
+
+Validation evidence:
+
+- Touched Dart formatting: `PASS`.
+- Exact focused editor/application/page gate final result: `62/62 PASS`.
+- Under analyzer continuation `5462274022`, the focused gate was not rerun and
+  the authorized `62/62 PASS` result was preserved.
+- The prior analyzer invocation found exactly one test-only
+  `unnecessary_non_null_assertion` at
+  `mobile/test/inventory_application_test.dart:1680`.
+- Continuation correction removed only the exact unnecessary `!`; assertion
+  strength and product behavior were unchanged.
+- Continuation analyzer invocation count: exactly `1`.
+- `flutter analyze --no-pub`: `PASS` — `No issues found!`.
+- Full `git diff --check`: `PASS`.
+- Staged `git diff --check`: `PASS`.
+- Changed-path count including this evidence: `8`; authority allowlist: `10`;
+  outside-allowlist drift: `0`.
+- Schema: `22`; backup format: `1`; mobile version: `0.1.0+1`.
+- Gradle/package/permission/manifest/dependency/pubspec/platform drift beyond
+  the parent head: `0`.
+- APK/build/device/ADB/MAIN: `NOT RUN`.
+- Manual tests `MT-527-001..010`: remain `PENDING / NOT RUN`; no PASS inferred.
+- Ready/merge/Slice 6.2/Slice 6.3: `NOT PERFORMED`.
+
+```yaml
+execution_record:
+  issue: 527
+  correction: OWNER_ACCEPTANCE_ORTHOGONAL_DRAWING
+  analyzer_continuation: 5462274022
+  exact_parent: 53a5606098cfa074d1b396c3e261de8a05b8aa1f
+  branch: codex/issue-527-inventory-spatial-foundation
+  focused_gate: PASS_62_OF_62
+  focused_gate_rerun_under_continuation: false
+  analyzer_invocations_under_continuation: 1
+  analyzer_result: PASS
+  changed_paths: 8
+  outside_allowlist_drift: 0
+  application_source_changed: false
+  schema: 22
+  backup_format: 1
+  mobile_version: 0.1.0+1
+  protected_platform_drift: 0
+  build: NOT_RUN
+  device: NOT_RUN
+  main_touched: false
+  manual_test_status: PENDING
+  ready: false
+  merged: false
+  runtime_model: unknown
+  runtime_reasoning_effort: null
+  runtime_routing_verified: false
+review_recommendation: FRESH_INDEPENDENT_R4_REREVIEW
+```
+
 ## Schema 22 compatibility correction — superseded schema 21
 
 - Authorities: Issue #527 comments `5461456833`, `5461543841`,

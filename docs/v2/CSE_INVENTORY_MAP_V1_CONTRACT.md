@@ -349,11 +349,20 @@ v1; schema22 is the durable final schema for this contract:
 
 A new block boundary MUST be closed, have at least three distinct vertices and
 non-zero area, and MUST NOT self-intersect, overlap, touch or contain/be
-contained by another active mapped block boundary. Each tapped edge is one
-straight segment at any angle. The editor MUST show a live proposed edge,
-provide bounded snap-to-first closure plus explicit `Alanı kapat`, and request
-the block name and positive bounded floor count before closing the polygon.
-Validation MUST fail before draft/final source mutation.
+contained by another active mapped block boundary. Every normally drawn new
+edge MUST be horizontal or vertical. The first edge selects its axis from the
+dominant snapped pointer delta; each following edge MUST use the axis
+perpendicular to the preceding edge. Default smart alignment MUST choose a
+deterministic relevant prior vertex coordinate in the intended direction and
+MUST expose a visible proposed edge plus light alignment guide. `Serbest
+uzunluk` disables only this prior-vertex length alignment for the next committed
+edge; that edge remains orthogonal and smart alignment then restores
+automatically. Preserved legacy/finalized geometry MAY remain diagonal and MUST
+remain readable; this drawing rule MUST NOT become a schema/domain-wide legacy
+rejection. The editor MUST also provide bounded snap-to-first closure plus
+explicit `Alanı kapat`, and request the block name and positive bounded floor
+count before closing the polygon. Validation MUST fail before draft/final source
+mutation.
 
 Schema20 migration MUST first validate source relationships, then create one
 deterministic `Varsayılan Alan` / `1. Kat` pair for every project with Inventory
@@ -865,13 +874,22 @@ In `DRAW`:
 
 1. a single tap on a valid grid point while idle starts a one-point working
    polyline;
-2. each later distinct snapped tap appends one point and segment;
-3. tapping the first point after at least three distinct points closes and ends
-   the polyline;
-4. `Çizgiyi bitir` ends an open polyline with at least two points;
-5. ending a one-point polyline removes that incomplete point as one undoable
+2. the second tap projects to the horizontal or vertical axis whose absolute
+   pointer delta from the first point is greater; an exact tie is horizontal;
+3. every later distinct tap projects onto the axis perpendicular to the
+   preceding segment;
+4. smart alignment defaults on and, when a prior vertex coordinate exists in
+   the intended direction, chooses the deterministic closest pointer target,
+   then closest start target, then lowest coordinate; a guide identifies the
+   selected coordinate;
+5. `Serbest uzunluk` is a one-shot override for the next segment only, bypasses
+   step 4 but not steps 2–3, and resets only after a valid segment commits;
+6. tapping the first point after at least three distinct points closes and ends
+   the polyline only when the required orthogonal axis can reach it;
+7. `Çizgiyi bitir` ends an open polyline with at least two points;
+8. ending a one-point polyline removes that incomplete point as one undoable
    editor command;
-6. a duplicate consecutive point, invalid point or limit-exceeding point is
+9. a duplicate consecutive point, invalid point or limit-exceeding point is
    rejected without changing the draft.
 
 In `SELECT`, tapping the nearest segment within a `24` logical-pixel hit radius
@@ -894,6 +912,14 @@ incomplete-point removal. It MUST NOT include pan, zoom, selection, marker focus
 or already committed asset mutations. The stack MUST retain at most `100`
 commands; a new command after undo clears redo. Relaunch recovers durable draft
 geometry with an empty undo/redo stack.
+
+During `Krokiyi güncelle` / `editActive`, the finalized/base geometry is an
+immutable prefix in Slice 6.1. Any selection/delete or other editor action that
+would change that prefix MUST be rejected locally before autosave and MUST show
+an explicit safe message that existing area shape editing is not yet available.
+The same draft MAY append new orthogonal blocks after the untouched prefix and
+those blocks MUST autosave, reload and finalize normally. Base reshape,
+placement reconciliation and vertex movement remain Slice 6.3.
 
 ### 8.3 Gesture separation and viewport
 

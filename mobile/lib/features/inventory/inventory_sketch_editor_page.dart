@@ -34,6 +34,9 @@ class InventorySketchEditorController extends ChangeNotifier {
   final RecordIdFactory idFactory;
   final Duration autosaveDelay;
 
+  static const lockedBaseGeometryCode =
+      'inventory_base_geometry_edit_not_supported';
+
   InventorySketchLoadStatus loadStatus = InventorySketchLoadStatus.idle;
   InventorySketchSaveStatus saveStatus = InventorySketchSaveStatus.saved;
   InventorySketchEditorSnapshot? editor;
@@ -60,12 +63,14 @@ class InventorySketchEditorController extends ChangeNotifier {
   List<InventoryBlockDraft> _acknowledgedNewBlocks = const [];
   List<List<InventoryBlockDraft>> _undoBlockHistory = const [];
   List<List<InventoryBlockDraft>> _redoBlockHistory = const [];
+  bool _freeLengthNextSegment = false;
 
   String? get sketchId => _sketchId;
   String? get draftRevisionId => _draftRevisionId;
   int? get expectedSketchRevision => _expectedSketchRevision;
   int? get expectedContentRevision => _expectedContentRevision;
   List<InventoryBlockDraft> get newBlocks => _newBlocks;
+  bool get freeLengthNextSegment => _freeLengthNextSegment;
 
   InventoryPolyline? get workingPolyline {
     final current = editor;
@@ -206,8 +211,45 @@ class InventorySketchEditorController extends ChangeNotifier {
     _notify();
   }
 
-  bool drawPoint(InventorySketchPoint point) =>
-      _applyEditorAction(editor?.drawPoint(point));
+  InventorySketchDrawProposal? proposeDrawPoint(InventorySketchPoint point) =>
+      editor?.proposeDrawPoint(point, smartAlignment: !_freeLengthNextSegment);
+
+  bool drawPoint(InventorySketchPoint point) {
+    final current = editor;
+    if (current == null) return false;
+    final next = current.drawPoint(
+      point,
+      smartAlignment: !_freeLengthNextSegment,
+    );
+    final commitsSegment =
+        next != null &&
+        current.hasWorkingPolyline &&
+        current.geometry.canonicalJson != next.geometry.canonicalJson;
+    final applied = _applyEditorAction(next);
+    if (applied && commitsSegment && _freeLengthNextSegment) {
+      _freeLengthNextSegment = false;
+      _notify();
+    }
+    return applied;
+  }
+
+  void setFreeLengthNextSegment(bool value) {
+    final current = editor;
+    if (current == null ||
+        current.mode != InventorySketchEditorMode.draw ||
+        !current.hasWorkingPolyline ||
+        _freeLengthNextSegment == value) {
+      return;
+    }
+    _freeLengthNextSegment = value;
+    _notify();
+  }
+
+  void dismissLockedGeometryMessage() {
+    if (lastErrorCode != lockedBaseGeometryCode) return;
+    lastErrorCode = null;
+    _notify();
+  }
 
   bool shouldCloseAt(InventorySketchPoint point) {
     final working = workingPolyline;
@@ -216,7 +258,8 @@ class InventorySketchEditorController extends ChangeNotifier {
     final dx = first.x - point.x;
     final dy = first.y - point.y;
     const radius = InventoryGeometryContract.sketchGridStep * 2;
-    return dx * dx + dy * dy <= radius * radius;
+    return dx * dx + dy * dy <= radius * radius &&
+        proposeDrawPoint(first)?.end == first;
   }
 
   InventoryBlockDraft createBlockDraft({
@@ -255,7 +298,10 @@ class InventorySketchEditorController extends ChangeNotifier {
         definition.polygonIndex != index) {
       return false;
     }
-    final next = current.drawPoint(working.points.first);
+    final next = current.drawPoint(
+      working.points.first,
+      smartAlignment: !_freeLengthNextSegment,
+    );
     if (next == null || next.workingPolylineIndex != null) return false;
     try {
       definition.validate(next.geometry);
@@ -272,7 +318,12 @@ class InventorySketchEditorController extends ChangeNotifier {
       _notify();
       return false;
     }
-    return _applyEditorAction(next, addedBlock: definition);
+    final applied = _applyEditorAction(next, addedBlock: definition);
+    if (applied && _freeLengthNextSegment) {
+      _freeLengthNextSegment = false;
+      _notify();
+    }
+    return applied;
   }
 
   bool finishWorkingPolyline() =>
@@ -331,6 +382,11 @@ class InventorySketchEditorController extends ChangeNotifier {
     }
     final geometryChanged =
         current.geometry.canonicalJson != next.geometry.canonicalJson;
+    if (geometryChanged && !_preservesEditActiveBase(next.geometry)) {
+      lastErrorCode = lockedBaseGeometryCode;
+      _notify();
+      return false;
+    }
     final nextBlocks = geometryChanged
         ? _remapNewBlocks(
             current.geometry,
@@ -436,6 +492,25 @@ class InventorySketchEditorController extends ChangeNotifier {
     }
     for (var index = 0; index < first.points.length; index += 1) {
       if (first.points[index] != second.points[index]) return false;
+    }
+    return true;
+  }
+
+  bool _preservesEditActiveBase(InventoryGeometry candidate) {
+    if (launchIntent != InventorySketchLaunchIntent.editActive) return true;
+    final acknowledged = acknowledgedGeometry;
+    if (acknowledged == null ||
+        candidate.polylines.length < _basePolygonCount ||
+        acknowledged.polylines.length < _basePolygonCount) {
+      return false;
+    }
+    for (var index = 0; index < _basePolygonCount; index += 1) {
+      if (!_samePolyline(
+        acknowledged.polylines[index],
+        candidate.polylines[index],
+      )) {
+        return false;
+      }
     }
     return true;
   }
@@ -583,6 +658,7 @@ class InventorySketchEditorController extends ChangeNotifier {
     _newBlocks = _acknowledgedNewBlocks;
     _undoBlockHistory = const [];
     _redoBlockHistory = const [];
+    _freeLengthNextSegment = false;
     saveStatus = InventorySketchSaveStatus.saved;
     lastErrorCode = null;
     _notify();
@@ -772,6 +848,7 @@ class InventorySketchEditorController extends ChangeNotifier {
     _acknowledgedNewBlocks = projection.draftNewBlocks;
     _undoBlockHistory = const [];
     _redoBlockHistory = const [];
+    _freeLengthNextSegment = false;
     editor = InventorySketchEditorSnapshot.recover(draft.geometry);
     _autosaveTimer?.cancel();
     _autosaveTimer = null;
@@ -877,7 +954,7 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
   bool _orientationFailed = false;
   bool _orientationRestoreFailed = false;
   Object? _pendingPopResult;
-  InventorySketchPoint? _previewPoint;
+  InventorySketchDrawProposal? _previewProposal;
 
   @override
   void initState() {
@@ -911,7 +988,8 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
   }
 
   void _refresh() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() => _previewProposal = null);
   }
 
   @override
@@ -1044,14 +1122,23 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
         editor == null ||
         editor.mode != InventorySketchEditorMode.draw ||
         !editor.hasWorkingPolyline) {
-      if (_previewPoint != null) setState(() => _previewPoint = null);
+      if (_previewProposal != null) {
+        setState(() => _previewProposal = null);
+      }
       return;
     }
-    var point = viewport.snapViewPoint(localPosition);
+    final point = viewport.snapViewPoint(localPosition);
+    InventorySketchDrawProposal? proposal;
     if (point != null && controller.shouldCloseAt(point)) {
-      point = controller.workingPolyline!.points.first;
+      proposal = controller.proposeDrawPoint(
+        controller.workingPolyline!.points.first,
+      );
+    } else if (point != null) {
+      proposal = controller.proposeDrawPoint(point);
     }
-    if (point != _previewPoint) setState(() => _previewPoint = point);
+    if (proposal != _previewProposal) {
+      setState(() => _previewProposal = proposal);
+    }
   }
 
   Future<void> _retryBlockedExit() => _attemptExit(_pendingPopResult);
@@ -1169,6 +1256,23 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
               ),
             ],
           ),
+        if (controller.lastErrorCode ==
+            InventorySketchEditorController.lockedBaseGeometryCode)
+          MaterialBanner(
+            key: const Key('inventory-editor-locked-geometry-message'),
+            content: const Text(
+              'Mevcut alanın şekli henüz değiştirilemez. '
+              'Krokiyi güncelle ekranında yeni bir alan çizebilirsiniz; '
+              'kayıt değiştirilmedi.',
+            ),
+            actions: [
+              TextButton(
+                key: const Key('inventory-editor-locked-geometry-dismiss'),
+                onPressed: controller.dismissLockedGeometryMessage,
+                child: const Text('Anladım'),
+              ),
+            ],
+          ),
         if (_orientationFailed)
           MaterialBanner(
             content: const Text(
@@ -1194,6 +1298,8 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
           onFinish: controller.finishWorkingPolyline,
           onClose: () => unawaited(_closeCurrentBlock()),
           onDelete: controller.deleteSelection,
+          freeLengthNextSegment: controller.freeLengthNextSegment,
+          onFreeLengthChanged: controller.setFreeLengthNextSegment,
           onZoomOut: () => _canvasKey.currentState?.zoomOut(),
           onZoomIn: () => _canvasKey.currentState?.zoomIn(),
           onFit: () => _canvasKey.currentState?.fitCanvas(),
@@ -1204,8 +1310,8 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
             child: MouseRegion(
               onHover: (event) => _updatePreview(event.localPosition),
               onExit: (_) {
-                if (_previewPoint != null) {
-                  setState(() => _previewPoint = null);
+                if (_previewProposal != null) {
+                  setState(() => _previewProposal = null);
                 }
               },
               child: Listener(
@@ -1225,11 +1331,23 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
                         key: const Key('inventory-editor-edge-preview'),
                         painter: _InventoryProposedEdgePainter(
                           viewport: _canvasKey.currentState?.viewport,
-                          start: controller.workingPolyline?.points.last,
-                          end: _previewPoint,
+                          start: _previewProposal?.start,
+                          end: _previewProposal?.end,
+                          alignmentGuide: _previewProposal?.alignmentGuide,
                         ),
                       ),
                     ),
+                    if (_previewProposal?.alignmentGuide != null)
+                      IgnorePointer(
+                        child: Semantics(
+                          key: const Key(
+                            'inventory-editor-smart-alignment-guide',
+                          ),
+                          container: true,
+                          label: 'Akıllı hizalama kılavuzu',
+                          child: const SizedBox.expand(),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -1250,6 +1368,8 @@ class _EditorToolbar extends StatelessWidget {
     required this.onFinish,
     required this.onClose,
     required this.onDelete,
+    required this.freeLengthNextSegment,
+    required this.onFreeLengthChanged,
     required this.onZoomOut,
     required this.onZoomIn,
     required this.onFit,
@@ -1262,6 +1382,8 @@ class _EditorToolbar extends StatelessWidget {
   final VoidCallback onFinish;
   final VoidCallback onClose;
   final VoidCallback onDelete;
+  final bool freeLengthNextSegment;
+  final ValueChanged<bool> onFreeLengthChanged;
   final VoidCallback onZoomOut;
   final VoidCallback onZoomIn;
   final VoidCallback onFit;
@@ -1333,6 +1455,18 @@ class _EditorToolbar extends StatelessWidget {
                 : null,
             icon: const Icon(Icons.polyline_rounded),
             label: const Text('Alanı kapat'),
+          ),
+          const SizedBox(width: 8),
+          FilterChip(
+            key: const Key('inventory-editor-free-length'),
+            selected: freeLengthNextSegment,
+            onSelected:
+                editor.mode == InventorySketchEditorMode.draw &&
+                    editor.hasWorkingPolyline
+                ? onFreeLengthChanged
+                : null,
+            avatar: const Icon(Icons.straighten_rounded),
+            label: const Text('Serbest uzunluk'),
           ),
           const SizedBox(width: 8),
           OutlinedButton.icon(
@@ -1475,11 +1609,13 @@ class _InventoryProposedEdgePainter extends CustomPainter {
     required this.viewport,
     required this.start,
     required this.end,
+    required this.alignmentGuide,
   });
 
   final InventoryViewport? viewport;
   final InventorySketchPoint? start;
   final InventorySketchPoint? end;
+  final InventorySketchAlignmentGuide? alignmentGuide;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1491,6 +1627,29 @@ class _InventoryProposedEdgePainter extends CustomPainter {
         currentEnd == null ||
         currentStart == currentEnd) {
       return;
+    }
+    final guide = alignmentGuide;
+    if (guide != null) {
+      final guideStart = guide.axis == InventorySketchAxis.vertical
+          ? InventorySketchPoint(x: guide.coordinate, y: 0)
+          : InventorySketchPoint(x: 0, y: guide.coordinate);
+      final guideEnd = guide.axis == InventorySketchAxis.vertical
+          ? InventorySketchPoint(
+              x: guide.coordinate,
+              y: InventoryGeometryContract.canvasHeight,
+            )
+          : InventorySketchPoint(
+              x: InventoryGeometryContract.canvasWidth,
+              y: guide.coordinate,
+            );
+      canvas.drawLine(
+        currentViewport.virtualToView(guideStart),
+        currentViewport.virtualToView(guideEnd),
+        Paint()
+          ..color = Colors.lightBlueAccent.withAlpha(150)
+          ..strokeWidth = 1.5
+          ..style = PaintingStyle.stroke,
+      );
     }
     final startOffset = currentViewport.virtualToView(currentStart);
     final endOffset = currentViewport.virtualToView(currentEnd);
@@ -1520,7 +1679,8 @@ class _InventoryProposedEdgePainter extends CustomPainter {
   bool shouldRepaint(_InventoryProposedEdgePainter oldDelegate) =>
       oldDelegate.viewport != viewport ||
       oldDelegate.start != start ||
-      oldDelegate.end != end;
+      oldDelegate.end != end ||
+      oldDelegate.alignmentGuide != alignmentGuide;
 }
 
 class _EditorFailurePanel extends StatelessWidget {

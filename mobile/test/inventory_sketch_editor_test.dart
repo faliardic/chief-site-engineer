@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show PointerDeviceKind;
 
 import 'package:chief_site_engineer/application/inventory_application.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
@@ -42,13 +43,84 @@ void main() {
       var closed = InventorySketchEditorSnapshot.recover(
         InventoryGeometry.emptyDraft(),
       );
-      for (final point in [_point(0, 0), _point(64, 0), _point(64, 64)]) {
+      for (final point in [
+        _point(0, 0),
+        _point(64, 0),
+        _point(64, 64),
+        _point(0, 64),
+      ]) {
         closed = closed.drawPoint(point)!;
       }
       closed = closed.drawPoint(_point(0, 0))!;
       expect(closed.geometry.polylines.single.closed, isTrue);
-      expect(closed.geometry.polylines.single.points, hasLength(3));
+      expect(closed.geometry.polylines.single.points, hasLength(4));
       expect(closed.hasWorkingPolyline, isFalse);
+    });
+
+    test(
+      'normal drawing locks dominant axis, alternates 90 degrees and aligns rectangle',
+      () {
+        var editor = InventorySketchEditorSnapshot.recover(
+          InventoryGeometry.emptyDraft(),
+        ).drawPoint(_point(0, 0))!;
+
+        final firstEdge = editor.proposeDrawPoint(_point(256, 64))!;
+        expect(firstEdge.axis, InventorySketchAxis.horizontal);
+        expect(firstEdge.end, _point(256, 0));
+        expect(firstEdge.alignmentGuide, isNull);
+        editor = editor.drawPoint(_point(256, 64))!;
+
+        final secondEdge = editor.proposeDrawPoint(_point(320, 256))!;
+        expect(secondEdge.axis, InventorySketchAxis.vertical);
+        expect(secondEdge.end, _point(256, 256));
+        editor = editor.drawPoint(_point(320, 256))!;
+
+        final thirdEdge = editor.proposeDrawPoint(_point(128, 320))!;
+        expect(thirdEdge.axis, InventorySketchAxis.horizontal);
+        expect(thirdEdge.end, _point(0, 256));
+        expect(
+          thirdEdge.alignmentGuide,
+          const InventorySketchAlignmentGuide(
+            axis: InventorySketchAxis.vertical,
+            coordinate: 0,
+          ),
+        );
+        editor = editor.drawPoint(_point(128, 320))!;
+        expect(editor.geometry.polylines.single.points, [
+          _point(0, 0),
+          _point(256, 0),
+          _point(256, 256),
+          _point(0, 256),
+        ]);
+
+        var vertical = InventorySketchEditorSnapshot.recover(
+          InventoryGeometry.emptyDraft(),
+        ).drawPoint(_point(64, 64))!;
+        final verticalFirst = vertical.proposeDrawPoint(_point(128, 256))!;
+        expect(verticalFirst.axis, InventorySketchAxis.vertical);
+        expect(verticalFirst.end, _point(64, 256));
+        vertical = vertical.drawPoint(_point(128, 256))!;
+        expect(
+          vertical.proposeDrawPoint(_point(320, 320))!.end,
+          _point(320, 256),
+        );
+      },
+    );
+
+    test('legacy diagonal persisted geometry recovers unchanged', () {
+      final legacy = InventoryGeometry(
+        polylines: [
+          InventoryPolyline(
+            closed: true,
+            points: [_point(0, 0), _point(192, 64), _point(128, 192)],
+          ),
+        ],
+      );
+
+      final recovered = InventorySketchEditorSnapshot.recover(legacy);
+
+      expect(recovered.geometry.canonicalJson, legacy.canonicalJson);
+      expect(recovered.geometry.polylines.single.points[1], _point(192, 64));
     });
 
     test('duplicate, outside and limit commands leave state unchanged', () {
@@ -104,6 +176,46 @@ void main() {
       expect(editor.hasWorkingPolyline, isFalse);
     });
   });
+
+  test(
+    'Serbest uzunluk bypasses one vertex alignment, stays orthogonal and resets',
+    () async {
+      final fake = _FakeInventoryApplication.withDraft(
+        InventoryGeometry.emptyDraft(),
+      );
+      final controller = _controller(fake);
+      addTearDown(controller.dispose);
+      await controller.initialize();
+
+      expect(controller.drawPoint(_point(0, 0)), isTrue);
+      expect(controller.drawPoint(_point(256, 64)), isTrue);
+      expect(controller.drawPoint(_point(320, 256)), isTrue);
+      controller.setFreeLengthNextSegment(true);
+      expect(controller.freeLengthNextSegment, isTrue);
+
+      final freeProposal = controller.proposeDrawPoint(_point(128, 320))!;
+      expect(freeProposal.axis, InventorySketchAxis.horizontal);
+      expect(freeProposal.end, _point(128, 256));
+      expect(freeProposal.alignmentGuide, isNull);
+      expect(controller.drawPoint(_point(128, 320)), isTrue);
+      expect(controller.freeLengthNextSegment, isFalse);
+      expect(
+        controller.editor!.geometry.polylines.single.points.last,
+        _point(128, 256),
+      );
+
+      final restoredSmart = controller.proposeDrawPoint(_point(192, 64))!;
+      expect(restoredSmart.axis, InventorySketchAxis.vertical);
+      expect(restoredSmart.end, _point(128, 0));
+      expect(
+        restoredSmart.alignmentGuide,
+        const InventorySketchAlignmentGuide(
+          axis: InventorySketchAxis.horizontal,
+          coordinate: 0,
+        ),
+      );
+    },
+  );
 
   group('stable block spatial contract', () {
     test(
@@ -166,7 +278,12 @@ void main() {
         addTearDown(controller.dispose);
         await controller.initialize();
 
-        for (final point in [_point(0, 0), _point(192, 64), _point(128, 192)]) {
+        for (final point in [
+          _point(0, 0),
+          _point(192, 0),
+          _point(192, 192),
+          _point(0, 192),
+        ]) {
           controller.drawPoint(point);
         }
         expect(
@@ -177,8 +294,9 @@ void main() {
         );
         for (final point in [
           _point(512, 0),
-          _point(704, 64),
-          _point(640, 192),
+          _point(704, 0),
+          _point(704, 192),
+          _point(512, 192),
         ]) {
           controller.drawPoint(point);
         }
@@ -202,7 +320,8 @@ void main() {
         for (final point in [
           _point(64, 64),
           _point(256, 64),
-          _point(128, 256),
+          _point(256, 256),
+          _point(64, 256),
         ]) {
           controller.drawPoint(point);
         }
@@ -230,7 +349,12 @@ void main() {
         addTearDown(controller.dispose);
         await controller.initialize();
 
-        for (final point in [_point(0, 0), _point(192, 64), _point(128, 192)]) {
+        for (final point in [
+          _point(0, 0),
+          _point(192, 0),
+          _point(192, 192),
+          _point(0, 192),
+        ]) {
           controller.drawPoint(point);
         }
         expect(
@@ -241,8 +365,9 @@ void main() {
         );
         for (final point in [
           _point(512, 0),
-          _point(704, 64),
-          _point(640, 192),
+          _point(704, 0),
+          _point(704, 192),
+          _point(512, 192),
         ]) {
           controller.drawPoint(point);
         }
@@ -742,6 +867,69 @@ void main() {
     );
 
     test(
+      'edit-active keeps base untouched while appended block saves reloads and finalizes',
+      () async {
+        final base = _closedBlockGeometry();
+        final fake = _FakeInventoryApplication.withActive(base);
+        final controller = _controller(
+          fake,
+          intent: InventorySketchLaunchIntent.editActive,
+        );
+        addTearDown(controller.dispose);
+        await controller.initialize();
+
+        for (final point in [
+          _point(512, 0),
+          _point(768, 64),
+          _point(704, 256),
+          _point(512, 192),
+        ]) {
+          expect(controller.drawPoint(point), isTrue);
+        }
+        final appended = controller.createBlockDraft(
+          displayName: 'Yeni Alan',
+          floorCount: 2,
+        );
+        expect(controller.closeWorkingBlock(appended), isTrue);
+        expect(await controller.forceSave(), isTrue);
+        expect(fake.saveMutationCount, 1);
+        expect(
+          fake.projection!.draftRevision!.geometry.polylines.first,
+          base.polylines.first,
+        );
+        expect(
+          fake.projection!.draftRevision!.geometry.polylines,
+          hasLength(2),
+        );
+
+        final recovered = _controller(
+          fake,
+          intent: InventorySketchLaunchIntent.editActive,
+        );
+        addTearDown(recovered.dispose);
+        await recovered.initialize();
+        expect(fake.editCalls, 1);
+        expect(
+          recovered.editor!.geometry.polylines.first,
+          base.polylines.first,
+        );
+        _expectSameBlockIdentity(
+          recovered.newBlocks.single,
+          appended,
+          polygonIndex: 1,
+        );
+
+        expect(await recovered.finalizeDraft(), isTrue);
+        expect(fake.projection!.draftRevision, isNull);
+        expect(
+          fake.projection!.activeRevision!.geometry.polylines.first,
+          base.polylines.first,
+        );
+        expect(fake.finalizeCommands.single.newBlocks.single.id, appended.id);
+      },
+    );
+
+    test(
       'migrated schema20 first draft keeps legacy geometry without metadata rewrite',
       () async {
         final fake = _FakeInventoryApplication.withDraft(
@@ -773,8 +961,9 @@ void main() {
         addTearDown(controller.dispose);
         await controller.initialize();
         controller.drawPoint(_point(0, 0));
-        controller.drawPoint(_point(192, 64));
-        controller.drawPoint(_point(128, 192));
+        controller.drawPoint(_point(192, 0));
+        controller.drawPoint(_point(192, 192));
+        controller.drawPoint(_point(0, 192));
         final definition = controller.createBlockDraft(
           displayName: 'A Blok',
           floorCount: 2,
@@ -876,7 +1065,7 @@ void main() {
   });
 
   testWidgets(
-    'explicit close dialog persists arbitrary-angle block metadata and recovers',
+    'explicit close dialog persists orthogonal block metadata and recovers',
     (tester) async {
       final fake = _FakeInventoryApplication.withDraft(
         InventoryGeometry.emptyDraft(),
@@ -886,7 +1075,12 @@ void main() {
       await _openEditor(tester, fake, orientations, pageKey);
       final controller = pageKey.currentState!.controller;
 
-      for (final point in [_point(0, 0), _point(192, 64), _point(128, 192)]) {
+      for (final point in [
+        _point(0, 0),
+        _point(192, 0),
+        _point(192, 192),
+        _point(0, 192),
+      ]) {
         controller.drawPoint(point);
       }
       await tester.pump();
@@ -946,6 +1140,72 @@ void main() {
     },
   );
 
+  testWidgets(
+    'smart alignment guide is visible and Serbest uzunluk resets after one edge',
+    (tester) async {
+      final fake = _FakeInventoryApplication.withDraft(
+        InventoryGeometry.emptyDraft(),
+      );
+      final orientations = _OrientationRecorder();
+      final pageKey = GlobalKey<InventorySketchEditorPageState>();
+      await _openEditor(tester, fake, orientations, pageKey);
+      final controller = pageKey.currentState!.controller;
+      controller.drawPoint(_point(0, 0));
+      controller.drawPoint(_point(256, 64));
+      controller.drawPoint(_point(320, 256));
+      await tester.pump();
+
+      final canvas = find.byKey(const Key('inventory-sketch-canvas-gesture'));
+      final canvasRect = tester.getRect(canvas);
+      final viewport = InventoryViewport.fit(canvasRect.size);
+      final target =
+          canvasRect.topLeft + viewport.virtualToView(_point(128, 320));
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.addPointer(location: canvasRect.center);
+      await mouse.moveTo(target);
+      await tester.pump();
+
+      expect(
+        find.byKey(const Key('inventory-editor-smart-alignment-guide')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<Semantics>(
+              find.byKey(const Key('inventory-editor-smart-alignment-guide')),
+            )
+            .properties
+            .label,
+        'Akıllı hizalama kılavuzu',
+      );
+
+      final freeLength = find.byKey(const Key('inventory-editor-free-length'));
+      await tester.ensureVisible(freeLength);
+      await tester.tap(freeLength);
+      await tester.pump();
+      expect(controller.freeLengthNextSegment, isTrue);
+      expect(
+        find.byKey(const Key('inventory-editor-smart-alignment-guide')),
+        findsNothing,
+      );
+
+      await mouse.moveTo(target + const Offset(1, 0));
+      await tester.pump();
+      expect(
+        find.byKey(const Key('inventory-editor-smart-alignment-guide')),
+        findsNothing,
+      );
+      expect(controller.drawPoint(_point(128, 320)), isTrue);
+      await tester.pump();
+      expect(controller.freeLengthNextSegment, isFalse);
+      expect(tester.widget<FilterChip>(freeLength).selected, isFalse);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+    },
+  );
+
   group('page back, lifecycle and orientation boundary', () {
     testWidgets('create/recover final action copy is Oluştur', (tester) async {
       final fake = _FakeInventoryApplication.withDraft(_openGeometry());
@@ -1000,6 +1260,63 @@ void main() {
         );
         expect(fake.projection!.draftRevision, isNull);
         expect(find.byType(InventorySketchEditorPage), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'edit-active base mutation rejects before autosave with explicit safe message',
+      (tester) async {
+        final base = _closedBlockGeometry();
+        final fake = _FakeInventoryApplication.withActive(base);
+        final orientations = _OrientationRecorder();
+        final pageKey = GlobalKey<InventorySketchEditorPageState>();
+        await _openEditor(
+          tester,
+          fake,
+          orientations,
+          pageKey,
+          intent: InventorySketchLaunchIntent.editActive,
+        );
+        final controller = pageKey.currentState!.controller;
+        controller.setMode(InventorySketchEditorMode.select);
+        controller.editor = controller.editor!.withSelection(
+          const InventorySketchSelection.polyline(polylineIndex: 0),
+        );
+
+        expect(controller.deleteSelection(), isFalse);
+        await tester.pump(const Duration(milliseconds: 600));
+        expect(fake.saveCalls, isEmpty);
+        expect(controller.hasUnacknowledgedGeometry, isFalse);
+        expect(controller.saveStatus, InventorySketchSaveStatus.saved);
+        expect(controller.editor!.geometry.canonicalJson, base.canonicalJson);
+        expect(
+          controller.lastErrorCode,
+          InventorySketchEditorController.lockedBaseGeometryCode,
+        );
+        expect(
+          find.byKey(const Key('inventory-editor-locked-geometry-message')),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('Mevcut alanın şekli henüz değiştirilemez.'),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Taslak kaydedilemedi. Şematik kroki açık bırakıldı.'),
+          findsNothing,
+        );
+
+        await tester.tap(
+          find.byKey(const Key('inventory-editor-locked-geometry-dismiss')),
+        );
+        await tester.pump();
+        expect(
+          find.byKey(const Key('inventory-editor-locked-geometry-message')),
+          findsNothing,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(fake.saveCalls, isEmpty);
       },
     );
 

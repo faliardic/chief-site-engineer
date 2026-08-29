@@ -170,3 +170,61 @@ After every authorized gate passes:
 - stop for fresh independent R4 review.
 
 Ready, merge, Issue closure, Slice 6.2, APK/build/device/ADB/emulator and MAIN operations are forbidden.
+
+## Owner acceptance correction authority — comment 5462090995
+
+- Exact parent/head: `53a5606098cfa074d1b396c3e261de8a05b8aa1f`.
+- Target: existing PR `#528`, which must remain `OPEN/DRAFT`.
+- Risk/routing: `R4`; requested model `gpt-5.6-sol`; requested effort
+  `max`; runtime routing remains independently unverified.
+- Owner acceptance supersedes the earlier arbitrary-angle new-drawing
+  expectation. Preserved legacy/finalized diagonal geometry remains readable.
+
+Locked correction behavior:
+
+- normal new drawing persists only horizontal/vertical segments;
+- first segment uses dominant pointer axis, then segment axes alternate by 90°;
+- smart alignment is default and deterministically targets a relevant prior
+  vertex coordinate in the intended direction;
+- smart alignment exposes a visible preview/guide;
+- `Serbest uzunluk` disables vertex-length alignment for the next segment only,
+  never disables orthogonality, and resets after that segment commits;
+- edit-active finalized/base geometry remains immutable locally and any edit
+  attempt is rejected before autosave with an explicit safe UI message;
+- edit-active may append a new orthogonal block and must autosave, reload, and
+  finalize without Slice 6.3 reconciliation;
+- the existing A+B delete/metadata identity regression remains required.
+
+Exact write allowlist:
+
+1. `.cse/tasks/527_task.md`
+2. `.cse/results/527_result.md`
+3. `docs/v2/CSE_INVENTORY_MAP_V1_CONTRACT.md`
+4. `docs/v2/CSE_V2_SCOPE.md`
+5. `mobile/lib/features/inventory/inventory_sketch_canvas.dart`
+6. `mobile/lib/features/inventory/inventory_sketch_editor_page.dart`
+7. `mobile/lib/application/inventory_application.dart` only if the append
+   regression proves a real application save defect
+8. `mobile/test/inventory_sketch_editor_test.dart`
+9. `mobile/test/inventory_application_test.dart`
+10. `mobile/test/inventory_page_test.dart` only if required for the locked UI
+    message
+
+Validation budget:
+
+- format touched Dart files;
+- run exactly once:
+  `flutter test --no-pub test/inventory_sketch_editor_test.dart test/inventory_application_test.dart test/inventory_page_test.dart`;
+- only after focused PASS, run `flutter analyze --no-pub` exactly once;
+- then `git diff --check`, exact allowlist and protected/schema/backup/version/
+  package/platform/permission/dependency drift audits;
+- stage exact changed allowlist and run staged `git diff --check` before the
+  minimal correction commit.
+
+Hard stops:
+
+- no schema/domain-wide orthogonal rejection or legacy geometry rewrite;
+- no finalized/base reshape, placement reconciliation, Slice 6.2/6.3 work;
+- no Gradle/package/permission/manifest/dependency change;
+- no APK/build/device/ADB/MAIN operation;
+- no MT PASS inference, Ready, merge, or Issue closure.

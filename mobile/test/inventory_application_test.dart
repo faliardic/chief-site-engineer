@@ -1660,6 +1660,54 @@ void main() {
         recovered?.draftRevision?.geometry.canonicalJson,
         _geometry(128).canonicalJson,
       );
+      expect(recovered?.draftNewBlocks, hasLength(1));
+      expect(recovered?.draftNewBlocks.single.polygonIndex, 2);
+      expect(
+        InventoryGeometry(
+          polylines: recovered!.draftRevision!.geometry.polylines
+              .take(2)
+              .toList(),
+        ).canonicalJson,
+        _geometry(64).canonicalJson,
+      );
+
+      await editRelaunch.finalizeSketch(
+        FinalizeInventorySketchCommand(
+          operationId: _uuid(708),
+          projectId: _projectA,
+          sketchId: sketchId,
+          draftRevisionId: editDraftId,
+          expectedSketchRevision: recovered.sketch.revision,
+          expectedContentRevision: recovered.draftRevision!.contentRevision,
+          newBlocks: recovered.draftNewBlocks,
+        ),
+      );
+      final finalized = await editRelaunch.loadPrimarySketch(_projectA);
+      expect(finalized?.draftRevision, isNull);
+      expect(finalized?.activeRevision?.id, editDraftId);
+      expect(finalized?.activeRevision?.baseRevisionId, firstDraftId);
+      expect(
+        finalized?.activeRevision?.geometry.canonicalJson,
+        _geometry(128).canonicalJson,
+      );
+      expect(
+        InventoryGeometry(
+          polylines: finalized!.activeRevision!.geometry.polylines
+              .take(2)
+              .toList(),
+        ).canonicalJson,
+        _geometry(64).canonicalJson,
+      );
+      expect(
+        (await fixture.db.database.query(
+          'inventory_sketch_revision_block_polygons',
+          columns: const ['polygon_index'],
+          where: 'revision_id = ?',
+          whereArgs: [editDraftId],
+          orderBy: 'polygon_index ASC',
+        )).map((row) => row['polygon_index']),
+        [0, 1, 2],
+      );
       expect(
         (await fixture.db.database.query(
           'inventory_sketch_revisions',
@@ -1668,8 +1716,8 @@ void main() {
           orderBy: 'revision_number ASC',
         )).map((row) => row['state']),
         [
+          InventorySketchRevisionState.superseded.storageValue,
           InventorySketchRevisionState.active.storageValue,
-          InventorySketchRevisionState.draft.storageValue,
         ],
       );
     },

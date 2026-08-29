@@ -434,6 +434,16 @@ yolunu ve closed-area editor foundation'ını ayrı R4 authority/review sınır�
 uygular.
 Slice 6.2/6.3, Ready, merge ve cihaz işlemleri bu authority'nin dışındadır.
 
+Issue #527 owner-acceptance correction'ı normal yeni çizimi yatay/düşey
+segmentlerle sınırlar: ilk kenar dominant pointer axis'ini, sonraki kenarlar 90°
+alternation'ı kullanır; default smart alignment önceki vertex koordinatına
+visible guide ile hizalar. `Serbest uzunluk` yalnız sonraki segmentin length
+alignment'ını kapatır ve orthogonal kuralı korur. Legacy diagonal persisted
+geometry okunmaya devam eder. `Krokiyi güncelle` içinde finalized/base geometry
+Slice 6.1'de local fail-before-autosave mesajıyla immutable kalırken untouched
+base sonuna yeni orthogonal block append autosave/reload/finalize edilebilir.
+Reshape ve placement reconciliation hâlâ Slice 6.3 kapsamıdır.
+
 Issue #501, #502, #503 ve #499 P0 veri/owner-phone güvenlik kuralları bu ürün
 önceliğinden üstündür. Source geliştirme ve Draft PR devam edebilir; owner-phone
 MAIN kurulum yetkisi oluşmaz.
