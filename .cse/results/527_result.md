@@ -145,3 +145,66 @@ execution_record:
   runtime_routing_verified: false
 review_recommendation: FRESH_INDEPENDENT_R4_REVIEW
 ```
+
+## Narrow R4 correction — block metadata index preservation
+
+- Authority: Issue #527 comment `5461346053`.
+- Independent review: `5057414379`.
+- Exact reviewed parent: `66c08f6c860bed04ea63cc35d849db7d8a5cae4b`.
+- Blocker: `NEW_BLOCK_METADATA_INDEX_DRIFT_ON_POLYGON_DELETE`.
+- Correction paths: exact `3/3` subset; production/test changes are limited to
+  `inventory_sketch_editor_page.dart` and `inventory_sketch_editor_test.dart`;
+  this section is append-only evidence.
+
+Correction behavior:
+
+- removed polygon-index-keyed metadata rebinding;
+- added bounded metadata undo/redo history parallel to geometry history;
+- deterministically remapped surviving new-block definitions by exact unchanged
+  polygon geometry after index-changing deletion;
+- preserved surviving block ID, display name, floor IDs/names/order, and metadata;
+- restored/reapplied exact metadata frames across undo/redo without cross-wire;
+- kept existing/base/mapped polygon, schema, application persistence, migration,
+  backup, package/version, platform, permission, and unrelated UI contracts
+  unchanged.
+
+Regression evidence:
+
+- creates distinct A and B block/floor identities;
+- deletes whole A and proves only B geometry remains at index `0` with B's exact
+  block/floor identities and display name;
+- proves two undo/redo cycles do not bind A identity to B;
+- force-autosaves and reloads through a fresh controller with exact B metadata;
+- finalizes and proves the emitted remaining mapping belongs to B, not A.
+
+Validation:
+
+- Historical broad focused gate: `141/141 PASS` preserved and not rerun.
+- Exact narrow command:
+  `flutter test --no-pub test/inventory_sketch_editor_test.dart`
+- Narrow result: `32/32 PASS`.
+- `flutter analyze --no-pub`: `PASS — No issues found`.
+- `git diff --check`: `PASS`.
+- Correction path audit: `PASS`, outside exact three paths `0`.
+- Full PR original Issue #527 allowlist audit: `PASS`, outside paths `0`.
+- Schema `21`; backup format `1`; version `0.1.0+1`.
+- Pubspec/platform/package/permission/protected drift from reviewed parent: `0`.
+- Manual tests `MT-527-001..010`: remain `PENDING / NOT RUN`.
+- Build/APK/device/ADB/emulator/MAIN: not run.
+
+```yaml
+execution_record:
+  issue: 527
+  correction: NEW_BLOCK_METADATA_INDEX_DRIFT_ON_POLYGON_DELETE
+  reviewed_parent: 66c08f6c860bed04ea63cc35d849db7d8a5cae4b
+  historical_broad_gate: 141/141 PASS
+  narrow_gate: 32/32 PASS
+  analyzer: PASS
+  schema: 21
+  backup_format: 1
+  version: 0.1.0+1
+  manual_test_status: PENDING
+  ready: false
+  merged: false
+review_recommendation: FRESH_INDEPENDENT_R4_REREVIEW
+```

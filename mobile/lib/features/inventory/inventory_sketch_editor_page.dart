@@ -58,7 +58,8 @@ class InventorySketchEditorController extends ChangeNotifier {
   Set<int> _existingMappedPolygonIndexes = const {};
   List<InventoryBlockDraft> _newBlocks = const [];
   List<InventoryBlockDraft> _acknowledgedNewBlocks = const [];
-  final Map<int, InventoryBlockDraft> _blockDefinitionCache = {};
+  List<List<InventoryBlockDraft>> _undoBlockHistory = const [];
+  List<List<InventoryBlockDraft>> _redoBlockHistory = const [];
 
   String? get sketchId => _sketchId;
   String? get draftRevisionId => _draftRevisionId;
@@ -271,14 +272,7 @@ class InventorySketchEditorController extends ChangeNotifier {
       _notify();
       return false;
     }
-    _blockDefinitionCache[index] = definition;
-    _newBlocks = List<InventoryBlockDraft>.unmodifiable(
-      [..._newBlocks.where((block) => block.polygonIndex != index), definition]
-        ..sort(
-          (first, second) => first.polygonIndex.compareTo(second.polygonIndex),
-        ),
-    );
-    return _applyEditorAction(next);
+    return _applyEditorAction(next, addedBlock: definition);
   }
 
   bool finishWorkingPolyline() =>
@@ -297,40 +291,166 @@ class InventorySketchEditorController extends ChangeNotifier {
 
   bool undo() {
     final current = editor;
-    if (current == null || !current.canUndo) return false;
-    return _applyEditorAction(current.undo());
+    if (current == null || !current.canUndo || _undoBlockHistory.isEmpty) {
+      return false;
+    }
+    final previousBlocks = _undoBlockHistory.last;
+    _undoBlockHistory = List<List<InventoryBlockDraft>>.unmodifiable(
+      _undoBlockHistory.sublist(0, _undoBlockHistory.length - 1),
+    );
+    _redoBlockHistory = _boundedBlockHistory([
+      ..._redoBlockHistory,
+      _newBlocks,
+    ]);
+    return _applyHistoryFrame(current.undo(), previousBlocks);
   }
 
   bool redo() {
     final current = editor;
-    if (current == null || !current.canRedo) return false;
-    return _applyEditorAction(current.redo());
+    if (current == null || !current.canRedo || _redoBlockHistory.isEmpty) {
+      return false;
+    }
+    final nextBlocks = _redoBlockHistory.last;
+    _redoBlockHistory = List<List<InventoryBlockDraft>>.unmodifiable(
+      _redoBlockHistory.sublist(0, _redoBlockHistory.length - 1),
+    );
+    _undoBlockHistory = _boundedBlockHistory([
+      ..._undoBlockHistory,
+      _newBlocks,
+    ]);
+    return _applyHistoryFrame(current.redo(), nextBlocks);
   }
 
-  bool _applyEditorAction(InventorySketchEditorSnapshot? next) {
+  bool _applyEditorAction(
+    InventorySketchEditorSnapshot? next, {
+    InventoryBlockDraft? addedBlock,
+  }) {
     final current = editor;
     if (current == null || next == null || identical(current, next)) {
       return false;
     }
     final geometryChanged =
         current.geometry.canonicalJson != next.geometry.canonicalJson;
+    final nextBlocks = geometryChanged
+        ? _remapNewBlocks(
+            current.geometry,
+            next.geometry,
+            addedBlock: addedBlock,
+          )
+        : _newBlocks;
+    if (nextBlocks == null) {
+      lastErrorCode = 'inventory_block_metadata_history_invalid';
+      _notify();
+      return false;
+    }
+    _undoBlockHistory = _boundedBlockHistory([
+      ..._undoBlockHistory,
+      _newBlocks,
+    ]);
+    _redoBlockHistory = const [];
     editor = next;
+    _newBlocks = nextBlocks;
     if (geometryChanged) {
-      _newBlocks = List<InventoryBlockDraft>.unmodifiable(
-        [
-          for (final entry in _blockDefinitionCache.entries)
-            if (entry.key >= _basePolygonCount &&
-                entry.key < next.geometry.polylines.length &&
-                next.geometry.polylines[entry.key].closed)
-              entry.value,
-        ]..sort(
-          (first, second) => first.polygonIndex.compareTo(second.polygonIndex),
-        ),
-      );
       _scheduleAutosave();
     }
     _notify();
     return true;
+  }
+
+  bool _applyHistoryFrame(
+    InventorySketchEditorSnapshot next,
+    List<InventoryBlockDraft> nextBlocks,
+  ) {
+    final current = editor!;
+    final geometryChanged =
+        current.geometry.canonicalJson != next.geometry.canonicalJson;
+    editor = next;
+    _newBlocks = nextBlocks;
+    if (geometryChanged) _scheduleAutosave();
+    _notify();
+    return true;
+  }
+
+  List<InventoryBlockDraft>? _remapNewBlocks(
+    InventoryGeometry current,
+    InventoryGeometry next, {
+    InventoryBlockDraft? addedBlock,
+  }) {
+    final remapped = <InventoryBlockDraft>[];
+    final usedIndexes = <int>{};
+    for (final block in _newBlocks) {
+      if (block.polygonIndex < 0 ||
+          block.polygonIndex >= current.polylines.length) {
+        return null;
+      }
+      final source = current.polylines[block.polygonIndex];
+      final matches = <int>[
+        for (
+          var index = _basePolygonCount;
+          index < next.polylines.length;
+          index += 1
+        )
+          if (!usedIndexes.contains(index) &&
+              _samePolyline(source, next.polylines[index]))
+            index,
+      ];
+      if (matches.length > 1) return null;
+      if (matches.isEmpty) continue;
+      final index = matches.single;
+      usedIndexes.add(index);
+      remapped.add(_blockAtPolygonIndex(block, index));
+    }
+    if (addedBlock != null) {
+      final index = addedBlock.polygonIndex;
+      if (index < _basePolygonCount ||
+          index >= next.polylines.length ||
+          usedIndexes.contains(index) ||
+          !next.polylines[index].closed) {
+        return null;
+      }
+      usedIndexes.add(index);
+      remapped.add(_blockAtPolygonIndex(addedBlock, index));
+    }
+    remapped.sort(
+      (first, second) => first.polygonIndex.compareTo(second.polygonIndex),
+    );
+    return List<InventoryBlockDraft>.unmodifiable(remapped);
+  }
+
+  InventoryBlockDraft _blockAtPolygonIndex(
+    InventoryBlockDraft block,
+    int polygonIndex,
+  ) => block.polygonIndex == polygonIndex
+      ? block
+      : InventoryBlockDraft(
+          id: block.id,
+          displayName: block.displayName,
+          polygonIndex: polygonIndex,
+          floors: block.floors,
+        );
+
+  bool _samePolyline(InventoryPolyline first, InventoryPolyline second) {
+    if (first.closed != second.closed ||
+        first.points.length != second.points.length) {
+      return false;
+    }
+    for (var index = 0; index < first.points.length; index += 1) {
+      if (first.points[index] != second.points[index]) return false;
+    }
+    return true;
+  }
+
+  List<List<InventoryBlockDraft>> _boundedBlockHistory(
+    Iterable<List<InventoryBlockDraft>> values,
+  ) {
+    final bounded = List<List<InventoryBlockDraft>>.of(values);
+    if (bounded.length > InventorySketchEditorSnapshot.maximumHistory) {
+      bounded.removeRange(
+        0,
+        bounded.length - InventorySketchEditorSnapshot.maximumHistory,
+      );
+    }
+    return List<List<InventoryBlockDraft>>.unmodifiable(bounded);
   }
 
   void _scheduleAutosave() {
@@ -461,6 +581,8 @@ class InventorySketchEditorController extends ChangeNotifier {
       mode: current.mode,
     );
     _newBlocks = _acknowledgedNewBlocks;
+    _undoBlockHistory = const [];
+    _redoBlockHistory = const [];
     saveStatus = InventorySketchSaveStatus.saved;
     lastErrorCode = null;
     _notify();
@@ -648,13 +770,8 @@ class InventorySketchEditorController extends ChangeNotifier {
         .toSet();
     _newBlocks = projection.draftNewBlocks;
     _acknowledgedNewBlocks = projection.draftNewBlocks;
-    _blockDefinitionCache
-      ..clear()
-      ..addEntries(
-        projection.draftNewBlocks.map(
-          (block) => MapEntry(block.polygonIndex, block),
-        ),
-      );
+    _undoBlockHistory = const [];
+    _redoBlockHistory = const [];
     editor = InventorySketchEditorSnapshot.recover(draft.geometry);
     _autosaveTimer?.cancel();
     _autosaveTimer = null;

@@ -219,6 +219,105 @@ void main() {
         expect(controller.newBlocks, hasLength(2));
       },
     );
+
+    test(
+      'whole polygon delete remaps surviving identity through history and persistence',
+      () async {
+        final fake = _FakeInventoryApplication.withDraft(
+          InventoryGeometry.emptyDraft(),
+        );
+        final controller = _controller(fake);
+        addTearDown(controller.dispose);
+        await controller.initialize();
+
+        for (final point in [_point(0, 0), _point(192, 64), _point(128, 192)]) {
+          controller.drawPoint(point);
+        }
+        expect(
+          controller.closeWorkingBlock(
+            controller.createBlockDraft(displayName: 'A Blok', floorCount: 2),
+          ),
+          isTrue,
+        );
+        for (final point in [
+          _point(512, 0),
+          _point(704, 64),
+          _point(640, 192),
+        ]) {
+          controller.drawPoint(point);
+        }
+        expect(
+          controller.closeWorkingBlock(
+            controller.createBlockDraft(displayName: 'B Blok', floorCount: 3),
+          ),
+          isTrue,
+        );
+        final blockA = controller.newBlocks.first;
+        final blockB = controller.newBlocks.last;
+        final blockBGeometry = controller.editor!.geometry.polylines[1];
+
+        controller.editor = controller.editor!.withSelection(
+          const InventorySketchSelection.polyline(polylineIndex: 0),
+        );
+        expect(controller.deleteSelection(), isTrue);
+        expect(controller.editor!.geometry.polylines, [blockBGeometry]);
+        _expectSameBlockIdentity(
+          controller.newBlocks.single,
+          blockB,
+          polygonIndex: 0,
+        );
+        expect(controller.newBlocks.single.id, isNot(blockA.id));
+
+        expect(controller.undo(), isTrue);
+        expect(controller.newBlocks.map((block) => block.id), [
+          blockA.id,
+          blockB.id,
+        ]);
+        _expectSameBlockIdentity(
+          controller.newBlocks.last,
+          blockB,
+          polygonIndex: 1,
+        );
+        expect(controller.redo(), isTrue);
+        _expectSameBlockIdentity(
+          controller.newBlocks.single,
+          blockB,
+          polygonIndex: 0,
+        );
+        expect(controller.undo(), isTrue);
+        expect(controller.newBlocks.map((block) => block.id), [
+          blockA.id,
+          blockB.id,
+        ]);
+        expect(controller.redo(), isTrue);
+        _expectSameBlockIdentity(
+          controller.newBlocks.single,
+          blockB,
+          polygonIndex: 0,
+        );
+
+        expect(await controller.forceSave(), isTrue);
+        _expectSameBlockIdentity(
+          fake.projection!.draftNewBlocks.single,
+          blockB,
+          polygonIndex: 0,
+        );
+        final recovered = _controller(fake);
+        addTearDown(recovered.dispose);
+        await recovered.initialize();
+        expect(recovered.editor!.geometry.polylines, [blockBGeometry]);
+        _expectSameBlockIdentity(
+          recovered.newBlocks.single,
+          blockB,
+          polygonIndex: 0,
+        );
+
+        expect(await recovered.finalizeDraft(), isTrue);
+        final finalized = fake.finalizeCommands.single.newBlocks.single;
+        _expectSameBlockIdentity(finalized, blockB, polygonIndex: 0);
+        expect(finalized.id, isNot(blockA.id));
+      },
+    );
   });
 
   group('SELECT and deterministic delete', () {
@@ -1173,6 +1272,28 @@ List<InventoryBlockDraft> _blockDrafts() => [
   ),
 ];
 
+void _expectSameBlockIdentity(
+  InventoryBlockDraft actual,
+  InventoryBlockDraft expected, {
+  required int polygonIndex,
+}) {
+  expect(actual.id, expected.id);
+  expect(actual.displayName, expected.displayName);
+  expect(actual.polygonIndex, polygonIndex);
+  expect(
+    actual.floors.map((floor) => floor.id),
+    expected.floors.map((floor) => floor.id),
+  );
+  expect(
+    actual.floors.map((floor) => floor.displayName),
+    expected.floors.map((floor) => floor.displayName),
+  );
+  expect(
+    actual.floors.map((floor) => floor.ordinal),
+    expected.floors.map((floor) => floor.ordinal),
+  );
+}
+
 class _OrientationRecorder {
   final calls = <List<DeviceOrientation>>[];
   int failStandardCount = 0;
@@ -1278,6 +1399,7 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
   int concurrentSaves = 0;
   int maximumConcurrentSaves = 0;
   final saveCalls = <AutosaveInventorySketchDraftCommand>[];
+  final finalizeCommands = <FinalizeInventorySketchCommand>[];
   final saveGates = <Completer<void>>[];
   final loadGates = <Completer<void>>[];
   final operationOrder = <String>[];
@@ -1425,6 +1547,7 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
     FinalizeInventorySketchCommand command,
   ) async {
     finalizeCalls += 1;
+    finalizeCommands.add(command);
     operationOrder.add('finalize');
     if (failFinalizeCount > 0) {
       failFinalizeCount -= 1;
