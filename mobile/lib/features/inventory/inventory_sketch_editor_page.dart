@@ -47,6 +47,7 @@ class InventorySketchEditorController extends ChangeNotifier {
 
   String? _sketchId;
   String? _draftRevisionId;
+  String? _draftBaseRevisionId;
   int? _expectedSketchRevision;
   int? _expectedContentRevision;
   Timer? _autosaveTimer;
@@ -57,12 +58,19 @@ class InventorySketchEditorController extends ChangeNotifier {
   bool _forceDrainRequested = false;
   bool _finalizeBlockedByStaleRevision = false;
   bool _disposed = false;
-  int _basePolygonCount = 0;
-  Set<int> _existingMappedPolygonIndexes = const {};
+  Map<String, int> _sourceActiveMappings = const {};
+  Map<String, int> _existingBlockMappings = const {};
+  Map<String, int> _acknowledgedExistingBlockMappings = const {};
+  Map<String, InventoryBlockRecord> _blocksById = const {};
+  Map<String, List<InventoryFloorRecord>> _floorsByBlockId = const {};
+  List<InventoryPolyline> _lockedLegacyPolylines = const [];
+  Map<String, InventoryExistingBlockAction> _lifecycleActions = const {};
+  Map<String, InventoryExistingBlockAction> _acknowledgedLifecycleActions =
+      const {};
   List<InventoryBlockDraft> _newBlocks = const [];
   List<InventoryBlockDraft> _acknowledgedNewBlocks = const [];
-  List<List<InventoryBlockDraft>> _undoBlockHistory = const [];
-  List<List<InventoryBlockDraft>> _redoBlockHistory = const [];
+  List<_InventoryEditorSpatialFrame> _undoBlockHistory = const [];
+  List<_InventoryEditorSpatialFrame> _redoBlockHistory = const [];
   bool _freeLengthNextSegment = false;
 
   String? get sketchId => _sketchId;
@@ -70,7 +78,72 @@ class InventorySketchEditorController extends ChangeNotifier {
   int? get expectedSketchRevision => _expectedSketchRevision;
   int? get expectedContentRevision => _expectedContentRevision;
   List<InventoryBlockDraft> get newBlocks => _newBlocks;
+  List<InventoryExistingBlockMappingDraft> get existingBlockMappings =>
+      _mappingDrafts(_existingBlockMappings);
   bool get freeLengthNextSegment => _freeLengthNextSegment;
+
+  InventoryBlockRecord? get selectedExistingBlock {
+    final selection = editor?.selection;
+    if (selection == null) return null;
+    final blockId = _blockIdAtPolygonIndex(selection.polylineIndex);
+    return blockId == null ? null : _blocksById[blockId];
+  }
+
+  bool get selectedWholeBlockNeedsLifecycleChoice {
+    final selection = editor?.selection;
+    final block = selectedExistingBlock;
+    return selection != null &&
+        selection.wholePolyline &&
+        block != null &&
+        _sourceActiveMappings.containsKey(block.id);
+  }
+
+  bool get hasUnresolvedLifecycleChoices {
+    for (final blockId in _sourceActiveMappings.keys) {
+      if (!_existingBlockMappings.containsKey(blockId) &&
+          !_lifecycleActions.containsKey(blockId)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  List<InventoryBlockRecord> get unresolvedLifecycleBlocks {
+    final result = <InventoryBlockRecord>[];
+    for (final blockId in _sourceActiveMappings.keys) {
+      if (_existingBlockMappings.containsKey(blockId) ||
+          _lifecycleActions.containsKey(blockId)) {
+        continue;
+      }
+      final block = _blocksById[blockId];
+      if (block != null) result.add(block);
+    }
+    result.sort((first, second) => first.ordinal.compareTo(second.ordinal));
+    return List<InventoryBlockRecord>.unmodifiable(result);
+  }
+
+  List<InventoryFloorRecord> floorsForExistingBlock(String blockId) =>
+      _floorsByBlockId[blockId] ?? const [];
+
+  bool recordRecoveredLifecycleChoice(
+    String blockId,
+    InventoryExistingBlockAction action,
+  ) {
+    if ((action != InventoryExistingBlockAction.detach &&
+            action != InventoryExistingBlockAction.archive) ||
+        !_sourceActiveMappings.containsKey(blockId) ||
+        _existingBlockMappings.containsKey(blockId)) {
+      return false;
+    }
+    _lifecycleActions = Map<String, InventoryExistingBlockAction>.unmodifiable({
+      ..._lifecycleActions,
+      blockId: action,
+    });
+    _acknowledgedLifecycleActions = _lifecycleActions;
+    lastErrorCode = null;
+    _notify();
+    return true;
+  }
 
   InventoryPolyline? get workingPolyline {
     final current = editor;
@@ -90,7 +163,12 @@ class InventorySketchEditorController extends ChangeNotifier {
     return _pendingSave != null ||
         (candidate != null &&
             acknowledged != null &&
-            candidate.canonicalJson != acknowledged.canonicalJson);
+            candidate.canonicalJson != acknowledged.canonicalJson) ||
+        !_sameMappings(
+          _existingBlockMappings,
+          _acknowledgedExistingBlockMappings,
+        ) ||
+        !_sameBlockDrafts(_newBlocks, _acknowledgedNewBlocks);
   }
 
   String? get saveLabel {
@@ -110,11 +188,14 @@ class InventorySketchEditorController extends ChangeNotifier {
         finalizePersisted ||
         _finalizeBlockedByStaleRevision ||
         !_hasDraftIdentity ||
+        hasUnresolvedLifecycleChoices ||
         !_hasCompleteSpatialMetadata(candidate)) {
       return false;
     }
     try {
-      candidate.validateFinalizable();
+      candidate.validateFinalizable(
+        allowEmpty: _isLifecycleProvenEmpty(candidate),
+      );
       return true;
     } on InventoryGeometryFailure {
       return false;
@@ -270,9 +351,17 @@ class InventorySketchEditorController extends ChangeNotifier {
       throw const InventoryFailure('inventory_block_polygon_not_open');
     }
     InventorySpatialContract.validateFloorCount(floorCount);
+    final normalizedName = InventorySpatialContract.normalizeBlockName(
+      displayName,
+    );
+    if (detachedBlockSuggestion(normalizedName) != null) {
+      throw const InventoryFailure(
+        'inventory_block_reattach_confirmation_required',
+      );
+    }
     return InventoryBlockDraft(
       id: _nextId(),
-      displayName: InventorySpatialContract.normalizeBlockName(displayName),
+      displayName: normalizedName,
       polygonIndex: polygonIndex,
       floors: [
         for (var ordinal = 1; ordinal <= floorCount; ordinal += 1)
@@ -283,6 +372,35 @@ class InventorySketchEditorController extends ChangeNotifier {
           ),
       ],
     );
+  }
+
+  InventoryBlockRecord? detachedBlockSuggestion(String displayName) {
+    final normalized = _normalizeInventoryName(
+      InventorySpatialContract.normalizeBlockName(displayName),
+    );
+    final activeMatches = _blocksById.values
+        .where(
+          (block) =>
+              block.archivedAt == null &&
+              block.state == InventoryBlockState.active &&
+              block.normalizedName == normalized,
+        )
+        .toList(growable: false);
+    final detachedMatches = _blocksById.values
+        .where(
+          (block) =>
+              block.archivedAt == null &&
+              block.state == InventoryBlockState.detached &&
+              block.normalizedName == normalized,
+        )
+        .toList(growable: false);
+    if (activeMatches.isNotEmpty) {
+      throw const InventoryFailure('inventory_block_name_conflict');
+    }
+    if (detachedMatches.length > 1) {
+      throw const InventoryFailure('inventory_block_name_ambiguous');
+    }
+    return detachedMatches.isEmpty ? null : detachedMatches.single;
   }
 
   void validateWorkingBlockClosure() {
@@ -314,6 +432,46 @@ class InventorySketchEditorController extends ChangeNotifier {
     return applied;
   }
 
+  bool closeWorkingBlockAsReattach(String blockId) {
+    final proposal = _workingBlockClosureProposal();
+    final block = _blocksById[blockId];
+    if (proposal == null ||
+        block == null ||
+        block.archivedAt != null ||
+        block.state != InventoryBlockState.detached ||
+        _existingBlockMappings.containsKey(blockId)) {
+      return false;
+    }
+    try {
+      if (detachedBlockSuggestion(block.displayName)?.id != blockId) {
+        throw const InventoryFailure('inventory_block_name_ambiguous');
+      }
+      InventorySpatialContract.validateBlockPolygon(
+        proposal.editor.geometry.polylines[proposal.polygonIndex],
+      );
+      final nextMappings = Map<String, int>.of(_existingBlockMappings)
+        ..[blockId] = proposal.polygonIndex;
+      _validateCandidateSpatial(
+        proposal.editor.geometry,
+        nextMappings,
+        _newBlocks,
+      );
+      final applied = _applyEditorAction(
+        proposal.editor,
+        existingBlockMappings: nextMappings,
+      );
+      if (applied && _freeLengthNextSegment) {
+        _freeLengthNextSegment = false;
+        _notify();
+      }
+      return applied;
+    } on Object catch (error) {
+      lastErrorCode = _safeCode(error);
+      _notify();
+      return false;
+    }
+  }
+
   ({InventorySketchEditorSnapshot editor, int polygonIndex})?
   _workingBlockClosureProposal() {
     final current = editor;
@@ -337,7 +495,7 @@ class InventorySketchEditorController extends ChangeNotifier {
     ({InventorySketchEditorSnapshot editor, int polygonIndex}) proposal,
   ) {
     final polygons = <InventoryPolyline>[
-      for (final mappedIndex in _existingMappedPolygonIndexes)
+      for (final mappedIndex in _existingBlockMappings.values)
         proposal.editor.geometry.polylines[mappedIndex],
       for (final block in _newBlocks)
         proposal.editor.geometry.polylines[block.polygonIndex],
@@ -358,22 +516,141 @@ class InventorySketchEditorController extends ChangeNotifier {
     _notify();
   }
 
-  bool deleteSelection() => _applyEditorAction(editor?.deleteSelection());
+  void dismissHandledError() {
+    if (lastErrorCode == null) return;
+    lastErrorCode = null;
+    _notify();
+  }
+
+  bool nudgeSelection(InventorySketchNudgeDirection direction) {
+    final current = editor;
+    final selection = current?.selection;
+    if (current == null || selection == null) return false;
+    final blockId = _blockIdAtPolygonIndex(selection.polylineIndex);
+    if (blockId == null) {
+      lastErrorCode = lockedBaseGeometryCode;
+      _notify();
+      return false;
+    }
+    try {
+      final next = current.nudgeSelection(direction);
+      if (next == null) return false;
+      _validateCandidateSpatial(
+        next.geometry,
+        _existingBlockMappings,
+        _newBlocks,
+      );
+      return _applyEditorAction(
+        next,
+        existingBlockMappings: _existingBlockMappings,
+      );
+    } on InventoryGeometryFailure catch (error) {
+      lastErrorCode = error.reason == 'coordinate_out_of_bounds'
+          ? 'inventory_block_nudge_out_of_bounds'
+          : 'inventory_block_nudge_invalid';
+      _notify();
+      return false;
+    } on Object catch (error) {
+      lastErrorCode = _safeCode(error);
+      _notify();
+      return false;
+    }
+  }
+
+  bool deleteSelection() {
+    final current = editor;
+    final selection = current?.selection;
+    if (current == null || selection == null) return false;
+    final blockId = _blockIdAtPolygonIndex(selection.polylineIndex);
+    if (blockId != null) {
+      if (_sourceActiveMappings.containsKey(blockId)) {
+        lastErrorCode = selection.wholePolyline
+            ? 'inventory_block_lifecycle_choice_required'
+            : 'inventory_mapped_block_segment_delete_not_supported';
+        _notify();
+        return false;
+      }
+      if (!selection.wholePolyline) {
+        lastErrorCode = 'inventory_mapped_block_segment_delete_not_supported';
+        _notify();
+        return false;
+      }
+      return _deleteMappedSelection(blockId: blockId);
+    }
+    if (_isLockedLegacyPolyline(
+      current.geometry.polylines[selection.polylineIndex],
+    )) {
+      lastErrorCode = lockedBaseGeometryCode;
+      _notify();
+      return false;
+    }
+    return _applyEditorAction(current.deleteSelection());
+  }
+
+  bool deleteMappedSelection(InventoryExistingBlockAction action) {
+    if (action != InventoryExistingBlockAction.detach &&
+        action != InventoryExistingBlockAction.archive) {
+      return false;
+    }
+    final selection = editor?.selection;
+    if (selection == null || !selection.wholePolyline) return false;
+    final blockId = _blockIdAtPolygonIndex(selection.polylineIndex);
+    if (blockId == null || !_sourceActiveMappings.containsKey(blockId)) {
+      return false;
+    }
+    return _deleteMappedSelection(blockId: blockId, action: action);
+  }
+
+  bool _deleteMappedSelection({
+    required String blockId,
+    InventoryExistingBlockAction? action,
+  }) {
+    final current = editor;
+    final selection = current?.selection;
+    final removedIndex = _existingBlockMappings[blockId];
+    if (current == null ||
+        selection == null ||
+        !selection.wholePolyline ||
+        removedIndex == null ||
+        selection.polylineIndex != removedIndex) {
+      return false;
+    }
+    final next = current.deleteSelection();
+    if (next == null) return false;
+    final nextMappings = <String, int>{
+      for (final entry in _existingBlockMappings.entries)
+        if (entry.key != blockId)
+          entry.key: entry.value > removedIndex ? entry.value - 1 : entry.value,
+    };
+    final nextActions = Map<String, InventoryExistingBlockAction>.of(
+      _lifecycleActions,
+    );
+    if (action == null) {
+      nextActions.remove(blockId);
+    } else {
+      nextActions[blockId] = action;
+    }
+    return _applyEditorAction(
+      next,
+      existingBlockMappings: nextMappings,
+      lifecycleActions: nextActions,
+    );
+  }
 
   bool undo() {
     final current = editor;
     if (current == null || !current.canUndo || _undoBlockHistory.isEmpty) {
       return false;
     }
-    final previousBlocks = _undoBlockHistory.last;
-    _undoBlockHistory = List<List<InventoryBlockDraft>>.unmodifiable(
+    final previousFrame = _undoBlockHistory.last;
+    _undoBlockHistory = List<_InventoryEditorSpatialFrame>.unmodifiable(
       _undoBlockHistory.sublist(0, _undoBlockHistory.length - 1),
     );
     _redoBlockHistory = _boundedBlockHistory([
       ..._redoBlockHistory,
-      _newBlocks,
+      _currentSpatialFrame,
     ]);
-    return _applyHistoryFrame(current.undo(), previousBlocks);
+    return _applyHistoryFrame(current.undo(), previousFrame);
   }
 
   bool redo() {
@@ -381,20 +658,22 @@ class InventorySketchEditorController extends ChangeNotifier {
     if (current == null || !current.canRedo || _redoBlockHistory.isEmpty) {
       return false;
     }
-    final nextBlocks = _redoBlockHistory.last;
-    _redoBlockHistory = List<List<InventoryBlockDraft>>.unmodifiable(
+    final nextFrame = _redoBlockHistory.last;
+    _redoBlockHistory = List<_InventoryEditorSpatialFrame>.unmodifiable(
       _redoBlockHistory.sublist(0, _redoBlockHistory.length - 1),
     );
     _undoBlockHistory = _boundedBlockHistory([
       ..._undoBlockHistory,
-      _newBlocks,
+      _currentSpatialFrame,
     ]);
-    return _applyHistoryFrame(current.redo(), nextBlocks);
+    return _applyHistoryFrame(current.redo(), nextFrame);
   }
 
   bool _applyEditorAction(
     InventorySketchEditorSnapshot? next, {
     InventoryBlockDraft? addedBlock,
+    Map<String, int>? existingBlockMappings,
+    Map<String, InventoryExistingBlockAction>? lifecycleActions,
   }) {
     final current = editor;
     if (current == null || next == null || identical(current, next)) {
@@ -402,11 +681,6 @@ class InventorySketchEditorController extends ChangeNotifier {
     }
     final geometryChanged =
         current.geometry.canonicalJson != next.geometry.canonicalJson;
-    if (geometryChanged && !_preservesEditActiveBase(next.geometry)) {
-      lastErrorCode = lockedBaseGeometryCode;
-      _notify();
-      return false;
-    }
     final nextBlocks = geometryChanged
         ? _remapNewBlocks(
             current.geometry,
@@ -414,18 +688,38 @@ class InventorySketchEditorController extends ChangeNotifier {
             addedBlock: addedBlock,
           )
         : _newBlocks;
-    if (nextBlocks == null) {
+    final nextMappings =
+        existingBlockMappings ??
+        (geometryChanged
+            ? _remapExistingBlockMappings(current.geometry, next.geometry)
+            : _existingBlockMappings);
+    final nextActions = lifecycleActions ?? _lifecycleActions;
+    if (nextBlocks == null ||
+        nextMappings == null ||
+        !_preservesLockedLegacy(next.geometry, nextMappings, nextBlocks)) {
       lastErrorCode = 'inventory_block_metadata_history_invalid';
       _notify();
       return false;
     }
+    try {
+      _validateCandidateSpatial(next.geometry, nextMappings, nextBlocks);
+    } on Object catch (error) {
+      lastErrorCode = _safeCode(error);
+      _notify();
+      return false;
+    }
+    lastErrorCode = null;
     _undoBlockHistory = _boundedBlockHistory([
       ..._undoBlockHistory,
-      _newBlocks,
+      _currentSpatialFrame,
     ]);
     _redoBlockHistory = const [];
     editor = next;
     _newBlocks = nextBlocks;
+    _existingBlockMappings = Map<String, int>.unmodifiable(nextMappings);
+    _lifecycleActions = Map<String, InventoryExistingBlockAction>.unmodifiable(
+      nextActions,
+    );
     if (geometryChanged) {
       _scheduleAutosave();
     }
@@ -435,13 +729,16 @@ class InventorySketchEditorController extends ChangeNotifier {
 
   bool _applyHistoryFrame(
     InventorySketchEditorSnapshot next,
-    List<InventoryBlockDraft> nextBlocks,
+    _InventoryEditorSpatialFrame nextFrame,
   ) {
     final current = editor!;
     final geometryChanged =
         current.geometry.canonicalJson != next.geometry.canonicalJson;
     editor = next;
-    _newBlocks = nextBlocks;
+    _newBlocks = nextFrame.newBlocks;
+    _existingBlockMappings = nextFrame.existingBlockMappings;
+    _lifecycleActions = nextFrame.lifecycleActions;
+    lastErrorCode = null;
     if (geometryChanged) _scheduleAutosave();
     _notify();
     return true;
@@ -461,11 +758,7 @@ class InventorySketchEditorController extends ChangeNotifier {
       }
       final source = current.polylines[block.polygonIndex];
       final matches = <int>[
-        for (
-          var index = _basePolygonCount;
-          index < next.polylines.length;
-          index += 1
-        )
+        for (var index = 0; index < next.polylines.length; index += 1)
           if (!usedIndexes.contains(index) &&
               _samePolyline(source, next.polylines[index]))
             index,
@@ -478,7 +771,7 @@ class InventorySketchEditorController extends ChangeNotifier {
     }
     if (addedBlock != null) {
       final index = addedBlock.polygonIndex;
-      if (index < _basePolygonCount ||
+      if (index < 0 ||
           index >= next.polylines.length ||
           usedIndexes.contains(index) ||
           !next.polylines[index].closed) {
@@ -516,36 +809,241 @@ class InventorySketchEditorController extends ChangeNotifier {
     return true;
   }
 
-  bool _preservesEditActiveBase(InventoryGeometry candidate) {
-    if (launchIntent != InventorySketchLaunchIntent.editActive) return true;
-    final acknowledged = acknowledgedGeometry;
-    if (acknowledged == null ||
-        candidate.polylines.length < _basePolygonCount ||
-        acknowledged.polylines.length < _basePolygonCount) {
-      return false;
+  String? _blockIdAtPolygonIndex(int polygonIndex) {
+    for (final entry in _existingBlockMappings.entries) {
+      if (entry.value == polygonIndex) return entry.key;
     }
-    for (var index = 0; index < _basePolygonCount; index += 1) {
-      if (!_samePolyline(
-        acknowledged.polylines[index],
-        candidate.polylines[index],
-      )) {
+    return null;
+  }
+
+  Map<String, int>? _remapExistingBlockMappings(
+    InventoryGeometry current,
+    InventoryGeometry next,
+  ) {
+    final remapped = <String, int>{};
+    final usedIndexes = <int>{};
+    for (final entry in _existingBlockMappings.entries) {
+      final sourceIndex = entry.value;
+      if (sourceIndex < 0 || sourceIndex >= current.polylines.length) {
+        return null;
+      }
+      final source = current.polylines[sourceIndex];
+      final matches = <int>[
+        for (var index = 0; index < next.polylines.length; index += 1)
+          if (!usedIndexes.contains(index) &&
+              _samePolyline(source, next.polylines[index]))
+            index,
+      ];
+      if (matches.length != 1) return null;
+      usedIndexes.add(matches.single);
+      remapped[entry.key] = matches.single;
+    }
+    return Map<String, int>.unmodifiable(remapped);
+  }
+
+  bool _preservesLockedLegacy(
+    InventoryGeometry geometry,
+    Map<String, int> mappings,
+    List<InventoryBlockDraft> newBlocks,
+  ) {
+    if (_lockedLegacyPolylines.isEmpty) return true;
+    final reservedIndexes = <int>{
+      ...mappings.values,
+      ...newBlocks.map((block) => block.polygonIndex),
+    };
+    var searchIndex = 0;
+    for (final locked in _lockedLegacyPolylines) {
+      var found = false;
+      while (searchIndex < geometry.polylines.length) {
+        final index = searchIndex;
+        searchIndex += 1;
+        if (!reservedIndexes.contains(index) &&
+            _samePolyline(locked, geometry.polylines[index])) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) return false;
+    }
+    return true;
+  }
+
+  bool _isLockedLegacyPolyline(InventoryPolyline polyline) =>
+      _lockedLegacyPolylines.any((locked) => _samePolyline(locked, polyline));
+
+  void _validateCandidateSpatial(
+    InventoryGeometry geometry,
+    Map<String, int> mappings,
+    List<InventoryBlockDraft> newBlocks,
+  ) {
+    final usedIndexes = <int>{};
+    final polygons = <InventoryPolyline>[];
+    for (final entry in mappings.entries) {
+      final block = _blocksById[entry.key];
+      final index = entry.value;
+      if (block == null ||
+          block.archivedAt != null ||
+          index < 0 ||
+          index >= geometry.polylines.length ||
+          !usedIndexes.add(index)) {
+        throw const InventoryFailure(
+          'inventory_block_mapping_integrity_failed',
+        );
+      }
+      polygons.add(geometry.polylines[index]);
+    }
+    for (final block in newBlocks) {
+      block.validate(geometry);
+      if (!usedIndexes.add(block.polygonIndex)) {
+        throw const InventoryFailure('inventory_block_identity_ambiguous');
+      }
+      polygons.add(geometry.polylines[block.polygonIndex]);
+    }
+    InventorySpatialContract.validateNonOverlappingPolygons(polygons);
+  }
+
+  _InventoryEditorSpatialFrame get _currentSpatialFrame =>
+      _InventoryEditorSpatialFrame(
+        existingBlockMappings: _existingBlockMappings,
+        newBlocks: _newBlocks,
+        lifecycleActions: _lifecycleActions,
+      );
+
+  List<InventoryExistingBlockMappingDraft> _mappingDrafts(
+    Map<String, int> mappings,
+  ) {
+    final entries = mappings.entries.toList(growable: false)
+      ..sort((first, second) => first.key.compareTo(second.key));
+    return List<InventoryExistingBlockMappingDraft>.unmodifiable([
+      for (final entry in entries)
+        InventoryExistingBlockMappingDraft(
+          blockId: entry.key,
+          polygonIndex: entry.value,
+        ),
+    ]);
+  }
+
+  bool _sameMappings(Map<String, int> first, Map<String, int> second) {
+    if (first.length != second.length) return false;
+    for (final entry in first.entries) {
+      if (second[entry.key] != entry.value) return false;
+    }
+    return true;
+  }
+
+  bool _sameBlockDrafts(
+    List<InventoryBlockDraft> first,
+    List<InventoryBlockDraft> second,
+  ) {
+    if (first.length != second.length) return false;
+    for (var index = 0; index < first.length; index += 1) {
+      final left = first[index];
+      final right = second[index];
+      if (left.id != right.id ||
+          left.displayName != right.displayName ||
+          left.polygonIndex != right.polygonIndex ||
+          left.floors.length != right.floors.length) {
         return false;
+      }
+      for (
+        var floorIndex = 0;
+        floorIndex < left.floors.length;
+        floorIndex += 1
+      ) {
+        final leftFloor = left.floors[floorIndex];
+        final rightFloor = right.floors[floorIndex];
+        if (leftFloor.id != rightFloor.id ||
+            leftFloor.displayName != rightFloor.displayName ||
+            leftFloor.ordinal != rightFloor.ordinal) {
+          return false;
+        }
       }
     }
     return true;
   }
 
-  List<List<InventoryBlockDraft>> _boundedBlockHistory(
-    Iterable<List<InventoryBlockDraft>> values,
+  bool _isLifecycleProvenEmpty(InventoryGeometry geometry) =>
+      launchIntent == InventorySketchLaunchIntent.editActive &&
+      geometry.polylines.isEmpty &&
+      _lockedLegacyPolylines.isEmpty &&
+      _newBlocks.isEmpty &&
+      _existingBlockMappings.isEmpty &&
+      _sourceActiveMappings.isNotEmpty &&
+      !hasUnresolvedLifecycleChoices;
+
+  List<InventoryExistingBlockFinalizeIntent> _existingBlockFinalizeIntents() {
+    final result = <InventoryExistingBlockFinalizeIntent>[];
+    for (final entry in _sourceActiveMappings.entries) {
+      final block = _blocksById[entry.key];
+      if (block == null || block.state != InventoryBlockState.active) {
+        throw const InventoryFailure(
+          'inventory_block_mapping_integrity_failed',
+        );
+      }
+      final targetIndex = _existingBlockMappings[entry.key];
+      if (targetIndex != null) {
+        if (_lifecycleActions.containsKey(entry.key)) {
+          throw const InventoryFailure(
+            'inventory_block_lifecycle_choice_invalid',
+          );
+        }
+        result.add(
+          InventoryExistingBlockFinalizeIntent(
+            blockId: entry.key,
+            action: InventoryExistingBlockAction.retainMapped,
+            expectedBlockRevision: block.revision,
+            targetPolygonIndex: targetIndex,
+          ),
+        );
+        continue;
+      }
+      final action = _lifecycleActions[entry.key];
+      if (action != InventoryExistingBlockAction.detach &&
+          action != InventoryExistingBlockAction.archive) {
+        throw const InventoryFailure(
+          'inventory_block_lifecycle_choice_required',
+        );
+      }
+      result.add(
+        InventoryExistingBlockFinalizeIntent(
+          blockId: entry.key,
+          action: action!,
+          expectedBlockRevision: block.revision,
+        ),
+      );
+    }
+    for (final entry in _existingBlockMappings.entries) {
+      if (_sourceActiveMappings.containsKey(entry.key)) continue;
+      final block = _blocksById[entry.key];
+      if (block == null || block.state != InventoryBlockState.detached) {
+        throw const InventoryFailure(
+          'inventory_block_mapping_integrity_failed',
+        );
+      }
+      result.add(
+        InventoryExistingBlockFinalizeIntent(
+          blockId: entry.key,
+          action: InventoryExistingBlockAction.reattach,
+          expectedBlockRevision: block.revision,
+          targetPolygonIndex: entry.value,
+        ),
+      );
+    }
+    result.sort((first, second) => first.blockId.compareTo(second.blockId));
+    return List<InventoryExistingBlockFinalizeIntent>.unmodifiable(result);
+  }
+
+  List<_InventoryEditorSpatialFrame> _boundedBlockHistory(
+    Iterable<_InventoryEditorSpatialFrame> values,
   ) {
-    final bounded = List<List<InventoryBlockDraft>>.of(values);
+    final bounded = List<_InventoryEditorSpatialFrame>.of(values);
     if (bounded.length > InventorySketchEditorSnapshot.maximumHistory) {
       bounded.removeRange(
         0,
         bounded.length - InventorySketchEditorSnapshot.maximumHistory,
       );
     }
-    return List<List<InventoryBlockDraft>>.unmodifiable(bounded);
+    return List<_InventoryEditorSpatialFrame>.unmodifiable(bounded);
   }
 
   void _scheduleAutosave() {
@@ -605,23 +1103,40 @@ class InventorySketchEditorController extends ChangeNotifier {
       try {
         final result = await application.autosaveSketchDraft(pending.command);
         final projection = await application.loadPrimarySketch(projectId);
+        final targetDraftRevisionId = result.supportingId;
+        if (projection == null ||
+            result.commandType != InventoryCommandType.sketchDraftAutosave ||
+            result.projectId != projectId ||
+            result.sourceId != projection.sketch.id ||
+            result.sourceRevision != projection.sketch.revision ||
+            targetDraftRevisionId == null) {
+          throw const InventoryFailure(
+            'inventory_sketch_save_verification_failed',
+          );
+        }
         final draft = _verifiedDraft(
           projection,
+          expectedDraftRevisionId: targetDraftRevisionId,
           expectedGeometry: pending.geometry,
+          expectedExistingBlockMappings: pending.command.existingBlockMappings,
           expectedNewBlocks: pending.command.newBlocks,
         );
-        if (result.commandType != InventoryCommandType.sketchDraftAutosave ||
-            result.projectId != projectId ||
-            result.sourceId != projection!.sketch.id ||
-            result.sourceRevision != projection.sketch.revision ||
-            result.supportingId != draft.id ||
-            result.supportingRevision != draft.contentRevision) {
+        if (result.supportingRevision != draft.contentRevision) {
           throw const InventoryFailure(
             'inventory_sketch_save_verification_failed',
           );
         }
         acknowledgedGeometry = draft.geometry;
-        _acknowledgedNewBlocks = projection.draftNewBlocks;
+        _acknowledgedExistingBlockMappings = Map<String, int>.unmodifiable({
+          for (final mapping
+              in pending.command.existingBlockMappings ?? const [])
+            mapping.blockId: mapping.polygonIndex,
+        });
+        _acknowledgedNewBlocks = List<InventoryBlockDraft>.unmodifiable(
+          pending.command.newBlocks,
+        );
+        _acknowledgedLifecycleActions = pending.lifecycleActions;
+        _draftRevisionId = draft.id;
         _expectedSketchRevision = projection.sketch.revision;
         _expectedContentRevision = draft.contentRevision;
         _pendingSave = null;
@@ -649,6 +1164,7 @@ class InventorySketchEditorController extends ChangeNotifier {
     return _PendingDraftSave(
       geometry: current,
       geometryGeneration: _geometryGeneration,
+      lifecycleActions: _lifecycleActions,
       command: AutosaveInventorySketchDraftCommand(
         operationId: _nextId(),
         projectId: projectId,
@@ -657,6 +1173,7 @@ class InventorySketchEditorController extends ChangeNotifier {
         expectedSketchRevision: _expectedSketchRevision!,
         expectedContentRevision: _expectedContentRevision!,
         geometry: current,
+        existingBlockMappings: _mappingDrafts(_existingBlockMappings),
         newBlocks: _newBlocks,
       ),
     );
@@ -676,6 +1193,8 @@ class InventorySketchEditorController extends ChangeNotifier {
       mode: current.mode,
     );
     _newBlocks = _acknowledgedNewBlocks;
+    _existingBlockMappings = _acknowledgedExistingBlockMappings;
+    _lifecycleActions = _acknowledgedLifecycleActions;
     _undoBlockHistory = const [];
     _redoBlockHistory = const [];
     _freeLengthNextSegment = false;
@@ -694,7 +1213,14 @@ class InventorySketchEditorController extends ChangeNotifier {
     final candidate = editor?.geometry;
     if (candidate == null) return false;
     try {
-      candidate.validateFinalizable();
+      if (hasUnresolvedLifecycleChoices) {
+        throw const InventoryFailure(
+          'inventory_block_lifecycle_choice_required',
+        );
+      }
+      candidate.validateFinalizable(
+        allowEmpty: _isLifecycleProvenEmpty(candidate),
+      );
       if (!_hasCompleteSpatialMetadata(candidate)) {
         throw const InventoryFailure('inventory_block_metadata_incomplete');
       }
@@ -709,7 +1235,14 @@ class InventorySketchEditorController extends ChangeNotifier {
     try {
       if (!await forceSave()) return false;
       final intended = editor!.geometry;
-      intended.validateFinalizable();
+      if (hasUnresolvedLifecycleChoices) {
+        throw const InventoryFailure(
+          'inventory_block_lifecycle_choice_required',
+        );
+      }
+      intended.validateFinalizable(
+        allowEmpty: _isLifecycleProvenEmpty(intended),
+      );
       if (!_hasCompleteSpatialMetadata(intended)) {
         throw const InventoryFailure('inventory_block_metadata_incomplete');
       }
@@ -719,6 +1252,7 @@ class InventorySketchEditorController extends ChangeNotifier {
       final draft = _verifiedDraft(
         before,
         expectedGeometry: intended,
+        expectedExistingBlockMappings: _mappingDrafts(_existingBlockMappings),
         expectedNewBlocks: _newBlocks,
       );
       if (before!.sketch.revision != expectedSketchRevision) {
@@ -728,6 +1262,8 @@ class InventorySketchEditorController extends ChangeNotifier {
         throw const InventoryFailure('inventory_stale_content_revision');
       }
       final targetDraftId = draft.id;
+      final existingBlockIntents = _existingBlockFinalizeIntents();
+      final placementExpectations = await _placementExpectations();
       final result = await application.finalizeSketch(
         FinalizeInventorySketchCommand(
           operationId: _nextId(),
@@ -736,6 +1272,8 @@ class InventorySketchEditorController extends ChangeNotifier {
           draftRevisionId: targetDraftId,
           expectedSketchRevision: expectedSketchRevision,
           expectedContentRevision: expectedContentRevision,
+          existingBlockIntents: existingBlockIntents,
+          placementExpectations: placementExpectations,
           newBlocks: _newBlocks,
         ),
       );
@@ -779,21 +1317,33 @@ class InventorySketchEditorController extends ChangeNotifier {
 
   InventorySketchRevisionRecord _verifiedDraft(
     InventoryPrimarySketchProjection? projection, {
+    String? expectedDraftRevisionId,
     required InventoryGeometry expectedGeometry,
+    List<InventoryExistingBlockMappingDraft>? expectedExistingBlockMappings,
     List<InventoryBlockDraft>? expectedNewBlocks,
   }) {
+    final targetDraftRevisionId = expectedDraftRevisionId ?? _draftRevisionId;
     final draft = projection?.draftRevision;
     if (projection == null ||
         projection.sketch.projectId != projectId ||
         projection.sketch.id != _sketchId ||
-        projection.sketch.draftRevisionId != _draftRevisionId ||
+        targetDraftRevisionId == null ||
+        projection.sketch.draftRevisionId != targetDraftRevisionId ||
         draft == null ||
-        draft.id != _draftRevisionId ||
+        draft.id != targetDraftRevisionId ||
         draft.sketchId != _sketchId ||
         draft.projectId != projectId ||
         draft.state != InventorySketchRevisionState.draft ||
+        draft.baseRevisionId != _draftBaseRevisionId ||
+        projection.activeRevision?.id != _draftBaseRevisionId ||
         draft.geometry.canonicalJson != expectedGeometry.canonicalJson ||
         draft.geometrySha256 != expectedGeometry.sha256 ||
+        (expectedExistingBlockMappings != null &&
+            !_sameExistingBlockMappings(
+              projection.draftBlockPolygons,
+              expectedExistingBlockMappings,
+              draft.id,
+            )) ||
         (expectedNewBlocks != null &&
             !_sameBlockDefinitions(
               projection.draftNewBlocks,
@@ -802,6 +1352,62 @@ class InventorySketchEditorController extends ChangeNotifier {
       throw const InventoryFailure('inventory_sketch_save_verification_failed');
     }
     return draft;
+  }
+
+  bool _sameExistingBlockMappings(
+    List<InventoryRevisionBlockPolygonRecord> actual,
+    List<InventoryExistingBlockMappingDraft> expected,
+    String expectedRevisionId,
+  ) {
+    if (actual.length != expected.length) return false;
+    final actualByBlock = <String, int>{};
+    for (final mapping in actual) {
+      if (mapping.revisionId != expectedRevisionId ||
+          mapping.projectId != projectId ||
+          mapping.sketchId != _sketchId ||
+          actualByBlock.containsKey(mapping.blockId)) {
+        return false;
+      }
+      actualByBlock[mapping.blockId] = mapping.polygonIndex;
+    }
+    for (final mapping in expected) {
+      if (actualByBlock[mapping.blockId] != mapping.polygonIndex) return false;
+    }
+    return true;
+  }
+
+  Future<List<InventoryPlacementReconciliationExpectation>>
+  _placementExpectations() async {
+    final assets = await application.listAssets(
+      projectId: projectId,
+      includeArchived: false,
+    );
+    final result = <InventoryPlacementReconciliationExpectation>[];
+    for (final projection in assets) {
+      final asset = projection.asset;
+      final placement = projection.activePlacement;
+      if (asset.projectId != projectId ||
+          asset.archivedAt != null ||
+          placement == null ||
+          !placement.isActive ||
+          placement.projectId != projectId ||
+          placement.assetId != asset.id) {
+        throw const InventoryFailure('inventory_projection_integrity_failed');
+      }
+      result.add(
+        InventoryPlacementReconciliationExpectation(
+          assetId: asset.id,
+          expectedAssetRevision: asset.revision,
+          placementId: placement.id,
+          placementKey: placement.placementKey,
+          expectedPlacementSequence: placement.sequence,
+        ),
+      );
+    }
+    result.sort((first, second) => first.assetId.compareTo(second.assetId));
+    return List<InventoryPlacementReconciliationExpectation>.unmodifiable(
+      result,
+    );
   }
 
   bool _sameBlockDefinitions(
@@ -847,23 +1453,92 @@ class InventorySketchEditorController extends ChangeNotifier {
         draft.state != InventorySketchRevisionState.draft) {
       throw const InventoryFailure('inventory_sketch_draft_unavailable');
     }
-    if (launchIntent == InventorySketchLaunchIntent.editActive) {
-      final active = projection.activeRevision;
-      if (active == null || draft.baseRevisionId != active.id) {
-        throw const InventoryFailure('inventory_sketch_edit_lifecycle_invalid');
-      }
+    final active = projection.activeRevision;
+    if (draft.baseRevisionId != active?.id ||
+        (launchIntent == InventorySketchLaunchIntent.editActive &&
+            active == null)) {
+      throw const InventoryFailure('inventory_sketch_edit_lifecycle_invalid');
     }
     _sketchId = projection.sketch.id;
     _draftRevisionId = draft.id;
+    _draftBaseRevisionId = draft.baseRevisionId;
     _expectedSketchRevision = projection.sketch.revision;
     _expectedContentRevision = draft.contentRevision;
     acknowledgedGeometry = draft.geometry;
-    _basePolygonCount =
-        projection.activeRevision?.geometry.polylines.length ??
-        projection.draftLegacyPolygonCount;
-    _existingMappedPolygonIndexes = projection.draftBlockPolygons
-        .map((mapping) => mapping.polygonIndex)
-        .toSet();
+    final blocksById = <String, InventoryBlockRecord>{};
+    for (final block in projection.blocks) {
+      if (block.projectId != projectId || blocksById.containsKey(block.id)) {
+        throw const InventoryFailure('inventory_projection_integrity_failed');
+      }
+      blocksById[block.id] = block;
+    }
+    _blocksById = Map<String, InventoryBlockRecord>.unmodifiable(blocksById);
+    final floorsByBlockId = <String, List<InventoryFloorRecord>>{};
+    for (final floor in projection.floors) {
+      if (floor.projectId != projectId ||
+          !blocksById.containsKey(floor.blockId)) {
+        throw const InventoryFailure('inventory_projection_integrity_failed');
+      }
+      floorsByBlockId.putIfAbsent(floor.blockId, () => []).add(floor);
+    }
+    for (final floors in floorsByBlockId.values) {
+      floors.sort((first, second) => first.ordinal.compareTo(second.ordinal));
+    }
+    _floorsByBlockId = Map<String, List<InventoryFloorRecord>>.unmodifiable({
+      for (final entry in floorsByBlockId.entries)
+        entry.key: List<InventoryFloorRecord>.unmodifiable(entry.value),
+    });
+    Map<String, int> mappingMap(
+      List<InventoryRevisionBlockPolygonRecord> mappings,
+      InventoryGeometry geometry,
+      String expectedRevisionId,
+    ) {
+      final result = <String, int>{};
+      final indexes = <int>{};
+      for (final mapping in mappings) {
+        if (mapping.revisionId != expectedRevisionId ||
+            mapping.projectId != projectId ||
+            mapping.sketchId != projection.sketch.id ||
+            !blocksById.containsKey(mapping.blockId) ||
+            mapping.polygonIndex < 0 ||
+            mapping.polygonIndex >= geometry.polylines.length ||
+            result.containsKey(mapping.blockId) ||
+            !indexes.add(mapping.polygonIndex)) {
+          throw const InventoryFailure('inventory_projection_integrity_failed');
+        }
+        result[mapping.blockId] = mapping.polygonIndex;
+      }
+      return Map<String, int>.unmodifiable(result);
+    }
+
+    final activeGeometry = projection.activeRevision?.geometry;
+    _sourceActiveMappings = activeGeometry == null
+        ? const {}
+        : mappingMap(
+            projection.activeBlockPolygons,
+            activeGeometry,
+            projection.activeRevision!.id,
+          );
+    _existingBlockMappings = mappingMap(
+      projection.draftBlockPolygons,
+      draft.geometry,
+      draft.id,
+    );
+    _acknowledgedExistingBlockMappings = _existingBlockMappings;
+    final legacyGeometry = activeGeometry ?? draft.geometry;
+    final legacyCount =
+        activeGeometry?.polylines.length ?? projection.draftLegacyPolygonCount;
+    if (legacyCount < 0 || legacyCount > legacyGeometry.polylines.length) {
+      throw const InventoryFailure('inventory_projection_integrity_failed');
+    }
+    final sourceMappedIndexes = _sourceActiveMappings.values.toSet();
+    _lockedLegacyPolylines = List<InventoryPolyline>.unmodifiable([
+      for (var index = 0; index < legacyCount; index += 1)
+        if (!sourceMappedIndexes.contains(index))
+          legacyGeometry.polylines[index],
+    ]);
+    _lifecycleActions = const {};
+    _acknowledgedLifecycleActions = const {};
     _newBlocks = projection.draftNewBlocks;
     _acknowledgedNewBlocks = projection.draftNewBlocks;
     _undoBlockHistory = const [];
@@ -880,31 +1555,42 @@ class InventorySketchEditorController extends ChangeNotifier {
   }
 
   bool _hasCompleteSpatialMetadata(InventoryGeometry geometry) {
-    final expectedIndexes = <int>{
-      for (
-        var index = _basePolygonCount;
-        index < geometry.polylines.length;
-        index += 1
-      )
-        index,
-    };
-    final actualIndexes = _newBlocks.map((block) => block.polygonIndex).toSet();
-    if (expectedIndexes.length != actualIndexes.length ||
-        !actualIndexes.containsAll(expectedIndexes)) {
-      return false;
-    }
     try {
-      final polygons = <InventoryPolyline>[
-        for (final index in _existingMappedPolygonIndexes)
-          geometry.polylines[index],
-        for (final block in _newBlocks) geometry.polylines[block.polygonIndex],
+      _validateCandidateSpatial(geometry, _existingBlockMappings, _newBlocks);
+      final accountedIndexes = <int>{
+        ..._existingBlockMappings.values,
+        ..._newBlocks.map((block) => block.polygonIndex),
+      };
+      final remaining = <InventoryPolyline>[
+        for (var index = 0; index < geometry.polylines.length; index += 1)
+          if (!accountedIndexes.contains(index)) geometry.polylines[index],
       ];
-      InventorySpatialContract.validateNonOverlappingPolygons(polygons);
-      return true;
+      if (remaining.length != _lockedLegacyPolylines.length) return false;
+      for (var index = 0; index < remaining.length; index += 1) {
+        if (!_samePolyline(remaining[index], _lockedLegacyPolylines[index])) {
+          return false;
+        }
+      }
+      for (final entry in _lifecycleActions.entries) {
+        if (!_sourceActiveMappings.containsKey(entry.key) ||
+            _existingBlockMappings.containsKey(entry.key) ||
+            (entry.value != InventoryExistingBlockAction.detach &&
+                entry.value != InventoryExistingBlockAction.archive)) {
+          return false;
+        }
+      }
+      return !hasUnresolvedLifecycleChoices;
     } on Object {
       return false;
     }
   }
+
+  String _normalizeInventoryName(String value) => value
+      .replaceAll('I', 'ı')
+      .replaceAll('İ', 'i')
+      .toLowerCase()
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
 
   String _nextId() {
     final value = idFactory();
@@ -1002,6 +1688,7 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
       _orientationFailed = false;
       _orientationRestoreFailed = false;
       await controller.initialize();
+      if (mounted) await _promptRecoveredLifecycleChoices();
     } on Object catch (error) {
       controller.recordHandledError(error);
       if (mounted) setState(() => _orientationFailed = true);
@@ -1140,6 +1827,14 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
     );
     if (input == null || !mounted) return;
     try {
+      final suggestion = controller.detachedBlockSuggestion(input.displayName);
+      if (suggestion != null) {
+        final confirmed = await _showReattachDialog(suggestion);
+        if (confirmed == true && mounted) {
+          controller.closeWorkingBlockAsReattach(suggestion.id);
+        }
+        return;
+      }
       final definition = controller.createBlockDraft(
         displayName: input.displayName,
         floorCount: input.floorCount,
@@ -1148,6 +1843,85 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
     } on Object catch (error) {
       controller.recordHandledError(error);
     }
+  }
+
+  Future<bool?> _showReattachDialog(InventoryBlockRecord block) =>
+      showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          key: const Key('inventory-block-reattach-dialog'),
+          title: const Text('Mevcut bloğu yeniden bağla'),
+          content: Text(
+            '${block.displayName} adlı krokiden kaldırılmış blok ve '
+            '${controller.floorsForExistingBlock(block.id).length} kat '
+            'mevcut kimlikleriyle yeniden bağlanacak.',
+          ),
+          actions: [
+            TextButton(
+              key: const Key('inventory-block-reattach-cancel'),
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Vazgeç'),
+            ),
+            FilledButton(
+              key: const Key('inventory-block-reattach-confirm'),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Mevcut bloğu yeniden bağla'),
+            ),
+          ],
+        ),
+      );
+
+  Future<InventoryExistingBlockAction?> _showBlockLifecycleDialog(
+    InventoryBlockRecord block,
+  ) => showDialog<InventoryExistingBlockAction>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      key: const Key('inventory-block-lifecycle-dialog'),
+      title: Text(block.displayName),
+      content: const Text(
+        'Bu bloğun krokiden kaldırılması için kayıtların nasıl '
+        'korunacağını seçin.',
+      ),
+      actions: [
+        TextButton(
+          key: const Key('inventory-block-lifecycle-archive'),
+          onPressed: () =>
+              Navigator.of(context).pop(InventoryExistingBlockAction.archive),
+          child: const Text('Bloğu ve envanter kayıtlarını sil'),
+        ),
+        FilledButton(
+          key: const Key('inventory-block-lifecycle-detach'),
+          onPressed: () =>
+              Navigator.of(context).pop(InventoryExistingBlockAction.detach),
+          child: const Text('Bloğu krokiden kaldır, kayıtları koru'),
+        ),
+      ],
+    ),
+  );
+
+  Future<void> _promptRecoveredLifecycleChoices() async {
+    while (mounted && controller.hasUnresolvedLifecycleChoices) {
+      final blocks = controller.unresolvedLifecycleBlocks;
+      if (blocks.isEmpty) return;
+      final block = blocks.first;
+      final action = await _showBlockLifecycleDialog(block);
+      if (!mounted || action == null) return;
+      controller.recordRecoveredLifecycleChoice(block.id, action);
+    }
+  }
+
+  Future<void> _deleteSelection() async {
+    if (controller.selectedWholeBlockNeedsLifecycleChoice) {
+      final block = controller.selectedExistingBlock;
+      if (block == null) return;
+      final action = await _showBlockLifecycleDialog(block);
+      if (!mounted || action == null) return;
+      controller.deleteMappedSelection(action);
+      return;
+    }
+    controller.deleteSelection();
   }
 
   void _updatePreview(Offset localPosition) {
@@ -1228,6 +2002,7 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
         widget.launchIntent == InventorySketchLaunchIntent.editActive
         ? 'Krokiyi yayınla ve güncelle'
         : 'Krokiyi yayınla';
+    final editorDiagnostic = _editorDiagnosticMessage(controller.lastErrorCode);
     return Stack(
       key: const Key('inventory-editor-fullscreen-workspace'),
       fit: StackFit.expand,
@@ -1334,6 +2109,20 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
                     ),
                   ],
                 ),
+              if (editorDiagnostic != null)
+                MaterialBanner(
+                  key: const Key('inventory-editor-spatial-diagnostic'),
+                  content: Text(editorDiagnostic),
+                  actions: [
+                    TextButton(
+                      key: const Key(
+                        'inventory-editor-spatial-diagnostic-dismiss',
+                      ),
+                      onPressed: controller.dismissHandledError,
+                      child: const Text('Anladım'),
+                    ),
+                  ],
+                ),
               if (_orientationFailed)
                 MaterialBanner(
                   content: const Text(
@@ -1392,7 +2181,8 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
             onRedo: controller.redo,
             onFinish: controller.finishWorkingPolyline,
             onClose: () => unawaited(_closeCurrentBlock()),
-            onDelete: controller.deleteSelection,
+            onNudge: controller.nudgeSelection,
+            onDelete: () => unawaited(_deleteSelection()),
             freeLengthNextSegment: controller.freeLengthNextSegment,
             onFreeLengthChanged: controller.setFreeLengthNextSegment,
             onZoomOut: () => _canvasKey.currentState?.zoomOut(),
@@ -1408,6 +2198,31 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
       ],
     );
   }
+
+  String? _editorDiagnosticMessage(String? code) => switch (code) {
+    'inventory_block_diagonal_edge_reshape_not_supported' =>
+      'Çapraz bir kenar bu sürümde yeniden şekillendirilemez. '
+          'Bloğun tamamını taşıyabilirsiniz.',
+    'inventory_block_edge_nudge_direction_invalid' =>
+      'Seçili kenar yalnız kendisine dik yönde taşınabilir.',
+    'inventory_block_nudge_out_of_bounds' =>
+      'Bu hareket bloğu kroki sınırlarının dışına çıkarır; kayıt değiştirilmedi.',
+    'inventory_block_nudge_invalid' =>
+      'Bu hareket geçerli bir blok kenarı oluşturmaz; kayıt değiştirilmedi.',
+    'inventory_block_polygon_self_intersects' ||
+    'inventory_block_polygon_zero_area' ||
+    'inventory_block_polygon_ambiguous' =>
+      'Bu hareket geçersiz veya başka bir bloğa temas eden bir şekil '
+          'oluşturur; kayıt değiştirilmedi.',
+    'inventory_mapped_block_segment_delete_not_supported' =>
+      'Mevcut bloğun tek kenarı silinemez. Kenarı paralel taşıyın veya '
+          'bloğun tamamını seçin.',
+    'inventory_block_name_conflict' || 'inventory_block_name_ambiguous' =>
+      'Bu ad mevcut blok kimliğiyle çakışıyor; yeni blok oluşturulmadı.',
+    'inventory_block_lifecycle_choice_required' =>
+      'Krokiden kaldırılan blok için kayıtları koruma seçimi gereklidir.',
+    _ => null,
+  };
 }
 
 class _EditorToolbar extends StatelessWidget {
@@ -1419,6 +2234,7 @@ class _EditorToolbar extends StatelessWidget {
     required this.onRedo,
     required this.onFinish,
     required this.onClose,
+    required this.onNudge,
     required this.onDelete,
     required this.freeLengthNextSegment,
     required this.onFreeLengthChanged,
@@ -1437,6 +2253,7 @@ class _EditorToolbar extends StatelessWidget {
   final VoidCallback onRedo;
   final VoidCallback onFinish;
   final VoidCallback onClose;
+  final ValueChanged<InventorySketchNudgeDirection> onNudge;
   final VoidCallback onDelete;
   final bool freeLengthNextSegment;
   final ValueChanged<bool> onFreeLengthChanged;
@@ -1553,6 +2370,38 @@ class _EditorToolbar extends StatelessWidget {
                       label: 'Seçileni sil',
                       icon: const Icon(Icons.delete_outline_rounded),
                       onPressed: editor.selection == null ? null : onDelete,
+                    ),
+                    _ToolbarIconButton(
+                      key: const Key('inventory-editor-nudge-up'),
+                      label: 'Yukarı taşı',
+                      icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                      onPressed: editor.selection == null
+                          ? null
+                          : () => onNudge(InventorySketchNudgeDirection.up),
+                    ),
+                    _ToolbarIconButton(
+                      key: const Key('inventory-editor-nudge-right'),
+                      label: 'Sağa taşı',
+                      icon: const Icon(Icons.keyboard_arrow_right_rounded),
+                      onPressed: editor.selection == null
+                          ? null
+                          : () => onNudge(InventorySketchNudgeDirection.right),
+                    ),
+                    _ToolbarIconButton(
+                      key: const Key('inventory-editor-nudge-down'),
+                      label: 'Aşağı taşı',
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                      onPressed: editor.selection == null
+                          ? null
+                          : () => onNudge(InventorySketchNudgeDirection.down),
+                    ),
+                    _ToolbarIconButton(
+                      key: const Key('inventory-editor-nudge-left'),
+                      label: 'Sola taşı',
+                      icon: const Icon(Icons.keyboard_arrow_left_rounded),
+                      onPressed: editor.selection == null
+                          ? null
+                          : () => onNudge(InventorySketchNudgeDirection.left),
                     ),
                     const Divider(height: 8),
                     _ToolbarIconButton(
@@ -1883,14 +2732,35 @@ class _EditorFailurePanel extends StatelessWidget {
   }
 }
 
+class _InventoryEditorSpatialFrame {
+  _InventoryEditorSpatialFrame({
+    required Map<String, int> existingBlockMappings,
+    required List<InventoryBlockDraft> newBlocks,
+    required Map<String, InventoryExistingBlockAction> lifecycleActions,
+  }) : existingBlockMappings = Map<String, int>.unmodifiable(
+         existingBlockMappings,
+       ),
+       newBlocks = List<InventoryBlockDraft>.unmodifiable(newBlocks),
+       lifecycleActions =
+           Map<String, InventoryExistingBlockAction>.unmodifiable(
+             lifecycleActions,
+           );
+
+  final Map<String, int> existingBlockMappings;
+  final List<InventoryBlockDraft> newBlocks;
+  final Map<String, InventoryExistingBlockAction> lifecycleActions;
+}
+
 class _PendingDraftSave {
   const _PendingDraftSave({
     required this.geometry,
     required this.geometryGeneration,
+    required this.lifecycleActions,
     required this.command,
   });
 
   final InventoryGeometry geometry;
   final int geometryGeneration;
+  final Map<String, InventoryExistingBlockAction> lifecycleActions;
   final AutosaveInventorySketchDraftCommand command;
 }
