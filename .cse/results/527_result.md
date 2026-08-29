@@ -208,3 +208,81 @@ execution_record:
   merged: false
 review_recommendation: FRESH_INDEPENDENT_R4_REREVIEW
 ```
+
+## Schema 22 compatibility correction — superseded schema 21
+
+- Authorities: Issue #527 comments `5461456833`, `5461543841`,
+  `5461589116`, and `5461624921`.
+- Exact committed parent: `8d279b34babee6838de950bc1d6edd13f7b0622b`.
+- Target PR: `#528`, kept `OPEN/DRAFT` throughout correction execution.
+- Final schema: `22`; backup format: `1`; mobile version: `0.1.0+1`.
+
+Compatibility behavior:
+
+- retained the production path `20 -> revised 21 -> 22`;
+- added exact shape classification for revised-v21, superseded PR #526-v21,
+  and mixed/unknown signatures;
+- converted only the exact superseded-v21 signature to the final block-owned
+  schema while preserving every floor and placement identity/history field;
+- created one deterministic detached compatibility block per represented
+  project, preserved legacy draft polygon counts with empty definitions, and
+  invented no active polygon mapping;
+- rejected mixed/unknown signatures and corrupt cross-project floor placement
+  relationships before destructive conversion;
+- retained the canonical placement project-availability trigger in both final
+  schema paths;
+- validated the final relationship graph plus SQLite foreign-key and physical
+  integrity before clearing the temporary deferred-FK mode used by the floor
+  table rebuild.
+
+Triage and corrections:
+
+- fresh-v21 classification initially rejected the canonical
+  `inventory_asset_placements_project_available_update` trigger; the revised
+  signature now requires and preserves it;
+- the superseded-v21 test fixture redundantly recreated that v20 trigger and
+  failed with SQLite code `1`; the redundant fixture DDL was removed;
+- the superseded floor-table rebuild produced a valid final graph but retained
+  SQLite's deferred implicit-delete counter, causing `COMMIT` to fail with
+  SQLite code `787`; after exact final `foreign_key_check` and
+  `integrity_check` validation, the superseded path restores
+  `defer_foreign_keys=OFF` before commit while `foreign_keys` enforcement stays
+  enabled.
+
+Validation evidence:
+
+- corrected preservation test: `1/1 PASS`;
+- exact schema21 compatibility gate: `3/3 PASS`;
+- exact six-file focused gate: `146/146 PASS`;
+- `flutter analyze --no-pub`: `PASS — No issues found`;
+- full `git diff --check`: `PASS`;
+- exact correction allowlist: `6/6`, outside paths `0`;
+- protected production application/UI/domain drift: `0`;
+- pubspec/lock, Android/iOS, package and permission drift: `0`;
+- schema `22`; backup format `1`; version `0.1.0+1`;
+- diagnostic instrumentation residue: `0`;
+- Flutter full suite/build/APK/device/ADB/emulator/MAIN: not run;
+- manual tests `MT-527-001..010`: `PENDING / NOT RUN`.
+
+```yaml
+execution_record:
+  issue: 527
+  correction: SUPERSEDED_SCHEMA21_TO_FINAL_SCHEMA22_COMPATIBILITY
+  exact_parent: 8d279b34babee6838de950bc1d6edd13f7b0622b
+  schema: 22
+  backup_format: 1
+  version: 0.1.0+1
+  preservation_gate: 1/1 PASS
+  schema21_compatibility_gate: 3/3 PASS
+  focused_gate: 146/146 PASS
+  analyzer: PASS
+  allowlist: 6/6 PASS
+  protected_drift: 0
+  manual_test_status: PENDING
+  ready: false
+  merged: false
+  runtime_model: unknown
+  runtime_reasoning_effort: null
+  runtime_routing_verified: false
+review_recommendation: FRESH_INDEPENDENT_R4_REREVIEW
+```

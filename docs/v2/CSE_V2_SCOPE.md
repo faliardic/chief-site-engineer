@@ -51,7 +51,7 @@ yerine bu baseline üzerinde ilerler.
 
 Güncel V2 teknik durum V1 metadata'sından ayrıdır: Issue #527 task başlangıç
 master'ı schema `20`, mobile version `0.1.0+1` ve backup format `1`dir; current
-revised Slice 6.1 branch hedefi additive schema `21`dir. Exact güncel merge SHA
+revised Slice 6.1 branch hedefi final schema `22`dir. Exact güncel merge SHA
 kalıcı bu kapsam belgesine sabitlenmez; GitHub `master` üzerinden doğrulanır. Bu
 baseline,
 schedule runtime ve persistent immutable reference-schedule snapshot temeliyle
@@ -428,8 +428,10 @@ Inventory Map v1:
 hedefler. Issue #507 tarihsel docs/source-authority Slice'ıdır. Slices 1–5
 production predecessors olarak tamamlanmıştır. Issue #527 exact master
 `f858740f6975bace9b6efd21deb1f679e4489cbf` üzerinden revised Slice 6.1'i,
-schema21 stable block/floor source'unu, deterministic schema20 backfill'ini ve
-closed-area editor foundation'ını ayrı R4 authority/review sınırında uygular.
+schema22 final stable block/floor source'unu, deterministic
+`20 -> revised 21 -> 22` backfill'ini, superseded PR #526 schema21 compatibility
+yolunu ve closed-area editor foundation'ını ayrı R4 authority/review sınırında
+uygular.
 Slice 6.2/6.3, Ready, merge ve cihaz işlemleri bu authority'nin dışındadır.
 
 Issue #501, #502, #503 ve #499 P0 veri/owner-phone güvenlik kuralları bu ürün
@@ -481,7 +483,7 @@ Kapanış kapısı:
 | 3 | Living 7-Day Plan; Günlük Log v1; İş Zinciri | Yaşayan yakın plan ve kaynaklı günlük akışı |
 | 4 | İstenecek Malzemeler; öneriler; telefon görüşmesi | Yardımcı akışların ana omurgaya bağlanması |
 | 5 | Proje albümü Slice 1 merged; Günlük Log v2 paused | V2.11 manual test/closure ve ayrı owner resume kararı |
-| Current priority | Inventory Map v1 revised Slice 6.1 / Issue #527 | Stable block/floor identity, deterministic schema21 migration ve closed-area editor foundation |
+| Current priority | Inventory Map v1 revised Slice 6.1 / Issue #527 | Stable block/floor identity, deterministic schema22 compatibility migration ve closed-area editor foundation |
 | 6 | Mini hesap makinesi — paused | Ayrı owner resume kararı ve dar saha aracı kabulü |
 
 Aynı anda yalnız bir production implementation Issue'su aktif olur. Bir dalga
@@ -576,7 +578,7 @@ pending ve V2.11 complete değildir. Issue #504 / PR #505 recovery surface'i
 mergedir; owner recovery doğrulaması ve P0 Issues #501–#503 açık kalır.
 
 Issue #527 task başlangıç facts schema `20`, backup format `1` ve version
-`0.1.0+1`dir; current branch target schema `21`dir. Exact current SHA ve son PR
+`0.1.0+1`dir; current branch target schema `22`dir. Exact current SHA ve son PR
 kalıcı burada dondurulmaz; GitHub `master` current repository truth'udur. Her
 Issue task başlangıç snapshot'ını kendi task/result kanıtında ayrıca bağlar.
 
@@ -635,11 +637,13 @@ değildir.
 
 Epic #506 altındaki Inventory Map v1 current ürün geliştirme önceliğidir.
 Issue #527, superseded PR #526 veya `d0267a7...` source'unu taşımadan revised
-Slice 6.1'i exact master temelinden yeniden kurar. Additive schema21 stable
+Slice 6.1'i exact master temelinden yeniden kurar. Revised schema21 stable
 project-owned block, block-owned ordered floor, immutable revision/polygon
-mapping ve placement `floor_id` foundation'ı getirir; schema20 geometry,
-placement history, event/photo truth ve backup format `1` korunur. Slice 6.2
-navigation ile Slice 6.3 reshape/move lifecycle bu current kapsamda başlamaz.
+mapping ve placement `floor_id` foundation'ını kurar; final schema22 hem normal
+`20 -> 21 -> 22` zincirini hem de korunmuş superseded PR #526 schema21 verisinin
+kayıpsız dönüşümünü destekler. Schema20 geometry, tüm placement history,
+event/photo truth ve backup format `1` korunur. Slice 6.2 navigation ile Slice
+6.3 reshape/move lifecycle bu current kapsamda başlamaz.
 `docs/v2/CSE_INVENTORY_MAP_V1_CONTRACT.md` güncel normative sınırdır.
 
 Issue #501 recovery verification, Issue #502 external verified backup/update

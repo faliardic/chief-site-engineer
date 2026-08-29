@@ -153,7 +153,7 @@ void main() {
   });
 
   test(
-    'current database smoke requires every schema 20 Inventory table',
+    'current database smoke requires every schema 22 Inventory table',
     () async {
       final raw = await _openRaw(directories);
       await raw.execute('DROP TABLE inventory_events');
@@ -175,6 +175,7 @@ void main() {
   test(
     'format 1 backup restores populated Inventory with exact replayable truth',
     () async {
+      expect(AppDatabase.schemaVersion, 22);
       final fixture = await _seedPopulatedInventory(directories);
       final sourceInventory = fixture.application;
       final sourceRows = await _inventoryRowsSnapshot(directories);
@@ -248,6 +249,7 @@ void main() {
       expect(picked?.stablePath, imported.stablePath);
       final preflight = await backup.preflightBackup(picked!, _password);
       expect(preflight.manifest.formatVersion, CseBackupCodec.formatVersion);
+      expect(preflight.manifest.formatVersion, 1);
       expect(preflight.manifest.mobileSchemaVersion, AppDatabase.schemaVersion);
       expect(preflight.manifest.attachments, isEmpty);
 

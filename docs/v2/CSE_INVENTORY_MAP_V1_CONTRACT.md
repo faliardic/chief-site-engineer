@@ -5,7 +5,7 @@
 - **Contract version:** `1.1`
 - **Contract status:** Slices 1–5 are production predecessors; revised Slice 6.1 spatial foundation is implemented for independent review
 - **Task-start baseline:** `f858740f6975bace9b6efd21deb1f679e4489cbf`
-- **Current persisted facts:** SQLite schema `21`, backup format `1`, mobile version `0.1.0+1`, MAIN package `com.faliardic.sefim`
+- **Current persisted facts:** SQLite schema `22`, backup format `1`, mobile version `0.1.0+1`, MAIN package `com.faliardic.sefim`
 
 ## 1. Normative language and product boundary
 
@@ -328,9 +328,10 @@ Every sketch mutation MUST use optimistic revision and durable command receipt
 semantics from section 7. Missing, corrupt or wrong-project revision state MUST
 return a typed diagnostic and MUST NOT be repaired implicitly.
 
-### 4.5 Revised schema21 block and floor foundation
+### 4.5 Revised schema21 foundation and final schema22 compatibility
 
-Schema21 adds normalized spatial ownership without rewriting geometry v1:
+Revised schema21 adds normalized spatial ownership without rewriting geometry
+v1; schema22 is the durable final schema for this contract:
 
 - `inventory_blocks` is a stable project-owned identity with immutable project
   and ordinal, a bounded display name plus Turkish-aware normalized name, and
@@ -361,6 +362,20 @@ placement receives that exact floor while placement ID/key/sequence, sketch,
 provenance revision, x/y, quantity, predecessor and terminal truth remain
 unchanged. Geometry JSON/checksum and event/photo history MUST remain unchanged.
 Any corruption or incomplete backfill rolls the entire schema21 migration back.
+
+Schema22 MUST classify the exact schema21 shape before mutation. A revised
+block-owned schema21 advances through a structural no-op plus foreign-key and
+integrity validation. The superseded PR #526 project-owned-floor schema21 MUST
+transactionally retain every floor identity/name/order/revision/timestamp and
+every placement version including its existing `floor_id`, create one
+deterministic `DETACHED` default block per represented project, bind the old
+floors to it, and create empty mapping plus exact legacy-draft metadata. It MUST
+NOT invent an active polygon mapping for legacy geometry. The final floor schema
+MUST use block-local ordinal uniqueness, so separate blocks may each own an
+ordinal `1` floor. Mixed or unknown signatures and corrupt floor/placement
+relationships MUST fail closed. The two supported chains are exactly
+`20 -> revised 21 -> 22` and `superseded 21 -> 22`; same-version repair is
+forbidden. Backup format remains `1`.
 
 ## 5. Inventory source model
 

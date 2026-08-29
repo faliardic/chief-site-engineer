@@ -27,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 21;
+  static const schemaVersion = 22;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2902,6 +2902,10 @@ class AppDatabase {
     DatabaseMigration(version: 19, apply: _applyAgendaPhoneCallMigration),
     DatabaseMigration(version: 20, apply: _applyInventoryFoundationMigration),
     DatabaseMigration(version: 21, apply: _applyInventorySpatialMigration),
+    DatabaseMigration(
+      version: 22,
+      apply: _applyInventoryCompatibilityMigration,
+    ),
   ];
 
   final String path;
@@ -5805,6 +5809,837 @@ Future<void> _applyInventorySpatialMigration(Transaction transaction) async {
       0;
   if (missingFloorCount != 0) {
     throw StateError('inventory spatial migration backfill failed');
+  }
+}
+
+enum _InventorySchema21Shape { revised, superseded }
+
+Future<void> _applyInventoryCompatibilityMigration(
+  Transaction transaction,
+) async {
+  final shape = await _classifyInventorySchema21Shape(transaction);
+  switch (shape) {
+    case _InventorySchema21Shape.revised:
+      await _validateInventorySchema22Integrity(transaction);
+      return;
+    case _InventorySchema21Shape.superseded:
+      await _convertSupersededInventorySchema21(transaction);
+      if (await _classifyInventorySchema21Shape(transaction) !=
+          _InventorySchema21Shape.revised) {
+        throw StateError('inventory schema 22 final signature mismatch');
+      }
+      await _validateInventorySchema22Integrity(transaction);
+      await transaction.execute('PRAGMA defer_foreign_keys = OFF');
+  }
+}
+
+Future<_InventorySchema21Shape> _classifyInventorySchema21Shape(
+  Transaction transaction,
+) async {
+  const revisedTables = <String>{
+    'inventory_blocks',
+    'inventory_sketch_revision_block_polygons',
+    'inventory_sketch_revision_spatial_drafts',
+  };
+  const requiredTables = <String>{
+    'inventory_sketches',
+    'inventory_sketch_revisions',
+    'inventory_floors',
+    'inventory_assets',
+    'inventory_asset_placements',
+    'inventory_command_receipts',
+    'inventory_events',
+    'inventory_asset_attachment_links',
+  };
+  final tables = await _sqliteObjectNames(transaction, 'table');
+  if (!tables.containsAll(requiredTables) ||
+      tables.any((name) => name.startsWith('inventory_schema22_'))) {
+    throw StateError('inventory schema 21 signature is unknown');
+  }
+  final hasAllRevisedTables = tables.containsAll(revisedTables);
+  final hasNoRevisedTables = revisedTables.every(
+    (name) => !tables.contains(name),
+  );
+  if (!hasAllRevisedTables && !hasNoRevisedTables) {
+    throw StateError('inventory schema 21 signature is mixed');
+  }
+
+  final floorColumns = await _tableColumns(transaction, 'inventory_floors');
+  final placementColumns = await _tableColumns(
+    transaction,
+    'inventory_asset_placements',
+  );
+  const placementColumnsExpected = <String>{
+    'id',
+    'placement_key',
+    'project_id',
+    'asset_id',
+    'sketch_id',
+    'provenance_revision_id',
+    'sequence',
+    'x',
+    'y',
+    'quantity',
+    'created_at',
+    'ended_at',
+    'end_reason',
+    'supersedes_placement_id',
+    'floor_id',
+  };
+  if (!_sameStrings(placementColumns, placementColumnsExpected)) {
+    throw StateError('inventory schema 21 placement signature is unknown');
+  }
+  final floorSql = _normalizeSchemaSql(
+    await _tableSql(transaction, 'inventory_floors'),
+  );
+  final placementSql = _normalizeSchemaSql(
+    await _tableSql(transaction, 'inventory_asset_placements'),
+  );
+  final indexes = await _sqliteObjectNames(transaction, 'index');
+  final triggers = await _sqliteObjectNames(transaction, 'trigger');
+
+  if (hasAllRevisedTables) {
+    const revisedFloorColumns = <String>{
+      'id',
+      'block_id',
+      'project_id',
+      'display_name',
+      'ordinal',
+      'revision',
+      'created_at',
+      'updated_at',
+      'archived_at',
+    };
+    const revisedIndexes = <String>{
+      'inventory_blocks_project_state',
+      'uq_inventory_blocks_active_name',
+      'inventory_floors_project_block',
+      'inventory_revision_block_polygons_revision',
+      'inventory_spatial_drafts_revision',
+      'inventory_placements_floor_history',
+    };
+    const revisedTriggers = <String>{
+      'inventory_asset_placements_floor_insert',
+      'inventory_asset_placements_project_available_update',
+      'inventory_blocks_guarded_update',
+      'inventory_floors_guarded_update',
+      'inventory_blocks_no_physical_delete',
+      'inventory_floors_no_physical_delete',
+      'inventory_sketch_revision_block_polygons_no_physical_delete',
+      'inventory_sketch_revision_spatial_drafts_no_physical_delete',
+      'inventory_revision_block_polygons_append_only_update',
+      'inventory_revision_block_polygons_append_only_delete',
+      'inventory_spatial_drafts_append_only_update',
+      'inventory_spatial_drafts_append_only_delete',
+    };
+    final revisedColumnSignature =
+        _sameStrings(floorColumns, revisedFloorColumns) &&
+        _sameStrings(
+          await _tableColumns(transaction, 'inventory_blocks'),
+          const {
+            'id',
+            'project_id',
+            'display_name',
+            'normalized_name',
+            'ordinal',
+            'state',
+            'revision',
+            'created_at',
+            'updated_at',
+            'archived_at',
+          },
+        ) &&
+        _sameStrings(
+          await _tableColumns(
+            transaction,
+            'inventory_sketch_revision_block_polygons',
+          ),
+          const {
+            'revision_id',
+            'block_id',
+            'project_id',
+            'sketch_id',
+            'polygon_index',
+            'created_at',
+          },
+        ) &&
+        _sameStrings(
+          await _tableColumns(
+            transaction,
+            'inventory_sketch_revision_spatial_drafts',
+          ),
+          const {
+            'revision_id',
+            'project_id',
+            'sketch_id',
+            'content_revision',
+            'legacy_polygon_count',
+            'definitions_json',
+            'created_at',
+          },
+        );
+    if (!revisedColumnSignature ||
+        !floorSql.contains('unique (block_id, ordinal)') ||
+        floorSql.contains('unique (project_id, ordinal)') ||
+        !indexes.containsAll(revisedIndexes) ||
+        !triggers.containsAll(revisedTriggers) ||
+        indexes.contains('ix_inventory_floors_project') ||
+        triggers.contains('inventory_floors_contiguous_insert')) {
+      throw StateError('inventory revised schema 21 signature is unknown');
+    }
+    return _InventorySchema21Shape.revised;
+  }
+
+  const supersededFloorColumns = <String>{
+    'id',
+    'project_id',
+    'ordinal',
+    'display_name',
+    'revision',
+    'created_at',
+    'updated_at',
+  };
+  const supersededIndexes = <String>{
+    'ix_inventory_asset_placements_floor_map',
+    'ix_inventory_floors_project',
+  };
+  const supersededTriggers = <String>{
+    'inventory_floors_project_available_insert',
+    'inventory_floors_project_available_update',
+    'inventory_floors_contiguous_insert',
+    'inventory_floors_guarded_update',
+    'inventory_floors_no_physical_delete',
+    'inventory_asset_placements_floor_insert',
+    'inventory_asset_placements_project_available_update',
+    'inventory_asset_placements_terminal_update',
+  };
+  if (!_sameStrings(floorColumns, supersededFloorColumns) ||
+      !floorSql.contains('unique (project_id, ordinal)') ||
+      floorSql.contains('block_id') ||
+      !placementSql.contains('floor_id text references inventory_floors(id)') ||
+      !indexes.containsAll(supersededIndexes) ||
+      !triggers.containsAll(supersededTriggers) ||
+      indexes.contains('inventory_floors_project_block')) {
+    throw StateError('inventory superseded schema 21 signature is unknown');
+  }
+  return _InventorySchema21Shape.superseded;
+}
+
+Future<Set<String>> _sqliteObjectNames(
+  Transaction transaction,
+  String type,
+) async => (await transaction.rawQuery(
+  'SELECT name FROM sqlite_master WHERE type = ?',
+  [type],
+)).map((row) => row['name']! as String).toSet();
+
+Future<Set<String>> _tableColumns(
+  Transaction transaction,
+  String table,
+) async => (await transaction.rawQuery(
+  'PRAGMA table_info($table)',
+)).map((row) => row['name']! as String).toSet();
+
+Future<String> _tableSql(Transaction transaction, String table) async {
+  final rows = await transaction.query(
+    'sqlite_master',
+    columns: ['sql'],
+    where: 'type = ? AND name = ?',
+    whereArgs: ['table', table],
+  );
+  if (rows.length != 1 || rows.single['sql'] is! String) {
+    throw StateError('inventory schema table definition is unavailable');
+  }
+  return rows.single['sql']! as String;
+}
+
+bool _sameStrings(Set<String> left, Set<String> right) =>
+    left.length == right.length && left.containsAll(right);
+
+String _normalizeSchemaSql(String value) =>
+    value.replaceAll(RegExp(r'\s+'), ' ').trim().toLowerCase();
+
+Future<void> _validateSqliteInventoryHealth(Transaction transaction) async {
+  if ((await transaction.rawQuery('PRAGMA foreign_key_check')).isNotEmpty) {
+    throw StateError('inventory schema foreign key integrity failed');
+  }
+  final integrity = await transaction.rawQuery('PRAGMA integrity_check');
+  if (integrity.length != 1 || integrity.single['integrity_check'] != 'ok') {
+    throw StateError('inventory schema physical integrity failed');
+  }
+}
+
+Future<void> _validateSupersededInventorySchema21(
+  Transaction transaction,
+) async {
+  await _validateSqliteInventoryHealth(transaction);
+  final invalidFloorProjects = Sqflite.firstIntValue(
+    await transaction.rawQuery('''
+      SELECT count(*)
+      FROM inventory_floors floor
+      LEFT JOIN projects project ON project.id = floor.project_id
+      WHERE project.id IS NULL
+    '''),
+  );
+  final invalidPlacementFloors = Sqflite.firstIntValue(
+    await transaction.rawQuery('''
+      SELECT count(*)
+      FROM inventory_asset_placements placement
+      LEFT JOIN inventory_floors floor
+        ON floor.id = placement.floor_id
+        AND floor.project_id = placement.project_id
+      WHERE placement.floor_id IS NULL OR floor.id IS NULL
+    '''),
+  );
+  final missingProjectFloors = Sqflite.firstIntValue(
+    await transaction.rawQuery('''
+      SELECT count(*)
+      FROM (
+        SELECT project_id FROM inventory_sketches
+        UNION
+        SELECT project_id FROM inventory_asset_placements
+      ) source
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM inventory_floors floor
+        WHERE floor.project_id = source.project_id
+      )
+    '''),
+  );
+  final invalidPlacementGraph = Sqflite.firstIntValue(
+    await transaction.rawQuery('''
+      SELECT count(*)
+      FROM inventory_asset_placements placement
+      LEFT JOIN inventory_assets asset
+        ON asset.id = placement.asset_id
+        AND asset.project_id = placement.project_id
+      LEFT JOIN inventory_sketches sketch
+        ON sketch.id = placement.sketch_id
+        AND sketch.project_id = placement.project_id
+      LEFT JOIN inventory_sketch_revisions revision
+        ON revision.id = placement.provenance_revision_id
+        AND revision.project_id = placement.project_id
+        AND revision.sketch_id = placement.sketch_id
+      LEFT JOIN inventory_asset_placements predecessor
+        ON predecessor.id = placement.supersedes_placement_id
+        AND predecessor.project_id = placement.project_id
+      WHERE asset.id IS NULL
+        OR sketch.id IS NULL
+        OR revision.id IS NULL
+        OR (
+          placement.supersedes_placement_id IS NOT NULL
+          AND (
+            predecessor.id IS NULL
+            OR predecessor.placement_key != placement.placement_key
+            OR predecessor.asset_id != placement.asset_id
+            OR predecessor.sketch_id != placement.sketch_id
+            OR predecessor.sequence + 1 != placement.sequence
+            OR predecessor.ended_at IS NULL
+          )
+        )
+    '''),
+  );
+  final invalidDraftGeometry = Sqflite.firstIntValue(
+    await transaction.rawQuery('''
+      SELECT count(*)
+      FROM inventory_sketch_revisions
+      WHERE state = 'DRAFT'
+        AND (
+          json_valid(geometry_json) != 1
+          OR json_type(json_extract(geometry_json, '\$.polylines')) != 'array'
+        )
+    '''),
+  );
+  if (invalidFloorProjects != 0 ||
+      invalidPlacementFloors != 0 ||
+      missingProjectFloors != 0 ||
+      invalidPlacementGraph != 0 ||
+      invalidDraftGeometry != 0) {
+    throw StateError('inventory superseded schema 21 integrity failed');
+  }
+}
+
+Future<void> _validateInventorySchema22Integrity(
+  Transaction transaction,
+) async {
+  final invalidFloors = Sqflite.firstIntValue(
+    await transaction.rawQuery('''
+      SELECT count(*)
+      FROM inventory_floors floor
+      LEFT JOIN inventory_blocks block
+        ON block.id = floor.block_id
+        AND block.project_id = floor.project_id
+      WHERE block.id IS NULL
+    '''),
+  );
+  final invalidPlacements = Sqflite.firstIntValue(
+    await transaction.rawQuery('''
+      SELECT count(*)
+      FROM inventory_asset_placements placement
+      LEFT JOIN inventory_floors floor
+        ON floor.id = placement.floor_id
+        AND floor.project_id = placement.project_id
+      LEFT JOIN inventory_blocks block
+        ON block.id = floor.block_id
+        AND block.project_id = floor.project_id
+      WHERE placement.floor_id IS NULL OR floor.id IS NULL OR block.id IS NULL
+    '''),
+  );
+  final invalidMappings = Sqflite.firstIntValue(
+    await transaction.rawQuery('''
+      SELECT count(*)
+      FROM inventory_sketch_revision_block_polygons mapping
+      LEFT JOIN inventory_sketch_revisions revision
+        ON revision.id = mapping.revision_id
+        AND revision.project_id = mapping.project_id
+        AND revision.sketch_id = mapping.sketch_id
+      LEFT JOIN inventory_blocks block
+        ON block.id = mapping.block_id
+        AND block.project_id = mapping.project_id
+      WHERE revision.id IS NULL OR block.id IS NULL
+    '''),
+  );
+  final invalidDrafts = Sqflite.firstIntValue(
+    await transaction.rawQuery('''
+      SELECT count(*)
+      FROM inventory_sketch_revision_spatial_drafts draft
+      LEFT JOIN inventory_sketch_revisions revision
+        ON revision.id = draft.revision_id
+        AND revision.project_id = draft.project_id
+        AND revision.sketch_id = draft.sketch_id
+      WHERE revision.id IS NULL
+        OR json_valid(draft.definitions_json) != 1
+        OR json_type(draft.definitions_json) != 'array'
+    '''),
+  );
+  if (invalidFloors != 0 ||
+      invalidPlacements != 0 ||
+      invalidMappings != 0 ||
+      invalidDrafts != 0) {
+    throw StateError('inventory schema 22 relationship integrity failed');
+  }
+  await _validateSqliteInventoryHealth(transaction);
+}
+
+Future<void> _convertSupersededInventorySchema21(
+  Transaction transaction,
+) async {
+  await _validateSupersededInventorySchema21(transaction);
+  const floorProjection = <String>[
+    'id',
+    'project_id',
+    'ordinal',
+    'display_name',
+    'revision',
+    'created_at',
+    'updated_at',
+  ];
+  const placementProjection = <String>[
+    'id',
+    'placement_key',
+    'project_id',
+    'asset_id',
+    'sketch_id',
+    'provenance_revision_id',
+    'sequence',
+    'x',
+    'y',
+    'quantity',
+    'created_at',
+    'ended_at',
+    'end_reason',
+    'supersedes_placement_id',
+    'floor_id',
+  ];
+  final legacyFloors = await transaction.query(
+    'inventory_floors',
+    columns: floorProjection,
+    orderBy: 'id ASC',
+  );
+  final legacyPlacements = await transaction.query(
+    'inventory_asset_placements',
+    columns: placementProjection,
+    orderBy: 'id ASC',
+  );
+
+  await transaction.execute('PRAGMA defer_foreign_keys = ON');
+  await _createInventorySchema22SpatialTables(transaction);
+  final projectRows = await transaction.rawQuery('''
+    SELECT project_id, MIN(created_at) AS created_at
+    FROM inventory_floors
+    GROUP BY project_id
+    ORDER BY project_id ASC
+  ''');
+  for (final project in projectRows) {
+    final projectId = project['project_id']! as String;
+    final blockId = _migrationStableUuid(
+      'inventory-spatial-v21:block:$projectId',
+    );
+    await transaction.insert('inventory_blocks', {
+      'id': blockId,
+      'project_id': projectId,
+      'display_name': 'Varsayılan Alan',
+      'normalized_name': 'varsayılan alan',
+      'ordinal': 1,
+      'state': 'DETACHED',
+      'revision': 1,
+      'created_at': project['created_at'],
+      'updated_at': project['created_at'],
+    });
+    await transaction.rawInsert(
+      '''
+        INSERT INTO inventory_schema22_floors (
+          id,
+          block_id,
+          project_id,
+          display_name,
+          ordinal,
+          revision,
+          created_at,
+          updated_at,
+          archived_at
+        )
+        SELECT
+          id,
+          ?,
+          project_id,
+          display_name,
+          ordinal,
+          revision,
+          created_at,
+          updated_at,
+          NULL
+        FROM inventory_floors
+        WHERE project_id = ?
+        ORDER BY ordinal ASC, id ASC
+      ''',
+      [blockId, projectId],
+    );
+  }
+  await transaction.execute('''
+    INSERT INTO inventory_sketch_revision_spatial_drafts (
+      revision_id,
+      project_id,
+      sketch_id,
+      content_revision,
+      legacy_polygon_count,
+      definitions_json,
+      created_at
+    )
+    SELECT
+      id,
+      project_id,
+      sketch_id,
+      content_revision,
+      json_array_length(json_extract(geometry_json, '\$.polylines')),
+      '[]',
+      updated_at
+    FROM inventory_sketch_revisions
+    WHERE state = 'DRAFT'
+    ORDER BY id ASC
+  ''');
+
+  final copiedFloors = await transaction.query(
+    'inventory_schema22_floors',
+    columns: floorProjection,
+    orderBy: 'id ASC',
+  );
+  final copiedPlacements = await transaction.query(
+    'inventory_asset_placements',
+    columns: placementProjection,
+    orderBy: 'id ASC',
+  );
+  if (jsonEncode(copiedFloors) != jsonEncode(legacyFloors) ||
+      jsonEncode(copiedPlacements) != jsonEncode(legacyPlacements) ||
+      await _tableDifferenceCount(
+            transaction,
+            'inventory_floors',
+            'inventory_schema22_floors',
+            floorProjection,
+          ) !=
+          0) {
+    throw StateError('inventory schema 22 copy verification failed');
+  }
+
+  await _replaceSupersededInventoryFloors(transaction);
+  final finalPlacements = await transaction.query(
+    'inventory_asset_placements',
+    columns: placementProjection,
+    orderBy: 'id ASC',
+  );
+  if (jsonEncode(finalPlacements) != jsonEncode(legacyPlacements)) {
+    throw StateError('inventory schema 22 placement preservation failed');
+  }
+  await _createInventorySchema22SpatialObjects(transaction);
+}
+
+Future<int> _tableDifferenceCount(
+  Transaction transaction,
+  String firstTable,
+  String secondTable,
+  List<String> columns,
+) async {
+  final projection = columns.join(', ');
+  return Sqflite.firstIntValue(
+        await transaction.rawQuery('''
+          SELECT count(*)
+          FROM (
+            SELECT * FROM (
+              SELECT $projection FROM $firstTable
+              EXCEPT
+              SELECT $projection FROM $secondTable
+            )
+            UNION ALL
+            SELECT * FROM (
+              SELECT $projection FROM $secondTable
+              EXCEPT
+              SELECT $projection FROM $firstTable
+            )
+          )
+        '''),
+      ) ??
+      -1;
+}
+
+Future<void> _createInventorySchema22SpatialTables(
+  Transaction transaction,
+) async {
+  await transaction.execute('''
+    CREATE TABLE inventory_blocks (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      project_id TEXT NOT NULL,
+      display_name TEXT NOT NULL CHECK (
+        length(display_name) BETWEEN 1 AND 80
+        AND display_name = trim(display_name)
+      ),
+      normalized_name TEXT NOT NULL CHECK (
+        length(normalized_name) BETWEEN 1 AND 80
+        AND normalized_name = trim(normalized_name)
+      ),
+      ordinal INTEGER NOT NULL CHECK (ordinal BETWEEN 1 AND 1000000),
+      state TEXT NOT NULL CHECK (
+        state IN ('ACTIVE', 'DETACHED', 'ARCHIVED')
+      ),
+      revision INTEGER NOT NULL CHECK (revision >= 1),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      archived_at TEXT,
+      UNIQUE (id, project_id),
+      UNIQUE (project_id, ordinal),
+      FOREIGN KEY (project_id) REFERENCES projects(id),
+      CHECK (updated_at >= created_at),
+      CHECK (
+        (state = 'ARCHIVED' AND archived_at = updated_at)
+        OR (state != 'ARCHIVED' AND archived_at IS NULL)
+      )
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE inventory_schema22_floors (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      block_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      display_name TEXT NOT NULL CHECK (
+        length(display_name) BETWEEN 1 AND 80
+        AND display_name = trim(display_name)
+      ),
+      ordinal INTEGER NOT NULL CHECK (ordinal BETWEEN 1 AND 100),
+      revision INTEGER NOT NULL CHECK (revision >= 1),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      archived_at TEXT,
+      UNIQUE (id, project_id),
+      UNIQUE (id, project_id, block_id),
+      UNIQUE (block_id, ordinal),
+      FOREIGN KEY (block_id, project_id)
+        REFERENCES inventory_blocks(id, project_id)
+        DEFERRABLE INITIALLY DEFERRED,
+      CHECK (updated_at >= created_at),
+      CHECK (archived_at IS NULL OR archived_at = updated_at)
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE inventory_sketch_revision_block_polygons (
+      revision_id TEXT NOT NULL,
+      block_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      sketch_id TEXT NOT NULL,
+      polygon_index INTEGER NOT NULL CHECK (polygon_index >= 0),
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (revision_id, block_id),
+      UNIQUE (revision_id, polygon_index),
+      FOREIGN KEY (revision_id, project_id, sketch_id)
+        REFERENCES inventory_sketch_revisions(id, project_id, sketch_id)
+        DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY (block_id, project_id)
+        REFERENCES inventory_blocks(id, project_id)
+        DEFERRABLE INITIALLY DEFERRED
+    )
+  ''');
+  await transaction.execute('''
+    CREATE TABLE inventory_sketch_revision_spatial_drafts (
+      revision_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      sketch_id TEXT NOT NULL,
+      content_revision INTEGER NOT NULL CHECK (content_revision >= 1),
+      legacy_polygon_count INTEGER NOT NULL CHECK (legacy_polygon_count >= 0),
+      definitions_json TEXT NOT NULL CHECK (
+        json_valid(definitions_json)
+        AND json_type(definitions_json) = 'array'
+      ),
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (revision_id, content_revision),
+      FOREIGN KEY (revision_id, project_id, sketch_id)
+        REFERENCES inventory_sketch_revisions(id, project_id, sketch_id)
+        DEFERRABLE INITIALLY DEFERRED
+    )
+  ''');
+}
+
+Future<void> _replaceSupersededInventoryFloors(Transaction transaction) async {
+  for (final trigger in const [
+    'inventory_floors_created_at_canonical_insert',
+    'inventory_floors_created_at_canonical_update',
+    'inventory_floors_updated_at_canonical_insert',
+    'inventory_floors_updated_at_canonical_update',
+    'inventory_floors_project_available_insert',
+    'inventory_floors_project_available_update',
+    'inventory_floors_contiguous_insert',
+    'inventory_floors_guarded_update',
+    'inventory_floors_no_physical_delete',
+    'inventory_asset_placements_floor_insert',
+  ]) {
+    await transaction.execute('DROP TRIGGER $trigger');
+  }
+  await transaction.execute(
+    'DROP INDEX ix_inventory_asset_placements_floor_map',
+  );
+  await transaction.execute('DROP INDEX ix_inventory_floors_project');
+  await transaction.execute('DROP TABLE inventory_floors');
+  await transaction.execute('''
+    ALTER TABLE inventory_schema22_floors RENAME TO inventory_floors
+  ''');
+}
+
+Future<void> _createInventorySchema22SpatialObjects(
+  Transaction transaction,
+) async {
+  await transaction.execute('''
+    CREATE INDEX inventory_blocks_project_state
+    ON inventory_blocks(project_id, state, ordinal, id)
+  ''');
+  await transaction.execute('''
+    CREATE UNIQUE INDEX uq_inventory_blocks_active_name
+    ON inventory_blocks(project_id, normalized_name)
+    WHERE state = 'ACTIVE'
+  ''');
+  await transaction.execute('''
+    CREATE INDEX inventory_floors_project_block
+    ON inventory_floors(project_id, block_id, ordinal, id)
+  ''');
+  await transaction.execute('''
+    CREATE INDEX inventory_revision_block_polygons_revision
+    ON inventory_sketch_revision_block_polygons(
+      project_id, sketch_id, revision_id, polygon_index
+    )
+  ''');
+  await transaction.execute('''
+    CREATE INDEX inventory_spatial_drafts_revision
+    ON inventory_sketch_revision_spatial_drafts(
+      project_id, sketch_id, revision_id, content_revision
+    )
+  ''');
+  await transaction.execute('''
+    CREATE INDEX inventory_placements_floor_history
+    ON inventory_asset_placements(project_id, floor_id, ended_at, created_at, id)
+  ''');
+
+  await transaction.execute('''
+    CREATE TRIGGER inventory_asset_placements_floor_insert
+    BEFORE INSERT ON inventory_asset_placements
+    WHEN NEW.floor_id IS NULL OR NOT EXISTS (
+      SELECT 1
+      FROM inventory_floors floor
+      JOIN inventory_blocks block
+        ON block.id = floor.block_id
+        AND block.project_id = floor.project_id
+      WHERE floor.id = NEW.floor_id
+        AND floor.project_id = NEW.project_id
+        AND floor.archived_at IS NULL
+        AND block.state != 'ARCHIVED'
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'inventory placement floor source is invalid');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER inventory_blocks_guarded_update
+    BEFORE UPDATE ON inventory_blocks
+    BEGIN
+      SELECT CASE
+        WHEN NEW.id != OLD.id
+          OR NEW.project_id != OLD.project_id
+          OR NEW.ordinal != OLD.ordinal
+          OR NEW.created_at != OLD.created_at
+        THEN RAISE(ABORT, 'inventory block identity is immutable')
+      END;
+      SELECT CASE
+        WHEN NEW.revision != OLD.revision + 1
+          OR NEW.updated_at < OLD.updated_at
+        THEN RAISE(ABORT, 'inventory block revision mismatch')
+      END;
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER inventory_floors_guarded_update
+    BEFORE UPDATE ON inventory_floors
+    BEGIN
+      SELECT CASE
+        WHEN NEW.id != OLD.id
+          OR NEW.block_id != OLD.block_id
+          OR NEW.project_id != OLD.project_id
+          OR NEW.ordinal != OLD.ordinal
+          OR NEW.created_at != OLD.created_at
+        THEN RAISE(ABORT, 'inventory floor identity is immutable')
+      END;
+      SELECT CASE
+        WHEN NEW.revision != OLD.revision + 1
+          OR NEW.updated_at < OLD.updated_at
+        THEN RAISE(ABORT, 'inventory floor revision mismatch')
+      END;
+    END
+  ''');
+  for (final table in const [
+    'inventory_blocks',
+    'inventory_floors',
+    'inventory_sketch_revision_block_polygons',
+    'inventory_sketch_revision_spatial_drafts',
+  ]) {
+    await transaction.execute('''
+      CREATE TRIGGER ${table}_no_physical_delete
+      BEFORE DELETE ON $table
+      BEGIN
+        SELECT RAISE(ABORT, 'inventory spatial source cannot be deleted');
+      END
+    ''');
+  }
+  for (final operation in const ['update', 'delete']) {
+    await transaction.execute('''
+      CREATE TRIGGER inventory_revision_block_polygons_append_only_$operation
+      BEFORE ${operation.toUpperCase()}
+      ON inventory_sketch_revision_block_polygons
+      BEGIN
+        SELECT RAISE(ABORT, 'inventory block polygon mapping is immutable');
+      END
+    ''');
+    await transaction.execute('''
+      CREATE TRIGGER inventory_spatial_drafts_append_only_$operation
+      BEFORE ${operation.toUpperCase()}
+      ON inventory_sketch_revision_spatial_drafts
+      BEGIN
+        SELECT RAISE(ABORT, 'inventory spatial drafts are append-only');
+      END
+    ''');
   }
 }
 
