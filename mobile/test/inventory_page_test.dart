@@ -21,6 +21,9 @@ const _assetB = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd2';
 const _assetArchived = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd3';
 const _assetMissing = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd4';
 const _assetInvalid = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd5';
+const _floorA1 = '99999999-9999-4999-8999-999999999991';
+const _floorA2 = '99999999-9999-4999-8999-999999999992';
+const _floorB1 = '99999999-9999-4999-8999-999999999993';
 final _now = DateTime.parse('2026-08-28T08:00:00Z');
 
 void main() {
@@ -777,6 +780,7 @@ void main() {
 
       final corrupt = _FakeInventory()
         ..primaryFailure = const InventoryGeometryFailure('synthetic_corrupt')
+        ..floors[_projectA] = [_floor(_projectA, 1, id: _floorA1)]
         ..assets[_projectA] = [_asset(_projectA, _assetA)];
       final corruptController = _controller(corrupt, source);
       addTearDown(corruptController.dispose);
@@ -800,6 +804,105 @@ void main() {
         InventoryGeometryFailure.safeCode,
       );
       expect(corrupt.mutations, 0);
+    },
+  );
+
+  testWidgets(
+    'multi-floor overview isolates markers and list focus selects exact floor',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _sketch(_projectA)
+        ..floors[_projectA] = [
+          _floor(_projectA, 1, id: _floorA1),
+          _floor(_projectA, 2, id: _floorA2),
+        ]
+        ..assets[_projectA] = [
+          _asset(
+            _projectA,
+            _assetB,
+            floorId: _floorA2,
+            name: 'Bodrum pompası',
+            x: 400,
+            y: 404,
+          ),
+          _asset(_projectA, _assetA, floorId: _floorA1, x: 100, y: 100),
+        ];
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      final controller = _controller(inventory, source);
+      addTearDown(controller.dispose);
+      addTearDown(source.dispose);
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        controller: controller,
+      );
+
+      controller.setView(InventoryPageView.floors);
+      await tester.pump();
+      expect(find.byKey(const Key('inventory-floor-overview')), findsOneWidget);
+      expect(find.text('Genel / Tümü'), findsOneWidget);
+      expect(find.text('2 kayıt'), findsOneWidget);
+      expect(
+        find.byKey(const Key('inventory-floor-$_floorA1')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('inventory-floor-$_floorA2')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('inventory-floor-$_floorA2')));
+      await tester.pump();
+      expect(controller.selectedFloorId, _floorA2);
+      expect(controller.view, InventoryPageView.map);
+      expect(find.byKey(const Key('inventory-marker-$_assetA')), findsNothing);
+      expect(
+        find.byKey(const Key('inventory-marker-$_assetB')),
+        findsOneWidget,
+      );
+
+      await _tapMapTarget(tester);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('inventory-quick-form')), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const Key('inventory-quick-name')),
+        'Kat pompası',
+      );
+      await tester.tap(find.byKey(const Key('inventory-quick-category')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Makine / ekipman').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('inventory-quick-submit')));
+      await tester.pumpAndSettle();
+      expect(inventory.lastCreate?.floorId, _floorA2);
+      expect(find.byKey(const Key('inventory-asset-detail')), findsOneWidget);
+      await _dismissDetail(tester);
+
+      controller
+        ..setView(InventoryPageView.list)
+        ..setFloorFilter(_floorA2);
+      await tester.pump();
+      expect(find.byKey(const Key('inventory-list-$_assetA')), findsNothing);
+      expect(find.byKey(const Key('inventory-list-$_assetB')), findsOneWidget);
+      expect(find.textContaining('2. Kat'), findsWidgets);
+
+      controller.setFloorFilter(null);
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('inventory-list-$_assetA')));
+      await tester.pump();
+      await tester.pump();
+      expect(controller.selectedFloorId, _floorA1);
+      expect(controller.view, InventoryPageView.map);
+      expect(
+        find.byKey(const Key('inventory-marker-$_assetA')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('inventory-marker-$_assetB')), findsNothing);
+      expect(find.byIcon(Icons.center_focus_strong), findsOneWidget);
+      expect(inventory.mutations, 1);
+      expect(tester.takeException(), isNull);
     },
   );
 }
@@ -871,6 +974,7 @@ class _FakeInventory extends UnavailableInventoryApplication {
   final Map<String, InventoryPrimarySketchProjection?> sketches = {};
   final Map<String, List<InventoryAssetProjection>> assets = {};
   final Map<String, List<InventoryPlacementRecord>> placementVersions = {};
+  final Map<String, List<InventoryFloorRecord>> floors = {};
   Object? primaryFailure;
   Object? listFailure;
   int primaryReads = 0;
@@ -880,6 +984,7 @@ class _FakeInventory extends UnavailableInventoryApplication {
   int unarchiveCalls = 0;
   MoveInventoryPlacementCommand? lastMove;
   UnarchiveInventoryAssetCommand? lastUnarchive;
+  CreateInventoryAssetCommand? lastCreate;
 
   int get reads => primaryReads + listReads;
 
@@ -901,6 +1006,54 @@ class _FakeInventory extends UnavailableInventoryApplication {
     primaryReads += 1;
     if (primaryFailure case final error?) throw error;
     return sketches[projectId];
+  }
+
+  @override
+  Future<List<InventoryFloorSummary>> listFloors(String projectId) async {
+    final configured = floors[projectId];
+    final values =
+        configured ??
+        (sketches[projectId] == null
+            ? const <InventoryFloorRecord>[]
+            : [_floor(projectId, 1)]);
+    return [
+      for (final floor in values)
+        InventoryFloorSummary(
+          floor: floor,
+          activeAssetCount: (assets[projectId] ?? const [])
+              .where(
+                (projection) => projection.activePlacement?.floorId == floor.id,
+              )
+              .length,
+        ),
+    ];
+  }
+
+  @override
+  Future<InventoryFloorRecord> renameFloor(
+    RenameInventoryFloorCommand command,
+  ) async {
+    final values = floors[command.projectId];
+    final index = values?.indexWhere((floor) => floor.id == command.floorId);
+    if (values == null || index == null || index < 0) {
+      throw const InventoryFailure('inventory_floor_not_found');
+    }
+    final current = values[index];
+    if (current.revision != command.expectedRevision) {
+      throw const InventoryFailure('inventory_stale_revision');
+    }
+    final renamed = InventoryFloorRecord(
+      id: current.id,
+      projectId: current.projectId,
+      ordinal: current.ordinal,
+      displayName: command.displayName,
+      revision: current.revision + 1,
+      createdAt: current.createdAt,
+      updatedAt: _now.add(const Duration(minutes: 1)),
+    );
+    values[index] = renamed;
+    mutations += 1;
+    return renamed;
   }
 
   @override
@@ -928,6 +1081,40 @@ class _FakeInventory extends UnavailableInventoryApplication {
       throw const InventoryFailure('inventory_asset_not_found');
     }
     return projection;
+  }
+
+  @override
+  Future<InventoryMutationResult> createAsset(
+    CreateInventoryAssetCommand command,
+  ) async {
+    mutations += 1;
+    lastCreate = command;
+    final values = assets.putIfAbsent(command.projectId, () => []);
+    values.add(
+      _asset(
+        command.projectId,
+        command.assetId,
+        name: command.displayName,
+        category: command.category,
+        status: command.status,
+        x: command.x,
+        y: command.y,
+        floorId: command.floorId,
+      ),
+    );
+    values.sort((left, right) {
+      final byName = left.asset.normalizedName.compareTo(
+        right.asset.normalizedName,
+      );
+      return byName != 0 ? byName : left.asset.id.compareTo(right.asset.id);
+    });
+    return _mutationResult(
+      command,
+      sourceId: command.assetId,
+      sourceRevision: 1,
+      supportingId: command.placementId,
+      supportingRevision: 1,
+    );
   }
 
   @override
@@ -997,6 +1184,7 @@ class _FakeInventory extends UnavailableInventoryApplication {
       id: command.successorPlacementId,
       placementKey: placement.placementKey,
       projectId: placement.projectId,
+      floorId: command.floorId ?? placement.floorId,
       assetId: placement.assetId,
       sketchId: command.sketchId,
       provenanceRevisionId: command.activeRevisionId,
@@ -1020,6 +1208,7 @@ class _FakeInventory extends UnavailableInventoryApplication {
       InventoryAssetProjection(
         asset: current.asset,
         activePlacement: successor,
+        latestPlacement: successor,
       ),
     );
     return _mutationResult(
@@ -1058,6 +1247,7 @@ class _FakeInventory extends UnavailableInventoryApplication {
       id: command.successorPlacementId,
       placementKey: predecessor.placementKey,
       projectId: predecessor.projectId,
+      floorId: command.floorId ?? predecessor.floorId,
       assetId: predecessor.assetId,
       sketchId: command.sketchId,
       provenanceRevisionId: command.activeRevisionId,
@@ -1080,6 +1270,7 @@ class _FakeInventory extends UnavailableInventoryApplication {
           archivedAt: null,
         ),
         activePlacement: successor,
+        latestPlacement: successor,
       ),
     );
     return _mutationResult(
@@ -1174,6 +1365,24 @@ InventoryPrimarySketchProjection _sketch(
   );
 }
 
+String _defaultFloorId(String projectId) =>
+    projectId == _projectA ? _floorA1 : _floorB1;
+
+InventoryFloorRecord _floor(
+  String projectId,
+  int ordinal, {
+  String? id,
+  String? displayName,
+}) => InventoryFloorRecord(
+  id: id ?? _defaultFloorId(projectId),
+  projectId: projectId,
+  ordinal: ordinal,
+  displayName: displayName ?? '$ordinal. Kat',
+  revision: 1,
+  createdAt: _now,
+  updatedAt: _now,
+);
+
 InventoryAssetProjection _asset(
   String projectId,
   String assetId, {
@@ -1184,6 +1393,7 @@ InventoryAssetProjection _asset(
   bool placement = true,
   int x = 100,
   int y = 100,
+  String? floorId,
 }) {
   final normalized = name
       .replaceAll('I', 'ı')
@@ -1191,6 +1401,28 @@ InventoryAssetProjection _asset(
       .toLowerCase();
   final sketchId = projectId == _projectA ? _sketchA : _sketchB;
   final revisionId = projectId == _projectA ? _revisionA : _revisionB;
+  final resolvedFloorId = floorId ?? _defaultFloorId(projectId);
+  final currentPlacement = !placement
+      ? null
+      : InventoryPlacementRecord(
+          id: 'eeeeeeee-eeee-4eee-8eee-${assetId.substring(24)}',
+          placementKey: 'ffffffff-ffff-4fff-8fff-${assetId.substring(24)}',
+          projectId: projectId,
+          floorId: resolvedFloorId,
+          assetId: assetId,
+          sketchId: sketchId,
+          provenanceRevisionId: revisionId,
+          sequence: 1,
+          x: x,
+          y: y,
+          quantity: 2,
+          createdAt: _now,
+          endedAt: archived ? _now.add(const Duration(minutes: 1)) : null,
+          endReason: archived
+              ? InventoryPlacementEndReason.assetArchived
+              : null,
+          supersedesPlacementId: null,
+        );
   return InventoryAssetProjection(
     asset: InventoryAssetRecord(
       id: assetId,
@@ -1208,24 +1440,8 @@ InventoryAssetProjection _asset(
       statusChangedAt: _now,
       archivedAt: archived ? _now : null,
     ),
-    activePlacement: !placement || archived
-        ? null
-        : InventoryPlacementRecord(
-            id: 'eeeeeeee-eeee-4eee-8eee-${assetId.substring(24)}',
-            placementKey: 'ffffffff-ffff-4fff-8fff-${assetId.substring(24)}',
-            projectId: projectId,
-            assetId: assetId,
-            sketchId: sketchId,
-            provenanceRevisionId: revisionId,
-            sequence: 1,
-            x: x,
-            y: y,
-            quantity: 2,
-            createdAt: _now,
-            endedAt: null,
-            endReason: null,
-            supersedesPlacementId: null,
-          ),
+    activePlacement: archived ? null : currentPlacement,
+    latestPlacement: currentPlacement,
   );
 }
 
@@ -1235,6 +1451,7 @@ InventoryPlacementRecord _placement(
   int sequence = 1,
   int x = 100,
   int y = 100,
+  String? floorId,
   DateTime? endedAt,
   InventoryPlacementEndReason? endReason,
   String? supersedesPlacementId,
@@ -1245,6 +1462,7 @@ InventoryPlacementRecord _placement(
     id: 'eeeeeeee-eeee-4eee-8eee-${assetId.substring(24)}',
     placementKey: 'ffffffff-ffff-4fff-8fff-${assetId.substring(24)}',
     projectId: projectId,
+    floorId: floorId ?? _defaultFloorId(projectId),
     assetId: assetId,
     sketchId: sketchId,
     provenanceRevisionId: revisionId,
@@ -1267,6 +1485,7 @@ InventoryPlacementRecord _copyPlacement(
   id: current.id,
   placementKey: current.placementKey,
   projectId: current.projectId,
+  floorId: current.floorId,
   assetId: current.assetId,
   sketchId: current.sketchId,
   provenanceRevisionId: current.provenanceRevisionId,

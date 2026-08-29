@@ -153,7 +153,7 @@ void main() {
   });
 
   test(
-    'current database smoke requires every schema 20 Inventory table',
+    'current database smoke requires every schema 21 Inventory table',
     () async {
       final raw = await _openRaw(directories);
       await raw.execute('DROP TABLE inventory_events');
@@ -1088,6 +1088,7 @@ void main() {
         'inventory_command_receipts',
         'inventory_asset_attachment_links',
         'inventory_asset_placements',
+        'inventory_floors',
         'inventory_sketch_revisions',
         'inventory_assets',
         'inventory_sketches',
@@ -2506,6 +2507,7 @@ void main() {
 const _inventoryTables = <String>[
   'inventory_sketches',
   'inventory_sketch_revisions',
+  'inventory_floors',
   'inventory_assets',
   'inventory_asset_placements',
   'inventory_command_receipts',
@@ -2890,6 +2892,7 @@ Future<Map<String, List<Map<String, Object?>>>> _inventoryRowsSnapshot(
   const ordering = <String, String>{
     'inventory_sketches': 'id ASC',
     'inventory_sketch_revisions': 'sketch_id ASC, revision_number ASC, id ASC',
+    'inventory_floors': 'project_id ASC, ordinal ASC, id ASC',
     'inventory_assets': 'normalized_name ASC, id ASC',
     'inventory_asset_placements': 'placement_key ASC, sequence ASC, id ASC',
     'inventory_command_receipts': 'id ASC',
@@ -2966,7 +2969,12 @@ void _expectInventoryStoredIntegrity(
   }
 
   final placementsByKey = <String, List<Map<String, Object?>>>{};
+  final floorIds = rows['inventory_floors']!
+      .map((row) => row['id']! as String)
+      .toSet();
+  expect(floorIds, isNotEmpty);
   for (final row in rows['inventory_asset_placements']!) {
+    expect(floorIds, contains(row['floor_id']));
     placementsByKey
         .putIfAbsent(row['placement_key']! as String, () => [])
         .add(row);

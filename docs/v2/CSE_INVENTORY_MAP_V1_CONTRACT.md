@@ -1,18 +1,18 @@
 # CSE Inventory Map v1 Canonical Contract
 
 - **Belge türü:** Normative product, UX and persistence contract
-- **Owner authority:** [Feature Epic #506](https://github.com/faliardic/chief-site-engineer/issues/506) and [Issue #507](https://github.com/faliardic/chief-site-engineer/issues/507)
-- **Contract version:** `1.0`
-- **Contract status:** Approved design for later Slices; production implementation has not started
-- **Task-start baseline:** `1d1b818b4b630a08fe6eb77157fe92b7a460b5c3`
-- **Current persisted facts:** SQLite schema `19`, backup format `1`, mobile version `0.1.0+1`, MAIN package `com.faliardic.sefim`
+- **Owner authority:** [Feature Epic #506](https://github.com/faliardic/chief-site-engineer/issues/506), [Issue #507](https://github.com/faliardic/chief-site-engineer/issues/507) and Slice authorities through [Issue #525](https://github.com/faliardic/chief-site-engineer/issues/525)
+- **Contract version:** `1.1`
+- **Contract status:** Slices 1–5 merged; Slice 6 multi-floor implementation is under Draft review
+- **Slice 6 base:** `f858740f6975bace9b6efd21deb1f679e4489cbf`
+- **Current target facts:** SQLite schema `21`, backup format `1`, mobile version `0.1.0+1`, MAIN package `com.faliardic.sefim`
 
 ## 1. Normative language and product boundary
 
 `MUST`, `MUST NOT`, `SHOULD` and `SHOULD NOT` are normative. Turkish UI copy
 is normative where it is shown in backticks. This document fixes the product
-decisions required for Slices 1–6; it does not claim that any Inventory source,
-schema, UI, build or device behavior exists today.
+decisions required for Slices 1–6. Implementation status is recorded separately
+by each Slice Issue, Draft PR and evidence record.
 
 Inventory Map v1 is the local-first spatial record of durable site assets. It
 MUST let the owner draw a schematic site sketch, place durable assets on that
@@ -25,6 +25,8 @@ V1 MUST include:
 - direct top-level `Envanter` access;
 - one active schematic sketch in the v1 UI, with a persistence model that can
   represent multiple sketches later;
+- one shared sketch geometry/revision chain projected through stable project
+  floors, never one copied sketch per floor;
 - durable draft recovery and immutable finalized sketch revisions;
 - durable asset/lot records with category, positive integer quantity, status,
   optional note and optional photo boundary;
@@ -588,6 +590,7 @@ allowed; IDs are the identity.
 | `id` | `TEXT PRIMARY KEY`, placement-version identity |
 | `placement_key` | stable logical placement UUID |
 | `project_id` | exact project ID |
+| `floor_id` | schema-21 stable floor identity in the exact project |
 | `asset_id` | composite FK with project to `inventory_assets` |
 | `sketch_id` | composite FK with project to `inventory_sketches` |
 | `provenance_revision_id` | composite FK with project/sketch to revision |
@@ -778,6 +781,7 @@ Slice 5 MUST adopt photos without duplicating a binary:
 - the existing `attachment_links` table MUST NOT be rebuilt to add a new
   `source_type`; Inventory uses the additive
   `inventory_asset_attachment_links` relation;
+
 - attachment catalog, media album and reconciliation queries MUST explicitly
   union this relation while preserving exact project/source provenance;
 - backup `_activeAttachmentRows` and `_manifestAttachmentRows` equivalents MUST
@@ -792,6 +796,29 @@ Round-trip validation MUST compare sketch/revision JSON and checksum, assets,
 placement chains, receipts, events, photo relations and each referenced byte's
 path/size/SHA-256/MIME. `PRAGMA integrity_check` and `foreign_key_check` MUST
 pass before activation.
+
+### 7.6 Additive schema 21 multi-floor extension
+
+Issue #525 adds exactly one table, `inventory_floors`, and one nullable-during-
+migration `floor_id` column to `inventory_asset_placements`. The final runtime
+contract requires every new placement version to reference an exact same-project
+floor. Floor identity and ordinal are immutable; rename changes only bounded
+`display_name`, optimistic `revision` and canonical `updated_at`.
+
+Schema `20 -> 21` MUST be atomic and deterministic. Before backfill it MUST
+verify the existing Inventory FK and full placement graph. Every project already
+represented by a sketch or placement receives exactly one `1. Kat` row whose ID
+is the stable UUID derived from `inventory-floor-v1:<project_id>`. Backfill MAY
+update only the newly added `floor_id`; all existing sketch, revision, asset,
+placement identity/key/sequence/x/y, event, receipt and photo-link values MUST
+remain byte-for-byte unchanged. Any failure MUST roll back to usable schema 20.
+
+Fresh first-sketch finalization creates ordered `1. Kat ... N. Kat` rows in the
+same transaction as first activation. Edit-active finalization MUST NOT create
+or replace floors. Quantity successors retain floor; same-floor and cross-floor
+moves both retain the stable placement key and append a new placement version.
+No per-floor geometry, revision chain, backup format or attachment-store variant
+is permitted.
 
 ## 8. Editor and Inventory UI behavior
 
@@ -1034,32 +1061,29 @@ this contract does not pre-mark any test PASS.
   album visibility, overlapping markers, accessibility, offline relaunch and
   safe failures.
 
-### Slice 6 — Backup/restore, migration and field acceptance
+### Slice 6 — Stable floors and floor-aware Inventory projection
 
-- Intended production paths: modify only proven gaps in
-  `mobile/lib/application/mobile_backup_application.dart` and Inventory
-  application diagnostics; production code MAY remain unchanged if prior
-  adoption is complete. Focused migration/backup/integration/manual-register
-  tests and evidence are primary.
-- Changed contracts: no new product behavior by default; executable proof of
-  schema upgrade, complete format-1 round-trip and safe in-place update.
-- Validation class: `persistence`; any MAIN package/signing/install work becomes
-  separately authorized `release-critical` scope.
-- Focused gates: schema-19 fixture migration, populated geometry/assets/
-  placement chains/events/receipts/photos round-trip, checksums/FKs/integrity,
-  rollback, newer-live-data protection, external backup verification and
-  owner-led numbered acceptance.
-- Impact: target remains schema 20, backup format 1, version unchanged unless a
-  separate release Issue authorizes versioning; no device command under Epic
-  #506 or Issue #507 alone.
-- Stop: Issue #501 recovery unverified for recovery claims, #502 external backup
-  gate incomplete, #503 unsafe restore path, wrong signer/package, uninstall,
-  clear-data, debug/acceptance identity or absent separate owner authority.
-- Owner manual-test family: migration/reopen, draft and active sketch survival,
-  asset/placement/history/photo restore, historical data preservation and
-  representative post-update verification.
-- First owner-phone MAIN eligibility: **Slice 6 only**, after #502 PASS for the
-  exact current dataset/candidate and separate explicit install authority.
+- Production authority: Issue #525; one shared sketch geometry/revision chain,
+  stable floor instances and floor-aware placement versions.
+- Changed contracts: additive schema `20 -> 21`, deterministic legacy default
+  floor, first-finalize floor creation, stable floor rename, floor-aware create/
+  move/unarchive, Kat Görünümü, selected-floor map, floor labels/filter and exact
+  list-to-floor/x/y focus.
+- Validation class: `persistence` plus focused real widget coverage.
+- Focused gates: populated schema-20 preservation and rollback, stable floor
+  identity/rename/relaunch, cross-floor placement history, canonical counts,
+  floor-local marker/cluster projection, target-selection precedence, first-
+  finalize prompt and edit-active recovery, and format-1 round-trip.
+- Impact: target schema `21`; backup format `1`, version `0.1.0+1`, pubspec,
+  packages, permissions and platform files unchanged. Production backup/restore
+  source is frozen because the SQLite snapshot already carries the additive
+  table and column.
+- Stop: unsafe/different-row backfill, per-floor sketch or geometry copy,
+  placement/history/photo identity loss, cross-project floor, destructive
+  migration, data-root/device/MAIN operation or any authority expansion.
+- Owner manual-test family: first-sketch floor count, floor rename, Kat Görünümü
+  counts, selected-floor marker isolation, list filter/focus and cross-floor move;
+  all remain `PENDING` until owner report.
 
 ## 10. Cumulative P0 data-safety gates
 

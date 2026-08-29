@@ -181,6 +181,7 @@ class InventoryMapController extends ChangeNotifier {
 
   InventoryMapLoadStatus loadStatus = InventoryMapLoadStatus.idle;
   InventoryPrimarySketchProjection? sketch;
+  String? selectedFloorId;
   List<InventoryAssetProjection> projections = const [];
   InventoryPlacementTarget? pendingCreateTarget;
   String? movingAssetId;
@@ -196,18 +197,29 @@ class InventoryMapController extends ChangeNotifier {
     required InventoryPrimarySketchProjection activeSketch,
     required Iterable<InventoryAssetProjection> assets,
     Iterable<String>? visibleAssetIds,
+    String? floorId,
   }) {
     try {
       _verifyActiveSketch(activeSketch);
+      final assetList = assets.toList(growable: false);
+      final floorIds = assetList
+          .map((projection) => projection.activePlacement?.floorId)
+          .whereType<String>()
+          .toSet();
+      final resolvedFloorId =
+          floorId ?? (floorIds.length == 1 ? floorIds.single : selectedFloorId);
+      if (resolvedFloorId == null) {
+        throw const InventoryFailure('inventory_floor_unavailable');
+      }
       final verified = <InventoryAssetProjection>[];
       final assetIds = <String>{};
-      for (final projection in assets) {
+      for (final projection in assetList) {
         if (!assetIds.add(projection.asset.id)) {
           throw const InventoryFailure(
             'inventory_multiple_placements_not_supported_in_v1',
           );
         }
-        _verifyMarkerProjection(projection, activeSketch);
+        _verifyMarkerProjection(projection, activeSketch, resolvedFloorId);
         verified.add(projection);
       }
       final requestedVisibleIds = visibleAssetIds?.toList(growable: false);
@@ -218,6 +230,7 @@ class InventoryMapController extends ChangeNotifier {
         throw const InventoryFailure('inventory_projection_integrity_failed');
       }
       sketch = activeSketch;
+      selectedFloorId = resolvedFloorId;
       projections = List<InventoryAssetProjection>.unmodifiable(
         visibleIds == null
             ? verified
@@ -238,6 +251,7 @@ class InventoryMapController extends ChangeNotifier {
 
   void clearSession() {
     sketch = null;
+    selectedFloorId = null;
     projections = const [];
     pendingCreateTarget = null;
     movingAssetId = null;
@@ -258,9 +272,18 @@ class InventoryMapController extends ChangeNotifier {
         projectId: projectId,
         includeArchived: false,
       );
+      final loadedFloors = await application.listFloors(projectId);
+      if (loadedFloors.isEmpty) {
+        throw const InventoryFailure('inventory_floor_unavailable');
+      }
       return useCanonicalSnapshot(
         activeSketch: loadedSketch!,
-        assets: loadedAssets,
+        assets: loadedAssets.where(
+          (projection) =>
+              projection.activePlacement?.floorId ==
+              loadedFloors.first.floor.id,
+        ),
+        floorId: loadedFloors.first.floor.id,
       );
     } on Object catch (error) {
       _failSnapshot(_safeCode(error));
@@ -364,6 +387,7 @@ class InventoryMapController extends ChangeNotifier {
   void _verifyMarkerProjection(
     InventoryAssetProjection value,
     InventoryPrimarySketchProjection activeSketch,
+    String floorId,
   ) {
     final asset = value.asset;
     final placement = value.activePlacement;
@@ -379,6 +403,7 @@ class InventoryMapController extends ChangeNotifier {
         placement.projectId != projectId ||
         placement.assetId != asset.id ||
         placement.sketchId != activeSketch.sketch.id ||
+        placement.floorId != floorId ||
         !isValidInventoryPlacementTarget(
           InventoryPlacementTarget(x: placement.x, y: placement.y),
         )) {

@@ -27,7 +27,7 @@ class AppDatabase {
     List<DatabaseMigration>? migrations,
   }) : migrations = migrations ?? foundationMigrations;
 
-  static const schemaVersion = 20;
+  static const schemaVersion = 21;
 
   static final List<DatabaseMigration> foundationMigrations = [
     DatabaseMigration(
@@ -2901,6 +2901,7 @@ class AppDatabase {
     DatabaseMigration(version: 18, apply: _applyMaterialRequestMigration),
     DatabaseMigration(version: 19, apply: _applyAgendaPhoneCallMigration),
     DatabaseMigration(version: 20, apply: _applyInventoryFoundationMigration),
+    DatabaseMigration(version: 21, apply: _applyInventoryMultiFloorMigration),
   ];
 
   final String path;
@@ -4869,6 +4870,257 @@ Future<void> _applyInventoryFoundationMigration(Transaction transaction) async {
   );
 
   await _addInventoryInvariantTriggers(transaction);
+}
+
+Future<void> _applyInventoryMultiFloorMigration(Transaction transaction) async {
+  final inventoryForeignKeyFailures =
+      (await transaction.rawQuery('PRAGMA foreign_key_check')).where(
+        (row) => (row['table'] as String?)?.startsWith('inventory_') ?? false,
+      );
+  if (inventoryForeignKeyFailures.isNotEmpty) {
+    throw StateError('inventory schema 20 foreign key integrity failed');
+  }
+  final invalidPlacementGraph = Sqflite.firstIntValue(
+    await transaction.rawQuery('''
+      SELECT count(*)
+      FROM inventory_asset_placements placement
+      LEFT JOIN inventory_assets asset
+        ON asset.id = placement.asset_id
+        AND asset.project_id = placement.project_id
+      LEFT JOIN inventory_sketches sketch
+        ON sketch.id = placement.sketch_id
+        AND sketch.project_id = placement.project_id
+      LEFT JOIN inventory_sketch_revisions revision
+        ON revision.id = placement.provenance_revision_id
+        AND revision.project_id = placement.project_id
+        AND revision.sketch_id = placement.sketch_id
+      LEFT JOIN inventory_asset_placements predecessor
+        ON predecessor.id = placement.supersedes_placement_id
+        AND predecessor.project_id = placement.project_id
+      WHERE asset.id IS NULL
+        OR sketch.id IS NULL
+        OR revision.id IS NULL
+        OR (
+          placement.supersedes_placement_id IS NOT NULL
+          AND (
+            predecessor.id IS NULL
+            OR predecessor.placement_key != placement.placement_key
+            OR predecessor.asset_id != placement.asset_id
+            OR predecessor.sketch_id != placement.sketch_id
+            OR predecessor.sequence + 1 != placement.sequence
+            OR predecessor.ended_at IS NULL
+          )
+        )
+    '''),
+  );
+  if (invalidPlacementGraph != 0) {
+    throw StateError('inventory schema 20 placement graph is invalid');
+  }
+
+  await transaction.execute('''
+    CREATE TABLE inventory_floors (
+      id TEXT PRIMARY KEY CHECK (length(id) > 0 AND id = trim(id)),
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      ordinal INTEGER NOT NULL CHECK (ordinal BETWEEN 1 AND 100),
+      display_name TEXT NOT NULL CHECK (
+        length(display_name) BETWEEN 1 AND 80
+        AND display_name = trim(display_name)
+      ),
+      revision INTEGER NOT NULL CHECK (revision >= 1),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (id, project_id),
+      UNIQUE (project_id, ordinal),
+      CHECK (updated_at >= created_at)
+    )
+  ''');
+  await transaction.execute('''
+    ALTER TABLE inventory_asset_placements
+    ADD COLUMN floor_id TEXT REFERENCES inventory_floors(id)
+  ''');
+
+  final projectRows = await transaction.rawQuery('''
+    SELECT project.id, project.created_at
+    FROM projects project
+    WHERE project.id IN (
+      SELECT project_id FROM inventory_sketches
+      UNION
+      SELECT project_id FROM inventory_asset_placements
+    )
+    ORDER BY project.id ASC
+  ''');
+  await transaction.execute(
+    'DROP TRIGGER inventory_asset_placements_terminal_update',
+  );
+  await transaction.execute(
+    'DROP TRIGGER inventory_asset_placements_project_available_update',
+  );
+  for (final project in projectRows) {
+    final projectId = project['id']! as String;
+    final floorId = _migrationStableUuid('inventory-floor-v1:$projectId');
+    await transaction.insert('inventory_floors', {
+      'id': floorId,
+      'project_id': projectId,
+      'ordinal': 1,
+      'display_name': '1. Kat',
+      'revision': 1,
+      'created_at': project['created_at'],
+      'updated_at': project['created_at'],
+    });
+    await transaction.update(
+      'inventory_asset_placements',
+      {'floor_id': floorId},
+      where: 'project_id = ? AND floor_id IS NULL',
+      whereArgs: [projectId],
+    );
+  }
+
+  final invalidBackfill = Sqflite.firstIntValue(
+    await transaction.rawQuery('''
+      SELECT count(*)
+      FROM inventory_asset_placements placement
+      LEFT JOIN inventory_floors floor
+        ON floor.id = placement.floor_id
+        AND floor.project_id = placement.project_id
+      WHERE placement.floor_id IS NULL OR floor.id IS NULL
+    '''),
+  );
+  final floorCount = Sqflite.firstIntValue(
+    await transaction.rawQuery('SELECT count(*) FROM inventory_floors'),
+  );
+  if (invalidBackfill != 0 || floorCount != projectRows.length) {
+    throw StateError('inventory floor backfill integrity failed');
+  }
+
+  await transaction.execute('''
+    CREATE INDEX ix_inventory_asset_placements_floor_map
+    ON inventory_asset_placements(
+      project_id, floor_id, sketch_id, ended_at, y, x, id
+    )
+  ''');
+  await transaction.execute('''
+    CREATE INDEX ix_inventory_floors_project
+    ON inventory_floors(project_id, ordinal, id)
+  ''');
+  await _addInventoryTimestampGuards(transaction, 'inventory_floors', const [
+    'created_at',
+    'updated_at',
+  ]);
+  await transaction.execute('''
+    CREATE TRIGGER inventory_floors_project_available_insert
+    BEFORE INSERT ON inventory_floors
+    WHEN NOT EXISTS (
+      SELECT 1 FROM projects project
+      WHERE project.id = NEW.project_id AND project.archived_at IS NULL
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'inventory project is unavailable');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER inventory_floors_project_available_update
+    BEFORE UPDATE ON inventory_floors
+    WHEN NOT EXISTS (
+      SELECT 1 FROM projects project
+      WHERE project.id = NEW.project_id AND project.archived_at IS NULL
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'inventory project is unavailable');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER inventory_floors_contiguous_insert
+    BEFORE INSERT ON inventory_floors
+    WHEN NEW.ordinal != (
+      SELECT COALESCE(MAX(floor.ordinal), 0) + 1
+      FROM inventory_floors floor
+      WHERE floor.project_id = NEW.project_id
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'inventory floor ordinal is not contiguous');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER inventory_floors_guarded_update
+    BEFORE UPDATE ON inventory_floors
+    BEGIN
+      SELECT CASE
+        WHEN NEW.id != OLD.id
+          OR NEW.project_id != OLD.project_id
+          OR NEW.ordinal != OLD.ordinal
+          OR NEW.created_at != OLD.created_at
+        THEN RAISE(ABORT, 'inventory floor identity is immutable')
+      END;
+      SELECT CASE
+        WHEN NEW.revision != OLD.revision + 1
+        THEN RAISE(ABORT, 'inventory floor revision mismatch')
+      END;
+      SELECT CASE
+        WHEN NEW.updated_at < OLD.updated_at
+        THEN RAISE(ABORT, 'inventory floor timestamp regression')
+      END;
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER inventory_floors_no_physical_delete
+    BEFORE DELETE ON inventory_floors
+    BEGIN
+      SELECT RAISE(ABORT, 'inventory source cannot be physically deleted');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER inventory_asset_placements_floor_insert
+    BEFORE INSERT ON inventory_asset_placements
+    WHEN NEW.floor_id IS NULL OR NOT EXISTS (
+      SELECT 1 FROM inventory_floors floor
+      WHERE floor.id = NEW.floor_id AND floor.project_id = NEW.project_id
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'inventory placement floor is invalid');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER inventory_asset_placements_project_available_update
+    BEFORE UPDATE ON inventory_asset_placements
+    WHEN NOT EXISTS (
+      SELECT 1
+      FROM projects project
+      WHERE project.id = NEW.project_id
+        AND project.archived_at IS NULL
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'inventory project is unavailable');
+    END
+  ''');
+  await transaction.execute('''
+    CREATE TRIGGER inventory_asset_placements_terminal_update
+    BEFORE UPDATE ON inventory_asset_placements
+    BEGIN
+      SELECT CASE
+        WHEN NEW.id != OLD.id
+          OR NEW.placement_key != OLD.placement_key
+          OR NEW.project_id != OLD.project_id
+          OR NEW.asset_id != OLD.asset_id
+          OR NEW.sketch_id != OLD.sketch_id
+          OR NEW.floor_id IS NOT OLD.floor_id
+          OR NEW.provenance_revision_id != OLD.provenance_revision_id
+          OR NEW.sequence != OLD.sequence
+          OR NEW.x != OLD.x
+          OR NEW.y != OLD.y
+          OR NEW.quantity != OLD.quantity
+          OR NEW.created_at != OLD.created_at
+          OR NEW.supersedes_placement_id IS NOT OLD.supersedes_placement_id
+        THEN RAISE(ABORT, 'inventory placement source is immutable')
+      END;
+      SELECT CASE
+        WHEN OLD.ended_at IS NOT NULL
+          OR OLD.end_reason IS NOT NULL
+          OR NEW.ended_at IS NULL
+          OR NEW.end_reason IS NULL
+        THEN RAISE(ABORT, 'inventory placement terminal transition is invalid')
+      END;
+    END
+  ''');
 }
 
 Future<void> _addInventoryTimestampGuards(

@@ -41,6 +41,7 @@ class InventorySketchEditorController extends ChangeNotifier {
   String? lastErrorCode;
   bool finalizing = false;
   bool finalizePersisted = false;
+  bool isFirstActivation = false;
 
   String? _sketchId;
   String? _draftRevisionId;
@@ -357,7 +358,7 @@ class InventorySketchEditorController extends ChangeNotifier {
     _notify();
   }
 
-  Future<bool> finalizeDraft() async {
+  Future<bool> finalizeDraft({int? initialFloorCount}) async {
     if (finalizing ||
         finalizePersisted ||
         _finalizeBlockedByStaleRevision ||
@@ -399,6 +400,7 @@ class InventorySketchEditorController extends ChangeNotifier {
           draftRevisionId: targetDraftId,
           expectedSketchRevision: expectedSketchRevision,
           expectedContentRevision: expectedContentRevision,
+          initialFloorCount: isFirstActivation ? initialFloorCount : null,
         ),
       );
       final after = await application.loadPrimarySketch(projectId);
@@ -483,6 +485,7 @@ class InventorySketchEditorController extends ChangeNotifier {
     _expectedSketchRevision = projection.sketch.revision;
     _expectedContentRevision = draft.contentRevision;
     acknowledgedGeometry = draft.geometry;
+    isFirstActivation = projection.activeRevision == null;
     editor = InventorySketchEditorSnapshot.recover(draft.geometry);
     _autosaveTimer?.cancel();
     _autosaveTimer = null;
@@ -686,8 +689,17 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
   }
 
   Future<void> _finalizeAndExit() async {
+    int? initialFloorCount;
+    if (!controller.finalizePersisted && controller.isFirstActivation) {
+      initialFloorCount = await showDialog<int>(
+        context: context,
+        builder: (_) => const _InventoryFloorCountDialog(),
+      );
+      if (initialFloorCount == null || !mounted) return;
+    }
     final finalized =
-        controller.finalizePersisted || await controller.finalizeDraft();
+        controller.finalizePersisted ||
+        await controller.finalizeDraft(initialFloorCount: initialFloorCount);
     if (!finalized || !mounted) return;
     await _attemptExit(true);
   }
@@ -845,6 +857,66 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
               onSelect: controller.selectAt,
             ),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _InventoryFloorCountDialog extends StatefulWidget {
+  const _InventoryFloorCountDialog();
+
+  @override
+  State<_InventoryFloorCountDialog> createState() =>
+      _InventoryFloorCountDialogState();
+}
+
+class _InventoryFloorCountDialogState
+    extends State<_InventoryFloorCountDialog> {
+  late final TextEditingController _count;
+
+  @override
+  void initState() {
+    super.initState();
+    _count = TextEditingController(text: '1');
+  }
+
+  @override
+  void dispose() {
+    _count.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final value = int.tryParse(_count.text.trim());
+    final valid = value != null && value >= 1 && value <= 100;
+    return AlertDialog(
+      key: const Key('inventory-floor-count-dialog'),
+      title: const Text('Kat sayısı'),
+      content: TextField(
+        key: const Key('inventory-floor-count'),
+        controller: _count,
+        autofocus: true,
+        keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        decoration: const InputDecoration(
+          labelText: 'Toplam kat sayısı',
+          helperText: '1 ile 100 arasında bir sayı girin.',
+          border: OutlineInputBorder(),
+        ),
+        onChanged: (_) => setState(() {}),
+      ),
+      actions: [
+        TextButton(
+          key: const Key('inventory-floor-count-cancel'),
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Vazgeç'),
+        ),
+        FilledButton(
+          key: const Key('inventory-floor-count-confirm'),
+          onPressed: valid ? () => Navigator.pop(context, value) : null,
+          child: const Text('Devam et'),
         ),
       ],
     );

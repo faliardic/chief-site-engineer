@@ -798,8 +798,27 @@ void main() {
         );
 
         await tester.tap(find.byKey(const Key('inventory-editor-finalize')));
+        await tester.pump();
+        expect(
+          find.byKey(const Key('inventory-floor-count-dialog')),
+          findsOneWidget,
+        );
+        await tester.enterText(
+          find.byKey(const Key('inventory-floor-count')),
+          '3',
+        );
+        await tester.pump();
+        await tester.tap(
+          find.byKey(const Key('inventory-floor-count-confirm')),
+        );
         await tester.pumpAndSettle();
         expect(fake.finalizeCalls, 1);
+        expect(fake.lastFinalize!.initialFloorCount, 3);
+        expect(fake.floors.map((floor) => floor.displayName), [
+          '1. Kat',
+          '2. Kat',
+          '3. Kat',
+        ]);
         expect(find.byType(InventorySketchEditorPage), findsOneWidget);
         expect(
           find.byKey(const Key('inventory-editor-retry-orientation')),
@@ -818,6 +837,29 @@ void main() {
         );
       },
     );
+
+    testWidgets('first floor-count cancel does not finalize or mutate', (
+      tester,
+    ) async {
+      final fake = _FakeInventoryApplication.withDraft(_openGeometry());
+      final orientations = _OrientationRecorder();
+      final pageKey = GlobalKey<InventorySketchEditorPageState>();
+      await _openEditor(tester, fake, orientations, pageKey);
+
+      await tester.tap(find.byKey(const Key('inventory-editor-finalize')));
+      await tester.pump();
+      expect(
+        find.byKey(const Key('inventory-floor-count-dialog')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('inventory-floor-count-cancel')));
+      await tester.pumpAndSettle();
+
+      expect(fake.finalizeCalls, 0);
+      expect(fake.floors, isEmpty);
+      expect(find.byType(InventorySketchEditorPage), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
 
     testWidgets('handled load error exits through standard restoration', (
       tester,
@@ -1022,6 +1064,8 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
   final loadGates = <Completer<void>>[];
   final operationOrder = <String>[];
   final _receipts = <String, InventoryMutationResult>{};
+  final floors = <InventoryFloorRecord>[];
+  FinalizeInventorySketchCommand? lastFinalize;
 
   @override
   Future<InventoryPrimarySketchProjection?> loadPrimarySketch(
@@ -1034,6 +1078,17 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
     }
     return projection;
   }
+
+  @override
+  Future<List<InventoryFloorSummary>> listFloors(String projectId) async => [
+    for (final floor in floors)
+      InventoryFloorSummary(floor: floor, activeAssetCount: 0),
+  ];
+
+  @override
+  Future<InventoryFloorRecord> renameFloor(
+    RenameInventoryFloorCommand command,
+  ) async => throw UnsupportedError('not used');
 
   @override
   Future<InventoryMutationResult> createSketch(
@@ -1162,6 +1217,7 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
     FinalizeInventorySketchCommand command,
   ) async {
     finalizeCalls += 1;
+    lastFinalize = command;
     operationOrder.add('finalize');
     if (failFinalizeCount > 0) {
       failFinalizeCount -= 1;
@@ -1170,6 +1226,22 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
     final current = projection!;
     final draft = current.draftRevision!;
     draft.geometry.validateFinalizable();
+    if (current.activeRevision == null && floors.isEmpty) {
+      final count = command.initialFloorCount ?? 1;
+      for (var ordinal = 1; ordinal <= count; ordinal += 1) {
+        floors.add(
+          InventoryFloorRecord(
+            id: _uuid(8000 + ordinal),
+            projectId: _projectId,
+            ordinal: ordinal,
+            displayName: '$ordinal. Kat',
+            revision: 1,
+            createdAt: _time,
+            updatedAt: _time,
+          ),
+        );
+      }
+    }
     final active = _revision(
       id: draft.id,
       sketchId: current.sketch.id,

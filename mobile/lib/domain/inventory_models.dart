@@ -556,6 +556,7 @@ class FinalizeInventorySketchCommand implements InventoryMutationCommand {
     required this.draftRevisionId,
     required this.expectedSketchRevision,
     required this.expectedContentRevision,
+    this.initialFloorCount,
   });
 
   @override
@@ -566,6 +567,7 @@ class FinalizeInventorySketchCommand implements InventoryMutationCommand {
   final String draftRevisionId;
   final int expectedSketchRevision;
   final int expectedContentRevision;
+  final int? initialFloorCount;
   @override
   String get primaryAggregateId => sketchId;
   @override
@@ -661,6 +663,7 @@ class CreateInventoryAssetCommand implements InventoryMutationCommand {
     required this.totalQuantity,
     required this.x,
     required this.y,
+    this.floorId,
     this.otherCategoryLabel,
     this.status = InventoryAssetStatus.available,
     this.note,
@@ -683,6 +686,7 @@ class CreateInventoryAssetCommand implements InventoryMutationCommand {
   final String? note;
   final int x;
   final int y;
+  final String? floorId;
   @override
   String get primaryAggregateId => assetId;
   @override
@@ -818,6 +822,7 @@ class UnarchiveInventoryAssetCommand implements InventoryMutationCommand {
     required this.expectedPreviousPlacementSequence,
     required this.x,
     required this.y,
+    this.floorId,
   });
 
   @override
@@ -833,6 +838,7 @@ class UnarchiveInventoryAssetCommand implements InventoryMutationCommand {
   final int expectedPreviousPlacementSequence;
   final int x;
   final int y;
+  final String? floorId;
   @override
   String get primaryAggregateId => assetId;
   @override
@@ -855,6 +861,7 @@ class MoveInventoryPlacementCommand implements InventoryMutationCommand {
     required this.expectedPlacementSequence,
     required this.x,
     required this.y,
+    this.floorId,
   });
 
   @override
@@ -869,6 +876,7 @@ class MoveInventoryPlacementCommand implements InventoryMutationCommand {
   final int expectedPlacementSequence;
   final int x;
   final int y;
+  final String? floorId;
   @override
   String get primaryAggregateId => placementKey;
   @override
@@ -1182,6 +1190,50 @@ class InventoryPrimarySketchProjection {
   final InventorySketchRevisionRecord? draftRevision;
 }
 
+class InventoryFloorRecord {
+  const InventoryFloorRecord({
+    required this.id,
+    required this.projectId,
+    required this.ordinal,
+    required this.displayName,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  final String id;
+  final String projectId;
+  final int ordinal;
+  final String displayName;
+  final int revision;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+}
+
+class InventoryFloorSummary {
+  const InventoryFloorSummary({
+    required this.floor,
+    required this.activeAssetCount,
+  });
+
+  final InventoryFloorRecord floor;
+  final int activeAssetCount;
+}
+
+class RenameInventoryFloorCommand {
+  const RenameInventoryFloorCommand({
+    required this.projectId,
+    required this.floorId,
+    required this.expectedRevision,
+    required this.displayName,
+  });
+
+  final String projectId;
+  final String floorId;
+  final int expectedRevision;
+  final String displayName;
+}
+
 class InventoryAssetRecord {
   const InventoryAssetRecord({
     required this.id,
@@ -1223,6 +1275,7 @@ class InventoryPlacementRecord {
     required this.projectId,
     required this.assetId,
     required this.sketchId,
+    required this.floorId,
     required this.provenanceRevisionId,
     required this.sequence,
     required this.x,
@@ -1239,6 +1292,7 @@ class InventoryPlacementRecord {
   final String projectId;
   final String assetId;
   final String sketchId;
+  final String floorId;
   final String provenanceRevisionId;
   final int sequence;
   final int x;
@@ -1255,10 +1309,15 @@ class InventoryAssetProjection {
   const InventoryAssetProjection({
     required this.asset,
     required this.activePlacement,
+    this.latestPlacement,
   });
 
   final InventoryAssetRecord asset;
   final InventoryPlacementRecord? activePlacement;
+  final InventoryPlacementRecord? latestPlacement;
+
+  InventoryPlacementRecord? get floorPlacement =>
+      activePlacement ?? latestPlacement;
 }
 
 class InventoryAssetPhotoRecord {

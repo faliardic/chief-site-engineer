@@ -73,6 +73,8 @@ abstract interface class InventoryApplicationPort {
     required String projectId,
     required String assetId,
   });
+  Future<List<InventoryFloorSummary>> listFloors(String projectId);
+  Future<InventoryFloorRecord> renameFloor(RenameInventoryFloorCommand command);
 }
 
 abstract interface class InventoryPhotoApplicationPort {
@@ -247,6 +249,13 @@ class SqliteInventoryApplication
   }) => _withApplication(
     (app) => app.listAssetHistory(projectId: projectId, assetId: assetId),
   );
+  @override
+  Future<List<InventoryFloorSummary>> listFloors(String projectId) =>
+      _withApplication((app) => app.listFloors(projectId));
+  @override
+  Future<InventoryFloorRecord> renameFloor(
+    RenameInventoryFloorCommand command,
+  ) => _withApplication((app) => app.renameFloor(command));
 
   @override
   Future<InventoryPhotoPickResult> pickAssetPhoto(
@@ -395,6 +404,120 @@ class UnavailableInventoryApplication implements InventoryApplicationPort {
     required String projectId,
     required String assetId,
   }) async => _fail();
+
+  @override
+  Future<List<InventoryFloorSummary>> listFloors(String projectId) async =>
+      _fail();
+
+  @override
+  Future<InventoryFloorRecord> renameFloor(
+    RenameInventoryFloorCommand command,
+  ) async => _fail();
+}
+
+class DelegatingInventoryApplication implements InventoryApplicationPort {
+  const DelegatingInventoryApplication(this.delegate);
+
+  final InventoryApplicationPort delegate;
+
+  @override
+  Future<InventoryMutationResult> abandonSketchDraft(
+    AbandonInventorySketchDraftCommand command,
+  ) => delegate.abandonSketchDraft(command);
+  @override
+  Future<InventoryMutationResult> archiveAsset(
+    ArchiveInventoryAssetCommand command,
+  ) => delegate.archiveAsset(command);
+  @override
+  Future<InventoryMutationResult> archiveSketch(
+    ArchiveInventorySketchCommand command,
+  ) => delegate.archiveSketch(command);
+  @override
+  Future<InventoryMutationResult> autosaveSketchDraft(
+    AutosaveInventorySketchDraftCommand command,
+  ) => delegate.autosaveSketchDraft(command);
+  @override
+  Future<InventoryMutationResult> changeAssetQuantity(
+    ChangeInventoryAssetQuantityCommand command,
+  ) => delegate.changeAssetQuantity(command);
+  @override
+  Future<InventoryMutationResult> changeAssetStatus(
+    ChangeInventoryAssetStatusCommand command,
+  ) => delegate.changeAssetStatus(command);
+  @override
+  Future<InventoryMutationResult> createAsset(
+    CreateInventoryAssetCommand command,
+  ) => delegate.createAsset(command);
+  @override
+  Future<InventoryMutationResult> createSketch(
+    CreateInventorySketchCommand command,
+  ) => delegate.createSketch(command);
+  @override
+  Future<InventoryMutationResult> finalizeSketch(
+    FinalizeInventorySketchCommand command,
+  ) => delegate.finalizeSketch(command);
+  @override
+  Future<List<InventoryEventRecord>> listAssetHistory({
+    required String projectId,
+    required String assetId,
+  }) => delegate.listAssetHistory(projectId: projectId, assetId: assetId);
+  @override
+  Future<List<InventoryAssetProjection>> listAssets({
+    required String projectId,
+    bool includeArchived = false,
+  }) => delegate.listAssets(
+    projectId: projectId,
+    includeArchived: includeArchived,
+  );
+  @override
+  Future<List<InventoryFloorSummary>> listFloors(String projectId) =>
+      delegate.listFloors(projectId);
+  @override
+  Future<List<InventoryPlacementRecord>> listPlacementVersions({
+    required String projectId,
+    required String assetId,
+    required String placementKey,
+  }) => delegate.listPlacementVersions(
+    projectId: projectId,
+    assetId: assetId,
+    placementKey: placementKey,
+  );
+  @override
+  Future<InventoryAssetProjection> loadAsset({
+    required String projectId,
+    required String assetId,
+  }) => delegate.loadAsset(projectId: projectId, assetId: assetId);
+  @override
+  Future<InventoryAvailability> loadAvailability(String projectId) =>
+      delegate.loadAvailability(projectId);
+  @override
+  Future<InventoryPrimarySketchProjection?> loadPrimarySketch(
+    String projectId,
+  ) => delegate.loadPrimarySketch(projectId);
+  @override
+  Future<InventoryMutationResult> movePlacement(
+    MoveInventoryPlacementCommand command,
+  ) => delegate.movePlacement(command);
+  @override
+  Future<InventoryFloorRecord> renameFloor(
+    RenameInventoryFloorCommand command,
+  ) => delegate.renameFloor(command);
+  @override
+  Future<InventoryMutationResult> startSketchEdit(
+    StartInventorySketchEditCommand command,
+  ) => delegate.startSketchEdit(command);
+  @override
+  Future<InventoryMutationResult> unarchiveAsset(
+    UnarchiveInventoryAssetCommand command,
+  ) => delegate.unarchiveAsset(command);
+  @override
+  Future<InventoryMutationResult> unarchiveSketch(
+    UnarchiveInventorySketchCommand command,
+  ) => delegate.unarchiveSketch(command);
+  @override
+  Future<InventoryMutationResult> updateAsset(
+    UpdateInventoryAssetCommand command,
+  ) => delegate.updateAsset(command);
 }
 
 class InventoryApplication
@@ -1163,6 +1286,7 @@ class InventoryApplication
       'inventory_sketch_revisions',
       'inventory_assets',
       'inventory_asset_placements',
+      'inventory_floors',
       'inventory_asset_attachment_links',
       'managed_attachments',
     };
@@ -1324,6 +1448,30 @@ class InventoryApplication
     return asset;
   }
 
+  Future<String> _resolveFloorId(
+    Transaction transaction, {
+    required String projectId,
+    String? requestedFloorId,
+  }) async {
+    final rows = await transaction.query(
+      'inventory_floors',
+      where: 'project_id = ?',
+      whereArgs: [projectId],
+      orderBy: 'ordinal ASC, id ASC',
+    );
+    if (requestedFloorId == null) {
+      if (rows.length != 1) {
+        throw const InventoryFailure('inventory_floor_required');
+      }
+      return _floorFromRow(rows.single).id;
+    }
+    for (final row in rows) {
+      final floor = _floorFromRow(row);
+      if (floor.id == requestedFloorId) return floor.id;
+    }
+    throw const InventoryFailure('inventory_floor_unavailable');
+  }
+
   Future<List<Map<String, Object?>>> _loadActivePlacementRows(
     Transaction transaction, {
     required String projectId,
@@ -1369,6 +1517,28 @@ class InventoryApplication
     return placement;
   }
 
+  Future<InventoryPlacementRecord?> _loadLatestPlacementOrNull(
+    Transaction transaction, {
+    required String projectId,
+    required String assetId,
+  }) async {
+    final rows = await transaction.query(
+      'inventory_asset_placements',
+      where: 'project_id = ? AND asset_id = ?',
+      whereArgs: [projectId, assetId],
+      orderBy: 'sequence DESC, id ASC',
+      limit: 2,
+    );
+    if (rows.isEmpty) return null;
+    final latest = _placementFromRow(rows.first);
+    if (rows.length > 1 && rows[1]['sequence'] == rows.first['sequence']) {
+      throw const InventoryFailure(
+        'inventory_placement_history_integrity_failed',
+      );
+    }
+    return latest;
+  }
+
   Future<InventoryAssetProjection> _loadAssetProjection(
     Transaction transaction, {
     required String projectId,
@@ -1389,7 +1559,18 @@ class InventoryApplication
         (placement != null && placement.quantity != asset.totalQuantity)) {
       throw const InventoryFailure('inventory_projection_integrity_failed');
     }
-    return InventoryAssetProjection(asset: asset, activePlacement: placement);
+    final latestPlacement =
+        placement ??
+        await _loadLatestPlacementOrNull(
+          transaction,
+          projectId: projectId,
+          assetId: assetId,
+        );
+    return InventoryAssetProjection(
+      asset: asset,
+      activePlacement: placement,
+      latestPlacement: latestPlacement,
+    );
   }
 
   Future<void> _insertPlacementSuccessor(
@@ -1397,6 +1578,7 @@ class InventoryApplication
     required String id,
     required InventoryPlacementRecord predecessor,
     String? sketchId,
+    required String floorId,
     required String provenanceRevisionId,
     required int quantity,
     required int x,
@@ -1409,6 +1591,7 @@ class InventoryApplication
       'project_id': predecessor.projectId,
       'asset_id': predecessor.assetId,
       'sketch_id': sketchId ?? predecessor.sketchId,
+      'floor_id': floorId,
       'provenance_revision_id': provenanceRevisionId,
       'sequence': predecessor.sequence + 1,
       'x': x,
@@ -1595,6 +1778,32 @@ class InventoryApplication
     );
   }
 
+  InventoryFloorRecord _floorFromRow(Map<String, Object?> row) {
+    final id = _requiredStoredUuid(row, 'id');
+    final projectId = _requiredStoredString(row, 'project_id');
+    final ordinal = _requiredPositiveStoredInt(row, 'ordinal');
+    final displayName = _requiredStoredString(row, 'display_name');
+    final revision = _requiredPositiveStoredInt(row, 'revision');
+    final createdAt = _storedTimestamp(row, 'created_at');
+    final updatedAt = _storedTimestamp(row, 'updated_at');
+    if (ordinal > 100 ||
+        displayName != displayName.trim() ||
+        displayName.isEmpty ||
+        displayName.runes.length > 80 ||
+        updatedAt.isBefore(createdAt)) {
+      throw const InventoryFailure('inventory_floor_integrity_failed');
+    }
+    return InventoryFloorRecord(
+      id: id,
+      projectId: projectId,
+      ordinal: ordinal,
+      displayName: displayName,
+      revision: revision,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
+  }
+
   InventorySketchRevisionRecord _sketchRevisionFromRow(
     Map<String, Object?> row,
   ) {
@@ -1711,6 +1920,7 @@ class InventoryApplication
     final projectId = _requiredStoredString(row, 'project_id');
     final assetId = _requiredStoredUuid(row, 'asset_id');
     final sketchId = _requiredStoredUuid(row, 'sketch_id');
+    final floorId = _requiredStoredUuid(row, 'floor_id');
     final provenanceRevisionId = _requiredStoredUuid(
       row,
       'provenance_revision_id',
@@ -1754,6 +1964,7 @@ class InventoryApplication
       projectId: projectId,
       assetId: assetId,
       sketchId: sketchId,
+      floorId: floorId,
       provenanceRevisionId: provenanceRevisionId,
       sequence: sequence,
       x: x,
@@ -2204,13 +2415,132 @@ class InventoryApplication
               'inventory_projection_integrity_failed',
             );
           }
+          final latestPlacement =
+              placement ??
+              await _loadLatestPlacementOrNull(
+                transaction,
+                projectId: projectId,
+                assetId: asset.id,
+              );
           result.add(
-            InventoryAssetProjection(asset: asset, activePlacement: placement),
+            InventoryAssetProjection(
+              asset: asset,
+              activePlacement: placement,
+              latestPlacement: latestPlacement,
+            ),
           );
           previousName = asset.normalizedName;
           previousId = asset.id;
         }
         return List<InventoryAssetProjection>.unmodifiable(result);
+      }),
+    );
+  }
+
+  @override
+  Future<List<InventoryFloorSummary>> listFloors(String projectId) {
+    _requireIdentity(projectId, 'inventory_invalid_project_id');
+    return _guardRead(
+      () => database.database.transaction((transaction) async {
+        await _requireProjectAvailable(transaction, projectId);
+        final rows = await transaction.rawQuery(
+          '''
+          SELECT floor.*, count(placement.id) AS active_asset_count
+          FROM inventory_floors floor
+          LEFT JOIN inventory_asset_placements placement
+            ON placement.floor_id = floor.id
+            AND placement.project_id = floor.project_id
+            AND placement.ended_at IS NULL
+          WHERE floor.project_id = ?
+          GROUP BY floor.id, floor.project_id, floor.ordinal,
+            floor.display_name, floor.revision,
+            floor.created_at, floor.updated_at
+          ORDER BY floor.ordinal ASC, floor.id ASC
+          ''',
+          [projectId],
+        );
+        final result = <InventoryFloorSummary>[];
+        for (var index = 0; index < rows.length; index += 1) {
+          final floor = _floorFromRow(rows[index]);
+          final count = rows[index]['active_asset_count'];
+          if (floor.projectId != projectId ||
+              floor.ordinal != index + 1 ||
+              count is! int ||
+              count < 0) {
+            throw const InventoryFailure('inventory_floor_integrity_failed');
+          }
+          result.add(
+            InventoryFloorSummary(floor: floor, activeAssetCount: count),
+          );
+        }
+        return List<InventoryFloorSummary>.unmodifiable(result);
+      }),
+    );
+  }
+
+  @override
+  Future<InventoryFloorRecord> renameFloor(
+    RenameInventoryFloorCommand command,
+  ) {
+    _requireIdentity(command.projectId, 'inventory_invalid_project_id');
+    _requireUuid(command.floorId, 'inventory_invalid_floor_id');
+    _requirePositiveRevision(command.expectedRevision);
+    final displayName = _boundedText(
+      command.displayName,
+      maximum: 80,
+      code: 'inventory_invalid_floor_name',
+    );
+    return _guardRead(
+      () => database.database.transaction((transaction) async {
+        await _requireProjectAvailable(transaction, command.projectId);
+        final rows = await transaction.query(
+          'inventory_floors',
+          where: 'id = ? AND project_id = ?',
+          whereArgs: [command.floorId, command.projectId],
+          limit: 2,
+        );
+        if (rows.length != 1) {
+          throw const InventoryFailure('inventory_floor_unavailable');
+        }
+        final current = _floorFromRow(rows.single);
+        if (current.revision != command.expectedRevision) {
+          throw const InventoryFailure('inventory_stale_revision');
+        }
+        if (current.displayName == displayName) return current;
+        final timestamp = CseTimeCodec.encodeUtc(
+          _canonicalNowAfter(current.updatedAt),
+        );
+        final updated = await transaction.update(
+          'inventory_floors',
+          {
+            'display_name': displayName,
+            'revision': current.revision + 1,
+            'updated_at': timestamp,
+          },
+          where: 'id = ? AND project_id = ? AND revision = ?',
+          whereArgs: [command.floorId, command.projectId, current.revision],
+        );
+        if (updated != 1) {
+          throw const InventoryFailure('inventory_stale_revision');
+        }
+        final reloaded = await transaction.query(
+          'inventory_floors',
+          where: 'id = ? AND project_id = ?',
+          whereArgs: [command.floorId, command.projectId],
+          limit: 2,
+        );
+        if (reloaded.length != 1) {
+          throw const InventoryFailure('inventory_floor_integrity_failed');
+        }
+        final result = _floorFromRow(reloaded.single);
+        if (result.id != current.id ||
+            result.projectId != current.projectId ||
+            result.ordinal != current.ordinal ||
+            result.displayName != displayName ||
+            result.revision != current.revision + 1) {
+          throw const InventoryFailure('inventory_floor_integrity_failed');
+        }
+        return result;
       }),
     );
   }
@@ -2558,6 +2888,9 @@ class InventoryApplication
     );
     _requireUuid(command.sketchId, 'inventory_invalid_sketch_id');
     _requireUuid(command.activeRevisionId, 'inventory_invalid_revision_id');
+    if (command.floorId case final floorId?) {
+      _requireUuid(floorId, 'inventory_invalid_floor_id');
+    }
     _requirePositiveRevision(command.expectedAssetRevision);
     _requirePositiveRevision(command.expectedPreviousPlacementSequence);
     final x = _quantizedPlacementX(command.x);
@@ -2571,11 +2904,17 @@ class InventoryApplication
       'placement_key': command.placementKey,
       'project_id': command.projectId,
       'sketch_id': command.sketchId,
+      'floor_id': command.floorId,
       'successor_placement_id': command.successorPlacementId,
       'x': x,
       'y': y,
     };
     return _runMutation(command, intent, (transaction, intentSha256) async {
+      final floorId = await _resolveFloorId(
+        transaction,
+        projectId: command.projectId,
+        requestedFloorId: command.floorId,
+      );
       final asset = await _requireAsset(
         transaction,
         projectId: command.projectId,
@@ -2599,6 +2938,7 @@ class InventoryApplication
               placement.sequence == command.expectedPreviousPlacementSequence &&
               placement.sketchId == command.sketchId &&
               placement.provenanceRevisionId == command.activeRevisionId &&
+              placement.floorId == floorId &&
               placement.x == x &&
               placement.y == y) {
             return _finishNoOpAsset(
@@ -2675,6 +3015,7 @@ class InventoryApplication
         id: command.successorPlacementId,
         predecessor: predecessor,
         sketchId: command.sketchId,
+        floorId: floorId,
         provenanceRevisionId: command.activeRevisionId,
         quantity: asset.totalQuantity,
         x: x,
@@ -2718,6 +3059,7 @@ class InventoryApplication
               values: <String, Object?>{
                 'asset_id': command.assetId,
                 'placement_id': command.successorPlacementId,
+                'floor_id': floorId,
                 'predecessor_placement_id': predecessor.id,
                 'provenance_revision_id': command.activeRevisionId,
                 'quantity': asset.totalQuantity,
@@ -2837,6 +3179,7 @@ class InventoryApplication
         transaction,
         id: command.successorPlacementId,
         predecessor: placement,
+        floorId: placement.floorId,
         provenanceRevisionId: currentSketch.activeRevisionId!,
         quantity: quantity,
         x: placement.x,
@@ -2903,6 +3246,9 @@ class InventoryApplication
     );
     _requireUuid(command.sketchId, 'inventory_invalid_sketch_id');
     _requireUuid(command.activeRevisionId, 'inventory_invalid_revision_id');
+    if (command.floorId case final floorId?) {
+      _requireUuid(floorId, 'inventory_invalid_floor_id');
+    }
     _requirePositiveRevision(command.expectedPlacementSequence);
     final x = _quantizedPlacementX(command.x);
     final y = _quantizedPlacementY(command.y);
@@ -2913,6 +3259,7 @@ class InventoryApplication
       'placement_key': command.placementKey,
       'project_id': command.projectId,
       'sketch_id': command.sketchId,
+      'floor_id': command.floorId,
       'successor_placement_id': command.successorPlacementId,
       'x': x,
       'y': y,
@@ -2940,7 +3287,14 @@ class InventoryApplication
         sketchId: command.sketchId,
         activeRevisionId: command.activeRevisionId,
       );
-      if (placement.x == x && placement.y == y) {
+      final floorId = await _resolveFloorId(
+        transaction,
+        projectId: command.projectId,
+        requestedFloorId: command.floorId,
+      );
+      if (placement.x == x &&
+          placement.y == y &&
+          placement.floorId == floorId) {
         final result = _result(
           command: command,
           sourceId: command.assetId,
@@ -2994,6 +3348,7 @@ class InventoryApplication
         transaction,
         id: command.successorPlacementId,
         predecessor: placement,
+        floorId: floorId,
         provenanceRevisionId: command.activeRevisionId,
         quantity: placement.quantity,
         x: x,
@@ -3025,8 +3380,10 @@ class InventoryApplication
               values: <String, Object?>{
                 'after_x': x,
                 'after_y': y,
+                'after_floor_id': floorId,
                 'before_x': placement.x,
                 'before_y': placement.y,
+                'before_floor_id': placement.floorId,
                 'placement_id': command.successorPlacementId,
                 'predecessor_placement_id': placement.id,
                 'sequence': placement.sequence + 1,
@@ -3640,6 +3997,9 @@ class InventoryApplication
     _requireUuid(command.placementKey, 'inventory_invalid_placement_key');
     _requireUuid(command.sketchId, 'inventory_invalid_sketch_id');
     _requireUuid(command.activeRevisionId, 'inventory_invalid_revision_id');
+    if (command.floorId case final floorId?) {
+      _requireUuid(floorId, 'inventory_invalid_floor_id');
+    }
     final input = _validatedAssetInput(
       displayName: command.displayName,
       category: command.category,
@@ -3661,6 +4021,7 @@ class InventoryApplication
       'placement_key': command.placementKey,
       'project_id': command.projectId,
       'sketch_id': command.sketchId,
+      'floor_id': command.floorId,
       'status': command.status.storageValue,
       'total_quantity': quantity,
       'x': x,
@@ -3672,6 +4033,11 @@ class InventoryApplication
         projectId: command.projectId,
         sketchId: command.sketchId,
         activeRevisionId: command.activeRevisionId,
+      );
+      final floorId = await _resolveFloorId(
+        transaction,
+        projectId: command.projectId,
+        requestedFloorId: command.floorId,
       );
       await _requireUnusedId(
         transaction,
@@ -3719,6 +4085,7 @@ class InventoryApplication
         'project_id': command.projectId,
         'asset_id': command.assetId,
         'sketch_id': command.sketchId,
+        'floor_id': floorId,
         'provenance_revision_id': command.activeRevisionId,
         'sequence': 1,
         'x': x,
@@ -3768,6 +4135,7 @@ class InventoryApplication
               values: <String, Object?>{
                 'asset_id': command.assetId,
                 'placement_id': command.placementId,
+                'floor_id': floorId,
                 'provenance_revision_id': command.activeRevisionId,
                 'quantity': quantity,
                 'sequence': 1,
@@ -4087,10 +4455,16 @@ class InventoryApplication
     _requireUuid(command.draftRevisionId, 'inventory_invalid_revision_id');
     _requirePositiveRevision(command.expectedSketchRevision);
     _requirePositiveRevision(command.expectedContentRevision);
+    final requestedFloorCount = command.initialFloorCount;
+    if (requestedFloorCount != null &&
+        (requestedFloorCount < 1 || requestedFloorCount > 100)) {
+      throw const InventoryFailure('inventory_invalid_floor_count');
+    }
     final intent = <String, Object?>{
       'draft_revision_id': command.draftRevisionId,
       'expected_content_revision': command.expectedContentRevision,
       'expected_sketch_revision': command.expectedSketchRevision,
+      'initial_floor_count': requestedFloorCount,
       'project_id': command.projectId,
       'sketch_id': command.sketchId,
     };
@@ -4128,12 +4502,61 @@ class InventoryApplication
           throw const InventoryFailure('inventory_active_revision_unavailable');
         }
       }
+      final existingFloorRows = await transaction.query(
+        'inventory_floors',
+        where: 'project_id = ?',
+        whereArgs: [command.projectId],
+        orderBy: 'ordinal ASC, id ASC',
+      );
+      for (var index = 0; index < existingFloorRows.length; index += 1) {
+        final floor = _floorFromRow(existingFloorRows[index]);
+        if (floor.projectId != command.projectId ||
+            floor.ordinal != index + 1) {
+          throw const InventoryFailure('inventory_floor_integrity_failed');
+        }
+      }
+      if (active != null && requestedFloorCount != null) {
+        throw const InventoryFailure('inventory_floor_plan_already_active');
+      }
+      if (active != null && existingFloorRows.isEmpty) {
+        throw const InventoryFailure('inventory_floor_integrity_failed');
+      }
+      final targetFloorCount = active == null
+          ? requestedFloorCount ??
+                (existingFloorRows.isEmpty ? 1 : existingFloorRows.length)
+          : existingFloorRows.length;
+      if (targetFloorCount < existingFloorRows.length) {
+        throw const InventoryFailure('inventory_floor_plan_already_active');
+      }
       final occurredAt = _canonicalNowAfter(
         sketch.updatedAt,
         draft.updatedAt,
         active?.updatedAt,
       );
       final timestamp = CseTimeCodec.encodeUtc(occurredAt);
+      for (
+        var ordinal = existingFloorRows.length + 1;
+        ordinal <= targetFloorCount;
+        ordinal += 1
+      ) {
+        final floorId = idFactory();
+        _requireUuid(floorId, 'inventory_invalid_generated_id');
+        await _requireUnusedId(
+          transaction,
+          table: 'inventory_floors',
+          id: floorId,
+          code: 'inventory_floor_id_conflict',
+        );
+        await transaction.insert('inventory_floors', {
+          'id': floorId,
+          'project_id': command.projectId,
+          'ordinal': ordinal,
+          'display_name': '$ordinal. Kat',
+          'revision': 1,
+          'created_at': timestamp,
+          'updated_at': timestamp,
+        });
+      }
       if (active != null) {
         final superseded = await transaction.update(
           'inventory_sketch_revisions',
@@ -4212,6 +4635,7 @@ class InventoryApplication
                 'active_revision_id': command.draftRevisionId,
                 'geometry_sha256': draft.geometrySha256,
                 'geometry_version': InventoryGeometryContract.geometryVersion,
+                'floor_count': targetFloorCount,
                 'point_count': draft.geometry.pointCount,
                 'polyline_count': draft.geometry.polylines.length,
                 'segment_count': draft.geometry.segmentCount,

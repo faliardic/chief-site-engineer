@@ -38,11 +38,14 @@ class InventoryAssetDetailController extends ChangeNotifier {
       InventoryAssetDetailLoadStatus.idle;
   InventoryAssetProjection? projection;
   List<InventoryPlacementRecord> placementVersions = const [];
+  List<InventoryFloorSummary> floors = const [];
   List<InventoryEventRecord> history = const [];
   InventoryAssetPhotoRecord? photo;
   InventoryPhotoContent? photoContent;
   InventoryPlacementTarget? pendingMoveTarget;
   InventoryPlacementTarget? pendingUnarchiveTarget;
+  String? pendingMoveFloorId;
+  String? pendingUnarchiveFloorId;
   bool selectingMoveTarget = false;
   bool selectingUnarchiveTarget = false;
   bool actionRunning = false;
@@ -54,6 +57,14 @@ class InventoryAssetDetailController extends ChangeNotifier {
   InventoryPlacementRecord? get activePlacement => projection?.activePlacement;
   bool get isArchived => asset?.archivedAt != null;
   bool get hasHardDeleteAction => false;
+  String? get currentFloorName {
+    final floorId = projection?.floorPlacement?.floorId;
+    if (floorId == null) return null;
+    for (final summary in floors) {
+      if (summary.floor.id == floorId) return summary.floor.displayName;
+    }
+    return null;
+  }
 
   Future<bool> reload() async {
     loadStatus = InventoryAssetDetailLoadStatus.loading;
@@ -65,6 +76,8 @@ class InventoryAssetDetailController extends ChangeNotifier {
         assetId: assetId,
       );
       _verifyProjection(loadedProjection);
+      final loadedFloors = await application.listFloors(projectId);
+      _verifyFloors(loadedFloors, loadedProjection);
       final loadedHistory = await application.listAssetHistory(
         projectId: projectId,
         assetId: assetId,
@@ -119,6 +132,7 @@ class InventoryAssetDetailController extends ChangeNotifier {
       placementVersions = List<InventoryPlacementRecord>.unmodifiable(
         loadedVersions,
       );
+      floors = List<InventoryFloorSummary>.unmodifiable(loadedFloors);
       photo = loadedPhoto;
       photoContent = loadedPhotoContent;
       photoDiagnosticCode = loadedPhotoDiagnostic;
@@ -300,15 +314,20 @@ class InventoryAssetDetailController extends ChangeNotifier {
     selectingUnarchiveTarget = false;
     pendingMoveTarget = null;
     pendingUnarchiveTarget = null;
+    pendingMoveFloorId = null;
+    pendingUnarchiveFloorId = null;
     _notify();
     return true;
   }
 
-  bool previewMove(InventoryPlacementTarget target) {
-    if (!selectingMoveTarget || !isValidInventoryPlacementTarget(target)) {
+  bool previewMove(InventoryPlacementTarget target, {required String floorId}) {
+    if (!selectingMoveTarget ||
+        !isValidInventoryPlacementTarget(target) ||
+        !_hasFloor(floorId)) {
       return false;
     }
     pendingMoveTarget = target;
+    pendingMoveFloorId = floorId;
     _notify();
     return true;
   }
@@ -317,6 +336,7 @@ class InventoryAssetDetailController extends ChangeNotifier {
     if (!selectingMoveTarget && pendingMoveTarget == null) return;
     selectingMoveTarget = false;
     pendingMoveTarget = null;
+    pendingMoveFloorId = null;
     _notify();
   }
 
@@ -324,8 +344,10 @@ class InventoryAssetDetailController extends ChangeNotifier {
     final current = _requireUnarchivedProjection();
     final placement = _requireSoleCurrentPlacement(current);
     final target = pendingMoveTarget;
+    final floorId = pendingMoveFloorId;
     if (!selectingMoveTarget ||
         target == null ||
+        floorId == null ||
         !isValidInventoryPlacementTarget(target)) {
       throw const InventoryFailure('inventory_move_target_unavailable');
     }
@@ -343,6 +365,7 @@ class InventoryAssetDetailController extends ChangeNotifier {
           expectedPlacementSequence: placement.sequence,
           x: target.x,
           y: target.y,
+          floorId: floorId,
         ),
       );
       return result;
@@ -375,15 +398,23 @@ class InventoryAssetDetailController extends ChangeNotifier {
     selectingMoveTarget = false;
     pendingUnarchiveTarget = null;
     pendingMoveTarget = null;
+    pendingUnarchiveFloorId = null;
+    pendingMoveFloorId = null;
     _notify();
     return true;
   }
 
-  bool previewUnarchive(InventoryPlacementTarget target) {
-    if (!selectingUnarchiveTarget || !isValidInventoryPlacementTarget(target)) {
+  bool previewUnarchive(
+    InventoryPlacementTarget target, {
+    required String floorId,
+  }) {
+    if (!selectingUnarchiveTarget ||
+        !isValidInventoryPlacementTarget(target) ||
+        !_hasFloor(floorId)) {
       return false;
     }
     pendingUnarchiveTarget = target;
+    pendingUnarchiveFloorId = floorId;
     _notify();
     return true;
   }
@@ -392,17 +423,20 @@ class InventoryAssetDetailController extends ChangeNotifier {
     if (!selectingUnarchiveTarget && pendingUnarchiveTarget == null) return;
     selectingUnarchiveTarget = false;
     pendingUnarchiveTarget = null;
+    pendingUnarchiveFloorId = null;
     _notify();
   }
 
   Future<bool> confirmUnarchive() {
     final current = projection;
     final target = pendingUnarchiveTarget;
+    final floorId = pendingUnarchiveFloorId;
     if (current == null ||
         current.asset.archivedAt == null ||
         current.activePlacement != null ||
         !selectingUnarchiveTarget ||
         target == null ||
+        floorId == null ||
         !isValidInventoryPlacementTarget(target) ||
         placementVersions.isEmpty) {
       throw const InventoryFailure('inventory_unarchive_target_unavailable');
@@ -426,6 +460,7 @@ class InventoryAssetDetailController extends ChangeNotifier {
           expectedPreviousPlacementSequence: predecessor.sequence,
           x: target.x,
           y: target.y,
+          floorId: floorId,
         ),
       );
     }, clearUnarchiveOnSuccess: true);
@@ -451,10 +486,12 @@ class InventoryAssetDetailController extends ChangeNotifier {
       if (clearMoveOnSuccess) {
         selectingMoveTarget = false;
         pendingMoveTarget = null;
+        pendingMoveFloorId = null;
       }
       if (clearUnarchiveOnSuccess) {
         selectingUnarchiveTarget = false;
         pendingUnarchiveTarget = null;
+        pendingUnarchiveFloorId = null;
       }
       actionRunning = false;
       lastErrorCode = null;
@@ -534,6 +571,27 @@ class InventoryAssetDetailController extends ChangeNotifier {
       throw const InventoryFailure('inventory_projection_integrity_failed');
     }
   }
+
+  void _verifyFloors(
+    List<InventoryFloorSummary> values,
+    InventoryAssetProjection current,
+  ) {
+    for (var index = 0; index < values.length; index += 1) {
+      final summary = values[index];
+      if (summary.floor.projectId != projectId ||
+          summary.floor.ordinal != index + 1 ||
+          summary.activeAssetCount < 0) {
+        throw const InventoryFailure('inventory_floor_integrity_failed');
+      }
+    }
+    final floorId = current.floorPlacement?.floorId;
+    if (floorId == null || !values.any((value) => value.floor.id == floorId)) {
+      throw const InventoryFailure('inventory_floor_integrity_failed');
+    }
+  }
+
+  bool _hasFloor(String floorId) =>
+      floors.any((summary) => summary.floor.id == floorId);
 
   void _verifyPhoto(InventoryAssetPhotoRecord value) {
     if (value.projectId != projectId ||
@@ -750,9 +808,15 @@ class _InventoryAssetDetailSheetState extends State<InventoryAssetDetailSheet> {
         _photoSection(context, controller),
         const SizedBox(height: 12),
         if (placement != null)
-          Text('Şematik kroki konumu: ${placement.x}, ${placement.y}')
+          Text(
+            '${controller.currentFloorName ?? 'Kat bilgisi yok'} • '
+            'Şematik kroki konumu: ${placement.x}, ${placement.y}',
+          )
         else
-          const Text('Arşivli — aktif kroki yerleşimi yok'),
+          Text(
+            '${controller.currentFloorName ?? 'Kat bilgisi yok'} • '
+            'Arşivli — aktif kroki yerleşimi yok',
+          ),
         if (controller.lastErrorCode case final code?)
           Text(
             'İşlem tamamlanamadı. Tanı kodu: $code',

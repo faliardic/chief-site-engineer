@@ -10,6 +10,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 const _projectA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
 const _projectB = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
 const _sketchA = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
+const _floorA = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
 const _revisionA = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1';
 const _assetA = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1';
 const _placementA = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1';
@@ -26,6 +27,7 @@ const _digest =
     'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
 const _inventoryTables = <String>{
+  'inventory_floors',
   'inventory_sketches',
   'inventory_sketch_revisions',
   'inventory_assets',
@@ -52,6 +54,8 @@ const _plannedIndexes = <String>{
   'uq_inventory_asset_attachment_links_active',
   'ix_inventory_asset_attachment_links_asset',
   'ix_inventory_asset_attachment_links_attachment',
+  'ix_inventory_asset_placements_floor_map',
+  'ix_inventory_floors_project',
 };
 
 void main() {
@@ -74,7 +78,7 @@ void main() {
   });
 
   test(
-    'fresh database creates exact schema 20 Inventory tables and indices',
+    'fresh database creates exact schema 21 Inventory tables and indices',
     () async {
       final database = _database(databasePath);
       await database.open();
@@ -82,7 +86,7 @@ void main() {
 
       expect(
         sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
-        20,
+        21,
       );
       expect(
         (await db.query(
@@ -90,7 +94,7 @@ void main() {
           columns: ['version'],
           orderBy: 'version ASC',
         )).map((row) => row['version']),
-        List.generate(20, (index) => index + 1),
+        List.generate(21, (index) => index + 1),
       );
       expect(
         await _objectNames(db, type: 'table', prefix: 'inventory_'),
@@ -136,7 +140,7 @@ void main() {
       expect(afterRows, beforeRows);
       expect(
         sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
-        20,
+        21,
       );
       for (final table in _inventoryTables) {
         expect(await db.query(table), isEmpty, reason: table);
@@ -195,7 +199,122 @@ void main() {
   );
 
   test(
-    'schema 20 fails closed and retains one valid populated graph',
+    'schema 20 to 21 backfill is deterministic and preserves Inventory graph',
+    () async {
+      final upgradePath = path.join(temporaryRoot.path, 'schema20.sqlite3');
+      final schemaTwenty = _database(
+        upgradePath,
+        migrations: AppDatabase.foundationMigrations.take(20).toList(),
+      );
+      await schemaTwenty.open();
+      final source = schemaTwenty.database;
+      await _seedProjects(source);
+      await _seedValidInventoryGraph(source, schemaTwenty: true);
+      await source.update(
+        'inventory_asset_placements',
+        {'ended_at': _t2, 'end_reason': 'MOVED'},
+        where: 'id = ?',
+        whereArgs: [_placementA],
+      );
+      await source.insert(
+        'inventory_asset_placements',
+        _placementRow(
+          id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2',
+          sequence: 2,
+          x: 4,
+          y: 4,
+          supersedesPlacementId: _placementA,
+          createdAt: _t2,
+          includeFloor: false,
+        ),
+      );
+      final before = await _inventoryPreservationRows(source);
+      await schemaTwenty.close();
+
+      final upgraded = _database(upgradePath);
+      await upgraded.open();
+      final db = upgraded.database;
+      final after = await _inventoryPreservationRows(db, stripFloorId: true);
+      expect(after, before);
+      final floors = await db.query('inventory_floors');
+      expect(floors, hasLength(1));
+      expect(floors.single, {
+        'id': _stableUuid('inventory-floor-v1:$_projectA'),
+        'project_id': _projectA,
+        'ordinal': 1,
+        'display_name': '1. Kat',
+        'revision': 1,
+        'created_at': _t0,
+        'updated_at': _t0,
+      });
+      final placements = await db.query(
+        'inventory_asset_placements',
+        orderBy: 'sequence ASC',
+      );
+      expect(placements, hasLength(2));
+      expect(placements.map((row) => row['floor_id']).toSet(), {
+        _stableUuid('inventory-floor-v1:$_projectA'),
+      });
+      expect(await db.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      await upgraded.close();
+
+      final rollbackPath = path.join(
+        temporaryRoot.path,
+        'schema21-rollback.sqlite3',
+      );
+      final rollbackSource = _database(
+        rollbackPath,
+        migrations: AppDatabase.foundationMigrations.take(20).toList(),
+      );
+      await rollbackSource.open();
+      await _seedProjects(rollbackSource.database);
+      await _seedValidInventoryGraph(
+        rollbackSource.database,
+        schemaTwenty: true,
+      );
+      final rollbackBefore = await _inventoryPreservationRows(
+        rollbackSource.database,
+      );
+      await rollbackSource.close();
+      final failing = _database(
+        rollbackPath,
+        migrations: [
+          ...AppDatabase.foundationMigrations.take(20),
+          DatabaseMigration(
+            version: 21,
+            apply: (transaction) async {
+              await AppDatabase.foundationMigrations[20].apply(transaction);
+              throw StateError('forced inventory schema 21 failure');
+            },
+          ),
+        ],
+      );
+      await expectLater(failing.open(), throwsA(isA<DatabaseOpenFailure>()));
+      final afterFailure = await databaseFactoryFfi.openDatabase(
+        rollbackPath,
+        options: sqflite.OpenDatabaseOptions(singleInstance: false),
+      );
+      expect(
+        sqflite.Sqflite.firstIntValue(
+          await afterFailure.rawQuery('PRAGMA user_version'),
+        ),
+        20,
+      );
+      expect(
+        await _objectNames(
+          afterFailure,
+          type: 'table',
+          prefix: 'inventory_floors',
+        ),
+        isEmpty,
+      );
+      expect(await _inventoryPreservationRows(afterFailure), rollbackBefore);
+      await afterFailure.close();
+    },
+  );
+
+  test(
+    'schema 21 fails closed and retains one valid populated graph',
     () async {
       final database = _database(databasePath);
       await database.open();
@@ -215,6 +334,7 @@ void main() {
         'ok',
       );
       expect(await db.query('inventory_sketches'), isNotEmpty);
+      expect(await db.query('inventory_floors'), hasLength(1));
       expect(await db.query('inventory_sketch_revisions'), isNotEmpty);
       expect(await db.query('inventory_assets'), hasLength(1));
       expect(await db.query('inventory_asset_placements'), hasLength(2));
@@ -287,8 +407,9 @@ Future<void> _seedProjects(sqflite.Database database) async {
 }
 
 Future<Map<String, Object>> _seedValidInventoryGraph(
-  sqflite.Database database,
-) async {
+  sqflite.Database database, {
+  bool schemaTwenty = false,
+}) async {
   final geometry = InventoryGeometry(
     polylines: [
       InventoryPolyline(
@@ -320,8 +441,14 @@ Future<Map<String, Object>> _seedValidInventoryGraph(
     where: 'id = ?',
     whereArgs: [_sketchA],
   );
+  if (!schemaTwenty) {
+    await database.insert('inventory_floors', _floorRow());
+  }
   await database.insert('inventory_assets', _assetRow());
-  await database.insert('inventory_asset_placements', _placementRow());
+  await database.insert(
+    'inventory_asset_placements',
+    _placementRow(includeFloor: !schemaTwenty),
+  );
   await database.insert('managed_attachments', {
     'id': _attachmentA,
     'relative_path': 'managed/inventory-photo.jpg',
@@ -745,12 +872,14 @@ Map<String, Object?> _placementRow({
   int quantity = 5,
   String createdAt = _t1,
   String? supersedesPlacementId,
+  bool includeFloor = true,
 }) => {
   'id': id,
   'placement_key': placementKey,
   'project_id': projectId,
   'asset_id': assetId,
   'sketch_id': sketchId,
+  if (includeFloor) 'floor_id': _floorA,
   'provenance_revision_id': provenanceRevisionId,
   'sequence': sequence,
   'x': x,
@@ -760,6 +889,21 @@ Map<String, Object?> _placementRow({
   'ended_at': null,
   'end_reason': null,
   'supersedes_placement_id': supersedesPlacementId,
+};
+
+Map<String, Object?> _floorRow({
+  String id = _floorA,
+  String projectId = _projectA,
+  int ordinal = 1,
+  String displayName = '1. Kat',
+}) => {
+  'id': id,
+  'project_id': projectId,
+  'ordinal': ordinal,
+  'display_name': displayName,
+  'revision': 1,
+  'created_at': _t0,
+  'updated_at': _t0,
 };
 
 Map<String, Object?> _photoLinkRow({
@@ -851,3 +995,55 @@ Future<Map<String, List<Map<String, Object?>>>> _representativeRows(
 
 Future<void> _fails(Future<Object?> operation) =>
     expectLater(operation, throwsA(isA<sqflite.DatabaseException>()));
+
+Future<Map<String, List<Map<String, Object?>>>> _inventoryPreservationRows(
+  sqflite.Database database, {
+  bool stripFloorId = false,
+}) async {
+  final result = <String, List<Map<String, Object?>>>{};
+  for (final table in const [
+    'inventory_sketches',
+    'inventory_sketch_revisions',
+    'inventory_assets',
+    'inventory_asset_placements',
+    'inventory_command_receipts',
+    'inventory_events',
+    'inventory_asset_attachment_links',
+  ]) {
+    final rows = await database.query(table, orderBy: 'id ASC');
+    result[table] = rows
+        .map((row) {
+          final copy = Map<String, Object?>.from(row);
+          if (stripFloorId && table == 'inventory_asset_placements') {
+            copy.remove('floor_id');
+          }
+          return copy;
+        })
+        .toList(growable: false);
+  }
+  return result;
+}
+
+String _stableUuid(String seed) {
+  int hash(String value, int salt) {
+    var result = (2166136261 ^ salt) & 0xffffffff;
+    for (final unit in value.codeUnits) {
+      result ^= unit;
+      result = (result * 16777619) & 0xffffffff;
+    }
+    return result;
+  }
+
+  final raw = List.generate(
+    4,
+    (index) =>
+        hash(seed, 0x9e3779b9 * (index + 1)).toRadixString(16).padLeft(8, '0'),
+  ).join();
+  final chars = raw.split('');
+  chars[12] = '4';
+  chars[16] = '8';
+  final value = chars.join();
+  return '${value.substring(0, 8)}-${value.substring(8, 12)}-'
+      '${value.substring(12, 16)}-${value.substring(16, 20)}-'
+      '${value.substring(20)}';
+}

@@ -507,6 +507,147 @@ void main() {
   );
 
   test(
+    'floors generate in order, rename stably, and cross-floor move preserves history',
+    () async {
+      final fixture = await _Fixture.create('floors');
+      addTearDown(fixture.close);
+      final sketch = await _createFinalizedSketch(
+        fixture,
+        seed: 250,
+        floorCount: 3,
+      );
+      var floors = await fixture.app.listFloors(_projectA);
+      expect(floors.map((item) => item.floor.ordinal), [1, 2, 3]);
+      expect(floors.map((item) => item.floor.displayName), [
+        '1. Kat',
+        '2. Kat',
+        '3. Kat',
+      ]);
+      final floor1 = floors[0].floor;
+      final floor2 = floors[1].floor;
+      final renamed = await fixture.app.renameFloor(
+        RenameInventoryFloorCommand(
+          projectId: _projectA,
+          floorId: floor2.id,
+          expectedRevision: floor2.revision,
+          displayName: 'Bodrum Kat',
+        ),
+      );
+      expect(renamed.id, floor2.id);
+      expect(renamed.ordinal, floor2.ordinal);
+      expect(renamed.displayName, 'Bodrum Kat');
+      expect(renamed.revision, floor2.revision + 1);
+
+      final assetId = _uuid(260);
+      final placementKey = _uuid(261);
+      final placement1 = _uuid(262);
+      await fixture.app.createAsset(
+        CreateInventoryAssetCommand(
+          operationId: _uuid(263),
+          projectId: _projectA,
+          assetId: assetId,
+          placementId: placement1,
+          placementKey: placementKey,
+          sketchId: sketch.sketchId,
+          activeRevisionId: sketch.activeRevisionId,
+          floorId: floor1.id,
+          displayName: 'Katlar arası pompa',
+          category: InventoryCategory.equipment,
+          totalQuantity: 2,
+          x: 128,
+          y: 128,
+        ),
+      );
+      await expectLater(
+        fixture.app.createAsset(
+          CreateInventoryAssetCommand(
+            operationId: _uuid(264),
+            projectId: _projectA,
+            assetId: _uuid(265),
+            placementId: _uuid(266),
+            placementKey: _uuid(267),
+            sketchId: sketch.sketchId,
+            activeRevisionId: sketch.activeRevisionId,
+            displayName: 'Katı eksik',
+            category: InventoryCategory.equipment,
+            totalQuantity: 1,
+            x: 64,
+            y: 64,
+          ),
+        ),
+        _fails('inventory_floor_required'),
+      );
+      final placement2 = _uuid(268);
+      final moved = await fixture.app.movePlacement(
+        MoveInventoryPlacementCommand(
+          operationId: _uuid(269),
+          projectId: _projectA,
+          assetId: assetId,
+          placementKey: placementKey,
+          successorPlacementId: placement2,
+          sketchId: sketch.sketchId,
+          activeRevisionId: sketch.activeRevisionId,
+          expectedPlacementSequence: 1,
+          floorId: floor2.id,
+          x: 128,
+          y: 128,
+        ),
+      );
+      expect(moved.isNoOp, isFalse);
+      final placement3 = _uuid(270);
+      await fixture.app.changeAssetQuantity(
+        ChangeInventoryAssetQuantityCommand(
+          operationId: _uuid(271),
+          projectId: _projectA,
+          assetId: assetId,
+          placementKey: placementKey,
+          successorPlacementId: placement3,
+          expectedAssetRevision: 1,
+          expectedPlacementSequence: 2,
+          totalQuantity: 3,
+        ),
+      );
+      final versions = await fixture.app.listPlacementVersions(
+        projectId: _projectA,
+        assetId: assetId,
+        placementKey: placementKey,
+      );
+      expect(versions.map((value) => value.id), [
+        placement1,
+        placement2,
+        placement3,
+      ]);
+      expect(versions.map((value) => value.floorId), [
+        floor1.id,
+        floor2.id,
+        floor2.id,
+      ]);
+      expect(versions.map((value) => (value.x, value.y)), [
+        (128, 128),
+        (128, 128),
+        (128, 128),
+      ]);
+      floors = await fixture.app.listFloors(_projectA);
+      expect(floors.map((item) => item.activeAssetCount), [0, 1, 0]);
+      final relaunched = InventoryApplication(
+        database: fixture.db,
+        clock: fixture.clock.call,
+        idFactory: fixture.ids.call,
+      );
+      final reloadedFloors = await relaunched.listFloors(_projectA);
+      expect(reloadedFloors[1].floor.id, floor2.id);
+      expect(reloadedFloors[1].floor.displayName, 'Bodrum Kat');
+      expect(
+        (await relaunched.loadAsset(
+          projectId: _projectA,
+          assetId: assetId,
+        )).activePlacement!.floorId,
+        floor2.id,
+      );
+    },
+  );
+
+  test(
     'asset and placement lifecycle is atomic, versioned, and readable',
     () async {
       final fixture = await _Fixture.create('asset');
@@ -1082,10 +1223,12 @@ void main() {
         where: 'id = ?',
         whereArgs: [assetId],
       );
+      final floorId = (await fixture.app.listFloors(_projectA)).single.floor.id;
       await fixture.db.database.insert('inventory_asset_placements', {
         'id': _uuid(514),
         'placement_key': _uuid(515),
         'project_id': _projectA,
+        'floor_id': floorId,
         'asset_id': assetId,
         'sketch_id': sketch.sketchId,
         'provenance_revision_id': sketch.activeRevisionId,
@@ -1615,6 +1758,7 @@ Future<_FinalizedSketch> _createFinalizedSketch(
   _Fixture fixture, {
   required int seed,
   String projectId = _projectA,
+  int floorCount = 1,
 }) async {
   final sketchId = _uuid(seed);
   final draftId = _uuid(seed + 1);
@@ -1645,6 +1789,7 @@ Future<_FinalizedSketch> _createFinalizedSketch(
       draftRevisionId: draftId,
       expectedSketchRevision: 2,
       expectedContentRevision: 2,
+      initialFloorCount: floorCount,
     ),
   );
   return _FinalizedSketch(
@@ -1812,6 +1957,7 @@ Future<Map<String, int>> _counts(sqflite.Database db) async => {
   for (final table in const [
     'inventory_sketches',
     'inventory_sketch_revisions',
+    'inventory_floors',
     'inventory_assets',
     'inventory_asset_placements',
     'inventory_command_receipts',

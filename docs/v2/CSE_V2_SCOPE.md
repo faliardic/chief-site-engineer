@@ -50,7 +50,8 @@ V1 tarihsel baseline'dır. V2, aynı offline-first mobil ürünü yeniden yazmak
 yerine bu baseline üzerinde ilerler.
 
 Güncel merged V2 teknik baseline'ı V1 metadata'sından ayrıdır: mobile version
-`0.1.0+1`, SQLite schema `19` ve backup format `1`dir. Exact güncel merge SHA'sı
+`0.1.0+1`, SQLite schema `20` ve backup format `1`dir. Issue #525 Slice 6'nın
+additive hedefi schema `21`dir. Exact güncel merge SHA'sı
 kalıcı bu kapsam belgesine sabitlenmez; GitHub `master` üzerinden doğrulanır. Bu
 baseline,
 schedule runtime ve persistent immutable reference-schedule snapshot temeliyle
@@ -97,7 +98,8 @@ Proje/Mahal, Saha Rehberi, Attachment ve Ajanda omurgası — complete
 → Issue #492 / PR #493 Telefon görüşmesi sonucu → Ajanda Slice 1 — merged / manual test deferred
 → Issue #497 / PR #498 Proje fotoğraf/video albümü Slice 1 — merged / manual test pending
 → Issue #504 / PR #505 pre-restore safety-backup recovery surface — merged / owner recovery verification pending
-→ Epic #506 / Issue #507 Inventory Map v1 Slice 0 contract — current / production implementation not started
+→ Epic #506 Inventory Map v1 Slices 1–5 — merged through Issue #522 / PR #524
+→ Issue #525 Inventory Map v1 Slice 6 multi-floor — current / Draft review pending
 → V2.12 and later planned product work — paused by owner decision
 ```
 
@@ -422,11 +424,13 @@ Inventory Map v1:
 - autosaved draft ve immutable finalized revision;
 - exact project-isolated asset, placement, event ve receipt gerçeği;
 - Kroki/Liste ortak source projection'ı;
-- additive persistence ve normal backup/restore adoption'ı
+- additive persistence ve normal backup/restore adoption'ı;
+- shared sketch üzerinde stable katlar ve floor-aware placement history
 
-hedefler. Issue #507 yalnız docs/source-authority Slice'ıdır. Inventory schema,
-source, UI, test, build veya cihaz davranışı uygulanmış değildir. Production
-Slices 1–6 ayrı Issue, authority, validation ve review gerektirir.
+hedefler. Slice 0 normative source'tur; Slices 1–5 merged production temelini
+kurmuştur. Issue #525 Slice 6, shared sketch/revision zincirini çoğaltmadan
+schema `20 -> 21` stable floor modelini ve Kat Görünümü'nü uygular. Draft review,
+manuel smoke ve merge kararları ayrı kalır.
 
 Issue #501, #502, #503 ve #499 P0 veri/owner-phone güvenlik kuralları bu ürün
 önceliğinden üstündür. Source geliştirme ve Draft PR devam edebilir; owner-phone
@@ -571,7 +575,8 @@ buffer'ındaki kanıtlanmış ekstra büyük kopyayı kaldırmıştır. Issue #4
 pending ve V2.11 complete değildir. Issue #504 / PR #505 recovery surface'i
 mergedir; owner recovery doğrulaması ve P0 Issues #501–#503 açık kalır.
 
-Güncel teknik facts schema `19`, backup format `1` ve version `0.1.0+1`dir.
+Güncel merged teknik facts schema `20`, backup format `1` ve version
+`0.1.0+1`dir. Issue #525 branch hedefi schema `21`; backup ve version değişmez.
 Exact current SHA ve son PR kalıcı burada dondurulmaz; GitHub `master` current
 repository truth'udur. Issue #507 task başlangıç snapshot'ı kendi task/result
 kanıtında ayrıca bağlanır.
@@ -595,8 +600,9 @@ Living Plan MVP Core — merged / PR #463
 → Issue #492 / PR #493 Telefon görüşmesi sonucu → Ajanda Slice 1 — merged / manual test deferred
 → Issue #497 / PR #498 Proje fotoğraf/video albümü Slice 1 — merged / manual test pending
 → Issue #504 / PR #505 recovery surface — merged / owner recovery verification pending
-→ Epic #506 / Issue #507 Inventory Map v1 Slice 0 canonical contract — current / docs only
-→ Inventory Map v1 Slices 1–6 — not started
+→ Epic #506 / Issue #507 Inventory Map v1 Slice 0 canonical contract — source authority
+→ Inventory Map v1 Slices 1–5 — merged through Issue #522 / PR #524
+→ Issue #525 Inventory Map v1 Slice 6 multi-floor — current / Draft review pending
 → V2.12 and later planned product work — paused by owner decision
 ```
 
@@ -629,10 +635,11 @@ source navigation kurar; manual testleri pending'dir ve V2.11 completion ilanı
 değildir.
 
 Epic #506 altındaki Inventory Map v1 current ürün geliştirme önceliğidir.
-Issue #507 yalnız normative contract ve truth-sync üretir; production code,
-schema 20, editor, Envanter destination, test, build veya cihaz behavior'ı
-uygulanmış sayılmaz. `docs/v2/CSE_INVENTORY_MAP_V1_CONTRACT.md` Slices 1–6'nın
-ayrı authority ile uygulayacağı exact sınırdır.
+Issue #507 normative contract ve truth-sync kaynağıdır; Slices 1–5'in merged
+production sonucu schema `20` üzerinde editor, Envanter destination, durable
+asset/placement/photo ve usability davranışını sağlar. Issue #525 yalnız Slice 6
+stable-floor extension'ını ve schema `21` hedefini uygular. Bu durum Inventory
+v1 completion, field acceptance, Ready veya merge ilanı değildir.
 
 Issue #501 recovery verification, Issue #502 external verified backup/update
 gate'i, Issue #503 newer-live-data-safe restore yönü ve Issue #499 owner-phone

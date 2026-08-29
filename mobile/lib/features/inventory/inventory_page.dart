@@ -34,7 +34,7 @@ enum InventoryPageLoadStatus {
   failed,
 }
 
-enum InventoryPageView { map, list }
+enum InventoryPageView { floors, map, list }
 
 enum _InventoryDetailTargetRequest { move, unarchive }
 
@@ -63,8 +63,11 @@ class InventoryPageController extends ChangeNotifier {
   String? selectedProjectId;
   String? selectedProjectName;
   InventoryPrimarySketchProjection? sketch;
+  List<InventoryFloorSummary> floors = const [];
   List<InventoryAssetProjection> assets = const [];
   InventoryPageView view = InventoryPageView.map;
+  String? selectedFloorId;
+  String? floorFilterId;
   String search = '';
   InventoryCategory? categoryFilter;
   InventoryAssetStatus? statusFilter;
@@ -83,6 +86,10 @@ class InventoryPageController extends ChangeNotifier {
     return List<InventoryAssetProjection>.unmodifiable(
       assets.where((projection) {
         final asset = projection.asset;
+        if (floorFilterId != null &&
+            projection.floorPlacement?.floorId != floorFilterId) {
+          return false;
+        }
         if (query.isNotEmpty && !asset.normalizedName.contains(query)) {
           return false;
         }
@@ -103,15 +110,36 @@ class InventoryPageController extends ChangeNotifier {
 
   List<InventoryAssetProjection> get canonicalActiveMapAssets =>
       List<InventoryAssetProjection>.unmodifiable(
-        assets.where((projection) => projection.asset.archivedAt == null),
+        assets.where(
+          (projection) =>
+              projection.asset.archivedAt == null &&
+              projection.activePlacement?.floorId == selectedFloorId,
+        ),
       );
 
   List<InventoryAssetProjection> get visibleMapAssets =>
       List<InventoryAssetProjection>.unmodifiable(
         visibleAssets.where(
-          (projection) => projection.asset.archivedAt == null,
+          (projection) =>
+              projection.asset.archivedAt == null &&
+              projection.activePlacement?.floorId == selectedFloorId,
         ),
       );
+
+  InventoryAssetProjection? get invalidActiveMapProjection {
+    for (final projection in assets) {
+      if (projection.asset.archivedAt == null &&
+          !_isValidMapProjection(projection)) {
+        return projection;
+      }
+    }
+    return null;
+  }
+
+  InventoryFloorSummary? get selectedFloor => _floorOrNull(selectedFloorId);
+
+  int get totalActiveAssetCount =>
+      floors.fold(0, (total, floor) => total + floor.activeAssetCount);
 
   Future<void> initialize() async {
     if (!_initialized) {
@@ -216,6 +244,34 @@ class InventoryPageController extends ChangeNotifier {
     _notify();
   }
 
+  void selectFloor(String floorId, {bool openMap = true}) {
+    final floor = _floorOrNull(floorId);
+    if (floor == null) {
+      lastDiagnosticCode = 'inventory_floor_unavailable';
+      _notify();
+      return;
+    }
+    selectedFloorId = floor.floor.id;
+    if (openMap) view = InventoryPageView.map;
+    lastDiagnosticCode = null;
+    _notify();
+  }
+
+  void setFloorFilter(String? floorId) {
+    if (floorId != null && _floorOrNull(floorId) == null) {
+      lastDiagnosticCode = 'inventory_floor_unavailable';
+      _notify();
+      return;
+    }
+    if (floorFilterId == floorId) return;
+    floorFilterId = floorId;
+    lastDiagnosticCode = null;
+    _notify();
+  }
+
+  String floorName(String floorId) =>
+      _floorOrNull(floorId)?.floor.displayName ?? 'Kat bilgisi yok';
+
   void setSearch(String value) {
     if (search == value) return;
     search = value;
@@ -244,7 +300,10 @@ class InventoryPageController extends ChangeNotifier {
     _notify();
   }
 
-  bool canFocus(InventoryAssetProjection projection) {
+  bool canFocus(InventoryAssetProjection projection) =>
+      _isValidMapProjection(projection);
+
+  bool _isValidMapProjection(InventoryAssetProjection projection) {
     final activeSketch = sketch;
     final revision = activeSketch?.activeRevision;
     final asset = projection.asset;
@@ -256,6 +315,7 @@ class InventoryPageController extends ChangeNotifier {
         placement == null ||
         !placement.isActive ||
         placement.projectId != selectedProjectId ||
+        _floorOrNull(placement.floorId) == null ||
         placement.assetId != asset.id ||
         placement.sketchId != activeSketch.sketch.id ||
         placement.quantity != asset.totalQuantity) {
@@ -319,6 +379,8 @@ class InventoryPageController extends ChangeNotifier {
     lastDiagnosticCode = null;
     sketchDiagnosticCode = null;
     sketch = null;
+    final previousFloorId = selectedFloorId;
+    floors = const [];
     assets = const [];
     _notify();
     InventoryPrimarySketchProjection? loadedSketch;
@@ -338,6 +400,12 @@ class InventoryPageController extends ChangeNotifier {
       if (loadedSketch != null) {
         _verifySketch(projectId, loadedSketch);
       }
+      final loadedFloors = await application.listFloors(projectId);
+      if (!_isCurrent(generation) || selectedProjectId != projectId) return;
+      _verifyFloors(projectId, loadedFloors);
+      if (loadedFloors.isEmpty) {
+        throw const InventoryFailure('inventory_floor_integrity_failed');
+      }
       final loadedAssets = await application.listAssets(
         projectId: projectId,
         includeArchived: true,
@@ -345,6 +413,15 @@ class InventoryPageController extends ChangeNotifier {
       if (!_isCurrent(generation) || selectedProjectId != projectId) return;
       _verifyAssetIdentities(projectId, loadedAssets);
       sketch = loadedSketch;
+      floors = List<InventoryFloorSummary>.unmodifiable(loadedFloors);
+      selectedFloorId =
+          loadedFloors.any((floor) => floor.floor.id == previousFloorId)
+          ? previousFloorId
+          : loadedFloors.first.floor.id;
+      if (floorFilterId != null &&
+          !loadedFloors.any((floor) => floor.floor.id == floorFilterId)) {
+        floorFilterId = null;
+      }
       assets = List<InventoryAssetProjection>.unmodifiable(loadedAssets);
       sketchDiagnosticCode = geometryFailure;
       if (geometryFailure != null) {
@@ -356,6 +433,7 @@ class InventoryPageController extends ChangeNotifier {
     } on Object catch (error) {
       if (!_isCurrent(generation) || selectedProjectId != projectId) return;
       sketch = null;
+      floors = const [];
       assets = const [];
       loadStatus = InventoryPageLoadStatus.failed;
       lastErrorCode = _safeCode(error, fallback: 'inventory_page_load_failed');
@@ -390,6 +468,19 @@ class InventoryPageController extends ChangeNotifier {
     }
   }
 
+  void _verifyFloors(String projectId, List<InventoryFloorSummary> values) {
+    final ids = <String>{};
+    for (var index = 0; index < values.length; index += 1) {
+      final summary = values[index];
+      if (summary.floor.projectId != projectId ||
+          summary.floor.ordinal != index + 1 ||
+          summary.activeAssetCount < 0 ||
+          !ids.add(summary.floor.id)) {
+        throw const InventoryFailure('inventory_floor_integrity_failed');
+      }
+    }
+  }
+
   MobileProject? _projectOrNull(String id) {
     for (final project in projects) {
       if (project.id == id) return project;
@@ -397,14 +488,25 @@ class InventoryPageController extends ChangeNotifier {
     return null;
   }
 
+  InventoryFloorSummary? _floorOrNull(String? id) {
+    if (id == null) return null;
+    for (final floor in floors) {
+      if (floor.floor.id == id) return floor;
+    }
+    return null;
+  }
+
   void _clearProjectSession({bool keepSelection = false}) {
     sketch = null;
+    floors = const [];
     assets = const [];
     view = InventoryPageView.map;
     search = '';
     categoryFilter = null;
     statusFilter = null;
     archiveFilter = InventoryArchiveFilter.active;
+    selectedFloorId = null;
+    floorFilterId = null;
     lastErrorCode = null;
     lastDiagnosticCode = null;
     sketchDiagnosticCode = null;
@@ -531,11 +633,26 @@ class InventoryPageState extends State<InventoryPage> {
     }
     final map = _mapController!;
     final sketch = controller.sketch;
+    final floorId = controller.selectedFloorId;
     if (controller.loadStatus == InventoryPageLoadStatus.ready &&
-        sketch != null) {
+        sketch != null &&
+        floorId != null) {
+      final invalidProjection = controller.invalidActiveMapProjection;
+      if (invalidProjection != null) {
+        map.useCanonicalSnapshot(
+          activeSketch: sketch,
+          assets: [invalidProjection],
+          floorId: floorId,
+        );
+        controller.recordMapProjectionFailure(
+          map.lastErrorCode ?? 'inventory_projection_integrity_failed',
+        );
+        return;
+      }
       if (!map.useCanonicalSnapshot(
         activeSketch: sketch,
         assets: controller.canonicalActiveMapAssets,
+        floorId: floorId,
         visibleAssetIds: controller.visibleMapAssets.map(
           (projection) => projection.asset.id,
         ),
@@ -689,6 +806,11 @@ class InventoryPageState extends State<InventoryPage> {
             key: const Key('inventory-view-switch'),
             segments: const [
               ButtonSegment(
+                value: InventoryPageView.floors,
+                icon: Icon(Icons.layers_outlined),
+                label: Text('Katlar'),
+              ),
+              ButtonSegment(
                 value: InventoryPageView.map,
                 icon: Icon(Icons.map_outlined),
                 label: Text('Kroki'),
@@ -717,9 +839,11 @@ class InventoryPageState extends State<InventoryPage> {
             ],
           ),
         Expanded(
-          child: controller.view == InventoryPageView.map
-              ? _map()
-              : _list(visible),
+          child: switch (controller.view) {
+            InventoryPageView.floors => _floorOverview(),
+            InventoryPageView.map => _map(),
+            InventoryPageView.list => _list(visible),
+          },
         ),
       ],
     );
@@ -741,6 +865,33 @@ class InventoryPageState extends State<InventoryPage> {
               prefixIcon: Icon(Icons.search),
               border: OutlineInputBorder(),
             ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 170,
+          child: DropdownButtonFormField<String?>(
+            key: ValueKey(
+              'inventory-floor-filter-${controller.floorFilterId ?? 'all'}',
+            ),
+            initialValue: controller.floorFilterId,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Kat',
+              border: OutlineInputBorder(),
+            ),
+            items: [
+              const DropdownMenuItem(value: null, child: Text('Tümü')),
+              for (final summary in controller.floors)
+                DropdownMenuItem(
+                  value: summary.floor.id,
+                  child: Text(
+                    summary.floor.displayName,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            onChanged: controller.setFloorFilter,
           ),
         ),
         const SizedBox(width: 8),
@@ -900,8 +1051,10 @@ class InventoryPageState extends State<InventoryPage> {
                     Expanded(
                       child: Text(
                         request == _InventoryDetailTargetRequest.move
-                            ? 'Taşınacak yeni konumu kroki üzerinde seçin.'
-                            : 'Yeni aktif konumu kroki üzerinde seçin.',
+                            ? '${controller.selectedFloor?.floor.displayName ?? 'Kat'}: '
+                                  'taşınacak yeni konumu kroki üzerinde seçin.'
+                            : '${controller.selectedFloor?.floor.displayName ?? 'Kat'}: '
+                                  'yeni aktif konumu kroki üzerinde seçin.',
                       ),
                     ),
                     TextButton(
@@ -946,6 +1099,40 @@ class InventoryPageState extends State<InventoryPage> {
     );
   }
 
+  Widget _floorOverview() => ListView(
+    key: const Key('inventory-floor-overview'),
+    padding: const EdgeInsets.fromLTRB(12, 4, 12, 96),
+    children: [
+      Card(
+        key: const Key('inventory-floor-all'),
+        child: ListTile(
+          leading: const Icon(Icons.layers_rounded),
+          title: const Text('Genel / Tümü'),
+          subtitle: Text('${controller.totalActiveAssetCount} kayıt'),
+        ),
+      ),
+      for (final summary in controller.floors)
+        Padding(
+          padding: EdgeInsets.only(left: (summary.floor.ordinal - 1) * 8.0),
+          child: Card(
+            key: Key('inventory-floor-${summary.floor.id}'),
+            child: ListTile(
+              leading: const Icon(Icons.layers_outlined),
+              title: Text(summary.floor.displayName),
+              subtitle: Text('${summary.activeAssetCount} kayıt'),
+              trailing: IconButton(
+                key: Key('inventory-floor-rename-${summary.floor.id}'),
+                tooltip: 'Kat adını değiştir',
+                onPressed: () => unawaited(_renameFloor(summary.floor)),
+                icon: const Icon(Icons.edit_outlined),
+              ),
+              onTap: () => controller.selectFloor(summary.floor.id),
+            ),
+          ),
+        ),
+    ],
+  );
+
   Widget _list(List<InventoryAssetProjection> visible) {
     if (controller.assets.isEmpty) {
       return _message(
@@ -980,7 +1167,8 @@ class InventoryPageState extends State<InventoryPage> {
             subtitle: Text(
               '${inventoryCategoryLabel(asset.category)} • '
               '${inventoryAssetStatusLabel(asset.status)} • '
-              '${asset.totalQuantity} adet'
+              '${asset.totalQuantity} adet • '
+              '${projection.floorPlacement == null ? 'Kat bilgisi yok' : controller.floorName(projection.floorPlacement!.floorId)}'
               '${asset.archivedAt == null ? '' : ' • Arşivli'}',
             ),
             trailing: Icon(
@@ -1066,9 +1254,16 @@ class InventoryPageState extends State<InventoryPage> {
 
   Future<void> _openQuickCreate(InventoryPlacementTarget target) async {
     final projectId = controller.selectedProjectId;
-    if (projectId == null) return;
+    final floorId = controller.selectedFloorId;
+    if (projectId == null || floorId == null) {
+      controller.recordPresentationFailure('inventory_floor_unavailable');
+      return;
+    }
     final quickController = InventoryAssetQuickCreateController(
-      application: widget.application,
+      application: _FloorScopedInventoryApplication(
+        widget.application,
+        floorId,
+      ),
       projectId: projectId,
       reloadCanonical: controller.reloadSelected,
     );
@@ -1191,19 +1386,21 @@ class InventoryPageState extends State<InventoryPage> {
       _targetSelectionCompleter = null;
       _targetSelectionRequest = null;
     }
+    final floorId = controller.selectedFloorId;
     if (!mounted ||
         controller.selectedProjectId != detailController.projectId ||
         !identical(_activeDetailController, detailController) ||
-        target == null) {
+        target == null ||
+        floorId == null) {
       _cancelDetailControllerSelection(detailController, request);
     } else if (request == _InventoryDetailTargetRequest.move) {
-      if (!detailController.previewMove(target)) {
+      if (!detailController.previewMove(target, floorId: floorId)) {
         detailController.cancelMove();
         controller.recordPresentationFailure(
           'inventory_move_target_unavailable',
         );
       }
-    } else if (!detailController.previewUnarchive(target)) {
+    } else if (!detailController.previewUnarchive(target, floorId: floorId)) {
       detailController.cancelUnarchive();
       controller.recordPresentationFailure(
         'inventory_unarchive_target_unavailable',
@@ -1278,7 +1475,7 @@ class InventoryPageState extends State<InventoryPage> {
       controller.recordFocusFailure(projection);
       return;
     }
-    controller.setView(InventoryPageView.map);
+    controller.selectFloor(projection.activePlacement!.floorId);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final focused = _mapKey.currentState?.focusAsset(projection.asset.id);
@@ -1287,6 +1484,121 @@ class InventoryPageState extends State<InventoryPage> {
         controller.recordPresentationFailure('inventory_map_focus_failed');
       }
     });
+  }
+
+  Future<void> _renameFloor(InventoryFloorRecord floor) async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => _InventoryFloorRenameDialog(floor: floor),
+    );
+    if (result == null || !mounted) return;
+    try {
+      await widget.application.renameFloor(
+        RenameInventoryFloorCommand(
+          projectId: floor.projectId,
+          floorId: floor.id,
+          expectedRevision: floor.revision,
+          displayName: result,
+        ),
+      );
+      if (mounted && controller.selectedProjectId == floor.projectId) {
+        await controller.reloadSelected();
+      }
+    } on Object catch (error) {
+      controller.recordPresentationFailure(
+        _safeCode(error, fallback: 'inventory_floor_rename_failed'),
+      );
+    }
+  }
+}
+
+class _FloorScopedInventoryApplication extends DelegatingInventoryApplication {
+  const _FloorScopedInventoryApplication(super.delegate, this.floorId);
+
+  final String floorId;
+
+  @override
+  Future<InventoryMutationResult> createAsset(
+    CreateInventoryAssetCommand command,
+  ) => delegate.createAsset(
+    CreateInventoryAssetCommand(
+      operationId: command.operationId,
+      projectId: command.projectId,
+      assetId: command.assetId,
+      placementId: command.placementId,
+      placementKey: command.placementKey,
+      sketchId: command.sketchId,
+      activeRevisionId: command.activeRevisionId,
+      displayName: command.displayName,
+      category: command.category,
+      totalQuantity: command.totalQuantity,
+      x: command.x,
+      y: command.y,
+      floorId: floorId,
+      otherCategoryLabel: command.otherCategoryLabel,
+      status: command.status,
+      note: command.note,
+    ),
+  );
+}
+
+class _InventoryFloorRenameDialog extends StatefulWidget {
+  const _InventoryFloorRenameDialog({required this.floor});
+
+  final InventoryFloorRecord floor;
+
+  @override
+  State<_InventoryFloorRenameDialog> createState() =>
+      _InventoryFloorRenameDialogState();
+}
+
+class _InventoryFloorRenameDialogState
+    extends State<_InventoryFloorRenameDialog> {
+  late final TextEditingController _name;
+
+  @override
+  void initState() {
+    super.initState();
+    _name = TextEditingController(text: widget.floor.displayName);
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final value = _name.text.trim();
+    final valid = value.isNotEmpty && value.runes.length <= 80;
+    return AlertDialog(
+      key: const Key('inventory-floor-rename-dialog'),
+      title: const Text('Kat adını değiştir'),
+      content: TextField(
+        key: const Key('inventory-floor-rename-name'),
+        controller: _name,
+        autofocus: true,
+        maxLength: 80,
+        decoration: const InputDecoration(
+          labelText: 'Kat adı',
+          border: OutlineInputBorder(),
+        ),
+        onChanged: (_) => setState(() {}),
+      ),
+      actions: [
+        TextButton(
+          key: const Key('inventory-floor-rename-cancel'),
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Vazgeç'),
+        ),
+        FilledButton(
+          key: const Key('inventory-floor-rename-save'),
+          onPressed: valid ? () => Navigator.pop(context, value) : null,
+          child: const Text('Kaydet'),
+        ),
+      ],
+    );
   }
 }
 

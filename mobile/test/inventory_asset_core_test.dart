@@ -17,6 +17,7 @@ const _sketchId = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1';
 const _activeRevisionId = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1';
 const _placementId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1';
 const _placementKey = 'ffffffff-ffff-4fff-8fff-fffffffffff1';
+const _floorId = '99999999-9999-4999-8999-999999999991';
 final _t0 = DateTime.parse('2026-08-28T06:00:00Z');
 final _pixelPng = base64Decode(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8'
@@ -1111,7 +1112,10 @@ void main() {
 
     expect(controller.beginMove(), isTrue);
     expect(
-      controller.previewMove(const InventoryPlacementTarget(x: 400, y: 404)),
+      controller.previewMove(
+        const InventoryPlacementTarget(x: 400, y: 404),
+        floorId: _floorId,
+      ),
       isTrue,
     );
     expect(
@@ -1129,7 +1133,10 @@ void main() {
 
     expect(controller.beginMove(), isTrue);
     expect(
-      controller.previewMove(const InventoryPlacementTarget(x: 400, y: 404)),
+      controller.previewMove(
+        const InventoryPlacementTarget(x: 400, y: 404),
+        floorId: _floorId,
+      ),
       isTrue,
     );
     controller.cancelMove();
@@ -1149,6 +1156,7 @@ void main() {
     expect(
       controller.previewMove(
         InventoryPlacementTarget(x: original.x, y: original.y),
+        floorId: _floorId,
       ),
       isTrue,
     );
@@ -1168,7 +1176,10 @@ void main() {
 
       expect(controller.beginMove(), isTrue);
       expect(
-        controller.previewMove(const InventoryPlacementTarget(x: 500, y: 504)),
+        controller.previewMove(
+          const InventoryPlacementTarget(x: 500, y: 504),
+          floorId: _floorId,
+        ),
         isTrue,
       );
       expect(await controller.confirmMove(), isTrue);
@@ -1195,7 +1206,10 @@ void main() {
     final original = controller.activePlacement!;
 
     controller.beginMove();
-    controller.previewMove(const InventoryPlacementTarget(x: 600, y: 604));
+    controller.previewMove(
+      const InventoryPlacementTarget(x: 600, y: 604),
+      floorId: _floorId,
+    );
     expect(await controller.confirmMove(), isTrue);
     final successor = controller.activePlacement!;
 
@@ -1218,7 +1232,10 @@ void main() {
     addTearDown(staleController.dispose);
     final original = staleController.activePlacement!;
     staleController.beginMove();
-    staleController.previewMove(const InventoryPlacementTarget(x: 700, y: 704));
+    staleController.previewMove(
+      const InventoryPlacementTarget(x: 700, y: 704),
+      floorId: _floorId,
+    );
     stale.nextFailure = const InventoryFailure('inventory_stale_revision');
 
     expect(await staleController.confirmMove(), isFalse);
@@ -1235,6 +1252,7 @@ void main() {
     expect(
       invalidController.previewMove(
         const InventoryPlacementTarget(x: 701, y: 704),
+        floorId: _floorId,
       ),
       isFalse,
     );
@@ -1247,7 +1265,10 @@ void main() {
     );
     addTearDown(crossController.dispose);
     crossController.beginMove();
-    crossController.previewMove(const InventoryPlacementTarget(x: 800, y: 804));
+    crossController.previewMove(
+      const InventoryPlacementTarget(x: 800, y: 804),
+      floorId: _floorId,
+    );
     cross.primarySketch = _primarySketch(projectId: _otherProjectId);
     expect(await crossController.confirmMove(), isFalse);
     expect(cross.moveCalls, 0);
@@ -1319,6 +1340,7 @@ void main() {
       expect(
         controller.previewUnarchive(
           const InventoryPlacementTarget(x: 900, y: 904),
+          floorId: _floorId,
         ),
         isTrue,
       );
@@ -1567,20 +1589,21 @@ InventoryAssetProjection _projection({
     statusChangedAt: _t0,
     archivedAt: archived ? _t0 : null,
   );
+  final placement = _placement(
+    id: placementId,
+    placementKey: placementKey,
+    assetId: assetId,
+    projectId: projectId,
+    sequence: sequence,
+    x: x,
+    y: y,
+    quantity: placementQuantity ?? quantity,
+    endReason: archived ? InventoryPlacementEndReason.assetArchived : null,
+  );
   return InventoryAssetProjection(
     asset: asset,
-    activePlacement: archived
-        ? null
-        : _placement(
-            id: placementId,
-            placementKey: placementKey,
-            assetId: assetId,
-            projectId: projectId,
-            sequence: sequence,
-            x: x,
-            y: y,
-            quantity: placementQuantity ?? quantity,
-          ),
+    activePlacement: archived ? null : placement,
+    latestPlacement: placement,
   );
 }
 
@@ -1589,6 +1612,7 @@ InventoryPlacementRecord _placement({
   String placementKey = _placementKey,
   String assetId = _assetId,
   String projectId = _projectId,
+  String floorId = _floorId,
   String sketchId = _sketchId,
   String provenanceRevisionId = _activeRevisionId,
   int sequence = 1,
@@ -1601,6 +1625,7 @@ InventoryPlacementRecord _placement({
   id: id,
   placementKey: placementKey,
   projectId: projectId,
+  floorId: floorId,
   assetId: assetId,
   sketchId: sketchId,
   provenanceRevisionId: provenanceRevisionId,
@@ -1677,6 +1702,18 @@ class _FakeInventoryApplication
   final Map<String, InventoryAssetProjection> projections;
   final Map<String, List<InventoryPlacementRecord>> versions;
   final Map<String, List<InventoryEventRecord>> histories;
+
+  List<InventoryFloorRecord> floors = [
+    InventoryFloorRecord(
+      id: _floorId,
+      projectId: _projectId,
+      ordinal: 1,
+      displayName: '1. Kat',
+      revision: 1,
+      createdAt: _t0,
+      updatedAt: _t0,
+    ),
+  ];
 
   Object? nextFailure;
   bool duplicateAssetInList = false;
@@ -1764,6 +1801,49 @@ class _FakeInventoryApplication
   Future<InventoryPrimarySketchProjection?> loadPrimarySketch(
     String projectId,
   ) async => primarySketch;
+
+  @override
+  Future<List<InventoryFloorSummary>> listFloors(String projectId) async =>
+      floors
+          .where((floor) => floor.projectId == projectId)
+          .map(
+            (floor) => InventoryFloorSummary(
+              floor: floor,
+              activeAssetCount: projections.values
+                  .where(
+                    (projection) =>
+                        projection.activePlacement?.floorId == floor.id,
+                  )
+                  .length,
+            ),
+          )
+          .toList();
+
+  @override
+  Future<InventoryFloorRecord> renameFloor(
+    RenameInventoryFloorCommand command,
+  ) async {
+    final index = floors.indexWhere(
+      (floor) =>
+          floor.id == command.floorId && floor.projectId == command.projectId,
+    );
+    if (index < 0) throw const InventoryFailure('inventory_floor_not_found');
+    final current = floors[index];
+    if (current.revision != command.expectedRevision) {
+      throw const InventoryFailure('inventory_stale_revision');
+    }
+    final renamed = InventoryFloorRecord(
+      id: current.id,
+      projectId: current.projectId,
+      ordinal: current.ordinal,
+      displayName: command.displayName,
+      revision: current.revision + 1,
+      createdAt: current.createdAt,
+      updatedAt: _t0.add(const Duration(minutes: 1)),
+    );
+    floors[index] = renamed;
+    return renamed;
+  }
 
   @override
   Future<List<InventoryAssetProjection>> listAssets({
@@ -1957,6 +2037,7 @@ class _FakeInventoryApplication
       placementKey: command.placementKey,
       assetId: command.assetId,
       projectId: command.projectId,
+      floorId: command.floorId ?? _floorId,
       sketchId: command.sketchId,
       provenanceRevisionId: command.activeRevisionId,
       x: command.x,
@@ -2088,6 +2169,7 @@ class _FakeInventoryApplication
         placementKey: placement.placementKey,
         assetId: placement.assetId,
         projectId: placement.projectId,
+        floorId: placement.floorId,
         sketchId: placement.sketchId,
         provenanceRevisionId: placement.provenanceRevisionId,
         sequence: placement.sequence + 1,
@@ -2141,6 +2223,7 @@ class _FakeInventoryApplication
         archivedAt: _t0.add(const Duration(minutes: 1)),
       ),
       activePlacement: null,
+      latestPlacement: ended,
     );
     return _remember(
       _result(
@@ -2178,6 +2261,7 @@ class _FakeInventoryApplication
       placementKey: predecessor.placementKey,
       assetId: predecessor.assetId,
       projectId: predecessor.projectId,
+      floorId: command.floorId ?? predecessor.floorId,
       sketchId: command.sketchId,
       provenanceRevisionId: command.activeRevisionId,
       sequence: predecessor.sequence + 1,
@@ -2194,6 +2278,7 @@ class _FakeInventoryApplication
         archivedAt: null,
       ),
       activePlacement: successor,
+      latestPlacement: successor,
     );
     return _remember(
       _result(
@@ -2221,7 +2306,11 @@ class _FakeInventoryApplication
       key: command.placementKey,
       sequence: command.expectedPlacementSequence,
     );
-    final noOp = placement.x == command.x && placement.y == command.y;
+    final targetFloorId = command.floorId ?? placement.floorId;
+    final noOp =
+        placement.x == command.x &&
+        placement.y == command.y &&
+        placement.floorId == targetFloorId;
     if (!noOp) {
       final ended = _endPlacement(placement, InventoryPlacementEndReason.moved);
       final successor = _placement(
@@ -2229,6 +2318,7 @@ class _FakeInventoryApplication
         placementKey: placement.placementKey,
         assetId: placement.assetId,
         projectId: placement.projectId,
+        floorId: targetFloorId,
         sketchId: command.sketchId,
         provenanceRevisionId: command.activeRevisionId,
         sequence: placement.sequence + 1,
@@ -2241,6 +2331,7 @@ class _FakeInventoryApplication
       projections[command.assetId] = InventoryAssetProjection(
         asset: current.asset,
         activePlacement: successor,
+        latestPlacement: successor,
       );
     }
     return _remember(
@@ -2300,6 +2391,7 @@ class _FakeInventoryApplication
     projections[asset.id] = InventoryAssetProjection(
       asset: asset,
       activePlacement: current.activePlacement,
+      latestPlacement: current.latestPlacement,
     );
   }
 
@@ -2395,6 +2487,7 @@ InventoryPlacementRecord _endPlacement(
   id: current.id,
   placementKey: current.placementKey,
   projectId: current.projectId,
+  floorId: current.floorId,
   assetId: current.assetId,
   sketchId: current.sketchId,
   provenanceRevisionId: current.provenanceRevisionId,
