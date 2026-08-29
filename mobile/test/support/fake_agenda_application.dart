@@ -60,6 +60,10 @@ class FakeAgendaApplication
   int getAgendaLogDetailCalls = 0;
   int reminderLifecycleDetailCalls = 0;
   int listAgendaCalls = 0;
+  int listProjectsCalls = 0;
+  Completer<void>? listProjectsGate;
+  final List<Future<List<MobileProject>>> listProjectsResponses = [];
+  final List<AgendaQuery> agendaQueries = [];
   MutateReminderCommand? lastMutationCommand;
   SyncAgendaToReminderCommand? lastSyncAgendaToReminderCommand;
   AgendaQuery? lastAgendaQuery;
@@ -437,6 +441,7 @@ class FakeAgendaApplication
   Future<List<AgendaLog>> listAgenda(AgendaQuery query) async {
     listAgendaCalls += 1;
     lastAgendaQuery = query;
+    agendaQueries.add(query);
     final result = [...logs];
     result.sort(
       (left, right) => _compareAgendaLogs(left, right, query.sortOrder),
@@ -449,7 +454,15 @@ class FakeAgendaApplication
       const [];
 
   @override
-  Future<List<MobileProject>> listProjects() async => projects;
+  Future<List<MobileProject>> listProjects() async {
+    listProjectsCalls += 1;
+    if (listProjectsResponses.isNotEmpty) {
+      return List.unmodifiable(await listProjectsResponses.removeAt(0));
+    }
+    final gate = listProjectsGate;
+    if (gate != null) await gate.future;
+    return List.unmodifiable(projects);
+  }
 
   @override
   Future<ReminderTodayOverview> getReminderTodayOverview() async {
