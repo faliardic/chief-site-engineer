@@ -18,6 +18,7 @@ const _activeRevisionId = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1';
 const _placementId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1';
 const _placementKey = 'ffffffff-ffff-4fff-8fff-fffffffffff1';
 const _floorId = '99999999-9999-4999-8999-999999999991';
+const _blockId = '88888888-8888-4888-8888-888888888881';
 final _t0 = DateTime.parse('2026-08-28T06:00:00Z');
 final _pixelPng = base64Decode(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8'
@@ -94,6 +95,125 @@ void main() {
       isNull,
     );
   });
+
+  test(
+    'AT-531-008 safe interior sequence is strict deterministic and compact',
+    () {
+      final rectangle = InventoryPolyline(
+        closed: true,
+        points: [
+          InventorySketchPoint(x: 0, y: 0),
+          InventorySketchPoint(x: 128, y: 0),
+          InventorySketchPoint(x: 128, y: 128),
+          InventorySketchPoint(x: 0, y: 128),
+        ],
+      );
+
+      List<InventoryPlacementCoordinates> sequence() {
+        final result = <InventoryPlacementCoordinates>[];
+        for (var index = 0; index < 8; index += 1) {
+          result.add(
+            InventorySpatialContract.safeInteriorPlacement(
+              rectangle,
+              spreadIndex: result.length,
+              occupied: result,
+            ),
+          );
+        }
+        return result;
+      }
+
+      final first = sequence();
+      final second = sequence();
+      expect(second, first);
+      expect(first.toSet(), hasLength(first.length));
+      for (final target in first) {
+        expect(target.x % InventoryGeometryContract.placementStep, 0);
+        expect(target.y % InventoryGeometryContract.placementStep, 0);
+        expect(
+          InventorySpatialContract.strictlyContainsPlacement(
+            rectangle,
+            x: target.x,
+            y: target.y,
+          ),
+          isTrue,
+        );
+        expect((target.x - 64).abs(), lessThanOrEqualTo(8));
+        expect((target.y - 64).abs(), lessThanOrEqualTo(8));
+      }
+      final wrapPolygon = InventoryPolyline(
+        closed: true,
+        points: [
+          InventorySketchPoint(x: 0, y: 0),
+          InventorySketchPoint(x: 64, y: 0),
+          InventorySketchPoint(x: 64, y: 64),
+          InventorySketchPoint(x: 0, y: 64),
+        ],
+      );
+      final wrapFirst = InventorySpatialContract.safeInteriorPlacement(
+        wrapPolygon,
+        spreadIndex: 0,
+      );
+      final allOtherWrapTargets = [
+        for (
+          var x = InventoryGeometryContract.placementStep;
+          x < 64;
+          x += InventoryGeometryContract.placementStep
+        )
+          for (
+            var y = InventoryGeometryContract.placementStep;
+            y < 64;
+            y += InventoryGeometryContract.placementStep
+          )
+            if (x != wrapFirst.x || y != wrapFirst.y)
+              InventoryPlacementCoordinates(x: x, y: y),
+      ];
+      expect(
+        InventorySpatialContract.safeInteriorPlacement(
+          wrapPolygon,
+          spreadIndex: 2,
+          occupied: allOtherWrapTargets,
+        ),
+        wrapFirst,
+      );
+      expect(
+        InventorySpatialContract.containsPlacement(rectangle, x: 0, y: 64),
+        isTrue,
+      );
+      expect(
+        InventorySpatialContract.strictlyContainsPlacement(
+          rectangle,
+          x: 0,
+          y: 64,
+        ),
+        isFalse,
+      );
+
+      final concave = InventoryPolyline(
+        closed: true,
+        points: [
+          InventorySketchPoint(x: 0, y: 0),
+          InventorySketchPoint(x: 192, y: 0),
+          InventorySketchPoint(x: 192, y: 64),
+          InventorySketchPoint(x: 64, y: 64),
+          InventorySketchPoint(x: 64, y: 192),
+          InventorySketchPoint(x: 0, y: 192),
+        ],
+      );
+      final concaveTarget = InventorySpatialContract.safeInteriorPlacement(
+        concave,
+        spreadIndex: 0,
+      );
+      expect(
+        InventorySpatialContract.strictlyContainsPlacement(
+          concave,
+          x: concaveTarget.x,
+          y: concaveTarget.y,
+        ),
+        isTrue,
+      );
+    },
+  );
 
   testWidgets('05 marker tap opens detail and never starts create', (
     tester,
@@ -239,6 +359,31 @@ void main() {
       expect(command.x, 124);
       expect(command.y, 208);
       expect(command.totalQuantity, 3);
+      expect(command.floorId, isNull);
+    },
+  );
+
+  test(
+    'AT-531-007 exact floor quick-create intent is forwarded unchanged',
+    () async {
+      final fake = _FakeInventoryApplication.standard();
+      final controller = _quickController(
+        fake,
+        ids: _SequentialIds(1050),
+        floorId: _floorId,
+      );
+
+      expect(
+        await controller.submit(
+          target: const InventoryPlacementTarget(x: 124, y: 208),
+          displayName: 'Kat aracı',
+          category: InventoryCategory.equipment,
+          quantityText: '1',
+        ),
+        isTrue,
+      );
+      expect(fake.lastCreate!.floorId, _floorId);
+      expect(fake.projections[_uuid(1051)]!.activePlacement!.floorId, _floorId);
     },
   );
 
@@ -1458,10 +1603,12 @@ Future<void> _pumpDetailWithTextScale(
 InventoryAssetQuickCreateController _quickController(
   _FakeInventoryApplication fake, {
   _SequentialIds? ids,
+  String? floorId,
 }) => InventoryAssetQuickCreateController(
   application: fake,
   projectId: _projectId,
   reloadCanonical: _noReload,
+  floorId: floorId,
   idFactory: (ids ?? _SequentialIds(900)).call,
 );
 
@@ -1531,6 +1678,33 @@ InventoryPrimarySketchProjection _primarySketch({
       abandonedAt: null,
     ),
     draftRevision: null,
+    blocks: [
+      InventoryBlockRecord(
+        id: _blockId,
+        projectId: projectId,
+        displayName: 'Eski alan',
+        normalizedName: 'eski alan',
+        ordinal: 1,
+        state: InventoryBlockState.detached,
+        revision: 1,
+        createdAt: _t0,
+        updatedAt: _t0,
+        archivedAt: null,
+      ),
+    ],
+    floors: [
+      InventoryFloorRecord(
+        id: _floorId,
+        blockId: _blockId,
+        projectId: projectId,
+        displayName: '1. Kat',
+        ordinal: 1,
+        revision: 1,
+        createdAt: _t0,
+        updatedAt: _t0,
+        archivedAt: null,
+      ),
+    ],
   );
 }
 
@@ -1551,6 +1725,7 @@ InventoryAssetProjection _projection({
   int sequence = 1,
   int x = 200,
   int y = 204,
+  String floorId = _floorId,
 }) {
   final asset = InventoryAssetRecord(
     id: assetId,
@@ -1580,6 +1755,7 @@ InventoryAssetProjection _projection({
             sequence: sequence,
             x: x,
             y: y,
+            floorId: floorId,
             quantity: placementQuantity ?? quantity,
           ),
   );
@@ -1596,6 +1772,7 @@ InventoryPlacementRecord _placement({
   int x = 200,
   int y = 204,
   int quantity = 2,
+  String floorId = _floorId,
   InventoryPlacementEndReason? endReason,
   String? supersedesPlacementId,
 }) => InventoryPlacementRecord(
@@ -1604,7 +1781,7 @@ InventoryPlacementRecord _placement({
   projectId: projectId,
   assetId: assetId,
   sketchId: sketchId,
-  floorId: _floorId,
+  floorId: floorId,
   provenanceRevisionId: provenanceRevisionId,
   sequence: sequence,
   x: x,
@@ -1964,6 +2141,7 @@ class _FakeInventoryApplication
       x: command.x,
       y: command.y,
       quantity: command.totalQuantity,
+      floorId: command.floorId ?? _floorId,
     );
     projections[command.assetId] = InventoryAssetProjection(
       asset: asset,

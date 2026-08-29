@@ -61,12 +61,14 @@ class InventoryAssetQuickCreateController extends ChangeNotifier {
     required this.application,
     required this.projectId,
     required this.reloadCanonical,
+    this.floorId,
     RecordIdFactory? idFactory,
   }) : idFactory = idFactory ?? RecordId.randomUuid;
 
   final InventoryApplicationPort application;
   final String projectId;
   final InventoryCanonicalReload reloadCanonical;
+  final String? floorId;
   final RecordIdFactory idFactory;
 
   InventoryQuickCreateStatus status = InventoryQuickCreateStatus.idle;
@@ -139,6 +141,7 @@ class InventoryAssetQuickCreateController extends ChangeNotifier {
           placementKey: placementKey,
           sketchId: sketch.sketch.id,
           activeRevisionId: sketch.activeRevision!.id,
+          floorId: floorId,
           displayName: cleanName,
           category: category,
           otherCategoryLabel: commandOther,
@@ -227,12 +230,14 @@ class InventoryAssetQuickForm extends StatefulWidget {
   const InventoryAssetQuickForm({
     required this.controller,
     required this.target,
+    this.spatialContextLabel,
     this.onCreated,
     super.key,
   });
 
   final InventoryAssetQuickCreateController controller;
   final InventoryPlacementTarget target;
+  final String? spatialContextLabel;
   final ValueChanged<String>? onCreated;
 
   @override
@@ -314,6 +319,8 @@ class _InventoryAssetQuickFormState extends State<InventoryAssetQuickForm> {
         children: [
           Text('Envanter ekle', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 4),
+          if (widget.spatialContextLabel case final label?)
+            Text(label, key: const Key('inventory-quick-spatial-context')),
           Text('Şematik kroki konumu: ${widget.target.x}, ${widget.target.y}'),
           const SizedBox(height: 16),
           TextFormField(

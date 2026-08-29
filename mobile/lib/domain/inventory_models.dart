@@ -90,6 +90,20 @@ class InventorySketchPoint {
   int get hashCode => Object.hash(x, y);
 }
 
+class InventoryPlacementCoordinates {
+  const InventoryPlacementCoordinates({required this.x, required this.y});
+
+  final int x;
+  final int y;
+
+  @override
+  bool operator ==(Object other) =>
+      other is InventoryPlacementCoordinates && other.x == x && other.y == y;
+
+  @override
+  int get hashCode => Object.hash(x, y);
+}
+
 class InventoryPolyline {
   InventoryPolyline({
     required this.closed,
@@ -365,6 +379,152 @@ abstract final class InventorySpatialContract {
     );
     validateBlockPolygon(polygon);
     return _containsPoint(polygon.points, x, y);
+  }
+
+  static bool strictlyContainsPlacement(
+    InventoryPolyline polygon, {
+    required int x,
+    required int y,
+  }) {
+    InventoryGeometryContract.validatePlacementCoordinate(
+      x,
+      maximum: InventoryGeometryContract.canvasWidth,
+    );
+    InventoryGeometryContract.validatePlacementCoordinate(
+      y,
+      maximum: InventoryGeometryContract.canvasHeight,
+    );
+    validateBlockPolygon(polygon);
+    return _strictlyContainsPoint(polygon.points, x, y);
+  }
+
+  static bool _strictlyContainsPoint(
+    List<InventorySketchPoint> points,
+    int x,
+    int y,
+  ) {
+    for (var index = 0; index < points.length; index += 1) {
+      if (_pointOnSegment(
+        points[index],
+        points[(index + 1) % points.length],
+        x,
+        y,
+      )) {
+        return false;
+      }
+    }
+    return _containsPoint(points, x, y);
+  }
+
+  static InventoryPlacementCoordinates safeInteriorPlacement(
+    InventoryPolyline polygon, {
+    required int spreadIndex,
+    Iterable<InventoryPlacementCoordinates> occupied = const [],
+  }) {
+    if (spreadIndex < 0) {
+      throw const InventoryFailure('inventory_safe_interior_unavailable');
+    }
+    validateBlockPolygon(polygon);
+    final points = polygon.points;
+    final area = _twiceSignedArea(points);
+    var centroidXNumerator = 0;
+    var centroidYNumerator = 0;
+    var minimumX = InventoryGeometryContract.canvasWidth;
+    var maximumX = 0;
+    var minimumY = InventoryGeometryContract.canvasHeight;
+    var maximumY = 0;
+    for (var index = 0; index < points.length; index += 1) {
+      final point = points[index];
+      final next = points[(index + 1) % points.length];
+      final cross = point.x * next.y - next.x * point.y;
+      centroidXNumerator += (point.x + next.x) * cross;
+      centroidYNumerator += (point.y + next.y) * cross;
+      if (point.x < minimumX) minimumX = point.x;
+      if (point.x > maximumX) maximumX = point.x;
+      if (point.y < minimumY) minimumY = point.y;
+      if (point.y > maximumY) maximumY = point.y;
+    }
+    final anchorX = InventoryGeometryContract.snapPlacementCoordinate(
+      (centroidXNumerator / (3 * area)).round(),
+      maximum: InventoryGeometryContract.canvasWidth,
+    );
+    final anchorY = InventoryGeometryContract.snapPlacementCoordinate(
+      (centroidYNumerator / (3 * area)).round(),
+      maximum: InventoryGeometryContract.canvasHeight,
+    );
+    const step = InventoryGeometryContract.placementStep;
+    final maximumRing =
+        [
+              (anchorX - minimumX).abs(),
+              (maximumX - anchorX).abs(),
+              (anchorY - minimumY).abs(),
+              (maximumY - anchorY).abs(),
+            ].reduce((left, right) => left > right ? left : right) ~/
+            step +
+        1;
+    final occupiedTargets = occupied.toSet();
+
+    InventoryPlacementCoordinates? candidate(int x, int y) {
+      if (x < minimumX ||
+          x > maximumX ||
+          y < minimumY ||
+          y > maximumY ||
+          x < 0 ||
+          x > InventoryGeometryContract.canvasWidth ||
+          y < 0 ||
+          y > InventoryGeometryContract.canvasHeight ||
+          !_strictlyContainsPoint(points, x, y)) {
+        return null;
+      }
+      return InventoryPlacementCoordinates(x: x, y: y);
+    }
+
+    Iterable<InventoryPlacementCoordinates> candidates() sync* {
+      for (var ring = 0; ring <= maximumRing; ring += 1) {
+        if (ring == 0) {
+          final target = candidate(anchorX, anchorY);
+          if (target != null) yield target;
+          continue;
+        }
+        final delta = ring * step;
+        final left = anchorX - delta;
+        final right = anchorX + delta;
+        final top = anchorY - delta;
+        final bottom = anchorY + delta;
+        for (var x = left; x <= right; x += step) {
+          final target = candidate(x, top);
+          if (target != null) yield target;
+        }
+        for (var y = top + step; y <= bottom; y += step) {
+          final target = candidate(right, y);
+          if (target != null) yield target;
+        }
+        for (var x = right - step; x >= left; x -= step) {
+          final target = candidate(x, bottom);
+          if (target != null) yield target;
+        }
+        for (var y = bottom - step; y > top; y -= step) {
+          final target = candidate(left, y);
+          if (target != null) yield target;
+        }
+      }
+    }
+
+    var skipped = 0;
+    for (final target in candidates()) {
+      if (skipped < spreadIndex) {
+        skipped += 1;
+        continue;
+      }
+      if (!occupiedTargets.contains(target)) return target;
+    }
+    var wrapped = 0;
+    for (final target in candidates()) {
+      if (wrapped >= spreadIndex) break;
+      wrapped += 1;
+      if (!occupiedTargets.contains(target)) return target;
+    }
+    throw const InventoryFailure('inventory_safe_interior_unavailable');
   }
 
   static int _twiceSignedArea(List<InventorySketchPoint> points) {
@@ -978,6 +1138,7 @@ class CreateInventoryAssetCommand implements InventoryMutationCommand {
     required this.totalQuantity,
     required this.x,
     required this.y,
+    this.floorId,
     this.otherCategoryLabel,
     this.status = InventoryAssetStatus.available,
     this.note,
@@ -992,6 +1153,7 @@ class CreateInventoryAssetCommand implements InventoryMutationCommand {
   final String placementKey;
   final String sketchId;
   final String activeRevisionId;
+  final String? floorId;
   final String displayName;
   final InventoryCategory category;
   final String? otherCategoryLabel;

@@ -1407,7 +1407,11 @@ class InventoryApplication
     required int x,
     required int y,
     String? preferredFloorId,
+    String? exactFloorId,
   }) async {
+    if (preferredFloorId != null && exactFloorId != null) {
+      throw const InventoryFailure('inventory_floor_unavailable');
+    }
     final revision = await _requireSketchRevision(
       transaction,
       projectId: projectId,
@@ -1488,6 +1492,30 @@ class InventoryApplication
     final targetBlockIds = targetRows.map((row) => row['block_id']).toSet();
     if (targetBlockIds.length != 1) {
       throw const InventoryFailure('inventory_spatial_context_ambiguous');
+    }
+    if (exactFloorId != null) {
+      if (activeBlockIds.isEmpty) {
+        throw const InventoryFailure('inventory_floor_unavailable');
+      }
+      final exactRows = targetRows
+          .where((row) => row['floor_id'] == exactFloorId)
+          .toList(growable: false);
+      if (exactRows.length != 1) {
+        throw const InventoryFailure('inventory_floor_unavailable');
+      }
+      final exactRow = exactRows.single;
+      final polygonIndex = exactRow['polygon_index'];
+      if (polygonIndex is! int ||
+          polygonIndex < 0 ||
+          polygonIndex >= revision.geometry.polylines.length ||
+          !InventorySpatialContract.strictlyContainsPlacement(
+            revision.geometry.polylines[polygonIndex],
+            x: x,
+            y: y,
+          )) {
+        throw const InventoryFailure('inventory_floor_unavailable');
+      }
+      return exactRow['floor_id']! as String;
     }
     if (preferredFloorId != null) {
       final sameFloor = targetRows
@@ -4178,6 +4206,9 @@ class InventoryApplication
     _requireUuid(command.placementKey, 'inventory_invalid_placement_key');
     _requireUuid(command.sketchId, 'inventory_invalid_sketch_id');
     _requireUuid(command.activeRevisionId, 'inventory_invalid_revision_id');
+    if (command.floorId case final floorId?) {
+      _requireUuid(floorId, 'inventory_invalid_floor_id');
+    }
     final input = _validatedAssetInput(
       displayName: command.displayName,
       category: command.category,
@@ -4192,6 +4223,7 @@ class InventoryApplication
       'asset_id': command.assetId,
       'category_code': input.category.storageValue,
       'display_name': input.displayName,
+      if (command.floorId != null) 'floor_id': command.floorId,
       'normalized_name': input.normalizedName,
       'note': input.note,
       'other_category_label': input.otherCategoryLabel,
@@ -4218,6 +4250,7 @@ class InventoryApplication
         activeRevisionId: command.activeRevisionId,
         x: x,
         y: y,
+        exactFloorId: command.floorId,
       );
       await _requireUnusedId(
         transaction,
