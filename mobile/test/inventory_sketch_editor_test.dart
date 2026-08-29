@@ -515,6 +515,262 @@ void main() {
         expect(finalized.id, isNot(blockA.id));
       },
     );
+
+    test(
+      'AT-533-001/014 mapped whole nudge preserves identity, history, and idempotent save',
+      () async {
+        final blockId = _uuid(8100);
+        final geometry = _rectangleGeometry();
+        final fake = _FakeInventoryApplication.withMappedActive(
+          geometry: geometry,
+          blocks: [_blockRecord(id: blockId, revision: 7)],
+          floors: [_floorRecord(id: _uuid(8101), blockId: blockId)],
+          activeBlockPolygons: [
+            _blockPolygon(
+              revisionId: _activeId,
+              blockId: blockId,
+              polygonIndex: 0,
+            ),
+          ],
+        );
+        final controller = _controller(
+          fake,
+          intent: InventorySketchLaunchIntent.editActive,
+        );
+        addTearDown(controller.dispose);
+        await controller.initialize();
+        controller.setMode(InventorySketchEditorMode.select);
+        controller.editor = controller.editor!.withSelection(
+          const InventorySketchSelection.polyline(polylineIndex: 0),
+        );
+
+        final before = controller.editor!.geometry.polylines.single;
+        expect(
+          controller.nudgeSelection(InventorySketchNudgeDirection.right),
+          isTrue,
+        );
+        final translated = controller.editor!.geometry.polylines.single;
+        expect(
+          () => InventorySpatialContract.validateBlockPolygon(translated),
+          returnsNormally,
+        );
+        expect(translated.points, [
+          for (final point in before.points)
+            InventorySketchPoint(
+              x: point.x + InventoryGeometryContract.sketchGridStep,
+              y: point.y,
+            ),
+        ]);
+        expect(
+          controller.existingBlockMappings.map(
+            (mapping) => (mapping.blockId, mapping.polygonIndex),
+          ),
+          [(blockId, 0)],
+        );
+
+        expect(controller.undo(), isTrue);
+        expect(
+          controller.editor!.geometry.canonicalJson,
+          geometry.canonicalJson,
+        );
+        expect(controller.existingBlockMappings.single.blockId, blockId);
+        expect(controller.redo(), isTrue);
+        expect(
+          controller.editor!.geometry.canonicalJson,
+          InventoryGeometry(polylines: [translated]).canonicalJson,
+        );
+        expect(controller.existingBlockMappings.single.blockId, blockId);
+
+        expect(await controller.forceSave(), isTrue);
+        expect(fake.saveCalls, hasLength(1));
+        final mapping = fake.saveCalls.single.existingBlockMappings!.single;
+        expect((mapping.blockId, mapping.polygonIndex), (blockId, 0));
+        expect(fake.projection!.draftBlockPolygons.single.blockId, blockId);
+
+        final recovered = _controller(
+          fake,
+          intent: InventorySketchLaunchIntent.editActive,
+        );
+        addTearDown(recovered.dispose);
+        await recovered.initialize();
+        expect(
+          recovered.editor!.geometry.canonicalJson,
+          controller.editor!.geometry.canonicalJson,
+        );
+        expect(recovered.existingBlockMappings.single.blockId, blockId);
+        final saveCount = fake.saveCalls.length;
+        expect(await recovered.forceSave(), isTrue);
+        expect(fake.saveCalls, hasLength(saveCount));
+
+        expect(await recovered.finalizeDraft(), isTrue);
+        final intent =
+            fake.finalizeCommands.single.existingBlockIntents!.single;
+        expect(intent.blockId, blockId);
+        expect(intent.action, InventoryExistingBlockAction.retainMapped);
+        expect(intent.expectedBlockRevision, 7);
+        expect(intent.targetPolygonIndex, 0);
+        expect(fake.projection!.activeBlockPolygons.single.blockId, blockId);
+      },
+    );
+
+    test(
+      'AT-533-006 orthogonal edge nudge validates before history and autosave',
+      () async {
+        final validBlockId = _uuid(8200);
+        final validFake = _FakeInventoryApplication.withMappedActive(
+          geometry: _rectangleGeometry(),
+          blocks: [_blockRecord(id: validBlockId)],
+          floors: [_floorRecord(id: _uuid(8201), blockId: validBlockId)],
+          activeBlockPolygons: [
+            _blockPolygon(
+              revisionId: _activeId,
+              blockId: validBlockId,
+              polygonIndex: 0,
+            ),
+          ],
+        );
+        final validController = _controller(
+          validFake,
+          intent: InventorySketchLaunchIntent.editActive,
+        );
+        addTearDown(validController.dispose);
+        await validController.initialize();
+        validController.setMode(InventorySketchEditorMode.select);
+        validController.editor = validController.editor!.withSelection(
+          const InventorySketchSelection.segment(
+            polylineIndex: 0,
+            segmentIndex: 0,
+          ),
+        );
+
+        expect(
+          validController.nudgeSelection(InventorySketchNudgeDirection.right),
+          isFalse,
+        );
+        expect(
+          validController.lastErrorCode,
+          'inventory_block_edge_nudge_direction_invalid',
+        );
+        expect(validController.editor!.undoDepth, 0);
+        expect(validFake.saveCalls, isEmpty);
+        expect(
+          validController.nudgeSelection(InventorySketchNudgeDirection.down),
+          isTrue,
+        );
+        expect(validController.lastErrorCode, isNull);
+        expect(validController.editor!.geometry.polylines.single.points, [
+          _point(64, 128),
+          _point(256, 128),
+          _point(256, 256),
+          _point(64, 256),
+        ]);
+        expect(
+          validController.existingBlockMappings.single.blockId,
+          validBlockId,
+        );
+
+        Future<void> expectRejected({
+          required InventoryGeometry geometry,
+          required InventorySketchSelection selection,
+          required InventorySketchNudgeDirection direction,
+          required String errorCode,
+        }) async {
+          final blockIds = [
+            for (var index = 0; index < geometry.polylines.length; index += 1)
+              _uuid(8300 + index),
+          ];
+          final fake = _FakeInventoryApplication.withMappedActive(
+            geometry: geometry,
+            blocks: [
+              for (var index = 0; index < blockIds.length; index += 1)
+                _blockRecord(
+                  id: blockIds[index],
+                  displayName: '${index + 1}. Blok',
+                  normalizedName: '${index + 1}. blok',
+                  ordinal: index + 1,
+                ),
+            ],
+            floors: [
+              for (var index = 0; index < blockIds.length; index += 1)
+                _floorRecord(id: _uuid(8350 + index), blockId: blockIds[index]),
+            ],
+            activeBlockPolygons: [
+              for (var index = 0; index < blockIds.length; index += 1)
+                _blockPolygon(
+                  revisionId: _activeId,
+                  blockId: blockIds[index],
+                  polygonIndex: index,
+                ),
+            ],
+          );
+          final controller = _controller(
+            fake,
+            intent: InventorySketchLaunchIntent.editActive,
+          );
+          addTearDown(controller.dispose);
+          await controller.initialize();
+          controller.setMode(InventorySketchEditorMode.select);
+          controller.editor = controller.editor!.withSelection(selection);
+          final beforeGeometry = controller.editor!.geometry.canonicalJson;
+          final beforeUndoDepth = controller.editor!.undoDepth;
+          final beforeProjection = fake.projection;
+          final beforeMappings = [
+            for (final mapping in controller.existingBlockMappings)
+              (mapping.blockId, mapping.polygonIndex),
+          ];
+
+          expect(controller.nudgeSelection(direction), isFalse);
+          expect(controller.lastErrorCode, errorCode);
+          expect(controller.editor!.geometry.canonicalJson, beforeGeometry);
+          expect(controller.editor!.undoDepth, beforeUndoDepth);
+          expect(
+            controller.existingBlockMappings.map(
+              (mapping) => (mapping.blockId, mapping.polygonIndex),
+            ),
+            beforeMappings,
+          );
+          expect(fake.saveCalls, isEmpty);
+          expect(fake.operationOrder, isEmpty);
+          expect(identical(fake.projection, beforeProjection), isTrue);
+        }
+
+        await expectRejected(
+          geometry: _edgeSelfIntersectionGeometry(),
+          selection: const InventorySketchSelection.segment(
+            polylineIndex: 0,
+            segmentIndex: 4,
+          ),
+          direction: InventorySketchNudgeDirection.up,
+          errorCode: 'inventory_block_polygon_self_intersects',
+        );
+        await expectRejected(
+          geometry: _rectangleGeometry(left: 0, right: 192),
+          selection: const InventorySketchSelection.polyline(polylineIndex: 0),
+          direction: InventorySketchNudgeDirection.left,
+          errorCode: 'inventory_block_nudge_out_of_bounds',
+        );
+        await expectRejected(
+          geometry: InventoryGeometry(
+            polylines: [
+              _rectangleGeometry(left: 0, right: 192).polylines.single,
+              _rectangleGeometry(left: 256, right: 448).polylines.single,
+            ],
+          ),
+          selection: const InventorySketchSelection.polyline(polylineIndex: 0),
+          direction: InventorySketchNudgeDirection.right,
+          errorCode: 'inventory_block_polygon_ambiguous',
+        );
+        await expectRejected(
+          geometry: _closedBlockGeometry(),
+          selection: const InventorySketchSelection.segment(
+            polylineIndex: 0,
+            segmentIndex: 0,
+          ),
+          direction: InventorySketchNudgeDirection.right,
+          errorCode: 'inventory_block_diagonal_edge_reshape_not_supported',
+        );
+      },
+    );
   });
 
   group('SELECT and deterministic delete', () {
@@ -1489,6 +1745,272 @@ void main() {
     },
   );
 
+  testWidgets(
+    'AT-533-014 mapped delete requires exact choice and history keeps mapping',
+    (tester) async {
+      final blockId = _uuid(8400);
+      final geometry = _rectangleGeometry();
+      final fake = _FakeInventoryApplication.withMappedActive(
+        geometry: geometry,
+        blocks: [_blockRecord(id: blockId)],
+        floors: [_floorRecord(id: _uuid(8401), blockId: blockId)],
+        activeBlockPolygons: [
+          _blockPolygon(
+            revisionId: _activeId,
+            blockId: blockId,
+            polygonIndex: 0,
+          ),
+        ],
+      );
+      final orientations = _OrientationRecorder();
+      final pageKey = GlobalKey<InventorySketchEditorPageState>();
+      await _openEditor(
+        tester,
+        fake,
+        orientations,
+        pageKey,
+        intent: InventorySketchLaunchIntent.editActive,
+      );
+      final controller = pageKey.currentState!.controller;
+      final originalDraftRevisionId = controller.draftRevisionId;
+      controller.editor = controller.editor!.withSelection(
+        const InventorySketchSelection.polyline(polylineIndex: 0),
+      );
+      controller.setMode(InventorySketchEditorMode.select);
+      await tester.pump();
+      final beforeGeometry = controller.editor!.geometry.canonicalJson;
+      final beforeMappings = controller.existingBlockMappings;
+
+      final delete = find.byKey(const Key('inventory-editor-delete'));
+      await tester.ensureVisible(delete);
+      await tester.tap(delete);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('inventory-block-lifecycle-dialog')),
+        findsOneWidget,
+      );
+      expect(find.text('Bloğu ve envanter kayıtlarını sil'), findsOneWidget);
+      expect(
+        find.byKey(const Key('inventory-block-lifecycle-archive')),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Bloğu krokiden kaldır, kayıtları koru'),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('inventory-block-lifecycle-detach')),
+        findsOneWidget,
+      );
+      expect(controller.editor!.geometry.canonicalJson, beforeGeometry);
+      expect(controller.existingBlockMappings.single.blockId, blockId);
+      expect(fake.saveCalls, isEmpty);
+
+      await tester.tap(
+        find.byKey(const Key('inventory-block-lifecycle-detach')),
+      );
+      await tester.pumpAndSettle();
+      expect(controller.editor!.geometry.polylines, isEmpty);
+      expect(controller.existingBlockMappings, isEmpty);
+      expect(controller.hasUnresolvedLifecycleChoices, isFalse);
+      expect(controller.isFinalizeEnabled, isTrue);
+
+      expect(controller.undo(), isTrue);
+      expect(controller.editor!.geometry.canonicalJson, beforeGeometry);
+      expect(
+        controller.existingBlockMappings.map(
+          (mapping) => (mapping.blockId, mapping.polygonIndex),
+        ),
+        beforeMappings.map(
+          (mapping) => (mapping.blockId, mapping.polygonIndex),
+        ),
+      );
+      expect(controller.redo(), isTrue);
+      expect(controller.editor!.geometry.polylines, isEmpty);
+      expect(controller.existingBlockMappings, isEmpty);
+      expect(controller.hasUnresolvedLifecycleChoices, isFalse);
+
+      expect(await controller.finalizeDraft(), isTrue);
+      expect(
+        controller.draftRevisionId,
+        allOf(isNotNull, isNot(originalDraftRevisionId)),
+      );
+      final intent = fake.finalizeCommands.single.existingBlockIntents!.single;
+      expect(intent.blockId, blockId);
+      expect(intent.action, InventoryExistingBlockAction.detach);
+      expect(intent.targetPolygonIndex, isNull);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'AT-533-014 recovered missing mapping requires a fresh session choice',
+    (tester) async {
+      final blockId = _uuid(8500);
+      final activeGeometry = _rectangleGeometry();
+      final fake = _FakeInventoryApplication.withSpatialEditDraft(
+        activeGeometry: activeGeometry,
+        draftGeometry: InventoryGeometry.emptyDraft(),
+        blocks: [_blockRecord(id: blockId)],
+        floors: [_floorRecord(id: _uuid(8501), blockId: blockId)],
+        activeBlockPolygons: [
+          _blockPolygon(
+            revisionId: _activeId,
+            blockId: blockId,
+            polygonIndex: 0,
+          ),
+        ],
+      );
+      final orientations = _OrientationRecorder();
+      final pageKey = GlobalKey<InventorySketchEditorPageState>();
+      await _openEditor(
+        tester,
+        fake,
+        orientations,
+        pageKey,
+        intent: InventorySketchLaunchIntent.editActive,
+      );
+      final controller = pageKey.currentState!.controller;
+
+      expect(
+        find.byKey(const Key('inventory-block-lifecycle-dialog')),
+        findsOneWidget,
+      );
+      expect(controller.hasUnresolvedLifecycleChoices, isTrue);
+      expect(controller.isFinalizeEnabled, isFalse);
+      expect(fake.saveCalls, isEmpty);
+
+      await tester.tap(
+        find.byKey(const Key('inventory-block-lifecycle-detach')),
+      );
+      await tester.pumpAndSettle();
+      expect(controller.hasUnresolvedLifecycleChoices, isFalse);
+      expect(controller.isFinalizeEnabled, isTrue);
+      expect(controller.hasUnacknowledgedGeometry, isFalse);
+      expect(fake.saveCalls, isEmpty);
+
+      final freshSession = _controller(
+        fake,
+        intent: InventorySketchLaunchIntent.editActive,
+      );
+      addTearDown(freshSession.dispose);
+      await freshSession.initialize();
+      expect(freshSession.hasUnresolvedLifecycleChoices, isTrue);
+      expect(freshSession.isFinalizeEnabled, isFalse);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'AT-533-011 Turkish-normalized reattach reuses exact block and floor IDs',
+    (tester) async {
+      final blockId = _uuid(8600);
+      final floorIds = [_uuid(8601), _uuid(8602)];
+      final fake = _FakeInventoryApplication.withSpatialEditDraft(
+        activeGeometry: InventoryGeometry.emptyDraft(),
+        draftGeometry: InventoryGeometry.emptyDraft(),
+        blocks: [
+          _blockRecord(
+            id: blockId,
+            displayName: 'I Blok',
+            normalizedName: 'ı blok',
+            state: InventoryBlockState.detached,
+            revision: 3,
+          ),
+        ],
+        floors: [
+          _floorRecord(id: floorIds[0], blockId: blockId),
+          _floorRecord(
+            id: floorIds[1],
+            blockId: blockId,
+            displayName: '2. Kat',
+            ordinal: 2,
+          ),
+        ],
+      );
+      final orientations = _OrientationRecorder();
+      final pageKey = GlobalKey<InventorySketchEditorPageState>();
+      await _openEditor(
+        tester,
+        fake,
+        orientations,
+        pageKey,
+        intent: InventorySketchLaunchIntent.editActive,
+      );
+      final controller = pageKey.currentState!.controller;
+      final originalDraftRevisionId = controller.draftRevisionId;
+      for (final point in [
+        _point(64, 64),
+        _point(256, 64),
+        _point(256, 256),
+        _point(64, 256),
+      ]) {
+        expect(controller.drawPoint(point), isTrue);
+      }
+      await tester.pump();
+
+      final close = find.byKey(const Key('inventory-editor-close-block'));
+      await tester.ensureVisible(close);
+      await tester.tap(close);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('inventory-block-name')),
+        'I   BLOK',
+      );
+      await tester.tap(find.byKey(const Key('inventory-block-metadata-save')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('inventory-block-reattach-dialog')),
+        findsOneWidget,
+      );
+      expect(controller.existingBlockMappings, isEmpty);
+      expect(controller.newBlocks, isEmpty);
+      expect(controller.editor!.workingPolylineIndex, 0);
+      expect(find.textContaining('I Blok'), findsOneWidget);
+      expect(find.textContaining('2 kat'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const Key('inventory-block-reattach-confirm')),
+      );
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump();
+
+      expect(controller.newBlocks, isEmpty);
+      expect(
+        controller.draftRevisionId,
+        allOf(isNotNull, isNot(originalDraftRevisionId)),
+      );
+      expect(fake.projection!.draftRevision!.id, controller.draftRevisionId);
+      expect(controller.existingBlockMappings, hasLength(1));
+      expect(controller.existingBlockMappings.single.blockId, blockId);
+      expect(controller.existingBlockMappings.single.polygonIndex, 0);
+      expect(
+        controller.floorsForExistingBlock(blockId).map((floor) => floor.id),
+        floorIds,
+      );
+      expect(fake.saveCalls, isNotEmpty);
+      expect(
+        fake.saveCalls.last.existingBlockMappings!.single.blockId,
+        blockId,
+      );
+      expect(fake.saveCalls.last.newBlocks, isEmpty);
+
+      expect(await controller.finalizeDraft(), isTrue);
+      final intent = fake.finalizeCommands.single.existingBlockIntents!.single;
+      expect(intent.blockId, blockId);
+      expect(intent.action, InventoryExistingBlockAction.reattach);
+      expect(intent.expectedBlockRevision, 3);
+      expect(intent.targetPolygonIndex, 0);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+    },
+  );
+
   testWidgets('full-screen editor uses accessible icon-only right toolbar', (
     tester,
   ) async {
@@ -1530,6 +2052,10 @@ void main() {
       Key('inventory-editor-close-block'): 'Alanı kapat',
       Key('inventory-editor-free-length'): 'Serbest uzunluk',
       Key('inventory-editor-delete'): 'Seçileni sil',
+      Key('inventory-editor-nudge-up'): 'Yukarı taşı',
+      Key('inventory-editor-nudge-right'): 'Sağa taşı',
+      Key('inventory-editor-nudge-down'): 'Aşağı taşı',
+      Key('inventory-editor-nudge-left'): 'Sola taşı',
       Key('inventory-editor-zoom-out'): 'Uzaklaştır',
       Key('inventory-editor-zoom-in'): 'Yakınlaştır',
       Key('inventory-editor-fit'): 'Tamamını göster',
@@ -2166,6 +2692,94 @@ List<InventoryBlockDraft> _blockDrafts() => [
   ),
 ];
 
+InventoryBlockRecord _blockRecord({
+  required String id,
+  String displayName = 'A Blok',
+  String normalizedName = 'a blok',
+  int ordinal = 1,
+  InventoryBlockState state = InventoryBlockState.active,
+  int revision = 1,
+}) => InventoryBlockRecord(
+  id: id,
+  projectId: _projectId,
+  displayName: displayName,
+  normalizedName: normalizedName,
+  ordinal: ordinal,
+  state: state,
+  revision: revision,
+  createdAt: _time,
+  updatedAt: _time,
+  archivedAt: null,
+);
+
+InventoryFloorRecord _floorRecord({
+  required String id,
+  required String blockId,
+  String displayName = '1. Kat',
+  int ordinal = 1,
+  int revision = 1,
+}) => InventoryFloorRecord(
+  id: id,
+  blockId: blockId,
+  projectId: _projectId,
+  displayName: displayName,
+  ordinal: ordinal,
+  revision: revision,
+  createdAt: _time,
+  updatedAt: _time,
+  archivedAt: null,
+);
+
+InventoryRevisionBlockPolygonRecord _blockPolygon({
+  required String revisionId,
+  required String blockId,
+  required int polygonIndex,
+}) => InventoryRevisionBlockPolygonRecord(
+  revisionId: revisionId,
+  blockId: blockId,
+  projectId: _projectId,
+  sketchId: _sketchId,
+  polygonIndex: polygonIndex,
+  createdAt: _time,
+);
+
+InventoryGeometry _rectangleGeometry({
+  int left = 64,
+  int top = 64,
+  int right = 256,
+  int bottom = 256,
+}) => InventoryGeometry(
+  polylines: [
+    InventoryPolyline(
+      closed: true,
+      points: [
+        _point(left, top),
+        _point(right, top),
+        _point(right, bottom),
+        _point(left, bottom),
+      ],
+    ),
+  ],
+);
+
+InventoryGeometry _edgeSelfIntersectionGeometry() => InventoryGeometry(
+  polylines: [
+    InventoryPolyline(
+      closed: true,
+      points: [
+        _point(0, 0),
+        _point(256, 0),
+        _point(256, 256),
+        _point(192, 256),
+        _point(192, 64),
+        _point(64, 64),
+        _point(64, 256),
+        _point(0, 256),
+      ],
+    ),
+  ],
+);
+
 void _expectSameBlockIdentity(
   InventoryBlockDraft actual,
   InventoryBlockDraft expected, {
@@ -2281,6 +2895,56 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
         ),
       );
 
+  factory _FakeInventoryApplication.withMappedActive({
+    required InventoryGeometry geometry,
+    required List<InventoryBlockRecord> blocks,
+    required List<InventoryFloorRecord> floors,
+    required List<InventoryRevisionBlockPolygonRecord> activeBlockPolygons,
+  }) => _FakeInventoryApplication._(
+    _projection(
+      sketchRevision: 3,
+      active: _revision(
+        id: _activeId,
+        state: InventorySketchRevisionState.active,
+        geometry: geometry,
+        contentRevision: 2,
+      ),
+      blocks: blocks,
+      floors: floors,
+      activeBlockPolygons: activeBlockPolygons,
+    ),
+  );
+
+  factory _FakeInventoryApplication.withSpatialEditDraft({
+    required InventoryGeometry activeGeometry,
+    required InventoryGeometry draftGeometry,
+    List<InventoryBlockRecord> blocks = const [],
+    List<InventoryFloorRecord> floors = const [],
+    List<InventoryRevisionBlockPolygonRecord> activeBlockPolygons = const [],
+    List<InventoryRevisionBlockPolygonRecord> draftBlockPolygons = const [],
+  }) => _FakeInventoryApplication._(
+    _projection(
+      sketchRevision: 4,
+      active: _revision(
+        id: _activeId,
+        state: InventorySketchRevisionState.active,
+        geometry: activeGeometry,
+        contentRevision: 2,
+      ),
+      draft: _revision(
+        id: _draftId,
+        state: InventorySketchRevisionState.draft,
+        geometry: draftGeometry,
+        contentRevision: 1,
+        baseRevisionId: _activeId,
+      ),
+      blocks: blocks,
+      floors: floors,
+      activeBlockPolygons: activeBlockPolygons,
+      draftBlockPolygons: draftBlockPolygons,
+    ),
+  );
+
   InventoryPrimarySketchProjection? projection;
   int createCalls = 0;
   int editCalls = 0;
@@ -2290,10 +2954,12 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
   int failFinalizeCount = 0;
   int failLoadCount = 0;
   int saveMutationCount = 0;
+  int replacementDraftCount = 0;
   int concurrentSaves = 0;
   int maximumConcurrentSaves = 0;
   final saveCalls = <AutosaveInventorySketchDraftCommand>[];
   final finalizeCommands = <FinalizeInventorySketchCommand>[];
+  final assetProjections = <InventoryAssetProjection>[];
   final saveGates = <Completer<void>>[];
   final loadGates = <Completer<void>>[];
   final operationOrder = <String>[];
@@ -2361,6 +3027,17 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
       sketchRevision: current.sketch.revision + 1,
       active: active,
       draft: draft,
+      blocks: current.blocks,
+      floors: current.floors,
+      activeBlockPolygons: current.activeBlockPolygons,
+      draftBlockPolygons: [
+        for (final mapping in current.activeBlockPolygons)
+          _blockPolygon(
+            revisionId: draft.id,
+            blockId: mapping.blockId,
+            polygonIndex: mapping.polygonIndex,
+          ),
+      ],
     );
     return _result(
       command: InventoryCommandType.sketchEditStart,
@@ -2398,13 +3075,32 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
       if (draft.contentRevision != command.expectedContentRevision) {
         throw const InventoryFailure('inventory_stale_content_revision');
       }
+      final requestedMappings =
+          command.existingBlockMappings ??
+          [
+            for (final mapping in current.draftBlockPolygons)
+              InventoryExistingBlockMappingDraft(
+                blockId: mapping.blockId,
+                polygonIndex: mapping.polygonIndex,
+              ),
+          ];
+      final mappingsChanged = !_sameExistingBlockMappings(
+        current.draftBlockPolygons,
+        requestedMappings,
+      );
       final changed =
           draft.geometry.canonicalJson != command.geometry.canonicalJson ||
+          mappingsChanged ||
           !_sameBlockDrafts(current.draftNewBlocks, command.newBlocks);
       final nextSketchRevision = current.sketch.revision + (changed ? 1 : 0);
-      final nextContentRevision = draft.contentRevision + (changed ? 1 : 0);
+      final nextDraftId = mappingsChanged
+          ? _uuid(900000 + replacementDraftCount++)
+          : draft.id;
+      final nextContentRevision = mappingsChanged
+          ? 1
+          : draft.contentRevision + (changed ? 1 : 0);
       final nextDraft = _revision(
-        id: draft.id,
+        id: nextDraftId,
         sketchId: current.sketch.id,
         state: InventorySketchRevisionState.draft,
         geometry: command.geometry,
@@ -2416,6 +3112,17 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
         sketchRevision: nextSketchRevision,
         active: current.activeRevision,
         draft: nextDraft,
+        blocks: current.blocks,
+        floors: current.floors,
+        activeBlockPolygons: current.activeBlockPolygons,
+        draftBlockPolygons: [
+          for (final mapping in requestedMappings)
+            _blockPolygon(
+              revisionId: nextDraftId,
+              blockId: mapping.blockId,
+              polygonIndex: mapping.polygonIndex,
+            ),
+        ],
         draftNewBlocks: command.newBlocks,
         draftLegacyPolygonCount: current.draftLegacyPolygonCount,
       );
@@ -2425,7 +3132,7 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
         operationId: command.operationId,
         sourceId: current.sketch.id,
         sourceRevision: nextSketchRevision,
-        supportingId: draft.id,
+        supportingId: nextDraftId,
         supportingRevision: nextContentRevision,
         isNoOp: !changed,
       );
@@ -2449,9 +3156,35 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
     }
     final current = projection!;
     final draft = current.draftRevision!;
-    draft.geometry.validateFinalizable();
+    final intents = command.existingBlockIntents;
+    final allowEmpty =
+        intents != null &&
+        intents.isNotEmpty &&
+        intents.every(
+          (intent) =>
+              intent.action == InventoryExistingBlockAction.detach ||
+              intent.action == InventoryExistingBlockAction.archive,
+        );
+    draft.geometry.validateFinalizable(allowEmpty: allowEmpty);
     if (!_sameBlockDrafts(current.draftNewBlocks, command.newBlocks)) {
       throw const InventoryFailure('inventory_block_metadata_mismatch');
+    }
+    if (intents != null) {
+      final mappedByBlock = {
+        for (final mapping in current.draftBlockPolygons)
+          mapping.blockId: mapping.polygonIndex,
+      };
+      for (final intent in intents) {
+        final target = mappedByBlock[intent.blockId];
+        if (intent.action == InventoryExistingBlockAction.retainMapped ||
+            intent.action == InventoryExistingBlockAction.reattach) {
+          if (target == null || target != intent.targetPolygonIndex) {
+            throw const InventoryFailure('inventory_spatial_draft_mismatch');
+          }
+        } else if (target != null) {
+          throw const InventoryFailure('inventory_spatial_draft_mismatch');
+        }
+      }
     }
     final active = _revision(
       id: draft.id,
@@ -2466,6 +3199,16 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
       sketchId: current.sketch.id,
       sketchRevision: nextRevision,
       active: active,
+      blocks: current.blocks,
+      floors: current.floors,
+      activeBlockPolygons: [
+        for (final mapping in current.draftBlockPolygons)
+          _blockPolygon(
+            revisionId: draft.id,
+            blockId: mapping.blockId,
+            polygonIndex: mapping.polygonIndex,
+          ),
+      ],
     );
     return _result(
       command: InventoryCommandType.sketchFinalize,
@@ -2486,6 +3229,18 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
   }
 
   @override
+  Future<List<InventoryAssetProjection>> listAssets({
+    required String projectId,
+    bool includeArchived = false,
+  }) async => List<InventoryAssetProjection>.unmodifiable(
+    assetProjections.where(
+      (projection) =>
+          projection.asset.projectId == projectId &&
+          (includeArchived || projection.asset.archivedAt == null),
+    ),
+  );
+
+  @override
   dynamic noSuchMethod(Invocation invocation) =>
       throw UnsupportedError(invocation.memberName.toString());
 }
@@ -2495,6 +3250,10 @@ InventoryPrimarySketchProjection _projection({
   required int sketchRevision,
   InventorySketchRevisionRecord? active,
   InventorySketchRevisionRecord? draft,
+  List<InventoryBlockRecord> blocks = const [],
+  List<InventoryFloorRecord> floors = const [],
+  List<InventoryRevisionBlockPolygonRecord> activeBlockPolygons = const [],
+  List<InventoryRevisionBlockPolygonRecord> draftBlockPolygons = const [],
   List<InventoryBlockDraft> draftNewBlocks = const [],
   int draftLegacyPolygonCount = 0,
 }) => InventoryPrimarySketchProjection(
@@ -2512,6 +3271,10 @@ InventoryPrimarySketchProjection _projection({
   ),
   activeRevision: active,
   draftRevision: draft,
+  blocks: blocks,
+  floors: floors,
+  activeBlockPolygons: activeBlockPolygons,
+  draftBlockPolygons: draftBlockPolygons,
   draftNewBlocks: draftNewBlocks,
   draftLegacyPolygonCount: draftLegacyPolygonCount,
 );
@@ -2537,6 +3300,22 @@ bool _sameBlockDrafts(
         return false;
       }
     }
+  }
+  return true;
+}
+
+bool _sameExistingBlockMappings(
+  List<InventoryRevisionBlockPolygonRecord> records,
+  List<InventoryExistingBlockMappingDraft> drafts,
+) {
+  if (records.length != drafts.length) return false;
+  final recordIndexes = <String, int>{};
+  for (final record in records) {
+    if (recordIndexes.containsKey(record.blockId)) return false;
+    recordIndexes[record.blockId] = record.polygonIndex;
+  }
+  for (final draft in drafts) {
+    if (recordIndexes[draft.blockId] != draft.polygonIndex) return false;
   }
   return true;
 }

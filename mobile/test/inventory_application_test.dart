@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:chief_site_engineer/application/inventory_application.dart';
+import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:crypto/crypto.dart' as hashes;
@@ -2228,6 +2230,1310 @@ void main() {
       );
     },
   );
+
+  test(
+    'AT-533-002/003/004/005 rigid and non-rigid reconciliation is deterministic, historical, and idempotent',
+    () async {
+      final fixture = await _Fixture.create('at_533_reconciliation');
+      addTearDown(fixture.close);
+      final sketch = await _createFinalizedSketch(fixture, seed: 16000);
+      var spatial = (await fixture.app.loadPrimarySketch(_projectA))!;
+      final block = spatial.blocks.single;
+      final floor = spatial.floors.firstWhere(
+        (item) => item.blockId == block.id && item.ordinal == 1,
+      );
+      final stableAssetId = _uuid(16010);
+      await fixture.app.createAsset(
+        CreateInventoryAssetCommand(
+          operationId: _uuid(16011),
+          projectId: _projectA,
+          assetId: stableAssetId,
+          placementId: _uuid(16012),
+          placementKey: _uuid(16013),
+          sketchId: sketch.sketchId,
+          activeRevisionId: sketch.activeRevisionId,
+          floorId: floor.id,
+          displayName: 'Stable interior',
+          category: InventoryCategory.equipment,
+          totalQuantity: 1,
+          x: 128,
+          y: 128,
+        ),
+      );
+      final rigidPeerAssetId = _uuid(16014);
+      await fixture.app.createAsset(
+        CreateInventoryAssetCommand(
+          operationId: _uuid(16015),
+          projectId: _projectA,
+          assetId: rigidPeerAssetId,
+          placementId: _uuid(16016),
+          placementKey: _uuid(16017),
+          sketchId: sketch.sketchId,
+          activeRevisionId: sketch.activeRevisionId,
+          floorId: floor.id,
+          displayName: 'Rigid peer',
+          category: InventoryCategory.handTool,
+          totalQuantity: 1,
+          x: 384,
+          y: 256,
+        ),
+      );
+      final beforeRigid = await fixture.app.loadAsset(
+        projectId: _projectA,
+        assetId: stableAssetId,
+      );
+      final peerBeforeRigid = await fixture.app.loadAsset(
+        projectId: _projectA,
+        assetId: rigidPeerAssetId,
+      );
+      final rigidDraftId = _uuid(16020);
+      await _seedLegacyPrefixEditDraft(
+        fixture,
+        draftId: rigidDraftId,
+        legacyPolygonCount: spatial.activeRevision!.geometry.polylines.length,
+      );
+      spatial = (await fixture.app.loadPrimarySketch(_projectA))!;
+      expect(
+        spatial.draftLegacyPolygonCount,
+        spatial.activeRevision!.geometry.polylines.length,
+      );
+      final rigidGeometry = InventoryGeometry(
+        polylines: [_rectangle(64, 0, 2112, 1536)],
+      );
+      await fixture.app.autosaveSketchDraft(
+        AutosaveInventorySketchDraftCommand(
+          operationId: _uuid(16022),
+          projectId: _projectA,
+          sketchId: sketch.sketchId,
+          draftRevisionId: rigidDraftId,
+          expectedSketchRevision: spatial.sketch.revision,
+          expectedContentRevision: spatial.draftRevision!.contentRevision,
+          geometry: rigidGeometry,
+          existingBlockMappings: [
+            InventoryExistingBlockMappingDraft(
+              blockId: block.id,
+              polygonIndex: 0,
+            ),
+          ],
+        ),
+      );
+      spatial = (await fixture.app.loadPrimarySketch(_projectA))!;
+      expect(spatial.draftLegacyPolygonCount, 0);
+      final rigidCommand = FinalizeInventorySketchCommand(
+        operationId: _uuid(16023),
+        projectId: _projectA,
+        sketchId: sketch.sketchId,
+        draftRevisionId: rigidDraftId,
+        expectedSketchRevision: spatial.sketch.revision,
+        expectedContentRevision: spatial.draftRevision!.contentRevision,
+        existingBlockIntents: [
+          InventoryExistingBlockFinalizeIntent(
+            blockId: block.id,
+            action: InventoryExistingBlockAction.retainMapped,
+            expectedBlockRevision: block.revision,
+            targetPolygonIndex: 0,
+          ),
+        ],
+        placementExpectations: await _placementExpectations(fixture.app),
+      );
+      final rigidResult = await fixture.app.finalizeSketch(rigidCommand);
+      expect(rigidResult.eventCount, 3);
+      final afterRigid = await fixture.app.loadAsset(
+        projectId: _projectA,
+        assetId: stableAssetId,
+      );
+      final peerAfterRigid = await fixture.app.loadAsset(
+        projectId: _projectA,
+        assetId: rigidPeerAssetId,
+      );
+      expect(
+        afterRigid.activePlacement!.x,
+        beforeRigid.activePlacement!.x + 64,
+      );
+      expect(afterRigid.activePlacement!.y, beforeRigid.activePlacement!.y);
+      expect(
+        afterRigid.activePlacement!.sequence,
+        beforeRigid.activePlacement!.sequence + 1,
+      );
+      expect(
+        peerAfterRigid.activePlacement!.x,
+        peerBeforeRigid.activePlacement!.x + 64,
+      );
+      expect(
+        peerAfterRigid.activePlacement!.y,
+        peerBeforeRigid.activePlacement!.y,
+      );
+      expect(
+        peerAfterRigid.activePlacement!.sequence,
+        peerBeforeRigid.activePlacement!.sequence + 1,
+      );
+      expect(
+        peerAfterRigid.activePlacement!.x - afterRigid.activePlacement!.x,
+        peerBeforeRigid.activePlacement!.x - beforeRigid.activePlacement!.x,
+      );
+      expect(
+        peerAfterRigid.activePlacement!.y - afterRigid.activePlacement!.y,
+        peerBeforeRigid.activePlacement!.y - beforeRigid.activePlacement!.y,
+      );
+      final rigidEvents = await fixture.db.database.query(
+        'inventory_events',
+        where: 'operation_id = ?',
+        whereArgs: [rigidCommand.operationId],
+        orderBy: 'aggregate_type ASC',
+      );
+      expect(rigidEvents, hasLength(3));
+      final rigidMoveRows = rigidEvents
+          .where(
+            (row) =>
+                row['event_type'] ==
+                InventoryEventType.placementMoved.storageValue,
+          )
+          .toList(growable: false);
+      expect(rigidMoveRows, hasLength(2));
+      final rigidMovePayload =
+          jsonDecode(
+                rigidMoveRows.singleWhere(
+                      (row) =>
+                          row['aggregate_id'] ==
+                          beforeRigid.activePlacement!.placementKey,
+                    )['payload_json']!
+                    as String,
+              )
+              as Map<String, dynamic>;
+      expect(rigidMovePayload['reason'], 'geometry_reconciliation');
+      expect(rigidMovePayload['source_revision_id'], sketch.activeRevisionId);
+      expect(rigidMovePayload['target_revision_id'], rigidDraftId);
+      expect(rigidMovePayload['before_floor_id'], floor.id);
+      expect(rigidMovePayload['after_floor_id'], floor.id);
+      expect(rigidMovePayload['before_x'], beforeRigid.activePlacement!.x);
+      expect(rigidMovePayload['before_y'], beforeRigid.activePlacement!.y);
+      expect(rigidMovePayload['after_x'], afterRigid.activePlacement!.x);
+      expect(rigidMovePayload['after_y'], afterRigid.activePlacement!.y);
+      expect(
+        rigidMovePayload['predecessor_placement_id'],
+        beforeRigid.activePlacement!.id,
+      );
+      expect(rigidMovePayload['placement_id'], afterRigid.activePlacement!.id);
+      final peerRigidMovePayload =
+          jsonDecode(
+                rigidMoveRows.singleWhere(
+                      (row) =>
+                          row['aggregate_id'] ==
+                          peerBeforeRigid.activePlacement!.placementKey,
+                    )['payload_json']!
+                    as String,
+              )
+              as Map<String, dynamic>;
+      expect(peerRigidMovePayload['reason'], 'geometry_reconciliation');
+      expect(
+        peerRigidMovePayload['before_x'],
+        peerBeforeRigid.activePlacement!.x,
+      );
+      expect(
+        peerRigidMovePayload['before_y'],
+        peerBeforeRigid.activePlacement!.y,
+      );
+      expect(
+        peerRigidMovePayload['after_x'],
+        peerAfterRigid.activePlacement!.x,
+      );
+      expect(
+        peerRigidMovePayload['after_y'],
+        peerAfterRigid.activePlacement!.y,
+      );
+      expect(
+        peerRigidMovePayload['predecessor_placement_id'],
+        peerBeforeRigid.activePlacement!.id,
+      );
+      expect(
+        peerRigidMovePayload['placement_id'],
+        peerAfterRigid.activePlacement!.id,
+      );
+      final countsBeforeReplay = await _counts(fixture.db.database);
+      final rigidReplay = await fixture.app.finalizeSketch(rigidCommand);
+      expect(_resultValues(rigidReplay), _resultValues(rigidResult));
+      expect(await _counts(fixture.db.database), countsBeforeReplay);
+
+      spatial = (await fixture.app.loadPrimarySketch(_projectA))!;
+      final outsideAssetId = _uuid(16030);
+      await fixture.app.createAsset(
+        CreateInventoryAssetCommand(
+          operationId: _uuid(16031),
+          projectId: _projectA,
+          assetId: outsideAssetId,
+          placementId: _uuid(16032),
+          placementKey: _uuid(16033),
+          sketchId: sketch.sketchId,
+          activeRevisionId: spatial.activeRevision!.id,
+          floorId: floor.id,
+          displayName: 'Outside after reshape',
+          category: InventoryCategory.handTool,
+          totalQuantity: 1,
+          x: 2048,
+          y: 128,
+        ),
+      );
+      final stableBeforeReshape = await fixture.app.loadAsset(
+        projectId: _projectA,
+        assetId: stableAssetId,
+      );
+      final outsideBeforeReshape = await fixture.app.loadAsset(
+        projectId: _projectA,
+        assetId: outsideAssetId,
+      );
+      final nonRigidDraftId = _uuid(16040);
+      await fixture.app.startSketchEdit(
+        StartInventorySketchEditCommand(
+          operationId: _uuid(16041),
+          projectId: _projectA,
+          sketchId: sketch.sketchId,
+          activeRevisionId: spatial.activeRevision!.id,
+          newDraftRevisionId: nonRigidDraftId,
+          expectedSketchRevision: spatial.sketch.revision,
+        ),
+      );
+      spatial = (await fixture.app.loadPrimarySketch(_projectA))!;
+      final nonRigidGeometry = InventoryGeometry(
+        polylines: [_rectangle(64, 0, 1024, 1536)],
+      );
+      await fixture.app.autosaveSketchDraft(
+        AutosaveInventorySketchDraftCommand(
+          operationId: _uuid(16042),
+          projectId: _projectA,
+          sketchId: sketch.sketchId,
+          draftRevisionId: nonRigidDraftId,
+          expectedSketchRevision: spatial.sketch.revision,
+          expectedContentRevision: spatial.draftRevision!.contentRevision,
+          geometry: nonRigidGeometry,
+          existingBlockMappings: [
+            InventoryExistingBlockMappingDraft(
+              blockId: block.id,
+              polygonIndex: 0,
+            ),
+          ],
+        ),
+      );
+      spatial = (await fixture.app.loadPrimarySketch(_projectA))!;
+      final currentBlock = spatial.blocks.singleWhere(
+        (item) => item.id == block.id,
+      );
+      final nonRigidCommand = FinalizeInventorySketchCommand(
+        operationId: _uuid(16043),
+        projectId: _projectA,
+        sketchId: sketch.sketchId,
+        draftRevisionId: nonRigidDraftId,
+        expectedSketchRevision: spatial.sketch.revision,
+        expectedContentRevision: spatial.draftRevision!.contentRevision,
+        existingBlockIntents: [
+          InventoryExistingBlockFinalizeIntent(
+            blockId: block.id,
+            action: InventoryExistingBlockAction.retainMapped,
+            expectedBlockRevision: currentBlock.revision,
+            targetPolygonIndex: 0,
+          ),
+        ],
+        placementExpectations: await _placementExpectations(fixture.app),
+      );
+      final nonRigidResult = await fixture.app.finalizeSketch(nonRigidCommand);
+      expect(nonRigidResult.eventCount, 2);
+      final stableAfterReshape = await fixture.app.loadAsset(
+        projectId: _projectA,
+        assetId: stableAssetId,
+      );
+      final outsideAfterReshape = await fixture.app.loadAsset(
+        projectId: _projectA,
+        assetId: outsideAssetId,
+      );
+      expect(
+        stableAfterReshape.activePlacement!.id,
+        stableBeforeReshape.activePlacement!.id,
+      );
+      expect(
+        stableAfterReshape.activePlacement!.sequence,
+        stableBeforeReshape.activePlacement!.sequence,
+      );
+      expect(
+        outsideAfterReshape.activePlacement!.sequence,
+        outsideBeforeReshape.activePlacement!.sequence + 1,
+      );
+      expect(
+        InventorySpatialContract.safelyContainsPlacement(
+          nonRigidGeometry.polylines.single,
+          x: outsideAfterReshape.activePlacement!.x,
+          y: outsideAfterReshape.activePlacement!.y,
+        ),
+        isTrue,
+      );
+      expect(
+        await fixture.db.database.query(
+          'inventory_events',
+          where: 'operation_id = ? AND event_type = ?',
+          whereArgs: [
+            nonRigidCommand.operationId,
+            InventoryEventType.placementMoved.storageValue,
+          ],
+        ),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'AT-533-008/010/012/013 detach, reattach, archive, and name ambiguity preserve invariants',
+    () async {
+      final fixture = await _Fixture.create('at_533_lifecycle');
+      addTearDown(fixture.close);
+      final geometry = _geometry(64);
+      final sketch = await _createFinalizedSketch(
+        fixture,
+        seed: 17000,
+        geometry: geometry,
+      );
+      final gateway = _MemoryInventoryAttachmentGateway();
+      final app = InventoryApplication(
+        database: fixture.db,
+        clock: fixture.clock.call,
+        idFactory: fixture.ids.call,
+        attachmentGateway: gateway,
+      );
+      var spatial = (await app.loadPrimarySketch(_projectA))!;
+      final firstMapping = spatial.activeBlockPolygons.singleWhere(
+        (mapping) => mapping.polygonIndex == 0,
+      );
+      final secondMapping = spatial.activeBlockPolygons.singleWhere(
+        (mapping) => mapping.polygonIndex == 1,
+      );
+      final firstBlockId = firstMapping.blockId;
+      final secondBlockId = secondMapping.blockId;
+      final firstFloor = spatial.floors.firstWhere(
+        (floor) => floor.blockId == firstBlockId && floor.ordinal == 1,
+      );
+      final firstFloorIds = spatial.floors
+          .where((floor) => floor.blockId == firstBlockId)
+          .map((floor) => floor.id)
+          .toList(growable: false);
+      final firstPolygon =
+          spatial.activeRevision!.geometry.polylines[firstMapping.polygonIndex];
+      final secondPolygon = spatial
+          .activeRevision!
+          .geometry
+          .polylines[secondMapping.polygonIndex];
+      final assetId = _uuid(17010);
+      await app.createAsset(
+        CreateInventoryAssetCommand(
+          operationId: _uuid(17011),
+          projectId: _projectA,
+          assetId: assetId,
+          placementId: _uuid(17012),
+          placementKey: _uuid(17013),
+          sketchId: sketch.sketchId,
+          activeRevisionId: sketch.activeRevisionId,
+          floorId: firstFloor.id,
+          displayName: 'Lifecycle asset',
+          category: InventoryCategory.equipment,
+          totalQuantity: 1,
+          x: 128,
+          y: 128,
+        ),
+      );
+      final secondAssetId = _uuid(17050);
+      await app.createAsset(
+        CreateInventoryAssetCommand(
+          operationId: _uuid(17051),
+          projectId: _projectA,
+          assetId: secondAssetId,
+          placementId: _uuid(17052),
+          placementKey: _uuid(17053),
+          sketchId: sketch.sketchId,
+          activeRevisionId: sketch.activeRevisionId,
+          floorId: firstFloor.id,
+          displayName: 'Lifecycle peer',
+          category: InventoryCategory.handTool,
+          totalQuantity: 1,
+          x: 384,
+          y: 256,
+        ),
+      );
+      final photoLinkId = _uuid(17014);
+      await app.addOrReplaceAssetPhoto(
+        AddOrReplaceInventoryAssetPhotoCommand(
+          operationId: _uuid(17015),
+          projectId: _projectA,
+          assetId: assetId,
+          linkId: photoLinkId,
+          attachmentId: _uuid(17016),
+          expectedAssetRevision: 1,
+          selection: InventoryPhotoSelection(
+            originalFileName: 'lifecycle.jpg',
+            bytes: _jpeg(17),
+            source: InventoryPhotoSource.camera,
+          ),
+        ),
+      );
+      final photoPath = gateway.files.keys.single;
+      final placementBeforeDetach = (await app.loadAsset(
+        projectId: _projectA,
+        assetId: assetId,
+      )).activePlacement!;
+      final secondPlacementBeforeDetach = (await app.loadAsset(
+        projectId: _projectA,
+        assetId: secondAssetId,
+      )).activePlacement!;
+
+      final detachDraftId = _uuid(17020);
+      await app.startSketchEdit(
+        StartInventorySketchEditCommand(
+          operationId: _uuid(17021),
+          projectId: _projectA,
+          sketchId: sketch.sketchId,
+          activeRevisionId: spatial.activeRevision!.id,
+          newDraftRevisionId: detachDraftId,
+          expectedSketchRevision: spatial.sketch.revision,
+        ),
+      );
+      spatial = (await app.loadPrimarySketch(_projectA))!;
+      final detachedGeometry = InventoryGeometry(polylines: [secondPolygon]);
+      final detachAutosaveCommand = AutosaveInventorySketchDraftCommand(
+        operationId: _uuid(17022),
+        projectId: _projectA,
+        sketchId: sketch.sketchId,
+        draftRevisionId: detachDraftId,
+        expectedSketchRevision: spatial.sketch.revision,
+        expectedContentRevision: spatial.draftRevision!.contentRevision,
+        geometry: detachedGeometry,
+        existingBlockMappings: [
+          InventoryExistingBlockMappingDraft(
+            blockId: secondBlockId,
+            polygonIndex: 0,
+          ),
+        ],
+      );
+      final detachAutosaveResult = await app.autosaveSketchDraft(
+        detachAutosaveCommand,
+      );
+      spatial = (await app.loadPrimarySketch(_projectA))!;
+      final detachReplacementDraftId = spatial.draftRevision!.id;
+      expect(detachReplacementDraftId, isNot(detachDraftId));
+      expect(spatial.draftRevision!.contentRevision, 1);
+      expect(
+        (await fixture.db.database.query(
+          'inventory_sketch_revisions',
+          columns: const ['state'],
+          where: 'id = ?',
+          whereArgs: [detachDraftId],
+        )).single['state'],
+        InventorySketchRevisionState.abandoned.storageValue,
+      );
+      expect(
+        await fixture.db.database.query(
+          'inventory_sketch_revision_block_polygons',
+          where: 'revision_id = ?',
+          whereArgs: [detachDraftId],
+        ),
+        hasLength(2),
+      );
+      expect(spatial.draftBlockPolygons.map((mapping) => mapping.blockId), [
+        secondBlockId,
+      ]);
+      final detachAutosaveCounts = await _counts(fixture.db.database);
+      expect(
+        _resultValues(await app.autosaveSketchDraft(detachAutosaveCommand)),
+        _resultValues(detachAutosaveResult),
+      );
+      expect(await _counts(fixture.db.database), detachAutosaveCounts);
+      final detachAutosaveEvent = (await fixture.db.database.query(
+        'inventory_events',
+        where: 'operation_id = ?',
+        whereArgs: [detachAutosaveCommand.operationId],
+      )).single;
+      final detachAutosavePayload =
+          jsonDecode(detachAutosaveEvent['payload_json']! as String)
+              as Map<String, dynamic>;
+      expect(detachAutosavePayload['mapping_revision_replaced'], isTrue);
+      expect(
+        detachAutosavePayload['replaced_draft_revision_id'],
+        detachDraftId,
+      );
+      expect(
+        detachAutosavePayload['draft_revision_id'],
+        detachReplacementDraftId,
+      );
+      final countsBeforeMissingIntent = await _counts(fixture.db.database);
+      await expectLater(
+        app.finalizeSketch(
+          FinalizeInventorySketchCommand(
+            operationId: _uuid(17023),
+            projectId: _projectA,
+            sketchId: sketch.sketchId,
+            draftRevisionId: detachReplacementDraftId,
+            expectedSketchRevision: spatial.sketch.revision,
+            expectedContentRevision: spatial.draftRevision!.contentRevision,
+          ),
+        ),
+        _fails('inventory_block_lifecycle_intent_required'),
+      );
+      expect(await _counts(fixture.db.database), countsBeforeMissingIntent);
+      final detachResult = await app.finalizeSketch(
+        FinalizeInventorySketchCommand(
+          operationId: _uuid(17024),
+          projectId: _projectA,
+          sketchId: sketch.sketchId,
+          draftRevisionId: detachReplacementDraftId,
+          expectedSketchRevision: spatial.sketch.revision,
+          expectedContentRevision: spatial.draftRevision!.contentRevision,
+          existingBlockIntents: [
+            InventoryExistingBlockFinalizeIntent(
+              blockId: firstBlockId,
+              action: InventoryExistingBlockAction.detach,
+              expectedBlockRevision: 1,
+            ),
+            InventoryExistingBlockFinalizeIntent(
+              blockId: secondBlockId,
+              action: InventoryExistingBlockAction.retainMapped,
+              expectedBlockRevision: 1,
+              targetPolygonIndex: 0,
+            ),
+          ],
+          placementExpectations: await _placementExpectations(app),
+        ),
+      );
+      expect(detachResult.eventCount, 1);
+      spatial = (await app.loadPrimarySketch(_projectA))!;
+      expect(
+        spatial.blocks.singleWhere((block) => block.id == firstBlockId).state,
+        InventoryBlockState.detached,
+      );
+      expect(spatial.activeBlockPolygons.map((mapping) => mapping.blockId), [
+        secondBlockId,
+      ]);
+      final placementAfterDetach = (await app.loadAsset(
+        projectId: _projectA,
+        assetId: assetId,
+      )).activePlacement!;
+      final secondPlacementAfterDetach = (await app.loadAsset(
+        projectId: _projectA,
+        assetId: secondAssetId,
+      )).activePlacement!;
+      expect(placementAfterDetach.id, placementBeforeDetach.id);
+      expect(placementAfterDetach.sequence, placementBeforeDetach.sequence);
+      expect(secondPlacementAfterDetach.id, secondPlacementBeforeDetach.id);
+      expect(
+        secondPlacementAfterDetach.sequence,
+        secondPlacementBeforeDetach.sequence,
+      );
+      expect(
+        spatial.floors
+            .where((floor) => firstFloorIds.contains(floor.id))
+            .every((floor) => floor.archivedAt == null),
+        isTrue,
+      );
+
+      final reattachDraftId = _uuid(17030);
+      await app.startSketchEdit(
+        StartInventorySketchEditCommand(
+          operationId: _uuid(17031),
+          projectId: _projectA,
+          sketchId: sketch.sketchId,
+          activeRevisionId: spatial.activeRevision!.id,
+          newDraftRevisionId: reattachDraftId,
+          expectedSketchRevision: spatial.sketch.revision,
+        ),
+      );
+      spatial = (await app.loadPrimarySketch(_projectA))!;
+      final reattachedGeometry = InventoryGeometry(
+        polylines: [secondPolygon, firstPolygon],
+      );
+      await app.autosaveSketchDraft(
+        AutosaveInventorySketchDraftCommand(
+          operationId: _uuid(17032),
+          projectId: _projectA,
+          sketchId: sketch.sketchId,
+          draftRevisionId: reattachDraftId,
+          expectedSketchRevision: spatial.sketch.revision,
+          expectedContentRevision: spatial.draftRevision!.contentRevision,
+          geometry: reattachedGeometry,
+          existingBlockMappings: [
+            InventoryExistingBlockMappingDraft(
+              blockId: secondBlockId,
+              polygonIndex: 0,
+            ),
+            InventoryExistingBlockMappingDraft(
+              blockId: firstBlockId,
+              polygonIndex: 1,
+            ),
+          ],
+        ),
+      );
+      spatial = (await app.loadPrimarySketch(_projectA))!;
+      final reattachReplacementDraftId = spatial.draftRevision!.id;
+      expect(reattachReplacementDraftId, isNot(reattachDraftId));
+      expect(spatial.draftRevision!.contentRevision, 1);
+      final detachedBlock = spatial.blocks.singleWhere(
+        (block) => block.id == firstBlockId,
+      );
+      final conflictingBlockId = _uuid(17034);
+      final conflictingFloorId = _uuid(17035);
+      await fixture.db.database.insert('inventory_blocks', {
+        'id': conflictingBlockId,
+        'project_id': _projectA,
+        'display_name': detachedBlock.displayName,
+        'normalized_name': detachedBlock.normalizedName,
+        'ordinal': 999,
+        'state': InventoryBlockState.active.storageValue,
+        'revision': 1,
+        'created_at': _t0,
+        'updated_at': _t0,
+        'archived_at': null,
+      });
+      await fixture.db.database.insert('inventory_floors', {
+        'id': conflictingFloorId,
+        'block_id': conflictingBlockId,
+        'project_id': _projectA,
+        'display_name': '1. Kat',
+        'ordinal': 1,
+        'revision': 1,
+        'created_at': _t0,
+        'updated_at': _t0,
+        'archived_at': null,
+      });
+      final countsBeforeNameConflict = await _counts(fixture.db.database);
+      await expectLater(
+        app.finalizeSketch(
+          FinalizeInventorySketchCommand(
+            operationId: _uuid(17036),
+            projectId: _projectA,
+            sketchId: sketch.sketchId,
+            draftRevisionId: reattachReplacementDraftId,
+            expectedSketchRevision: spatial.sketch.revision,
+            expectedContentRevision: spatial.draftRevision!.contentRevision,
+            existingBlockIntents: [
+              InventoryExistingBlockFinalizeIntent(
+                blockId: firstBlockId,
+                action: InventoryExistingBlockAction.reattach,
+                expectedBlockRevision: 2,
+                targetPolygonIndex: 1,
+              ),
+              InventoryExistingBlockFinalizeIntent(
+                blockId: secondBlockId,
+                action: InventoryExistingBlockAction.retainMapped,
+                expectedBlockRevision: 1,
+                targetPolygonIndex: 0,
+              ),
+            ],
+            placementExpectations: await _placementExpectations(app),
+          ),
+        ),
+        _fails('inventory_block_name_conflict'),
+      );
+      expect(await _counts(fixture.db.database), countsBeforeNameConflict);
+      await fixture.db.database.update(
+        'inventory_floors',
+        {'revision': 2, 'updated_at': _t0, 'archived_at': _t0},
+        where: 'id = ? AND revision = 1',
+        whereArgs: [conflictingFloorId],
+      );
+      await fixture.db.database.update(
+        'inventory_blocks',
+        {
+          'state': InventoryBlockState.archived.storageValue,
+          'revision': 2,
+          'updated_at': _t0,
+          'archived_at': _t0,
+        },
+        where: 'id = ? AND revision = 1',
+        whereArgs: [conflictingBlockId],
+      );
+      final reattachResult = await app.finalizeSketch(
+        FinalizeInventorySketchCommand(
+          operationId: _uuid(17033),
+          projectId: _projectA,
+          sketchId: sketch.sketchId,
+          draftRevisionId: reattachReplacementDraftId,
+          expectedSketchRevision: spatial.sketch.revision,
+          expectedContentRevision: spatial.draftRevision!.contentRevision,
+          existingBlockIntents: [
+            InventoryExistingBlockFinalizeIntent(
+              blockId: firstBlockId,
+              action: InventoryExistingBlockAction.reattach,
+              expectedBlockRevision: 2,
+              targetPolygonIndex: 1,
+            ),
+            InventoryExistingBlockFinalizeIntent(
+              blockId: secondBlockId,
+              action: InventoryExistingBlockAction.retainMapped,
+              expectedBlockRevision: 1,
+              targetPolygonIndex: 0,
+            ),
+          ],
+          placementExpectations: await _placementExpectations(app),
+        ),
+      );
+      expect(reattachResult.eventCount, 3);
+      spatial = (await app.loadPrimarySketch(_projectA))!;
+      final reattachedBlock = spatial.blocks.singleWhere(
+        (block) => block.id == firstBlockId,
+      );
+      expect(reattachedBlock.state, InventoryBlockState.active);
+      expect(reattachedBlock.revision, 3);
+      expect(
+        spatial.floors
+            .where((floor) => firstFloorIds.contains(floor.id))
+            .map((floor) => floor.id),
+        firstFloorIds,
+      );
+      final placementAfterReattach = (await app.loadAsset(
+        projectId: _projectA,
+        assetId: assetId,
+      )).activePlacement!;
+      final secondPlacementAfterReattach = (await app.loadAsset(
+        projectId: _projectA,
+        assetId: secondAssetId,
+      )).activePlacement!;
+      expect(
+        placementAfterReattach.sequence,
+        placementBeforeDetach.sequence + 1,
+      );
+      expect(placementAfterReattach.floorId, placementBeforeDetach.floorId);
+      expect(
+        secondPlacementAfterReattach.sequence,
+        secondPlacementBeforeDetach.sequence + 1,
+      );
+      expect(
+        secondPlacementAfterReattach.floorId,
+        secondPlacementBeforeDetach.floorId,
+      );
+      final expectedReattachTarget =
+          InventorySpatialContract.safeInteriorPlacement(
+            firstPolygon,
+            spreadIndex: 0,
+            clearance: InventoryGeometryContract.placementStep,
+          );
+      final expectedSecondReattachTarget =
+          InventorySpatialContract.safeInteriorPlacement(
+            firstPolygon,
+            spreadIndex: 1,
+            occupied: <InventoryPlacementCoordinates>{expectedReattachTarget},
+            clearance: InventoryGeometryContract.placementStep,
+          );
+      expect(placementAfterReattach.x, expectedReattachTarget.x);
+      expect(placementAfterReattach.y, expectedReattachTarget.y);
+      expect(secondPlacementAfterReattach.x, expectedSecondReattachTarget.x);
+      expect(secondPlacementAfterReattach.y, expectedSecondReattachTarget.y);
+      expect(
+        placementAfterReattach.x == secondPlacementAfterReattach.x &&
+            placementAfterReattach.y == secondPlacementAfterReattach.y,
+        isFalse,
+      );
+      final reattachMoveEvents = await fixture.db.database.query(
+        'inventory_events',
+        where: 'operation_id = ? AND event_type = ?',
+        whereArgs: [
+          _uuid(17033),
+          InventoryEventType.placementMoved.storageValue,
+        ],
+      );
+      expect(reattachMoveEvents, hasLength(2));
+      final reattachMovePayload =
+          jsonDecode(
+                reattachMoveEvents.singleWhere(
+                      (row) =>
+                          row['aggregate_id'] ==
+                          placementBeforeDetach.placementKey,
+                    )['payload_json']!
+                    as String,
+              )
+              as Map<String, dynamic>;
+      expect(reattachMovePayload['reason'], 'geometry_reconciliation');
+      expect(reattachMovePayload['before_floor_id'], firstFloor.id);
+      expect(reattachMovePayload['after_floor_id'], firstFloor.id);
+      expect(reattachMovePayload['before_x'], placementBeforeDetach.x);
+      expect(reattachMovePayload['before_y'], placementBeforeDetach.y);
+      expect(reattachMovePayload['after_x'], placementAfterReattach.x);
+      expect(reattachMovePayload['after_y'], placementAfterReattach.y);
+      expect(
+        reattachMovePayload['predecessor_placement_id'],
+        placementBeforeDetach.id,
+      );
+      expect(reattachMovePayload['placement_id'], placementAfterReattach.id);
+      final secondReattachMovePayload =
+          jsonDecode(
+                reattachMoveEvents.singleWhere(
+                      (row) =>
+                          row['aggregate_id'] ==
+                          secondPlacementBeforeDetach.placementKey,
+                    )['payload_json']!
+                    as String,
+              )
+              as Map<String, dynamic>;
+      expect(secondReattachMovePayload['reason'], 'geometry_reconciliation');
+      expect(secondReattachMovePayload['before_floor_id'], firstFloor.id);
+      expect(secondReattachMovePayload['after_floor_id'], firstFloor.id);
+      expect(
+        secondReattachMovePayload['before_x'],
+        secondPlacementBeforeDetach.x,
+      );
+      expect(
+        secondReattachMovePayload['before_y'],
+        secondPlacementBeforeDetach.y,
+      );
+      expect(
+        secondReattachMovePayload['after_x'],
+        secondPlacementAfterReattach.x,
+      );
+      expect(
+        secondReattachMovePayload['after_y'],
+        secondPlacementAfterReattach.y,
+      );
+      expect(
+        secondReattachMovePayload['predecessor_placement_id'],
+        secondPlacementBeforeDetach.id,
+      );
+      expect(
+        secondReattachMovePayload['placement_id'],
+        secondPlacementAfterReattach.id,
+      );
+      final firstReattachVersions = await app.listPlacementVersions(
+        projectId: _projectA,
+        assetId: assetId,
+        placementKey: placementBeforeDetach.placementKey,
+      );
+      expect(firstReattachVersions.map((item) => item.id), [
+        placementBeforeDetach.id,
+        placementAfterReattach.id,
+      ]);
+      expect(firstReattachVersions.map((item) => item.sequence), [1, 2]);
+      expect(firstReattachVersions.map((item) => item.supersedesPlacementId), [
+        null,
+        placementBeforeDetach.id,
+      ]);
+      final secondReattachVersions = await app.listPlacementVersions(
+        projectId: _projectA,
+        assetId: secondAssetId,
+        placementKey: secondPlacementBeforeDetach.placementKey,
+      );
+      expect(secondReattachVersions.map((item) => item.id), [
+        secondPlacementBeforeDetach.id,
+        secondPlacementAfterReattach.id,
+      ]);
+      expect(secondReattachVersions.map((item) => item.sequence), [1, 2]);
+      expect(secondReattachVersions.map((item) => item.supersedesPlacementId), [
+        null,
+        secondPlacementBeforeDetach.id,
+      ]);
+      expect(
+        [
+          placementBeforeDetach.placementKey,
+          secondPlacementBeforeDetach.placementKey,
+        ]..sort(),
+        [
+          placementBeforeDetach.placementKey,
+          secondPlacementBeforeDetach.placementKey,
+        ],
+      );
+
+      final archiveDraftId = _uuid(17040);
+      await app.startSketchEdit(
+        StartInventorySketchEditCommand(
+          operationId: _uuid(17041),
+          projectId: _projectA,
+          sketchId: sketch.sketchId,
+          activeRevisionId: spatial.activeRevision!.id,
+          newDraftRevisionId: archiveDraftId,
+          expectedSketchRevision: spatial.sketch.revision,
+        ),
+      );
+      spatial = (await app.loadPrimarySketch(_projectA))!;
+      await app.autosaveSketchDraft(
+        AutosaveInventorySketchDraftCommand(
+          operationId: _uuid(17042),
+          projectId: _projectA,
+          sketchId: sketch.sketchId,
+          draftRevisionId: archiveDraftId,
+          expectedSketchRevision: spatial.sketch.revision,
+          expectedContentRevision: spatial.draftRevision!.contentRevision,
+          geometry: detachedGeometry,
+          existingBlockMappings: [
+            InventoryExistingBlockMappingDraft(
+              blockId: secondBlockId,
+              polygonIndex: 0,
+            ),
+          ],
+        ),
+      );
+      spatial = (await app.loadPrimarySketch(_projectA))!;
+      final archiveReplacementDraftId = spatial.draftRevision!.id;
+      expect(archiveReplacementDraftId, isNot(archiveDraftId));
+      expect(spatial.draftRevision!.contentRevision, 1);
+      final archiveResult = await app.finalizeSketch(
+        FinalizeInventorySketchCommand(
+          operationId: _uuid(17043),
+          projectId: _projectA,
+          sketchId: sketch.sketchId,
+          draftRevisionId: archiveReplacementDraftId,
+          expectedSketchRevision: spatial.sketch.revision,
+          expectedContentRevision: spatial.draftRevision!.contentRevision,
+          existingBlockIntents: [
+            InventoryExistingBlockFinalizeIntent(
+              blockId: firstBlockId,
+              action: InventoryExistingBlockAction.archive,
+              expectedBlockRevision: 3,
+            ),
+            InventoryExistingBlockFinalizeIntent(
+              blockId: secondBlockId,
+              action: InventoryExistingBlockAction.retainMapped,
+              expectedBlockRevision: 1,
+              targetPolygonIndex: 0,
+            ),
+          ],
+          placementExpectations: await _placementExpectations(app),
+        ),
+      );
+      expect(archiveResult.eventCount, 5);
+      final archivedAsset = await app.loadAsset(
+        projectId: _projectA,
+        assetId: assetId,
+      );
+      final archivedSecondAsset = await app.loadAsset(
+        projectId: _projectA,
+        assetId: secondAssetId,
+      );
+      expect(archivedAsset.asset.archivedAt, isNotNull);
+      expect(archivedAsset.activePlacement, isNull);
+      expect(archivedSecondAsset.asset.archivedAt, isNotNull);
+      expect(archivedSecondAsset.activePlacement, isNull);
+      spatial = (await app.loadPrimarySketch(_projectA))!;
+      final archivedBlock = spatial.blocks.singleWhere(
+        (block) => block.id == firstBlockId,
+      );
+      expect(archivedBlock.state, InventoryBlockState.archived);
+      expect(archivedBlock.revision, 4);
+      expect(
+        spatial.floors
+            .where((floor) => firstFloorIds.contains(floor.id))
+            .every((floor) => floor.archivedAt != null),
+        isTrue,
+      );
+      expect(spatial.activeBlockPolygons.map((mapping) => mapping.blockId), [
+        secondBlockId,
+      ]);
+      expect(
+        await app.readAssetPhoto(
+          projectId: _projectA,
+          assetId: assetId,
+          linkId: photoLinkId,
+        ),
+        isA<InventoryPhotoContent>(),
+      );
+      expect(gateway.files.keys, [photoPath]);
+      final placementRows = await fixture.db.database.query(
+        'inventory_asset_placements',
+        where: 'asset_id = ?',
+        whereArgs: [assetId],
+        orderBy: 'sequence ASC',
+      );
+      expect(placementRows, hasLength(2));
+      expect(
+        placementRows.last['end_reason'],
+        InventoryPlacementEndReason.assetArchived.storageValue,
+      );
+      final secondPlacementRows = await fixture.db.database.query(
+        'inventory_asset_placements',
+        where: 'asset_id = ?',
+        whereArgs: [secondAssetId],
+        orderBy: 'sequence ASC',
+      );
+      expect(secondPlacementRows, hasLength(2));
+      expect(secondPlacementRows.map((row) => row['id']), [
+        secondPlacementBeforeDetach.id,
+        secondPlacementAfterReattach.id,
+      ]);
+      expect(
+        secondPlacementRows.last['end_reason'],
+        InventoryPlacementEndReason.assetArchived.storageValue,
+      );
+    },
+  );
+
+  test(
+    'AT-533-006/007 mixed draft metadata and ambiguous intent fail closed; injected finalize rolls back',
+    () async {
+      final fixture = await _Fixture.create('at_533_rollback');
+      addTearDown(fixture.close);
+      final sketch = await _createFinalizedSketch(
+        fixture,
+        seed: 18000,
+        geometry: _geometry(64),
+      );
+      var spatial = (await fixture.app.loadPrimarySketch(_projectA))!;
+      final firstMapping = spatial.activeBlockPolygons.singleWhere(
+        (mapping) => mapping.polygonIndex == 0,
+      );
+      final secondMapping = spatial.activeBlockPolygons.singleWhere(
+        (mapping) => mapping.polygonIndex == 1,
+      );
+      final firstFloor = spatial.floors.firstWhere(
+        (floor) => floor.blockId == firstMapping.blockId && floor.ordinal == 1,
+      );
+      final assetId = _uuid(18010);
+      await fixture.app.createAsset(
+        CreateInventoryAssetCommand(
+          operationId: _uuid(18011),
+          projectId: _projectA,
+          assetId: assetId,
+          placementId: _uuid(18012),
+          placementKey: _uuid(18013),
+          sketchId: sketch.sketchId,
+          activeRevisionId: sketch.activeRevisionId,
+          floorId: firstFloor.id,
+          displayName: 'Rollback asset',
+          category: InventoryCategory.equipment,
+          totalQuantity: 1,
+          x: 128,
+          y: 128,
+        ),
+      );
+      final placementBefore = (await fixture.app.loadAsset(
+        projectId: _projectA,
+        assetId: assetId,
+      )).activePlacement!;
+      final corruptDraftId = _uuid(18020);
+      final sketchRevisionBeforeCorruptDraft = spatial.sketch.revision;
+      await _seedLegacyPrefixEditDraft(
+        fixture,
+        draftId: corruptDraftId,
+        legacyPolygonCount: 1,
+      );
+      await expectLater(
+        fixture.app.loadPrimarySketch(_projectA),
+        _fails('inventory_projection_integrity_failed'),
+      );
+      await fixture.app.abandonSketchDraft(
+        AbandonInventorySketchDraftCommand(
+          operationId: _uuid(18021),
+          projectId: _projectA,
+          sketchId: sketch.sketchId,
+          draftRevisionId: corruptDraftId,
+          expectedSketchRevision: sketchRevisionBeforeCorruptDraft + 1,
+        ),
+      );
+      spatial = (await fixture.app.loadPrimarySketch(_projectA))!;
+      final draftId = _uuid(18060);
+      await fixture.app.startSketchEdit(
+        StartInventorySketchEditCommand(
+          operationId: _uuid(18061),
+          projectId: _projectA,
+          sketchId: sketch.sketchId,
+          activeRevisionId: spatial.activeRevision!.id,
+          newDraftRevisionId: draftId,
+          expectedSketchRevision: spatial.sketch.revision,
+        ),
+      );
+      spatial = (await fixture.app.loadPrimarySketch(_projectA))!;
+      expect(spatial.draftLegacyPolygonCount, 0);
+      final rigidGeometry = InventoryGeometry(
+        polylines: [_rectangle(64, 0, 2112, 1536)],
+      );
+      await fixture.app.autosaveSketchDraft(
+        AutosaveInventorySketchDraftCommand(
+          operationId: _uuid(18022),
+          projectId: _projectA,
+          sketchId: sketch.sketchId,
+          draftRevisionId: draftId,
+          expectedSketchRevision: spatial.sketch.revision,
+          expectedContentRevision: spatial.draftRevision!.contentRevision,
+          geometry: rigidGeometry,
+          existingBlockMappings: [
+            InventoryExistingBlockMappingDraft(
+              blockId: firstMapping.blockId,
+              polygonIndex: 0,
+            ),
+          ],
+        ),
+      );
+      spatial = (await fixture.app.loadPrimarySketch(_projectA))!;
+      final replacementDraftId = spatial.draftRevision!.id;
+      expect(replacementDraftId, isNot(draftId));
+      expect(spatial.draftRevision!.contentRevision, 1);
+      expect(spatial.draftBlockPolygons.map((mapping) => mapping.blockId), [
+        firstMapping.blockId,
+      ]);
+      final countsBeforeAmbiguity = await _counts(fixture.db.database);
+      await expectLater(
+        () => fixture.app.finalizeSketch(
+          FinalizeInventorySketchCommand(
+            operationId: _uuid(18023),
+            projectId: _projectA,
+            sketchId: sketch.sketchId,
+            draftRevisionId: replacementDraftId,
+            expectedSketchRevision: spatial.sketch.revision,
+            expectedContentRevision: spatial.draftRevision!.contentRevision,
+            existingBlockIntents: [
+              InventoryExistingBlockFinalizeIntent(
+                blockId: firstMapping.blockId,
+                action: InventoryExistingBlockAction.retainMapped,
+                expectedBlockRevision: 1,
+                targetPolygonIndex: 0,
+              ),
+              InventoryExistingBlockFinalizeIntent(
+                blockId: firstMapping.blockId,
+                action: InventoryExistingBlockAction.detach,
+                expectedBlockRevision: 1,
+              ),
+            ],
+          ),
+        ),
+        _fails('inventory_block_identity_ambiguous'),
+      );
+      expect(await _counts(fixture.db.database), countsBeforeAmbiguity);
+      final validIntents = [
+        InventoryExistingBlockFinalizeIntent(
+          blockId: firstMapping.blockId,
+          action: InventoryExistingBlockAction.retainMapped,
+          expectedBlockRevision: 1,
+          targetPolygonIndex: 0,
+        ),
+        InventoryExistingBlockFinalizeIntent(
+          blockId: secondMapping.blockId,
+          action: InventoryExistingBlockAction.detach,
+          expectedBlockRevision: 1,
+        ),
+      ];
+      await expectLater(
+        fixture.app.finalizeSketch(
+          FinalizeInventorySketchCommand(
+            operationId: _uuid(18024),
+            projectId: _projectA,
+            sketchId: sketch.sketchId,
+            draftRevisionId: replacementDraftId,
+            expectedSketchRevision: spatial.sketch.revision,
+            expectedContentRevision: spatial.draftRevision!.contentRevision,
+            existingBlockIntents: validIntents,
+          ),
+        ),
+        _fails('inventory_placement_expectation_required'),
+      );
+      expect(await _counts(fixture.db.database), countsBeforeAmbiguity);
+      final finalizeCommand = FinalizeInventorySketchCommand(
+        operationId: _uuid(18025),
+        projectId: _projectA,
+        sketchId: sketch.sketchId,
+        draftRevisionId: replacementDraftId,
+        expectedSketchRevision: spatial.sketch.revision,
+        expectedContentRevision: spatial.draftRevision!.contentRevision,
+        existingBlockIntents: validIntents,
+        placementExpectations: await _placementExpectations(fixture.app),
+      );
+      final failing = InventoryApplication(
+        database: fixture.db,
+        clock: fixture.clock.call,
+        idFactory: fixture.ids.call,
+        afterSourceWritesBeforeHistory: () async {
+          throw StateError('injected lifecycle write-boundary failure');
+        },
+      );
+      final countsBeforeFailure = await _counts(fixture.db.database);
+      await expectLater(
+        failing.finalizeSketch(finalizeCommand),
+        _fails('inventory_persistence_failed'),
+      );
+      expect(await _counts(fixture.db.database), countsBeforeFailure);
+      final afterFailureSpatial = (await fixture.app.loadPrimarySketch(
+        _projectA,
+      ))!;
+      expect(afterFailureSpatial.activeRevision!.id, sketch.activeRevisionId);
+      expect(afterFailureSpatial.draftRevision!.id, replacementDraftId);
+      expect(afterFailureSpatial.blocks.map((block) => block.revision), [1, 1]);
+      final placementAfterFailure = (await fixture.app.loadAsset(
+        projectId: _projectA,
+        assetId: assetId,
+      )).activePlacement!;
+      expect(placementAfterFailure.id, placementBefore.id);
+      expect(placementAfterFailure.sequence, placementBefore.sequence);
+      expect(
+        await fixture.db.database.query(
+          'inventory_command_receipts',
+          where: 'id = ?',
+          whereArgs: [finalizeCommand.operationId],
+        ),
+        isEmpty,
+      );
+      final recovered = await fixture.app.finalizeSketch(finalizeCommand);
+      expect(recovered.eventCount, 2);
+      final recoveredSpatial = (await fixture.app.loadPrimarySketch(
+        _projectA,
+      ))!;
+      expect(
+        recoveredSpatial.blocks
+            .singleWhere((block) => block.id == secondMapping.blockId)
+            .state,
+        InventoryBlockState.detached,
+      );
+      expect(
+        recoveredSpatial.activeBlockPolygons.map((mapping) => mapping.blockId),
+        [firstMapping.blockId],
+      );
+      expect(
+        (await fixture.app.loadAsset(
+          projectId: _projectA,
+          assetId: assetId,
+        )).activePlacement!.sequence,
+        placementBefore.sequence + 1,
+      );
+    },
+  );
+
+  test(
+    'AT-533-016 exact legacy-prefix edit draft finalizes unchanged through typed lifecycle path',
+    () async {
+      final fixture = await _Fixture.create('at_533_legacy_finalize');
+      addTearDown(fixture.close);
+      final sketch = await _createFinalizedSketch(fixture, seed: 19000);
+      var spatial = (await fixture.app.loadPrimarySketch(_projectA))!;
+      final block = spatial.blocks.single;
+      final mapping = spatial.activeBlockPolygons.single;
+      final draftId = _uuid(19010);
+      await _seedLegacyPrefixEditDraft(
+        fixture,
+        draftId: draftId,
+        legacyPolygonCount: spatial.activeRevision!.geometry.polylines.length,
+      );
+      spatial = (await fixture.app.loadPrimarySketch(_projectA))!;
+      expect(
+        spatial.draftLegacyPolygonCount,
+        spatial.activeRevision!.geometry.polylines.length,
+      );
+      final result = await fixture.app.finalizeSketch(
+        FinalizeInventorySketchCommand(
+          operationId: _uuid(19012),
+          projectId: _projectA,
+          sketchId: sketch.sketchId,
+          draftRevisionId: draftId,
+          expectedSketchRevision: spatial.sketch.revision,
+          expectedContentRevision: spatial.draftRevision!.contentRevision,
+          existingBlockIntents: [
+            InventoryExistingBlockFinalizeIntent(
+              blockId: block.id,
+              action: InventoryExistingBlockAction.retainMapped,
+              expectedBlockRevision: block.revision,
+              targetPolygonIndex: mapping.polygonIndex,
+            ),
+          ],
+        ),
+      );
+      expect(result.eventCount, 1);
+      final finalized = (await fixture.app.loadPrimarySketch(_projectA))!;
+      expect(finalized.draftRevision, isNull);
+      expect(finalized.activeRevision!.id, draftId);
+      expect(
+        finalized.activeRevision!.geometry.canonicalJson,
+        spatial.activeRevision!.geometry.canonicalJson,
+      );
+      expect(
+        finalized.blocks.singleWhere((item) => item.id == block.id).revision,
+        block.revision,
+      );
+    },
+  );
 }
 
 class _Fixture {
@@ -2358,6 +3664,83 @@ Future<_FinalizedSketch> _createFinalizedSketch(
   );
 }
 
+Future<void> _seedLegacyPrefixEditDraft(
+  _Fixture fixture, {
+  required String draftId,
+  required int legacyPolygonCount,
+}) async {
+  final projection = (await fixture.app.loadPrimarySketch(_projectA))!;
+  final active = projection.activeRevision!;
+  if (projection.draftRevision != null ||
+      projection.sketch.activeRevisionId != active.id) {
+    throw StateError('legacy-prefix fixture requires one active revision');
+  }
+  final timestamp = CseTimeCodec.encodeUtc(fixture.clock.call());
+  await fixture.db.database.transaction((transaction) async {
+    final nextRevisionNumber =
+        (sqflite.Sqflite.firstIntValue(
+              await transaction.rawQuery(
+                'SELECT max(revision_number) FROM inventory_sketch_revisions '
+                'WHERE project_id = ? AND sketch_id = ?',
+                [_projectA, projection.sketch.id],
+              ),
+            ) ??
+            0) +
+        1;
+    await transaction.insert('inventory_sketch_revisions', {
+      'id': draftId,
+      'sketch_id': projection.sketch.id,
+      'project_id': _projectA,
+      'revision_number': nextRevisionNumber,
+      'base_revision_id': active.id,
+      'state': InventorySketchRevisionState.draft.storageValue,
+      'geometry_version': InventoryGeometryContract.geometryVersion,
+      'canvas_width': InventoryGeometryContract.canvasWidth,
+      'canvas_height': InventoryGeometryContract.canvasHeight,
+      'geometry_json': active.geometry.canonicalJson,
+      'geometry_sha256': active.geometrySha256,
+      'content_revision': 1,
+      'created_at': timestamp,
+      'updated_at': timestamp,
+      'finalized_at': null,
+      'superseded_at': null,
+      'abandoned_at': null,
+    });
+    for (final mapping in projection.activeBlockPolygons) {
+      await transaction.insert('inventory_sketch_revision_block_polygons', {
+        'revision_id': draftId,
+        'block_id': mapping.blockId,
+        'project_id': _projectA,
+        'sketch_id': projection.sketch.id,
+        'polygon_index': mapping.polygonIndex,
+        'created_at': timestamp,
+      });
+    }
+    await transaction.insert('inventory_sketch_revision_spatial_drafts', {
+      'revision_id': draftId,
+      'project_id': _projectA,
+      'sketch_id': projection.sketch.id,
+      'content_revision': 1,
+      'legacy_polygon_count': legacyPolygonCount,
+      'definitions_json': '[]',
+      'created_at': timestamp,
+    });
+    final updated = await transaction.update(
+      'inventory_sketches',
+      {
+        'draft_revision_id': draftId,
+        'revision': projection.sketch.revision + 1,
+        'updated_at': timestamp,
+      },
+      where: 'id = ? AND project_id = ? AND revision = ?',
+      whereArgs: [projection.sketch.id, _projectA, projection.sketch.revision],
+    );
+    if (updated != 1) {
+      throw StateError('legacy-prefix fixture sketch update failed');
+    }
+  });
+}
+
 Future<void> _createAsset(
   _Fixture fixture, {
   required _FinalizedSketch sketch,
@@ -2381,6 +3764,23 @@ Future<void> _createAsset(
       ),
     )
     .then((_) {});
+
+Future<List<InventoryPlacementReconciliationExpectation>>
+_placementExpectations(InventoryApplication app) async {
+  final projections = await app.listAssets(projectId: _projectA);
+  final result = <InventoryPlacementReconciliationExpectation>[
+    for (final projection in projections)
+      if (projection.activePlacement != null)
+        InventoryPlacementReconciliationExpectation(
+          assetId: projection.asset.id,
+          expectedAssetRevision: projection.asset.revision,
+          placementId: projection.activePlacement!.id,
+          placementKey: projection.activePlacement!.placementKey,
+          expectedPlacementSequence: projection.activePlacement!.sequence,
+        ),
+  ]..sort((first, second) => first.assetId.compareTo(second.assetId));
+  return result;
+}
 
 List<int> _jpeg(int suffix) => <int>[0xff, 0xd8, 0xff, suffix];
 

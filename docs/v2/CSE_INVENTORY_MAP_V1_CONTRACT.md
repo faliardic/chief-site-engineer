@@ -1,10 +1,10 @@
 # CSE Inventory Map v1 Canonical Contract
 
 - **Belge türü:** Normative product, UX and persistence contract
-- **Owner authority:** [Feature Epic #506](https://github.com/faliardic/chief-site-engineer/issues/506), [Issue #507](https://github.com/faliardic/chief-site-engineer/issues/507), revised spatial foundation [Issue #527](https://github.com/faliardic/chief-site-engineer/issues/527), and floor navigation [Issue #531](https://github.com/faliardic/chief-site-engineer/issues/531)
-- **Contract version:** `1.2`
-- **Contract status:** Slices 1–5 and revised Slice 6.1 are production predecessors; Slice 6.2 floor navigation is the current implementation scope
-- **Task-start baseline:** `b68ceca5cf51773cb3067d9cf4090a7181935289`
+- **Owner authority:** [Feature Epic #506](https://github.com/faliardic/chief-site-engineer/issues/506), [Issue #507](https://github.com/faliardic/chief-site-engineer/issues/507), revised spatial foundation [Issue #527](https://github.com/faliardic/chief-site-engineer/issues/527), floor navigation [Issue #531](https://github.com/faliardic/chief-site-engineer/issues/531), and block lifecycle [Issue #533](https://github.com/faliardic/chief-site-engineer/issues/533)
+- **Contract version:** `1.3`
+- **Contract status:** Slices 1–5, revised Slice 6.1 and Slice 6.2 are production predecessors; Slice 6.3 block reshape/reconciliation/lifecycle is the current implementation scope
+- **Task-start baseline:** `237e2024b856a9bc71e226e958eeebb56bee9d78`
 - **Current persisted facts:** SQLite schema `22`, backup format `1`, mobile version `0.1.0+1`, MAIN package `com.faliardic.sefim`
 
 ## 1. Normative language and product boundary
@@ -270,11 +270,12 @@ editor MUST also force an awaited save on:
 - application `inactive`, `paused` or `detached` lifecycle notification;
 - editor error handling before it leaves the route.
 
-Each real autosave MUST compare expected `content_revision`, replace only the
-draft's canonical JSON/checksum, increment `content_revision` and sketch
-`revision` by exactly one, and append `inventory.sketch_draft_autosaved` in the
-same transaction. Identical geometry MUST create an idempotent/no-op receipt
-without revision or event.
+Except for the immutable-mapping successor case defined in section 8.7, each
+real autosave MUST compare expected `content_revision`, replace only the draft's
+canonical JSON/checksum, increment `content_revision` and sketch `revision` by
+exactly one, and append `inventory.sketch_draft_autosaved` in the same
+transaction. Identical geometry and spatial metadata MUST create an
+idempotent/no-op receipt without revision or event.
 
 After relaunch, a sketch `draft_revision_id` MUST reopen the exact last durable
 draft and identify whether it is a first sketch or an edit of an active base.
@@ -920,13 +921,13 @@ or already committed asset mutations. The stack MUST retain at most `100`
 commands; a new command after undo clears redo. Relaunch recovers durable draft
 geometry with an empty undo/redo stack.
 
-During `Krokiyi güncelle` / `editActive`, the finalized/base geometry is an
-immutable prefix in Slice 6.1. Any selection/delete or other editor action that
-would change that prefix MUST be rejected locally before autosave and MUST show
-an explicit safe message that existing area shape editing is not yet available.
-The same draft MAY append new orthogonal blocks after the untouched prefix and
-those blocks MUST autosave, reload and finalize normally. Base reshape,
-placement reconciliation and vertex movement remain Slice 6.3.
+During `Krokiyi güncelle` / `editActive`, unmapped legacy base geometry remains
+immutable. A mapped active block MAY be changed only through the bounded Slice
+6.3 whole-block nudge, orthogonal edge reshape or explicit detach/archive
+lifecycle actions in section 8.7. Candidate geometry MUST pass local bounds,
+polygon and non-overlap checks before editor history or autosave changes. The
+same draft MAY still append new orthogonal blocks; they MUST autosave, reload
+and finalize normally.
 
 ### 8.3 Gesture separation and viewport
 
@@ -1059,6 +1060,73 @@ form and write nothing.
 Slice 6.2 changes no database table, migration or stored filter contract.
 SQLite schema remains `22`, backup format remains `1`, and mobile version
 remains `0.1.0+1`.
+
+### 8.7 Block reshape, placement reconciliation and lifecycle
+
+In `SELECT`, selecting the same segment again MUST promote the selection to its
+whole mapped polygon. Four icon actions with tooltips and semantic labels MUST
+nudge a whole polygon exactly one sketch-grid step left, right, up or down. A
+selected horizontal or vertical edge MUST move parallel exactly one sketch-grid
+step in its perpendicular direction while its adjacent edges remain connected.
+A persisted legacy diagonal polygon MAY be whole-translated, but an individual
+diagonal edge reshape MUST fail safely. A self-intersecting, overlapping or
+out-of-canvas candidate MUST change neither editor history nor autosave state.
+
+A finalized revision MUST use an explicit typed intent for every existing block
+whose geometry or lifecycle changes. Retained blocks bind to an exact target
+polygon; removed active blocks require the owner to choose exactly one of
+`Bloğu ve envanter kayıtlarını sil` or
+`Bloğu krokiden kaldır, kayıtları koru`; a detached block may be reattached only
+after explicit confirmation. Draft geometry and revision mappings MAY autosave,
+but destructive lifecycle intent MUST remain current-session state. A recovered
+draft missing an existing active mapping MUST ask for detach/archive again and
+MUST NOT silently select either outcome. Undo/redo MUST keep geometry, stable
+mapping identity, new-block metadata and pending reattach state in one logical
+frame.
+
+Schema `22` revision→block polygon rows are immutable. An autosave whose mapping
+set is unchanged MUST update the current mutable draft without rewriting those
+rows. An autosave whose mapping set changes MUST atomically abandon the old
+draft, create one successor draft on the same active base, insert the successor
+mapping set once, and move `draft_revision_id` to that successor. The old draft
+and its mappings remain append-only evidence; a receipt replay MUST return the
+same successor identity.
+
+Finalization MUST reconcile the new immutable revision, mappings, block/floor
+state, placements, events and command receipt in one transaction. A rigid
+whole-polygon translation MUST append a placement successor at exact old
+coordinates plus the common `dx/dy`. A non-rigid reshape MUST leave an active
+placement unchanged only when it remains safely inside the new polygon with a
+deterministic inward clearance of one placement-grid step (`4`). Otherwise it
+MUST append the nearest deterministic safe-interior successor; squared
+distance, then `y`, then `x` ascending is the stable tie-break. The predecessor
+MUST end as `MOVED`;
+placement key, floor, quantity and sequence continuity MUST be preserved.
+`inventory.placement_moved` MUST carry `reason: geometry_reconciliation`, exact
+before/after coordinates, predecessor/successor IDs, floor ID and old/new
+revision provenance.
+
+Detach MUST set the stable block to `DETACHED`, omit it from the new active
+revision mapping and preserve its floor IDs, active assets, placement history,
+events and photos without coordinate rewrite solely due to detach. The List
+MUST show its retained active records with exact text
+`Krokisi kaldırılmış blok`; Map, Katlar and active selectors MUST show no fake
+polygon/marker, and List-to-Map focus MUST fail safely.
+
+Archive MUST tombstone the stable block and floors and canonically archive every
+owned non-archived asset while physically deleting no placement, event, receipt
+or photo history. Reattach MUST reuse the exact detached block and floor IDs,
+names and ordinals, create a new active-revision mapping, and append a
+deterministic safe-interior placement cluster. Exactly one normalized detached
+name match MAY be offered for reuse; an active/detached duplicate or ambiguous
+match MUST fail closed. Any stale sketch/content/block/asset/placement revision,
+invalid relationship, write-boundary failure or receipt conflict MUST roll the
+whole transaction back. Replaying the exact operation ID and intent MUST remain
+idempotent.
+
+Slice 6.3 changes no database table, migration or backup contract. SQLite
+schema remains `22`, backup format remains `1`, and mobile version remains
+`0.1.0+1`.
 
 ## 9. Slice-by-slice implementation ownership
 
@@ -1200,6 +1268,29 @@ this contract does not pre-mark any test PASS.
 - Owner manual-test family: Kat stacks/counts, exact Map/List navigation,
   selector/label behavior and floor-row quick create. Automated results do not
   imply owner/manual PASS.
+
+### Slice 6.3 — Block reshape, placement reconciliation and lifecycle
+
+- Intended production paths: Inventory domain/application command boundary,
+  sketch canvas/editor and Inventory page detached presentation only.
+- Changed contracts: bounded whole-polygon/orthogonal-edge transforms, typed
+  finalize lifecycle intent, atomic placement reconciliation, detach/archive,
+  same-identity reattach and detached List behavior.
+- Validation class: `persistence` plus focused real editor/page widget coverage
+  because one finalization transaction changes immutable revision mappings,
+  append-only placement history and asset lifecycle together.
+- Focused gates: `AT-533-001..016`, including exact rigid delta, safe-margin
+  non-rigid relocation, rollback/idempotency, detach/archive/reattach identity,
+  undo/redo mapping integrity and all selected Slice 6.2 regressions.
+- Impact: schema stays `22`; backup format stays `1`; mobile version stays
+  `0.1.0+1`; storage/migration, package, permission and platform behavior do not
+  change.
+- Stop: hidden destructive recovery choice, in-place placement rewrite,
+  physical history/photo deletion, unstable block/floor identity, partial
+  revision activation or any write outside the Issue #533 allowlist.
+- Owner manual-test family: bounded reshape, deterministic placement response,
+  detach/archive consequences, detached List behavior and same-ID reattach.
+  Automated results do not imply owner/manual PASS.
 
 ### Slice 6 — Backup/restore, migration and field acceptance
 

@@ -117,13 +117,19 @@ class InventoryPageController extends ChangeNotifier {
 
   List<InventoryAssetProjection> get canonicalActiveMapAssets =>
       List<InventoryAssetProjection>.unmodifiable(
-        assets.where((projection) => projection.asset.archivedAt == null),
+        assets.where(
+          (projection) =>
+              projection.asset.archivedAt == null &&
+              detachedSpatialContextFor(projection) == null,
+        ),
       );
 
   List<InventoryAssetProjection> get visibleMapAssets =>
       List<InventoryAssetProjection>.unmodifiable(
         visibleAssets.where(
-          (projection) => projection.asset.archivedAt == null,
+          (projection) =>
+              projection.asset.archivedAt == null &&
+              detachedSpatialContextFor(projection) == null,
         ),
       );
 
@@ -205,6 +211,54 @@ class InventoryPageController extends ChangeNotifier {
       return null;
     }
     return InventoryAssetSpatialContext(block: block, floor: floor);
+  }
+
+  InventoryAssetSpatialContext? detachedSpatialContextFor(
+    InventoryAssetProjection projection,
+  ) {
+    final currentSketch = sketch;
+    final activeRevision = currentSketch?.activeRevision;
+    final placement = projection.activePlacement;
+    final context = spatialContextFor(projection);
+    if (currentSketch == null ||
+        activeRevision == null ||
+        placement == null ||
+        context == null ||
+        projection.asset.projectId != selectedProjectId ||
+        currentSketch.sketch.projectId != selectedProjectId ||
+        activeRevision.projectId != selectedProjectId ||
+        activeRevision.sketchId != currentSketch.sketch.id ||
+        context.block.projectId != selectedProjectId ||
+        context.block.state != InventoryBlockState.detached ||
+        context.floor.projectId != selectedProjectId ||
+        context.floor.blockId != context.block.id ||
+        placement.floorId != context.floor.id ||
+        currentSketch.blocks
+                .where((block) => block.id == context.block.id)
+                .length !=
+            1 ||
+        currentSketch.floors
+                .where((floor) => floor.id == context.floor.id)
+                .length !=
+            1 ||
+        currentSketch.activeBlockPolygons.any(
+          (mapping) => mapping.blockId == context.block.id,
+        )) {
+      return null;
+    }
+    try {
+      InventoryGeometryContract.validatePlacementCoordinate(
+        placement.x,
+        maximum: InventoryGeometryContract.canvasWidth,
+      );
+      InventoryGeometryContract.validatePlacementCoordinate(
+        placement.y,
+        maximum: InventoryGeometryContract.canvasHeight,
+      );
+    } on InventoryGeometryFailure {
+      return null;
+    }
+    return context;
   }
 
   void setBlockSelection(String? blockId) {
@@ -413,7 +467,7 @@ class InventoryPageController extends ChangeNotifier {
         placement.assetId != asset.id ||
         placement.sketchId != activeSketch.sketch.id ||
         placement.quantity != asset.totalQuantity ||
-        spatialContextFor(projection) == null) {
+        spatialContextFor(projection, activeBlockOnly: true) == null) {
       return false;
     }
     try {
@@ -437,6 +491,9 @@ class InventoryPageController extends ChangeNotifier {
     }
     if (projection.activePlacement == null) {
       return 'inventory_active_placement_unavailable';
+    }
+    if (detachedSpatialContextFor(projection) != null) {
+      return 'inventory_block_detached';
     }
     return 'inventory_projection_integrity_failed';
   }
@@ -1360,6 +1417,9 @@ class InventoryPageState extends State<InventoryPage> {
         final projection = visible[index];
         final asset = projection.asset;
         final spatial = controller.spatialContextFor(projection);
+        final detachedSpatial = controller.detachedSpatialContextFor(
+          projection,
+        );
         return Card(
           child: ListTile(
             key: Key('inventory-list-${asset.id}'),
@@ -1372,7 +1432,18 @@ class InventoryPageState extends State<InventoryPage> {
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (spatial != null)
+                if (detachedSpatial != null)
+                  Text(
+                    'Krokisi kaldırılmış blok',
+                    key: Key('inventory-list-detached-${asset.id}'),
+                  ),
+                if (detachedSpatial != null)
+                  Text(
+                    '${detachedSpatial.block.displayName} · '
+                    '${detachedSpatial.floor.displayName}',
+                    key: Key('inventory-list-detached-context-${asset.id}'),
+                  ),
+                if (spatial != null && detachedSpatial == null)
                   Text(
                     '${asset.displayName} · ${spatial.block.displayName} · '
                     '${spatial.floor.displayName}',
@@ -1387,9 +1458,11 @@ class InventoryPageState extends State<InventoryPage> {
               ],
             ),
             trailing: Icon(
-              asset.archivedAt == null
-                  ? Icons.my_location_rounded
-                  : Icons.chevron_right_rounded,
+              asset.archivedAt != null
+                  ? Icons.chevron_right_rounded
+                  : detachedSpatial != null
+                  ? Icons.link_off_rounded
+                  : Icons.my_location_rounded,
             ),
             onTap: asset.archivedAt == null
                 ? () => _focusFromList(projection)

@@ -215,6 +215,86 @@ void main() {
     },
   );
 
+  test('AT-533-002 rigid translation reports the exact shared delta', () {
+    final source = InventoryPolyline(
+      closed: true,
+      points: [
+        InventorySketchPoint(x: 64, y: 64),
+        InventorySketchPoint(x: 192, y: 64),
+        InventorySketchPoint(x: 192, y: 192),
+        InventorySketchPoint(x: 64, y: 192),
+      ],
+    );
+    final translated = InventoryPolyline(
+      closed: true,
+      points: [
+        InventorySketchPoint(x: 128, y: 192),
+        InventorySketchPoint(x: 256, y: 192),
+        InventorySketchPoint(x: 256, y: 320),
+        InventorySketchPoint(x: 128, y: 320),
+      ],
+    );
+    final reshaped = InventoryPolyline(
+      closed: true,
+      points: [
+        InventorySketchPoint(x: 64, y: 64),
+        InventorySketchPoint(x: 256, y: 64),
+        InventorySketchPoint(x: 256, y: 192),
+        InventorySketchPoint(x: 64, y: 192),
+      ],
+    );
+
+    final translation = InventorySpatialContract.rigidTranslation(
+      source,
+      translated,
+    );
+    expect(translation, isNotNull);
+    expect(translation?.dx, 64);
+    expect(translation?.dy, 128);
+    expect(InventorySpatialContract.rigidTranslation(source, reshaped), isNull);
+  });
+
+  test('AT-533-003/004 safe margin and nearest target are deterministic', () {
+    final rectangle = InventoryPolyline(
+      closed: true,
+      points: [
+        InventorySketchPoint(x: 0, y: 0),
+        InventorySketchPoint(x: 128, y: 0),
+        InventorySketchPoint(x: 128, y: 128),
+        InventorySketchPoint(x: 0, y: 128),
+      ],
+    );
+
+    expect(
+      InventorySpatialContract.safelyContainsPlacement(rectangle, x: 64, y: 64),
+      isTrue,
+    );
+    expect(
+      InventorySpatialContract.safelyContainsPlacement(rectangle, x: 4, y: 64),
+      isTrue,
+    );
+    expect(
+      InventorySpatialContract.safelyContainsPlacement(rectangle, x: 0, y: 64),
+      isFalse,
+    );
+
+    final nearest = InventorySpatialContract.nearestSafeInteriorPlacement(
+      rectangle,
+      x: 128,
+      y: 64,
+    );
+    expect(nearest, const InventoryPlacementCoordinates(x: 124, y: 64));
+    expect(
+      InventorySpatialContract.nearestSafeInteriorPlacement(
+        rectangle,
+        x: 128,
+        y: 64,
+        occupied: [nearest],
+      ),
+      const InventoryPlacementCoordinates(x: 124, y: 60),
+    );
+  });
+
   testWidgets('05 marker tap opens detail and never starts create', (
     tester,
   ) async {

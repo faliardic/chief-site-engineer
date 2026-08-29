@@ -7,6 +7,8 @@ enum InventorySketchEditorMode { draw, select, pan }
 
 enum InventorySketchAxis { horizontal, vertical }
 
+enum InventorySketchNudgeDirection { up, right, down, left }
+
 class InventorySketchAlignmentGuide {
   const InventorySketchAlignmentGuide({
     required this.axis,
@@ -437,6 +439,80 @@ class InventorySketchEditorSnapshot {
     );
   }
 
+  InventorySketchEditorSnapshot? nudgeSelection(
+    InventorySketchNudgeDirection direction,
+  ) {
+    final current = selection;
+    if (mode != InventorySketchEditorMode.select ||
+        current == null ||
+        current.polylineIndex < 0 ||
+        current.polylineIndex >= geometry.polylines.length) {
+      return null;
+    }
+    const step = InventoryGeometryContract.sketchGridStep;
+    final dx = switch (direction) {
+      InventorySketchNudgeDirection.left => -step,
+      InventorySketchNudgeDirection.right => step,
+      InventorySketchNudgeDirection.up => 0,
+      InventorySketchNudgeDirection.down => 0,
+    };
+    final dy = switch (direction) {
+      InventorySketchNudgeDirection.up => -step,
+      InventorySketchNudgeDirection.down => step,
+      InventorySketchNudgeDirection.left => 0,
+      InventorySketchNudgeDirection.right => 0,
+    };
+    final polylines = geometry.polylines.toList(growable: false);
+    final selected = polylines[current.polylineIndex];
+    late final InventoryPolyline nudged;
+    if (current.wholePolyline) {
+      nudged = InventoryPolyline(
+        closed: selected.closed,
+        points: [
+          for (final point in selected.points)
+            InventorySketchPoint(x: point.x + dx, y: point.y + dy),
+        ],
+      );
+    } else {
+      final segmentIndex = current.segmentIndex;
+      if (segmentIndex == null ||
+          segmentIndex < 0 ||
+          segmentIndex >= selected.segmentCount) {
+        return null;
+      }
+      final endIndex = segmentIndex + 1 < selected.points.length
+          ? segmentIndex + 1
+          : 0;
+      final start = selected.points[segmentIndex];
+      final end = selected.points[endIndex];
+      final horizontal = start.y == end.y;
+      final vertical = start.x == end.x;
+      if (!horizontal && !vertical) {
+        throw const InventoryFailure(
+          'inventory_block_diagonal_edge_reshape_not_supported',
+        );
+      }
+      if ((horizontal && dx != 0) || (vertical && dy != 0)) {
+        throw const InventoryFailure(
+          'inventory_block_edge_nudge_direction_invalid',
+        );
+      }
+      final points = selected.points.toList(growable: false);
+      points[segmentIndex] = InventorySketchPoint(
+        x: start.x + dx,
+        y: start.y + dy,
+      );
+      points[endIndex] = InventorySketchPoint(x: end.x + dx, y: end.y + dy);
+      nudged = InventoryPolyline(closed: selected.closed, points: points);
+    }
+    polylines[current.polylineIndex] = nudged;
+    return _recordFrame(
+      InventoryGeometry(polylines: polylines),
+      workingPolylineIndex,
+      nextSelection: current,
+    );
+  }
+
   InventorySketchEditorSnapshot undo() {
     if (_undoHistory.isEmpty) return this;
     final previous = _undoHistory.last;
@@ -478,11 +554,12 @@ class InventorySketchEditorSnapshot {
 
   InventorySketchEditorSnapshot _recordFrame(
     InventoryGeometry value,
-    int? nextWorkingIndex,
-  ) => InventorySketchEditorSnapshot._(
+    int? nextWorkingIndex, {
+    InventorySketchSelection? nextSelection,
+  }) => InventorySketchEditorSnapshot._(
     geometry: value,
     mode: mode,
-    selection: null,
+    selection: nextSelection,
     workingPolylineIndex: nextWorkingIndex,
     undoHistory: _boundedHistory([
       ..._undoHistory,

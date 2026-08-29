@@ -104,6 +104,13 @@ class InventoryPlacementCoordinates {
   int get hashCode => Object.hash(x, y);
 }
 
+class InventoryGeometryTranslation {
+  const InventoryGeometryTranslation({required this.dx, required this.dy});
+
+  final int dx;
+  final int dy;
+}
+
 class InventoryPolyline {
   InventoryPolyline({
     required this.closed,
@@ -261,11 +268,12 @@ class InventoryGeometry {
   String get sha256 =>
       hashes.sha256.convert(utf8.encode(canonicalJson)).toString();
 
-  void validateFinalizable() {
-    if (polylines.isEmpty || polylines.any((item) => item.isIncompleteDraft)) {
+  void validateFinalizable({bool allowEmpty = false}) {
+    if ((!allowEmpty && polylines.isEmpty) ||
+        polylines.any((item) => item.isIncompleteDraft)) {
       throw const InventoryGeometryFailure('geometry_not_finalizable');
     }
-    if (segmentCount < 1) {
+    if ((!allowEmpty || polylines.isNotEmpty) && segmentCount < 1) {
       throw const InventoryGeometryFailure('geometry_not_finalizable');
     }
   }
@@ -398,6 +406,154 @@ abstract final class InventorySpatialContract {
     return _strictlyContainsPoint(polygon.points, x, y);
   }
 
+  static InventoryGeometryTranslation? rigidTranslation(
+    InventoryPolyline source,
+    InventoryPolyline target,
+  ) {
+    validateBlockPolygon(source);
+    validateBlockPolygon(target);
+    if (source.points.length != target.points.length) return null;
+    final dx = target.points.first.x - source.points.first.x;
+    final dy = target.points.first.y - source.points.first.y;
+    for (var index = 1; index < source.points.length; index += 1) {
+      if (target.points[index].x - source.points[index].x != dx ||
+          target.points[index].y - source.points[index].y != dy) {
+        return null;
+      }
+    }
+    return InventoryGeometryTranslation(dx: dx, dy: dy);
+  }
+
+  static bool safelyContainsPlacement(
+    InventoryPolyline polygon, {
+    required int x,
+    required int y,
+    int clearance = InventoryGeometryContract.placementStep,
+  }) {
+    InventoryGeometryContract.validatePlacementCoordinate(
+      x,
+      maximum: InventoryGeometryContract.canvasWidth,
+    );
+    InventoryGeometryContract.validatePlacementCoordinate(
+      y,
+      maximum: InventoryGeometryContract.canvasHeight,
+    );
+    if (clearance < 0) {
+      throw const InventoryFailure('inventory_safe_interior_unavailable');
+    }
+    validateBlockPolygon(polygon);
+    return _safelyContainsPoint(polygon.points, x, y, clearance: clearance);
+  }
+
+  static InventoryPlacementCoordinates nearestSafeInteriorPlacement(
+    InventoryPolyline polygon, {
+    required int x,
+    required int y,
+    Iterable<InventoryPlacementCoordinates> occupied = const [],
+    int clearance = InventoryGeometryContract.placementStep,
+  }) {
+    InventoryGeometryContract.validatePlacementCoordinate(
+      x,
+      maximum: InventoryGeometryContract.canvasWidth,
+    );
+    InventoryGeometryContract.validatePlacementCoordinate(
+      y,
+      maximum: InventoryGeometryContract.canvasHeight,
+    );
+    if (clearance < 0) {
+      throw const InventoryFailure('inventory_safe_interior_unavailable');
+    }
+    validateBlockPolygon(polygon);
+    final occupiedTargets = occupied.toSet();
+    const step = InventoryGeometryContract.placementStep;
+    final minimumX = polygon.points
+        .map((point) => point.x)
+        .reduce((left, right) => left < right ? left : right);
+    final maximumX = polygon.points
+        .map((point) => point.x)
+        .reduce((left, right) => left > right ? left : right);
+    final minimumY = polygon.points
+        .map((point) => point.y)
+        .reduce((left, right) => left < right ? left : right);
+    final maximumY = polygon.points
+        .map((point) => point.y)
+        .reduce((left, right) => left > right ? left : right);
+    InventoryPlacementCoordinates? best;
+    int? bestDistanceSquared;
+    final maximumDistance = [
+      (x - minimumX).abs(),
+      (x - maximumX).abs(),
+      (y - minimumY).abs(),
+      (y - maximumY).abs(),
+    ].reduce((left, right) => left > right ? left : right);
+    final maximumRing = maximumDistance ~/ step;
+
+    void consider(int candidateX, int candidateY) {
+      if (candidateX < minimumX ||
+          candidateX > maximumX ||
+          candidateY < minimumY ||
+          candidateY > maximumY) {
+        return;
+      }
+      final candidate = InventoryPlacementCoordinates(
+        x: candidateX,
+        y: candidateY,
+      );
+      if (occupiedTargets.contains(candidate) ||
+          !_safelyContainsPoint(
+            polygon.points,
+            candidateX,
+            candidateY,
+            clearance: clearance,
+          )) {
+        return;
+      }
+      final deltaX = candidateX - x;
+      final deltaY = candidateY - y;
+      final distanceSquared = deltaX * deltaX + deltaY * deltaY;
+      if (bestDistanceSquared == null ||
+          distanceSquared < bestDistanceSquared! ||
+          (distanceSquared == bestDistanceSquared &&
+              (candidateY < best!.y ||
+                  (candidateY == best!.y && candidateX < best!.x)))) {
+        best = candidate;
+        bestDistanceSquared = distanceSquared;
+      }
+    }
+
+    for (var ring = 0; ring <= maximumRing; ring += 1) {
+      if (ring == 0) {
+        consider(x, y);
+      } else {
+        final delta = ring * step;
+        final left = x - delta;
+        final right = x + delta;
+        final top = y - delta;
+        final bottom = y + delta;
+        for (var candidateX = left; candidateX <= right; candidateX += step) {
+          consider(candidateX, top);
+          consider(candidateX, bottom);
+        }
+        for (
+          var candidateY = top + step;
+          candidateY < bottom;
+          candidateY += step
+        ) {
+          consider(left, candidateY);
+          consider(right, candidateY);
+        }
+      }
+      if (bestDistanceSquared != null) {
+        final nextRingMinimumDistance = (ring + 1) * step;
+        if (nextRingMinimumDistance * nextRingMinimumDistance >
+            bestDistanceSquared!) {
+          return best!;
+        }
+      }
+    }
+    throw const InventoryFailure('inventory_safe_interior_unavailable');
+  }
+
   static bool _strictlyContainsPoint(
     List<InventorySketchPoint> points,
     int x,
@@ -416,12 +572,50 @@ abstract final class InventorySpatialContract {
     return _containsPoint(points, x, y);
   }
 
+  static bool _safelyContainsPoint(
+    List<InventorySketchPoint> points,
+    int x,
+    int y, {
+    required int clearance,
+  }) {
+    if (!_strictlyContainsPoint(points, x, y)) return false;
+    if (clearance == 0) return true;
+    final clearanceSquared = clearance * clearance;
+    for (var index = 0; index < points.length; index += 1) {
+      final start = points[index];
+      final end = points[(index + 1) % points.length];
+      final dx = end.x - start.x;
+      final dy = end.y - start.y;
+      final offsetX = x - start.x;
+      final offsetY = y - start.y;
+      final lengthSquared = dx * dx + dy * dy;
+      final dot = offsetX * dx + offsetY * dy;
+      if (dot <= 0) {
+        if (offsetX * offsetX + offsetY * offsetY < clearanceSquared) {
+          return false;
+        }
+      } else if (dot >= lengthSquared) {
+        final endOffsetX = x - end.x;
+        final endOffsetY = y - end.y;
+        if (endOffsetX * endOffsetX + endOffsetY * endOffsetY <
+            clearanceSquared) {
+          return false;
+        }
+      } else {
+        final cross = dx * offsetY - dy * offsetX;
+        if (cross * cross < clearanceSquared * lengthSquared) return false;
+      }
+    }
+    return true;
+  }
+
   static InventoryPlacementCoordinates safeInteriorPlacement(
     InventoryPolyline polygon, {
     required int spreadIndex,
     Iterable<InventoryPlacementCoordinates> occupied = const [],
+    int clearance = 0,
   }) {
-    if (spreadIndex < 0) {
+    if (spreadIndex < 0 || clearance < 0) {
       throw const InventoryFailure('inventory_safe_interior_unavailable');
     }
     validateBlockPolygon(polygon);
@@ -473,7 +667,7 @@ abstract final class InventorySpatialContract {
           x > InventoryGeometryContract.canvasWidth ||
           y < 0 ||
           y > InventoryGeometryContract.canvasHeight ||
-          !_strictlyContainsPoint(points, x, y)) {
+          !_safelyContainsPoint(points, x, y, clearance: clearance)) {
         return null;
       }
       return InventoryPlacementCoordinates(x: x, y: y);
@@ -778,6 +972,16 @@ enum InventoryBlockState {
   }
 }
 
+enum InventoryExistingBlockAction {
+  retainMapped('retain_mapped'),
+  detach('detach'),
+  archive('archive'),
+  reattach('reattach');
+
+  const InventoryExistingBlockAction(this.intentValue);
+  final String intentValue;
+}
+
 enum InventoryCategory {
   equipment('EQUIPMENT'),
   powerTool('POWER_TOOL'),
@@ -873,6 +1077,46 @@ abstract interface class InventoryMutationCommand {
   InventoryCommandType get commandType;
 }
 
+class InventoryExistingBlockMappingDraft {
+  const InventoryExistingBlockMappingDraft({
+    required this.blockId,
+    required this.polygonIndex,
+  });
+
+  final String blockId;
+  final int polygonIndex;
+}
+
+class InventoryExistingBlockFinalizeIntent {
+  const InventoryExistingBlockFinalizeIntent({
+    required this.blockId,
+    required this.action,
+    required this.expectedBlockRevision,
+    this.targetPolygonIndex,
+  });
+
+  final String blockId;
+  final InventoryExistingBlockAction action;
+  final int expectedBlockRevision;
+  final int? targetPolygonIndex;
+}
+
+class InventoryPlacementReconciliationExpectation {
+  const InventoryPlacementReconciliationExpectation({
+    required this.assetId,
+    required this.expectedAssetRevision,
+    required this.placementId,
+    required this.placementKey,
+    required this.expectedPlacementSequence,
+  });
+
+  final String assetId;
+  final int expectedAssetRevision;
+  final String placementId;
+  final String placementKey;
+  final int expectedPlacementSequence;
+}
+
 class CreateInventorySketchCommand implements InventoryMutationCommand {
   const CreateInventorySketchCommand({
     required this.operationId,
@@ -907,6 +1151,7 @@ class AutosaveInventorySketchDraftCommand implements InventoryMutationCommand {
     required this.expectedSketchRevision,
     required this.expectedContentRevision,
     required this.geometry,
+    this.existingBlockMappings,
     this.newBlocks = const [],
   });
 
@@ -919,6 +1164,7 @@ class AutosaveInventorySketchDraftCommand implements InventoryMutationCommand {
   final int expectedSketchRevision;
   final int expectedContentRevision;
   final InventoryGeometry geometry;
+  final List<InventoryExistingBlockMappingDraft>? existingBlockMappings;
   final List<InventoryBlockDraft> newBlocks;
   @override
   String get primaryAggregateId => sketchId;
@@ -965,6 +1211,8 @@ class FinalizeInventorySketchCommand implements InventoryMutationCommand {
     required this.draftRevisionId,
     required this.expectedSketchRevision,
     required this.expectedContentRevision,
+    this.existingBlockIntents,
+    this.placementExpectations = const [],
     this.newBlocks = const [],
   });
 
@@ -976,6 +1224,8 @@ class FinalizeInventorySketchCommand implements InventoryMutationCommand {
   final String draftRevisionId;
   final int expectedSketchRevision;
   final int expectedContentRevision;
+  final List<InventoryExistingBlockFinalizeIntent>? existingBlockIntents;
+  final List<InventoryPlacementReconciliationExpectation> placementExpectations;
   final List<InventoryBlockDraft> newBlocks;
   @override
   String get primaryAggregateId => sketchId;

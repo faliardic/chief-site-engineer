@@ -245,7 +245,7 @@ void main() {
     'Kroki and Liste share exact identities and all filters are projection-only',
     (tester) async {
       final inventory = _FakeInventory()
-        ..sketches[_projectA] = _sketch(_projectA)
+        ..sketches[_projectA] = _activeMappedSketch(_projectA)
         ..assets[_projectA] = [
           _asset(
             _projectA,
@@ -357,7 +357,7 @@ void main() {
     expect(find.byKey(const Key('inventory-empty')), findsOneWidget);
 
     final populated = _FakeInventory()
-      ..sketches[_projectA] = _sketch(_projectA)
+      ..sketches[_projectA] = _activeMappedSketch(_projectA)
       ..assets[_projectA] = [_asset(_projectA, _assetA)];
     final populatedController = _controller(populated, source);
     addTearDown(populatedController.dispose);
@@ -418,7 +418,7 @@ void main() {
     tester,
   ) async {
     final inventory = _FakeInventory()
-      ..sketches[_projectA] = _sketch(_projectA)
+      ..sketches[_projectA] = _activeMappedSketch(_projectA)
       ..assets[_projectA] = [_asset(_projectA, _assetA)];
     final source = _ProjectSource()
       ..projects = [_project(_projectA, 'Proje A')];
@@ -442,7 +442,7 @@ void main() {
     'real detail move selects map target confirms and canonical reloads',
     (tester) async {
       final inventory = _FakeInventory()
-        ..sketches[_projectA] = _sketch(_projectA)
+        ..sketches[_projectA] = _activeMappedSketch(_projectA)
         ..assets[_projectA] = [_asset(_projectA, _assetA)];
       final source = _ProjectSource()
         ..projects = [_project(_projectA, 'Proje A')];
@@ -489,7 +489,7 @@ void main() {
     tester,
   ) async {
     final inventory = _FakeInventory()
-      ..sketches[_projectA] = _sketch(_projectA)
+      ..sketches[_projectA] = _activeMappedSketch(_projectA)
       ..assets[_projectA] = [_asset(_projectA, _assetA)];
     final source = _ProjectSource()
       ..projects = [_project(_projectA, 'Proje A')];
@@ -521,8 +521,8 @@ void main() {
     (tester) async {
       final inventory = _FakeInventory()
         ..sketches.addAll({
-          _projectA: _sketch(_projectA),
-          _projectB: _sketch(_projectB),
+          _projectA: _activeMappedSketch(_projectA),
+          _projectB: _activeMappedSketch(_projectB),
         })
         ..assets.addAll({
           _projectA: [_asset(_projectA, _assetA, name: 'Kule vinç A')],
@@ -593,7 +593,7 @@ void main() {
     'archived row opens real detail and unarchives through map target',
     (tester) async {
       final inventory = _FakeInventory()
-        ..sketches[_projectA] = _sketch(_projectA)
+        ..sketches[_projectA] = _activeMappedSketch(_projectA)
         ..assets[_projectA] = [
           _asset(_projectA, _assetArchived, archived: true),
         ]
@@ -657,8 +657,8 @@ void main() {
     (tester) async {
       final inventory = _FakeInventory()
         ..sketches.addAll({
-          _projectA: _sketch(_projectA),
-          _projectB: _sketch(_projectB),
+          _projectA: _activeMappedSketch(_projectA),
+          _projectB: _activeMappedSketch(_projectB),
         })
         ..assets.addAll({
           _projectA: [_asset(_projectA, _assetA, x: 1024, y: 768)],
@@ -725,7 +725,7 @@ void main() {
     'invalid full active projection fails Kroki closed without partial markers',
     (tester) async {
       final inventory = _FakeInventory()
-        ..sketches[_projectA] = _sketch(_projectA)
+        ..sketches[_projectA] = _activeMappedSketch(_projectA)
         ..assets[_projectA] = [
           _asset(_projectA, _assetA),
           _asset(_projectA, _assetMissing, placement: false),
@@ -744,6 +744,8 @@ void main() {
         find.byType(InventoryPage),
       );
 
+      expect(controller.activeBlocks.single.state, InventoryBlockState.active);
+      expect(controller.canonicalActiveMapAssets, hasLength(2));
       expect(controller.view, InventoryPageView.list);
       expect(
         controller.lastDiagnosticCode,
@@ -780,7 +782,7 @@ void main() {
     'missing invalid and corrupt geometry stay in Liste with typed failure',
     (tester) async {
       final inventory = _FakeInventory()
-        ..sketches[_projectA] = _sketch(_projectA)
+        ..sketches[_projectA] = _activeMappedSketch(_projectA)
         ..assets[_projectA] = [
           _asset(_projectA, _assetMissing, placement: false),
           _asset(_projectA, _assetInvalid, x: 101, y: 100),
@@ -840,6 +842,71 @@ void main() {
         InventoryGeometryFailure.safeCode,
       );
       expect(corrupt.mutations, 0);
+    },
+  );
+
+  testWidgets(
+    'AT-533-009 detached asset stays Liste with exact label and typed focus failure',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _sketch(_projectA)
+        ..assets[_projectA] = [_asset(_projectA, _assetA)];
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      final controller = _controller(inventory, source);
+      addTearDown(controller.dispose);
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        controller: controller,
+      );
+      final pageState = tester.state<InventoryPageState>(
+        find.byType(InventoryPage),
+      );
+
+      expect(controller.visibleAssets.single.asset.id, _assetA);
+      expect(controller.canonicalActiveMapAssets, isEmpty);
+      expect(controller.visibleMapAssets, isEmpty);
+      expect(pageState.mapController?.projections, isEmpty);
+      expect(find.byKey(const Key('inventory-marker-$_assetA')), findsNothing);
+      expect(controller.canFocus(controller.assets.single), isFalse);
+      expect(
+        controller.focusFailureCode(controller.assets.single),
+        'inventory_block_detached',
+      );
+
+      controller.setView(InventoryPageView.list);
+      await tester.pump();
+      expect(
+        find.byKey(const Key('inventory-list-detached-$_assetA')),
+        findsOneWidget,
+      );
+      expect(find.text('Krokisi kaldırılmış blok'), findsOneWidget);
+      expect(
+        find.byKey(const Key('inventory-list-detached-context-$_assetA')),
+        findsOneWidget,
+      );
+      expect(find.text('Eski alan · 1. Kat'), findsOneWidget);
+      expect(
+        find.byKey(const Key('inventory-list-spatial-$_assetA')),
+        findsNothing,
+      );
+      expect(find.text('Kule vinç · Eski alan · 1. Kat'), findsNothing);
+      expect(find.byIcon(Icons.link_off_rounded), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('inventory-list-$_assetA')));
+      await tester.pump();
+      expect(controller.view, InventoryPageView.list);
+      expect(controller.lastDiagnosticCode, 'inventory_block_detached');
+      expect(
+        find.byKey(const Key('inventory-typed-diagnostic')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('inventory_block_detached'), findsOneWidget);
+      expect(pageState.mapController?.projections, isEmpty);
+      expect(find.byKey(const Key('inventory-marker-$_assetA')), findsNothing);
+      expect(inventory.mutations, 0);
     },
   );
 
@@ -1718,6 +1785,46 @@ InventoryPrimarySketchProjection _sketch(
         projectId: projectId,
         name: '1. Kat',
         ordinal: 1,
+      ),
+    ],
+  );
+}
+
+InventoryPrimarySketchProjection _activeMappedSketch(String projectId) {
+  final geometry = InventoryGeometry(polylines: [_rectangle(0, 0, 4096, 3072)]);
+  final base = _sketch(projectId, geometryOverride: geometry);
+  final blockId = projectId == _projectA ? _detachedBlockA : _detachedBlockB;
+  final floorId = projectId == _projectA ? _floorA : _floorB;
+  return InventoryPrimarySketchProjection(
+    sketch: base.sketch,
+    activeRevision: base.activeRevision,
+    draftRevision: null,
+    blocks: [
+      _block(
+        id: blockId,
+        projectId: projectId,
+        name: 'Aktif alan',
+        ordinal: 1,
+        state: InventoryBlockState.active,
+      ),
+    ],
+    floors: [
+      _floor(
+        id: floorId,
+        blockId: blockId,
+        projectId: projectId,
+        name: '1. Kat',
+        ordinal: 1,
+      ),
+    ],
+    activeBlockPolygons: [
+      InventoryRevisionBlockPolygonRecord(
+        revisionId: base.activeRevision!.id,
+        blockId: blockId,
+        projectId: projectId,
+        sketchId: base.sketch.id,
+        polygonIndex: 0,
+        createdAt: _now,
       ),
     ],
   );
