@@ -556,3 +556,154 @@ execution_record:
   runtime_routing_verified: false
 review_recommendation: FRESH_INDEPENDENT_R4_REREVIEW
 ```
+
+## MT-527-004..010 automated acceptance correction — focused gate stopped
+
+- Authority: Issue #527 comment `5462955964`.
+- Exact parent: `c07b977a6a4ecedb988eecf1b00f7c415270f2e4`.
+- Production correction implemented locally: closure proposal is validated by
+  the existing non-overlap spatial contract before the block metadata dialog;
+  `closeWorkingBlock` retains the same persistence-boundary validation.
+- Touched Dart formatting: `PASS` (`4` files checked, `3` changed).
+- Authorized focused Flutter invocation count: exactly `1`.
+- Focused command:
+  `flutter test --no-pub test/inventory_sketch_editor_test.dart test/inventory_application_test.dart test/inventory_page_test.dart test/inventory_schema_migration_test.dart`.
+- Focused result: `FAIL` (`78` passed, `1` failed).
+- Exact failure:
+  `MT-527-004 invalid closure rejects before metadata without mutation`,
+  `mobile/test/inventory_sketch_editor_test.dart:1359`;
+  expected `inventory_block_polygon_ambiguous`, actual `null`.
+- The metadata-dialog absence assertion passed before the failing diagnostic
+  assertion. Assertions after line 1359 were not reached for that loop case,
+  so MT-527-004 mutation proof is incomplete.
+- Failure classification: `BLOCKED — ROOT_CAUSE_NOT_PROVEN_WITHIN_SINGLE_INVOCATION_AUTHORITY`.
+  No test retry or post-failure source/test correction was performed.
+- `flutter analyze --no-pub`: `NOT RUN` because the focused gate failed.
+- PASS-only diff/audit/stage/commit/push/Issue/PR publication steps:
+  `NOT RUN`.
+- APK/build/device/ADB/MAIN: `NOT RUN`.
+- Ready/merge/Slice 6.2/6.3/Issue #529 changes: `NOT RUN`.
+- Owner/manual status was not inferred or mutated.
+
+Automated acceptance matrix for this invocation:
+
+- `MT-527-004`: `BLOCKED`.
+- `MT-527-005`: `AUTOMATED PASS`.
+- `MT-527-006`: `AUTOMATED PASS`.
+- `MT-527-007`: `AUTOMATED PASS`.
+- `MT-527-008`: `AUTOMATED PASS`.
+- `MT-527-009`: `AUTOMATED PASS`.
+- `MT-527-010`: `AUTOMATED PASS`.
+
+```yaml
+execution_record:
+  issue: 527
+  authority_comment: 5462955964
+  exact_parent: c07b977a6a4ecedb988eecf1b00f7c415270f2e4
+  implementation_status: IN_PROGRESS_UNCOMMITTED
+  focused_test_invocations: 1
+  focused_result: FAIL
+  focused_passed: 78
+  focused_failed: 1
+  failing_test: MT-527-004 invalid closure rejects before metadata without mutation
+  failing_location: mobile/test/inventory_sketch_editor_test.dart:1359
+  expected: inventory_block_polygon_ambiguous
+  actual: null
+  analyzer: NOT_RUN
+  commit: null
+  push: false
+  pr: 528
+  pr_draft_expected: true
+  ready: false
+  merged: false
+  owner_manual_status_mutated: false
+  runtime_model: unknown
+  runtime_reasoning_effort: null
+  runtime_routing_verified: false
+review_recommendation: NARROW_TEST_FAILURE_TRIAGE_AUTHORITY_REQUIRED
+```
+
+## MT-527-004 diagnostic continuation — final automated acceptance PASS
+
+- Authority: Issue #527 comment `5463115132`.
+- Exact parent/head before commit:
+  `c07b977a6a4ecedb988eecf1b00f7c415270f2e4`.
+- Preserved branch: `codex/issue-527-inventory-spatial-foundation`;
+  existing PR `#528` remains `OPEN/DRAFT`.
+- Root cause: the original MT-527-004 fixture preloaded a multi-point open
+  polyline. Recovery recognizes only a one-point open polyline as the current
+  working draft, so the close toolbar action was disabled and the validator,
+  catch, and diagnostic recorder were never invoked. Dialog absence was
+  therefore a disabled-button false positive, not swallowed production error.
+- Narrow correction: test-only working-state construction now starts from a
+  one-point open draft, draws the remaining exact orthogonal points, drains the
+  legitimate setup autosave, captures durable baselines, proves the close
+  `IconButton` is enabled, and retains the exact diagnostic assertion.
+- Production prevalidation remains the previously implemented pure proposal +
+  reused `InventorySpatialContract.validateNonOverlappingPolygons` path.
+  `closeWorkingBlock()` retains equivalent defense-in-depth validation.
+- Continuation touched-Dart formatting: `PASS` (`1/1`).
+
+Validation evidence:
+
+- Authorized focused retry invocation count: exactly `1/1`; no further retry.
+- Command:
+  `flutter test --no-pub test/inventory_sketch_editor_test.dart test/inventory_application_test.dart test/inventory_page_test.dart test/inventory_schema_migration_test.dart`.
+- Final focused result: `79/79 PASS — All tests passed`.
+- `flutter analyze --no-pub`: exactly `1/1`, `PASS — No issues found`
+  (`48.6s`).
+- Full `git diff --check`: `PASS`.
+- Exact current changed paths: `6/7` allowlisted; outside allowlist: `0`.
+- Schema: `22`; schema source drift: `0`.
+- Backup format: `1`; backup production source drift: `0`.
+- Mobile version: `0.1.0+1`.
+- Android/iOS/platform/package/permission drift: `0`.
+- `pubspec.yaml` / `pubspec.lock` / dependency drift: `0`.
+- Other protected/source and Issue #529 drift: `0`.
+- APK/build/device/ADB/MAIN: `NOT RUN`.
+- Owner/manual status was not inferred or mutated.
+- Ready/merge/Issue close/Slice 6.2/6.3: `NOT RUN`.
+
+Final automated acceptance classification:
+
+- `MT-527-004`: `AUTOMATED PASS`.
+- `MT-527-005`: `AUTOMATED PASS`.
+- `MT-527-006`: `AUTOMATED PASS`.
+- `MT-527-007`: `AUTOMATED PASS`.
+- `MT-527-008`: `AUTOMATED PASS`.
+- `MT-527-009`: `AUTOMATED PASS`.
+- `MT-527-010`: `AUTOMATED PASS`.
+
+These automated classifications do not alter the owner/manual test register.
+
+```yaml
+execution_record:
+  issue: 527
+  authority_comment: 5463115132
+  exact_parent: c07b977a6a4ecedb988eecf1b00f7c415270f2e4
+  branch: codex/issue-527-inventory-spatial-foundation
+  root_cause: MECHANICAL_TEST_FIXTURE_DISABLED_CLOSE_ACTION
+  continuation_production_edits: 0
+  focused_retry_invocations: 1
+  focused_result: 79/79 PASS
+  analyzer_invocations: 1
+  analyzer: PASS
+  diff_check_full: PASS
+  allowlist_changed: 6/7
+  outside_allowlist: 0
+  schema: 22
+  backup_format: 1
+  version: 0.1.0+1
+  protected_platform_permission_package_dependency_drift: 0
+  commit: containing_commit
+  push: pending_publication_gate
+  pr: 528
+  pr_state: OPEN_DRAFT
+  ready: false
+  merged: false
+  owner_manual_status_mutated: false
+  runtime_model: unknown
+  runtime_reasoning_effort: null
+  runtime_routing_verified: false
+review_recommendation: FRESH_INDEPENDENT_R4_REREVIEW
+```

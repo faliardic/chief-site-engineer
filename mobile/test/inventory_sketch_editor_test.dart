@@ -340,6 +340,78 @@ void main() {
     );
 
     test(
+      'MT-527-006 metadata boundaries fail closed and limits succeed',
+      () async {
+        final fake = _FakeInventoryApplication.withDraft(
+          InventoryGeometry.emptyDraft(),
+        );
+        final controller = _controller(fake);
+        addTearDown(controller.dispose);
+        await controller.initialize();
+        for (final point in [
+          _point(0, 0),
+          _point(192, 0),
+          _point(192, 192),
+          _point(0, 192),
+        ]) {
+          controller.drawPoint(point);
+        }
+        final beforeGeometry = controller.editor!.geometry.canonicalJson;
+
+        Matcher failsWith(String code) => throwsA(
+          isA<InventoryFailure>().having(
+            (failure) => failure.code,
+            'code',
+            code,
+          ),
+        );
+
+        expect(
+          () => controller.createBlockDraft(displayName: ' ', floorCount: 1),
+          failsWith('inventory_block_name_invalid'),
+        );
+        expect(
+          () => controller.createBlockDraft(
+            displayName: ''.padRight(81, 'A'),
+            floorCount: 1,
+          ),
+          failsWith('inventory_block_name_invalid'),
+        );
+        expect(
+          () => controller.createBlockDraft(displayName: 'Alan', floorCount: 0),
+          failsWith('inventory_floor_count_invalid'),
+        );
+        expect(
+          () =>
+              controller.createBlockDraft(displayName: 'Alan', floorCount: 101),
+          failsWith('inventory_floor_count_invalid'),
+        );
+
+        final minimum = controller.createBlockDraft(
+          displayName: 'A',
+          floorCount: 1,
+        );
+        expect(minimum.displayName, 'A');
+        expect(minimum.floors.single.ordinal, 1);
+        final maximum = controller.createBlockDraft(
+          displayName: ''.padRight(80, 'B'),
+          floorCount: 100,
+        );
+        expect(maximum.displayName.length, 80);
+        expect(maximum.floors, hasLength(100));
+        expect(
+          maximum.floors.map((floor) => floor.ordinal),
+          List.generate(100, (index) => index + 1),
+        );
+        expect(maximum.floors.map((floor) => floor.id).toSet(), hasLength(100));
+        expect(controller.editor!.geometry.canonicalJson, beforeGeometry);
+        expect(controller.newBlocks, isEmpty);
+        expect(fake.saveCalls, isEmpty);
+        expect(fake.finalizeCalls, 0);
+      },
+    );
+
+    test(
       'whole polygon delete remaps surviving identity through history and persistence',
       () async {
         final fake = _FakeInventoryApplication.withDraft(
@@ -1164,26 +1236,183 @@ void main() {
       ]);
       expect(fake.finalizeCalls, 0);
       expect(fake.saveCalls.last.newBlocks, hasLength(2));
+      final expectedGeometry = controller.editor!.geometry.canonicalJson;
+      final expectedBlocks = List<InventoryBlockDraft>.of(controller.newBlocks);
 
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       final recoveredKey = GlobalKey<InventorySketchEditorPageState>();
       await _openEditor(tester, fake, orientations, recoveredKey);
+      final recoveredController = recoveredKey.currentState!.controller;
+      expect(recoveredController.newBlocks.map((block) => block.displayName), [
+        'A Blok',
+        'B Blok',
+      ]);
       expect(
-        recoveredKey.currentState!.controller.newBlocks.map(
-          (block) => block.displayName,
-        ),
-        ['A Blok', 'B Blok'],
-      );
-      expect(
-        recoveredKey.currentState!.controller.newBlocks.first.floors.map(
+        recoveredController.newBlocks.first.floors.map(
           (floor) => floor.ordinal,
         ),
         [1, 2],
       );
+      expect(
+        recoveredController.editor!.geometry.canonicalJson,
+        expectedGeometry,
+      );
+      expect(recoveredController.newBlocks, hasLength(expectedBlocks.length));
+      for (var index = 0; index < expectedBlocks.length; index += 1) {
+        _expectSameBlockIdentity(
+          recoveredController.newBlocks[index],
+          expectedBlocks[index],
+          polygonIndex: index,
+        );
+      }
       expect(tester.takeException(), isNull);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'MT-527-004 invalid closure rejects before metadata without mutation',
+    (tester) async {
+      final cases =
+          <
+            ({
+              String label,
+              List<InventorySketchPoint> points,
+              String errorCode,
+            })
+          >[
+            (
+              label: 'intersecting',
+              points: [
+                _point(64, 64),
+                _point(256, 64),
+                _point(256, 256),
+                _point(64, 256),
+              ],
+              errorCode: 'inventory_block_polygon_ambiguous',
+            ),
+            (
+              label: 'touching',
+              points: [
+                _point(192, 64),
+                _point(320, 64),
+                _point(320, 128),
+                _point(192, 128),
+              ],
+              errorCode: 'inventory_block_polygon_ambiguous',
+            ),
+            (
+              label: 'contained',
+              points: [
+                _point(64, 64),
+                _point(128, 64),
+                _point(128, 128),
+                _point(64, 128),
+              ],
+              errorCode: 'inventory_block_polygon_ambiguous',
+            ),
+            (
+              label: 'self-intersecting',
+              points: [
+                _point(512, 128),
+                _point(704, 128),
+                _point(704, 320),
+                _point(576, 320),
+                _point(576, 64),
+                _point(768, 64),
+                _point(768, 256),
+                _point(512, 256),
+              ],
+              errorCode: 'inventory_block_polygon_self_intersects',
+            ),
+          ];
+
+      for (final testCase in cases) {
+        final firstBlock = _blockDrafts().single;
+        final fake = _FakeInventoryApplication.withDraft(
+          _draftWithWorkingSecondBlock(testCase.points.first),
+          draftNewBlocks: [firstBlock],
+        );
+        final orientations = _OrientationRecorder();
+        final pageKey = GlobalKey<InventorySketchEditorPageState>();
+        await _openEditor(tester, fake, orientations, pageKey);
+        final controller = pageKey.currentState!.controller;
+        for (final point in testCase.points.skip(1)) {
+          controller.setFreeLengthNextSegment(true);
+          expect(
+            controller.drawPoint(point),
+            isTrue,
+            reason: '${testCase.label} setup point',
+          );
+        }
+        expect(await controller.forceSave(), isTrue);
+        await tester.pumpAndSettle();
+        expect(fake.saveCalls, hasLength(1), reason: testCase.label);
+        expect(fake.saveMutationCount, 1, reason: testCase.label);
+        expect(controller.hasUnacknowledgedGeometry, isFalse);
+
+        final originalProjection = fake.projection!;
+        final geometry = controller.editor!.geometry;
+        final beforeGeometry = controller.editor!.geometry.canonicalJson;
+        final saveCallsBeforeClose =
+            List<AutosaveInventorySketchDraftCommand>.of(fake.saveCalls);
+        final saveMutationCountBeforeClose = fake.saveMutationCount;
+        final operationOrderBeforeClose = List<String>.of(fake.operationOrder);
+        expect(
+          () => controller.validateWorkingBlockClosure(),
+          throwsA(
+            isA<InventoryFailure>().having(
+              (error) => error.code,
+              'code',
+              testCase.errorCode,
+            ),
+          ),
+          reason: testCase.label,
+        );
+        expect(controller.lastErrorCode, isNull);
+
+        final closeBlock = find.byKey(
+          const Key('inventory-editor-close-block'),
+        );
+        await tester.ensureVisible(closeBlock);
+        final closeIconButton = tester.widget<IconButton>(
+          find.descendant(of: closeBlock, matching: find.byType(IconButton)),
+        );
+        expect(closeIconButton.onPressed, isNotNull, reason: testCase.label);
+        await tester.tap(closeBlock);
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(milliseconds: 600));
+
+        expect(
+          find.byKey(const Key('inventory-block-metadata-dialog')),
+          findsNothing,
+          reason: testCase.label,
+        );
+        expect(controller.lastErrorCode, testCase.errorCode);
+        expect(controller.editor!.geometry.canonicalJson, beforeGeometry);
+        expect(controller.editor!.workingPolylineIndex, 1);
+        expect(controller.newBlocks, hasLength(1));
+        _expectSameBlockIdentity(
+          controller.newBlocks.single,
+          firstBlock,
+          polygonIndex: 0,
+        );
+        expect(identical(fake.projection, originalProjection), isTrue);
+        expect(
+          fake.projection!.draftRevision!.geometry.canonicalJson,
+          geometry.canonicalJson,
+        );
+        expect(fake.saveCalls, orderedEquals(saveCallsBeforeClose));
+        expect(fake.saveMutationCount, saveMutationCountBeforeClose);
+        expect(fake.operationOrder, orderedEquals(operationOrderBeforeClose));
+        expect(fake.finalizeCalls, 0);
+        expect(tester.takeException(), isNull);
+
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+      }
     },
   );
 
@@ -1908,6 +2137,22 @@ InventoryGeometry _closedBlockGeometry() => InventoryGeometry(
     ),
   ],
 );
+
+InventoryGeometry _draftWithWorkingSecondBlock(InventorySketchPoint start) =>
+    InventoryGeometry(
+      polylines: [
+        InventoryPolyline(
+          closed: true,
+          points: [
+            _point(0, 0),
+            _point(192, 0),
+            _point(192, 192),
+            _point(0, 192),
+          ],
+        ),
+        InventoryPolyline(closed: false, points: [start]),
+      ],
+    );
 
 List<InventoryBlockDraft> _blockDrafts() => [
   InventoryBlockDraft(

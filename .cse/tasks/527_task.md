@@ -285,3 +285,73 @@ Hard stops:
 - no app/bootstrap/global diagnostic correction for `#529`;
 - no APK/build/device/ADB/MAIN operation;
 - no MT PASS inference, Ready, merge, Issue closure, Slice 6.2, or Slice 6.3.
+
+## MT-527-004 UX correction + automated MT sweep — comment 5462955964
+
+- Exact parent/head: `c07b977a6a4ecedb988eecf1b00f7c415270f2e4`.
+- Target: PR `#528`, retained `OPEN/DRAFT`.
+- Risk/routing: `R4`; requested model `gpt-5.6-sol`; requested effort
+  `max`; runtime routing remains independently unverified.
+- Owner/manual testing remains paused; automated outcomes must not be reported
+  as owner/manual PASS.
+
+Locked correction:
+
+- factor/reuse the exact existing closure-spatial validation as a pure,
+  non-mutating pre-dialog check;
+- self-intersection, overlap, touch, and containment must reject before metadata
+  UI, preserve the working polyline and durable prior draft, and cause no
+  autosave/persistence/finalize mutation;
+- `closeWorkingBlock()` retains equivalent defense-in-depth validation;
+- valid candidates still open `Alanı ekle`; orthogonal drawing, alignment,
+  one-shot free length, active-base immutability, and publish UX remain intact.
+
+Exact write allowlist:
+
+1. `.cse/tasks/527_task.md`
+2. `.cse/results/527_result.md`
+3. `mobile/lib/features/inventory/inventory_sketch_editor_page.dart`
+4. `mobile/test/inventory_sketch_editor_test.dart`
+5. `mobile/test/inventory_page_test.dart`
+6. `mobile/test/inventory_application_test.dart`
+7. `mobile/test/inventory_schema_migration_test.dart`
+
+Automated sweep and validation budget:
+
+- map and cover only missing assertions for `MT-527-004..010`;
+- run touched Dart formatting;
+- run exactly one minimum focused Flutter test invocation;
+- only after focused PASS, run `flutter analyze --no-pub` exactly once;
+- then full/staged `git diff --check`, exact allowlist and schema `22` / backup
+  `1` / version `0.1.0+1` / platform / package / permission / pubspec /
+  dependency / protected drift audits;
+- append result evidence, create one minimal correction commit, push the same
+  branch, publish Issue/PR evidence, and stop for fresh independent R4 review.
+
+Hard stops:
+
+- any new production defect during `MT-527-005..010` stops execution without a
+  same-turn product fix;
+- no APK/build/device/ADB/MAIN, Ready, merge, Issue closure, Slice 6.2/6.3, or
+  Issue #529 change.
+
+## MT-527-004 diagnostic continuation — comment 5463115132
+
+- Preserve exact parent/head
+  `c07b977a6a4ecedb988eecf1b00f7c415270f2e4` and the existing uncommitted
+  six-path worktree; no reset, discard, or rebase.
+- Preserve prior `78 PASS / 1 FAIL` evidence and the MT-527-005..010 coverage.
+- Exact blocker: metadata dialog remained closed but the expected
+  `inventory_block_polygon_ambiguous` diagnostic was `null`.
+- Root-cause contract: `InventorySketchEditorSnapshot.recover()` recognizes
+  only a one-point open polyline as the current working draft. The failed test
+  preloaded a multi-point open candidate, so no working index existed and the
+  disabled close action never invoked prevalidation.
+- Allowed continuation edit: mechanical MT-527-004 fixture setup only unless
+  triage proves a production editor-path defect; diagnostic assertions may not
+  be weakened.
+- Run the exact focused acceptance suite one final time only. Focused failure
+  stops execution; focused PASS permits exactly one analyzer invocation and
+  the locked diff/audit/commit/push/evidence sequence.
+- No APK/build/device/ADB/MAIN, owner/manual PASS inference, Ready, merge,
+  Issue closure, Slice 6.2/6.3, or Issue #529 change.

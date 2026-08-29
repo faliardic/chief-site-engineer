@@ -285,43 +285,65 @@ class InventorySketchEditorController extends ChangeNotifier {
     );
   }
 
+  void validateWorkingBlockClosure() {
+    final proposal = _workingBlockClosureProposal();
+    if (proposal == null) {
+      throw const InventoryFailure('inventory_block_polygon_not_closed');
+    }
+    _validateWorkingBlockNonOverlap(proposal);
+  }
+
   bool closeWorkingBlock(InventoryBlockDraft definition) {
-    final current = editor;
-    final index = current?.workingPolylineIndex;
-    final working = workingPolyline;
-    if (current == null ||
-        index == null ||
-        working == null ||
-        working.points.length < 3 ||
-        definition.polygonIndex != index) {
+    final proposal = _workingBlockClosureProposal();
+    if (proposal == null || definition.polygonIndex != proposal.polygonIndex) {
       return false;
     }
-    final next = current.drawPoint(
-      working.points.first,
-      smartAlignment: !_freeLengthNextSegment,
-    );
-    if (next == null || next.workingPolylineIndex != null) return false;
     try {
-      definition.validate(next.geometry);
-      final polygons = <InventoryPolyline>[
-        for (final mappedIndex in _existingMappedPolygonIndexes)
-          next.geometry.polylines[mappedIndex],
-        for (final block in _newBlocks)
-          next.geometry.polylines[block.polygonIndex],
-        next.geometry.polylines[index],
-      ];
-      InventorySpatialContract.validateNonOverlappingPolygons(polygons);
+      definition.validate(proposal.editor.geometry);
+      _validateWorkingBlockNonOverlap(proposal);
     } on InventoryFailure catch (error) {
       lastErrorCode = error.code;
       _notify();
       return false;
     }
-    final applied = _applyEditorAction(next, addedBlock: definition);
+    final applied = _applyEditorAction(proposal.editor, addedBlock: definition);
     if (applied && _freeLengthNextSegment) {
       _freeLengthNextSegment = false;
       _notify();
     }
     return applied;
+  }
+
+  ({InventorySketchEditorSnapshot editor, int polygonIndex})?
+  _workingBlockClosureProposal() {
+    final current = editor;
+    final polygonIndex = current?.workingPolylineIndex;
+    final working = workingPolyline;
+    if (current == null ||
+        polygonIndex == null ||
+        working == null ||
+        working.points.length < 3) {
+      return null;
+    }
+    final next = current.drawPoint(
+      working.points.first,
+      smartAlignment: !_freeLengthNextSegment,
+    );
+    if (next == null || next.workingPolylineIndex != null) return null;
+    return (editor: next, polygonIndex: polygonIndex);
+  }
+
+  void _validateWorkingBlockNonOverlap(
+    ({InventorySketchEditorSnapshot editor, int polygonIndex}) proposal,
+  ) {
+    final polygons = <InventoryPolyline>[
+      for (final mappedIndex in _existingMappedPolygonIndexes)
+        proposal.editor.geometry.polylines[mappedIndex],
+      for (final block in _newBlocks)
+        proposal.editor.geometry.polylines[block.polygonIndex],
+      proposal.editor.geometry.polylines[proposal.polygonIndex],
+    ];
+    InventorySpatialContract.validateNonOverlappingPolygons(polygons);
   }
 
   bool finishWorkingPolyline() =>
@@ -1105,6 +1127,12 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
   Future<void> _closeCurrentBlock() async {
     final working = controller.workingPolyline;
     if (working == null || working.points.length < 3) return;
+    try {
+      controller.validateWorkingBlockClosure();
+    } on Object catch (error) {
+      controller.recordHandledError(error);
+      return;
+    }
     final input = await showDialog<_InventoryBlockMetadataInput>(
       context: context,
       barrierDismissible: false,

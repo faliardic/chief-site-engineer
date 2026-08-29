@@ -228,11 +228,19 @@ void main() {
       final floors = await db.query('inventory_floors');
       expect(blocks, hasLength(1));
       expect(floors, hasLength(1));
+      expect(
+        blocks.single['id'],
+        _stableMigrationUuid('inventory-spatial-v21:block:$_projectA'),
+      );
       expect(blocks.single['project_id'], _projectA);
       expect(blocks.single['display_name'], 'Varsayılan Alan');
       expect(blocks.single['normalized_name'], 'varsayılan alan');
       expect(blocks.single['ordinal'], 1);
       expect(blocks.single['state'], 'DETACHED');
+      expect(
+        floors.single['id'],
+        _stableMigrationUuid('inventory-spatial-v21:floor:$_projectA'),
+      );
       expect(floors.single['project_id'], _projectA);
       expect(floors.single['block_id'], blocks.single['id']);
       expect(floors.single['display_name'], '1. Kat');
@@ -262,6 +270,10 @@ void main() {
       expect(projection.draftLegacyPolygonCount, 1);
       expect(projection.draftNewBlocks, isEmpty);
       expect(await db.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      expect(
+        (await db.rawQuery('PRAGMA integrity_check')).single['integrity_check'],
+        'ok',
+      );
       await upgraded.close();
     },
   );

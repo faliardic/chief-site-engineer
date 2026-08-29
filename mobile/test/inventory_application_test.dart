@@ -661,11 +661,32 @@ void main() {
       expect(firstProjection.activePlacement!.y, 20);
       expect(firstProjection.activePlacement!.quantity, 2);
       final stableFloorId = firstProjection.activePlacement!.floorId;
+      final spatialAfterCreate = (await fixture.app.loadPrimarySketch(
+        _projectA,
+      ))!;
       expect(
-        (await fixture.app.loadPrimarySketch(
-          _projectA,
-        ))!.floors.map((floor) => floor.id),
+        spatialAfterCreate.floors.map((floor) => floor.id),
         contains(stableFloorId),
+      );
+      final stableFloor = spatialAfterCreate.floors.singleWhere(
+        (floor) => floor.id == stableFloorId,
+      );
+      final owningBlock = spatialAfterCreate.blocks.singleWhere(
+        (block) => block.id == stableFloor.blockId,
+      );
+      final owningMapping = spatialAfterCreate.activeBlockPolygons.singleWhere(
+        (mapping) => mapping.blockId == owningBlock.id,
+      );
+      expect(owningBlock.state, InventoryBlockState.active);
+      expect(stableFloor.ordinal, 1);
+      expect(
+        InventorySpatialContract.containsPlacement(
+          spatialAfterCreate.activeRevision!.geometry.polylines[owningMapping
+              .polygonIndex],
+          x: firstProjection.activePlacement!.x,
+          y: firstProjection.activePlacement!.y,
+        ),
+        isTrue,
       );
 
       final secondAssetId = _uuid(314);
@@ -937,6 +958,259 @@ void main() {
         )).single['integrity_check'],
         'ok',
       );
+    },
+  );
+
+  test(
+    'MT-527-006 normalized duplicate block name fails before mutation',
+    () async {
+      final fixture = await _Fixture.create('mt_527_006_duplicate');
+      addTearDown(fixture.close);
+      final sketchId = _uuid(850);
+      final draftId = _uuid(851);
+      await fixture.app.createSketch(
+        CreateInventorySketchCommand(
+          operationId: _uuid(852),
+          projectId: _projectA,
+          sketchId: sketchId,
+          draftRevisionId: draftId,
+        ),
+      );
+      final geometry = _geometry(64);
+      final sourceBlocks = _blockDrafts(sketchId, geometry);
+      final duplicateBlocks = [
+        InventoryBlockDraft(
+          id: sourceBlocks[0].id,
+          displayName: 'Alan',
+          polygonIndex: sourceBlocks[0].polygonIndex,
+          floors: sourceBlocks[0].floors,
+        ),
+        InventoryBlockDraft(
+          id: sourceBlocks[1].id,
+          displayName: 'alan',
+          polygonIndex: sourceBlocks[1].polygonIndex,
+          floors: sourceBlocks[1].floors,
+        ),
+      ];
+      final countsBefore = await _counts(fixture.db.database);
+      final sketchBefore = (await fixture.db.database.query(
+        'inventory_sketches',
+        where: 'id = ?',
+        whereArgs: [sketchId],
+      )).single;
+      final revisionBefore = (await fixture.db.database.query(
+        'inventory_sketch_revisions',
+        where: 'id = ?',
+        whereArgs: [draftId],
+      )).single;
+      final spatialBefore = (await fixture.db.database.query(
+        'inventory_sketch_revision_spatial_drafts',
+        where: 'revision_id = ?',
+        whereArgs: [draftId],
+      )).single;
+
+      await expectLater(
+        Future<InventoryMutationResult>.sync(
+          () => fixture.app.finalizeSketch(
+            FinalizeInventorySketchCommand(
+              operationId: _uuid(853),
+              projectId: _projectA,
+              sketchId: sketchId,
+              draftRevisionId: draftId,
+              expectedSketchRevision: 1,
+              expectedContentRevision: 1,
+              newBlocks: duplicateBlocks,
+            ),
+          ),
+        ),
+        _fails('inventory_block_name_conflict'),
+      );
+
+      expect(await _counts(fixture.db.database), countsBefore);
+      expect(
+        (await fixture.db.database.query(
+          'inventory_sketches',
+          where: 'id = ?',
+          whereArgs: [sketchId],
+        )).single,
+        sketchBefore,
+      );
+      expect(
+        (await fixture.db.database.query(
+          'inventory_sketch_revisions',
+          where: 'id = ?',
+          whereArgs: [draftId],
+        )).single,
+        revisionBefore,
+      );
+      expect(
+        (await fixture.db.database.query(
+          'inventory_sketch_revision_spatial_drafts',
+          where: 'revision_id = ?',
+          whereArgs: [draftId],
+        )).single,
+        spatialBefore,
+      );
+      expect(
+        await fixture.db.database.query(
+          'inventory_command_receipts',
+          where: 'id = ?',
+          whereArgs: [_uuid(853)],
+        ),
+        isEmpty,
+      );
+    },
+  );
+
+  test(
+    'MT-527-008 cross-block move preserves placement and event truth',
+    () async {
+      final fixture = await _Fixture.create('mt_527_008_cross_block');
+      addTearDown(fixture.close);
+      final geometry = _geometry(64);
+      final sketch = await _createFinalizedSketch(
+        fixture,
+        seed: 860,
+        geometry: geometry,
+      );
+      final spatial = (await fixture.app.loadPrimarySketch(_projectA))!;
+      InventoryFloorRecord firstFloorForPolygon(int polygonIndex) {
+        final mapping = spatial.activeBlockPolygons.singleWhere(
+          (item) => item.polygonIndex == polygonIndex,
+        );
+        return spatial.floors.singleWhere(
+          (floor) => floor.blockId == mapping.blockId && floor.ordinal == 1,
+        );
+      }
+
+      final firstFloor = firstFloorForPolygon(0);
+      final secondFloor = firstFloorForPolygon(1);
+      expect(secondFloor.id, isNot(firstFloor.id));
+      final assetId = _uuid(870);
+      final placementKey = _uuid(871);
+      final firstPlacementId = _uuid(872);
+      await fixture.app.createAsset(
+        CreateInventoryAssetCommand(
+          operationId: _uuid(873),
+          projectId: _projectA,
+          assetId: assetId,
+          placementId: firstPlacementId,
+          placementKey: placementKey,
+          sketchId: sketch.sketchId,
+          activeRevisionId: sketch.activeRevisionId,
+          displayName: 'Taşınan kayıt',
+          category: InventoryCategory.equipment,
+          totalQuantity: 1,
+          x: 128,
+          y: 128,
+        ),
+      );
+      expect(
+        (await fixture.app.loadAsset(
+          projectId: _projectA,
+          assetId: assetId,
+        )).activePlacement!.floorId,
+        firstFloor.id,
+      );
+
+      final sameBlockPlacementId = _uuid(874);
+      await fixture.app.movePlacement(
+        MoveInventoryPlacementCommand(
+          operationId: _uuid(875),
+          projectId: _projectA,
+          assetId: assetId,
+          placementKey: placementKey,
+          successorPlacementId: sameBlockPlacementId,
+          sketchId: sketch.sketchId,
+          activeRevisionId: sketch.activeRevisionId,
+          expectedPlacementSequence: 1,
+          x: 512,
+          y: 512,
+        ),
+      );
+      expect(
+        (await fixture.app.loadAsset(
+          projectId: _projectA,
+          assetId: assetId,
+        )).activePlacement!.floorId,
+        firstFloor.id,
+      );
+
+      final crossBlockPlacementId = _uuid(876);
+      await fixture.app.movePlacement(
+        MoveInventoryPlacementCommand(
+          operationId: _uuid(877),
+          projectId: _projectA,
+          assetId: assetId,
+          placementKey: placementKey,
+          successorPlacementId: crossBlockPlacementId,
+          sketchId: sketch.sketchId,
+          activeRevisionId: sketch.activeRevisionId,
+          expectedPlacementSequence: 2,
+          x: 2704,
+          y: 128,
+        ),
+      );
+      final active = (await fixture.app.loadAsset(
+        projectId: _projectA,
+        assetId: assetId,
+      )).activePlacement!;
+      expect(active.id, crossBlockPlacementId);
+      expect(active.floorId, secondFloor.id);
+      expect(active.x, 2704);
+      expect(active.y, 128);
+
+      final versions = await fixture.app.listPlacementVersions(
+        projectId: _projectA,
+        assetId: assetId,
+        placementKey: placementKey,
+      );
+      expect(versions.map((item) => item.id), [
+        firstPlacementId,
+        sameBlockPlacementId,
+        crossBlockPlacementId,
+      ]);
+      expect(versions.map((item) => item.sequence), [1, 2, 3]);
+      expect(versions.map((item) => item.floorId), [
+        firstFloor.id,
+        firstFloor.id,
+        secondFloor.id,
+      ]);
+      expect(versions.map((item) => item.supersedesPlacementId), [
+        null,
+        firstPlacementId,
+        sameBlockPlacementId,
+      ]);
+      expect(versions.map((item) => item.endReason), [
+        InventoryPlacementEndReason.moved,
+        InventoryPlacementEndReason.moved,
+        null,
+      ]);
+      expect(versions.map((item) => item.isActive), [false, false, true]);
+      expect(
+        versions.every((item) => item.placementKey == placementKey),
+        isTrue,
+      );
+
+      final moves = (await fixture.app.listAssetHistory(
+        projectId: _projectA,
+        assetId: assetId,
+      )).where((event) => event.eventType == InventoryEventType.placementMoved);
+      expect(moves, hasLength(2));
+      final sameBlockEvent = moves.singleWhere(
+        (event) => event.payload['sequence'] == 2,
+      );
+      expect(sameBlockEvent.payload['before_floor_id'], firstFloor.id);
+      expect(sameBlockEvent.payload['after_floor_id'], firstFloor.id);
+      final crossBlockEvent = moves.singleWhere(
+        (event) => event.payload['sequence'] == 3,
+      );
+      expect(crossBlockEvent.payload['before_floor_id'], firstFloor.id);
+      expect(crossBlockEvent.payload['after_floor_id'], secondFloor.id);
+      expect(crossBlockEvent.payload['before_x'], 512);
+      expect(crossBlockEvent.payload['before_y'], 512);
+      expect(crossBlockEvent.payload['after_x'], 2704);
+      expect(crossBlockEvent.payload['after_y'], 128);
     },
   );
 
@@ -1720,6 +1994,68 @@ void main() {
           InventorySketchRevisionState.active.storageValue,
         ],
       );
+      List<Object?> blockTruth(InventoryBlockRecord block) => [
+        block.id,
+        block.projectId,
+        block.displayName,
+        block.normalizedName,
+        block.ordinal,
+        block.state,
+        block.revision,
+        block.createdAt,
+        block.updatedAt,
+        block.archivedAt,
+      ];
+      List<Object?> floorTruth(InventoryFloorRecord floor) => [
+        floor.id,
+        floor.blockId,
+        floor.projectId,
+        floor.displayName,
+        floor.ordinal,
+        floor.revision,
+        floor.createdAt,
+        floor.updatedAt,
+        floor.archivedAt,
+      ];
+      List<Object?> mappingTruth(InventoryRevisionBlockPolygonRecord mapping) =>
+          [
+            mapping.revisionId,
+            mapping.blockId,
+            mapping.projectId,
+            mapping.sketchId,
+            mapping.polygonIndex,
+            mapping.createdAt,
+          ];
+
+      final blockSnapshot = finalized.blocks.map(blockTruth).toList();
+      final floorSnapshot = finalized.floors.map(floorTruth).toList();
+      final mappingSnapshot = finalized.activeBlockPolygons
+          .map(mappingTruth)
+          .toList();
+      await fixture.db.close();
+      await fixture.db.open();
+      final finalizedRelaunch = InventoryApplication(
+        database: fixture.db,
+        clock: fixture.clock.call,
+        idFactory: fixture.ids.call,
+      );
+      final durable = (await finalizedRelaunch.loadPrimarySketch(_projectA))!;
+      expect(durable.draftRevision, isNull);
+      expect(durable.activeRevision!.id, editDraftId);
+      expect(
+        durable.activeRevision!.geometry.canonicalJson,
+        finalized.activeRevision!.geometry.canonicalJson,
+      );
+      expect(
+        durable.activeRevision!.geometrySha256,
+        finalized.activeRevision!.geometrySha256,
+      );
+      expect(durable.blocks.map(blockTruth).toList(), blockSnapshot);
+      expect(durable.floors.map(floorTruth).toList(), floorSnapshot);
+      expect(
+        durable.activeBlockPolygons.map(mappingTruth).toList(),
+        mappingSnapshot,
+      );
     },
   );
 }
@@ -1809,9 +2145,11 @@ Future<_FinalizedSketch> _createFinalizedSketch(
   _Fixture fixture, {
   required int seed,
   String projectId = _projectA,
+  InventoryGeometry? geometry,
 }) async {
   final sketchId = _uuid(seed);
   final draftId = _uuid(seed + 1);
+  final finalizedGeometry = geometry ?? _geometry();
   await fixture.app.createSketch(
     CreateInventorySketchCommand(
       operationId: _uuid(seed + 2),
@@ -1828,8 +2166,8 @@ Future<_FinalizedSketch> _createFinalizedSketch(
       draftRevisionId: draftId,
       expectedSketchRevision: 1,
       expectedContentRevision: 1,
-      geometry: _geometry(),
-      newBlocks: _blockDrafts(sketchId, _geometry()),
+      geometry: finalizedGeometry,
+      newBlocks: _blockDrafts(sketchId, finalizedGeometry),
     ),
   );
   await fixture.app.finalizeSketch(
@@ -1840,7 +2178,7 @@ Future<_FinalizedSketch> _createFinalizedSketch(
       draftRevisionId: draftId,
       expectedSketchRevision: 2,
       expectedContentRevision: 2,
-      newBlocks: _blockDrafts(sketchId, _geometry()),
+      newBlocks: _blockDrafts(sketchId, finalizedGeometry),
     ),
   );
   return _FinalizedSketch(
