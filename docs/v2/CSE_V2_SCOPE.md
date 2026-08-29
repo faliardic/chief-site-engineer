@@ -3,7 +3,7 @@
 **Belge türü:** Güncel ürün yürütme kapsamı
 **Durum:** Kanonik V2 kapsam ve sıra kaynağı
 **Tarih:** 29 Ağustos 2026
-**Güncel yön kaynağı:** Epic #506 / Issue #533 — Inventory Map v1 Slice 6.3
+**Güncel yön kaynağı:** Epic #506 / Issue #535 — Inventory Map v1 Slice 6.4 Phase A
 **Değişken repository gerçeği:** Güncel SHA/PR durumu GitHub `master` ve current Issue üzerinden doğrulanır.
 
 ## 1. Belgenin rolü
@@ -50,9 +50,9 @@ V1 tarihsel baseline'dır. V2, aynı offline-first mobil ürünü yeniden yazmak
 yerine bu baseline üzerinde ilerler.
 
 Güncel V2 teknik durum V1 metadata'sından ayrıdır: Issue #527 revised Slice 6.1,
-Issue #529 correction'ı ve Issue #531 Slice 6.2 merged predecessor'dır; current
-Issue #533 Slice 6.3
-baseline'ı schema `22`, mobile version `0.1.0+1` ve backup format `1`dir.
+Issue #529 correction'ı, Issue #531 Slice 6.2 ve Issue #533 Slice 6.3 merged
+predecessor'lardır. Current Issue #535 Slice 6.4 Phase A baseline'ı schema `22`,
+mobile version `0.1.0+1` ve backup format `1`dir.
 Exact güncel merge SHA kalıcı bu kapsam belgesine sabitlenmez; GitHub `master`
 üzerinden doğrulanır. Bu baseline,
 schedule runtime ve persistent immutable reference-schedule snapshot temeliyle
@@ -102,7 +102,8 @@ Proje/Mahal, Saha Rehberi, Attachment ve Ajanda omurgası — complete
 → Epic #506 / Issue #507 Inventory Map v1 Slice 0 contract — historical normative foundation
 → Inventory Map v1 Slices 1–5 and Issue #527 / PR #528 revised Slice 6.1 — merged predecessors
 → Issue #529 / PR #530 correction and Issue #531 / PR #532 Slice 6.2 — merged
-→ Issue #533 Slice 6.3 block reshape/reconciliation/lifecycle — current implementation
+→ Issue #533 / PR #534 Slice 6.3 block reshape/reconciliation/lifecycle — merged
+→ Issue #535 Slice 6.4 Phase A integrated automation — PASS / owner acceptance pending
 → V2.12 and later planned product work — paused by owner decision
 ```
 
@@ -437,17 +438,19 @@ yolunu ve closed-area editor foundation'ını kuran merged predecessor'dır. Iss
 #529 Agenda transient-project diagnostic correction'ı da merged predecessor'dır.
 Issue #531 Slice 6.2 Kat Görünümü, block/floor navigation, Map/List spatial
 context ve exact-floor quick-create davranışını schema/storage değiştirmeden
-merged temele eklemiştir. Current Issue #533 yalnız Slice 6.3 mapped-block
-reshape, placement reconciliation ve explicit detach/archive/reattach lifecycle
-davranışını schema/storage değiştirmeden uygular. Slice 6.4/7, Ready, merge ve
-cihaz işlemleri current authority'nin dışındadır.
+merged temele eklemiştir. Issue #533 / PR #534 Slice 6.3 mapped-block reshape,
+placement reconciliation ve explicit detach/archive/reattach lifecycle
+davranışını schema/storage değiştirmeden merged temele eklemiştir. Issue #535
+Slice 6.4 Phase A exact integrated automation'ı PASS'tir; owner acceptance
+`PENDING / NOT RUN` kalır ve ayrı device authority gerektirir. Slice 7, Ready,
+merge ve cihaz işlemleri current authority'nin dışındadır.
 
 Issue #527 owner-acceptance correction'ı normal yeni çizimi yatay/düşey
 segmentlerle sınırlar: ilk kenar dominant pointer axis'ini, sonraki kenarlar 90°
 alternation'ı kullanır; default smart alignment önceki vertex koordinatına
 visible guide ile hizalar. `Serbest uzunluk` yalnız sonraki segmentin length
 alignment'ını kapatır ve orthogonal kuralı korur. Legacy diagonal persisted
-geometry okunmaya devam eder. Current Slice 6.3 `Krokiyi güncelle` içinde yalnız
+geometry okunmaya devam eder. Merged Slice 6.3 `Krokiyi güncelle` içinde yalnız
 mapped active block için bounded whole-nudge ve orthogonal edge reshape açar;
 unmapped legacy base kilitli kalır. Yeni orthogonal block append akışı korunur.
 
@@ -510,7 +513,7 @@ Kapanış kapısı:
 | 3 | Living 7-Day Plan; Günlük Log v1; İş Zinciri | Yaşayan yakın plan ve kaynaklı günlük akışı |
 | 4 | İstenecek Malzemeler; öneriler; telefon görüşmesi | Yardımcı akışların ana omurgaya bağlanması |
 | 5 | Proje albümü Slice 1 merged; Günlük Log v2 paused | V2.11 manual test/closure ve ayrı owner resume kararı |
-| Current priority | Inventory Map v1 Slice 6.3 / Issue #533 | Block reshape, deterministic placement reconciliation, detach/archive/reattach ve schema22/storage drift 0 |
+| Current priority | Inventory Map v1 Slice 6.4 Phase A / Issue #535 | Integrated automation PASS; owner acceptance PENDING / NOT RUN; Slice 7 unstarted |
 | 6 | Mini hesap makinesi — paused | Ayrı owner resume kararı ve dar saha aracı kabulü |
 
 Aynı anda yalnız bir production implementation Issue'su aktif olur. Bir dalga
@@ -604,8 +607,8 @@ buffer'ındaki kanıtlanmış ekstra büyük kopyayı kaldırmıştır. Issue #4
 pending ve V2.11 complete değildir. Issue #504 / PR #505 recovery surface'i
 mergedir; owner recovery doğrulaması ve P0 Issues #501–#503 açık kalır.
 
-Current Issue #533 task başlangıç facts schema `22`, backup format `1` ve
-version `0.1.0+1`dir; Slice 6.3 bunları değiştirmez. Exact current SHA ve son
+Current Issue #535 task başlangıç facts schema `22`, backup format `1` ve
+version `0.1.0+1`dir; Slice 6.4 Phase A bunları değiştirmez. Exact current SHA ve son
 PR kalıcı burada dondurulmaz; GitHub `master` current repository truth'udur.
 Her Issue task başlangıç snapshot'ını kendi task/result kanıtında ayrıca bağlar.
 
@@ -633,7 +636,8 @@ Living Plan MVP Core — merged / PR #463
 → Issue #527 / PR #528 revised Inventory Spatial v1 Slice 6.1 — merged predecessor
 → Issue #529 / PR #530 transient project diagnostic correction — merged predecessor
 → Issue #531 / PR #532 Inventory Spatial v1 Slice 6.2 — merged predecessor
-→ Issue #533 Inventory Spatial v1 Slice 6.3 — current implementation / independent R4 review required
+→ Issue #533 / PR #534 Inventory Spatial v1 Slice 6.3 — merged
+→ Issue #535 Inventory Spatial v1 Slice 6.4 Phase A — integrated automation PASS / owner acceptance PENDING / NOT RUN
 → V2.12 and later planned product work — paused by owner decision
 ```
 
@@ -676,10 +680,12 @@ event/photo truth ve backup format `1` korunur. Issue #531 Slice 6.2 bu
 foundation üzerinde aktif blockları stable ordinal sırasıyla Kat Görünümü'nde
 sunar; route-local block/floor seçimi, exact floor Map/List focus, canonical
 count/label ve strict-interior exact-floor quick create ekler. UI selection
-persist edilmez; schema/storage/migration değişmez. Current Issue #533 Slice 6.3
+persist edilmez; schema/storage/migration değişmez. Issue #533 / PR #534 Slice 6.3
 mapped block whole-nudge/edge reshape, append-only placement reconciliation,
 explicit detach/archive ve same-identity reattach lifecycle'ını ekler; schema
-exact `22` kalır. Slice 6.4 ve Slice 7 bu current kapsamda başlamaz.
+exact `22` kalır. Issue #535 Slice 6.4 Phase A exact integrated gate'i
+`187/187` PASS ve analyzer PASS ile kapatmıştır; owner acceptance
+`PENDING / NOT RUN` kalır. Slice 7 başlamamıştır.
 `docs/v2/CSE_INVENTORY_MAP_V1_CONTRACT.md` güncel normative sınırdır.
 
 Issue #501 recovery verification, Issue #502 external verified backup/update

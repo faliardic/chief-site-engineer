@@ -1,18 +1,18 @@
 # CSE Inventory Map v1 Canonical Contract
 
 - **Belge türü:** Normative product, UX and persistence contract
-- **Owner authority:** [Feature Epic #506](https://github.com/faliardic/chief-site-engineer/issues/506), [Issue #507](https://github.com/faliardic/chief-site-engineer/issues/507), revised spatial foundation [Issue #527](https://github.com/faliardic/chief-site-engineer/issues/527), floor navigation [Issue #531](https://github.com/faliardic/chief-site-engineer/issues/531), and block lifecycle [Issue #533](https://github.com/faliardic/chief-site-engineer/issues/533)
-- **Contract version:** `1.3`
-- **Contract status:** Slices 1–5, revised Slice 6.1 and Slice 6.2 are production predecessors; Slice 6.3 block reshape/reconciliation/lifecycle is the current implementation scope
-- **Task-start baseline:** `237e2024b856a9bc71e226e958eeebb56bee9d78`
+- **Owner authority:** [Feature Epic #506](https://github.com/faliardic/chief-site-engineer/issues/506), [Issue #507](https://github.com/faliardic/chief-site-engineer/issues/507), revised spatial foundation [Issue #527](https://github.com/faliardic/chief-site-engineer/issues/527), floor navigation [Issue #531](https://github.com/faliardic/chief-site-engineer/issues/531), block lifecycle [Issue #533](https://github.com/faliardic/chief-site-engineer/issues/533), and integrated closure [Issue #535](https://github.com/faliardic/chief-site-engineer/issues/535)
+- **Contract version:** `1.4`
+- **Contract status:** Slices 1–5 and revised Slices 6.1–6.3 are merged; Slice 6.4 Phase A integrated automation is PASS while owner acceptance remains `PENDING / NOT RUN`
+- **Task-start baseline:** `baa7beff186e3fee95f1fb439d92045d7ba1af4e`
 - **Current persisted facts:** SQLite schema `22`, backup format `1`, mobile version `0.1.0+1`, MAIN package `com.faliardic.sefim`
 
 ## 1. Normative language and product boundary
 
 `MUST`, `MUST NOT`, `SHOULD` and `SHOULD NOT` are normative. Turkish UI copy
 is normative where it is shown in backticks. This document fixes the product
-decisions required for Slices 1–6; it does not claim that any Inventory source,
-schema, UI, build or device behavior exists today.
+decisions required for Slices 1–7. Merged implementation, automated closure,
+owner acceptance and final backup/restore closure remain separate states.
 
 Inventory Map v1 is the local-first spatial record of durable site assets. It
 MUST let the owner draw a schematic site sketch, place durable assets on that
@@ -1292,7 +1292,23 @@ this contract does not pre-mark any test PASS.
   detach/archive consequences, detached List behavior and same-ID reattach.
   Automated results do not imply owner/manual PASS.
 
-### Slice 6 — Backup/restore, migration and field acceptance
+Slice 6.3 is merged through PR #534. Its merged state is source availability,
+not owner acceptance.
+
+### Slice 6.4 — Integrated regression and owner acceptance closure
+
+- Intended paths: task/result evidence and the three authorized Inventory v1
+  documentation surfaces only. Production Dart and test sources are read-only.
+- Phase A exact nine-file integrated Flutter gate passed `187/187` at source
+  head `baa7beff186e3fee95f1fb439d92045d7ba1af4e`; analyzer also passed.
+- Phase A changes no product behavior, schema, storage, migration, backup,
+  version, package, permission or platform contract.
+- `MT-535-001..007` remain `PENDING / NOT RUN`; automated evidence does not
+  imply owner/manual PASS.
+- Phase B requires separate explicit owner authority and isolated Acceptance
+  package handling. Slice 7 remains unstarted.
+
+### Slice 7 — Backup/restore, migration and field acceptance
 
 - Intended production paths: modify only proven gaps in
   `mobile/lib/application/mobile_backup_application.dart` and Inventory
@@ -1307,7 +1323,7 @@ this contract does not pre-mark any test PASS.
   placement chains/events/receipts/photos round-trip, checksums/FKs/integrity,
   rollback, newer-live-data protection, external backup verification and
   owner-led numbered acceptance.
-- Impact: target remains schema 20, backup format 1, version unchanged unless a
+- Impact: target remains schema 22, backup format 1, version unchanged unless a
   separate release Issue authorizes versioning; no device command under Epic
   #506 or Issue #507 alone.
 - Stop: Issue #501 recovery unverified for recovery claims, #502 external backup
@@ -1316,7 +1332,7 @@ this contract does not pre-mark any test PASS.
 - Owner manual-test family: migration/reopen, draft and active sketch survival,
   asset/placement/history/photo restore, historical data preservation and
   representative post-update verification.
-- First owner-phone MAIN eligibility: **Slice 6 only**, after #502 PASS for the
+- First owner-phone MAIN eligibility: **Slice 7 only**, after #502 PASS for the
   exact current dataset/candidate and separate explicit install authority.
 
 ## 10. Cumulative P0 data-safety gates
