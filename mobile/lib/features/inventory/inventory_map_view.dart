@@ -41,6 +41,138 @@ int _quantizePlacementDouble(double value, {required int maximum}) {
   return snapped.clamp(0, maximum).toInt();
 }
 
+class InventoryMarkerGroup {
+  InventoryMarkerGroup({
+    required this.bucketX,
+    required this.bucketY,
+    required this.center,
+    required Iterable<InventoryAssetProjection> projections,
+  }) : projections = List<InventoryAssetProjection>.unmodifiable(projections);
+
+  final int bucketX;
+  final int bucketY;
+  final Offset center;
+  final List<InventoryAssetProjection> projections;
+
+  bool get isCluster => projections.length > 1;
+}
+
+List<InventoryMarkerGroup> buildInventoryMarkerGroups(
+  Iterable<InventoryAssetProjection> projections,
+  InventoryViewport viewport,
+) {
+  const bucketSize = 48.0;
+  final candidates = <_InventoryMarkerCandidate>[];
+  for (final projection in projections) {
+    final placement = projection.activePlacement;
+    if (placement == null) continue;
+    candidates.add(
+      _InventoryMarkerCandidate(
+        projection: projection,
+        center: _placementToView(placement, viewport),
+      ),
+    );
+  }
+  candidates.sort((left, right) {
+    final x = left.center.dx.compareTo(right.center.dx);
+    if (x != 0) return x;
+    final y = left.center.dy.compareTo(right.center.dy);
+    if (y != 0) return y;
+    return left.projection.asset.id.compareTo(right.projection.asset.id);
+  });
+  final parents = List<int>.generate(candidates.length, (index) => index);
+  final bins = <(int, int), List<int>>{};
+  for (var index = 0; index < candidates.length; index += 1) {
+    final candidate = candidates[index];
+    final key = (
+      ((candidate.center.dx - viewport.origin.dx) / bucketSize).floor(),
+      ((candidate.center.dy - viewport.origin.dy) / bucketSize).floor(),
+    );
+    for (var x = key.$1 - 1; x <= key.$1 + 1; x += 1) {
+      for (var y = key.$2 - 1; y <= key.$2 + 1; y += 1) {
+        for (final otherIndex in bins[(x, y)] ?? const <int>[]) {
+          final other = candidates[otherIndex];
+          if ((candidate.center.dx - other.center.dx).abs() < bucketSize &&
+              (candidate.center.dy - other.center.dy).abs() < bucketSize) {
+            _unionInventoryMarkerGroups(parents, index, otherIndex);
+          }
+        }
+      }
+    }
+    bins.putIfAbsent(key, () => <int>[]).add(index);
+  }
+  final grouped = <int, List<_InventoryMarkerCandidate>>{};
+  for (var index = 0; index < candidates.length; index += 1) {
+    final root = _inventoryMarkerGroupRoot(parents, index);
+    grouped
+        .putIfAbsent(root, () => <_InventoryMarkerCandidate>[])
+        .add(candidates[index]);
+  }
+  final groups = grouped.values.map((items) {
+    items.sort((left, right) {
+      final name = left.projection.asset.normalizedName.compareTo(
+        right.projection.asset.normalizedName,
+      );
+      return name != 0
+          ? name
+          : left.projection.asset.id.compareTo(right.projection.asset.id);
+    });
+    var dx = 0.0;
+    var dy = 0.0;
+    for (final item in items) {
+      dx += item.center.dx;
+      dy += item.center.dy;
+    }
+    final center = Offset(dx / items.length, dy / items.length);
+    return InventoryMarkerGroup(
+      bucketX: ((center.dx - viewport.origin.dx) / bucketSize).floor(),
+      bucketY: ((center.dy - viewport.origin.dy) / bucketSize).floor(),
+      center: center,
+      projections: items.map((item) => item.projection),
+    );
+  }).toList();
+  groups.sort((left, right) {
+    final x = left.bucketX.compareTo(right.bucketX);
+    if (x != 0) return x;
+    final y = left.bucketY.compareTo(right.bucketY);
+    if (y != 0) return y;
+    return left.projections.first.asset.id.compareTo(
+      right.projections.first.asset.id,
+    );
+  });
+  return List<InventoryMarkerGroup>.unmodifiable(groups);
+}
+
+class _InventoryMarkerCandidate {
+  const _InventoryMarkerCandidate({
+    required this.projection,
+    required this.center,
+  });
+
+  final InventoryAssetProjection projection;
+  final Offset center;
+}
+
+int _inventoryMarkerGroupRoot(List<int> parents, int index) {
+  var current = index;
+  while (parents[current] != current) {
+    parents[current] = parents[parents[current]];
+    current = parents[current];
+  }
+  return current;
+}
+
+void _unionInventoryMarkerGroups(List<int> parents, int left, int right) {
+  final leftRoot = _inventoryMarkerGroupRoot(parents, left);
+  final rightRoot = _inventoryMarkerGroupRoot(parents, right);
+  if (leftRoot == rightRoot) return;
+  if (leftRoot < rightRoot) {
+    parents[rightRoot] = leftRoot;
+  } else {
+    parents[leftRoot] = rightRoot;
+  }
+}
+
 class InventoryMapController extends ChangeNotifier {
   InventoryMapController({required this.application, required this.projectId});
 
@@ -482,6 +614,10 @@ class InventoryMapViewState extends State<InventoryMapView> {
           _viewport = InventoryViewport.fit(size);
         }
         final viewport = _viewport!;
+        final groups = buildInventoryMarkerGroups(
+          widget.controller.projections,
+          viewport,
+        );
         return Semantics(
           container: true,
           label: 'Şematik kroki envanter haritası',
@@ -509,26 +645,46 @@ class InventoryMapViewState extends State<InventoryMapView> {
                     ),
                   ),
                 ),
-                for (final projection in widget.controller.projections)
-                  _InventoryMarker(
-                    projection: projection,
-                    viewport: viewport,
-                    highlighted: _highlightedAssetId == projection.asset.id,
-                    onTap: () {
-                      final selectTarget = widget.onSelectTarget;
-                      if (selectTarget != null) {
-                        final placement = projection.activePlacement!;
-                        selectTarget(
-                          InventoryPlacementTarget(
-                            x: placement.x,
-                            y: placement.y,
-                          ),
-                        );
-                        return;
-                      }
-                      widget.onOpenAsset(projection.asset.id);
-                    },
-                  ),
+                for (final group in groups)
+                  if (group.isCluster)
+                    _InventoryCluster(
+                      group: group,
+                      onTap: () {
+                        final selectTarget = widget.onSelectTarget;
+                        if (selectTarget != null) {
+                          final target = captureInventoryPlacementTarget(
+                            group.center,
+                            viewport,
+                          );
+                          if (target != null) selectTarget(target);
+                          return;
+                        }
+                        unawaited(_openClusterChooser(group));
+                      },
+                    )
+                  else
+                    _InventoryMarker(
+                      projection: group.projections.single,
+                      viewport: viewport,
+                      highlighted:
+                          _highlightedAssetId ==
+                          group.projections.single.asset.id,
+                      onTap: () {
+                        final projection = group.projections.single;
+                        final selectTarget = widget.onSelectTarget;
+                        if (selectTarget != null) {
+                          final placement = projection.activePlacement!;
+                          selectTarget(
+                            InventoryPlacementTarget(
+                              x: placement.x,
+                              y: placement.y,
+                            ),
+                          );
+                          return;
+                        }
+                        widget.onOpenAsset(projection.asset.id);
+                      },
+                    ),
               ],
             ),
           ),
@@ -536,6 +692,99 @@ class InventoryMapViewState extends State<InventoryMapView> {
       },
     );
   }
+
+  Future<void> _openClusterChooser(InventoryMarkerGroup group) async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 420),
+          child: ListView(
+            key: const Key('inventory-cluster-chooser'),
+            shrinkWrap: true,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.group_work_outlined),
+                title: Text('${group.projections.length} envanter kaydı'),
+                subtitle: const Text(
+                  'Ayrıntısını açmak istediğiniz kaydı seçin.',
+                ),
+              ),
+              for (final projection in group.projections)
+                ListTile(
+                  key: Key('inventory-cluster-item-${projection.asset.id}'),
+                  leading: const Icon(Icons.location_on_outlined),
+                  title: Text(projection.asset.displayName),
+                  subtitle: Text(
+                    '${projection.asset.totalQuantity} adet, '
+                    '${inventoryAssetStatusLabel(projection.asset.status)}',
+                  ),
+                  onTap: () => Navigator.pop(sheetContext, projection.asset.id),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (selected != null && mounted) widget.onOpenAsset(selected);
+  }
+}
+
+class _InventoryCluster extends StatelessWidget {
+  const _InventoryCluster({required this.group, required this.onTap});
+
+  final InventoryMarkerGroup group;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Positioned(
+    left: group.center.dx - 24,
+    top: group.center.dy - 24,
+    width: 48,
+    height: 48,
+    child: Semantics(
+      container: true,
+      excludeSemantics: true,
+      button: true,
+      label: '${group.projections.length} envanter kaydı içeren küme',
+      onTap: onTap,
+      child: Material(
+        color: Theme.of(context).colorScheme.tertiaryContainer,
+        shape: const StadiumBorder(side: BorderSide(width: 2)),
+        child: InkWell(
+          key: Key('inventory-cluster-${group.bucketX}-${group.bucketY}'),
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              const Icon(Icons.group_work_outlined, size: 30),
+              Positioned(
+                right: 2,
+                top: 1,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(2),
+                    child: Text(
+                      group.projections.length.toString(),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _InventoryMarker extends StatelessWidget {

@@ -321,7 +321,10 @@ enum InventoryCommandType {
   assetQuantityChange('asset_quantity_change'),
   assetArchive('asset_archive'),
   assetUnarchiveWithPlacement('asset_unarchive_with_placement'),
-  placementMove('placement_move');
+  placementMove('placement_move'),
+  photoLink('photo_link'),
+  photoArchive('photo_archive'),
+  photoRestore('photo_restore');
 
   const InventoryCommandType(this.storageValue);
   final String storageValue;
@@ -337,7 +340,8 @@ enum InventoryCommandType {
 enum InventoryAggregateType {
   sketch('sketch'),
   asset('asset'),
-  placement('placement');
+  placement('placement'),
+  attachmentLink('attachment_link');
 
   const InventoryAggregateType(this.storageValue);
   final String storageValue;
@@ -438,7 +442,10 @@ enum InventoryEventType {
   placementCreated('inventory.placement_created'),
   placementMoved('inventory.placement_moved'),
   placementQuantityChanged('inventory.placement_quantity_changed'),
-  placementRetired('inventory.placement_retired');
+  placementRetired('inventory.placement_retired'),
+  photoLinked('inventory.photo_linked'),
+  photoArchived('inventory.photo_archived'),
+  photoRestored('inventory.photo_restored');
 
   const InventoryEventType(this.storageValue);
   final String storageValue;
@@ -871,6 +878,196 @@ class MoveInventoryPlacementCommand implements InventoryMutationCommand {
   InventoryCommandType get commandType => InventoryCommandType.placementMove;
 }
 
+enum InventoryPhotoSource { camera, photoLibrary }
+
+enum InventoryPhotoPickOutcome { selected, denied, cancelled, unavailable }
+
+enum InventoryPhotoIntegrity {
+  healthy('healthy'),
+  missingFile('missing_file'),
+  sizeMismatch('size_mismatch'),
+  hashMismatch('hash_mismatch'),
+  mimeMismatch('mime_mismatch'),
+  unsafePath('unsafe_path');
+
+  const InventoryPhotoIntegrity(this.code);
+
+  final String code;
+}
+
+class InventoryPhotoSelection {
+  InventoryPhotoSelection({
+    required this.originalFileName,
+    required Iterable<int> bytes,
+    required this.source,
+  }) : bytes = List<int>.unmodifiable(bytes);
+
+  final String originalFileName;
+  final List<int> bytes;
+  final InventoryPhotoSource source;
+}
+
+class InventoryPhotoPickResult {
+  const InventoryPhotoPickResult({required this.outcome, this.selection});
+
+  final InventoryPhotoPickOutcome outcome;
+  final InventoryPhotoSelection? selection;
+}
+
+class StagedInventoryPhoto {
+  const StagedInventoryPhoto({
+    required this.relativePath,
+    required this.mimeType,
+    required this.byteSize,
+    required this.sha256Value,
+  });
+
+  final String relativePath;
+  final String mimeType;
+  final int byteSize;
+  final String sha256Value;
+}
+
+class InventoryPhotoContent {
+  InventoryPhotoContent({
+    required this.fileName,
+    required this.mimeType,
+    required Iterable<int> bytes,
+  }) : bytes = List<int>.unmodifiable(bytes);
+
+  final String fileName;
+  final String mimeType;
+  final List<int> bytes;
+}
+
+abstract interface class InventoryAttachmentGateway {
+  Future<InventoryPhotoPickResult> pick(InventoryPhotoSource source);
+
+  Future<StagedInventoryPhoto> stage({
+    required String assetId,
+    required String attachmentId,
+    required String originalFileName,
+    required List<int> bytes,
+  });
+
+  Future<InventoryPhotoIntegrity> inspect({
+    required String relativePath,
+    required String expectedSha256,
+    required String expectedMimeType,
+    required int expectedByteSize,
+  });
+
+  Future<InventoryPhotoContent> read({
+    required String relativePath,
+    required String originalFileName,
+    required String expectedSha256,
+    required String expectedMimeType,
+    required int expectedByteSize,
+  });
+
+  Future<void> cleanup(String relativePath);
+}
+
+class UnavailableInventoryAttachmentGateway
+    implements InventoryAttachmentGateway {
+  const UnavailableInventoryAttachmentGateway();
+
+  Never _fail() => throw const InventoryFailure('inventory_photo_unavailable');
+
+  @override
+  Future<void> cleanup(String relativePath) async {}
+
+  @override
+  Future<InventoryPhotoIntegrity> inspect({
+    required String relativePath,
+    required String expectedSha256,
+    required String expectedMimeType,
+    required int expectedByteSize,
+  }) async => InventoryPhotoIntegrity.missingFile;
+
+  @override
+  Future<InventoryPhotoPickResult> pick(InventoryPhotoSource source) async =>
+      const InventoryPhotoPickResult(
+        outcome: InventoryPhotoPickOutcome.unavailable,
+      );
+
+  @override
+  Future<InventoryPhotoContent> read({
+    required String relativePath,
+    required String originalFileName,
+    required String expectedSha256,
+    required String expectedMimeType,
+    required int expectedByteSize,
+  }) async => _fail();
+
+  @override
+  Future<StagedInventoryPhoto> stage({
+    required String assetId,
+    required String attachmentId,
+    required String originalFileName,
+    required List<int> bytes,
+  }) async => _fail();
+}
+
+class AddOrReplaceInventoryAssetPhotoCommand
+    implements InventoryMutationCommand {
+  AddOrReplaceInventoryAssetPhotoCommand({
+    required this.operationId,
+    required this.projectId,
+    required this.assetId,
+    required this.linkId,
+    required this.attachmentId,
+    required this.expectedAssetRevision,
+    required this.selection,
+  });
+
+  @override
+  final String operationId;
+  @override
+  final String projectId;
+  final String assetId;
+  final String linkId;
+  final String attachmentId;
+  final int expectedAssetRevision;
+  final InventoryPhotoSelection selection;
+
+  @override
+  InventoryCommandType get commandType => InventoryCommandType.photoLink;
+  @override
+  String get primaryAggregateId => linkId;
+  @override
+  InventoryAggregateType get primaryAggregateType =>
+      InventoryAggregateType.attachmentLink;
+}
+
+class RemoveInventoryAssetPhotoCommand implements InventoryMutationCommand {
+  const RemoveInventoryAssetPhotoCommand({
+    required this.operationId,
+    required this.projectId,
+    required this.assetId,
+    required this.linkId,
+    required this.expectedAssetRevision,
+    required this.expectedLinkRevision,
+  });
+
+  @override
+  final String operationId;
+  @override
+  final String projectId;
+  final String assetId;
+  final String linkId;
+  final int expectedAssetRevision;
+  final int expectedLinkRevision;
+
+  @override
+  InventoryCommandType get commandType => InventoryCommandType.photoArchive;
+  @override
+  String get primaryAggregateId => linkId;
+  @override
+  InventoryAggregateType get primaryAggregateType =>
+      InventoryAggregateType.attachmentLink;
+}
+
 class InventoryMutationResult {
   const InventoryMutationResult({
     required this.operationId,
@@ -1062,6 +1259,44 @@ class InventoryAssetProjection {
 
   final InventoryAssetRecord asset;
   final InventoryPlacementRecord? activePlacement;
+}
+
+class InventoryAssetPhotoRecord {
+  const InventoryAssetPhotoRecord({
+    required this.linkId,
+    required this.attachmentId,
+    required this.assetId,
+    required this.projectId,
+    required this.originalFileName,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.archivedAt,
+    required this.relativePath,
+    required this.mimeType,
+    required this.byteSize,
+    required this.sha256Value,
+    required this.integrity,
+  });
+
+  final String linkId;
+  final String attachmentId;
+  final String assetId;
+  final String projectId;
+  final String originalFileName;
+  final int revision;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? archivedAt;
+  final String relativePath;
+  final String mimeType;
+  final int byteSize;
+  final String sha256Value;
+  final InventoryPhotoIntegrity integrity;
+
+  bool get isActive => archivedAt == null;
+  bool get supportsInlinePreview =>
+      mimeType == 'image/jpeg' || mimeType == 'image/png';
 }
 
 class InventoryEventRecord {

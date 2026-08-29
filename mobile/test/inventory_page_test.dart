@@ -320,6 +320,7 @@ void main() {
       source: source,
       controller: emptyController,
     );
+    expect(find.byKey(const Key('inventory-map-empty')), findsOneWidget);
     emptyController.setView(InventoryPageView.list);
     await tester.pump();
     expect(find.byKey(const Key('inventory-empty')), findsOneWidget);
@@ -335,9 +336,10 @@ void main() {
       source: source,
       controller: populatedController,
     );
-    populatedController
-      ..setView(InventoryPageView.list)
-      ..setSearch('eşleşmeyen');
+    populatedController.setSearch('eşleşmeyen');
+    await tester.pump();
+    expect(find.byKey(const Key('inventory-map-empty-filter')), findsOneWidget);
+    populatedController.setView(InventoryPageView.list);
     await tester.pump();
     expect(find.byKey(const Key('inventory-empty-search')), findsOneWidget);
 
@@ -347,6 +349,29 @@ void main() {
     await _pumpPage(tester, inventory: failed, source: source);
     expect(find.byKey(const Key('inventory-load-failure')), findsOneWidget);
     expect(find.textContaining('inventory_test_load_failed'), findsOneWidget);
+  });
+
+  testWidgets('large text keeps critical Inventory controls usable', (
+    tester,
+  ) async {
+    final inventory = _FakeInventory()
+      ..sketches[_projectA] = _sketch(_projectA)
+      ..assets[_projectA] = [_asset(_projectA, _assetA)];
+    final source = _ProjectSource()
+      ..projects = [_project(_projectA, 'Proje A')];
+
+    await _pumpPage(
+      tester,
+      inventory: inventory,
+      source: source,
+      textScale: 2.5,
+    );
+
+    expect(find.byKey(const Key('inventory-search')), findsOneWidget);
+    expect(find.byKey(const Key('inventory-update-sketch')), findsOneWidget);
+    expect(find.byKey(const Key('inventory-view-switch')), findsOneWidget);
+    expect(find.byKey(const Key('inventory-marker-$_assetA')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('marker opens exact existing asset detail identity', (
@@ -795,9 +820,16 @@ Future<void> _pumpPage(
   InventoryPageController? controller,
   InventorySketchEditorLauncher? sketchEditorLauncher,
   InventoryAssetDetailLauncher? assetDetailLauncher,
+  double textScale = 1,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
       home: Scaffold(
         body: InventoryPage(
           application: inventory,

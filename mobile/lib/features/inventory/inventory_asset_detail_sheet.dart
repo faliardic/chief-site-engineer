@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:chief_site_engineer/application/inventory_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
@@ -14,13 +15,23 @@ class InventoryAssetDetailController extends ChangeNotifier {
     required this.projectId,
     required this.assetId,
     required this.reloadMapCanonical,
+    InventoryPhotoApplicationPort? photoApplication,
+    bool Function()? isProjectContextCurrent,
     RecordIdFactory? idFactory,
-  }) : idFactory = idFactory ?? RecordId.randomUuid;
+  }) : photoApplication =
+           photoApplication ??
+           (application is InventoryPhotoApplicationPort
+               ? application as InventoryPhotoApplicationPort
+               : null),
+       isProjectContextCurrent = isProjectContextCurrent ?? (() => true),
+       idFactory = idFactory ?? RecordId.randomUuid;
 
   final InventoryApplicationPort application;
   final String projectId;
   final String assetId;
   final InventoryCanonicalReload reloadMapCanonical;
+  final InventoryPhotoApplicationPort? photoApplication;
+  final bool Function() isProjectContextCurrent;
   final RecordIdFactory idFactory;
 
   InventoryAssetDetailLoadStatus loadStatus =
@@ -28,12 +39,15 @@ class InventoryAssetDetailController extends ChangeNotifier {
   InventoryAssetProjection? projection;
   List<InventoryPlacementRecord> placementVersions = const [];
   List<InventoryEventRecord> history = const [];
+  InventoryAssetPhotoRecord? photo;
+  InventoryPhotoContent? photoContent;
   InventoryPlacementTarget? pendingMoveTarget;
   InventoryPlacementTarget? pendingUnarchiveTarget;
   bool selectingMoveTarget = false;
   bool selectingUnarchiveTarget = false;
   bool actionRunning = false;
   String? lastErrorCode;
+  String? photoDiagnosticCode;
   bool _disposed = false;
 
   InventoryAssetRecord? get asset => projection?.asset;
@@ -63,11 +77,51 @@ class InventoryAssetDetailController extends ChangeNotifier {
         placementKey: placementKey,
       );
       _verifyPlacementVersions(loadedProjection, placementKey, loadedVersions);
+      InventoryAssetPhotoRecord? loadedPhoto;
+      InventoryPhotoContent? loadedPhotoContent;
+      String? loadedPhotoDiagnostic;
+      final photoPort = photoApplication;
+      if (photoPort != null) {
+        loadedPhoto = await photoPort.loadActiveAssetPhoto(
+          projectId: projectId,
+          assetId: assetId,
+        );
+        if (loadedPhoto != null) {
+          _verifyPhoto(loadedPhoto);
+          if (loadedPhoto.integrity == InventoryPhotoIntegrity.healthy &&
+              loadedPhoto.supportsInlinePreview) {
+            try {
+              loadedPhotoContent = await photoPort.readAssetPhoto(
+                projectId: projectId,
+                assetId: assetId,
+                linkId: loadedPhoto.linkId,
+              );
+              if (loadedPhotoContent.mimeType != loadedPhoto.mimeType) {
+                loadedPhotoContent = null;
+                loadedPhotoDiagnostic = 'inventory_photo_mimeMismatch';
+              }
+            } on Object catch (error) {
+              loadedPhotoDiagnostic = _safeCode(
+                error,
+                fallback: 'inventory_photo_read_failed',
+              );
+            }
+          } else if (loadedPhoto.integrity != InventoryPhotoIntegrity.healthy) {
+            loadedPhotoDiagnostic =
+                'inventory_photo_${loadedPhoto.integrity.code}';
+          } else {
+            loadedPhotoDiagnostic = 'inventory_photo_preview_unavailable';
+          }
+        }
+      }
       projection = loadedProjection;
       history = List<InventoryEventRecord>.unmodifiable(loadedHistory);
       placementVersions = List<InventoryPlacementRecord>.unmodifiable(
         loadedVersions,
       );
+      photo = loadedPhoto;
+      photoContent = loadedPhotoContent;
+      photoDiagnosticCode = loadedPhotoDiagnostic;
       loadStatus = InventoryAssetDetailLoadStatus.ready;
       lastErrorCode = null;
       _notify();
@@ -81,6 +135,96 @@ class InventoryAssetDetailController extends ChangeNotifier {
       _notify();
       return false;
     }
+  }
+
+  Future<bool> addOrReplacePhoto(InventoryPhotoSource source) async {
+    final current = _requireUnarchivedProjection();
+    final photoPort = photoApplication;
+    if (photoPort == null) {
+      lastErrorCode = 'inventory_photo_unavailable';
+      _notify();
+      return false;
+    }
+    if (actionRunning) return false;
+    actionRunning = true;
+    lastErrorCode = null;
+    _notify();
+    try {
+      if (!isProjectContextCurrent()) {
+        throw const InventoryFailure('inventory_project_context_changed');
+      }
+      final picked = await photoPort.pickAssetPhoto(source);
+      if (picked.outcome == InventoryPhotoPickOutcome.cancelled) {
+        actionRunning = false;
+        lastErrorCode = null;
+        _notify();
+        return false;
+      }
+      if (picked.outcome != InventoryPhotoPickOutcome.selected ||
+          picked.selection == null) {
+        throw InventoryFailure(
+          picked.outcome == InventoryPhotoPickOutcome.denied
+              ? 'inventory_photo_permission_denied'
+              : 'inventory_photo_picker_unavailable',
+        );
+      }
+      if (!isProjectContextCurrent()) {
+        throw const InventoryFailure('inventory_project_context_changed');
+      }
+      await photoPort.addOrReplaceAssetPhoto(
+        AddOrReplaceInventoryAssetPhotoCommand(
+          operationId: _nextId(),
+          projectId: projectId,
+          assetId: assetId,
+          linkId: _nextId(),
+          attachmentId: _nextId(),
+          expectedAssetRevision: current.asset.revision,
+          selection: picked.selection!,
+        ),
+      );
+      if (!isProjectContextCurrent()) {
+        throw const InventoryFailure('inventory_project_context_changed');
+      }
+      if (!await reload()) {
+        throw InventoryFailure(
+          lastErrorCode ?? 'inventory_asset_reload_failed',
+        );
+      }
+      await reloadMapCanonical();
+      actionRunning = false;
+      lastErrorCode = null;
+      _notify();
+      return true;
+    } on Object catch (error) {
+      actionRunning = false;
+      lastErrorCode = _safeCode(
+        error,
+        fallback: 'inventory_photo_mutation_failed',
+      );
+      _notify();
+      return false;
+    }
+  }
+
+  Future<bool> removePhoto() {
+    final current = _requireUnarchivedProjection();
+    final activePhoto = photo;
+    final photoPort = photoApplication;
+    if (photoPort == null || activePhoto == null || !activePhoto.isActive) {
+      throw const InventoryFailure('inventory_photo_unavailable');
+    }
+    return _runMutation(
+      () => photoPort.removeAssetPhoto(
+        RemoveInventoryAssetPhotoCommand(
+          operationId: _nextId(),
+          projectId: projectId,
+          assetId: assetId,
+          linkId: activePhoto.linkId,
+          expectedAssetRevision: current.asset.revision,
+          expectedLinkRevision: activePhoto.revision,
+        ),
+      ),
+    );
   }
 
   Future<bool> updateMetadata({
@@ -391,6 +535,19 @@ class InventoryAssetDetailController extends ChangeNotifier {
     }
   }
 
+  void _verifyPhoto(InventoryAssetPhotoRecord value) {
+    if (value.projectId != projectId ||
+        value.assetId != assetId ||
+        !value.isActive ||
+        !const {
+          'image/jpeg',
+          'image/png',
+          'image/heic',
+        }.contains(value.mimeType)) {
+      throw const InventoryFailure('inventory_photo_integrity_failed');
+    }
+  }
+
   void _verifyHistory(List<InventoryEventRecord> values) {
     for (var index = 0; index < values.length; index += 1) {
       final event = values[index];
@@ -589,6 +746,9 @@ class _InventoryAssetDetailSheetState extends State<InventoryAssetDetailSheet> {
         Text('${asset.totalQuantity} adet'),
         Text(inventoryAssetStatusLabel(asset.status)),
         if (asset.note case final note?) Text(note),
+        const SizedBox(height: 12),
+        _photoSection(context, controller),
+        const SizedBox(height: 12),
         if (placement != null)
           Text('Şematik kroki konumu: ${placement.x}, ${placement.y}')
         else
@@ -764,6 +924,196 @@ class _InventoryAssetDetailSheetState extends State<InventoryAssetDetailSheet> {
       await controller.changeQuantity(quantity);
     }
   }
+
+  Widget _photoSection(
+    BuildContext context,
+    InventoryAssetDetailController controller,
+  ) {
+    final photo = controller.photo;
+    final content = controller.photoContent;
+    final archived = controller.isArchived;
+    if (photo == null) {
+      return Semantics(
+        container: true,
+        label: 'Envanter fotoğrafı yok',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Fotoğraf yok'),
+            if (!archived)
+              OutlinedButton.icon(
+                key: const Key('inventory-photo-add'),
+                onPressed: controller.actionRunning
+                    ? null
+                    : () => unawaited(_choosePhotoSource(context, controller)),
+                icon: const Icon(Icons.add_a_photo_outlined),
+                label: const Text('Fotoğraf ekle'),
+              ),
+          ],
+        ),
+      );
+    }
+    final healthy =
+        photo.integrity == InventoryPhotoIntegrity.healthy && content != null;
+    return Semantics(
+      container: true,
+      label: healthy
+          ? 'Envanter fotoğrafı: ${photo.originalFileName}'
+          : 'Envanter fotoğrafı güvenle açılamadı',
+      child: Card(
+        key: const Key('inventory-photo-card'),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Fotoğraf', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              if (healthy)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.memory(
+                    Uint8List.fromList(content.bytes),
+                    key: const Key('inventory-photo-preview'),
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.contain,
+                    semanticLabel: photo.originalFileName,
+                    errorBuilder: (_, _, _) => const _InventoryPhotoFailure(
+                      code: 'inventory_photo_decode_unavailable',
+                    ),
+                  ),
+                )
+              else
+                _InventoryPhotoFailure(
+                  code:
+                      controller.photoDiagnosticCode ??
+                      'inventory_photo_${photo.integrity.code}',
+                ),
+              const SizedBox(height: 8),
+              Text(photo.originalFileName, overflow: TextOverflow.ellipsis),
+              if (!archived) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      key: const Key('inventory-photo-replace'),
+                      onPressed: controller.actionRunning
+                          ? null
+                          : () => unawaited(
+                              _choosePhotoSource(context, controller),
+                            ),
+                      icon: const Icon(Icons.cameraswitch_outlined),
+                      label: const Text('Fotoğrafı değiştir'),
+                    ),
+                    OutlinedButton.icon(
+                      key: const Key('inventory-photo-remove'),
+                      onPressed: controller.actionRunning
+                          ? null
+                          : () => unawaited(
+                              _confirmPhotoRemoval(context, controller),
+                            ),
+                      icon: const Icon(Icons.link_off_outlined),
+                      label: const Text('Fotoğrafı kaldır'),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _choosePhotoSource(
+    BuildContext context,
+    InventoryAssetDetailController controller,
+  ) async {
+    final source = await showModalBottomSheet<InventoryPhotoSource>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              key: const Key('inventory-photo-camera'),
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Kamera'),
+              onTap: () =>
+                  Navigator.pop(sheetContext, InventoryPhotoSource.camera),
+            ),
+            ListTile(
+              key: const Key('inventory-photo-library'),
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Fotoğraf arşivi'),
+              onTap: () => Navigator.pop(
+                sheetContext,
+                InventoryPhotoSource.photoLibrary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source != null) {
+      await controller.addOrReplacePhoto(source);
+    }
+  }
+
+  Future<void> _confirmPhotoRemoval(
+    BuildContext context,
+    InventoryAssetDetailController controller,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Fotoğrafı kaldır'),
+        content: const Text(
+          'Fotoğraf bağlantısı geçmişte korunarak kaldırılacak.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            key: const Key('inventory-photo-remove-confirm'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Kaldır'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await controller.removePhoto();
+  }
+}
+
+class _InventoryPhotoFailure extends StatelessWidget {
+  const _InventoryPhotoFailure({required this.code});
+
+  final String code;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('inventory-photo-failure'),
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      border: Border.all(color: Theme.of(context).colorScheme.outline),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.broken_image_outlined, size: 40),
+        const SizedBox(height: 8),
+        const Text('Fotoğraf güvenle açılamadı.'),
+        Text('Tanı kodu: $code', textAlign: TextAlign.center),
+      ],
+    ),
+  );
 }
 
 class _InventoryMetadataDialogResult {
