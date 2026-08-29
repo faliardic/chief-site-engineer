@@ -153,7 +153,7 @@ void main() {
   });
 
   test(
-    'current database smoke requires every schema 20 Inventory table',
+    'current database smoke requires every schema 22 Inventory table',
     () async {
       final raw = await _openRaw(directories);
       await raw.execute('DROP TABLE inventory_events');
@@ -175,6 +175,7 @@ void main() {
   test(
     'format 1 backup restores populated Inventory with exact replayable truth',
     () async {
+      expect(AppDatabase.schemaVersion, 22);
       final fixture = await _seedPopulatedInventory(directories);
       final sourceInventory = fixture.application;
       final sourceRows = await _inventoryRowsSnapshot(directories);
@@ -248,6 +249,7 @@ void main() {
       expect(picked?.stablePath, imported.stablePath);
       final preflight = await backup.preflightBackup(picked!, _password);
       expect(preflight.manifest.formatVersion, CseBackupCodec.formatVersion);
+      expect(preflight.manifest.formatVersion, 1);
       expect(preflight.manifest.mobileSchemaVersion, AppDatabase.schemaVersion);
       expect(preflight.manifest.attachments, isEmpty);
 
@@ -1084,6 +1086,10 @@ void main() {
         'DROP TRIGGER agenda_phone_call_contexts_source_category_update',
       );
       for (final table in const [
+        'inventory_sketch_revision_spatial_drafts',
+        'inventory_sketch_revision_block_polygons',
+        'inventory_floors',
+        'inventory_blocks',
         'inventory_events',
         'inventory_command_receipts',
         'inventory_asset_attachment_links',
@@ -2506,6 +2512,10 @@ void main() {
 const _inventoryTables = <String>[
   'inventory_sketches',
   'inventory_sketch_revisions',
+  'inventory_blocks',
+  'inventory_floors',
+  'inventory_sketch_revision_block_polygons',
+  'inventory_sketch_revision_spatial_drafts',
   'inventory_assets',
   'inventory_asset_placements',
   'inventory_command_receipts',
@@ -2560,17 +2570,55 @@ class _InventoryIds {
 String _inventoryUuid(int value) =>
     '51400000-0000-4000-8000-${value.toString().padLeft(12, '0')}';
 
-InventoryGeometry _inventoryGeometry([int offset = 0]) => InventoryGeometry(
+InventoryGeometry _inventoryGeometry([int stage = 0]) => InventoryGeometry(
   polylines: [
-    InventoryPolyline(
-      closed: false,
-      points: [
-        InventorySketchPoint(x: offset, y: 0),
-        InventorySketchPoint(x: offset + 64, y: 64),
-      ],
-    ),
+    _inventoryRectangle(0, 0, 2048, 1536),
+    if (stage >= 64) _inventoryRectangle(2560, 0, 2944, 512),
   ],
 );
+
+InventoryPolyline _inventoryRectangle(
+  int left,
+  int top,
+  int right,
+  int bottom,
+) => InventoryPolyline(
+  closed: true,
+  points: [
+    InventorySketchPoint(x: left, y: top),
+    InventorySketchPoint(x: right, y: top),
+    InventorySketchPoint(x: right, y: bottom),
+    InventorySketchPoint(x: left, y: bottom),
+  ],
+);
+
+List<InventoryBlockDraft> _inventoryBlockDrafts(
+  String sketchId,
+  InventoryGeometry geometry, {
+  int firstPolygonIndex = 0,
+}) {
+  final sketchSeed = int.parse(sketchId.substring(sketchId.length - 12));
+  final base = 710000000000 + sketchSeed * 100;
+  return [
+    for (
+      var index = firstPolygonIndex;
+      index < geometry.polylines.length;
+      index += 1
+    )
+      InventoryBlockDraft(
+        id: _inventoryUuid(base + index * 10),
+        displayName: 'Alan ${index + 1}',
+        polygonIndex: index,
+        floors: [
+          InventoryFloorDraft(
+            id: _inventoryUuid(base + index * 10 + 1),
+            displayName: '1. Kat',
+            ordinal: 1,
+          ),
+        ],
+      ),
+  ];
+}
 
 Future<_InventoryRoundTripFixture> _seedPopulatedInventory(
   AppDirectories directories,
@@ -2615,6 +2663,7 @@ Future<_InventoryRoundTripFixture> _seedPopulatedInventory(
       expectedSketchRevision: 1,
       expectedContentRevision: 1,
       geometry: _inventoryGeometry(),
+      newBlocks: _inventoryBlockDrafts(sketchId, _inventoryGeometry()),
     ),
   );
   await application.finalizeSketch(
@@ -2625,6 +2674,7 @@ Future<_InventoryRoundTripFixture> _seedPopulatedInventory(
       draftRevisionId: firstRevisionId,
       expectedSketchRevision: 2,
       expectedContentRevision: 2,
+      newBlocks: _inventoryBlockDrafts(sketchId, _inventoryGeometry()),
     ),
   );
   await application.startSketchEdit(
@@ -2646,6 +2696,11 @@ Future<_InventoryRoundTripFixture> _seedPopulatedInventory(
       expectedSketchRevision: 4,
       expectedContentRevision: 1,
       geometry: _inventoryGeometry(64),
+      newBlocks: _inventoryBlockDrafts(
+        sketchId,
+        _inventoryGeometry(64),
+        firstPolygonIndex: 1,
+      ),
     ),
   );
   await application.finalizeSketch(
@@ -2656,6 +2711,11 @@ Future<_InventoryRoundTripFixture> _seedPopulatedInventory(
       draftRevisionId: activeRevisionId,
       expectedSketchRevision: 5,
       expectedContentRevision: 2,
+      newBlocks: _inventoryBlockDrafts(
+        sketchId,
+        _inventoryGeometry(64),
+        firstPolygonIndex: 1,
+      ),
     ),
   );
   await application.startSketchEdit(
@@ -2852,6 +2912,7 @@ Future<String> _seedRollbackInventory(
       expectedSketchRevision: 1,
       expectedContentRevision: 1,
       geometry: _inventoryGeometry(),
+      newBlocks: _inventoryBlockDrafts(sketchId, _inventoryGeometry()),
     ),
   );
   await application.finalizeSketch(
@@ -2862,6 +2923,7 @@ Future<String> _seedRollbackInventory(
       draftRevisionId: revisionId,
       expectedSketchRevision: 2,
       expectedContentRevision: 2,
+      newBlocks: _inventoryBlockDrafts(sketchId, _inventoryGeometry()),
     ),
   );
   final assetId = _inventoryUuid(6006);
@@ -2890,6 +2952,12 @@ Future<Map<String, List<Map<String, Object?>>>> _inventoryRowsSnapshot(
   const ordering = <String, String>{
     'inventory_sketches': 'id ASC',
     'inventory_sketch_revisions': 'sketch_id ASC, revision_number ASC, id ASC',
+    'inventory_blocks': 'project_id ASC, ordinal ASC, id ASC',
+    'inventory_floors': 'project_id ASC, block_id ASC, ordinal ASC, id ASC',
+    'inventory_sketch_revision_block_polygons':
+        'revision_id ASC, polygon_index ASC, block_id ASC',
+    'inventory_sketch_revision_spatial_drafts':
+        'revision_id ASC, content_revision ASC',
     'inventory_assets': 'normalized_name ASC, id ASC',
     'inventory_asset_placements': 'placement_key ASC, sequence ASC, id ASC',
     'inventory_command_receipts': 'id ASC',
@@ -2924,6 +2992,37 @@ void _expectInventoryStoredIntegrity(
     if (row['state'] != InventorySketchRevisionState.draft.storageValue) {
       geometry.validateFinalizable();
     }
+  }
+
+  final blockIds = rows['inventory_blocks']!
+      .map((row) => row['id']! as String)
+      .toSet();
+  final floorIds = rows['inventory_floors']!
+      .map((row) => row['id']! as String)
+      .toSet();
+  expect(
+    rows['inventory_floors']!.every(
+      (row) => blockIds.contains(row['block_id']),
+    ),
+    isTrue,
+  );
+  expect(
+    rows['inventory_sketch_revision_block_polygons']!.every(
+      (row) => blockIds.contains(row['block_id']),
+    ),
+    isTrue,
+  );
+  expect(
+    rows['inventory_asset_placements']!.every(
+      (row) => floorIds.contains(row['floor_id']),
+    ),
+    isTrue,
+  );
+  for (final row in rows['inventory_sketch_revision_spatial_drafts']!) {
+    expect(
+      jsonDecode(row['definitions_json']! as String),
+      isA<List<Object?>>(),
+    );
   }
 
   final events = rows['inventory_events']!;

@@ -274,6 +274,237 @@ class InventoryGeometry {
   }
 }
 
+abstract final class InventorySpatialContract {
+  static const maximumBlockNameLength = 80;
+  static const maximumBlockOrdinal = 1000000;
+  static const maximumFloorNameLength = 80;
+  static const maximumFloorCount = 100;
+
+  static String normalizeBlockName(String value) {
+    final normalized = value.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (normalized.isEmpty || normalized.length > maximumBlockNameLength) {
+      throw const InventoryFailure('inventory_block_name_invalid');
+    }
+    return normalized;
+  }
+
+  static String normalizeFloorName(String value) {
+    final normalized = value.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (normalized.isEmpty || normalized.length > maximumFloorNameLength) {
+      throw const InventoryFailure('inventory_floor_name_invalid');
+    }
+    return normalized;
+  }
+
+  static void validateFloorCount(int value) {
+    if (value < 1 || value > maximumFloorCount) {
+      throw const InventoryFailure('inventory_floor_count_invalid');
+    }
+  }
+
+  static void validateBlockPolygon(InventoryPolyline polygon) {
+    if (!polygon.closed || polygon.points.length < 3) {
+      throw const InventoryFailure('inventory_block_polygon_not_closed');
+    }
+    if (_twiceSignedArea(polygon.points) == 0) {
+      throw const InventoryFailure('inventory_block_polygon_zero_area');
+    }
+    final points = polygon.points;
+    for (var first = 0; first < points.length; first += 1) {
+      final firstNext = (first + 1) % points.length;
+      for (var second = first + 1; second < points.length; second += 1) {
+        final secondNext = (second + 1) % points.length;
+        if (first == second ||
+            firstNext == second ||
+            secondNext == first ||
+            (first == 0 && secondNext == 0)) {
+          continue;
+        }
+        if (_segmentsIntersect(
+          points[first],
+          points[firstNext],
+          points[second],
+          points[secondNext],
+        )) {
+          throw const InventoryFailure(
+            'inventory_block_polygon_self_intersects',
+          );
+        }
+      }
+    }
+  }
+
+  static void validateNonOverlappingPolygons(
+    Iterable<InventoryPolyline> polygons,
+  ) {
+    final values = List<InventoryPolyline>.of(polygons);
+    for (final polygon in values) {
+      validateBlockPolygon(polygon);
+    }
+    for (var first = 0; first < values.length; first += 1) {
+      for (var second = first + 1; second < values.length; second += 1) {
+        if (_polygonsConflict(values[first], values[second])) {
+          throw const InventoryFailure('inventory_block_polygon_ambiguous');
+        }
+      }
+    }
+  }
+
+  static bool containsPlacement(
+    InventoryPolyline polygon, {
+    required int x,
+    required int y,
+  }) {
+    InventoryGeometryContract.validatePlacementCoordinate(
+      x,
+      maximum: InventoryGeometryContract.canvasWidth,
+    );
+    InventoryGeometryContract.validatePlacementCoordinate(
+      y,
+      maximum: InventoryGeometryContract.canvasHeight,
+    );
+    validateBlockPolygon(polygon);
+    return _containsPoint(polygon.points, x, y);
+  }
+
+  static int _twiceSignedArea(List<InventorySketchPoint> points) {
+    var result = 0;
+    for (var index = 0; index < points.length; index += 1) {
+      final next = points[(index + 1) % points.length];
+      result += points[index].x * next.y - next.x * points[index].y;
+    }
+    return result;
+  }
+
+  static bool _polygonsConflict(
+    InventoryPolyline first,
+    InventoryPolyline second,
+  ) {
+    for (
+      var firstIndex = 0;
+      firstIndex < first.points.length;
+      firstIndex += 1
+    ) {
+      final firstNext = (firstIndex + 1) % first.points.length;
+      for (
+        var secondIndex = 0;
+        secondIndex < second.points.length;
+        secondIndex += 1
+      ) {
+        final secondNext = (secondIndex + 1) % second.points.length;
+        if (_segmentsIntersect(
+          first.points[firstIndex],
+          first.points[firstNext],
+          second.points[secondIndex],
+          second.points[secondNext],
+        )) {
+          return true;
+        }
+      }
+    }
+    final firstPoint = first.points.first;
+    final secondPoint = second.points.first;
+    return _containsPoint(second.points, firstPoint.x, firstPoint.y) ||
+        _containsPoint(first.points, secondPoint.x, secondPoint.y);
+  }
+
+  static bool _containsPoint(
+    List<InventorySketchPoint> polygon,
+    int pointX,
+    int pointY,
+  ) {
+    var inside = false;
+    for (
+      var current = 0, previous = polygon.length - 1;
+      current < polygon.length;
+      previous = current, current += 1
+    ) {
+      final start = polygon[previous];
+      final end = polygon[current];
+      if (_pointOnSegment(start, end, pointX, pointY)) return true;
+      final crosses = (start.y > pointY) != (end.y > pointY);
+      if (crosses) {
+        final intersectionX =
+            (end.x - start.x) * (pointY - start.y) / (end.y - start.y) +
+            start.x;
+        if (pointX < intersectionX) inside = !inside;
+      }
+    }
+    return inside;
+  }
+
+  static bool _segmentsIntersect(
+    InventorySketchPoint firstStart,
+    InventorySketchPoint firstEnd,
+    InventorySketchPoint secondStart,
+    InventorySketchPoint secondEnd,
+  ) {
+    final firstOrientation = _orientation(
+      firstStart,
+      firstEnd,
+      secondStart.x,
+      secondStart.y,
+    );
+    final secondOrientation = _orientation(
+      firstStart,
+      firstEnd,
+      secondEnd.x,
+      secondEnd.y,
+    );
+    final thirdOrientation = _orientation(
+      secondStart,
+      secondEnd,
+      firstStart.x,
+      firstStart.y,
+    );
+    final fourthOrientation = _orientation(
+      secondStart,
+      secondEnd,
+      firstEnd.x,
+      firstEnd.y,
+    );
+    if (firstOrientation == 0 &&
+        _pointOnSegment(firstStart, firstEnd, secondStart.x, secondStart.y)) {
+      return true;
+    }
+    if (secondOrientation == 0 &&
+        _pointOnSegment(firstStart, firstEnd, secondEnd.x, secondEnd.y)) {
+      return true;
+    }
+    if (thirdOrientation == 0 &&
+        _pointOnSegment(secondStart, secondEnd, firstStart.x, firstStart.y)) {
+      return true;
+    }
+    if (fourthOrientation == 0 &&
+        _pointOnSegment(secondStart, secondEnd, firstEnd.x, firstEnd.y)) {
+      return true;
+    }
+    return (firstOrientation > 0) != (secondOrientation > 0) &&
+        (thirdOrientation > 0) != (fourthOrientation > 0);
+  }
+
+  static int _orientation(
+    InventorySketchPoint start,
+    InventorySketchPoint end,
+    int pointX,
+    int pointY,
+  ) =>
+      (end.x - start.x) * (pointY - start.y) -
+      (end.y - start.y) * (pointX - start.x);
+
+  static bool _pointOnSegment(
+    InventorySketchPoint start,
+    InventorySketchPoint end,
+    int pointX,
+    int pointY,
+  ) =>
+      _orientation(start, end, pointX, pointY) == 0 &&
+      pointX >= (start.x < end.x ? start.x : end.x) &&
+      pointX <= (start.x > end.x ? start.x : end.x) &&
+      pointY >= (start.y < end.y ? start.y : end.y) &&
+      pointY <= (start.y > end.y ? start.y : end.y);
+}
+
 Map<String, Object?> _exactStringMap(Object? value, Set<String> expectedKeys) {
   if (value is! Map || value.length != expectedKeys.length) {
     throw const InventoryGeometryFailure('geometry_keys_invalid');
@@ -364,6 +595,22 @@ enum InventorySketchRevisionState {
   final String storageValue;
 
   static InventorySketchRevisionState fromStorage(Object? value) {
+    for (final item in values) {
+      if (item.storageValue == value) return item;
+    }
+    throw const InventoryFailure('inventory_projection_integrity_failed');
+  }
+}
+
+enum InventoryBlockState {
+  active('ACTIVE'),
+  detached('DETACHED'),
+  archived('ARCHIVED');
+
+  const InventoryBlockState(this.storageValue);
+  final String storageValue;
+
+  static InventoryBlockState fromStorage(Object? value) {
     for (final item in values) {
       if (item.storageValue == value) return item;
     }
@@ -500,6 +747,7 @@ class AutosaveInventorySketchDraftCommand implements InventoryMutationCommand {
     required this.expectedSketchRevision,
     required this.expectedContentRevision,
     required this.geometry,
+    this.newBlocks = const [],
   });
 
   @override
@@ -511,6 +759,7 @@ class AutosaveInventorySketchDraftCommand implements InventoryMutationCommand {
   final int expectedSketchRevision;
   final int expectedContentRevision;
   final InventoryGeometry geometry;
+  final List<InventoryBlockDraft> newBlocks;
   @override
   String get primaryAggregateId => sketchId;
   @override
@@ -556,6 +805,7 @@ class FinalizeInventorySketchCommand implements InventoryMutationCommand {
     required this.draftRevisionId,
     required this.expectedSketchRevision,
     required this.expectedContentRevision,
+    this.newBlocks = const [],
   });
 
   @override
@@ -566,6 +816,7 @@ class FinalizeInventorySketchCommand implements InventoryMutationCommand {
   final String draftRevisionId;
   final int expectedSketchRevision;
   final int expectedContentRevision;
+  final List<InventoryBlockDraft> newBlocks;
   @override
   String get primaryAggregateId => sketchId;
   @override
@@ -573,6 +824,72 @@ class FinalizeInventorySketchCommand implements InventoryMutationCommand {
       InventoryAggregateType.sketch;
   @override
   InventoryCommandType get commandType => InventoryCommandType.sketchFinalize;
+}
+
+class InventoryFloorDraft {
+  const InventoryFloorDraft({
+    required this.id,
+    required this.displayName,
+    required this.ordinal,
+  });
+
+  final String id;
+  final String displayName;
+  final int ordinal;
+
+  void validate() {
+    if (InventorySpatialContract.normalizeFloorName(displayName) !=
+        displayName) {
+      throw const InventoryFailure('inventory_floor_name_invalid');
+    }
+    if (ordinal < 1 || ordinal > InventorySpatialContract.maximumFloorCount) {
+      throw const InventoryFailure('inventory_floor_ordinal_invalid');
+    }
+  }
+}
+
+class InventoryBlockDraft {
+  InventoryBlockDraft({
+    required this.id,
+    required this.displayName,
+    required this.polygonIndex,
+    required Iterable<InventoryFloorDraft> floors,
+  }) : floors = List<InventoryFloorDraft>.unmodifiable(
+         List<InventoryFloorDraft>.of(floors)
+           ..sort((first, second) => first.ordinal.compareTo(second.ordinal)),
+       );
+
+  final String id;
+  final String displayName;
+  final int polygonIndex;
+  final List<InventoryFloorDraft> floors;
+
+  void validate(InventoryGeometry geometry) {
+    if (InventorySpatialContract.normalizeBlockName(displayName) !=
+        displayName) {
+      throw const InventoryFailure('inventory_block_name_invalid');
+    }
+    InventorySpatialContract.validateFloorCount(floors.length);
+    if (polygonIndex < 0 || polygonIndex >= geometry.polylines.length) {
+      throw const InventoryFailure('inventory_block_polygon_index_invalid');
+    }
+    InventorySpatialContract.validateBlockPolygon(
+      geometry.polylines[polygonIndex],
+    );
+    final floorIds = <String>{};
+    final ordinals = <int>{};
+    for (final floor in floors) {
+      floor.validate();
+      if (!floorIds.add(floor.id) || !ordinals.add(floor.ordinal)) {
+        throw const InventoryFailure('inventory_floor_identity_ambiguous');
+      }
+    }
+    for (var ordinal = 1; ordinal <= floors.length; ordinal += 1) {
+      if (!ordinals.contains(ordinal)) {
+        throw const InventoryFailure('inventory_floor_order_invalid');
+      }
+    }
+  }
 }
 
 class AbandonInventorySketchDraftCommand implements InventoryMutationCommand {
@@ -1175,11 +1492,91 @@ class InventoryPrimarySketchProjection {
     required this.sketch,
     required this.activeRevision,
     required this.draftRevision,
+    this.blocks = const [],
+    this.floors = const [],
+    this.activeBlockPolygons = const [],
+    this.draftBlockPolygons = const [],
+    this.draftNewBlocks = const [],
+    this.draftLegacyPolygonCount = 0,
   });
 
   final InventorySketchRecord sketch;
   final InventorySketchRevisionRecord? activeRevision;
   final InventorySketchRevisionRecord? draftRevision;
+  final List<InventoryBlockRecord> blocks;
+  final List<InventoryFloorRecord> floors;
+  final List<InventoryRevisionBlockPolygonRecord> activeBlockPolygons;
+  final List<InventoryRevisionBlockPolygonRecord> draftBlockPolygons;
+  final List<InventoryBlockDraft> draftNewBlocks;
+  final int draftLegacyPolygonCount;
+}
+
+class InventoryBlockRecord {
+  const InventoryBlockRecord({
+    required this.id,
+    required this.projectId,
+    required this.displayName,
+    required this.normalizedName,
+    required this.ordinal,
+    required this.state,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.archivedAt,
+  });
+
+  final String id;
+  final String projectId;
+  final String displayName;
+  final String normalizedName;
+  final int ordinal;
+  final InventoryBlockState state;
+  final int revision;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? archivedAt;
+}
+
+class InventoryFloorRecord {
+  const InventoryFloorRecord({
+    required this.id,
+    required this.blockId,
+    required this.projectId,
+    required this.displayName,
+    required this.ordinal,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.archivedAt,
+  });
+
+  final String id;
+  final String blockId;
+  final String projectId;
+  final String displayName;
+  final int ordinal;
+  final int revision;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? archivedAt;
+}
+
+class InventoryRevisionBlockPolygonRecord {
+  const InventoryRevisionBlockPolygonRecord({
+    required this.revisionId,
+    required this.blockId,
+    required this.projectId,
+    required this.sketchId,
+    required this.polygonIndex,
+    required this.createdAt,
+  });
+
+  final String revisionId;
+  final String blockId;
+  final String projectId;
+  final String sketchId;
+  final int polygonIndex;
+  final DateTime createdAt;
 }
 
 class InventoryAssetRecord {
@@ -1223,6 +1620,7 @@ class InventoryPlacementRecord {
     required this.projectId,
     required this.assetId,
     required this.sketchId,
+    required this.floorId,
     required this.provenanceRevisionId,
     required this.sequence,
     required this.x,
@@ -1239,6 +1637,7 @@ class InventoryPlacementRecord {
   final String projectId;
   final String assetId;
   final String sketchId;
+  final String floorId;
   final String provenanceRevisionId;
   final int sequence;
   final int x;

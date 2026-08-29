@@ -1,11 +1,11 @@
 # CSE Inventory Map v1 Canonical Contract
 
 - **Belge türü:** Normative product, UX and persistence contract
-- **Owner authority:** [Feature Epic #506](https://github.com/faliardic/chief-site-engineer/issues/506) and [Issue #507](https://github.com/faliardic/chief-site-engineer/issues/507)
-- **Contract version:** `1.0`
-- **Contract status:** Approved design for later Slices; production implementation has not started
-- **Task-start baseline:** `1d1b818b4b630a08fe6eb77157fe92b7a460b5c3`
-- **Current persisted facts:** SQLite schema `19`, backup format `1`, mobile version `0.1.0+1`, MAIN package `com.faliardic.sefim`
+- **Owner authority:** [Feature Epic #506](https://github.com/faliardic/chief-site-engineer/issues/506), [Issue #507](https://github.com/faliardic/chief-site-engineer/issues/507), and revised spatial foundation [Issue #527](https://github.com/faliardic/chief-site-engineer/issues/527)
+- **Contract version:** `1.1`
+- **Contract status:** Slices 1–5 are production predecessors; revised Slice 6.1 spatial foundation is implemented for independent review
+- **Task-start baseline:** `f858740f6975bace9b6efd21deb1f679e4489cbf`
+- **Current persisted facts:** SQLite schema `22`, backup format `1`, mobile version `0.1.0+1`, MAIN package `com.faliardic.sefim`
 
 ## 1. Normative language and product boundary
 
@@ -179,8 +179,10 @@ V1 MUST allow open and closed polylines.
   be repeated as the final point.
 - Consecutive duplicate points and zero-length segments MUST be rejected.
 - A closed polyline whose final point equals its first point MUST be rejected.
-- Non-consecutive repeated points, shared endpoints, crossings and
-  self-intersections MAY exist because the drawing is schematic.
+- Preserved schema20/general sketch geometry MAY contain non-consecutive
+  repeated points, shared endpoints, crossings or self-intersections because
+  those historical bytes remain schematic and immutable. A polyline linked as
+  a schema21 block boundary is subject to the stricter section 4.5 contract.
 - A draft MAY contain zero polylines or one incomplete one-point polyline.
 - Finalization MUST require at least one valid polyline and at least one
   non-zero-length segment.
@@ -326,6 +328,64 @@ Every sketch mutation MUST use optimistic revision and durable command receipt
 semantics from section 7. Missing, corrupt or wrong-project revision state MUST
 return a typed diagnostic and MUST NOT be repaired implicitly.
 
+### 4.5 Revised schema21 foundation and final schema22 compatibility
+
+Revised schema21 adds normalized spatial ownership without rewriting geometry
+v1; schema22 is the durable final schema for this contract:
+
+- `inventory_blocks` is a stable project-owned identity with immutable project
+  and ordinal, a bounded display name plus Turkish-aware normalized name, and
+  lifecycle state `ACTIVE | DETACHED | ARCHIVED`;
+- active block names MUST be unique per project by normalized name;
+- `inventory_floors` is a stable block-owned identity with immutable positive
+  ordinal and bounded display name; generated floor order is exactly
+  `1. Kat .. N. Kat`;
+- `inventory_sketch_revision_block_polygons` immutably maps one exact revision
+  polygon index to one stable block, without cloning geometry per floor;
+- `inventory_sketch_revision_spatial_drafts` append-only binds each durable
+  draft content revision to its canonical new-block metadata;
+- every placement version carries `floor_id`; block ownership is derived only
+  through that floor.
+
+A new block boundary MUST be closed, have at least three distinct vertices and
+non-zero area, and MUST NOT self-intersect, overlap, touch or contain/be
+contained by another active mapped block boundary. Every normally drawn new
+edge MUST be horizontal or vertical. The first edge selects its axis from the
+dominant snapped pointer delta; each following edge MUST use the axis
+perpendicular to the preceding edge. Default smart alignment MUST choose a
+deterministic relevant prior vertex coordinate in the intended direction and
+MUST expose a visible proposed edge plus light alignment guide. `Serbest
+uzunluk` disables only this prior-vertex length alignment for the next committed
+edge; that edge remains orthogonal and smart alignment then restores
+automatically. Preserved legacy/finalized geometry MAY remain diagonal and MUST
+remain readable; this drawing rule MUST NOT become a schema/domain-wide legacy
+rejection. The editor MUST also provide bounded snap-to-first closure plus
+explicit `Alanı kapat`, and request the block name and positive bounded floor
+count before closing the polygon. Validation MUST fail before draft/final source
+mutation.
+
+Schema20 migration MUST first validate source relationships, then create one
+deterministic `Varsayılan Alan` / `1. Kat` pair for every project with Inventory
+sketch data. The default block begins `DETACHED`. Every active and historical
+placement receives that exact floor while placement ID/key/sequence, sketch,
+provenance revision, x/y, quantity, predecessor and terminal truth remain
+unchanged. Geometry JSON/checksum and event/photo history MUST remain unchanged.
+Any corruption or incomplete backfill rolls the entire schema21 migration back.
+
+Schema22 MUST classify the exact schema21 shape before mutation. A revised
+block-owned schema21 advances through a structural no-op plus foreign-key and
+integrity validation. The superseded PR #526 project-owned-floor schema21 MUST
+transactionally retain every floor identity/name/order/revision/timestamp and
+every placement version including its existing `floor_id`, create one
+deterministic `DETACHED` default block per represented project, bind the old
+floors to it, and create empty mapping plus exact legacy-draft metadata. It MUST
+NOT invent an active polygon mapping for legacy geometry. The final floor schema
+MUST use block-local ordinal uniqueness, so separate blocks may each own an
+ordinal `1` floor. Mixed or unknown signatures and corrupt floor/placement
+relationships MUST fail closed. The two supported chains are exactly
+`20 -> revised 21 -> 22` and `superseded 21 -> 22`; same-version repair is
+forbidden. Backup format remains `1`.
+
 ## 5. Inventory source model
 
 ### 5.1 Durable asset/lot
@@ -400,9 +460,10 @@ would exceed total quantity.
 `inventory_asset_placements.id` identifies one immutable placement version.
 
 Each placement version MUST carry exact `project_id`, `asset_id`, `sketch_id`,
-`provenance_revision_id`, integer `x`, integer `y`, positive integer `quantity`,
-monotonic `sequence`, `created_at`, nullable `ended_at`, nullable `end_reason`
-and nullable predecessor `supersedes_placement_id`.
+stable same-project `floor_id`, `provenance_revision_id`, integer `x`, integer
+`y`, positive integer `quantity`, monotonic `sequence`, `created_at`, nullable
+`ended_at`, nullable `end_reason` and nullable predecessor
+`supersedes_placement_id`.
 
 An active placement has `ended_at IS NULL`. A move MUST atomically:
 
@@ -805,6 +866,13 @@ guard. On resume, a mounted editor MUST reassert landscape; a non-editor shell
 MUST reassert the standard set. Orientation calls MUST NOT change Android/iOS
 manifest or permission files unless a later Issue separately proves necessity.
 
+The ready editor MUST use the landscape route as a full-screen canvas without a
+large AppBar or horizontal text toolbar. A compact icon-only toolbar MUST stay
+on the right; every control MUST expose both a tooltip and an accessibility
+label. Selected modes and one-shot state MUST include a non-color-only
+indicator. Draft acknowledgement MAY appear as a compact overlay and MUST NOT
+reduce the canonical canvas work area.
+
 ### 8.2 Tap-to-connect editor state machine
 
 The editor has exact modes `DRAW`, `SELECT` and `PAN`.
@@ -813,13 +881,22 @@ In `DRAW`:
 
 1. a single tap on a valid grid point while idle starts a one-point working
    polyline;
-2. each later distinct snapped tap appends one point and segment;
-3. tapping the first point after at least three distinct points closes and ends
-   the polyline;
-4. `Çizgiyi bitir` ends an open polyline with at least two points;
-5. ending a one-point polyline removes that incomplete point as one undoable
+2. the second tap projects to the horizontal or vertical axis whose absolute
+   pointer delta from the first point is greater; an exact tie is horizontal;
+3. every later distinct tap projects onto the axis perpendicular to the
+   preceding segment;
+4. smart alignment defaults on and, when a prior vertex coordinate exists in
+   the intended direction, chooses the deterministic closest pointer target,
+   then closest start target, then lowest coordinate; a guide identifies the
+   selected coordinate;
+5. `Serbest uzunluk` is a one-shot override for the next segment only, bypasses
+   step 4 but not steps 2–3, and resets only after a valid segment commits;
+6. tapping the first point after at least three distinct points closes and ends
+   the polyline only when the required orthogonal axis can reach it;
+7. `Çizgiyi bitir` ends an open polyline with at least two points;
+8. ending a one-point polyline removes that incomplete point as one undoable
    editor command;
-6. a duplicate consecutive point, invalid point or limit-exceeding point is
+9. a duplicate consecutive point, invalid point or limit-exceeding point is
    rejected without changing the draft.
 
 In `SELECT`, tapping the nearest segment within a `24` logical-pixel hit radius
@@ -843,6 +920,14 @@ or already committed asset mutations. The stack MUST retain at most `100`
 commands; a new command after undo clears redo. Relaunch recovers durable draft
 geometry with an empty undo/redo stack.
 
+During `Krokiyi güncelle` / `editActive`, the finalized/base geometry is an
+immutable prefix in Slice 6.1. Any selection/delete or other editor action that
+would change that prefix MUST be rejected locally before autosave and MUST show
+an explicit safe message that existing area shape editing is not yet available.
+The same draft MAY append new orthogonal blocks after the untouched prefix and
+those blocks MUST autosave, reload and finalize normally. Base reshape,
+placement reconciliation and vertex movement remain Slice 6.3.
+
 ### 8.3 Gesture separation and viewport
 
 - One-finger taps draw only in `DRAW`.
@@ -864,10 +949,22 @@ The editor MUST show `Kaydediliyor…`, `Kaydedildi` or `Kaydedilemedi` from the
 actual last acknowledgement. It MUST NOT claim a save before the transaction
 returns.
 
-A stale or failed autosave MUST leave the durable prior draft intact and offer
-reload/retry. `Oluştur` MUST run the section 4 finalize transaction. A failure
-MUST keep the editor open, restore standard orientation only if the route exits,
-and MUST NOT expose a partially active revision.
+A complete, finalizable draft MUST keep its prominent check/save action enabled
+while the latest autosave debounce or acknowledgement is pending. That action
+MUST drain/force-save the latest draft, run the section 4 finalize transaction,
+verify the canonical active successor, and only then return route result
+`true`. Inventory MUST canonical-reload that result so create and edit-active
+successors are visible on the map in the same session.
+
+A stale or failed autosave/finalize MUST leave the durable prior draft intact.
+Finalize failure MUST keep the editor open and show explicit draft-preserved
+feedback with retry; it MUST restore standard orientation only if the route
+exits and MUST NOT expose a partially active revision.
+
+Closing a new polygon MUST request local block/floor metadata with the action
+`Alanı ekle`. Metadata acceptance adds that block to the current draft and
+MUST NOT finalize the sketch; one draft MAY collect multiple new blocks before
+the global check/save action.
 
 Loading MUST be explicit. Missing sketch, recoverable draft, corrupt geometry,
 unavailable revision, stale command and database-read failure MUST have distinct

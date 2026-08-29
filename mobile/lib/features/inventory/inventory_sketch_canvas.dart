@@ -5,6 +5,54 @@ import 'package:flutter/material.dart';
 
 enum InventorySketchEditorMode { draw, select, pan }
 
+enum InventorySketchAxis { horizontal, vertical }
+
+class InventorySketchAlignmentGuide {
+  const InventorySketchAlignmentGuide({
+    required this.axis,
+    required this.coordinate,
+  });
+
+  final InventorySketchAxis axis;
+  final int coordinate;
+
+  @override
+  bool operator ==(Object other) =>
+      other is InventorySketchAlignmentGuide &&
+      other.axis == axis &&
+      other.coordinate == coordinate;
+
+  @override
+  int get hashCode => Object.hash(axis, coordinate);
+}
+
+class InventorySketchDrawProposal {
+  const InventorySketchDrawProposal({
+    required this.start,
+    required this.end,
+    required this.axis,
+    required this.alignmentGuide,
+  });
+
+  final InventorySketchPoint? start;
+  final InventorySketchPoint end;
+  final InventorySketchAxis? axis;
+  final InventorySketchAlignmentGuide? alignmentGuide;
+
+  bool get smartAligned => alignmentGuide != null;
+
+  @override
+  bool operator ==(Object other) =>
+      other is InventorySketchDrawProposal &&
+      other.start == start &&
+      other.end == end &&
+      other.axis == axis &&
+      other.alignmentGuide == alignmentGuide;
+
+  @override
+  int get hashCode => Object.hash(start, end, axis, alignmentGuide);
+}
+
 class InventorySketchSelection {
   const InventorySketchSelection.segment({
     required this.polylineIndex,
@@ -101,13 +149,75 @@ class InventorySketchEditorSnapshot {
     redoHistory: _redoHistory,
   );
 
-  InventorySketchEditorSnapshot? drawPoint(InventorySketchPoint point) {
+  InventorySketchDrawProposal? proposeDrawPoint(
+    InventorySketchPoint point, {
+    bool smartAlignment = true,
+  }) {
     if (mode != InventorySketchEditorMode.draw) return null;
+    final workingIndex = workingPolylineIndex;
+    if (workingIndex == null) {
+      return InventorySketchDrawProposal(
+        start: null,
+        end: point,
+        axis: null,
+        alignmentGuide: null,
+      );
+    }
+    if (workingIndex != geometry.polylines.length - 1) return null;
+    final working = geometry.polylines[workingIndex];
+    if (working.closed) return null;
+    final start = working.points.last;
+    final axis = _nextDrawAxis(working, point);
+    final rawCoordinate = axis == InventorySketchAxis.horizontal
+        ? point.x
+        : point.y;
+    final startCoordinate = axis == InventorySketchAxis.horizontal
+        ? start.x
+        : start.y;
+    if (rawCoordinate == startCoordinate) return null;
+    final alignedCoordinate = smartAlignment
+        ? _smartAlignmentCoordinate(
+            working,
+            axis: axis,
+            rawCoordinate: rawCoordinate,
+            startCoordinate: startCoordinate,
+          )
+        : null;
+    final end = axis == InventorySketchAxis.horizontal
+        ? InventorySketchPoint(
+            x: alignedCoordinate ?? rawCoordinate,
+            y: start.y,
+          )
+        : InventorySketchPoint(
+            x: start.x,
+            y: alignedCoordinate ?? rawCoordinate,
+          );
+    return InventorySketchDrawProposal(
+      start: start,
+      end: end,
+      axis: axis,
+      alignmentGuide: alignedCoordinate == null
+          ? null
+          : InventorySketchAlignmentGuide(
+              axis: axis == InventorySketchAxis.horizontal
+                  ? InventorySketchAxis.vertical
+                  : InventorySketchAxis.horizontal,
+              coordinate: alignedCoordinate,
+            ),
+    );
+  }
+
+  InventorySketchEditorSnapshot? drawPoint(
+    InventorySketchPoint point, {
+    bool smartAlignment = true,
+  }) {
+    final proposal = proposeDrawPoint(point, smartAlignment: smartAlignment);
+    if (proposal == null) return null;
     final polylines = geometry.polylines.toList(growable: true);
     final workingIndex = workingPolylineIndex;
     try {
       if (workingIndex == null) {
-        polylines.add(InventoryPolyline(closed: false, points: [point]));
+        polylines.add(InventoryPolyline(closed: false, points: [proposal.end]));
         return _recordGeometry(
           InventoryGeometry(polylines: polylines),
           polylines.length - 1,
@@ -115,8 +225,9 @@ class InventorySketchEditorSnapshot {
       }
       if (workingIndex != polylines.length - 1) return null;
       final working = polylines[workingIndex];
-      if (working.closed || working.points.last == point) return null;
-      if (working.points.length >= 3 && working.points.first == point) {
+      final endpoint = proposal.end;
+      if (working.closed || working.points.last == endpoint) return null;
+      if (working.points.length >= 3 && working.points.first == endpoint) {
         polylines[workingIndex] = InventoryPolyline(
           closed: true,
           points: working.points,
@@ -125,7 +236,7 @@ class InventorySketchEditorSnapshot {
       }
       polylines[workingIndex] = InventoryPolyline(
         closed: false,
-        points: [...working.points, point],
+        points: [...working.points, endpoint],
       );
       return _recordGeometry(
         InventoryGeometry(polylines: polylines),
@@ -134,6 +245,69 @@ class InventorySketchEditorSnapshot {
     } on InventoryGeometryFailure {
       return null;
     }
+  }
+
+  InventorySketchAxis _nextDrawAxis(
+    InventoryPolyline working,
+    InventorySketchPoint rawPoint,
+  ) {
+    if (working.points.length == 1) {
+      final start = working.points.single;
+      final dx = (rawPoint.x - start.x).abs();
+      final dy = (rawPoint.y - start.y).abs();
+      return dx >= dy
+          ? InventorySketchAxis.horizontal
+          : InventorySketchAxis.vertical;
+    }
+    final previousStart = working.points[working.points.length - 2];
+    final previousEnd = working.points.last;
+    final previousDx = (previousEnd.x - previousStart.x).abs();
+    final previousDy = (previousEnd.y - previousStart.y).abs();
+    final previousAxis = previousDx >= previousDy
+        ? InventorySketchAxis.horizontal
+        : InventorySketchAxis.vertical;
+    return previousAxis == InventorySketchAxis.horizontal
+        ? InventorySketchAxis.vertical
+        : InventorySketchAxis.horizontal;
+  }
+
+  int? _smartAlignmentCoordinate(
+    InventoryPolyline working, {
+    required InventorySketchAxis axis,
+    required int rawCoordinate,
+    required int startCoordinate,
+  }) {
+    final direction = rawCoordinate.compareTo(startCoordinate);
+    if (direction == 0) return null;
+    final candidates =
+        <int>{
+              for (final point in working.points.take(
+                working.points.length - 1,
+              ))
+                if (axis == InventorySketchAxis.horizontal)
+                  point.x
+                else
+                  point.y,
+            }
+            .where(
+              (coordinate) => direction > 0
+                  ? coordinate > startCoordinate
+                  : coordinate < startCoordinate,
+            )
+            .toList();
+    if (candidates.isEmpty) return null;
+    candidates.sort((first, second) {
+      final pointerDistance = (first - rawCoordinate).abs().compareTo(
+        (second - rawCoordinate).abs(),
+      );
+      if (pointerDistance != 0) return pointerDistance;
+      final startDistance = (first - startCoordinate).abs().compareTo(
+        (second - startCoordinate).abs(),
+      );
+      if (startDistance != 0) return startDistance;
+      return first.compareTo(second);
+    });
+    return candidates.first;
   }
 
   InventorySketchEditorSnapshot? finishWorkingPolyline() {

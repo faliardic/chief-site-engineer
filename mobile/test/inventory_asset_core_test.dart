@@ -17,6 +17,7 @@ const _sketchId = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1';
 const _activeRevisionId = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1';
 const _placementId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1';
 const _placementKey = 'ffffffff-ffff-4fff-8fff-fffffffffff1';
+const _floorId = '99999999-9999-4999-8999-999999999991';
 final _t0 = DateTime.parse('2026-08-28T06:00:00Z');
 final _pixelPng = base64Decode(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8'
@@ -1603,6 +1604,7 @@ InventoryPlacementRecord _placement({
   projectId: projectId,
   assetId: assetId,
   sketchId: sketchId,
+  floorId: _floorId,
   provenanceRevisionId: provenanceRevisionId,
   sequence: sequence,
   x: x,
@@ -2397,6 +2399,7 @@ InventoryPlacementRecord _endPlacement(
   projectId: current.projectId,
   assetId: current.assetId,
   sketchId: current.sketchId,
+  floorId: current.floorId,
   provenanceRevisionId: current.provenanceRevisionId,
   sequence: current.sequence,
   x: current.x,

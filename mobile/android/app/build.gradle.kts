@@ -81,7 +81,7 @@ android {
             applicationIdSuffix = if (acceptanceHarnessBuild) ".acceptance" else ".debug"
             versionNameSuffix = if (acceptanceHarnessBuild) "-acceptance" else "-debug"
             manifestPlaceholders["appLabel"] = if (acceptanceHarnessBuild) {
-                "Şefim"
+                "Şefim (Acceptance)"
             } else {
                 "Şefim (Debug)"
             }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show PointerDeviceKind;
 
 import 'package:chief_site_engineer/application/inventory_application.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
@@ -42,13 +43,84 @@ void main() {
       var closed = InventorySketchEditorSnapshot.recover(
         InventoryGeometry.emptyDraft(),
       );
-      for (final point in [_point(0, 0), _point(64, 0), _point(64, 64)]) {
+      for (final point in [
+        _point(0, 0),
+        _point(64, 0),
+        _point(64, 64),
+        _point(0, 64),
+      ]) {
         closed = closed.drawPoint(point)!;
       }
       closed = closed.drawPoint(_point(0, 0))!;
       expect(closed.geometry.polylines.single.closed, isTrue);
-      expect(closed.geometry.polylines.single.points, hasLength(3));
+      expect(closed.geometry.polylines.single.points, hasLength(4));
       expect(closed.hasWorkingPolyline, isFalse);
+    });
+
+    test(
+      'normal drawing locks dominant axis, alternates 90 degrees and aligns rectangle',
+      () {
+        var editor = InventorySketchEditorSnapshot.recover(
+          InventoryGeometry.emptyDraft(),
+        ).drawPoint(_point(0, 0))!;
+
+        final firstEdge = editor.proposeDrawPoint(_point(256, 64))!;
+        expect(firstEdge.axis, InventorySketchAxis.horizontal);
+        expect(firstEdge.end, _point(256, 0));
+        expect(firstEdge.alignmentGuide, isNull);
+        editor = editor.drawPoint(_point(256, 64))!;
+
+        final secondEdge = editor.proposeDrawPoint(_point(320, 256))!;
+        expect(secondEdge.axis, InventorySketchAxis.vertical);
+        expect(secondEdge.end, _point(256, 256));
+        editor = editor.drawPoint(_point(320, 256))!;
+
+        final thirdEdge = editor.proposeDrawPoint(_point(128, 320))!;
+        expect(thirdEdge.axis, InventorySketchAxis.horizontal);
+        expect(thirdEdge.end, _point(0, 256));
+        expect(
+          thirdEdge.alignmentGuide,
+          const InventorySketchAlignmentGuide(
+            axis: InventorySketchAxis.vertical,
+            coordinate: 0,
+          ),
+        );
+        editor = editor.drawPoint(_point(128, 320))!;
+        expect(editor.geometry.polylines.single.points, [
+          _point(0, 0),
+          _point(256, 0),
+          _point(256, 256),
+          _point(0, 256),
+        ]);
+
+        var vertical = InventorySketchEditorSnapshot.recover(
+          InventoryGeometry.emptyDraft(),
+        ).drawPoint(_point(64, 64))!;
+        final verticalFirst = vertical.proposeDrawPoint(_point(128, 256))!;
+        expect(verticalFirst.axis, InventorySketchAxis.vertical);
+        expect(verticalFirst.end, _point(64, 256));
+        vertical = vertical.drawPoint(_point(128, 256))!;
+        expect(
+          vertical.proposeDrawPoint(_point(320, 320))!.end,
+          _point(320, 256),
+        );
+      },
+    );
+
+    test('legacy diagonal persisted geometry recovers unchanged', () {
+      final legacy = InventoryGeometry(
+        polylines: [
+          InventoryPolyline(
+            closed: true,
+            points: [_point(0, 0), _point(192, 64), _point(128, 192)],
+          ),
+        ],
+      );
+
+      final recovered = InventorySketchEditorSnapshot.recover(legacy);
+
+      expect(recovered.geometry.canonicalJson, legacy.canonicalJson);
+      expect(recovered.geometry.polylines.single.points[1], _point(192, 64));
     });
 
     test('duplicate, outside and limit commands leave state unchanged', () {
@@ -103,6 +175,346 @@ void main() {
       expect(editor.redoDepth, 0);
       expect(editor.hasWorkingPolyline, isFalse);
     });
+  });
+
+  test(
+    'Serbest uzunluk bypasses one vertex alignment, stays orthogonal and resets',
+    () async {
+      final fake = _FakeInventoryApplication.withDraft(
+        InventoryGeometry.emptyDraft(),
+      );
+      final controller = _controller(fake);
+      addTearDown(controller.dispose);
+      await controller.initialize();
+
+      expect(controller.drawPoint(_point(0, 0)), isTrue);
+      expect(controller.drawPoint(_point(256, 64)), isTrue);
+      expect(controller.drawPoint(_point(320, 256)), isTrue);
+      controller.setFreeLengthNextSegment(true);
+      expect(controller.freeLengthNextSegment, isTrue);
+
+      final freeProposal = controller.proposeDrawPoint(_point(128, 320))!;
+      expect(freeProposal.axis, InventorySketchAxis.horizontal);
+      expect(freeProposal.end, _point(128, 256));
+      expect(freeProposal.alignmentGuide, isNull);
+      expect(controller.drawPoint(_point(128, 320)), isTrue);
+      expect(controller.freeLengthNextSegment, isFalse);
+      expect(
+        controller.editor!.geometry.polylines.single.points.last,
+        _point(128, 256),
+      );
+
+      final restoredSmart = controller.proposeDrawPoint(_point(192, 64))!;
+      expect(restoredSmart.axis, InventorySketchAxis.vertical);
+      expect(restoredSmart.end, _point(128, 0));
+      expect(
+        restoredSmart.alignmentGuide,
+        const InventorySketchAlignmentGuide(
+          axis: InventorySketchAxis.horizontal,
+          coordinate: 0,
+        ),
+      );
+    },
+  );
+
+  group('stable block spatial contract', () {
+    test(
+      'self-intersection, overlap, touching and containment fail closed',
+      () {
+        final bowTie = InventoryPolyline(
+          closed: true,
+          points: [
+            _point(0, 0),
+            _point(256, 192),
+            _point(0, 256),
+            _point(192, 0),
+          ],
+        );
+        expect(
+          () => InventorySpatialContract.validateBlockPolygon(bowTie),
+          throwsA(
+            isA<InventoryFailure>().having(
+              (error) => error.code,
+              'code',
+              'inventory_block_polygon_self_intersects',
+            ),
+          ),
+        );
+
+        final first = _closedBlockGeometry().polylines.single;
+        final touching = InventoryPolyline(
+          closed: true,
+          points: [_point(192, 64), _point(320, 64), _point(256, 192)],
+        );
+        final contained = InventoryPolyline(
+          closed: true,
+          points: [_point(64, 64), _point(128, 64), _point(64, 128)],
+        );
+        for (final candidate in [touching, contained]) {
+          expect(
+            () => InventorySpatialContract.validateNonOverlappingPolygons([
+              first,
+              candidate,
+            ]),
+            throwsA(
+              isA<InventoryFailure>().having(
+                (error) => error.code,
+                'code',
+                'inventory_block_polygon_ambiguous',
+              ),
+            ),
+          );
+        }
+      },
+    );
+
+    test(
+      'multiple non-overlapping blocks keep stable ordered floor metadata',
+      () async {
+        final fake = _FakeInventoryApplication.withDraft(
+          InventoryGeometry.emptyDraft(),
+        );
+        final controller = _controller(fake);
+        addTearDown(controller.dispose);
+        await controller.initialize();
+
+        for (final point in [
+          _point(0, 0),
+          _point(192, 0),
+          _point(192, 192),
+          _point(0, 192),
+        ]) {
+          controller.drawPoint(point);
+        }
+        expect(
+          controller.closeWorkingBlock(
+            controller.createBlockDraft(displayName: 'A Blok', floorCount: 2),
+          ),
+          isTrue,
+        );
+        for (final point in [
+          _point(512, 0),
+          _point(704, 0),
+          _point(704, 192),
+          _point(512, 192),
+        ]) {
+          controller.drawPoint(point);
+        }
+        expect(
+          controller.closeWorkingBlock(
+            controller.createBlockDraft(displayName: 'B Blok', floorCount: 3),
+          ),
+          isTrue,
+        );
+        expect(controller.newBlocks.map((block) => block.polygonIndex), [0, 1]);
+        expect(
+          controller.newBlocks.first.floors.map((floor) => floor.ordinal),
+          [1, 2],
+        );
+        expect(controller.newBlocks.last.floors.map((floor) => floor.ordinal), [
+          1,
+          2,
+          3,
+        ]);
+
+        for (final point in [
+          _point(64, 64),
+          _point(256, 64),
+          _point(256, 256),
+          _point(64, 256),
+        ]) {
+          controller.drawPoint(point);
+        }
+        expect(
+          controller.closeWorkingBlock(
+            controller.createBlockDraft(
+              displayName: 'Çakışan Alan',
+              floorCount: 1,
+            ),
+          ),
+          isFalse,
+        );
+        expect(controller.lastErrorCode, 'inventory_block_polygon_ambiguous');
+        expect(controller.newBlocks, hasLength(2));
+      },
+    );
+
+    test(
+      'MT-527-006 metadata boundaries fail closed and limits succeed',
+      () async {
+        final fake = _FakeInventoryApplication.withDraft(
+          InventoryGeometry.emptyDraft(),
+        );
+        final controller = _controller(fake);
+        addTearDown(controller.dispose);
+        await controller.initialize();
+        for (final point in [
+          _point(0, 0),
+          _point(192, 0),
+          _point(192, 192),
+          _point(0, 192),
+        ]) {
+          controller.drawPoint(point);
+        }
+        final beforeGeometry = controller.editor!.geometry.canonicalJson;
+
+        Matcher failsWith(String code) => throwsA(
+          isA<InventoryFailure>().having(
+            (failure) => failure.code,
+            'code',
+            code,
+          ),
+        );
+
+        expect(
+          () => controller.createBlockDraft(displayName: ' ', floorCount: 1),
+          failsWith('inventory_block_name_invalid'),
+        );
+        expect(
+          () => controller.createBlockDraft(
+            displayName: ''.padRight(81, 'A'),
+            floorCount: 1,
+          ),
+          failsWith('inventory_block_name_invalid'),
+        );
+        expect(
+          () => controller.createBlockDraft(displayName: 'Alan', floorCount: 0),
+          failsWith('inventory_floor_count_invalid'),
+        );
+        expect(
+          () =>
+              controller.createBlockDraft(displayName: 'Alan', floorCount: 101),
+          failsWith('inventory_floor_count_invalid'),
+        );
+
+        final minimum = controller.createBlockDraft(
+          displayName: 'A',
+          floorCount: 1,
+        );
+        expect(minimum.displayName, 'A');
+        expect(minimum.floors.single.ordinal, 1);
+        final maximum = controller.createBlockDraft(
+          displayName: ''.padRight(80, 'B'),
+          floorCount: 100,
+        );
+        expect(maximum.displayName.length, 80);
+        expect(maximum.floors, hasLength(100));
+        expect(
+          maximum.floors.map((floor) => floor.ordinal),
+          List.generate(100, (index) => index + 1),
+        );
+        expect(maximum.floors.map((floor) => floor.id).toSet(), hasLength(100));
+        expect(controller.editor!.geometry.canonicalJson, beforeGeometry);
+        expect(controller.newBlocks, isEmpty);
+        expect(fake.saveCalls, isEmpty);
+        expect(fake.finalizeCalls, 0);
+      },
+    );
+
+    test(
+      'whole polygon delete remaps surviving identity through history and persistence',
+      () async {
+        final fake = _FakeInventoryApplication.withDraft(
+          InventoryGeometry.emptyDraft(),
+        );
+        final controller = _controller(fake);
+        addTearDown(controller.dispose);
+        await controller.initialize();
+
+        for (final point in [
+          _point(0, 0),
+          _point(192, 0),
+          _point(192, 192),
+          _point(0, 192),
+        ]) {
+          controller.drawPoint(point);
+        }
+        expect(
+          controller.closeWorkingBlock(
+            controller.createBlockDraft(displayName: 'A Blok', floorCount: 2),
+          ),
+          isTrue,
+        );
+        for (final point in [
+          _point(512, 0),
+          _point(704, 0),
+          _point(704, 192),
+          _point(512, 192),
+        ]) {
+          controller.drawPoint(point);
+        }
+        expect(
+          controller.closeWorkingBlock(
+            controller.createBlockDraft(displayName: 'B Blok', floorCount: 3),
+          ),
+          isTrue,
+        );
+        final blockA = controller.newBlocks.first;
+        final blockB = controller.newBlocks.last;
+        final blockBGeometry = controller.editor!.geometry.polylines[1];
+
+        controller.editor = controller.editor!.withSelection(
+          const InventorySketchSelection.polyline(polylineIndex: 0),
+        );
+        expect(controller.deleteSelection(), isTrue);
+        expect(controller.editor!.geometry.polylines, [blockBGeometry]);
+        _expectSameBlockIdentity(
+          controller.newBlocks.single,
+          blockB,
+          polygonIndex: 0,
+        );
+        expect(controller.newBlocks.single.id, isNot(blockA.id));
+
+        expect(controller.undo(), isTrue);
+        expect(controller.newBlocks.map((block) => block.id), [
+          blockA.id,
+          blockB.id,
+        ]);
+        _expectSameBlockIdentity(
+          controller.newBlocks.last,
+          blockB,
+          polygonIndex: 1,
+        );
+        expect(controller.redo(), isTrue);
+        _expectSameBlockIdentity(
+          controller.newBlocks.single,
+          blockB,
+          polygonIndex: 0,
+        );
+        expect(controller.undo(), isTrue);
+        expect(controller.newBlocks.map((block) => block.id), [
+          blockA.id,
+          blockB.id,
+        ]);
+        expect(controller.redo(), isTrue);
+        _expectSameBlockIdentity(
+          controller.newBlocks.single,
+          blockB,
+          polygonIndex: 0,
+        );
+
+        expect(await controller.forceSave(), isTrue);
+        _expectSameBlockIdentity(
+          fake.projection!.draftNewBlocks.single,
+          blockB,
+          polygonIndex: 0,
+        );
+        final recovered = _controller(fake);
+        addTearDown(recovered.dispose);
+        await recovered.initialize();
+        expect(recovered.editor!.geometry.polylines, [blockBGeometry]);
+        _expectSameBlockIdentity(
+          recovered.newBlocks.single,
+          blockB,
+          polygonIndex: 0,
+        );
+
+        expect(await recovered.finalizeDraft(), isTrue);
+        final finalized = fake.finalizeCommands.single.newBlocks.single;
+        _expectSameBlockIdentity(finalized, blockB, polygonIndex: 0);
+        expect(finalized.id, isNot(blockA.id));
+      },
+    );
   });
 
   group('SELECT and deterministic delete', () {
@@ -461,7 +873,7 @@ void main() {
 
   group('launch, finalize and durable recovery', () {
     test(
-      'finalize enablement requires finalizable acknowledged geometry',
+      'finalize enablement requires complete geometry but accepts pending save',
       () async {
         final emptyFake = _FakeInventoryApplication.withDraft(
           InventoryGeometry.emptyDraft(),
@@ -472,13 +884,27 @@ void main() {
         expect(emptyController.isFinalizeEnabled, isFalse);
         emptyController.drawPoint(_point(0, 0));
         expect(emptyController.isFinalizeEnabled, isFalse);
+        emptyController.drawPoint(_point(192, 0));
+        emptyController.drawPoint(_point(192, 192));
+        emptyController.drawPoint(_point(0, 192));
+        final pendingBlock = emptyController.createBlockDraft(
+          displayName: 'A Blok',
+          floorCount: 1,
+        );
+        expect(emptyController.closeWorkingBlock(pendingBlock), isTrue);
+        expect(emptyController.saveStatus, InventorySketchSaveStatus.saving);
+        expect(emptyController.hasUnacknowledgedGeometry, isTrue);
+        expect(emptyController.isFinalizeEnabled, isTrue);
 
-        final readyFake = _FakeInventoryApplication.withDraft(_openGeometry());
+        final readyFake = _FakeInventoryApplication.withDraft(
+          _closedBlockGeometry(),
+          draftNewBlocks: _blockDrafts(),
+        );
         final readyController = _controller(readyFake);
         addTearDown(readyController.dispose);
         await readyController.initialize();
         expect(readyController.isFinalizeEnabled, isTrue);
-        readyController.drawPoint(_point(128, 0));
+        readyController.drawPoint(_point(512, 512));
         expect(readyController.isFinalizeEnabled, isFalse);
       },
     );
@@ -524,15 +950,108 @@ void main() {
     );
 
     test(
+      'edit-active keeps base untouched while appended block saves reloads and finalizes',
+      () async {
+        final base = _closedBlockGeometry();
+        final fake = _FakeInventoryApplication.withActive(base);
+        final controller = _controller(
+          fake,
+          intent: InventorySketchLaunchIntent.editActive,
+        );
+        addTearDown(controller.dispose);
+        await controller.initialize();
+
+        for (final point in [
+          _point(512, 0),
+          _point(768, 64),
+          _point(704, 256),
+          _point(512, 192),
+        ]) {
+          expect(controller.drawPoint(point), isTrue);
+        }
+        final appended = controller.createBlockDraft(
+          displayName: 'Yeni Alan',
+          floorCount: 2,
+        );
+        expect(controller.closeWorkingBlock(appended), isTrue);
+        expect(await controller.forceSave(), isTrue);
+        expect(fake.saveMutationCount, 1);
+        expect(
+          fake.projection!.draftRevision!.geometry.polylines.first,
+          base.polylines.first,
+        );
+        expect(
+          fake.projection!.draftRevision!.geometry.polylines,
+          hasLength(2),
+        );
+
+        final recovered = _controller(
+          fake,
+          intent: InventorySketchLaunchIntent.editActive,
+        );
+        addTearDown(recovered.dispose);
+        await recovered.initialize();
+        expect(fake.editCalls, 1);
+        expect(
+          recovered.editor!.geometry.polylines.first,
+          base.polylines.first,
+        );
+        _expectSameBlockIdentity(
+          recovered.newBlocks.single,
+          appended,
+          polygonIndex: 1,
+        );
+
+        expect(await recovered.finalizeDraft(), isTrue);
+        expect(fake.projection!.draftRevision, isNull);
+        expect(
+          fake.projection!.activeRevision!.geometry.polylines.first,
+          base.polylines.first,
+        );
+        expect(fake.finalizeCommands.single.newBlocks.single.id, appended.id);
+      },
+    );
+
+    test(
+      'migrated schema20 first draft keeps legacy geometry without metadata rewrite',
+      () async {
+        final fake = _FakeInventoryApplication.withDraft(
+          _openGeometry(),
+          legacyPolygonCount: 1,
+        );
+        final controller = _controller(fake);
+        addTearDown(controller.dispose);
+
+        await controller.initialize();
+        expect(controller.newBlocks, isEmpty);
+        expect(controller.isFinalizeEnabled, isTrue);
+        expect(await controller.finalizeDraft(), isTrue);
+        expect(fake.saveCalls, isEmpty);
+        expect(
+          fake.projection!.activeRevision!.geometry.canonicalJson,
+          _openGeometry().canonicalJson,
+        );
+      },
+    );
+
+    test(
       'finalize forces latest save, verifies it, and failure stays draft',
       () async {
-        final fake = _FakeInventoryApplication.withDraft(_openGeometry());
+        final fake = _FakeInventoryApplication.withDraft(
+          InventoryGeometry.emptyDraft(),
+        );
         final controller = _controller(fake);
         addTearDown(controller.dispose);
         await controller.initialize();
-        controller.drawPoint(_point(128, 0));
+        controller.drawPoint(_point(0, 0));
         controller.drawPoint(_point(192, 0));
-        controller.finishWorkingPolyline();
+        controller.drawPoint(_point(192, 192));
+        controller.drawPoint(_point(0, 192));
+        final definition = controller.createBlockDraft(
+          displayName: 'A Blok',
+          floorCount: 2,
+        );
+        expect(controller.closeWorkingBlock(definition), isTrue);
 
         expect(await controller.finalizeDraft(), isTrue);
         expect(fake.operationOrder, ['save', 'finalize']);
@@ -540,11 +1059,15 @@ void main() {
         expect(fake.projection!.draftRevision, isNull);
         expect(
           fake.projection!.activeRevision!.geometry.polylines,
-          hasLength(2),
+          hasLength(1),
         );
+        expect(fake.saveCalls.single.newBlocks.single.displayName, 'A Blok');
+        expect(fake.saveCalls.single.newBlocks.single.floors, hasLength(2));
 
-        final failingFake = _FakeInventoryApplication.withDraft(_openGeometry())
-          ..failFinalizeCount = 1;
+        final failingFake = _FakeInventoryApplication.withDraft(
+          _closedBlockGeometry(),
+          draftNewBlocks: _blockDrafts(),
+        )..failFinalizeCount = 1;
         final failingController = _controller(failingFake);
         addTearDown(failingController.dispose);
         await failingController.initialize();
@@ -562,7 +1085,10 @@ void main() {
     );
 
     test('finalize rejects externally advanced sketch revision', () async {
-      final fake = _FakeInventoryApplication.withDraft(_openGeometry());
+      final fake = _FakeInventoryApplication.withDraft(
+        _closedBlockGeometry(),
+        draftNewBlocks: _blockDrafts(),
+      );
       final controller = _controller(fake);
       addTearDown(controller.dispose);
       await controller.initialize();
@@ -573,6 +1099,7 @@ void main() {
         sketchRevision: before.sketch.revision + 1,
         active: before.activeRevision,
         draft: before.draftRevision,
+        draftNewBlocks: before.draftNewBlocks,
       );
 
       expect(await controller.finalizeDraft(), isFalse);
@@ -585,7 +1112,10 @@ void main() {
     });
 
     test('finalize rejects externally advanced content revision', () async {
-      final fake = _FakeInventoryApplication.withDraft(_openGeometry());
+      final fake = _FakeInventoryApplication.withDraft(
+        _closedBlockGeometry(),
+        draftNewBlocks: _blockDrafts(),
+      );
       final controller = _controller(fake);
       addTearDown(controller.dispose);
       await controller.initialize();
@@ -604,6 +1134,7 @@ void main() {
           contentRevision: draft.contentRevision + 1,
           baseRevisionId: draft.baseRevisionId,
         ),
+        draftNewBlocks: before.draftNewBlocks,
       );
 
       expect(await controller.finalizeDraft(), isFalse);
@@ -616,14 +1147,601 @@ void main() {
     });
   });
 
+  testWidgets(
+    'explicit close dialog persists orthogonal block metadata and recovers',
+    (tester) async {
+      final fake = _FakeInventoryApplication.withDraft(
+        InventoryGeometry.emptyDraft(),
+      );
+      final orientations = _OrientationRecorder();
+      final pageKey = GlobalKey<InventorySketchEditorPageState>();
+      await _openEditor(tester, fake, orientations, pageKey);
+      final controller = pageKey.currentState!.controller;
+
+      for (final point in [
+        _point(0, 0),
+        _point(192, 0),
+        _point(192, 192),
+        _point(0, 192),
+      ]) {
+        controller.drawPoint(point);
+      }
+      await tester.pump();
+      expect(
+        find.byKey(const Key('inventory-editor-edge-preview')),
+        findsOneWidget,
+      );
+      final closeBlock = find.byKey(const Key('inventory-editor-close-block'));
+      await tester.ensureVisible(closeBlock);
+      await tester.pump();
+      await tester.tap(closeBlock);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('inventory-block-metadata-dialog')),
+        findsOneWidget,
+      );
+      expect(find.text('Alanı ekle'), findsOneWidget);
+      expect(find.text('Alanı oluştur'), findsNothing);
+      expect(find.text('Kaydet'), findsNothing);
+
+      await tester.enterText(
+        find.byKey(const Key('inventory-block-name')),
+        'A Blok',
+      );
+      await tester.enterText(
+        find.byKey(const Key('inventory-block-floor-count')),
+        '2',
+      );
+      await tester.tap(find.byKey(const Key('inventory-block-metadata-save')));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump();
+
+      expect(controller.editor!.geometry.polylines.single.closed, isTrue);
+      expect(controller.newBlocks.single.displayName, 'A Blok');
+      expect(controller.newBlocks.single.floors, hasLength(2));
+      expect(fake.finalizeCalls, 0);
+      expect(
+        fake.saveCalls.last.newBlocks.single.id,
+        controller.newBlocks.single.id,
+      );
+      expect(tester.takeException(), isNull);
+
+      for (final point in [
+        _point(512, 0),
+        _point(704, 0),
+        _point(704, 192),
+        _point(512, 192),
+      ]) {
+        controller.drawPoint(point);
+      }
+      await tester.pump();
+      await tester.ensureVisible(closeBlock);
+      await tester.tap(closeBlock);
+      await tester.pumpAndSettle();
+      expect(find.text('Alanı ekle'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const Key('inventory-block-name')),
+        'B Blok',
+      );
+      await tester.tap(find.byKey(const Key('inventory-block-metadata-save')));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump();
+
+      expect(controller.editor!.geometry.polylines, hasLength(2));
+      expect(controller.newBlocks.map((block) => block.displayName), [
+        'A Blok',
+        'B Blok',
+      ]);
+      expect(fake.finalizeCalls, 0);
+      expect(fake.saveCalls.last.newBlocks, hasLength(2));
+      final expectedGeometry = controller.editor!.geometry.canonicalJson;
+      final expectedBlocks = List<InventoryBlockDraft>.of(controller.newBlocks);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      final recoveredKey = GlobalKey<InventorySketchEditorPageState>();
+      await _openEditor(tester, fake, orientations, recoveredKey);
+      final recoveredController = recoveredKey.currentState!.controller;
+      expect(recoveredController.newBlocks.map((block) => block.displayName), [
+        'A Blok',
+        'B Blok',
+      ]);
+      expect(
+        recoveredController.newBlocks.first.floors.map(
+          (floor) => floor.ordinal,
+        ),
+        [1, 2],
+      );
+      expect(
+        recoveredController.editor!.geometry.canonicalJson,
+        expectedGeometry,
+      );
+      expect(recoveredController.newBlocks, hasLength(expectedBlocks.length));
+      for (var index = 0; index < expectedBlocks.length; index += 1) {
+        _expectSameBlockIdentity(
+          recoveredController.newBlocks[index],
+          expectedBlocks[index],
+          polygonIndex: index,
+        );
+      }
+      expect(tester.takeException(), isNull);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'MT-527-004 invalid closure rejects before metadata without mutation',
+    (tester) async {
+      final cases =
+          <
+            ({
+              String label,
+              List<InventorySketchPoint> points,
+              String errorCode,
+            })
+          >[
+            (
+              label: 'intersecting',
+              points: [
+                _point(64, 64),
+                _point(256, 64),
+                _point(256, 256),
+                _point(64, 256),
+              ],
+              errorCode: 'inventory_block_polygon_ambiguous',
+            ),
+            (
+              label: 'touching',
+              points: [
+                _point(192, 64),
+                _point(320, 64),
+                _point(320, 128),
+                _point(192, 128),
+              ],
+              errorCode: 'inventory_block_polygon_ambiguous',
+            ),
+            (
+              label: 'contained',
+              points: [
+                _point(64, 64),
+                _point(128, 64),
+                _point(128, 128),
+                _point(64, 128),
+              ],
+              errorCode: 'inventory_block_polygon_ambiguous',
+            ),
+            (
+              label: 'self-intersecting',
+              points: [
+                _point(512, 128),
+                _point(704, 128),
+                _point(704, 320),
+                _point(576, 320),
+                _point(576, 64),
+                _point(768, 64),
+                _point(768, 256),
+                _point(512, 256),
+              ],
+              errorCode: 'inventory_block_polygon_self_intersects',
+            ),
+          ];
+
+      for (final testCase in cases) {
+        final firstBlock = _blockDrafts().single;
+        final fake = _FakeInventoryApplication.withDraft(
+          _draftWithWorkingSecondBlock(testCase.points.first),
+          draftNewBlocks: [firstBlock],
+        );
+        final orientations = _OrientationRecorder();
+        final pageKey = GlobalKey<InventorySketchEditorPageState>();
+        await _openEditor(tester, fake, orientations, pageKey);
+        final controller = pageKey.currentState!.controller;
+        for (final point in testCase.points.skip(1)) {
+          controller.setFreeLengthNextSegment(true);
+          expect(
+            controller.drawPoint(point),
+            isTrue,
+            reason: '${testCase.label} setup point',
+          );
+        }
+        expect(await controller.forceSave(), isTrue);
+        await tester.pumpAndSettle();
+        expect(fake.saveCalls, hasLength(1), reason: testCase.label);
+        expect(fake.saveMutationCount, 1, reason: testCase.label);
+        expect(controller.hasUnacknowledgedGeometry, isFalse);
+
+        final originalProjection = fake.projection!;
+        final geometry = controller.editor!.geometry;
+        final beforeGeometry = controller.editor!.geometry.canonicalJson;
+        final saveCallsBeforeClose =
+            List<AutosaveInventorySketchDraftCommand>.of(fake.saveCalls);
+        final saveMutationCountBeforeClose = fake.saveMutationCount;
+        final operationOrderBeforeClose = List<String>.of(fake.operationOrder);
+        expect(
+          () => controller.validateWorkingBlockClosure(),
+          throwsA(
+            isA<InventoryFailure>().having(
+              (error) => error.code,
+              'code',
+              testCase.errorCode,
+            ),
+          ),
+          reason: testCase.label,
+        );
+        expect(controller.lastErrorCode, isNull);
+
+        final closeBlock = find.byKey(
+          const Key('inventory-editor-close-block'),
+        );
+        await tester.ensureVisible(closeBlock);
+        final closeIconButton = tester.widget<IconButton>(
+          find.descendant(of: closeBlock, matching: find.byType(IconButton)),
+        );
+        expect(closeIconButton.onPressed, isNotNull, reason: testCase.label);
+        await tester.tap(closeBlock);
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(milliseconds: 600));
+
+        expect(
+          find.byKey(const Key('inventory-block-metadata-dialog')),
+          findsNothing,
+          reason: testCase.label,
+        );
+        expect(controller.lastErrorCode, testCase.errorCode);
+        expect(controller.editor!.geometry.canonicalJson, beforeGeometry);
+        expect(controller.editor!.workingPolylineIndex, 1);
+        expect(controller.newBlocks, hasLength(1));
+        _expectSameBlockIdentity(
+          controller.newBlocks.single,
+          firstBlock,
+          polygonIndex: 0,
+        );
+        expect(identical(fake.projection, originalProjection), isTrue);
+        expect(
+          fake.projection!.draftRevision!.geometry.canonicalJson,
+          geometry.canonicalJson,
+        );
+        expect(fake.saveCalls, orderedEquals(saveCallsBeforeClose));
+        expect(fake.saveMutationCount, saveMutationCountBeforeClose);
+        expect(fake.operationOrder, orderedEquals(operationOrderBeforeClose));
+        expect(fake.finalizeCalls, 0);
+        expect(tester.takeException(), isNull);
+
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+      }
+    },
+  );
+
+  testWidgets(
+    'smart alignment guide is visible and Serbest uzunluk resets after one edge',
+    (tester) async {
+      final fake = _FakeInventoryApplication.withDraft(
+        InventoryGeometry.emptyDraft(),
+      );
+      final orientations = _OrientationRecorder();
+      final pageKey = GlobalKey<InventorySketchEditorPageState>();
+      await _openEditor(tester, fake, orientations, pageKey);
+      final controller = pageKey.currentState!.controller;
+      controller.drawPoint(_point(0, 0));
+      controller.drawPoint(_point(256, 64));
+      controller.drawPoint(_point(320, 256));
+      await tester.pump();
+
+      final canvas = find.byKey(const Key('inventory-sketch-canvas-gesture'));
+      final canvasRect = tester.getRect(canvas);
+      final viewport = InventoryViewport.fit(canvasRect.size);
+      final target =
+          canvasRect.topLeft + viewport.virtualToView(_point(128, 320));
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.addPointer(location: canvasRect.center);
+      await mouse.moveTo(target);
+      await tester.pump();
+
+      expect(
+        find.byKey(const Key('inventory-editor-smart-alignment-guide')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<Semantics>(
+              find.byKey(const Key('inventory-editor-smart-alignment-guide')),
+            )
+            .properties
+            .label,
+        'Akıllı hizalama kılavuzu',
+      );
+
+      final freeLength = find.byKey(const Key('inventory-editor-free-length'));
+      await tester.ensureVisible(freeLength);
+      await tester.tap(freeLength);
+      await tester.pump();
+      expect(controller.freeLengthNextSegment, isTrue);
+      expect(
+        find.byKey(const Key('inventory-editor-free-length-selected')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('inventory-editor-smart-alignment-guide')),
+        findsNothing,
+      );
+
+      await mouse.moveTo(target + const Offset(1, 0));
+      await tester.pump();
+      expect(
+        find.byKey(const Key('inventory-editor-smart-alignment-guide')),
+        findsNothing,
+      );
+      expect(controller.drawPoint(_point(128, 320)), isTrue);
+      await tester.pump();
+      expect(controller.freeLengthNextSegment, isFalse);
+      expect(
+        find.byKey(const Key('inventory-editor-free-length-selected')),
+        findsNothing,
+      );
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets('full-screen editor uses accessible icon-only right toolbar', (
+    tester,
+  ) async {
+    final fake = _FakeInventoryApplication.withDraft(
+      _closedBlockGeometry(),
+      draftNewBlocks: _blockDrafts(),
+    );
+    final orientations = _OrientationRecorder();
+    final pageKey = GlobalKey<InventorySketchEditorPageState>();
+    await _openEditor(tester, fake, orientations, pageKey);
+
+    expect(find.byType(AppBar), findsNothing);
+    final workspace = find.byKey(
+      const Key('inventory-editor-fullscreen-workspace'),
+    );
+    final canvas = find.byKey(const Key('inventory-sketch-canvas-gesture'));
+    final toolbar = find.byKey(const Key('inventory-editor-right-toolbar'));
+    expect(workspace, findsOneWidget);
+    expect(canvas, findsOneWidget);
+    expect(toolbar, findsOneWidget);
+    expect(tester.getRect(canvas).size, tester.getRect(workspace).size);
+    expect(
+      tester.getRect(toolbar).right,
+      closeTo(tester.getRect(workspace).right - 8, 0.1),
+    );
+    expect(
+      find.descendant(of: toolbar, matching: find.byType(Text)),
+      findsNothing,
+    );
+
+    final controls = <Key, String>{
+      Key('inventory-editor-back'): 'Geri',
+      Key('inventory-editor-mode-draw'): 'Çiz',
+      Key('inventory-editor-mode-select'): 'Seç',
+      Key('inventory-editor-mode-pan'): 'Taşı',
+      Key('inventory-editor-undo'): 'Geri al',
+      Key('inventory-editor-redo'): 'İleri al',
+      Key('inventory-editor-finish-line'): 'Çizgiyi bitir',
+      Key('inventory-editor-close-block'): 'Alanı kapat',
+      Key('inventory-editor-free-length'): 'Serbest uzunluk',
+      Key('inventory-editor-delete'): 'Seçileni sil',
+      Key('inventory-editor-zoom-out'): 'Uzaklaştır',
+      Key('inventory-editor-zoom-in'): 'Yakınlaştır',
+      Key('inventory-editor-fit'): 'Tamamını göster',
+      Key('inventory-editor-finalize'): 'Krokiyi yayınla',
+    };
+    for (final entry in controls.entries) {
+      final control = find.byKey(entry.key);
+      expect(control, findsOneWidget);
+      expect(
+        tester
+            .widgetList<Tooltip>(
+              find.descendant(of: control, matching: find.byType(Tooltip)),
+            )
+            .map((tooltip) => tooltip.message),
+        contains(entry.value),
+      );
+      expect(
+        tester
+            .widgetList<Semantics>(
+              find.descendant(of: control, matching: find.byType(Semantics)),
+            )
+            .map((semantics) => semantics.properties.label),
+        contains(entry.value),
+      );
+    }
+
+    expect(
+      find.byKey(const Key('inventory-editor-mode-selected-draw')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('inventory-editor-mode-select')));
+    await tester.pump();
+    expect(
+      find.byKey(const Key('inventory-editor-mode-selected-draw')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('inventory-editor-mode-selected-select')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets(
+    'closed block final icon drains pending autosave before create finalize',
+    (tester) async {
+      final fake = _FakeInventoryApplication.withDraft(
+        InventoryGeometry.emptyDraft(),
+      );
+      final orientations = _OrientationRecorder();
+      final pageKey = GlobalKey<InventorySketchEditorPageState>();
+      bool? result;
+      await _openEditor(
+        tester,
+        fake,
+        orientations,
+        pageKey,
+        onResult: (value) => result = value,
+      );
+      final controller = pageKey.currentState!.controller;
+      _appendClosedBlock(
+        controller,
+        left: 0,
+        top: 0,
+        right: 192,
+        bottom: 192,
+        displayName: 'A Blok',
+      );
+      await tester.pump();
+
+      expect(fake.saveCalls, isEmpty);
+      expect(controller.saveStatus, InventorySketchSaveStatus.saving);
+      expect(controller.hasUnacknowledgedGeometry, isTrue);
+      expect(controller.isFinalizeEnabled, isTrue);
+
+      await tester.tap(find.byKey(const Key('inventory-editor-finalize')));
+      await tester.pumpAndSettle();
+
+      expect(result, isTrue);
+      expect(fake.operationOrder, ['save', 'finalize']);
+      expect(fake.projection!.draftRevision, isNull);
+      expect(fake.projection!.activeRevision!.geometry.polylines, hasLength(1));
+      expect(find.byType(InventorySketchEditorPage), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'edit-active appended block immediately drains and finalizes with base',
+    (tester) async {
+      final base = _closedBlockGeometry();
+      final fake = _FakeInventoryApplication.withActive(base);
+      final orientations = _OrientationRecorder();
+      final pageKey = GlobalKey<InventorySketchEditorPageState>();
+      bool? result;
+      await _openEditor(
+        tester,
+        fake,
+        orientations,
+        pageKey,
+        intent: InventorySketchLaunchIntent.editActive,
+        onResult: (value) => result = value,
+      );
+      final controller = pageKey.currentState!.controller;
+      final appended = _appendClosedBlock(
+        controller,
+        left: 512,
+        top: 0,
+        right: 704,
+        bottom: 192,
+        displayName: 'Yeni Alan',
+      );
+      await tester.pump();
+
+      expect(fake.saveCalls, isEmpty);
+      expect(controller.isFinalizeEnabled, isTrue);
+      await tester.tap(find.byKey(const Key('inventory-editor-finalize')));
+      await tester.pumpAndSettle();
+
+      expect(result, isTrue);
+      expect(fake.operationOrder, ['save', 'finalize']);
+      expect(fake.projection!.draftRevision, isNull);
+      expect(
+        fake.projection!.activeRevision!.geometry.polylines.first,
+        base.polylines.first,
+      );
+      expect(fake.projection!.activeRevision!.geometry.polylines, hasLength(2));
+      _expectSameBlockIdentity(
+        fake.finalizeCommands.single.newBlocks.single,
+        appended,
+        polygonIndex: 1,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('finalize failure preserves draft and exposes retry feedback', (
+    tester,
+  ) async {
+    final fake = _FakeInventoryApplication.withDraft(
+      _closedBlockGeometry(),
+      draftNewBlocks: _blockDrafts(),
+    )..failFinalizeCount = 1;
+    final orientations = _OrientationRecorder();
+    final pageKey = GlobalKey<InventorySketchEditorPageState>();
+    bool? result;
+    await _openEditor(
+      tester,
+      fake,
+      orientations,
+      pageKey,
+      onResult: (value) => result = value,
+    );
+
+    await tester.tap(find.byKey(const Key('inventory-editor-finalize')));
+    await tester.pumpAndSettle();
+
+    expect(result, isNull);
+    expect(find.byType(InventorySketchEditorPage), findsOneWidget);
+    expect(fake.projection!.draftRevision, isNotNull);
+    expect(fake.projection!.activeRevision, isNull);
+    expect(
+      find.byKey(const Key('inventory-editor-finalize-failure')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Dayanıklı taslak korundu'), findsOneWidget);
+    final retry = find.byKey(const Key('inventory-editor-retry-finalize'));
+    expect(retry, findsOneWidget);
+
+    await tester.tap(retry);
+    await tester.pumpAndSettle();
+
+    expect(result, isTrue);
+    expect(fake.finalizeCalls, 2);
+    expect(fake.projection!.draftRevision, isNull);
+    expect(find.byType(InventorySketchEditorPage), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   group('page back, lifecycle and orientation boundary', () {
-    testWidgets('create/recover final action copy is Oluştur', (tester) async {
+    testWidgets('create/recover final action is accessible publish icon', (
+      tester,
+    ) async {
       final fake = _FakeInventoryApplication.withDraft(_openGeometry());
       final orientations = _OrientationRecorder();
       final pageKey = GlobalKey<InventorySketchEditorPageState>();
       await _openEditor(tester, fake, orientations, pageKey);
 
-      expect(find.widgetWithText(FilledButton, 'Oluştur'), findsOneWidget);
+      final finalize = find.byKey(const Key('inventory-editor-finalize'));
+      expect(
+        find.descendant(of: finalize, matching: find.byType(Tooltip)),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<Tooltip>(
+              find.descendant(of: finalize, matching: find.byType(Tooltip)),
+            )
+            .message,
+        'Krokiyi yayınla',
+      );
+      expect(
+        find.descendant(
+          of: finalize,
+          matching: find.byIcon(Icons.check_circle_rounded),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Oluştur'), findsNothing);
       expect(find.text('Güncelle'), findsNothing);
 
       await tester.binding.handlePopRoute();
@@ -653,8 +1771,17 @@ void main() {
           pageKey.currentState!.controller.editor!.geometry.canonicalJson,
           _openGeometry().canonicalJson,
         );
-        expect(find.widgetWithText(FilledButton, 'Güncelle'), findsOneWidget);
+        final finalize = find.byKey(const Key('inventory-editor-finalize'));
+        expect(
+          tester
+              .widget<Tooltip>(
+                find.descendant(of: finalize, matching: find.byType(Tooltip)),
+              )
+              .message,
+          'Krokiyi yayınla ve güncelle',
+        );
         expect(find.text('Oluştur'), findsNothing);
+        expect(find.text('Güncelle'), findsNothing);
 
         await tester.tap(find.byKey(const Key('inventory-editor-finalize')));
         await tester.pumpAndSettle();
@@ -670,6 +1797,63 @@ void main() {
         );
         expect(fake.projection!.draftRevision, isNull);
         expect(find.byType(InventorySketchEditorPage), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'edit-active base mutation rejects before autosave with explicit safe message',
+      (tester) async {
+        final base = _closedBlockGeometry();
+        final fake = _FakeInventoryApplication.withActive(base);
+        final orientations = _OrientationRecorder();
+        final pageKey = GlobalKey<InventorySketchEditorPageState>();
+        await _openEditor(
+          tester,
+          fake,
+          orientations,
+          pageKey,
+          intent: InventorySketchLaunchIntent.editActive,
+        );
+        final controller = pageKey.currentState!.controller;
+        controller.setMode(InventorySketchEditorMode.select);
+        controller.editor = controller.editor!.withSelection(
+          const InventorySketchSelection.polyline(polylineIndex: 0),
+        );
+
+        expect(controller.deleteSelection(), isFalse);
+        await tester.pump(const Duration(milliseconds: 600));
+        expect(fake.saveCalls, isEmpty);
+        expect(controller.hasUnacknowledgedGeometry, isFalse);
+        expect(controller.saveStatus, InventorySketchSaveStatus.saved);
+        expect(controller.editor!.geometry.canonicalJson, base.canonicalJson);
+        expect(
+          controller.lastErrorCode,
+          InventorySketchEditorController.lockedBaseGeometryCode,
+        );
+        expect(
+          find.byKey(const Key('inventory-editor-locked-geometry-message')),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('Mevcut alanın şekli henüz değiştirilemez.'),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Taslak kaydedilemedi. Şematik kroki açık bırakıldı.'),
+          findsNothing,
+        );
+
+        await tester.tap(
+          find.byKey(const Key('inventory-editor-locked-geometry-dismiss')),
+        );
+        await tester.pump();
+        expect(
+          find.byKey(const Key('inventory-editor-locked-geometry-message')),
+          findsNothing,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(fake.saveCalls, isEmpty);
       },
     );
 
@@ -788,7 +1972,10 @@ void main() {
     testWidgets(
       'finalize restores before exit and orientation retry never refinalizes',
       (tester) async {
-        final fake = _FakeInventoryApplication.withDraft(_openGeometry());
+        final fake = _FakeInventoryApplication.withDraft(
+          _closedBlockGeometry(),
+          draftNewBlocks: _blockDrafts(),
+        );
         final orientations = _OrientationRecorder()..failStandardCount = 1;
         final pageKey = GlobalKey<InventorySketchEditorPageState>();
         await _openEditor(tester, fake, orientations, pageKey);
@@ -903,6 +2090,30 @@ Future<void> _openEditor(
 
 InventorySketchPoint _point(int x, int y) => InventorySketchPoint(x: x, y: y);
 
+InventoryBlockDraft _appendClosedBlock(
+  InventorySketchEditorController controller, {
+  required int left,
+  required int top,
+  required int right,
+  required int bottom,
+  required String displayName,
+}) {
+  for (final point in [
+    _point(left, top),
+    _point(right, top),
+    _point(right, bottom),
+    _point(left, bottom),
+  ]) {
+    expect(controller.drawPoint(point), isTrue);
+  }
+  final block = controller.createBlockDraft(
+    displayName: displayName,
+    floorCount: 1,
+  );
+  expect(controller.closeWorkingBlock(block), isTrue);
+  return block;
+}
+
 InventoryGeometry _openGeometry() => InventoryGeometry(
   polylines: [
     InventoryPolyline(closed: false, points: [_point(0, 0), _point(64, 0)]),
@@ -917,6 +2128,65 @@ InventoryGeometry _fourPointOpenGeometry() => InventoryGeometry(
     ),
   ],
 );
+
+InventoryGeometry _closedBlockGeometry() => InventoryGeometry(
+  polylines: [
+    InventoryPolyline(
+      closed: true,
+      points: [_point(0, 0), _point(192, 64), _point(128, 192), _point(0, 128)],
+    ),
+  ],
+);
+
+InventoryGeometry _draftWithWorkingSecondBlock(InventorySketchPoint start) =>
+    InventoryGeometry(
+      polylines: [
+        InventoryPolyline(
+          closed: true,
+          points: [
+            _point(0, 0),
+            _point(192, 0),
+            _point(192, 192),
+            _point(0, 192),
+          ],
+        ),
+        InventoryPolyline(closed: false, points: [start]),
+      ],
+    );
+
+List<InventoryBlockDraft> _blockDrafts() => [
+  InventoryBlockDraft(
+    id: _uuid(8000),
+    displayName: 'A Blok',
+    polygonIndex: 0,
+    floors: [
+      InventoryFloorDraft(id: _uuid(8001), displayName: '1. Kat', ordinal: 1),
+      InventoryFloorDraft(id: _uuid(8002), displayName: '2. Kat', ordinal: 2),
+    ],
+  ),
+];
+
+void _expectSameBlockIdentity(
+  InventoryBlockDraft actual,
+  InventoryBlockDraft expected, {
+  required int polygonIndex,
+}) {
+  expect(actual.id, expected.id);
+  expect(actual.displayName, expected.displayName);
+  expect(actual.polygonIndex, polygonIndex);
+  expect(
+    actual.floors.map((floor) => floor.id),
+    expected.floors.map((floor) => floor.id),
+  );
+  expect(
+    actual.floors.map((floor) => floor.displayName),
+    expected.floors.map((floor) => floor.displayName),
+  );
+  expect(
+    actual.floors.map((floor) => floor.ordinal),
+    expected.floors.map((floor) => floor.ordinal),
+  );
+}
 
 class _OrientationRecorder {
   final calls = <List<DeviceOrientation>>[];
@@ -960,18 +2230,23 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
   factory _FakeInventoryApplication.empty() =>
       _FakeInventoryApplication._(null);
 
-  factory _FakeInventoryApplication.withDraft(InventoryGeometry geometry) =>
-      _FakeInventoryApplication._(
-        _projection(
-          sketchRevision: 1,
-          draft: _revision(
-            id: _draftId,
-            state: InventorySketchRevisionState.draft,
-            geometry: geometry,
-            contentRevision: 1,
-          ),
-        ),
-      );
+  factory _FakeInventoryApplication.withDraft(
+    InventoryGeometry geometry, {
+    List<InventoryBlockDraft> draftNewBlocks = const [],
+    int legacyPolygonCount = 0,
+  }) => _FakeInventoryApplication._(
+    _projection(
+      sketchRevision: 1,
+      draft: _revision(
+        id: _draftId,
+        state: InventorySketchRevisionState.draft,
+        geometry: geometry,
+        contentRevision: 1,
+      ),
+      draftNewBlocks: draftNewBlocks,
+      draftLegacyPolygonCount: legacyPolygonCount,
+    ),
+  );
 
   factory _FakeInventoryApplication.withActive(InventoryGeometry geometry) =>
       _FakeInventoryApplication._(
@@ -1018,6 +2293,7 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
   int concurrentSaves = 0;
   int maximumConcurrentSaves = 0;
   final saveCalls = <AutosaveInventorySketchDraftCommand>[];
+  final finalizeCommands = <FinalizeInventorySketchCommand>[];
   final saveGates = <Completer<void>>[];
   final loadGates = <Completer<void>>[];
   final operationOrder = <String>[];
@@ -1123,7 +2399,8 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
         throw const InventoryFailure('inventory_stale_content_revision');
       }
       final changed =
-          draft.geometry.canonicalJson != command.geometry.canonicalJson;
+          draft.geometry.canonicalJson != command.geometry.canonicalJson ||
+          !_sameBlockDrafts(current.draftNewBlocks, command.newBlocks);
       final nextSketchRevision = current.sketch.revision + (changed ? 1 : 0);
       final nextContentRevision = draft.contentRevision + (changed ? 1 : 0);
       final nextDraft = _revision(
@@ -1139,6 +2416,8 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
         sketchRevision: nextSketchRevision,
         active: current.activeRevision,
         draft: nextDraft,
+        draftNewBlocks: command.newBlocks,
+        draftLegacyPolygonCount: current.draftLegacyPolygonCount,
       );
       if (changed) saveMutationCount += 1;
       final result = _result(
@@ -1162,6 +2441,7 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
     FinalizeInventorySketchCommand command,
   ) async {
     finalizeCalls += 1;
+    finalizeCommands.add(command);
     operationOrder.add('finalize');
     if (failFinalizeCount > 0) {
       failFinalizeCount -= 1;
@@ -1170,6 +2450,9 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
     final current = projection!;
     final draft = current.draftRevision!;
     draft.geometry.validateFinalizable();
+    if (!_sameBlockDrafts(current.draftNewBlocks, command.newBlocks)) {
+      throw const InventoryFailure('inventory_block_metadata_mismatch');
+    }
     final active = _revision(
       id: draft.id,
       sketchId: current.sketch.id,
@@ -1212,6 +2495,8 @@ InventoryPrimarySketchProjection _projection({
   required int sketchRevision,
   InventorySketchRevisionRecord? active,
   InventorySketchRevisionRecord? draft,
+  List<InventoryBlockDraft> draftNewBlocks = const [],
+  int draftLegacyPolygonCount = 0,
 }) => InventoryPrimarySketchProjection(
   sketch: InventorySketchRecord(
     id: sketchId,
@@ -1227,7 +2512,34 @@ InventoryPrimarySketchProjection _projection({
   ),
   activeRevision: active,
   draftRevision: draft,
+  draftNewBlocks: draftNewBlocks,
+  draftLegacyPolygonCount: draftLegacyPolygonCount,
 );
+
+bool _sameBlockDrafts(
+  List<InventoryBlockDraft> first,
+  List<InventoryBlockDraft> second,
+) {
+  if (first.length != second.length) return false;
+  for (var index = 0; index < first.length; index += 1) {
+    final left = first[index];
+    final right = second[index];
+    if (left.id != right.id ||
+        left.displayName != right.displayName ||
+        left.polygonIndex != right.polygonIndex ||
+        left.floors.length != right.floors.length) {
+      return false;
+    }
+    for (var floor = 0; floor < left.floors.length; floor += 1) {
+      if (left.floors[floor].id != right.floors[floor].id ||
+          left.floors[floor].displayName != right.floors[floor].displayName ||
+          left.floors[floor].ordinal != right.floors[floor].ordinal) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
 
 InventorySketchRevisionRecord _revision({
   required String id,

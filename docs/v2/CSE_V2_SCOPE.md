@@ -49,8 +49,9 @@ CSE V1, proje sahibinin kararıyla tamamlanmış ürün fazıdır.
 V1 tarihsel baseline'dır. V2, aynı offline-first mobil ürünü yeniden yazmak
 yerine bu baseline üzerinde ilerler.
 
-Güncel merged V2 teknik baseline'ı V1 metadata'sından ayrıdır: mobile version
-`0.1.0+1`, SQLite schema `19` ve backup format `1`dir. Exact güncel merge SHA'sı
+Güncel V2 teknik durum V1 metadata'sından ayrıdır: Issue #527 task başlangıç
+master'ı schema `20`, mobile version `0.1.0+1` ve backup format `1`dir; current
+revised Slice 6.1 branch hedefi final schema `22`dir. Exact güncel merge SHA
 kalıcı bu kapsam belgesine sabitlenmez; GitHub `master` üzerinden doğrulanır. Bu
 baseline,
 schedule runtime ve persistent immutable reference-schedule snapshot temeliyle
@@ -424,9 +425,33 @@ Inventory Map v1:
 - Kroki/Liste ortak source projection'ı;
 - additive persistence ve normal backup/restore adoption'ı
 
-hedefler. Issue #507 yalnız docs/source-authority Slice'ıdır. Inventory schema,
-source, UI, test, build veya cihaz davranışı uygulanmış değildir. Production
-Slices 1–6 ayrı Issue, authority, validation ve review gerektirir.
+hedefler. Issue #507 tarihsel docs/source-authority Slice'ıdır. Slices 1–5
+production predecessors olarak tamamlanmıştır. Issue #527 exact master
+`f858740f6975bace9b6efd21deb1f679e4489cbf` üzerinden revised Slice 6.1'i,
+schema22 final stable block/floor source'unu, deterministic
+`20 -> revised 21 -> 22` backfill'ini, superseded PR #526 schema21 compatibility
+yolunu ve closed-area editor foundation'ını ayrı R4 authority/review sınırında
+uygular.
+Slice 6.2/6.3, Ready, merge ve cihaz işlemleri bu authority'nin dışındadır.
+
+Issue #527 owner-acceptance correction'ı normal yeni çizimi yatay/düşey
+segmentlerle sınırlar: ilk kenar dominant pointer axis'ini, sonraki kenarlar 90°
+alternation'ı kullanır; default smart alignment önceki vertex koordinatına
+visible guide ile hizalar. `Serbest uzunluk` yalnız sonraki segmentin length
+alignment'ını kapatır ve orthogonal kuralı korur. Legacy diagonal persisted
+geometry okunmaya devam eder. `Krokiyi güncelle` içinde finalized/base geometry
+Slice 6.1'de local fail-before-autosave mesajıyla immutable kalırken untouched
+base sonuna yeni orthogonal block append autosave/reload/finalize edilebilir.
+Reshape ve placement reconciliation hâlâ Slice 6.3 kapsamıdır.
+
+Issue #527'nin current owner-acceptance correction'ı editorü landscape
+full-screen canvas ve sağ compact icon-only, tooltip/Semantics etiketli toolbar
+olarak sunar. Global check/save action pending debounce'u force-save/drain eder,
+finalize sonucunu doğrular ve Inventory'nin canonical map projection'ını aynı
+session'da yeniler. Block metadata action'ı lokal `Alanı ekle` olarak kalır;
+bir draft global finalize öncesinde birden fazla block biriktirebilir.
+Finalize hatasında dayanıklı draft korunur ve görünür retry sunulur. Issue #529
+global safe-diagnostic konusu bu correction kapsamı dışındadır.
 
 Issue #501, #502, #503 ve #499 P0 veri/owner-phone güvenlik kuralları bu ürün
 önceliğinden üstündür. Source geliştirme ve Draft PR devam edebilir; owner-phone
@@ -477,7 +502,7 @@ Kapanış kapısı:
 | 3 | Living 7-Day Plan; Günlük Log v1; İş Zinciri | Yaşayan yakın plan ve kaynaklı günlük akışı |
 | 4 | İstenecek Malzemeler; öneriler; telefon görüşmesi | Yardımcı akışların ana omurgaya bağlanması |
 | 5 | Proje albümü Slice 1 merged; Günlük Log v2 paused | V2.11 manual test/closure ve ayrı owner resume kararı |
-| Current priority | Inventory Map v1 Slices 0–6 | Exact geometry/persistence, usable UI ve P0-safe backup/update evidence |
+| Current priority | Inventory Map v1 revised Slice 6.1 / Issue #527 | Stable block/floor identity, deterministic schema22 compatibility migration ve closed-area editor foundation |
 | 6 | Mini hesap makinesi — paused | Ayrı owner resume kararı ve dar saha aracı kabulü |
 
 Aynı anda yalnız bir production implementation Issue'su aktif olur. Bir dalga
@@ -571,10 +596,10 @@ buffer'ındaki kanıtlanmış ekstra büyük kopyayı kaldırmıştır. Issue #4
 pending ve V2.11 complete değildir. Issue #504 / PR #505 recovery surface'i
 mergedir; owner recovery doğrulaması ve P0 Issues #501–#503 açık kalır.
 
-Güncel teknik facts schema `19`, backup format `1` ve version `0.1.0+1`dir.
-Exact current SHA ve son PR kalıcı burada dondurulmaz; GitHub `master` current
-repository truth'udur. Issue #507 task başlangıç snapshot'ı kendi task/result
-kanıtında ayrıca bağlanır.
+Issue #527 task başlangıç facts schema `20`, backup format `1` ve version
+`0.1.0+1`dir; current branch target schema `22`dir. Exact current SHA ve son PR
+kalıcı burada dondurulmaz; GitHub `master` current repository truth'udur. Her
+Issue task başlangıç snapshot'ını kendi task/result kanıtında ayrıca bağlar.
 
 Güncel canonical faz:
 
@@ -595,8 +620,9 @@ Living Plan MVP Core — merged / PR #463
 → Issue #492 / PR #493 Telefon görüşmesi sonucu → Ajanda Slice 1 — merged / manual test deferred
 → Issue #497 / PR #498 Proje fotoğraf/video albümü Slice 1 — merged / manual test pending
 → Issue #504 / PR #505 recovery surface — merged / owner recovery verification pending
-→ Epic #506 / Issue #507 Inventory Map v1 Slice 0 canonical contract — current / docs only
-→ Inventory Map v1 Slices 1–6 — not started
+→ Epic #506 / Issue #507 Inventory Map v1 Slice 0 canonical contract — historical normative foundation
+→ Inventory Map v1 Slices 1–5 — production predecessors complete / manual status per Issue #479
+→ Issue #527 revised Inventory Spatial v1 Slice 6.1 — current implementation / independent R4 review pending
 → V2.12 and later planned product work — paused by owner decision
 ```
 
@@ -629,10 +655,15 @@ source navigation kurar; manual testleri pending'dir ve V2.11 completion ilanı
 değildir.
 
 Epic #506 altındaki Inventory Map v1 current ürün geliştirme önceliğidir.
-Issue #507 yalnız normative contract ve truth-sync üretir; production code,
-schema 20, editor, Envanter destination, test, build veya cihaz behavior'ı
-uygulanmış sayılmaz. `docs/v2/CSE_INVENTORY_MAP_V1_CONTRACT.md` Slices 1–6'nın
-ayrı authority ile uygulayacağı exact sınırdır.
+Issue #527, superseded PR #526 veya `d0267a7...` source'unu taşımadan revised
+Slice 6.1'i exact master temelinden yeniden kurar. Revised schema21 stable
+project-owned block, block-owned ordered floor, immutable revision/polygon
+mapping ve placement `floor_id` foundation'ını kurar; final schema22 hem normal
+`20 -> 21 -> 22` zincirini hem de korunmuş superseded PR #526 schema21 verisinin
+kayıpsız dönüşümünü destekler. Schema20 geometry, tüm placement history,
+event/photo truth ve backup format `1` korunur. Slice 6.2 navigation ile Slice
+6.3 reshape/move lifecycle bu current kapsamda başlamaz.
+`docs/v2/CSE_INVENTORY_MAP_V1_CONTRACT.md` güncel normative sınırdır.
 
 Issue #501 recovery verification, Issue #502 external verified backup/update
 gate'i, Issue #503 newer-live-data-safe restore yönü ve Issue #499 owner-phone
