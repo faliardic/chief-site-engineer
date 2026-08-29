@@ -234,6 +234,7 @@ void main() {
           expectedSketchRevision: 1,
           expectedContentRevision: 1,
           geometry: _geometry(),
+          newBlocks: _blockDrafts(sketchId, _geometry()),
         ),
       );
       expect(changed.sourceRevision, 2);
@@ -247,6 +248,7 @@ void main() {
           expectedSketchRevision: 2,
           expectedContentRevision: 2,
           geometry: _geometry(),
+          newBlocks: _blockDrafts(sketchId, _geometry()),
         ),
       );
       expect(identical.isNoOp, isTrue);
@@ -261,6 +263,7 @@ void main() {
             expectedSketchRevision: 1,
             expectedContentRevision: 2,
             geometry: _geometry(64),
+            newBlocks: _blockDrafts(sketchId, _geometry(64)),
           ),
         ),
         _fails('inventory_stale_revision'),
@@ -282,11 +285,32 @@ void main() {
           draftRevisionId: firstDraft,
           expectedSketchRevision: 2,
           expectedContentRevision: 2,
+          newBlocks: _blockDrafts(sketchId, _geometry()),
         ),
       );
       projection = await fixture.app.loadPrimarySketch(_projectA);
       expect(projection!.activeRevision!.id, firstDraft);
       expect(projection.draftRevision, isNull);
+      expect(projection.blocks, hasLength(1));
+      expect(projection.blocks.single.state, InventoryBlockState.active);
+      expect(projection.blocks.single.ordinal, 1);
+      expect(projection.blocks.single.normalizedName, 'alan 1');
+      expect(projection.floors, hasLength(2));
+      expect(projection.floors.map((floor) => floor.ordinal), [1, 2]);
+      expect(
+        projection.floors.every(
+          (floor) => floor.blockId == projection!.blocks.single.id,
+        ),
+        isTrue,
+      );
+      expect(projection.activeBlockPolygons, hasLength(1));
+      expect(
+        projection.activeBlockPolygons.single.blockId,
+        projection.blocks.single.id,
+      );
+      expect(projection.activeBlockPolygons.single.polygonIndex, 0);
+      final firstBlockId = projection.blocks.single.id;
+      final firstFloorId = projection.floors.first.id;
 
       final secondDraft = _uuid(207);
       await fixture.app.startSketchEdit(
@@ -305,6 +329,58 @@ void main() {
         projection.activeRevision!.geometry.canonicalJson,
       );
       expect(projection.draftRevision!.baseRevisionId, firstDraft);
+      final rewrittenBase = InventoryGeometry(
+        polylines: [
+          _rectangle(0, 0, 1984, 1536),
+          _rectangle(2560, 0, 2944, 512),
+        ],
+      );
+      final beforeRejectedAutosaves = await _counts(fixture.db.database);
+      await expectLater(
+        fixture.app.autosaveSketchDraft(
+          AutosaveInventorySketchDraftCommand(
+            operationId: _uuid(224),
+            projectId: _projectA,
+            sketchId: sketchId,
+            draftRevisionId: secondDraft,
+            expectedSketchRevision: 4,
+            expectedContentRevision: 1,
+            geometry: rewrittenBase,
+            newBlocks: _blockDrafts(
+              sketchId,
+              rewrittenBase,
+              firstPolygonIndex: 1,
+            ),
+          ),
+        ),
+        _fails('inventory_block_geometry_immutable'),
+      );
+      final overlapping = InventoryGeometry(
+        polylines: [
+          _rectangle(0, 0, 2048, 1536),
+          _rectangle(512, 512, 1024, 1024),
+        ],
+      );
+      await expectLater(
+        fixture.app.autosaveSketchDraft(
+          AutosaveInventorySketchDraftCommand(
+            operationId: _uuid(225),
+            projectId: _projectA,
+            sketchId: sketchId,
+            draftRevisionId: secondDraft,
+            expectedSketchRevision: 4,
+            expectedContentRevision: 1,
+            geometry: overlapping,
+            newBlocks: _blockDrafts(
+              sketchId,
+              overlapping,
+              firstPolygonIndex: 1,
+            ),
+          ),
+        ),
+        _fails('inventory_block_polygon_ambiguous'),
+      );
+      expect(await _counts(fixture.db.database), beforeRejectedAutosaves);
       await fixture.app.autosaveSketchDraft(
         AutosaveInventorySketchDraftCommand(
           operationId: _uuid(209),
@@ -314,6 +390,11 @@ void main() {
           expectedSketchRevision: 4,
           expectedContentRevision: 1,
           geometry: _geometry(64),
+          newBlocks: _blockDrafts(
+            sketchId,
+            _geometry(64),
+            firstPolygonIndex: 1,
+          ),
         ),
       );
       await fixture.app.finalizeSketch(
@@ -324,7 +405,33 @@ void main() {
           draftRevisionId: secondDraft,
           expectedSketchRevision: 5,
           expectedContentRevision: 2,
+          newBlocks: _blockDrafts(
+            sketchId,
+            _geometry(64),
+            firstPolygonIndex: 1,
+          ),
         ),
+      );
+      projection = await fixture.app.loadPrimarySketch(_projectA);
+      expect(projection!.blocks, hasLength(2));
+      expect(projection.blocks.map((block) => block.ordinal), [1, 2]);
+      expect(projection.floors, hasLength(4));
+      expect(projection.activeBlockPolygons, hasLength(2));
+      expect(
+        projection.blocks.firstWhere((block) => block.id == firstBlockId).state,
+        InventoryBlockState.active,
+      );
+      expect(
+        projection.floors
+            .singleWhere((floor) => floor.id == firstFloorId)
+            .blockId,
+        firstBlockId,
+      );
+      expect(
+        projection.activeBlockPolygons
+            .singleWhere((mapping) => mapping.blockId == firstBlockId)
+            .polygonIndex,
+        0,
       );
       final oldActive = await fixture.db.database.query(
         'inventory_sketch_revisions',
@@ -380,6 +487,12 @@ void main() {
         ),
       );
       expect(await fixture.app.loadPrimarySketch(_projectA), isNull);
+      expect(
+        (await fixture.db.database.query(
+          'inventory_blocks',
+        )).map((row) => row['state']).toSet(),
+        {InventoryBlockState.archived.storageValue},
+      );
       await fixture.app.unarchiveSketch(
         UnarchiveInventorySketchCommand(
           operationId: _uuid(215),
@@ -391,6 +504,12 @@ void main() {
       expect(
         (await fixture.app.loadPrimarySketch(_projectA))!.sketch.revision,
         10,
+      );
+      expect(
+        (await fixture.db.database.query(
+          'inventory_blocks',
+        )).map((row) => row['state']).toSet(),
+        {InventoryBlockState.active.storageValue},
       );
 
       final mismatchedDraft = _uuid(222);
@@ -541,6 +660,13 @@ void main() {
       expect(firstProjection.activePlacement!.x, 16);
       expect(firstProjection.activePlacement!.y, 20);
       expect(firstProjection.activePlacement!.quantity, 2);
+      final stableFloorId = firstProjection.activePlacement!.floorId;
+      expect(
+        (await fixture.app.loadPrimarySketch(
+          _projectA,
+        ))!.floors.map((floor) => floor.id),
+        contains(stableFloorId),
+      );
 
       final secondAssetId = _uuid(314);
       await fixture.app.createAsset(
@@ -770,6 +896,10 @@ void main() {
       expect(versions.last.isActive, isTrue);
       expect(versions.last.x, 80);
       expect(versions.last.y, 84);
+      expect(
+        versions.every((placement) => placement.floorId == stableFloorId),
+        isTrue,
+      );
 
       final history = await fixture.app.listAssetHistory(
         projectId: _projectA,
@@ -1082,6 +1212,14 @@ void main() {
         where: 'id = ?',
         whereArgs: [assetId],
       );
+      final floorId =
+          (await fixture.db.database.query(
+                'inventory_asset_placements',
+                columns: const ['floor_id'],
+                where: 'asset_id = ? AND ended_at IS NULL',
+                whereArgs: [assetId],
+              )).single['floor_id']!
+              as String;
       await fixture.db.database.insert('inventory_asset_placements', {
         'id': _uuid(514),
         'placement_key': _uuid(515),
@@ -1089,6 +1227,7 @@ void main() {
         'asset_id': assetId,
         'sketch_id': sketch.sketchId,
         'provenance_revision_id': sketch.activeRevisionId,
+        'floor_id': floorId,
         'sequence': 1,
         'x': 128,
         'y': 128,
@@ -1453,6 +1592,7 @@ void main() {
           expectedSketchRevision: 1,
           expectedContentRevision: 1,
           geometry: _geometry(64),
+          newBlocks: _blockDrafts(sketchId, _geometry(64)),
         ),
       );
       final firstRelaunch = InventoryApplication(
@@ -1476,6 +1616,7 @@ void main() {
           draftRevisionId: firstDraftId,
           expectedSketchRevision: 2,
           expectedContentRevision: 2,
+          newBlocks: _blockDrafts(sketchId, _geometry(64)),
         ),
       );
       final editDraftId = _uuid(705);
@@ -1498,6 +1639,11 @@ void main() {
           expectedSketchRevision: 4,
           expectedContentRevision: 1,
           geometry: _geometry(128),
+          newBlocks: _blockDrafts(
+            sketchId,
+            _geometry(128),
+            firstPolygonIndex: 2,
+          ),
         ),
       );
 
@@ -1635,6 +1781,7 @@ Future<_FinalizedSketch> _createFinalizedSketch(
       expectedSketchRevision: 1,
       expectedContentRevision: 1,
       geometry: _geometry(),
+      newBlocks: _blockDrafts(sketchId, _geometry()),
     ),
   );
   await fixture.app.finalizeSketch(
@@ -1645,6 +1792,7 @@ Future<_FinalizedSketch> _createFinalizedSketch(
       draftRevisionId: draftId,
       expectedSketchRevision: 2,
       expectedContentRevision: 2,
+      newBlocks: _blockDrafts(sketchId, _geometry()),
     ),
   );
   return _FinalizedSketch(
@@ -1774,17 +1922,57 @@ class _MemoryInventoryAttachmentGateway implements InventoryAttachmentGateway {
   }
 }
 
-InventoryGeometry _geometry([int offset = 0]) => InventoryGeometry(
+InventoryGeometry _geometry([int stage = 0]) => InventoryGeometry(
   polylines: [
-    InventoryPolyline(
-      closed: false,
-      points: [
-        InventorySketchPoint(x: offset, y: 0),
-        InventorySketchPoint(x: offset + 64, y: 64),
-      ],
-    ),
+    _rectangle(0, 0, 2048, 1536),
+    if (stage >= 64) _rectangle(2560, 0, 2944, 512),
+    if (stage >= 128) _rectangle(3200, 0, 3584, 512),
   ],
 );
+
+InventoryPolyline _rectangle(int left, int top, int right, int bottom) =>
+    InventoryPolyline(
+      closed: true,
+      points: [
+        InventorySketchPoint(x: left, y: top),
+        InventorySketchPoint(x: right, y: top),
+        InventorySketchPoint(x: right, y: bottom),
+        InventorySketchPoint(x: left, y: bottom),
+      ],
+    );
+
+List<InventoryBlockDraft> _blockDrafts(
+  String sketchId,
+  InventoryGeometry geometry, {
+  int firstPolygonIndex = 0,
+}) {
+  final sketchSeed = int.parse(sketchId.substring(sketchId.length - 12));
+  final base = 700000000000 + sketchSeed * 100;
+  return [
+    for (
+      var index = firstPolygonIndex;
+      index < geometry.polylines.length;
+      index += 1
+    )
+      InventoryBlockDraft(
+        id: _uuid(base + index * 10),
+        displayName: 'Alan ${index + 1}',
+        polygonIndex: index,
+        floors: [
+          InventoryFloorDraft(
+            id: _uuid(base + index * 10 + 1),
+            displayName: '1. Kat',
+            ordinal: 1,
+          ),
+          InventoryFloorDraft(
+            id: _uuid(base + index * 10 + 2),
+            displayName: '2. Kat',
+            ordinal: 2,
+          ),
+        ],
+      ),
+  ];
+}
 
 String _uuid(int value) =>
     '00000000-0000-4000-8000-${value.toString().padLeft(12, '0')}';
@@ -1812,6 +2000,10 @@ Future<Map<String, int>> _counts(sqflite.Database db) async => {
   for (final table in const [
     'inventory_sketches',
     'inventory_sketch_revisions',
+    'inventory_blocks',
+    'inventory_floors',
+    'inventory_sketch_revision_block_polygons',
+    'inventory_sketch_revision_spatial_drafts',
     'inventory_assets',
     'inventory_asset_placements',
     'inventory_command_receipts',

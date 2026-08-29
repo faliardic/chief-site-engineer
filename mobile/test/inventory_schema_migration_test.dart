@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:chief_site_engineer/application/inventory_application.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +12,7 @@ const _projectA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
 const _projectB = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
 const _sketchA = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
 const _revisionA = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1';
+const _legacyDraft = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2';
 const _assetA = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1';
 const _placementA = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1';
 const _placementKeyA = 'ffffffff-ffff-4fff-8fff-fffffffffff1';
@@ -18,6 +20,8 @@ const _attachmentA = '11111111-1111-4111-8111-111111111111';
 const _photoLinkA = '22222222-2222-4222-8222-222222222222';
 const _receiptA = '33333333-3333-4333-8333-333333333333';
 const _eventA = '44444444-4444-4444-8444-444444444444';
+const _blockA = '55555555-5555-4555-8555-555555555555';
+const _floorA = '66666666-6666-4666-8666-666666666666';
 const _t0 = '2026-08-27T04:00:00Z';
 const _t1 = '2026-08-27T05:00:00Z';
 const _t2 = '2026-08-27T06:00:00Z';
@@ -28,6 +32,10 @@ const _digest =
 const _inventoryTables = <String>{
   'inventory_sketches',
   'inventory_sketch_revisions',
+  'inventory_blocks',
+  'inventory_floors',
+  'inventory_sketch_revision_block_polygons',
+  'inventory_sketch_revision_spatial_drafts',
   'inventory_assets',
   'inventory_asset_placements',
   'inventory_command_receipts',
@@ -52,6 +60,12 @@ const _plannedIndexes = <String>{
   'uq_inventory_asset_attachment_links_active',
   'ix_inventory_asset_attachment_links_asset',
   'ix_inventory_asset_attachment_links_attachment',
+  'inventory_blocks_project_state',
+  'uq_inventory_blocks_active_name',
+  'inventory_floors_project_block',
+  'inventory_revision_block_polygons_revision',
+  'inventory_spatial_drafts_revision',
+  'inventory_placements_floor_history',
 };
 
 void main() {
@@ -74,7 +88,7 @@ void main() {
   });
 
   test(
-    'fresh database creates exact schema 20 Inventory tables and indices',
+    'fresh database creates exact schema 21 Inventory tables and indices',
     () async {
       final database = _database(databasePath);
       await database.open();
@@ -82,7 +96,7 @@ void main() {
 
       expect(
         sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
-        20,
+        21,
       );
       expect(
         (await db.query(
@@ -90,7 +104,7 @@ void main() {
           columns: ['version'],
           orderBy: 'version ASC',
         )).map((row) => row['version']),
-        List.generate(20, (index) => index + 1),
+        List.generate(21, (index) => index + 1),
       );
       expect(
         await _objectNames(db, type: 'table', prefix: 'inventory_'),
@@ -136,7 +150,7 @@ void main() {
       expect(afterRows, beforeRows);
       expect(
         sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
-        20,
+        21,
       );
       for (final table in _inventoryTables) {
         expect(await db.query(table), isEmpty, reason: table);
@@ -145,18 +159,18 @@ void main() {
       await upgraded.close();
 
       final rollbackPath = path.join(temporaryRoot.path, 'rollback.sqlite3');
-      final rollbackSchema = await _openSeededSchemaNineteen(rollbackPath);
-      final rollbackRows = await _representativeRows(rollbackSchema.database);
+      final rollbackSchema = await _openSeededSchemaTwenty(rollbackPath);
+      final rollbackRows = await _inventoryV20Snapshot(rollbackSchema.database);
       await rollbackSchema.close();
       final failing = _database(
         rollbackPath,
         migrations: [
-          ...AppDatabase.foundationMigrations.take(19),
+          ...AppDatabase.foundationMigrations.take(20),
           DatabaseMigration(
-            version: 20,
+            version: 21,
             apply: (transaction) async {
-              await AppDatabase.foundationMigrations[19].apply(transaction);
-              throw StateError('forced inventory schema 20 failure');
+              await AppDatabase.foundationMigrations[20].apply(transaction);
+              throw StateError('forced inventory schema 21 failure');
             },
           ),
         ],
@@ -171,31 +185,144 @@ void main() {
         sqflite.Sqflite.firstIntValue(
           await afterFailure.rawQuery('PRAGMA user_version'),
         ),
-        19,
+        20,
       );
       expect(
         await _objectNames(afterFailure, type: 'table', prefix: 'inventory_'),
-        isEmpty,
+        _inventoryTables.difference(const {
+          'inventory_blocks',
+          'inventory_floors',
+          'inventory_sketch_revision_block_polygons',
+          'inventory_sketch_revision_spatial_drafts',
+        }),
       );
       expect(
-        await afterFailure.query('schema_versions', where: 'version = 20'),
+        await afterFailure.query('schema_versions', where: 'version = 21'),
         isEmpty,
       );
-      expect(await _representativeRows(afterFailure), rollbackRows);
-      expect(
-        (await afterFailure.query(
-          'projects',
-          where: 'id = ?',
-          whereArgs: [_projectA],
-        )).single['name'],
-        'Inventory migration project',
-      );
+      expect(await _inventoryV20Snapshot(afterFailure), rollbackRows);
       await afterFailure.close();
     },
   );
 
   test(
-    'schema 20 fails closed and retains one valid populated graph',
+    'schema 20 to 21 backfill preserves the exact Inventory graph',
+    () async {
+      final legacy = await _openSeededSchemaTwenty(databasePath);
+      final before = await _inventoryV20Snapshot(legacy.database);
+      await legacy.close();
+
+      final upgraded = _database(databasePath);
+      await upgraded.open();
+      final db = upgraded.database;
+
+      expect(await _inventoryV20Snapshot(db), before);
+      expect(
+        sqflite.Sqflite.firstIntValue(await db.rawQuery('PRAGMA user_version')),
+        21,
+      );
+      final blocks = await db.query('inventory_blocks');
+      final floors = await db.query('inventory_floors');
+      expect(blocks, hasLength(1));
+      expect(floors, hasLength(1));
+      expect(blocks.single['project_id'], _projectA);
+      expect(blocks.single['display_name'], 'Varsayılan Alan');
+      expect(blocks.single['normalized_name'], 'varsayılan alan');
+      expect(blocks.single['ordinal'], 1);
+      expect(blocks.single['state'], 'DETACHED');
+      expect(floors.single['project_id'], _projectA);
+      expect(floors.single['block_id'], blocks.single['id']);
+      expect(floors.single['display_name'], '1. Kat');
+      expect(floors.single['ordinal'], 1);
+      expect(
+        (await db.query('inventory_asset_placements')).single['floor_id'],
+        floors.single['id'],
+      );
+      expect(
+        await db.query('inventory_sketch_revision_block_polygons'),
+        isEmpty,
+      );
+      expect(
+        (await db.query(
+          'inventory_sketch_revision_spatial_drafts',
+        )).single['legacy_polygon_count'],
+        1,
+      );
+      final application = InventoryApplication(
+        database: upgraded,
+        clock: () => DateTime.parse(_t2),
+        idFactory: () => '77777777-7777-4777-8777-777777777777',
+      );
+      final projection = await application.loadPrimarySketch(_projectA);
+      expect(projection!.activeRevision!.id, _revisionA);
+      expect(projection.draftRevision!.id, _legacyDraft);
+      expect(projection.draftLegacyPolygonCount, 1);
+      expect(projection.draftNewBlocks, isEmpty);
+      expect(await db.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      await upgraded.close();
+    },
+  );
+
+  test(
+    'schema 21 corrupt cross-project source rolls back before any DDL',
+    () async {
+      final legacy = await _openSeededSchemaTwenty(databasePath);
+      await legacy.close();
+      final corrupt = await databaseFactoryFfi.openDatabase(
+        databasePath,
+        options: sqflite.OpenDatabaseOptions(
+          singleInstance: false,
+          onConfigure: (database) async {
+            await database.execute('PRAGMA foreign_keys = OFF');
+          },
+        ),
+      );
+      await corrupt.execute(
+        'DROP TRIGGER inventory_asset_placements_source_insert',
+      );
+      final corruptPlacement =
+          _placementRow(
+              id: 'cross-project-corrupt-placement',
+              placementKey: 'cross-project-corrupt-key',
+              projectId: _projectB,
+              quantity: 1,
+              createdAt: _t2,
+            )
+            ..remove('floor_id')
+            ..['ended_at'] = _t2
+            ..['end_reason'] = 'MOVED';
+      await corrupt.insert('inventory_asset_placements', corruptPlacement);
+      final before = await _inventoryV20Snapshot(corrupt);
+      await corrupt.close();
+
+      final upgraded = _database(databasePath);
+      await expectLater(upgraded.open(), throwsA(isA<DatabaseOpenFailure>()));
+      final afterFailure = await databaseFactoryFfi.openDatabase(
+        databasePath,
+        options: sqflite.OpenDatabaseOptions(singleInstance: false),
+      );
+      expect(
+        sqflite.Sqflite.firstIntValue(
+          await afterFailure.rawQuery('PRAGMA user_version'),
+        ),
+        20,
+      );
+      expect(
+        await _objectNames(afterFailure, type: 'table', prefix: 'inventory_'),
+        _inventoryTables.difference(const {
+          'inventory_blocks',
+          'inventory_floors',
+          'inventory_sketch_revision_block_polygons',
+          'inventory_sketch_revision_spatial_drafts',
+        }),
+      );
+      expect(await _inventoryV20Snapshot(afterFailure), before);
+      await afterFailure.close();
+    },
+  );
+
+  test(
+    'schema 21 fails closed and retains one valid populated graph',
     () async {
       final database = _database(databasePath);
       await database.open();
@@ -271,6 +398,38 @@ Future<AppDatabase> _openSeededSchemaNineteen(String databasePath) async {
   return database;
 }
 
+Future<AppDatabase> _openSeededSchemaTwenty(String databasePath) async {
+  final database = _database(
+    databasePath,
+    migrations: AppDatabase.foundationMigrations.take(20).toList(),
+  );
+  await database.open();
+  await _seedProjects(database.database);
+  final graph = await _seedValidInventoryGraph(
+    database.database,
+    spatial: false,
+  );
+  await database.database.insert(
+    'inventory_sketch_revisions',
+    _revisionRow(
+      id: _legacyDraft,
+      revisionNumber: 2,
+      baseRevisionId: _revisionA,
+      geometryJson: graph['geometry_json']! as String,
+      geometrySha256: graph['geometry_sha256']! as String,
+      createdAt: _t2,
+      updatedAt: _t2,
+    ),
+  );
+  await database.database.update(
+    'inventory_sketches',
+    {'draft_revision_id': _legacyDraft, 'revision': 3, 'updated_at': _t2},
+    where: 'id = ? AND revision = 2',
+    whereArgs: [_sketchA],
+  );
+  return database;
+}
+
 Future<void> _seedProjects(sqflite.Database database) async {
   for (final item in const [
     (_projectA, 'Project A'),
@@ -287,8 +446,9 @@ Future<void> _seedProjects(sqflite.Database database) async {
 }
 
 Future<Map<String, Object>> _seedValidInventoryGraph(
-  sqflite.Database database,
-) async {
+  sqflite.Database database, {
+  bool spatial = true,
+}) async {
   final geometry = InventoryGeometry(
     polylines: [
       InventoryPolyline(
@@ -320,8 +480,14 @@ Future<Map<String, Object>> _seedValidInventoryGraph(
     where: 'id = ?',
     whereArgs: [_sketchA],
   );
+  if (spatial) {
+    await database.insert('inventory_blocks', _blockRow());
+    await database.insert('inventory_floors', _floorRow());
+  }
   await database.insert('inventory_assets', _assetRow());
-  await database.insert('inventory_asset_placements', _placementRow());
+  final placement = _placementRow();
+  if (!spatial) placement.remove('floor_id');
+  await database.insert('inventory_asset_placements', placement);
   await database.insert('managed_attachments', {
     'id': _attachmentA,
     'relative_path': 'managed/inventory-photo.jpg',
@@ -732,12 +898,45 @@ Map<String, Object?> _assetRow({
   'archived_at': null,
 };
 
+Map<String, Object?> _blockRow({
+  String id = _blockA,
+  String projectId = _projectA,
+}) => {
+  'id': id,
+  'project_id': projectId,
+  'display_name': 'Varsayılan Alan',
+  'normalized_name': 'varsayılan alan',
+  'ordinal': 1,
+  'state': 'DETACHED',
+  'revision': 1,
+  'created_at': _t0,
+  'updated_at': _t0,
+  'archived_at': null,
+};
+
+Map<String, Object?> _floorRow({
+  String id = _floorA,
+  String blockId = _blockA,
+  String projectId = _projectA,
+}) => {
+  'id': id,
+  'block_id': blockId,
+  'project_id': projectId,
+  'display_name': '1. Kat',
+  'ordinal': 1,
+  'revision': 1,
+  'created_at': _t0,
+  'updated_at': _t0,
+  'archived_at': null,
+};
+
 Map<String, Object?> _placementRow({
   String id = _placementA,
   String placementKey = _placementKeyA,
   String projectId = _projectA,
   String assetId = _assetA,
   String sketchId = _sketchA,
+  String floorId = _floorA,
   String provenanceRevisionId = _revisionA,
   int sequence = 1,
   int x = 0,
@@ -751,6 +950,7 @@ Map<String, Object?> _placementRow({
   'project_id': projectId,
   'asset_id': assetId,
   'sketch_id': sketchId,
+  'floor_id': floorId,
   'provenance_revision_id': provenanceRevisionId,
   'sequence': sequence,
   'x': x,
@@ -845,6 +1045,31 @@ Future<Map<String, List<Map<String, Object?>>>> _representativeRows(
     'managed_attachments',
   ]) {
     result[table] = await database.query(table, orderBy: 'id ASC');
+  }
+  return result;
+}
+
+Future<Map<String, List<Map<String, Object?>>>> _inventoryV20Snapshot(
+  sqflite.Database database,
+) async {
+  final result = <String, List<Map<String, Object?>>>{};
+  for (final table in const [
+    'inventory_sketches',
+    'inventory_sketch_revisions',
+    'inventory_assets',
+    'inventory_asset_placements',
+    'inventory_command_receipts',
+    'inventory_events',
+    'inventory_asset_attachment_links',
+  ]) {
+    final rows = await database.query(table, orderBy: 'id ASC');
+    result[table] = [
+      for (final row in rows)
+        {
+          for (final entry in row.entries)
+            if (entry.key != 'floor_id') entry.key: entry.value,
+        },
+    ];
   }
   return result;
 }

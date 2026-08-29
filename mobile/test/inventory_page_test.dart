@@ -16,6 +16,8 @@ const _sketchB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
 const _revisionA = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1';
 const _revisionB = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2';
 const _revisionUpdated = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc3';
+const _floorA = '99999999-9999-4999-8999-999999999991';
+const _floorB = '99999999-9999-4999-8999-999999999992';
 const _assetA = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1';
 const _assetB = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd2';
 const _assetArchived = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd3';
@@ -999,6 +1001,7 @@ class _FakeInventory extends UnavailableInventoryApplication {
       projectId: placement.projectId,
       assetId: placement.assetId,
       sketchId: command.sketchId,
+      floorId: placement.floorId,
       provenanceRevisionId: command.activeRevisionId,
       sequence: placement.sequence + 1,
       x: command.x,
@@ -1060,6 +1063,7 @@ class _FakeInventory extends UnavailableInventoryApplication {
       projectId: predecessor.projectId,
       assetId: predecessor.assetId,
       sketchId: command.sketchId,
+      floorId: predecessor.floorId,
       provenanceRevisionId: command.activeRevisionId,
       sequence: predecessor.sequence + 1,
       x: command.x,
@@ -1216,6 +1220,7 @@ InventoryAssetProjection _asset(
             projectId: projectId,
             assetId: assetId,
             sketchId: sketchId,
+            floorId: projectId == _projectA ? _floorA : _floorB,
             provenanceRevisionId: revisionId,
             sequence: 1,
             x: x,
@@ -1247,6 +1252,7 @@ InventoryPlacementRecord _placement(
     projectId: projectId,
     assetId: assetId,
     sketchId: sketchId,
+    floorId: projectId == _projectA ? _floorA : _floorB,
     provenanceRevisionId: revisionId,
     sequence: sequence,
     x: x,
@@ -1269,6 +1275,7 @@ InventoryPlacementRecord _copyPlacement(
   projectId: current.projectId,
   assetId: current.assetId,
   sketchId: current.sketchId,
+  floorId: current.floorId,
   provenanceRevisionId: current.provenanceRevisionId,
   sequence: current.sequence,
   x: current.x,

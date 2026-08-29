@@ -54,11 +54,29 @@ class InventorySketchEditorController extends ChangeNotifier {
   bool _forceDrainRequested = false;
   bool _finalizeBlockedByStaleRevision = false;
   bool _disposed = false;
+  int _basePolygonCount = 0;
+  Set<int> _existingMappedPolygonIndexes = const {};
+  List<InventoryBlockDraft> _newBlocks = const [];
+  List<InventoryBlockDraft> _acknowledgedNewBlocks = const [];
+  final Map<int, InventoryBlockDraft> _blockDefinitionCache = {};
 
   String? get sketchId => _sketchId;
   String? get draftRevisionId => _draftRevisionId;
   int? get expectedSketchRevision => _expectedSketchRevision;
   int? get expectedContentRevision => _expectedContentRevision;
+  List<InventoryBlockDraft> get newBlocks => _newBlocks;
+
+  InventoryPolyline? get workingPolyline {
+    final current = editor;
+    final index = current?.workingPolylineIndex;
+    if (current == null ||
+        index == null ||
+        index < 0 ||
+        index >= current.geometry.polylines.length) {
+      return null;
+    }
+    return current.geometry.polylines[index];
+  }
 
   bool get hasUnacknowledgedGeometry {
     final candidate = editor?.geometry;
@@ -87,7 +105,8 @@ class InventorySketchEditorController extends ChangeNotifier {
         _finalizeBlockedByStaleRevision ||
         saveStatus != InventorySketchSaveStatus.saved ||
         hasUnacknowledgedGeometry ||
-        !_hasDraftIdentity) {
+        !_hasDraftIdentity ||
+        !_hasCompleteSpatialMetadata(candidate)) {
       return false;
     }
     try {
@@ -189,6 +208,79 @@ class InventorySketchEditorController extends ChangeNotifier {
   bool drawPoint(InventorySketchPoint point) =>
       _applyEditorAction(editor?.drawPoint(point));
 
+  bool shouldCloseAt(InventorySketchPoint point) {
+    final working = workingPolyline;
+    if (working == null || working.points.length < 3) return false;
+    final first = working.points.first;
+    final dx = first.x - point.x;
+    final dy = first.y - point.y;
+    const radius = InventoryGeometryContract.sketchGridStep * 2;
+    return dx * dx + dy * dy <= radius * radius;
+  }
+
+  InventoryBlockDraft createBlockDraft({
+    required String displayName,
+    required int floorCount,
+  }) {
+    final current = editor;
+    final polygonIndex = current?.workingPolylineIndex;
+    if (current == null || polygonIndex == null) {
+      throw const InventoryFailure('inventory_block_polygon_not_open');
+    }
+    InventorySpatialContract.validateFloorCount(floorCount);
+    return InventoryBlockDraft(
+      id: _nextId(),
+      displayName: InventorySpatialContract.normalizeBlockName(displayName),
+      polygonIndex: polygonIndex,
+      floors: [
+        for (var ordinal = 1; ordinal <= floorCount; ordinal += 1)
+          InventoryFloorDraft(
+            id: _nextId(),
+            displayName: '$ordinal. Kat',
+            ordinal: ordinal,
+          ),
+      ],
+    );
+  }
+
+  bool closeWorkingBlock(InventoryBlockDraft definition) {
+    final current = editor;
+    final index = current?.workingPolylineIndex;
+    final working = workingPolyline;
+    if (current == null ||
+        index == null ||
+        working == null ||
+        working.points.length < 3 ||
+        definition.polygonIndex != index) {
+      return false;
+    }
+    final next = current.drawPoint(working.points.first);
+    if (next == null || next.workingPolylineIndex != null) return false;
+    try {
+      definition.validate(next.geometry);
+      final polygons = <InventoryPolyline>[
+        for (final mappedIndex in _existingMappedPolygonIndexes)
+          next.geometry.polylines[mappedIndex],
+        for (final block in _newBlocks)
+          next.geometry.polylines[block.polygonIndex],
+        next.geometry.polylines[index],
+      ];
+      InventorySpatialContract.validateNonOverlappingPolygons(polygons);
+    } on InventoryFailure catch (error) {
+      lastErrorCode = error.code;
+      _notify();
+      return false;
+    }
+    _blockDefinitionCache[index] = definition;
+    _newBlocks = List<InventoryBlockDraft>.unmodifiable(
+      [..._newBlocks.where((block) => block.polygonIndex != index), definition]
+        ..sort(
+          (first, second) => first.polygonIndex.compareTo(second.polygonIndex),
+        ),
+    );
+    return _applyEditorAction(next);
+  }
+
   bool finishWorkingPolyline() =>
       _applyEditorAction(editor?.finishWorkingPolyline());
 
@@ -223,7 +315,20 @@ class InventorySketchEditorController extends ChangeNotifier {
     final geometryChanged =
         current.geometry.canonicalJson != next.geometry.canonicalJson;
     editor = next;
-    if (geometryChanged) _scheduleAutosave();
+    if (geometryChanged) {
+      _newBlocks = List<InventoryBlockDraft>.unmodifiable(
+        [
+          for (final entry in _blockDefinitionCache.entries)
+            if (entry.key >= _basePolygonCount &&
+                entry.key < next.geometry.polylines.length &&
+                next.geometry.polylines[entry.key].closed)
+              entry.value,
+        ]..sort(
+          (first, second) => first.polygonIndex.compareTo(second.polygonIndex),
+        ),
+      );
+      _scheduleAutosave();
+    }
     _notify();
     return true;
   }
@@ -288,6 +393,7 @@ class InventorySketchEditorController extends ChangeNotifier {
         final draft = _verifiedDraft(
           projection,
           expectedGeometry: pending.geometry,
+          expectedNewBlocks: pending.command.newBlocks,
         );
         if (result.commandType != InventoryCommandType.sketchDraftAutosave ||
             result.projectId != projectId ||
@@ -300,6 +406,7 @@ class InventorySketchEditorController extends ChangeNotifier {
           );
         }
         acknowledgedGeometry = draft.geometry;
+        _acknowledgedNewBlocks = projection.draftNewBlocks;
         _expectedSketchRevision = projection.sketch.revision;
         _expectedContentRevision = draft.contentRevision;
         _pendingSave = null;
@@ -335,6 +442,7 @@ class InventorySketchEditorController extends ChangeNotifier {
         expectedSketchRevision: _expectedSketchRevision!,
         expectedContentRevision: _expectedContentRevision!,
         geometry: current,
+        newBlocks: _newBlocks,
       ),
     );
   }
@@ -352,6 +460,7 @@ class InventorySketchEditorController extends ChangeNotifier {
       acknowledged,
       mode: current.mode,
     );
+    _newBlocks = _acknowledgedNewBlocks;
     saveStatus = InventorySketchSaveStatus.saved;
     lastErrorCode = null;
     _notify();
@@ -368,8 +477,11 @@ class InventorySketchEditorController extends ChangeNotifier {
     if (candidate == null) return false;
     try {
       candidate.validateFinalizable();
-    } on InventoryGeometryFailure catch (error) {
-      lastErrorCode = error.code;
+      if (!_hasCompleteSpatialMetadata(candidate)) {
+        throw const InventoryFailure('inventory_block_metadata_incomplete');
+      }
+    } on Object catch (error) {
+      lastErrorCode = _safeCode(error);
       _notify();
       return false;
     }
@@ -380,10 +492,17 @@ class InventorySketchEditorController extends ChangeNotifier {
       if (!await forceSave()) return false;
       final intended = editor!.geometry;
       intended.validateFinalizable();
+      if (!_hasCompleteSpatialMetadata(intended)) {
+        throw const InventoryFailure('inventory_block_metadata_incomplete');
+      }
       final expectedSketchRevision = _expectedSketchRevision!;
       final expectedContentRevision = _expectedContentRevision!;
       final before = await application.loadPrimarySketch(projectId);
-      final draft = _verifiedDraft(before, expectedGeometry: intended);
+      final draft = _verifiedDraft(
+        before,
+        expectedGeometry: intended,
+        expectedNewBlocks: _newBlocks,
+      );
       if (before!.sketch.revision != expectedSketchRevision) {
         throw const InventoryFailure('inventory_stale_revision');
       }
@@ -399,6 +518,7 @@ class InventorySketchEditorController extends ChangeNotifier {
           draftRevisionId: targetDraftId,
           expectedSketchRevision: expectedSketchRevision,
           expectedContentRevision: expectedContentRevision,
+          newBlocks: _newBlocks,
         ),
       );
       final after = await application.loadPrimarySketch(projectId);
@@ -442,6 +562,7 @@ class InventorySketchEditorController extends ChangeNotifier {
   InventorySketchRevisionRecord _verifiedDraft(
     InventoryPrimarySketchProjection? projection, {
     required InventoryGeometry expectedGeometry,
+    List<InventoryBlockDraft>? expectedNewBlocks,
   }) {
     final draft = projection?.draftRevision;
     if (projection == null ||
@@ -454,10 +575,46 @@ class InventorySketchEditorController extends ChangeNotifier {
         draft.projectId != projectId ||
         draft.state != InventorySketchRevisionState.draft ||
         draft.geometry.canonicalJson != expectedGeometry.canonicalJson ||
-        draft.geometrySha256 != expectedGeometry.sha256) {
+        draft.geometrySha256 != expectedGeometry.sha256 ||
+        (expectedNewBlocks != null &&
+            !_sameBlockDefinitions(
+              projection.draftNewBlocks,
+              expectedNewBlocks,
+            ))) {
       throw const InventoryFailure('inventory_sketch_save_verification_failed');
     }
     return draft;
+  }
+
+  bool _sameBlockDefinitions(
+    List<InventoryBlockDraft> first,
+    List<InventoryBlockDraft> second,
+  ) {
+    if (first.length != second.length) return false;
+    for (var index = 0; index < first.length; index += 1) {
+      final left = first[index];
+      final right = second[index];
+      if (left.id != right.id ||
+          left.displayName != right.displayName ||
+          left.polygonIndex != right.polygonIndex ||
+          left.floors.length != right.floors.length) {
+        return false;
+      }
+      for (
+        var floorIndex = 0;
+        floorIndex < left.floors.length;
+        floorIndex += 1
+      ) {
+        final leftFloor = left.floors[floorIndex];
+        final rightFloor = right.floors[floorIndex];
+        if (leftFloor.id != rightFloor.id ||
+            leftFloor.displayName != rightFloor.displayName ||
+            leftFloor.ordinal != rightFloor.ordinal) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   void _adoptProjection(InventoryPrimarySketchProjection projection) {
@@ -483,6 +640,21 @@ class InventorySketchEditorController extends ChangeNotifier {
     _expectedSketchRevision = projection.sketch.revision;
     _expectedContentRevision = draft.contentRevision;
     acknowledgedGeometry = draft.geometry;
+    _basePolygonCount =
+        projection.activeRevision?.geometry.polylines.length ??
+        projection.draftLegacyPolygonCount;
+    _existingMappedPolygonIndexes = projection.draftBlockPolygons
+        .map((mapping) => mapping.polygonIndex)
+        .toSet();
+    _newBlocks = projection.draftNewBlocks;
+    _acknowledgedNewBlocks = projection.draftNewBlocks;
+    _blockDefinitionCache
+      ..clear()
+      ..addEntries(
+        projection.draftNewBlocks.map(
+          (block) => MapEntry(block.polygonIndex, block),
+        ),
+      );
     editor = InventorySketchEditorSnapshot.recover(draft.geometry);
     _autosaveTimer?.cancel();
     _autosaveTimer = null;
@@ -491,6 +663,33 @@ class InventorySketchEditorController extends ChangeNotifier {
     _forceDrainRequested = false;
     _finalizeBlockedByStaleRevision = false;
     _pendingSave = null;
+  }
+
+  bool _hasCompleteSpatialMetadata(InventoryGeometry geometry) {
+    final expectedIndexes = <int>{
+      for (
+        var index = _basePolygonCount;
+        index < geometry.polylines.length;
+        index += 1
+      )
+        index,
+    };
+    final actualIndexes = _newBlocks.map((block) => block.polygonIndex).toSet();
+    if (expectedIndexes.length != actualIndexes.length ||
+        !actualIndexes.containsAll(expectedIndexes)) {
+      return false;
+    }
+    try {
+      final polygons = <InventoryPolyline>[
+        for (final index in _existingMappedPolygonIndexes)
+          geometry.polylines[index],
+        for (final block in _newBlocks) geometry.polylines[block.polygonIndex],
+      ];
+      InventorySpatialContract.validateNonOverlappingPolygons(polygons);
+      return true;
+    } on Object {
+      return false;
+    }
   }
 
   String _nextId() {
@@ -561,6 +760,7 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
   bool _orientationFailed = false;
   bool _orientationRestoreFailed = false;
   Object? _pendingPopResult;
+  InventorySketchPoint? _previewPoint;
 
   @override
   void initState() {
@@ -690,6 +890,51 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
         controller.finalizePersisted || await controller.finalizeDraft();
     if (!finalized || !mounted) return;
     await _attemptExit(true);
+  }
+
+  void _handleDrawPoint(InventorySketchPoint point) {
+    if (controller.shouldCloseAt(point)) {
+      unawaited(_closeCurrentBlock());
+      return;
+    }
+    controller.drawPoint(point);
+  }
+
+  Future<void> _closeCurrentBlock() async {
+    final working = controller.workingPolyline;
+    if (working == null || working.points.length < 3) return;
+    final input = await showDialog<_InventoryBlockMetadataInput>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const _InventoryBlockMetadataDialog(),
+    );
+    if (input == null || !mounted) return;
+    try {
+      final definition = controller.createBlockDraft(
+        displayName: input.displayName,
+        floorCount: input.floorCount,
+      );
+      controller.closeWorkingBlock(definition);
+    } on Object catch (error) {
+      controller.recordHandledError(error);
+    }
+  }
+
+  void _updatePreview(Offset localPosition) {
+    final viewport = _canvasKey.currentState?.viewport;
+    final editor = controller.editor;
+    if (viewport == null ||
+        editor == null ||
+        editor.mode != InventorySketchEditorMode.draw ||
+        !editor.hasWorkingPolyline) {
+      if (_previewPoint != null) setState(() => _previewPoint = null);
+      return;
+    }
+    var point = viewport.snapViewPoint(localPosition);
+    if (point != null && controller.shouldCloseAt(point)) {
+      point = controller.workingPolyline!.points.first;
+    }
+    if (point != _previewPoint) setState(() => _previewPoint = point);
   }
 
   Future<void> _retryBlockedExit() => _attemptExit(_pendingPopResult);
@@ -830,6 +1075,7 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
           onUndo: controller.undo,
           onRedo: controller.redo,
           onFinish: controller.finishWorkingPolyline,
+          onClose: () => unawaited(_closeCurrentBlock()),
           onDelete: controller.deleteSelection,
           onZoomOut: () => _canvasKey.currentState?.zoomOut(),
           onZoomIn: () => _canvasKey.currentState?.zoomIn(),
@@ -838,11 +1084,38 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
         Expanded(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            child: InventorySketchCanvas(
-              key: _canvasKey,
-              snapshot: editor,
-              onDrawPoint: controller.drawPoint,
-              onSelect: controller.selectAt,
+            child: MouseRegion(
+              onHover: (event) => _updatePreview(event.localPosition),
+              onExit: (_) {
+                if (_previewPoint != null) {
+                  setState(() => _previewPoint = null);
+                }
+              },
+              child: Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerMove: (event) => _updatePreview(event.localPosition),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    InventorySketchCanvas(
+                      key: _canvasKey,
+                      snapshot: editor,
+                      onDrawPoint: _handleDrawPoint,
+                      onSelect: controller.selectAt,
+                    ),
+                    IgnorePointer(
+                      child: CustomPaint(
+                        key: const Key('inventory-editor-edge-preview'),
+                        painter: _InventoryProposedEdgePainter(
+                          viewport: _canvasKey.currentState?.viewport,
+                          start: controller.workingPolyline?.points.last,
+                          end: _previewPoint,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -858,6 +1131,7 @@ class _EditorToolbar extends StatelessWidget {
     required this.onUndo,
     required this.onRedo,
     required this.onFinish,
+    required this.onClose,
     required this.onDelete,
     required this.onZoomOut,
     required this.onZoomIn,
@@ -869,6 +1143,7 @@ class _EditorToolbar extends StatelessWidget {
   final VoidCallback onUndo;
   final VoidCallback onRedo;
   final VoidCallback onFinish;
+  final VoidCallback onClose;
   final VoidCallback onDelete;
   final VoidCallback onZoomOut;
   final VoidCallback onZoomIn;
@@ -927,6 +1202,22 @@ class _EditorToolbar extends StatelessWidget {
             label: const Text('Çizgiyi bitir'),
           ),
           const SizedBox(width: 8),
+          FilledButton.tonalIcon(
+            key: const Key('inventory-editor-close-block'),
+            onPressed:
+                editor.hasWorkingPolyline &&
+                    editor
+                            .geometry
+                            .polylines[editor.workingPolylineIndex!]
+                            .points
+                            .length >=
+                        3
+                ? onClose
+                : null,
+            icon: const Icon(Icons.polyline_rounded),
+            label: const Text('Alanı kapat'),
+          ),
+          const SizedBox(width: 8),
           OutlinedButton.icon(
             key: const Key('inventory-editor-delete'),
             onPressed: editor.selection == null ? null : onDelete,
@@ -956,6 +1247,163 @@ class _EditorToolbar extends StatelessWidget {
       ),
     );
   }
+}
+
+class _InventoryBlockMetadataInput {
+  const _InventoryBlockMetadataInput({
+    required this.displayName,
+    required this.floorCount,
+  });
+
+  final String displayName;
+  final int floorCount;
+}
+
+class _InventoryBlockMetadataDialog extends StatefulWidget {
+  const _InventoryBlockMetadataDialog();
+
+  @override
+  State<_InventoryBlockMetadataDialog> createState() =>
+      _InventoryBlockMetadataDialogState();
+}
+
+class _InventoryBlockMetadataDialogState
+    extends State<_InventoryBlockMetadataDialog> {
+  final _nameController = TextEditingController();
+  final _floorCountController = TextEditingController(text: '1');
+  String? _errorText;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _floorCountController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final floorCount = int.tryParse(_floorCountController.text);
+    try {
+      final name = InventorySpatialContract.normalizeBlockName(
+        _nameController.text,
+      );
+      if (floorCount == null) {
+        throw const InventoryFailure('inventory_floor_count_invalid');
+      }
+      InventorySpatialContract.validateFloorCount(floorCount);
+      Navigator.of(context).pop(
+        _InventoryBlockMetadataInput(displayName: name, floorCount: floorCount),
+      );
+    } on InventoryFailure {
+      setState(() {
+        _errorText =
+            'Alan adı boş bırakılamaz; kat sayısı 1 ile '
+            '${InventorySpatialContract.maximumFloorCount} arasında olmalıdır.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      key: const Key('inventory-block-metadata-dialog'),
+      title: const Text('Alan bilgileri'),
+      content: SizedBox(
+        width: 360,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              key: const Key('inventory-block-name'),
+              controller: _nameController,
+              autofocus: true,
+              maxLength: InventorySpatialContract.maximumBlockNameLength,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'Alan adı',
+                hintText: 'Örn. A Blok',
+              ),
+            ),
+            TextField(
+              key: const Key('inventory-block-floor-count'),
+              controller: _floorCountController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              onSubmitted: (_) => _submit(),
+              decoration: InputDecoration(
+                labelText: 'Kat sayısı',
+                errorText: _errorText,
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          key: const Key('inventory-block-metadata-cancel'),
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('İptal'),
+        ),
+        FilledButton(
+          key: const Key('inventory-block-metadata-save'),
+          onPressed: _submit,
+          child: const Text('Alanı oluştur'),
+        ),
+      ],
+    );
+  }
+}
+
+class _InventoryProposedEdgePainter extends CustomPainter {
+  const _InventoryProposedEdgePainter({
+    required this.viewport,
+    required this.start,
+    required this.end,
+  });
+
+  final InventoryViewport? viewport;
+  final InventorySketchPoint? start;
+  final InventorySketchPoint? end;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final currentViewport = viewport;
+    final currentStart = start;
+    final currentEnd = end;
+    if (currentViewport == null ||
+        currentStart == null ||
+        currentEnd == null ||
+        currentStart == currentEnd) {
+      return;
+    }
+    final startOffset = currentViewport.virtualToView(currentStart);
+    final endOffset = currentViewport.virtualToView(currentEnd);
+    final vector = endOffset - startOffset;
+    final distance = vector.distance;
+    if (distance <= 0) return;
+    final direction = vector / distance;
+    final paint = Paint()
+      ..color = Colors.deepOrange
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    const dash = 10.0;
+    const gap = 7.0;
+    for (var offset = 0.0; offset < distance; offset += dash + gap) {
+      canvas.drawLine(
+        startOffset + direction * offset,
+        startOffset +
+            direction * (offset + dash).clamp(0.0, distance).toDouble(),
+        paint,
+      );
+    }
+    canvas.drawCircle(endOffset, 7, paint);
+  }
+
+  @override
+  bool shouldRepaint(_InventoryProposedEdgePainter oldDelegate) =>
+      oldDelegate.viewport != viewport ||
+      oldDelegate.start != start ||
+      oldDelegate.end != end;
 }
 
 class _EditorFailurePanel extends StatelessWidget {

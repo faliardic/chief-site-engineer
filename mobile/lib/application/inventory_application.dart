@@ -488,6 +488,15 @@ class InventoryApplication
         'updated_at': timestamp,
         'archived_at': null,
       });
+      await transaction.insert('inventory_sketch_revision_spatial_drafts', {
+        'revision_id': command.draftRevisionId,
+        'project_id': command.projectId,
+        'sketch_id': command.sketchId,
+        'content_revision': 1,
+        'legacy_polygon_count': 0,
+        'definitions_json': '[]',
+        'created_at': timestamp,
+      });
       final result = _result(
         command: command,
         sourceId: command.sketchId,
@@ -683,6 +692,119 @@ class InventoryApplication
       };
     }
     throw const InventoryFailure('inventory_canonical_json_invalid');
+  }
+
+  String _spatialDraftJson(Iterable<InventoryBlockDraft> definitions) {
+    final blocks = List<InventoryBlockDraft>.of(definitions)
+      ..sort(
+        (first, second) => first.polygonIndex.compareTo(second.polygonIndex),
+      );
+    return jsonEncode(
+      _canonicalJsonValue([
+        for (final block in blocks)
+          <String, Object?>{
+            'block_id': block.id,
+            'display_name': block.displayName,
+            'polygon_index': block.polygonIndex,
+            'floors': [
+              for (final floor
+                  in (List<InventoryFloorDraft>.of(block.floors)..sort(
+                    (first, second) => first.ordinal.compareTo(second.ordinal),
+                  )))
+                <String, Object?>{
+                  'display_name': floor.displayName,
+                  'floor_id': floor.id,
+                  'ordinal': floor.ordinal,
+                },
+            ],
+          },
+      ]),
+    );
+  }
+
+  List<InventoryBlockDraft> _decodeSpatialDraftJson(String value) {
+    try {
+      final decoded = jsonDecode(value);
+      if (decoded is! List) {
+        throw const InventoryFailure('inventory_projection_integrity_failed');
+      }
+      final blocks = <InventoryBlockDraft>[];
+      for (final rawBlock in decoded) {
+        if (rawBlock is! Map ||
+            rawBlock.length != 4 ||
+            rawBlock.keys.any((key) => key is! String) ||
+            !rawBlock.keys.toSet().containsAll(const {
+              'block_id',
+              'display_name',
+              'polygon_index',
+              'floors',
+            })) {
+          throw const InventoryFailure('inventory_projection_integrity_failed');
+        }
+        final block = rawBlock.cast<String, Object?>();
+        final blockId = block['block_id'];
+        final displayName = block['display_name'];
+        final polygonIndex = block['polygon_index'];
+        final rawFloors = block['floors'];
+        if (blockId is! String ||
+            !RecordId.isUuid(blockId) ||
+            displayName is! String ||
+            polygonIndex is! int ||
+            rawFloors is! List) {
+          throw const InventoryFailure('inventory_projection_integrity_failed');
+        }
+        final floors = <InventoryFloorDraft>[];
+        for (final rawFloor in rawFloors) {
+          if (rawFloor is! Map ||
+              rawFloor.length != 3 ||
+              rawFloor.keys.any((key) => key is! String) ||
+              !rawFloor.keys.toSet().containsAll(const {
+                'display_name',
+                'floor_id',
+                'ordinal',
+              })) {
+            throw const InventoryFailure(
+              'inventory_projection_integrity_failed',
+            );
+          }
+          final floor = rawFloor.cast<String, Object?>();
+          final floorId = floor['floor_id'];
+          final floorName = floor['display_name'];
+          final ordinal = floor['ordinal'];
+          if (floorId is! String ||
+              !RecordId.isUuid(floorId) ||
+              floorName is! String ||
+              ordinal is! int) {
+            throw const InventoryFailure(
+              'inventory_projection_integrity_failed',
+            );
+          }
+          floors.add(
+            InventoryFloorDraft(
+              id: floorId,
+              displayName: floorName,
+              ordinal: ordinal,
+            ),
+          );
+        }
+        blocks.add(
+          InventoryBlockDraft(
+            id: blockId,
+            displayName: displayName,
+            polygonIndex: polygonIndex,
+            floors: floors,
+          ),
+        );
+      }
+      if (_spatialDraftJson(blocks) != value) {
+        throw const InventoryFailure('inventory_projection_integrity_failed');
+      }
+      return List<InventoryBlockDraft>.unmodifiable(blocks);
+    } on InventoryFailure {
+      rethrow;
+    } on Object {
+      throw const InventoryFailure('inventory_projection_integrity_failed');
+    }
   }
 
   String _sha256(String value) =>
@@ -1161,6 +1283,8 @@ class InventoryApplication
     const allowedTables = <String>{
       'inventory_sketches',
       'inventory_sketch_revisions',
+      'inventory_blocks',
+      'inventory_floors',
       'inventory_assets',
       'inventory_asset_placements',
       'inventory_asset_attachment_links',
@@ -1275,6 +1399,147 @@ class InventoryApplication
     return sketch;
   }
 
+  Future<String> _resolvePlacementFloor(
+    Transaction transaction, {
+    required String projectId,
+    required String sketchId,
+    required String activeRevisionId,
+    required int x,
+    required int y,
+    String? preferredFloorId,
+  }) async {
+    final revision = await _requireSketchRevision(
+      transaction,
+      projectId: projectId,
+      sketchId: sketchId,
+      revisionId: activeRevisionId,
+    );
+    if (revision.state != InventorySketchRevisionState.active) {
+      throw const InventoryFailure('inventory_active_revision_unavailable');
+    }
+    final rows = await transaction.rawQuery(
+      '''
+        SELECT
+          floor.id AS floor_id,
+          floor.ordinal AS floor_ordinal,
+          block.id AS block_id,
+          block.state AS block_state,
+          mapping.polygon_index AS polygon_index
+        FROM inventory_floors floor
+        JOIN inventory_blocks block
+          ON block.id = floor.block_id
+          AND block.project_id = floor.project_id
+        LEFT JOIN inventory_sketch_revision_block_polygons mapping
+          ON mapping.block_id = block.id
+          AND mapping.project_id = block.project_id
+          AND mapping.revision_id = ?
+          AND mapping.sketch_id = ?
+        WHERE floor.project_id = ?
+          AND floor.archived_at IS NULL
+          AND block.state != 'ARCHIVED'
+        ORDER BY block.id ASC, floor.ordinal ASC, floor.id ASC
+      ''',
+      [activeRevisionId, sketchId, projectId],
+    );
+    if (rows.isEmpty) {
+      throw const InventoryFailure('inventory_spatial_context_unavailable');
+    }
+    final activeBlockIds = <String>{};
+    for (final row in rows) {
+      if (row['block_state'] != InventoryBlockState.active.storageValue) {
+        continue;
+      }
+      final polygonIndex = row['polygon_index'];
+      if (polygonIndex is! int ||
+          polygonIndex < 0 ||
+          polygonIndex >= revision.geometry.polylines.length) {
+        throw const InventoryFailure('inventory_projection_integrity_failed');
+      }
+      if (InventorySpatialContract.containsPlacement(
+        revision.geometry.polylines[polygonIndex],
+        x: x,
+        y: y,
+      )) {
+        activeBlockIds.add(row['block_id']! as String);
+      }
+    }
+    if (activeBlockIds.length > 1) {
+      throw const InventoryFailure('inventory_block_polygon_ambiguous');
+    }
+    final hasActiveBlocks = rows.any(
+      (row) => row['block_state'] == InventoryBlockState.active.storageValue,
+    );
+    final targetRows = activeBlockIds.isNotEmpty
+        ? rows
+              .where((row) => row['block_id'] == activeBlockIds.single)
+              .toList(growable: false)
+        : hasActiveBlocks
+        ? const <Map<String, Object?>>[]
+        : rows
+              .where(
+                (row) =>
+                    row['block_state'] ==
+                    InventoryBlockState.detached.storageValue,
+              )
+              .toList(growable: false);
+    if (targetRows.isEmpty) {
+      throw const InventoryFailure('inventory_placement_outside_blocks');
+    }
+    final targetBlockIds = targetRows.map((row) => row['block_id']).toSet();
+    if (targetBlockIds.length != 1) {
+      throw const InventoryFailure('inventory_spatial_context_ambiguous');
+    }
+    if (preferredFloorId != null) {
+      final sameFloor = targetRows
+          .where((row) => row['floor_id'] == preferredFloorId)
+          .toList(growable: false);
+      if (sameFloor.length == 1) {
+        return sameFloor.single['floor_id']! as String;
+      }
+      final preferredRows = rows
+          .where((row) => row['floor_id'] == preferredFloorId)
+          .toList(growable: false);
+      if (preferredRows.length != 1) {
+        throw const InventoryFailure('inventory_projection_integrity_failed');
+      }
+      final preferredOrdinal = preferredRows.single['floor_ordinal'];
+      final ordinalMatch = targetRows
+          .where((row) => row['floor_ordinal'] == preferredOrdinal)
+          .toList(growable: false);
+      if (ordinalMatch.length == 1) {
+        return ordinalMatch.single['floor_id']! as String;
+      }
+    }
+    final firstFloor = targetRows
+        .where((row) => row['floor_ordinal'] == 1)
+        .toList(growable: false);
+    if (firstFloor.length != 1) {
+      throw const InventoryFailure('inventory_spatial_context_ambiguous');
+    }
+    return firstFloor.single['floor_id']! as String;
+  }
+
+  Future<void> _requirePlacementFloorIntegrity(
+    Transaction transaction,
+    InventoryPlacementRecord placement,
+  ) async {
+    final rows = await transaction.rawQuery(
+      '''
+        SELECT floor.id
+        FROM inventory_floors floor
+        JOIN inventory_blocks block
+          ON block.id = floor.block_id
+          AND block.project_id = floor.project_id
+        WHERE floor.id = ?
+          AND floor.project_id = ?
+      ''',
+      [placement.floorId, placement.projectId],
+    );
+    if (rows.length != 1) {
+      throw const InventoryFailure('inventory_projection_integrity_failed');
+    }
+  }
+
   Future<InventorySketchRecord> _requireCurrentActiveSketch(
     Transaction transaction, {
     required String projectId,
@@ -1350,7 +1615,10 @@ class InventoryApplication
         'inventory_multiple_placements_not_supported_in_v1',
       );
     }
-    return rows.isEmpty ? null : _placementFromRow(rows.single);
+    if (rows.isEmpty) return null;
+    final placement = _placementFromRow(rows.single);
+    await _requirePlacementFloorIntegrity(transaction, placement);
+    return placement;
   }
 
   Future<InventoryPlacementRecord> _requireSoleActivePlacement(
@@ -1389,6 +1657,9 @@ class InventoryApplication
         (placement != null && placement.quantity != asset.totalQuantity)) {
       throw const InventoryFailure('inventory_projection_integrity_failed');
     }
+    if (placement != null) {
+      await _requirePlacementFloorIntegrity(transaction, placement);
+    }
     return InventoryAssetProjection(asset: asset, activePlacement: placement);
   }
 
@@ -1397,6 +1668,7 @@ class InventoryApplication
     required String id,
     required InventoryPlacementRecord predecessor,
     String? sketchId,
+    String? floorId,
     required String provenanceRevisionId,
     required int quantity,
     required int x,
@@ -1409,6 +1681,7 @@ class InventoryApplication
       'project_id': predecessor.projectId,
       'asset_id': predecessor.assetId,
       'sketch_id': sketchId ?? predecessor.sketchId,
+      'floor_id': floorId ?? predecessor.floorId,
       'provenance_revision_id': provenanceRevisionId,
       'sequence': predecessor.sequence + 1,
       'x': x,
@@ -1711,6 +1984,7 @@ class InventoryApplication
     final projectId = _requiredStoredString(row, 'project_id');
     final assetId = _requiredStoredUuid(row, 'asset_id');
     final sketchId = _requiredStoredUuid(row, 'sketch_id');
+    final floorId = _requiredStoredUuid(row, 'floor_id');
     final provenanceRevisionId = _requiredStoredUuid(
       row,
       'provenance_revision_id',
@@ -1754,6 +2028,7 @@ class InventoryApplication
       projectId: projectId,
       assetId: assetId,
       sketchId: sketchId,
+      floorId: floorId,
       provenanceRevisionId: provenanceRevisionId,
       sequence: sequence,
       x: x,
@@ -1763,6 +2038,79 @@ class InventoryApplication
       endedAt: endedAt,
       endReason: endReason,
       supersedesPlacementId: supersedesPlacementId,
+    );
+  }
+
+  InventoryBlockRecord _blockFromRow(Map<String, Object?> row) {
+    final createdAt = _storedTimestamp(row, 'created_at');
+    final updatedAt = _storedTimestamp(row, 'updated_at');
+    final archivedAt = _optionalStoredTimestamp(row, 'archived_at');
+    final state = InventoryBlockState.fromStorage(row['state']);
+    final ordinal = _requiredPositiveStoredInt(row, 'ordinal');
+    final displayName = InventorySpatialContract.normalizeBlockName(
+      _requiredStoredString(row, 'display_name'),
+    );
+    final normalizedName = _requiredStoredString(row, 'normalized_name');
+    if (ordinal > InventorySpatialContract.maximumBlockOrdinal ||
+        normalizedName != _normalizeInventoryName(displayName) ||
+        updatedAt.isBefore(createdAt) ||
+        ((state == InventoryBlockState.archived) != (archivedAt != null)) ||
+        (archivedAt != null && archivedAt != updatedAt)) {
+      throw const InventoryFailure('inventory_projection_integrity_failed');
+    }
+    return InventoryBlockRecord(
+      id: _requiredStoredUuid(row, 'id'),
+      projectId: _requiredStoredString(row, 'project_id'),
+      displayName: displayName,
+      normalizedName: normalizedName,
+      ordinal: ordinal,
+      state: state,
+      revision: _requiredPositiveStoredInt(row, 'revision'),
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      archivedAt: archivedAt,
+    );
+  }
+
+  InventoryFloorRecord _floorFromRow(Map<String, Object?> row) {
+    final createdAt = _storedTimestamp(row, 'created_at');
+    final updatedAt = _storedTimestamp(row, 'updated_at');
+    final archivedAt = _optionalStoredTimestamp(row, 'archived_at');
+    final ordinal = _requiredPositiveStoredInt(row, 'ordinal');
+    if (ordinal > InventorySpatialContract.maximumFloorCount ||
+        updatedAt.isBefore(createdAt) ||
+        (archivedAt != null && archivedAt != updatedAt)) {
+      throw const InventoryFailure('inventory_projection_integrity_failed');
+    }
+    return InventoryFloorRecord(
+      id: _requiredStoredUuid(row, 'id'),
+      blockId: _requiredStoredUuid(row, 'block_id'),
+      projectId: _requiredStoredString(row, 'project_id'),
+      displayName: InventorySpatialContract.normalizeFloorName(
+        _requiredStoredString(row, 'display_name'),
+      ),
+      ordinal: ordinal,
+      revision: _requiredPositiveStoredInt(row, 'revision'),
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      archivedAt: archivedAt,
+    );
+  }
+
+  InventoryRevisionBlockPolygonRecord _blockPolygonFromRow(
+    Map<String, Object?> row,
+  ) {
+    final polygonIndex = _requiredStoredInt(row, 'polygon_index');
+    if (polygonIndex < 0) {
+      throw const InventoryFailure('inventory_projection_integrity_failed');
+    }
+    return InventoryRevisionBlockPolygonRecord(
+      revisionId: _requiredStoredUuid(row, 'revision_id'),
+      blockId: _requiredStoredUuid(row, 'block_id'),
+      projectId: _requiredStoredString(row, 'project_id'),
+      sketchId: _requiredStoredUuid(row, 'sketch_id'),
+      polygonIndex: polygonIndex,
+      createdAt: _storedTimestamp(row, 'created_at'),
     );
   }
 
@@ -2132,10 +2480,125 @@ class InventoryApplication
             throw const InventoryFailure('inventory_sketch_draft_unavailable');
           }
         }
+        final blockRows = await transaction.query(
+          'inventory_blocks',
+          where: 'project_id = ?',
+          whereArgs: [projectId],
+          orderBy: 'ordinal ASC, id ASC',
+        );
+        final blocks = blockRows.map(_blockFromRow).toList(growable: false);
+        final floorRows = await transaction.rawQuery(
+          '''
+            SELECT floor.*
+            FROM inventory_floors floor
+            JOIN inventory_blocks block
+              ON block.id = floor.block_id
+              AND block.project_id = floor.project_id
+            WHERE floor.project_id = ?
+            ORDER BY block.id ASC, floor.ordinal ASC, floor.id ASC
+          ''',
+          [projectId],
+        );
+        final floors = floorRows.map(_floorFromRow).toList(growable: false);
+        Future<List<InventoryRevisionBlockPolygonRecord>> loadMappings(
+          InventorySketchRevisionRecord? revision,
+        ) async {
+          if (revision == null) return const [];
+          final mappingRows = await transaction.query(
+            'inventory_sketch_revision_block_polygons',
+            where: 'project_id = ? AND sketch_id = ? AND revision_id = ?',
+            whereArgs: [projectId, sketch.id, revision.id],
+            orderBy: 'polygon_index ASC, block_id ASC',
+          );
+          final mappings = mappingRows
+              .map(_blockPolygonFromRow)
+              .toList(growable: false);
+          for (final mapping in mappings) {
+            if (mapping.polygonIndex >= revision.geometry.polylines.length) {
+              throw const InventoryFailure(
+                'inventory_projection_integrity_failed',
+              );
+            }
+            InventorySpatialContract.validateBlockPolygon(
+              revision.geometry.polylines[mapping.polygonIndex],
+            );
+          }
+          return mappings;
+        }
+
+        final activeMappings = await loadMappings(active);
+        final draftMappings = await loadMappings(draft);
+        var draftNewBlocks = const <InventoryBlockDraft>[];
+        var draftLegacyPolygonCount = 0;
+        if (draft != null) {
+          final spatialRows = await transaction.query(
+            'inventory_sketch_revision_spatial_drafts',
+            columns: const ['definitions_json', 'legacy_polygon_count'],
+            where:
+                'revision_id = ? AND project_id = ? AND sketch_id = ? '
+                'AND content_revision = ?',
+            whereArgs: [draft.id, projectId, sketch.id, draft.contentRevision],
+            limit: 2,
+          );
+          if (spatialRows.length != 1 ||
+              spatialRows.single['definitions_json'] is! String ||
+              spatialRows.single['legacy_polygon_count'] is! int) {
+            throw const InventoryFailure(
+              'inventory_projection_integrity_failed',
+            );
+          }
+          draftNewBlocks = _decodeSpatialDraftJson(
+            spatialRows.single['definitions_json']! as String,
+          );
+          draftLegacyPolygonCount =
+              spatialRows.single['legacy_polygon_count']! as int;
+          if (draftLegacyPolygonCount < 0 ||
+              draftLegacyPolygonCount > draft.geometry.polylines.length ||
+              draftNewBlocks.any(
+                (block) => block.polygonIndex < draftLegacyPolygonCount,
+              )) {
+            throw const InventoryFailure(
+              'inventory_projection_integrity_failed',
+            );
+          }
+          for (final block in draftNewBlocks) {
+            block.validate(draft.geometry);
+          }
+        }
+        final blockIds = blocks.map((block) => block.id).toSet();
+        if (floors.any((floor) => !blockIds.contains(floor.blockId)) ||
+            activeMappings.any(
+              (mapping) => !blockIds.contains(mapping.blockId),
+            ) ||
+            draftMappings.any(
+              (mapping) => !blockIds.contains(mapping.blockId),
+            )) {
+          throw const InventoryFailure('inventory_projection_integrity_failed');
+        }
+        if (active != null) {
+          final mappedActiveIds = activeMappings
+              .map((mapping) => mapping.blockId)
+              .toSet();
+          for (final block in blocks.where(
+            (item) => item.state == InventoryBlockState.active,
+          )) {
+            if (!mappedActiveIds.contains(block.id)) {
+              throw const InventoryFailure(
+                'inventory_projection_integrity_failed',
+              );
+            }
+          }
+        }
         return InventoryPrimarySketchProjection(
           sketch: sketch,
           activeRevision: active,
           draftRevision: draft,
+          blocks: blocks,
+          floors: floors,
+          activeBlockPolygons: activeMappings,
+          draftBlockPolygons: draftMappings,
+          draftNewBlocks: draftNewBlocks,
+          draftLegacyPolygonCount: draftLegacyPolygonCount,
         );
       }),
     );
@@ -2330,6 +2793,7 @@ class InventoryApplication
         final result = rows.map(_placementFromRow).toList(growable: false);
         for (var index = 0; index < result.length; index += 1) {
           final placement = result[index];
+          await _requirePlacementFloorIntegrity(transaction, placement);
           if (placement.sequence != index + 1 ||
               placement.projectId != projectId ||
               placement.assetId != assetId ||
@@ -2644,6 +3108,15 @@ class InventoryApplication
           predecessor.sequence != command.expectedPreviousPlacementSequence) {
         throw const InventoryFailure('inventory_stale_placement_sequence');
       }
+      final floorId = await _resolvePlacementFloor(
+        transaction,
+        projectId: command.projectId,
+        sketchId: command.sketchId,
+        activeRevisionId: command.activeRevisionId,
+        x: x,
+        y: y,
+        preferredFloorId: predecessor.floorId,
+      );
       await _requireUnusedId(
         transaction,
         table: 'inventory_asset_placements',
@@ -2675,6 +3148,7 @@ class InventoryApplication
         id: command.successorPlacementId,
         predecessor: predecessor,
         sketchId: command.sketchId,
+        floorId: floorId,
         provenanceRevisionId: command.activeRevisionId,
         quantity: asset.totalQuantity,
         x: x,
@@ -2717,6 +3191,7 @@ class InventoryApplication
               result,
               values: <String, Object?>{
                 'asset_id': command.assetId,
+                'floor_id': floorId,
                 'placement_id': command.successorPlacementId,
                 'predecessor_placement_id': predecessor.id,
                 'provenance_revision_id': command.activeRevisionId,
@@ -2940,7 +3415,18 @@ class InventoryApplication
         sketchId: command.sketchId,
         activeRevisionId: command.activeRevisionId,
       );
-      if (placement.x == x && placement.y == y) {
+      final floorId = await _resolvePlacementFloor(
+        transaction,
+        projectId: command.projectId,
+        sketchId: command.sketchId,
+        activeRevisionId: command.activeRevisionId,
+        x: x,
+        y: y,
+        preferredFloorId: placement.floorId,
+      );
+      if (placement.x == x &&
+          placement.y == y &&
+          placement.floorId == floorId) {
         final result = _result(
           command: command,
           sourceId: command.assetId,
@@ -2994,6 +3480,7 @@ class InventoryApplication
         transaction,
         id: command.successorPlacementId,
         predecessor: placement,
+        floorId: floorId,
         provenanceRevisionId: command.activeRevisionId,
         quantity: placement.quantity,
         x: x,
@@ -3025,6 +3512,8 @@ class InventoryApplication
               values: <String, Object?>{
                 'after_x': x,
                 'after_y': y,
+                'after_floor_id': floorId,
+                'before_floor_id': placement.floorId,
                 'before_x': placement.x,
                 'before_y': placement.y,
                 'placement_id': command.successorPlacementId,
@@ -3252,6 +3741,55 @@ class InventoryApplication
       );
       if (updated != 1) {
         throw const InventoryFailure('inventory_stale_revision');
+      }
+      final activeRevisionId = sketch.activeRevisionId;
+      if (activeRevisionId != null) {
+        final blockRows = await transaction.rawQuery(
+          '''
+            SELECT block.*
+            FROM inventory_blocks block
+            JOIN inventory_sketch_revision_block_polygons mapping
+              ON mapping.block_id = block.id
+              AND mapping.project_id = block.project_id
+            WHERE mapping.revision_id = ?
+              AND mapping.project_id = ?
+              AND mapping.sketch_id = ?
+              AND block.state = ?
+            ORDER BY block.id ASC
+          ''',
+          [
+            activeRevisionId,
+            command.projectId,
+            sketchId,
+            archive
+                ? InventoryBlockState.active.storageValue
+                : InventoryBlockState.archived.storageValue,
+          ],
+        );
+        for (final row in blockRows) {
+          final block = _blockFromRow(row);
+          final blockUpdated = await transaction.update(
+            'inventory_blocks',
+            {
+              'state': archive
+                  ? InventoryBlockState.archived.storageValue
+                  : InventoryBlockState.active.storageValue,
+              'revision': block.revision + 1,
+              'updated_at': timestamp,
+              'archived_at': archive ? timestamp : null,
+            },
+            where: 'id = ? AND project_id = ? AND revision = ? AND state = ?',
+            whereArgs: [
+              block.id,
+              command.projectId,
+              block.revision,
+              block.state.storageValue,
+            ],
+          );
+          if (blockUpdated != 1) {
+            throw const InventoryFailure('inventory_stale_revision');
+          }
+        }
       }
       final result = _result(
         command: command,
@@ -3673,6 +4211,14 @@ class InventoryApplication
         sketchId: command.sketchId,
         activeRevisionId: command.activeRevisionId,
       );
+      final floorId = await _resolvePlacementFloor(
+        transaction,
+        projectId: command.projectId,
+        sketchId: command.sketchId,
+        activeRevisionId: command.activeRevisionId,
+        x: x,
+        y: y,
+      );
       await _requireUnusedId(
         transaction,
         table: 'inventory_assets',
@@ -3719,6 +4265,7 @@ class InventoryApplication
         'project_id': command.projectId,
         'asset_id': command.assetId,
         'sketch_id': command.sketchId,
+        'floor_id': floorId,
         'provenance_revision_id': command.activeRevisionId,
         'sequence': 1,
         'x': x,
@@ -3767,6 +4314,7 @@ class InventoryApplication
               result,
               values: <String, Object?>{
                 'asset_id': command.assetId,
+                'floor_id': floorId,
                 'placement_id': command.placementId,
                 'provenance_revision_id': command.activeRevisionId,
                 'quantity': quantity,
@@ -4031,6 +4579,40 @@ class InventoryApplication
         'superseded_at': null,
         'abandoned_at': null,
       });
+      await transaction.rawInsert(
+        '''
+          INSERT INTO inventory_sketch_revision_block_polygons (
+            revision_id,
+            block_id,
+            project_id,
+            sketch_id,
+            polygon_index,
+            created_at
+          )
+          SELECT ?, block_id, project_id, sketch_id, polygon_index, ?
+          FROM inventory_sketch_revision_block_polygons
+          WHERE revision_id = ?
+            AND project_id = ?
+            AND sketch_id = ?
+          ORDER BY polygon_index ASC
+        ''',
+        [
+          command.newDraftRevisionId,
+          timestamp,
+          command.activeRevisionId,
+          command.projectId,
+          command.sketchId,
+        ],
+      );
+      await transaction.insert('inventory_sketch_revision_spatial_drafts', {
+        'revision_id': command.newDraftRevisionId,
+        'project_id': command.projectId,
+        'sketch_id': command.sketchId,
+        'content_revision': 1,
+        'legacy_polygon_count': active.geometry.polylines.length,
+        'definitions_json': '[]',
+        'created_at': timestamp,
+      });
       final updated = await transaction.update(
         'inventory_sketches',
         {
@@ -4087,12 +4669,47 @@ class InventoryApplication
     _requireUuid(command.draftRevisionId, 'inventory_invalid_revision_id');
     _requirePositiveRevision(command.expectedSketchRevision);
     _requirePositiveRevision(command.expectedContentRevision);
+    final newBlocks = List<InventoryBlockDraft>.of(command.newBlocks)
+      ..sort(
+        (first, second) => first.polygonIndex.compareTo(second.polygonIndex),
+      );
+    final normalizedBlockNames = <String>{};
+    for (final block in newBlocks) {
+      _requireUuid(block.id, 'inventory_invalid_block_id');
+      final displayName = InventorySpatialContract.normalizeBlockName(
+        block.displayName,
+      );
+      if (!normalizedBlockNames.add(_normalizeInventoryName(displayName))) {
+        throw const InventoryFailure('inventory_block_name_conflict');
+      }
+      for (final floor in block.floors) {
+        _requireUuid(floor.id, 'inventory_invalid_floor_id');
+      }
+    }
     final intent = <String, Object?>{
       'draft_revision_id': command.draftRevisionId,
       'expected_content_revision': command.expectedContentRevision,
       'expected_sketch_revision': command.expectedSketchRevision,
       'project_id': command.projectId,
       'sketch_id': command.sketchId,
+      'new_blocks': newBlocks
+          .map(
+            (block) => <String, Object?>{
+              'block_id': block.id,
+              'display_name': block.displayName,
+              'polygon_index': block.polygonIndex,
+              'floors': block.floors
+                  .map(
+                    (floor) => <String, Object?>{
+                      'display_name': floor.displayName,
+                      'floor_id': floor.id,
+                      'ordinal': floor.ordinal,
+                    },
+                  )
+                  .toList(growable: false),
+            },
+          )
+          .toList(growable: false),
     };
     return _runMutation(command, intent, (transaction, intentSha256) async {
       final sketch = await _requireSketch(
@@ -4115,7 +4732,120 @@ class InventoryApplication
           draft.contentRevision != command.expectedContentRevision) {
         throw const InventoryFailure('inventory_stale_content_revision');
       }
+      final spatialDraftRows = await transaction.query(
+        'inventory_sketch_revision_spatial_drafts',
+        columns: const ['definitions_json', 'legacy_polygon_count'],
+        where:
+            'revision_id = ? AND project_id = ? AND sketch_id = ? '
+            'AND content_revision = ?',
+        whereArgs: [
+          command.draftRevisionId,
+          command.projectId,
+          command.sketchId,
+          command.expectedContentRevision,
+        ],
+        limit: 2,
+      );
+      if (spatialDraftRows.length != 1 ||
+          spatialDraftRows.single['definitions_json'] is! String ||
+          spatialDraftRows.single['legacy_polygon_count'] is! int ||
+          spatialDraftRows.single['definitions_json'] !=
+              _spatialDraftJson(newBlocks)) {
+        throw const InventoryFailure('inventory_spatial_draft_mismatch');
+      }
+      final legacyPolygonCount =
+          spatialDraftRows.single['legacy_polygon_count']! as int;
       draft.geometry.validateFinalizable();
+      final existingMappingRows = await transaction.query(
+        'inventory_sketch_revision_block_polygons',
+        where: 'revision_id = ? AND project_id = ? AND sketch_id = ?',
+        whereArgs: [
+          command.draftRevisionId,
+          command.projectId,
+          command.sketchId,
+        ],
+        orderBy: 'polygon_index ASC, block_id ASC',
+      );
+      final existingMappings = existingMappingRows
+          .map(_blockPolygonFromRow)
+          .toList(growable: false);
+      InventorySketchRevisionRecord? base;
+      if (draft.baseRevisionId != null) {
+        base = await _requireSketchRevision(
+          transaction,
+          projectId: command.projectId,
+          sketchId: command.sketchId,
+          revisionId: draft.baseRevisionId!,
+        );
+        if (draft.geometry.polylines.length < base.geometry.polylines.length) {
+          throw const InventoryFailure('inventory_block_geometry_immutable');
+        }
+        for (
+          var index = 0;
+          index < base.geometry.polylines.length;
+          index += 1
+        ) {
+          if (!_samePolyline(
+            base.geometry.polylines[index],
+            draft.geometry.polylines[index],
+          )) {
+            throw const InventoryFailure('inventory_block_geometry_immutable');
+          }
+        }
+      }
+      if (legacyPolygonCount < 0 ||
+          legacyPolygonCount > draft.geometry.polylines.length ||
+          (base != null &&
+              legacyPolygonCount != base.geometry.polylines.length)) {
+        throw const InventoryFailure('inventory_projection_integrity_failed');
+      }
+      final firstNewPolygonIndex =
+          base?.geometry.polylines.length ?? legacyPolygonCount;
+      final requiredNewIndexes = <int>{
+        for (
+          var index = firstNewPolygonIndex;
+          index < draft.geometry.polylines.length;
+          index += 1
+        )
+          index,
+      };
+      final newBlockIds = <String>{};
+      final newFloorIds = <String>{};
+      final newPolygonIndexes = <int>{};
+      for (final block in newBlocks) {
+        block.validate(draft.geometry);
+        if (!newBlockIds.add(block.id) ||
+            !newPolygonIndexes.add(block.polygonIndex) ||
+            block.polygonIndex < firstNewPolygonIndex) {
+          throw const InventoryFailure('inventory_block_identity_ambiguous');
+        }
+        for (final floor in block.floors) {
+          if (!newFloorIds.add(floor.id)) {
+            throw const InventoryFailure('inventory_floor_identity_ambiguous');
+          }
+        }
+      }
+      if (newPolygonIndexes.length != requiredNewIndexes.length ||
+          !newPolygonIndexes.containsAll(requiredNewIndexes)) {
+        throw const InventoryFailure('inventory_block_metadata_incomplete');
+      }
+      final existingIndexes = existingMappings
+          .map((mapping) => mapping.polygonIndex)
+          .toSet();
+      if (existingIndexes.any((index) => index >= firstNewPolygonIndex)) {
+        throw const InventoryFailure('inventory_projection_integrity_failed');
+      }
+      final mappedPolygons = <InventoryPolyline>[
+        for (final mapping in existingMappings)
+          if (mapping.polygonIndex < draft.geometry.polylines.length)
+            draft.geometry.polylines[mapping.polygonIndex],
+        for (final block in newBlocks)
+          draft.geometry.polylines[block.polygonIndex],
+      ];
+      if (mappedPolygons.length != existingMappings.length + newBlocks.length) {
+        throw const InventoryFailure('inventory_projection_integrity_failed');
+      }
+      InventorySpatialContract.validateNonOverlappingPolygons(mappedPolygons);
       InventorySketchRevisionRecord? active;
       if (sketch.activeRevisionId != null) {
         active = await _requireSketchRevision(
@@ -4134,6 +4864,86 @@ class InventoryApplication
         active?.updatedAt,
       );
       final timestamp = CseTimeCodec.encodeUtc(occurredAt);
+      if (normalizedBlockNames.isNotEmpty) {
+        final activeNameRows = await transaction.query(
+          'inventory_blocks',
+          columns: const ['normalized_name'],
+          where: 'project_id = ? AND state = ?',
+          whereArgs: [
+            command.projectId,
+            InventoryBlockState.active.storageValue,
+          ],
+        );
+        if (activeNameRows.any(
+          (row) => normalizedBlockNames.contains(row['normalized_name']),
+        )) {
+          throw const InventoryFailure('inventory_block_name_conflict');
+        }
+      }
+      final lastBlockOrdinal =
+          Sqflite.firstIntValue(
+            await transaction.rawQuery(
+              'SELECT max(ordinal) FROM inventory_blocks WHERE project_id = ?',
+              [command.projectId],
+            ),
+          ) ??
+          0;
+      if (lastBlockOrdinal + newBlocks.length >
+          InventorySpatialContract.maximumBlockOrdinal) {
+        throw const InventoryFailure('inventory_block_limit_exceeded');
+      }
+      for (var blockIndex = 0; blockIndex < newBlocks.length; blockIndex += 1) {
+        final block = newBlocks[blockIndex];
+        await _requireUnusedId(
+          transaction,
+          table: 'inventory_blocks',
+          id: block.id,
+          code: 'inventory_block_id_conflict',
+        );
+        await transaction.insert('inventory_blocks', {
+          'id': block.id,
+          'project_id': command.projectId,
+          'display_name': InventorySpatialContract.normalizeBlockName(
+            block.displayName,
+          ),
+          'normalized_name': _normalizeInventoryName(block.displayName),
+          'ordinal': lastBlockOrdinal + blockIndex + 1,
+          'state': InventoryBlockState.active.storageValue,
+          'revision': 1,
+          'created_at': timestamp,
+          'updated_at': timestamp,
+          'archived_at': null,
+        });
+        for (final floor in block.floors) {
+          await _requireUnusedId(
+            transaction,
+            table: 'inventory_floors',
+            id: floor.id,
+            code: 'inventory_floor_id_conflict',
+          );
+          await transaction.insert('inventory_floors', {
+            'id': floor.id,
+            'block_id': block.id,
+            'project_id': command.projectId,
+            'display_name': InventorySpatialContract.normalizeFloorName(
+              floor.displayName,
+            ),
+            'ordinal': floor.ordinal,
+            'revision': 1,
+            'created_at': timestamp,
+            'updated_at': timestamp,
+            'archived_at': null,
+          });
+        }
+        await transaction.insert('inventory_sketch_revision_block_polygons', {
+          'revision_id': command.draftRevisionId,
+          'block_id': block.id,
+          'project_id': command.projectId,
+          'sketch_id': command.sketchId,
+          'polygon_index': block.polygonIndex,
+          'created_at': timestamp,
+        });
+      }
       if (active != null) {
         final superseded = await transaction.update(
           'inventory_sketch_revisions',
@@ -4212,6 +5022,7 @@ class InventoryApplication
                 'active_revision_id': command.draftRevisionId,
                 'geometry_sha256': draft.geometrySha256,
                 'geometry_version': InventoryGeometryContract.geometryVersion,
+                'new_block_count': newBlocks.length,
                 'point_count': draft.geometry.pointCount,
                 'polyline_count': draft.geometry.polylines.length,
                 'segment_count': draft.geometry.segmentCount,
@@ -4224,6 +5035,17 @@ class InventoryApplication
     });
   }
 
+  bool _samePolyline(InventoryPolyline first, InventoryPolyline second) {
+    if (first.closed != second.closed ||
+        first.points.length != second.points.length) {
+      return false;
+    }
+    for (var index = 0; index < first.points.length; index += 1) {
+      if (first.points[index] != second.points[index]) return false;
+    }
+    return true;
+  }
+
   @override
   Future<InventoryMutationResult> autosaveSketchDraft(
     AutosaveInventorySketchDraftCommand command,
@@ -4233,6 +5055,27 @@ class InventoryApplication
     _requirePositiveRevision(command.expectedSketchRevision);
     _requirePositiveRevision(command.expectedContentRevision);
     final geometry = command.geometry;
+    final definitions = List<InventoryBlockDraft>.of(command.newBlocks);
+    final blockIds = <String>{};
+    final floorIds = <String>{};
+    final polygonIndexes = <int>{};
+    for (final block in definitions) {
+      _requireUuid(block.id, 'inventory_invalid_block_id');
+      block.validate(geometry);
+      if (!blockIds.add(block.id) || !polygonIndexes.add(block.polygonIndex)) {
+        throw const InventoryFailure('inventory_block_identity_ambiguous');
+      }
+      for (final floor in block.floors) {
+        _requireUuid(floor.id, 'inventory_invalid_floor_id');
+        if (!floorIds.add(floor.id)) {
+          throw const InventoryFailure('inventory_floor_identity_ambiguous');
+        }
+      }
+    }
+    InventorySpatialContract.validateNonOverlappingPolygons([
+      for (final block in definitions) geometry.polylines[block.polygonIndex],
+    ]);
+    final definitionsJson = _spatialDraftJson(definitions);
     final intent = <String, Object?>{
       'draft_revision_id': command.draftRevisionId,
       'expected_content_revision': command.expectedContentRevision,
@@ -4241,6 +5084,7 @@ class InventoryApplication
       'geometry_sha256': geometry.sha256,
       'project_id': command.projectId,
       'sketch_id': command.sketchId,
+      'spatial_definitions': jsonDecode(definitionsJson),
     };
     return _runMutation(command, intent, (transaction, intentSha256) async {
       final sketch = await _requireSketch(
@@ -4265,8 +5109,94 @@ class InventoryApplication
       if (draft.contentRevision != command.expectedContentRevision) {
         throw const InventoryFailure('inventory_stale_content_revision');
       }
+      final spatialRows = await transaction.query(
+        'inventory_sketch_revision_spatial_drafts',
+        columns: const ['definitions_json', 'legacy_polygon_count'],
+        where:
+            'revision_id = ? AND project_id = ? AND sketch_id = ? '
+            'AND content_revision = ?',
+        whereArgs: [
+          command.draftRevisionId,
+          command.projectId,
+          command.sketchId,
+          command.expectedContentRevision,
+        ],
+        limit: 2,
+      );
+      if (spatialRows.length != 1 ||
+          spatialRows.single['definitions_json'] is! String ||
+          spatialRows.single['legacy_polygon_count'] is! int) {
+        throw const InventoryFailure('inventory_projection_integrity_failed');
+      }
+      final currentDefinitionsJson =
+          spatialRows.single['definitions_json']! as String;
+      final legacyPolygonCount =
+          spatialRows.single['legacy_polygon_count']! as int;
+      InventorySketchRevisionRecord? base;
+      if (draft.baseRevisionId != null) {
+        base = await _requireSketchRevision(
+          transaction,
+          projectId: command.projectId,
+          sketchId: command.sketchId,
+          revisionId: draft.baseRevisionId!,
+        );
+        if (geometry.polylines.length < base.geometry.polylines.length) {
+          throw const InventoryFailure('inventory_block_geometry_immutable');
+        }
+        for (
+          var index = 0;
+          index < base.geometry.polylines.length;
+          index += 1
+        ) {
+          if (!_samePolyline(
+            base.geometry.polylines[index],
+            geometry.polylines[index],
+          )) {
+            throw const InventoryFailure('inventory_block_geometry_immutable');
+          }
+        }
+      }
+      if (legacyPolygonCount < 0 ||
+          legacyPolygonCount > geometry.polylines.length ||
+          (base != null &&
+              legacyPolygonCount != base.geometry.polylines.length)) {
+        throw const InventoryFailure('inventory_projection_integrity_failed');
+      }
+      final firstNewPolygonIndex =
+          base?.geometry.polylines.length ?? legacyPolygonCount;
+      if (definitions.any(
+        (block) => block.polygonIndex < firstNewPolygonIndex,
+      )) {
+        throw const InventoryFailure('inventory_block_identity_ambiguous');
+      }
+      final existingMappingRows = await transaction.query(
+        'inventory_sketch_revision_block_polygons',
+        where: 'revision_id = ? AND project_id = ? AND sketch_id = ?',
+        whereArgs: [
+          command.draftRevisionId,
+          command.projectId,
+          command.sketchId,
+        ],
+        orderBy: 'polygon_index ASC, block_id ASC',
+      );
+      final existingMappings = existingMappingRows
+          .map(_blockPolygonFromRow)
+          .toList(growable: false);
+      if (existingMappings.any(
+        (mapping) =>
+            mapping.polygonIndex >= firstNewPolygonIndex ||
+            mapping.polygonIndex >= geometry.polylines.length,
+      )) {
+        throw const InventoryFailure('inventory_projection_integrity_failed');
+      }
+      InventorySpatialContract.validateNonOverlappingPolygons([
+        for (final mapping in existingMappings)
+          geometry.polylines[mapping.polygonIndex],
+        for (final block in definitions) geometry.polylines[block.polygonIndex],
+      ]);
       if (draft.geometry.canonicalJson == geometry.canonicalJson &&
-          draft.geometrySha256 == geometry.sha256) {
+          draft.geometrySha256 == geometry.sha256 &&
+          currentDefinitionsJson == definitionsJson) {
         final result = _result(
           command: command,
           sourceId: command.sketchId,
@@ -4283,6 +5213,12 @@ class InventoryApplication
           intentSha256: intentSha256,
           result: result,
           events: const [],
+        );
+      }
+      if (draft.geometry.canonicalJson == geometry.canonicalJson ||
+          draft.geometrySha256 == geometry.sha256) {
+        throw const InventoryFailure(
+          'inventory_spatial_metadata_requires_geometry_change',
         );
       }
       final occurredAt = _canonicalNowAfter(sketch.updatedAt, draft.updatedAt);
@@ -4315,6 +5251,15 @@ class InventoryApplication
       if (draftUpdated != 1 || sketchUpdated != 1) {
         throw const InventoryFailure('inventory_stale_revision');
       }
+      await transaction.insert('inventory_sketch_revision_spatial_drafts', {
+        'revision_id': command.draftRevisionId,
+        'project_id': command.projectId,
+        'sketch_id': command.sketchId,
+        'content_revision': draft.contentRevision + 1,
+        'legacy_polygon_count': legacyPolygonCount,
+        'definitions_json': definitionsJson,
+        'created_at': timestamp,
+      });
       final result = _result(
         command: command,
         sourceId: command.sketchId,
@@ -4344,6 +5289,7 @@ class InventoryApplication
                 'point_count': geometry.pointCount,
                 'polyline_count': geometry.polylines.length,
                 'segment_count': geometry.segmentCount,
+                'spatial_block_count': definitions.length,
               },
             ),
           ),

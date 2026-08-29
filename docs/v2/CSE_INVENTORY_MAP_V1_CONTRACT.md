@@ -1,11 +1,11 @@
 # CSE Inventory Map v1 Canonical Contract
 
 - **Belge türü:** Normative product, UX and persistence contract
-- **Owner authority:** [Feature Epic #506](https://github.com/faliardic/chief-site-engineer/issues/506) and [Issue #507](https://github.com/faliardic/chief-site-engineer/issues/507)
-- **Contract version:** `1.0`
-- **Contract status:** Approved design for later Slices; production implementation has not started
-- **Task-start baseline:** `1d1b818b4b630a08fe6eb77157fe92b7a460b5c3`
-- **Current persisted facts:** SQLite schema `19`, backup format `1`, mobile version `0.1.0+1`, MAIN package `com.faliardic.sefim`
+- **Owner authority:** [Feature Epic #506](https://github.com/faliardic/chief-site-engineer/issues/506), [Issue #507](https://github.com/faliardic/chief-site-engineer/issues/507), and revised spatial foundation [Issue #527](https://github.com/faliardic/chief-site-engineer/issues/527)
+- **Contract version:** `1.1`
+- **Contract status:** Slices 1–5 are production predecessors; revised Slice 6.1 spatial foundation is implemented for independent review
+- **Task-start baseline:** `f858740f6975bace9b6efd21deb1f679e4489cbf`
+- **Current persisted facts:** SQLite schema `21`, backup format `1`, mobile version `0.1.0+1`, MAIN package `com.faliardic.sefim`
 
 ## 1. Normative language and product boundary
 
@@ -179,8 +179,10 @@ V1 MUST allow open and closed polylines.
   be repeated as the final point.
 - Consecutive duplicate points and zero-length segments MUST be rejected.
 - A closed polyline whose final point equals its first point MUST be rejected.
-- Non-consecutive repeated points, shared endpoints, crossings and
-  self-intersections MAY exist because the drawing is schematic.
+- Preserved schema20/general sketch geometry MAY contain non-consecutive
+  repeated points, shared endpoints, crossings or self-intersections because
+  those historical bytes remain schematic and immutable. A polyline linked as
+  a schema21 block boundary is subject to the stricter section 4.5 contract.
 - A draft MAY contain zero polylines or one incomplete one-point polyline.
 - Finalization MUST require at least one valid polyline and at least one
   non-zero-length segment.
@@ -326,6 +328,40 @@ Every sketch mutation MUST use optimistic revision and durable command receipt
 semantics from section 7. Missing, corrupt or wrong-project revision state MUST
 return a typed diagnostic and MUST NOT be repaired implicitly.
 
+### 4.5 Revised schema21 block and floor foundation
+
+Schema21 adds normalized spatial ownership without rewriting geometry v1:
+
+- `inventory_blocks` is a stable project-owned identity with immutable project
+  and ordinal, a bounded display name plus Turkish-aware normalized name, and
+  lifecycle state `ACTIVE | DETACHED | ARCHIVED`;
+- active block names MUST be unique per project by normalized name;
+- `inventory_floors` is a stable block-owned identity with immutable positive
+  ordinal and bounded display name; generated floor order is exactly
+  `1. Kat .. N. Kat`;
+- `inventory_sketch_revision_block_polygons` immutably maps one exact revision
+  polygon index to one stable block, without cloning geometry per floor;
+- `inventory_sketch_revision_spatial_drafts` append-only binds each durable
+  draft content revision to its canonical new-block metadata;
+- every placement version carries `floor_id`; block ownership is derived only
+  through that floor.
+
+A new block boundary MUST be closed, have at least three distinct vertices and
+non-zero area, and MUST NOT self-intersect, overlap, touch or contain/be
+contained by another active mapped block boundary. Each tapped edge is one
+straight segment at any angle. The editor MUST show a live proposed edge,
+provide bounded snap-to-first closure plus explicit `Alanı kapat`, and request
+the block name and positive bounded floor count before closing the polygon.
+Validation MUST fail before draft/final source mutation.
+
+Schema20 migration MUST first validate source relationships, then create one
+deterministic `Varsayılan Alan` / `1. Kat` pair for every project with Inventory
+sketch data. The default block begins `DETACHED`. Every active and historical
+placement receives that exact floor while placement ID/key/sequence, sketch,
+provenance revision, x/y, quantity, predecessor and terminal truth remain
+unchanged. Geometry JSON/checksum and event/photo history MUST remain unchanged.
+Any corruption or incomplete backfill rolls the entire schema21 migration back.
+
 ## 5. Inventory source model
 
 ### 5.1 Durable asset/lot
@@ -400,9 +436,10 @@ would exceed total quantity.
 `inventory_asset_placements.id` identifies one immutable placement version.
 
 Each placement version MUST carry exact `project_id`, `asset_id`, `sketch_id`,
-`provenance_revision_id`, integer `x`, integer `y`, positive integer `quantity`,
-monotonic `sequence`, `created_at`, nullable `ended_at`, nullable `end_reason`
-and nullable predecessor `supersedes_placement_id`.
+stable same-project `floor_id`, `provenance_revision_id`, integer `x`, integer
+`y`, positive integer `quantity`, monotonic `sequence`, `created_at`, nullable
+`ended_at`, nullable `end_reason` and nullable predecessor
+`supersedes_placement_id`.
 
 An active placement has `ended_at IS NULL`. A move MUST atomically:
 
