@@ -51,6 +51,8 @@ class _AgendaPageState extends State<AgendaPage> {
   StreamSubscription<void>? _projectSubscription;
   bool _detailNavigationBusy = false;
   bool _preservingDetailReload = false;
+  int _reloadGeneration = 0;
+  String? _preferredProjectId;
 
   @override
   void initState() {
@@ -90,8 +92,7 @@ class _AgendaPageState extends State<AgendaPage> {
         CreateProjectCommand(id: RecordId.randomUuid(), name: name),
       );
       if (!mounted) return;
-      setState(() => _projectId = project.id);
-      await _reload();
+      await _reload(preferredProjectId: project.id);
     } on Object catch (error) {
       if (!mounted) return;
       setState(
@@ -102,7 +103,15 @@ class _AgendaPageState extends State<AgendaPage> {
     }
   }
 
-  Future<void> _reload({double? restoreOffset}) async {
+  Future<void> _reload({
+    double? restoreOffset,
+    String? preferredProjectId,
+  }) async {
+    if (preferredProjectId != null) {
+      _preferredProjectId = preferredProjectId;
+    }
+    final generation = ++_reloadGeneration;
+    final requestedProjectId = _preferredProjectId ?? _projectId;
     setState(() {
       _loading = true;
       _error = null;
@@ -110,16 +119,23 @@ class _AgendaPageState extends State<AgendaPage> {
     });
     try {
       final projects = await widget.agenda.listProjects();
+      if (!mounted || generation != _reloadGeneration) return;
+      final selectedProjectId =
+          requestedProjectId != null &&
+              projects.any((project) => project.id == requestedProjectId)
+          ? requestedProjectId
+          : null;
       final logs = await widget.agenda.listAgenda(
         AgendaQuery(
           istanbulDay: _selectedDay,
-          projectId: _projectId,
+          projectId: selectedProjectId,
           category: _category,
           literalSearch: _search,
           archiveFilter: _archiveFilter,
           sortOrder: _sortOrder,
         ),
       );
+      if (!mounted || generation != _reloadGeneration) return;
       final linkedReminders = <String, MobileReminder>{};
       await Future.wait(
         logs.map((log) async {
@@ -136,22 +152,27 @@ class _AgendaPageState extends State<AgendaPage> {
           }
         }),
       );
-      if (!mounted) return;
+      if (!mounted || generation != _reloadGeneration) return;
       setState(() {
         _projects = projects;
+        _projectId = selectedProjectId;
+        if (_preferredProjectId == selectedProjectId) {
+          _preferredProjectId = null;
+        }
         _logs = logs;
         _linkedReminders = linkedReminders;
         _loading = false;
         _preservingDetailReload = false;
       });
     } on Object {
-      if (!mounted) return;
+      if (!mounted || generation != _reloadGeneration) return;
       setState(() {
         _loading = false;
         _preservingDetailReload = false;
         _error = 'Ajanda kayıtları güvenli biçimde okunamadı.';
       });
     }
+    if (!mounted || generation != _reloadGeneration) return;
     _restoreScrollOffset(restoreOffset);
   }
 
