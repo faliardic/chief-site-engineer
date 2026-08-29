@@ -209,6 +209,136 @@ execution_record:
 review_recommendation: FRESH_INDEPENDENT_R4_REREVIEW
 ```
 
+## Owner-acceptance editor correction — focused gate fail-closed
+
+- Authority: Issue #527 comment `5462564747`.
+- Exact parent/worktree HEAD:
+  `9855a377119a1e02485535744019dabbccac3d08`.
+- Touched Dart formatting: repository-recorded Dart SDK formatted the exact
+  three changed Dart paths.
+- Authorized focused invocation count: exactly `1/1`.
+- Command:
+  `flutter test --no-pub test/inventory_sketch_editor_test.dart test/inventory_page_test.dart`.
+- Result: `FAIL` before test execution; `0` tests passed and both test
+  libraries failed to load.
+- `mobile/test/inventory_sketch_editor_test.dart:1293`: const map key
+  `Key('inventory-editor-back')` cannot be constant-evaluated because
+  `ValueKey` does not have primitive equality.
+- `mobile/test/inventory_page_test.dart:1209..1235`: twelve
+  `InventorySketchPoint` values were placed in const lists although the
+  constructor is non-const.
+- Classification: `TEST_HARNESS_MECHANICAL_DEFECT` for both compile
+  failures; no production runtime assertion executed.
+- Retry: `NOT RUN`; the authority's single focused invocation budget is
+  exhausted.
+- Analyzer, git diff checks, final drift audit, staging, commit, push and
+  evidence publication: `NOT RUN` because the focused gate did not pass.
+- Worktree remains uncommitted and unstaged. Changed paths before this append
+  were the task record, two authorized docs, editor production source and the
+  two authorized tests; all are inside the exact 8-path allowlist.
+- Source constants observed read-only before the gate: schema `22`, backup
+  format `1`, version `0.1.0+1`. This is not a substitute for the
+  unexecuted final drift audit.
+- PR #528 was not mutated and remains on its previously reviewed Draft head.
+- APK/device/ADB/MAIN, MT status mutation, Ready, merge and Slice 6.2/6.3:
+  `NOT RUN`.
+
+```yaml
+execution_record:
+  issue: 527
+  authority_comment: 5462564747
+  exact_parent: 9855a377119a1e02485535744019dabbccac3d08
+  implementation_state: UNCOMMITTED_WORKTREE
+  focused_test_invocations: 1
+  focused_test_result: FAIL_TEST_LIBRARY_COMPILE
+  tests_executed: 0
+  failure_classification: TEST_HARNESS_MECHANICAL_DEFECT
+  analyzer: NOT_RUN
+  diff_check: NOT_RUN
+  final_drift_audit: NOT_RUN
+  commit: null
+  push: false
+  pr: 528
+  pr_draft_mutated: false
+  manual_test_status_mutated: false
+  ready: false
+  merged: false
+  runtime_model: unknown
+  runtime_reasoning_effort: null
+  runtime_routing_verified: false
+review_recommendation: NARROW_TEST_HARNESS_RETRY_AUTHORITY_REQUIRED
+```
+
+## Narrow test-harness retry — correction gates PASS
+
+- Authority: Issue #527 comment `5462697914`.
+- Exact parent:
+  `9855a377119a1e02485535744019dabbccac3d08`.
+- Existing uncommitted/unstaged owner-acceptance correction worktree was
+  preserved; reset/discard/rebase was not used.
+- Mechanical harness correction only:
+  - `mobile/test/inventory_sketch_editor_test.dart`: invalid const context
+    around the `Key` map was removed;
+  - `mobile/test/inventory_page_test.dart`: invalid const context around the
+    three `InventorySketchPoint` lists was removed.
+- Assertions and product expectations were unchanged.
+
+Validation evidence:
+
+- Continuation focused retry invocation count: exactly `1/1`.
+- Command:
+  `flutter test --no-pub test/inventory_sketch_editor_test.dart test/inventory_page_test.dart`.
+- Focused retry result: `PASS — 57/57`.
+- Analyzer invocation count after focused PASS: exactly `1/1`.
+- `flutter analyze --no-pub`: `PASS — No issues found`.
+- Full `git diff --check`: `PASS`; line-ending conversion warnings only.
+- Exact allowlist: `7/8` paths changed, `0` outside allowlist.
+- Untracked paths: `0`; staged paths before evidence/staging: `0`.
+- Schema: `22`; storage schema path drift: `0`.
+- Backup format: `1`; production backup application drift: `0`.
+- Mobile version: `0.1.0+1`.
+- `pubspec.yaml` / `pubspec.lock` and dependency drift: `0`.
+- Android/iOS/platform/package/permission drift: `0`.
+- Issue #529 app/bootstrap/global diagnostic paths: untouched.
+- APK/build/device/ADB/MAIN: `NOT RUN`.
+- Manual test status mutation: `NOT RUN`.
+- PR #528 remained `OPEN/DRAFT` at the pre-commit audit; Ready and merge were
+  not performed.
+
+```yaml
+execution_record:
+  issue: 527
+  authority_comment: 5462697914
+  exact_parent: 9855a377119a1e02485535744019dabbccac3d08
+  correction: OWNER_ACCEPTANCE_EDITOR_UX_AND_FINALIZE
+  mechanical_harness_retry:
+    invocation_count: 1
+    result: PASS
+    tests: 57/57
+  analyzer:
+    invocation_count: 1
+    result: PASS
+  diff_check_full: PASS
+  changed_paths: 7/8
+  outside_allowlist: 0
+  untracked_paths: 0
+  schema: 22
+  backup_format: 1
+  version: 0.1.0+1
+  protected_drift: 0
+  platform_permission_package_dependency_drift: 0
+  commit: containing_commit
+  pr: 528
+  pr_state_pre_commit: OPEN_DRAFT
+  manual_test_status_mutated: false
+  ready: false
+  merged: false
+  runtime_model: unknown
+  runtime_reasoning_effort: null
+  runtime_routing_verified: false
+review_recommendation: FRESH_INDEPENDENT_R4_REREVIEW
+```
+
 ## 2026-08-29 — owner-acceptance orthogonal drawing correction
 
 Authorities:

@@ -866,6 +866,13 @@ guard. On resume, a mounted editor MUST reassert landscape; a non-editor shell
 MUST reassert the standard set. Orientation calls MUST NOT change Android/iOS
 manifest or permission files unless a later Issue separately proves necessity.
 
+The ready editor MUST use the landscape route as a full-screen canvas without a
+large AppBar or horizontal text toolbar. A compact icon-only toolbar MUST stay
+on the right; every control MUST expose both a tooltip and an accessibility
+label. Selected modes and one-shot state MUST include a non-color-only
+indicator. Draft acknowledgement MAY appear as a compact overlay and MUST NOT
+reduce the canonical canvas work area.
+
 ### 8.2 Tap-to-connect editor state machine
 
 The editor has exact modes `DRAW`, `SELECT` and `PAN`.
@@ -942,10 +949,22 @@ The editor MUST show `Kaydediliyor…`, `Kaydedildi` or `Kaydedilemedi` from the
 actual last acknowledgement. It MUST NOT claim a save before the transaction
 returns.
 
-A stale or failed autosave MUST leave the durable prior draft intact and offer
-reload/retry. `Oluştur` MUST run the section 4 finalize transaction. A failure
-MUST keep the editor open, restore standard orientation only if the route exits,
-and MUST NOT expose a partially active revision.
+A complete, finalizable draft MUST keep its prominent check/save action enabled
+while the latest autosave debounce or acknowledgement is pending. That action
+MUST drain/force-save the latest draft, run the section 4 finalize transaction,
+verify the canonical active successor, and only then return route result
+`true`. Inventory MUST canonical-reload that result so create and edit-active
+successors are visible on the map in the same session.
+
+A stale or failed autosave/finalize MUST leave the durable prior draft intact.
+Finalize failure MUST keep the editor open and show explicit draft-preserved
+feedback with retry; it MUST restore standard orientation only if the route
+exits and MUST NOT expose a partially active revision.
+
+Closing a new polygon MUST request local block/floor metadata with the action
+`Alanı ekle`. Metadata acceptance adds that block to the current draft and
+MUST NOT finalize the sketch; one draft MAY collect multiple new blocks before
+the global check/save action.
 
 Loading MUST be explicit. Missing sketch, recoverable draft, corrupt geometry,
 unavailable revision, stale command and database-read failure MUST have distinct

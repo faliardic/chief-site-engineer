@@ -444,6 +444,15 @@ Slice 6.1'de local fail-before-autosave mesajıyla immutable kalırken untouched
 base sonuna yeni orthogonal block append autosave/reload/finalize edilebilir.
 Reshape ve placement reconciliation hâlâ Slice 6.3 kapsamıdır.
 
+Issue #527'nin current owner-acceptance correction'ı editorü landscape
+full-screen canvas ve sağ compact icon-only, tooltip/Semantics etiketli toolbar
+olarak sunar. Global check/save action pending debounce'u force-save/drain eder,
+finalize sonucunu doğrular ve Inventory'nin canonical map projection'ını aynı
+session'da yeniler. Block metadata action'ı lokal `Alanı ekle` olarak kalır;
+bir draft global finalize öncesinde birden fazla block biriktirebilir.
+Finalize hatasında dayanıklı draft korunur ve görünür retry sunulur. Issue #529
+global safe-diagnostic konusu bu correction kapsamı dışındadır.
+
 Issue #501, #502, #503 ve #499 P0 veri/owner-phone güvenlik kuralları bu ürün
 önceliğinden üstündür. Source geliştirme ve Draft PR devam edebilir; owner-phone
 MAIN kurulum yetkisi oluşmaz.

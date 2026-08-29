@@ -118,6 +118,7 @@ void main() {
     'no-sketch exact action reuses editor result and reloads only after finalize',
     (tester) async {
       final inventory = _FakeInventory();
+      final createdGeometry = _finalizedCreateGeometry();
       final source = _ProjectSource()
         ..projects = [_project(_projectA, 'Proje A')];
       var launches = 0;
@@ -130,7 +131,10 @@ void main() {
           expect(projectId, _projectA);
           expect(launchIntent, InventorySketchLaunchIntent.createOrRecover);
           inventory
-            ..sketches[_projectA] = _sketch(_projectA)
+            ..sketches[_projectA] = _sketch(
+              _projectA,
+              geometryOverride: createdGeometry,
+            )
             ..assets[_projectA] = [];
           return true;
         },
@@ -146,6 +150,17 @@ void main() {
       expect(inventory.primaryReads, 2);
       expect(inventory.listReads, 1);
       expect(find.byType(InventoryMapView), findsOneWidget);
+      final pageState = tester.state<InventoryPageState>(
+        find.byType(InventoryPage),
+      );
+      expect(
+        pageState.controller.sketch!.activeRevision!.geometry.canonicalJson,
+        createdGeometry.canonicalJson,
+      );
+      expect(
+        pageState.mapController!.activeRevision!.geometry.canonicalJson,
+        createdGeometry.canonicalJson,
+      );
     },
   );
 
@@ -161,6 +176,7 @@ void main() {
       addTearDown(controller.dispose);
       addTearDown(source.dispose);
       var launches = 0;
+      final successorGeometry = _editSuccessorGeometry();
       await _pumpPage(
         tester,
         inventory: inventory,
@@ -175,7 +191,7 @@ void main() {
             revisionId: _revisionUpdated,
             sketchRevision: 2,
             revisionNumber: 2,
-            endpointX: 2048,
+            geometryOverride: successorGeometry,
           );
           return true;
         },
@@ -199,15 +215,19 @@ void main() {
       expect(inventory.listReads, 2);
       expect(controller.sketch!.activeRevision!.id, _revisionUpdated);
       expect(
-        controller
-            .sketch!
-            .activeRevision!
-            .geometry
-            .polylines
-            .single
-            .points
-            .last,
-        InventorySketchPoint(x: 2048, y: 3072),
+        controller.sketch!.activeRevision!.geometry.canonicalJson,
+        successorGeometry.canonicalJson,
+      );
+      final pageState = tester.state<InventoryPageState>(
+        find.byType(InventoryPage),
+      );
+      expect(
+        pageState.mapController!.activeRevision!.geometry.canonicalJson,
+        successorGeometry.canonicalJson,
+      );
+      expect(
+        pageState.mapController!.activeRevision!.geometry.polylines,
+        hasLength(2),
       );
     },
   );
@@ -1130,21 +1150,24 @@ InventoryPrimarySketchProjection _sketch(
   int sketchRevision = 1,
   int revisionNumber = 1,
   int endpointX = 4096,
+  InventoryGeometry? geometryOverride,
 }) {
   final sketchId = projectId == _projectA ? _sketchA : _sketchB;
   final activeRevisionId =
       revisionId ?? (projectId == _projectA ? _revisionA : _revisionB);
-  final geometry = InventoryGeometry(
-    polylines: [
-      InventoryPolyline(
-        closed: false,
-        points: [
-          InventorySketchPoint(x: 0, y: 0),
-          InventorySketchPoint(x: endpointX, y: 3072),
+  final geometry =
+      geometryOverride ??
+      InventoryGeometry(
+        polylines: [
+          InventoryPolyline(
+            closed: false,
+            points: [
+              InventorySketchPoint(x: 0, y: 0),
+              InventorySketchPoint(x: endpointX, y: 3072),
+            ],
+          ),
         ],
-      ),
-    ],
-  );
+      );
   return InventoryPrimarySketchProjection(
     sketch: InventorySketchRecord(
       id: sketchId,
@@ -1177,6 +1200,43 @@ InventoryPrimarySketchProjection _sketch(
     draftRevision: null,
   );
 }
+
+InventoryGeometry _finalizedCreateGeometry() => InventoryGeometry(
+  polylines: [
+    InventoryPolyline(
+      closed: true,
+      points: [
+        InventorySketchPoint(x: 0, y: 0),
+        InventorySketchPoint(x: 1024, y: 0),
+        InventorySketchPoint(x: 1024, y: 1024),
+        InventorySketchPoint(x: 0, y: 1024),
+      ],
+    ),
+  ],
+);
+
+InventoryGeometry _editSuccessorGeometry() => InventoryGeometry(
+  polylines: [
+    InventoryPolyline(
+      closed: true,
+      points: [
+        InventorySketchPoint(x: 0, y: 0),
+        InventorySketchPoint(x: 1024, y: 0),
+        InventorySketchPoint(x: 1024, y: 1024),
+        InventorySketchPoint(x: 0, y: 1024),
+      ],
+    ),
+    InventoryPolyline(
+      closed: true,
+      points: [
+        InventorySketchPoint(x: 1536, y: 0),
+        InventorySketchPoint(x: 2560, y: 0),
+        InventorySketchPoint(x: 2560, y: 1024),
+        InventorySketchPoint(x: 1536, y: 1024),
+      ],
+    ),
+  ],
+);
 
 InventoryAssetProjection _asset(
   String projectId,

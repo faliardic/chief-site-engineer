@@ -801,7 +801,7 @@ void main() {
 
   group('launch, finalize and durable recovery', () {
     test(
-      'finalize enablement requires finalizable acknowledged geometry',
+      'finalize enablement requires complete geometry but accepts pending save',
       () async {
         final emptyFake = _FakeInventoryApplication.withDraft(
           InventoryGeometry.emptyDraft(),
@@ -812,6 +812,17 @@ void main() {
         expect(emptyController.isFinalizeEnabled, isFalse);
         emptyController.drawPoint(_point(0, 0));
         expect(emptyController.isFinalizeEnabled, isFalse);
+        emptyController.drawPoint(_point(192, 0));
+        emptyController.drawPoint(_point(192, 192));
+        emptyController.drawPoint(_point(0, 192));
+        final pendingBlock = emptyController.createBlockDraft(
+          displayName: 'A Blok',
+          floorCount: 1,
+        );
+        expect(emptyController.closeWorkingBlock(pendingBlock), isTrue);
+        expect(emptyController.saveStatus, InventorySketchSaveStatus.saving);
+        expect(emptyController.hasUnacknowledgedGeometry, isTrue);
+        expect(emptyController.isFinalizeEnabled, isTrue);
 
         final readyFake = _FakeInventoryApplication.withDraft(
           _closedBlockGeometry(),
@@ -1097,6 +1108,9 @@ void main() {
         find.byKey(const Key('inventory-block-metadata-dialog')),
         findsOneWidget,
       );
+      expect(find.text('Alanı ekle'), findsOneWidget);
+      expect(find.text('Alanı oluştur'), findsNothing);
+      expect(find.text('Kaydet'), findsNothing);
 
       await tester.enterText(
         find.byKey(const Key('inventory-block-name')),
@@ -1114,22 +1128,55 @@ void main() {
       expect(controller.editor!.geometry.polylines.single.closed, isTrue);
       expect(controller.newBlocks.single.displayName, 'A Blok');
       expect(controller.newBlocks.single.floors, hasLength(2));
+      expect(fake.finalizeCalls, 0);
       expect(
         fake.saveCalls.last.newBlocks.single.id,
         controller.newBlocks.single.id,
       );
       expect(tester.takeException(), isNull);
 
+      for (final point in [
+        _point(512, 0),
+        _point(704, 0),
+        _point(704, 192),
+        _point(512, 192),
+      ]) {
+        controller.drawPoint(point);
+      }
+      await tester.pump();
+      await tester.ensureVisible(closeBlock);
+      await tester.tap(closeBlock);
+      await tester.pumpAndSettle();
+      expect(find.text('Alanı ekle'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const Key('inventory-block-name')),
+        'B Blok',
+      );
+      await tester.tap(find.byKey(const Key('inventory-block-metadata-save')));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump();
+
+      expect(controller.editor!.geometry.polylines, hasLength(2));
+      expect(controller.newBlocks.map((block) => block.displayName), [
+        'A Blok',
+        'B Blok',
+      ]);
+      expect(fake.finalizeCalls, 0);
+      expect(fake.saveCalls.last.newBlocks, hasLength(2));
+
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       final recoveredKey = GlobalKey<InventorySketchEditorPageState>();
       await _openEditor(tester, fake, orientations, recoveredKey);
       expect(
-        recoveredKey.currentState!.controller.newBlocks.single.displayName,
-        'A Blok',
+        recoveredKey.currentState!.controller.newBlocks.map(
+          (block) => block.displayName,
+        ),
+        ['A Blok', 'B Blok'],
       );
       expect(
-        recoveredKey.currentState!.controller.newBlocks.single.floors.map(
+        recoveredKey.currentState!.controller.newBlocks.first.floors.map(
           (floor) => floor.ordinal,
         ),
         [1, 2],
@@ -1186,6 +1233,10 @@ void main() {
       await tester.pump();
       expect(controller.freeLengthNextSegment, isTrue);
       expect(
+        find.byKey(const Key('inventory-editor-free-length-selected')),
+        findsOneWidget,
+      );
+      expect(
         find.byKey(const Key('inventory-editor-smart-alignment-guide')),
         findsNothing,
       );
@@ -1199,21 +1250,269 @@ void main() {
       expect(controller.drawPoint(_point(128, 320)), isTrue);
       await tester.pump();
       expect(controller.freeLengthNextSegment, isFalse);
-      expect(tester.widget<FilterChip>(freeLength).selected, isFalse);
+      expect(
+        find.byKey(const Key('inventory-editor-free-length-selected')),
+        findsNothing,
+      );
 
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
     },
   );
 
+  testWidgets('full-screen editor uses accessible icon-only right toolbar', (
+    tester,
+  ) async {
+    final fake = _FakeInventoryApplication.withDraft(
+      _closedBlockGeometry(),
+      draftNewBlocks: _blockDrafts(),
+    );
+    final orientations = _OrientationRecorder();
+    final pageKey = GlobalKey<InventorySketchEditorPageState>();
+    await _openEditor(tester, fake, orientations, pageKey);
+
+    expect(find.byType(AppBar), findsNothing);
+    final workspace = find.byKey(
+      const Key('inventory-editor-fullscreen-workspace'),
+    );
+    final canvas = find.byKey(const Key('inventory-sketch-canvas-gesture'));
+    final toolbar = find.byKey(const Key('inventory-editor-right-toolbar'));
+    expect(workspace, findsOneWidget);
+    expect(canvas, findsOneWidget);
+    expect(toolbar, findsOneWidget);
+    expect(tester.getRect(canvas).size, tester.getRect(workspace).size);
+    expect(
+      tester.getRect(toolbar).right,
+      closeTo(tester.getRect(workspace).right - 8, 0.1),
+    );
+    expect(
+      find.descendant(of: toolbar, matching: find.byType(Text)),
+      findsNothing,
+    );
+
+    final controls = <Key, String>{
+      Key('inventory-editor-back'): 'Geri',
+      Key('inventory-editor-mode-draw'): 'Çiz',
+      Key('inventory-editor-mode-select'): 'Seç',
+      Key('inventory-editor-mode-pan'): 'Taşı',
+      Key('inventory-editor-undo'): 'Geri al',
+      Key('inventory-editor-redo'): 'İleri al',
+      Key('inventory-editor-finish-line'): 'Çizgiyi bitir',
+      Key('inventory-editor-close-block'): 'Alanı kapat',
+      Key('inventory-editor-free-length'): 'Serbest uzunluk',
+      Key('inventory-editor-delete'): 'Seçileni sil',
+      Key('inventory-editor-zoom-out'): 'Uzaklaştır',
+      Key('inventory-editor-zoom-in'): 'Yakınlaştır',
+      Key('inventory-editor-fit'): 'Tamamını göster',
+      Key('inventory-editor-finalize'): 'Krokiyi yayınla',
+    };
+    for (final entry in controls.entries) {
+      final control = find.byKey(entry.key);
+      expect(control, findsOneWidget);
+      expect(
+        tester
+            .widgetList<Tooltip>(
+              find.descendant(of: control, matching: find.byType(Tooltip)),
+            )
+            .map((tooltip) => tooltip.message),
+        contains(entry.value),
+      );
+      expect(
+        tester
+            .widgetList<Semantics>(
+              find.descendant(of: control, matching: find.byType(Semantics)),
+            )
+            .map((semantics) => semantics.properties.label),
+        contains(entry.value),
+      );
+    }
+
+    expect(
+      find.byKey(const Key('inventory-editor-mode-selected-draw')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('inventory-editor-mode-select')));
+    await tester.pump();
+    expect(
+      find.byKey(const Key('inventory-editor-mode-selected-draw')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('inventory-editor-mode-selected-select')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets(
+    'closed block final icon drains pending autosave before create finalize',
+    (tester) async {
+      final fake = _FakeInventoryApplication.withDraft(
+        InventoryGeometry.emptyDraft(),
+      );
+      final orientations = _OrientationRecorder();
+      final pageKey = GlobalKey<InventorySketchEditorPageState>();
+      bool? result;
+      await _openEditor(
+        tester,
+        fake,
+        orientations,
+        pageKey,
+        onResult: (value) => result = value,
+      );
+      final controller = pageKey.currentState!.controller;
+      _appendClosedBlock(
+        controller,
+        left: 0,
+        top: 0,
+        right: 192,
+        bottom: 192,
+        displayName: 'A Blok',
+      );
+      await tester.pump();
+
+      expect(fake.saveCalls, isEmpty);
+      expect(controller.saveStatus, InventorySketchSaveStatus.saving);
+      expect(controller.hasUnacknowledgedGeometry, isTrue);
+      expect(controller.isFinalizeEnabled, isTrue);
+
+      await tester.tap(find.byKey(const Key('inventory-editor-finalize')));
+      await tester.pumpAndSettle();
+
+      expect(result, isTrue);
+      expect(fake.operationOrder, ['save', 'finalize']);
+      expect(fake.projection!.draftRevision, isNull);
+      expect(fake.projection!.activeRevision!.geometry.polylines, hasLength(1));
+      expect(find.byType(InventorySketchEditorPage), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'edit-active appended block immediately drains and finalizes with base',
+    (tester) async {
+      final base = _closedBlockGeometry();
+      final fake = _FakeInventoryApplication.withActive(base);
+      final orientations = _OrientationRecorder();
+      final pageKey = GlobalKey<InventorySketchEditorPageState>();
+      bool? result;
+      await _openEditor(
+        tester,
+        fake,
+        orientations,
+        pageKey,
+        intent: InventorySketchLaunchIntent.editActive,
+        onResult: (value) => result = value,
+      );
+      final controller = pageKey.currentState!.controller;
+      final appended = _appendClosedBlock(
+        controller,
+        left: 512,
+        top: 0,
+        right: 704,
+        bottom: 192,
+        displayName: 'Yeni Alan',
+      );
+      await tester.pump();
+
+      expect(fake.saveCalls, isEmpty);
+      expect(controller.isFinalizeEnabled, isTrue);
+      await tester.tap(find.byKey(const Key('inventory-editor-finalize')));
+      await tester.pumpAndSettle();
+
+      expect(result, isTrue);
+      expect(fake.operationOrder, ['save', 'finalize']);
+      expect(fake.projection!.draftRevision, isNull);
+      expect(
+        fake.projection!.activeRevision!.geometry.polylines.first,
+        base.polylines.first,
+      );
+      expect(fake.projection!.activeRevision!.geometry.polylines, hasLength(2));
+      _expectSameBlockIdentity(
+        fake.finalizeCommands.single.newBlocks.single,
+        appended,
+        polygonIndex: 1,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('finalize failure preserves draft and exposes retry feedback', (
+    tester,
+  ) async {
+    final fake = _FakeInventoryApplication.withDraft(
+      _closedBlockGeometry(),
+      draftNewBlocks: _blockDrafts(),
+    )..failFinalizeCount = 1;
+    final orientations = _OrientationRecorder();
+    final pageKey = GlobalKey<InventorySketchEditorPageState>();
+    bool? result;
+    await _openEditor(
+      tester,
+      fake,
+      orientations,
+      pageKey,
+      onResult: (value) => result = value,
+    );
+
+    await tester.tap(find.byKey(const Key('inventory-editor-finalize')));
+    await tester.pumpAndSettle();
+
+    expect(result, isNull);
+    expect(find.byType(InventorySketchEditorPage), findsOneWidget);
+    expect(fake.projection!.draftRevision, isNotNull);
+    expect(fake.projection!.activeRevision, isNull);
+    expect(
+      find.byKey(const Key('inventory-editor-finalize-failure')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Dayanıklı taslak korundu'), findsOneWidget);
+    final retry = find.byKey(const Key('inventory-editor-retry-finalize'));
+    expect(retry, findsOneWidget);
+
+    await tester.tap(retry);
+    await tester.pumpAndSettle();
+
+    expect(result, isTrue);
+    expect(fake.finalizeCalls, 2);
+    expect(fake.projection!.draftRevision, isNull);
+    expect(find.byType(InventorySketchEditorPage), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   group('page back, lifecycle and orientation boundary', () {
-    testWidgets('create/recover final action copy is Oluştur', (tester) async {
+    testWidgets('create/recover final action is accessible publish icon', (
+      tester,
+    ) async {
       final fake = _FakeInventoryApplication.withDraft(_openGeometry());
       final orientations = _OrientationRecorder();
       final pageKey = GlobalKey<InventorySketchEditorPageState>();
       await _openEditor(tester, fake, orientations, pageKey);
 
-      expect(find.widgetWithText(FilledButton, 'Oluştur'), findsOneWidget);
+      final finalize = find.byKey(const Key('inventory-editor-finalize'));
+      expect(
+        find.descendant(of: finalize, matching: find.byType(Tooltip)),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<Tooltip>(
+              find.descendant(of: finalize, matching: find.byType(Tooltip)),
+            )
+            .message,
+        'Krokiyi yayınla',
+      );
+      expect(
+        find.descendant(
+          of: finalize,
+          matching: find.byIcon(Icons.check_circle_rounded),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Oluştur'), findsNothing);
       expect(find.text('Güncelle'), findsNothing);
 
       await tester.binding.handlePopRoute();
@@ -1243,8 +1542,17 @@ void main() {
           pageKey.currentState!.controller.editor!.geometry.canonicalJson,
           _openGeometry().canonicalJson,
         );
-        expect(find.widgetWithText(FilledButton, 'Güncelle'), findsOneWidget);
+        final finalize = find.byKey(const Key('inventory-editor-finalize'));
+        expect(
+          tester
+              .widget<Tooltip>(
+                find.descendant(of: finalize, matching: find.byType(Tooltip)),
+              )
+              .message,
+          'Krokiyi yayınla ve güncelle',
+        );
         expect(find.text('Oluştur'), findsNothing);
+        expect(find.text('Güncelle'), findsNothing);
 
         await tester.tap(find.byKey(const Key('inventory-editor-finalize')));
         await tester.pumpAndSettle();
@@ -1552,6 +1860,30 @@ Future<void> _openEditor(
 }
 
 InventorySketchPoint _point(int x, int y) => InventorySketchPoint(x: x, y: y);
+
+InventoryBlockDraft _appendClosedBlock(
+  InventorySketchEditorController controller, {
+  required int left,
+  required int top,
+  required int right,
+  required int bottom,
+  required String displayName,
+}) {
+  for (final point in [
+    _point(left, top),
+    _point(right, top),
+    _point(right, bottom),
+    _point(left, bottom),
+  ]) {
+    expect(controller.drawPoint(point), isTrue);
+  }
+  final block = controller.createBlockDraft(
+    displayName: displayName,
+    floorCount: 1,
+  );
+  expect(controller.closeWorkingBlock(block), isTrue);
+  return block;
+}
 
 InventoryGeometry _openGeometry() => InventoryGeometry(
   polylines: [

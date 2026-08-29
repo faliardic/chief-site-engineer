@@ -228,3 +228,60 @@ Hard stops:
 - no Gradle/package/permission/manifest/dependency change;
 - no APK/build/device/ADB/MAIN operation;
 - no MT PASS inference, Ready, merge, or Issue closure.
+
+## Owner acceptance blocker/UI correction — comment 5462564747
+
+- Exact parent/head: `9855a377119a1e02485535744019dabbccac3d08`.
+- Target: existing PR `#528`, which must remain `OPEN/DRAFT`.
+- Risk/routing: `R4`; requested model `gpt-5.6-sol`; requested effort
+  `max`; runtime routing remains independently unverified.
+- Separate global safe-diagnostic issue `#529` is explicitly out of scope.
+
+Locked behavior:
+
+- keep landscape and make the sketch editor a full-screen canvas without the
+  large AppBar or horizontal text toolbar;
+- provide one compact RIGHT-side icon-only toolbar with tooltip, Semantics
+  label, and a non-color-only selected mode state;
+- expose a prominent final check/save icon and a compact draft/save-status
+  overlay;
+- valid geometry plus complete block metadata may invoke finalization while
+  autosave is pending: the existing force-save/drain must complete before
+  verified `finalizeDraft()` and successful route result `true`;
+- finalization failure must preserve the durable draft, stay in the editor, and
+  show explicit retryable feedback;
+- successful create/edit finalization must cause InventoryPage to reload
+  canonical active geometry in the same session;
+- metadata dialog action is local `Alanı ekle`; it never auto-finalizes the
+  whole sketch, and multiple blocks remain drawable in one draft;
+- orthogonal drawing, smart alignment, one-shot `Serbest uzunluk`, legacy
+  diagonal readability, and edit-active base immutability remain unchanged.
+
+Exact write allowlist:
+
+1. `.cse/tasks/527_task.md`
+2. `.cse/results/527_result.md`
+3. `docs/v2/CSE_INVENTORY_MAP_V1_CONTRACT.md`
+4. `docs/v2/CSE_V2_SCOPE.md`
+5. `mobile/lib/features/inventory/inventory_sketch_editor_page.dart`
+6. `mobile/lib/features/inventory/inventory_page.dart`
+7. `mobile/test/inventory_sketch_editor_test.dart`
+8. `mobile/test/inventory_page_test.dart`
+
+Validation budget:
+
+- format touched Dart files;
+- run exactly once:
+  `flutter test --no-pub test/inventory_sketch_editor_test.dart test/inventory_page_test.dart`;
+- only after focused PASS, run `flutter analyze --no-pub` exactly once;
+- then full/staged `git diff --check`, exact allowlist and protected/schema/
+  backup/version/package/platform/permission/dependency drift audits;
+- append result evidence, create one minimal correction commit, push the same
+  branch, publish Issue/PR evidence, and stop for fresh independent R4 review.
+
+Hard stops:
+
+- schema `22`, backup format `1`, and version `0.1.0+1` remain unchanged;
+- no app/bootstrap/global diagnostic correction for `#529`;
+- no APK/build/device/ADB/MAIN operation;
+- no MT PASS inference, Ready, merge, Issue closure, Slice 6.2, or Slice 6.3.
