@@ -2,11 +2,11 @@
 
 ## Current status
 
-- Execution status: `PHASE_A_PASS — READY FOR DRAFT PUBLICATION`
+- Execution status: `PHASE_A_PASS — DRAFT_PUBLISHED — OWNER_ACCEPTANCE_PENDING — FRESH_R4_CORRECTION_REQUIRED`
 - Implementation class: documentation/evidence-only integrated regression closure
 - Manual acceptance: `PENDING / NOT RUN`
 - Phase B device authority: not granted
-- Source correction authority: not granted
+- Source correction authority: documentation-only Issue #535 comment `5464503005`
 
 ## Repository and authority
 
@@ -65,6 +65,19 @@
     operation occurred.
 17. Staged exactly the five authorized paths and no others.
 18. Ran staged `git diff --check`: `PASS`; staged allowlist: `5/5`.
+19. Created Phase-A evidence commit
+    `df64274976056a82842d10cb9fcc6cddb4b62aba` and pushed the canonical branch;
+    local/remote divergence was verified as `0/0`.
+20. Created PR #536 as `OPEN/DRAFT`; Ready and merge remained false.
+21. Published Issue evidence comment `5464445151` and PR evidence comment
+    `5464446424`.
+22. Registered `MT-535-001..007` in Issue #479 comment `5464443462` as
+    `PENDING / NOT RUN`.
+23. Fresh independent R4 reviewed exact head `df64274976056a82842d10cb9fcc6cddb4b62aba`
+    and authorized only this result-evidence correction through Issue #535
+    comment `5464503005`; production/source/test review scope otherwise passed.
+24. This correction does not rerun Flutter tests or analyzer and does not start
+    Phase B, Slice 7, build, APK, device, ADB or MAIN work.
 
 ## Authorized gates
 
@@ -100,26 +113,46 @@
 - Schema/backup/version drift: `0 — 22 / 1 / 0.1.0+1`
 - Pubspec/lock/platform/package/permission/signing drift: `0`
 - Artifact/build/device drift: `0`; no such command ran
-- Branch/base/master: `PASS`; upstream branch will be created by normal push
+- Branch/base/master: `PASS`; Phase-A evidence branch push completed with
+  local/remote divergence `0/0`
 
 ## Manual acceptance register
 
 - `MT-535-001..007`: `PENDING / NOT RUN`
-- Issue #479 registration: pending Phase-A PASS and publication
+- Issue #479 registration: comment `5464443462`
 - Automated evidence will not be represented as owner/manual PASS.
 
 ## Publication state
 
-- Commit: not created
-- Push: not performed
-- Draft PR: not created
-- Issue evidence: not published
-- PR evidence: not published
+- Phase-A evidence commit: `df64274976056a82842d10cb9fcc6cddb4b62aba`
+- Push: completed; branch divergence `0/0` at the reviewed head
+- Draft PR: #536 `OPEN/DRAFT`
+- Issue evidence: published — comment `5464445151`
+- PR evidence: published — comment `5464446424`
+- Manual Test Register: published — comment `5464443462`;
+  `MT-535-001..007 = PENDING / NOT RUN`
 - Ready: `false`; not authorized
 - Merge: `false`; not authorized
-- Issue closure: not authorized
-- Slice 7: not started
+- Issue closure: `false`; not authorized
+- Phase B device authority: `false`; not started
+- Slice 7: `false`; not started
+- APK/build/device/ADB/MAIN: not run
 - DWG: not started
+
+## Narrow evidence correction
+
+- Authority: Issue #535 comment `5464503005`
+- Reviewed parent: `df64274976056a82842d10cb9fcc6cddb4b62aba`
+- Exact write allowlist: `.cse/results/535_result.md` only
+- Flutter tests rerun: `NO`
+- Analyzer rerun: `NO`
+- Correction `git diff --check`: `PASS`
+- Correction allowlist audit: `PASS — 1/1`, only
+  `.cse/results/535_result.md`
+- Correction production/test/protected drift: `0`
+- Schema/backup/version read-only audit: `PASS — 22 / 1 / 0.1.0+1`
+- Correction commit/push SHA and final divergence are published in Issue/PR
+  evidence after this file is committed; no self-referential metadata commit
 
 ## execution_record
 
@@ -127,6 +160,7 @@
 execution_record:
   issue: 535
   authority_comment: 5464356178
+  correction_authority_comment: 5464503005
   task_risk: R4
   requested_model: gpt-5.6-sol
   requested_reasoning_effort: max
@@ -143,15 +177,23 @@ execution_record:
   integrated_test_exit: 0
   analyzer_invocations: 1
   analyzer_result: PASS
+  phase_a_evidence_commit: df64274976056a82842d10cb9fcc6cddb4b62aba
+  draft_pr: 536
+  owner_acceptance: PENDING_NOT_RUN
+  phase_b_device_authorized: false
+  ready: false
+  merge: false
+  issue_closure: false
+  slice_7_started: false
 ```
 
 ## review_recommendation
 
 ```yaml
 review_recommendation:
-  required_review: fresh independent R4
-  current_recommendation: DRAFT_PUBLICATION_AUTHORIZED_THEN_STOP
-  reason: Phase-A gate, analyzer, full/staged diff checks and drift audits passed; authorized Draft publication remains
+  required_review: FRESH_INDEPENDENT_R4_REQUIRED_ON_UPDATED_HEAD
+  current_recommendation: REVIEW_DRAFT_DO_NOT_READY_OR_MERGE
+  reason: publication is complete; result evidence is corrected under comment 5464503005 and requires fresh R4 review on the correction head
   ready: false
   merge: false
   phase_b_device_authorized: false
