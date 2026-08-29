@@ -384,6 +384,47 @@ class InventoryMapController extends ChangeNotifier {
         )) {
       throw const InventoryFailure('inventory_projection_integrity_failed');
     }
+    final floorRows = activeSketch.floors
+        .where(
+          (floor) =>
+              floor.id == placement.floorId &&
+              floor.projectId == projectId &&
+              floor.archivedAt == null,
+        )
+        .toList(growable: false);
+    if (floorRows.length != 1) {
+      throw const InventoryFailure('inventory_projection_integrity_failed');
+    }
+    final blockRows = activeSketch.blocks
+        .where(
+          (block) =>
+              block.id == floorRows.single.blockId &&
+              block.projectId == projectId &&
+              block.archivedAt == null,
+        )
+        .toList(growable: false);
+    if (blockRows.length != 1) {
+      throw const InventoryFailure('inventory_projection_integrity_failed');
+    }
+    final block = blockRows.single;
+    if (block.state == InventoryBlockState.active) {
+      final mappings = activeSketch.activeBlockPolygons
+          .where((mapping) => mapping.blockId == block.id)
+          .toList(growable: false);
+      final revision = activeSketch.activeRevision!;
+      if (mappings.length != 1 ||
+          mappings.single.revisionId != revision.id ||
+          mappings.single.sketchId != activeSketch.sketch.id ||
+          mappings.single.polygonIndex < 0 ||
+          mappings.single.polygonIndex >= revision.geometry.polylines.length ||
+          !InventorySpatialContract.containsPlacement(
+            revision.geometry.polylines[mappings.single.polygonIndex],
+            x: placement.x,
+            y: placement.y,
+          )) {
+        throw const InventoryFailure('inventory_projection_integrity_failed');
+      }
+    }
   }
 
   String _safeCode(Object error) => switch (error) {
@@ -460,7 +501,17 @@ class InventoryMapViewState extends State<InventoryMapView> {
   }
 
   void _refresh() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final highlighted = _highlightedAssetId;
+    if (highlighted != null &&
+        !widget.controller.projections.any(
+          (projection) => projection.asset.id == highlighted,
+        )) {
+      _highlightTimer?.cancel();
+      _highlightTimer = null;
+      _highlightedAssetId = null;
+    }
+    setState(() {});
   }
 
   void zoomIn() => _changeZoom(1.25);

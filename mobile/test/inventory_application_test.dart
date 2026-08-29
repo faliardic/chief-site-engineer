@@ -36,6 +36,7 @@ void main() {
       y: 21,
     );
     final first = await fixture.app.createAsset(create);
+    expect(create.floorId, isNull);
     final before = await _counts(fixture.db.database);
     final replay = await fixture.app.createAsset(create);
     expect(_resultValues(replay), _resultValues(first));
@@ -155,6 +156,175 @@ void main() {
       isEmpty,
     );
   });
+
+  test(
+    'AT-531-007/010 exact floor persists and wrong-block or project writes nothing',
+    () async {
+      final fixture = await _Fixture.create('exact_floor');
+      addTearDown(fixture.close);
+      final sketchA = await _createFinalizedSketch(
+        fixture,
+        seed: 12000,
+        geometry: _geometry(64),
+      );
+      final projectionA = (await fixture.app.loadPrimarySketch(_projectA))!;
+      final firstMapping = projectionA.activeBlockPolygons.singleWhere(
+        (mapping) => mapping.polygonIndex == 0,
+      );
+      final secondMapping = projectionA.activeBlockPolygons.singleWhere(
+        (mapping) => mapping.polygonIndex == 1,
+      );
+      final exactFloor = projectionA.floors.singleWhere(
+        (floor) => floor.blockId == firstMapping.blockId && floor.ordinal == 2,
+      );
+      final otherBlockFloor = projectionA.floors.singleWhere(
+        (floor) => floor.blockId == secondMapping.blockId && floor.ordinal == 2,
+      );
+      final exact = CreateInventoryAssetCommand(
+        operationId: _uuid(12010),
+        projectId: _projectA,
+        assetId: _uuid(12011),
+        placementId: _uuid(12012),
+        placementKey: _uuid(12013),
+        sketchId: sketchA.sketchId,
+        activeRevisionId: sketchA.activeRevisionId,
+        floorId: exactFloor.id,
+        displayName: 'İkinci kat aracı',
+        category: InventoryCategory.equipment,
+        totalQuantity: 1,
+        x: 256,
+        y: 256,
+      );
+      final result = await fixture.app.createAsset(exact);
+      expect(result.isNoOp, isFalse);
+      expect(
+        (await fixture.app.loadAsset(
+          projectId: _projectA,
+          assetId: exact.assetId,
+        )).activePlacement!.floorId,
+        exactFloor.id,
+      );
+      expect(
+        (await fixture.db.database.query(
+          'inventory_asset_placements',
+          columns: const ['floor_id'],
+          where: 'id = ?',
+          whereArgs: [exact.placementId],
+        )).single['floor_id'],
+        exactFloor.id,
+      );
+      final placementEvent =
+          (await fixture.app.listAssetHistory(
+            projectId: _projectA,
+            assetId: exact.assetId,
+          )).singleWhere(
+            (event) => event.eventType == InventoryEventType.placementCreated,
+          );
+      expect(placementEvent.payload['floor_id'], exactFloor.id);
+
+      final afterExact = await _counts(fixture.db.database);
+      final replay = await fixture.app.createAsset(exact);
+      expect(_resultValues(replay), _resultValues(result));
+      expect(await _counts(fixture.db.database), afterExact);
+      await expectLater(
+        fixture.app.createAsset(
+          CreateInventoryAssetCommand(
+            operationId: exact.operationId,
+            projectId: exact.projectId,
+            assetId: exact.assetId,
+            placementId: exact.placementId,
+            placementKey: exact.placementKey,
+            sketchId: exact.sketchId,
+            activeRevisionId: exact.activeRevisionId,
+            floorId: projectionA.floors
+                .singleWhere(
+                  (floor) =>
+                      floor.blockId == firstMapping.blockId &&
+                      floor.ordinal == 1,
+                )
+                .id,
+            displayName: exact.displayName,
+            category: exact.category,
+            totalQuantity: exact.totalQuantity,
+            x: exact.x,
+            y: exact.y,
+          ),
+        ),
+        _fails('inventory_operation_id_conflict'),
+      );
+      expect(await _counts(fixture.db.database), afterExact);
+
+      await expectLater(
+        fixture.app.createAsset(
+          CreateInventoryAssetCommand(
+            operationId: _uuid(12020),
+            projectId: _projectA,
+            assetId: _uuid(12021),
+            placementId: _uuid(12022),
+            placementKey: _uuid(12023),
+            sketchId: sketchA.sketchId,
+            activeRevisionId: sketchA.activeRevisionId,
+            floorId: otherBlockFloor.id,
+            displayName: 'Yanlış blok',
+            category: InventoryCategory.handTool,
+            totalQuantity: 1,
+            x: 256,
+            y: 256,
+          ),
+        ),
+        _fails('inventory_floor_unavailable'),
+      );
+      expect(await _counts(fixture.db.database), afterExact);
+
+      await expectLater(
+        fixture.app.createAsset(
+          CreateInventoryAssetCommand(
+            operationId: _uuid(12030),
+            projectId: _projectA,
+            assetId: _uuid(12031),
+            placementId: _uuid(12032),
+            placementKey: _uuid(12033),
+            sketchId: sketchA.sketchId,
+            activeRevisionId: sketchA.activeRevisionId,
+            floorId: exactFloor.id,
+            displayName: 'Sınır noktası',
+            category: InventoryCategory.handTool,
+            totalQuantity: 1,
+            x: 0,
+            y: 256,
+          ),
+        ),
+        _fails('inventory_floor_unavailable'),
+      );
+      expect(await _counts(fixture.db.database), afterExact);
+
+      await _createFinalizedSketch(fixture, seed: 12100, projectId: _projectB);
+      final projectionB = (await fixture.app.loadPrimarySketch(_projectB))!;
+      final projectBFloor = projectionB.floors.first;
+      final beforeCrossProject = await _counts(fixture.db.database);
+      await expectLater(
+        fixture.app.createAsset(
+          CreateInventoryAssetCommand(
+            operationId: _uuid(12110),
+            projectId: _projectA,
+            assetId: _uuid(12111),
+            placementId: _uuid(12112),
+            placementKey: _uuid(12113),
+            sketchId: sketchA.sketchId,
+            activeRevisionId: sketchA.activeRevisionId,
+            floorId: projectBFloor.id,
+            displayName: 'Yanlış proje katı',
+            category: InventoryCategory.handTool,
+            totalQuantity: 1,
+            x: 256,
+            y: 256,
+          ),
+        ),
+        _fails('inventory_floor_unavailable'),
+      );
+      expect(await _counts(fixture.db.database), beforeCrossProject);
+    },
+  );
 
   test(
     'sketch lifecycle preserves revisions, geometry, and constraints',

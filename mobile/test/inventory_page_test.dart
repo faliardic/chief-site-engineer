@@ -18,6 +18,15 @@ const _revisionB = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2';
 const _revisionUpdated = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc3';
 const _floorA = '99999999-9999-4999-8999-999999999991';
 const _floorB = '99999999-9999-4999-8999-999999999992';
+const _detachedBlockA = '88888888-8888-4888-8888-888888888881';
+const _detachedBlockB = '88888888-8888-4888-8888-888888888882';
+const _spatialBlockA = '88888888-8888-4888-8888-888888888883';
+const _spatialBlockB = '88888888-8888-4888-8888-888888888884';
+const _spatialFloorA1 = '99999999-9999-4999-8999-999999999993';
+const _spatialFloorA2 = '99999999-9999-4999-8999-999999999994';
+const _spatialFloorB1 = '99999999-9999-4999-8999-999999999995';
+const _spatialFloorB2 = '99999999-9999-4999-8999-999999999996';
+const _spatialFloorB3 = '99999999-9999-4999-8999-999999999997';
 const _assetA = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1';
 const _assetB = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd2';
 const _assetArchived = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd3';
@@ -377,8 +386,10 @@ void main() {
     tester,
   ) async {
     final inventory = _FakeInventory()
-      ..sketches[_projectA] = _sketch(_projectA)
-      ..assets[_projectA] = [_asset(_projectA, _assetA)];
+      ..sketches[_projectA] = _spatialSketch()
+      ..assets[_projectA] = [
+        _asset(_projectA, _assetA, floorId: _spatialFloorA1, x: 256, y: 256),
+      ];
     final source = _ProjectSource()
       ..projects = [_project(_projectA, 'Proje A')];
 
@@ -393,6 +404,13 @@ void main() {
     expect(find.byKey(const Key('inventory-update-sketch')), findsOneWidget);
     expect(find.byKey(const Key('inventory-view-switch')), findsOneWidget);
     expect(find.byKey(const Key('inventory-marker-$_assetA')), findsOneWidget);
+    await tester.tap(find.text('Katlar'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('inventory-floor-view')), findsOneWidget);
+    expect(
+      find.byKey(const Key('inventory-floor-row-$_spatialFloorB3')),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -824,6 +842,435 @@ void main() {
       expect(corrupt.mutations, 0);
     },
   );
+
+  testWidgets(
+    'AT-531-001/002 Kat Görünümü keeps stable stacks and exact active counts',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _spatialSketch()
+        ..assets[_projectA] = [
+          _asset(_projectA, _assetA, floorId: _spatialFloorA1, x: 256, y: 256),
+          _asset(_projectA, _assetB, floorId: _spatialFloorA2, x: 512, y: 512),
+          _asset(
+            _projectA,
+            _assetInvalid,
+            floorId: _spatialFloorB3,
+            x: 2304,
+            y: 256,
+          ),
+          _asset(
+            _projectA,
+            _assetArchived,
+            archived: true,
+            floorId: _spatialFloorA1,
+          ),
+        ];
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      await _pumpPage(tester, inventory: inventory, source: source);
+
+      await tester.tap(find.text('Katlar'));
+      await tester.pumpAndSettle();
+
+      final blockA = find.byKey(
+        const Key('inventory-floor-block-$_spatialBlockA'),
+      );
+      final blockB = find.byKey(
+        const Key('inventory-floor-block-$_spatialBlockB'),
+      );
+      expect(blockA, findsOneWidget);
+      expect(blockB, findsOneWidget);
+      expect(
+        tester.getTopLeft(blockA).dx,
+        lessThan(tester.getTopLeft(blockB).dx),
+      );
+      expect(
+        tester
+            .getTopLeft(
+              find.byKey(const Key('inventory-floor-row-$_spatialFloorA2')),
+            )
+            .dy,
+        lessThan(
+          tester
+              .getTopLeft(
+                find.byKey(const Key('inventory-floor-row-$_spatialFloorA1')),
+              )
+              .dy,
+        ),
+      );
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(const Key('inventory-floor-project-total')),
+            )
+            .data,
+        'Proje toplamı: 3 kayıt',
+      );
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(
+                const Key('inventory-floor-block-total-$_spatialBlockA'),
+              ),
+            )
+            .data,
+        '2 kayıt',
+      );
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(const Key('inventory-floor-count-$_spatialFloorB3')),
+            )
+            .data,
+        '1 kayıt',
+      );
+      expect(inventory.mutations, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'AT-531-003/004 floor navigation isolates markers and block clears stale floor',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _spatialSketch()
+        ..assets[_projectA] = [
+          _asset(_projectA, _assetA, floorId: _spatialFloorA1, x: 256, y: 256),
+          _asset(_projectA, _assetB, floorId: _spatialFloorA2, x: 512, y: 512),
+          _asset(
+            _projectA,
+            _assetInvalid,
+            floorId: _spatialFloorB1,
+            x: 2304,
+            y: 256,
+          ),
+        ];
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      final controller = _controller(inventory, source);
+      addTearDown(controller.dispose);
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        controller: controller,
+      );
+
+      controller.setView(InventoryPageView.floors);
+      await tester.pump();
+      await tester.tap(
+        find.byKey(const Key('inventory-floor-map-$_spatialFloorA1')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.view, InventoryPageView.map);
+      expect(controller.selectedBlockId, _spatialBlockA);
+      expect(controller.selectedFloorId, _spatialFloorA1);
+      expect(
+        find.byKey(const Key('inventory-marker-$_assetA')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('inventory-marker-$_assetB')), findsNothing);
+      expect(
+        find.byKey(const Key('inventory-marker-$_assetInvalid')),
+        findsNothing,
+      );
+
+      controller.setBlockSelection(_spatialBlockB);
+      await tester.pump();
+      expect(controller.selectedFloorId, isNull);
+      expect(
+        find.byKey(const Key('inventory-marker-$_assetInvalid')),
+        findsOneWidget,
+      );
+      controller.setFloorSelection(_spatialFloorA1);
+      await tester.pump();
+      expect(controller.selectedFloorId, isNull);
+      expect(
+        controller.lastDiagnosticCode,
+        'inventory_spatial_context_unavailable',
+      );
+      expect(inventory.mutations, 0);
+    },
+  );
+
+  testWidgets(
+    'AT-531-005 spatial labels and filters compose without archived floor invention',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _spatialSketch()
+        ..assets[_projectA] = [
+          _asset(
+            _projectA,
+            _assetA,
+            name: 'Kule vinç',
+            floorId: _spatialFloorA1,
+            x: 256,
+            y: 256,
+          ),
+          _asset(
+            _projectA,
+            _assetB,
+            name: 'Lazer metre',
+            category: InventoryCategory.measurementDevice,
+            floorId: _spatialFloorA2,
+            x: 512,
+            y: 512,
+          ),
+          _asset(
+            _projectA,
+            _assetInvalid,
+            name: 'B matkabı',
+            floorId: _spatialFloorB1,
+            x: 2304,
+            y: 256,
+          ),
+          _asset(
+            _projectA,
+            _assetArchived,
+            name: 'Arşiv kaydı',
+            archived: true,
+          ),
+        ];
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      final controller = _controller(inventory, source);
+      addTearDown(controller.dispose);
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        controller: controller,
+      );
+
+      controller.setView(InventoryPageView.list);
+      await tester.pump();
+      expect(find.text('Kule vinç · A Blok · A 1. Kat'), findsOneWidget);
+      expect(
+        find.byKey(const Key('inventory-list-spatial-$_assetArchived')),
+        findsNothing,
+      );
+
+      controller.setBlockSelection(_spatialBlockA);
+      await tester.pump();
+      expect(find.byKey(const Key('inventory-list-$_assetA')), findsOneWidget);
+      expect(find.byKey(const Key('inventory-list-$_assetB')), findsOneWidget);
+      expect(
+        find.byKey(const Key('inventory-list-$_assetInvalid')),
+        findsNothing,
+      );
+      controller.setFloorSelection(_spatialFloorA2);
+      controller.setCategoryFilter(InventoryCategory.measurementDevice);
+      controller.setSearch('Lazer');
+      await tester.pump();
+      expect(find.byKey(const Key('inventory-list-$_assetB')), findsOneWidget);
+      expect(find.byKey(const Key('inventory-list-$_assetA')), findsNothing);
+
+      controller
+        ..setSearch('')
+        ..setCategoryFilter(null)
+        ..setBlockSelection(null)
+        ..setArchiveFilter(InventoryArchiveFilter.archived);
+      await tester.pump();
+      expect(
+        find.byKey(const Key('inventory-list-$_assetArchived')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('inventory-list-spatial-$_assetArchived')),
+        findsNothing,
+      );
+      expect(inventory.mutations, 0);
+    },
+  );
+
+  testWidgets(
+    'AT-531-006 list focus selects exact block floor before existing cue',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _spatialSketch()
+        ..assets[_projectA] = [
+          _asset(_projectA, _assetA, floorId: _spatialFloorA1, x: 256, y: 256),
+          _asset(_projectA, _assetB, floorId: _spatialFloorB2, x: 3008, y: 768),
+        ];
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      final controller = _controller(inventory, source);
+      addTearDown(controller.dispose);
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        controller: controller,
+      );
+      controller.setView(InventoryPageView.list);
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('inventory-list-$_assetB')));
+      await tester.pump();
+
+      expect(controller.view, InventoryPageView.map);
+      expect(controller.selectedBlockId, _spatialBlockB);
+      expect(controller.selectedFloorId, _spatialFloorB2);
+      expect(find.byKey(const Key('inventory-marker-$_assetA')), findsNothing);
+      expect(
+        find.byKey(const Key('inventory-marker-$_assetB')),
+        findsOneWidget,
+      );
+      final pageState = tester.state<InventoryPageState>(
+        find.byType(InventoryPage),
+      );
+      expect(pageState.mapViewState?.highlightedAssetId, _assetB);
+      await tester.pump(const Duration(milliseconds: 2100));
+      expect(pageState.mapViewState?.highlightedAssetId, isNull);
+      expect(inventory.mutations, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'AT-531-007/008 floor plus uses exact floor and deterministic safe spread',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _spatialSketch()
+        ..assets[_projectA] = [
+          _asset(_projectA, _assetA, floorId: _spatialFloorA1, x: 256, y: 256),
+        ];
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      final controller = _controller(inventory, source);
+      addTearDown(controller.dispose);
+      final opened = <String>[];
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        controller: controller,
+        assetDetailLauncher: (context, projectId, assetId) async {
+          expect(projectId, _projectA);
+          opened.add(assetId);
+        },
+      );
+      controller.setView(InventoryPageView.floors);
+      await tester.pump();
+
+      Future<CreateInventoryAssetCommand> create(String name) async {
+        await tester.tap(
+          find.byKey(const Key('inventory-floor-create-$_spatialFloorA1')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('A Blok · A 1. Kat'), findsOneWidget);
+        await tester.enterText(
+          find.byKey(const Key('inventory-quick-name')),
+          name,
+        );
+        await tester.tap(find.byKey(const Key('inventory-quick-category')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Makine / ekipman').last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('inventory-quick-submit')));
+        await tester.pumpAndSettle();
+        return inventory.lastCreate!;
+      }
+
+      final first = await create('Kat aracı 1');
+      expect(first.floorId, _spatialFloorA1);
+      expect(
+        InventorySpatialContract.strictlyContainsPlacement(
+          _spatialSketch().activeRevision!.geometry.polylines.first,
+          x: first.x,
+          y: first.y,
+        ),
+        isTrue,
+      );
+      final second = await create('Kat aracı 2');
+      expect(second.floorId, _spatialFloorA1);
+      expect((second.x, second.y), isNot((first.x, first.y)));
+      expect(second.x % InventoryGeometryContract.placementStep, 0);
+      expect(second.y % InventoryGeometryContract.placementStep, 0);
+      expect(
+        InventorySpatialContract.strictlyContainsPlacement(
+          _spatialSketch().activeRevision!.geometry.polylines.first,
+          x: second.x,
+          y: second.y,
+        ),
+        isTrue,
+      );
+      expect(inventory.createCalls, 2);
+      expect(opened, hasLength(2));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test(
+    'AT-531-009 detached or unmapped floor has no safe create write',
+    () async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _sketch(_projectA)
+        ..assets[_projectA] = [];
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      final controller = _controller(inventory, source);
+      addTearDown(controller.dispose);
+      addTearDown(source.dispose);
+      await controller.initialize();
+
+      expect(
+        () => controller.safeCreateTargetForFloor(
+          blockId: _detachedBlockA,
+          floorId: _floorA,
+        ),
+        throwsA(
+          isA<InventoryFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'inventory_safe_interior_unavailable',
+          ),
+        ),
+      );
+      expect(
+        () => controller.safeCreateTargetForFloor(
+          blockId: _spatialBlockA,
+          floorId: _spatialFloorA1,
+        ),
+        throwsA(
+          isA<InventoryFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'inventory_safe_interior_unavailable',
+          ),
+        ),
+      );
+
+      final spatial = _spatialSketch();
+      final unmappedController = _controller(inventory, source)
+        ..selectedProjectId = _projectA
+        ..sketch = InventoryPrimarySketchProjection(
+          sketch: spatial.sketch,
+          activeRevision: spatial.activeRevision,
+          draftRevision: spatial.draftRevision,
+          blocks: spatial.blocks,
+          floors: spatial.floors,
+        )
+        ..assets = const [];
+      addTearDown(unmappedController.dispose);
+      expect(
+        () => unmappedController.safeCreateTargetForFloor(
+          blockId: _spatialBlockA,
+          floorId: _spatialFloorA1,
+        ),
+        throwsA(
+          isA<InventoryFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'inventory_safe_interior_unavailable',
+          ),
+        ),
+      );
+      expect(inventory.createCalls, 0);
+      expect(inventory.mutations, 0);
+    },
+  );
 }
 
 InventoryPageController _controller(
@@ -900,6 +1347,8 @@ class _FakeInventory extends UnavailableInventoryApplication {
   int mutations = 0;
   int moveCalls = 0;
   int unarchiveCalls = 0;
+  int createCalls = 0;
+  CreateInventoryAssetCommand? lastCreate;
   MoveInventoryPlacementCommand? lastMove;
   UnarchiveInventoryAssetCommand? lastUnarchive;
 
@@ -993,6 +1442,61 @@ class _FakeInventory extends UnavailableInventoryApplication {
       throw const InventoryFailure('inventory_placement_not_found');
     }
     return List.unmodifiable(values);
+  }
+
+  @override
+  Future<InventoryMutationResult> createAsset(
+    CreateInventoryAssetCommand command,
+  ) async {
+    createCalls += 1;
+    mutations += 1;
+    lastCreate = command;
+    final projection = InventoryAssetProjection(
+      asset: InventoryAssetRecord(
+        id: command.assetId,
+        projectId: command.projectId,
+        displayName: command.displayName,
+        normalizedName: command.displayName.toLowerCase(),
+        category: command.category,
+        otherCategoryLabel: command.otherCategoryLabel,
+        totalQuantity: command.totalQuantity,
+        status: command.status,
+        note: command.note,
+        revision: 1,
+        createdAt: _now,
+        updatedAt: _now,
+        statusChangedAt: _now,
+        archivedAt: null,
+      ),
+      activePlacement: InventoryPlacementRecord(
+        id: command.placementId,
+        placementKey: command.placementKey,
+        projectId: command.projectId,
+        assetId: command.assetId,
+        sketchId: command.sketchId,
+        floorId: command.floorId ?? _floorA,
+        provenanceRevisionId: command.activeRevisionId,
+        sequence: 1,
+        x: command.x,
+        y: command.y,
+        quantity: command.totalQuantity,
+        createdAt: _now,
+        endedAt: null,
+        endReason: null,
+        supersedesPlacementId: null,
+      ),
+    );
+    assets[command.projectId] = [
+      ...assets[command.projectId] ?? const <InventoryAssetProjection>[],
+      projection,
+    ];
+    return _mutationResult(
+      command,
+      sourceId: command.assetId,
+      sourceRevision: 1,
+      supportingId: command.placementId,
+      supportingRevision: 1,
+    );
   }
 
   @override
@@ -1198,8 +1702,157 @@ InventoryPrimarySketchProjection _sketch(
       abandonedAt: null,
     ),
     draftRevision: null,
+    blocks: [
+      _block(
+        id: projectId == _projectA ? _detachedBlockA : _detachedBlockB,
+        projectId: projectId,
+        name: 'Eski alan',
+        ordinal: 1,
+        state: InventoryBlockState.detached,
+      ),
+    ],
+    floors: [
+      _floor(
+        id: projectId == _projectA ? _floorA : _floorB,
+        blockId: projectId == _projectA ? _detachedBlockA : _detachedBlockB,
+        projectId: projectId,
+        name: '1. Kat',
+        ordinal: 1,
+      ),
+    ],
   );
 }
+
+InventoryPrimarySketchProjection _spatialSketch() {
+  final geometry = InventoryGeometry(
+    polylines: [_rectangle(0, 0, 1536, 1536), _rectangle(2048, 0, 3584, 1536)],
+  );
+  final base = _sketch(_projectA, geometryOverride: geometry);
+  return InventoryPrimarySketchProjection(
+    sketch: base.sketch,
+    activeRevision: base.activeRevision,
+    draftRevision: null,
+    blocks: [
+      _block(
+        id: _spatialBlockB,
+        projectId: _projectA,
+        name: 'B Blok',
+        ordinal: 2,
+        state: InventoryBlockState.active,
+      ),
+      _block(
+        id: _spatialBlockA,
+        projectId: _projectA,
+        name: 'A Blok',
+        ordinal: 1,
+        state: InventoryBlockState.active,
+      ),
+    ],
+    floors: [
+      _floor(
+        id: _spatialFloorB2,
+        blockId: _spatialBlockB,
+        projectId: _projectA,
+        name: 'B 2. Kat',
+        ordinal: 2,
+      ),
+      _floor(
+        id: _spatialFloorA2,
+        blockId: _spatialBlockA,
+        projectId: _projectA,
+        name: 'A 2. Kat',
+        ordinal: 2,
+      ),
+      _floor(
+        id: _spatialFloorB3,
+        blockId: _spatialBlockB,
+        projectId: _projectA,
+        name: 'B 3. Kat',
+        ordinal: 3,
+      ),
+      _floor(
+        id: _spatialFloorA1,
+        blockId: _spatialBlockA,
+        projectId: _projectA,
+        name: 'A 1. Kat',
+        ordinal: 1,
+      ),
+      _floor(
+        id: _spatialFloorB1,
+        blockId: _spatialBlockB,
+        projectId: _projectA,
+        name: 'B 1. Kat',
+        ordinal: 1,
+      ),
+    ],
+    activeBlockPolygons: [
+      InventoryRevisionBlockPolygonRecord(
+        revisionId: _revisionA,
+        blockId: _spatialBlockB,
+        projectId: _projectA,
+        sketchId: _sketchA,
+        polygonIndex: 1,
+        createdAt: _now,
+      ),
+      InventoryRevisionBlockPolygonRecord(
+        revisionId: _revisionA,
+        blockId: _spatialBlockA,
+        projectId: _projectA,
+        sketchId: _sketchA,
+        polygonIndex: 0,
+        createdAt: _now,
+      ),
+    ],
+  );
+}
+
+InventoryBlockRecord _block({
+  required String id,
+  required String projectId,
+  required String name,
+  required int ordinal,
+  required InventoryBlockState state,
+}) => InventoryBlockRecord(
+  id: id,
+  projectId: projectId,
+  displayName: name,
+  normalizedName: name.toLowerCase(),
+  ordinal: ordinal,
+  state: state,
+  revision: 1,
+  createdAt: _now,
+  updatedAt: _now,
+  archivedAt: null,
+);
+
+InventoryFloorRecord _floor({
+  required String id,
+  required String blockId,
+  required String projectId,
+  required String name,
+  required int ordinal,
+}) => InventoryFloorRecord(
+  id: id,
+  blockId: blockId,
+  projectId: projectId,
+  displayName: name,
+  ordinal: ordinal,
+  revision: 1,
+  createdAt: _now,
+  updatedAt: _now,
+  archivedAt: null,
+);
+
+InventoryPolyline _rectangle(int left, int top, int right, int bottom) =>
+    InventoryPolyline(
+      closed: true,
+      points: [
+        InventorySketchPoint(x: left, y: top),
+        InventorySketchPoint(x: right, y: top),
+        InventorySketchPoint(x: right, y: bottom),
+        InventorySketchPoint(x: left, y: bottom),
+      ],
+    );
 
 InventoryGeometry _finalizedCreateGeometry() => InventoryGeometry(
   polylines: [
@@ -1248,6 +1901,7 @@ InventoryAssetProjection _asset(
   bool placement = true,
   int x = 100,
   int y = 100,
+  String? floorId,
 }) {
   final normalized = name
       .replaceAll('I', 'ı')
@@ -1280,7 +1934,7 @@ InventoryAssetProjection _asset(
             projectId: projectId,
             assetId: assetId,
             sketchId: sketchId,
-            floorId: projectId == _projectA ? _floorA : _floorB,
+            floorId: floorId ?? (projectId == _projectA ? _floorA : _floorB),
             provenanceRevisionId: revisionId,
             sequence: 1,
             x: x,

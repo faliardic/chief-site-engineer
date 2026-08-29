@@ -5,6 +5,7 @@ import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/features/inventory/inventory_asset_detail_sheet.dart';
 import 'package:chief_site_engineer/features/inventory/inventory_asset_quick_form.dart';
+import 'package:chief_site_engineer/features/inventory/inventory_floor_view.dart';
 import 'package:chief_site_engineer/features/inventory/inventory_map_view.dart';
 import 'package:chief_site_engineer/features/inventory/inventory_sketch_editor_page.dart';
 import 'package:flutter/material.dart';
@@ -34,7 +35,17 @@ enum InventoryPageLoadStatus {
   failed,
 }
 
-enum InventoryPageView { map, list }
+enum InventoryPageView { map, floors, list }
+
+class InventoryAssetSpatialContext {
+  const InventoryAssetSpatialContext({
+    required this.block,
+    required this.floor,
+  });
+
+  final InventoryBlockRecord block;
+  final InventoryFloorRecord floor;
+}
 
 enum _InventoryDetailTargetRequest { move, unarchive }
 
@@ -69,6 +80,8 @@ class InventoryPageController extends ChangeNotifier {
   InventoryCategory? categoryFilter;
   InventoryAssetStatus? statusFilter;
   InventoryArchiveFilter archiveFilter = InventoryArchiveFilter.active;
+  String? selectedBlockId;
+  String? selectedFloorId;
   String? lastErrorCode;
   String? lastDiagnosticCode;
   String? sketchDiagnosticCode;
@@ -92,6 +105,7 @@ class InventoryPageController extends ChangeNotifier {
         if (statusFilter != null && asset.status != statusFilter) {
           return false;
         }
+        if (!_matchesSpatialSelection(projection)) return false;
         return switch (archiveFilter) {
           InventoryArchiveFilter.active => asset.archivedAt == null,
           InventoryArchiveFilter.archived => asset.archivedAt != null,
@@ -112,6 +126,146 @@ class InventoryPageController extends ChangeNotifier {
           (projection) => projection.asset.archivedAt == null,
         ),
       );
+
+  List<InventoryBlockRecord> get activeBlocks {
+    final projection = sketch;
+    if (projection == null) return const [];
+    final mappedIds = projection.activeBlockPolygons
+        .map((mapping) => mapping.blockId)
+        .toSet();
+    final result =
+        projection.blocks
+            .where(
+              (block) =>
+                  block.projectId == selectedProjectId &&
+                  block.state == InventoryBlockState.active &&
+                  block.archivedAt == null &&
+                  mappedIds.contains(block.id),
+            )
+            .toList(growable: false)
+          ..sort(_compareBlocks);
+    return List<InventoryBlockRecord>.unmodifiable(result);
+  }
+
+  List<InventoryFloorRecord> get activeFloors {
+    final projection = sketch;
+    if (projection == null) return const [];
+    final blockIds = activeBlocks.map((block) => block.id).toSet();
+    final result =
+        projection.floors
+            .where(
+              (floor) =>
+                  floor.projectId == selectedProjectId &&
+                  floor.archivedAt == null &&
+                  blockIds.contains(floor.blockId),
+            )
+            .toList(growable: false)
+          ..sort(_compareFloors);
+    return List<InventoryFloorRecord>.unmodifiable(result);
+  }
+
+  List<InventoryFloorRecord> get selectedBlockFloors {
+    final blockId = selectedBlockId;
+    if (blockId == null) return const [];
+    return List<InventoryFloorRecord>.unmodifiable(
+      activeFloors.where((floor) => floor.blockId == blockId),
+    );
+  }
+
+  InventoryFloorViewModel get floorViewModel =>
+      InventoryFloorViewModel.fromCanonical(
+        activeBlocks: activeBlocks,
+        activeFloors: activeFloors,
+        assets: assets,
+      );
+
+  InventoryAssetSpatialContext? spatialContextFor(
+    InventoryAssetProjection projection, {
+    bool activeBlockOnly = false,
+  }) {
+    final currentSketch = sketch;
+    final placement = projection.activePlacement;
+    if (currentSketch == null ||
+        projection.asset.archivedAt != null ||
+        placement == null ||
+        !placement.isActive ||
+        placement.projectId != selectedProjectId ||
+        placement.assetId != projection.asset.id ||
+        placement.sketchId != currentSketch.sketch.id ||
+        placement.quantity != projection.asset.totalQuantity) {
+      return null;
+    }
+    final floor = _floorOrNull(placement.floorId);
+    if (floor == null || floor.archivedAt != null) return null;
+    final block = _blockOrNull(floor.blockId);
+    if (block == null || block.archivedAt != null) return null;
+    if (activeBlockOnly &&
+        (block.state != InventoryBlockState.active ||
+            !activeBlocks.any((candidate) => candidate.id == block.id))) {
+      return null;
+    }
+    return InventoryAssetSpatialContext(block: block, floor: floor);
+  }
+
+  void setBlockSelection(String? blockId) {
+    if (blockId != null && !activeBlocks.any((block) => block.id == blockId)) {
+      lastDiagnosticCode = 'inventory_spatial_context_unavailable';
+      _notify();
+      return;
+    }
+    final floorStillValid =
+        blockId != null &&
+        selectedFloorId != null &&
+        activeFloors.any(
+          (floor) => floor.id == selectedFloorId && floor.blockId == blockId,
+        );
+    if (selectedBlockId == blockId &&
+        (floorStillValid || selectedFloorId == null)) {
+      return;
+    }
+    selectedBlockId = blockId;
+    if (!floorStillValid) selectedFloorId = null;
+    lastDiagnosticCode = null;
+    _notify();
+  }
+
+  void setFloorSelection(String? floorId) {
+    final blockId = selectedBlockId;
+    if (floorId != null &&
+        (blockId == null ||
+            !activeFloors.any(
+              (floor) => floor.id == floorId && floor.blockId == blockId,
+            ))) {
+      lastDiagnosticCode = 'inventory_spatial_context_unavailable';
+      _notify();
+      return;
+    }
+    if (selectedFloorId == floorId) return;
+    selectedFloorId = floorId;
+    lastDiagnosticCode = null;
+    _notify();
+  }
+
+  bool selectSpatialContext({
+    required String blockId,
+    required String floorId,
+    required InventoryPageView targetView,
+  }) {
+    final valid = activeFloors.any(
+      (floor) => floor.id == floorId && floor.blockId == blockId,
+    );
+    if (!valid || targetView == InventoryPageView.floors) {
+      lastDiagnosticCode = 'inventory_spatial_context_unavailable';
+      _notify();
+      return false;
+    }
+    selectedBlockId = blockId;
+    selectedFloorId = floorId;
+    view = targetView;
+    lastDiagnosticCode = null;
+    _notify();
+    return true;
+  }
 
   Future<void> initialize() async {
     if (!_initialized) {
@@ -204,7 +358,7 @@ class InventoryPageController extends ChangeNotifier {
   Future<void> reloadSelected() => refreshProjects();
 
   void setView(InventoryPageView value) {
-    if (value == InventoryPageView.map && sketch == null) {
+    if (value != InventoryPageView.list && sketch == null) {
       lastDiagnosticCode =
           sketchDiagnosticCode ?? 'inventory_active_revision_unavailable';
       _notify();
@@ -258,7 +412,8 @@ class InventoryPageController extends ChangeNotifier {
         placement.projectId != selectedProjectId ||
         placement.assetId != asset.id ||
         placement.sketchId != activeSketch.sketch.id ||
-        placement.quantity != asset.totalQuantity) {
+        placement.quantity != asset.totalQuantity ||
+        spatialContextFor(projection) == null) {
       return false;
     }
     try {
@@ -312,6 +467,70 @@ class InventoryPageController extends ChangeNotifier {
     _notify();
   }
 
+  InventoryPlacementCoordinates safeCreateTargetForFloor({
+    required String blockId,
+    required String floorId,
+  }) {
+    try {
+      final projection = sketch;
+      final active = projection?.activeRevision;
+      if (projection == null || active == null) {
+        throw const InventoryFailure('inventory_safe_interior_unavailable');
+      }
+      final block = activeBlocks
+          .where((candidate) => candidate.id == blockId)
+          .toList(growable: false);
+      final floor = activeFloors
+          .where(
+            (candidate) =>
+                candidate.id == floorId && candidate.blockId == blockId,
+          )
+          .toList(growable: false);
+      final mapping = projection.activeBlockPolygons
+          .where(
+            (candidate) =>
+                candidate.blockId == blockId &&
+                candidate.revisionId == active.id &&
+                candidate.sketchId == projection.sketch.id,
+          )
+          .toList(growable: false);
+      if (block.length != 1 ||
+          floor.length != 1 ||
+          mapping.length != 1 ||
+          mapping.single.polygonIndex < 0 ||
+          mapping.single.polygonIndex >= active.geometry.polylines.length) {
+        throw const InventoryFailure('inventory_safe_interior_unavailable');
+      }
+      final occupied = <InventoryPlacementCoordinates>[];
+      for (final asset in assets) {
+        final context = spatialContextFor(asset, activeBlockOnly: true);
+        final placement = asset.activePlacement;
+        if (context?.block.id == blockId &&
+            context?.floor.id == floorId &&
+            placement != null) {
+          occupied.add(
+            InventoryPlacementCoordinates(x: placement.x, y: placement.y),
+          );
+        }
+      }
+      final target = InventorySpatialContract.safeInteriorPlacement(
+        active.geometry.polylines[mapping.single.polygonIndex],
+        spreadIndex: occupied.length,
+        occupied: occupied,
+      );
+      if (!InventorySpatialContract.strictlyContainsPlacement(
+        active.geometry.polylines[mapping.single.polygonIndex],
+        x: target.x,
+        y: target.y,
+      )) {
+        throw const InventoryFailure('inventory_safe_interior_unavailable');
+      }
+      return target;
+    } on Object {
+      throw const InventoryFailure('inventory_safe_interior_unavailable');
+    }
+  }
+
   Future<void> _loadInventory(String projectId, int generation) async {
     if (!_isCurrent(generation) || selectedProjectId != projectId) return;
     loadStatus = InventoryPageLoadStatus.loadingInventory;
@@ -346,6 +565,7 @@ class InventoryPageController extends ChangeNotifier {
       _verifyAssetIdentities(projectId, loadedAssets);
       sketch = loadedSketch;
       assets = List<InventoryAssetProjection>.unmodifiable(loadedAssets);
+      _revalidateSpatialSelection();
       sketchDiagnosticCode = geometryFailure;
       if (geometryFailure != null) {
         view = InventoryPageView.list;
@@ -375,6 +595,41 @@ class InventoryPageController extends ChangeNotifier {
         active?.state != InventorySketchRevisionState.active) {
       throw const InventoryFailure('inventory_active_revision_unavailable');
     }
+    final blockIds = <String>{};
+    for (final block in value.blocks) {
+      if (block.projectId != projectId || !blockIds.add(block.id)) {
+        throw const InventoryFailure('inventory_projection_integrity_failed');
+      }
+    }
+    final floorIds = <String>{};
+    for (final floor in value.floors) {
+      if (floor.projectId != projectId ||
+          !blockIds.contains(floor.blockId) ||
+          !floorIds.add(floor.id)) {
+        throw const InventoryFailure('inventory_projection_integrity_failed');
+      }
+    }
+    final mappedBlockIds = <String>{};
+    final mappedPolygonIndices = <int>{};
+    for (final mapping in value.activeBlockPolygons) {
+      if (mapping.projectId != projectId ||
+          mapping.sketchId != value.sketch.id ||
+          mapping.revisionId != active!.id ||
+          !blockIds.contains(mapping.blockId) ||
+          mapping.polygonIndex < 0 ||
+          mapping.polygonIndex >= active.geometry.polylines.length ||
+          !mappedBlockIds.add(mapping.blockId) ||
+          !mappedPolygonIndices.add(mapping.polygonIndex)) {
+        throw const InventoryFailure('inventory_projection_integrity_failed');
+      }
+    }
+    if (value.blocks.any(
+      (block) =>
+          block.state == InventoryBlockState.active &&
+          !mappedBlockIds.contains(block.id),
+    )) {
+      throw const InventoryFailure('inventory_projection_integrity_failed');
+    }
   }
 
   void _verifyAssetIdentities(
@@ -397,6 +652,45 @@ class InventoryPageController extends ChangeNotifier {
     return null;
   }
 
+  InventoryBlockRecord? _blockOrNull(String id) {
+    for (final block in sketch?.blocks ?? const <InventoryBlockRecord>[]) {
+      if (block.id == id) return block;
+    }
+    return null;
+  }
+
+  InventoryFloorRecord? _floorOrNull(String id) {
+    for (final floor in sketch?.floors ?? const <InventoryFloorRecord>[]) {
+      if (floor.id == id) return floor;
+    }
+    return null;
+  }
+
+  bool _matchesSpatialSelection(InventoryAssetProjection projection) {
+    final blockId = selectedBlockId;
+    if (blockId == null) return true;
+    final context = spatialContextFor(projection, activeBlockOnly: true);
+    if (context == null || context.block.id != blockId) return false;
+    final floorId = selectedFloorId;
+    return floorId == null || context.floor.id == floorId;
+  }
+
+  void _revalidateSpatialSelection() {
+    final blockId = selectedBlockId;
+    if (blockId == null || !activeBlocks.any((block) => block.id == blockId)) {
+      selectedBlockId = null;
+      selectedFloorId = null;
+      return;
+    }
+    final floorId = selectedFloorId;
+    if (floorId != null &&
+        !activeFloors.any(
+          (floor) => floor.id == floorId && floor.blockId == blockId,
+        )) {
+      selectedFloorId = null;
+    }
+  }
+
   void _clearProjectSession({bool keepSelection = false}) {
     sketch = null;
     assets = const [];
@@ -405,6 +699,8 @@ class InventoryPageController extends ChangeNotifier {
     categoryFilter = null;
     statusFilter = null;
     archiveFilter = InventoryArchiveFilter.active;
+    selectedBlockId = null;
+    selectedFloorId = null;
     lastErrorCode = null;
     lastDiagnosticCode = null;
     sketchDiagnosticCode = null;
@@ -667,7 +963,7 @@ class InventoryPageState extends State<InventoryPage> {
     final visible = controller.visibleAssets;
     return Column(
       children: [
-        _filters(),
+        if (controller.view != InventoryPageView.floors) _filters(),
         if (controller.sketch != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
@@ -685,24 +981,32 @@ class InventoryPageState extends State<InventoryPage> {
           ),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-          child: SegmentedButton<InventoryPageView>(
-            key: const Key('inventory-view-switch'),
-            segments: const [
-              ButtonSegment(
-                value: InventoryPageView.map,
-                icon: Icon(Icons.map_outlined),
-                label: Text('Kroki'),
-              ),
-              ButtonSegment(
-                value: InventoryPageView.list,
-                icon: Icon(Icons.view_list_outlined),
-                label: Text('Liste'),
-              ),
-            ],
-            selected: {controller.view},
-            onSelectionChanged: (selection) {
-              if (selection.isNotEmpty) controller.setView(selection.single);
-            },
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SegmentedButton<InventoryPageView>(
+              key: const Key('inventory-view-switch'),
+              segments: const [
+                ButtonSegment(
+                  value: InventoryPageView.map,
+                  icon: Icon(Icons.map_outlined),
+                  label: Text('Kroki'),
+                ),
+                ButtonSegment(
+                  value: InventoryPageView.floors,
+                  icon: Icon(Icons.layers_outlined),
+                  label: Text('Katlar'),
+                ),
+                ButtonSegment(
+                  value: InventoryPageView.list,
+                  icon: Icon(Icons.view_list_outlined),
+                  label: Text('Liste'),
+                ),
+              ],
+              selected: {controller.view},
+              onSelectionChanged: (selection) {
+                if (selection.isNotEmpty) controller.setView(selection.single);
+              },
+            ),
           ),
         ),
         if (controller.lastDiagnosticCode case final code?)
@@ -717,9 +1021,11 @@ class InventoryPageState extends State<InventoryPage> {
             ],
           ),
         Expanded(
-          child: controller.view == InventoryPageView.map
-              ? _map()
-              : _list(visible),
+          child: switch (controller.view) {
+            InventoryPageView.map => _map(),
+            InventoryPageView.floors => _floors(),
+            InventoryPageView.list => _list(visible),
+          },
         ),
       ],
     );
@@ -730,6 +1036,10 @@ class InventoryPageState extends State<InventoryPage> {
     padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
     child: Row(
       children: [
+        _blockSelector(),
+        const SizedBox(width: 8),
+        _floorSelector(),
+        const SizedBox(width: 8),
         SizedBox(
           width: 220,
           child: TextField(
@@ -822,6 +1132,87 @@ class InventoryPageState extends State<InventoryPage> {
         ),
       ],
     ),
+  );
+
+  Widget _blockSelector() {
+    final blocks = controller.activeBlocks;
+    final selected = controller.selectedBlockId ?? '';
+    return SizedBox(
+      key: const Key('inventory-block-selector'),
+      width: 170,
+      child: DropdownButtonFormField<String>(
+        key: ValueKey('inventory-block-$selected-${blocks.length}'),
+        initialValue: selected,
+        isExpanded: true,
+        decoration: const InputDecoration(
+          labelText: 'Blok',
+          border: OutlineInputBorder(),
+        ),
+        items: [
+          const DropdownMenuItem(value: '', child: Text('Tümü')),
+          for (final block in blocks)
+            DropdownMenuItem(
+              value: block.id,
+              child: Text(block.displayName, overflow: TextOverflow.ellipsis),
+            ),
+        ],
+        onChanged: (value) => controller.setBlockSelection(
+          value == null || value.isEmpty ? null : value,
+        ),
+      ),
+    );
+  }
+
+  Widget _floorSelector() {
+    final floors = controller.selectedBlockFloors;
+    final enabled = controller.selectedBlockId != null;
+    final selected = enabled ? controller.selectedFloorId ?? '' : '';
+    return SizedBox(
+      key: const Key('inventory-floor-selector'),
+      width: 170,
+      child: DropdownButtonFormField<String>(
+        key: ValueKey('inventory-floor-$selected-${floors.length}-$enabled'),
+        initialValue: selected,
+        isExpanded: true,
+        decoration: const InputDecoration(
+          labelText: 'Kat',
+          border: OutlineInputBorder(),
+        ),
+        items: [
+          const DropdownMenuItem(value: '', child: Text('Tüm katlar')),
+          for (final floor in floors)
+            DropdownMenuItem(
+              value: floor.id,
+              child: Text(floor.displayName, overflow: TextOverflow.ellipsis),
+            ),
+        ],
+        onChanged: enabled
+            ? (value) => controller.setFloorSelection(
+                value == null || value.isEmpty ? null : value,
+              )
+            : null,
+      ),
+    );
+  }
+
+  Widget _floors() => InventoryFloorView(
+    model: controller.floorViewModel,
+    onOpenMap: (blockId, floorId) {
+      controller.selectSpatialContext(
+        blockId: blockId,
+        floorId: floorId,
+        targetView: InventoryPageView.map,
+      );
+    },
+    onOpenList: (blockId, floorId) {
+      controller.selectSpatialContext(
+        blockId: blockId,
+        floorId: floorId,
+        targetView: InventoryPageView.list,
+      );
+    },
+    onCreate: (blockId, floorId) =>
+        unawaited(_openFloorQuickCreate(blockId, floorId)),
   );
 
   Widget _map() {
@@ -968,6 +1359,7 @@ class InventoryPageState extends State<InventoryPage> {
       itemBuilder: (context, index) {
         final projection = visible[index];
         final asset = projection.asset;
+        final spatial = controller.spatialContextFor(projection);
         return Card(
           child: ListTile(
             key: Key('inventory-list-${asset.id}'),
@@ -977,11 +1369,22 @@ class InventoryPageState extends State<InventoryPage> {
                   : Icons.archive_outlined,
             ),
             title: Text(asset.displayName),
-            subtitle: Text(
-              '${inventoryCategoryLabel(asset.category)} • '
-              '${inventoryAssetStatusLabel(asset.status)} • '
-              '${asset.totalQuantity} adet'
-              '${asset.archivedAt == null ? '' : ' • Arşivli'}',
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (spatial != null)
+                  Text(
+                    '${asset.displayName} · ${spatial.block.displayName} · '
+                    '${spatial.floor.displayName}',
+                    key: Key('inventory-list-spatial-${asset.id}'),
+                  ),
+                Text(
+                  '${inventoryCategoryLabel(asset.category)} • '
+                  '${inventoryAssetStatusLabel(asset.status)} • '
+                  '${asset.totalQuantity} adet'
+                  '${asset.archivedAt == null ? '' : ' • Arşivli'}',
+                ),
+              ],
             ),
             trailing: Icon(
               asset.archivedAt == null
@@ -1064,13 +1467,18 @@ class InventoryPageState extends State<InventoryPage> {
     }
   }
 
-  Future<void> _openQuickCreate(InventoryPlacementTarget target) async {
+  Future<void> _openQuickCreate(
+    InventoryPlacementTarget target, {
+    String? floorId,
+    String? spatialContextLabel,
+  }) async {
     final projectId = controller.selectedProjectId;
     if (projectId == null) return;
     final quickController = InventoryAssetQuickCreateController(
       application: widget.application,
       projectId: projectId,
       reloadCanonical: controller.reloadSelected,
+      floorId: floorId,
     );
     final createdId = await showModalBottomSheet<String>(
       context: context,
@@ -1078,12 +1486,48 @@ class InventoryPageState extends State<InventoryPage> {
       builder: (sheetContext) => InventoryAssetQuickForm(
         controller: quickController,
         target: target,
+        spatialContextLabel: spatialContextLabel,
         onCreated: (assetId) => Navigator.of(sheetContext).pop(assetId),
       ),
     );
     quickController.dispose();
     _mapController?.clearCreateTarget();
     if (createdId != null && mounted) await _openAssetDetail(createdId);
+  }
+
+  Future<void> _openFloorQuickCreate(String blockId, String floorId) async {
+    late final InventoryPlacementCoordinates coordinates;
+    late final String spatialContextLabel;
+    try {
+      final block = controller.activeBlocks
+          .where((candidate) => candidate.id == blockId)
+          .toList(growable: false);
+      final floor = controller.activeFloors
+          .where(
+            (candidate) =>
+                candidate.id == floorId && candidate.blockId == blockId,
+          )
+          .toList(growable: false);
+      if (block.length != 1 || floor.length != 1) {
+        throw const InventoryFailure('inventory_safe_interior_unavailable');
+      }
+      coordinates = controller.safeCreateTargetForFloor(
+        blockId: blockId,
+        floorId: floorId,
+      );
+      spatialContextLabel =
+          '${block.single.displayName} · ${floor.single.displayName}';
+    } on Object {
+      controller.recordPresentationFailure(
+        'inventory_safe_interior_unavailable',
+      );
+      return;
+    }
+    await _openQuickCreate(
+      InventoryPlacementTarget(x: coordinates.x, y: coordinates.y),
+      floorId: floorId,
+      spatialContextLabel: spatialContextLabel,
+    );
   }
 
   Future<void> _openAssetDetail(String assetId) async {
@@ -1278,7 +1722,22 @@ class InventoryPageState extends State<InventoryPage> {
       controller.recordFocusFailure(projection);
       return;
     }
-    controller.setView(InventoryPageView.map);
+    final spatial = controller.spatialContextFor(
+      projection,
+      activeBlockOnly: true,
+    );
+    if (spatial != null) {
+      if (!controller.selectSpatialContext(
+        blockId: spatial.block.id,
+        floorId: spatial.floor.id,
+        targetView: InventoryPageView.map,
+      )) {
+        return;
+      }
+    } else {
+      controller.setBlockSelection(null);
+      controller.setView(InventoryPageView.map);
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final focused = _mapKey.currentState?.focusAsset(projection.asset.id);
@@ -1321,6 +1780,18 @@ String _normalizeName(String value) => value
     .toLowerCase()
     .replaceAll(RegExp(r'\s+'), ' ')
     .trim();
+
+int _compareBlocks(InventoryBlockRecord left, InventoryBlockRecord right) {
+  final ordinal = left.ordinal.compareTo(right.ordinal);
+  return ordinal != 0 ? ordinal : left.id.compareTo(right.id);
+}
+
+int _compareFloors(InventoryFloorRecord left, InventoryFloorRecord right) {
+  final block = left.blockId.compareTo(right.blockId);
+  if (block != 0) return block;
+  final ordinal = left.ordinal.compareTo(right.ordinal);
+  return ordinal != 0 ? ordinal : left.id.compareTo(right.id);
+}
 
 String _safeCode(Object error, {required String fallback}) => switch (error) {
   InventoryFailure() => error.code,

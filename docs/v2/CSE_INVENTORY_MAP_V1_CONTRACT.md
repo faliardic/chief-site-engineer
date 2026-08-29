@@ -1,10 +1,10 @@
 # CSE Inventory Map v1 Canonical Contract
 
 - **Belge türü:** Normative product, UX and persistence contract
-- **Owner authority:** [Feature Epic #506](https://github.com/faliardic/chief-site-engineer/issues/506), [Issue #507](https://github.com/faliardic/chief-site-engineer/issues/507), and revised spatial foundation [Issue #527](https://github.com/faliardic/chief-site-engineer/issues/527)
-- **Contract version:** `1.1`
-- **Contract status:** Slices 1–5 are production predecessors; revised Slice 6.1 spatial foundation is implemented for independent review
-- **Task-start baseline:** `f858740f6975bace9b6efd21deb1f679e4489cbf`
+- **Owner authority:** [Feature Epic #506](https://github.com/faliardic/chief-site-engineer/issues/506), [Issue #507](https://github.com/faliardic/chief-site-engineer/issues/507), revised spatial foundation [Issue #527](https://github.com/faliardic/chief-site-engineer/issues/527), and floor navigation [Issue #531](https://github.com/faliardic/chief-site-engineer/issues/531)
+- **Contract version:** `1.2`
+- **Contract status:** Slices 1–5 and revised Slice 6.1 are production predecessors; Slice 6.2 floor navigation is the current implementation scope
+- **Task-start baseline:** `b68ceca5cf51773cb3067d9cf4090a7181935289`
 - **Current persisted facts:** SQLite schema `22`, backup format `1`, mobile version `0.1.0+1`, MAIN package `com.faliardic.sefim`
 
 ## 1. Normative language and product boundary
@@ -1015,6 +1015,51 @@ All controls MUST expose semantic labels, selected/disabled state, logical
 reading order and scalable text. Color MUST NOT be the sole carrier for mode,
 selection, status, archive, corrupt state or save state.
 
+### 8.6 Kat Görünümü and canonical block/floor navigation
+
+Inventory navigation MUST derive its route-local spatial selection from the
+canonical active relation `asset -> active placement -> floor -> block ->
+project`. A nullable selected block means all active blocks; a nullable selected
+floor means all floors of the selected block. A selected floor is legal only
+under its selected active block. Project, block and same-project reload changes
+MUST clear or revalidate incompatible IDs deterministically. This UI state MUST
+NOT be persisted.
+
+`Katlar` MUST present active blocks side by side in stable block-ordinal order.
+Each block MUST present its unarchived floors as a vertical stack with higher
+floor ordinals visually above lower ordinals. Floor, block and project counts
+MUST count distinct non-archived assets with one valid active placement in the
+exact canonical floor; ended placement history and archived assets MUST NOT be
+counted or double-counted. Detached/archived block lifecycle MUST NOT be
+represented by invented active polygons.
+
+Map and List MUST share compact block/floor selectors. Spatial filtering MUST
+compose with existing search, category, status and archive filters. Valid active
+rows MUST show the exact asset, block and floor names. Archived or currently
+unplaced rows MUST NOT receive an invented current spatial label. List focus
+MUST select the exact owning block and floor before switching to Map, then reuse
+the existing exact-coordinate center and two-second non-color-only focus
+indicator. Floor and block changes MUST NOT leak markers from another floor.
+
+A floor-row `+` action MUST reuse the normal asset quick-create flow with an
+optional exact floor intent. The application boundary MUST accept that intent
+only when the floor belongs to the selected project and to the active block
+whose current-revision polygon strictly contains the target. Wrong-project,
+wrong-block, detached, missing or stale floor context MUST fail before mutation.
+Map-tap create without an explicit floor MUST retain its existing canonical
+fallback behavior and receipt compatibility.
+
+Floor quick-create coordinates MUST be integer grid-quantized, deterministic,
+distinct from occupied active coordinates and strictly inside the shared active
+block polygon; boundary points are not safe create targets. Repeated creates
+MUST use a deterministic compact spread. If no provably safe point exists, the
+operation MUST report `inventory_safe_interior_unavailable`, open no create
+form and write nothing.
+
+Slice 6.2 changes no database table, migration or stored filter contract.
+SQLite schema remains `22`, backup format remains `1`, and mobile version
+remains `0.1.0+1`.
+
 ## 9. Slice-by-slice implementation ownership
 
 Each child Slice MUST have its own Issue/authority and may narrow file splits,
@@ -1130,6 +1175,31 @@ this contract does not pre-mark any test PASS.
 - Owner manual-test family: optional photo add/view/archive/restore, catalog and
   album visibility, overlapping markers, accessibility, offline relaunch and
   safe failures.
+
+### Slice 6.2 — Kat Görünümü and block/floor navigation
+
+- Intended production paths: Inventory domain/application command boundary,
+  `inventory_page.dart`, `inventory_map_view.dart`,
+  `inventory_asset_quick_form.dart` and the dedicated
+  `inventory_floor_view.dart` presentation surface.
+- Changed contracts: route-local block/floor selection, stable active-floor
+  stacks and counts, Map/List spatial filtering and labels, exact-floor
+  list-to-map focus, exact-floor quick create and deterministic strict-interior
+  targets.
+- Validation class: `domain` plus focused real widget coverage.
+- Focused gates: `AT-531-001..013`, including stable ordering/counts,
+  cross-block selection isolation, exact-floor persistence, safe-target
+  determinism, wrong-floor no-write and the prior create/move/archive/editor/
+  migration regressions selected by Issue #531.
+- Impact: schema stays `22`; backup format stays `1`; mobile version stays
+  `0.1.0+1`; storage/migration, package, permission and platform behavior do not
+  change.
+- Stop: required storage/migration work, fake active geometry, cross-floor
+  marker leakage, non-exact floor ownership, unsafe coordinate fallback or any
+  write outside the Issue #531 allowlist.
+- Owner manual-test family: Kat stacks/counts, exact Map/List navigation,
+  selector/label behavior and floor-row quick create. Automated results do not
+  imply owner/manual PASS.
 
 ### Slice 6 — Backup/restore, migration and field acceptance
 
