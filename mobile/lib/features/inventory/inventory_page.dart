@@ -85,27 +85,34 @@ class InventoryPageController extends ChangeNotifier {
     final query = _normalizeName(search);
     return List<InventoryAssetProjection>.unmodifiable(
       assets.where((projection) {
-        final asset = projection.asset;
         if (floorFilterId != null &&
             projection.floorPlacement?.floorId != floorFilterId) {
           return false;
         }
-        if (query.isNotEmpty && !asset.normalizedName.contains(query)) {
-          return false;
-        }
-        if (categoryFilter != null && asset.category != categoryFilter) {
-          return false;
-        }
-        if (statusFilter != null && asset.status != statusFilter) {
-          return false;
-        }
-        return switch (archiveFilter) {
-          InventoryArchiveFilter.active => asset.archivedAt == null,
-          InventoryArchiveFilter.archived => asset.archivedAt != null,
-          InventoryArchiveFilter.all => true,
-        };
+        return _matchesNonFloorFilters(projection, query);
       }),
     );
+  }
+
+  bool _matchesNonFloorFilters(
+    InventoryAssetProjection projection,
+    String query,
+  ) {
+    final asset = projection.asset;
+    if (query.isNotEmpty && !asset.normalizedName.contains(query)) {
+      return false;
+    }
+    if (categoryFilter != null && asset.category != categoryFilter) {
+      return false;
+    }
+    if (statusFilter != null && asset.status != statusFilter) {
+      return false;
+    }
+    return switch (archiveFilter) {
+      InventoryArchiveFilter.active => asset.archivedAt == null,
+      InventoryArchiveFilter.archived => asset.archivedAt != null,
+      InventoryArchiveFilter.all => true,
+    };
   }
 
   List<InventoryAssetProjection> get canonicalActiveMapAssets =>
@@ -117,14 +124,17 @@ class InventoryPageController extends ChangeNotifier {
         ),
       );
 
-  List<InventoryAssetProjection> get visibleMapAssets =>
-      List<InventoryAssetProjection>.unmodifiable(
-        visibleAssets.where(
-          (projection) =>
-              projection.asset.archivedAt == null &&
-              projection.activePlacement?.floorId == selectedFloorId,
-        ),
-      );
+  List<InventoryAssetProjection> get visibleMapAssets {
+    final query = _normalizeName(search);
+    return List<InventoryAssetProjection>.unmodifiable(
+      assets.where(
+        (projection) =>
+            projection.asset.archivedAt == null &&
+            projection.activePlacement?.floorId == selectedFloorId &&
+            _matchesNonFloorFilters(projection, query),
+      ),
+    );
+  }
 
   InventoryAssetProjection? get invalidActiveMapProjection {
     for (final projection in assets) {
@@ -867,33 +877,34 @@ class InventoryPageState extends State<InventoryPage> {
             ),
           ),
         ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 170,
-          child: DropdownButtonFormField<String?>(
-            key: ValueKey(
-              'inventory-floor-filter-${controller.floorFilterId ?? 'all'}',
-            ),
-            initialValue: controller.floorFilterId,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Kat',
-              border: OutlineInputBorder(),
-            ),
-            items: [
-              const DropdownMenuItem(value: null, child: Text('Tümü')),
-              for (final summary in controller.floors)
-                DropdownMenuItem(
-                  value: summary.floor.id,
-                  child: Text(
-                    summary.floor.displayName,
-                    overflow: TextOverflow.ellipsis,
+        if (controller.view == InventoryPageView.list) const SizedBox(width: 8),
+        if (controller.view == InventoryPageView.list)
+          SizedBox(
+            width: 170,
+            child: DropdownButtonFormField<String?>(
+              key: ValueKey(
+                'inventory-floor-filter-${controller.floorFilterId ?? 'all'}',
+              ),
+              initialValue: controller.floorFilterId,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Kat',
+                border: OutlineInputBorder(),
+              ),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('Tümü')),
+                for (final summary in controller.floors)
+                  DropdownMenuItem(
+                    value: summary.floor.id,
+                    child: Text(
+                      summary.floor.displayName,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-            ],
-            onChanged: controller.setFloorFilter,
+              ],
+              onChanged: controller.setFloorFilter,
+            ),
           ),
-        ),
         const SizedBox(width: 8),
         SizedBox(
           width: 190,

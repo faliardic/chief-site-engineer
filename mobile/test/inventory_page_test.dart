@@ -888,6 +888,41 @@ void main() {
       expect(find.byKey(const Key('inventory-list-$_assetB')), findsOneWidget);
       expect(find.textContaining('2. Kat'), findsWidgets);
 
+      await tester.tap(find.text('Katlar'));
+      await tester.pump();
+      expect(find.byKey(const Key('inventory-floor-overview')), findsOneWidget);
+      expect(
+        find.byKey(const Key('inventory-floor-filter-$_floorA2')),
+        findsNothing,
+      );
+      expect(controller.floorFilterId, _floorA2);
+
+      await tester.tap(find.byKey(const Key('inventory-floor-$_floorA1')));
+      await tester.pump();
+      expect(controller.selectedFloorId, _floorA1);
+      expect(controller.view, InventoryPageView.map);
+      expect(
+        find.byKey(const Key('inventory-marker-$_assetA')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('inventory-marker-$_assetB')), findsNothing);
+      expect(
+        find.byKey(const Key('inventory-floor-filter-$_floorA2')),
+        findsNothing,
+      );
+      expect(controller.floorFilterId, _floorA2);
+
+      controller
+        ..selectFloor(_floorA2)
+        ..setView(InventoryPageView.list);
+      await tester.pump();
+      expect(
+        find.byKey(const Key('inventory-floor-filter-$_floorA2')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('inventory-list-$_assetA')), findsNothing);
+      expect(find.byKey(const Key('inventory-list-$_assetB')), findsOneWidget);
+
       controller.setFloorFilter(null);
       await tester.pump();
       await tester.tap(find.byKey(const Key('inventory-list-$_assetA')));

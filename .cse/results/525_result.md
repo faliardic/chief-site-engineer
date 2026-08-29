@@ -238,3 +238,45 @@ test or analyzer retry is needed for that evidence-only whitespace correction.
     publication_status: READY_FOR_MINIMAL_COMMIT_AND_DRAFT_PR
     ready: false
     merge: false
+
+## R4 floor-filter view-boundary correction -- authority 5460580407
+
+- Parent head: f6602560c2758991be1b24fd3284224150d6ab8c.
+- floorFilterId remains retained List state but is applied only to visible
+  List projections.
+- Kroki visibility derives from selectedFloorId plus the existing
+  search/category/status/archive filters and no longer consumes floorFilterId.
+- The floor filter control is rendered only in Liste, so Katlar and Kroki do
+  not present a misleading specific List-floor filter.
+- Widget regression covers List filter B to Katlar to floor A and proves that
+  floor-A markers render while floor-B markers remain absent. The test also
+  preserves list-to-exact-floor/exact-x-y focus coverage.
+- Exact narrow command:
+  flutter test --no-pub test/inventory_page_test.dart
+- Narrow widget result: PASS 16/16.
+- Historical broad focused result remains PASS 139/139 and was not rerun.
+- flutter analyze --no-pub: PASS, no issues.
+- git diff --check: PASS.
+- Correction paths: exact 3-path authority maximum; unexpected paths 0.
+- Schema 21, backup format 1, mobile version 0.1.0+1.
+- Pubspec/lock/platform/permission/package/protected/artifact drift: 0.
+- No build, APK, device, ADB, emulator, MAIN, Ready, merge, or Slice 7 action.
+- MT-525-001..006 remain PENDING / NOT RUN.
+
+    correction_authority_comment: 5460580407
+    parent_head: f6602560c2758991be1b24fd3284224150d6ab8c
+    touched_paths: 3
+    narrow_widget_test: PASS_16_OF_16
+    broad_focused_preserved: PASS_139_OF_139_NOT_RERUN
+    analyzer: PASS_NO_ISSUES
+    diff_check: PASS
+    schema: 21
+    backup_format: 1
+    mobile_version: 0.1.0+1
+    protected_drift: 0
+    manual_tests: MT_525_001_TO_006_PENDING_NOT_RUN
+    ready: false
+    merge: false
+
+review_recommendation: Push one minimal correction commit to the same Draft PR
+and stop for fresh independent R4 review. Do not mark Ready or merge.
