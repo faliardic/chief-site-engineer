@@ -174,6 +174,128 @@ void main() {
   );
 
   testWidgets(
+    'draft-only primary exposes recovery and non-finalized exit stays read-only',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _draftOnlySketch(_projectA)
+        ..assets[_projectA] = [];
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      var launches = 0;
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        sketchEditorLauncher: (context, projectId, launchIntent) async {
+          launches += 1;
+          expect(projectId, _projectA);
+          expect(launchIntent, InventorySketchLaunchIntent.createOrRecover);
+          return false;
+        },
+      );
+
+      final pageState = tester.state<InventoryPageState>(
+        find.byType(InventoryPage),
+      );
+      expect(
+        pageState.controller.loadStatus,
+        InventoryPageLoadStatus.recoverableDraft,
+      );
+      expect(
+        find.byKey(const Key('inventory-recoverable-draft')),
+        findsOneWidget,
+      );
+      expect(find.text('Krokiye devam et'), findsOneWidget);
+      expect(find.text('Kroki ekle'), findsNothing);
+      expect(find.text('Envanter güvenle yüklenemedi.'), findsNothing);
+      expect(inventory.primaryReads, 1);
+      expect(inventory.listReads, 1);
+      expect(inventory.mutations, 0);
+
+      await tester.tap(find.byKey(const Key('inventory-recover-sketch')));
+      await tester.pumpAndSettle();
+
+      expect(launches, 1);
+      expect(inventory.primaryReads, 1);
+      expect(inventory.listReads, 1);
+      expect(inventory.mutations, 0);
+      expect(
+        pageState.controller.loadStatus,
+        InventoryPageLoadStatus.recoverableDraft,
+      );
+      expect(pageState.controller.sketch!.sketch.id, _sketchA);
+      expect(pageState.controller.sketch!.draftRevision!.id, _revisionA);
+      expect(find.text('Krokiye devam et'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'draft recovery finalized result reloads the same project into ready state',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _draftOnlySketch(_projectA)
+        ..assets[_projectA] = [];
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      var launches = 0;
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        sketchEditorLauncher: (context, projectId, launchIntent) async {
+          launches += 1;
+          expect(projectId, _projectA);
+          expect(launchIntent, InventorySketchLaunchIntent.createOrRecover);
+          inventory.sketches[_projectA] = _sketch(_projectA);
+          return true;
+        },
+      );
+
+      await tester.tap(find.byKey(const Key('inventory-recover-sketch')));
+      await tester.pumpAndSettle();
+
+      final pageState = tester.state<InventoryPageState>(
+        find.byType(InventoryPage),
+      );
+      expect(launches, 1);
+      expect(inventory.primaryReads, 2);
+      expect(inventory.listReads, 2);
+      expect(inventory.mutations, 0);
+      expect(pageState.controller.selectedProjectId, _projectA);
+      expect(pageState.controller.loadStatus, InventoryPageLoadStatus.ready);
+      expect(pageState.controller.sketch!.sketch.id, _sketchA);
+      expect(pageState.controller.sketch!.activeRevision!.id, _revisionA);
+      expect(find.text('Krokiye devam et'), findsNothing);
+      expect(find.text('Krokiyi güncelle'), findsOneWidget);
+    },
+  );
+
+  test(
+    'malformed draft-only primary remains fail-closed',
+    () async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _draftOnlySketch(
+          _projectA,
+          draftProjectId: _projectB,
+        );
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      final controller = _controller(inventory, source);
+      addTearDown(controller.dispose);
+      addTearDown(source.dispose);
+
+      await controller.initialize();
+
+      expect(controller.loadStatus, InventoryPageLoadStatus.failed);
+      expect(controller.lastErrorCode, 'inventory_sketch_draft_unavailable');
+      expect(controller.sketch, isNull);
+      expect(inventory.primaryReads, 1);
+      expect(inventory.listReads, 0);
+      expect(inventory.mutations, 0);
+    },
+  );
+
+  testWidgets(
     'ready sketch update stays visible in Liste, launches edit-active, and reloads successor',
     (tester) async {
       final inventory = _FakeInventory()
@@ -1787,6 +1909,46 @@ InventoryPrimarySketchProjection _sketch(
         ordinal: 1,
       ),
     ],
+  );
+}
+
+InventoryPrimarySketchProjection _draftOnlySketch(
+  String projectId, {
+  String? draftProjectId,
+}) {
+  final sketchId = projectId == _projectA ? _sketchA : _sketchB;
+  final draftRevisionId = projectId == _projectA ? _revisionA : _revisionB;
+  final geometry = InventoryGeometry(polylines: const []);
+  return InventoryPrimarySketchProjection(
+    sketch: InventorySketchRecord(
+      id: sketchId,
+      projectId: projectId,
+      displayName: 'Saha krokisi',
+      isPrimary: true,
+      activeRevisionId: null,
+      draftRevisionId: draftRevisionId,
+      revision: 1,
+      createdAt: _now,
+      updatedAt: _now,
+      archivedAt: null,
+    ),
+    activeRevision: null,
+    draftRevision: InventorySketchRevisionRecord(
+      id: draftRevisionId,
+      sketchId: sketchId,
+      projectId: draftProjectId ?? projectId,
+      revisionNumber: 1,
+      baseRevisionId: null,
+      state: InventorySketchRevisionState.draft,
+      geometry: geometry,
+      geometrySha256: geometry.sha256,
+      contentRevision: 1,
+      createdAt: _now,
+      updatedAt: _now,
+      finalizedAt: null,
+      supersededAt: null,
+      abandonedAt: null,
+    ),
   );
 }
 

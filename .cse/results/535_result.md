@@ -318,3 +318,94 @@ review_recommendation:
   phase_b_device_authorized: false
   slice_7_authorized: false
 ```
+
+## Preserved-draft normal-UI recovery correction
+
+- Authority: Issue #535 comment `5469015767`.
+- Correction class: `PRESERVED_DRAFT_NORMAL_UI_RECOVERY`.
+- Exact parent/source head:
+  `7c8e301a1edf23a60464c1f017de1b9b157acf51`.
+- Exact write allowlist:
+  - `mobile/lib/features/inventory/inventory_page.dart`;
+  - `mobile/test/inventory_page_test.dart`;
+  - `.cse/results/535_result.md`.
+- `InventoryPageLoadStatus.noSketch` remains exclusive to a null primary
+  sketch projection.
+- A separate `recoverableDraft` state is now selected only for an unarchived
+  primary sketch with no active pointer/revision and an exact matching draft
+  pointer/revision in `draft` state. Project, sketch, revision, block, floor
+  and draft mapping identities remain fail-closed.
+- The recovery surface exposes `Krokiye devam et` and calls the existing
+  `InventorySketchLaunchIntent.createOrRecover` launcher. Page load/render
+  remains read-only and exposes no second-sketch action.
+- A finalized editor result reloads the selected project normally into
+  `ready`; a non-finalized result does not reload, create, abandon, normalize
+  or otherwise mutate the preserved draft.
+- Existing null-sketch `Kroki ekle`, active/finalized `ready`, generic failure
+  `Tekrar dene`, navigation/filter and editor result behavior remain intact.
+
+### Correction gates
+
+- Focused invocation, exactly once:
+  `flutter test --no-pub test/inventory_page_test.dart`.
+- Focused result: `25/25 PASS`, terminal `All tests passed!`, exit `0`,
+  retries `0`.
+- Exact nine-file integrated invocation, exactly once: `192/192 PASS`,
+  terminal `All tests passed!`, exit `0`, retries `0`.
+- Analyzer invocation, exactly once after integrated PASS:
+  `flutter analyze --no-pub`.
+- Analyzer result: `PASS — No issues found! (36.8s)`, exit `0`, retries `0`.
+- Full diff check: `PASS`.
+- Exact correction allowlist: `PASS — 3/3-or-fewer`; final commit contains
+  only the three paths listed above.
+- Schema / backup / version: `PASS — 22 / 1 / 0.1.0+1`.
+- Storage/migration, pubspec/lock, Android/iOS/platform, package, permission,
+  signing, backup format and unrelated/protected drift: `0`.
+- Build, install, device/ADB continuation and Acceptance artifact refresh:
+  `NOT RUN / NOT AUTHORIZED`.
+- `MT-535-001..007`: `PENDING / NOT RUN`.
+- PR #536 remains `OPEN/DRAFT`; Ready, merge and Issue closure remain false.
+- Correction commit SHA and final remote divergence are published in Issue/PR
+  evidence after commit; no self-referential metadata commit is created.
+
+### correction_execution_record
+
+```yaml
+execution_record:
+  issue: 535
+  correction_authority_comment: 5469015767
+  correction_class: PRESERVED_DRAFT_NORMAL_UI_RECOVERY
+  task_risk: R4
+  requested_model: gpt-5.6-sol
+  requested_reasoning_effort: max
+  runtime_actual_model: unknown
+  runtime_actual_reasoning_effort: null
+  runtime_actual_verification: unverified
+  exact_parent: 7c8e301a1edf23a60464c1f017de1b9b157acf51
+  branch: codex/issue-535-inventory-spatial-closure
+  focused_test_invocations: 1
+  focused_test_result: 25/25_PASS
+  integrated_test_invocations: 1
+  integrated_test_result: 192/192_PASS
+  analyzer_invocations: 1
+  analyzer_result: PASS
+  build_authorized: false
+  install_authorized: false
+  device_resume_authorized: false
+  manual_tests: MT-535-001..007_PENDING_NOT_RUN
+  draft_pr: 536_OPEN_DRAFT
+  ready: false
+  merge: false
+  issue_closure: false
+```
+
+### correction_review_recommendation
+
+```yaml
+review_recommendation:
+  decision: FRESH_INDEPENDENT_R4_AFTER_CORRECTION
+  review_exact_updated_head: required
+  resume_device_acceptance: false
+  ready: false
+  merge: false
+```
