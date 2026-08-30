@@ -4371,3 +4371,31 @@
   newer live data'yı unavailable bırakamaz ve Issue #499 owner telefonunda
   debug/acceptance package'ı yasaklar. Bu P0 kurallar source/Draft PR çalışması
   sürse de bütün phone operation'larından önce gelir.
+
+## Issue 540 — UI/UX Release Readiness aktif ürün hattıdır
+
+- Exact `master` UI'sı, production source değiştirmeyen Wave 0 audit ile
+  değerlendirilir. Gözlenen current source behavior, locked owner direction,
+  review recommendation ve future/deferred idea birbirinden açıkça ayrılır.
+- Home'un release yönü aktif-proje Dashboard/control center'dır. İlk dar
+  successor; görünür active project, read-only today summary, direct `Unutma`
+  ve Ajanda quick capture, 7-day plan/material yolları ile no-project/error
+  state'lerini kapsayan Project Dashboard v1'dir. Domain/source-of-truth
+  mutation, AI karar/summary ve büyük UI rewrite bu karardan çıkmaz.
+- Project-bound top-level ekranlar ortak session active-project context'ini
+  başlangıç seçimi olarak kullanmalıdır. Source-bound detail route'ları exact
+  proje bağını korur ve selector eklemez; Ajanda/Hatırlatıcı gibi cross-project
+  veya personal görünümler bilinçli secondary scope olarak kalabilir.
+- Inventory Map v1'in Issue #533 / PR #534'e kadar merged tarihsel çalışması
+  korunur. Issue #535 / Draft PR #536 deferred, current ancestry dışı ve device
+  acceptance incomplete'tir. Bu durum Inventory'yi complete/rejected yapmaz;
+  owner'ın genel yayın öncesi Inventory closure gate'i devam eder.
+- Güncel sıra UI/UX Wave 0 → Project Dashboard → project-context/navigation
+  dilimleri → Minimal Reliable DWG Viewer later high-priority → release-readiness
+  closure'dır. Minimum project search, onboarding, telemetry, privacy/KVKK,
+  gerekli manual/device kabulü ve release kararı kendi ayrı gate/Issue'larında
+  kapanır.
+- Issue #540 yalnız altı dokümantasyon/evidence path'inde truth-sync üretir.
+  Schema `22`, backup format `1`, version `0.1.0+1`, Dart/test/platform,
+  Inventory/DWG behavior, Ready, merge ve release bu kararla değişmez veya
+  başlamaz.
