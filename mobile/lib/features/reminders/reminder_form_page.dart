@@ -17,6 +17,7 @@ class ReminderFormPage extends StatefulWidget {
     this.contextSuggestions,
     this.projectLocations,
     this.log,
+    this.preferredProjectId,
     super.key,
   });
 
@@ -24,6 +25,7 @@ class ReminderFormPage extends StatefulWidget {
   final ContextSuggestionApplication? contextSuggestions;
   final ProjectLocationApplication? projectLocations;
   final AgendaLog? log;
+  final String? preferredProjectId;
 
   @override
   State<ReminderFormPage> createState() => _ReminderFormPageState();
@@ -44,6 +46,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   String? _locationId;
   bool _loadingLocations = false;
   String? _locationError;
+  int _projectLoadGeneration = 0;
   int _locationLoadGeneration = 0;
   List<ContextSuggestion> _contextSuggestions = const [];
   Timer? _suggestionDebounce;
@@ -59,6 +62,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   late DateTime _deadlineDate;
   TimeOfDay _deadlineTime = const TimeOfDay(hour: 17, minute: 0);
   bool _submitting = false;
+  bool _loadingProjects = true;
   String? _error;
   StreamSubscription<void>? _projectSubscription;
 
@@ -66,7 +70,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   void initState() {
     super.initState();
     _title = TextEditingController(text: widget.log?.description ?? '');
-    _projectId = widget.log?.projectId;
+    _projectId = widget.log?.projectId ?? widget.preferredProjectId;
     _locationId = widget.log?.locationId;
     if (_locationId == null) _location.text = widget.log?.location ?? '';
     _recordId = RecordId.randomUuid();
@@ -77,20 +81,56 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
     _customDate = DateTime(local.year, local.month, local.day + 1);
     _deadlineDate = _customDate;
     _projectSubscription = widget.agenda.projectChanges.listen(
-      (_) => _loadProjects(),
+      (_) => unawaited(_handleProjectChanges()),
     );
     _loadProjects().then((_) async {
+      if (!mounted) return;
       await _loadLocations();
       _scheduleSuggestionLoad();
     });
   }
 
+  Future<void> _handleProjectChanges() async {
+    await _loadProjects();
+    if (!mounted) return;
+    await _loadLocations();
+    _scheduleSuggestionLoad();
+  }
+
   Future<void> _loadProjects() async {
+    final generation = ++_projectLoadGeneration;
+    if (mounted) setState(() => _loadingProjects = true);
     try {
-      final projects = await widget.agenda.listProjects();
-      if (mounted) setState(() => _projects = projects);
+      final projects = (await widget.agenda.listProjects())
+          .where((project) => !project.isArchived)
+          .toList(growable: false);
+      if (!mounted || generation != _projectLoadGeneration) return;
+      final selected =
+          widget.log == null &&
+              !projects.any((project) => project.id == _projectId)
+          ? null
+          : _projectId;
+      setState(() {
+        _projects = projects;
+        _projectId = selected;
+        if (selected == null) {
+          _locationId = null;
+          _location.clear();
+        }
+        _loadingProjects = false;
+      });
     } on Object {
       // Standalone capture remains available without a project.
+      if (!mounted || generation != _projectLoadGeneration) return;
+      setState(() {
+        _projects = const [];
+        if (widget.log == null) {
+          _projectId = null;
+          _locationId = null;
+          _location.clear();
+        }
+        _loadingProjects = false;
+      });
     }
   }
 
@@ -208,7 +248,9 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   }
 
   Future<void> _submit() async {
-    if (_submitting || !_formKey.currentState!.validate()) return;
+    if (_submitting || _loadingProjects || !_formKey.currentState!.validate()) {
+      return;
+    }
     setState(() {
       _submitting = true;
       _error = null;
@@ -397,6 +439,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
               onChanged: (value) => setState(() => _kind = value!),
             ),
             const SizedBox(height: 12),
+            if (_loadingProjects) const LinearProgressIndicator(),
             if (widget.log == null && _projects.isNotEmpty) ...[
               DropdownButtonFormField<String?>(
                 key: const Key('reminder-project'),
@@ -675,7 +718,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
               height: 52,
               child: FilledButton.icon(
                 key: const Key('submit-reminder'),
-                onPressed: _submitting ? null : _submit,
+                onPressed: _submitting || _loadingProjects ? null : _submit,
                 icon: _submitting
                     ? const SizedBox.square(
                         dimension: 20,

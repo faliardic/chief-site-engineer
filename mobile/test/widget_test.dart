@@ -1,5 +1,6 @@
 import 'package:chief_site_engineer/app.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
+import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -62,11 +63,8 @@ void main() {
       expect(cupertino.pasteButtonLabel, 'Yapıştır');
       expect(cupertino.cutButtonLabel, 'Kes');
       expect(cupertino.selectAllButtonLabel, 'Tümünü Seç');
-      expect(find.text('Çevrim dışı temel hazır'), findsOneWidget);
-      expect(
-        find.textContaining('Bulut eşitleme ve kullanıcı hesabı'),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('dashboard-no-project')), findsOneWidget);
+      expect(find.text('İlk projenizi oluşturun'), findsOneWidget);
       expect(find.textContaining('Offline temel hazır'), findsNothing);
       expect(find.textContaining('Cloud sync'), findsNothing);
     },
@@ -229,7 +227,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Saha hafızanız cihazınızda.'), findsOneWidget);
+      expect(find.byKey(const Key('dashboard-no-project')), findsOneWidget);
       const expectedLabels = [
         'Başlangıç',
         'Hatırlatıcı',
@@ -275,118 +273,56 @@ void main() {
     },
   );
 
-  testWidgets('home field tips stay single cycle manually and remain accessible', (
+  testWidgets('Dashboard quick actions open exact existing capture routes', (
     tester,
   ) async {
-    final semanticsHandle = tester.ensureSemantics();
-    tester.view.physicalSize = const Size(320, 900);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    tester.binding.platformDispatcher.textScaleFactorTestValue = 1.6;
-    tester.binding.platformDispatcher.platformBrightnessTestValue =
-        Brightness.dark;
-    addTearDown(
-      tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
+    const project = MobileProject(
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'Şantiye A',
+      createdAt: '2026-08-30T06:00:00Z',
+      updatedAt: '2026-08-30T06:00:00Z',
+      revision: 1,
     );
-    addTearDown(
-      tester.binding.platformDispatcher.clearPlatformBrightnessTestValue,
-    );
-
-    const tips = <String>[
-      'Sahada görülen veya söylenenler, mümkün olduğunca anında kayda geçtiğinde unutulmaz.',
-      'Fotoğraf; neyi, nerede ve neden gösterdiğiyle birlikte anlam kazanır.',
-      'Gün sonu, önemli gelişmelerin rapor ve kayıtlara yansıdığını kontrol etme zamanıdır.',
-      'Açık işler zihinde değil, sistemde görünür kaldığında daha kolay takip edilir.',
-    ];
-
+    final agenda = FakeAgendaApplication(projects: const [project]);
     await tester.pumpWidget(
       CseApp(
         bootstrap: Future<BootstrapResult>.value(
           BootstrapSuccess(
             environmentLabel: 'Geliştirme',
-            smokeRecordId: 'home-field-tips',
-            smokeRecordCreatedAt: '2026-08-08T08:00:00Z',
-            agenda: FakeAgendaApplication(),
+            smokeRecordId: 'dashboard-routes',
+            smokeRecordCreatedAt: '2026-08-30T08:00:00Z',
+            agenda: agenda,
           ),
         ),
       ),
     );
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('home-field-tip-card')),
-      200,
-      scrollable: find.byType(Scrollable).first,
+
+    expect(find.byKey(const Key('dashboard-project-header')), findsOneWidget);
+    expect(find.byKey(const Key('home-field-tip-card')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('dashboard-quick-reminder')));
+    await tester.pumpAndSettle();
+    final reminderProject = tester.widget<DropdownButtonFormField<String?>>(
+      find.byKey(const Key('reminder-project')),
     );
+    expect(reminderProject.initialValue, project.id);
+    expect(find.byType(BackButton), findsOneWidget);
+    await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
 
-    void expectOnlyTip(int index) {
-      for (var tipIndex = 0; tipIndex < tips.length; tipIndex += 1) {
-        expect(
-          find.text(tips[tipIndex]),
-          tipIndex == index ? findsOneWidget : findsNothing,
-        );
-      }
-    }
-
-    Future<void> tapTipControl(Key key) async {
-      final control = find.byKey(key);
-      await tester.ensureVisible(control);
-      await tester.tap(control);
-      await tester.pump();
-    }
-
-    expect(find.byKey(const Key('home-field-tip-card')), findsOneWidget);
-    expect(find.text('Saha İpucu'), findsOneWidget);
-    expect(find.byKey(const Key('field-tip-text')), findsOneWidget);
-    expectOnlyTip(0);
-    expect(find.text('1 / 4'), findsOneWidget);
-
-    final previous = tester.widget<IconButton>(
-      find.byKey(const Key('previous-field-tip')),
+    await tester.tap(find.byKey(const Key('dashboard-quick-agenda')));
+    await tester.pumpAndSettle();
+    final logProject = tester.widget<DropdownButtonFormField<String>>(
+      find.byKey(const Key('log-project')),
     );
-    final next = tester.widget<IconButton>(
-      find.byKey(const Key('next-field-tip')),
-    );
-    expect(previous.tooltip, 'Önceki saha ipucu');
-    expect(next.tooltip, 'Sonraki saha ipucu');
+    expect(logProject.initialValue, project.id);
+    expect(find.byType(BackButton), findsOneWidget);
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
 
-    var liveRegion = tester.widget<Semantics>(
-      find.byKey(const Key('field-tip-live-region')),
-    );
-    expect(liveRegion.properties.liveRegion, isTrue);
-    expect(liveRegion.properties.label, 'Saha İpucu 1 / 4: ${tips.first}');
-
-    await tapTipControl(const Key('next-field-tip'));
-    expectOnlyTip(1);
-    expect(find.text('2 / 4'), findsOneWidget);
-
-    await tapTipControl(const Key('next-field-tip'));
-    await tapTipControl(const Key('next-field-tip'));
-    expectOnlyTip(3);
-    expect(find.text('4 / 4'), findsOneWidget);
-
-    await tapTipControl(const Key('next-field-tip'));
-    expectOnlyTip(0);
-    expect(find.text('1 / 4'), findsOneWidget);
-
-    await tapTipControl(const Key('previous-field-tip'));
-    expectOnlyTip(3);
-    expect(find.text('4 / 4'), findsOneWidget);
-    liveRegion = tester.widget<Semantics>(
-      find.byKey(const Key('field-tip-live-region')),
-    );
-    expect(liveRegion.properties.liveRegion, isTrue);
-    expect(liveRegion.properties.label, 'Saha İpucu 4 / 4: ${tips.last}');
-
-    final cardContext = tester.element(
-      find.byKey(const Key('home-field-tip-card')),
-    );
-    expect(Theme.of(cardContext).brightness, Brightness.dark);
-    expect(MediaQuery.textScalerOf(cardContext).scale(10), 16);
-    final exception = tester.takeException();
-    semanticsHandle.dispose();
-    expect(exception, isNull);
+    expect(agenda.createReminderCalls, 0);
+    expect(agenda.createLogCalls, 0);
   });
 
   testWidgets('database bootstrap failure is fail closed and user safe', (
