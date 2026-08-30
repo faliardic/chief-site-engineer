@@ -1088,6 +1088,8 @@ class InventorySketchEditorController extends ChangeNotifier {
       return false;
     }
     while (hasUnacknowledgedGeometry) {
+      _discardSupersededDefinitivelyRejectedSave();
+      if (!hasUnacknowledgedGeometry) break;
       if (_pendingSave == null &&
           !_forceDrainRequested &&
           _normalSaveEligibleGeneration != _geometryGeneration) {
@@ -1145,9 +1147,18 @@ class InventorySketchEditorController extends ChangeNotifier {
         }
         _notify();
       } on Object catch (error) {
+        final failureCode = _safeCode(error);
+        if (failureCode == 'inventory_legacy_geometry_immutable') {
+          _pendingSave = pending.withDefinitiveFailure(failureCode);
+          final newerGenerationCanDrain =
+              pending.geometryGeneration < _geometryGeneration &&
+              (_forceDrainRequested ||
+                  _normalSaveEligibleGeneration == _geometryGeneration);
+          if (newerGenerationCanDrain) continue;
+        }
         _forceDrainRequested = false;
         saveStatus = InventorySketchSaveStatus.failed;
-        lastErrorCode = _safeCode(error);
+        lastErrorCode = failureCode;
         _notify();
         return false;
       }
@@ -1157,6 +1168,17 @@ class InventorySketchEditorController extends ChangeNotifier {
     lastErrorCode = null;
     _notify();
     return true;
+  }
+
+  void _discardSupersededDefinitivelyRejectedSave() {
+    final pending = _pendingSave;
+    if (pending == null ||
+        pending.definitiveFailureCode !=
+            'inventory_legacy_geometry_immutable' ||
+        pending.geometryGeneration >= _geometryGeneration) {
+      return;
+    }
+    _pendingSave = null;
   }
 
   _PendingDraftSave _createPendingSave() {
@@ -2757,10 +2779,21 @@ class _PendingDraftSave {
     required this.geometryGeneration,
     required this.lifecycleActions,
     required this.command,
+    this.definitiveFailureCode,
   });
 
   final InventoryGeometry geometry;
   final int geometryGeneration;
   final Map<String, InventoryExistingBlockAction> lifecycleActions;
   final AutosaveInventorySketchDraftCommand command;
+  final String? definitiveFailureCode;
+
+  _PendingDraftSave withDefinitiveFailure(String failureCode) =>
+      _PendingDraftSave(
+        geometry: geometry,
+        geometryGeneration: geometryGeneration,
+        lifecycleActions: lifecycleActions,
+        command: command,
+        definitiveFailureCode: failureCode,
+      );
 }

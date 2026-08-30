@@ -2,11 +2,130 @@
 
 ## Current status
 
-- Execution status: `PHASE_A_PASS — DRAFT_PUBLISHED — OWNER_ACCEPTANCE_PENDING — FRESH_R4_CORRECTION_REQUIRED`
-- Implementation class: documentation/evidence-only integrated regression closure
+- Execution status: `CORRECTION_VALIDATION_PASS — NARROW_PUBLICATION_AUTHORIZED`
+- Implementation class: narrow failed-`_pendingSave` lifecycle correction after the published Phase-A closure
 - Manual acceptance: `PENDING / NOT RUN`
 - Phase B device authority: not granted
-- Source correction authority: documentation-only Issue #535 comment `5464503005`
+- Source correction authority: attached Issue #535 failed-`_pendingSave`
+  lifecycle instruction
+- Environment recovery authority: attached Issue #535 exact-runner instruction
+
+## Environment recovery and fresh validation — 2026-08-30
+
+- Required starting head:
+  `b0f2b8b0c77558f79d038580ad11314bc144091f`.
+- Exact runner:
+  `C:\Users\Fatih\.cache\flutter-sdk\3.44.6-ee80f08\flutter\bin\flutter.bat`.
+- Read-only runner existence check: `True`.
+- Preflight: exact repository/branch/head/origin, tracked drift exactly the
+  three authorized paths, staged drift `0`, untracked drift `0`, branch
+  divergence `0/0`, PR #536 `OPEN/DRAFT`.
+- Existing source/test correction was not reset, checked out, stashed or
+  rewritten before the fresh focused gate.
+- Fresh focused gate: `PASS — 51/51`, exit `0`, invocations/retries `1/0`.
+- Exact nine-file integrated gate: `PASS — 189/189`, exit `0`,
+  invocations/retries `1/0`.
+- Analyzer: `PASS — No issues found! (ran in 53.6s)`,
+  invocations/retries `1/0`.
+- Full working-tree `git diff --check`: `PASS`.
+- Changed-path audit: `PASS — 3/3`, exactly:
+  - `mobile/lib/features/inventory/inventory_sketch_editor_page.dart`;
+  - `mobile/test/inventory_sketch_editor_test.dart`;
+  - `.cse/results/535_result.md`.
+- Schema/backup/version: `22 / 1 / 0.1.0+1`; drift `0`.
+- Migration, pubspec/lock, Android/iOS/platform, package/signing and unrelated
+  source/test drift: `0`.
+- Correction contract:
+  - same-generation retry retains the same operation ID;
+  - only exact definitively rejected
+    `inventory_legacy_geometry_immutable` older pending work may be superseded;
+  - a newer editor generation creates a new operation ID and persists current
+    geometry plus block/floor mappings;
+  - the stale pending operation is not replayed and no duplicate mutation is
+    emitted;
+  - single-flight, 500 ms debounce, `forceSave`, optimistic revision and
+    acknowledged-state behavior remain covered.
+- Device/APK/build/ADB/MAIN operations: `NOT RUN`.
+- Manual tests: `MT-535-001..007 = PENDING / NOT RUN`.
+- Correction commit/final head is intentionally recorded in post-commit
+  Issue/PR evidence to avoid a self-referential metadata commit.
+
+```yaml
+execution_record:
+  issue: 535
+  defect: failed_pending_save_lifecycle
+  starting_head: b0f2b8b0c77558f79d038580ad11314bc144091f
+  flutter_runner: C:\Users\Fatih\.cache\flutter-sdk\3.44.6-ee80f08\flutter\bin\flutter.bat
+  flutter_runner_exists: true
+  correction_commit: POST_COMMIT_ISSUE_PR_EVIDENCE
+  final_head: POST_COMMIT_ISSUE_PR_EVIDENCE
+  focused_gate:
+    invocation_count: 1
+    result: PASS
+    tally: 51/51
+  integrated_gate:
+    invocation_count: 1
+    result: PASS
+    tally: 189/189
+  analyzer:
+    invocation_count: 1
+    result: PASS_NO_ISSUES
+  schema: 22
+  backup_format: 1
+  write_allowlist: PASS_3_OF_3
+  tracked_drift: EXACT_3_AUTHORIZED_PATHS_BEFORE_COMMIT
+  staged_drift: 0_BEFORE_STAGE
+  device_tests_run: false
+  manual_tests: MT-535-001..007_PENDING
+  pr: 536_OPEN_DRAFT
+  ready: false
+  merge: false
+```
+
+```yaml
+review_recommendation:
+  decision: FRESH_INDEPENDENT_R4_REVIEW
+  resume_device_acceptance: false
+```
+
+## Historical failed PATH invocation — 2026-08-30
+
+- Owner correction authority: attached Issue #535 failed-`_pendingSave`
+  lifecycle instruction.
+- Required starting head:
+  `b0f2b8b0c77558f79d038580ad11314bc144091f`.
+- Verified local/remote branch head:
+  `b0f2b8b0c77558f79d038580ad11314bc144091f`, divergence `0/0`.
+- Start tracked/staged drift: `0 / 0`.
+- Draft PR #536: `OPEN / DRAFT`; Ready=false; merge=false.
+- Manual tests: `MT-535-001..007 = PENDING / NOT RUN`.
+- Source analysis proved `inventory_legacy_geometry_immutable` is raised inside
+  the autosave transaction after read-only validation and before the first
+  source/receipt/event write. Ambiguous persistence and post-mutation
+  verification failures were not classified as disposable.
+- At that stop boundary, uncommitted narrow changes existed only in:
+  - `mobile/lib/features/inventory/inventory_sketch_editor_page.dart`;
+  - `mobile/test/inventory_sketch_editor_test.dart`;
+  - this result evidence file.
+- Intended invariant in that uncommitted patch:
+  - same-generation retry retains the original pending operation;
+  - only an exact definitively rejected
+    `inventory_legacy_geometry_immutable` pending command may be superseded by
+    a newer editor generation;
+  - an eligible newer generation continues draining after the older in-flight
+    command is definitively rejected.
+- Focused command attempted exactly once:
+  `flutter test --no-pub test/inventory_sketch_editor_test.dart`.
+- Focused result: `FAIL — ENVIRONMENT / COMMAND NOT FOUND`, exit `1`, test
+  tally `0`; PowerShell reported that `flutter` was not recognized as a
+  cmdlet, function, script file, or executable program.
+- No retry was attempted. No source/test correction was made after the failed
+  gate.
+- Integrated nine-file gate: `NOT RUN`.
+- Analyzer: `NOT RUN`.
+- Commit/push/GitHub correction evidence at that stop boundary:
+  `NOT PERFORMED`.
+- Device/APK/build/ADB/MAIN operations: `NOT RUN`.
 
 ## Repository and authority
 
