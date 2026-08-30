@@ -313,3 +313,78 @@ PR state; Ready/merge/closure state; `execution_record`; and
 - Build, APK/AAB, device/ADB, application launch and manual acceptance were not
   run and were not authorized. `MT-542-*` registration remains deferred; no
   manual PASS is claimed.
+
+## R4 correction attempt — comment 5470503734
+
+- Fresh independent R4 record: PR #544 review `5061586143`.
+- Classification: `R4-542-01 — TEST_EVIDENCE_FALSE_POSITIVE`.
+- Required starting state passed at exact local/upstream HEAD
+  `f58e1cfb723cf86236764154a08f68c0c3b5d495`, branch
+  `codex/issue-542-project-dashboard-v1`, staged/tracked/untracked scope clean,
+  no Git operation in progress, and parent exact base `3038e979...b83d`.
+- Production tree baseline: `9399539d668edabe7eef193292870099fd07632d`.
+  The four reusable regression files were hashed before the edit.
+- The test-only correction used the existing routed-form harness, added
+  rendered visibility handling, and changed both nullable standalone
+  assertions to require `createReminderCalls == 1` plus a non-null emitted
+  command before checking `projectId == null`. Source-log precedence was also
+  reasserted after positive command emission.
+- Required focused gate result: `+92 -1`, exit `1`.
+- Exact remaining failure: in
+  `preferred project can be changed to personal before save`, the submit
+  control center remained at `y=612` outside the `600`-pixel test viewport.
+  Flutter emitted the prohibited hit-test warning; no tap reached the control,
+  and the strengthened assertion correctly observed
+  `createReminderCalls: expected 1, actual 0`.
+- This confirms the R4 false-positive diagnosis and proves the first visibility
+  hardening was insufficient. It does not prove a production defect.
+- Comment `5470503734` authorized one correction cycle. That focused invocation
+  consumed the cycle, so no second edit or focused rerun was inferred.
+- Analyze, format and publication gates were not reached. No correction commit,
+  push, PR update, Ready, merge or closure action was performed. The exact
+  uncommitted correction/evidence state is preserved for a new explicit
+  authority.
+
+## R4 Reminder harness closure — comment 5470562373
+
+- Authority URL:
+  <https://github.com/faliardic/chief-site-engineer/issues/542#issuecomment-5470562373>
+- Preserved-state preflight passed: local/upstream/remote PR head remained
+  `f58e1cfb723cf86236764154a08f68c0c3b5d495`, PR #544 remained OPEN/DRAFT,
+  staged was empty, and writable drift was exactly the three authorized paths.
+- Production Dart and all four verified regression files remained byte-identical
+  to published head. Production tree baseline remained
+  `9399539d668edabe7eef193292870099fd07632d`.
+- The primary harness edit added one shared UI submit helper that:
+  - finds exact `Key('submit-reminder')`;
+  - resolves that control's actual ancestor `Scrollable`;
+  - uses rendered `scrollUntilVisible` plus at most six small upward drags;
+  - requires exactly one `submit.hitTestable()` result before a normal tap;
+  - pumps through the real submit and route-pop lifecycle without suppressing
+    hit-test diagnostics.
+- The helper is used by the standalone personal, invalid/archived preferred and
+  source-log precedence saves. The personal form is hosted on a real pushed
+  `MaterialPageRoute` and proves a successful return to its opener.
+- Each binding branch now proves exact positive command emission before project
+  binding:
+  - personal save: `createReminderCalls == 1`, non-null command,
+    `projectId == null`;
+  - invalid/archived preferred save: `createReminderCalls == 1`, non-null
+    command, `projectId == null`;
+  - source-log save: `createReminderCalls == 1`, non-null command,
+    `projectId == agendaProjectId`.
+- Focused invocation 1/2: `+93`, exit `0`; no corrected Reminder submit hit-test
+  warning appeared. The optional adaptive edit/invocation was not used.
+- `flutter analyze --no-pub`: `No issues found`, exit `0`.
+- Changed-Dart format precheck required deterministic formatting of the one
+  writable Dart path. Mechanical format was applied only to
+  `mobile/test/reminder_widget_test.dart`; final format check reported
+  `0 changed`, exit `0`.
+- Full and staged `git diff --check`: PASS. Final correction drift remained
+  exactly the three authorized paths; staged remained empty before commit.
+- Prior verified regression `+78 PASS` was reused because production Dart and
+  all four regression files remained byte-identical to published head.
+- Schema `22`, backup format `1`, mobile version `0.1.0+1` and all protected
+  boundaries remain unchanged. Build/device/manual work was not run.
+- Next successful publication gate: one new narrow commit, normal push, Issue/PR
+  evidence update, then `FRESH_INDEPENDENT_R4_REREVIEW`.

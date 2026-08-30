@@ -222,3 +222,141 @@ must verify the fail-closed multi-project selection, exact selected-project/day
 read boundaries, isolated section retries, Reminder source-log precedence and
 the disclosed non-fatal Reminder harness hit-test warning. Do not mark Ready or
 merge without new owner authority.
+
+## R4 correction attempt — comment 5470503734
+
+Status: `STOPPED — AUTHORIZED CORRECTION CYCLE FAILED`.
+
+- Starting local/upstream head:
+  `f58e1cfb723cf86236764154a08f68c0c3b5d495`.
+- Classification: `R4-542-01_TEST_EVIDENCE_FALSE_POSITIVE`.
+- Writable surface used: `mobile/test/reminder_widget_test.dart` plus this
+  append-only task/result evidence.
+- Test correction: routed personal-save form, rendered visibility handling,
+  exact create-call count `1`, non-null command proof, then nullable personal
+  project assertion; the invalid-preferred standalone and source-log branches
+  received the same positive command-emission proof.
+- Focused four-file result: `+92 -1`, exit `1`.
+- Exact failure evidence: personal-save submit center `Offset(400.0, 612.0)`
+  remained outside root `Size(800.0, 600.0)`; hit-test warning emitted;
+  `createReminderCalls` was `0` instead of `1`.
+- The strengthened assertion successfully exposed the prior false positive,
+  but the first visibility correction did not make the rendered control
+  hit-testable.
+- One authorized correction cycle was consumed. No second edit/rerun was
+  inferred. Analyze, format, correction commit, push and GitHub evidence update
+  were not reached.
+- Production source and the four regression files remain read-only; their
+  byte-identity is audited after this ledger append.
+- Build, device and manual acceptance remain not run / not authorized. PR #544
+  remains Draft; Issue #542 remains open.
+
+```yaml
+r4_correction_execution_record:
+  authority_comment: 5470503734
+  starting_head: f58e1cfb723cf86236764154a08f68c0c3b5d495
+  classification: R4-542-01_TEST_EVIDENCE_FALSE_POSITIVE
+  focused_result: FAIL_92_1
+  hit_test_warning_absent: false
+  expected_create_calls: 1
+  actual_create_calls: 0
+  analyze_run: false
+  format_gate_run: false
+  regression_reused: false
+  commit_created: false
+  push_performed: false
+  pr_updated: false
+  runtime_actual_model: unknown
+  runtime_actual_reasoning_effort: unknown
+  runtime_verification_status: unverified
+  next_gate: NEW_EXPLICIT_R4_CORRECTION_AUTHORITY
+```
+
+### R4 correction review recommendation
+
+Authorize a new narrow test-only cycle only if another focused invocation is
+intended. The next correction should use an ordinary user-visible scroll that
+makes the entire submit target hit-testable before tapping, then retain the new
+positive command-emission assertions. Production source need not change based
+on the current evidence.
+
+## R4 Reminder harness closure — comment 5470562373
+
+Status: `CORRECTED — SOURCE-LEVEL VALIDATED / PUBLICATION PENDING`.
+
+- Starting and published PR head:
+  `f58e1cfb723cf86236764154a08f68c0c3b5d495`.
+- The failed `5470503734` cycle above remains authoritative history and was not
+  rewritten or discarded.
+- Final correction paths are exactly:
+  1. `mobile/test/reminder_widget_test.dart`;
+  2. `.cse/tasks/542_task.md`;
+  3. `.cse/results/542_result.md`.
+- A shared test-only helper resolves the submit control's own ancestor
+  `Scrollable`, performs bounded rendered scrolling until the submit center is
+  hit-testable, asserts exactly one hit-testable submit, then taps normally and
+  settles the real pushed-route lifecycle.
+- Positive evidence from the passing focused gate:
+  - standalone personal: create calls `1`, command non-null, project `null`,
+    route returned to opener;
+  - invalid/archived preferred: create calls `1`, command non-null, project
+    `null`;
+  - source-log precedence: create calls `1`, command non-null, project exact
+    `agendaProjectId`; archived preferred project did not replace the source.
+- Focused full four-file invocation 1/2: `+93`, exit `0`.
+- Corrected submit hit-test warning: absent.
+- Optional adaptive harness edit/invocation: not used.
+- Analyzer: `No issues found`, exit `0`.
+- Format: one authorized mechanical formatting pass on the changed Reminder test;
+  final check `0 changed`, exit `0`.
+- Full/staged diff check: PASS.
+- Regression: prior `+78 PASS` reused. Production Dart diff from published head
+  is empty and the exact four regression files are byte-identical:
+  - `agenda_application_test.dart`:
+    `21dd537474b44be2cdc3278a92734b1c348b1557efa0b0d790b201d37e4c7a79`;
+  - `app_bootstrap_test.dart`:
+    `9a2cb8a8a724c165ade2511ad41923eb60dc4233feb00e0905354e8b051dbb21`;
+  - `construction_living_plan_application_test.dart`:
+    `3f39e785260438e1fb08a0fec28b62493f20b8449a3f9de76a659791e7edcdf8`;
+  - `mobile_agenda_widget_test.dart`:
+    `b699cac08d2032c64ccac23455ec7fa2804ad0b6051e8fbbef887798789d5059`.
+- Schema / backup / mobile version remain `22 / 1 / 0.1.0+1`.
+- No production, other-test, build, device, ADB, install, launch or manual work
+  occurred.
+
+```yaml
+r4_reminder_harness_closure_execution_record:
+  authority_comment: 5470562373
+  execution_class: R4_REMINDER_HARNESS_CLOSURE_2
+  starting_head: f58e1cfb723cf86236764154a08f68c0c3b5d495
+  focused_invocations_used: 1
+  focused_invocations_remaining: 1
+  adaptive_harness_round_used: false
+  focused_final: PASS_93
+  corrected_hit_test_warning_absent: true
+  personal_create_calls: 1
+  invalid_preferred_create_calls: 1
+  source_log_create_calls: 1
+  analyze_final: PASS
+  format_final: PASS_0_CHANGED
+  diff_check_final: PASS
+  regression_reused: PASS_78_BYTE_IDENTICAL
+  production_changed: false
+  runtime_actual_model: unknown
+  runtime_actual_reasoning_effort: unknown
+  runtime_verification_status: unverified
+  build_run: false
+  device_run: false
+  manual_run: false
+  ready_authorized: false
+  merge_authorized: false
+  next_gate: FRESH_INDEPENDENT_R4_REREVIEW
+```
+
+### R4 rereview recommendation
+
+Review the new narrow correction commit on top of `f58e1cf...`. Confirm the
+shared helper targets the form's own Scrollable, requires center hit-testability
+before tap, preserves the real route-pop lifecycle and retains all three exact
+positive project-binding assertions. Keep PR #544 Draft pending fresh
+independent R4 rereview.
