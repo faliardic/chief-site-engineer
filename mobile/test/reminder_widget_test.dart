@@ -110,6 +110,16 @@ AgendaLog sourceAgendaLog({
   revision: revision,
 );
 
+MobileProject reminderProject(String id, String name, {String? archivedAt}) =>
+    MobileProject(
+      id: id,
+      name: name,
+      createdAt: '2026-08-30T06:00:00Z',
+      updatedAt: '2026-08-30T06:00:00Z',
+      revision: 1,
+      archivedAt: archivedAt,
+    );
+
 Future<void> openAgendaReminderSyncDialog(WidgetTester tester) async {
   final action = find.byKey(const Key('sync-agenda-to-reminder'));
   await tester.scrollUntilVisible(
@@ -227,7 +237,171 @@ Future<void> openDetailAllDayPicker(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _pumpReminderFormRoute(
+  WidgetTester tester, {
+  required Key openerKey,
+  required WidgetBuilder builder,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: FilledButton(
+            key: openerKey,
+            onPressed: () => Navigator.of(
+              context,
+            ).push<void>(MaterialPageRoute(builder: builder)),
+            child: const Text('Formu aç'),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.tap(find.byKey(openerKey));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _submitReminderFormThroughUi(WidgetTester tester) async {
+  final submit = find.byKey(const Key('submit-reminder'));
+  expect(submit, findsOneWidget);
+  final formScrollable = find.ancestor(
+    of: submit,
+    matching: find.byType(Scrollable),
+  );
+  expect(formScrollable, findsOneWidget);
+  await tester.scrollUntilVisible(submit, 200, scrollable: formScrollable);
+  await tester.pumpAndSettle();
+  for (
+    var dragCount = 0;
+    dragCount < 6 && submit.hitTestable().evaluate().isEmpty;
+    dragCount += 1
+  ) {
+    await tester.drag(formScrollable, const Offset(0, -48));
+    await tester.pumpAndSettle();
+  }
+  final hitTestableSubmit = submit.hitTestable();
+  expect(hitTestableSubmit, findsOneWidget);
+  await tester.tap(hitTestableSubmit);
+  await tester.pumpAndSettle();
+}
+
 void main() {
+  testWidgets('preferred project is initial only and cancel creates nothing', (
+    tester,
+  ) async {
+    final agenda = FakeAgendaApplication(
+      projects: [reminderProject(agendaProjectId, 'Şantiye A')],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: FilledButton(
+              onPressed: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => ReminderFormPage(
+                    agenda: agenda,
+                    preferredProjectId: agendaProjectId,
+                  ),
+                ),
+              ),
+              child: const Text('Formu aç'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Formu aç'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('reminder-project')), findsOneWidget);
+    expect(find.text('Şantiye A'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(agenda.createReminderCalls, 0);
+  });
+
+  testWidgets('preferred project can be changed to personal before save', (
+    tester,
+  ) async {
+    final agenda = FakeAgendaApplication(
+      projects: [reminderProject(agendaProjectId, 'Şantiye A')],
+    );
+    await _pumpReminderFormRoute(
+      tester,
+      openerKey: const Key('open-personal-preferred-form'),
+      builder: (_) =>
+          ReminderFormPage(agenda: agenda, preferredProjectId: agendaProjectId),
+    );
+
+    await tester.tap(find.byKey(const Key('reminder-project')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Kişisel / projesiz').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('reminder-title')),
+      'Kişisel kontrol',
+    );
+    await _submitReminderFormThroughUi(tester);
+
+    expect(agenda.createReminderCalls, 1);
+    expect(agenda.lastReminderCommand, isNotNull);
+    expect(agenda.lastReminderCommand!.projectId, isNull);
+    expect(
+      find.byKey(const Key('open-personal-preferred-form')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('submit-reminder')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('invalid preferred project clears but source log project wins', (
+    tester,
+  ) async {
+    final preferred = reminderProject(
+      'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      'Arşivli',
+      archivedAt: '2026-08-30T07:00:00Z',
+    );
+    final sourceProject = reminderProject(agendaProjectId, 'Şantiye A');
+    final invalidAgenda = FakeAgendaApplication(projects: [preferred]);
+    await _pumpReminderFormRoute(
+      tester,
+      openerKey: const Key('open-invalid-preferred-form'),
+      builder: (_) => ReminderFormPage(
+        agenda: invalidAgenda,
+        preferredProjectId: preferred.id,
+      ),
+    );
+    await tester.enterText(
+      find.byKey(const Key('reminder-title')),
+      'Arşivli projeye yazma',
+    );
+    await _submitReminderFormThroughUi(tester);
+    expect(invalidAgenda.createReminderCalls, 1);
+    expect(invalidAgenda.lastReminderCommand, isNotNull);
+    expect(invalidAgenda.lastReminderCommand!.projectId, isNull);
+
+    final sourceAgenda = FakeAgendaApplication(
+      projects: [sourceProject, preferred],
+    );
+    await _pumpReminderFormRoute(
+      tester,
+      openerKey: const Key('open-source-log-form'),
+      builder: (_) => ReminderFormPage(
+        agenda: sourceAgenda,
+        log: sourceAgendaLog(),
+        preferredProjectId: preferred.id,
+      ),
+    );
+    expect(find.byKey(const Key('reminder-project')), findsNothing);
+    await _submitReminderFormThroughUi(tester);
+    expect(sourceAgenda.createReminderCalls, 1);
+    expect(sourceAgenda.lastReminderCommand, isNotNull);
+    expect(sourceAgenda.lastReminderCommand!.projectId, agendaProjectId);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('+ Unutma is usable at 320 px with 44 px targets', (
     tester,
   ) async {

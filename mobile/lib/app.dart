@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
+import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
 import 'package:chief_site_engineer/features/agenda/phone_call_result_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_day_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_page.dart';
@@ -13,11 +14,14 @@ import 'package:chief_site_engineer/features/attachments/project_media_album_pag
 import 'package:chief_site_engineer/features/concrete/concrete_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
 import 'package:chief_site_engineer/features/daily_log/daily_log_page.dart';
+import 'package:chief_site_engineer/features/dashboard/project_dashboard_page.dart';
 import 'package:chief_site_engineer/features/inventory/inventory_page.dart';
 import 'package:chief_site_engineer/features/living_plan/living_plan_page.dart';
 import 'package:chief_site_engineer/features/material_requests/material_requests_page.dart';
 import 'package:chief_site_engineer/features/memory/memory_backup_page.dart';
+import 'package:chief_site_engineer/features/project_context/active_project_session.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
+import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -236,10 +240,12 @@ class MobileShell extends StatefulWidget {
 class _MobileShellState extends State<MobileShell> {
   int _selectedIndex = 0;
   StreamSubscription<String>? _notificationTapSubscription;
+  late final ActiveProjectSession _activeProjectSession;
 
   @override
   void initState() {
     super.initState();
+    _activeProjectSession = ActiveProjectSession();
     _notificationTapSubscription = widget.bootstrap.agenda.notificationTaps
         .listen(_openReminderFromNotification);
     final initial = widget.bootstrap.agenda.initialNotificationReminderId;
@@ -253,6 +259,7 @@ class _MobileShellState extends State<MobileShell> {
   @override
   void dispose() {
     _notificationTapSubscription?.cancel();
+    _activeProjectSession.dispose();
     super.dispose();
   }
 
@@ -316,6 +323,174 @@ class _MobileShellState extends State<MobileShell> {
     );
   }
 
+  Future<void> _openPhoneCallResult() async {
+    final logId = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => PhoneCallResultPage(
+          agenda: widget.bootstrap.agenda,
+          contextSuggestions: widget.bootstrap.contextSuggestions,
+          projectLocations: widget.bootstrap.projectLocations,
+        ),
+      ),
+    );
+    if (!mounted || logId == null) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => LogDetailPage(
+          agenda: widget.bootstrap.agenda,
+          projectLocations: widget.bootstrap.projectLocations,
+          attachments: widget.bootstrap.concreteAttachments,
+          concrete: widget.bootstrap.concrete,
+          concreteAttachments: widget.bootstrap.concreteAttachments,
+          logId: logId,
+        ),
+      ),
+    );
+  }
+
+  ProjectDashboardPage _buildDashboard() {
+    final bootstrap = widget.bootstrap;
+    final dailyLog = bootstrap.dailyLog;
+    final materials = bootstrap.materialRequests;
+    final catalog = bootstrap.attachmentCatalog;
+    final attendance = bootstrap.attendance;
+    final backup = bootstrap.backup;
+    final reconciliation = bootstrap.attachmentReconciliation;
+    return ProjectDashboardPage(
+      agenda: bootstrap.agenda,
+      dailyLog: dailyLog,
+      livingPlan: bootstrap.livingPlan,
+      materialRequests: materials,
+      session: _activeProjectSession,
+      onCreateProject: () => setState(() => _selectedIndex = 2),
+      onAddReminder: (projectId, localDay) async {
+        final value = await Navigator.of(context).push<Object?>(
+          MaterialPageRoute(
+            builder: (_) => ReminderFormPage(
+              agenda: bootstrap.agenda,
+              contextSuggestions: bootstrap.contextSuggestions,
+              projectLocations: bootstrap.projectLocations,
+              preferredProjectId: projectId,
+            ),
+          ),
+        );
+        return value != null;
+      },
+      onAddAgenda: (projectId, localDay) async {
+        final value = await Navigator.of(context).push<Object?>(
+          MaterialPageRoute(
+            builder: (_) => LogFormPage(
+              agenda: bootstrap.agenda,
+              projectLocations: bootstrap.projectLocations,
+              attachments: bootstrap.concreteAttachments,
+              concrete: bootstrap.concrete,
+              concreteAttachments: bootstrap.concreteAttachments,
+              initialProjectId: projectId,
+              initialIstanbulDay: localDay,
+            ),
+          ),
+        );
+        return value != null;
+      },
+      onOpenToday: dailyLog == null
+          ? null
+          : (_) => unawaited(
+              Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => DailyLogPage(
+                    dailyLog: dailyLog,
+                    workChain: bootstrap.workChain,
+                  ),
+                ),
+              ),
+            ),
+      onOpenPlan: (_) => unawaited(
+        Navigator.of(context).push<void>(
+          MaterialPageRoute(
+            builder: (_) => LivingPlanPage(
+              agenda: bootstrap.agenda,
+              livingPlan: bootstrap.livingPlan,
+              intelligence: bootstrap.livingPlanIntelligence,
+            ),
+          ),
+        ),
+      ),
+      onOpenMaterials: materials == null
+          ? null
+          : (_) => unawaited(
+              Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => MaterialRequestsPage(application: materials),
+                ),
+              ),
+            ),
+      onOpenProjectAlbum: catalog == null
+          ? null
+          : (_) => unawaited(
+              Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => ProjectMediaAlbumPage(
+                    catalog: catalog,
+                    agenda: bootstrap.agenda,
+                    concrete: bootstrap.concrete,
+                    attachments: bootstrap.concreteAttachments,
+                    projectLocations: bootstrap.projectLocations,
+                  ),
+                ),
+              ),
+            ),
+      onOpenWorkforce: attendance == null
+          ? null
+          : (_) => unawaited(
+              Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => Scaffold(
+                    appBar: AppBar(title: const Text('Sicil')),
+                    body: SafeArea(
+                      child: WorkforceDirectoryPage(
+                        attendance: attendance,
+                        agenda: bootstrap.agenda,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+      onOpenPhoneCall: (_) => unawaited(_openPhoneCallResult()),
+      onOpenBackup: backup == null
+          ? null
+          : () => unawaited(
+              Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => MemoryBackupPage(backup: backup),
+                ),
+              ),
+            ),
+      onOpenCatalog: catalog == null
+          ? null
+          : (projectId) => unawaited(
+              Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => AttachmentCatalogPage(
+                    catalog: catalog,
+                    initialProjectId: projectId,
+                  ),
+                ),
+              ),
+            ),
+      onOpenAttachmentHealth: reconciliation == null
+          ? null
+          : () => unawaited(
+              Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      AttachmentHealthPage(reconciliation: reconciliation),
+                ),
+              ),
+            ),
+    );
+  }
+
   static const _destinations = <NavigationDestination>[
     NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Başlangıç'),
     NavigationDestination(
@@ -343,7 +518,7 @@ class _MobileShellState extends State<MobileShell> {
         child: IndexedStack(
           index: _selectedIndex,
           children: [
-            _HomePage(bootstrap: widget.bootstrap),
+            _buildDashboard(),
             RemindersPage(
               agenda: widget.bootstrap.agenda,
               attendance: widget.bootstrap.attendance,
@@ -458,302 +633,6 @@ class _MorePage extends StatelessWidget {
                 : null,
           ),
         ),
-      ],
-    );
-  }
-}
-
-class _HomePage extends StatefulWidget {
-  const _HomePage({required this.bootstrap});
-
-  final BootstrapSuccess bootstrap;
-
-  @override
-  State<_HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<_HomePage> {
-  static const _fieldTips = <String>[
-    'Sahada görülen veya söylenenler, mümkün olduğunca anında kayda geçtiğinde unutulmaz.',
-    'Fotoğraf; neyi, nerede ve neden gösterdiğiyle birlikte anlam kazanır.',
-    'Gün sonu, önemli gelişmelerin rapor ve kayıtlara yansıdığını kontrol etme zamanıdır.',
-    'Açık işler zihinde değil, sistemde görünür kaldığında daha kolay takip edilir.',
-  ];
-
-  var _fieldTipIndex = 0;
-
-  void _showPreviousFieldTip() {
-    setState(() {
-      _fieldTipIndex =
-          (_fieldTipIndex - 1 + _fieldTips.length) % _fieldTips.length;
-    });
-  }
-
-  void _showNextFieldTip() {
-    setState(() {
-      _fieldTipIndex = (_fieldTipIndex + 1) % _fieldTips.length;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final fieldTip = _fieldTips[_fieldTipIndex];
-    final fieldTipPosition = '${_fieldTipIndex + 1} / ${_fieldTips.length}';
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        Text(
-          'Saha hafızanız cihazınızda.',
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Günlük kullanım internet, bilgisayar veya yerel ağ bağlantısı gerektirmez.',
-        ),
-        const SizedBox(height: 20),
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.offline_bolt_outlined),
-            title: const Text('Çevrim dışı temel hazır'),
-            subtitle: Text(
-              'Cihaz-içi SQLite • ${widget.bootstrap.environmentLabel} ortamı',
-            ),
-          ),
-        ),
-        const Card(
-          child: ListTile(
-            leading: Icon(Icons.lock_outline_rounded),
-            title: Text('Veri sınırı'),
-            subtitle: Text(
-              'Bulut eşitleme ve kullanıcı hesabı bu sürümde yoktur.',
-            ),
-          ),
-        ),
-        Card(
-          child: ListTile(
-            key: const Key('open-phone-call-result'),
-            leading: const Icon(Icons.phone_in_talk_outlined),
-            title: const Text('Görüşme sonucu'),
-            subtitle: const Text(
-              'Telefon görüşmesinin sonucunu Ajanda’ya hızlıca kaydet.',
-            ),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () async {
-              final logId = await Navigator.of(context).push<String>(
-                MaterialPageRoute(
-                  builder: (_) => PhoneCallResultPage(
-                    agenda: widget.bootstrap.agenda,
-                    contextSuggestions: widget.bootstrap.contextSuggestions,
-                    projectLocations: widget.bootstrap.projectLocations,
-                  ),
-                ),
-              );
-              if (!context.mounted || logId == null) return;
-              await Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => LogDetailPage(
-                    agenda: widget.bootstrap.agenda,
-                    projectLocations: widget.bootstrap.projectLocations,
-                    attachments: widget.bootstrap.concreteAttachments,
-                    concrete: widget.bootstrap.concrete,
-                    concreteAttachments: widget.bootstrap.concreteAttachments,
-                    logId: logId,
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        Card(
-          child: ListTile(
-            key: const Key('open-living-plan'),
-            leading: const Icon(Icons.calendar_view_week_outlined),
-            title: const Text('7 Günlük Plan'),
-            subtitle: const Text('Geciken işleri ve önündeki yedi günü yönet.'),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () => Navigator.of(context).push<void>(
-              MaterialPageRoute(
-                builder: (_) => LivingPlanPage(
-                  agenda: widget.bootstrap.agenda,
-                  livingPlan: widget.bootstrap.livingPlan,
-                  intelligence: widget.bootstrap.livingPlanIntelligence,
-                ),
-              ),
-            ),
-          ),
-        ),
-        if (widget.bootstrap.dailyLog case final dailyLog?)
-          Card(
-            child: ListTile(
-              key: const Key('open-daily-log'),
-              leading: const Icon(Icons.summarize_outlined),
-              title: const Text('Günlük Log'),
-              subtitle: const Text(
-                'Seçilen günün kaynak kayıtlarından salt-okunur taslak hazırla.',
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => DailyLogPage(
-                    dailyLog: dailyLog,
-                    workChain: widget.bootstrap.workChain,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        if (widget.bootstrap.materialRequests case final materialRequests?)
-          Card(
-            child: ListTile(
-              key: const Key('open-material-requests'),
-              leading: const Icon(Icons.inventory_2_outlined),
-              title: const Text('İstenecek Malzemeler'),
-              subtitle: const Text(
-                'Malzeme ihtiyaçlarını İhtiyaç var, İstendi ve Geldi akışında takip et.',
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      MaterialRequestsPage(application: materialRequests),
-                ),
-              ),
-            ),
-          ),
-        Card(
-          key: const Key('home-field-tip-card'),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.tips_and_updates_outlined),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Saha İpucu',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Semantics(
-                  key: const Key('field-tip-live-region'),
-                  label: 'Saha İpucu $fieldTipPosition: $fieldTip',
-                  liveRegion: true,
-                  child: Text(fieldTip, key: const Key('field-tip-text')),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    IconButton(
-                      key: const Key('previous-field-tip'),
-                      tooltip: 'Önceki saha ipucu',
-                      onPressed: _showPreviousFieldTip,
-                      icon: const Icon(Icons.arrow_back_rounded),
-                    ),
-                    Expanded(
-                      child: Text(
-                        fieldTipPosition,
-                        key: const Key('field-tip-position'),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    IconButton(
-                      key: const Key('next-field-tip'),
-                      tooltip: 'Sonraki saha ipucu',
-                      onPressed: _showNextFieldTip,
-                      icon: const Icon(Icons.arrow_forward_rounded),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (widget.bootstrap.backup case final backup?)
-          Card(
-            child: ListTile(
-              key: const Key('open-memory-backup'),
-              minVerticalPadding: 12,
-              leading: const Icon(Icons.settings_backup_restore_rounded),
-              title: const Text('Hafıza ve Yedekleme'),
-              subtitle: const Text(
-                'Parola korumalı tam mobil yedek oluştur veya geri yükle.',
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => MemoryBackupPage(backup: backup),
-                ),
-              ),
-            ),
-          ),
-        if (widget.bootstrap.attachmentCatalog case final catalog?)
-          Card(
-            child: ListTile(
-              key: const Key('open-project-media-album'),
-              minVerticalPadding: 12,
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Proje Albümü'),
-              subtitle: const Text(
-                'Projedeki fotoğraf ve videoları kaynak kayıtlarıyla görüntüle.',
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => ProjectMediaAlbumPage(
-                    catalog: catalog,
-                    agenda: widget.bootstrap.agenda,
-                    concrete: widget.bootstrap.concrete,
-                    attachments: widget.bootstrap.concreteAttachments,
-                    projectLocations: widget.bootstrap.projectLocations,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        if (widget.bootstrap.attachmentCatalog case final catalog?)
-          Card(
-            child: ListTile(
-              key: const Key('open-attachment-catalog'),
-              minVerticalPadding: 12,
-              leading: const Icon(Icons.folder_copy_outlined),
-              title: const Text('Dosya Kataloğu'),
-              subtitle: const Text(
-                'Projedeki dosyaları ve bağlı CSE kayıtlarını görüntüle.',
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => AttachmentCatalogPage(catalog: catalog),
-                ),
-              ),
-            ),
-          ),
-        if (widget.bootstrap.attachmentReconciliation
-            case final reconciliation?)
-          Card(
-            child: ListTile(
-              key: const Key('open-attachment-health'),
-              minVerticalPadding: 12,
-              leading: const Icon(Icons.health_and_safety_outlined),
-              title: const Text('Dosya sağlığı'),
-              subtitle: const Text(
-                'Eksik, bozuk veya kırık bağlantıları salt-okunur denetle.',
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      AttachmentHealthPage(reconciliation: reconciliation),
-                ),
-              ),
-            ),
-          ),
       ],
     );
   }
