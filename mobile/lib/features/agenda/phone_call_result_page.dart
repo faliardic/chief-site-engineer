@@ -13,12 +13,16 @@ class PhoneCallResultPage extends StatefulWidget {
     required this.agenda,
     this.contextSuggestions,
     this.projectLocations,
+    this.initialProjectId,
+    this.onProjectSelected,
     super.key,
   });
 
   final AgendaApplication agenda;
   final ContextSuggestionApplication? contextSuggestions;
   final ProjectLocationApplication? projectLocations;
+  final String? initialProjectId;
+  final ValueChanged<String>? onProjectSelected;
 
   @override
   State<PhoneCallResultPage> createState() => _PhoneCallResultPageState();
@@ -37,6 +41,7 @@ class _PhoneCallResultPageState extends State<PhoneCallResultPage> {
   List<MobileProjectLocation> _locations = const [];
   List<ContextSuggestion> _suggestions = const [];
   ContextSuggestion? _selectedSuggestion;
+  String? _projectIdToValidate;
   String? _projectId;
   String? _locationId;
   String? _projectError;
@@ -56,6 +61,7 @@ class _PhoneCallResultPageState extends State<PhoneCallResultPage> {
     super.initState();
     _logId = RecordId.randomUuid();
     _eventId = RecordId.randomUuid();
+    _projectIdToValidate = widget.initialProjectId;
     _party.addListener(_partyChanged);
     _projectSubscription = widget.agenda.projectChanges.listen(
       (_) => _loadProjects(),
@@ -77,6 +83,7 @@ class _PhoneCallResultPageState extends State<PhoneCallResultPage> {
 
   Future<void> _loadProjects() async {
     final generation = ++_projectLoadGeneration;
+    final projectIdToValidate = _projectIdToValidate;
     if (mounted) {
       setState(() {
         _loadingProjects = true;
@@ -84,13 +91,16 @@ class _PhoneCallResultPageState extends State<PhoneCallResultPage> {
       });
     }
     try {
-      final projects = await widget.agenda.listProjects();
+      final projects = (await widget.agenda.listProjects())
+          .where((project) => !project.isArchived)
+          .toList(growable: false);
       if (!mounted || generation != _projectLoadGeneration) return;
-      final selected = projects.any((project) => project.id == _projectId)
-          ? _projectId
-          : projects.isEmpty
-          ? null
-          : projects.first.id;
+      final selected =
+          projects.any((project) => project.id == projectIdToValidate)
+          ? projectIdToValidate
+          : widget.initialProjectId == null && projects.isNotEmpty
+          ? projects.first.id
+          : null;
       final projectChanged = selected != _projectId;
       if (projectChanged) {
         _invalidateProjectBoundState();
@@ -99,6 +109,7 @@ class _PhoneCallResultPageState extends State<PhoneCallResultPage> {
       setState(() {
         _projects = projects;
         _projectId = selected;
+        if (selected != null) _projectIdToValidate = selected;
         _loadingProjects = false;
         if (projectChanged) {
           _locationId = null;
@@ -128,9 +139,14 @@ class _PhoneCallResultPageState extends State<PhoneCallResultPage> {
   }
 
   Future<void> _selectProject(String? projectId) async {
-    if (projectId == _projectId) return;
+    if (projectId == null ||
+        projectId == _projectId ||
+        !_projects.any((project) => project.id == projectId)) {
+      return;
+    }
     _invalidateProjectBoundState();
     setState(() {
+      _projectIdToValidate = projectId;
       _projectId = projectId;
       _locationId = null;
       _locations = const [];
@@ -139,6 +155,7 @@ class _PhoneCallResultPageState extends State<PhoneCallResultPage> {
       _suggestionsUnavailable = false;
       _setPartyText('');
     });
+    widget.onProjectSelected?.call(projectId);
     await _loadLocations();
     _scheduleSuggestionLoad();
   }
@@ -378,6 +395,16 @@ class _PhoneCallResultPageState extends State<PhoneCallResultPage> {
                   error,
                   key: const Key('phone-call-project-error'),
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+            if (_projectError != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: const Key('phone-call-project-retry'),
+                  onPressed: _loadingProjects ? null : _loadProjects,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Projeleri yeniden dene'),
                 ),
               ),
             const SizedBox(height: 16),

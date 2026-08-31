@@ -127,3 +127,29 @@ PR, do not mark Ready, do not merge, and stop at `FRESH_INDEPENDENT_R4`.
   Inventory PR #536 remains open and untouched; no pre-existing `MT-547-*` rows.
 - Branch: created from exact `origin/master`; initial divergence `0/0`.
 - Status: implementation inspection in progress.
+
+## Process v3 supersession and final recovery (authoritative)
+
+- The earlier R4/local-matrix wording above is retained as historical evidence
+  but is superseded by owner comments `5482063488` and `5482388860`.
+- Current lane: `STANDARD`; review level: `R3`; exact base:
+  `0ec8a241336fbf9afae38226e5faf988b1481163`.
+- The authorized recovery advanced local `master` to the exact base and rebased
+  this branch once without conflicts. The recovery ledger commit became
+  `66c38ada9cebd2f7a29ac260c983fbbae6a9ec44`.
+- Production implementation stayed inside the original Issue #547 allowlist.
+- Two normal same-scope corrections fixed deterministic test-harness defects.
+  The remaining eager `Future.error` fixture defect then received the explicit
+  `ONE_FINAL_HARNESS_ONLY_CORRECTION` authority.
+- That final exception changed only
+  `mobile/test/project_context_bidirectional_widget_test.dart`: discovery
+  failures are now created lazily when `listProjects()` is invoked, preserving
+  all fail-closed and zero-scoped-call assertions.
+- The exact previously failing discovery test passed after the correction.
+- STANDARD source-level closure passed: changed-Dart format, full diff check,
+  exact allowlist, protected drift, and invariants `22 / 1 / 0.1.0+1`.
+- Broad Flutter validation is intentionally not rerun locally; it belongs to PR
+  CI under the current authority.
+- Publication target: one implementation commit, branch push, one Draft PR,
+  manual tests `MT-547-*` recorded as `PENDING`, then stop at
+  `DRAFT_PR_FOR_SHORT_REVIEW`.
