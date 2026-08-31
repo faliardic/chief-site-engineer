@@ -394,33 +394,38 @@ class _MobileShellState extends State<MobileShell> {
       },
       onOpenToday: dailyLog == null
           ? null
-          : (_) => unawaited(
+          : (projectId) => unawaited(
               Navigator.of(context).push<void>(
                 MaterialPageRoute(
                   builder: (_) => DailyLogPage(
                     dailyLog: dailyLog,
                     workChain: bootstrap.workChain,
+                    initialProjectId: projectId,
                   ),
                 ),
               ),
             ),
-      onOpenPlan: (_) => unawaited(
+      onOpenPlan: (projectId) => unawaited(
         Navigator.of(context).push<void>(
           MaterialPageRoute(
             builder: (_) => LivingPlanPage(
               agenda: bootstrap.agenda,
               livingPlan: bootstrap.livingPlan,
               intelligence: bootstrap.livingPlanIntelligence,
+              initialProjectId: projectId,
             ),
           ),
         ),
       ),
       onOpenMaterials: materials == null
           ? null
-          : (_) => unawaited(
+          : (projectId) => unawaited(
               Navigator.of(context).push<void>(
                 MaterialPageRoute(
-                  builder: (_) => MaterialRequestsPage(application: materials),
+                  builder: (_) => MaterialRequestsPage(
+                    application: materials,
+                    initialProjectId: projectId,
+                  ),
                 ),
               ),
             ),

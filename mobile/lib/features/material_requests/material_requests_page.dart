@@ -7,9 +7,14 @@ import 'package:chief_site_engineer/domain/material_request_models.dart';
 import 'package:flutter/material.dart';
 
 class MaterialRequestsPage extends StatefulWidget {
-  const MaterialRequestsPage({required this.application, super.key});
+  const MaterialRequestsPage({
+    required this.application,
+    this.initialProjectId,
+    super.key,
+  });
 
   final MaterialRequestApplicationPort application;
+  final String? initialProjectId;
 
   @override
   State<MaterialRequestsPage> createState() => _MaterialRequestsPageState();
@@ -26,6 +31,7 @@ class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
   @override
   void initState() {
     super.initState();
+    _projectId = widget.initialProjectId;
     unawaited(_loadProjects());
   }
 
@@ -38,7 +44,9 @@ class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
       final projects = await widget.application.listProjects();
       final selected = projects.any((project) => project.id == _projectId)
           ? _projectId
-          : (projects.isEmpty ? null : projects.first.id);
+          : widget.initialProjectId == null && projects.isNotEmpty
+          ? projects.first.id
+          : null;
       if (!mounted) return;
       setState(() {
         _projects = projects;
@@ -191,7 +199,7 @@ class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
             ),
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: _reload,
+          onRefresh: _loadProjects,
           child: ListView(
             key: const Key('material-requests-page'),
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
@@ -236,7 +244,9 @@ class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
                   ),
                 ],
                 selected: {_kind},
-                onSelectionChanged: _loading ? null : _changeKind,
+                onSelectionChanged: _loading || _projectId == null
+                    ? null
+                    : _changeKind,
               ),
               const SizedBox(height: 12),
               if (_loading)
@@ -255,6 +265,15 @@ class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
                 const _MessageCard(
                   icon: Icons.apartment_outlined,
                   text: 'Önce aktif bir proje oluşturun.',
+                )
+              else if (_projectId == null)
+                const KeyedSubtree(
+                  key: Key('material-request-project-context-unavailable'),
+                  child: _MessageCard(
+                    icon: Icons.folder_off_outlined,
+                    text:
+                        'Dashboard projesi artık kullanılamıyor. Devam etmek için bir proje seçin.',
+                  ),
                 )
               else if (_requests.isEmpty)
                 _MessageCard(

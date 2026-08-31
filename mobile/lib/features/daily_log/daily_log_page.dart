@@ -7,10 +7,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class DailyLogPage extends StatefulWidget {
-  const DailyLogPage({required this.dailyLog, this.workChain, super.key});
+  const DailyLogPage({
+    required this.dailyLog,
+    this.workChain,
+    this.initialProjectId,
+    super.key,
+  });
 
   final DailyLogApplicationPort dailyLog;
   final WorkChainApplicationPort? workChain;
+  final String? initialProjectId;
 
   @override
   State<DailyLogPage> createState() => _DailyLogPageState();
@@ -30,13 +36,19 @@ class _DailyLogPageState extends State<DailyLogPage> {
     _selectedDay = CseTimeCodec.istanbulDayKey(
       CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
     );
+    _selectedProjectId = widget.initialProjectId;
     _loadProjects();
   }
 
   Future<void> _loadProjects() async {
     try {
       final projects = await widget.dailyLog.listProjects();
-      final selectedProjectId = projects.isEmpty ? null : projects.first.id;
+      final selectedProjectId =
+          projects.any((project) => project.id == _selectedProjectId)
+          ? _selectedProjectId
+          : widget.initialProjectId == null && projects.isNotEmpty
+          ? projects.first.id
+          : null;
       final day = selectedProjectId == null
           ? null
           : await widget.dailyLog.loadDay(
@@ -165,7 +177,7 @@ class _DailyLogPageState extends State<DailyLogPage> {
             const SizedBox(height: 12),
             OutlinedButton.icon(
               key: const Key('daily-log-select-day'),
-              onPressed: _projects.isEmpty ? null : _selectDay,
+              onPressed: _selectedProjectId == null ? null : _selectDay,
               icon: const Icon(Icons.calendar_today_outlined),
               label: Text(CseTimeCodec.formatIstanbulDay(_selectedDay)),
             ),
@@ -191,6 +203,16 @@ class _DailyLogPageState extends State<DailyLogPage> {
               )
             else if (_projects.isEmpty)
               const _DailyLogEmptyProjects()
+            else if (_selectedProjectId == null)
+              const Card(
+                key: Key('daily-log-project-context-unavailable'),
+                child: ListTile(
+                  leading: Icon(Icons.folder_off_outlined),
+                  title: Text(
+                    'Dashboard projesi artık kullanılamıyor. Devam etmek için bir proje seçin.',
+                  ),
+                ),
+              )
             else if (day != null) ...[
               Semantics(
                 header: true,
