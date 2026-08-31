@@ -18,6 +18,7 @@ class RemindersPage extends StatefulWidget {
     this.attendance,
     this.contextSuggestions,
     this.projectLocations,
+    this.preferredProjectId,
     super.key,
   });
 
@@ -25,6 +26,7 @@ class RemindersPage extends StatefulWidget {
   final AttendanceApplication? attendance;
   final ContextSuggestionApplication? contextSuggestions;
   final ProjectLocationApplication? projectLocations;
+  final String? preferredProjectId;
 
   @override
   State<RemindersPage> createState() => _RemindersPageState();
@@ -287,6 +289,7 @@ class _RemindersPageState extends State<RemindersPage> {
                           agenda: widget.agenda,
                           contextSuggestions: widget.contextSuggestions,
                           projectLocations: widget.projectLocations,
+                          preferredProjectId: widget.preferredProjectId,
                         ),
                       ),
                     );

@@ -20,6 +20,7 @@ class AgendaPage extends StatefulWidget {
     this.attachments,
     this.concrete,
     this.concreteAttachments,
+    this.activeProjectId,
     super.key,
   });
 
@@ -28,6 +29,7 @@ class AgendaPage extends StatefulWidget {
   final SafeAttachmentPicker? attachments;
   final ConcreteApplication? concrete;
   final SafeAttachmentPicker? concreteAttachments;
+  final String? activeProjectId;
 
   @override
   State<AgendaPage> createState() => _AgendaPageState();
@@ -202,6 +204,21 @@ class _AgendaPageState extends State<AgendaPage> {
   }
 
   Future<void> _openCreateLog() async {
+    final requestedProjectId = _projectId ?? widget.activeProjectId;
+    final initialProjectId =
+        _projects.any(
+          (project) => !project.isArchived && project.id == requestedProjectId,
+        )
+        ? requestedProjectId
+        : null;
+    if (initialProjectId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Önce aktif proje veya Ajanda proje filtresi seçin.'),
+        ),
+      );
+      return;
+    }
     final day = await Navigator.of(context).push<String>(
       MaterialPageRoute(
         builder: (_) => LogFormPage(
@@ -210,7 +227,7 @@ class _AgendaPageState extends State<AgendaPage> {
           attachments: widget.attachments,
           concrete: widget.concrete,
           concreteAttachments: widget.concreteAttachments,
-          initialProjectId: _projectId,
+          initialProjectId: initialProjectId,
           initialIstanbulDay: _selectedDay,
         ),
       ),
