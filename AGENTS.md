@@ -11,10 +11,11 @@ Bilgi türüne göre yetkili kaynaklar:
 3. Model ve reasoning routing: `docs/protocols/CSE_MODEL_REASONING_ROUTING_POLICY.md`
 4. Risk-temelli validation: `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`
 5. **Varsayılan workflow lane, correction, local-vs-CI validation ve hızlandırılmış publication:** `docs/protocols/CSE_WORKFLOW_ACCELERATION_PROTOCOL.md`
-6. Güncel ürün kapsamı ve sıra: `docs/v2/CSE_V2_SCOPE.md` ve `ROADMAP.md`
-7. Aktif görev: current GitHub Issue/PR ve owner scope kararları
-8. Kalıcı manuel test backlog'u: GitHub Issue `#479 — CSE Manual Test Register`
-9. Yerel yürütme kaydı: gerektiğinde `.cse/tasks/<issue_no>_task.md` ve `.cse/results/<issue_no>_result.md`
+6. **Owner'a insan-diliyle raporlama ve teknik çıktı tercümesi:** `docs/protocols/CSE_OWNER_COMMUNICATION_STANDARD.md`
+7. Güncel ürün kapsamı ve sıra: `docs/v2/CSE_V2_SCOPE.md` ve `ROADMAP.md`
+8. Aktif görev: current GitHub Issue/PR ve owner scope kararları
+9. Kalıcı manuel test backlog'u: GitHub Issue `#479 — CSE Manual Test Register`
+10. Yerel yürütme kaydı: gerektiğinde `.cse/tasks/<issue_no>_task.md` ve `.cse/results/<issue_no>_result.md`
 
 README, eski Epic/Issue ceremony'si, ZIP, handoff, podcast, `.cse/state`, Orchestrator, Bridge, Work Mode veya sohbet hafızası current GitHub ve kanonik kaynak gerçeğini override edemez.
 
@@ -74,12 +75,13 @@ Bir kez oku:
 4. `CSE_MODEL_REASONING_ROUTING_POLICY.md`
 5. `CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`
 6. `CSE_WORKFLOW_ACCELERATION_PROTOCOL.md`
-7. `CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md`
-8. `CSE_PROJECT_SOURCE_REGISTER.md`
-9. ürün işi ise `CSE_V2_SCOPE.md`
-10. `ROADMAP.md`
-11. current Issue/PR/branch/master
-12. ilgili Issue #479 manual test kayıtları
+7. `CSE_OWNER_COMMUNICATION_STANDARD.md`
+8. `CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md`
+9. `CSE_PROJECT_SOURCE_REGISTER.md`
+10. ürün işi ise `CSE_V2_SCOPE.md`
+11. `ROADMAP.md`
+12. current Issue/PR/branch/master
+13. ilgili Issue #479 manual test kayıtları
 
 ### Aynı Issue resume/correction
 
@@ -261,7 +263,33 @@ Build yalnız owner artifact/manual test istediğinde veya CRITICAL/release gate
 
 Artifact varsa source commit, package ID, version, size ve SHA-256 kaydedilir.
 
-## 15. Current migration
+## 15. Owner iletişim standardı
+
+Bütün CSE ChatGPT/Codex çıktıları `docs/protocols/CSE_OWNER_COMMUNICATION_STANDARD.md` kuralına uyar.
+
+Owner'a önce **ürün ve pratik anlam** anlatılır; teknik jargon ikinci katmandır.
+
+Önemli durumlarda cevap şu soruları sade Türkçe ile kapsar:
+
+```text
+Ne yaptık?
+Sonuç ne?
+Sorun var mı?
+Risk ne?
+Benim önerim ne?
+Senden ne gerekiyor?
+```
+
+Kurallar:
+
+- salt YAML/execution record owner cevabı olamaz;
+- SHA, R4, harness, fixture, allowlist, invariant, CI/analyzer gibi terimler ana açıklama olamaz;
+- teknik terim gerekiyorsa pratik anlamı hemen tercüme edilir;
+- Codex blocker/completion metni owner'a doğrudan kopyalanmaz; ChatGPT önce ürün diline çevirir;
+- owner teknik ayrıntıyı okumadan projenin nerede olduğunu ve kendisinden ne beklendiğini anlayabilmelidir;
+- teknik evidence silinmez veya çarpıtılmaz; gerekirse ikinci katmanda verilir.
+
+## 16. Current migration
 
 Issue #547 ve sonraki ordinary UI/context işleri `CSE_WORKFLOW_ACCELERATION_PROTOCOL.md` uyarınca FAST/STANDARD'a taşınır.
 
@@ -277,6 +305,6 @@ same_scope_corrections_without_new_authority: 2
 
 Product scope/allowlist/Attendance protection aynen korunur.
 
-## 16. Ana karar
+## 17. Ana karar
 
-> CSE'nin varsayılan döngüsü Issue → implementation → Draft PR → CI → kısa review → owner merge'dür. Ağır fail-closed süreç yalnız gerçek CRITICAL risklerde kullanılır.
+> CSE'nin varsayılan döngüsü Issue → implementation → Draft PR → CI → kısa review → owner merge'dür. Ağır fail-closed süreç yalnız gerçek CRITICAL risklerde kullanılır. Owner'a her zaman önce yapılan işin ürün/pratik anlamı sade Türkçeyle anlatılır; teknik jargon ve execution evidence ikinci katmandır.
