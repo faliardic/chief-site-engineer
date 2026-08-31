@@ -120,6 +120,14 @@ void main() {
       ),
     );
     expect(plan.calls, [projectB.id]);
+    expect(
+      tester
+          .widget<DropdownButtonFormField<String>>(
+            find.byKey(ValueKey('living-plan-project-${projectB.id}')),
+          )
+          .initialValue,
+      projectB.id,
+    );
 
     final daily = _DailyFake.fromMobile(const [projectA, projectB]);
     await _pumpPage(
@@ -127,6 +135,14 @@ void main() {
       DailyLogPage(dailyLog: daily, initialProjectId: projectB.id),
     );
     expect(daily.calls, [projectB.id]);
+    expect(
+      tester
+          .widget<DropdownButtonFormField<String>>(
+            find.byKey(ValueKey('daily-log-project-${projectB.id}')),
+          )
+          .initialValue,
+      projectB.id,
+    );
 
     final materials = _MaterialFake.fromMobile(const [projectA, projectB]);
     await _pumpPage(
@@ -137,7 +153,103 @@ void main() {
       ),
     );
     expect(materials.calls, [projectB.id]);
+    expect(
+      tester
+          .widget<DropdownButtonFormField<String>>(
+            find.byKey(ValueKey('material-request-project-${projectB.id}')),
+          )
+          .initialValue,
+      projectB.id,
+    );
   });
+
+  testWidgets(
+    'Daily Log revalidates explicit context after project discovery failure',
+    (tester) async {
+      final daily = _DailyFake.fromMobile(const [projectA, projectB])
+        ..failProjectDiscovery = true;
+
+      await _pumpPage(
+        tester,
+        DailyLogPage(dailyLog: daily, initialProjectId: projectB.id),
+      );
+
+      expect(daily.events, ['listProjects']);
+      expect(daily.calls, isEmpty);
+      expect(find.byKey(const Key('daily-log-project-retry')), findsOneWidget);
+
+      daily.failProjectDiscovery = false;
+      await tester.tap(find.byKey(const Key('daily-log-project-retry')));
+      await tester.pumpAndSettle();
+
+      expect(daily.projectDiscoveryCalls, 2);
+      expect(daily.events, [
+        'listProjects',
+        'listProjects',
+        'loadDay:${projectB.id}',
+      ]);
+      expect(daily.calls, [projectB.id]);
+      expect(
+        tester
+            .widget<DropdownButtonFormField<String>>(
+              find.byKey(ValueKey('daily-log-project-${projectB.id}')),
+            )
+            .initialValue,
+        projectB.id,
+      );
+    },
+  );
+
+  testWidgets(
+    'Materials exposes no project work before failed discovery is retried',
+    (tester) async {
+      final materials = _MaterialFake.fromMobile(const [projectA, projectB])
+        ..failProjectDiscovery = true;
+
+      await _pumpPage(
+        tester,
+        MaterialRequestsPage(
+          application: materials,
+          initialProjectId: projectB.id,
+        ),
+      );
+
+      expect(materials.events, ['listProjects']);
+      expect(materials.calls, isEmpty);
+      expect(materials.locationCalls, 0);
+      expect(materials.livingPlanCalls, 0);
+      expect(materials.createCalls, 0);
+      expect(find.byKey(const Key('material-request-create')), findsNothing);
+      expect(
+        find.byKey(const Key('material-request-project-retry')),
+        findsOneWidget,
+      );
+
+      materials.failProjectDiscovery = false;
+      await tester.tap(find.byKey(const Key('material-request-project-retry')));
+      await tester.pumpAndSettle();
+
+      expect(materials.projectDiscoveryCalls, 2);
+      expect(materials.events, [
+        'listProjects',
+        'listProjects',
+        'listMaterialRequests:${projectB.id}',
+      ]);
+      expect(materials.calls, [projectB.id]);
+      expect(materials.locationCalls, 0);
+      expect(materials.livingPlanCalls, 0);
+      expect(materials.createCalls, 0);
+      expect(
+        tester
+            .widget<DropdownButtonFormField<String>>(
+              find.byKey(ValueKey('material-request-project-${projectB.id}')),
+            )
+            .initialValue,
+        projectB.id,
+      );
+      expect(find.byKey(const Key('material-request-create')), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'stale explicit context reads nothing and each local selector recovers',
@@ -352,9 +464,19 @@ class _DailyFake implements DailyLogApplicationPort {
 
   List<DailyLogProject> projects;
   final List<String> calls = [];
+  final List<String> events = [];
+  var failProjectDiscovery = false;
+  var projectDiscoveryCalls = 0;
 
   @override
-  Future<List<DailyLogProject>> listProjects() async => projects;
+  Future<List<DailyLogProject>> listProjects() async {
+    projectDiscoveryCalls += 1;
+    events.add('listProjects');
+    if (failProjectDiscovery) {
+      throw const DailyLogFailure('daily_log_project_discovery_failed');
+    }
+    return projects;
+  }
 
   @override
   Future<DailyLogDay> loadDay({
@@ -362,6 +484,7 @@ class _DailyFake implements DailyLogApplicationPort {
     required String localDay,
   }) async {
     calls.add(projectId);
+    events.add('loadDay:$projectId');
     final project = projects.singleWhere((item) => item.id == projectId);
     return DailyLogDay(
       projectId: project.id,
@@ -411,9 +534,24 @@ class _MaterialFake implements MaterialRequestApplicationPort {
 
   List<MaterialRequestProject> projects;
   final List<String> calls = [];
+  final List<String> events = [];
+  var failProjectDiscovery = false;
+  var projectDiscoveryCalls = 0;
+  var locationCalls = 0;
+  var livingPlanCalls = 0;
+  var createCalls = 0;
 
   @override
-  Future<List<MaterialRequestProject>> listProjects() async => projects;
+  Future<List<MaterialRequestProject>> listProjects() async {
+    projectDiscoveryCalls += 1;
+    events.add('listProjects');
+    if (failProjectDiscovery) {
+      throw const MaterialRequestFailure(
+        'material_request_project_discovery_failed',
+      );
+    }
+    return projects;
+  }
 
   @override
   Future<List<MaterialRequest>> listMaterialRequests({
@@ -421,7 +559,35 @@ class _MaterialFake implements MaterialRequestApplicationPort {
     required MaterialRequestListKind kind,
   }) async {
     calls.add(projectId);
+    events.add('listMaterialRequests:$projectId');
     return const [];
+  }
+
+  @override
+  Future<List<MaterialRequestLocationOption>> listLocations(
+    String projectId,
+  ) async {
+    locationCalls += 1;
+    events.add('listLocations:$projectId');
+    return const [];
+  }
+
+  @override
+  Future<List<MaterialRequestLivingPlanOption>> listLivingPlanItems(
+    String projectId,
+  ) async {
+    livingPlanCalls += 1;
+    events.add('listLivingPlanItems:$projectId');
+    return const [];
+  }
+
+  @override
+  Future<MaterialRequest> createMaterialRequest(
+    CreateMaterialRequestCommand command,
+  ) async {
+    createCalls += 1;
+    events.add('createMaterialRequest:${command.projectId}');
+    throw StateError('createMaterialRequest must not be called in this test');
   }
 
   @override

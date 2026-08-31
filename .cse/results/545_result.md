@@ -233,3 +233,108 @@ execution_record:
 All authorized implementation and validation gates are green. Publish one
 minimal commit and one Draft PR, keep manual tests `PENDING`, and stop before
 Ready/merge for fresh independent R4 review.
+
+## R4 fail-closed validation correction
+
+### Source and scope
+
+- Reviewed head:
+  `3db1363a7e7ed4a1519d9cedda6be0a0a29606d6`.
+- Branch / PR:
+  `codex/issue-545-project-context-core-routes` / Draft PR `#546`.
+- Independent input disposition:
+  `BLOCKED — R4_CORRECTION_REQUIRED`.
+- Exact correction paths:
+  - `mobile/lib/features/daily_log/daily_log_page.dart`
+  - `mobile/lib/features/material_requests/material_requests_page.dart`
+  - `mobile/test/project_context_core_routes_widget_test.dart`
+  - `.cse/tasks/545_task.md`
+  - `.cse/results/545_result.md`
+- Protected correction drift: `0`. `mobile/lib/app.dart` and Living Plan
+  production were not changed by this correction.
+
+### Implementation result
+
+- Daily Log and Materials now keep the supplied/remembered project ID only as
+  a non-operational validation candidate.
+- Operational selection is null while `listProjects()` is unresolved or has
+  failed. A selection becomes operational only when the successful current
+  option list proves the candidate exists.
+- A project discovery failure causes zero Daily Log day reads and zero
+  Materials request/location/Living Plan option/create calls. Materials create
+  UI is absent.
+- Discovery retry calls `listProjects()` again; after B is validated, the
+  first scoped read is B.
+- Explicit stale ID remains fail-closed with local selector recovery. Legacy
+  no-initial callers retain first-active-project behavior.
+- `ActiveProjectSession`, schema, application, domain, storage, backup,
+  version and platform behavior were not changed.
+
+### Validation
+
+- Pre-gate deterministic format write: exact three authorized changed Dart
+  files; `3 files / 3 changed`.
+- Focused gate:
+  `flutter test --no-pub test/project_context_core_routes_widget_test.dart test/living_plan_widget_test.dart test/project_dashboard_widget_test.dart test/widget_test.dart`
+  -> exit `0`, `44/44 PASS`.
+- Regression gate:
+  `flutter test --no-pub test/active_project_session_test.dart test/construction_living_plan_application_test.dart test/mobile_agenda_widget_test.dart test/app_bootstrap_test.dart`
+  -> exit `0`, `49/49 PASS`.
+- `flutter analyze --no-pub`: exit `0`, `No issues found`.
+- Aggregate changed-Dart format check: exit `0`,
+  `6 files / 0 changed`.
+- Full and empty-staged `git diff --check`: exit `0`.
+- Correction paths before result closure: exact four already-written allowed
+  paths; result ledger is the fifth allowed path.
+- Aggregate PR changed paths: exact eight paths, all within the original
+  nine-path Issue #545 allowlist.
+- Correction protected/unrelated/Inventory/DWG drift: `0`.
+- Invariants: schema `22`, backup format `1`, mobile
+  `0.1.0+1`.
+
+### Manual tests, artifact and publication boundary
+
+- Issue #479 comment `5481152018` remains authoritative for
+  `MT-545-001..006`; all remain `PENDING`.
+- Automated gates do not replace owner manual verification.
+- APK/AAB/build/device/ADB/install/manual acceptance: not run.
+- Artifact: none.
+- One correction commit and push to existing Draft PR #546 are authorized
+  after exact staged verification. Ready, merge and Issue closure are not
+  authorized.
+
+## execution_record — R4 correction
+
+```yaml
+execution_record:
+  issue: 545
+  authority_type: R4_FAIL_CLOSED_VALIDATION_CORRECTION
+  requested_model: unknown
+  requested_reasoning_effort: unknown
+  actual_model: unknown
+  actual_reasoning_effort: null
+  runtime_identity_verified: false
+  reviewed_head: 3db1363a7e7ed4a1519d9cedda6be0a0a29606d6
+  branch: codex/issue-545-project-context-core-routes
+  pr: 546
+  implementation_status: IMPLEMENTED
+  correction_status: IMPLEMENTED_VALIDATED
+  manual_test_status: PENDING
+  focused_gate: PASS_44_OF_44
+  regression_gate: PASS_49_OF_49
+  analyzer_gate: PASS_NO_ISSUES
+  format_gate: PASS_6_FILES_0_CHANGED
+  diff_check: PASS_FULL_AND_PRESTAGE
+  correction_allowlist: PASS_5_OF_5
+  aggregate_allowlist: PASS_8_OF_9
+  protected_drift: 0
+  schema_backup_version: 22_1_0.1.0+1
+  build_artifact: NONE_NOT_AUTHORIZED
+  commit: EXTERNAL_EVIDENCE_AFTER_LEDGER_COMMIT
+  push: AUTHORIZED_AFTER_STAGED_VERIFICATION
+  draft_pr: 546_EXISTING_DRAFT
+```
+
+## review_recommendation — R4 correction
+
+`PUBLISH CORRECTION TO DRAFT PR #546 — THEN STOP FOR FRESH_INDEPENDENT_R4`.

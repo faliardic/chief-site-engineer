@@ -283,3 +283,76 @@ not authorized. Success stop: `FRESH_INDEPENDENT_R4`.
 - Publication is authorized only as one minimal commit, push and one Draft PR;
   Ready/merge/close remain forbidden. Success stop:
   `FRESH_INDEPENDENT_R4`.
+
+## R4 fail-closed correction authority
+
+- Owner authority: exact current
+  `R4_FAIL_CLOSED_VALIDATION_CORRECTION` block supplied in chat.
+- Independent disposition: `BLOCKED — R4_CORRECTION_REQUIRED`.
+- Reviewed branch/head/PR:
+  `codex/issue-545-project-context-core-routes` /
+  `3db1363a7e7ed4a1519d9cedda6be0a0a29606d6` / Draft PR `#546`.
+- Preflight PASS: local branch, local HEAD and origin branch matched the
+  reviewed identity; staged and unstaged tracked sets were empty; no Git
+  operation was active.
+- Issue #479 comment `5481152018` confirms stable manual tests
+  `MT-545-001..006` remain `PENDING`.
+- Proven root cause: Daily Log and Materials assigned the supplied
+  `initialProjectId` directly to operational selection during `initState`.
+  Therefore a failed `listProjects()` left an unvalidated project usable by
+  retry or project-bound create UI.
+- Exact correction write boundary:
+  - `mobile/lib/features/daily_log/daily_log_page.dart`
+  - `mobile/lib/features/material_requests/material_requests_page.dart`
+  - `mobile/test/project_context_core_routes_widget_test.dart`
+  - `.cse/tasks/545_task.md`
+  - `.cse/results/545_result.md`
+- `mobile/lib/app.dart`, Living Plan production, schema, application, storage,
+  platform, Inventory, DWG and all unrelated work remain read-only.
+- Correction design: keep operational selection null until successful project
+  discovery validates the explicit initial ID; retry discovery after discovery
+  failure; retain fail-closed stale-ID behavior, deliberate local recovery and
+  legacy first-active fallback.
+- Required closure chain: focused gate, regression gate,
+  `flutter analyze --no-pub`, changed-Dart format check, full/staged
+  `git diff --check`, allowlist/protected-drift and invariant
+  `22 / 1 / 0.1.0+1`.
+- Publication on all-PASS only: one correction commit, push to existing Draft
+  PR #546, exact evidence publication; no Ready, merge or manual-test status
+  change. Success stop: `FRESH_INDEPENDENT_R4`.
+
+## R4 fail-closed correction outcome
+
+- Corrected only the two authorized production pages and the focused route
+  test:
+  - supplied/remembered project ID is now a non-operational validation
+    candidate;
+  - operational selection is cleared before project discovery and becomes
+    non-null only after the returned active options prove the candidate exists;
+  - discovery failure leaves project reads and project-bound create UI
+    unavailable;
+  - retry repeats discovery before any scoped call;
+  - valid explicit B, stale explicit recovery, deliberate local override and
+    legacy no-initial fallback are preserved.
+- A deterministic formatter write targeted exactly the three authorized
+  changed Dart files before the final validation cycle.
+- Final invalidated closure chain:
+  - focused gate: exit `0`, `44/44 PASS`;
+  - regression gate: exit `0`, `49/49 PASS`;
+  - `flutter analyze --no-pub`: exit `0`, `No issues found`;
+  - aggregate changed-Dart format check: exit `0`,
+    `6 files / 0 changed`;
+  - full and empty-staged `git diff --check`: exit `0`;
+  - correction protected drift: `0`;
+  - aggregate PR paths: `8/9` original Issue #545 allowlist paths;
+  - invariants: schema `22`, backup format `1`, mobile
+    `0.1.0+1`.
+- `mobile/lib/app.dart` and Living Plan production remained byte-untouched by
+  this correction. No schema/application/storage/platform/Inventory/DWG path
+  changed.
+- APK/AAB/build/device/ADB/install/manual acceptance: not run.
+- Issue #479 `MT-545-001..006`: `PENDING`; no PASS was inferred.
+- Remaining authorized closure: append result ledger, stage exact five
+  correction paths, rerun staged/full diff and drift checks, create one
+  correction commit, push existing Draft PR #546, publish exact evidence and
+  stop for `FRESH_INDEPENDENT_R4`.

@@ -25,6 +25,7 @@ class DailyLogPage extends StatefulWidget {
 class _DailyLogPageState extends State<DailyLogPage> {
   late String _selectedDay;
   List<DailyLogProject> _projects = const [];
+  String? _projectIdToValidate;
   String? _selectedProjectId;
   DailyLogDay? _day;
   String? _errorCode;
@@ -36,19 +37,37 @@ class _DailyLogPageState extends State<DailyLogPage> {
     _selectedDay = CseTimeCodec.istanbulDayKey(
       CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
     );
-    _selectedProjectId = widget.initialProjectId;
+    _projectIdToValidate = widget.initialProjectId;
     _loadProjects();
   }
 
   Future<void> _loadProjects() async {
+    final projectIdToValidate = _projectIdToValidate;
+    var projectsValidated = false;
+    setState(() {
+      _projects = const [];
+      _selectedProjectId = null;
+      _day = null;
+      _errorCode = null;
+      _loading = true;
+    });
     try {
       final projects = await widget.dailyLog.listProjects();
+      projectsValidated = true;
       final selectedProjectId =
-          projects.any((project) => project.id == _selectedProjectId)
-          ? _selectedProjectId
+          projects.any((project) => project.id == projectIdToValidate)
+          ? projectIdToValidate
           : widget.initialProjectId == null && projects.isNotEmpty
           ? projects.first.id
           : null;
+      if (!mounted) return;
+      setState(() {
+        _projects = projects;
+        _selectedProjectId = selectedProjectId;
+        if (selectedProjectId != null) {
+          _projectIdToValidate = selectedProjectId;
+        }
+      });
       final day = selectedProjectId == null
           ? null
           : await widget.dailyLog.loadDay(
@@ -57,8 +76,6 @@ class _DailyLogPageState extends State<DailyLogPage> {
             );
       if (!mounted) return;
       setState(() {
-        _projects = projects;
-        _selectedProjectId = selectedProjectId;
         _day = day;
         _errorCode = null;
         _loading = false;
@@ -66,6 +83,11 @@ class _DailyLogPageState extends State<DailyLogPage> {
     } on Object catch (error) {
       if (!mounted) return;
       setState(() {
+        if (!projectsValidated) {
+          _projects = const [];
+          _selectedProjectId = null;
+          _day = null;
+        }
         _errorCode = _failureCode(error);
         _loading = false;
       });
@@ -103,7 +125,10 @@ class _DailyLogPageState extends State<DailyLogPage> {
     if (projectId == null || projectId == _selectedProjectId || _loading) {
       return;
     }
-    setState(() => _selectedProjectId = projectId);
+    setState(() {
+      _projectIdToValidate = projectId;
+      _selectedProjectId = projectId;
+    });
     await _loadDay();
   }
 
@@ -396,6 +421,7 @@ class _DailyLogError extends StatelessWidget {
             Text('Tanı kodu: $code'),
             const SizedBox(height: 12),
             OutlinedButton.icon(
+              key: const Key('daily-log-project-retry'),
               onPressed: onRetry,
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('Tekrar oku'),

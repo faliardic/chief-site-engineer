@@ -23,27 +23,35 @@ class MaterialRequestsPage extends StatefulWidget {
 class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
   List<MaterialRequestProject> _projects = const [];
   List<MaterialRequest> _requests = const [];
+  String? _projectIdToValidate;
   String? _projectId;
   MaterialRequestListKind _kind = MaterialRequestListKind.open;
   bool _loading = true;
+  bool _projectDiscoveryFailed = false;
   String? _failure;
 
   @override
   void initState() {
     super.initState();
-    _projectId = widget.initialProjectId;
+    _projectIdToValidate = widget.initialProjectId;
     unawaited(_loadProjects());
   }
 
   Future<void> _loadProjects() async {
+    final projectIdToValidate = _projectIdToValidate;
     setState(() {
+      _projects = const [];
+      _requests = const [];
+      _projectId = null;
       _loading = true;
+      _projectDiscoveryFailed = false;
       _failure = null;
     });
     try {
       final projects = await widget.application.listProjects();
-      final selected = projects.any((project) => project.id == _projectId)
-          ? _projectId
+      final selected =
+          projects.any((project) => project.id == projectIdToValidate)
+          ? projectIdToValidate
           : widget.initialProjectId == null && projects.isNotEmpty
           ? projects.first.id
           : null;
@@ -51,12 +59,19 @@ class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
       setState(() {
         _projects = projects;
         _projectId = selected;
+        if (selected != null) {
+          _projectIdToValidate = selected;
+        }
       });
       await _reload();
     } on MaterialRequestFailure catch (error) {
       if (!mounted) return;
       setState(() {
+        _projects = const [];
+        _requests = const [];
+        _projectId = null;
         _loading = false;
+        _projectDiscoveryFailed = true;
         _failure = error.code;
       });
     }
@@ -97,7 +112,10 @@ class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
 
   Future<void> _selectProject(String? value) async {
     if (value == null || value == _projectId) return;
-    setState(() => _projectId = value);
+    setState(() {
+      _projectIdToValidate = value;
+      _projectId = value;
+    });
     await _reload();
   }
 
@@ -257,9 +275,22 @@ class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
                   ),
                 )
               else if (_failure case final failure?)
-                _MessageCard(
-                  icon: Icons.error_outline_rounded,
-                  text: 'Malzeme talepleri okunamadı. ($failure)',
+                Column(
+                  children: [
+                    _MessageCard(
+                      icon: Icons.error_outline_rounded,
+                      text: 'Malzeme talepleri okunamadı. ($failure)',
+                    ),
+                    if (_projectDiscoveryFailed) ...[
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        key: const Key('material-request-project-retry'),
+                        onPressed: _loadProjects,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Projeleri yeniden dene'),
+                      ),
+                    ],
+                  ],
                 )
               else if (_projects.isEmpty)
                 const _MessageCard(
