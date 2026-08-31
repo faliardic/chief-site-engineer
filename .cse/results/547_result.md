@@ -48,3 +48,35 @@ execution_record:
   runtime_verification: unverified
 review_recommendation: DRAFT_PR_FOR_SHORT_REVIEW
 ```
+
+## Owner manual-test product correction — MT-547-001 FAIL
+
+- Authority: Issue #547 comment `5482883231`, process lane `STANDARD`.
+- Failing owner-tested source: PR #552 head
+  `2a0439515cfed339432f5507f1513fe7d83d6fa1`.
+- Observed: Dashboard selection worked, but `Daha → Beton Paketi` and
+  `Daha → Sicil` did not open. `MT-547-001` is `FAIL` pending owner re-test.
+- Source-level root cause: both More handlers performed a redundant shell
+  `listProjects()` validation before navigation. A validation failure returned
+  null and redirected to the already-selected Dashboard, producing an apparent
+  silent no-op. Both destination pages already perform fail-closed explicit-ID
+  validation and expose bounded retry/selection recovery before scoped work.
+- Authorized correction: pass only the current session candidate ID into the
+  destination page; keep null-session redirect behavior and destination-owned
+  operational validation. No Attendance/Puantaj mutation is introduced.
+- Production correction changed only `mobile/lib/app.dart`; Concrete and
+  Workforce page-entry implementations were not changed.
+- Regression harness now exercises Dashboard project B followed by both More
+  entries under a synthetic first discovery failure. Each route remains open
+  with its bounded retry, performs zero scoped work before validation, and uses
+  B for the first scoped read after retry. The existing no-session fail-closed
+  and hidden Attendance mutation assertions remain intact.
+- Focused source analysis: `app.dart` PASS; bidirectional widget test source
+  PASS. Changed-Dart format and full/staged diff checks PASS.
+- Automated widget/device/ADB acceptance and APK build were not run under this
+  correction authority. Broad Flutter execution remains PR CI; owner will
+  manually re-test a separately authorized fresh Acceptance APK.
+- Protected drift: none. Invariants remain `22 / 1 / 0.1.0+1`.
+- Publication: correction commit/push evidence is recorded on Issue #547 and
+  Draft PR #552. Ready/merge remain blocked; `MT-547-001` remains `FAIL` until
+  owner re-test.

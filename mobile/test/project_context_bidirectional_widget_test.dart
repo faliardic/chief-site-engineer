@@ -366,7 +366,12 @@ void main() {
 
       await tester.tap(find.text('Daha').last);
       await tester.pumpAndSettle();
+      agenda.failNextProjectDiscovery = true;
       await tester.tap(find.byKey(const Key('more-concrete-package')));
+      await tester.pumpAndSettle();
+      expect(concrete.projectCalls, isEmpty);
+      expect(find.byKey(const Key('concrete-project-retry')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('concrete-project-retry')));
       await tester.pumpAndSettle();
       expect(concrete.projectCalls.first, _projectB.id);
       expect(
@@ -380,6 +385,28 @@ void main() {
       );
       await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
+
+      final workforceMemberBaseline = attendance.memberProjectCalls.length;
+      agenda.failNextProjectDiscovery = true;
+      await tester.tap(find.byKey(const Key('more-workforce-directory')));
+      await tester.pumpAndSettle();
+      expect(attendance.memberProjectCalls.length, workforceMemberBaseline);
+      expect(
+        find.byKey(const Key('workforce-directory-project-retry')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const Key('workforce-directory-project-retry')),
+      );
+      await tester.pumpAndSettle();
+      expect(attendance.memberProjectCalls.length, workforceMemberBaseline + 1);
+      expect(attendance.memberProjectCalls.last, _projectB.id);
+      expect(attendance.subcontractorProjectCalls.last, _projectB.id);
+      expect(attendance.teamProjectCalls.last, _projectB.id);
+      expect(find.text('Görünen proje: ${_projectB.name}'), findsOneWidget);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+
       await tester.tap(find.text('Başlangıç').last);
       await tester.pumpAndSettle();
 
@@ -399,19 +426,6 @@ void main() {
       await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
       expect(agenda.captureCalls, 0);
-
-      final workforceMemberBaseline = attendance.memberProjectCalls.length;
-      await _openDashboardTool(
-        tester,
-        const Key('dashboard-workforce-directory'),
-      );
-      expect(attendance.memberProjectCalls.length, workforceMemberBaseline + 1);
-      expect(attendance.memberProjectCalls.last, _projectB.id);
-      expect(attendance.subcontractorProjectCalls.last, _projectB.id);
-      expect(attendance.teamProjectCalls.last, _projectB.id);
-      expect(find.text('Görünen proje: ${_projectB.name}'), findsOneWidget);
-      await tester.tap(find.byType(BackButton).first);
-      await tester.pumpAndSettle();
 
       await _openDashboardTool(tester, const Key('dashboard-project-album'));
       expect(catalog.scopedCalls.first, _projectB.id);
@@ -749,6 +763,16 @@ class _PhoneAgenda extends FakeAgendaApplication
   _PhoneAgenda({required super.projects});
 
   int captureCalls = 0;
+  bool failNextProjectDiscovery = false;
+
+  @override
+  Future<List<MobileProject>> listProjects() async {
+    if (failNextProjectDiscovery) {
+      failNextProjectDiscovery = false;
+      throw StateError('synthetic discovery');
+    }
+    return super.listProjects();
+  }
 
   @override
   Future<AgendaLog> createPhoneCallAgendaLog(

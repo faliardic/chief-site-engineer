@@ -281,16 +281,6 @@ class _MobileShellState extends State<MobileShell> {
     unawaited(_adoptRouteProjectSelection(projectId));
   }
 
-  Future<String?> _validatedActiveProjectIdForMore() async {
-    try {
-      final projects = await widget.bootstrap.agenda.listProjects();
-      if (!mounted) return null;
-      return _activeProjectSession.selectedProject(projects)?.id;
-    } on Object {
-      return null;
-    }
-  }
-
   void _showDashboardProjectSelection() {
     if (mounted) setState(() => _selectedIndex = 0);
   }
@@ -299,7 +289,7 @@ class _MobileShellState extends State<MobileShell> {
     final concrete = widget.bootstrap.concrete;
     final attachments = widget.bootstrap.concreteAttachments;
     if (concrete == null || attachments == null) return;
-    final projectId = await _validatedActiveProjectIdForMore();
+    final projectId = _activeProjectSession.selectedProjectId;
     if (projectId == null) {
       _showDashboardProjectSelection();
       return;
@@ -327,7 +317,7 @@ class _MobileShellState extends State<MobileShell> {
   Future<void> _openWorkforceFromMore() async {
     final attendance = widget.bootstrap.attendance;
     if (attendance == null) return;
-    final projectId = await _validatedActiveProjectIdForMore();
+    final projectId = _activeProjectSession.selectedProjectId;
     if (projectId == null) {
       _showDashboardProjectSelection();
       return;
