@@ -1,334 +1,437 @@
-# CSE Workflow Acceleration Protocol
+# CSE Workflow Acceleration Protocol — Development Process v3
 
-**Belge türü:** Bağlayıcı execution/manual-verification addendum  
-**Geçerlilik tarihi:** 2026-08-24  
-**Kaynak karar:** Epic #385 owner kararları, Issue #477 ve kalıcı Manual Test Register #479  
-**Kapsam:** Bütün yeni CSE feature, correction, publication, resume ve new-chat işlemleri
+**Belge türü:** Bağlayıcı execution / review / publication protokolü  
+**Geçerlilik tarihi:** 2026-08-31  
+**Kaynak owner kararı:** Issue #548  
+**Kapsam:** Bütün yeni CSE feature, correction, review, publication, resume ve new-chat işlemleri
 
-Bu protokol, CSE geliştirmesini güvenlikten ödün vermeden hızlandırır. Ana değişiklik şudur:
+Bu protokolün amacı güvenliği azaltmak değil, güvenlik mekanizmasının geliştirme hızının önüne geçmesini engellemektir.
 
-> Codex uygulama davranışını varsayılan olarak test etmez. Her özellik için numaralı manuel test listesi hazırlanır; testleri owner isterse yapar, istemezse sonraya bırakılır ve geliştirme devam eder.
+> CSE'de varsayılan süreç maksimum kanıt değil, riske uygun minimum yeterli kanıt üretir.
 
-Çelişki halinde:
+Bu belge workflow lane seçimi, retry/correction bütçesi, local-vs-CI test sorumluluğu, evidence yoğunluğu ve review derinliği konularında daha eski ağır süreç tariflerinden önceliklidir.
 
-- ürün/veri ilkelerinde `CSE_UNIFIED_PROJECT_SOURCE.md`;
-- model routing'de `CSE_MODEL_REASONING_ROUTING_POLICY.md`;
-- repository ve data safety'de `CSE_PROJECT_INSTRUCTIONS.md`;
-- automated test zorunluluğu, manuel test listesi, test erteleme ve hızlandırılmış publication konularında bu protokol
+Değişmez üst sınırlar:
 
-uygulanır.
+- `CSE_UNIFIED_PROJECT_SOURCE.md` ürün/veri ilkelerinde otoritedir;
+- `CSE_PROJECT_INSTRUCTIONS.md` repository ve data safety'de otoritedir;
+- `CSE_MODEL_REASONING_ROUTING_POLICY.md` model routing'de otoritedir;
+- exact Issue scope/allowlist korunur;
+- schema/migration/backup/version/permission/platform/user-data authority kendiliğinden genişlemez;
+- Ready, merge, release/store ve destructive production işlemleri owner onayı olmadan yapılmaz.
 
-## 1. Ana karar
+---
 
-Feature implementation ve application verification iki ayrı akıştır:
+## 1. Zorunlu process lane seçimi
+
+Her yeni teknik Issue üç lane'den **yalnız birini** seçer.
+
+### FAST
+
+Kullanım alanı:
+
+- documentation-only değişiklik;
+- metin, label, icon, spacing, layout;
+- küçük UI state/empty/error görünümü;
+- basit navigation veya route wiring;
+- mevcut contract'ı değiştirmeyen selector/context aktarımı;
+- küçük test-harness veya deterministic format düzeltmesi;
+- persistence/data-integrity/release-critical etkisi olmayan dar presentation işi.
+
+Varsayılan review seviyesi: `R1-R2`.
+
+Varsayılan yürütme:
 
 ```text
-implementation
+Issue
+→ tek implementation window
 → source-level checks
 → commit/push/Draft PR
-→ numbered manual test list
-→ next feature may continue
-
-owner manual test — now or later
-→ PASS / FAIL / PARTIAL / DEFERRED
-→ register update
+→ PR CI
+→ kısa review
+→ owner merge
 ```
 
-Test yapılmaması implementation'ı otomatik olarak durdurmaz. Ancak test edilmemiş davranış `VERIFIED`, `FIELD_ACCEPTED`, `PRODUCTION_READY` veya `RELEASE_READY` olarak sunulamaz.
+FAST iş için ayrı one-shot execution authority yorumu gerekmez. Issue body + bu protokol standing authority'dir.
 
-## 2. Codex'in varsayılan olarak çalıştırmayacağı uygulama testleri
+### STANDARD
 
-Owner ayrıca ve açıkça belirli bir gate istemedikçe Codex şunları çalıştırmaz:
+Kullanım alanı:
 
-- Flutter unit testleri;
-- widget testleri;
-- integration testleri;
-- full Flutter test suite;
-- emulator/device UI testleri;
-- ADB acceptance;
-- PowerShell scripted UI/selector acceptance;
-- acceptance package install, launch, data clear veya lifecycle testi;
-- uygulamayı davranış doğrulaması amacıyla çalıştırma;
-- otomatik saha kabulü;
-- APK/AAB build — owner artifact veya manuel test build'i istemedikçe.
+- birden fazla ekran/modül arasında behavior değişikliği;
+- project-context/session continuity;
+- mevcut feature mutation'ının yeni presentation akışında kullanılması;
+- source-compatible constructor/callback contract genişlemesi;
+- orta ölçekli feature behavior;
+- persistence/release contract'ı değiştirmeyen cross-module değişiklik.
 
-Eski Issue veya protokolde “focused test”, “full suite”, “fresh build” veya “device acceptance” yazması, yeni owner kararı sonrasında otomatik yetki sayılmaz. Current owner açıkça yeniden istemedikçe bu kapılar `NOT_RUN — OWNER-LED MANUAL TEST POLICY` olarak kaydedilir.
+Varsayılan review seviyesi: `R3`.
 
-## 3. Codex'in varsayılan source-level kontrolleri
+Varsayılan yürütme FAST ile aynıdır; yalnız source review ve gerekirse dar targeted local check daha dikkatli yapılır.
 
-Codex feature implementation sonunda yalnız riske uygun ve uygulamayı çalıştırmayan kontrolleri yapar:
+STANDARD iş sırf birden fazla dosya değiştirdiği veya kullanıcıya görünür olduğu için `R4` yapılmaz.
 
-- exact allowlist ve changed-path kontrolü;
-- protected path drift;
-- format ve syntax kontrolü;
-- makul ve hızlı ise static analysis;
-- `git diff --check`;
-- schema/migration/backup/version/permission/platform drift;
-- staged/branch/head/diff doğrulaması;
-- commit/push/Draft PR kanıtı.
+### CRITICAL
 
-Static analysis uygulama davranış testi değildir. Bununla birlikte static analysis PASS sonucu kullanıcı akışının çalıştığı anlamına gelmez.
+Aşağıdaki tetiklerden biri varsa kullanılır:
 
-Owner isterse belirli bir automated gate ayrıca yetkilendirilebilir. Bu istisna test politikasını kalıcı olarak değiştirmez; yalnız yazılan exact gate için geçerlidir.
+- schema veya migration;
+- backup/restore formatı veya restore davranışı;
+- destructive data operation;
+- stable identity / optimistic revision / transaction / append-only history değişikliği;
+- attachment/data integrity veya corruption riski;
+- security/privacy-sensitive data handling;
+- permission, signing, application ID, platform/runtime production ayarı;
+- release artifact/store gate;
+- background/reboot engine;
+- DWG conversion/runtime katmanında kullanıcı dosyası veya data-loss riski;
+- gerçek kullanıcı data root'una kontrollü erişim;
+- failure halinde geri dönüşü zor veya veri kaybettirebilecek değişiklik.
 
-## 4. Her feature için numaralı manuel test listesi
+Varsayılan review seviyesi: `R4 / R4+`.
 
-Kalıcı kayıt yüzeyi:
+CRITICAL işte Issue'a özel ağır gate, integration/device/release zinciri yazılabilir.
+
+---
+
+## 2. Lane seçme kuralı
+
+Her zaman **riski karşılayan en hafif lane** seçilir.
+
+Şunlar tek başına CRITICAL gerekçesi değildir:
+
+- dosya sayısının fazla olması;
+- widget testinin karmaşık olması;
+- project selector değişikliği;
+- navigation değişikliği;
+- callback eklenmesi;
+- birden fazla ekranın aynı session state'i kullanması;
+- daha önce benzer işlerin R4 yapılmış olması.
+
+R4 / ağır fail-closed process yalnız somut CRITICAL trigger ile gerekçelendirilebilir.
+
+Belirsizlik varsa önce STANDARD seçilir; source incelemesinde gerçek CRITICAL trigger bulunursa lane yükseltilir ve owner'a kısa gerekçe bildirilir.
+
+---
+
+## 3. FAST / STANDARD standing execution authority
+
+FAST ve STANDARD lane'lerde Issue açıldıktan sonra tekrar tekrar owner execution authority istenmez.
+
+Issue şu bilgileri içerdiğinde execution authorized kabul edilir:
 
 ```text
-GitHub Issue #479 — CSE Manual Test Register
+Process lane
+Goal / changed contract
+Expected base
+Allowed/protected paths
+Critical exclusions
+Publication boundary
 ```
 
-Her feature implementation sonunda ChatGPT:
+Aynı scope içinde aşağıdakiler otomatik yetkilidir:
 
-1. feature Issue numarasını kullanır;
-2. stable test ID'leri üretir;
-3. adımları ve beklenen sonucu sade biçimde yazar;
-4. ilgili commit/PR/build referansını ekler;
-5. test durumlarını owner bildirimine göre günceller.
+- implementation;
+- deterministic formatting;
+- test expectation/harness düzeltmesi;
+- analyzer/syntax düzeltmesi;
+- aynı changed-contract içindeki dar source correction;
+- PR evidence güncellemesi.
 
-ID standardı:
+Yeni authority gereken durumlar yalnız bölüm 9'daki escalation koşullarıdır.
+
+---
+
+## 4. Correction bütçesi
+
+FAST ve STANDARD için varsayılan:
+
+```text
+primary implementation: 1
+same-scope correction rounds: up to 2
+environment-only retry: up to 1 after exact root cause
+new owner authority inside same scope: 0
+```
+
+Bir correction round, completed validation/review sonucunda bulunan aynı-scope blocker'ların **tek seferde topluca** düzeltilmesidir.
+
+Aşağıdakiler ayrı authority gerektirmez:
+
+- format boundary;
+- test harness migration;
+- stale widget key;
+- compile/analyzer defect;
+- allowlist içindeki fail-closed source bug;
+- review sırasında bulunan aynı contract'a ait dar behavior bug.
+
+İki correction round biter ve blocker sürerse owner escalation yapılır.
+
+CRITICAL retry/correction bütçesi Issue'a özel olabilir.
+
+---
+
+## 5. Local doğrulama ile PR CI'nın ayrılması
+
+CSE mobile PR'larında mevcut GitHub `Flutter PR` workflow'u şunları zaten çalıştırır:
+
+- Dart format check;
+- `flutter analyze`;
+- full `flutter test --no-pub`.
+
+Bu nedenle FAST/STANDARD işlerde Codex aynı geniş zinciri local olarak tekrar etmez.
+
+### FAST local default
+
+- exact scope/allowlist;
+- changed-path review;
+- deterministic format/syntax;
+- `git diff --check`;
+- protected drift;
+- yalnız gerçekten gerekiyorsa çok dar compile/source check.
+
+### STANDARD local default
+
+FAST kontrollerine ek olarak, cross-module riskini erken yakalamak için **yalnız material faydası varsa** tek targeted check çalıştırılabilir.
+
+Yerelde full Flutter suite, geniş regression paketi ve tekrar analyzer çalıştırmak varsayılan değildir.
+
+### PR CI
+
+Draft PR açıldıktan sonra geniş Flutter otomasyonu CI'nın sorumluluğudur.
+
+CI failure olursa:
+
+1. bütün failure'lar tek seferde okunur;
+2. scope içindekiler tek correction round'da düzeltilir;
+3. branch push edilir;
+4. CI yeniden çalışır.
+
+Her CI failure için yeni owner authority yazılmaz.
+
+### CRITICAL
+
+Issue'ın riskine göre gerekli local focused/integration/device/release gate ayrıca tanımlanır; PR CI bunun yerine geçmeyebilir.
+
+---
+
+## 6. Owner-led manual test politikası
+
+Implementation verification ile field/manual acceptance ayrı kalır.
+
+User-visible feature sonunda stable test ID'leri Issue #479'a kaydedilir:
 
 ```text
 MT-<FEATURE_ISSUE>-001
 MT-<FEATURE_ISSUE>-002
-MT-<FEATURE_ISSUE>-003
+...
 ```
 
-Bir ID yayımlandıktan sonra başka davranış için yeniden kullanılmaz. Test kapsamı değişirse yeni ID eklenir veya eski ID açıklaması revision notuyla güncellenir.
-
-## 5. Manuel test durumları
+Durumlar:
 
 ```text
-PENDING   — owner henüz test etmedi veya karar vermedi
-PASS      — owner beklenen davranışı doğruladı
-FAIL      — owner hata bildirdi
-PARTIAL   — listenin bir kısmı doğrulandı
-DEFERRED  — owner testi sonraya bıraktı
-N/A       — current kapsam/build için uygulanamaz
+PENDING
+PASS
+FAIL
+PARTIAL
+DEFERRED
+N/A
 ```
 
-Owner kısa format kullanabilir:
+Manual test `PENDING` veya `DEFERRED` olması FAST/STANDARD development progression'ını otomatik bloke etmez.
 
-```text
-MT-476-003 PASS
-MT-476-006 FAIL — +N gün görünmedi
-MT-476 kalanlar DEFERRED
+Test edilmemiş behavior `VERIFIED`, `FIELD_ACCEPTED` veya `RELEASE_READY` diye sunulmaz.
+
+Owner `MT-xxx PASS/FAIL` biçiminde kısa cevap verebilir; ChatGPT register'ı günceller.
+
+---
+
+## 7. Evidence yoğunluğu
+
+Aynı bilgiyi Issue, task, result, PR body ve PR comment içinde uzun uzun tekrar etmek yasaktır.
+
+### FAST
+
+Kanonik evidence:
+
+- Issue;
+- PR diff;
+- PR CI;
+- gerekirse kısa Issue/PR sonucu.
+
+`.cse` task/result yalnız local Codex yürütmesi gerçekten kullanılıyorsa veya Issue özel olarak istiyorsa gerekir; kronolojik uzun rapor yazılmaz.
+
+### STANDARD
+
+Kısa `.cse` task/result kullanılabilir/istenebilir; hedef 15-40 satırlık structured summary'dir.
+
+Yeterli kayıt:
+
+```yaml
+issue: NNN
+process_lane: STANDARD
+base: <sha>
+head: <sha>
+changed_paths: [...]
+local_checks: [...]
+ci: PASS|FAIL|PENDING
+manual_tests: PENDING|...
+corrections_used: 0..2
+pr: <number>
 ```
 
-ChatGPT Issue #479'u günceller. Kullanıcıdan task/result/YAML/ADB evidence hazırlaması istenmez.
+### CRITICAL
 
-## 6. Testi erteleme ve geliştirmeye devam etme
+Tam chronology, provenance ve risk evidence tutulabilir.
 
-Owner “sonraya bırak”, “test etmeyeceğim”, “devam et” veya eşdeğer karar verirse:
+---
 
-- ilgili MT kayıtları `DEFERRED` yapılır;
-- feature `IMPLEMENTED — MANUAL TEST DEFERRED` olarak kaydedilir;
-- Draft PR, review, merge ve sonraki feature owner kararına göre ilerleyebilir;
-- açık test backlog'u Issue #479'da korunur;
-- ileride aynı stable test ID'leriyle devam edilir.
+## 8. Review mimarisi
 
-Manual test `PENDING` veya `DEFERRED` olması fail-closed nedeni değildir.
+ChatGPT review sonucu varsayılan olarak kısa olur.
 
-Yüksek riskli schema/migration/backup/security değişikliğinde de owner test erteleme kararı verebilir; ancak completion ve PR açıkça `UNVERIFIED HIGH-RISK BEHAVIOR` yazar. Release/store/public-production ilanı ayrıca owner kararı olmadan yapılmaz.
-
-## 7. Implementation ve verification status
-
-Her feature iki ayrı status taşır:
+FAST:
 
 ```text
-implementation_status:
-  NOT_STARTED
-  IN_PROGRESS
-  IMPLEMENTED
-  MERGED
-
-manual_test_status:
-  PENDING
-  PARTIAL
-  PASS
-  FAIL
-  DEFERRED
+PASS
 ```
 
-Örnek:
+veya
 
 ```text
-implementation_status: IMPLEMENTED
-manual_test_status: DEFERRED
-claim: IMPLEMENTED — MANUAL TEST DEFERRED
+BLOCKER
+- <exact defect>
+- <required narrow correction>
 ```
 
-Codex veya ChatGPT test yapılmadığı halde `PASS` yazamaz. Eski automated test evidence'ı farklı source revision içinse current owner test sonucu yerine geçmez.
-
-## 8. FAIL sonucunun yönetimi
-
-Owner bir MT maddesine `FAIL` bildirirse:
-
-1. ChatGPT Issue #479 kaydını günceller;
-2. feature Issue/PR'ına bağlantı ekler;
-3. exact test ID ve owner notuna bağlı dar correction Issue'su açar veya current Issue'yu yeniden açar;
-4. Codex yalnız gerekli source düzeltmesini yapar;
-5. test durumu yeniden `PENDING` olur;
-6. owner isterse tekrar test eder.
-
-Codex aynı hatayı otomatik cihaz testiyle yeniden üretmeye zorlanmaz; owner'ın verdiği açıklama ve güvenli source incelemesi correction başlangıcı olabilir.
-
-## 9. Build ve test artifact politikası
-
-APK/AAB her feature sonunda otomatik üretilmez.
-
-Build yalnız:
-
-- owner `test edeceğim`, `APK hazırla` veya artifact istediğinde;
-- milestone/release build'i açıkça istendiğinde;
-- belirli compile gate owner tarafından ayrıca yetkilendirildiğinde
-
-çalıştırılır.
-
-Build yoksa feature yine commit/push/Draft PR aşamasına geçebilir.
-
-Artifact üretilirse kaydedilir:
+STANDARD:
 
 ```text
-source commit
-package/application ID
-version
-size
-SHA-256
-manual test IDs
+PASS — no blocking finding
 ```
 
-Owner testi sonraya bıraktığında eski artifact varsa source revision eşleşmesi korunur; yeni source değişirse eski artifact stale olarak işaretlenir.
+veya blocker'ların tamamı tek listede verilir.
 
-## 10. Feature sonunda ChatGPT çıktısı
+CRITICAL review ayrıntılı R4 evidence kullanabilir.
 
-Her feature sonunda ChatGPT kullanıcıya en az şunları verir:
+Review sırasında format, harness veya aynı scope source defect bulunursa FAST/STANDARD correction budget kullanılır; yeni governance turu açılmaz.
+
+---
+
+## 9. Anında escalation / CRITICAL'e yükseltme
+
+Aşağıdakilerden biri oluşursa normal FAST/STANDARD execution durur:
+
+- allowlist veya product scope genişlemesi gerekiyor;
+- yeni owner product/design kararı gerekiyor;
+- schema/migration/backup/version/permission/signing/platform değişikliği ortaya çıkıyor;
+- production/debug/gerçek kullanıcı data riski doğuyor;
+- stable identity/transaction/event/history/integrity/security contract etkileniyor;
+- destructive/force/uninstall/production clear-data gerekiyor;
+- DWG/user-file conversion değişikliği data-loss/corruption riski taşıyor;
+- root cause aynı scope source correction'a indirgenemiyor;
+- iki correction round tüketildi;
+- artifact provenance belirsiz.
+
+Escalation mesajı kısa olmalıdır:
 
 ```text
-Feature / Issue
-Implementation durumu
-PR/commit durumu
-Manual test status
-Numbered test list veya #479 bağlantısı
-Test şimdi mi, sonra mı kararı
-Sonraki roadmap işi
+STOP — CRITICAL ESCALATION
+Trigger: <one sentence>
+Required new authority/scope: <one sentence>
 ```
 
-ChatGPT bir kerede uygulanabilir, sade test listesi çıkarır. Kod içi düşük seviyeli unit-test senaryolarını kullanıcıya yüklemez; yalnız sahada/uygulamada anlamlı davranışları listeler.
+---
 
-## 11. New-chat davranışı
+## 10. Publication ve merge
 
-Her yeni CSE sohbeti şu kaynağı okur:
+FAST/STANDARD:
 
-```text
-GitHub Issue #479 — CSE Manual Test Register
-```
+1. source-level checks;
+2. commit + push;
+3. Draft PR;
+4. PR CI;
+5. ChatGPT short review;
+6. owner merge approval;
+7. squash merge;
+8. sonraki roadmap item.
 
-Yeni sohbet şu bilgileri kendisi bulur:
+Manual testler PENDING/DEFERRED kalabilir.
 
-- hangi feature'lar implement edildi;
-- hangi testler `PENDING`, `PASS`, `FAIL`, `PARTIAL` veya `DEFERRED`;
-- owner'ın en son verdiği test notları;
-- sıradaki development işi.
+Ready/merge owner onayı gerektirir; ancak owner açıkça `merge et`, `ready`, `devam et ve merge et` veya eşdeğer karar verdiğinde tekrar ayrı authority aranmaz.
 
-Kullanıcıdan önceki test listesini veya sonuçlarını tekrar yapıştırması istenmez.
+CRITICAL publication Issue'a özel olabilir.
 
-## 12. Konsolide implementation window
+---
 
-Varsayılan pencere:
+## 11. Issue/task minimum alanları
 
-```text
-primary implementation: 1
-same-scope narrow source corrections: up to 3
-environment-only recovery: exact root cause sonrası at most 1
-automated application tests: 0 unless owner explicitly opts in
-manual test list publication: required
-```
-
-Dar correction koşulları:
-
-- current Issue ve exact allowlist içinde;
-- changed contract aynı;
-- kök neden yeterince açık;
-- yeni ürün/tasarım kararı yok;
-- schema/migration/backup/version/permission/platform authority aşılmıyor;
-- production/debug/gerçek kullanıcı data riski yok.
-
-Her dar source correction için yeni owner authority gerekmez. Manual test ertelemesi correction bütçesini tüketmez.
-
-## 13. Anında fail-closed / owner escalation
-
-- allowlist veya ürün kapsamı genişlemesi;
-- yeni ürün/tasarım kararı;
-- schema, migration, backup formatı, version, permission, signing veya platform production ayarı değişikliği;
-- production/debug/gerçek kullanıcı verisi riski;
-- stable identity, transaction, event/history, integrity veya security contract değişikliği;
-- kök nedenin güvenli source düzeltmesine indirgenememesi;
-- correction bütçesinin tükenmesi;
-- destructive/force/uninstall/production clear-data ihtiyacı;
-- artifact provenance belirsizliği.
-
-Automated test yapılmaması, manual test `PENDING` veya `DEFERRED` olması escalation nedeni değildir.
-
-## 14. Publication ve merge
-
-- Yeni teknik iş doğrudan `master` üzerinde geliştirilmez.
-- PR önce Draft açılır.
-- Source-level kontroller PASS olduğunda Draft publication yapılabilir.
-- Manual test listesi yayımlanmadan feature tamamlanmış sayılmaz.
-- Manual testler `PENDING` veya `DEFERRED` iken owner onayıyla Ready/merge ve sonraki feature mümkündür.
-- PR açıklaması test durumunu açıkça yazar.
-- Merge varsayılan squash merge'dir.
-- Ready, merge, Issue/Epic closure, release/store ve roadmap geçişi owner kararı gerektirir.
-
-## 15. Issue/task zorunlu alanları
+FAST/STANDARD için ağır instruction blokları yerine:
 
 ```text
+Process lane:
+Goal / changed contract:
 Expected base:
-Risk/model routing:
-Changed contracts:
-Allowed/protected paths:
-Source-level checks:
-Automated application tests: disabled unless owner explicitly requests
-Manual test register: #479
-Manual test IDs:
-Manual test status:
-Build/artifact authority:
-Implementation/correction budget:
-Immediate escalation conditions:
-Publication authority:
+Allowed paths:
+Protected / critical exclusions:
+Local checks:
+CI expectation:
+Manual test register:
+Correction budget: 2
+Publication boundary:
 ```
 
-## 16. Completion evidence
+CRITICAL Issue eski ayrıntılı validation/provenance alanlarını kullanabilir.
+
+---
+
+## 12. New-chat / resume davranışı
+
+Yeni sohbet:
+
+1. `AGENTS.md` ve bu protokolü okur;
+2. current GitHub Issue/PR/master durumunu bulur;
+3. process lane'i okur;
+4. aynı issue resume ise önceki uzun authority metnini yeniden üretmez;
+5. kullanıcı `devam` dediğinde current lane'e göre doğrudan sıradaki gerçek işi yapar.
+
+FAST/STANDARD issue'da sırf eski bir authority yorumunda ağır gate yazıyor diye eski ceremony yeniden canlandırılmaz; **daha yeni owner workflow kararı olarak bu protokol workflow/test/retry/evidence yoğunluğunu override eder**. Product scope, allowlist ve critical exclusions override edilmez.
+
+---
+
+## 13. Current migration rule — Issue #547 ve sonrası
+
+Issue #547 ve merge edilmemiş sonraki ordinary UI/context işleri varsayılan olarak bu protokole taşınır.
+
+#547 için:
+
+```yaml
+process_lane: STANDARD
+product_scope: unchanged
+allowlist: unchanged
+attendance_protection: unchanged
+local_full_flutter_gate_required: false
+pr_ci_is_broad_gate: true
+same_scope_corrections_without_new_authority: 2
+review_level: R3
+```
+
+Somut CRITICAL trigger çıkmadıkça yeni R4 one-shot authority zinciri açılmaz.
+
+---
+
+## 14. Başarı ölçütleri
 
 ```text
-Current head/diff:
-Implementation status:
-Source-level checks:
-Automated application tests not run and why:
-Manual test IDs and status:
-Owner-reported results:
-Artifact package/size/SHA if any:
-Schema/backup/version/platform impact:
-Commit/push/Draft/Ready/merge:
-Remaining manual test backlog:
-Next roadmap item:
+ordinary UI/context issue uses R4 ceremony: 0
+new owner authority for same-scope format/harness correction: 0
+local full Flutter suite duplicated before PR CI: 0 by default
+same-scope blockers grouped into one correction round: 100%
+manual test backlog preserved: 100%
+critical data/release changes still use heavy process: 100%
 ```
 
-`execution_record` ve `review_recommendation` zorunludur. Runtime actual model/effort görünmüyorsa `unknown / null / unverified` kullanılır.
+---
 
-## 17. Başarı ölçütleri
+## 15. Ana cümle
 
-```text
-Codex automated app/device tests per normal feature: 0
-numbered manual test list per feature: 1
-owner report format burden: one-line test IDs accepted
-manual test deferral blocks next development: no
-unverified feature mislabeled verified: 0
-persistent cross-chat manual test register: 100%
-```
-
-## 18. Ana cümle
-
-> CSE'de Codex kodu uygular ve source-level kontrolleri yapar. Uygulamanın davranış testleri owner'a aittir. Her özellik için stable numaralı test listesi oluşturulur; owner test ederse sonuçlar kaydedilir, test etmezse liste ertelenir ve geliştirme devam eder.
+> CSE'nin varsayılan çalışma döngüsü Issue → implementation → Draft PR → CI → kısa review → owner merge'dür. FAST/STANDARD işler ağır governance zincirine dönüştürülmez. Ağır fail-closed süreç yalnız gerçek CRITICAL risklerde kullanılır.
