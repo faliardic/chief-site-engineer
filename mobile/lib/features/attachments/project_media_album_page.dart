@@ -17,6 +17,8 @@ class ProjectMediaAlbumPage extends StatefulWidget {
     this.concrete,
     this.attachments,
     this.projectLocations,
+    this.initialProjectId,
+    this.onProjectSelected,
     super.key,
   });
 
@@ -25,6 +27,8 @@ class ProjectMediaAlbumPage extends StatefulWidget {
   final ConcreteApplication? concrete;
   final SafeAttachmentPicker? attachments;
   final ProjectLocationApplication? projectLocations;
+  final String? initialProjectId;
+  final ValueChanged<String>? onProjectSelected;
 
   @override
   State<ProjectMediaAlbumPage> createState() => _ProjectMediaAlbumPageState();
@@ -45,6 +49,7 @@ class _ProjectMediaAlbumPageState extends State<ProjectMediaAlbumPage> {
   @override
   void initState() {
     super.initState();
+    _selectedProjectId = widget.initialProjectId;
     _reload();
   }
 
@@ -59,7 +64,9 @@ class _ProjectMediaAlbumPageState extends State<ProjectMediaAlbumPage> {
         !projects.any((project) => project.id == selectedProjectId)) {
       selectedProjectId = null;
     }
-    if (selectedProjectId == null && projects.isNotEmpty) {
+    if (selectedProjectId == null &&
+        widget.initialProjectId == null &&
+        projects.isNotEmpty) {
       selectedProjectId = projects.first.id;
     }
     final items = selectedProjectId == null
@@ -82,6 +89,7 @@ class _ProjectMediaAlbumPageState extends State<ProjectMediaAlbumPage> {
       _dateRange = null;
       _reload();
     });
+    widget.onProjectSelected?.call(projectId);
   }
 
   Future<void> _refresh() async {
@@ -341,10 +349,21 @@ class _ProjectMediaAlbumPageState extends State<ProjectMediaAlbumPage> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return const _AlbumMessage(
-              key: Key('project-media-album-error'),
-              icon: Icons.warning_amber_rounded,
-              message: 'Proje albümü güvenli biçimde açılamadı.',
+            return Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const _AlbumMessage(
+                  key: Key('project-media-album-error'),
+                  icon: Icons.warning_amber_rounded,
+                  message: 'Proje albümü güvenli biçimde açılamadı.',
+                ),
+                OutlinedButton.icon(
+                  key: const Key('project-media-album-retry'),
+                  onPressed: () => setState(_reload),
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Projeleri yeniden dene'),
+                ),
+              ],
             );
           }
           final view = snapshot.requireData;
@@ -394,6 +413,16 @@ class _ProjectMediaAlbumPageState extends State<ProjectMediaAlbumPage> {
                     child: _AlbumMessage(
                       icon: Icons.folder_off_outlined,
                       message: 'Aktif proje bulunamadı.',
+                    ),
+                  )
+                else if (view.selectedProjectId == null)
+                  const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _AlbumMessage(
+                      key: Key('project-media-album-context-unavailable'),
+                      icon: Icons.folder_off_outlined,
+                      message:
+                          'Başlangıç projesi artık kullanılamıyor. Devam etmek için bir proje seçin.',
                     ),
                   )
                 else if (view.items.isEmpty)

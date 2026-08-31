@@ -11,12 +11,14 @@ class DailyLogPage extends StatefulWidget {
     required this.dailyLog,
     this.workChain,
     this.initialProjectId,
+    this.onProjectSelected,
     super.key,
   });
 
   final DailyLogApplicationPort dailyLog;
   final WorkChainApplicationPort? workChain;
   final String? initialProjectId;
+  final ValueChanged<String>? onProjectSelected;
 
   @override
   State<DailyLogPage> createState() => _DailyLogPageState();
@@ -129,6 +131,7 @@ class _DailyLogPageState extends State<DailyLogPage> {
       _projectIdToValidate = projectId;
       _selectedProjectId = projectId;
     });
+    widget.onProjectSelected?.call(projectId);
     await _loadDay();
   }
 

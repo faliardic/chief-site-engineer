@@ -10,11 +10,13 @@ class MaterialRequestsPage extends StatefulWidget {
   const MaterialRequestsPage({
     required this.application,
     this.initialProjectId,
+    this.onProjectSelected,
     super.key,
   });
 
   final MaterialRequestApplicationPort application;
   final String? initialProjectId;
+  final ValueChanged<String>? onProjectSelected;
 
   @override
   State<MaterialRequestsPage> createState() => _MaterialRequestsPageState();
@@ -116,6 +118,7 @@ class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
       _projectIdToValidate = value;
       _projectId = value;
     });
+    widget.onProjectSelected?.call(value);
     await _reload();
   }
 

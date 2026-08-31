@@ -16,6 +16,7 @@ class LivingPlanPage extends StatefulWidget {
     required this.agenda,
     required this.livingPlan,
     this.initialProjectId,
+    this.onProjectSelected,
     this.intelligence =
         const UnavailableConstructionLivingPlanIntelligenceApplication(),
     DateTime Function()? clock,
@@ -25,6 +26,7 @@ class LivingPlanPage extends StatefulWidget {
   final AgendaApplication agenda;
   final ConstructionLivingPlanApplicationPort livingPlan;
   final String? initialProjectId;
+  final ValueChanged<String>? onProjectSelected;
   final ConstructionLivingPlanIntelligenceApplicationPort intelligence;
   final DateTime Function() clock;
 
@@ -137,6 +139,7 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
   Future<void> _selectProject(String? projectId) async {
     if (projectId == null || projectId == _projectId || _loading) return;
     setState(() => _projectId = projectId);
+    widget.onProjectSelected?.call(projectId);
     await _reload();
   }
 

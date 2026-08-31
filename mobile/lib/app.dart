@@ -241,6 +241,8 @@ class _MobileShellState extends State<MobileShell> {
   int _selectedIndex = 0;
   StreamSubscription<String>? _notificationTapSubscription;
   late final ActiveProjectSession _activeProjectSession;
+  int _routeProjectValidationGeneration = 0;
+  int _dashboardContextEpoch = 0;
 
   @override
   void initState() {
@@ -261,6 +263,81 @@ class _MobileShellState extends State<MobileShell> {
     _notificationTapSubscription?.cancel();
     _activeProjectSession.dispose();
     super.dispose();
+  }
+
+  Future<void> _adoptRouteProjectSelection(String projectId) async {
+    final generation = ++_routeProjectValidationGeneration;
+    try {
+      final projects = await widget.bootstrap.agenda.listProjects();
+      if (!mounted || generation != _routeProjectValidationGeneration) return;
+      if (!_activeProjectSession.select(projectId, projects)) return;
+      setState(() => _dashboardContextEpoch += 1);
+    } on Object {
+      // Route-local selection remains local when fresh shell validation fails.
+    }
+  }
+
+  void _reportRouteProjectSelection(String projectId) {
+    unawaited(_adoptRouteProjectSelection(projectId));
+  }
+
+  void _showDashboardProjectSelection() {
+    if (mounted) setState(() => _selectedIndex = 0);
+  }
+
+  Future<void> _openConcreteFromMore() async {
+    final concrete = widget.bootstrap.concrete;
+    final attachments = widget.bootstrap.concreteAttachments;
+    if (concrete == null || attachments == null) return;
+    final projectId = _activeProjectSession.selectedProjectId;
+    if (projectId == null) {
+      _showDashboardProjectSelection();
+      return;
+    }
+    if (!mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Beton Paketi')),
+          body: SafeArea(
+            child: ConcretePage(
+              concrete: concrete,
+              agenda: widget.bootstrap.agenda,
+              attachments: attachments,
+              projectLocations: widget.bootstrap.projectLocations,
+              initialProjectId: projectId,
+              onProjectSelected: _reportRouteProjectSelection,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openWorkforceFromMore() async {
+    final attendance = widget.bootstrap.attendance;
+    if (attendance == null) return;
+    final projectId = _activeProjectSession.selectedProjectId;
+    if (projectId == null) {
+      _showDashboardProjectSelection();
+      return;
+    }
+    if (!mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Sicil')),
+          body: SafeArea(
+            child: WorkforceDirectoryPage(
+              attendance: attendance,
+              agenda: widget.bootstrap.agenda,
+              initialProjectId: projectId,
+              onProjectSelected: _reportRouteProjectSelection,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _openReminderFromNotification(String reminderId) async {
@@ -323,13 +400,15 @@ class _MobileShellState extends State<MobileShell> {
     );
   }
 
-  Future<void> _openPhoneCallResult() async {
+  Future<void> _openPhoneCallResult(String initialProjectId) async {
     final logId = await Navigator.of(context).push<String>(
       MaterialPageRoute(
         builder: (_) => PhoneCallResultPage(
           agenda: widget.bootstrap.agenda,
           contextSuggestions: widget.bootstrap.contextSuggestions,
           projectLocations: widget.bootstrap.projectLocations,
+          initialProjectId: initialProjectId,
+          onProjectSelected: _reportRouteProjectSelection,
         ),
       ),
     );
@@ -357,6 +436,7 @@ class _MobileShellState extends State<MobileShell> {
     final backup = bootstrap.backup;
     final reconciliation = bootstrap.attachmentReconciliation;
     return ProjectDashboardPage(
+      key: ValueKey('project-dashboard-context-$_dashboardContextEpoch'),
       agenda: bootstrap.agenda,
       dailyLog: dailyLog,
       livingPlan: bootstrap.livingPlan,
@@ -401,6 +481,7 @@ class _MobileShellState extends State<MobileShell> {
                     dailyLog: dailyLog,
                     workChain: bootstrap.workChain,
                     initialProjectId: projectId,
+                    onProjectSelected: _reportRouteProjectSelection,
                   ),
                 ),
               ),
@@ -413,6 +494,7 @@ class _MobileShellState extends State<MobileShell> {
               livingPlan: bootstrap.livingPlan,
               intelligence: bootstrap.livingPlanIntelligence,
               initialProjectId: projectId,
+              onProjectSelected: _reportRouteProjectSelection,
             ),
           ),
         ),
@@ -425,13 +507,14 @@ class _MobileShellState extends State<MobileShell> {
                   builder: (_) => MaterialRequestsPage(
                     application: materials,
                     initialProjectId: projectId,
+                    onProjectSelected: _reportRouteProjectSelection,
                   ),
                 ),
               ),
             ),
       onOpenProjectAlbum: catalog == null
           ? null
-          : (_) => unawaited(
+          : (projectId) => unawaited(
               Navigator.of(context).push<void>(
                 MaterialPageRoute(
                   builder: (_) => ProjectMediaAlbumPage(
@@ -440,13 +523,15 @@ class _MobileShellState extends State<MobileShell> {
                     concrete: bootstrap.concrete,
                     attachments: bootstrap.concreteAttachments,
                     projectLocations: bootstrap.projectLocations,
+                    initialProjectId: projectId,
+                    onProjectSelected: _reportRouteProjectSelection,
                   ),
                 ),
               ),
             ),
       onOpenWorkforce: attendance == null
           ? null
-          : (_) => unawaited(
+          : (projectId) => unawaited(
               Navigator.of(context).push<void>(
                 MaterialPageRoute(
                   builder: (_) => Scaffold(
@@ -455,13 +540,16 @@ class _MobileShellState extends State<MobileShell> {
                       child: WorkforceDirectoryPage(
                         attendance: attendance,
                         agenda: bootstrap.agenda,
+                        initialProjectId: projectId,
+                        onProjectSelected: _reportRouteProjectSelection,
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-      onOpenPhoneCall: (_) => unawaited(_openPhoneCallResult()),
+      onOpenPhoneCall: (projectId) =>
+          unawaited(_openPhoneCallResult(projectId)),
       onOpenBackup: backup == null
           ? null
           : () => unawaited(
@@ -552,7 +640,17 @@ class _MobileShellState extends State<MobileShell> {
                 icon: Icons.badge_outlined,
                 title: 'Puantaj',
               ),
-            _MorePage(bootstrap: widget.bootstrap),
+            _MorePage(
+              bootstrap: widget.bootstrap,
+              onOpenConcrete:
+                  widget.bootstrap.concrete != null &&
+                      widget.bootstrap.concreteAttachments != null
+                  ? () => unawaited(_openConcreteFromMore())
+                  : null,
+              onOpenWorkforce: widget.bootstrap.attendance == null
+                  ? null
+                  : () => unawaited(_openWorkforceFromMore()),
+            ),
           ],
         ),
       ),
@@ -567,9 +665,15 @@ class _MobileShellState extends State<MobileShell> {
 }
 
 class _MorePage extends StatelessWidget {
-  const _MorePage({required this.bootstrap});
+  const _MorePage({
+    required this.bootstrap,
+    required this.onOpenConcrete,
+    required this.onOpenWorkforce,
+  });
 
   final BootstrapSuccess bootstrap;
+  final VoidCallback? onOpenConcrete;
+  final VoidCallback? onOpenWorkforce;
 
   @override
   Widget build(BuildContext context) {
@@ -591,23 +695,7 @@ class _MorePage extends StatelessWidget {
                   : 'Hazırlanıyor',
             ),
             trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: concrete != null && attachments != null
-                ? () => Navigator.of(context).push<void>(
-                    MaterialPageRoute(
-                      builder: (_) => Scaffold(
-                        appBar: AppBar(title: const Text('Beton Paketi')),
-                        body: SafeArea(
-                          child: ConcretePage(
-                            concrete: concrete,
-                            agenda: bootstrap.agenda,
-                            attachments: attachments,
-                            projectLocations: bootstrap.projectLocations,
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                : null,
+            onTap: onOpenConcrete,
           ),
         ),
         Card(
@@ -621,21 +709,7 @@ class _MorePage extends StatelessWidget {
                   : 'Hazırlanıyor',
             ),
             trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: attendance != null
-                ? () => Navigator.of(context).push<void>(
-                    MaterialPageRoute(
-                      builder: (_) => Scaffold(
-                        appBar: AppBar(title: const Text('Sicil')),
-                        body: SafeArea(
-                          child: WorkforceDirectoryPage(
-                            attendance: attendance,
-                            agenda: bootstrap.agenda,
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                : null,
+            onTap: onOpenWorkforce,
           ),
         ),
       ],
