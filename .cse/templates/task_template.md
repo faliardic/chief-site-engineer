@@ -2,73 +2,125 @@
 
 ## Objective
 
-Describe one small, testable, reversible outcome.
+Describe one bounded, reversible outcome.
 
-## V2 Context
+## Process Lane
 
-- Parent Epic: `#385`
-- V2 item: `<V2.x — name>`
-- Wave: `<1-6>`
+- Process lane: `<FAST|STANDARD|CRITICAL>`
+- Review level: `<R1/R2|R3|R4/R4+>`
+- Why this lane: `<one sentence>`
+
+Use the lightest lane that safely covers the changed contract. Ordinary UI/context/navigation work must not default to CRITICAL/R4.
+
+## Context
+
+- Parent Epic / roadmap item: `<issue/item>`
 - Depends on: `<issues/merged contracts or none>`
 - Canonical scope: `docs/v2/CSE_V2_SCOPE.md`
 - Roadmap: `ROADMAP.md`
 
-## Repository Context
+## Repository
 
 - Repository: `faliardic/chief-site-engineer`
 - Base branch: `master`
 - Expected base commit: `<sha>`
-- Working branch: `codex/issue-NNN-<slug>`
+- Working branch: `<codex/issue-NNN-slug|docs/issue-NNN-slug>`
 - Official local working directory: `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer`
 
-## Required Sources Read
+## Required Sources
 
 1. `AGENTS.md`
-2. `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
-3. `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
-4. `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`
-5. `docs/v2/CSE_V2_SCOPE.md`
+2. `docs/protocols/CSE_WORKFLOW_ACCELERATION_PROTOCOL.md`
+3. `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
+4. `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
+5. current GitHub Issue / PR / branch
 6. `ROADMAP.md`
-7. current GitHub Issue and scope comments
-8. `.cse/tasks/NNN_task.md`
+7. relevant Issue #479 manual-test entries
 
-For workflow/bootstrap/source-authority tasks also read the new-chat bootstrap and source register.
+Read deeper protocol/source files only when the changed contract needs them. Resume does not reread unchanged long sources.
 
-## Local Preconditions
+## Goal / Changed Contract
 
-- Inspect tracked, staged, untracked and ignored status before any write.
-- Do not reset, clean, stash, delete or overwrite unexpected user work.
-- Fast-forward local `master` from `origin/master`; required divergence: `0 0`.
-- Keep ignored ZIP, device backups, reports and user artifacts untouched.
+- Goal: `<one paragraph>`
+- Changed contract(s): `<list>`
+- User-visible result: `<list>`
 
-## Validation Contract
+## Allowed / Protected Paths
 
-- Validation class: `<docs|narrow-ui|domain|persistence|release-critical>`
-- Changed contracts: `<list>`
-- Focused tests: `<list>`
-- Allowed broad gates: `<none|full Flutter|analyze|build|release gate|device etc.>`
-- Reused merged evidence: `<list or none>`
-- Minimum physical-device/field acceptance: `<scenario or none>`
-- Retry budget: `<value>`
-- Time budget: `<value>`
-- Stop conditions: `<list>`
+Allowed:
 
-## Data / Compatibility Impact
+- `<exact path or bounded group>`
 
-- Schema impact: `<none|details>`
-- Migration impact: `<none|details>`
-- Backup compatibility impact: `<none|details>`
-- Attachment impact: `<none|details>`
-- Notification impact: `<none|details>`
-- User-data access: `<forbidden by default|explicit allowed boundary>`
+Protected:
 
-## Authorized Paths
+- `<critical paths/contracts>`
 
-- `.cse/tasks/NNN_task.md`
-- `.cse/results/NNN_result.md`
-- `<exact path or bounded file group>`
+If another path is required, stop only when the need is a real scope/critical escalation. Same-scope format/harness/analyzer/source corrections stay inside the current execution window.
 
-`.cse/state/project_state.json` is changed only when the Issue explicitly requires a canonical merged/finalized state update.
+## Critical Exclusions
+
+- Schema/migration: `<none|details>`
+- Backup/restore: `<none|details>`
+- Permission/signing/platform: `<none|details>`
+- User-data/destructive access: `<forbidden|explicit boundary>`
+- Inventory/DWG/release impact: `<none|details>`
+
+Any newly discovered CRITICAL trigger requires escalation.
+
+## Local Checks
+
+### FAST default
+
+- exact scope/allowlist
+- changed-path diff review
+- deterministic format/syntax
+- `git diff --check`
+- protected drift
+
+### STANDARD default
+
+FAST checks plus at most one targeted local check only when materially useful.
+
+Do not duplicate the full Flutter format/analyze/test chain locally when PR CI will run it.
+
+### CRITICAL
+
+List issue-specific focused/integration/device/release gates:
+
+- `<gate>`
+
+## PR CI Expectation
+
+For mobile changes, existing `Flutter PR` CI is the broad gate:
+
+```text
+format
+flutter analyze
+full flutter test
+```
+
+CI failure is handled as one same-scope correction round where possible; no new owner authority is required for each failure.
+
+## Manual Test Register
+
+- Register: GitHub Issue #479
+- IDs: `<MT-NNN-001... or pending creation>`
+- Status: `<PENDING|PASS|FAIL|PARTIAL|DEFERRED|N/A>`
+
+Manual test PENDING/DEFERRED does not automatically block continued development or owner-approved merge.
+
+## Correction Budget
+
+FAST/STANDARD default:
+
+```text
+primary implementation: 1
+same-scope correction rounds: 2
+environment-only retry: 1
+new owner authority inside same scope: 0
+```
+
+CRITICAL may define a custom bounded budget.
 
 ## Required Work
 
@@ -78,31 +130,46 @@ For workflow/bootstrap/source-authority tasks also read the new-chat bootstrap a
 ## Out of Scope
 
 - `<explicit non-goals>`
-- no unrelated schema/migration/backup/audit/API/GUI/CLI/release/device expansion
-- no hidden hard-delete or automatic formal decision
+- no unrelated product/schema/backup/release expansion
 
-## Required Verification
-
-- Run only the focused and broad gates authorized above.
-- `git diff --check`
-- changed/staged files equal the Issue allowlist
-- no unintended export/artifact output
-- ignored/user areas untouched
-- final branch/local-remote divergence reported
-
-## Publication Permission
+## Publication Boundary
 
 - Commit: `<allowed|not allowed>`
 - Push: `<allowed|not allowed>`
-- Pull request: `<draft|required|not allowed>`
-- Ready: `<allowed|not allowed>`
-- Merge: `<allowed|not allowed>`
+- Pull request: `<Draft required|not allowed>`
+- Ready: `owner approval required`
+- Merge: `owner approval required; squash default`
+
+FAST/STANDARD Issue body + standing protocol are sufficient execution authority. Do not add a separate one-shot authority unless a real escalation occurs.
+
+## Completion Evidence
+
+Keep evidence concise.
+
+FAST/STANDARD preferred summary:
+
+```yaml
+issue: NNN
+process_lane: FAST|STANDARD
+base: <sha>
+head: <sha>
+changed_paths: [...]
+local_checks: [...]
+ci: PASS|FAIL|PENDING
+manual_tests: PENDING|...
+corrections_used: 0..2
+pr: <number>
+```
+
+CRITICAL may use full provenance chronology.
 
 ## Completion Criteria
 
-- User-visible acceptance is satisfied.
-- Data/compatibility invariants are preserved.
-- Required checks pass.
-- Result report is factual and distinguishes executed, reused and skipped gates.
-- No unrelated file changes.
-- Next V2 dependency is not started automatically unless explicitly authorized.
+- changed contract is implemented;
+- scope/protected boundaries are preserved;
+- local minimum checks pass;
+- Draft PR is published when authorized;
+- PR CI state is recorded;
+- manual test status is truthful;
+- no unrelated changes;
+- next roadmap item is not started before current publication/review boundary is respected.
