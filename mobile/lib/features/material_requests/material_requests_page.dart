@@ -7,9 +7,14 @@ import 'package:chief_site_engineer/domain/material_request_models.dart';
 import 'package:flutter/material.dart';
 
 class MaterialRequestsPage extends StatefulWidget {
-  const MaterialRequestsPage({required this.application, super.key});
+  const MaterialRequestsPage({
+    required this.application,
+    this.initialProjectId,
+    super.key,
+  });
 
   final MaterialRequestApplicationPort application;
+  final String? initialProjectId;
 
   @override
   State<MaterialRequestsPage> createState() => _MaterialRequestsPageState();
@@ -18,37 +23,55 @@ class MaterialRequestsPage extends StatefulWidget {
 class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
   List<MaterialRequestProject> _projects = const [];
   List<MaterialRequest> _requests = const [];
+  String? _projectIdToValidate;
   String? _projectId;
   MaterialRequestListKind _kind = MaterialRequestListKind.open;
   bool _loading = true;
+  bool _projectDiscoveryFailed = false;
   String? _failure;
 
   @override
   void initState() {
     super.initState();
+    _projectIdToValidate = widget.initialProjectId;
     unawaited(_loadProjects());
   }
 
   Future<void> _loadProjects() async {
+    final projectIdToValidate = _projectIdToValidate;
     setState(() {
+      _projects = const [];
+      _requests = const [];
+      _projectId = null;
       _loading = true;
+      _projectDiscoveryFailed = false;
       _failure = null;
     });
     try {
       final projects = await widget.application.listProjects();
-      final selected = projects.any((project) => project.id == _projectId)
-          ? _projectId
-          : (projects.isEmpty ? null : projects.first.id);
+      final selected =
+          projects.any((project) => project.id == projectIdToValidate)
+          ? projectIdToValidate
+          : widget.initialProjectId == null && projects.isNotEmpty
+          ? projects.first.id
+          : null;
       if (!mounted) return;
       setState(() {
         _projects = projects;
         _projectId = selected;
+        if (selected != null) {
+          _projectIdToValidate = selected;
+        }
       });
       await _reload();
     } on MaterialRequestFailure catch (error) {
       if (!mounted) return;
       setState(() {
+        _projects = const [];
+        _requests = const [];
+        _projectId = null;
         _loading = false;
+        _projectDiscoveryFailed = true;
         _failure = error.code;
       });
     }
@@ -89,7 +112,10 @@ class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
 
   Future<void> _selectProject(String? value) async {
     if (value == null || value == _projectId) return;
-    setState(() => _projectId = value);
+    setState(() {
+      _projectIdToValidate = value;
+      _projectId = value;
+    });
     await _reload();
   }
 
@@ -191,7 +217,7 @@ class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
             ),
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: _reload,
+          onRefresh: _loadProjects,
           child: ListView(
             key: const Key('material-requests-page'),
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
@@ -236,7 +262,9 @@ class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
                   ),
                 ],
                 selected: {_kind},
-                onSelectionChanged: _loading ? null : _changeKind,
+                onSelectionChanged: _loading || _projectId == null
+                    ? null
+                    : _changeKind,
               ),
               const SizedBox(height: 12),
               if (_loading)
@@ -247,14 +275,36 @@ class _MaterialRequestsPageState extends State<MaterialRequestsPage> {
                   ),
                 )
               else if (_failure case final failure?)
-                _MessageCard(
-                  icon: Icons.error_outline_rounded,
-                  text: 'Malzeme talepleri okunamadı. ($failure)',
+                Column(
+                  children: [
+                    _MessageCard(
+                      icon: Icons.error_outline_rounded,
+                      text: 'Malzeme talepleri okunamadı. ($failure)',
+                    ),
+                    if (_projectDiscoveryFailed) ...[
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        key: const Key('material-request-project-retry'),
+                        onPressed: _loadProjects,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Projeleri yeniden dene'),
+                      ),
+                    ],
+                  ],
                 )
               else if (_projects.isEmpty)
                 const _MessageCard(
                   icon: Icons.apartment_outlined,
                   text: 'Önce aktif bir proje oluşturun.',
+                )
+              else if (_projectId == null)
+                const KeyedSubtree(
+                  key: Key('material-request-project-context-unavailable'),
+                  child: _MessageCard(
+                    icon: Icons.folder_off_outlined,
+                    text:
+                        'Dashboard projesi artık kullanılamıyor. Devam etmek için bir proje seçin.',
+                  ),
                 )
               else if (_requests.isEmpty)
                 _MessageCard(
