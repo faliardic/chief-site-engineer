@@ -298,7 +298,9 @@ class _MobileShellState extends State<MobileShell> {
       });
     } on Object {
       if (!mounted || generation != _projectContextGeneration) return;
-      setState(() => _activeProjectNames = const {});
+      // A transient refresh must not make the visible context contradict the
+      // still-operational ActiveProjectSession selection. Keep the last
+      // successfully validated display cache until a later refresh succeeds.
     }
   }
 

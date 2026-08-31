@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:chief_site_engineer/app.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
@@ -178,6 +180,67 @@ void main() {
       await _openTab(tester, 'Daha');
       _expectIndicator(_projectA.name);
 
+      expect(agenda.createLogCalls, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'transient project refresh failure preserves visible and capture B context',
+    (tester) async {
+      final agenda = FakeAgendaApplication(
+        projects: const [_projectA, _projectB],
+      );
+      await _pumpShell(tester, agenda);
+      await tester.tap(find.text('Proje seç'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
+      );
+      await tester.pumpAndSettle();
+      await _openTab(tester, 'Hatırlatıcı');
+      _expectIndicator(_projectB.name);
+
+      final failedRefresh = Completer<List<MobileProject>>();
+      agenda.listProjectsResponses.add(failedRefresh.future);
+      await agenda.createProject(
+        const CreateProjectCommand(
+          id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+          name: 'Doğu',
+        ),
+      );
+      await tester.pump();
+      failedRefresh.completeError(
+        StateError('transient project discovery failure'),
+      );
+      await tester.pumpAndSettle();
+
+      _expectIndicator(_projectB.name);
+      await tester.tap(find.byKey(const Key('quick-reminder')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<DropdownButtonFormField<String?>>(
+              find.byKey(const Key('reminder-project')),
+            )
+            .initialValue,
+        _projectB.id,
+      );
+      _popRoute(tester, find.byType(ReminderFormPage));
+      await tester.pumpAndSettle();
+
+      await _openTab(tester, 'Ajanda');
+      _expectIndicator(_projectB.name);
+      await tester.tap(find.byKey(const Key('create-agenda-log')));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<LogFormPage>(find.byType(LogFormPage)).initialProjectId,
+        _projectB.id,
+      );
+      _popRoute(tester, find.byType(LogFormPage));
+      await tester.pumpAndSettle();
+
+      expect(agenda.createReminderCalls, 0);
       expect(agenda.createLogCalls, 0);
       expect(tester.takeException(), isNull);
     },

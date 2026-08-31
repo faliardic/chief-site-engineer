@@ -71,8 +71,8 @@ runtime_actual_model: unknown
 runtime_actual_effort: unknown
 runtime_verification: unverified
 routing_mismatch: null
-correction_budget_used: 2/2
-application_test_status: 2/2_TARGETED_PASS
+correction_budget_used: 2/2_INITIAL_HARNESS_PLUS_1/1_OWNER_AUTHORIZED
+application_test_status: 3/3_TARGETED_PASS
 manual_test_status: PENDING
 ```
 
@@ -80,3 +80,47 @@ manual_test_status: PENDING
 
 Keep the PR Draft. Run PR CI and a fresh independent review at the recorded
 `gpt-5.6-sol / xhigh` floor before any owner Ready or merge decision.
+
+## Same-scope cache consistency correction
+
+- Authority: Issue #558 comment `5483589282`.
+- Reviewed head / Draft PR: `8a200abb98049911bc680a99a8d4d502d7275162` / #559.
+- Root cause confirmed: `_refreshActiveProjectOptions()` cleared the last
+  validated name map on a transient read failure while the operational session
+  selection remained unchanged.
+- Correction: transient refresh failure now preserves the last validated
+  display cache; a later successful refresh still replaces it normally.
+- Correction paths: `.cse/tasks/558_task.md`, `.cse/results/558_result.md`,
+  `mobile/lib/app.dart`,
+  `mobile/test/global_active_project_context_widget_test.dart`.
+- Regression: active B → transient project-list refresh failure → indicator B,
+  Reminder default B and Agenda default B.
+- First regression run: existing two scenarios passed; the new scenario stopped
+  on eager-error test setup before behavior assertion.
+- Harness correction: controlled completer delivered the same error after the
+  shell refresh attached; production code was unchanged.
+- Final targeted widget check: `3/3 PASS`.
+- Changed-Dart formatter/idempotence: PASS; 2 files, `0 changed` final.
+- `git diff --check`, exact allowlist and protected drift: PASS.
+- Invariants unchanged: schema `22`, backup format `1`, version `0.1.0+1`;
+  platform/pubspec/lock drift `0`.
+- Broad Flutter analyze/full suite: not run locally; remains assigned to PR CI.
+- Manual tests `MT-558-001..005`: remain `PENDING`.
+- Artifact: none. Draft/Ready/merge state remains unchanged pending push and
+  short re-review.
+
+### correction_execution_record
+
+```yaml
+authority_comment: 5483589282
+classification: SAME_SCOPE_CACHE_CONSISTENCY_CORRECTION
+reviewed_head: 8a200abb98049911bc680a99a8d4d502d7275162
+owner_authorized_correction_window: 1/1
+targeted_widget_status: 3/3_PASS
+manual_test_status: PENDING
+```
+
+### correction_review_recommendation
+
+Keep PR #559 Draft and stop for the requested short re-review after the
+correction commit is pushed. Do not mark Ready or merge.

@@ -39,3 +39,19 @@
 - `CSE_PROJECT_SOURCE_REGISTER.md`: `583663cf0016d5060ed90ec44d1fce8aa16f74a5`
 - `CSE_V2_SCOPE.md`: `12bf27e27dde086a396aa063d16c148410906ea7`
 - `ROADMAP.md`: `61037f291f18b3434d740fdb096bdce6a0f9b885`
+
+## Owner-authorized cache consistency correction
+
+- Authority: Issue #558 comment `5483589282`.
+- Reviewed head / Draft PR: `8a200abb98049911bc680a99a8d4d502d7275162` / #559.
+- Classification: same-scope active-project display-cache consistency correction.
+- Root cause: a transient shell `listProjects()` failure cleared the last known
+  project-name cache while `ActiveProjectSession.selectedProjectId` remained
+  operational, so the visible label could contradict capture defaults.
+- Correction boundary: preserve the last validated display cache on transient
+  refresh failure; add one focused regression scenario.
+- Owner-authorized correction window: `1/1` used.
+- Validation harness note: the first regression run's eager `Future.error`
+  escaped before consumption; a controlled completer now delivers the same
+  failure after the shell refresh is waiting. Production code was unchanged.
+- Allowed paths and protected exclusions remain unchanged.
