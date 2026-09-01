@@ -162,11 +162,103 @@ void main() {
     },
   );
 
+  testWidgets('normal phone Dashboard uses compact field layout', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final fixture = _Fixture(projects: [_project('a', 'Kuzey')]);
+    addTearDown(fixture.dispose);
+
+    await tester.pumpWidget(
+      fixture.app(
+        onReminder: (_, _) async => false,
+        onAgenda: (_, _) async => false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final reminder = find.byKey(const Key('dashboard-quick-reminder'));
+    final agenda = find.byKey(const Key('dashboard-quick-agenda'));
+    final reminderRect = tester.getRect(reminder);
+    final agendaRect = tester.getRect(agenda);
+    expect(reminderRect.top, closeTo(agendaRect.top, 0.01));
+    expect(reminderRect.right, lessThan(agendaRect.left));
+    expect(reminderRect.height, inInclusiveRange(40, 42));
+    expect(agendaRect.height, inInclusiveRange(40, 42));
+
+    final header = find.byKey(const Key('dashboard-project-header'));
+    final headerPaddings = tester.widgetList<Padding>(
+      find.descendant(of: header, matching: find.byType(Padding)),
+    );
+    expect(
+      headerPaddings.map((widget) => widget.padding),
+      contains(const EdgeInsets.all(12)),
+    );
+    expect(
+      tester
+          .widget<Icon>(
+            find.descendant(of: header, matching: find.byType(Icon)).first,
+          )
+          .size,
+      28,
+    );
+
+    final planCard = find.byKey(const Key('dashboard-plan-card'));
+    final summaryPaddings = tester.widgetList<Padding>(
+      find.descendant(of: planCard, matching: find.byType(Padding)),
+    );
+    expect(
+      summaryPaddings.map((widget) => widget.padding),
+      contains(const EdgeInsets.all(12)),
+    );
+    expect(
+      tester
+          .widget<Icon>(
+            find.descendant(of: planCard, matching: find.byType(Icon)).first,
+          )
+          .size,
+      22,
+    );
+
+    final album = find.byKey(const Key('dashboard-project-album'));
+    await tester.scrollUntilVisible(
+      album,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    final tile = tester.widget<ListTile>(
+      find.descendant(of: album, matching: find.byType(ListTile)),
+    );
+    expect(tile.dense, isTrue);
+    expect(
+      tile.visualDensity,
+      const VisualDensity(horizontal: -1, vertical: -2),
+    );
+    expect(tile.contentPadding, const EdgeInsets.symmetric(horizontal: 12));
+    expect(tile.minVerticalPadding, 4);
+    expect(tile.horizontalTitleGap, 8);
+    expect(
+      find.descendant(of: album, matching: find.text('Proje Albümü')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: album,
+        matching: find.text('Bu kurulumda hazır değil.'),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
-    'small large-text Dashboard scrolls with 48dp actions and semantics',
+    'large-text Dashboard uses safe action fallback without overflow',
     (tester) async {
       final semantics = tester.ensureSemantics();
-      tester.view.physicalSize = const Size(320, 700);
+      tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -190,8 +282,12 @@ void main() {
 
       final reminder = find.byKey(const Key('dashboard-quick-reminder'));
       final agenda = find.byKey(const Key('dashboard-quick-agenda'));
-      expect(tester.getSize(reminder).height, greaterThanOrEqualTo(48));
-      expect(tester.getSize(agenda).height, greaterThanOrEqualTo(48));
+      final reminderRect = tester.getRect(reminder);
+      final agendaRect = tester.getRect(agenda);
+      expect(reminderRect.bottom, lessThan(agendaRect.top));
+      expect(reminderRect.center.dx, closeTo(agendaRect.center.dx, 0.01));
+      expect(reminderRect.height, greaterThanOrEqualTo(40));
+      expect(agendaRect.height, greaterThanOrEqualTo(40));
       expect(
         find.bySemanticsLabel(RegExp('Aktif proje Çok Uzun Kuzey Projesi')),
         findsOneWidget,
