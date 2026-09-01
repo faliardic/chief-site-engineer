@@ -15,10 +15,11 @@ changed_paths:
 local_checks:
   dart_format: PASS
   git_diff_check: PASS
-  initial_focused_invocation: FAIL_68_OF_76_BEFORE_HARNESS_CORRECTION
+  initial_focused_invocation: FAIL_60_OF_68_BEFORE_HARNESS_CORRECTION
   correction_round_2_invocation: FAIL_74_OF_76
   post_2_2_narrow_verification: PASS_76_OF_76
   focused_widget_final: PASS
+  focused_test_code_head: 7960a9fcb1f1eb99e930e25c819431bbbde20725
   protected_drift: NONE
   invariants: 22 / 1 / 0.1.0+1
 ci: PENDING
