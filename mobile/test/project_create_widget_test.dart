@@ -53,7 +53,9 @@ void main() {
     expect(result.value, isNull);
   });
 
-  testWidgets('saving progress disables duplicate submit', (tester) async {
+  testWidgets('saving blocks route back until created result is returned', (
+    tester,
+  ) async {
     final agenda = _ProjectCreateAgenda();
     final pending = Completer<MobileProject>();
     agenda.pendingCreate = pending;
@@ -81,11 +83,34 @@ void main() {
     await tester.tap(save, warnIfMissed: false);
     await tester.pump();
     expect(agenda.createProjectCalls, 1);
+    expect(find.byKey(const Key('project-create-page')), findsOneWidget);
+
+    await tester.tap(find.byType(BackButton));
+    await tester.pump();
+    expect(find.byKey(const Key('project-create-page')), findsOneWidget);
+    expect(result.value, isNull);
+    expect(agenda.createProjectCalls, 1);
+
+    final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+    await navigator.maybePop();
+    await tester.pump();
+    expect(find.byKey(const Key('project-create-page')), findsOneWidget);
+    expect(result.value, isNull);
+    expect(agenda.createProjectCalls, 1);
+
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(find.byKey(const Key('project-create-page')), findsOneWidget);
+    expect(result.value, isNull);
+    expect(agenda.createProjectCalls, 1);
 
     final command = agenda.lastCommand!;
-    pending.complete(_project(command.id, command.name));
+    final created = _project(command.id, command.name);
+    pending.complete(created);
     await tester.pumpAndSettle();
-    expect(result.value?.id, command.id);
+    expect(find.byKey(const Key('project-create-page')), findsNothing);
+    expect(result.value, same(created));
+    expect(agenda.createProjectCalls, 1);
   });
 
   testWidgets('create failure stays open, is user safe, and permits retry', (
@@ -138,6 +163,32 @@ void main() {
     expect(agenda.createProjectCalls, 0);
     expect(result.value, isNull);
     expect(find.byKey(const Key('project-create-page')), findsNothing);
+  });
+
+  testWidgets('back remains available after create failure', (tester) async {
+    final agenda = _ProjectCreateAgenda()
+      ..failure = const AgendaValidationFailure(
+        'Aynı adlı aktif proje zaten bulunuyor.',
+      );
+    final result = ValueNotifier<MobileProject?>(null);
+    addTearDown(result.dispose);
+    await _openPage(tester, agenda, result);
+
+    await tester.enterText(
+      find.byKey(const Key('project-name')),
+      'Başarısız Proje',
+    );
+    await tester.tap(find.byKey(const Key('save-project')));
+    await tester.pumpAndSettle();
+
+    expect(agenda.createProjectCalls, 1);
+    expect(find.byKey(const Key('project-create-error')), findsOneWidget);
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('project-create-page')), findsNothing);
+    expect(result.value, isNull);
+    expect(agenda.createProjectCalls, 1);
   });
 
   testWidgets('320 px and text scale 1.6 keeps submit hit-testable', (

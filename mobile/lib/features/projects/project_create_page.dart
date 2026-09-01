@@ -58,45 +58,48 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: const Key('project-create-page'),
-      appBar: AppBar(title: const Text('Yeni Proje')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            TextField(
-              key: const Key('project-name'),
-              controller: _nameController,
-              enabled: !_saving,
-              maxLength: 160,
-              textInputAction: TextInputAction.done,
-              decoration: const InputDecoration(
-                labelText: 'Proje adı',
-                border: OutlineInputBorder(),
+    return PopScope(
+      canPop: !_saving,
+      child: Scaffold(
+        key: const Key('project-create-page'),
+        appBar: AppBar(title: const Text('Yeni Proje')),
+        body: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              TextField(
+                key: const Key('project-name'),
+                controller: _nameController,
+                enabled: !_saving,
+                maxLength: 160,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(
+                  labelText: 'Proje adı',
+                  border: OutlineInputBorder(),
+                ),
+                onSubmitted: _saving ? null : (_) => _save(),
               ),
-              onSubmitted: _saving ? null : (_) => _save(),
-            ),
-            if (_error case final error?) ...[
-              const SizedBox(height: 8),
-              Text(
-                error,
-                key: const Key('project-create-error'),
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              if (_error case final error?) ...[
+                const SizedBox(height: 8),
+                Text(
+                  error,
+                  key: const Key('project-create-error'),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+              const SizedBox(height: 16),
+              FilledButton(
+                key: const Key('save-project'),
+                onPressed: _saving ? null : _save,
+                child: _saving
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Kaydet'),
               ),
             ],
-            const SizedBox(height: 16),
-            FilledButton(
-              key: const Key('save-project'),
-              onPressed: _saving ? null : _save,
-              child: _saving
-                  ? const SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Kaydet'),
-            ),
-          ],
+          ),
         ),
       ),
     );
