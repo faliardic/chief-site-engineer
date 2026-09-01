@@ -382,7 +382,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.log == null ? '+ Unutma' : 'Hatırlatıcı oluştur'),
+        title: Text(widget.log == null ? 'Unutma' : 'Hatırlatıcı oluştur'),
       ),
       body: Form(
         key: _formKey,
@@ -496,17 +496,17 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                OutlinedButton.icon(
-                  key: const Key('reminder-today'),
+                _ReminderFormIconAction(
+                  actionKey: const Key('reminder-today'),
+                  label: 'Bugün',
                   onPressed: () => _selectAllDay(0),
                   icon: const Icon(Icons.today_outlined),
-                  label: const Text('Bugün'),
                 ),
-                OutlinedButton.icon(
-                  key: const Key('reminder-all-day-tomorrow'),
+                _ReminderFormIconAction(
+                  actionKey: const Key('reminder-all-day-tomorrow'),
+                  label: 'Yarın • Tam gün',
                   onPressed: () => _selectAllDay(1),
                   icon: const Icon(Icons.event_outlined),
-                  label: const Text('Yarın • Tam gün'),
                 ),
               ],
             ),
@@ -714,20 +714,19 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
               ],
             ),
             const SizedBox(height: 20),
-            SizedBox(
-              height: 52,
-              child: FilledButton.icon(
-                key: const Key('submit-reminder'),
+            Align(
+              alignment: Alignment.centerRight,
+              child: _ReminderFormIconAction(
+                actionKey: const Key('submit-reminder'),
+                label: 'Hatırlatıcıyı kaydet',
+                kind: _ReminderFormIconActionKind.filled,
                 onPressed: _submitting || _loadingProjects ? null : _submit,
                 icon: _submitting
                     ? const SizedBox.square(
                         dimension: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.add_alert_outlined),
-                label: Text(
-                  _submitting ? 'Oluşturuluyor…' : 'Hatırlatıcı oluştur',
-                ),
+                    : const Icon(Icons.check_rounded),
               ),
             ),
           ],
@@ -817,13 +816,70 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
             ),
           ),
         const SizedBox(height: 8),
-        OutlinedButton.icon(
-          key: const Key('open-location-catalog-from-reminder'),
-          onPressed: _openLocationCatalog,
-          icon: const Icon(Icons.account_tree_outlined),
-          label: const Text('Mahal Kataloğu'),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _ReminderFormIconAction(
+            actionKey: const Key('open-location-catalog-from-reminder'),
+            label: 'Mahal Kataloğu',
+            onPressed: _openLocationCatalog,
+            icon: const Icon(Icons.account_tree_outlined),
+          ),
         ),
       ],
+    );
+  }
+}
+
+enum _ReminderFormIconActionKind { standard, filled }
+
+class _ReminderFormIconAction extends StatelessWidget {
+  const _ReminderFormIconAction({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.actionKey,
+    this.kind = _ReminderFormIconActionKind.standard,
+  });
+
+  final Key? actionKey;
+  final Widget icon;
+  final String label;
+  final VoidCallback? onPressed;
+  final _ReminderFormIconActionKind kind;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = IconButton.styleFrom(
+      minimumSize: const Size.square(40),
+      fixedSize: const Size.square(40),
+      maximumSize: const Size.square(40),
+      iconSize: 20,
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.standard,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+    final button = switch (kind) {
+      _ReminderFormIconActionKind.standard => IconButton.outlined(
+        key: actionKey,
+        tooltip: label,
+        style: style,
+        onPressed: onPressed,
+        icon: icon,
+      ),
+      _ReminderFormIconActionKind.filled => IconButton.filled(
+        key: actionKey,
+        tooltip: label,
+        style: style,
+        onPressed: onPressed,
+        icon: icon,
+      ),
+    };
+    return Semantics(
+      label: label,
+      button: true,
+      enabled: onPressed != null,
+      excludeSemantics: true,
+      child: button,
     );
   }
 }

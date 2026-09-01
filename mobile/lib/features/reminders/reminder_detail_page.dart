@@ -1225,10 +1225,13 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
             media: _sourceAgendaMedia!,
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            height: 52,
-            child: FilledButton.tonalIcon(
-              key: const Key('open-source-agenda-log'),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _DetailIconAction(
+              actionKey: const Key('open-source-agenda-log'),
+              label: 'Kaynak Ajanda kaydına dön',
+              icon: Icons.event_note_outlined,
+              kind: _DetailIconActionKind.tonal,
               onPressed: () => Navigator.of(context).push<void>(
                 MaterialPageRoute(
                   builder: (_) => LogDetailPage(
@@ -1237,31 +1240,33 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
                   ),
                 ),
               ),
-              icon: const Icon(Icons.event_note_outlined),
-              label: const Text('Kaynak Ajanda kaydına dön'),
             ),
           ),
           if (agendaSyncDiffs.isNotEmpty) ...[
             const SizedBox(height: 12),
-            SizedBox(
-              height: 52,
-              child: FilledButton.icon(
-                key: const Key('sync-agenda-to-reminder'),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _DetailIconAction(
+                actionKey: const Key('sync-agenda-to-reminder'),
+                label: 'Ajanda’dan güncelle',
+                icon: Icons.sync_outlined,
+                kind: _DetailIconActionKind.filled,
                 onPressed: _mutating || _syncDialogOpen
                     ? null
                     : _showAgendaSyncConfirmation,
-                icon: const Icon(Icons.sync_outlined),
-                label: const Text('Ajanda’dan güncelle'),
               ),
             ),
           ],
         ],
         if (reminder.attendanceDayId != null && widget.attendance != null) ...[
           const SizedBox(height: 16),
-          SizedBox(
-            height: 52,
-            child: FilledButton.tonalIcon(
-              key: const Key('open-source-attendance-day'),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _DetailIconAction(
+              actionKey: const Key('open-source-attendance-day'),
+              label: 'Kaynak Puantaj gününe dön',
+              icon: Icons.badge_outlined,
+              kind: _DetailIconActionKind.tonal,
               onPressed: () => Navigator.of(context).push<void>(
                 MaterialPageRoute(
                   builder: (_) => AttendanceDayPage(
@@ -1271,8 +1276,6 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
                   ),
                 ),
               ),
-              icon: const Icon(Icons.badge_outlined),
-              label: const Text('Kaynak Puantaj gününe dön'),
             ),
           ),
         ],
@@ -1280,10 +1283,13 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
             widget.concrete != null &&
             widget.concreteAttachments != null) ...[
           const SizedBox(height: 16),
-          SizedBox(
-            height: 52,
-            child: FilledButton.tonalIcon(
-              key: const Key('open-source-concrete-pour'),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _DetailIconAction(
+              actionKey: const Key('open-source-concrete-pour'),
+              label: 'Kaynak Beton paketine dön',
+              icon: Icons.foundation_outlined,
+              kind: _DetailIconActionKind.tonal,
               onPressed: () => Navigator.of(context).push<void>(
                 MaterialPageRoute(
                   builder: (_) => ConcretePourDetailPage(
@@ -1295,8 +1301,6 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
                   ),
                 ),
               ),
-              icon: const Icon(Icons.foundation_outlined),
-              label: const Text('Kaynak Beton paketine dön'),
             ),
           ),
         ],
@@ -1326,7 +1330,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
                   _ActionButton(
                     key: const Key('snooze-tomorrow'),
                     label: reminder.allDayLocalDate == null
-                        ? 'Yarın 08:00'
+                        ? "Yarın 08:00'a ertele"
                         : 'Yarına ertele',
                     icon: Icons.wb_sunny_outlined,
                     onPressed: _mutating
@@ -1347,6 +1351,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
                   key: const Key('snooze-1h'),
                   label: '1 saat ertele',
                   icon: Icons.more_time,
+                  badgeText: '1',
                   onPressed: _mutating
                       ? null
                       : () => _mutate(ReminderMutationAction.snooze1Hour),
@@ -1355,6 +1360,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
                   key: const Key('snooze-2h'),
                   label: '2 saat ertele',
                   icon: Icons.more_time,
+                  badgeText: '2',
                   onPressed: _mutating
                       ? null
                       : () => _mutate(ReminderMutationAction.snooze2Hours),
@@ -1363,6 +1369,7 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
                   key: const Key('snooze-3h'),
                   label: '3 saat ertele',
                   icon: Icons.more_time,
+                  badgeText: '3',
                   onPressed: _mutating
                       ? null
                       : () => _mutate(ReminderMutationAction.snooze3Hours),
@@ -1648,28 +1655,139 @@ class _DeliveryDiagnosticCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                OutlinedButton.icon(
-                  key: const Key('retry-reminder-delivery'),
+                _DetailIconAction(
+                  actionKey: const Key('retry-reminder-delivery'),
+                  label: 'Yeniden doğrula',
+                  icon: Icons.sync,
                   onPressed: enabled ? onRetry : null,
-                  icon: const Icon(Icons.sync),
-                  label: const Text('Yeniden doğrula'),
                 ),
-                OutlinedButton.icon(
-                  key: const Key('open-notification-settings'),
+                _DetailIconAction(
+                  actionKey: const Key('open-notification-settings'),
+                  label: 'Bildirim ayarları',
+                  icon: Icons.notifications_outlined,
                   onPressed: enabled ? onNotificationSettings : null,
-                  icon: const Icon(Icons.notifications_outlined),
-                  label: const Text('Bildirim ayarları'),
                 ),
-                OutlinedButton.icon(
-                  key: const Key('open-battery-settings'),
+                _DetailIconAction(
+                  actionKey: const Key('open-battery-settings'),
+                  label: 'Batarya ayarları',
+                  icon: Icons.battery_saver_outlined,
                   onPressed: enabled ? onBatterySettings : null,
-                  icon: const Icon(Icons.battery_saver_outlined),
-                  label: const Text('Batarya ayarları'),
                 ),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+enum _DetailIconActionKind { outlined, filled, tonal }
+
+class _DetailIconAction extends StatelessWidget {
+  const _DetailIconAction({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.actionKey,
+    this.badgeText,
+    this.kind = _DetailIconActionKind.outlined,
+  });
+
+  final Key? actionKey;
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final String? badgeText;
+  final _DetailIconActionKind kind;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = IconButton.styleFrom(
+      minimumSize: const Size.square(40),
+      fixedSize: const Size.square(40),
+      maximumSize: const Size.square(40),
+      iconSize: 20,
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.standard,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+    final iconWidget = _DetailBadgedIcon(icon: icon, badgeText: badgeText);
+    final button = switch (kind) {
+      _DetailIconActionKind.outlined => IconButton.outlined(
+        key: actionKey,
+        tooltip: label,
+        style: style,
+        onPressed: onPressed,
+        icon: iconWidget,
+      ),
+      _DetailIconActionKind.filled => IconButton.filled(
+        key: actionKey,
+        tooltip: label,
+        style: style,
+        onPressed: onPressed,
+        icon: iconWidget,
+      ),
+      _DetailIconActionKind.tonal => IconButton.filledTonal(
+        key: actionKey,
+        tooltip: label,
+        style: style,
+        onPressed: onPressed,
+        icon: iconWidget,
+      ),
+    };
+    return Semantics(
+      label: label,
+      button: true,
+      enabled: onPressed != null,
+      excludeSemantics: true,
+      child: button,
+    );
+  }
+}
+
+class _DetailBadgedIcon extends StatelessWidget {
+  const _DetailBadgedIcon({required this.icon, this.badgeText});
+
+  final IconData icon;
+  final String? badgeText;
+
+  @override
+  Widget build(BuildContext context) {
+    final badge = badgeText;
+    if (badge == null) return Icon(icon);
+    final colors = Theme.of(context).colorScheme;
+    return SizedBox.square(
+      dimension: 30,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(left: 3, bottom: 3, child: Icon(icon, size: 20)),
+          Positioned(
+            top: 0,
+            right: 0,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: colors.error,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                badge,
+                maxLines: 1,
+                textScaler: TextScaler.noScaling,
+                style: TextStyle(
+                  color: colors.onError,
+                  fontSize: 10,
+                  height: 1,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1681,21 +1799,21 @@ class _ActionButton extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.onPressed,
+    this.badgeText,
   });
 
   final String label;
   final IconData icon;
   final VoidCallback? onPressed;
+  final String? badgeText;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: OutlinedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon),
-        label: Text(label),
-      ),
+    return _DetailIconAction(
+      label: label,
+      icon: icon,
+      badgeText: badgeText,
+      onPressed: onPressed,
     );
   }
 }

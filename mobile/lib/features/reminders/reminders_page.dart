@@ -277,10 +277,13 @@ class _RemindersPageState extends State<RemindersPage> {
         controller: _scrollController,
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 88),
         children: [
-          SizedBox(
-            height: 52,
-            child: FilledButton.icon(
-              key: const Key('quick-reminder'),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _ReminderIconAction(
+              actionKey: const Key('quick-reminder'),
+              icon: Icons.add_alert_outlined,
+              label: 'Unutma ekle',
+              kind: _ReminderIconActionKind.filled,
               onPressed: () async {
                 final created = await Navigator.of(context)
                     .push<MobileReminder>(
@@ -305,8 +308,6 @@ class _RemindersPageState extends State<RemindersPage> {
                   await _reload();
                 }
               },
-              icon: const Icon(Icons.add_alert_outlined),
-              label: const Text('+ Unutma'),
             ),
           ),
           const SizedBox(height: 12),
@@ -318,16 +319,19 @@ class _RemindersPageState extends State<RemindersPage> {
               _primaryChip(
                 key: const Key('reminder-primary-today'),
                 label: 'Bugün',
+                icon: Icons.today_outlined,
                 view: _ReminderPrimaryView.today,
               ),
               _primaryChip(
                 key: const Key('reminder-primary-tomorrow'),
                 label: 'Yarın',
+                icon: Icons.wb_sunny_outlined,
                 view: _ReminderPrimaryView.tomorrow,
               ),
               _primaryChip(
                 key: const Key('reminder-primary-other'),
                 label: 'Diğer',
+                icon: Icons.more_horiz_rounded,
                 view: _ReminderPrimaryView.other,
               ),
             ],
@@ -383,16 +387,19 @@ class _RemindersPageState extends State<RemindersPage> {
   Widget _primaryChip({
     required Key key,
     required String label,
+    required IconData icon,
     required _ReminderPrimaryView view,
   }) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 48),
-      child: ChoiceChip(
-        key: key,
-        label: Text(label),
-        selected: _primaryView == view,
-        onSelected: (_) => _selectPrimary(view),
-      ),
+    final selected = _primaryView == view;
+    return _ReminderIconAction(
+      actionKey: key,
+      icon: icon,
+      label: label,
+      selected: selected,
+      kind: selected
+          ? _ReminderIconActionKind.filled
+          : _ReminderIconActionKind.outlined,
+      onPressed: () => _selectPrimary(view),
     );
   }
 
@@ -472,12 +479,14 @@ class _RemindersPageState extends State<RemindersPage> {
   }
 
   Widget _inboxButton() {
-    return TextButton.icon(
-      key: const Key('reminder-inbox-count'),
-      style: TextButton.styleFrom(minimumSize: const Size(44, 48)),
+    final count = _todayOverview.inboxCount;
+    return _ReminderIconAction(
+      actionKey: const Key('reminder-inbox-count'),
+      icon: Icons.inbox_outlined,
+      label: 'Unutma Kutusu, $count kayıt',
+      badgeText: '$count',
+      kind: _ReminderIconActionKind.tonal,
       onPressed: _openInbox,
-      icon: const Icon(Icons.inbox_outlined),
-      label: Text('Unutma Kutusunda ${_todayOverview.inboxCount} kayıt var'),
     );
   }
 
@@ -543,18 +552,15 @@ class _RemindersPageState extends State<RemindersPage> {
               alignment: Alignment.centerRight,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                child: TextButton.icon(
-                  key: Key('reminder-tomorrow-${reminder.id}'),
-                  style: TextButton.styleFrom(minimumSize: const Size(88, 48)),
+                child: _ReminderIconAction(
+                  actionKey: Key('reminder-tomorrow-${reminder.id}'),
+                  icon: Icons.wb_sunny_outlined,
+                  label: reminder.allDayLocalDate == null
+                      ? "Yarın 08:00'a ertele"
+                      : 'Yarına ertele',
                   onPressed: _tomorrowBusy.contains(reminder.id)
                       ? null
                       : () => _moveToTomorrow(reminder),
-                  icon: const Icon(Icons.wb_sunny_outlined),
-                  label: Text(
-                    reminder.allDayLocalDate == null
-                        ? 'Yarın 08:00'
-                        : 'Yarına ertele',
-                  ),
                 ),
               ),
             ),
@@ -563,14 +569,13 @@ class _RemindersPageState extends State<RemindersPage> {
               alignment: Alignment.centerRight,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                child: TextButton.icon(
-                  key: Key('restore-reminder-${reminder.id}'),
-                  style: TextButton.styleFrom(minimumSize: const Size(112, 48)),
+                child: _ReminderIconAction(
+                  actionKey: Key('restore-reminder-${reminder.id}'),
+                  icon: Icons.restore_from_trash_outlined,
+                  label: 'Geri yükle',
                   onPressed: _restoreBusy.contains(reminder.id)
                       ? null
                       : () => _restoreFromTrash(reminder),
-                  icon: const Icon(Icons.restore_from_trash_outlined),
-                  label: const Text('Geri yükle'),
                 ),
               ),
             ),
@@ -626,5 +631,134 @@ class _RemindersPageState extends State<RemindersPage> {
         return '${CseTimeCodec.formatIstanbulDay(reminder.allDayLocalDate!)}'
             ' • Tam gün';
     }
+  }
+}
+
+enum _ReminderIconActionKind { standard, filled, tonal, outlined }
+
+class _ReminderIconAction extends StatelessWidget {
+  const _ReminderIconAction({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.actionKey,
+    this.kind = _ReminderIconActionKind.standard,
+    this.badgeText,
+    this.selected = false,
+  });
+
+  final Key? actionKey;
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+  final _ReminderIconActionKind kind;
+  final String? badgeText;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = IconButton.styleFrom(
+      minimumSize: const Size.square(40),
+      fixedSize: const Size.square(40),
+      maximumSize: const Size.square(40),
+      iconSize: 20,
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.standard,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+    final iconWidget = _ReminderBadgedIcon(icon: icon, badgeText: badgeText);
+    final button = switch (kind) {
+      _ReminderIconActionKind.standard => IconButton(
+        key: actionKey,
+        tooltip: label,
+        style: style,
+        isSelected: selected,
+        selectedIcon: iconWidget,
+        onPressed: onPressed,
+        icon: iconWidget,
+      ),
+      _ReminderIconActionKind.filled => IconButton.filled(
+        key: actionKey,
+        tooltip: label,
+        style: style,
+        isSelected: selected,
+        selectedIcon: iconWidget,
+        onPressed: onPressed,
+        icon: iconWidget,
+      ),
+      _ReminderIconActionKind.tonal => IconButton.filledTonal(
+        key: actionKey,
+        tooltip: label,
+        style: style,
+        isSelected: selected,
+        selectedIcon: iconWidget,
+        onPressed: onPressed,
+        icon: iconWidget,
+      ),
+      _ReminderIconActionKind.outlined => IconButton.outlined(
+        key: actionKey,
+        tooltip: label,
+        style: style,
+        isSelected: selected,
+        selectedIcon: iconWidget,
+        onPressed: onPressed,
+        icon: iconWidget,
+      ),
+    };
+    return Semantics(
+      label: label,
+      button: true,
+      enabled: onPressed != null,
+      selected: selected,
+      excludeSemantics: true,
+      child: button,
+    );
+  }
+}
+
+class _ReminderBadgedIcon extends StatelessWidget {
+  const _ReminderBadgedIcon({required this.icon, this.badgeText});
+
+  final IconData icon;
+  final String? badgeText;
+
+  @override
+  Widget build(BuildContext context) {
+    final badge = badgeText;
+    if (badge == null) return Icon(icon);
+    final colors = Theme.of(context).colorScheme;
+    return SizedBox.square(
+      dimension: 30,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(left: 3, bottom: 3, child: Icon(icon, size: 20)),
+          Positioned(
+            top: 0,
+            right: 0,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: colors.error,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                badge,
+                maxLines: 1,
+                textScaler: TextScaler.noScaling,
+                style: TextStyle(
+                  color: colors.onError,
+                  fontSize: 10,
+                  height: 1,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
