@@ -21,6 +21,7 @@ import 'package:chief_site_engineer/features/living_plan/living_plan_page.dart';
 import 'package:chief_site_engineer/features/material_requests/material_requests_page.dart';
 import 'package:chief_site_engineer/features/memory/memory_backup_page.dart';
 import 'package:chief_site_engineer/features/project_context/active_project_session.dart';
+import 'package:chief_site_engineer/features/projects/project_create_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
@@ -420,6 +421,31 @@ class _MobileShellState extends State<MobileShell> {
     _selectPrimaryTab(0);
   }
 
+  Future<void> _openProjectCreate() async {
+    final project = await Navigator.of(context).push<MobileProject>(
+      MaterialPageRoute(
+        builder: (_) => ProjectCreatePage(agenda: widget.bootstrap.agenda),
+      ),
+    );
+    if (!mounted || project == null) return;
+
+    final activeProjects = [
+      for (final current in _activeProjectOptions)
+        if (current.id != project.id) current,
+      project,
+    ];
+    setState(() {
+      _activeProjectOptions = activeProjects;
+      _activeProjectNames = {
+        for (final current in activeProjects) current.id: current.name,
+      };
+      _selectedIndex = 0;
+      _visitedPrimaryTabs.add(0);
+      _dashboardContextEpoch += 1;
+    });
+    _activeProjectSession.select(project.id, activeProjects);
+  }
+
   void _selectPrimaryTab(int index) {
     if (!mounted ||
         (_selectedIndex == index && _visitedPrimaryTabs.contains(index))) {
@@ -594,7 +620,7 @@ class _MobileShellState extends State<MobileShell> {
       livingPlan: bootstrap.livingPlan,
       materialRequests: materials,
       session: _activeProjectSession,
-      onCreateProject: () => _selectPrimaryTab(2),
+      onCreateProject: () => unawaited(_openProjectCreate()),
       onAddReminder: (projectId, localDay) async {
         final value = await Navigator.of(context).push<Object?>(
           MaterialPageRoute(

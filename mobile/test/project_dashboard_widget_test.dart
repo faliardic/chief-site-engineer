@@ -33,7 +33,7 @@ void main() {
     expect(fixture.plan.calls, isEmpty);
     expect(fixture.materials.calls, isEmpty);
 
-    final setupAction = find.byTooltip('Proje kurulumuna git');
+    final setupAction = find.byKey(const Key('dashboard-create-project'));
     expect(setupAction, findsOneWidget);
     expect(
       find.descendant(
@@ -42,7 +42,13 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('Proje kurulumuna git'), findsNothing);
+    expect(
+      find.descendant(
+        of: setupAction,
+        matching: find.text('Yeni proje oluştur'),
+      ),
+      findsOneWidget,
+    );
     await tester.tap(setupAction);
     expect(setupCalls, 1);
   });
@@ -245,6 +251,11 @@ void main() {
     expect(find.bySemanticsLabel('Ajanda kaydı ekle'), findsOneWidget);
 
     final header = find.byKey(const Key('dashboard-project-header'));
+    final createProject = find.byKey(const Key('dashboard-create-project'));
+    expect(
+      find.descendant(of: createProject, matching: find.text('Yeni proje')),
+      findsOneWidget,
+    );
     final headerPaddings = tester.widgetList<Padding>(
       find.descendant(of: header, matching: find.byType(Padding)),
     );
@@ -343,7 +354,7 @@ void main() {
     'large-text Dashboard uses safe action fallback without overflow',
     (tester) async {
       final semantics = tester.ensureSemantics();
-      tester.view.physicalSize = const Size(390, 844);
+      tester.view.physicalSize = const Size(320, 844);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -379,6 +390,14 @@ void main() {
         find.bySemanticsLabel(RegExp('Aktif proje Çok Uzun Kuzey Projesi')),
         findsOneWidget,
       );
+      final createProject = find.byKey(const Key('dashboard-create-project'));
+      expect(
+        find.descendant(of: createProject, matching: find.text('Yeni proje')),
+        findsOneWidget,
+      );
+      expect(createProject.hitTestable(), findsOneWidget);
+      await tester.tap(createProject);
+      await tester.pump();
       expect(find.byType(ListView), findsWidgets);
       semantics.dispose();
       expect(tester.takeException(), isNull);

@@ -400,7 +400,9 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         body:
             'Dashboard günlük saha kayıtlarını bir proje bağlamında gösterir.',
         actionIcon: Icons.add_business_rounded,
-        actionLabel: 'Proje kurulumuna git',
+        actionLabel: 'Yeni proje oluştur',
+        actionKey: const Key('dashboard-create-project'),
+        showActionLabel: true,
         onAction: widget.onCreateProject,
       );
     }
@@ -431,40 +433,55 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           key: const Key('dashboard-project-header'),
           child: Padding(
             padding: const EdgeInsets.all(12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.apartment_rounded, size: 28),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Semantics(
-                    container: true,
-                    label: 'Aktif proje ${project.name}, bugün $dateLabel',
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Aktif proje',
-                          style: Theme.of(context).textTheme.labelLarge,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.apartment_rounded, size: 28),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Semantics(
+                        container: true,
+                        label: 'Aktif proje ${project.name}, bugün $dateLabel',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Aktif proje',
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              project.name,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(dateLabel, key: const Key('dashboard-date')),
+                          ],
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          project.name,
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(dateLabel, key: const Key('dashboard-date')),
-                      ],
+                      ),
                     ),
+                    if (_projects.length > 1)
+                      _DashboardIconAction(
+                        actionKey: const Key('dashboard-change-project'),
+                        icon: Icons.swap_horiz_rounded,
+                        label: 'Aktif projeyi değiştir',
+                        onPressed: _showProjectSelector,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.tonalIcon(
+                    key: const Key('dashboard-create-project'),
+                    onPressed: widget.onCreateProject,
+                    icon: const Icon(Icons.add_business_rounded),
+                    label: const Text('Yeni proje'),
                   ),
                 ),
-                if (_projects.length > 1)
-                  _DashboardIconAction(
-                    actionKey: const Key('dashboard-change-project'),
-                    icon: Icons.swap_horiz_rounded,
-                    label: 'Aktif projeyi değiştir',
-                    onPressed: _showProjectSelector,
-                  ),
               ],
             ),
           ),
@@ -728,6 +745,8 @@ class _ProjectStateSurface extends StatelessWidget {
     required this.actionIcon,
     required this.actionLabel,
     required this.onAction,
+    this.actionKey,
+    this.showActionLabel = false,
     super.key,
   });
 
@@ -737,6 +756,8 @@ class _ProjectStateSurface extends StatelessWidget {
   final IconData actionIcon;
   final String actionLabel;
   final VoidCallback onAction;
+  final Key? actionKey;
+  final bool showActionLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -758,12 +779,21 @@ class _ProjectStateSurface extends StatelessWidget {
               const SizedBox(height: 6),
               Text(body, textAlign: TextAlign.center),
               const SizedBox(height: 12),
-              _DashboardIconAction(
-                icon: actionIcon,
-                label: actionLabel,
-                kind: _DashboardIconActionKind.filled,
-                onPressed: onAction,
-              ),
+              if (showActionLabel)
+                FilledButton.icon(
+                  key: actionKey,
+                  onPressed: onAction,
+                  icon: Icon(actionIcon),
+                  label: Text(actionLabel),
+                )
+              else
+                _DashboardIconAction(
+                  actionKey: actionKey,
+                  icon: actionIcon,
+                  label: actionLabel,
+                  kind: _DashboardIconActionKind.filled,
+                  onPressed: onAction,
+                ),
             ],
           ),
         ),

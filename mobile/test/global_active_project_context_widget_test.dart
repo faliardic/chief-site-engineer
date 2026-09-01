@@ -81,7 +81,7 @@ void main() {
       await _openTab(tester, 'Envanter');
       expect(find.byKey(const Key('active-project-indicator')), findsNothing);
       await _openTab(tester, 'Puantaj');
-      expect(find.byKey(const Key('active-project-indicator')), findsNothing);
+      _expectIndicator('Proje seçilmedi');
       await _openTab(tester, 'Daha');
       _expectIndicator('Proje seçilmedi');
 
@@ -98,7 +98,7 @@ void main() {
         projects: const [_projectA, _projectB],
       );
       await _pumpShell(tester, agenda);
-      await tester.tap(find.text('Proje seç'));
+      await tester.tap(find.byTooltip('Proje seç'));
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
@@ -199,7 +199,7 @@ void main() {
         projects: const [_projectA, _projectB],
       );
       await _pumpShell(tester, agenda);
-      await tester.tap(find.text('Proje seç'));
+      await tester.tap(find.byTooltip('Proje seç'));
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
@@ -262,7 +262,7 @@ void main() {
         isCatalogDiscoveryInFlight: () => catalog.discoveryInFlight,
       );
       await _pumpShell(tester, agenda, attachmentCatalog: catalog);
-      await tester.tap(find.text('Proje seç'));
+      await tester.tap(find.byTooltip('Proje seç'));
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
