@@ -307,6 +307,12 @@ IconButton _iconButtonByKey(WidgetTester tester, Key key) {
   );
 }
 
+Semantics _semanticsByKey(WidgetTester tester, Key key) {
+  return tester.widget<Semantics>(
+    find.ancestor(of: find.byKey(key), matching: find.byType(Semantics)).first,
+  );
+}
+
 void main() {
   testWidgets('preferred project is initial only and cancel creates nothing', (
     tester,
@@ -444,6 +450,14 @@ void main() {
     expect(
       _iconButtonByKey(tester, const Key('quick-reminder')).tooltip,
       'Unutma ekle',
+    );
+    expect(
+      _iconButtonByKey(tester, const Key('quick-reminder')).isSelected,
+      isNull,
+    );
+    expect(
+      _semanticsByKey(tester, const Key('quick-reminder')).properties.selected,
+      isNull,
     );
     expect(
       find.descendant(
@@ -677,13 +691,51 @@ void main() {
           '${schedule.label} sonra kontrol',
         );
         final submit = find.byKey(const Key('submit-reminder'));
+        final formListView = find.ancestor(
+          of: submit,
+          matching: find.byType(ListView),
+        );
+        final formScrollable = find.ancestor(
+          of: submit,
+          matching: find.byType(Scrollable),
+        );
+        expect(formListView, findsOneWidget);
+        expect(formScrollable, findsOneWidget);
+        expect(
+          find.descendant(of: formListView, matching: formScrollable),
+          findsOneWidget,
+        );
         await tester.scrollUntilVisible(
           submit,
-          300,
-          scrollable: find.byType(Scrollable).first,
+          200,
+          scrollable: formScrollable,
         );
-        await tester.ensureVisible(submit);
         await tester.pumpAndSettle();
+
+        bool submitIsFullyInViewport() {
+          final viewport = tester.getRect(formScrollable);
+          final submitRect = tester.getRect(submit);
+          return submitRect.left >= viewport.left &&
+              submitRect.right <= viewport.right &&
+              submitRect.top >= viewport.top + 1 &&
+              submitRect.bottom <= viewport.bottom - 1;
+        }
+
+        for (
+          var correction = 0;
+          correction < 6 && !submitIsFullyInViewport();
+          correction += 1
+        ) {
+          final viewport = tester.getRect(formScrollable);
+          final submitRect = tester.getRect(submit);
+          final dragDy = submitRect.bottom > viewport.bottom - 1
+              ? -math.max(submitRect.bottom - viewport.bottom + 24, 32.0)
+              : math.max(viewport.top - submitRect.top + 24, 32.0);
+          await tester.drag(formScrollable, Offset(0, dragDy));
+          await tester.pumpAndSettle();
+        }
+
+        expect(submitIsFullyInViewport(), isTrue);
         expect(submit.hitTestable(), findsOneWidget);
         await tester.tap(submit.hitTestable());
         await tester.pumpAndSettle();
@@ -823,21 +875,29 @@ void main() {
 
       expect(agenda.todayOverviewCalls, 1);
       expect(find.byType(ChoiceChip), findsNothing);
-      expect(
-        _iconButtonByKey(
-          tester,
-          const Key('reminder-primary-today'),
-        ).isSelected,
-        isTrue,
-      );
       for (final action in const [
-        (Key('reminder-primary-today'), 'Bugün', Icons.today_outlined),
-        (Key('reminder-primary-tomorrow'), 'Yarın', Icons.wb_sunny_outlined),
-        (Key('reminder-primary-other'), 'Diğer', Icons.more_horiz_rounded),
+        (Key('reminder-primary-today'), 'Bugün', Icons.today_outlined, true),
+        (
+          Key('reminder-primary-tomorrow'),
+          'Yarın',
+          Icons.wb_sunny_outlined,
+          false,
+        ),
+        (
+          Key('reminder-primary-other'),
+          'Diğer',
+          Icons.more_horiz_rounded,
+          false,
+        ),
       ]) {
         final finder = find.byKey(action.$1);
         expect(tester.getSize(finder), const Size.square(40));
         expect(_iconButtonByKey(tester, action.$1).tooltip, action.$2);
+        expect(_iconButtonByKey(tester, action.$1).isSelected, action.$4);
+        expect(
+          _semanticsByKey(tester, action.$1).properties.selected,
+          action.$4,
+        );
         expect(find.bySemanticsLabel(action.$2), findsOneWidget);
         expect(
           find.descendant(of: finder, matching: find.byIcon(action.$3)),
@@ -926,6 +986,17 @@ void main() {
     expect(
       _iconButtonByKey(tester, const Key('reminder-inbox-count')).tooltip,
       'Unutma Kutusu, 3 kayıt',
+    );
+    expect(
+      _iconButtonByKey(tester, const Key('reminder-inbox-count')).isSelected,
+      isNull,
+    );
+    expect(
+      _semanticsByKey(
+        tester,
+        const Key('reminder-inbox-count'),
+      ).properties.selected,
+      isNull,
     );
     expect(
       find.descendant(of: inboxAction, matching: find.text('3')),
@@ -2222,11 +2293,32 @@ void main() {
 
     expect(agenda.lastReminderGroup, ReminderViewGroup.tomorrow);
     expect(
+      _semanticsByKey(
+        tester,
+        const Key('reminder-primary-today'),
+      ).properties.selected,
+      isFalse,
+    );
+    expect(
       _iconButtonByKey(
         tester,
         const Key('reminder-primary-tomorrow'),
       ).isSelected,
       isTrue,
+    );
+    expect(
+      _semanticsByKey(
+        tester,
+        const Key('reminder-primary-tomorrow'),
+      ).properties.selected,
+      isTrue,
+    );
+    expect(
+      _semanticsByKey(
+        tester,
+        const Key('reminder-primary-other'),
+      ).properties.selected,
+      isFalse,
     );
     expect(find.text('Yarın için planlanmış hatırlatıcı yok.'), findsOneWidget);
     expect(find.byKey(const Key('reminder-delivery-diagnostic')), findsNothing);

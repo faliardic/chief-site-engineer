@@ -644,7 +644,7 @@ class _ReminderIconAction extends StatelessWidget {
     this.actionKey,
     this.kind = _ReminderIconActionKind.standard,
     this.badgeText,
-    this.selected = false,
+    this.selected,
   });
 
   final Key? actionKey;
@@ -653,7 +653,7 @@ class _ReminderIconAction extends StatelessWidget {
   final VoidCallback? onPressed;
   final _ReminderIconActionKind kind;
   final String? badgeText;
-  final bool selected;
+  final bool? selected;
 
   @override
   Widget build(BuildContext context) {
