@@ -94,6 +94,8 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   int _todayGeneration = 0;
   int _planGeneration = 0;
   int _materialGeneration = 0;
+  int _loadAllGeneration = 0;
+  Future<void> _dashboardReadTail = Future<void>.value();
 
   @override
   void initState() {
@@ -149,6 +151,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   }
 
   void _clearSections() {
+    _loadAllGeneration += 1;
     _todayGeneration += 1;
     _planGeneration += 1;
     _materialGeneration += 1;
@@ -165,9 +168,63 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   }
 
   void _loadAll(String projectId) {
-    unawaited(_loadToday(projectId));
-    unawaited(_loadPlan(projectId));
-    unawaited(_loadMaterials(projectId));
+    final generation = ++_loadAllGeneration;
+    _todayGeneration += 1;
+    _planGeneration += 1;
+    _materialGeneration += 1;
+    if (!mounted) return;
+    setState(() {
+      _today = widget.dailyLog == null
+          ? const _SectionState.disabled()
+          : const _SectionState.loading();
+      _plan = const _SectionState.loading();
+      _materials = widget.materialRequests == null
+          ? const _SectionState.disabled()
+          : const _SectionState.loading();
+    });
+    unawaited(_loadAllInOrder(projectId, generation));
+  }
+
+  Future<void> _loadAllInOrder(String projectId, int generation) async {
+    await _loadPipelineSection(
+      projectId,
+      generation,
+      () => _loadToday(projectId),
+    );
+    if (!_acceptLoadAll(projectId, generation)) return;
+    await _loadPipelineSection(
+      projectId,
+      generation,
+      () => _loadPlan(projectId),
+    );
+    if (!_acceptLoadAll(projectId, generation)) return;
+    await _loadPipelineSection(
+      projectId,
+      generation,
+      () => _loadMaterials(projectId),
+    );
+  }
+
+  Future<void> _loadPipelineSection(
+    String projectId,
+    int generation,
+    Future<void> Function() operation,
+  ) => _enqueueDashboardRead(() async {
+    if (!_acceptLoadAll(projectId, generation)) return;
+    await operation();
+  });
+
+  Future<void> _enqueueDashboardRead(Future<void> Function() operation) {
+    final completer = Completer<void>();
+    _dashboardReadTail = _dashboardReadTail.then((_) async {
+      try {
+        await operation();
+        completer.complete();
+      } on Object catch (error, stackTrace) {
+        completer.completeError(error, stackTrace);
+      }
+    });
+    return completer.future;
   }
 
   Future<void> _loadToday(String projectId) async {
@@ -252,6 +309,20 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
       generation == currentGeneration &&
       widget.session.selectedProjectId == projectId;
 
+  bool _acceptLoadAll(String projectId, int generation) =>
+      mounted &&
+      generation == _loadAllGeneration &&
+      widget.session.selectedProjectId == projectId;
+
+  void _reloadSection(String projectId, Future<void> Function() operation) {
+    unawaited(
+      _enqueueDashboardRead(() async {
+        if (!mounted || widget.session.selectedProjectId != projectId) return;
+        await operation();
+      }),
+    );
+  }
+
   void _selectProject(String projectId) {
     if (!widget.session.select(projectId, _projects)) return;
     setState(() {});
@@ -296,7 +367,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     if (action == null || projectId == null) return;
     final changed = await action(projectId, _localDay);
     if (changed && mounted && widget.session.selectedProjectId == projectId) {
-      unawaited(_loadToday(projectId));
+      _reloadSection(projectId, () => _loadToday(projectId));
     }
   }
 
@@ -415,7 +486,8 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           errorText: 'Bugünün özeti okunamadı. Diğer bölümler korunuyor.',
           disabledText: 'Bugün özeti bu kurulumda hazır değil.',
           retryKey: const Key('dashboard-today-retry'),
-          onRetry: () => _loadToday(project.id),
+          onRetry: () =>
+              _reloadSection(project.id, () => _loadToday(project.id)),
           actionKey: const Key('dashboard-open-today'),
           actionLabel: 'Günlük Log’u aç',
           onAction: widget.onOpenToday == null
@@ -435,7 +507,8 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           errorText: '7 günlük plan okunamadı. Diğer bölümler korunuyor.',
           disabledText: '7 günlük plan bu kurulumda hazır değil.',
           retryKey: const Key('dashboard-plan-retry'),
-          onRetry: () => _loadPlan(project.id),
+          onRetry: () =>
+              _reloadSection(project.id, () => _loadPlan(project.id)),
           actionKey: const Key('dashboard-open-plan'),
           actionLabel: 'Planı aç',
           onAction: widget.onOpenPlan == null
@@ -455,7 +528,8 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           errorText: 'Malzeme ihtiyaçları okunamadı. Diğer bölümler korunuyor.',
           disabledText: 'Malzeme takibi bu kurulumda hazır değil.',
           retryKey: const Key('dashboard-materials-retry'),
-          onRetry: () => _loadMaterials(project.id),
+          onRetry: () =>
+              _reloadSection(project.id, () => _loadMaterials(project.id)),
           actionKey: const Key('dashboard-open-materials'),
           actionLabel: 'Malzemeleri aç',
           onAction: widget.onOpenMaterials == null

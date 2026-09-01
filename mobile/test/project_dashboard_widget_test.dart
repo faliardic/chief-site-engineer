@@ -201,16 +201,201 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('core reads run Today then Plan then Materials without overlap', (
+    tester,
+  ) async {
+    _useTallSurface(tester);
+    final reads = _ControlledDashboardReads();
+    final fixture = _Fixture(
+      projects: [_project('a', 'Kuzey')],
+      controlledReads: reads,
+    );
+    addTearDown(fixture.dispose);
+
+    await tester.pumpWidget(fixture.app());
+    await _pumpUntil(
+      tester,
+      () => reads.starts.length == 1,
+      'Today read did not start.',
+    );
+
+    expect(reads.starts, ['today:a']);
+    expect(reads.inFlight, 1);
+    expect(reads.maxInFlight, 1);
+    expect(find.byType(LinearProgressIndicator), findsNWidgets(3));
+
+    reads.complete('today:a', _dailyLogDay('a', summaryText: 'A gün özeti'));
+    await _pumpUntil(
+      tester,
+      () => reads.starts.length == 2,
+      'Living Plan read did not follow Today.',
+    );
+
+    expect(reads.starts, ['today:a', 'plan:a']);
+    expect(reads.inFlight, 1);
+    expect(find.textContaining('A gün özeti'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNWidgets(2));
+
+    reads.complete('plan:a', const <ConstructionLivingPlanWindowItem>[]);
+    await _pumpUntil(
+      tester,
+      () => reads.starts.length == 3,
+      'Materials read did not follow Living Plan.',
+    );
+
+    expect(reads.starts, ['today:a', 'plan:a', 'materials:a']);
+    expect(reads.inFlight, 1);
+    expect(find.text('Plan penceresinde kayıt yok.'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+
+    reads.complete('materials:a', const <MaterialRequest>[]);
+    await tester.pumpAndSettle();
+
+    expect(reads.inFlight, 0);
+    expect(reads.maxInFlight, 1);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.text('Açık malzeme ihtiyacı yok.'), findsOneWidget);
+  });
+
+  testWidgets('section failure settles and does not stop later reads', (
+    tester,
+  ) async {
+    _useTallSurface(tester);
+    final reads = _ControlledDashboardReads();
+    final fixture = _Fixture(
+      projects: [_project('a', 'Kuzey')],
+      controlledReads: reads,
+    );
+    addTearDown(fixture.dispose);
+
+    await tester.pumpWidget(fixture.app());
+    await _pumpUntil(
+      tester,
+      () => reads.starts.length == 1,
+      'Today read did not start.',
+    );
+    reads.fail('today:a', const DailyLogFailure('controlled_daily_failure'));
+    await _pumpUntil(
+      tester,
+      () => reads.starts.length == 2,
+      'Living Plan did not start after Today failure.',
+    );
+
+    expect(reads.starts, ['today:a', 'plan:a']);
+    expect(find.byKey(const Key('dashboard-today-retry')), findsOneWidget);
+    expect(reads.inFlight, 1);
+
+    reads.complete('plan:a', const <ConstructionLivingPlanWindowItem>[]);
+    await _pumpUntil(
+      tester,
+      () => reads.starts.length == 3,
+      'Materials did not start after Living Plan.',
+    );
+    reads.complete('materials:a', const <MaterialRequest>[]);
+    await tester.pumpAndSettle();
+
+    expect(reads.starts, ['today:a', 'plan:a', 'materials:a']);
+    expect(reads.inFlight, 0);
+    expect(reads.maxInFlight, 1);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.byKey(const Key('dashboard-today-retry')), findsOneWidget);
+    expect(find.text('Plan penceresinde kayıt yok.'), findsOneWidget);
+    expect(find.text('Açık malzeme ihtiyacı yok.'), findsOneWidget);
+  });
+
+  testWidgets(
+    'project switch rejects stale result and runs only the new pipeline',
+    (tester) async {
+      _useTallSurface(tester);
+      final reads = _ControlledDashboardReads();
+      final fixture = _Fixture(
+        projects: [_project('a', 'Kuzey'), _project('b', 'Güney')],
+        controlledReads: reads,
+      );
+      addTearDown(fixture.dispose);
+
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Proje seç'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('dashboard-project-a')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await _pumpUntil(
+        tester,
+        () => reads.starts.contains('today:a'),
+        'Project A Today read did not start.',
+      );
+
+      await tester.tap(find.byKey(const Key('dashboard-change-project')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.byKey(const ValueKey('dashboard-project-b')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(fixture.session.selectedProjectId, 'b');
+      expect(reads.starts, ['today:a']);
+      expect(reads.inFlight, 1);
+      expect(find.byType(LinearProgressIndicator), findsNWidgets(3));
+
+      reads.complete(
+        'today:a',
+        _dailyLogDay('a', summaryText: 'ESKİ A SONUCU'),
+      );
+      await _pumpUntil(
+        tester,
+        () => reads.starts.contains('today:b'),
+        'Project B Today read did not follow stale Project A.',
+      );
+
+      expect(reads.starts, ['today:a', 'today:b']);
+      expect(find.textContaining('ESKİ A SONUCU'), findsNothing);
+      expect(reads.inFlight, 1);
+
+      reads.complete(
+        'today:b',
+        _dailyLogDay('b', summaryText: 'GÜNCEL B SONUCU'),
+      );
+      await _pumpUntil(
+        tester,
+        () => reads.starts.contains('plan:b'),
+        'Project B Living Plan read did not start.',
+      );
+      reads.complete('plan:b', const <ConstructionLivingPlanWindowItem>[]);
+      await _pumpUntil(
+        tester,
+        () => reads.starts.contains('materials:b'),
+        'Project B Materials read did not start.',
+      );
+      reads.complete('materials:b', const <MaterialRequest>[]);
+      await tester.pumpAndSettle();
+
+      expect(reads.starts, ['today:a', 'today:b', 'plan:b', 'materials:b']);
+      expect(reads.maxInFlight, 1);
+      expect(fixture.session.selectedProjectId, 'b');
+      expect(find.textContaining('ESKİ A SONUCU'), findsNothing);
+      expect(find.textContaining('GÜNCEL B SONUCU'), findsOneWidget);
+      expect(find.text('Güney'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+    },
+  );
 }
 
 class _Fixture {
-  _Fixture({required List<MobileProject> projects})
-    : agenda = _AgendaFake(projects: projects);
+  _Fixture({
+    required List<MobileProject> projects,
+    _ControlledDashboardReads? controlledReads,
+  }) : agenda = _AgendaFake(projects: projects),
+       daily = _DailyFake(controlledReads),
+       plan = _PlanFake(controlledReads),
+       materials = _MaterialFake(controlledReads);
 
   final _AgendaFake agenda;
-  final _DailyFake daily = _DailyFake();
-  final _PlanFake plan = _PlanFake();
-  final _MaterialFake materials = _MaterialFake();
+  final _DailyFake daily;
+  final _PlanFake plan;
+  final _MaterialFake materials;
   final ActiveProjectSession session = ActiveProjectSession();
 
   Widget app({
@@ -259,6 +444,9 @@ class _AgendaFake extends FakeAgendaApplication {
 }
 
 class _DailyFake implements DailyLogApplicationPort {
+  _DailyFake(this.controlledReads);
+
+  final _ControlledDashboardReads? controlledReads;
   final List<(String, String)> calls = [];
   bool fail = false;
 
@@ -272,52 +460,18 @@ class _DailyFake implements DailyLogApplicationPort {
   }) async {
     calls.add((projectId, localDay));
     if (fail) throw const DailyLogFailure('synthetic_daily_failure');
-    return DailyLogDay(
-      projectId: projectId,
-      projectName: 'Kuzey',
-      localDay: localDay,
-      sections: [
-        DailyLogSection.summary(text: '1 kaynak kaydı'),
-        DailyLogSection.unavailable(
-          kind: DailyLogSectionKind.attendance,
-          failure: const DailyLogSectionFailure(
-            code: 'attendance_unavailable',
-            message: 'Puantaj okunamadı.',
-          ),
-        ),
-        DailyLogSection.available(
-          kind: DailyLogSectionKind.livingPlan,
-          entries: const [],
-        ),
-        DailyLogSection.available(
-          kind: DailyLogSectionKind.concrete,
-          entries: const [],
-        ),
-        DailyLogSection.available(
-          kind: DailyLogSectionKind.agenda,
-          entries: [
-            DailyLogEntry(
-              id: 'agenda-1',
-              text: 'Saha turu',
-              sourceRefs: [
-                DailyLogSourceRef(
-                  kind: DailyLogSourceKind.agendaLog,
-                  sourceId: 'agenda-1',
-                ),
-              ],
-            ),
-          ],
-        ),
-        DailyLogSection.available(
-          kind: DailyLogSectionKind.openFollowUps,
-          entries: const [],
-        ),
-      ],
-    );
+    final controlled = controlledReads;
+    if (controlled != null) {
+      return controlled.wait<DailyLogDay>('today:$projectId');
+    }
+    return _dailyLogDay(projectId, localDay: localDay);
   }
 }
 
 class _PlanFake extends UnavailableConstructionLivingPlanApplication {
+  _PlanFake(this.controlledReads);
+
+  final _ControlledDashboardReads? controlledReads;
   final List<(String, DateTime)> calls = [];
 
   @override
@@ -326,11 +480,20 @@ class _PlanFake extends UnavailableConstructionLivingPlanApplication {
     required DateTime windowStart,
   }) async {
     calls.add((projectId, windowStart));
+    final controlled = controlledReads;
+    if (controlled != null) {
+      return controlled.wait<List<ConstructionLivingPlanWindowItem>>(
+        'plan:$projectId',
+      );
+    }
     return const [];
   }
 }
 
 class _MaterialFake implements MaterialRequestApplicationPort {
+  _MaterialFake(this.controlledReads);
+
+  final _ControlledDashboardReads? controlledReads;
   final List<String> calls = [];
 
   @override
@@ -340,12 +503,115 @@ class _MaterialFake implements MaterialRequestApplicationPort {
   }) async {
     calls.add(projectId);
     expect(kind, MaterialRequestListKind.open);
+    final controlled = controlledReads;
+    if (controlled != null) {
+      return controlled.wait<List<MaterialRequest>>('materials:$projectId');
+    }
     return const [];
   }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
+
+class _ControlledDashboardReads {
+  final List<String> starts = [];
+  final Map<String, Completer<Object?>> _pending = {};
+  int inFlight = 0;
+  int maxInFlight = 0;
+
+  Future<T> wait<T>(String label) async {
+    expect(_pending.containsKey(label), isFalse, reason: 'duplicate $label');
+    starts.add(label);
+    inFlight += 1;
+    if (inFlight > maxInFlight) maxInFlight = inFlight;
+    final completer = Completer<Object?>();
+    _pending[label] = completer;
+    try {
+      return (await completer.future) as T;
+    } finally {
+      inFlight -= 1;
+    }
+  }
+
+  void complete(String label, Object? value) {
+    final completer = _pending.remove(label);
+    expect(completer, isNotNull, reason: '$label is not pending');
+    completer!.complete(value);
+  }
+
+  void fail(String label, Object error) {
+    final completer = _pending.remove(label);
+    expect(completer, isNotNull, reason: '$label is not pending');
+    completer!.completeError(error);
+  }
+}
+
+Future<void> _pumpUntil(
+  WidgetTester tester,
+  bool Function() condition,
+  String failureMessage,
+) async {
+  for (var attempt = 0; attempt < 20; attempt += 1) {
+    await tester.pump();
+    if (condition()) return;
+  }
+  fail(failureMessage);
+}
+
+void _useTallSurface(WidgetTester tester) {
+  tester.view.physicalSize = const Size(900, 1800);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+DailyLogDay _dailyLogDay(
+  String projectId, {
+  String localDay = '2026-08-30',
+  String summaryText = '1 kaynak kaydı',
+}) => DailyLogDay(
+  projectId: projectId,
+  projectName: projectId == 'b' ? 'Güney' : 'Kuzey',
+  localDay: localDay,
+  sections: [
+    DailyLogSection.summary(text: summaryText),
+    DailyLogSection.unavailable(
+      kind: DailyLogSectionKind.attendance,
+      failure: const DailyLogSectionFailure(
+        code: 'attendance_unavailable',
+        message: 'Puantaj okunamadı.',
+      ),
+    ),
+    DailyLogSection.available(
+      kind: DailyLogSectionKind.livingPlan,
+      entries: const [],
+    ),
+    DailyLogSection.available(
+      kind: DailyLogSectionKind.concrete,
+      entries: const [],
+    ),
+    DailyLogSection.available(
+      kind: DailyLogSectionKind.agenda,
+      entries: [
+        DailyLogEntry(
+          id: 'agenda-1',
+          text: 'Saha turu',
+          sourceRefs: [
+            DailyLogSourceRef(
+              kind: DailyLogSourceKind.agendaLog,
+              sourceId: 'agenda-1',
+            ),
+          ],
+        ),
+      ],
+    ),
+    DailyLogSection.available(
+      kind: DailyLogSectionKind.openFollowUps,
+      entries: const [],
+    ),
+  ],
+);
 
 MobileProject _project(String id, String name) => MobileProject(
   id: id,

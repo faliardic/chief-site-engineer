@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
+import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
@@ -240,7 +241,11 @@ class MobileShell extends StatefulWidget {
 class _MobileShellState extends State<MobileShell> {
   int _selectedIndex = 0;
   StreamSubscription<String>? _notificationTapSubscription;
+  StreamSubscription<void>? _projectContextSubscription;
   late final ActiveProjectSession _activeProjectSession;
+  List<MobileProject> _activeProjectOptions = const [];
+  Map<String, String> _activeProjectNames = const {};
+  int _projectContextGeneration = 0;
   int _routeProjectValidationGeneration = 0;
   int _dashboardContextEpoch = 0;
 
@@ -248,6 +253,11 @@ class _MobileShellState extends State<MobileShell> {
   void initState() {
     super.initState();
     _activeProjectSession = ActiveProjectSession();
+    _activeProjectSession.addListener(_handleActiveProjectChanged);
+    _projectContextSubscription = widget.bootstrap.agenda.projectChanges.listen(
+      (_) => unawaited(_refreshActiveProjectOptions()),
+    );
+    unawaited(_refreshActiveProjectOptions());
     _notificationTapSubscription = widget.bootstrap.agenda.notificationTaps
         .listen(_openReminderFromNotification);
     final initial = widget.bootstrap.agenda.initialNotificationReminderId;
@@ -261,17 +271,70 @@ class _MobileShellState extends State<MobileShell> {
   @override
   void dispose() {
     _notificationTapSubscription?.cancel();
+    _projectContextSubscription?.cancel();
+    _activeProjectSession.removeListener(_handleActiveProjectChanged);
     _activeProjectSession.dispose();
     super.dispose();
   }
 
-  Future<void> _adoptRouteProjectSelection(String projectId) async {
+  void _handleActiveProjectChanged() {
+    if (!mounted) return;
+    setState(() {});
+    final selectedProjectId = _activeProjectSession.selectedProjectId;
+    if (selectedProjectId != null &&
+        !_activeProjectNames.containsKey(selectedProjectId)) {
+      unawaited(_refreshActiveProjectOptions());
+    }
+  }
+
+  Future<void> _refreshActiveProjectOptions() async {
+    final generation = ++_projectContextGeneration;
+    try {
+      final projects = await widget.bootstrap.agenda.listProjects();
+      if (!mounted || generation != _projectContextGeneration) return;
+      final activeProjects = projects
+          .where((project) => !project.isArchived)
+          .toList(growable: false);
+      setState(() {
+        _activeProjectOptions = activeProjects;
+        _activeProjectNames = {
+          for (final project in activeProjects) project.id: project.name,
+        };
+      });
+    } on Object {
+      if (!mounted || generation != _projectContextGeneration) return;
+      // A transient refresh must not make the visible context contradict the
+      // still-operational ActiveProjectSession selection. Keep the last
+      // successfully validated display cache until a later refresh succeeds.
+    }
+  }
+
+  String get _activeProjectLabel {
+    final selectedProjectId = _activeProjectSession.selectedProjectId;
+    if (selectedProjectId == null) return 'Proje seçilmedi';
+    return _activeProjectNames[selectedProjectId] ?? 'Proje seçilmedi';
+  }
+
+  bool get _showsActiveProjectIndicator =>
+      _selectedIndex == 1 || _selectedIndex == 2 || _selectedIndex == 5;
+
+  Future<void> _adoptRouteProjectSelection(
+    String projectId, {
+    bool refreshDashboard = true,
+  }) async {
     final generation = ++_routeProjectValidationGeneration;
+    final cachedProjects = _activeProjectOptions;
+    if (cachedProjects.any((project) => project.id == projectId)) {
+      if (!mounted || generation != _routeProjectValidationGeneration) return;
+      if (!_activeProjectSession.select(projectId, cachedProjects)) return;
+      if (refreshDashboard) setState(() => _dashboardContextEpoch += 1);
+      return;
+    }
     try {
       final projects = await widget.bootstrap.agenda.listProjects();
       if (!mounted || generation != _routeProjectValidationGeneration) return;
       if (!_activeProjectSession.select(projectId, projects)) return;
-      setState(() => _dashboardContextEpoch += 1);
+      if (refreshDashboard) setState(() => _dashboardContextEpoch += 1);
     } on Object {
       // Route-local selection remains local when fresh shell validation fails.
     }
@@ -279,6 +342,34 @@ class _MobileShellState extends State<MobileShell> {
 
   void _reportRouteProjectSelection(String projectId) {
     unawaited(_adoptRouteProjectSelection(projectId));
+  }
+
+  void _reportAlbumProjectSelection(String projectId) {
+    unawaited(_adoptRouteProjectSelection(projectId, refreshDashboard: false));
+  }
+
+  Future<void> _openProjectAlbum(String projectId) async {
+    final catalog = widget.bootstrap.attachmentCatalog;
+    if (catalog == null) return;
+    final initialSessionProjectId = _activeProjectSession.selectedProjectId;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ProjectMediaAlbumPage(
+          catalog: catalog,
+          agenda: widget.bootstrap.agenda,
+          concrete: widget.bootstrap.concrete,
+          attachments: widget.bootstrap.concreteAttachments,
+          projectLocations: widget.bootstrap.projectLocations,
+          initialProjectId: projectId,
+          onProjectSelected: _reportAlbumProjectSelection,
+        ),
+      ),
+    );
+    if (!mounted ||
+        _activeProjectSession.selectedProjectId == initialSessionProjectId) {
+      return;
+    }
+    setState(() => _dashboardContextEpoch += 1);
   }
 
   void _showDashboardProjectSelection() {
@@ -514,21 +605,7 @@ class _MobileShellState extends State<MobileShell> {
             ),
       onOpenProjectAlbum: catalog == null
           ? null
-          : (projectId) => unawaited(
-              Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => ProjectMediaAlbumPage(
-                    catalog: catalog,
-                    agenda: bootstrap.agenda,
-                    concrete: bootstrap.concrete,
-                    attachments: bootstrap.concreteAttachments,
-                    projectLocations: bootstrap.projectLocations,
-                    initialProjectId: projectId,
-                    onProjectSelected: _reportRouteProjectSelection,
-                  ),
-                ),
-              ),
-            ),
+          : (projectId) => unawaited(_openProjectAlbum(projectId)),
       onOpenWorkforce: attendance == null
           ? null
           : (projectId) => unawaited(
@@ -606,7 +683,12 @@ class _MobileShellState extends State<MobileShell> {
   Widget build(BuildContext context) {
     final title = _destinations[_selectedIndex].label;
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(
+        title: Text(title),
+        actions: _showsActiveProjectIndicator
+            ? [_ActiveProjectIndicator(label: _activeProjectLabel)]
+            : null,
+      ),
       body: SafeArea(
         child: IndexedStack(
           index: _selectedIndex,
@@ -617,6 +699,7 @@ class _MobileShellState extends State<MobileShell> {
               attendance: widget.bootstrap.attendance,
               contextSuggestions: widget.bootstrap.contextSuggestions,
               projectLocations: widget.bootstrap.projectLocations,
+              preferredProjectId: _activeProjectSession.selectedProjectId,
             ),
             AgendaPage(
               agenda: widget.bootstrap.agenda,
@@ -624,6 +707,7 @@ class _MobileShellState extends State<MobileShell> {
               attachments: widget.bootstrap.concreteAttachments,
               concrete: widget.bootstrap.concrete,
               concreteAttachments: widget.bootstrap.concreteAttachments,
+              activeProjectId: _activeProjectSession.selectedProjectId,
             ),
             InventoryPage(
               application: widget.bootstrap.inventory,
@@ -659,6 +743,42 @@ class _MobileShellState extends State<MobileShell> {
         destinations: _destinations,
         onDestinationSelected: (index) =>
             setState(() => _selectedIndex = index),
+      ),
+    );
+  }
+}
+
+class _ActiveProjectIndicator extends StatelessWidget {
+  const _ActiveProjectIndicator({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: Center(
+        child: Tooltip(
+          message: 'Aktif proje: $label',
+          child: Semantics(
+            container: true,
+            label: 'Aktif proje: $label',
+            child: Chip(
+              key: const Key('active-project-indicator'),
+              avatar: const Icon(Icons.apartment_rounded, size: 18),
+              label: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 132),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              visualDensity: VisualDensity.compact,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+        ),
       ),
     );
   }
