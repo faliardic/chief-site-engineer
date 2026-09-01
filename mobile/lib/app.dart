@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
+import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
@@ -242,6 +243,7 @@ class _MobileShellState extends State<MobileShell> {
   StreamSubscription<String>? _notificationTapSubscription;
   StreamSubscription<void>? _projectContextSubscription;
   late final ActiveProjectSession _activeProjectSession;
+  List<MobileProject> _activeProjectOptions = const [];
   Map<String, String> _activeProjectNames = const {};
   int _projectContextGeneration = 0;
   int _routeProjectValidationGeneration = 0;
@@ -290,10 +292,13 @@ class _MobileShellState extends State<MobileShell> {
     try {
       final projects = await widget.bootstrap.agenda.listProjects();
       if (!mounted || generation != _projectContextGeneration) return;
+      final activeProjects = projects
+          .where((project) => !project.isArchived)
+          .toList(growable: false);
       setState(() {
+        _activeProjectOptions = activeProjects;
         _activeProjectNames = {
-          for (final project in projects)
-            if (!project.isArchived) project.id: project.name,
+          for (final project in activeProjects) project.id: project.name,
         };
       });
     } on Object {
@@ -313,13 +318,23 @@ class _MobileShellState extends State<MobileShell> {
   bool get _showsActiveProjectIndicator =>
       _selectedIndex == 1 || _selectedIndex == 2 || _selectedIndex == 5;
 
-  Future<void> _adoptRouteProjectSelection(String projectId) async {
+  Future<void> _adoptRouteProjectSelection(
+    String projectId, {
+    bool refreshDashboard = true,
+  }) async {
     final generation = ++_routeProjectValidationGeneration;
+    final cachedProjects = _activeProjectOptions;
+    if (cachedProjects.any((project) => project.id == projectId)) {
+      if (!mounted || generation != _routeProjectValidationGeneration) return;
+      if (!_activeProjectSession.select(projectId, cachedProjects)) return;
+      if (refreshDashboard) setState(() => _dashboardContextEpoch += 1);
+      return;
+    }
     try {
       final projects = await widget.bootstrap.agenda.listProjects();
       if (!mounted || generation != _routeProjectValidationGeneration) return;
       if (!_activeProjectSession.select(projectId, projects)) return;
-      setState(() => _dashboardContextEpoch += 1);
+      if (refreshDashboard) setState(() => _dashboardContextEpoch += 1);
     } on Object {
       // Route-local selection remains local when fresh shell validation fails.
     }
@@ -327,6 +342,34 @@ class _MobileShellState extends State<MobileShell> {
 
   void _reportRouteProjectSelection(String projectId) {
     unawaited(_adoptRouteProjectSelection(projectId));
+  }
+
+  void _reportAlbumProjectSelection(String projectId) {
+    unawaited(_adoptRouteProjectSelection(projectId, refreshDashboard: false));
+  }
+
+  Future<void> _openProjectAlbum(String projectId) async {
+    final catalog = widget.bootstrap.attachmentCatalog;
+    if (catalog == null) return;
+    final initialSessionProjectId = _activeProjectSession.selectedProjectId;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ProjectMediaAlbumPage(
+          catalog: catalog,
+          agenda: widget.bootstrap.agenda,
+          concrete: widget.bootstrap.concrete,
+          attachments: widget.bootstrap.concreteAttachments,
+          projectLocations: widget.bootstrap.projectLocations,
+          initialProjectId: projectId,
+          onProjectSelected: _reportAlbumProjectSelection,
+        ),
+      ),
+    );
+    if (!mounted ||
+        _activeProjectSession.selectedProjectId == initialSessionProjectId) {
+      return;
+    }
+    setState(() => _dashboardContextEpoch += 1);
   }
 
   void _showDashboardProjectSelection() {
@@ -562,21 +605,7 @@ class _MobileShellState extends State<MobileShell> {
             ),
       onOpenProjectAlbum: catalog == null
           ? null
-          : (projectId) => unawaited(
-              Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => ProjectMediaAlbumPage(
-                    catalog: catalog,
-                    agenda: bootstrap.agenda,
-                    concrete: bootstrap.concrete,
-                    attachments: bootstrap.concreteAttachments,
-                    projectLocations: bootstrap.projectLocations,
-                    initialProjectId: projectId,
-                    onProjectSelected: _reportRouteProjectSelection,
-                  ),
-                ),
-              ),
-            ),
+          : (projectId) => unawaited(_openProjectAlbum(projectId)),
       onOpenWorkforce: attendance == null
           ? null
           : (projectId) => unawaited(

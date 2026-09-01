@@ -55,3 +55,33 @@
   escaped before consumption; a controlled completer now delivers the same
   failure after the shell refresh is waiting. Production code was unchanged.
 - Allowed paths and protected exclusions remain unchanged.
+
+## Owner manual-acceptance route-adoption correction
+
+- Authority: Issue #558 comment `5488293972`.
+- Exact failing head / Draft PR: `6f4684bf0dbef88eb1e3eb99b9c7075d53b82e3b`
+  / #559.
+- Manual blocker: `MT-558-005` — Dashboard B → Proje Albümü → local A
+  selection fails until project discovery is retried.
+- Exact root cause: `ProjectMediaAlbumPage._selectProject()` starts its local
+  A `_reload()` inside `setState` and immediately reports A to the shell. The
+  shell's `_adoptRouteProjectSelection()` then unconditionally starts a second
+  `agenda.listProjects()` without waiting for the album reload. Bootstrap gives
+  the catalog and Agenda applications the same SQLite database path, so the two
+  independent open/read flows overlap on the same selection event.
+- Authorized production correction: retain the shell's last successfully
+  validated active-project options and use that cache when the reported route
+  project is already present. A cache miss keeps the existing fresh discovery
+  and active-project validation path, so unknown/stale IDs remain fail-closed.
+- Exact write allowlist: `mobile/lib/app.dart`,
+  `mobile/test/global_active_project_context_widget_test.dart`, this task ledger
+  and `.cse/results/558_result.md`.
+- Protected exclusions: `ProjectMediaAlbumPage`, `ActiveProjectSession`,
+  AppDatabase/coordinator, Puantaj and Envanter.
+- Targeted regression: active B → Album local A while its catalog read remains
+  in flight → no second Agenda project discovery → shared session A →
+  Hatırlatıcı/Ajanda/Daha visibly A; unknown/stale route ID still cannot retarget
+  the session.
+- Build authority: none; do not build or install an APK.
+- Publication: one correction commit/push to existing Draft PR #559; no Ready
+  or merge.
