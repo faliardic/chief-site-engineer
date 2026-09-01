@@ -383,6 +383,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         icon: Icons.warning_amber_rounded,
         title: 'Projeler güvenli biçimde okunamadı.',
         body: 'Hiçbir proje kaydı değiştirilmedi.',
+        actionIcon: Icons.refresh_rounded,
         actionLabel: 'Tekrar dene',
         onAction: _loadProjects,
       ),
@@ -398,6 +399,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         title: 'İlk projenizi oluşturun',
         body:
             'Dashboard günlük saha kayıtlarını bir proje bağlamında gösterir.',
+        actionIcon: Icons.add_business_rounded,
         actionLabel: 'Proje kurulumuna git',
         onAction: widget.onCreateProject,
       );
@@ -410,6 +412,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         title: 'Çalışacağınız projeyi seçin',
         body:
             'Birden fazla aktif proje var. Seçim yapılmadan proje kayıtları okunmaz.',
+        actionIcon: Icons.swap_horiz_rounded,
         actionLabel: 'Proje seç',
         onAction: _showProjectSelector,
       );
@@ -456,10 +459,11 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
                   ),
                 ),
                 if (_projects.length > 1)
-                  TextButton(
-                    key: const Key('dashboard-change-project'),
+                  _DashboardIconAction(
+                    actionKey: const Key('dashboard-change-project'),
+                    icon: Icons.swap_horiz_rounded,
+                    label: 'Aktif projeyi değiştir',
                     onPressed: _showProjectSelector,
-                    child: const Text('Değiştir'),
                   ),
               ],
             ),
@@ -509,7 +513,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           onRetry: () =>
               _reloadSection(project.id, () => _loadPlan(project.id)),
           actionKey: const Key('dashboard-open-plan'),
-          actionLabel: 'Planı aç',
+          actionLabel: '7 Günlük Planı aç',
           onAction: widget.onOpenPlan == null
               ? null
               : () => widget.onOpenPlan!(project.id),
@@ -622,6 +626,74 @@ String _planSummary(List<ConstructionLivingPlanWindowItem> items) {
       : '${items.length} plan işi • $overdue geciken';
 }
 
+enum _DashboardIconActionKind { standard, filled, tonal, outlined }
+
+class _DashboardIconAction extends StatelessWidget {
+  const _DashboardIconAction({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.actionKey,
+    this.kind = _DashboardIconActionKind.standard,
+  });
+
+  final Key? actionKey;
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+  final _DashboardIconActionKind kind;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = IconButton.styleFrom(
+      minimumSize: const Size.square(40),
+      fixedSize: const Size.square(40),
+      maximumSize: const Size.square(40),
+      iconSize: 20,
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.standard,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+    final button = switch (kind) {
+      _DashboardIconActionKind.standard => IconButton(
+        key: actionKey,
+        tooltip: label,
+        style: style,
+        onPressed: onPressed,
+        icon: Icon(icon),
+      ),
+      _DashboardIconActionKind.filled => IconButton.filled(
+        key: actionKey,
+        tooltip: label,
+        style: style,
+        onPressed: onPressed,
+        icon: Icon(icon),
+      ),
+      _DashboardIconActionKind.tonal => IconButton.filledTonal(
+        key: actionKey,
+        tooltip: label,
+        style: style,
+        onPressed: onPressed,
+        icon: Icon(icon),
+      ),
+      _DashboardIconActionKind.outlined => IconButton.outlined(
+        key: actionKey,
+        tooltip: label,
+        style: style,
+        onPressed: onPressed,
+        icon: Icon(icon),
+      ),
+    };
+    return Semantics(
+      label: label,
+      button: true,
+      enabled: onPressed != null,
+      excludeSemantics: true,
+      child: button,
+    );
+  }
+}
+
 class _QuickActions extends StatelessWidget {
   const _QuickActions({required this.onReminder, required this.onAgenda});
 
@@ -630,48 +702,21 @@ class _QuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actionStyle = FilledButton.styleFrom(
-      minimumSize: const Size(0, 40),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      visualDensity: VisualDensity.standard,
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-    );
-    final reminder = FilledButton.icon(
-      key: const Key('dashboard-quick-reminder'),
-      style: actionStyle,
+    final reminder = _DashboardIconAction(
+      actionKey: const Key('dashboard-quick-reminder'),
+      icon: Icons.add_alert_outlined,
+      label: 'Unutma ekle',
+      kind: _DashboardIconActionKind.filled,
       onPressed: onReminder,
-      icon: const Icon(Icons.add_alert_outlined, size: 18),
-      label: const Text('+ Unutma', maxLines: 1, overflow: TextOverflow.fade),
     );
-    final agenda = FilledButton.tonalIcon(
-      key: const Key('dashboard-quick-agenda'),
-      style: actionStyle,
+    final agenda = _DashboardIconAction(
+      actionKey: const Key('dashboard-quick-agenda'),
+      icon: Icons.note_add_outlined,
+      label: 'Ajanda kaydı ekle',
+      kind: _DashboardIconActionKind.tonal,
       onPressed: onAgenda,
-      icon: const Icon(Icons.note_add_outlined, size: 18),
-      label: const Text(
-        '+ Ajanda kaydı',
-        maxLines: 1,
-        overflow: TextOverflow.fade,
-      ),
     );
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
-        if (constraints.maxWidth < 340 || textScale > 1.3) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [reminder, const SizedBox(height: 8), agenda],
-          );
-        }
-        return Row(
-          children: [
-            Expanded(child: reminder),
-            const SizedBox(width: 8),
-            Expanded(child: agenda),
-          ],
-        );
-      },
-    );
+    return Wrap(spacing: 8, runSpacing: 8, children: [reminder, agenda]);
   }
 }
 
@@ -680,6 +725,7 @@ class _ProjectStateSurface extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.body,
+    required this.actionIcon,
     required this.actionLabel,
     required this.onAction,
     super.key,
@@ -688,6 +734,7 @@ class _ProjectStateSurface extends StatelessWidget {
   final IconData icon;
   final String title;
   final String body;
+  final IconData actionIcon;
   final String actionLabel;
   final VoidCallback onAction;
 
@@ -711,7 +758,12 @@ class _ProjectStateSurface extends StatelessWidget {
               const SizedBox(height: 6),
               Text(body, textAlign: TextAlign.center),
               const SizedBox(height: 12),
-              FilledButton(onPressed: onAction, child: Text(actionLabel)),
+              _DashboardIconAction(
+                icon: actionIcon,
+                label: actionLabel,
+                kind: _DashboardIconActionKind.filled,
+                onPressed: onAction,
+              ),
             ],
           ),
         ),
@@ -769,6 +821,12 @@ class _DashboardSummaryCard extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
+                _DashboardIconAction(
+                  actionKey: actionKey,
+                  icon: Icons.open_in_new_rounded,
+                  label: actionLabel,
+                  onPressed: onAction,
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -779,10 +837,15 @@ class _DashboardSummaryCard extends StatelessWidget {
                 children: [
                   Text(errorText),
                   const SizedBox(height: 6),
-                  OutlinedButton(
-                    key: retryKey,
-                    onPressed: onRetry,
-                    child: const Text('Tekrar dene'),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: _DashboardIconAction(
+                      actionKey: retryKey,
+                      icon: Icons.refresh_rounded,
+                      label: 'Tekrar dene',
+                      kind: _DashboardIconActionKind.outlined,
+                      onPressed: onRetry,
+                    ),
                   ),
                 ],
               ),
@@ -792,15 +855,6 @@ class _DashboardSummaryCard extends StatelessWidget {
               ),
               _SectionStatus.idle => const Text('Proje seçimi bekleniyor.'),
             },
-            const SizedBox(height: 6),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                key: actionKey,
-                onPressed: onAction,
-                child: Text(actionLabel),
-              ),
-            ),
           ],
         ),
       ),
