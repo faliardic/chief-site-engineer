@@ -33,7 +33,17 @@ void main() {
     expect(fixture.plan.calls, isEmpty);
     expect(fixture.materials.calls, isEmpty);
 
-    await tester.tap(find.text('Proje kurulumuna git'));
+    final setupAction = find.byTooltip('Proje kurulumuna git');
+    expect(setupAction, findsOneWidget);
+    expect(
+      find.descendant(
+        of: setupAction,
+        matching: find.byIcon(Icons.add_business_rounded),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Proje kurulumuna git'), findsNothing);
+    await tester.tap(setupAction);
     expect(setupCalls, 1);
   });
 
@@ -56,7 +66,17 @@ void main() {
     expect(fixture.plan.calls, isEmpty);
     expect(fixture.materials.calls, isEmpty);
 
-    await tester.tap(find.text('Proje seç'));
+    final selectAction = find.byTooltip('Proje seç');
+    expect(selectAction, findsOneWidget);
+    expect(
+      find.descendant(
+        of: selectAction,
+        matching: find.byIcon(Icons.swap_horiz_rounded),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Proje seç'), findsNothing);
+    await tester.tap(selectAction);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('dashboard-project-b')));
     await tester.pumpAndSettle();
@@ -105,12 +125,22 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('dashboard-today-retry')), findsOneWidget);
+      final retry = find.byKey(const Key('dashboard-today-retry'));
+      expect(tester.widget<IconButton>(retry).tooltip, 'Tekrar dene');
+      expect(
+        find.descendant(
+          of: retry,
+          matching: find.byIcon(Icons.refresh_rounded),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Tekrar dene'), findsNothing);
       expect(find.text('Plan penceresinde kayıt yok.'), findsOneWidget);
       expect(fixture.plan.calls, hasLength(1));
       expect(fixture.materials.calls, hasLength(1));
 
       fixture.daily.fail = false;
-      await tester.tap(find.byKey(const Key('dashboard-today-retry')));
+      await tester.tap(retry);
       await tester.pumpAndSettle();
 
       expect(fixture.daily.calls, hasLength(2));
@@ -165,17 +195,22 @@ void main() {
   testWidgets('normal phone Dashboard uses compact field layout', (
     tester,
   ) async {
+    final semantics = tester.ensureSemantics();
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final fixture = _Fixture(projects: [_project('a', 'Kuzey')]);
     addTearDown(fixture.dispose);
+    final opened = <(String, String)>[];
 
     await tester.pumpWidget(
       fixture.app(
         onReminder: (_, _) async => false,
         onAgenda: (_, _) async => false,
+        onOpenToday: (projectId) => opened.add(('today', projectId)),
+        onOpenPlan: (projectId) => opened.add(('plan', projectId)),
+        onOpenMaterials: (projectId) => opened.add(('materials', projectId)),
       ),
     );
     await tester.pumpAndSettle();
@@ -188,6 +223,26 @@ void main() {
     expect(reminderRect.right, lessThan(agendaRect.left));
     expect(reminderRect.height, inInclusiveRange(40, 42));
     expect(agendaRect.height, inInclusiveRange(40, 42));
+    expect(tester.widget<IconButton>(reminder).tooltip, 'Unutma ekle');
+    expect(tester.widget<IconButton>(agenda).tooltip, 'Ajanda kaydı ekle');
+    expect(
+      find.descendant(
+        of: reminder,
+        matching: find.byIcon(Icons.add_alert_outlined),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: agenda,
+        matching: find.byIcon(Icons.note_add_outlined),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('+ Unutma'), findsNothing);
+    expect(find.text('+ Ajanda kaydı'), findsNothing);
+    expect(find.bySemanticsLabel('Unutma ekle'), findsOneWidget);
+    expect(find.bySemanticsLabel('Ajanda kaydı ekle'), findsOneWidget);
 
     final header = find.byKey(const Key('dashboard-project-header'));
     final headerPaddings = tester.widgetList<Padding>(
@@ -223,6 +278,35 @@ void main() {
       22,
     );
 
+    final summaryActions = <(Finder, String)>[
+      (find.byKey(const Key('dashboard-open-today')), 'Günlük Log’u aç'),
+      (find.byKey(const Key('dashboard-open-plan')), '7 Günlük Planı aç'),
+      (find.byKey(const Key('dashboard-open-materials')), 'Malzemeleri aç'),
+    ];
+    for (final (action, label) in summaryActions) {
+      expect(tester.widget<IconButton>(action).tooltip, label);
+      expect(
+        find.descendant(
+          of: action,
+          matching: find.byIcon(Icons.open_in_new_rounded),
+        ),
+        findsOneWidget,
+      );
+      final actionSemantics = tester.widgetList<Semantics>(
+        find.ancestor(of: action, matching: find.byType(Semantics)),
+      );
+      expect(
+        actionSemantics.map((widget) => widget.properties.label),
+        contains(label),
+      );
+      expect(find.text(label), findsNothing);
+      await tester.tap(action);
+    }
+    expect(opened, [('today', 'a'), ('plan', 'a'), ('materials', 'a')]);
+    expect(find.text('Bugün'), findsWidgets);
+    expect(find.text('7 Günlük Plan'), findsOneWidget);
+    expect(find.text('İstenecek Malzemeler'), findsOneWidget);
+
     final album = find.byKey(const Key('dashboard-project-album'));
     await tester.scrollUntilVisible(
       album,
@@ -251,6 +335,7 @@ void main() {
       ),
       findsOneWidget,
     );
+    semantics.dispose();
     expect(tester.takeException(), isNull);
   });
 
@@ -284,10 +369,12 @@ void main() {
       final agenda = find.byKey(const Key('dashboard-quick-agenda'));
       final reminderRect = tester.getRect(reminder);
       final agendaRect = tester.getRect(agenda);
-      expect(reminderRect.bottom, lessThan(agendaRect.top));
-      expect(reminderRect.center.dx, closeTo(agendaRect.center.dx, 0.01));
-      expect(reminderRect.height, greaterThanOrEqualTo(40));
-      expect(agendaRect.height, greaterThanOrEqualTo(40));
+      expect(reminderRect.top, closeTo(agendaRect.top, 0.01));
+      expect(reminderRect.right, lessThan(agendaRect.left));
+      expect(reminderRect.height, inInclusiveRange(40, 42));
+      expect(agendaRect.height, inInclusiveRange(40, 42));
+      expect(find.bySemanticsLabel('Unutma ekle'), findsOneWidget);
+      expect(find.bySemanticsLabel('Ajanda kaydı ekle'), findsOneWidget);
       expect(
         find.bySemanticsLabel(RegExp('Aktif proje Çok Uzun Kuzey Projesi')),
         findsOneWidget,
@@ -413,7 +500,7 @@ void main() {
 
       await tester.pumpWidget(fixture.app());
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Proje seç'));
+      await tester.tap(find.byTooltip('Proje seç'));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('dashboard-project-a')));
       await tester.pump();
@@ -424,7 +511,20 @@ void main() {
         'Project A Today read did not start.',
       );
 
-      await tester.tap(find.byKey(const Key('dashboard-change-project')));
+      final changeProject = find.byKey(const Key('dashboard-change-project'));
+      expect(
+        tester.widget<IconButton>(changeProject).tooltip,
+        'Aktif projeyi değiştir',
+      );
+      expect(
+        find.descendant(
+          of: changeProject,
+          matching: find.byIcon(Icons.swap_horiz_rounded),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Değiştir'), findsNothing);
+      await tester.tap(changeProject);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       await tester.tap(find.byKey(const ValueKey('dashboard-project-b')));
@@ -498,6 +598,9 @@ class _Fixture {
     VoidCallback? onCreateProject,
     DashboardCaptureAction? onReminder,
     DashboardCaptureAction? onAgenda,
+    DashboardProjectAction? onOpenToday,
+    DashboardProjectAction? onOpenPlan,
+    DashboardProjectAction? onOpenMaterials,
     Brightness brightness = Brightness.light,
   }) => MaterialApp(
     locale: CseApp.locale,
@@ -514,6 +617,9 @@ class _Fixture {
         onCreateProject: onCreateProject ?? () {},
         onAddReminder: onReminder,
         onAddAgenda: onAgenda,
+        onOpenToday: onOpenToday,
+        onOpenPlan: onOpenPlan,
+        onOpenMaterials: onOpenMaterials,
         clock: () => DateTime.utc(2026, 8, 30, 9),
       ),
     ),

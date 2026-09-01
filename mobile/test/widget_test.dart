@@ -213,6 +213,7 @@ void main() {
   testWidgets(
     'mobile shell exposes exact six Slice 4 destinations and Daha hub',
     (tester) async {
+      final semantics = tester.ensureSemantics();
       await tester.pumpWidget(
         CseApp(
           bootstrap: Future<BootstrapResult>.value(
@@ -236,10 +237,13 @@ void main() {
         'Puantaj',
         'Daha',
       ];
-      final navigation = tester.widget<NavigationBar>(
-        find.byType(NavigationBar),
-      );
+      final navigationFinder = find.byType(NavigationBar);
+      final navigation = tester.widget<NavigationBar>(navigationFinder);
       expect(navigation.destinations, hasLength(6));
+      expect(
+        navigation.labelBehavior,
+        NavigationDestinationLabelBehavior.alwaysHide,
+      );
       expect(
         navigation.destinations
             .cast<NavigationDestination>()
@@ -248,17 +252,46 @@ void main() {
         expectedLabels,
       );
       for (final label in expectedLabels) {
-        expect(find.text(label), findsWidgets);
+        final labelText = find.descendant(
+          of: navigationFinder,
+          matching: find.text(label),
+        );
+        expect(labelText, findsOneWidget);
+        final labelFades = tester.widgetList<FadeTransition>(
+          find.ancestor(of: labelText, matching: find.byType(FadeTransition)),
+        );
+        expect(
+          labelFades.any((fade) => fade.opacity.value == 0),
+          isTrue,
+          reason: '$label NavigationBar label must be visually hidden.',
+        );
+        expect(
+          find.descendant(
+            of: navigationFinder,
+            matching: find.bySemanticsLabel(RegExp('^${RegExp.escape(label)}')),
+          ),
+          findsOneWidget,
+        );
       }
 
-      await tester.tap(find.text('Envanter').last);
+      await tester.tap(
+        find.descendant(
+          of: navigationFinder,
+          matching: find.byIcon(Icons.inventory_2_outlined),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('inventory-project-required')),
         findsOneWidget,
       );
 
-      await tester.tap(find.text('Daha').last);
+      await tester.tap(
+        find.descendant(
+          of: navigationFinder,
+          matching: find.byIcon(Icons.more_horiz_rounded),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('more-page')), findsOneWidget);
       expect(find.byKey(const Key('more-concrete-package')), findsOneWidget);
@@ -266,16 +299,23 @@ void main() {
       expect(find.text('Beton Paketi'), findsOneWidget);
       expect(find.text('Sicil'), findsOneWidget);
 
-      await tester.tap(find.text('Ajanda').last);
+      await tester.tap(
+        find.descendant(
+          of: navigationFinder,
+          matching: find.byIcon(Icons.event_note_outlined),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(find.text('Bu günde Ajanda kaydı yok.'), findsOneWidget);
       expect(find.byKey(const Key('create-agenda-log')), findsOneWidget);
+      semantics.dispose();
     },
   );
 
   testWidgets('Dashboard quick actions open exact existing capture routes', (
     tester,
   ) async {
+    final semantics = tester.ensureSemantics();
     const project = MobileProject(
       id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       name: 'Şantiye A',
@@ -301,7 +341,33 @@ void main() {
     expect(find.byKey(const Key('dashboard-project-header')), findsOneWidget);
     expect(find.byKey(const Key('home-field-tip-card')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('dashboard-quick-reminder')));
+    final reminderAction = find.byKey(const Key('dashboard-quick-reminder'));
+    final agendaAction = find.byKey(const Key('dashboard-quick-agenda'));
+    expect(tester.widget<IconButton>(reminderAction).tooltip, 'Unutma ekle');
+    expect(
+      tester.widget<IconButton>(agendaAction).tooltip,
+      'Ajanda kaydı ekle',
+    );
+    expect(
+      find.descendant(
+        of: reminderAction,
+        matching: find.byIcon(Icons.add_alert_outlined),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: agendaAction,
+        matching: find.byIcon(Icons.note_add_outlined),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('+ Unutma'), findsNothing);
+    expect(find.text('+ Ajanda kaydı'), findsNothing);
+    expect(find.bySemanticsLabel('Unutma ekle'), findsOneWidget);
+    expect(find.bySemanticsLabel('Ajanda kaydı ekle'), findsOneWidget);
+
+    await tester.tap(reminderAction);
     await tester.pumpAndSettle();
     final reminderProject = tester.widget<DropdownButtonFormField<String?>>(
       find.byKey(const Key('reminder-project')),
@@ -311,7 +377,7 @@ void main() {
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('dashboard-quick-agenda')));
+    await tester.tap(agendaAction);
     await tester.pumpAndSettle();
     final logProject = tester.widget<DropdownButtonFormField<String>>(
       find.byKey(const Key('log-project')),
@@ -323,6 +389,7 @@ void main() {
 
     expect(agenda.createReminderCalls, 0);
     expect(agenda.createLogCalls, 0);
+    semantics.dispose();
   });
 
   testWidgets('database bootstrap failure is fail closed and user safe', (

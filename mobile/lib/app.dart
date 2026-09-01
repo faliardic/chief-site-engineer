@@ -786,6 +786,7 @@ class _MobileShellState extends State<MobileShell> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
         destinations: _destinations,
         onDestinationSelected: (index) =>
             setState(() => _selectedIndex = index),
