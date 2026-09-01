@@ -1,6 +1,13 @@
+import 'dart:async';
+
 import 'package:chief_site_engineer/app.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
+import 'package:chief_site_engineer/features/attendance/attendance_page.dart';
+import 'package:chief_site_engineer/features/dashboard/project_dashboard_page.dart';
+import 'package:chief_site_engineer/features/inventory/inventory_page.dart';
+import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'support/fake_agenda_application.dart';
+import 'support/fake_attendance_application.dart';
 
 void main() {
   testWidgets(
@@ -309,6 +317,101 @@ void main() {
       expect(find.text('Bu günde Ajanda kaydı yok.'), findsOneWidget);
       expect(find.byKey(const Key('create-agenda-log')), findsOneWidget);
       semantics.dispose();
+    },
+  );
+
+  testWidgets(
+    'mobile shell lazily mounts primary tabs once and preserves visited state',
+    (tester) async {
+      final projectGate = Completer<void>();
+      final agenda = FakeAgendaApplication()..listProjectsGate = projectGate;
+      final attendance = FakeAttendanceApplication();
+
+      await tester.pumpWidget(
+        CseApp(
+          bootstrap: Future<BootstrapResult>.value(
+            BootstrapSuccess(
+              environmentLabel: 'Geliştirme',
+              smokeRecordId: 'lazy-primary-tabs',
+              smokeRecordCreatedAt: '2026-09-01T08:00:00Z',
+              agenda: agenda,
+              attendance: attendance,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byType(ProjectDashboardPage), findsOneWidget);
+      expect(find.byType(RemindersPage, skipOffstage: false), findsNothing);
+      expect(find.byType(AgendaPage, skipOffstage: false), findsNothing);
+      expect(find.byType(InventoryPage, skipOffstage: false), findsNothing);
+      expect(find.byType(AttendancePage, skipOffstage: false), findsNothing);
+      expect(agenda.listProjectsCalls, 2);
+      expect(agenda.todayOverviewCalls, 0);
+      expect(agenda.listAgendaCalls, 0);
+      expect(agenda.getAgendaLogDetailCalls, 0);
+
+      projectGate.complete();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('dashboard-no-project')), findsOneWidget);
+
+      final navigation = find.byType(NavigationBar);
+      Future<void> openTab(IconData icon) async {
+        await tester.tap(
+          find.descendant(of: navigation, matching: find.byIcon(icon)),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await openTab(Icons.notifications_none_rounded);
+      expect(agenda.todayOverviewCalls, 1);
+      expect(find.text('Bugün için açık hatırlatıcı yok.'), findsOneWidget);
+      final reminderState = tester.state(
+        find.byType(RemindersPage, skipOffstage: false),
+      );
+
+      await openTab(Icons.event_note_outlined);
+      expect(agenda.listProjectsCalls, 3);
+      expect(agenda.listAgendaCalls, 1);
+      expect(find.text('Bu günde Ajanda kaydı yok.'), findsOneWidget);
+      final agendaState = tester.state(
+        find.byType(AgendaPage, skipOffstage: false),
+      );
+
+      await openTab(Icons.inventory_2_outlined);
+      expect(agenda.listProjectsCalls, 4);
+      expect(
+        find.byKey(const Key('inventory-project-required')),
+        findsOneWidget,
+      );
+
+      await openTab(Icons.badge_outlined);
+      expect(agenda.listProjectsCalls, 5);
+      expect(
+        find.text('Puantaj için önce Ajanda bölümünden bir proje oluşturun.'),
+        findsOneWidget,
+      );
+
+      await openTab(Icons.more_horiz_rounded);
+      final projectReadsAfterFirstVisits = agenda.listProjectsCalls;
+      await openTab(Icons.notifications_none_rounded);
+      expect(
+        tester.state(find.byType(RemindersPage, skipOffstage: false)),
+        same(reminderState),
+      );
+      expect(agenda.todayOverviewCalls, 1);
+      expect(agenda.listProjectsCalls, projectReadsAfterFirstVisits);
+
+      await openTab(Icons.event_note_outlined);
+      expect(
+        tester.state(find.byType(AgendaPage, skipOffstage: false)),
+        same(agendaState),
+      );
+      expect(agenda.listAgendaCalls, 1);
+      expect(agenda.getAgendaLogDetailCalls, 0);
+      expect(agenda.listProjectsCalls, projectReadsAfterFirstVisits);
     },
   );
 
