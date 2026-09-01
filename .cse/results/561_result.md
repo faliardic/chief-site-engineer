@@ -6,6 +6,8 @@ Puantaj now remains dormant while its IndexedStack tab is hidden. Launch, Dashbo
 
 A deliberate Puantaj selector change is reported to the shared active-project session only after the exact project load succeeds. A failed local load restores the prior visible selection and does not retarget the shared session. The compact active-project indicator is visible on Puantaj.
 
+Review correction 5488745745 now also recreates the Puantaj project FormField on every model-selection generation. Hidden shared B→A adoption therefore changes both the operational model and the dropdown's real selected state to A; a failed local selection likewise returns the real field state to the previous valid project without emitting a shared-session change.
+
 ## Exact changed paths
 
 1. `.cse/tasks/561_task.md`
@@ -30,6 +32,20 @@ No attendance application/domain/repository/storage, database/coordinator, `Acti
 - `flutter analyze`: not run by owner instruction.
 - APK/emulator/device: not run and not authorized.
 
+Correction validation:
+
+- Reviewed head: `0e01f235c022ba45a9b2778772d53f57a8278540`.
+- The first correction gate exposed that a same-frame failed local selection
+  could retain the attempted FormField value even when the model rolled back.
+- A direct `FormFieldState.didChange` implementation was rejected by the gate
+  because Flutter's dropdown state forwards it to `onChanged`, producing
+  duplicate loads; that implementation was removed.
+- Final implementation uses callback-free generation-key recreation.
+- Final focused gate: PASS, `21` tests.
+- Hidden B→A→reopen asserts `FormFieldState.value == A` and visible project A.
+- Failed local selection asserts the real field state returns to the prior valid
+  project; the shared session remains unchanged.
+
 Final source gate records exact allowlist, protected drift, `git diff --check`, changed-Dart format, and invariants `schema 22 / backup 1 / app 0.1.0+1`.
 
 ## Manual test register
@@ -49,6 +65,8 @@ One commit, branch push, and Draft PR are authorized after final source gates. R
 ```yaml
 issue: 561
 authority_comment: 5488533818
+correction_authority_comment: 5488745745
+reviewed_head: 0e01f235c022ba45a9b2778772d53f57a8278540
 base: bffe537d6a04947dd42e71c19df2d39e7d55c915
 branch: codex/issue-561-attendance-active-project-safety
 process: accelerated_STANDARD_R4
@@ -58,7 +76,9 @@ actual_model: unknown
 actual_effort: null
 runtime_verified: false
 focused_gate_final: PASS_21
+correction_focused_gate_final: PASS_21
 mechanical_retry_used: 1
+corrections_used: 2
 implementation_status: IMPLEMENTED
 manual_test_status: PENDING
 artifact: none
@@ -68,4 +88,4 @@ merge: false
 
 ## review_recommendation
 
-`FRESH_INDEPENDENT_R4` at `gpt-5.6-sol / xhigh`, emphasizing zero hidden mutation, exact shared-project validation, and success-only session adoption.
+`FRESH_INDEPENDENT_R4` at `gpt-5.6-sol / xhigh`, emphasizing zero hidden mutation, actual dropdown FormField state after shared B→A adoption, exact shared-project validation, and success-only session adoption.

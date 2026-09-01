@@ -510,12 +510,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(attendance.ensureProjectIds, [_projectB.id]);
       expect(attendance.rollingCalls, 1);
+      final attendanceProjectField = find.descendant(
+        of: find.byKey(const Key('attendance-project')),
+        matching: find.byType(DropdownButtonFormField<String>),
+      );
       expect(
-        tester
-            .widget<DropdownButtonFormField<String>>(
-              find.byKey(const Key('attendance-project')),
-            )
-            .initialValue,
+        tester.state<FormFieldState<String>>(attendanceProjectField).value,
         _projectB.id,
       );
       expect(
@@ -552,20 +552,19 @@ void main() {
       expect(attendance.ensureProjectIds, [_projectB.id, _projectA.id]);
       expect(attendance.rollingCalls, 2);
       expect(
-        tester
-            .widget<DropdownButtonFormField<String>>(
-              find.byKey(const Key('attendance-project')),
-            )
-            .initialValue,
+        tester.state<FormFieldState<String>>(attendanceProjectField).value,
         _projectA.id,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('attendance-project')),
+          matching: find.text(_projectA.name),
+        ),
+        findsOneWidget,
       );
 
       attendance.failNextEnsureProjectId = _projectB.id;
-      await _chooseProject(
-        tester,
-        find.byKey(const Key('attendance-project')),
-        _projectB.name,
-      );
+      await _chooseProject(tester, attendanceProjectField, _projectB.name);
       expect(attendance.ensureProjectIds.last, _projectB.id);
       expect(attendance.rollingCalls, 2);
       expect(
@@ -576,11 +575,7 @@ void main() {
         findsOneWidget,
       );
 
-      await _chooseProject(
-        tester,
-        find.byKey(const Key('attendance-project')),
-        _projectB.name,
-      );
+      await _chooseProject(tester, attendanceProjectField, _projectB.name);
       expect(attendance.rollingCalls, 3);
       expect(
         find.descendant(
@@ -590,11 +585,7 @@ void main() {
         findsOneWidget,
       );
 
-      await _chooseProject(
-        tester,
-        find.byKey(const Key('attendance-project')),
-        _projectA.name,
-      );
+      await _chooseProject(tester, attendanceProjectField, _projectA.name);
       expect(attendance.rollingCalls, 4);
       expect(attendance.ensureProjectIds.last, _projectA.id);
       expect(

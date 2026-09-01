@@ -184,23 +184,23 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(attendance.ensureProjectIds, [_secondProject().id]);
+      final projectField = find.descendant(
+        of: find.byKey(const Key('attendance-project')),
+        matching: find.byType(DropdownButtonFormField<String>),
+      );
 
       attendance.failNextEnsureProjectId = projectId;
-      await tester.tap(find.byKey(const Key('attendance-project')));
+      await tester.tap(projectField);
       await tester.pumpAndSettle();
       await tester.tap(find.text(_project().name).last);
       await tester.pumpAndSettle();
       expect(reportedProjects, isEmpty);
       expect(
-        tester
-            .widget<DropdownButtonFormField<String>>(
-              find.byKey(const Key('attendance-project')),
-            )
-            .initialValue,
+        tester.state<FormFieldState<String>>(projectField).value,
         _secondProject().id,
       );
 
-      await tester.tap(find.byKey(const Key('attendance-project')));
+      await tester.tap(projectField);
       await tester.pumpAndSettle();
       await tester.tap(find.text(_project().name).last);
       await tester.pumpAndSettle();

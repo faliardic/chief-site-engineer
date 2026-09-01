@@ -43,6 +43,7 @@ class _AttendancePageState extends State<AttendancePage> {
   List<ActiveTeamCount> _teamCounts = const [];
   StreamSubscription<void>? _projectSubscription;
   bool _detailNavigationBusy = false;
+  int _projectFieldGeneration = 0;
   int _projectLoadGeneration = 0;
   int _dayLoadGeneration = 0;
 
@@ -109,6 +110,7 @@ class _AttendancePageState extends State<AttendancePage> {
       setState(() {
         _projects = projects;
         _project = project;
+        _projectFieldGeneration += 1;
         _detail = null;
         _teamCounts = const [];
       });
@@ -122,6 +124,7 @@ class _AttendancePageState extends State<AttendancePage> {
       setState(() {
         _projects = const [];
         _project = null;
+        _projectFieldGeneration += 1;
         _detail = null;
         _teamCounts = const [];
         _error = _message(error, 'Projeler açılamadı.');
@@ -195,6 +198,7 @@ class _AttendancePageState extends State<AttendancePage> {
     final previousTeamCounts = _teamCounts;
     setState(() {
       _project = project;
+      _projectFieldGeneration += 1;
       _detail = null;
       _teamCounts = const [];
     });
@@ -206,6 +210,7 @@ class _AttendancePageState extends State<AttendancePage> {
     }
     setState(() {
       _project = previousProject;
+      _projectFieldGeneration += 1;
       _detail = previousDetail;
       _teamCounts = previousTeamCounts;
     });
@@ -341,25 +346,33 @@ class _AttendancePageState extends State<AttendancePage> {
             ),
           )
         else ...[
-          DropdownButtonFormField<String>(
+          KeyedSubtree(
             key: const Key('attendance-project'),
-            initialValue: _project?.id,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Proje',
-              border: OutlineInputBorder(),
+            child: DropdownButtonFormField<String>(
+              key: ValueKey(
+                'attendance-project-field-$_projectFieldGeneration',
+              ),
+              initialValue: _project?.id,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Proje',
+                border: OutlineInputBorder(),
+              ),
+              items: _projects
+                  .map(
+                    (project) => DropdownMenuItem(
+                      value: project.id,
+                      child: Text(
+                        project.name,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
+                  .toList(growable: false),
+              onChanged: (id) {
+                if (id != null) unawaited(_selectProject(id));
+              },
             ),
-            items: _projects
-                .map(
-                  (project) => DropdownMenuItem(
-                    value: project.id,
-                    child: Text(project.name, overflow: TextOverflow.ellipsis),
-                  ),
-                )
-                .toList(growable: false),
-            onChanged: (id) {
-              if (id != null) unawaited(_selectProject(id));
-            },
           ),
           const SizedBox(height: 10),
           Row(

@@ -1,7 +1,7 @@
 # Issue #561 — Puantaj active-project adoption + hidden-mutation safety
 
 - Parent / V2 item: #554 / #539, after #558 and PR #560
-- Owner authority: Issue #561 comment 5488533818
+- Owner authority: Issue #561 comments 5488533818 and correction 5488745745
 - Expected base: `bffe537d6a04947dd42e71c19df2d39e7d55c915`
 - Branch: `codex/issue-561-attendance-active-project-safety`
 - Process lane: accelerated STANDARD, R4 mutation-safety review
@@ -38,6 +38,16 @@ Attendance application/domain/repository/storage, database/coordinator, `ActiveP
 - Same-scope correction budget: at most one mechanical retry.
 - Immediate escalation: scope/allowlist expansion, database/coordinator/session implementation change, schema/version/platform change, or unproven mutation safety.
 - Publication authority: one commit, push, and Draft PR; stop before Ready/merge.
+
+## Review correction
+
+- Reviewed head: `0e01f235c022ba45a9b2778772d53f57a8278540`, Draft PR #562.
+- Recreate the Puantaj project FormField whenever its model selection changes,
+  including programmatic shared-project adoption and failed local-load rollback.
+- The hidden B→A→reopen regression must assert actual FormField state and the
+  visible selected project, not only widget `initialValue`.
+- Preserve the original six-path allowlist and all zero-hidden-mutation,
+  fail-closed, no-fallback, and success-only session-adoption contracts.
 
 ## Canonical source manifest
 
