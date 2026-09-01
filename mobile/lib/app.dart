@@ -28,6 +28,60 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+const _compactButtonStyle = ButtonStyle(
+  minimumSize: WidgetStatePropertyAll(Size(0, 40)),
+  padding: WidgetStatePropertyAll(
+    EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+  ),
+  visualDensity: VisualDensity.standard,
+  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+);
+
+ThemeData _buildCseTheme(Brightness brightness) {
+  const seed = Color(0xFF1E5D4E);
+  final base = ThemeData(
+    colorScheme: ColorScheme.fromSeed(seedColor: seed, brightness: brightness),
+    useMaterial3: true,
+  );
+  final textTheme = base.typography.englishLike
+      .merge(base.textTheme)
+      .apply(fontSizeFactor: 0.92);
+  return base.copyWith(
+    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    visualDensity: const VisualDensity(horizontal: -1, vertical: -1),
+    textTheme: textTheme,
+    filledButtonTheme: const FilledButtonThemeData(style: _compactButtonStyle),
+    elevatedButtonTheme: const ElevatedButtonThemeData(
+      style: _compactButtonStyle,
+    ),
+    outlinedButtonTheme: const OutlinedButtonThemeData(
+      style: _compactButtonStyle,
+    ),
+    textButtonTheme: const TextButtonThemeData(style: _compactButtonStyle),
+    iconButtonTheme: const IconButtonThemeData(
+      style: ButtonStyle(
+        minimumSize: WidgetStatePropertyAll(Size.square(40)),
+        visualDensity: VisualDensity.standard,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    ),
+    inputDecorationTheme: const InputDecorationThemeData(
+      isDense: true,
+      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    ),
+    appBarTheme: AppBarThemeData(
+      toolbarHeight: 52,
+      titleTextStyle: textTheme.titleLarge?.copyWith(
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      height: 64,
+      labelTextStyle: WidgetStatePropertyAll(textTheme.labelSmall),
+    ),
+  );
+}
+
 class CseApp extends StatelessWidget {
   const CseApp({
     required this.bootstrap,
@@ -62,28 +116,14 @@ class CseApp extends StatelessWidget {
   }
 
   Widget _buildMaterialApp(String? fatalErrorCode) {
-    const seed = Color(0xFF1E5D4E);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: productName,
       locale: locale,
       supportedLocales: supportedLocales,
       localizationsDelegates: localizationsDelegates,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: seed),
-        materialTapTargetSize: MaterialTapTargetSize.padded,
-        visualDensity: VisualDensity.standard,
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: seed,
-          brightness: Brightness.dark,
-        ),
-        materialTapTargetSize: MaterialTapTargetSize.padded,
-        visualDensity: VisualDensity.standard,
-        useMaterial3: true,
-      ),
+      theme: _buildCseTheme(Brightness.light),
+      darkTheme: _buildCseTheme(Brightness.dark),
       themeMode: ThemeMode.system,
       builder: (context, child) {
         final label = environmentLabel;
