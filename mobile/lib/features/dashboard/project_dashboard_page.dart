@@ -422,17 +422,17 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     final dateLabel = MaterialLocalizations.of(context).formatFullDate(day);
     return ListView(
       key: const Key('project-dashboard-list'),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
       children: [
         Card(
           key: const Key('dashboard-project-header'),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.apartment_rounded, size: 32),
-                const SizedBox(width: 12),
+                const Icon(Icons.apartment_rounded, size: 28),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Semantics(
                     container: true,
@@ -447,9 +447,9 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
                         const SizedBox(height: 2),
                         Text(
                           project.name,
-                          style: Theme.of(context).textTheme.headlineSmall,
+                          style: Theme.of(context).textTheme.titleLarge,
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Text(dateLabel, key: const Key('dashboard-date')),
                       ],
                     ),
@@ -465,7 +465,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         _QuickActions(
           onReminder: widget.onAddReminder == null
               ? null
@@ -474,9 +474,9 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
               ? null
               : () => _runCapture(widget.onAddAgenda),
         ),
-        const SizedBox(height: 20),
-        Text('Bugün', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
+        Text('Bugün', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
         _DashboardSummaryCard(
           key: const Key('dashboard-today-card'),
           icon: Icons.today_outlined,
@@ -494,7 +494,6 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
               ? null
               : () => widget.onOpenToday!(project.id),
         ),
-        const SizedBox(height: 12),
         _DashboardSummaryCard(
           key: const Key('dashboard-plan-card'),
           icon: Icons.calendar_view_week_outlined,
@@ -515,7 +514,6 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
               ? null
               : () => widget.onOpenPlan!(project.id),
         ),
-        const SizedBox(height: 12),
         _DashboardSummaryCard(
           key: const Key('dashboard-materials-card'),
           icon: Icons.inventory_2_outlined,
@@ -536,9 +534,9 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
               ? null
               : () => widget.onOpenMaterials!(project.id),
         ),
-        const SizedBox(height: 20),
-        Text('Proje araçları', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 8),
+        Text('Proje araçları', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
         _DashboardActionTile(
           key: const Key('dashboard-project-album'),
           icon: Icons.photo_library_outlined,
@@ -557,12 +555,12 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
               ? null
               : () => widget.onOpenWorkforce!(project.id),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 8),
         Text(
           'Tüm araçlar ve güvenlik',
-          style: Theme.of(context).textTheme.titleLarge,
+          style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         _DashboardActionTile(
           key: const Key('dashboard-phone-call-result'),
           icon: Icons.phone_in_talk_outlined,
@@ -632,38 +630,43 @@ class _QuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final actionStyle = FilledButton.styleFrom(
+      minimumSize: const Size(0, 40),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      visualDensity: VisualDensity.standard,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
     final reminder = FilledButton.icon(
       key: const Key('dashboard-quick-reminder'),
-      style: FilledButton.styleFrom(
-        minimumSize: const Size.fromHeight(56),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      ),
+      style: actionStyle,
       onPressed: onReminder,
-      icon: const Icon(Icons.add_alert_outlined),
-      label: const Text('+ Unutma'),
+      icon: const Icon(Icons.add_alert_outlined, size: 18),
+      label: const Text('+ Unutma', maxLines: 1, overflow: TextOverflow.fade),
     );
     final agenda = FilledButton.tonalIcon(
       key: const Key('dashboard-quick-agenda'),
-      style: FilledButton.styleFrom(
-        minimumSize: const Size.fromHeight(56),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      ),
+      style: actionStyle,
       onPressed: onAgenda,
-      icon: const Icon(Icons.note_add_outlined),
-      label: const Text('+ Ajanda kaydı'),
+      icon: const Icon(Icons.note_add_outlined, size: 18),
+      label: const Text(
+        '+ Ajanda kaydı',
+        maxLines: 1,
+        overflow: TextOverflow.fade,
+      ),
     );
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < 480) {
+        final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+        if (constraints.maxWidth < 340 || textScale > 1.3) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [reminder, const SizedBox(height: 10), agenda],
+            children: [reminder, const SizedBox(height: 8), agenda],
           );
         }
         return Row(
           children: [
             Expanded(child: reminder),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             Expanded(child: agenda),
           ],
         );
@@ -692,29 +695,23 @@ class _ProjectStateSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(16),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 440),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 52),
-              const SizedBox(height: 16),
+              Icon(icon, size: 40),
+              const SizedBox(height: 12),
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineSmall,
+                style: Theme.of(context).textTheme.titleLarge,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(body, textAlign: TextAlign.center),
-              const SizedBox(height: 20),
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(52),
-                ),
-                onPressed: onAction,
-                child: Text(actionLabel),
-              ),
+              const SizedBox(height: 12),
+              FilledButton(onPressed: onAction, child: Text(actionLabel)),
             ],
           ),
         ),
@@ -758,14 +755,14 @@ class _DashboardSummaryCard extends StatelessWidget {
     final resolvedTitle = title ?? 'Bugün';
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                Icon(icon),
-                const SizedBox(width: 10),
+                Icon(icon, size: 22),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     resolvedTitle,
@@ -774,14 +771,14 @@ class _DashboardSummaryCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             switch (status) {
               _SectionStatus.loading => const LinearProgressIndicator(),
               _SectionStatus.error => Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(errorText),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   OutlinedButton(
                     key: retryKey,
                     onPressed: onRetry,
@@ -795,7 +792,7 @@ class _DashboardSummaryCard extends StatelessWidget {
               ),
               _SectionStatus.idle => const Text('Proje seçimi bekleniyor.'),
             },
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
@@ -829,14 +826,19 @@ class _DashboardActionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: ListTile(
-        leading: Icon(icon),
+        dense: true,
+        visualDensity: const VisualDensity(horizontal: -1, vertical: -2),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        minVerticalPadding: 4,
+        horizontalTitleGap: 8,
+        leading: Icon(icon, size: 22),
         title: Text(title),
         subtitle: Text(
           onTap == null ? 'Bu kurulumda hazır değil.' : enabledSubtitle,
         ),
         trailing: onTap == null
-            ? const Icon(Icons.block_outlined)
-            : const Icon(Icons.chevron_right_rounded),
+            ? const Icon(Icons.block_outlined, size: 20)
+            : const Icon(Icons.chevron_right_rounded, size: 20),
         onTap: onTap,
       ),
     );
