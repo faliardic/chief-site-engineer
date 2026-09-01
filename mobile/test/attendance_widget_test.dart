@@ -34,7 +34,12 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: AttendancePage(attendance: attendance, agenda: agenda),
+          body: AttendancePage(
+            attendance: attendance,
+            agenda: agenda,
+            activeProjectId: projectId,
+            isActive: true,
+          ),
         ),
       ),
     );
@@ -82,6 +87,131 @@ void main() {
     expect(save, findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'Puantaj stays dormant while hidden and validates only shared project',
+    (tester) async {
+      final agenda = FakeAgendaApplication(
+        projects: [_project(), _secondProject()],
+      );
+      final attendance = _TrackingAttendanceApplication();
+      var isActive = false;
+      String? activeProjectId;
+      late StateSetter updateHost;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                updateHost = setState;
+                return AttendancePage(
+                  attendance: attendance,
+                  agenda: agenda,
+                  activeProjectId: activeProjectId,
+                  isActive: isActive,
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(agenda.listProjectsCalls, 0);
+      expect(attendance.ensureProjectIds, isEmpty);
+      expect(attendance.rollingCalls, 0);
+
+      updateHost(() => isActive = true);
+      await tester.pumpAndSettle();
+      expect(agenda.listProjectsCalls, 1);
+      expect(attendance.ensureProjectIds, isEmpty);
+
+      updateHost(() => activeProjectId = 'stale-project');
+      await tester.pumpAndSettle();
+      expect(agenda.listProjectsCalls, 2);
+      expect(attendance.ensureProjectIds, isEmpty);
+
+      updateHost(() => activeProjectId = _secondProject().id);
+      await tester.pumpAndSettle();
+      expect(agenda.listProjectsCalls, 3);
+      expect(attendance.ensureProjectIds, [_secondProject().id]);
+      expect(attendance.rollingCalls, 1);
+
+      updateHost(() {
+        isActive = false;
+        activeProjectId = projectId;
+      });
+      await tester.pumpAndSettle();
+      await agenda.createProject(
+        const CreateProjectCommand(
+          id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+          name: 'Hidden signal',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(agenda.listProjectsCalls, 3);
+      expect(attendance.ensureProjectIds, [_secondProject().id]);
+      expect(attendance.rollingCalls, 1);
+
+      updateHost(() => isActive = true);
+      await tester.pumpAndSettle();
+      expect(agenda.listProjectsCalls, 4);
+      expect(attendance.ensureProjectIds, [_secondProject().id, projectId]);
+      expect(attendance.rollingCalls, 2);
+    },
+  );
+
+  testWidgets(
+    'Puantaj reports a deliberate project only after exact load succeeds',
+    (tester) async {
+      final agenda = FakeAgendaApplication(
+        projects: [_project(), _secondProject()],
+      );
+      final attendance = _TrackingAttendanceApplication();
+      final reportedProjects = <String>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AttendancePage(
+              attendance: attendance,
+              agenda: agenda,
+              activeProjectId: _secondProject().id,
+              isActive: true,
+              onProjectSelected: reportedProjects.add,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(attendance.ensureProjectIds, [_secondProject().id]);
+      final projectField = find.descendant(
+        of: find.byKey(const Key('attendance-project')),
+        matching: find.byType(DropdownButtonFormField<String>),
+      );
+
+      attendance.failNextEnsureProjectId = projectId;
+      await tester.tap(projectField);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(_project().name).last);
+      await tester.pumpAndSettle();
+      expect(reportedProjects, isEmpty);
+      expect(
+        tester.state<FormFieldState<String>>(projectField).value,
+        _secondProject().id,
+      );
+
+      await tester.tap(projectField);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(_project().name).last);
+      await tester.pumpAndSettle();
+      expect(reportedProjects, [projectId]);
+      expect(attendance.ensureProjectIds, [
+        _secondProject().id,
+        projectId,
+        projectId,
+      ]);
+    },
+  );
 
   testWidgets(
     'Kaydet saves the Puantaj roster while draft lifecycle stays open',
@@ -584,6 +714,8 @@ void main() {
               body: AttendancePage(
                 attendance: attendance,
                 agenda: FakeAgendaApplication(projects: [_project()]),
+                activeProjectId: projectId,
+                isActive: true,
               ),
             ),
           ),
@@ -648,6 +780,8 @@ void main() {
             body: AttendancePage(
               attendance: attendance,
               agenda: FakeAgendaApplication(projects: [_project()]),
+              activeProjectId: projectId,
+              isActive: true,
             ),
           ),
         ),
@@ -725,6 +859,28 @@ class _DelayedAttendanceApplication extends FakeAttendanceApplication {
       teamCounts;
 }
 
+class _TrackingAttendanceApplication extends FakeAttendanceApplication {
+  final List<String> ensureProjectIds = [];
+  int rollingCalls = 0;
+  String? failNextEnsureProjectId;
+
+  @override
+  Future<AttendanceDay> ensureDay(EnsureAttendanceDayCommand command) async {
+    ensureProjectIds.add(command.projectId);
+    if (failNextEnsureProjectId == command.projectId) {
+      failNextEnsureProjectId = null;
+      throw StateError('synthetic attendance load failure');
+    }
+    return super.ensureDay(command);
+  }
+
+  @override
+  Future<void> ensureRollingOccurrences() async {
+    rollingCalls += 1;
+    return super.ensureRollingOccurrences();
+  }
+}
+
 class _AttendancePushCountingObserver extends NavigatorObserver {
   int pushes = 0;
 
@@ -747,6 +903,14 @@ Future<void> _setPhoneSize(WidgetTester tester, Size size) async {
 MobileProject _project() => const MobileProject(
   id: projectId,
   name: 'Test Projesi',
+  createdAt: '2026-07-19T08:00:00Z',
+  updatedAt: '2026-07-19T08:00:00Z',
+  revision: 1,
+);
+
+MobileProject _secondProject() => const MobileProject(
+  id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+  name: 'İkinci Proje',
   createdAt: '2026-07-19T08:00:00Z',
   updatedAt: '2026-07-19T08:00:00Z',
   revision: 1,
