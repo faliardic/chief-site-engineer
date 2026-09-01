@@ -316,7 +316,10 @@ class _MobileShellState extends State<MobileShell> {
   }
 
   bool get _showsActiveProjectIndicator =>
-      _selectedIndex == 1 || _selectedIndex == 2 || _selectedIndex == 5;
+      _selectedIndex == 1 ||
+      _selectedIndex == 2 ||
+      _selectedIndex == 4 ||
+      _selectedIndex == 5;
 
   Future<void> _adoptRouteProjectSelection(
     String projectId, {
@@ -718,6 +721,9 @@ class _MobileShellState extends State<MobileShell> {
               AttendancePage(
                 attendance: attendance,
                 agenda: widget.bootstrap.agenda,
+                activeProjectId: _activeProjectSession.selectedProjectId,
+                isActive: _selectedIndex == 4,
+                onProjectSelected: _reportRouteProjectSelection,
               )
             else
               const _PreparingPage(

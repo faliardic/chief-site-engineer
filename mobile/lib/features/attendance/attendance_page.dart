@@ -15,11 +15,17 @@ class AttendancePage extends StatefulWidget {
   const AttendancePage({
     required this.attendance,
     required this.agenda,
+    required this.activeProjectId,
+    required this.isActive,
+    this.onProjectSelected,
     super.key,
   });
 
   final AttendanceApplication attendance;
   final AgendaApplication agenda;
+  final String? activeProjectId;
+  final bool isActive;
+  final ValueChanged<String>? onProjectSelected;
 
   @override
   State<AttendancePage> createState() => _AttendancePageState();
@@ -32,21 +38,42 @@ class _AttendancePageState extends State<AttendancePage> {
   MobileProject? _project;
   AttendanceDayDetail? _detail;
   late String _localDate;
-  bool _loading = true;
+  bool _loading = false;
   String? _error;
   List<ActiveTeamCount> _teamCounts = const [];
   StreamSubscription<void>? _projectSubscription;
   bool _detailNavigationBusy = false;
+  int _projectLoadGeneration = 0;
+  int _dayLoadGeneration = 0;
 
   @override
   void initState() {
     super.initState();
     final now = DateTime.now().toUtc();
     _localDate = CseTimeCodec.istanbulDayKey(CseTimeCodec.encodeUtc(now));
-    _projectSubscription = widget.agenda.projectChanges.listen(
-      (_) => _loadProjects(),
-    );
-    _loadProjects();
+    _projectSubscription = widget.agenda.projectChanges.listen((_) {
+      if (widget.isActive) unawaited(_loadProjects());
+    });
+    if (widget.isActive) unawaited(_loadProjects());
+  }
+
+  @override
+  void didUpdateWidget(covariant AttendancePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.isActive) {
+      _projectLoadGeneration += 1;
+      _dayLoadGeneration += 1;
+      if (oldWidget.isActive && _loading) setState(() => _loading = false);
+      return;
+    }
+    final becameActive = !oldWidget.isActive;
+    final sharedProjectChanged =
+        oldWidget.activeProjectId != widget.activeProjectId;
+    final currentProjectIsShared =
+        _project?.id == widget.activeProjectId && _detail != null;
+    if (becameActive || (sharedProjectChanged && !currentProjectIsShared)) {
+      unawaited(_loadProjects());
+    }
   }
 
   @override
@@ -57,40 +84,66 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   Future<void> _loadProjects() async {
+    if (!widget.isActive) return;
+    final generation = ++_projectLoadGeneration;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final projects = await widget.agenda.listProjects();
-      if (!mounted) return;
-      _projects = projects;
-      _project = _project == null
-          ? projects.firstOrNull
-          : projects.where((item) => item.id == _project!.id).firstOrNull;
-      if (_project != null) {
-        await _loadDay();
-      } else {
-        _teamCounts = const [];
-        _detail = null;
+      final discoveredProjects = await widget.agenda.listProjects();
+      if (!mounted ||
+          !widget.isActive ||
+          generation != _projectLoadGeneration) {
+        return;
       }
+      final projects = discoveredProjects
+          .where((project) => !project.isArchived)
+          .toList(growable: false);
+      final activeProjectId = widget.activeProjectId;
+      final project = activeProjectId == null
+          ? null
+          : projects
+                .where((candidate) => candidate.id == activeProjectId)
+                .firstOrNull;
+      setState(() {
+        _projects = projects;
+        _project = project;
+        _detail = null;
+        _teamCounts = const [];
+      });
+      if (project != null) await _loadDay(project: project);
     } on Object catch (error) {
-      if (!mounted) return;
-      setState(() => _error = _message(error, 'Projeler açılamadı.'));
+      if (!mounted ||
+          !widget.isActive ||
+          generation != _projectLoadGeneration) {
+        return;
+      }
+      setState(() {
+        _projects = const [];
+        _project = null;
+        _detail = null;
+        _teamCounts = const [];
+        _error = _message(error, 'Projeler açılamadı.');
+      });
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && widget.isActive && generation == _projectLoadGeneration) {
+        setState(() => _loading = false);
+      }
     }
   }
 
-  Future<void> _loadDay({double? restoreOffset}) async {
-    final project = _project;
-    if (project == null) return;
+  Future<bool> _loadDay({MobileProject? project, double? restoreOffset}) async {
+    if (!widget.isActive) return false;
+    final selectedProject = project ?? _project;
+    if (selectedProject == null) return false;
+    final generation = ++_dayLoadGeneration;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final key = '${project.id}:$_localDate';
+      final key = '${selectedProject.id}:$_localDate';
       final ids = _ensureIds.putIfAbsent(
         key,
         () => _EnsureIds(RecordId.randomUuid(), RecordId.randomUuid()),
@@ -99,27 +152,63 @@ class _AttendancePageState extends State<AttendancePage> {
         EnsureAttendanceDayCommand(
           id: ids.dayId,
           eventId: ids.eventId,
-          projectId: project.id,
+          projectId: selectedProject.id,
           localDate: _localDate,
         ),
       );
       await widget.attendance.ensureRollingOccurrences();
       final detail = await widget.attendance.getDayDetail(day.id);
       final teamCounts = await widget.attendance.listActiveTeamCounts(
-        project.id,
+        selectedProject.id,
       );
-      if (!mounted) return;
+      if (!mounted ||
+          !widget.isActive ||
+          generation != _dayLoadGeneration ||
+          _project?.id != selectedProject.id) {
+        return false;
+      }
       setState(() {
         _detail = detail;
         _teamCounts = teamCounts;
       });
+      _restoreScrollOffset(restoreOffset);
+      return true;
     } on Object catch (error) {
-      if (!mounted) return;
-      setState(() => _error = _message(error, 'Puantaj günü açılamadı.'));
+      if (mounted && widget.isActive && generation == _dayLoadGeneration) {
+        setState(() => _error = _message(error, 'Puantaj günü açılamadı.'));
+      }
+      return false;
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && widget.isActive && generation == _dayLoadGeneration) {
+        setState(() => _loading = false);
+      }
     }
-    _restoreScrollOffset(restoreOffset);
+  }
+
+  Future<void> _selectProject(String projectId) async {
+    final project = _projects
+        .where((candidate) => candidate.id == projectId)
+        .firstOrNull;
+    if (project == null) return;
+    final previousProject = _project;
+    final previousDetail = _detail;
+    final previousTeamCounts = _teamCounts;
+    setState(() {
+      _project = project;
+      _detail = null;
+      _teamCounts = const [];
+    });
+    final loaded = await _loadDay(project: project);
+    if (!mounted || !widget.isActive || _project?.id != projectId) return;
+    if (loaded) {
+      widget.onProjectSelected?.call(projectId);
+      return;
+    }
+    setState(() {
+      _project = previousProject;
+      _detail = previousDetail;
+      _teamCounts = previousTeamCounts;
+    });
   }
 
   Future<void> _shiftDay(int delta) async {
@@ -269,12 +358,7 @@ class _AttendancePageState extends State<AttendancePage> {
                 )
                 .toList(growable: false),
             onChanged: (id) {
-              if (id == null) return;
-              setState(() {
-                _project = _projects.firstWhere((item) => item.id == id);
-                _detail = null;
-              });
-              _loadDay();
+              if (id != null) unawaited(_selectProject(id));
             },
           ),
           const SizedBox(height: 10),

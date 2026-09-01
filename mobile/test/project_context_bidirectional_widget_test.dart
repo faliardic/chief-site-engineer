@@ -354,6 +354,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      expect(attendance.ensureDayCalls, 0);
+      expect(attendance.rollingCalls, 0);
       final baselineEnsureDay = attendance.ensureDayCalls;
       final baselineRolling = attendance.rollingCalls;
 
@@ -363,6 +365,8 @@ void main() {
         find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
       );
       await tester.pumpAndSettle();
+      expect(attendance.ensureDayCalls, 0);
+      expect(attendance.rollingCalls, 0);
 
       await tester.tap(find.text('Daha').last);
       await tester.pumpAndSettle();
@@ -461,6 +465,145 @@ void main() {
       expect(attendance.ensureDayCalls, baselineEnsureDay);
       expect(attendance.rollingCalls, baselineRolling);
       expect(agenda.captureCalls, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'shell opens Puantaj on exact shared project and adopts only successful load',
+    (tester) async {
+      final agenda = _PhoneAgenda(projects: const [_projectA, _projectB]);
+      final attendance = _TrackingAttendance();
+      await tester.pumpWidget(
+        CseApp(
+          bootstrap: Future.value(
+            BootstrapSuccess(
+              environmentLabel: 'Test',
+              smokeRecordId: 'issue-561-shell',
+              smokeRecordCreatedAt: '2026-09-01T08:00:00Z',
+              agenda: agenda,
+              dailyLog: _DailyFake.fromMobile(const [_projectA, _projectB]),
+              livingPlan: _PlanFake(),
+              materialRequests: _MaterialFake.fromMobile(const [
+                _projectA,
+                _projectB,
+              ]),
+              attendance: attendance,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(attendance.ensureProjectIds, isEmpty);
+      expect(attendance.rollingCalls, 0);
+
+      await tester.tap(find.text('Proje seç'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
+      );
+      await tester.pumpAndSettle();
+      expect(attendance.ensureProjectIds, isEmpty);
+      expect(attendance.rollingCalls, 0);
+
+      await tester.tap(find.text('Puantaj').last);
+      await tester.pumpAndSettle();
+      expect(attendance.ensureProjectIds, [_projectB.id]);
+      expect(attendance.rollingCalls, 1);
+      expect(
+        tester
+            .widget<DropdownButtonFormField<String>>(
+              find.byKey(const Key('attendance-project')),
+            )
+            .initialValue,
+        _projectB.id,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text(_projectB.name),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Başlangıç').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('dashboard-change-project')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(ValueKey('dashboard-project-${_projectA.id}')),
+      );
+      await tester.pumpAndSettle();
+      expect(attendance.ensureProjectIds, [_projectB.id]);
+      expect(attendance.rollingCalls, 1);
+
+      await agenda.createProject(
+        const CreateProjectCommand(
+          id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+          name: 'Hidden project signal',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(attendance.ensureProjectIds, [_projectB.id]);
+      expect(attendance.rollingCalls, 1);
+
+      await tester.tap(find.text('Puantaj').last);
+      await tester.pumpAndSettle();
+      expect(attendance.ensureProjectIds, [_projectB.id, _projectA.id]);
+      expect(attendance.rollingCalls, 2);
+      expect(
+        tester
+            .widget<DropdownButtonFormField<String>>(
+              find.byKey(const Key('attendance-project')),
+            )
+            .initialValue,
+        _projectA.id,
+      );
+
+      attendance.failNextEnsureProjectId = _projectB.id;
+      await _chooseProject(
+        tester,
+        find.byKey(const Key('attendance-project')),
+        _projectB.name,
+      );
+      expect(attendance.ensureProjectIds.last, _projectB.id);
+      expect(attendance.rollingCalls, 2);
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text(_projectA.name),
+        ),
+        findsOneWidget,
+      );
+
+      await _chooseProject(
+        tester,
+        find.byKey(const Key('attendance-project')),
+        _projectB.name,
+      );
+      expect(attendance.rollingCalls, 3);
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text(_projectB.name),
+        ),
+        findsOneWidget,
+      );
+
+      await _chooseProject(
+        tester,
+        find.byKey(const Key('attendance-project')),
+        _projectA.name,
+      );
+      expect(attendance.rollingCalls, 4);
+      expect(attendance.ensureProjectIds.last, _projectA.id);
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text(_projectA.name),
+        ),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     },
   );
@@ -660,6 +803,8 @@ class _TrackingAttendance extends FakeAttendanceApplication {
   final List<String> teamProjectCalls = [];
   int ensureDayCalls = 0;
   int rollingCalls = 0;
+  final List<String> ensureProjectIds = [];
+  String? failNextEnsureProjectId;
 
   List<String> get directoryProjectCalls => [
     ...memberProjectCalls,
@@ -705,6 +850,11 @@ class _TrackingAttendance extends FakeAttendanceApplication {
   @override
   Future<AttendanceDay> ensureDay(EnsureAttendanceDayCommand command) async {
     ensureDayCalls += 1;
+    ensureProjectIds.add(command.projectId);
+    if (failNextEnsureProjectId == command.projectId) {
+      failNextEnsureProjectId = null;
+      throw StateError('synthetic attendance load failure');
+    }
     return super.ensureDay(command);
   }
 
