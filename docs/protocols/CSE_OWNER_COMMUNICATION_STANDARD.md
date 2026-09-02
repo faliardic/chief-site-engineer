@@ -75,7 +75,15 @@ Her sonuçta yalnız owner'ın değil, sıradaki işi kimin yapacağı da açık
 - `Sıradaki aksiyon — ChatGPT: Owner-approved PR işlemini tamamla.`
 - `Sıradaki aksiyon — Yok: İş tamamlandı.`
 
-Repository/local execution gerekiyorsa ChatGPT, owner'ın ayrıca `Codex ile çalış` demesini beklemez; Codex handoff'unu kendiliğinden verir. ChatGPT'ın yetkili olduğu mevcut owner-approved işlem için ayrıca `devam` istenmez.
+Bir aksiyon tamamlandıktan sonra sıradaki aksiyonun yalnız adı verilmez. Aynı yanıtta:
+
+- Codex için `Hazır Codex talimatı:` altında kopyalanabilir 10–15 satırlık exact görev;
+- Fatih için `Hazır Fatih talimatı:` altında exact komut, kısa kontrol ve beklenen sonuç;
+- ChatGPT için mevcut authority içindeyse kendiliğinden execution, değilse gereken tek owner onayı
+
+sunulur.
+
+Repository/local execution gerekiyorsa ChatGPT, owner'ın ayrıca `Codex ile çalış`, `devam` veya `talimat hazırla` demesini beklemez; Codex handoff'unu kendiliğinden verir. ChatGPT'ın yetkili olduğu mevcut owner-approved işlem için ayrıca `devam` istenmez.
 
 ## 7. Resume
 
