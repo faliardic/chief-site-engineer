@@ -177,7 +177,13 @@ STANDARD sonucu kısa Issue/PR kaydıdır. CRITICAL ayrıntılı provenance taş
 
 Aynı bilgi Issue, comment, task, result, state ve PR body içinde tekrar edilmez.
 
-Owner'a önce ürün/pratik anlam sade Türkçeyle anlatılır. Teknik YAML ve execution evidence yalnız gerektiğinde ikinci katmanda verilir.
+ChatGPT kullanıcıya teslim ettiği her yanıtta önce sade Türkçeyle şunları anlatır:
+
+- ne yaptığını;
+- bunun uygulama veya çalışma açısından ne anlama geldiğini;
+- işlemin başarılı mı, eksik mi, engelli mi olduğunu.
+
+SHA, branch, divergence, allowlist, YAML ve benzeri teknik kanıtlar bu açıklamadan sonra ikinci katmanda verilir. Teknik terim gerekliyse hemen günlük dilde karşılığı açıklanır. Ham Codex çıktısı ana cevap olarak kopyalanmaz; ChatGPT sonucu owner'ın tek okumada anlayacağı dile çevirir. Kısalık, anlaşılabilirliği bozacak kadar bilgi eksiltme gerekçesi değildir.
 
 ## 9. Ana karar
 
