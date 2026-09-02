@@ -4,6 +4,18 @@
 
 CSE'de teknik gerçek saklanmaz; owner'a önce ürünün ve işlemin pratik anlamı anlatılır.
 
+## 0. Her yanıtta anlaşılır dil
+
+ChatGPT kullanıcıya teslim ettiği her sonuçta, teknik kaydı göstermeden önce sade Türkçeyle şunları açıklar:
+
+1. Ne yaptım?
+2. Bunun uygulama veya çalışma açısından anlamı ne?
+3. İşlem tamamlandı mı; sorun veya eksik var mı?
+
+Owner'ın Git, Android veya test terimlerini çözerek sonucu çıkarması beklenmez. `fast-forward`, `divergence`, `head`, `allowlist`, `artifact` veya benzeri bir terim kullanılıyorsa günlük dilde karşılığı aynı yerde söylenir.
+
+Ham Codex çıktısı, YAML veya komut dökümü ana açıklamanın yerine geçmez. ChatGPT bunları kısa bir sonuca çevirir; teknik ayrıntıyı yalnız kanıt veya uygulama talimatı olarak ikinci katmanda verir. Dil sade olur ancak risk, başarısızlık veya eksik doğrulama yumuşatılmaz.
+
 ## 1. Mikro mesajlar
 
 FAST ve rutin STANDARD ara sonuçları normalde 2–5 cümledir:

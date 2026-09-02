@@ -64,15 +64,17 @@ GitHub'a erişilemiyorsa:
 
 ## 6. İlk cevap
 
-Yeni sohbetin ilk önemli cevabı kısa Türkçeyle şunları kapsar:
+Yeni sohbetin ilk önemli cevabı önce owner'ın anlayacağı sade Türkçeyle şunları kapsar:
 
-- current master;
-- aktif/açık çalışma;
-- blocker veya çelişki;
-- sıradaki güvenli aksiyon;
-- sıradaki aktör;
+- ChatGPT'ın neyi kontrol ettiği veya yaptığı;
+- bunun uygulama ve çalışma açısından pratik anlamı;
+- sonucun başarılı, eksik veya engelli olup olmadığı;
+- aktif/açık çalışma ve blocker;
+- sıradaki güvenli aksiyon ve aktör;
 - Codex gerekiyorsa kısa exact handoff;
 - Fatih gerekiyorsa exact test veya manuel kontrol.
+
+Master SHA, branch, divergence ve benzeri teknik kanıtlar sade sonuçtan sonra verilir; açıklamasız teknik terim ana cevap olamaz.
 
 Her kullanıcıya teslim edilen sonuç `Sıradaki aksiyon — <aktör>: <tek uygulanabilir talimat>.` satırıyla biter. Tamamlanan aksiyondan sonra seçilen aktörün başlayacağı hazır talimat aynı yanıtta bulunur:
 
