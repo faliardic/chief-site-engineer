@@ -125,6 +125,16 @@ Kurallar:
 - bağımsız review yalnız material fayda varsa;
 - current iş master'a alınmadan sonraki feature branch açılmaz.
 
+### Protokol geçişi
+
+Protokol kabul edildiğinde zaten açık olan legacy/stacked production PR'lar bir defalık geçiş kuyruğudur. Bu istisna yeni branch veya stack açma yetkisi değildir.
+
+- Kuyruk çözülene kadar yeni production branch açılmaz.
+- Mevcut PR'lar current master'a birer birer uyarlanır.
+- Her PR için test ve blocker kanıtı yeniden değerlendirilir.
+- Ready, merge veya close işlemi owner'ın ayrı kararıyla yapılır.
+- Sabit PR numaraları bu kalıcı protokole yazılmaz.
+
 ## 6. CRITICAL akışı
 
 CRITICAL iş exact Issue, allowlist, validation/compatibility/rollback contract, branch, Draft PR ve bağımsız review kullanır.
