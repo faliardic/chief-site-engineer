@@ -82,7 +82,7 @@ Salt YAML owner cevabı olamaz. Codex completion metni owner'a doğrudan kopyala
 
 Her sonuçta yalnız owner'ın değil, sıradaki işi kimin yapacağı da açık olmalıdır:
 
-- `Sıradaki aksiyon — Fatih: Exact testi çalıştır ve PASS/FAIL bildir.`
+- `Sıradaki aksiyon — Fatih: Manuel ürün kontrolünü yap ve davranış PASS/FAIL kararını bildir.`
 - `Sıradaki aksiyon — Codex: Verilen 5 dakikalık exact görevi uygula.`
 - `Sıradaki aksiyon — ChatGPT: Owner-approved PR işlemini tamamla.`
 - `Sıradaki aksiyon — Yok: İş tamamlandı.`
@@ -90,7 +90,7 @@ Her sonuçta yalnız owner'ın değil, sıradaki işi kimin yapacağı da açık
 Bir aksiyon tamamlandıktan sonra sıradaki aksiyonun yalnız adı verilmez. Aynı yanıtta:
 
 - Codex için `Hazır Codex talimatı:` altında kopyalanabilir 10–15 satırlık exact görev;
-- Fatih için `Hazır Fatih talimatı:` altında exact komut, kısa kontrol ve beklenen sonuç;
+- Fatih için `Hazır Fatih talimatı:` altında yalnız manuel ürün/device kontrolü ve beklenen sonuç; terminal komutu verilmez;
 - ChatGPT için mevcut authority içindeyse kendiliğinden execution, değilse gereken tek owner onayı
 
 sunulur.

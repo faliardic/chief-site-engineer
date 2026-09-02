@@ -15,8 +15,9 @@ Her talepte lane'den önce sıradaki tek aksiyon ve aktör seçilir:
 |---|---|
 | GitHub okuma, plan, Issue/PR koordinasyonu, review, owner-approved Ready/merge | ChatGPT |
 | Repository/local dosya değişikliği, format/diff, local Git, commit/push | Codex |
-| Test/analyzer ve manuel ürün kabulü | Fatih |
-| Build/APK/ADB/device | Fatih; yalnız exact owner delegasyonuyla Codex istisnası |
+| Repository-local terminal, automated test/analyzer ve build/APK hazırlığı | Codex |
+| Manuel ürün/device kabulü ve nihai davranış PASS/FAIL | Fatih; terminal komutu çalıştırmaz |
+| Emulator/ADB/device execution | Yalnız exact package/device/data-safety owner delegasyonuyla Codex |
 
 Codex gereken işte ChatGPT kullanıcının `Codex ile çalış` demesini beklemez. `Sıradaki aktör: Codex` der ve current Issue/protokolü kopyalamadan yalnız goal, allowlist, stop ve handoff'u içeren 10–15 satırlık exact görev verir.
 
@@ -77,21 +78,11 @@ Süre dolduğunda:
 
 Büyük STANDARD/CRITICAL görevler birden fazla bağımsız 5 dakikalık mikro adıma bölünebilir. Aynı anda yalnız bir production adımı yürür.
 
-## 3. Test sahipliği
+## 3. Execution ve kabul sahipliği
 
-Codex test, analyzer veya manuel ürün kabulü çalıştırmaz. Build, emulator, ADB veya device işlemi varsayılan olarak Fatih'tedir; Fatih exact package/device/data-safety sınırıyla açıkça devrederse Codex bunları tek bir 5 dakikalık hard-stop görevi olarak çalıştırabilir. PASS/FAIL ve ürün kabulü Fatih'te kalır.
+Repository-local terminal, automated test, analyzer ve build/APK hazırlığı Codex tarafından, yetkili görevin minimum yeterli kapsamıyla yürütülür. Fatih PowerShell/terminal/Git/Flutter/test/analyzer/build komutu çalıştırmaz; kendisine bu komutlar hazırlanmaz veya verilmez. Fatih yalnız manuel ürün/device kabulünü ve nihai görsel/davranış PASS/FAIL kararını verir. Emulator/ADB/device execution yalnız exact package, cihaz ve veri-koruma sınırıyla açık owner delegasyonunda yapılabilir; MAIN/Acceptance/Debug ve mevcut veri güvenliği sınırları korunur.
 
-Codex normalde yalnız:
-
-- exact source edit;
-- değişen dosyalarda format;
-- changed-path diff review;
-- `git diff --check`;
-- protected path ve kritik contract drift kontrolü
-
-yapar ve Fatih'e exact doğrulama komutlarını verir.
-
-Fatih focused/full test, analyzer, build, APK/install, device ve ürün kabulünü çalıştırır; exact build/APK/ADB/device execution'ını isterse açık sınırlarla Codex'e devreder.
+Codex source edit, format, changed-path review, `git diff --check`, protected drift ve minimum yeterli automated doğrulamayı yapar; sonuçları raporlar. Fatih'e yalnız manuel kabul adımları verilir.
 
 ## 4. FAST akışı
 
@@ -99,7 +90,8 @@ Fatih focused/full test, analyzer, build, APK/install, device ve ürün kabulün
 clean synchronized master
 → one micro edit
 → format/diff-check
-→ Fatih validation
+→ Codex automated validation
+→ Fatih manuel kabulü
 → PASS
 → small commit/push
 → next micro step
@@ -124,7 +116,8 @@ Fatih PASS bildirmeden commit/push yapılmaz. FAIL/PENDING durumunda yeni işe g
 short task/Issue
 → one short-lived branch
 → bounded micro edits
-→ Fatih validation
+→ Codex automated validation
+→ Fatih manuel kabulü
 → concise evidence
 → optional single Draft PR/review
 → owner merge
@@ -175,7 +168,7 @@ Her correction ayrı 5 dakikalık mikro adımdır. Aynı hata için:
 
 - exact root cause belirlenir;
 - tek dar correction yapılır;
-- Fatih yeniden gerekli testi çalıştırır.
+- Codex yalnız gerekli automated doğrulamayı çalıştırır; Fatih gerekiyorsa manuel kabulü yeniden değerlendirir.
 
 Yeni authority yalnız şu durumlarda gerekir:
 
@@ -193,7 +186,8 @@ FAST minimum:
 changed behavior
 changed paths
 format/diff-check
-Fatih test status
+Codex automated validation status
+Fatih manual acceptance status
 commit/push
 ```
 
@@ -237,8 +231,9 @@ Required decision: <tek karar>
 
 - FAST Codex işlemi 5 dakikanın altında: %100
 - FAST Issue/PR/`.cse`: 0
-- Codex test/analyzer/manual acceptance invocation: 0
-- owner delegasyonu olmadan Codex build/APK/ADB/device invocation: 0
+- Codex manuel ürün kabulü kararı: 0
+- Fatih'e terminal execution görevi/komutu verme: 0
+- exact owner delegasyonu olmadan Codex emulator/ADB/device invocation: 0
 - user PASS olmadan FAST commit/push: 0
 - stacked PR: 0
 - aynı anda production PR: en fazla 1
@@ -246,4 +241,4 @@ Required decision: <tek karar>
 
 ## 12. Ana karar
 
-> CSE'nin varsayılan döngüsü küçük işte mikro edit ve owner testidir. Branch/PR/review yalnız değişen risk bunu gerektirdiğinde kullanılır. Ağır süreç gerçek veri, integrity ve release riskine ayrılır.
+> CSE'nin varsayılan döngüsü küçük işte mikro edit, Codex automated doğrulaması ve owner manuel kabulüdür. Branch/PR/review yalnız değişen risk bunu gerektirdiğinde kullanılır. Ağır süreç gerçek veri, integrity ve release riskine ayrılır.

@@ -549,7 +549,7 @@ Sabit yerel yol, SHA, schema, version, aktif Issue veya sıradaki iş bu belgede
 ### Owner / Fatih
 
 - Ürün kapsamının ve ilerlemenin nihai karar sahibidir.
-- Bütün test, analyzer, build, APK ve cihaz doğrulamalarını yürütür.
+- Manuel ürün/device kabulünü ve nihai görsel/davranış PASS/FAIL kararını verir; PowerShell/terminal komutu çalıştırmaz.
 - Ready, merge, Issue close, release, gerçek veri ve branch silme işlemlerine ayrı açık yetki verir.
 
 ### ChatGPT
@@ -563,7 +563,7 @@ Sabit yerel yol, SHA, schema, version, aktif Issue veya sıradaki iş bu belgede
 
 - Yalnız açıkça yetkilendirilen mikro-adımı uygular.
 - Tek işlemde beş dakikalık hard stop'a uyar.
-- Test, analyzer, build, emulator, ADB veya cihaz işlemi çalıştırmaz; owner'a exact doğrulama komutlarını verir.
+- Repository-local terminal, automated test, analyzer ve build/APK hazırlığını yetkili görev kapsamında çalıştırır. Emulator/ADB/device execution yalnız exact package/device/data-safety owner delegasyonuyla yapılır; Fatih'e terminal komutu verilmez.
 - Beklenmeyen değişiklik, izin veya kapsam çelişkisinde fail-closed durur.
 - Ready, merge, Issue close veya branch silme yapmaz.
 
@@ -611,7 +611,7 @@ Ortak akış:
 1. Güncel durum gözlenir.
 2. Owner kapsamı yetkilendirir.
 3. Codex tek mikro-adımı uygular ve statik kanıtı verir.
-4. Fatih exact doğrulamayı çalıştırır.
+4. Codex minimum yeterli automated doğrulamayı çalıştırır; Fatih manuel ürün/device kabulünü değerlendirir.
 5. PASS sonrası commit/push ayrı kısa işlem olarak yapılır.
 6. Ready/merge/close yalnız ayrı açık yetkiyle ilerler.
 
@@ -637,9 +637,9 @@ Beklenmeyen worktree değişikliği kullanıcıya ait kabul edilir ve korunur.
 
 ## 22. Test ve Kalite Kontrol
 
-Bütün test, analyzer, build, APK ve cihaz kontrollerini Fatih çalıştırır.
+Repository-local terminal, automated test, analyzer ve build/APK hazırlığı Codex tarafından, yetkili görevin minimum yeterli kapsamıyla yürütülür. Fatih PowerShell/terminal/Git/Flutter/test/analyzer/build komutu çalıştırmaz; kendisine bu komutlar hazırlanmaz veya verilmez. Fatih yalnız manuel ürün/device kabulünü ve nihai görsel/davranış PASS/FAIL kararını verir. Emulator/ADB/device execution yalnız exact package, cihaz ve veri-koruma sınırıyla açık owner delegasyonunda yapılabilir; MAIN/Acceptance/Debug ve mevcut veri güvenliği sınırları korunur.
 
-Codex yalnız hızlı statik kontrolleri yapar:
+Codex automated execution yanında şu statik kontrolleri yapar:
 
 - dokunulan dosyalarda gerekli format;
 - tam diff ve exact changed-path incelemesi;
@@ -647,7 +647,7 @@ Codex yalnız hızlı statik kontrolleri yapar:
 - protected drift;
 - riskli işlerde schema/backup/version değişimi.
 
-Codex tesliminde çalıştırılacak exact komut ve kısa manuel kontrol bulunur. PASS bildirilmeden commit/push yapılmaz. CI varsa ek güvenlik ağıdır; owner doğrulamasının yerine geçmez.
+Codex tesliminde automated execution sonuçları ve Fatih için yalnız kısa manuel kabul adımları bulunur. PASS bildirilmeden commit/push yapılmaz. CI varsa ek güvenlik ağıdır; owner doğrulamasının yerine geçmez.
 
 ---
 
@@ -720,7 +720,7 @@ SHA, version, schema, tamamlanan madde veya sıradaki iş eski metinden tahmin e
 Aşağıdaki tarihsel hükümler artık execution kuralı değildir:
 
 - her işte zorunlu Issue → branch → Draft PR zinciri;
-- Codex'in test/analyzer/build/device çalıştırması;
+- test/analyzer/build execution'ının Fatih'e atanması;
 - beş dakikayı aşan sabit execution/test bütçeleri;
 - her adımda zorunlu `.cse` kaydı;
 - sabit aralıkta podcast veya learning dosyası;
@@ -768,7 +768,8 @@ Execution döngüsü:
 Güncel durumu gözle
 -> owner kapsamı yetkilendirir
 -> Codex en fazla 5 dakikalık mikro-adımı uygular
--> Fatih doğrular
+-> Codex automated doğrulamayı çalıştırır
+-> Fatih manuel ürün/device kabulünü verir
 -> PASS sonrası kısa commit/push
 -> gerekiyorsa ayrı owner onayıyla Ready/merge
 ```
