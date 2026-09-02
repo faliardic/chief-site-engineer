@@ -1,13 +1,13 @@
 # CHIEF SITE ENGINEER exe - Birleştirilmiş Proje Kaynağı
 
-**Belge türü:** Birleştirilmiş ana proje kaynağı
-**Sürüm tarihi:** 2026-07-16
-**Durum:** Tracked kanonik ürün ve kalıcı politika kaynağı
+**Belge türü:** Kanonik ürün ve veri ilkeleri kaynağı
+**Sürüm tarihi:** 2026-09-02
+**Durum:** Tracked kanonik ürün kaynağı; dinamik çalışma durumu içermez
 **Kanonik repo yolu:** `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
 
-Bu belge, CHIEF SITE ENGINEER exe projesine ait mevcut yol haritalarını, ürün stratejisini, veri ilkelerini, özel alan modelini, Chat Handoff paketini, güncel proje talimatlarını, GitHub/Codex çalışma düzenini ve bu sohbet içinde alınan son kararları tek kaynağa birleştirir.
+Bu belge, CHIEF SITE ENGINEER exe projesinin kalıcı ürün yönünü, veri ilkelerini, saha modelini ve tarihsel sözleşmelerini birleştirir. Değişken repository durumu ile GitHub/Codex çalışma kuralları burada kopyalanmaz; `AGENTS.md` ve onun yönlendirdiği güncel protokollerden okunur.
 
-Bu belge onaylanıp proje kaynaklarına eklendiğinde, eski belgeler tarihsel ve destekleyici kaynak olarak korunmalı; güncel karar ve çalışma düzeni için bu belge ile tracked kanonik proje talimatı esas alınmalıdır.
+Eski belgeler tarihsel ve destekleyici kaynak olarak korunur. Ürün ve veri ilkelerinde bu belge; execution ve current-state konularında `AGENTS.md`, kanonik protokoller ve güncel GitHub kanıtı esas alınır.
 
 ---
 
@@ -234,13 +234,9 @@ Ofiste:
 6. Günlük export
 7. Haftalık özet
 
-Merge edilmiş Local Field MVP ilk altı hedefi destekleyen SQLite persistence ve migration runner, managed attachment store, local Flask web akışı, proje/gözlem create-list-detail-update, revision conflict koruması, arama, günlük export, backup/verify/izole restore ve Windows tek tık launcher içerir. Haftalık özet ürün yüzeyi henüz tamamlanmış kabul edilmez.
+Bu yedi çekirdek tarihsel MVP hedeflerini açıklar; hangilerinin güncel runtime'da uygulandığı veya kabul edildiği burada sabitlenmez. Gerçek implementation durumu güncel GitHub `master`, V2 Scope, Roadmap ve ilgili test/Issue kanıtından doğrulanır.
 
-Bu omurganın üzerindeki Saha Takibi v0.1 diliminde domain/recurrence, SQLite
-schema v4 repository/event persistence, transactional application service,
-yedi günlük lazy backfill, Backup compatibility, resmî export izolasyonu ve ilk
-PC UI tamamlanmıştır. Gerçek saha kabulü, mobile/offline/notification ve ortak
-Hafıza yaşam döngüsü tamamlanmamıştır.
+Tarihsel Flask/PC ve Saha Takibi v0.1 uygulamaları ürün omurgasının gelişim kanıtıdır; güncel mobil runtime, schema veya tamamlanma durumu olarak kullanılmaz. Bu bölüm yalnız MVP yetenek yönünü korur.
 
 ### Kalıcı ürün kapsamı dışında kalanlar
 
@@ -447,127 +443,15 @@ gerektirir. Project bağlantısı, link, AI veya routine işlemi scope değişti
 
 ## 11. Modül Yol Haritasının Güncel Yorumu
 
-Eski yol haritalarındaki 001-034 modül listesi tarihsel referanstır. Güncel V2
-ürün paketi ve sırası `docs/v2/CSE_V2_SCOPE.md` ile `ROADMAP.md` içindedir.
-Kurumsal/multi-user ürün hedefleri geri dönmez.
+Bu belge kalıcı ürün yönünü korur; tamamlanan madde, aktif iş ve sıradaki görev gibi değişken bilgiler burada dondurulmaz.
 
-### Güncel öncelik sırası
+Güncel ürün kapsamı ve sırası şu kaynaklardan doğrulanır:
 
-```text
-1. Proje/Mahal — complete
-2. Sicil/Puantaj V2/Saha Rehberi — complete
-3. Attachment/Fotoğraf/Medya V2 — complete
-4. Ajanda V2 + kontrollü sync — complete
-5. 7 Günlük Yaşayan İş Programı / İş ve Gün Planı — current
-6. Günlük Log Çıktısı v1
-7. İş Zinciri / Bağlı Log v1
-8. İstenecek Malzemeler
-9. Deterministik kişi/firma/etiket önerileri
-10. Telefon görüşmesi sonucu → Ajanda
-11. Proje fotoğraf/video albümü
-12. Günlük Log Çıktısı v2
-13. Mini hesap makinesi
-```
+1. `docs/v2/CSE_V2_SCOPE.md`
+2. `ROADMAP.md`
+3. Güncel GitHub `master`, açık Issue/PR ve owner kararı
 
-Teknik sistem binlerce inşaat aktivitesi ve deterministik bağımlılık taşıyabilir;
-şantiye şefinin kullanıcı akışı aktiviteyi bulup yakın plana birkaç işlemle
-eklemek ve yalnız önündeki yedi günü güncel tutmak kadar sade kalır. Bu living
-site plan bir Primavera klonu veya approved/contractual baseline değildir.
-
-Activity Catalog Runtime, typed Project Profile ve Dependency Catalog, Project
-Activity Instance Graph, deterministic Schedule Date Engine ve immutable
-persistent reference-schedule snapshots merged temeldir. UI'dan önce yalnız
-tek dar Living Plan MVP Core slice'ı gelebilir; immediate successor 7-day UI +
-APK/device acceptance olmalıdır.
-
-### Tarihsel Mobil-first Kâğıdı Bırakma çerçevesi
-
-Bu çerçeve geçmiş ürün yönünü açıklar; güncel V2 Item 5 sırasını override etmez.
-İlk gerçek saha pilotu için tariflenen minimum bütünleşik yüzey şunlardı:
-
-- `+ Yakala` / `+ Unutma`;
-- Bugün / Şimdi ilgilen / Geciken;
-- Dönüş bekliyorum / tekrar kontrol;
-- rutinler;
-- fotoğraf veya dosya ekleme;
-- minimum hızlı hesap şeridi;
-- günlük zaman çizelgesi ve düzenlenebilir taslak;
-- arama;
-- backup durumu/görünürlüğü.
-
-Minimum hesap şeridi ile günlük zaman çizelgesi pilot öncesidir; gelişmiş hesap araçları ve yayımlanmış immutable günlük zinciri sonraki fazlarda kalır.
-
-### Kayıtlı mühendislik hesap defteri
-
-İlk Kâğıdı Bırakma Sürümü minimum hızlı hesap şeridi taşır. Bu bölümdeki gelişmiş ve kaydedilebilir mühendislik hesap defteri 30 günlük ana uygulama pilotundan sonra gelir ve yalnız sonucu değil şunları korur:
-
-- girdiler;
-- birimler;
-- formül veya işlem şeridi;
-- sonuç;
-- tarih/saat;
-- açıklama;
-- proje, konum ve iş paketi bağlantısı;
-- varsa fotoğraf veya kroki;
-- resmî kayda aktarım durumu.
-
-Kişisel hesap otomatik resmî metraj değildir. Resmî aktarma açık kullanıcı onayı gerektirir.
-
-### Günlük şantiye logu
-
-Günlük Log Çıktısı v1, ilk usable Living Plan sonrasında gelir ve gerçek
-plan/progress/source kayıtlarını tüketir; primary saha-yönetimi döngüsünü
-geciktirmez.
-
-Gelişmiş günlük zincirinde taslak akşam kontrol edilip yayımlanan bir snapshot olur. Yayımlanmış günlük sessizce değişmez; düzeltme yeni revizyon veya ek ile yapılır.
-
-### Canlı Proje Haritası
-
-Harita ana veri kaynağı değil, kaynak kayıtların proje bağlamındaki read-model/projeksiyonudur.
-
-```text
-Proje dairesine dokun
--> ana iş/alan baloncukları
-
-Taşıyıcı baloncuğa dokun
--> baloncuk büyüyerek yeni odak olur
-
-Yaprak baloncuğa dokun
--> ayrıntılı ve düzenlenebilir kaynak kayıt çalışma ekranı
-```
-
-Haritada mouse wheel zoom, pinch zoom, trackpad zoom, pan/sürükleme, serbest zoom veya `+/-` zoom kontrolü bulunmaz. Tam uzak görünümde yalnız proje adını taşıyan en büyük daire görünür. `88/140`, `231 m³` veya `4 açık takip` gibi hesaplanmış balonlar doğrudan düzenlenmez; kaynak kayıt düzenlenir ve özet yeniden hesaplanır.
-
-Harita minimum Saha Takibi UI ve gerçek saha kabulünden önce production önceliği değildir.
-
-### Bugün, Harita, kayıt ve günlük ayrımı
-
-- `Bugün`: Şu anda ne yapmalıyım?
-- `Harita`: Bu bilgi proje içinde nerede?
-- `Kayıt çalışma alanı`: Tam olarak ne oldu ve hangi işlem yapılacak?
-- `Günlük`: Bugün ne yaşandı?
-
-`Bugün`, `Geciken` ve `Beklenen` ayrı kopya kayıtlar değildir; aynı source record'ların dinamik görünümleridir.
-
-### Eski modül numaraları
-
-Eski modül numaraları arşiv referansı olarak kullanılabilir; yeni teknik adımların numarasıyla karıştırılmamalıdır. Teknik Step numaraları Git/GitHub geliştirme geçmişini, modül numaraları ise tarihsel ürün backlog’unu temsil eder.
-
-### Legacy model envanteri ve deprecation yönü
-
-Fiziksel silme öncesinde ayrı bir envanter görevi şu adayları sınıflandırır:
-
-- `TrackingRecord` / `TaskCandidateRecord` -> `FollowUpItem` yönü;
-- `AttachmentRecord` / `FileAttachmentRecord` -> kalıcı attachment metadata/store yönü;
-- `DailySiteLog` / `DailyReportRecord` -> gelecekte `DailyLogSnapshot` yönü;
-- `ProjectPartyRecord` / `ContactPersonRecord` / `SupplierRecord` -> tek kişi/kurum referans yönü;
-- `MeetingActionRecord` / `RFIRecord` / `SubmittalRecord` -> not + takip + beklenen cevap ilişkisi;
-- karmaşık NCR prototip zinciri -> gözlem + aksiyon + kanıt + sonuç temelinde yeniden değerlendirme;
-- `app/records.py` in-memory repository'leri -> SQLite karşılıkları doğrulandıktan sonra deprecation.
-
-Sınıflandırma sözlüğü `Aktif çekirdek`, `Dönüştürülecek`, `Legacy/arşivlenecek` ve `Silme adayı`dır.
-
-Bu yön fiziksel silme, rename, import taşıma veya test kaldırma yetkisi vermez.
+Tarihsel modül listeleri araştırma ve iz sürme kaynağıdır. Yeni bir iş, yalnız güncel kapsam ve gerçek saha ihtiyacıyla uyumluysa başlatılır.
 
 ---
 
@@ -586,31 +470,15 @@ Uzun vadeli mimari katmanlı olmalıdır:
 - Audit ve backup/restore
 - Search/AI katmanı
 
-### Güncel gerçeklik
+### Değişmeyen mimari sınırlar
 
-Güncel ürün Flutter tabanlı, offline-first ve tek sahipli mobil uygulamadır.
-Mobile version `0.1.0+1`, SQLite schema `14`, backup format `1` ve safe merge
-`447916be0b3ddd2af75b0fe85f8c7f710f29c1cd` değeridir.
+- Güncel ürün Flutter tabanlı, offline-first ve tek sahipli mobil uygulamadır.
+- Mobil runtime bir Python sunucusuna bağlı kabul edilmez.
+- Reference snapshot öneri/history olarak immutable kalır.
+- Kullanıcıya ait living-plan kararları ayrı mutable/evented katmanda saklanır.
+- Stable identity, revision, transaction, history ve backup bütünlüğü korunur.
 
-V2 Items 1–4 complete'tir. Merged schedule foundation şunları içerir:
-
-- Activity Catalog Runtime;
-- typed Project Profile ve Dependency Catalog Runtime;
-- Project Activity Instance Graph;
-- deterministic Schedule Date Engine;
-- immutable persistent reference-schedule snapshots;
-- trusted date-window query.
-
-Reference snapshot öneri/history olarak immutable kalır. Living-plan kullanıcı
-kararları bunun üzerinde değil, ayrı mutable/evented katmanda saklanacaktır.
-Item 5 Living 7-Day Plan current direction'dır fakat complete değildir. UI/APK/
-device acceptance, actual quantity/progress/reforecast ve project-specific
-productivity learning henüz uygulanmamıştır.
-
-V1 owner saha kullanımı vardır; public/store release ve genel production
-readiness ilan edilmemiştir. Python/Flask çekirdeği tarihsel ürün omurgası ve
-sözleşme referansı olarak repository içinde korunur; güncel mobil runtime bir
-Python sunucusuna bağlanmaz.
+Runtime sürümü, SQLite schema, backup formatı, son merged SHA, tamamlanan V2 maddeleri ve sıradaki iş değişken repository bilgisidir. Bunlar her görev başında güncel kaynak kodu, GitHub `master`, V2 kapsamı ve aktif Issue üzerinden doğrulanır; bu belge sabit snapshot taşımaz.
 
 ---
 
@@ -644,613 +512,247 @@ Podcast ve tarihsel öğrenme belgeleri korunur; current-state veya ürün otori
 
 ---
 
-## 14. Podcast Disiplini
+## 14. Öğrenme ve Podcast Çıktıları
 
-Her beş teknik Step tamamlandığında NotebookLM podcast notu oluşturulur.
+Öğrenme notu, glossary, podcast veya benzeri anlatım çıktıları yalnız owner açıkça istediğinde ya da kalıcı ve yeni bir kavramı açıklamak belirgin öğrenme değeri sağladığında oluşturulur.
 
-Güncel durum:
-
-- Podcast 030: Steps 196-200
-- Podcast 031: Steps 201-205
-- Sıradaki doğal aralık: Steps 206-210
-
-Podcast notu yalnız ilgili aralığı kapsamalı ve ürün, teknik, saha ve öğrenme kazanımlarını birlikte açıklamalıdır.
+Sabit adım aralığı, dosya sayısı veya podcast üretim zorunluluğu yoktur. Bu çıktılar production işini, doğrulamayı, commit/push veya merge akışını bloke etmez.
 
 ---
 
 ## 15. Kaynak ve Karar Otoritesi
 
-Tek bir genel sıralama yerine her bilgi türünün ayrı yetkili yüzeyi vardır:
-
 | Bilgi türü | Yetkili kaynak |
 | --- | --- |
-| Kalıcı ürün amacı, ilkeler ve ürün sırası | `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md` |
-| Git/GitHub/Codex güvenliği ve çalışma protokolü | `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` |
-| Aktif görevin dar kapsamı | current GitHub Issue ve `.cse/tasks/<issue_no>_task.md` |
-| Değişken repository durumu | GitHub `master`, PR, Issue, branch ve commit kanıtı |
-| Yerel factual mirror ve completion evidence | `.cse/state/project_state.json` ve `.cse/results/<issue_no>_result.md` |
-| Tarihsel yön ve karar izi | `ROADMAP.md`, `docs/project_decisions.md`, `CHANGELOG.md` |
+| Kalıcı ürün amacı ve veri ilkeleri | Bu belge |
+| Başlangıç ve kaynak sırası | `AGENTS.md` |
+| Git/GitHub/Codex execution kuralları | `CSE_PROJECT_INSTRUCTIONS.md`, `CSE_WORKFLOW_ACCELERATION_PROTOCOL.md` |
+| Doğrulama sahipliği ve minimum yeterli test | `CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md` |
+| Değişken repository durumu | Güncel GitHub `master`, Issue, PR, branch ve commit kanıtı |
+| Aktif işin dar kapsamı | Owner'ın güncel yetkisi ve risk şeridi gerektiriyorsa ilgili Issue |
+| Task/result/state kayıtları | İkincil kanıt; yalnız protokol gerektiriyorsa |
 
-Current state her yeni iş öncesinde `origin/master` HEAD, açık Issue/PR'lar, ilgili diff, current Issue completion evidence'i ve yerel doğrulama ile belirlenir. `.cse/state`, README, ROADMAP, handoff, ZIP veya sohbet hafızası bu GitHub gerçeğini override edemez.
-
-### Yerel ayna
-
-Kök dizindeki ignored `CSE_GUNCEL_PROJE_TALIMATLARI.md` yalnız yerel kolaylık aynasıdır. Güncelliği kanıtlanmadan kullanılmaz; tracked kanonik dosyadan daha yüksek önceliğe sahip değildir ve normal görevlerde otomatik olarak değiştirilmez.
+Alt düzey bir kaynak kalıcı ürün veya veri güvenliği ilkesini gevşetemez. Statik bir snapshot güncel GitHub gerçeğini geçersiz kılamaz.
 
 ---
 
-## 16. Resmî Repository ve Çalışma Yolu
+## 16. Resmî Repository ve Güncel Durum
 
-Repository:
+Resmî repository `faliardic/chief-site-engineer`, varsayılan entegrasyon branch'i `master`dır.
 
-```text
-faliardic/chief-site-engineer
-```
-
-Resmî yerel çalışma kopyası:
-
-```text
-V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer
-```
-
-Varsayılan branch:
-
-```text
-master
-```
-
-CSE için otomatik `C:` clone/workspace oluşturulmaz.
-
-Şu eski/yanlış yol kullanılmaz ve yeniden oluşturulmaz:
-
-```text
-C:\Users\Fatih\Documents\chieh-site-engineer
-```
-
-Ayrı Desktop arşiv kopyası doğrulanmadan silinmez veya değiştirilmez:
-
-```text
-C:\Users\Fatih\Desktop\fatih\chief-site-engineer
-```
+Sabit yerel yol, SHA, schema, version, aktif Issue veya sıradaki iş bu belgede tutulmaz. Her çalışma güncel ortamda `git rev-parse --show-toplevel`, branch/HEAD, worktree ve GitHub kanıtıyla doğrulanır.
 
 ---
 
-## 17. ChatGPT, Codex ve GitHub İş Bölümü
+## 17. Görev Paylaşımı
+
+### Owner / Fatih
+
+- Ürün kapsamının ve ilerlemenin nihai karar sahibidir.
+- Bütün test, analyzer, build, APK ve cihaz doğrulamalarını yürütür.
+- Ready, merge, Issue close, release, gerçek veri ve branch silme işlemlerine ayrı açık yetki verir.
 
 ### ChatGPT
 
-- GitHub durumunu kontrol eder.
-- Issue oluşturur veya günceller.
-- Codex gerekip gerekmediğine karar verir.
-- Codex gerekiyorsa kullanıcıya açıkça **“Codex çalışmalı”** der ve nedenini belirtir.
-- Branch diff’ini ve kanıtları inceler.
-- Draft PR açar.
-- PR’ı ready yapar.
-- Kullanıcı onayıyla squash merge yapar.
-- Gereksiz Codex çalışmalarını engeller.
-- Proje dosyalarını GitHub connector üzerinden üretmez.
+- Güncel GitHub durumunu inceler.
+- Uygun risk şeridini ve tek güvenli sonraki adımı belirler.
+- Codex'e dar, kesin ve en fazla beş dakikalık görev verir.
+- Kanıtı ve diff'i owner açısından sade biçimde raporlar.
 
 ### Codex
 
-- Yalnız resmî `V:` reposunda çalışır.
-- Yerel dosya oluşturma/düzenleme, test, branch, commit ve push işlerini yapar.
-- Yalnız Issue tarafından yetkilendirilen kapsamda çalışır.
-- Beklenmeyen yerel değişiklikte durur.
-- Tamamlama kanıtını güncel Issue’ya ekler.
-- Varsayılan olarak PR açmaz ve merge yapmaz.
-
-### GitHub
-
-- Senkronize remote ve inceleme yüzeyidir.
-- Issue, PR, review ve merge kayıtlarını taşır.
-- Tek başına GitHub üzerinden dosya oluşturulması yerel uygulama tamamlandı anlamına gelmez.
-
-### Kullanıcı
-
-- Ürün kapsamının nihai karar sahibidir.
-- `devam`, `işlem tamam` veya eşdeğer kısa komutlarla güvenli akışı ilerletir.
-- Uzun talimat ve sonuç bloklarını ChatGPT ile Codex arasında taşımak zorunda değildir.
+- Yalnız açıkça yetkilendirilen mikro-adımı uygular.
+- Tek işlemde beş dakikalık hard stop'a uyar.
+- Test, analyzer, build, emulator, ADB veya cihaz işlemi çalıştırmaz; owner'a exact doğrulama komutlarını verir.
+- Beklenmeyen değişiklik, izin veya kapsam çelişkisinde fail-closed durur.
+- Ready, merge, Issue close veya branch silme yapmaz.
 
 ---
 
 ## 18. Codex Çağırma Politikası
 
-Codex’in çalışması gerektiğine ChatGPT karar verir.
+Codex yalnız yerel dosya değişikliği, statik kontrol, commit/push veya başka mekanik repository işlemi gerektiğinde çağrılır. Planlama, GitHub incelemesi, ürün kararı ve salt-okunur analiz için yeni Codex turu zorunlu değildir.
 
-### Codex çalışmalı
-
-- Yerel proje dosyası oluşturulacak veya düzenlenecekse
-- Yerel test/script çalıştırılacaksa
-- Hash, ZIP, ignored file, exports, path veya worktree kontrolü gerekiyorsa
-- Branch oluşturma/değiştirme gerekiyorsa
-- Commit veya push yapılacaksa
-- Yerel hata çözülecekse
-- Yerel master senkronizasyonu gerekiyorsa
-- GitHub üzerinden güvenle yapılamayan yerel işlem varsa
-
-### Codex normalde gerekmez
-
-- Planlama ve mimari değerlendirme
-- Ürün önceliklendirme
-- GitHub Issue/PR/diff/comment/review kontrolü
-- Issue veya yorum oluşturma
-- Pushlanmış branch için Draft PR açma
-- PR’ı ready yapma
-- Squash merge
-- Kavramsal analiz ve araştırma
-- Yalnız GitHub durumunu raporlama
-
-### Toplu çalışma modeli
-
-```text
-1 teknik adım = 1 ana Codex çalışması
-engelleyici hata = en fazla 1 düzeltme çalışması
-post-merge sync = güvenliyse sonraki Codex gerektiren işin başında
-```
-
-Her küçük yorum, metadata gözlemi veya engelleyici olmayan metin düzeltmesi için ayrı Codex turu açılmaz.
-
-### Düzeltme turu gerektiren durumlar
-
-- Test başarısızlığı
-- Yetkisiz dosya değişikliği
-- Yanlış repo/branch
-- Bozuk JSON
-- Eksik zorunlu dosya
-- Merge güvenliğini etkileyen repository truth çelişkisi
-- Gerçek kapsam veya veri güvenliği sorunu
-
-### Metadata churn yasağı
-
-Bir commit’in kendi SHA’sını aynı commit içindeki result/state dosyasına yazmak için yeni commit zinciri oluşturulmaz.
-
-Final branch SHA ve divergence şu yüzeylerde kaydedilebilir:
-
-- Issue completion comment
-- GitHub branch bilgisi
-- PR metadata
-
-İkinci metadata commit’i yalnız gerçek ve engelleyici bir çelişki varsa yapılır.
+Bir görev beş dakikada güvenle tamamlanamayacaksa başlamadan mikro-adımlara ayrılır. Süre dolduğunda kapsam genişletilmez, retry zinciri başlatılmaz ve gerçekleşen durum dürüstçe raporlanır.
 
 ---
 
-## 19. Post-Merge Senkronizasyon Politikası
+## 19. Senkronizasyon ve Preflight
 
-Merge sonrası yerel `master`ın anında senkronlanması her zaman ayrı Codex çalışması gerektirmez.
+Her değişiklik öncesinde yalnız gerekli minimum kontrol yapılır:
 
-Güvenliyse senkronizasyon, sonraki Codex gerektiren görevin ilk aşamasında toplu yapılır.
+- doğru repository ve branch;
+- `HEAD` ile ilgili remote ref ilişkisi;
+- tracked/staged/untracked kapsamı;
+- yarım merge/rebase/cherry-pick bulunmaması;
+- exact changed-path allowlist'i;
+- riskli işlerde schema/backup/version başlangıç değerleri.
 
-Bu yapılana kadar yerel master’ın senkron olduğu iddia edilmez.
-
-### Hemen senkronizasyon gereken durumlar
-
-- Hemen ardından yeni yerel iş başlayacaksa
-- Yerel durum belirsizse
-- Kullanıcı açıkça isterse
-- Merge sonrası yerel doğrulama kritikse
-
-### Senkronizasyon komutları
-
-```powershell
-git fetch origin --prune
-git checkout master
-git pull --ff-only origin master
-git rev-parse master
-git rev-parse origin/master
-git rev-list --left-right --count origin/master...master
-```
-
-Beklenen divergence:
-
-```text
-0 0
-```
+Uyumsuzlukta otomatik düzeltme yapılmadan durulur. Post-merge senkronizasyonu güvenliyse sonraki ilgili işlemin başlangıcına eklenebilir; sırf senkronizasyon için ayrı tur zorunlu değildir.
 
 ---
 
-## 20. Standart Teknik Adım Akışı
+## 20. Risk Şeritleri ve Mikro-Akış
 
-1. ChatGPT güncel GitHub durumunu doğrular.
-2. Küçük ve sınırları net bir Issue açar veya günceller.
-3. Codex gerekip gerekmediğine karar verir.
-4. Gerekliyse kullanıcıya “Codex çalışmalı” bildirimi yapılır.
-5. Codex tek toplu çalışmada:
-   - resmî repo doğrulaması
-   - gerekiyorsa post-merge sync
-   - branch oluşturma
-   - task dosyası
-   - yetkili değişiklikler
-   - test ve kalite kontrol
-   - commit ve push
-   - completion evidence
-   işlemlerini yapar.
-6. ChatGPT branch ve kanıtları inceler.
-7. Güvenliyse Draft PR açılır.
-8. Yalnız engelleyici hata varsa bir düzeltme turu istenir.
-9. İnceleme geçerse PR ready yapılır.
-10. Kullanıcının `devam` komutu güvenliyse merge akışını ilerletir.
-11. Squash merge uygulanır.
-12. Post-merge sync hemen veya sonraki gerekli Codex çalışmasının başında yapılır.
+### FAST
 
-Yeni branch standardı:
+Dar, düşük riskli ve geri alınabilir işlerde temiz/senkron `master` üzerinde ilerlenebilir. Issue, PR, `.cse`, routing YAML ve ayrı hazırlık turu zorunlu değildir.
 
-```text
-codex/issue-<issue_no>-<slug>
-```
+### STANDARD
 
-Eski `step-NNN-*` branch'ler tarihsel olarak korunur ve yeniden adlandırılmaz. Aynı anda yalnız bir aktif production implementation görevi ve en fazla bir incelemede PR bulunur; dokümantasyon işi aktif production branch'ini sessizce geçmez.
+Birden fazla dosyaya yayılan veya inceleme değeri taşıyan işte tek kısa ömürlü branch kullanılır. Gerekliyse tek PR açılır; başka iş bunun üzerine stacklenmez.
+
+### CRITICAL
+
+Schema, migration, backup, veri bütünlüğü, güvenlik, geniş mimari veya release-critical işlerde Issue, bağımsız branch, Draft PR, provenance ve owner review kapıları korunur.
+
+Ortak akış:
+
+1. Güncel durum gözlenir.
+2. Owner kapsamı yetkilendirir.
+3. Codex tek mikro-adımı uygular ve statik kanıtı verir.
+4. Fatih exact doğrulamayı çalıştırır.
+5. PASS sonrası commit/push ayrı kısa işlem olarak yapılır.
+6. Ready/merge/close yalnız ayrı açık yetkiyle ilerler.
+
+FAIL sonucunda yeni özelliğe geçilmez; yalnız exact hataya yönelik dar düzeltme ele alınır.
 
 ---
 
-## 21. Git ve Yerel Güvenlik Kuralları
+## 21. Git ve Yerel Güvenlik
 
-Her yerel çalışma öncesinde:
+Exact allowlist dışında dosya stage edilmez veya değiştirilmez. Geniş staging kullanılmaz.
 
-```powershell
-Set-Location 'V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer'
-git rev-parse --show-toplevel
-git status --short --branch
-git status --ignored --short --untracked-files=all
-git remote -v
-```
+Açık izin olmadan şu işlemler yapılmaz:
 
-Beklenmeyen tracked, staged veya untracked proje değişikliği varsa durulur.
+- reset, clean veya stash;
+- silme, taşıma, rename veya üzerine yazma;
+- force-push;
+- branch silme;
+- gerçek kullanıcı verisi mutation'ı.
 
-Otomatik olarak yapılmaz:
-
-- `reset`
-- `clean`
-- `stash`
-- silme
-- taşıma
-- rename
-- üzerine yazma
-- force push
-- branch deletion
+Beklenmeyen worktree değişikliği kullanıcıya ait kabul edilir ve korunur.
 
 ---
 
 ## 22. Test ve Kalite Kontrol
 
-Her teknik yerel çalışmada uygun olan kontroller:
+Bütün test, analyzer, build, APK ve cihaz kontrollerini Fatih çalıştırır.
 
-```powershell
-python -m pytest
-git diff --check
-git diff -- app/models.py tests/test_models.py .github/workflows/pytest.yml
-python -m json.tool .cse/state/project_state.json
-```
+Codex yalnız hızlı statik kontrolleri yapar:
 
-Ayrıca:
+- dokunulan dosyalarda gerekli format;
+- tam diff ve exact changed-path incelemesi;
+- `git diff --check`;
+- protected drift;
+- riskli işlerde schema/backup/version değişimi.
 
-- Değişen dosyalar Issue kapsamıyla aynı mı?
-- Gerekli dosyalar fiziksel olarak yerelde mevcut mu?
-- `exports/` beklenmeyen çıktı içeriyor mu?
-- Ignored ZIP dokunulmamış mı?
-- Branch local/remote SHA aynı mı?
-- Divergence `0 0` mı?
-- Final çalışma ağacı durumu doğru raporlandı mı?
-
-Üretim kodu değiştiyse test eklenir veya güncellenir. Dokümantasyon-only adımlarda üretim kodu ve test davranışı değiştirilmez.
+Codex tesliminde çalıştırılacak exact komut ve kısa manuel kontrol bulunur. PASS bildirilmeden commit/push yapılmaz. CI varsa ek güvenlik ağıdır; owner doğrulamasının yerine geçmez.
 
 ---
 
 ## 23. `.cse` Kayıt Disiplini
 
-Her teknik adımda uygun kayıtlar:
+`.cse` her mikro-adım için zorunlu değildir.
 
-```text
-.cse/tasks/<issue_no>_task.md
-.cse/results/<issue_no>_result.md
-.cse/state/project_state.json
-```
+- FAST: task/result/state dosyası üretilmez.
+- STANDARD: yalnız kalıcı iz veya koordinasyon gerçekten gerekiyorsa kullanılır.
+- CRITICAL: task, result ve provenance kayıtları kanonik protokole göre tutulur.
+- Owner açıkça isterse ilgili kayıt oluşturulur.
 
-### State ayrımı
-
-- `current_safe_point`: son merged/finalized güvenli nokta
-- `active_work`: henüz merge edilmemiş aktif iş
-
-Aktif iş merged safe point gibi gösterilmez.
-
-### Result dosyası
-
-Result dosyası olgusal olmalıdır ve mümkün olduğunda şunları içerir:
-
-- Resmî yerel yol
-- Base/master SHA
-- Master divergence
-- Branch adı
-- Değişen dosyalar
-- Test sonucu
-- `git diff --check`
-- Protected path durumu
-- `exports/` ve ZIP durumu
-- Çalışma ağacı durumu
-- Push sonucu
-- PR durumu
-- Kalan işler
-
-Henüz gerçekleşmemiş işlem tamamlanmış gibi yazılmaz.
+Kayıtlar gerçekleşmemiş işi tamamlanmış gösteremez ve güncel GitHub durumunu override edemez.
 
 ---
 
-## 24. PR ve Merge Kuralları
+## 24. Branch, PR ve Merge
 
-- Yeni iş doğrudan `master` üzerinde yapılmaz.
-- PR önce Draft açılır.
-- Varsayılan PR açma sorumlusu ChatGPT’dir.
-- Codex yalnız açık yetki varsa PR açabilir.
-- Merge yöntemi squash merge’dir.
-- Force push yapılmaz.
-- Branch otomatik silinmez.
-- Review, kapsam ve test kontrolü geçmeden merge yapılmaz.
-- Temiz inceleme sonrasında `devam` veya eşdeğer komut merge onayı sayılır.
+- Stacked branch/PR oluşturulmaz.
+- FAST iş, owner PASS sonrasında doğrudan `master`a commit/push edilebilir.
+- STANDARD tek bağımsız kısa branch/PR kullanır.
+- CRITICAL Draft PR, review ve provenance kapılarını kullanır.
+- Draft durumu merge yetkisi değildir.
+- Ready, merge, Issue close ve branch delete ayrı owner onayı gerektirir.
+- Force-push yasaktır.
 
 ---
 
 ## 25. GitHub Actions ve CI
 
-Workflow dosyası korunur:
+CI, mevcut olduğu ve çalışabildiği ölçüde ek kanıt sağlar. Codex'in test süresini uzatmak veya owner testini bekletmek için zorunlu çalışma adımı değildir.
 
-```text
-.github/workflows/pytest.yml
-```
-
-Otomatik GitHub Actions çalıştırması billing/runner-start problemi nedeniyle manuel olarak devre dışıdır.
-
-Güncel kurallar:
-
-- Yeniden etkinleştirilmez.
-- Required checks açılmaz.
-- Workflow gereksiz değiştirilmez.
-- Güvenlik doğrulaması yerel testlerle yapılır.
-- Yalnız kullanıcı açıkça ister ve hesap sorunu çözülürse yeniden değerlendirilir.
-
-Dünya örnekleri raporundaki otomatik CI/Codex review önerileri uzun vadeli yön olarak korunur; güncel hesap koşullarında uygulanmaz.
+CI başarısızlığı görmezden gelinmez; kök neden ayrıştırılmadan Ready/merge yapılmaz. Billing, runner veya platform durumu değişken GitHub bilgisidir ve bu belgede sabitlenmez.
 
 ---
 
-## 26. ZIP, Export ve Handoff Politikası
+## 26. ZIP, Export ve Handoff
 
-### ZIP
-
-Mevcut ignored ZIP acil/offline yedektir:
-
-```text
-chief-site-engineer_adim_080_guvenli_nokta.zip
-```
-
-ZIP:
-
-- stage edilmez
-- silinmez
-- taşınmaz
-- yeniden adlandırılmaz
-- commitlenmez
-
-Her iteration sonunda yeni ZIP oluşturma kuralı kaldırılmıştır.
-
-Yeni ZIP yalnız kullanıcı açıkça isterse oluşturulur.
-
-### Export
-
-`exports/` varsayılan olarak yalnız `.gitkeep` içermelidir. Bir görev açıkça export üretmiyorsa burada yeni çıktı oluşmamalıdır.
-
-### Chat Handoff
-
-`chat_handoff/` uzun sohbet geçişlerinde kullanılabilecek yardımcı bir özet katmanıdır.
-
-Handoff:
-
-- normal teknik adımın zorunlu parçası değildir
-- her iteration sonunda otomatik oluşturulmaz
-- Git, Issue, PR veya state kayıtlarının yerine geçmez
-- yalnız kullanıcı istediğinde veya gerçekten yeni sohbete geçerken güncellenir
-- tam prompt geçmişi yerine güvenli ve kısa proje özeti tercih edilir
-
-Önerilen handoff dosyaları:
-
-- `CURRENT_CONTEXT.md`
-- `PROJECT_RULES.md`
-- `ACTIVE_ROADMAP.md`
-- `LAST_DECISIONS.md`
-- `NEXT_ACTION.md`
-- `MODULE_INDEX.md`
-- `FILE_INDEX.md`
-- `NEW_CHAT_START_PROMPT.md`
+ZIP, source bundle, export veya handoff paketi yalnız owner açıkça istediğinde üretilir. Normal devam akışı GitHub ve `AGENTS.md` üzerinden yürür; sohbetler arasında uzun prompt veya paket taşıma zorunlu değildir.
 
 ---
 
-## 27. Yayınlama ve Saha Testi Stratejisi
+## 27. Yayınlama ve Saha Testi
 
-CSE yayınlanmak için acele etmez.
+Yayın ve gerçek cihaz kabulü owner-led'dir. Codex açık yetki olmadan build, install, ADB, emulator, cihaz veya gerçek veri işlemi yapmaz.
 
-Önerilen sıra:
-
-1. Mobil-first Kâğıdı Bırakma Sürümü'nü şantiye şefinin ana uygulaması yapma
-2. 7 günlük gerçek saha pilotu
-3. 30 günlük ana uygulama pilotu
-4. Backup/restore tatbikatı ve veri kaybı kontrolü
-5. Kullanım sürtünmelerini ve kâğıda dönüş nedenlerini azaltma
-6. Gerçek kullanımın kanıtladığı kişisel yardımcı araçları değerlendirme
-
-### Saha geri besleme döngüsü
-
-```text
-Gerçek şantiye
--> gerçek problem
--> küçük kayıt aracı
--> sahada test
--> düzeltme
--> belge ve test
--> kontrollü ürün geliştirme
-```
+Saha testinde sentetik veri, veri koruma, backup/restore, başarısızlıkta durma ve dürüst PASS/PARTIAL/FAIL kaydı esastır. Public/store release veya production readiness yalnız ayrı kanıt ve owner kararıyla ilan edilir.
 
 ---
 
 ## 28. Güncel Proje Gerçeği
 
-Bu bölüm kalıcı ürün politikasından ayrı bir factual snapshot'tır. Güncel durum her yeni görev başında GitHub ve yerel Git kanıtıyla yeniden doğrulanır; bu metin yeni kanıtı override etmez.
+Bu belge current-state snapshot taşımaz.
 
-### 2026-08-16 doğrulanmış merged nokta
+Her yeni işte şu sıra izlenir:
 
-- Son schedule foundation görevi: Issue **#458**
-- Squash-merge PR: **#459**
-- `master` commit:
-
-```text
-447916be0b3ddd2af75b0fe85f8c7f710f29c1cd
-```
-
-- Mobile version `0.1.0+1`, SQLite schema `14` ve Backup format `1` current'tır.
-- V2 Items 1–4 complete'tir.
-- Activity Catalog, typed Project Profile/Dependency Catalog, Project Activity
-  Instance Graph, Schedule Date Engine ve persistent immutable reference
-  snapshots merged schedule foundation'dır.
-- Latest merged validation authority: database `22/22`, snapshot repository
-  `11/11`, Schedule Engine `23/23`, backup/restore `36/36`, full Flutter
-  `663/663`, analyze/integrity/FK PASS.
-- Living Plan UI/APK/device kabulü, progress/reforecast ve productivity learning
-  uygulanmadı.
-- Public/store release ve production readiness ilan edilmedi.
-- GitHub Actions hesabın runner/billing sınırı nedeniyle manuel olarak devre dışı kalır; yerel doğrulama zorunludur.
-
-### Aktif production işi
-
-Issue #460 source-authority truth-sync'i production davranışı değiştirmez.
-Güncel canonical faz `truth-sync complete / Living Plan MVP Core ready`dir.
-Sonraki production işi yalnız dar Living 7-Day Plan MVP Core olabilir; onun
-immediate successor'ı 7-day UI + APK/device acceptance olmalıdır.
-
-### Current-state doğrulama sırası
-
-1. `origin/master` HEAD;
+1. Güncel GitHub `master` HEAD;
 2. açık Issue ve PR'lar;
 3. ilgili branch/commit diff'i;
-4. current Issue completion evidence'i;
-5. resmî `V:` kopyasındaki yerel doğrulama;
-6. `.cse/state` ikincil factual mirror.
+4. owner'ın son kapsam ve test kanıtı;
+5. gerekiyorsa yerel repository durumu;
+6. yalnız destekleyici olarak task/result/state kayıtları.
+
+SHA, version, schema, tamamlanan madde veya sıradaki iş eski metinden tahmin edilmez.
 
 ---
 
-## 29. Kaynak Çakışmaları ve Kesin Çözümleri
+## 29. Eski Hükümlerin Durumu
 
-### 29.1 Her iteration sonunda ZIP
+Aşağıdaki tarihsel hükümler artık execution kuralı değildir:
 
-**Eski kural:** Her iteration sonunda ZIP paketi ve sohbet arşivi oluştur.
-**Güncel karar:** Kaldırıldı. ZIP yalnız açık kullanıcı talebiyle oluşturulur.
+- her işte zorunlu Issue → branch → Draft PR zinciri;
+- Codex'in test/analyzer/build/device çalıştırması;
+- beş dakikayı aşan sabit execution/test bütçeleri;
+- her adımda zorunlu `.cse` kaydı;
+- sabit aralıkta podcast veya learning dosyası;
+- her merge sonrası ayrı senkronizasyon turu;
+- sabit SHA/schema/version/current-item snapshot'ı;
+- her iteration sonunda ZIP/handoff paketi.
 
-### 29.2 Handoff’un ana proje hafızası olması
-
-**Eski kural:** Yeni sohbet yalnız handoff klasörünü esas alsın.
-**Güncel karar:** Handoff yardımcı özet katmanıdır; kanonik talimat, GitHub ve `.cse` kayıtlarının yerine geçmez.
-
-### 29.3 Yerel root talimatının en yüksek otorite olması
-
-**Eski kural:** `CSE_GUNCEL_PROJE_TALIMATLARI.md` en yüksek öncelikli kaynak.
-**Güncel karar:** Tracked kanonik dosya tek otoritedir; root dosya yalnız ignored yerel aynadır.
-
-### 29.4 Her merge sonrası ayrı Codex sync
-
-**Eski kural:** Merge sonrası hemen Codex çalıştır ve local master’ı senkronla.
-**Güncel karar:** Güvenliyse sonraki Codex gerektiren işin başında toplu senkronizasyon yapılır.
-
-### 29.5 Her Issue/comment sonrası Codex’in hemen çalışması
-
-**Eski uygulama:** GitHub talimatı yazılır yazılmaz Codex turu açmak.
-**Güncel karar:** ChatGPT Codex gerekliliğini değerlendirir ve yalnız gerektiğinde açıkça bildirir.
-
-### 29.6 Her küçük metadata hatası için yeni commit
-
-**Eski uygulama:** Result/state içinde final SHA yazmak için ek commit zinciri.
-**Güncel karar:** Final SHA Issue veya PR metadata’da tutulabilir; yalnız gerçek engelleyici çelişkide düzeltme commit’i yapılır.
-
-### 29.7 Eski aktif Step bilgileri
-
-Step 203-225 aralığını aktif iş veya son güvenli nokta olarak gösteren metinler tarihsel kayıttır. Güncel merged nokta GitHub'dan doğrulanır; 2026-07-15 snapshot'ında Issue #102 / PR #104 / `9b25152ae38b72470e332929cb3a30ff955b75f1` esas alınır.
-
-### 29.8 Eski modül sırasının bağlayıcı olması
-
-001-034 modül listesi tarihsel backlog referansıdır. Yalnız gerçek kullanımın kanıtladığı kişisel yardımcı araçlar Epic #105 Faz 11'de yeniden değerlendirilir; kurumsal/multi-user hedefler geri alınmaz.
-
-### 29.9 Her iteration için üç ayrı learning dosyası
-
-**Eski kural:** Python, saha ve EBİS için her adımda ayrı dosya.
-**Güncel karar:** Yalnız gerçekten ilgili olan öğrenme dosyaları oluşturulur.
-
-### 29.10 Otomatik CI ve branch protection
-
-Dünya örnekleri raporunda önerilen otomatik CI ve branch protection uzun vadeli iyi uygulamadır. Güncel billing/runner-start koşulu nedeniyle Actions ve required checks kapalı kalır.
-
-### 29.11 Audit ilkesi ile mevcut uygulama
-
-“Kanıt işlemi audit izi bırakır” ürün tasarım ilkesidir. Audit davranışı mevcut uygulamada otomatik olarak var kabul edilmez; ayrı görevle uygulanır.
-
-### 29.12 Step 204 düzeltme talimatı
-
-`STEP_204_CODEX_DUZELTME_TALIMATI.md` tamamlanmış geçmiş adıma aittir. Güncel proje davranışını yönetmez; arşiv kaynağıdır.
+Tarihsel kaynaklar iz için korunur; yeni işi yönetmez.
 
 ---
 
 ## 30. Kaynakların Durum Sınıflandırması
 
-### Aktif ve korunacak
-
-- Birleştirilmiş bu kaynak
-- Tracked kanonik proje talimatı
-- Stratejik ürün yönü
-- Güvenilir veri omurgası ilkeleri
-- Güncel GitHub Issue/PR/state/result kayıtları
-
-### Destekleyici ve uzun vadeli
-
-- Dünya örnekleri yol haritası
-- Özel alan ekli modüler yol haritası
-- Eski modül listeleri
-- Chat Handoff dosya şablonları
-
-### Arşiv/historical
-
-- Step 204 özel düzeltme talimatı
-- Eski aktif Step ve commit bilgileri
-- Her iteration ZIP zorunluluğu
-- Eski CI/branch protection zorunluluğu
-- Her adımda üç learning dosyası zorunluluğu
+- Bu belgenin ürün, veri ve saha sözleşmeleri aktiftir.
+- Execution için `AGENTS.md` ve onun yönlendirdiği protokoller aktiftir.
+- V2 kapsamı ve ürün sırası için `docs/v2/CSE_V2_SCOPE.md` ile `ROADMAP.md` aktiftir.
+- GitHub current-state için tek güncel kanıttır.
+- Eski Step, SHA, handoff, ZIP, learning ve workflow anlatımları tarihseldir.
 
 ---
 
 ## 31. Bir Sonraki Ürün Yönü
 
-Güncel 13 maddelik V2 paketinde Items 1–4 complete'tir. Revised Item 5,
-**7 Günlük Yaşayan İş Programı / İş ve Gün Planı**, current direction'dır.
+Sıradaki ürün işi bu belgede sabitlenmez. Güncel yön, `docs/v2/CSE_V2_SCOPE.md`, `ROADMAP.md`, güncel GitHub kanıtı ve owner kararı birlikte okunarak belirlenir.
 
-Hedef kullanıcı döngüsü:
-
-```text
-Reference schedule suggests
-→ site manager selects/adds to the seven-day plan
-→ Planlandı / Başladı / Tamamlandı / Ertelendi
-→ actual field evidence is recorded
-→ dependent planning can later be recalculated
-→ project-specific productivity learning follows real data
-```
-
-Reference schedule immutable suggestion/history olarak kalır; living-plan user
-decisions ayrı mutable/evented layer'da stable project/activity-instance/
-snapshot kimliklerine referans verir. İlk sonraki production Issue yalnız dar
-Living Plan MVP Core'dur. Immediate successor 7-day UI + APK/device acceptance
-olmalıdır; başka geniş backend fazı araya giremez.
-
-Critical path/float, full Gantt/Primavera replacement, approved baseline,
-automatic reforecast, productivity learning, resource optimization ve AI/cloud
-planning ilk usable UI/device pilotundan sonradır. Item 5 UI/APK/device kabulü
-olmadan complete sayılmaz.
+Yeni iş kalıcı ürün ilkelerine uymalı, gerçek saha değerini artırmalı ve aktif işi stacklememelidir.
 
 ---
 
 ## 32. Son Karar
 
-CSE yalnız şantiye şefinin kullandığı, araç bakımından geniş ve kullanıcı modeli bakımından tek sahipli kişisel saha asistanıdır; şu ana döngüde ilerler:
+CSE, yalnız şantiye şefinin kullandığı, araç bakımından geniş ve kullanıcı modeli bakımından tek sahipli kişisel saha asistanıdır:
 
 ```text
 Yakala
@@ -1260,41 +762,26 @@ Yakala
 -> Günlüğe al
 ```
 
-Çalışma düzeni ise:
+Execution döngüsü:
 
 ```text
-Kullanıcı intent/devam verir
--> ChatGPT GitHub durumunu kontrol eder
--> Codex gerekip gerekmediğine karar verir
--> gerekiyorsa “Codex çalışmalı” der
--> tek toplu Codex çalışması
--> GitHub review ve Draft PR
--> gerekirse tek engelleyici düzeltme
--> squash merge
--> post-merge sync güvenliyse sonraki gerekli Codex çalışmasına eklenir
+Güncel durumu gözle
+-> owner kapsamı yetkilendirir
+-> Codex en fazla 5 dakikalık mikro-adımı uygular
+-> Fatih doğrular
+-> PASS sonrası kısa commit/push
+-> gerekiyorsa ayrı owner onayıyla Ready/merge
 ```
 
-Bu belge, ürün yönü, veri ilkeleri, Tek Hafıza ve kayıt kapsamı, modül yol
-haritası, kaynak otoritesi ve ChatGPT/Codex/GitHub çalışma düzenini tek çatı
-altında birleştiren ana proje kaynağıdır.
+Ürün ve veri güvenliği değişmez; execution yükü riskle orantılı tutulur.
 
 ---
 
 ## Tracked GitHub Bootstrap Addendum
 
-Yeni ChatGPT sohbetleri CHIEF SITE ENGINEER projesine GitHub uzerinden devam eder. ZIP, handoff package, source ZIP veya uzun prompt kopyalama normal continuation icin gerekli degildir.
+Yeni sohbet, projenin güncel durumunu sohbet hafızasından tahmin etmez. Önce repository kökündeki `AGENTS.md` okunur; ardından onun yönlendirdiği güncel GitHub kanıtı ve yalnız gerekli protokoller takip edilir.
 
-GitHub-native new-chat bootstrap kurali icin tracked kaynak:
-
-```text
-docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md
-```
-
-Operasyonel Git/GitHub/Codex execution kurallari icin tracked kaynak:
-
-```text
-docs/protocols/CSE_PROJECT_INSTRUCTIONS.md
-```
+Normal devam için ZIP, handoff paketi, source bundle veya uzun prompt kopyalama gerekmez.
 
 ---
 
