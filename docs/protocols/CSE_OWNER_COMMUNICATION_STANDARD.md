@@ -10,7 +10,9 @@ FAST ve rutin STANDARD ara sonuçları normalde 2–5 cümledir:
 
 - ne değişti;
 - sonuç veya blocker;
-- Fatih'in çalıştıracağı test ya da vereceği karar.
+- sıradaki tek aksiyon, sorumlu aktör ve uygulanabilir talimat.
+
+Her kullanıcıya teslim edilen sonuç `Sıradaki aksiyon — <ChatGPT|Codex|Fatih|Yok>: <tek uygulanabilir talimat>.` satırıyla biter. Devam işi yoksa `Yok: İş tamamlandı.` yazılır; yapay iş üretilmez.
 
 Her mikro adımda altı başlıklı rapor, YAML veya uzun chronology yazılmaz.
 
@@ -64,13 +66,16 @@ verilir.
 
 Salt YAML owner cevabı olamaz. Codex completion metni owner'a doğrudan kopyalanmaz; ChatGPT ürün diline çevirir.
 
-## 6. Owner aksiyonu
+## 6. Sıradaki aksiyon
 
-Karar noktasının sonunda owner'ın yapacağı şey açık olmalıdır:
+Her sonuçta yalnız owner'ın değil, sıradaki işi kimin yapacağı da açık olmalıdır:
 
-- `Senden gereken: testi çalıştırıp PASS/FAIL bildirmen.`
-- `Senden gereken: merge onayı.`
-- `Senden gereken: hiçbir şey; aynı-scope correction devam edebilir.`
+- `Sıradaki aksiyon — Fatih: Exact testi çalıştır ve PASS/FAIL bildir.`
+- `Sıradaki aksiyon — Codex: Verilen 5 dakikalık exact görevi uygula.`
+- `Sıradaki aksiyon — ChatGPT: Owner-approved PR işlemini tamamla.`
+- `Sıradaki aksiyon — Yok: İş tamamlandı.`
+
+Repository/local execution gerekiyorsa ChatGPT, owner'ın ayrıca `Codex ile çalış` demesini beklemez; Codex handoff'unu kendiliğinden verir. ChatGPT'ın yetkili olduğu mevcut owner-approved işlem için ayrıca `devam` istenmez.
 
 ## 7. Resume
 

@@ -37,7 +37,24 @@ Aynı görev resume ediliyorsa değişmeyen uzun kaynaklar tekrar okunmaz. Kulla
 
 GitHub'a erişilemiyorsa güncel durum tahmin edilmez ve production işi başlatılmaz.
 
-## 3. Zorunlu lane seçimi
+## 3. Zorunlu aktör yönlendirmesi ve sıradaki aksiyon
+
+ChatGPT/Work Mode her kullanıcı talebinde execution başlamadan önce sıradaki tek işi ve sorumlu aktörü belirler:
+
+- **ChatGPT:** current GitHub okuma, planlama, Issue/PR koordinasyonu, review ve owner-approved Ready/merge;
+- **Codex:** repository dosyası veya local workspace değişikliği, format/diff, local Git, commit/push;
+- **Fatih:** test, analyzer ve manuel ürün kabulü; build/APK/ADB/device işlemleri varsayılan olarak;
+- **Codex device exception:** Fatih exact package, cihaz ve veri-koruma sınırıyla açıkça devrederse build/APK/ADB/device işlemi tek bir 5 dakikalık görev olarak Codex'e geçebilir. PASS/FAIL ve ürün kabulü Fatih'te kalır.
+
+Repository veya local execution gerekiyorsa ChatGPT, kullanıcının `Codex ile çalış` demesini beklemez. Açıkça `Sıradaki aktör: Codex` der ve current Issue/kuralları tekrar etmeyen, 10–15 satırı geçmeyen exact handoff verir. `CSE_PROJECT_INSTRUCTIONS.md` içindeki açık documentation-only owner istisnası dışında ChatGPT/Work Mode, GitHub Contents API üzerinden repository dosyası değiştirmez.
+
+ChatGPT'ın kendi yetkisindeki işlem mevcut owner kararıyla yapılabiliyorsa ayrıca `devam` istemeden yürütülür. Kullanıcıya teslim edilen her sonuç şu satırla biter:
+
+`Sıradaki aksiyon — <ChatGPT|Codex|Fatih|Yok>: <tek uygulanabilir talimat>.`
+
+Devam işi kalmadığında `Sıradaki aksiyon — Yok: İş tamamlandı.` yazılır; yapay yeni iş üretilmez.
+
+## 4. Zorunlu lane seçimi
 
 Her iş yalnız bir lane kullanır:
 
@@ -86,7 +103,7 @@ CRITICAL varsayılanı:
 
 Somut CRITICAL trigger yoksa iş ağır sürece yükseltilmez.
 
-## 4. Beş dakika ve test sahipliği
+## 5. Beş dakika ve test sahipliği
 
 Tek bir Codex execution/correction/commit işlemi 5 dakikayı geçmez.
 
@@ -98,7 +115,9 @@ Beş dakika dolduğunda:
 
 Codex:
 
-- test, analyzer, build, emulator, ADB veya cihaz işlemi çalıştırmaz;
+- test, analyzer veya manuel ürün kabulü çalıştırmaz;
+- build, emulator, ADB veya cihaz işlemini varsayılan olarak çalıştırmaz;
+- yalnız Fatih'in exact package/device/data-safety sınırıyla açıkça devrettiği build/APK/ADB/device görevini 5 dakikalık hard-stop içinde çalıştırabilir;
 - exact kullanıcı test komutunu ve manuel kontrolü verir;
 - yalnız kaynak düzenleme, format, diff ve Git kapsam kontrolünü yapar.
 
@@ -107,11 +126,12 @@ Fatih:
 - focused/full testleri;
 - analyzer ve build'i;
 - APK/install ve cihaz kabulünü;
-- ürün davranışı ve görsel kabulü çalıştırır.
+- ürün davranışı ve görsel kabulü çalıştırır;
+- isterse exact build/APK/ADB/device execution'ını açık sınırlarla Codex'e devreder; PASS/FAIL ve kabul kararını devretmez.
 
 Aynı source revision üzerinde geçen test tekrarlanmaz. Full suite her mikro adımda değil, birleşik milestone veya release kapısında çalıştırılır.
 
-## 5. Değişmez güvenlik sınırları
+## 6. Değişmez güvenlik sınırları
 
 - CSE owner-only, local-first ve mobile-first kalır.
 - Gerçek kullanıcı data root'u açık CRITICAL authority olmadan okunmaz/değiştirilmez.
@@ -121,7 +141,7 @@ Aynı source revision üzerinde geçen test tekrarlanmaz. Full suite her mikro a
 - Beklenmeyen tracked/untracked değişiklikte işlem durur; otomatik temizleme yapılmaz.
 - Ready, merge, Issue closure, release/store ve destructive production işlemleri owner onayı gerektirir.
 
-## 6. Git ve publication
+## 7. Git ve publication
 
 - FAST: user PASS sonrası küçük commit ve normal push; test öncesi commit/push yok.
 - STANDARD: en fazla bir aktif production branch/PR; squash merge varsayılanı.
@@ -132,7 +152,7 @@ Aynı source revision üzerinde geçen test tekrarlanmaz. Full suite her mikro a
 - Cihaz APK'sı mümkün olduğunda güncel birleşik master'dan üretilir.
 - Merge sonrası local master bir sonraki local işten önce `--ff-only` senkronlanır.
 
-## 7. Evidence ve çıktı
+## 8. Evidence ve çıktı
 
 FAST completion en fazla şu bilgileri taşır:
 
@@ -150,6 +170,6 @@ Aynı bilgi Issue, comment, task, result, state ve PR body içinde tekrar edilme
 
 Owner'a önce ürün/pratik anlam sade Türkçeyle anlatılır. Teknik YAML ve execution evidence yalnız gerektiğinde ikinci katmanda verilir.
 
-## 8. Ana karar
+## 9. Ana karar
 
 > Düşük riskte hızlı ve owner-testli master akışı; orta riskte tek kısa branch; gerçek veri/release riskinde tam güvenlik süreci. Güvenlik küçük UI işlerine değil, gerçekten zarar verebilecek sözleşmelere yoğunlaştırılır.

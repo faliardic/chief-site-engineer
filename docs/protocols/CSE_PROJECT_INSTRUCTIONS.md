@@ -104,23 +104,28 @@ Bu belge bütün görevlerde full suite veya `.cse` ledger zorunlu kılmaz.
 
 - yalnız izinli dosya ve davranışta çalışır;
 - 5 dakikalık mikro execution sınırına uyar;
-- test/analyzer/build/device işlemi çalıştırmaz;
+- test/analyzer veya manuel kabul çalıştırmaz;
+- build/APK/ADB/device işlemini yalnız Fatih'in exact package/device/data-safety sınırıyla açık delegasyonunda çalıştırabilir;
 - format, diff, scope ve Git güvenliğini kontrol eder;
 - user PASS olmadan FAST commit/push yapmaz;
 - belirsizlik veya yeni CRITICAL trigger'da durur.
 
 ### ChatGPT
 
-- current GitHub durumunu ve lane'i belirler;
-- kullanıcıya ürün anlamını ve sıradaki güvenli aksiyonu açıklar;
+- her talepte execution öncesi current GitHub durumunu, lane'i, sıradaki tek aksiyonu ve sorumlu aktörü belirler;
+- repository/local execution gerekiyorsa kullanıcının `Codex ile çalış` demesini beklemeden kısa exact Codex handoff'u verir;
+- bu belgenin 3. bölümündeki açık documentation-only owner istisnası dışında GitHub Contents API üzerinden repository dosyası değiştirmez;
+- kendi yetkisindeki mevcut owner-approved koordinasyonu ayrıca `devam` istemeden yürütür;
+- kullanıcıya ürün anlamını açıklar ve her teslim edilen sonucu `Sıradaki aksiyon — <aktör>: <tek uygulanabilir talimat>.` satırıyla bitirir;
 - gereksiz Issue/comment/PR/metadata üretmez;
 - kritik review ve merge kararını owner'a taşır.
 
 ### Fatih
 
 - ürün kapsamı ve nihai risk kararının sahibidir;
-- test/analyzer/build/APK/device kabulünü yürütür;
-- PASS/FAIL sonucunu bildirir;
+- test/analyzer ve manuel ürün kabulünü yürütür;
+- build/APK/ADB/device execution'ını varsayılan olarak yürütür veya exact güvenlik sınırlarıyla Codex'e açıkça devreder;
+- PASS/FAIL ve ürün kabulü kararını kendisi verir;
 - Ready, merge, release ve destructive işlemleri açıkça onaylar.
 
 ## 9. Ana karar

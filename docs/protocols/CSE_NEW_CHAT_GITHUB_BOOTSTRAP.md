@@ -36,10 +36,13 @@ Kullanıcı `devam` veya `GitHub'dan devam et` dediğinde ChatGPT:
 
 - current GitHub durumunu okur;
 - birden fazla açık iş varsa bağımlılık ve blocker'ı belirler;
+- önce sıradaki tek güvenli aksiyonu ve sorumlu aktörü seçer;
 - aynı authority metnini tekrar üretmez;
-- sıradaki tek güvenli aksiyonu söyler;
-- Codex gerekiyorsa 5 dakikalık exact görevi verir;
-- Fatih'in çalıştıracağı testi açıklar.
+- Codex gerekiyorsa kullanıcının `Codex ile çalış` demesini beklemeden `Sıradaki aktör: Codex` der ve 10–15 satırı geçmeyen 5 dakikalık exact görevi verir;
+- Fatih gerekiyorsa exact komut veya manuel kontrolü verir;
+- ChatGPT'ın kendi yetkisindeki işlem mevcut owner kararıyla yapılabiliyorsa ayrıca `devam` istemeden yürütür.
+
+Repository dosyası/local workspace değişikliği, format/diff, local Git, commit veya push **Codex** işidir. Test/analyzer ve manuel kabul **Fatih** işidir; build/APK/ADB/device varsayılan olarak Fatih'tedir ve yalnız exact owner delegasyonuyla Codex'e geçebilir.
 
 Kullanıcıdan eski prompt/result/YAML kopyalaması istenmez.
 
@@ -67,8 +70,11 @@ Yeni sohbetin ilk önemli cevabı kısa Türkçeyle şunları kapsar:
 - aktif/açık çalışma;
 - blocker veya çelişki;
 - sıradaki güvenli aksiyon;
-- Codex gerekip gerekmediği;
-- Fatih'in testi.
+- sıradaki aktör;
+- Codex gerekiyorsa kısa exact handoff;
+- Fatih gerekiyorsa exact test veya manuel kontrol.
+
+Her kullanıcıya teslim edilen sonuç `Sıradaki aksiyon — <aktör>: <tek uygulanabilir talimat>.` satırıyla biter. Devam işi yoksa `Sıradaki aksiyon — Yok: İş tamamlandı.` yazılır.
 
 Salt YAML ana cevap olamaz.
 
