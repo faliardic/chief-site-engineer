@@ -234,13 +234,9 @@ Ofiste:
 6. Günlük export
 7. Haftalık özet
 
-Merge edilmiş Local Field MVP ilk altı hedefi destekleyen SQLite persistence ve migration runner, managed attachment store, local Flask web akışı, proje/gözlem create-list-detail-update, revision conflict koruması, arama, günlük export, backup/verify/izole restore ve Windows tek tık launcher içerir. Haftalık özet ürün yüzeyi henüz tamamlanmış kabul edilmez.
+Bu yedi çekirdek tarihsel MVP hedeflerini açıklar; hangilerinin güncel runtime'da uygulandığı veya kabul edildiği burada sabitlenmez. Gerçek implementation durumu güncel GitHub `master`, V2 Scope, Roadmap ve ilgili test/Issue kanıtından doğrulanır.
 
-Bu omurganın üzerindeki Saha Takibi v0.1 diliminde domain/recurrence, SQLite
-schema v4 repository/event persistence, transactional application service,
-yedi günlük lazy backfill, Backup compatibility, resmî export izolasyonu ve ilk
-PC UI tamamlanmıştır. Gerçek saha kabulü, mobile/offline/notification ve ortak
-Hafıza yaşam döngüsü tamamlanmamıştır.
+Tarihsel Flask/PC ve Saha Takibi v0.1 uygulamaları ürün omurgasının gelişim kanıtıdır; güncel mobil runtime, schema veya tamamlanma durumu olarak kullanılmaz. Bu bölüm yalnız MVP yetenek yönünü korur.
 
 ### Kalıcı ürün kapsamı dışında kalanlar
 
