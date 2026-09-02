@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="@color/cse_debug_icon_background"
+        android:pathData="M54,2 A52,52 0,1 1,54,106 A52,52 0,1 1,54,2 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M31,30 L51,30 C68,30 77,39 77,54 C77,69 68,78 51,78 L31,78 Z M45,43 L45,65 L51,65 C60,65 64,61 64,54 C64,47 60,43 51,43 Z" />
+</vector>
