@@ -450,6 +450,7 @@ class InventoryMapView extends StatefulWidget {
     required this.onCreateTarget,
     required this.onOpenAsset,
     this.onSelectTarget,
+    this.onInteractionChanged,
     this.autoLoad = true,
     super.key,
   });
@@ -458,6 +459,7 @@ class InventoryMapView extends StatefulWidget {
   final ValueChanged<InventoryPlacementTarget> onCreateTarget;
   final ValueChanged<String> onOpenAsset;
   final ValueChanged<InventoryPlacementTarget>? onSelectTarget;
+  final ValueChanged<bool>? onInteractionChanged;
   final bool autoLoad;
 
   @override
@@ -497,6 +499,7 @@ class InventoryMapViewState extends State<InventoryMapView> {
       _highlightTimer = null;
       _highlightedAssetId = null;
       _viewport = null;
+      _gestureStartViewport = null;
     }
   }
 
@@ -631,6 +634,7 @@ class InventoryMapViewState extends State<InventoryMapView> {
     _gestureStartFocal = details.localFocalPoint;
     _lastFocal = details.localFocalPoint;
     _multiTouchGesture = details.pointerCount >= 2;
+    widget.onInteractionChanged?.call(true);
   }
 
   void _handleScaleUpdate(ScaleUpdateDetails details) {
@@ -655,8 +659,10 @@ class InventoryMapViewState extends State<InventoryMapView> {
   }
 
   void _handleScaleEnd(ScaleEndDetails details) {
+    final wasInteracting = _gestureStartViewport != null;
     _gestureStartViewport = null;
     _multiTouchGesture = false;
+    if (wasInteracting) widget.onInteractionChanged?.call(false);
   }
 
   @override

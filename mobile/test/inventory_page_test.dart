@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show Tristate;
 
 import 'package:chief_site_engineer/app.dart';
 import 'package:chief_site_engineer/application/inventory_application.dart';
@@ -411,7 +412,7 @@ void main() {
   );
 
   testWidgets(
-    'ready sketch update stays visible in Liste, launches edit-active, and reloads successor',
+    'ready sketch update is map-only, launches edit-active, and reloads successor',
     (tester) async {
       final inventory = _FakeInventory()
         ..sketches[_projectA] = _sketch(_projectA)
@@ -443,14 +444,23 @@ void main() {
         },
       );
 
-      expect(find.text('Krokiyi güncelle'), findsOneWidget);
+      expect(find.text('Krokiyi güncelle'), findsNothing);
+      expect(
+        find.byKey(const Key('inventory-update-sketch')).hitTestable(),
+        findsOneWidget,
+      );
       expect(controller.view, InventoryPageView.map);
       expect(inventory.primaryReads, 1);
 
-      await tester.tap(find.text('Liste'));
+      await tester.tap(find.byKey(const Key('inventory-view-list')));
       await tester.pumpAndSettle();
       expect(controller.view, InventoryPageView.list);
-      expect(find.text('Krokiyi güncelle'), findsOneWidget);
+      expect(find.byKey(const Key('inventory-update-sketch')), findsNothing);
+      await tester.tap(find.byKey(const Key('inventory-view-floors')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('inventory-update-sketch')), findsNothing);
+      await tester.tap(find.byKey(const Key('inventory-view-map')));
+      await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('inventory-update-sketch')));
       await tester.pumpAndSettle();
@@ -532,10 +542,17 @@ void main() {
         find.byKey(const Key('inventory-marker-$_assetArchived')),
         findsNothing,
       );
-      expect(find.byKey(const Key('inventory-search')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('inventory-filters-tool')));
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('inventory-category-all')), findsOneWidget);
       expect(find.byKey(const Key('inventory-status-all')), findsOneWidget);
       expect(find.byKey(const Key('inventory-archive-active')), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(TextButton, 'Kapat'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('inventory-search-tool')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('inventory-search')), findsOneWidget);
 
       await tester.enterText(
         find.byKey(const Key('inventory-search')),
@@ -544,6 +561,8 @@ void main() {
       await tester.pump();
       expect(map.projections.single, same(controller.assets[0]));
       expect(inventory.mutations, 0);
+      await tester.tap(find.widgetWithText(TextButton, 'Kapat'));
+      await tester.pumpAndSettle();
 
       controller
         ..setSearch('')
@@ -637,11 +656,11 @@ void main() {
       textScale: 2.5,
     );
 
-    expect(find.byKey(const Key('inventory-search')), findsOneWidget);
+    expect(find.byKey(const Key('inventory-search-tool')), findsOneWidget);
     expect(find.byKey(const Key('inventory-update-sketch')), findsOneWidget);
     expect(find.byKey(const Key('inventory-view-switch')), findsOneWidget);
     expect(find.byKey(const Key('inventory-marker-$_assetA')), findsOneWidget);
-    await tester.tap(find.text('Katlar'));
+    await tester.tap(find.byKey(const Key('inventory-view-floors')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('inventory-floor-view')), findsOneWidget);
     expect(
@@ -650,6 +669,246 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    '586 narrow rails expose bounded exact context without mutations',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final semantics = tester.ensureSemantics();
+      try {
+        final inventory = _FakeInventory()
+          ..sketches[_projectA] = _spatialSketch()
+          ..assets[_projectA] = [
+            _asset(
+              _projectA,
+              _assetA,
+              floorId: _spatialFloorA1,
+              x: 256,
+              y: 256,
+            ),
+          ];
+        final source = _ProjectSource()
+          ..projects = [_project(_projectA, 'Proje A')];
+        final controller = _controller(inventory, source);
+        addTearDown(source.dispose);
+        addTearDown(controller.dispose);
+        await _pumpPage(
+          tester,
+          inventory: inventory,
+          source: source,
+          controller: controller,
+          textScale: 1.6,
+        );
+
+        final views = ['map', 'floors', 'list'];
+        for (var i = 0; i < views.length; i++) {
+          final control = find.byKey(ValueKey('inventory-view-${views[i]}'));
+          expect(control.hitTestable(), findsOneWidget);
+          expect(tester.getSize(control), const Size(44, 44));
+          expect(
+            tester
+                .getSemantics(control)
+                .getSemanticsData()
+                .flagsCollection
+                .isSelected,
+            i == 0 ? Tristate.isTrue : Tristate.isFalse,
+          );
+          if (i > 0) {
+            expect(
+              tester.getTopLeft(control).dy,
+              greaterThan(
+                tester
+                    .getTopLeft(
+                      find.byKey(ValueKey('inventory-view-${views[i - 1]}')),
+                    )
+                    .dy,
+              ),
+            );
+          }
+        }
+        for (final name in [
+          'search-tool',
+          'block-tool',
+          'floor-tool',
+          'filters-tool',
+          'map-zoom-in',
+          'map-zoom-out',
+          'map-fit',
+          'update-sketch',
+        ]) {
+          final control = find.byKey(Key('inventory-$name'));
+          expect(control.hitTestable(), findsOneWidget);
+          expect(tester.getSize(control), const Size(44, 44));
+          expect(
+            tester
+                .getSemantics(control)
+                .getSemanticsData()
+                .flagsCollection
+                .isSelected,
+            Tristate.none,
+          );
+          expect(
+            find.descendant(of: control, matching: find.byType(Tooltip)),
+            findsOneWidget,
+          );
+        }
+        final floorTool = find.byKey(const Key('inventory-floor-tool'));
+        expect(tester.widget<Semantics>(floorTool).properties.enabled, isFalse);
+        await tester.tap(floorTool);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('inventory-tool-panel')), findsNothing);
+
+        await tester.tap(find.byKey(const Key('inventory-block-tool')));
+        await tester.pumpAndSettle();
+        expect(controller.selectedBlockId, isNull);
+        // Measure the visible card, not the dialog's route-sized layout shell.
+        final panelSurface = find.descendant(
+          of: find.byKey(const Key('inventory-tool-panel')),
+          matching: find.byWidgetPredicate(
+            (widget) => widget is Material && widget.type == MaterialType.card,
+          ),
+        );
+        expect(panelSurface, findsOneWidget);
+        expect(panelSurface.hitTestable(), findsOneWidget);
+        final logicalViewport =
+            tester.view.physicalSize / tester.view.devicePixelRatio;
+        expect(
+          tester.getSize(panelSurface).height,
+          lessThan(logicalViewport.height),
+        );
+        await tester.tap(find.byKey(const Key('inventory-block-selector')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('A Blok').last);
+        await tester.pumpAndSettle();
+        expect(controller.selectedBlockId, _spatialBlockA);
+        await tester.tap(find.widgetWithText(TextButton, 'Kapat'));
+        await tester.pumpAndSettle();
+        expect(tester.widget<Semantics>(floorTool).properties.enabled, isTrue);
+        await tester.tap(floorTool);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('inventory-floor-selector')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('A 1. Kat').last);
+        await tester.pumpAndSettle();
+        expect(controller.selectedFloorId, _spatialFloorA1);
+        await tester.tap(find.widgetWithText(TextButton, 'Kapat'));
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<Semantics>(floorTool).properties.label,
+          'Kat: A 1. Kat',
+        );
+
+        await tester.tap(find.byKey(const Key('inventory-filters-tool')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('inventory-category-all')), findsOneWidget);
+        expect(find.byKey(const Key('inventory-status-all')), findsOneWidget);
+        expect(
+          find.byKey(const Key('inventory-archive-active')),
+          findsOneWidget,
+        );
+        await tester.tap(find.widgetWithText(TextButton, 'Kapat'));
+        await tester.pumpAndSettle();
+        expect(controller.categoryFilter, isNull);
+        expect(controller.statusFilter, isNull);
+        expect(controller.archiveFilter, InventoryArchiveFilter.active);
+        expect(controller.selectedProjectId, _projectA);
+        expect(controller.selectedBlockId, _spatialBlockA);
+        expect(controller.selectedFloorId, _spatialFloorA1);
+        expect(inventory.mutations, 0);
+        expect(tester.takeException(), isNull);
+      } finally {
+        semantics.dispose();
+      }
+    },
+  );
+
+  testWidgets(
+    '586 real gestures hide hit targets then restore without viewport movement',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _activeMappedSketch(_projectA)
+        ..assets[_projectA] = [_asset(_projectA, _assetA)];
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      final controller = _controller(inventory, source);
+      addTearDown(source.dispose);
+      addTearDown(controller.dispose);
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        controller: controller,
+      );
+      final page = tester.state<InventoryPageState>(find.byType(InventoryPage));
+      final map = find.byKey(const Key('inventory-map-gesture'));
+      final rect = tester.getRect(map);
+      final controls = [
+        'inventory-view-map',
+        'inventory-search-tool',
+        'inventory-update-sketch',
+      ];
+      Future<void> expectHidden() async {
+        for (final key in controls) {
+          expect(find.byKey(Key(key)).hitTestable(), findsNothing);
+        }
+        expect(tester.getRect(map), rect);
+        expect(find.byType(AppBar).hitTestable(), findsOneWidget);
+      }
+
+      final gesture = await tester.startGesture(rect.center);
+      await gesture.moveBy(const Offset(50, 30));
+      await tester.pump();
+      await expectHidden();
+      await gesture.up();
+      await tester.pump(const Duration(milliseconds: 599));
+      await expectHidden();
+      // A second real movement must cancel the first idle deadline.
+      final first = await tester.startGesture(
+        rect.center - const Offset(40, 0),
+        pointer: 2,
+      );
+      final second = await tester.startGesture(
+        rect.center + const Offset(40, 0),
+        pointer: 3,
+      );
+      await first.moveBy(const Offset(-35, 0));
+      await second.moveBy(const Offset(35, 0));
+      await tester.pump(const Duration(milliseconds: 10));
+      await expectHidden();
+      await first.up();
+      await second.up();
+      final viewport = page.mapViewState!.viewport!;
+      await tester.pump(const Duration(milliseconds: 599));
+      await expectHidden();
+      await tester.pump(const Duration(milliseconds: 1));
+      await tester.pump(const Duration(milliseconds: 150));
+      for (final key in controls) {
+        expect(find.byKey(Key(key)).hitTestable(), findsOneWidget);
+      }
+      expect(page.mapViewState!.viewport!.pan, viewport.pan);
+      expect(page.mapViewState!.viewport!.zoom, viewport.zoom);
+      expect(tester.getRect(map), rect);
+      expect(inventory.mutations, 0);
+      expect(inventory.primaryReads, 1);
+
+      final last = await tester.startGesture(rect.center);
+      await last.moveBy(const Offset(40, 0));
+      await tester.pump();
+      await last.up();
+      controller.setView(InventoryPageView.list);
+      await tester.pump();
+      expect(
+        find.byKey(const Key('inventory-view-map')).hitTestable(),
+        findsOneWidget,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(seconds: 1));
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('marker opens exact existing asset detail identity', (
     tester,
@@ -1170,7 +1429,7 @@ void main() {
         ..projects = [_project(_projectA, 'Proje A')];
       await _pumpPage(tester, inventory: inventory, source: source);
 
-      await tester.tap(find.text('Katlar'));
+      await tester.tap(find.byKey(const Key('inventory-view-floors')));
       await tester.pumpAndSettle();
 
       final blockA = find.byKey(
