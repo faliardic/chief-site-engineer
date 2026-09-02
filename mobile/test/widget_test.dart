@@ -550,6 +550,79 @@ void main() {
   );
 
   testWidgets(
+    'unselected multiple-project Dashboard opens create and returns unchanged',
+    (tester) async {
+      const first = MobileProject(
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        name: 'Birinci Proje',
+        createdAt: '2026-09-01T07:00:00Z',
+        updatedAt: '2026-09-01T07:00:00Z',
+        revision: 1,
+      );
+      const second = MobileProject(
+        id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        name: 'İkinci Proje',
+        createdAt: '2026-09-01T07:30:00Z',
+        updatedAt: '2026-09-01T07:30:00Z',
+        revision: 1,
+      );
+      final agenda = _ShellProjectAgenda(projects: const [first, second]);
+      await tester.pumpWidget(
+        CseApp(
+          bootstrap: Future<BootstrapResult>.value(
+            BootstrapSuccess(
+              environmentLabel: 'Geliştirme',
+              smokeRecordId: 'dashboard-create-without-selection',
+              smokeRecordCreatedAt: '2026-09-01T08:00:00Z',
+              agenda: agenda,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('dashboard-project-selection-required')),
+        findsOneWidget,
+      );
+      var dashboard = tester.widget<ProjectDashboardPage>(
+        find.byType(ProjectDashboardPage),
+      );
+      expect(dashboard.session.selectedProjectId, isNull);
+      final create = find.byKey(const Key('dashboard-create-project'));
+      expect(create, findsOneWidget);
+
+      await tester.tap(create);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ProjectCreatePage), findsOneWidget);
+      expect(find.byType(AgendaPage, skipOffstage: false), findsNothing);
+      expect(agenda.listAgendaCalls, 0);
+      expect(agenda.createProjectCalls, 0);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ProjectCreatePage), findsNothing);
+      expect(
+        find.byKey(const Key('dashboard-project-selection-required')),
+        findsOneWidget,
+      );
+      dashboard = tester.widget<ProjectDashboardPage>(
+        find.byType(ProjectDashboardPage),
+      );
+      expect(agenda.createProjectCalls, 0);
+      expect(dashboard.session.selectedProjectId, isNull);
+      expect(find.byType(AgendaPage, skipOffstage: false), findsNothing);
+      expect(agenda.listAgendaCalls, 0);
+      expect(
+        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+        0,
+      );
+      expect(find.byKey(const Key('dashboard-create-project')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'existing-project create cancels safely then makes second project active',
     (tester) async {
       const first = MobileProject(

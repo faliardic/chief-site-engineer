@@ -98,7 +98,16 @@ void main() {
         projects: const [_projectA, _projectB],
       );
       await _pumpShell(tester, agenda);
-      await tester.tap(find.byTooltip('Proje seç'));
+      final selectionRequired = find.byKey(
+        const Key('dashboard-project-selection-required'),
+      );
+      final selectProject = find.descendant(
+        of: selectionRequired,
+        matching: find.widgetWithText(FilledButton, 'Proje seç'),
+      );
+      expect(selectProject, findsOneWidget);
+      expect(selectProject.hitTestable(), findsOneWidget);
+      await tester.tap(selectProject);
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
@@ -199,7 +208,16 @@ void main() {
         projects: const [_projectA, _projectB],
       );
       await _pumpShell(tester, agenda);
-      await tester.tap(find.byTooltip('Proje seç'));
+      final selectionRequired = find.byKey(
+        const Key('dashboard-project-selection-required'),
+      );
+      final selectProject = find.descendant(
+        of: selectionRequired,
+        matching: find.widgetWithText(FilledButton, 'Proje seç'),
+      );
+      expect(selectProject, findsOneWidget);
+      expect(selectProject.hitTestable(), findsOneWidget);
+      await tester.tap(selectProject);
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
@@ -262,7 +280,16 @@ void main() {
         isCatalogDiscoveryInFlight: () => catalog.discoveryInFlight,
       );
       await _pumpShell(tester, agenda, attachmentCatalog: catalog);
-      await tester.tap(find.byTooltip('Proje seç'));
+      final selectionRequired = find.byKey(
+        const Key('dashboard-project-selection-required'),
+      );
+      final selectProject = find.descendant(
+        of: selectionRequired,
+        matching: find.widgetWithText(FilledButton, 'Proje seç'),
+      );
+      expect(selectProject, findsOneWidget);
+      expect(selectProject.hitTestable(), findsOneWidget);
+      await tester.tap(selectProject);
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(ValueKey('dashboard-project-${_projectB.id}')),

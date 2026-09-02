@@ -416,7 +416,13 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
             'Birden fazla aktif proje var. Seçim yapılmadan proje kayıtları okunmaz.',
         actionIcon: Icons.swap_horiz_rounded,
         actionLabel: 'Proje seç',
+        actionKey: const Key('dashboard-select-project'),
+        showActionLabel: true,
         onAction: _showProjectSelector,
+        secondaryActionIcon: Icons.add_business_rounded,
+        secondaryActionLabel: 'Yeni proje',
+        secondaryActionKey: const Key('dashboard-create-project'),
+        onSecondaryAction: widget.onCreateProject,
       );
     }
     return _buildDashboard(selected);
@@ -747,8 +753,15 @@ class _ProjectStateSurface extends StatelessWidget {
     required this.onAction,
     this.actionKey,
     this.showActionLabel = false,
+    this.secondaryActionIcon,
+    this.secondaryActionLabel,
+    this.secondaryActionKey,
+    this.onSecondaryAction,
     super.key,
-  });
+  }) : assert(
+         onSecondaryAction == null ||
+             (secondaryActionIcon != null && secondaryActionLabel != null),
+       );
 
   final IconData icon;
   final String title;
@@ -758,9 +771,36 @@ class _ProjectStateSurface extends StatelessWidget {
   final VoidCallback onAction;
   final Key? actionKey;
   final bool showActionLabel;
+  final IconData? secondaryActionIcon;
+  final String? secondaryActionLabel;
+  final Key? secondaryActionKey;
+  final VoidCallback? onSecondaryAction;
 
   @override
   Widget build(BuildContext context) {
+    final Widget primaryAction = showActionLabel
+        ? FilledButton.icon(
+            key: actionKey,
+            onPressed: onAction,
+            icon: Icon(actionIcon),
+            label: Text(actionLabel),
+          )
+        : _DashboardIconAction(
+            actionKey: actionKey,
+            icon: actionIcon,
+            label: actionLabel,
+            kind: _DashboardIconActionKind.filled,
+            onPressed: onAction,
+          );
+    final secondaryCallback = onSecondaryAction;
+    final Widget? secondaryAction = secondaryCallback == null
+        ? null
+        : FilledButton.tonalIcon(
+            key: secondaryActionKey,
+            onPressed: secondaryCallback,
+            icon: Icon(secondaryActionIcon!),
+            label: Text(secondaryActionLabel!),
+          );
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -779,21 +819,15 @@ class _ProjectStateSurface extends StatelessWidget {
               const SizedBox(height: 6),
               Text(body, textAlign: TextAlign.center),
               const SizedBox(height: 12),
-              if (showActionLabel)
-                FilledButton.icon(
-                  key: actionKey,
-                  onPressed: onAction,
-                  icon: Icon(actionIcon),
-                  label: Text(actionLabel),
+              if (secondaryAction != null)
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [primaryAction, secondaryAction],
                 )
               else
-                _DashboardIconAction(
-                  actionKey: actionKey,
-                  icon: actionIcon,
-                  label: actionLabel,
-                  kind: _DashboardIconActionKind.filled,
-                  onPressed: onAction,
-                ),
+                primaryAction,
             ],
           ),
         ),
