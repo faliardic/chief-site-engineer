@@ -1,96 +1,64 @@
-# CSE Project Source Register
+# CSE Project Source Register — Dynamic Authority v2
 
-**Belge türü:** Proje kaynak kaydı
-**Güncelleme Issue:** #455
-**Güncelleme tarihi:** 16 Ağustos 2026
+**Güncelleme tarihi:** 2026-09-02
 
-Bu dosya CSE için kalıcı ürün kaynaklarını, güncel V2 yürütme kaynaklarını,
-destekleyici tarihsel kaynakları ve otorite sınırlarını kaydeder.
+Bu register kaynakların rolünü tanımlar; değişken repository durumunu kopyalamaz.
 
-## 1. Kanonik aktif kaynaklar
+## 1. Aktif kaynaklar
 
-| Source | Repository path | Yetkili rol | Durum |
-| --- | --- | --- | --- |
-| Birleştirilmiş Proje Kaynağı | `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md` | Kalıcı ürün amacı, tek kullanıcı modeli, veri ilkeleri ve uzun vadeli mimari | Aktif kalıcı kaynak |
-| CSE V2 Kanonik Kapsamı | `docs/v2/CSE_V2_SCOPE.md` | Güncel 13 maddelik V2 kapsamı, bağımlılıklar, V2 dışı alanlar ve DoD | Aktif güncel yürütme kaynağı |
-| CSE V2 Roadmap | `ROADMAP.md` | Güncel dalga, sıra, geçiş kapısı ve ilk production yönü | Aktif güncel sıra |
-| Proje Talimatları | `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` | Git/GitHub/execution güvenliği ve operasyon protokolü | Aktif operasyon kaynağı |
-| Model ve Reasoning Routing Policy | `docs/protocols/CSE_MODEL_REASONING_ROUTING_POLICY.md` | Model, reasoning effort, execution mode, orchestration, runtime kanıtı ve review floor sözleşmesi | Aktif routing kaynağı |
-| Minimum Yeterli Doğrulama | `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md` | Validation class, evidence reuse, retry/time budget ve gate genişliği | Aktif doğrulama kaynağı |
-| Repository giriş talimatı | `AGENTS.md` | Zorunlu pre-read ve kısa enforcement | Aktif |
-| New Chat Bootstrap | `docs/protocols/CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md` | Yeni sohbetin GitHub'dan güncel V2 bağlamıyla devamı | Aktif |
-| Machine-readable state | `.cse/state/project_state.json` | Son yayımlanmış/finalized checkpoint ve aktif Issue snapshot'ı | İkincil factual mirror |
+| Kaynak | Yetkili rol | Okuma |
+|---|---|---|
+| `AGENTS.md` | Günlük execution, lane, süre ve test sahipliği | Her yeni görev/resume |
+| `CSE_UNIFIED_PROJECT_SOURCE.md` | Kalıcı ürün amacı ve veri ilkeleri | Ürün/veri kararı gerektiğinde |
+| `CSE_V2_SCOPE.md` | Güncel ürün kapsamı ve bağımlılıkları | Kapsam kararı gerektiğinde |
+| `ROADMAP.md` | Güncel sıra | Sonraki ürün işi seçilirken |
+| `CSE_PROJECT_INSTRUCTIONS.md` | Kritik Git ve kullanıcı verisi güvenliği | İlgili riskte |
+| `CSE_WORKFLOW_ACCELERATION_PROTOCOL.md` | Lane, correction, evidence, publication | STANDARD/CRITICAL veya belirsiz lane |
+| `CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md` | Owner test merdiveni ve evidence reuse | Test/gate kararı gerektiğinde |
+| `CSE_MODEL_REASONING_ROUTING_POLICY.md` | Reasoning ve kritik review floor | Gerektiğinde |
+| `CSE_OWNER_COMMUNICATION_STANDARD.md` | Owner'a anlaşılır sonuç | Önemli durumlarda |
+| `CSE_CODEX_INSTRUCTION_COMMENT_PROTOCOL.md` | Kalıcı STANDARD/CRITICAL handoff | Gerektiğinde |
+| `CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md` | Dynamic fresh-chat davranışı | Yeni sohbet/resume |
+| current GitHub Issue/PR/commit | Aktif scope ve repository gerçeği | Her görevde |
 
-## 2. Otorite ve çakışma kuralları
+## 2. Otorite sırası
 
-1. Kalıcı ürün amacı ve veri ilkelerinde Unified Project Source üst kaynaktır.
-2. Güncel ürün paketi ve bağımlılıklarında `docs/v2/CSE_V2_SCOPE.md` üst
-   kaynaktır.
-3. Güncel sıra ve dalga durumunda `ROADMAP.md` esas alınır.
-4. Aktif teknik kapsam current GitHub Issue tarafından daraltılır.
-5. Model/reasoning/execution/orchestration seçimi
-   `docs/protocols/CSE_MODEL_REASONING_ROUTING_POLICY.md` ile current Issue'nun
-   daha yüksek review floor'u birlikte uygulanarak belirlenir.
-6. Current Issue V2 kapsamını sessizce genişletemez ve safety kurallarını
-   zayıflatamaz.
-7. `.cse/state`, README, podcast, handoff, ZIP veya sohbet hafızası current Git
-   ve GitHub gerçeğini override edemez.
-8. Geçmiş Issue/PR/test/podcast kaydı geriye dönük yeniden yazılmaz.
-9. V1 saha kullanımı, store/public release iddiası değildir.
+1. Kalıcı ürün/veri ilkelerinde Unified Project Source.
+2. Güncel ürün kapsamında V2 Scope.
+3. Güncel sırada Roadmap.
+4. Günlük execution/test sahipliğinde `AGENTS.md` ve yeni workflow/validation protokolleri.
+5. Aktif teknik kapsamda current owner kararı ve Issue.
+6. Değişken repository durumunda GitHub master/branch/PR/commit.
+7. `.cse` ve tarihsel kayıtlar yalnız ikincil evidence.
 
-## 3. V1 kapanış kaynağı
+Current Issue safety'yi sessizce zayıflatamaz. Kalıcı politika owner-approved tracked değişiklikle güncellenir.
 
-V1 baseline:
+## 3. Kalıcı belgelerde yasak current-state snapshot'ları
 
-```text
-commit: 7c9f65a811c9f4bca561adab6bd1f8e64e6908cc
-pull request: #382
-mobile version: 0.1.0+1
-schema: 10
-backup format: 1
-```
+Şunlar kalıcı protokole yazılmaz:
 
-Proje sahibi V1'in yaklaşık bir ay gerçek sahada kullanıldığını ve V1 ürün
-fazının tamamlandığını bildirmiştir. Bu karar, geriye dönük günlük test kanıtı
-veya store release kaydı üretmez.
+- master SHA;
+- schema/backup/app version current değeri;
+- aktif Issue/PR;
+- açık PR sayısı;
+- güncel test sayısı;
+- roadmap completion snapshot'ı.
 
-## 4. Tarihsel geliştirici otomasyonu kaynakları
+Bu bilgiler current GitHub/repository üzerinden okunur.
 
-Aşağıdaki belgeler korunur; fakat aktif V2 ürün roadmap'i değildir:
+## 4. `.cse` rolü
 
-| Source | Path | Tarihsel rol |
-| --- | --- | --- |
-| Orchestrator Architecture | `docs/orchestrator/CSE_ORCHESTRATOR_ARCHITECTURE.md` | Geliştirici otomasyon mimarisi |
-| Orchestrator State Machine | `docs/orchestrator/CSE_ORCHESTRATOR_STATE_MACHINE.md` | Yürütme state modeli |
-| Orchestrator Security Boundary | `docs/orchestrator/CSE_ORCHESTRATOR_SECURITY_BOUNDARY.md` | Tooling güvenlik araştırması |
-| Orchestrator Approval Model | `docs/orchestrator/CSE_ORCHESTRATOR_APPROVAL_MODEL.md` | Tooling approval modeli |
-| Orchestrator MVP Plan | `docs/orchestrator/CSE_ORCHESTRATOR_MVP_PLAN.md` | O0–O10 tarihsel program |
+- FAST: kullanılmaz.
+- STANDARD: yalnız material izlenebilirlik gerekiyorsa kısa kayıt.
+- CRITICAL: provenance/compatibility için kullanılabilir veya zorunlu tutulabilir.
+- `.cse/state` current GitHub'ı override edemez.
 
-Bridge ve Work Mode Issue/branch/PR kayıtları da tarihsel developer-tooling
-kanıtıdır. V2 product item'larını bloke etmez ve V2 milestone'una alınmaz.
+## 5. Tarihsel kaynaklar
 
-## 5. Tarihsel ürün ve araştırma kaynakları
+Eski Step/Adım, podcast, handoff, ZIP, Orchestrator, Bridge ve Work Mode kayıtları tarihsel kanıttır; aktif workflow veya roadmap değildir.
 
-| Original title | Repository copy | Durum |
-| --- | --- | --- |
-| `Şantiye Şefi İçin Dünya Örneklerine Dayalı Kontrol, Takip ve Arşivleme Sistemi Yol Haritası.pdf` | None | Bu ortamda yok; içerik uydurulmaz |
-| `CHIEF_SITE_ENGINEER_Guncel_Yol_Haritasi_Ozel_Alan_Ekli.pdf` | None | Bu ortamda yok; içerik uydurulmaz |
-| `CSE_CHAT_HANDOFF_PROTOCOL_SOURCE_PACKAGE.zip` | None | Raw ZIP commitlenmez |
-| `1. CSE önce güvenilir veri omurgası.txt` | `docs/reference_sources/cse_once_guvenilir_veri_omurgasi.txt` | Tracked supporting source |
-| `CSE_STRATEGIC_PRODUCT_DIRECTION.md` | None | Bu ortamda yok; içerik uydurulmaz |
-| Birleştirilmiş proje kaynağının repository kopyası | `docs/reference_sources/chief_site_engineer_exe_birlestirilmis_proje_kaynagi.md` | Tarihsel provenance |
+Geçmiş Issue/PR/test kaydı geriye dönük yeniden yazılmaz.
 
-## 6. Source handling rules
+## 6. Ana karar
 
-- Duplicate `(1)` kopyaları commitlenmez.
-- Raw handoff ZIP paketleri commitlenmez.
-- Erişilemeyen PDF/TXT/Markdown/ZIP içeriği uydurulmaz.
-- Original title bilgisi register içinde korunur.
-- Yeni kalıcı ürün kararı yetkili Issue ve tracked canonical kaynakla
-  kaydedilir.
-- Yeni V2 production işi başlamadan V2 scope, roadmap, current Issue ve
-  validation protocol okunur.
-- V2 dışında kalan fikirler silinmez; post-V2 backlog veya tarihsel kaynak olarak
-  sınıflandırılır.
-- Store release, field acceptance ve production readiness birbirinin yerine
-  kullanılmaz.
+> Kaynak register'ın görevi current state'i kopyalamak değil, hangi soruda hangi kaynağın yetkili olduğunu göstermektir.
