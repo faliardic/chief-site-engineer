@@ -7,14 +7,16 @@ Doğru hedef maksimum test değil, değişen sözleşmenin riskini karşılayan 
 
 ## 1. Test sahibi
 
-Bütün test, analyzer, build ve cihaz doğrulamalarının yürütme sahibi Fatih'tir.
+Bütün test, analyzer ve manuel ürün kabulünün sahibi Fatih'tir. Build/APK/ADB/device execution'ı da varsayılan olarak Fatih'tedir.
+
+Fatih exact package, cihaz ve data-safety sınırıyla açıkça devrederse Codex yalnız belirtilen build/APK/ADB/device execution'ını tek bir 5 dakikalık hard-stop görevi olarak çalıştırabilir. Bu istisna test/analyzer veya PASS/FAIL ve ürün kabulü kararını Codex'e devretmez.
 
 Codex:
 
 - test çalıştırmaz;
 - analyzer çalıştırmaz;
-- APK/AAB üretmez;
-- emulator/ADB/device işlemi yapmaz;
+- varsayılan olarak APK/AAB üretmez ve emulator/ADB/device işlemi yapmaz;
+- açık delegasyonda yalnız exact build/APK/ADB/device komutunu çalıştırır; kapsam genişletmez ve retry yapmaz;
 - changed contract'a göre exact komut ve manuel kontrol listesi verir;
 - kaynak tarafında format, diff, `git diff --check` ve protected drift kontrolü yapar.
 
@@ -116,7 +118,7 @@ Fatih sonucu `PASS`, `FAIL` veya exact hata ile bildirir.
 
 Tek Codex işlemi için hard stop: **5 dakika**.
 
-Bu sınır test süresine değil Codex execution süresine uygulanır. Fatih'in çalıştırdığı test/build süresi ayrı kaydedilebilir.
+Bu sınır test süresine değil Codex execution süresine uygulanır. Codex'e açıkça devredilen build/APK/ADB/device execution'ı da 5 dakikalık hard-stop içindedir. Fatih'in çalıştırdığı test/build süresi ayrı kaydedilebilir.
 
 5 dakika dolunca Codex:
 
@@ -174,4 +176,4 @@ Codex şu durumlarda durur:
 
 ## 11. Ana karar
 
-> Codex kaynak değişikliğini kısa ve kontrollü yapar; doğrulamayı Fatih yürütür. Aynı kanıt tekrar üretilmez, full gate yalnız risk veya milestone gerektirdiğinde çalışır.
+> Codex kaynak değişikliğini kısa ve kontrollü yapar; test/analyzer ve kabulü Fatih yürütür. Exact owner delegasyonunda Codex yalnız build/APK/ADB/device execution'ını yapabilir. Aynı kanıt tekrar üretilmez, full gate yalnız risk veya milestone gerektirdiğinde çalışır.
