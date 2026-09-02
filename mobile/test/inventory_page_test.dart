@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:chief_site_engineer/app.dart';
 import 'package:chief_site_engineer/application/inventory_application.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
@@ -35,6 +36,242 @@ const _assetInvalid = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd5';
 final _now = DateTime.parse('2026-08-28T08:00:00Z');
 
 void main() {
+  test(
+    'shared context rejects late discovery and late scoped completions',
+    () async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _sketch(_projectA)
+        ..assets[_projectA] = [_asset(_projectA, _assetA)];
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'A'), _project(_projectB, 'B')];
+      final controller = _controller(inventory, source);
+      addTearDown(controller.dispose);
+      addTearDown(source.dispose);
+      await controller.updateProjectContext(
+        activeProjectId: _projectB,
+        isActive: true,
+      );
+      final discovery = Completer<List<MobileProject>>();
+      source.responses.add(discovery.future);
+      final oldDiscovery = controller.initialize();
+      await controller.updateProjectContext(
+        activeProjectId: _projectA,
+        isActive: true,
+      );
+      discovery.complete(source.projects);
+      await oldDiscovery;
+      expect(inventory.primaryProjectIds, [_projectA]);
+      expect(controller.assets.single.asset.id, _assetA);
+
+      final primary = Completer<InventoryPrimarySketchProjection?>();
+      inventory.primaryResponses[_projectB] = [primary.future];
+      final oldPrimary = controller.updateProjectContext(
+        activeProjectId: _projectB,
+        isActive: true,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(inventory.primaryProjectIds.last, _projectB);
+      await controller.updateProjectContext(
+        activeProjectId: _projectA,
+        isActive: true,
+      );
+      primary.complete(_sketch(_projectB));
+      await oldPrimary;
+      expect(inventory.assetProjectIds, everyElement(_projectA));
+      expect(controller.selectedProjectId, _projectA);
+      expect(controller.sketch?.sketch.projectId, _projectA);
+      expect(controller.assets.single.asset.id, _assetA);
+
+      inventory.sketches[_projectB] = _sketch(_projectB);
+      final assets = Completer<List<InventoryAssetProjection>>();
+      inventory.assetResponses[_projectB] = [assets.future];
+      final oldAssets = controller.updateProjectContext(
+        activeProjectId: _projectB,
+        isActive: true,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(inventory.assetProjectIds.last, _projectB);
+      await controller.updateProjectContext(
+        activeProjectId: _projectA,
+        isActive: true,
+      );
+      assets.complete([_asset(_projectB, _assetB)]);
+      await oldAssets;
+      expect(controller.assets.single.asset.id, _assetA);
+      expect(controller.selectedProjectId, _projectA);
+      expect(inventory.mutations, 0);
+    },
+  );
+
+  test(
+    'null stale archived and undiscovered shared IDs remain inert',
+    () async {
+      final inventory = _FakeInventory();
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'A'), _project(_projectB, 'B')];
+      final controller = _controller(inventory, source);
+      addTearDown(controller.dispose);
+      addTearDown(source.dispose);
+      await controller.updateProjectContext(
+        activeProjectId: null,
+        isActive: true,
+      );
+      await controller.initialize();
+      expect(
+        controller.loadStatus,
+        InventoryPageLoadStatus.projectSelectionRequired,
+      );
+      source.projects = [_project(_projectA, 'A')];
+      await controller.refreshProjects();
+      expect(
+        controller.loadStatus,
+        InventoryPageLoadStatus.projectSelectionRequired,
+      );
+      await controller.updateProjectContext(
+        activeProjectId: _projectB,
+        isActive: true,
+      );
+      expect(controller.lastErrorCode, 'inventory_project_unavailable');
+      expect(controller.selectedProjectId, isNull);
+      source.projects = const [
+        MobileProject(
+          id: _projectB,
+          name: 'Archived',
+          createdAt: '2026-08-28T08:00:00Z',
+          updatedAt: '2026-08-28T08:00:00Z',
+          revision: 2,
+          archivedAt: '2026-08-29T08:00:00Z',
+        ),
+      ];
+      await controller.refreshProjects();
+      expect(controller.lastErrorCode, 'inventory_project_source_invalid');
+      final failedDiscovery = Completer<List<MobileProject>>();
+      source.responses.add(failedDiscovery.future);
+      final loading = controller.updateProjectContext(
+        activeProjectId: _projectA,
+        isActive: true,
+      );
+      failedDiscovery.completeError(StateError('project discovery failed'));
+      await loading;
+      expect(controller.loadStatus, InventoryPageLoadStatus.failed);
+      expect(inventory.primaryProjectIds, isEmpty);
+      expect(inventory.assetProjectIds, isEmpty);
+      expect(inventory.mutations, 0);
+    },
+  );
+
+  testWidgets(
+    'AppBar adoption waits for exact load and failed load retains prior shared project',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _sketch(_projectA)
+        ..sketches[_projectB] = _sketch(_projectB)
+        ..assets[_projectB] = [_asset(_projectB, _assetB)];
+      final source = _ProjectSource()
+        ..projects = [
+          _project(_projectA, 'Proje A'),
+          _project(_projectB, 'Proje B'),
+        ];
+      final shared = ValueNotifier<String?>(_projectB);
+      final callbacks = <String>[];
+      addTearDown(shared.dispose);
+      addTearDown(source.dispose);
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        sharedProject: shared,
+        onProjectSelected: callbacks.add,
+      );
+      expect(callbacks, isEmpty);
+      expect(find.text('Aktif proje'), findsNothing);
+      final pending = Completer<List<InventoryAssetProjection>>();
+      inventory.assetResponses[_projectA] = [pending.future];
+      await _chooseInventoryProject(tester, _projectA, settle: false);
+      expect(inventory.assetProjectIds.last, _projectA);
+      expect(shared.value, _projectB);
+      expect(callbacks, isEmpty);
+      pending.complete([_asset(_projectA, _assetA)]);
+      await tester.pumpAndSettle();
+      final state = tester.state<InventoryPageState>(
+        find.byType(InventoryPage),
+      );
+      expect(state.controller.assets.single.asset.id, _assetA);
+      expect(shared.value, _projectA);
+      expect(callbacks, [_projectA]);
+
+      final failed = Completer<InventoryPrimarySketchProjection?>();
+      inventory.primaryResponses[_projectB] = [failed.future];
+      await _chooseInventoryProject(tester, _projectB, settle: false);
+      failed.completeError(
+        const InventoryFailure('inventory_test_load_failed'),
+      );
+      await tester.pumpAndSettle();
+      expect(shared.value, _projectA);
+      expect(state.controller.selectedProjectId, _projectA);
+      expect(state.controller.loadStatus, InventoryPageLoadStatus.failed);
+      expect(state.controller.lastErrorCode, 'inventory_test_load_failed');
+      expect(callbacks, [_projectA]);
+      expect(inventory.mutations, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'hidden Inventory ignores pending error and resumes latest external project',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _sketch(_projectA)
+        ..assets[_projectA] = [_asset(_projectA, _assetA)];
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'A'), _project(_projectB, 'B')];
+      final shared = ValueNotifier<String?>(_projectB);
+      final active = ValueNotifier(false);
+      final callbacks = <String>[];
+      addTearDown(shared.dispose);
+      addTearDown(active.dispose);
+      addTearDown(source.dispose);
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        sharedProject: shared,
+        active: active,
+        onProjectSelected: callbacks.add,
+        settle: false,
+      );
+      expect(source.calls, 0);
+      expect(inventory.reads, 0);
+      final pending = Completer<InventoryPrimarySketchProjection?>();
+      inventory.primaryResponses[_projectB] = [pending.future];
+      active.value = true;
+      await tester.pump();
+      expect(inventory.primaryProjectIds, [_projectB]);
+      active.value = false;
+      shared.value = _projectA;
+      await tester.pump();
+      final discoveryCalls = source.calls;
+      source.emit();
+      pending.completeError(StateError('late hidden Inventory failure'));
+      await tester.pump();
+      expect(source.calls, discoveryCalls);
+      expect(inventory.assetProjectIds, isEmpty);
+      expect(callbacks, isEmpty);
+      expect(inventory.mutations, 0);
+      expect(tester.takeException(), isNull);
+      active.value = true;
+      await tester.pumpAndSettle();
+      final controller = tester
+          .state<InventoryPageState>(find.byType(InventoryPage))
+          .controller;
+      expect(controller.selectedProjectId, _projectA);
+      expect(controller.assets.single.asset.id, _assetA);
+      expect(inventory.primaryProjectIds, [_projectB, _projectA]);
+      expect(callbacks, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   test(
     'zero one many project binding is exact and zero-project does no I/O',
     () async {
@@ -553,10 +790,7 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(find.byKey(const Key('inventory-project-$_projectA-2')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Proje B').last);
-      await tester.pumpAndSettle();
+      await _chooseInventoryProject(tester, _projectB);
 
       expect(find.byKey(const Key('inventory-target-selection')), findsNothing);
       expect(inventory.moveCalls, 0);
@@ -1357,7 +1591,20 @@ Future<void> _pumpPage(
   InventorySketchEditorLauncher? sketchEditorLauncher,
   InventoryAssetDetailLauncher? assetDetailLauncher,
   double textScale = 1,
+  ValueNotifier<String?>? sharedProject,
+  ValueNotifier<bool>? active,
+  ValueChanged<String>? onProjectSelected,
+  bool settle = true,
 }) async {
+  final selection =
+      sharedProject ??
+      ValueNotifier<String?>(
+        source.projects.length == 1 ? source.projects.single.id : null,
+      );
+  final visibility = active ?? ValueNotifier(true);
+  if (sharedProject == null) addTearDown(selection.dispose);
+  if (active == null) addTearDown(visibility.dispose);
+  final pageKey = GlobalKey<InventoryPageState>();
   await tester.pumpWidget(
     MaterialApp(
       builder: (context, child) => MediaQuery(
@@ -1366,20 +1613,67 @@ Future<void> _pumpPage(
         ).copyWith(textScaler: TextScaler.linear(textScale)),
         child: child!,
       ),
-      home: Scaffold(
-        body: InventoryPage(
-          application: inventory,
-          listProjects: source.list,
-          projectChanges: source.changes,
-          controller: controller,
-          sketchEditorLauncher: sketchEditorLauncher,
-          assetDetailLauncher: assetDetailLauncher,
+      home: ListenableBuilder(
+        listenable: Listenable.merge([selection, visibility]),
+        builder: (context, child) => Scaffold(
+          appBar: AppBar(
+            actions: [
+              ActiveProjectControl(
+                label:
+                    source.projects
+                        .where((p) => p.id == selection.value)
+                        .firstOrNull
+                        ?.name ??
+                    'Proje seçilmedi',
+                projects: source.projects.where((p) => !p.isArchived).toList(),
+                onSelected: (id) =>
+                    unawaited(pageKey.currentState!.selectProject(id)),
+              ),
+            ],
+          ),
+          body: InventoryPage(
+            key: pageKey,
+            application: inventory,
+            listProjects: source.list,
+            projectChanges: source.changes,
+            activeProjectId: selection.value,
+            isActive: visibility.value,
+            onProjectSelected: (id) {
+              selection.value = id;
+              onProjectSelected?.call(id);
+            },
+            controller: controller,
+            sketchEditorLauncher: sketchEditorLauncher,
+            assetDetailLauncher: assetDetailLauncher,
+          ),
         ),
       ),
     ),
   );
   await tester.pump();
-  await tester.pumpAndSettle();
+  if (settle) await tester.pumpAndSettle();
+}
+
+Future<void> _chooseInventoryProject(
+  WidgetTester tester,
+  String id, {
+  bool settle = true,
+}) async {
+  final control = find
+      .byKey(const Key('active-project-indicator'))
+      .hitTestable();
+  expect(control, findsOneWidget);
+  await tester.tap(control);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
+  final option = find
+      .byKey(ValueKey('active-project-option-$id'))
+      .hitTestable();
+  expect(option, findsOneWidget);
+  await tester.tap(option);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
+  if (settle) await tester.pumpAndSettle();
 }
 
 Future<void> _tapMapTarget(WidgetTester tester) async {
@@ -1396,14 +1690,28 @@ Future<void> _dismissDetail(WidgetTester tester) async {
 
 class _ProjectSource {
   List<MobileProject> projects = const [];
+  final List<Future<List<MobileProject>>> responses = [];
+  int calls = 0;
   final _changes = StreamController<void>.broadcast();
 
   Stream<void> get changes => _changes.stream;
-  Future<List<MobileProject>> list() async => List.unmodifiable(projects);
+  Future<List<MobileProject>> list() async {
+    calls += 1;
+    if (responses.isNotEmpty) return responses.removeAt(0);
+    return List.unmodifiable(projects);
+  }
+
+  void emit() => _changes.add(null);
   void dispose() => _changes.close();
 }
 
 class _FakeInventory extends UnavailableInventoryApplication {
+  final Map<String, List<Future<InventoryPrimarySketchProjection?>>>
+  primaryResponses = {};
+  final Map<String, List<Future<List<InventoryAssetProjection>>>>
+  assetResponses = {};
+  final List<String> primaryProjectIds = [];
+  final List<String> assetProjectIds = [];
   final Map<String, InventoryPrimarySketchProjection?> sketches = {};
   final Map<String, List<InventoryAssetProjection>> assets = {};
   final Map<String, List<InventoryPlacementRecord>> placementVersions = {};
@@ -1437,6 +1745,9 @@ class _FakeInventory extends UnavailableInventoryApplication {
     String projectId,
   ) async {
     primaryReads += 1;
+    primaryProjectIds.add(projectId);
+    final responses = primaryResponses[projectId];
+    if (responses != null && responses.isNotEmpty) return responses.removeAt(0);
     if (primaryFailure case final error?) throw error;
     return sketches[projectId];
   }
@@ -1447,6 +1758,9 @@ class _FakeInventory extends UnavailableInventoryApplication {
     bool includeArchived = false,
   }) async {
     listReads += 1;
+    assetProjectIds.add(projectId);
+    final responses = assetResponses[projectId];
+    if (responses != null && responses.isNotEmpty) return responses.removeAt(0);
     if (listFailure case final error?) throw error;
     final values = assets[projectId] ?? const [];
     return List.unmodifiable(

@@ -90,6 +90,36 @@ class InventoryPageController extends ChangeNotifier {
   bool _initialized = false;
   bool _disposed = false;
   int _generation = 0;
+  bool _isActive = true;
+  bool _hasSharedContext = false;
+  String? _sharedProjectId;
+
+  Future<void> updateProjectContext({
+    required String? activeProjectId,
+    required bool isActive,
+  }) async {
+    final changed = !_hasSharedContext || _sharedProjectId != activeProjectId;
+    final becameActive = !_isActive && isActive;
+    _hasSharedContext = true;
+    _sharedProjectId = activeProjectId;
+    _isActive = isActive;
+    if (!_initialized || _disposed) return;
+    if (!isActive) {
+      _generation += 1;
+      _clearProjectSession();
+      loadStatus = InventoryPageLoadStatus.idle;
+      _notify();
+      return;
+    }
+    final alreadyLoaded =
+        selectedProjectId == activeProjectId &&
+        (loadStatus == InventoryPageLoadStatus.ready ||
+            loadStatus == InventoryPageLoadStatus.noSketch);
+    if (becameActive || (changed && !alreadyLoaded)) {
+      _clearProjectSession();
+      await refreshProjects();
+    }
+  }
 
   List<InventoryAssetProjection> get visibleAssets {
     final query = _normalizeName(search);
@@ -332,7 +362,18 @@ class InventoryPageController extends ChangeNotifier {
   }
 
   Future<void> refreshProjects() async {
+    if (!_isActive || _disposed) return;
     final generation = ++_generation;
+    await _loadProjects(
+      generation,
+      requestedId: _hasSharedContext ? _sharedProjectId : selectedProjectId,
+    );
+  }
+
+  Future<void> _loadProjects(
+    int generation, {
+    required String? requestedId,
+  }) async {
     loadStatus = InventoryPageLoadStatus.loadingProjects;
     lastErrorCode = null;
     _notify();
@@ -346,7 +387,7 @@ class InventoryPageController extends ChangeNotifier {
         }
       }
       projects = List<MobileProject>.unmodifiable(loaded);
-      final selectedId = selectedProjectId;
+      final selectedId = requestedId;
       if (selectedId != null) {
         final selected = _projectOrNull(selectedId);
         if (selected == null) {
@@ -356,6 +397,7 @@ class InventoryPageController extends ChangeNotifier {
           _notify();
           return;
         }
+        selectedProjectId = selected.id;
         selectedProjectName = selected.name;
         await _loadInventory(selected.id, generation);
         return;
@@ -366,7 +408,7 @@ class InventoryPageController extends ChangeNotifier {
         _notify();
         return;
       }
-      if (projects.length == 1) {
+      if (projects.length == 1 && !_hasSharedContext) {
         final selected = projects.single;
         _clearProjectSession();
         selectedProjectId = selected.id;
@@ -390,23 +432,24 @@ class InventoryPageController extends ChangeNotifier {
     }
   }
 
-  Future<void> selectProject(String projectId) async {
-    final selected = _projectOrNull(projectId);
-    if (selected == null) {
-      _clearProjectSession(keepSelection: true);
-      selectedProjectId = projectId;
-      loadStatus = InventoryPageLoadStatus.failed;
-      lastErrorCode = 'inventory_project_unavailable';
-      _notify();
-      return;
-    }
+  Future<bool> selectProject(String projectId) async {
+    if (!_isActive || _disposed) return false;
     final generation = ++_generation;
+    final previousId = selectedProjectId;
+    final previousName = selectedProjectName;
     _clearProjectSession();
-    selectedProjectId = selected.id;
-    selectedProjectName = selected.name;
-    loadStatus = InventoryPageLoadStatus.loadingInventory;
+    // Validate again: an AppBar option can become unavailable while its chooser
+    // is open. Never pass that stale ID to the Inventory application.
+    await _loadProjects(generation, requestedId: projectId);
+    if (!_isCurrent(generation)) return false;
+    if (loadStatus == InventoryPageLoadStatus.ready ||
+        loadStatus == InventoryPageLoadStatus.noSketch) {
+      return true;
+    }
+    selectedProjectId = previousId;
+    selectedProjectName = previousName;
     _notify();
-    await _loadInventory(selected.id, generation);
+    return false;
   }
 
   Future<void> reloadSelected() => refreshProjects();
@@ -767,7 +810,8 @@ class InventoryPageController extends ChangeNotifier {
     }
   }
 
-  bool _isCurrent(int generation) => !_disposed && generation == _generation;
+  bool _isCurrent(int generation) =>
+      !_disposed && _isActive && generation == _generation;
 
   void _notify() {
     if (!_disposed) notifyListeners();
@@ -787,6 +831,9 @@ class InventoryPage extends StatefulWidget {
     required this.application,
     required this.listProjects,
     required this.projectChanges,
+    this.activeProjectId,
+    this.isActive = true,
+    this.onProjectSelected,
     this.controller,
     this.sketchEditorLauncher,
     this.assetDetailLauncher,
@@ -796,6 +843,9 @@ class InventoryPage extends StatefulWidget {
   final InventoryApplicationPort application;
   final InventoryProjectLoader listProjects;
   final Stream<void> projectChanges;
+  final String? activeProjectId;
+  final bool isActive;
+  final ValueChanged<String>? onProjectSelected;
   final InventoryPageController? controller;
   final InventorySketchEditorLauncher? sketchEditorLauncher;
   final InventoryAssetDetailLauncher? assetDetailLauncher;
@@ -814,6 +864,8 @@ class InventoryPageState extends State<InventoryPage> {
   InventoryAssetDetailController? _activeDetailController;
   Completer<InventoryPlacementTarget?>? _targetSelectionCompleter;
   _InventoryDetailTargetRequest? _targetSelectionRequest;
+  int _projectFlowGeneration = 0;
+  String? _observedProjectId;
 
   InventoryMapController? get mapController => _mapController;
   InventoryMapViewState? get mapViewState => _mapKey.currentState;
@@ -833,6 +885,12 @@ class InventoryPageState extends State<InventoryPage> {
           listProjects: widget.listProjects,
           projectChanges: widget.projectChanges,
         );
+    unawaited(
+      controller.updateProjectContext(
+        activeProjectId: widget.activeProjectId,
+        isActive: widget.isActive,
+      ),
+    );
     controller.addListener(_refresh);
     final attached = controller;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -847,6 +905,17 @@ class InventoryPageState extends State<InventoryPage> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller == widget.controller &&
         oldWidget.application == widget.application) {
+      if (oldWidget.activeProjectId != widget.activeProjectId ||
+          oldWidget.isActive != widget.isActive) {
+        _projectFlowGeneration += 1;
+        _cancelPendingDetailTargetSelection();
+        unawaited(
+          controller.updateProjectContext(
+            activeProjectId: widget.activeProjectId,
+            isActive: widget.isActive,
+          ),
+        );
+      }
       return;
     }
     controller.removeListener(_refresh);
@@ -856,8 +925,27 @@ class InventoryPageState extends State<InventoryPage> {
     _attachController();
   }
 
+  Future<void> selectProject(String projectId) async {
+    if (!widget.isActive) return;
+    _cancelPendingDetailTargetSelection();
+    final attached = controller;
+    final loaded = await attached.selectProject(projectId);
+    if (!mounted ||
+        !widget.isActive ||
+        !identical(controller, attached) ||
+        !loaded ||
+        controller.selectedProjectId != projectId) {
+      return;
+    }
+    widget.onProjectSelected?.call(projectId);
+  }
+
   void _refresh() {
     if (!mounted) return;
+    if (_observedProjectId != controller.selectedProjectId) {
+      _observedProjectId = controller.selectedProjectId;
+      _projectFlowGeneration += 1;
+    }
     _cancelPendingTargetForProjectBoundary();
     if (_search.text != controller.search) {
       _search.value = TextEditingValue(
@@ -930,52 +1018,9 @@ class InventoryPageState extends State<InventoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return SizedBox.expand(
       key: const Key('inventory-page'),
-      children: [
-        _buildProjectSelector(),
-        Expanded(child: _buildBody()),
-      ],
-    );
-  }
-
-  Widget _buildProjectSelector() {
-    final selectedId = controller.selectedProjectId;
-    final selectableValue =
-        controller.projects.any((project) => project.id == selectedId)
-        ? selectedId
-        : null;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-      child: DropdownButtonFormField<String>(
-        key: ValueKey(
-          'inventory-project-${selectableValue ?? 'none'}-'
-          '${controller.projects.length}',
-        ),
-        initialValue: selectableValue,
-        isExpanded: true,
-        decoration: const InputDecoration(
-          labelText: 'Aktif proje',
-          border: OutlineInputBorder(),
-        ),
-        hint: Text(
-          controller.projects.length > 1
-              ? 'Proje seçin'
-              : 'Aktif proje gerekli',
-        ),
-        items: [
-          for (final project in controller.projects)
-            DropdownMenuItem(value: project.id, child: Text(project.name)),
-        ],
-        onChanged: controller.projects.isEmpty
-            ? null
-            : (value) {
-                if (value != null && value != controller.selectedProjectId) {
-                  _cancelPendingDetailTargetSelection();
-                  unawaited(controller.selectProject(value));
-                }
-              },
-      ),
+      child: widget.isActive ? _buildBody() : const SizedBox.shrink(),
     );
   }
 
@@ -1521,7 +1566,8 @@ class InventoryPageState extends State<InventoryPage> {
     InventorySketchLaunchIntent launchIntent,
   ) async {
     final projectId = controller.selectedProjectId;
-    if (projectId == null) return;
+    if (projectId == null || !widget.isActive) return;
+    final flowGeneration = _projectFlowGeneration;
     final result = widget.sketchEditorLauncher != null
         ? await widget.sketchEditorLauncher!(context, projectId, launchIntent)
         : await Navigator.of(context).push<bool>(
@@ -1535,6 +1581,8 @@ class InventoryPageState extends State<InventoryPage> {
           );
     if (result == true &&
         mounted &&
+        widget.isActive &&
+        flowGeneration == _projectFlowGeneration &&
         controller.selectedProjectId == projectId) {
       await controller.reloadSelected();
     }
@@ -1546,7 +1594,8 @@ class InventoryPageState extends State<InventoryPage> {
     String? spatialContextLabel,
   }) async {
     final projectId = controller.selectedProjectId;
-    if (projectId == null) return;
+    if (projectId == null || !widget.isActive) return;
+    final flowGeneration = _projectFlowGeneration;
     final quickController = InventoryAssetQuickCreateController(
       application: widget.application,
       projectId: projectId,
@@ -1564,8 +1613,14 @@ class InventoryPageState extends State<InventoryPage> {
       ),
     );
     quickController.dispose();
+    if (!mounted ||
+        !widget.isActive ||
+        flowGeneration != _projectFlowGeneration ||
+        controller.selectedProjectId != projectId) {
+      return;
+    }
     _mapController?.clearCreateTarget();
-    if (createdId != null && mounted) await _openAssetDetail(createdId);
+    if (createdId != null) await _openAssetDetail(createdId);
   }
 
   Future<void> _openFloorQuickCreate(String blockId, String floorId) async {
@@ -1605,7 +1660,11 @@ class InventoryPageState extends State<InventoryPage> {
 
   Future<void> _openAssetDetail(String assetId) async {
     final projectId = controller.selectedProjectId;
-    if (projectId == null) return;
+    if (projectId == null || !widget.isActive) return;
+    final flowGeneration = _projectFlowGeneration;
+    bool isCurrent() =>
+        flowGeneration == _projectFlowGeneration &&
+        _canContinueDetailFlow(projectId);
     final launcher = widget.assetDetailLauncher;
     if (launcher != null) {
       await launcher(context, projectId, assetId);
@@ -1617,13 +1676,13 @@ class InventoryPageState extends State<InventoryPage> {
       projectId: projectId,
       assetId: assetId,
       reloadMapCanonical: controller.reloadSelected,
-      isProjectContextCurrent: () => _canContinueDetailFlow(projectId),
+      isProjectContextCurrent: isCurrent,
     );
     _activeDetailController = detailController;
     try {
-      while (_canContinueDetailFlow(projectId)) {
+      while (isCurrent()) {
         final request = await _showAssetDetail(detailController);
-        if (!_canContinueDetailFlow(projectId) || request == null) {
+        if (!isCurrent() || request == null) {
           break;
         }
         await _selectTargetForDetail(detailController, request);
@@ -1640,7 +1699,7 @@ class InventoryPageState extends State<InventoryPage> {
       _targetSelectionRequest = null;
       detailController.dispose();
     }
-    if (_canContinueDetailFlow(projectId)) {
+    if (isCurrent()) {
       await controller.reloadSelected();
     }
   }
@@ -1775,6 +1834,7 @@ class InventoryPageState extends State<InventoryPage> {
 
   bool _canContinueDetailFlow(String projectId) =>
       mounted &&
+      widget.isActive &&
       controller.selectedProjectId == projectId &&
       !(controller.loadStatus == InventoryPageLoadStatus.failed &&
           controller.lastErrorCode == 'inventory_project_unavailable');
