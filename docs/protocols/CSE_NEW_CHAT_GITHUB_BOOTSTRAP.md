@@ -74,7 +74,13 @@ Yeni sohbetin ilk önemli cevabı kısa Türkçeyle şunları kapsar:
 - Codex gerekiyorsa kısa exact handoff;
 - Fatih gerekiyorsa exact test veya manuel kontrol.
 
-Her kullanıcıya teslim edilen sonuç `Sıradaki aksiyon — <aktör>: <tek uygulanabilir talimat>.` satırıyla biter. Devam işi yoksa `Sıradaki aksiyon — Yok: İş tamamlandı.` yazılır.
+Her kullanıcıya teslim edilen sonuç `Sıradaki aksiyon — <aktör>: <tek uygulanabilir talimat>.` satırıyla biter. Tamamlanan aksiyondan sonra seçilen aktörün başlayacağı hazır talimat aynı yanıtta bulunur:
+
+- Codex için kopyalanabilir, self-contained ve 10–15 satırı geçmeyen exact görev;
+- Fatih için exact komut, kısa manuel kontrol ve beklenen sonuç;
+- ChatGPT için mevcut owner yetkisi varsa otomatik yürütme, yoksa gerekli tek onay isteği.
+
+Kullanıcıdan `devam`, `Codex ile çalış` veya `talimat hazırla` demesi beklenmez. Devam işi yoksa `Sıradaki aksiyon — Yok: İş tamamlandı.` yazılır.
 
 Salt YAML ana cevap olamaz.
 

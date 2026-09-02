@@ -52,6 +52,15 @@ ChatGPT'ın kendi yetkisindeki işlem mevcut owner kararıyla yapılabiliyorsa a
 
 `Sıradaki aksiyon — <ChatGPT|Codex|Fatih|Yok>: <tek uygulanabilir talimat>.`
 
+Bir aksiyon tamamlandığında yalnız sonraki işin adı söylenmez; aynı yanıtta başlamaya hazır talimat da hazırlanır:
+
+- **Codex:** `Hazır Codex talimatı:` altında current kaynakları tekrar etmeyen, kopyalanabilir 10–15 satırlık exact görev;
+- **Fatih:** `Hazır Fatih talimatı:` altında exact komut, kısa manuel kontrol ve beklenen sonuç;
+- **ChatGPT:** mevcut owner yetkisi varsa sonraki koordinasyon işlemini kendiliğinden yürütür; yeni yetki gerekiyorsa yalnız gerekli tek onay cümlesini verir;
+- **Yok:** devam işi veya hazırlanacak talimat bulunmadığını açıklar.
+
+Kullanıcıdan sıradaki prompt'u yazması, `devam` demesi veya Codex talimatını ayrıca istemesi beklenmez. Hazır talimat, seçilen aktörün ek açıklama istemeden başlayabileceği kadar self-contained olur.
+
 Devam işi kalmadığında `Sıradaki aksiyon — Yok: İş tamamlandı.` yazılır; yapay yeni iş üretilmez.
 
 ## 4. Zorunlu lane seçimi
