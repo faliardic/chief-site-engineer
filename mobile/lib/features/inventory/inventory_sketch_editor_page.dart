@@ -1114,8 +1114,10 @@ class InventorySketchEditorController extends ChangeNotifier {
       return false;
     }
     while (hasUnacknowledgedGeometry) {
-      // Only an unchanged generation may retry the same operation identity.
-      if (_pendingSave?.geometryGeneration != _geometryGeneration) {
+      // An observed result must be reconciled before using newer revisions,
+      // even when the editor has advanced beyond the submitted generation.
+      if (_pendingSave?.geometryGeneration != _geometryGeneration &&
+          !(_pendingSave?.mutationResultObserved ?? false)) {
         _pendingSave = null;
       }
       if (_pendingSave == null &&
@@ -1132,6 +1134,7 @@ class InventorySketchEditorController extends ChangeNotifier {
       _notify();
       try {
         final result = await application.autosaveSketchDraft(pending.command);
+        pending.mutationResultObserved = true;
         final projection = await application.loadPrimarySketch(projectId);
         final targetDraftRevisionId = result.supportingId;
         if (projection == null ||
@@ -1175,7 +1178,8 @@ class InventorySketchEditorController extends ChangeNotifier {
         }
         _notify();
       } on Object catch (error) {
-        if (pending.geometryGeneration != _geometryGeneration) {
+        if (!pending.mutationResultObserved &&
+            pending.geometryGeneration != _geometryGeneration) {
           _pendingSave = null;
           // Re-check eligibility in this serial drain: the newer timer may
           // already have fired while awaiting the failed older operation.
@@ -2788,7 +2792,7 @@ class _InventoryEditorSpatialFrame {
 }
 
 class _PendingDraftSave {
-  const _PendingDraftSave({
+  _PendingDraftSave({
     required this.geometry,
     required this.geometryGeneration,
     required this.lifecycleActions,
@@ -2799,4 +2803,7 @@ class _PendingDraftSave {
   final int geometryGeneration;
   final Map<String, InventoryExistingBlockAction> lifecycleActions;
   final AutosaveInventorySketchDraftCommand command;
+  // Stays bound to this exact command through retries until it is acknowledged
+  // or the pending state is explicitly discarded/replaced by an adopted draft.
+  bool mutationResultObserved = false;
 }
