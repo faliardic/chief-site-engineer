@@ -1,24 +1,15 @@
-# CSE Minimum Yeterli Doğrulama Protokolü — Owner-Tested v2
+# CSE Minimum Yeterli Doğrulama Protokolü — Codex Execution / Owner Acceptance v3
 
 **Belge türü:** Bağlayıcı validation ve evidence protokolü
 **Geçerlilik tarihi:** 2026-09-02
 
 Doğru hedef maksimum test değil, değişen sözleşmenin riskini karşılayan minimum yeterli doğrulamadır.
 
-## 1. Test sahibi
+## 1. Execution ve kabul sahipliği
 
-Bütün test, analyzer ve manuel ürün kabulünün sahibi Fatih'tir. Build/APK/ADB/device execution'ı da varsayılan olarak Fatih'tedir.
+Repository-local terminal, automated test, analyzer ve build/APK hazırlığı Codex tarafından, yetkili görevin minimum yeterli kapsamıyla yürütülür. Fatih PowerShell/terminal/Git/Flutter/test/analyzer/build komutu çalıştırmaz; kendisine bu komutlar hazırlanmaz veya verilmez. Fatih yalnız manuel ürün/device kabulünü ve nihai görsel/davranış PASS/FAIL kararını verir. Emulator/ADB/device execution yalnız exact package, cihaz ve veri-koruma sınırıyla açık owner delegasyonunda yapılabilir; MAIN/Acceptance/Debug ve mevcut veri güvenliği sınırları korunur.
 
-Fatih exact package, cihaz ve data-safety sınırıyla açıkça devrederse Codex yalnız belirtilen build/APK/ADB/device execution'ını tek bir 5 dakikalık hard-stop görevi olarak çalıştırabilir. Bu istisna test/analyzer veya PASS/FAIL ve ürün kabulü kararını Codex'e devretmez.
-
-Codex:
-
-- test çalıştırmaz;
-- analyzer çalıştırmaz;
-- varsayılan olarak APK/AAB üretmez ve emulator/ADB/device işlemi yapmaz;
-- açık delegasyonda yalnız exact build/APK/ADB/device komutunu çalıştırır; kapsam genişletmez ve retry yapmaz;
-- changed contract'a göre exact komut ve manuel kontrol listesi verir;
-- kaynak tarafında format, diff, `git diff --check` ve protected drift kontrolü yapar.
+Codex format, diff, `git diff --check` ve protected drift kontrolünü de yapar. Açık device delegasyonunda yalnız exact komutu çalıştırır; kapsam genişletmez ve retry yapmaz.
 
 ## 2. Validation sınıfları
 
@@ -35,7 +26,7 @@ Test/analyzer/build/device gerekmez.
 
 ### narrow-ui
 
-Minimum owner doğrulaması:
+Minimum doğrulama (automated execution Codex, manuel kabul Fatih):
 
 - değişen behavior için focused test veya kısa manuel senaryo;
 - Dart değiştiyse uygun analyzer komutu;
@@ -45,7 +36,7 @@ Full suite her mikro adımda çalıştırılmaz.
 
 ### domain
 
-Minimum owner doğrulaması:
+Minimum doğrulama (automated execution Codex, manuel kabul Fatih):
 
 - ilgili domain/application testleri;
 - etkilenen adapter/persistence testleri;
@@ -103,12 +94,12 @@ Codex her mikro adım sonunda şunu teslim eder:
 Changed behavior:
 Changed paths:
 Static checks:
-Run this command:
+Codex execution / result:
 Manual check:
 Expected result:
 ```
 
-Fatih sonucu `PASS`, `FAIL` veya exact hata ile bildirir.
+Codex automated sonuçları ve exact hatayı raporlar. Fatih yalnız manuel ürün/device kabulü için `PASS` veya `FAIL` bildirir; kendisine terminal komutu verilmez.
 
 - PASS: commit/push kapısını açar.
 - FAIL: commit/push yapılmaz; exact hata için yeni mikro correction hazırlanır.
@@ -118,7 +109,7 @@ Fatih sonucu `PASS`, `FAIL` veya exact hata ile bildirir.
 
 Tek Codex işlemi için hard stop: **5 dakika**.
 
-Bu sınır test süresine değil Codex execution süresine uygulanır. Codex'e açıkça devredilen build/APK/ADB/device execution'ı da 5 dakikalık hard-stop içindedir. Fatih'in çalıştırdığı test/build süresi ayrı kaydedilebilir.
+Repository-local terminal, automated test, analyzer ve build dahil bütün Codex execution bu 5 dakikalık hard-stop içindedir. Açıkça devredilen emulator/ADB/device execution da aynı sınıra tabidir; owner manuel kabulü ayrı değerlendirilir.
 
 5 dakika dolunca Codex:
 
@@ -132,7 +123,7 @@ STANDARD/CRITICAL görev birden fazla mikro adıma bölünebilir.
 
 - Aynı failed operation exact düzeltme olmadan tekrarlanmaz.
 - Ortam/toolchain hatası feature kapsamına sessizce alınmaz.
-- Fatih exact hata çıktısını paylaşır; Codex yalnız current scope içindeki dar source correction'ı hazırlar.
+- Codex exact hata çıktısını kaydeder ve yalnız current scope içindeki dar source correction'ı hazırlar.
 - Toolchain, SDK, Gradle, signing veya device setup değişikliği ayrı karar ister.
 
 ## 8. Fiziksel cihaz kabulü
@@ -176,4 +167,4 @@ Codex şu durumlarda durur:
 
 ## 11. Ana karar
 
-> Codex kaynak değişikliğini kısa ve kontrollü yapar; test/analyzer ve kabulü Fatih yürütür. Exact owner delegasyonunda Codex yalnız build/APK/ADB/device execution'ını yapabilir. Aynı kanıt tekrar üretilmez, full gate yalnız risk veya milestone gerektirdiğinde çalışır.
+> Codex kaynak değişikliğini ve minimum yeterli automated execution'ı yapar; Fatih manuel ürün/device kabulünü verir. Device execution için exact owner delegasyonu ve veri güvenliği sınırları korunur. Aynı kanıt tekrar üretilmez, full gate yalnız risk veya milestone gerektirdiğinde çalışır.
