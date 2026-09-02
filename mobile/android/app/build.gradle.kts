@@ -54,6 +54,8 @@ android {
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher"
+        manifestPlaceholders["appRoundIcon"] = "@mipmap/ic_launcher_round"
     }
 
     signingConfigs {
@@ -80,6 +82,13 @@ android {
         debug {
             applicationIdSuffix = if (acceptanceHarnessBuild) ".acceptance" else ".debug"
             versionNameSuffix = if (acceptanceHarnessBuild) "-acceptance" else "-debug"
+            val launcherIcon = if (acceptanceHarnessBuild) {
+                "ic_launcher_acceptance"
+            } else {
+                "ic_launcher_debug"
+            }
+            manifestPlaceholders["appIcon"] = "@mipmap/$launcherIcon"
+            manifestPlaceholders["appRoundIcon"] = "@mipmap/${launcherIcon}_round"
             manifestPlaceholders["appLabel"] = if (acceptanceHarnessBuild) {
                 "Şefim (Acceptance)"
             } else {
