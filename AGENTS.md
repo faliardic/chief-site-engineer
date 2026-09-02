@@ -128,6 +128,7 @@ Aynı source revision üzerinde geçen test tekrarlanmaz. Full suite her mikro a
 - CRITICAL: Issue'ya özel branch/PR/review zinciri.
 - Force-push yapılmaz.
 - Stacked PR oluşturulmaz.
+- Protokol kabul edildiğinde zaten açık olan legacy/stacked production PR'lar bir defalık geçiş kuyruğudur; yeni stack açma yetkisi vermez. Kuyruk çözülene kadar yeni production branch açılmaz; mevcut PR'lar current master'a birer birer uyarlanır ve Ready/merge/close yalnız owner kararıyla yürütülür.
 - Cihaz APK'sı mümkün olduğunda güncel birleşik master'dan üretilir.
 - Merge sonrası local master bir sonraki local işten önce `--ff-only` senkronlanır.
 
