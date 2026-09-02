@@ -135,11 +135,15 @@ class InventorySketchEditorController extends ChangeNotifier {
         _existingBlockMappings.containsKey(blockId)) {
       return false;
     }
+    final pendingStateChanged =
+        _lifecycleActions[blockId] != action && hasUnacknowledgedGeometry;
     _lifecycleActions = Map<String, InventoryExistingBlockAction>.unmodifiable({
       ..._lifecycleActions,
       blockId: action,
     });
     _acknowledgedLifecycleActions = _lifecycleActions;
+    // A clean recovered choice remains local; pending work must capture it anew.
+    if (pendingStateChanged) _scheduleAutosave();
     lastErrorCode = null;
     _notify();
     return true;
@@ -168,7 +172,11 @@ class InventorySketchEditorController extends ChangeNotifier {
           _existingBlockMappings,
           _acknowledgedExistingBlockMappings,
         ) ||
-        !_sameBlockDrafts(_newBlocks, _acknowledgedNewBlocks);
+        !_sameBlockDrafts(_newBlocks, _acknowledgedNewBlocks) ||
+        !_sameLifecycleActions(
+          _lifecycleActions,
+          _acknowledgedLifecycleActions,
+        );
   }
 
   String? get saveLabel {
@@ -708,6 +716,11 @@ class InventorySketchEditorController extends ChangeNotifier {
       _notify();
       return false;
     }
+    final saveStateChanged =
+        geometryChanged ||
+        !_sameMappings(_existingBlockMappings, nextMappings) ||
+        !_sameBlockDrafts(_newBlocks, nextBlocks) ||
+        !_sameLifecycleActions(_lifecycleActions, nextActions);
     lastErrorCode = null;
     _undoBlockHistory = _boundedBlockHistory([
       ..._undoBlockHistory,
@@ -720,7 +733,7 @@ class InventorySketchEditorController extends ChangeNotifier {
     _lifecycleActions = Map<String, InventoryExistingBlockAction>.unmodifiable(
       nextActions,
     );
-    if (geometryChanged) {
+    if (saveStateChanged) {
       _scheduleAutosave();
     }
     _notify();
@@ -732,14 +745,20 @@ class InventorySketchEditorController extends ChangeNotifier {
     _InventoryEditorSpatialFrame nextFrame,
   ) {
     final current = editor!;
-    final geometryChanged =
-        current.geometry.canonicalJson != next.geometry.canonicalJson;
+    final saveStateChanged =
+        current.geometry.canonicalJson != next.geometry.canonicalJson ||
+        !_sameMappings(
+          _existingBlockMappings,
+          nextFrame.existingBlockMappings,
+        ) ||
+        !_sameBlockDrafts(_newBlocks, nextFrame.newBlocks) ||
+        !_sameLifecycleActions(_lifecycleActions, nextFrame.lifecycleActions);
     editor = next;
     _newBlocks = nextFrame.newBlocks;
     _existingBlockMappings = nextFrame.existingBlockMappings;
     _lifecycleActions = nextFrame.lifecycleActions;
     lastErrorCode = null;
-    if (geometryChanged) _scheduleAutosave();
+    if (saveStateChanged) _scheduleAutosave();
     _notify();
     return true;
   }
@@ -962,6 +981,13 @@ class InventorySketchEditorController extends ChangeNotifier {
     return true;
   }
 
+  bool _sameLifecycleActions(
+    Map<String, InventoryExistingBlockAction> first,
+    Map<String, InventoryExistingBlockAction> second,
+  ) =>
+      first.length == second.length &&
+      first.entries.every((entry) => second[entry.key] == entry.value);
+
   bool _isLifecycleProvenEmpty(InventoryGeometry geometry) =>
       launchIntent == InventorySketchLaunchIntent.editActive &&
       geometry.polylines.isEmpty &&
@@ -1088,6 +1114,10 @@ class InventorySketchEditorController extends ChangeNotifier {
       return false;
     }
     while (hasUnacknowledgedGeometry) {
+      // Only an unchanged generation may retry the same operation identity.
+      if (_pendingSave?.geometryGeneration != _geometryGeneration) {
+        _pendingSave = null;
+      }
       if (_pendingSave == null &&
           !_forceDrainRequested &&
           _normalSaveEligibleGeneration != _geometryGeneration) {
@@ -1145,6 +1175,12 @@ class InventorySketchEditorController extends ChangeNotifier {
         }
         _notify();
       } on Object catch (error) {
+        if (pending.geometryGeneration != _geometryGeneration) {
+          _pendingSave = null;
+          // Re-check eligibility in this serial drain: the newer timer may
+          // already have fired while awaiting the failed older operation.
+          continue;
+        }
         _forceDrainRequested = false;
         saveStatus = InventorySketchSaveStatus.failed;
         lastErrorCode = _safeCode(error);

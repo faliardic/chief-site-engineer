@@ -1029,6 +1029,464 @@ void main() {
       },
     );
 
+    testWidgets(
+      'failed intermediate generation saves fresh exact detached-block reattach',
+      (tester) async {
+        final activeBlockId = _uuid(8800);
+        final detachedBlockId = _uuid(8810);
+        final floorIds = [_uuid(8811), _uuid(8812)];
+        final baseGeometry = _rectangleGeometry();
+        final fake =
+            _FakeInventoryApplication.withSpatialEditDraft(
+                activeGeometry: baseGeometry,
+                draftGeometry: baseGeometry,
+                blocks: [
+                  _blockRecord(id: activeBlockId, revision: 4),
+                  _blockRecord(
+                    id: detachedBlockId,
+                    displayName: 'B Blok',
+                    normalizedName: 'b blok',
+                    ordinal: 2,
+                    state: InventoryBlockState.detached,
+                    revision: 3,
+                  ),
+                ],
+                floors: [
+                  _floorRecord(id: _uuid(8801), blockId: activeBlockId),
+                  _floorRecord(id: floorIds[0], blockId: detachedBlockId),
+                  _floorRecord(
+                    id: floorIds[1],
+                    blockId: detachedBlockId,
+                    displayName: '2. Kat',
+                    ordinal: 2,
+                  ),
+                ],
+                activeBlockPolygons: [
+                  _blockPolygon(
+                    revisionId: _activeId,
+                    blockId: activeBlockId,
+                    polygonIndex: 0,
+                  ),
+                ],
+                draftBlockPolygons: [
+                  _blockPolygon(
+                    revisionId: _draftId,
+                    blockId: activeBlockId,
+                    polygonIndex: 0,
+                  ),
+                ],
+              )
+              ..failSaveCount = 1
+              ..saveFailureCode = 'inventory_legacy_geometry_immutable';
+        final controller = _controller(
+          fake,
+          intent: InventorySketchLaunchIntent.editActive,
+        );
+        addTearDown(controller.dispose);
+        await controller.initialize();
+        final before = fake.projection!;
+        final acknowledged = controller.acknowledgedGeometry!.canonicalJson;
+
+        expect(controller.drawPoint(_point(512, 64)), isTrue);
+        expect(await controller.forceSave(), isFalse);
+        final failed = fake.saveCalls.single;
+        final failedGeometry = failed.geometry.canonicalJson;
+        expect(failed.geometry.polylines.last.closed, isFalse);
+        expect(failed.geometry.polylines.last.points, [_point(512, 64)]);
+        expect(
+          failed.existingBlockMappings!.map((m) => (m.blockId, m.polygonIndex)),
+          [(activeBlockId, 0)],
+        );
+        expect(failed.newBlocks, isEmpty);
+        expect(controller.lastErrorCode, 'inventory_legacy_geometry_immutable');
+        expect(controller.saveLabel, 'Kaydedilemedi');
+        expect(controller.acknowledgedGeometry!.canonicalJson, acknowledged);
+        expect(fake.projection, same(before));
+        expect(fake.saveMutationCount, 0);
+        expect(controller.isFinalizeEnabled, isFalse);
+        expect(await controller.finalizeDraft(), isFalse);
+        expect(fake.finalizeCalls, 0);
+
+        for (final point in [
+          _point(704, 64),
+          _point(704, 256),
+          _point(512, 256),
+        ]) {
+          expect(controller.drawPoint(point), isTrue);
+        }
+        expect(controller.closeWorkingBlockAsReattach(detachedBlockId), isTrue);
+        final currentGeometry = controller.editor!.geometry.canonicalJson;
+        expect(currentGeometry, isNot(failedGeometry));
+        expect(controller.isFinalizeEnabled, isTrue);
+        expect(await controller.forceSave(), isTrue);
+
+        expect(fake.saveCalls, hasLength(2));
+        final saved = fake.saveCalls.last;
+        expect(saved.operationId, isNot(failed.operationId));
+        expect(saved.geometry.canonicalJson, currentGeometry);
+        expect(saved.geometry.polylines.first, baseGeometry.polylines.first);
+        expect(saved.geometry.polylines.last.closed, isTrue);
+        expect(saved.newBlocks, isEmpty);
+        expect(controller.newBlocks, isEmpty);
+        final expectedMappings = [(activeBlockId, 0), (detachedBlockId, 1)];
+        expect(
+          saved.existingBlockMappings!.map((m) => (m.blockId, m.polygonIndex)),
+          expectedMappings,
+        );
+        expect(
+          controller.existingBlockMappings.map(
+            (m) => (m.blockId, m.polygonIndex),
+          ),
+          expectedMappings,
+        );
+        expect(
+          fake.projection!.draftBlockPolygons.map(
+            (m) => (m.blockId, m.polygonIndex),
+          ),
+          expectedMappings,
+        );
+        expect(fake.projection!.draftNewBlocks, isEmpty);
+        expect(fake.projection!.blocks.map((block) => block.id), [
+          activeBlockId,
+          detachedBlockId,
+        ]);
+        expect(
+          fake.projection!.blocks.map((block) => block.id).toSet(),
+          hasLength(2),
+        );
+        expect(fake.projection!.floors, before.floors);
+        expect(
+          controller
+              .floorsForExistingBlock(detachedBlockId)
+              .map((floor) => floor.id),
+          floorIds,
+        );
+        expect(controller.acknowledgedGeometry!.canonicalJson, currentGeometry);
+        expect(
+          fake.projection!.draftRevision!.geometry.canonicalJson,
+          currentGeometry,
+        );
+        expect(controller.hasUnacknowledgedGeometry, isFalse);
+        expect(controller.saveStatus, InventorySketchSaveStatus.saved);
+        expect(controller.saveLabel, 'Kaydedildi');
+        expect(controller.lastErrorCode, isNull);
+        expect(fake.saveMutationCount, 1);
+        expect(fake.maximumConcurrentSaves, 1);
+
+        expect(await controller.finalizeDraft(), isTrue);
+        expect(controller.finalizePersisted, isTrue);
+        final intents = fake.finalizeCommands.single.existingBlockIntents!;
+        expect(intents, hasLength(2));
+        expect(
+          intents.map(
+            (intent) => (
+              intent.blockId,
+              intent.action,
+              intent.expectedBlockRevision,
+              intent.targetPolygonIndex,
+            ),
+          ),
+          [
+            (activeBlockId, InventoryExistingBlockAction.retainMapped, 4, 0),
+            (detachedBlockId, InventoryExistingBlockAction.reattach, 3, 1),
+          ],
+        );
+        expect(fake.finalizeCommands.single.newBlocks, isEmpty);
+        expect(
+          fake.projection!.activeRevision!.geometry.canonicalJson,
+          currentGeometry,
+        );
+        expect(
+          fake.projection!.activeRevision!.geometry.canonicalJson,
+          isNot(failedGeometry),
+        );
+        expect(fake.projection!.floors, before.floors);
+        expect(fake.projection!.blocks.map((block) => block.id), [
+          activeBlockId,
+          detachedBlockId,
+        ]);
+        await tester.pump(const Duration(milliseconds: 501));
+        expect(fake.saveCalls, hasLength(2));
+        expect(fake.saveMutationCount, 1);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'expired newer debounce survives an in-flight stale failure without another edit',
+      (tester) async {
+        final gate = Completer<void>();
+        final fake =
+            _FakeInventoryApplication.withDraft(InventoryGeometry.emptyDraft())
+              ..failSaveCount = 1
+              ..saveGates.add(gate);
+        final controller = _controller(fake);
+        addTearDown(controller.dispose);
+        await controller.initialize();
+        final acknowledged = controller.acknowledgedGeometry!.canonicalJson;
+
+        expect(controller.drawPoint(_point(0, 0)), isTrue);
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(fake.saveCalls, hasLength(1));
+        expect(fake.concurrentSaves, 1);
+        final older = fake.saveCalls.single;
+
+        expect(controller.drawPoint(_point(64, 0)), isTrue);
+        final current = controller.editor!.geometry.canonicalJson;
+        await tester.pump(const Duration(milliseconds: 499));
+        expect(fake.saveCalls, hasLength(1));
+        await tester.pump(const Duration(milliseconds: 1));
+        expect(fake.saveCalls, hasLength(1));
+        expect(fake.concurrentSaves, 1);
+        expect(fake.saveMutationCount, 0);
+        expect(controller.acknowledgedGeometry!.canonicalJson, acknowledged);
+
+        gate.complete();
+        await tester.pump();
+        expect(fake.saveCalls, hasLength(2));
+        final newer = fake.saveCalls.last;
+        expect(newer.operationId, isNot(older.operationId));
+        expect(newer.geometry.canonicalJson, current);
+        expect(
+          newer.geometry.canonicalJson,
+          isNot(older.geometry.canonicalJson),
+        );
+        expect(controller.acknowledgedGeometry!.canonicalJson, current);
+        expect(controller.hasUnacknowledgedGeometry, isFalse);
+        expect(controller.saveStatus, InventorySketchSaveStatus.saved);
+        expect(controller.saveLabel, 'Kaydedildi');
+        expect(controller.lastErrorCode, isNull);
+        expect(fake.concurrentSaves, 0);
+        expect(fake.maximumConcurrentSaves, 1);
+        expect(fake.saveMutationCount, 1);
+        await tester.pump(const Duration(milliseconds: 501));
+        expect(fake.saveCalls, hasLength(2));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'stale failure preserves a newer debounce that is not yet eligible',
+      (tester) async {
+        final gate = Completer<void>();
+        final fake =
+            _FakeInventoryApplication.withDraft(InventoryGeometry.emptyDraft())
+              ..failSaveCount = 1
+              ..saveGates.add(gate);
+        final controller = _controller(fake);
+        addTearDown(controller.dispose);
+        await controller.initialize();
+
+        expect(controller.drawPoint(_point(0, 0)), isTrue);
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(fake.saveCalls, hasLength(1));
+        expect(fake.concurrentSaves, 1);
+        expect(controller.drawPoint(_point(64, 0)), isTrue);
+        gate.complete();
+        await tester.pump();
+        expect(fake.saveCalls, hasLength(1));
+        expect(fake.concurrentSaves, 0);
+        expect(controller.saveStatus, InventorySketchSaveStatus.saving);
+        expect(controller.lastErrorCode, isNull);
+        expect(controller.hasUnacknowledgedGeometry, isTrue);
+        await tester.pump(const Duration(milliseconds: 499));
+        expect(fake.saveCalls, hasLength(1));
+        await tester.pump(const Duration(milliseconds: 1));
+        expect(fake.saveCalls, hasLength(2));
+        expect(
+          fake.saveCalls.last.operationId,
+          isNot(fake.saveCalls.first.operationId),
+        );
+        expect(
+          fake.saveCalls.last.geometry.canonicalJson,
+          controller.editor!.geometry.canonicalJson,
+        );
+        expect(
+          controller.acknowledgedGeometry!.canonicalJson,
+          controller.editor!.geometry.canonicalJson,
+        );
+        expect(controller.hasUnacknowledgedGeometry, isFalse);
+        expect(controller.saveLabel, 'Kaydedildi');
+        expect(controller.lastErrorCode, isNull);
+        expect(fake.maximumConcurrentSaves, 1);
+        expect(fake.saveMutationCount, 1);
+        await tester.pump(const Duration(milliseconds: 501));
+        expect(fake.saveCalls, hasLength(2));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'force during an in-flight stale failure waits for the current serialized save',
+      (tester) async {
+        final olderGate = Completer<void>();
+        final currentGate = Completer<void>();
+        final fake =
+            _FakeInventoryApplication.withDraft(InventoryGeometry.emptyDraft())
+              ..failSaveCount = 1
+              ..saveGates.addAll([olderGate, currentGate]);
+        final controller = _controller(fake);
+        addTearDown(controller.dispose);
+        await controller.initialize();
+        final acknowledged = controller.acknowledgedGeometry!.canonicalJson;
+
+        expect(controller.drawPoint(_point(0, 0)), isTrue);
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(fake.saveCalls, hasLength(1));
+        expect(fake.concurrentSaves, 1);
+        expect(controller.drawPoint(_point(64, 0)), isTrue);
+        var forceCompleted = false;
+        final forced = controller.forceSave().then((result) {
+          forceCompleted = true;
+          return result;
+        });
+        olderGate.complete();
+        await tester.pump();
+
+        expect(fake.saveCalls, hasLength(2));
+        expect(fake.concurrentSaves, 1);
+        expect(fake.maximumConcurrentSaves, 1);
+        expect(forceCompleted, isFalse);
+        expect(controller.acknowledgedGeometry!.canonicalJson, acknowledged);
+        expect(controller.saveStatus, InventorySketchSaveStatus.saving);
+        expect(controller.lastErrorCode, isNull);
+        expect(
+          fake.saveCalls.last.operationId,
+          isNot(fake.saveCalls.first.operationId),
+        );
+        expect(
+          fake.saveCalls.last.geometry.canonicalJson,
+          controller.editor!.geometry.canonicalJson,
+        );
+        currentGate.complete();
+        await tester.pump();
+
+        expect(await forced, isTrue);
+        expect(forceCompleted, isTrue);
+        expect(
+          controller.acknowledgedGeometry!.canonicalJson,
+          controller.editor!.geometry.canonicalJson,
+        );
+        expect(controller.hasUnacknowledgedGeometry, isFalse);
+        expect(controller.saveLabel, 'Kaydedildi');
+        expect(controller.lastErrorCode, isNull);
+        expect(fake.concurrentSaves, 0);
+        expect(fake.maximumConcurrentSaves, 1);
+        expect(fake.saveMutationCount, 1);
+        await tester.pump(const Duration(milliseconds: 501));
+        expect(fake.saveCalls, hasLength(2));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'recovered lifecycle change refreshes pending state but unchanged retry keeps identity',
+      (tester) async {
+        final blockId = _uuid(8820);
+        final fake = _FakeInventoryApplication.withSpatialEditDraft(
+          activeGeometry: _rectangleGeometry(),
+          draftGeometry: InventoryGeometry.emptyDraft(),
+          blocks: [_blockRecord(id: blockId)],
+          floors: [_floorRecord(id: _uuid(8821), blockId: blockId)],
+          activeBlockPolygons: [
+            _blockPolygon(
+              revisionId: _activeId,
+              blockId: blockId,
+              polygonIndex: 0,
+            ),
+          ],
+        )..failSaveCount = 2;
+        final controller = _controller(
+          fake,
+          intent: InventorySketchLaunchIntent.editActive,
+        );
+        addTearDown(controller.dispose);
+        await controller.initialize();
+        expect(
+          controller.recordRecoveredLifecycleChoice(
+            blockId,
+            InventoryExistingBlockAction.detach,
+          ),
+          isTrue,
+        );
+        expect(controller.hasUnacknowledgedGeometry, isFalse);
+        expect(fake.saveCalls, isEmpty);
+
+        final added = _appendClosedBlock(
+          controller,
+          left: 512,
+          top: 64,
+          right: 704,
+          bottom: 256,
+          displayName: 'Yeni Blok',
+        );
+        expect(await controller.forceSave(), isFalse);
+        final failed = fake.saveCalls.single;
+        controller.setMode(InventorySketchEditorMode.select);
+        controller.selectAt(
+          const Offset(512, 64),
+          InventoryViewport.fit(const Size(4096, 3072)),
+        );
+        expect(
+          controller.recordRecoveredLifecycleChoice(
+            blockId,
+            InventoryExistingBlockAction.detach,
+          ),
+          isTrue,
+        );
+        expect(await controller.finalizeDraft(), isFalse);
+        expect(fake.finalizeCalls, 0);
+        expect(controller.finalizePersisted, isFalse);
+        expect(fake.saveCalls, hasLength(2));
+        expect(fake.saveCalls.last.operationId, failed.operationId);
+        expect(fake.saveMutationCount, 0);
+        expect(controller.saveLabel, 'Kaydedilemedi');
+
+        expect(
+          controller.recordRecoveredLifecycleChoice(
+            blockId,
+            InventoryExistingBlockAction.archive,
+          ),
+          isTrue,
+        );
+        expect(
+          controller.editor!.geometry.canonicalJson,
+          failed.geometry.canonicalJson,
+        );
+        expect(await controller.forceSave(), isTrue);
+        expect(fake.saveCalls, hasLength(3));
+        final current = fake.saveCalls.last;
+        expect(current.operationId, isNot(failed.operationId));
+        expect(current.geometry.canonicalJson, failed.geometry.canonicalJson);
+        expect(current.existingBlockMappings, isEmpty);
+        _expectSameBlockIdentity(
+          current.newBlocks.single,
+          added,
+          polygonIndex: 0,
+        );
+        expect(fake.saveMutationCount, 1);
+        expect(fake.maximumConcurrentSaves, 1);
+        expect(controller.hasUnacknowledgedGeometry, isFalse);
+        expect(controller.saveLabel, 'Kaydedildi');
+        controller.discardUnsaved();
+        expect(await controller.finalizeDraft(), isTrue);
+        final intent =
+            fake.finalizeCommands.single.existingBlockIntents!.single;
+        expect(intent.blockId, blockId);
+        expect(intent.action, InventoryExistingBlockAction.archive);
+        expect(intent.targetPolygonIndex, isNull);
+        _expectSameBlockIdentity(
+          fake.finalizeCommands.single.newBlocks.single,
+          added,
+          polygonIndex: 0,
+        );
+        expect(fake.abandonCalls, 0);
+        await tester.pump(const Duration(milliseconds: 501));
+        expect(fake.saveCalls, hasLength(3));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     test(
       'delayed older save is serialized and cannot replace newer candidate',
       () async {
@@ -2951,6 +3409,7 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
   int finalizeCalls = 0;
   int abandonCalls = 0;
   int failSaveCount = 0;
+  String saveFailureCode = 'inventory_persistence_failed';
   int failFinalizeCount = 0;
   int failLoadCount = 0;
   int saveMutationCount = 0;
@@ -3063,7 +3522,7 @@ class _FakeInventoryApplication implements InventoryApplicationPort {
       if (saveGates.isNotEmpty) await saveGates.removeAt(0).future;
       if (failSaveCount > 0) {
         failSaveCount -= 1;
-        throw const InventoryFailure('inventory_persistence_failed');
+        throw InventoryFailure(saveFailureCode);
       }
       final replay = _receipts[command.operationId];
       if (replay != null) return replay;
