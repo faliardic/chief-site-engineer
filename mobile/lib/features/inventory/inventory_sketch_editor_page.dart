@@ -1668,9 +1668,8 @@ class InventorySketchEditorPage extends StatefulWidget {
     super.key,
   });
 
-  static const landscapeOrientations = <DeviceOrientation>[
-    DeviceOrientation.landscapeLeft,
-    DeviceOrientation.landscapeRight,
+  static const portraitOrientations = <DeviceOrientation>[
+    DeviceOrientation.portraitUp,
   ];
   static const standardOrientations = <DeviceOrientation>[
     DeviceOrientation.portraitUp,
@@ -1721,7 +1720,7 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
   Future<void> _enterEditor() async {
     try {
       await widget.orientationSetter(
-        InventorySketchEditorPage.landscapeOrientations,
+        InventorySketchEditorPage.portraitOrientations,
       );
       if (!mounted) return;
       _standardRestored = false;
@@ -1758,7 +1757,7 @@ class InventorySketchEditorPageState extends State<InventorySketchEditorPage>
         (ModalRoute.of(context)?.isCurrent ?? true)) {
       try {
         await widget.orientationSetter(
-          InventorySketchEditorPage.landscapeOrientations,
+          InventorySketchEditorPage.portraitOrientations,
         );
         if (mounted) {
           setState(() {
@@ -2493,7 +2492,7 @@ class _ToolbarIconButton extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.onPressed,
-    this.selected = false,
+    this.selected,
     this.selectedIndicatorKey,
     this.emphasized = false,
   });
@@ -2501,13 +2500,13 @@ class _ToolbarIconButton extends StatelessWidget {
   final String label;
   final Widget icon;
   final VoidCallback? onPressed;
-  final bool selected;
+  final bool? selected;
   final Key? selectedIndicatorKey;
   final bool emphasized;
 
   @override
   Widget build(BuildContext context) {
-    final decoratedIcon = selected
+    final decoratedIcon = selected == true
         ? SizedBox.square(
             dimension: 24,
             child: Stack(
@@ -2527,14 +2526,17 @@ class _ToolbarIconButton extends StatelessWidget {
         : icon;
     final button = emphasized
         ? IconButton.filled(onPressed: onPressed, icon: decoratedIcon)
-        : selected
+        : selected == true
         ? IconButton.filledTonal(onPressed: onPressed, icon: decoratedIcon)
         : IconButton(onPressed: onPressed, icon: decoratedIcon);
     return Semantics(
       label: label,
       button: true,
       selected: selected,
-      child: Tooltip(message: label, child: button),
+      child: Tooltip(
+        message: label,
+        child: SizedBox.square(dimension: 44, child: button),
+      ),
     );
   }
 }

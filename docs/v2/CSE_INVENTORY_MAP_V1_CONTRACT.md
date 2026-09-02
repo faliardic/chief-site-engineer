@@ -102,7 +102,7 @@ copy MUST be `Bu projede henüz şematik kroki yok.` and the primary action MUST
 be `Kroki ekle`.
 
 Normal Inventory viewing MUST remain portrait-capable. Only the drawing editor
-route is landscape-scoped. `Kroki` and `Liste` MUST be sibling projections in
+route is portrait-scoped (Issue #586). `Kroki` and `Liste` MUST be sibling projections in
 the same Envanter destination and MUST share the same selected project,
 filters and canonical asset/placement query result.
 
@@ -859,20 +859,46 @@ pass before activation.
 
 ### 8.1 Route-scoped orientation
 
-The drawing editor MUST request only `landscapeLeft` and `landscapeRight` after
+The drawing editor MUST request only `portraitUp` after
 route entry. Every exit path—normal pop, system back, handled error, finalize,
 route replacement and lifecycle interruption—MUST restore the standard shell
 set `portraitUp`, `landscapeLeft`, `landscapeRight` in an awaited `finally`
-guard. On resume, a mounted editor MUST reassert landscape; a non-editor shell
+guard. On resume, a mounted editor MUST reassert portraitUp; a non-editor shell
 MUST reassert the standard set. Orientation calls MUST NOT change Android/iOS
 manifest or permission files unless a later Issue separately proves necessity.
 
-The ready editor MUST use the landscape route as a full-screen canvas without a
+The ready editor MUST use the portrait route as a full-screen canvas without a
 large AppBar or horizontal text toolbar. A compact icon-only toolbar MUST stay
 on the right; every control MUST expose both a tooltip and an accessibility
 label. Selected modes and one-shot state MUST include a non-color-only
 indicator. Draft acknowledgement MAY appear as a compact overlay and MUST NOT
 reduce the canonical canvas work area.
+
+Issue #586 supersedes the original landscape presentation only. Entry and
+resume use `portraitUp`; the standard shell restoration and #537 durable
+autosave/finalize contracts remain unchanged. At 320 logical pixels and text
+scale 1.6, back, save acknowledgement, drawing/selection, undo/redo, zoom/fit
+and publish remain reachable through the bounded, scrollable editor rail.
+
+Inventory uses a left icon rail ordered `Kroki`, `Katlar`, `Liste`, with exactly
+one selected view, and a separately grouped right context/filter rail. Search,
+block, floor, category/status/archive values remain visible in bounded textual
+panels; opening or closing a panel alone does not change them. Floor selection
+is disabled without a valid selected block. Compact indicators and descriptive
+tooltips expose active context without a permanent horizontal text toolbar.
+Map zoom/fit actions are a separate right-rail group visible only in Kroki.
+The bottom-right edit icon retains `inventory-update-sketch` and exact
+`editActive` intent, and is absent from other views and target-selection mode.
+Every icon has tooltip, Semantics label and a real hit target of at least
+40 by 40 logical pixels. Only actual state controls expose selected semantics;
+destructive confirmation actions retain visible text.
+
+During map pan/pinch the view/tool rails and edit icon fade out and immediately
+stop hit testing. After 600 ms of gesture idle they fade back; another movement
+restarts the delay. Disposal, project and view boundaries cancel that timer.
+This is overlay visibility only: viewport geometry, pan/zoom and deterministic
+list-to-map focus MUST NOT be reset or resized. AppBar, typed diagnostics and
+target-selection cancellation remain outside auto-hide.
 
 ### 8.2 Tap-to-connect editor state machine
 
@@ -1157,7 +1183,7 @@ this contract does not pre-mark any test PASS.
 - Owner manual-test family: none on owner phone; later UI/device Slices cover
   visible behavior. Persistence acceptance remains automated/synthetic.
 
-### Slice 2 — Landscape schematic-sketch editor
+### Slice 2 — Schematic-sketch editor (portrait presentation after #586)
 
 - Intended production paths: create
   `mobile/lib/features/inventory/inventory_sketch_editor_page.dart` and

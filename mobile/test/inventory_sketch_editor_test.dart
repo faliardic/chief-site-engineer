@@ -2618,13 +2618,18 @@ void main() {
   testWidgets('full-screen editor uses accessible icon-only right toolbar', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(320, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     final fake = _FakeInventoryApplication.withDraft(
       _closedBlockGeometry(),
       draftNewBlocks: _blockDrafts(),
     );
     final orientations = _OrientationRecorder();
     final pageKey = GlobalKey<InventorySketchEditorPageState>();
-    await _openEditor(tester, fake, orientations, pageKey);
+    await _openEditor(tester, fake, orientations, pageKey, textScale: 1.6);
+    expect(orientations.calls.single, [DeviceOrientation.portraitUp]);
 
     expect(find.byType(AppBar), findsNothing);
     final workspace = find.byKey(
@@ -2668,6 +2673,11 @@ void main() {
     for (final entry in controls.entries) {
       final control = find.byKey(entry.key);
       expect(control, findsOneWidget);
+      await tester.ensureVisible(control);
+      await tester.pump();
+      expect(control.hitTestable(), findsOneWidget);
+      expect(tester.getSize(control).width, greaterThanOrEqualTo(40));
+      expect(tester.getSize(control).height, greaterThanOrEqualTo(40));
       expect(
         tester
             .widgetList<Tooltip>(
@@ -2690,6 +2700,10 @@ void main() {
       find.byKey(const Key('inventory-editor-mode-selected-draw')),
       findsOneWidget,
     );
+    await tester.ensureVisible(
+      find.byKey(const Key('inventory-editor-mode-select')),
+    );
+    await tester.pump();
     await tester.tap(find.byKey(const Key('inventory-editor-mode-select')));
     await tester.pump();
     expect(
@@ -2700,6 +2714,23 @@ void main() {
       find.byKey(const Key('inventory-editor-mode-selected-select')),
       findsOneWidget,
     );
+    final canvasState = tester.state<InventorySketchCanvasState>(
+      find.byType(InventorySketchCanvas),
+    );
+    final zoomBefore = canvasState.viewport!.zoom;
+    final zoomIn = find.byKey(const Key('inventory-editor-zoom-in'));
+    await tester.ensureVisible(zoomIn);
+    await tester.pump();
+    expect(zoomIn.hitTestable(), findsOneWidget);
+    await tester.tap(zoomIn);
+    await tester.pump();
+    expect(canvasState.viewport!.zoom, greaterThan(zoomBefore));
+    final fit = find.byKey(const Key('inventory-editor-fit'));
+    await tester.ensureVisible(fit);
+    await tester.pump();
+    await tester.tap(fit);
+    await tester.pump();
+    expect(canvasState.viewport!.zoom, zoomBefore);
     expect(tester.takeException(), isNull);
 
     await tester.binding.handlePopRoute();
@@ -2709,6 +2740,10 @@ void main() {
   testWidgets(
     'closed block final icon drains pending autosave before create finalize',
     (tester) async {
+      tester.view.physicalSize = const Size(320, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final fake = _FakeInventoryApplication.withDraft(
         InventoryGeometry.emptyDraft(),
       );
@@ -2721,6 +2756,7 @@ void main() {
         orientations,
         pageKey,
         onResult: (value) => result = value,
+        textScale: 1.6,
       );
       final controller = pageKey.currentState!.controller;
       _appendClosedBlock(
@@ -2737,6 +2773,11 @@ void main() {
       expect(controller.saveStatus, InventorySketchSaveStatus.saving);
       expect(controller.hasUnacknowledgedGeometry, isTrue);
       expect(controller.isFinalizeEnabled, isTrue);
+
+      expect(
+        find.byKey(const Key('inventory-editor-finalize')).hitTestable(),
+        findsOneWidget,
+      );
 
       await tester.tap(find.byKey(const Key('inventory-editor-finalize')));
       await tester.pumpAndSettle();
@@ -3047,6 +3088,9 @@ void main() {
       await _openEditor(tester, fake, orientations, pageKey);
       pageKey.currentState!.controller.drawPoint(_point(0, 0));
 
+      final originalController = pageKey.currentState!.controller;
+      final draftId = originalController.draftRevisionId;
+
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.byType(InventorySketchEditorPage), findsOneWidget);
@@ -3054,8 +3098,12 @@ void main() {
       expect(find.text('Kaydedilmemiş değişiklikleri bırak'), findsOneWidget);
       expect(
         orientations.calls.last,
-        InventorySketchEditorPage.landscapeOrientations,
+        InventorySketchEditorPage.portraitOrientations,
       );
+      expect(orientations.calls.last, [DeviceOrientation.portraitUp]);
+      expect(pageKey.currentState!.controller, same(originalController));
+      expect(originalController.draftRevisionId, draftId);
+      expect(fake.saveCalls, hasLength(1));
 
       await tester.tap(find.byKey(const Key('inventory-editor-retry-save')));
       await tester.pumpAndSettle();
@@ -3076,6 +3124,8 @@ void main() {
       final pageKey = GlobalKey<InventorySketchEditorPageState>();
       await _openEditor(tester, fake, orientations, pageKey);
       pageKey.currentState!.controller.drawPoint(_point(0, 0));
+      final originalController = pageKey.currentState!.controller;
+      final draftId = originalController.draftRevisionId;
 
       pageKey.currentState!.didChangeAppLifecycleState(
         AppLifecycleState.paused,
@@ -3095,8 +3145,12 @@ void main() {
       await tester.pump();
       expect(
         orientations.calls.last,
-        InventorySketchEditorPage.landscapeOrientations,
+        InventorySketchEditorPage.portraitOrientations,
       );
+      expect(orientations.calls.last, [DeviceOrientation.portraitUp]);
+      expect(pageKey.currentState!.controller, same(originalController));
+      expect(originalController.draftRevisionId, draftId);
+      expect(fake.saveCalls, hasLength(1));
     });
 
     testWidgets(
@@ -3111,7 +3165,7 @@ void main() {
         await _openEditor(tester, fake, orientations, pageKey);
         expect(
           orientations.calls.first,
-          InventorySketchEditorPage.landscapeOrientations,
+          InventorySketchEditorPage.portraitOrientations,
         );
 
         await tester.tap(find.byKey(const Key('inventory-editor-finalize')));
@@ -3176,12 +3230,19 @@ Future<void> _openEditor(
   _OrientationRecorder orientations,
   GlobalKey<InventorySketchEditorPageState> pageKey, {
   bool settle = true,
+  double textScale = 1,
   InventorySketchLaunchIntent intent =
       InventorySketchLaunchIntent.createOrRecover,
   ValueChanged<bool?>? onResult,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
       home: Builder(
         builder: (context) => Scaffold(
           body: Center(
