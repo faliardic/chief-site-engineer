@@ -7,6 +7,21 @@ Amaç maksimum kanıt üretmek değil, değişen sözleşmenin riskini karşıla
 
 Bu belge workflow lane, correction, evidence ve publication konularında eski ağır Issue/authority tariflerinden önceliklidir. Ürün/veri ilkeleri ve kritik safety sınırları override edilmez.
 
+## 0. Zorunlu aktör dispatch'i
+
+Her talepte lane'den önce sıradaki tek aksiyon ve aktör seçilir:
+
+| İş | Aktör |
+|---|---|
+| GitHub okuma, plan, Issue/PR koordinasyonu, review, owner-approved Ready/merge | ChatGPT |
+| Repository/local dosya değişikliği, format/diff, local Git, commit/push | Codex |
+| Test/analyzer ve manuel ürün kabulü | Fatih |
+| Build/APK/ADB/device | Fatih; yalnız exact owner delegasyonuyla Codex istisnası |
+
+Codex gereken işte ChatGPT kullanıcının `Codex ile çalış` demesini beklemez. `Sıradaki aktör: Codex` der ve current Issue/protokolü kopyalamadan yalnız goal, allowlist, stop ve handoff'u içeren 10–15 satırlık exact görev verir.
+
+ChatGPT'ın kendi yetkisindeki işlem mevcut owner kararıyla yapılabiliyorsa ayrıca `devam` istenmez. Her kullanıcıya teslim edilen sonuç `Sıradaki aksiyon — <aktör>: <tek uygulanabilir talimat>.` satırıyla biter; kalan iş yoksa aktör `Yok` olur.
+
 ## 1. Lane seçimi
 
 Her iş yalnız bir lane seçer.
@@ -64,9 +79,9 @@ Büyük STANDARD/CRITICAL görevler birden fazla bağımsız 5 dakikalık mikro 
 
 ## 3. Test sahipliği
 
-Codex test, analyzer, build, emulator, ADB veya device işlemi çalıştırmaz.
+Codex test, analyzer veya manuel ürün kabulü çalıştırmaz. Build, emulator, ADB veya device işlemi varsayılan olarak Fatih'tedir; Fatih exact package/device/data-safety sınırıyla açıkça devrederse Codex bunları tek bir 5 dakikalık hard-stop görevi olarak çalıştırabilir. PASS/FAIL ve ürün kabulü Fatih'te kalır.
 
-Codex yalnız:
+Codex normalde yalnız:
 
 - exact source edit;
 - değişen dosyalarda format;
@@ -76,7 +91,7 @@ Codex yalnız:
 
 yapar ve Fatih'e exact doğrulama komutlarını verir.
 
-Fatih focused/full test, analyzer, build, APK/install, device ve ürün kabulünü çalıştırır.
+Fatih focused/full test, analyzer, build, APK/install, device ve ürün kabulünü çalıştırır; exact build/APK/ADB/device execution'ını isterse açık sınırlarla Codex'e devreder.
 
 ## 4. FAST akışı
 
@@ -222,7 +237,8 @@ Required decision: <tek karar>
 
 - FAST Codex işlemi 5 dakikanın altında: %100
 - FAST Issue/PR/`.cse`: 0
-- Codex test/analyzer/build/device invocation: 0
+- Codex test/analyzer/manual acceptance invocation: 0
+- owner delegasyonu olmadan Codex build/APK/ADB/device invocation: 0
 - user PASS olmadan FAST commit/push: 0
 - stacked PR: 0
 - aynı anda production PR: en fazla 1
