@@ -20,6 +20,7 @@ class AgendaPage extends StatefulWidget {
     this.attachments,
     this.concrete,
     this.concreteAttachments,
+    this.activeProjectId,
     super.key,
   });
 
@@ -28,6 +29,7 @@ class AgendaPage extends StatefulWidget {
   final SafeAttachmentPicker? attachments;
   final ConcreteApplication? concrete;
   final SafeAttachmentPicker? concreteAttachments;
+  final String? activeProjectId;
 
   @override
   State<AgendaPage> createState() => _AgendaPageState();
@@ -202,6 +204,21 @@ class _AgendaPageState extends State<AgendaPage> {
   }
 
   Future<void> _openCreateLog() async {
+    final requestedProjectId = _projectId ?? widget.activeProjectId;
+    final initialProjectId =
+        _projects.any(
+          (project) => !project.isArchived && project.id == requestedProjectId,
+        )
+        ? requestedProjectId
+        : null;
+    if (initialProjectId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Önce aktif proje veya Ajanda proje filtresi seçin.'),
+        ),
+      );
+      return;
+    }
     final day = await Navigator.of(context).push<String>(
       MaterialPageRoute(
         builder: (_) => LogFormPage(
@@ -210,7 +227,7 @@ class _AgendaPageState extends State<AgendaPage> {
           attachments: widget.attachments,
           concrete: widget.concrete,
           concreteAttachments: widget.concreteAttachments,
-          initialProjectId: _projectId,
+          initialProjectId: initialProjectId,
           initialIstanbulDay: _selectedDay,
         ),
       ),
@@ -322,18 +339,18 @@ class _AgendaPageState extends State<AgendaPage> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                OutlinedButton.icon(
+                _listIconAction(
                   key: const Key('create-agenda-project'),
                   onPressed: _createProject,
                   icon: const Icon(Icons.create_new_folder_outlined),
-                  label: const Text('Yeni proje'),
+                  label: 'Yeni proje oluştur',
                 ),
                 if (widget.projectLocations != null)
-                  OutlinedButton.icon(
+                  _listIconAction(
                     key: const Key('open-project-location-catalog'),
                     onPressed: _openProjectLocationCatalog,
                     icon: const Icon(Icons.account_tree_outlined),
-                    label: const Text('Mahal Kataloğu'),
+                    label: 'Mahal Kataloğu',
                   ),
               ],
             ),
@@ -343,17 +360,14 @@ class _AgendaPageState extends State<AgendaPage> {
               runSpacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                IconButton.filledTonal(
+                _listIconAction(
                   key: const Key('previous-day'),
-                  constraints: const BoxConstraints(
-                    minWidth: 48,
-                    minHeight: 48,
-                  ),
                   onPressed: () => _moveDay(-1),
                   icon: const Icon(Icons.chevron_left),
-                  tooltip: 'Önceki gün',
+                  label: 'Önceki gün',
                 ),
-                FilledButton.tonal(
+                _listIconAction(
+                  key: const Key('agenda-today'),
                   onPressed: () {
                     setState(() {
                       _selectedDay = CseTimeCodec.istanbulDayKey(
@@ -362,7 +376,8 @@ class _AgendaPageState extends State<AgendaPage> {
                     });
                     _reload();
                   },
-                  child: const Text('Bugün'),
+                  icon: const Icon(Icons.today_outlined),
+                  label: 'Bugüne git',
                 ),
                 OutlinedButton.icon(
                   key: const Key('selected-day'),
@@ -370,15 +385,11 @@ class _AgendaPageState extends State<AgendaPage> {
                   icon: const Icon(Icons.calendar_month_outlined),
                   label: Text(_selectedDay),
                 ),
-                IconButton.filledTonal(
+                _listIconAction(
                   key: const Key('next-day'),
-                  constraints: const BoxConstraints(
-                    minWidth: 48,
-                    minHeight: 48,
-                  ),
                   onPressed: () => _moveDay(1),
                   icon: const Icon(Icons.chevron_right),
-                  tooltip: 'Sonraki gün',
+                  label: 'Sonraki gün',
                 ),
               ],
             ),
@@ -480,10 +491,11 @@ class _AgendaPageState extends State<AgendaPage> {
                 labelText: 'Literal ara',
                 hintText: 'Açıklama, mahal, not veya proje',
                 border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
+                suffixIcon: _listIconAction(
+                  key: const Key('agenda-search'),
                   onPressed: _reload,
                   icon: const Icon(Icons.search),
-                  tooltip: 'Ara',
+                  label: 'Ara',
                 ),
               ),
               textInputAction: TextInputAction.search,
@@ -538,25 +550,14 @@ class _AgendaPageState extends State<AgendaPage> {
                                 ),
                               ),
                               if (openLinkedReminder != null)
-                                Semantics(
-                                  container: true,
-                                  button: true,
+                                _listIconAction(
+                                  key: Key(
+                                    'agenda-log-linked-reminder-${log.id}',
+                                  ),
                                   label: 'Bağlı hatırlatıcıyı aç',
-                                  excludeSemantics: true,
-                                  onTap: openLinkedReminder,
-                                  child: IconButton(
-                                    key: Key(
-                                      'agenda-log-linked-reminder-${log.id}',
-                                    ),
-                                    constraints: const BoxConstraints(
-                                      minWidth: 48,
-                                      minHeight: 48,
-                                    ),
-                                    onPressed: openLinkedReminder,
-                                    icon: const Icon(
-                                      Icons.notifications_active_outlined,
-                                    ),
-                                    tooltip: 'Bağlı hatırlatıcıyı aç',
+                                  onPressed: openLinkedReminder,
+                                  icon: const Icon(
+                                    Icons.notifications_active_outlined,
                                   ),
                                 ),
                             ],
@@ -583,7 +584,9 @@ class _AgendaPageState extends State<AgendaPage> {
                               children: [
                                 Icon(Icons.archive_outlined, size: 18),
                                 SizedBox(width: 6),
-                                Text('Arşivde • geri getirilebilir'),
+                                Expanded(
+                                  child: Text('Arşivde • geri getirilebilir'),
+                                ),
                               ],
                             ),
                           ],
@@ -596,15 +599,60 @@ class _AgendaPageState extends State<AgendaPage> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        key: const Key('create-agenda-log'),
-        onPressed: _openCreateLog,
-        icon: const Icon(Icons.add),
-        label: const Text('Log ekle'),
+      floatingActionButton: Semantics(
+        container: true,
+        button: true,
+        enabled: true,
+        label: 'Ajanda kaydı ekle',
+        excludeSemantics: true,
+        onTap: _openCreateLog,
+        child: SizedBox.square(
+          dimension: 40,
+          child: FloatingActionButton.small(
+            key: const Key('create-agenda-log'),
+            onPressed: _openCreateLog,
+            tooltip: 'Ajanda kaydı ekle',
+            child: const Icon(Icons.note_add_outlined),
+          ),
+        ),
       ),
     );
   }
 }
+
+Widget _listIconAction({
+  Key? key,
+  required Widget icon,
+  required String label,
+  required VoidCallback? onPressed,
+}) => Align(
+  alignment: AlignmentDirectional.centerStart,
+  widthFactor: 1,
+  heightFactor: 1,
+  child: Semantics(
+    container: true,
+    label: label,
+    button: true,
+    enabled: onPressed != null,
+    excludeSemantics: true,
+    onTap: onPressed,
+    child: IconButton.filledTonal(
+      key: key,
+      tooltip: label,
+      style: IconButton.styleFrom(
+        minimumSize: const Size.square(40),
+        fixedSize: const Size.square(40),
+        maximumSize: const Size.square(40),
+        iconSize: 20,
+        padding: EdgeInsets.zero,
+        visualDensity: VisualDensity.standard,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      onPressed: onPressed,
+      icon: icon,
+    ),
+  ),
+);
 
 class _MessageCard extends StatelessWidget {
   const _MessageCard({required this.icon, required this.message});

@@ -7,7 +7,10 @@ import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
+import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_photo_viewer_page.dart';
+import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
+import 'package:chief_site_engineer/features/agenda/project_location_catalog_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
@@ -110,6 +113,16 @@ AgendaLog sourceAgendaLog({
   revision: revision,
 );
 
+MobileProject reminderProject(String id, String name, {String? archivedAt}) =>
+    MobileProject(
+      id: id,
+      name: name,
+      createdAt: '2026-08-30T06:00:00Z',
+      updatedAt: '2026-08-30T06:00:00Z',
+      revision: 1,
+      archivedAt: archivedAt,
+    );
+
 Future<void> openAgendaReminderSyncDialog(WidgetTester tester) async {
   final action = find.byKey(const Key('sync-agenda-to-reminder'));
   await tester.scrollUntilVisible(
@@ -117,6 +130,16 @@ Future<void> openAgendaReminderSyncDialog(WidgetTester tester) async {
     300,
     scrollable: find.byType(Scrollable).first,
   );
+  expect(tester.getSize(action), const Size.square(40));
+  expect(
+    _iconButtonByKey(tester, const Key('sync-agenda-to-reminder')).tooltip,
+    'Ajanda’dan güncelle',
+  );
+  expect(
+    find.descendant(of: action, matching: find.byIcon(Icons.sync_outlined)),
+    findsOneWidget,
+  );
+  expect(find.text('Ajanda’dan güncelle'), findsNothing);
   await tester.tap(action);
   await tester.pumpAndSettle();
   expect(find.byKey(const Key('agenda-reminder-sync-dialog')), findsOneWidget);
@@ -227,10 +250,188 @@ Future<void> openDetailAllDayPicker(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _pumpReminderFormRoute(
+  WidgetTester tester, {
+  required Key openerKey,
+  required WidgetBuilder builder,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: FilledButton(
+            key: openerKey,
+            onPressed: () => Navigator.of(
+              context,
+            ).push<void>(MaterialPageRoute(builder: builder)),
+            child: const Text('Formu aç'),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.tap(find.byKey(openerKey));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _submitReminderFormThroughUi(WidgetTester tester) async {
+  final submit = find.byKey(const Key('submit-reminder'));
+  expect(submit, findsOneWidget);
+  final formScrollable = find.ancestor(
+    of: submit,
+    matching: find.byType(Scrollable),
+  );
+  expect(formScrollable, findsOneWidget);
+  await tester.scrollUntilVisible(submit, 200, scrollable: formScrollable);
+  await tester.pumpAndSettle();
+  for (
+    var dragCount = 0;
+    dragCount < 6 && submit.hitTestable().evaluate().isEmpty;
+    dragCount += 1
+  ) {
+    await tester.drag(formScrollable, const Offset(0, -48));
+    await tester.pumpAndSettle();
+  }
+  final hitTestableSubmit = submit.hitTestable();
+  expect(hitTestableSubmit, findsOneWidget);
+  await tester.tap(hitTestableSubmit);
+  await tester.pumpAndSettle();
+}
+
+IconButton _iconButtonByKey(WidgetTester tester, Key key) {
+  final keyed = find.byKey(key);
+  final keyedWidget = tester.widget(keyed);
+  if (keyedWidget is IconButton) return keyedWidget;
+  return tester.widget<IconButton>(
+    find.descendant(of: keyed, matching: find.byType(IconButton)),
+  );
+}
+
+Semantics _semanticsByKey(WidgetTester tester, Key key) {
+  return tester.widget<Semantics>(
+    find.ancestor(of: find.byKey(key), matching: find.byType(Semantics)).first,
+  );
+}
+
 void main() {
-  testWidgets('+ Unutma is usable at 320 px with 44 px targets', (
+  testWidgets('preferred project is initial only and cancel creates nothing', (
     tester,
   ) async {
+    final agenda = FakeAgendaApplication(
+      projects: [reminderProject(agendaProjectId, 'Şantiye A')],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: FilledButton(
+              onPressed: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => ReminderFormPage(
+                    agenda: agenda,
+                    preferredProjectId: agendaProjectId,
+                  ),
+                ),
+              ),
+              child: const Text('Formu aç'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Formu aç'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('reminder-project')), findsOneWidget);
+    expect(find.text('Şantiye A'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(agenda.createReminderCalls, 0);
+  });
+
+  testWidgets('preferred project can be changed to personal before save', (
+    tester,
+  ) async {
+    final agenda = FakeAgendaApplication(
+      projects: [reminderProject(agendaProjectId, 'Şantiye A')],
+    );
+    await _pumpReminderFormRoute(
+      tester,
+      openerKey: const Key('open-personal-preferred-form'),
+      builder: (_) =>
+          ReminderFormPage(agenda: agenda, preferredProjectId: agendaProjectId),
+    );
+
+    await tester.tap(find.byKey(const Key('reminder-project')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Kişisel / projesiz').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('reminder-title')),
+      'Kişisel kontrol',
+    );
+    await _submitReminderFormThroughUi(tester);
+
+    expect(agenda.createReminderCalls, 1);
+    expect(agenda.lastReminderCommand, isNotNull);
+    expect(agenda.lastReminderCommand!.projectId, isNull);
+    expect(
+      find.byKey(const Key('open-personal-preferred-form')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('submit-reminder')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('invalid preferred project clears but source log project wins', (
+    tester,
+  ) async {
+    final preferred = reminderProject(
+      'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      'Arşivli',
+      archivedAt: '2026-08-30T07:00:00Z',
+    );
+    final sourceProject = reminderProject(agendaProjectId, 'Şantiye A');
+    final invalidAgenda = FakeAgendaApplication(projects: [preferred]);
+    await _pumpReminderFormRoute(
+      tester,
+      openerKey: const Key('open-invalid-preferred-form'),
+      builder: (_) => ReminderFormPage(
+        agenda: invalidAgenda,
+        preferredProjectId: preferred.id,
+      ),
+    );
+    await tester.enterText(
+      find.byKey(const Key('reminder-title')),
+      'Arşivli projeye yazma',
+    );
+    await _submitReminderFormThroughUi(tester);
+    expect(invalidAgenda.createReminderCalls, 1);
+    expect(invalidAgenda.lastReminderCommand, isNotNull);
+    expect(invalidAgenda.lastReminderCommand!.projectId, isNull);
+
+    final sourceAgenda = FakeAgendaApplication(
+      projects: [sourceProject, preferred],
+    );
+    await _pumpReminderFormRoute(
+      tester,
+      openerKey: const Key('open-source-log-form'),
+      builder: (_) => ReminderFormPage(
+        agenda: sourceAgenda,
+        log: sourceAgendaLog(),
+        preferredProjectId: preferred.id,
+      ),
+    );
+    expect(find.byKey(const Key('reminder-project')), findsNothing);
+    await _submitReminderFormThroughUi(tester);
+    expect(sourceAgenda.createReminderCalls, 1);
+    expect(sourceAgenda.lastReminderCommand, isNotNull);
+    expect(sourceAgenda.lastReminderCommand!.projectId, agendaProjectId);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Unutma icon actions are exact 40 px at 320 px', (tester) async {
+    final semantics = tester.ensureSemantics();
     tester.view.physicalSize = const Size(320, 700);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -245,21 +446,49 @@ void main() {
     await tester.pumpAndSettle();
     final quick = find.byKey(const Key('quick-reminder'));
     expect(quick, findsOneWidget);
-    expect(tester.getSize(quick).height, greaterThanOrEqualTo(44));
+    expect(tester.getSize(quick), const Size.square(40));
+    expect(
+      _iconButtonByKey(tester, const Key('quick-reminder')).tooltip,
+      'Unutma ekle',
+    );
+    expect(
+      _iconButtonByKey(tester, const Key('quick-reminder')).isSelected,
+      isNull,
+    );
+    expect(
+      _semanticsByKey(tester, const Key('quick-reminder')).properties.selected,
+      isNull,
+    );
+    expect(
+      find.descendant(
+        of: quick,
+        matching: find.byIcon(Icons.add_alert_outlined),
+      ),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel('Unutma ekle'), findsOneWidget);
+    expect(find.text('+ Unutma'), findsNothing);
 
     await tester.tap(quick);
     await tester.pumpAndSettle();
-    expect(find.text('+ Unutma'), findsOneWidget);
+    expect(find.text('Unutma'), findsOneWidget);
     expect(find.byKey(const Key('reminder-title')), findsOneWidget);
     final submit = find.byKey(const Key('submit-reminder'));
     await tester.ensureVisible(submit);
-    expect(tester.getSize(submit).height, greaterThanOrEqualTo(44));
+    expect(tester.getSize(submit), const Size.square(40));
+    expect(
+      _iconButtonByKey(tester, const Key('submit-reminder')).tooltip,
+      'Hatırlatıcıyı kaydet',
+    );
+    expect(find.bySemanticsLabel('Hatırlatıcıyı kaydet'), findsOneWidget);
+    semantics.dispose();
     expect(tester.takeException(), isNull);
   });
 
   testWidgets(
     'form exposes quick Bugün and true Tam gün without waiting or fake time',
     (tester) async {
+      final semantics = tester.ensureSemantics();
       tester.view.physicalSize = const Size(800, 900);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -271,6 +500,14 @@ void main() {
       expect(find.text('Bekliyorum'), findsNothing);
       expect(find.byKey(const Key('reminder-today')), findsOneWidget);
       expect(find.byKey(const Key('reminder-all-day')), findsOneWidget);
+      for (final action in const [
+        (Key('reminder-today'), 'Bugün'),
+        (Key('reminder-all-day-tomorrow'), 'Yarın • Tam gün'),
+      ]) {
+        expect(tester.getSize(find.byKey(action.$1)), const Size.square(40));
+        expect(_iconButtonByKey(tester, action.$1).tooltip, action.$2);
+        expect(find.bySemanticsLabel(action.$2), findsOneWidget);
+      }
 
       await tester.enterText(
         find.byKey(const Key('reminder-title')),
@@ -286,6 +523,13 @@ void main() {
       );
       expect(find.byKey(const Key('reminder-custom-date')), findsOneWidget);
       expect(find.byKey(const Key('reminder-custom-time')), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('reminder-custom-date')),
+          matching: find.byType(Text),
+        ),
+        findsOneWidget,
+      );
 
       final submit = find.byKey(const Key('submit-reminder'));
       await tester.scrollUntilVisible(
@@ -299,8 +543,119 @@ void main() {
       expect(agenda.lastReminderCommand!.allDayLocalDate, isNotNull);
       expect(agenda.lastReminderCommand!.customAttentionAt, isNull);
       expect(agenda.lastReminderCommand!.kind, ReminderKind.action);
+      semantics.dispose();
     },
   );
+
+  testWidgets('form keeps selected schedule and deadline values visible', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1100);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final agenda = FakeAgendaApplication();
+    await tester.pumpWidget(
+      MaterialApp(home: ReminderFormPage(agenda: agenda)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('reminder-schedule')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ReminderScheduleKind.custom.label).last);
+    await tester.pumpAndSettle();
+    for (final key in const [
+      Key('reminder-custom-date'),
+      Key('reminder-custom-time'),
+    ]) {
+      final valueAction = find.byKey(key);
+      expect(valueAction, findsOneWidget);
+      expect(
+        find.descendant(of: valueAction, matching: find.byType(Text)),
+        findsOneWidget,
+      );
+    }
+
+    final optional = find.byKey(const Key('reminder-optional-details'));
+    await tester.scrollUntilVisible(
+      optional,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(optional);
+    await tester.pumpAndSettle();
+    final hasDeadline = find.byKey(const Key('reminder-has-deadline'));
+    await tester.scrollUntilVisible(
+      hasDeadline,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(hasDeadline);
+    await tester.pumpAndSettle();
+    for (final key in const [
+      Key('reminder-deadline-date'),
+      Key('reminder-deadline-time'),
+    ]) {
+      final valueAction = find.byKey(key);
+      expect(valueAction, findsOneWidget);
+      expect(
+        find.descendant(of: valueAction, matching: find.byType(Text)),
+        findsOneWidget,
+      );
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Mahal Kataloğu icon action keeps exact navigation callback', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final project = reminderProject(agendaProjectId, 'Şantiye A');
+    final agenda = FakeAgendaApplication(projects: [project]);
+    final locations = _FakeProjectLocations([project]);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReminderFormPage(
+          agenda: agenda,
+          projectLocations: locations,
+          preferredProjectId: project.id,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final optional = find.byKey(const Key('reminder-optional-details'));
+    await tester.scrollUntilVisible(
+      optional,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(optional);
+    await tester.pumpAndSettle();
+    final action = find.byKey(const Key('open-location-catalog-from-reminder'));
+    await tester.scrollUntilVisible(
+      action,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(tester.getSize(action), const Size.square(40));
+    expect(
+      _iconButtonByKey(
+        tester,
+        const Key('open-location-catalog-from-reminder'),
+      ).tooltip,
+      'Mahal Kataloğu',
+    );
+    expect(find.bySemanticsLabel('Mahal Kataloğu'), findsOneWidget);
+    expect(find.text('Mahal Kataloğu'), findsNothing);
+    _iconButtonByKey(
+      tester,
+      const Key('open-location-catalog-from-reminder'),
+    ).onPressed!.call();
+    await tester.pumpAndSettle();
+    expect(find.byType(ProjectLocationCatalogPage), findsOneWidget);
+    semantics.dispose();
+  });
 
   for (final schedule in [
     ReminderScheduleKind.in2Hours,
@@ -336,12 +691,53 @@ void main() {
           '${schedule.label} sonra kontrol',
         );
         final submit = find.byKey(const Key('submit-reminder'));
+        final formListView = find.ancestor(
+          of: submit,
+          matching: find.byType(ListView),
+        );
+        final formScrollable = find.ancestor(
+          of: submit,
+          matching: find.byType(Scrollable),
+        );
+        expect(formListView, findsOneWidget);
+        expect(formScrollable, findsOneWidget);
+        expect(
+          find.descendant(of: formListView, matching: formScrollable),
+          findsOneWidget,
+        );
         await tester.scrollUntilVisible(
           submit,
-          300,
-          scrollable: find.byType(Scrollable).first,
+          200,
+          scrollable: formScrollable,
         );
-        await tester.tap(submit);
+        await tester.pumpAndSettle();
+
+        bool submitIsFullyInViewport() {
+          final viewport = tester.getRect(formScrollable);
+          final submitRect = tester.getRect(submit);
+          return submitRect.left >= viewport.left &&
+              submitRect.right <= viewport.right &&
+              submitRect.top >= viewport.top + 1 &&
+              submitRect.bottom <= viewport.bottom - 1;
+        }
+
+        for (
+          var correction = 0;
+          correction < 6 && !submitIsFullyInViewport();
+          correction += 1
+        ) {
+          final viewport = tester.getRect(formScrollable);
+          final submitRect = tester.getRect(submit);
+          final dragDy = submitRect.bottom > viewport.bottom - 1
+              ? -math.max(submitRect.bottom - viewport.bottom + 24, 32.0)
+              : math.max(viewport.top - submitRect.top + 24, 32.0);
+          await tester.drag(formScrollable, Offset(0, dragDy));
+          await tester.pumpAndSettle();
+        }
+
+        expect(submitIsFullyInViewport(), isTrue);
+        expect(submit.hitTestable(), findsOneWidget);
+        await tester.tap(submit.hitTestable());
         await tester.pumpAndSettle();
 
         expect(agenda.lastReminderCommand!.schedule, schedule);
@@ -443,6 +839,7 @@ void main() {
   testWidgets(
     'Today is default and renders overdue all-day and timed sections once in priority order',
     (tester) async {
+      final semantics = tester.ensureSemantics();
       final overdue = reminder(
         id: widgetReminderId(1),
         title: 'Geciken kontrol',
@@ -477,13 +874,36 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(agenda.todayOverviewCalls, 1);
-      expect(find.byType(ChoiceChip), findsNWidgets(3));
-      expect(
-        tester
-            .widget<ChoiceChip>(find.byKey(const Key('reminder-primary-today')))
-            .selected,
-        isTrue,
-      );
+      expect(find.byType(ChoiceChip), findsNothing);
+      for (final action in const [
+        (Key('reminder-primary-today'), 'Bugün', Icons.today_outlined, true),
+        (
+          Key('reminder-primary-tomorrow'),
+          'Yarın',
+          Icons.wb_sunny_outlined,
+          false,
+        ),
+        (
+          Key('reminder-primary-other'),
+          'Diğer',
+          Icons.more_horiz_rounded,
+          false,
+        ),
+      ]) {
+        final finder = find.byKey(action.$1);
+        expect(tester.getSize(finder), const Size.square(40));
+        expect(_iconButtonByKey(tester, action.$1).tooltip, action.$2);
+        expect(_iconButtonByKey(tester, action.$1).isSelected, action.$4);
+        expect(
+          _semanticsByKey(tester, action.$1).properties.selected,
+          action.$4,
+        );
+        expect(find.bySemanticsLabel(action.$2), findsOneWidget);
+        expect(
+          find.descendant(of: finder, matching: find.byIcon(action.$3)),
+          findsOneWidget,
+        );
+      }
       final overdueSection = find.byKey(const Key('reminder-section-overdue'));
       final allDaySection = find.byKey(const Key('reminder-section-all-day'));
       final timedSection = find.byKey(
@@ -510,6 +930,7 @@ void main() {
       expect(find.textContaining('Bugün • 09:00'), findsOneWidget);
       expect(find.textContaining('Yarın •'), findsNothing);
       expect(find.byKey(Key('reminder-tomorrow-${allDay.id}')), findsOneWidget);
+      semantics.dispose();
     },
   );
 
@@ -542,6 +963,7 @@ void main() {
   testWidgets('Other menu keeps secondary views and inbox count reachable', (
     tester,
   ) async {
+    final semantics = tester.ensureSemantics();
     final agenda = FakeAgendaApplication(
       todayOverview: const ReminderTodayOverview(
         istanbulDay: '2026-07-20',
@@ -560,7 +982,35 @@ void main() {
 
     final inboxAction = find.byKey(const Key('reminder-inbox-count'));
     expect(inboxAction, findsOneWidget);
-    expect(tester.getSize(inboxAction).height, greaterThanOrEqualTo(44));
+    expect(tester.getSize(inboxAction), const Size.square(40));
+    expect(
+      _iconButtonByKey(tester, const Key('reminder-inbox-count')).tooltip,
+      'Unutma Kutusu, 3 kayıt',
+    );
+    expect(
+      _iconButtonByKey(tester, const Key('reminder-inbox-count')).isSelected,
+      isNull,
+    );
+    expect(
+      _semanticsByKey(
+        tester,
+        const Key('reminder-inbox-count'),
+      ).properties.selected,
+      isNull,
+    );
+    expect(
+      find.descendant(of: inboxAction, matching: find.text('3')),
+      findsOneWidget,
+    );
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Semantics &&
+            widget.properties.label == 'Unutma Kutusu, 3 kayıt',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Unutma Kutusunda'), findsNothing);
     await tester.tap(inboxAction);
     await tester.pumpAndSettle();
     expect(agenda.lastReminderGroup, ReminderViewGroup.inbox);
@@ -582,6 +1032,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(agenda.lastReminderGroup, ReminderViewGroup.upcoming);
     expect(find.text('Yaklaşanlar'), findsOneWidget);
+    semantics.dispose();
   });
 
   testWidgets('trash view has exact empty state', (tester) async {
@@ -650,7 +1101,11 @@ void main() {
       expect(find.textContaining('Şantiye A • Ajanda'), findsOneWidget);
       final restore = find.byKey(Key('restore-reminder-${item.id}'));
       await tester.ensureVisible(restore);
-      expect(tester.getSize(restore).height, greaterThanOrEqualTo(44));
+      expect(tester.getSize(restore), const Size.square(40));
+      expect(
+        _iconButtonByKey(tester, Key('restore-reminder-${item.id}')).tooltip,
+        'Geri yükle',
+      );
       await tester.tap(restore);
       await tester.pumpAndSettle();
 
@@ -684,12 +1139,18 @@ void main() {
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(tester.getSize(trash).height, greaterThanOrEqualTo(44));
+    expect(tester.getSize(trash), const Size.square(40));
+    expect(
+      _iconButtonByKey(tester, const Key('trash-reminder')).tooltip,
+      'Sil',
+    );
     await tester.tap(trash);
     await tester.pumpAndSettle();
     expect(find.text('Hatırlatıcı silinsin mi?'), findsOneWidget);
     expect(find.textContaining('Ajanda, Puantaj veya Beton'), findsOneWidget);
     expect(find.textContaining('geri getirilebilir'), findsOneWidget);
+    expect(find.text('Vazgeç'), findsOneWidget);
+    expect(find.text('Sil'), findsOneWidget);
     await tester.tap(find.byKey(const Key('confirm-trash-reminder')));
     await tester.pumpAndSettle();
 
@@ -698,7 +1159,14 @@ void main() {
       ReminderMutationAction.moveToTrash,
     );
     expect(find.byKey(const Key('reminder-trashed-at')), findsOneWidget);
-    expect(find.byKey(const Key('restore-reminder')), findsOneWidget);
+    final restore = find.byKey(const Key('restore-reminder'));
+    expect(restore, findsOneWidget);
+    expect(tester.getSize(restore), const Size.square(40));
+    expect(
+      _iconButtonByKey(tester, const Key('restore-reminder')).tooltip,
+      'Geri yükle',
+    );
+    expect(find.text('Geri yükle'), findsNothing);
     expect(find.byKey(const Key('edit-reminder')), findsNothing);
   });
 
@@ -916,6 +1384,52 @@ void main() {
       expect(find.byKey(const Key('open-source-agenda-log')), findsOneWidget);
     },
   );
+
+  testWidgets('source Agenda action is icon-only and opens the exact log', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final source = sourceAgendaLog();
+    final item = reminder(
+      projectId: source.projectId,
+      projectName: source.projectName,
+      sourceLogId: source.id,
+    );
+    final agenda = FakeAgendaApplication(
+      logs: [source],
+      reminders: [item],
+      reminderDetail: item,
+      sourceAgendaMedia: ReminderSourceAgendaMedia.loaded(
+        sourceLogId: source.id,
+        sourceLogArchivedAt: null,
+        photos: const [],
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReminderDetailPage(agenda: agenda, reminderId: item.id),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final action = find.byKey(const Key('open-source-agenda-log'));
+    await tester.scrollUntilVisible(
+      action,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(tester.getSize(action), const Size.square(40));
+    expect(
+      _iconButtonByKey(tester, const Key('open-source-agenda-log')).tooltip,
+      'Kaynak Ajanda kaydına dön',
+    );
+    expect(find.bySemanticsLabel('Kaynak Ajanda kaydına dön'), findsOneWidget);
+    expect(find.text('Kaynak Ajanda kaydına dön'), findsNothing);
+    await tester.tap(action);
+    await tester.pumpAndSettle();
+    expect(find.byType(LogDetailPage), findsOneWidget);
+    semantics.dispose();
+  });
 
   testWidgets(
     'source photo section is controlled for empty and absent source',
@@ -1136,9 +1650,19 @@ void main() {
         expect(tile, findsOneWidget);
         expect(tester.widget<CheckboxListTile>(tile).value, isTrue);
       }
-      expect(find.text('Başlık'), findsOneWidget);
-      expect(find.text('Açıklama'), findsOneWidget);
-      expect(find.text('Mahal'), findsOneWidget);
+      final dialog = find.byKey(const Key('agenda-reminder-sync-dialog'));
+      expect(
+        find.descendant(of: dialog, matching: find.text('Başlık')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: dialog, matching: find.text('Açıklama')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: dialog, matching: find.text('Mahal')),
+        findsOneWidget,
+      );
       expect(find.text('Hatırlatıcı: Eski başlık'), findsOneWidget);
       expect(find.text('Ajanda: Ajanda başlığı'), findsOneWidget);
       expect(find.text('Hatırlatıcı: Eski açıklama'), findsOneWidget);
@@ -1468,6 +1992,18 @@ void main() {
       await tester.ensureVisible(submit);
       await tester.tap(submit);
       await tester.pump();
+      expect(tester.getSize(submit), const Size.square(40));
+      expect(
+        _iconButtonByKey(tester, const Key('submit-reminder')).onPressed,
+        isNull,
+      );
+      expect(
+        find.descendant(
+          of: submit,
+          matching: find.byType(CircularProgressIndicator),
+        ),
+        findsOneWidget,
+      );
       await tester.tap(submit);
       await tester.pump();
 
@@ -1518,7 +2054,12 @@ void main() {
     await tester.pumpAndSettle();
     final action = find.byKey(Key('reminder-tomorrow-${item.id}'));
     expect(action, findsOneWidget);
-    expect(find.text('Yarın 08:00'), findsOneWidget);
+    expect(tester.getSize(action), const Size.square(40));
+    expect(
+      _iconButtonByKey(tester, Key('reminder-tomorrow-${item.id}')).tooltip,
+      "Yarın 08:00'a ertele",
+    );
+    expect(find.text('Yarın 08:00'), findsNothing);
     await tester.tap(action);
     await tester.pump();
     await tester.tap(action);
@@ -1546,8 +2087,19 @@ void main() {
 
       final todayAction = find.byKey(Key('reminder-tomorrow-${item.id}'));
       expect(todayAction, findsOneWidget);
-      expect(find.text('Yarın 08:00'), findsOneWidget);
-      expect(find.text('Yarın'), findsOneWidget);
+      expect(
+        _iconButtonByKey(tester, Key('reminder-tomorrow-${item.id}')).tooltip,
+        "Yarın 08:00'a ertele",
+      );
+      expect(find.text('Yarın 08:00'), findsNothing);
+      expect(
+        _iconButtonByKey(
+          tester,
+          const Key('reminder-primary-tomorrow'),
+        ).tooltip,
+        'Yarın',
+      );
+      expect(find.text('Yarın'), findsNothing);
       await tester.tap(todayAction);
       await tester.pumpAndSettle();
       expect(agenda.reminders.single.nextAttentionAt, '2026-07-21T05:00:00Z');
@@ -1582,7 +2134,11 @@ void main() {
 
     final action = find.byKey(Key('reminder-tomorrow-${item.id}'));
     expect(action, findsOneWidget);
-    expect(find.text('Yarına ertele'), findsOneWidget);
+    expect(
+      _iconButtonByKey(tester, Key('reminder-tomorrow-${item.id}')).tooltip,
+      'Yarına ertele',
+    );
+    expect(find.text('Yarına ertele'), findsNothing);
     await tester.tap(action);
     await tester.pumpAndSettle();
 
@@ -1634,6 +2190,7 @@ void main() {
   testWidgets(
     'Puantaj card and detail hide tomorrow and source action still opens',
     (tester) async {
+      final semantics = tester.ensureSemantics();
       tester.view.physicalSize = const Size(320, 900);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -1676,12 +2233,26 @@ void main() {
         scrollable: find.byType(Scrollable).first,
       );
       expect(source, findsOneWidget);
+      expect(tester.getSize(source), const Size.square(40));
+      expect(
+        _iconButtonByKey(
+          tester,
+          const Key('open-source-attendance-day'),
+        ).tooltip,
+        'Kaynak Puantaj gününe dön',
+      );
+      expect(
+        find.bySemanticsLabel('Kaynak Puantaj gününe dön'),
+        findsOneWidget,
+      );
+      expect(find.text('Kaynak Puantaj gününe dön'), findsNothing);
       await tester.tap(source);
       await tester.pumpAndSettle();
       expect(
         tester.state<NavigatorState>(find.byType(Navigator)).canPop(),
         isTrue,
       );
+      semantics.dispose();
       expect(tester.takeException(), isNull);
     },
   );
@@ -1721,6 +2292,34 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(agenda.lastReminderGroup, ReminderViewGroup.tomorrow);
+    expect(
+      _semanticsByKey(
+        tester,
+        const Key('reminder-primary-today'),
+      ).properties.selected,
+      isFalse,
+    );
+    expect(
+      _iconButtonByKey(
+        tester,
+        const Key('reminder-primary-tomorrow'),
+      ).isSelected,
+      isTrue,
+    );
+    expect(
+      _semanticsByKey(
+        tester,
+        const Key('reminder-primary-tomorrow'),
+      ).properties.selected,
+      isTrue,
+    );
+    expect(
+      _semanticsByKey(
+        tester,
+        const Key('reminder-primary-other'),
+      ).properties.selected,
+      isFalse,
+    );
     expect(find.text('Yarın için planlanmış hatırlatıcı yok.'), findsOneWidget);
     expect(find.byKey(const Key('reminder-delivery-diagnostic')), findsNothing);
   });
@@ -1753,7 +2352,7 @@ void main() {
 
       final tomorrowGroup = find.byKey(const Key('reminder-primary-tomorrow'));
       expect(tomorrowGroup, findsOneWidget);
-      expect(tester.getSize(tomorrowGroup).height, greaterThanOrEqualTo(48));
+      expect(tester.getSize(tomorrowGroup), const Size.square(40));
       await tester.tap(tomorrowGroup);
       await tester.pumpAndSettle();
       expect(agenda.lastReminderGroup, ReminderViewGroup.tomorrow);
@@ -1899,7 +2498,11 @@ void main() {
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('Erkene al'), findsOneWidget);
+    expect(
+      _iconButtonByKey(tester, const Key('earlier-reminder')).tooltip,
+      'Erkene al',
+    );
+    expect(find.text('Erkene al'), findsNothing);
 
     for (final item in [
       reminder(allDayLocalDate: '2026-07-19'),
@@ -2026,6 +2629,7 @@ void main() {
           findsOneWidget,
         );
         expect(find.textContaining('geçmişte kalıyor'), findsOneWidget);
+        expect(find.text('Geçmiş zamana al'), findsOneWidget);
         await tester.tap(find.text('Vazgeç'));
         await tester.pumpAndSettle();
         expect(agenda.mutateReminderCalls, 1);
@@ -2176,13 +2780,21 @@ void main() {
 
   for (final quickAction in [
     (
+      key: 'snooze-1h',
+      label: '1 saat ertele',
+      badge: '1',
+      action: ReminderMutationAction.snooze1Hour,
+    ),
+    (
       key: 'snooze-2h',
       label: '2 saat ertele',
+      badge: '2',
       action: ReminderMutationAction.snooze2Hours,
     ),
     (
       key: 'snooze-3h',
       label: '3 saat ertele',
+      badge: '3',
       action: ReminderMutationAction.snooze3Hours,
     ),
   ]) {
@@ -2209,7 +2821,16 @@ void main() {
         scrollable: find.byType(Scrollable).first,
       );
       expect(action, findsOneWidget);
-      expect(find.text(quickAction.label), findsOneWidget);
+      expect(tester.getSize(action), const Size.square(40));
+      expect(
+        _iconButtonByKey(tester, Key(quickAction.key)).tooltip,
+        quickAction.label,
+      );
+      expect(
+        find.descendant(of: action, matching: find.text(quickAction.badge)),
+        findsOneWidget,
+      );
+      expect(find.text(quickAction.label), findsNothing);
       await tester.tap(action);
       await tester.pump();
       await tester.tap(action, warnIfMissed: false);
@@ -2436,11 +3057,10 @@ void main() {
 
     expect(agenda.mutateReminderCalls, 1);
     final scheduleButton = find.byKey(const Key('schedule-reminder'));
-    final outlined = find.descendant(
-      of: scheduleButton,
-      matching: find.byType(OutlinedButton),
+    expect(
+      _iconButtonByKey(tester, const Key('schedule-reminder')).onPressed,
+      isNull,
     );
-    expect(tester.widget<OutlinedButton>(outlined).onPressed, isNull);
     await tester.tap(scheduleButton, warnIfMissed: false);
     await tester.pump();
     expect(agenda.mutateReminderCalls, 1);
@@ -2694,6 +3314,7 @@ void main() {
         '${configuration.brightness.name} with large Turkish text', (
       tester,
     ) async {
+      final semantics = tester.ensureSemantics();
       tester.view.physicalSize = Size(configuration.width, 900);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -2721,12 +3342,43 @@ void main() {
       );
       expect(complete, findsOneWidget);
       await tester.ensureVisible(complete);
-      expect(tester.getSize(complete).height, greaterThanOrEqualTo(44));
+      expect(tester.getSize(complete), const Size.square(40));
+      expect(
+        _iconButtonByKey(tester, const Key('complete-reminder')).tooltip,
+        'Tamamla',
+      );
+      expect(find.bySemanticsLabel('Tamamla'), findsOneWidget);
       expect(find.byKey(const Key('schedule-reminder')), findsOneWidget);
       expect(find.byKey(const Key('start-waiting')), findsNothing);
       final tomorrow = find.byKey(const Key('snooze-tomorrow'));
       await tester.ensureVisible(tomorrow);
-      expect(tester.getSize(tomorrow).height, greaterThanOrEqualTo(48));
+      expect(tester.getSize(tomorrow), const Size.square(40));
+      expect(
+        _iconButtonByKey(tester, const Key('snooze-tomorrow')).tooltip,
+        "Yarın 08:00'a ertele",
+      );
+      expect(find.bySemanticsLabel("Yarın 08:00'a ertele"), findsOneWidget);
+      for (final action in const [
+        (Key('complete-reminder'), 'Tamamla'),
+        (Key('snooze-tomorrow'), "Yarın 08:00'a ertele"),
+        (Key('snooze-15'), '15 dk ertele'),
+        (Key('snooze-1h'), '1 saat ertele'),
+        (Key('snooze-2h'), '2 saat ertele'),
+        (Key('snooze-3h'), '3 saat ertele'),
+        (Key('earlier-reminder'), 'Erkene al'),
+        (Key('schedule-reminder'), 'Yeni tarih'),
+        (Key('edit-reminder'), 'Düzenle'),
+        (Key('trash-reminder'), 'Sil'),
+        (Key('move-inbox'), 'Unutma Kutusu'),
+        (Key('cancel-reminder'), 'İptal et'),
+      ]) {
+        final finder = find.byKey(action.$1);
+        if (finder.evaluate().isEmpty) continue;
+        expect(tester.getSize(finder), const Size.square(40));
+        expect(_iconButtonByKey(tester, action.$1).tooltip, action.$2);
+        expect(find.text(action.$2), findsNothing);
+      }
+      semantics.dispose();
       expect(tester.takeException(), isNull);
     });
   }
@@ -2734,6 +3386,7 @@ void main() {
   testWidgets('delivery diagnostic exposes retry and user-opened settings', (
     tester,
   ) async {
+    final semantics = tester.ensureSemantics();
     tester.view.physicalSize = const Size(800, 1200);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -2766,6 +3419,12 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    expect(tester.getSize(notificationSettings), const Size.square(40));
+    expect(
+      _iconButtonByKey(tester, const Key('open-notification-settings')).tooltip,
+      'Bildirim ayarları',
+    );
+    expect(find.bySemanticsLabel('Bildirim ayarları'), findsOneWidget);
     await tester.tap(notificationSettings);
     await tester.pump();
     final batterySettings = find.byKey(const Key('open-battery-settings'));
@@ -2773,6 +3432,11 @@ void main() {
       batterySettings,
       200,
       scrollable: find.byType(Scrollable).first,
+    );
+    expect(tester.getSize(batterySettings), const Size.square(40));
+    expect(
+      _iconButtonByKey(tester, const Key('open-battery-settings')).tooltip,
+      'Batarya ayarları',
     );
     await tester.tap(batterySettings);
     await tester.pump();
@@ -2782,12 +3446,21 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    expect(tester.getSize(retry), const Size.square(40));
+    expect(
+      _iconButtonByKey(tester, const Key('retry-reminder-delivery')).tooltip,
+      'Yeniden doğrula',
+    );
     await tester.tap(retry);
     await tester.pumpAndSettle();
 
     expect(agenda.notificationSettingsCalls, 1);
     expect(agenda.batterySettingsCalls, 1);
     expect(agenda.retryCalls, 1);
+    expect(find.text('Yeniden doğrula'), findsNothing);
+    expect(find.text('Bildirim ayarları'), findsNothing);
+    expect(find.text('Batarya ayarları'), findsNothing);
+    semantics.dispose();
     expect(tester.takeException(), isNull);
   });
 
@@ -2825,7 +3498,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('reopen-reminder')), findsOneWidget);
+    final reopen = find.byKey(const Key('reopen-reminder'));
+    expect(reopen, findsOneWidget);
+    expect(tester.getSize(reopen), const Size.square(40));
+    expect(
+      _iconButtonByKey(tester, const Key('reopen-reminder')).tooltip,
+      'Yeniden aç',
+    );
+    expect(find.text('Yeniden aç'), findsNothing);
     expect(find.byKey(const Key('reminder-overdue-status')), findsNothing);
     expect(find.byKey(const Key('reminder-delivery-diagnostic')), findsNothing);
   });
@@ -3024,6 +3704,29 @@ class _ReminderPushCountingObserver extends NavigatorObserver {
     pushes += 1;
     super.didPush(route, previousRoute);
   }
+}
+
+class _FakeProjectLocations implements ProjectLocationApplication {
+  _FakeProjectLocations(this.projects);
+
+  final List<MobileProject> projects;
+
+  @override
+  Stream<void> get projectChanges => const Stream<void>.empty();
+
+  @override
+  Stream<void> get projectLocationChanges => const Stream<void>.empty();
+
+  @override
+  Future<List<MobileProject>> listProjects() async => projects;
+
+  @override
+  Future<List<MobileProjectLocation>> listProjectLocations(
+    ProjectLocationQuery query,
+  ) async => const [];
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _DeliveryAgenda extends FakeAgendaApplication

@@ -18,6 +18,7 @@ class ConcretePage extends StatefulWidget {
     this.projectLocations,
     this.initialProjectId,
     this.initialIstanbulDay,
+    this.onProjectSelected,
     super.key,
   });
 
@@ -27,6 +28,7 @@ class ConcretePage extends StatefulWidget {
   final ProjectLocationApplication? projectLocations;
   final String? initialProjectId;
   final String? initialIstanbulDay;
+  final ValueChanged<String>? onProjectSelected;
 
   @override
   State<ConcretePage> createState() => _ConcretePageState();
@@ -37,10 +39,12 @@ class _ConcretePageState extends State<ConcretePage> {
   final _search = TextEditingController();
   List<MobileProject> _projects = const [];
   List<ConcretePour> _pours = const [];
+  String? _projectIdToValidate;
   MobileProject? _project;
   ConcretePourGroup _group = ConcretePourGroup.today;
   late String _day;
   bool _loading = true;
+  bool _projectDiscoveryFailed = false;
   String? _error;
   StreamSubscription<void>? _projectSubscription;
   bool _detailNavigationBusy = false;
@@ -49,6 +53,7 @@ class _ConcretePageState extends State<ConcretePage> {
   void initState() {
     super.initState();
     _day = _safeInitialDay(widget.initialIstanbulDay);
+    _projectIdToValidate = widget.initialProjectId;
     _projectSubscription = widget.agenda.projectChanges.listen(
       (_) => _loadProjects(),
     );
@@ -64,25 +69,58 @@ class _ConcretePageState extends State<ConcretePage> {
   }
 
   Future<void> _loadProjects() async {
-    setState(() => _loading = true);
+    final projectIdToValidate = _projectIdToValidate;
+    setState(() {
+      _projects = const [];
+      _pours = const [];
+      _project = null;
+      _loading = true;
+      _projectDiscoveryFailed = false;
+      _error = null;
+    });
     try {
-      _projects = await widget.agenda.listProjects();
-      final preferredProjectId = _project?.id ?? widget.initialProjectId;
-      _project = _projects
-          .where((project) => project.id == preferredProjectId)
+      final projects = (await widget.agenda.listProjects())
+          .where((project) => !project.isArchived)
+          .toList(growable: false);
+      final selected = projects
+          .where((project) => project.id == projectIdToValidate)
           .firstOrNull;
-      _project ??= _projects.firstOrNull;
-      await _reload();
+      final project =
+          selected ??
+          (widget.initialProjectId == null ? projects.firstOrNull : null);
+      if (!mounted) return;
+      setState(() {
+        _projects = projects;
+        _project = project;
+        if (project != null) _projectIdToValidate = project.id;
+        _loading = false;
+      });
+      if (project != null) await _reload();
     } on Object catch (error) {
       if (mounted) {
-        setState(() => _error = _message(error, 'Beton paketleri açılamadı.'));
+        setState(() {
+          _projects = const [];
+          _pours = const [];
+          _project = null;
+          _loading = false;
+          _projectDiscoveryFailed = true;
+          _error = _message(error, 'Beton paketleri açılamadı.');
+        });
       }
-    } finally {
-      if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _reload({double? restoreOffset}) async {
+    final project = _project;
+    if (project == null) {
+      if (mounted) {
+        setState(() {
+          _pours = const [];
+          _loading = false;
+        });
+      }
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -91,7 +129,7 @@ class _ConcretePageState extends State<ConcretePage> {
       final values = await widget.concrete.listPours(
         ConcretePourQuery(
           group: _group,
-          projectId: _project?.id,
+          projectId: project.id,
           istanbulDay: _day,
           literalSearch: _search.text,
         ),
@@ -105,6 +143,16 @@ class _ConcretePageState extends State<ConcretePage> {
       if (mounted) setState(() => _loading = false);
     }
     _restoreScrollOffset(restoreOffset);
+  }
+
+  Future<void> _selectProject(MobileProject? project) async {
+    if (project == null || project.id == _project?.id || _loading) return;
+    setState(() {
+      _projectIdToValidate = project.id;
+      _project = project;
+    });
+    widget.onProjectSelected?.call(project.id);
+    await _reload();
   }
 
   Future<void> _pickDate() async {
@@ -184,7 +232,7 @@ class _ConcretePageState extends State<ConcretePage> {
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
-      onRefresh: _reload,
+      onRefresh: _loadProjects,
       child: ListView(
         key: const Key('concrete-page'),
         controller: _scrollController,
@@ -212,10 +260,7 @@ class _ConcretePageState extends State<ConcretePage> {
                         ),
                       )
                       .toList(growable: false),
-                  onChanged: (value) {
-                    setState(() => _project = value);
-                    _reload();
-                  },
+                  onChanged: _loading ? null : _selectProject,
                 ),
               ),
               const SizedBox(width: 8),
@@ -279,7 +324,7 @@ class _ConcretePageState extends State<ConcretePage> {
           Align(
             alignment: Alignment.centerLeft,
             child: FilledButton.icon(
-              onPressed: _projects.isEmpty ? null : _create,
+              onPressed: _project == null ? null : _create,
               icon: const Icon(Icons.add),
               label: const Text('Yeni döküm'),
             ),
@@ -290,13 +335,38 @@ class _ConcretePageState extends State<ConcretePage> {
               error,
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
+            if (_projectDiscoveryFailed)
+              OutlinedButton.icon(
+                key: const Key('concrete-project-retry'),
+                onPressed: _loadProjects,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Projeleri yeniden dene'),
+              ),
           ],
           if (_loading)
             const Padding(
               padding: EdgeInsets.all(24),
               child: Center(child: CircularProgressIndicator()),
             ),
-          if (!_loading && _pours.isEmpty)
+          if (!_loading && _projects.isEmpty)
+            const Card(
+              key: Key('concrete-no-projects'),
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Text('Önce aktif bir proje oluşturun.'),
+              ),
+            )
+          else if (!_loading && _project == null)
+            const Card(
+              key: Key('concrete-project-context-unavailable'),
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'Başlangıç projesi artık kullanılamıyor. Devam etmek için bir proje seçin.',
+                ),
+              ),
+            )
+          else if (!_loading && _pours.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 32),
               child: Center(child: Text('Bu görünümde Beton paketi yok.')),

@@ -7,10 +7,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class DailyLogPage extends StatefulWidget {
-  const DailyLogPage({required this.dailyLog, this.workChain, super.key});
+  const DailyLogPage({
+    required this.dailyLog,
+    this.workChain,
+    this.initialProjectId,
+    this.onProjectSelected,
+    super.key,
+  });
 
   final DailyLogApplicationPort dailyLog;
   final WorkChainApplicationPort? workChain;
+  final String? initialProjectId;
+  final ValueChanged<String>? onProjectSelected;
 
   @override
   State<DailyLogPage> createState() => _DailyLogPageState();
@@ -19,6 +27,7 @@ class DailyLogPage extends StatefulWidget {
 class _DailyLogPageState extends State<DailyLogPage> {
   late String _selectedDay;
   List<DailyLogProject> _projects = const [];
+  String? _projectIdToValidate;
   String? _selectedProjectId;
   DailyLogDay? _day;
   String? _errorCode;
@@ -30,13 +39,37 @@ class _DailyLogPageState extends State<DailyLogPage> {
     _selectedDay = CseTimeCodec.istanbulDayKey(
       CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
     );
+    _projectIdToValidate = widget.initialProjectId;
     _loadProjects();
   }
 
   Future<void> _loadProjects() async {
+    final projectIdToValidate = _projectIdToValidate;
+    var projectsValidated = false;
+    setState(() {
+      _projects = const [];
+      _selectedProjectId = null;
+      _day = null;
+      _errorCode = null;
+      _loading = true;
+    });
     try {
       final projects = await widget.dailyLog.listProjects();
-      final selectedProjectId = projects.isEmpty ? null : projects.first.id;
+      projectsValidated = true;
+      final selectedProjectId =
+          projects.any((project) => project.id == projectIdToValidate)
+          ? projectIdToValidate
+          : widget.initialProjectId == null && projects.isNotEmpty
+          ? projects.first.id
+          : null;
+      if (!mounted) return;
+      setState(() {
+        _projects = projects;
+        _selectedProjectId = selectedProjectId;
+        if (selectedProjectId != null) {
+          _projectIdToValidate = selectedProjectId;
+        }
+      });
       final day = selectedProjectId == null
           ? null
           : await widget.dailyLog.loadDay(
@@ -45,8 +78,6 @@ class _DailyLogPageState extends State<DailyLogPage> {
             );
       if (!mounted) return;
       setState(() {
-        _projects = projects;
-        _selectedProjectId = selectedProjectId;
         _day = day;
         _errorCode = null;
         _loading = false;
@@ -54,6 +85,11 @@ class _DailyLogPageState extends State<DailyLogPage> {
     } on Object catch (error) {
       if (!mounted) return;
       setState(() {
+        if (!projectsValidated) {
+          _projects = const [];
+          _selectedProjectId = null;
+          _day = null;
+        }
         _errorCode = _failureCode(error);
         _loading = false;
       });
@@ -91,7 +127,11 @@ class _DailyLogPageState extends State<DailyLogPage> {
     if (projectId == null || projectId == _selectedProjectId || _loading) {
       return;
     }
-    setState(() => _selectedProjectId = projectId);
+    setState(() {
+      _projectIdToValidate = projectId;
+      _selectedProjectId = projectId;
+    });
+    widget.onProjectSelected?.call(projectId);
     await _loadDay();
   }
 
@@ -165,7 +205,7 @@ class _DailyLogPageState extends State<DailyLogPage> {
             const SizedBox(height: 12),
             OutlinedButton.icon(
               key: const Key('daily-log-select-day'),
-              onPressed: _projects.isEmpty ? null : _selectDay,
+              onPressed: _selectedProjectId == null ? null : _selectDay,
               icon: const Icon(Icons.calendar_today_outlined),
               label: Text(CseTimeCodec.formatIstanbulDay(_selectedDay)),
             ),
@@ -191,6 +231,16 @@ class _DailyLogPageState extends State<DailyLogPage> {
               )
             else if (_projects.isEmpty)
               const _DailyLogEmptyProjects()
+            else if (_selectedProjectId == null)
+              const Card(
+                key: Key('daily-log-project-context-unavailable'),
+                child: ListTile(
+                  leading: Icon(Icons.folder_off_outlined),
+                  title: Text(
+                    'Dashboard projesi artık kullanılamıyor. Devam etmek için bir proje seçin.',
+                  ),
+                ),
+              )
             else if (day != null) ...[
               Semantics(
                 header: true,
@@ -374,6 +424,7 @@ class _DailyLogError extends StatelessWidget {
             Text('Tanı kodu: $code'),
             const SizedBox(height: 12),
             OutlinedButton.icon(
+              key: const Key('daily-log-project-retry'),
               onPressed: onRetry,
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('Tekrar oku'),

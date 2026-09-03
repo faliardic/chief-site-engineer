@@ -12,11 +12,15 @@ class WorkforceDirectoryPage extends StatefulWidget {
   const WorkforceDirectoryPage({
     required this.attendance,
     required this.agenda,
+    this.initialProjectId,
+    this.onProjectSelected,
     super.key,
   });
 
   final AttendanceApplication attendance;
   final AgendaApplication agenda;
+  final String? initialProjectId;
+  final ValueChanged<String>? onProjectSelected;
 
   @override
   State<WorkforceDirectoryPage> createState() => _WorkforceDirectoryPageState();
@@ -26,6 +30,7 @@ class _WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
   final TextEditingController _search = TextEditingController();
   StreamSubscription<void>? _projectSubscription;
   List<MobileProject> _projects = const [];
+  String? _projectIdToValidate;
   MobileProject? _project;
   List<WorkforceMember> _members = const [];
   List<Subcontractor> _subcontractors = const [];
@@ -34,12 +39,14 @@ class _WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
   String? _subcontractorId;
   String? _teamId;
   bool _loading = true;
+  bool _projectDiscoveryFailed = false;
   bool _navigationBusy = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    _projectIdToValidate = widget.initialProjectId;
     _search.addListener(_refreshFilter);
     _projectSubscription = widget.agenda.projectChanges.listen(
       (_) => _loadProjects(),
@@ -61,21 +68,32 @@ class _WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
   }
 
   Future<void> _loadProjects() async {
+    final projectIdToValidate = _projectIdToValidate;
     setState(() {
+      _projects = const [];
+      _project = null;
+      _members = const [];
+      _subcontractors = const [];
+      _teams = const [];
       _loading = true;
+      _projectDiscoveryFailed = false;
       _error = null;
     });
     try {
-      final projects = await widget.agenda.listProjects();
+      final projects = (await widget.agenda.listProjects())
+          .where((project) => !project.isArchived)
+          .toList(growable: false);
       if (!mounted) return;
-      final previousId = _project?.id;
-      final project = previousId == null
-          ? projects.firstOrNull
-          : projects.where((item) => item.id == previousId).firstOrNull ??
-                projects.firstOrNull;
+      final selected = projects
+          .where((project) => project.id == projectIdToValidate)
+          .firstOrNull;
+      final project =
+          selected ??
+          (widget.initialProjectId == null ? projects.firstOrNull : null);
       setState(() {
         _projects = projects;
         _project = project;
+        if (project != null) _projectIdToValidate = project.id;
         _subcontractorId = null;
         _teamId = null;
       });
@@ -90,7 +108,15 @@ class _WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
       }
     } on Object catch (error) {
       if (mounted) {
-        setState(() => _error = _message(error, 'Saha Rehberi açılamadı.'));
+        setState(() {
+          _projects = const [];
+          _project = null;
+          _members = const [];
+          _subcontractors = const [];
+          _teams = const [];
+          _projectDiscoveryFailed = true;
+          _error = _message(error, 'Saha Rehberi açılamadı.');
+        });
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -126,13 +152,15 @@ class _WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
   }
 
   Future<void> _selectProject(String? id) async {
-    if (id == null) return;
+    if (id == null || id == _project?.id || _loading) return;
     final project = _projects.firstWhere((item) => item.id == id);
     setState(() {
+      _projectIdToValidate = id;
       _project = project;
       _subcontractorId = null;
       _teamId = null;
     });
+    widget.onProjectSelected?.call(id);
     await _loadDirectory(project);
   }
 
@@ -220,7 +248,26 @@ class _WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
           'Personel sicili, taşeron ve ekip bağlarıyla proje kapsamında görünür.',
         ),
         const SizedBox(height: 12),
-        if (_projects.isEmpty && !_loading)
+        if (_projectDiscoveryFailed && !_loading)
+          Card(
+            key: const Key('workforce-directory-project-error'),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Text(_error ?? 'Projeler güvenli biçimde okunamadı.'),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    key: const Key('workforce-directory-project-retry'),
+                    onPressed: _loadProjects,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Projeleri yeniden dene'),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else if (_projects.isEmpty && !_loading)
           const Card(
             key: Key('workforce-directory-no-projects'),
             child: Padding(
@@ -256,13 +303,23 @@ class _WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
               key: const Key('workforce-directory-project-scope'),
               style: Theme.of(context).textTheme.labelLarge,
             ),
+          if (project == null)
+            const Card(
+              key: Key('workforce-directory-project-context-unavailable'),
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'Başlangıç projesi artık kullanılamıyor. Devam etmek için bir proje seçin.',
+                ),
+              ),
+            ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
             key: const Key('manage-workforce-directory'),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(48),
             ),
-            onPressed: _loading ? null : _openManagement,
+            onPressed: _loading || project == null ? null : _openManagement,
             icon: const Icon(Icons.manage_accounts_outlined),
             label: const Text('Sicili yönet'),
           ),

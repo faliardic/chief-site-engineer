@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:ui' show Tristate;
 
+import 'package:chief_site_engineer/app.dart';
 import 'package:chief_site_engineer/application/inventory_application.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
@@ -35,6 +37,242 @@ const _assetInvalid = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd5';
 final _now = DateTime.parse('2026-08-28T08:00:00Z');
 
 void main() {
+  test(
+    'shared context rejects late discovery and late scoped completions',
+    () async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _sketch(_projectA)
+        ..assets[_projectA] = [_asset(_projectA, _assetA)];
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'A'), _project(_projectB, 'B')];
+      final controller = _controller(inventory, source);
+      addTearDown(controller.dispose);
+      addTearDown(source.dispose);
+      await controller.updateProjectContext(
+        activeProjectId: _projectB,
+        isActive: true,
+      );
+      final discovery = Completer<List<MobileProject>>();
+      source.responses.add(discovery.future);
+      final oldDiscovery = controller.initialize();
+      await controller.updateProjectContext(
+        activeProjectId: _projectA,
+        isActive: true,
+      );
+      discovery.complete(source.projects);
+      await oldDiscovery;
+      expect(inventory.primaryProjectIds, [_projectA]);
+      expect(controller.assets.single.asset.id, _assetA);
+
+      final primary = Completer<InventoryPrimarySketchProjection?>();
+      inventory.primaryResponses[_projectB] = [primary.future];
+      final oldPrimary = controller.updateProjectContext(
+        activeProjectId: _projectB,
+        isActive: true,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(inventory.primaryProjectIds.last, _projectB);
+      await controller.updateProjectContext(
+        activeProjectId: _projectA,
+        isActive: true,
+      );
+      primary.complete(_sketch(_projectB));
+      await oldPrimary;
+      expect(inventory.assetProjectIds, everyElement(_projectA));
+      expect(controller.selectedProjectId, _projectA);
+      expect(controller.sketch?.sketch.projectId, _projectA);
+      expect(controller.assets.single.asset.id, _assetA);
+
+      inventory.sketches[_projectB] = _sketch(_projectB);
+      final assets = Completer<List<InventoryAssetProjection>>();
+      inventory.assetResponses[_projectB] = [assets.future];
+      final oldAssets = controller.updateProjectContext(
+        activeProjectId: _projectB,
+        isActive: true,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(inventory.assetProjectIds.last, _projectB);
+      await controller.updateProjectContext(
+        activeProjectId: _projectA,
+        isActive: true,
+      );
+      assets.complete([_asset(_projectB, _assetB)]);
+      await oldAssets;
+      expect(controller.assets.single.asset.id, _assetA);
+      expect(controller.selectedProjectId, _projectA);
+      expect(inventory.mutations, 0);
+    },
+  );
+
+  test(
+    'null stale archived and undiscovered shared IDs remain inert',
+    () async {
+      final inventory = _FakeInventory();
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'A'), _project(_projectB, 'B')];
+      final controller = _controller(inventory, source);
+      addTearDown(controller.dispose);
+      addTearDown(source.dispose);
+      await controller.updateProjectContext(
+        activeProjectId: null,
+        isActive: true,
+      );
+      await controller.initialize();
+      expect(
+        controller.loadStatus,
+        InventoryPageLoadStatus.projectSelectionRequired,
+      );
+      source.projects = [_project(_projectA, 'A')];
+      await controller.refreshProjects();
+      expect(
+        controller.loadStatus,
+        InventoryPageLoadStatus.projectSelectionRequired,
+      );
+      await controller.updateProjectContext(
+        activeProjectId: _projectB,
+        isActive: true,
+      );
+      expect(controller.lastErrorCode, 'inventory_project_unavailable');
+      expect(controller.selectedProjectId, isNull);
+      source.projects = const [
+        MobileProject(
+          id: _projectB,
+          name: 'Archived',
+          createdAt: '2026-08-28T08:00:00Z',
+          updatedAt: '2026-08-28T08:00:00Z',
+          revision: 2,
+          archivedAt: '2026-08-29T08:00:00Z',
+        ),
+      ];
+      await controller.refreshProjects();
+      expect(controller.lastErrorCode, 'inventory_project_source_invalid');
+      final failedDiscovery = Completer<List<MobileProject>>();
+      source.responses.add(failedDiscovery.future);
+      final loading = controller.updateProjectContext(
+        activeProjectId: _projectA,
+        isActive: true,
+      );
+      failedDiscovery.completeError(StateError('project discovery failed'));
+      await loading;
+      expect(controller.loadStatus, InventoryPageLoadStatus.failed);
+      expect(inventory.primaryProjectIds, isEmpty);
+      expect(inventory.assetProjectIds, isEmpty);
+      expect(inventory.mutations, 0);
+    },
+  );
+
+  testWidgets(
+    'AppBar adoption waits for exact load and failed load retains prior shared project',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _sketch(_projectA)
+        ..sketches[_projectB] = _sketch(_projectB)
+        ..assets[_projectB] = [_asset(_projectB, _assetB)];
+      final source = _ProjectSource()
+        ..projects = [
+          _project(_projectA, 'Proje A'),
+          _project(_projectB, 'Proje B'),
+        ];
+      final shared = ValueNotifier<String?>(_projectB);
+      final callbacks = <String>[];
+      addTearDown(shared.dispose);
+      addTearDown(source.dispose);
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        sharedProject: shared,
+        onProjectSelected: callbacks.add,
+      );
+      expect(callbacks, isEmpty);
+      expect(find.text('Aktif proje'), findsNothing);
+      final pending = Completer<List<InventoryAssetProjection>>();
+      inventory.assetResponses[_projectA] = [pending.future];
+      await _chooseInventoryProject(tester, _projectA, settle: false);
+      expect(inventory.assetProjectIds.last, _projectA);
+      expect(shared.value, _projectB);
+      expect(callbacks, isEmpty);
+      pending.complete([_asset(_projectA, _assetA)]);
+      await tester.pumpAndSettle();
+      final state = tester.state<InventoryPageState>(
+        find.byType(InventoryPage),
+      );
+      expect(state.controller.assets.single.asset.id, _assetA);
+      expect(shared.value, _projectA);
+      expect(callbacks, [_projectA]);
+
+      final failed = Completer<InventoryPrimarySketchProjection?>();
+      inventory.primaryResponses[_projectB] = [failed.future];
+      await _chooseInventoryProject(tester, _projectB, settle: false);
+      failed.completeError(
+        const InventoryFailure('inventory_test_load_failed'),
+      );
+      await tester.pumpAndSettle();
+      expect(shared.value, _projectA);
+      expect(state.controller.selectedProjectId, _projectA);
+      expect(state.controller.loadStatus, InventoryPageLoadStatus.failed);
+      expect(state.controller.lastErrorCode, 'inventory_test_load_failed');
+      expect(callbacks, [_projectA]);
+      expect(inventory.mutations, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'hidden Inventory ignores pending error and resumes latest external project',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _sketch(_projectA)
+        ..assets[_projectA] = [_asset(_projectA, _assetA)];
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'A'), _project(_projectB, 'B')];
+      final shared = ValueNotifier<String?>(_projectB);
+      final active = ValueNotifier(false);
+      final callbacks = <String>[];
+      addTearDown(shared.dispose);
+      addTearDown(active.dispose);
+      addTearDown(source.dispose);
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        sharedProject: shared,
+        active: active,
+        onProjectSelected: callbacks.add,
+        settle: false,
+      );
+      expect(source.calls, 0);
+      expect(inventory.reads, 0);
+      final pending = Completer<InventoryPrimarySketchProjection?>();
+      inventory.primaryResponses[_projectB] = [pending.future];
+      active.value = true;
+      await tester.pump();
+      expect(inventory.primaryProjectIds, [_projectB]);
+      active.value = false;
+      shared.value = _projectA;
+      await tester.pump();
+      final discoveryCalls = source.calls;
+      source.emit();
+      pending.completeError(StateError('late hidden Inventory failure'));
+      await tester.pump();
+      expect(source.calls, discoveryCalls);
+      expect(inventory.assetProjectIds, isEmpty);
+      expect(callbacks, isEmpty);
+      expect(inventory.mutations, 0);
+      expect(tester.takeException(), isNull);
+      active.value = true;
+      await tester.pumpAndSettle();
+      final controller = tester
+          .state<InventoryPageState>(find.byType(InventoryPage))
+          .controller;
+      expect(controller.selectedProjectId, _projectA);
+      expect(controller.assets.single.asset.id, _assetA);
+      expect(inventory.primaryProjectIds, [_projectB, _projectA]);
+      expect(callbacks, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   test(
     'zero one many project binding is exact and zero-project does no I/O',
     () async {
@@ -176,11 +414,11 @@ void main() {
   testWidgets(
     'draft-only primary exposes recovery and non-finalized exit stays read-only',
     (tester) async {
-      final inventory = _FakeInventory()
-        ..sketches[_projectA] = _draftOnlySketch(_projectA)
-        ..assets[_projectA] = [];
+      final preserved = _draftOnlySketch(_projectA);
+      final inventory = _FakeInventory()..sketches[_projectA] = preserved;
       final source = _ProjectSource()
         ..projects = [_project(_projectA, 'Proje A')];
+      addTearDown(source.dispose);
       var launches = 0;
       await _pumpPage(
         tester,
@@ -194,19 +432,17 @@ void main() {
         },
       );
 
-      final pageState = tester.state<InventoryPageState>(
-        find.byType(InventoryPage),
-      );
-      expect(
-        pageState.controller.loadStatus,
-        InventoryPageLoadStatus.recoverableDraft,
-      );
+      final controller = tester
+          .state<InventoryPageState>(find.byType(InventoryPage))
+          .controller;
+      expect(controller.loadStatus, InventoryPageLoadStatus.recoverableDraft);
+      expect(controller.lastErrorCode, isNull);
       expect(
         find.byKey(const Key('inventory-recoverable-draft')),
         findsOneWidget,
       );
       expect(find.text('Krokiye devam et'), findsOneWidget);
-      expect(find.text('Kroki ekle'), findsNothing);
+      expect(find.byKey(const Key('inventory-add-sketch')), findsNothing);
       expect(find.text('Envanter güvenle yüklenemedi.'), findsNothing);
       expect(inventory.primaryReads, 1);
       expect(inventory.listReads, 1);
@@ -218,14 +454,17 @@ void main() {
       expect(launches, 1);
       expect(inventory.primaryReads, 1);
       expect(inventory.listReads, 1);
+      expect(controller.loadStatus, InventoryPageLoadStatus.recoverableDraft);
+      expect(controller.sketch, same(preserved));
+      expect(controller.sketch!.sketch.id, _sketchA);
+      expect(controller.sketch!.draftRevision!.id, _revisionA);
+      await controller.reloadSelected();
+      await tester.pumpAndSettle();
+      expect(controller.loadStatus, InventoryPageLoadStatus.recoverableDraft);
+      expect(controller.sketch, same(preserved));
+      expect(inventory.sketches[_projectA], same(preserved));
       expect(inventory.mutations, 0);
-      expect(
-        pageState.controller.loadStatus,
-        InventoryPageLoadStatus.recoverableDraft,
-      );
-      expect(pageState.controller.sketch!.sketch.id, _sketchA);
-      expect(pageState.controller.sketch!.draftRevision!.id, _revisionA);
-      expect(find.text('Krokiye devam et'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -233,10 +472,10 @@ void main() {
     'draft recovery finalized result reloads the same project into ready state',
     (tester) async {
       final inventory = _FakeInventory()
-        ..sketches[_projectA] = _draftOnlySketch(_projectA)
-        ..assets[_projectA] = [];
+        ..sketches[_projectA] = _draftOnlySketch(_projectA);
       final source = _ProjectSource()
         ..projects = [_project(_projectA, 'Proje A')];
+      addTearDown(source.dispose);
       var launches = 0;
       await _pumpPage(
         tester,
@@ -254,30 +493,158 @@ void main() {
       await tester.tap(find.byKey(const Key('inventory-recover-sketch')));
       await tester.pumpAndSettle();
 
-      final pageState = tester.state<InventoryPageState>(
-        find.byType(InventoryPage),
-      );
+      final controller = tester
+          .state<InventoryPageState>(find.byType(InventoryPage))
+          .controller;
       expect(launches, 1);
-      expect(inventory.primaryReads, 2);
+      expect(inventory.primaryProjectIds, [_projectA, _projectA]);
       expect(inventory.listReads, 2);
       expect(inventory.mutations, 0);
-      expect(pageState.controller.selectedProjectId, _projectA);
-      expect(pageState.controller.loadStatus, InventoryPageLoadStatus.ready);
-      expect(pageState.controller.sketch!.sketch.id, _sketchA);
-      expect(pageState.controller.sketch!.activeRevision!.id, _revisionA);
-      expect(find.text('Krokiye devam et'), findsNothing);
-      expect(find.text('Krokiyi güncelle'), findsOneWidget);
+      expect(controller.selectedProjectId, _projectA);
+      expect(controller.loadStatus, InventoryPageLoadStatus.ready);
+      expect(controller.sketch!.sketch.id, _sketchA);
+      expect(controller.sketch!.activeRevision!.id, _revisionA);
+      expect(find.byKey(const Key('inventory-recover-sketch')), findsNothing);
+      expect(
+        find.byKey(const Key('inventory-update-sketch')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(find.byType(InventoryMapView), findsOneWidget);
+      expect(tester.takeException(), isNull);
     },
   );
 
-  test(
-    'malformed draft-only primary remains fail-closed',
-    () async {
+  testWidgets(
+    'draft project adoption waits for validation and does not reload on shared echo',
+    (tester) async {
       final inventory = _FakeInventory()
-        ..sketches[_projectA] = _draftOnlySketch(
-          _projectA,
-          draftProjectId: _projectB,
-        );
+        ..sketches[_projectA] = _draftOnlySketch(_projectA)
+        ..sketches[_projectB] = _sketch(_projectB);
+      final source = _ProjectSource()
+        ..projects = [
+          _project(_projectA, 'Proje A'),
+          _project(_projectB, 'Proje B'),
+        ];
+      final shared = ValueNotifier<String?>(_projectB);
+      final callbacks = <String>[];
+      addTearDown(shared.dispose);
+      addTearDown(source.dispose);
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        sharedProject: shared,
+        onProjectSelected: callbacks.add,
+      );
+      final pending = Completer<List<InventoryAssetProjection>>();
+      inventory.assetResponses[_projectA] = [pending.future];
+      await _chooseInventoryProject(tester, _projectA, settle: false);
+      expect(inventory.assetProjectIds, [_projectB, _projectA]);
+      expect(shared.value, _projectB);
+      expect(callbacks, isEmpty);
+
+      pending.complete([]);
+      await tester.pumpAndSettle();
+      final controller = tester
+          .state<InventoryPageState>(find.byType(InventoryPage))
+          .controller;
+      expect(controller.loadStatus, InventoryPageLoadStatus.recoverableDraft);
+      expect(controller.selectedProjectId, _projectA);
+      expect(shared.value, _projectA);
+      expect(callbacks, [_projectA]);
+      expect(inventory.primaryProjectIds, [_projectB, _projectA]);
+      expect(inventory.assetProjectIds, [_projectB, _projectA]);
+      expect(find.text('Krokiye devam et'), findsOneWidget);
+
+      inventory.sketches[_projectB] = _draftOnlySketch(
+        _projectB,
+        draftProjectId: _projectA,
+      );
+      await _chooseInventoryProject(tester, _projectB);
+      expect(controller.loadStatus, InventoryPageLoadStatus.failed);
+      expect(controller.lastErrorCode, 'inventory_sketch_draft_unavailable');
+      expect(controller.selectedProjectId, _projectA);
+      expect(shared.value, _projectA);
+      expect(callbacks, [_projectA]);
+      expect(inventory.mutations, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'late finalized draft return cannot reload a different shared project',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _draftOnlySketch(_projectA)
+        ..sketches[_projectB] = _sketch(_projectB);
+      final source = _ProjectSource()
+        ..projects = [
+          _project(_projectA, 'Proje A'),
+          _project(_projectB, 'Proje B'),
+        ];
+      final shared = ValueNotifier<String?>(_projectA);
+      final result = Completer<bool>();
+      addTearDown(shared.dispose);
+      addTearDown(source.dispose);
+      var launches = 0;
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        sharedProject: shared,
+        sketchEditorLauncher: (context, projectId, launchIntent) {
+          launches += 1;
+          expect(projectId, _projectA);
+          expect(launchIntent, InventorySketchLaunchIntent.createOrRecover);
+          return result.future;
+        },
+      );
+      await tester.tap(find.byKey(const Key('inventory-recover-sketch')));
+      await tester.pump();
+      expect(launches, 1);
+      shared.value = _projectB;
+      await tester.pumpAndSettle();
+      inventory.sketches[_projectA] = _sketch(_projectA);
+      result.complete(true);
+      await tester.pumpAndSettle();
+
+      final controller = tester
+          .state<InventoryPageState>(find.byType(InventoryPage))
+          .controller;
+      expect(controller.loadStatus, InventoryPageLoadStatus.ready);
+      expect(controller.selectedProjectId, _projectB);
+      expect(controller.sketch!.sketch.id, _sketchB);
+      expect(shared.value, _projectB);
+      expect(inventory.primaryProjectIds, [_projectA, _projectB]);
+      expect(inventory.assetProjectIds, [_projectA, _projectB]);
+      expect(inventory.mutations, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final invalid in <String, InventoryPrimarySketchProjection>{
+    'missing draft': _draftOnlySketch(_projectA, omitDraft: true),
+    'missing draft pointer': _draftOnlySketch(
+      _projectA,
+      omitDraftPointer: true,
+    ),
+    'wrong draft project': _draftOnlySketch(
+      _projectA,
+      draftProjectId: _projectB,
+    ),
+    'wrong draft sketch': _draftOnlySketch(_projectA, draftSketchId: _sketchB),
+    'wrong draft revision': _draftOnlySketch(_projectA, draftId: _revisionB),
+    'wrong draft state': _draftOnlySketch(
+      _projectA,
+      draftState: InventorySketchRevisionState.active,
+    ),
+    'unexpected active revision': _draftOnlySketch(
+      _projectA,
+      includeActive: true,
+    ),
+  }.entries) {
+    test('malformed draft-only primary fails closed: ${invalid.key}', () async {
+      final inventory = _FakeInventory()..sketches[_projectA] = invalid.value;
       final source = _ProjectSource()
         ..projects = [_project(_projectA, 'Proje A')];
       final controller = _controller(inventory, source);
@@ -292,11 +659,11 @@ void main() {
       expect(inventory.primaryReads, 1);
       expect(inventory.listReads, 0);
       expect(inventory.mutations, 0);
-    },
-  );
+    });
+  }
 
   testWidgets(
-    'ready sketch update stays visible in Liste, launches edit-active, and reloads successor',
+    'ready sketch update is map-only, launches edit-active, and reloads successor',
     (tester) async {
       final inventory = _FakeInventory()
         ..sketches[_projectA] = _sketch(_projectA)
@@ -328,14 +695,23 @@ void main() {
         },
       );
 
-      expect(find.text('Krokiyi güncelle'), findsOneWidget);
+      expect(find.text('Krokiyi güncelle'), findsNothing);
+      expect(
+        find.byKey(const Key('inventory-update-sketch')).hitTestable(),
+        findsOneWidget,
+      );
       expect(controller.view, InventoryPageView.map);
       expect(inventory.primaryReads, 1);
 
-      await tester.tap(find.text('Liste'));
+      await tester.tap(find.byKey(const Key('inventory-view-list')));
       await tester.pumpAndSettle();
       expect(controller.view, InventoryPageView.list);
-      expect(find.text('Krokiyi güncelle'), findsOneWidget);
+      expect(find.byKey(const Key('inventory-update-sketch')), findsNothing);
+      await tester.tap(find.byKey(const Key('inventory-view-floors')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('inventory-update-sketch')), findsNothing);
+      await tester.tap(find.byKey(const Key('inventory-view-map')));
+      await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('inventory-update-sketch')));
       await tester.pumpAndSettle();
@@ -417,10 +793,17 @@ void main() {
         find.byKey(const Key('inventory-marker-$_assetArchived')),
         findsNothing,
       );
-      expect(find.byKey(const Key('inventory-search')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('inventory-filters-tool')));
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('inventory-category-all')), findsOneWidget);
       expect(find.byKey(const Key('inventory-status-all')), findsOneWidget);
       expect(find.byKey(const Key('inventory-archive-active')), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(TextButton, 'Kapat'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('inventory-search-tool')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('inventory-search')), findsOneWidget);
 
       await tester.enterText(
         find.byKey(const Key('inventory-search')),
@@ -429,6 +812,8 @@ void main() {
       await tester.pump();
       expect(map.projections.single, same(controller.assets[0]));
       expect(inventory.mutations, 0);
+      await tester.tap(find.widgetWithText(TextButton, 'Kapat'));
+      await tester.pumpAndSettle();
 
       controller
         ..setSearch('')
@@ -522,11 +907,11 @@ void main() {
       textScale: 2.5,
     );
 
-    expect(find.byKey(const Key('inventory-search')), findsOneWidget);
+    expect(find.byKey(const Key('inventory-search-tool')), findsOneWidget);
     expect(find.byKey(const Key('inventory-update-sketch')), findsOneWidget);
     expect(find.byKey(const Key('inventory-view-switch')), findsOneWidget);
     expect(find.byKey(const Key('inventory-marker-$_assetA')), findsOneWidget);
-    await tester.tap(find.text('Katlar'));
+    await tester.tap(find.byKey(const Key('inventory-view-floors')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('inventory-floor-view')), findsOneWidget);
     expect(
@@ -535,6 +920,246 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    '586 narrow rails expose bounded exact context without mutations',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final semantics = tester.ensureSemantics();
+      try {
+        final inventory = _FakeInventory()
+          ..sketches[_projectA] = _spatialSketch()
+          ..assets[_projectA] = [
+            _asset(
+              _projectA,
+              _assetA,
+              floorId: _spatialFloorA1,
+              x: 256,
+              y: 256,
+            ),
+          ];
+        final source = _ProjectSource()
+          ..projects = [_project(_projectA, 'Proje A')];
+        final controller = _controller(inventory, source);
+        addTearDown(source.dispose);
+        addTearDown(controller.dispose);
+        await _pumpPage(
+          tester,
+          inventory: inventory,
+          source: source,
+          controller: controller,
+          textScale: 1.6,
+        );
+
+        final views = ['map', 'floors', 'list'];
+        for (var i = 0; i < views.length; i++) {
+          final control = find.byKey(ValueKey('inventory-view-${views[i]}'));
+          expect(control.hitTestable(), findsOneWidget);
+          expect(tester.getSize(control), const Size(44, 44));
+          expect(
+            tester
+                .getSemantics(control)
+                .getSemanticsData()
+                .flagsCollection
+                .isSelected,
+            i == 0 ? Tristate.isTrue : Tristate.isFalse,
+          );
+          if (i > 0) {
+            expect(
+              tester.getTopLeft(control).dy,
+              greaterThan(
+                tester
+                    .getTopLeft(
+                      find.byKey(ValueKey('inventory-view-${views[i - 1]}')),
+                    )
+                    .dy,
+              ),
+            );
+          }
+        }
+        for (final name in [
+          'search-tool',
+          'block-tool',
+          'floor-tool',
+          'filters-tool',
+          'map-zoom-in',
+          'map-zoom-out',
+          'map-fit',
+          'update-sketch',
+        ]) {
+          final control = find.byKey(Key('inventory-$name'));
+          expect(control.hitTestable(), findsOneWidget);
+          expect(tester.getSize(control), const Size(44, 44));
+          expect(
+            tester
+                .getSemantics(control)
+                .getSemanticsData()
+                .flagsCollection
+                .isSelected,
+            Tristate.none,
+          );
+          expect(
+            find.descendant(of: control, matching: find.byType(Tooltip)),
+            findsOneWidget,
+          );
+        }
+        final floorTool = find.byKey(const Key('inventory-floor-tool'));
+        expect(tester.widget<Semantics>(floorTool).properties.enabled, isFalse);
+        await tester.tap(floorTool);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('inventory-tool-panel')), findsNothing);
+
+        await tester.tap(find.byKey(const Key('inventory-block-tool')));
+        await tester.pumpAndSettle();
+        expect(controller.selectedBlockId, isNull);
+        // Measure the visible card, not the dialog's route-sized layout shell.
+        final panelSurface = find.descendant(
+          of: find.byKey(const Key('inventory-tool-panel')),
+          matching: find.byWidgetPredicate(
+            (widget) => widget is Material && widget.type == MaterialType.card,
+          ),
+        );
+        expect(panelSurface, findsOneWidget);
+        expect(panelSurface.hitTestable(), findsOneWidget);
+        final logicalViewport =
+            tester.view.physicalSize / tester.view.devicePixelRatio;
+        expect(
+          tester.getSize(panelSurface).height,
+          lessThan(logicalViewport.height),
+        );
+        await tester.tap(find.byKey(const Key('inventory-block-selector')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('A Blok').last);
+        await tester.pumpAndSettle();
+        expect(controller.selectedBlockId, _spatialBlockA);
+        await tester.tap(find.widgetWithText(TextButton, 'Kapat'));
+        await tester.pumpAndSettle();
+        expect(tester.widget<Semantics>(floorTool).properties.enabled, isTrue);
+        await tester.tap(floorTool);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('inventory-floor-selector')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('A 1. Kat').last);
+        await tester.pumpAndSettle();
+        expect(controller.selectedFloorId, _spatialFloorA1);
+        await tester.tap(find.widgetWithText(TextButton, 'Kapat'));
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<Semantics>(floorTool).properties.label,
+          'Kat: A 1. Kat',
+        );
+
+        await tester.tap(find.byKey(const Key('inventory-filters-tool')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('inventory-category-all')), findsOneWidget);
+        expect(find.byKey(const Key('inventory-status-all')), findsOneWidget);
+        expect(
+          find.byKey(const Key('inventory-archive-active')),
+          findsOneWidget,
+        );
+        await tester.tap(find.widgetWithText(TextButton, 'Kapat'));
+        await tester.pumpAndSettle();
+        expect(controller.categoryFilter, isNull);
+        expect(controller.statusFilter, isNull);
+        expect(controller.archiveFilter, InventoryArchiveFilter.active);
+        expect(controller.selectedProjectId, _projectA);
+        expect(controller.selectedBlockId, _spatialBlockA);
+        expect(controller.selectedFloorId, _spatialFloorA1);
+        expect(inventory.mutations, 0);
+        expect(tester.takeException(), isNull);
+      } finally {
+        semantics.dispose();
+      }
+    },
+  );
+
+  testWidgets(
+    '586 real gestures hide hit targets then restore without viewport movement',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _activeMappedSketch(_projectA)
+        ..assets[_projectA] = [_asset(_projectA, _assetA)];
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      final controller = _controller(inventory, source);
+      addTearDown(source.dispose);
+      addTearDown(controller.dispose);
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        controller: controller,
+      );
+      final page = tester.state<InventoryPageState>(find.byType(InventoryPage));
+      final map = find.byKey(const Key('inventory-map-gesture'));
+      final rect = tester.getRect(map);
+      final controls = [
+        'inventory-view-map',
+        'inventory-search-tool',
+        'inventory-update-sketch',
+      ];
+      Future<void> expectHidden() async {
+        for (final key in controls) {
+          expect(find.byKey(Key(key)).hitTestable(), findsNothing);
+        }
+        expect(tester.getRect(map), rect);
+        expect(find.byType(AppBar).hitTestable(), findsOneWidget);
+      }
+
+      final gesture = await tester.startGesture(rect.center);
+      await gesture.moveBy(const Offset(50, 30));
+      await tester.pump();
+      await expectHidden();
+      await gesture.up();
+      await tester.pump(const Duration(milliseconds: 599));
+      await expectHidden();
+      // A second real movement must cancel the first idle deadline.
+      final first = await tester.startGesture(
+        rect.center - const Offset(40, 0),
+        pointer: 2,
+      );
+      final second = await tester.startGesture(
+        rect.center + const Offset(40, 0),
+        pointer: 3,
+      );
+      await first.moveBy(const Offset(-35, 0));
+      await second.moveBy(const Offset(35, 0));
+      await tester.pump(const Duration(milliseconds: 10));
+      await expectHidden();
+      await first.up();
+      await second.up();
+      final viewport = page.mapViewState!.viewport!;
+      await tester.pump(const Duration(milliseconds: 599));
+      await expectHidden();
+      await tester.pump(const Duration(milliseconds: 1));
+      await tester.pump(const Duration(milliseconds: 150));
+      for (final key in controls) {
+        expect(find.byKey(Key(key)).hitTestable(), findsOneWidget);
+      }
+      expect(page.mapViewState!.viewport!.pan, viewport.pan);
+      expect(page.mapViewState!.viewport!.zoom, viewport.zoom);
+      expect(tester.getRect(map), rect);
+      expect(inventory.mutations, 0);
+      expect(inventory.primaryReads, 1);
+
+      final last = await tester.startGesture(rect.center);
+      await last.moveBy(const Offset(40, 0));
+      await tester.pump();
+      await last.up();
+      controller.setView(InventoryPageView.list);
+      await tester.pump();
+      expect(
+        find.byKey(const Key('inventory-view-map')).hitTestable(),
+        findsOneWidget,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(seconds: 1));
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('marker opens exact existing asset detail identity', (
     tester,
@@ -675,10 +1300,7 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(find.byKey(const Key('inventory-project-$_projectA-2')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Proje B').last);
-      await tester.pumpAndSettle();
+      await _chooseInventoryProject(tester, _projectB);
 
       expect(find.byKey(const Key('inventory-target-selection')), findsNothing);
       expect(inventory.moveCalls, 0);
@@ -1058,7 +1680,7 @@ void main() {
         ..projects = [_project(_projectA, 'Proje A')];
       await _pumpPage(tester, inventory: inventory, source: source);
 
-      await tester.tap(find.text('Katlar'));
+      await tester.tap(find.byKey(const Key('inventory-view-floors')));
       await tester.pumpAndSettle();
 
       final blockA = find.byKey(
@@ -1479,7 +2101,20 @@ Future<void> _pumpPage(
   InventorySketchEditorLauncher? sketchEditorLauncher,
   InventoryAssetDetailLauncher? assetDetailLauncher,
   double textScale = 1,
+  ValueNotifier<String?>? sharedProject,
+  ValueNotifier<bool>? active,
+  ValueChanged<String>? onProjectSelected,
+  bool settle = true,
 }) async {
+  final selection =
+      sharedProject ??
+      ValueNotifier<String?>(
+        source.projects.length == 1 ? source.projects.single.id : null,
+      );
+  final visibility = active ?? ValueNotifier(true);
+  if (sharedProject == null) addTearDown(selection.dispose);
+  if (active == null) addTearDown(visibility.dispose);
+  final pageKey = GlobalKey<InventoryPageState>();
   await tester.pumpWidget(
     MaterialApp(
       builder: (context, child) => MediaQuery(
@@ -1488,20 +2123,67 @@ Future<void> _pumpPage(
         ).copyWith(textScaler: TextScaler.linear(textScale)),
         child: child!,
       ),
-      home: Scaffold(
-        body: InventoryPage(
-          application: inventory,
-          listProjects: source.list,
-          projectChanges: source.changes,
-          controller: controller,
-          sketchEditorLauncher: sketchEditorLauncher,
-          assetDetailLauncher: assetDetailLauncher,
+      home: ListenableBuilder(
+        listenable: Listenable.merge([selection, visibility]),
+        builder: (context, child) => Scaffold(
+          appBar: AppBar(
+            actions: [
+              ActiveProjectControl(
+                label:
+                    source.projects
+                        .where((p) => p.id == selection.value)
+                        .firstOrNull
+                        ?.name ??
+                    'Proje seçilmedi',
+                projects: source.projects.where((p) => !p.isArchived).toList(),
+                onSelected: (id) =>
+                    unawaited(pageKey.currentState!.selectProject(id)),
+              ),
+            ],
+          ),
+          body: InventoryPage(
+            key: pageKey,
+            application: inventory,
+            listProjects: source.list,
+            projectChanges: source.changes,
+            activeProjectId: selection.value,
+            isActive: visibility.value,
+            onProjectSelected: (id) {
+              selection.value = id;
+              onProjectSelected?.call(id);
+            },
+            controller: controller,
+            sketchEditorLauncher: sketchEditorLauncher,
+            assetDetailLauncher: assetDetailLauncher,
+          ),
         ),
       ),
     ),
   );
   await tester.pump();
-  await tester.pumpAndSettle();
+  if (settle) await tester.pumpAndSettle();
+}
+
+Future<void> _chooseInventoryProject(
+  WidgetTester tester,
+  String id, {
+  bool settle = true,
+}) async {
+  final control = find
+      .byKey(const Key('active-project-indicator'))
+      .hitTestable();
+  expect(control, findsOneWidget);
+  await tester.tap(control);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
+  final option = find
+      .byKey(ValueKey('active-project-option-$id'))
+      .hitTestable();
+  expect(option, findsOneWidget);
+  await tester.tap(option);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
+  if (settle) await tester.pumpAndSettle();
 }
 
 Future<void> _tapMapTarget(WidgetTester tester) async {
@@ -1518,14 +2200,28 @@ Future<void> _dismissDetail(WidgetTester tester) async {
 
 class _ProjectSource {
   List<MobileProject> projects = const [];
+  final List<Future<List<MobileProject>>> responses = [];
+  int calls = 0;
   final _changes = StreamController<void>.broadcast();
 
   Stream<void> get changes => _changes.stream;
-  Future<List<MobileProject>> list() async => List.unmodifiable(projects);
+  Future<List<MobileProject>> list() async {
+    calls += 1;
+    if (responses.isNotEmpty) return responses.removeAt(0);
+    return List.unmodifiable(projects);
+  }
+
+  void emit() => _changes.add(null);
   void dispose() => _changes.close();
 }
 
 class _FakeInventory extends UnavailableInventoryApplication {
+  final Map<String, List<Future<InventoryPrimarySketchProjection?>>>
+  primaryResponses = {};
+  final Map<String, List<Future<List<InventoryAssetProjection>>>>
+  assetResponses = {};
+  final List<String> primaryProjectIds = [];
+  final List<String> assetProjectIds = [];
   final Map<String, InventoryPrimarySketchProjection?> sketches = {};
   final Map<String, List<InventoryAssetProjection>> assets = {};
   final Map<String, List<InventoryPlacementRecord>> placementVersions = {};
@@ -1559,6 +2255,9 @@ class _FakeInventory extends UnavailableInventoryApplication {
     String projectId,
   ) async {
     primaryReads += 1;
+    primaryProjectIds.add(projectId);
+    final responses = primaryResponses[projectId];
+    if (responses != null && responses.isNotEmpty) return responses.removeAt(0);
     if (primaryFailure case final error?) throw error;
     return sketches[projectId];
   }
@@ -1569,6 +2268,9 @@ class _FakeInventory extends UnavailableInventoryApplication {
     bool includeArchived = false,
   }) async {
     listReads += 1;
+    assetProjectIds.add(projectId);
+    final responses = assetResponses[projectId];
+    if (responses != null && responses.isNotEmpty) return responses.removeAt(0);
     if (listFailure case final error?) throw error;
     final values = assets[projectId] ?? const [];
     return List.unmodifiable(
@@ -1915,6 +2617,12 @@ InventoryPrimarySketchProjection _sketch(
 InventoryPrimarySketchProjection _draftOnlySketch(
   String projectId, {
   String? draftProjectId,
+  String? draftSketchId,
+  String? draftId,
+  InventorySketchRevisionState draftState = InventorySketchRevisionState.draft,
+  bool omitDraft = false,
+  bool omitDraftPointer = false,
+  bool includeActive = false,
 }) {
   final sketchId = projectId == _projectA ? _sketchA : _sketchB;
   final draftRevisionId = projectId == _projectA ? _revisionA : _revisionB;
@@ -1926,29 +2634,31 @@ InventoryPrimarySketchProjection _draftOnlySketch(
       displayName: 'Saha krokisi',
       isPrimary: true,
       activeRevisionId: null,
-      draftRevisionId: draftRevisionId,
+      draftRevisionId: omitDraftPointer ? null : draftRevisionId,
       revision: 1,
       createdAt: _now,
       updatedAt: _now,
       archivedAt: null,
     ),
-    activeRevision: null,
-    draftRevision: InventorySketchRevisionRecord(
-      id: draftRevisionId,
-      sketchId: sketchId,
-      projectId: draftProjectId ?? projectId,
-      revisionNumber: 1,
-      baseRevisionId: null,
-      state: InventorySketchRevisionState.draft,
-      geometry: geometry,
-      geometrySha256: geometry.sha256,
-      contentRevision: 1,
-      createdAt: _now,
-      updatedAt: _now,
-      finalizedAt: null,
-      supersededAt: null,
-      abandonedAt: null,
-    ),
+    activeRevision: includeActive ? _sketch(projectId).activeRevision : null,
+    draftRevision: omitDraft
+        ? null
+        : InventorySketchRevisionRecord(
+            id: draftId ?? draftRevisionId,
+            sketchId: draftSketchId ?? sketchId,
+            projectId: draftProjectId ?? projectId,
+            revisionNumber: 1,
+            baseRevisionId: null,
+            state: draftState,
+            geometry: geometry,
+            geometrySha256: geometry.sha256,
+            contentRevision: 1,
+            createdAt: _now,
+            updatedAt: _now,
+            finalizedAt: null,
+            supersededAt: null,
+            abandonedAt: null,
+          ),
   );
 }
 

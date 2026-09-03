@@ -17,6 +17,7 @@ class ReminderFormPage extends StatefulWidget {
     this.contextSuggestions,
     this.projectLocations,
     this.log,
+    this.preferredProjectId,
     super.key,
   });
 
@@ -24,6 +25,7 @@ class ReminderFormPage extends StatefulWidget {
   final ContextSuggestionApplication? contextSuggestions;
   final ProjectLocationApplication? projectLocations;
   final AgendaLog? log;
+  final String? preferredProjectId;
 
   @override
   State<ReminderFormPage> createState() => _ReminderFormPageState();
@@ -44,6 +46,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   String? _locationId;
   bool _loadingLocations = false;
   String? _locationError;
+  int _projectLoadGeneration = 0;
   int _locationLoadGeneration = 0;
   List<ContextSuggestion> _contextSuggestions = const [];
   Timer? _suggestionDebounce;
@@ -59,6 +62,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   late DateTime _deadlineDate;
   TimeOfDay _deadlineTime = const TimeOfDay(hour: 17, minute: 0);
   bool _submitting = false;
+  bool _loadingProjects = true;
   String? _error;
   StreamSubscription<void>? _projectSubscription;
 
@@ -66,7 +70,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   void initState() {
     super.initState();
     _title = TextEditingController(text: widget.log?.description ?? '');
-    _projectId = widget.log?.projectId;
+    _projectId = widget.log?.projectId ?? widget.preferredProjectId;
     _locationId = widget.log?.locationId;
     if (_locationId == null) _location.text = widget.log?.location ?? '';
     _recordId = RecordId.randomUuid();
@@ -77,20 +81,56 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
     _customDate = DateTime(local.year, local.month, local.day + 1);
     _deadlineDate = _customDate;
     _projectSubscription = widget.agenda.projectChanges.listen(
-      (_) => _loadProjects(),
+      (_) => unawaited(_handleProjectChanges()),
     );
     _loadProjects().then((_) async {
+      if (!mounted) return;
       await _loadLocations();
       _scheduleSuggestionLoad();
     });
   }
 
+  Future<void> _handleProjectChanges() async {
+    await _loadProjects();
+    if (!mounted) return;
+    await _loadLocations();
+    _scheduleSuggestionLoad();
+  }
+
   Future<void> _loadProjects() async {
+    final generation = ++_projectLoadGeneration;
+    if (mounted) setState(() => _loadingProjects = true);
     try {
-      final projects = await widget.agenda.listProjects();
-      if (mounted) setState(() => _projects = projects);
+      final projects = (await widget.agenda.listProjects())
+          .where((project) => !project.isArchived)
+          .toList(growable: false);
+      if (!mounted || generation != _projectLoadGeneration) return;
+      final selected =
+          widget.log == null &&
+              !projects.any((project) => project.id == _projectId)
+          ? null
+          : _projectId;
+      setState(() {
+        _projects = projects;
+        _projectId = selected;
+        if (selected == null) {
+          _locationId = null;
+          _location.clear();
+        }
+        _loadingProjects = false;
+      });
     } on Object {
       // Standalone capture remains available without a project.
+      if (!mounted || generation != _projectLoadGeneration) return;
+      setState(() {
+        _projects = const [];
+        if (widget.log == null) {
+          _projectId = null;
+          _locationId = null;
+          _location.clear();
+        }
+        _loadingProjects = false;
+      });
     }
   }
 
@@ -208,7 +248,9 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   }
 
   Future<void> _submit() async {
-    if (_submitting || !_formKey.currentState!.validate()) return;
+    if (_submitting || _loadingProjects || !_formKey.currentState!.validate()) {
+      return;
+    }
     setState(() {
       _submitting = true;
       _error = null;
@@ -340,7 +382,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.log == null ? '+ Unutma' : 'Hatırlatıcı oluştur'),
+        title: Text(widget.log == null ? 'Unutma' : 'Hatırlatıcı oluştur'),
       ),
       body: Form(
         key: _formKey,
@@ -397,6 +439,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
               onChanged: (value) => setState(() => _kind = value!),
             ),
             const SizedBox(height: 12),
+            if (_loadingProjects) const LinearProgressIndicator(),
             if (widget.log == null && _projects.isNotEmpty) ...[
               DropdownButtonFormField<String?>(
                 key: const Key('reminder-project'),
@@ -453,17 +496,17 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                OutlinedButton.icon(
-                  key: const Key('reminder-today'),
+                _ReminderFormIconAction(
+                  actionKey: const Key('reminder-today'),
+                  label: 'Bugün',
                   onPressed: () => _selectAllDay(0),
                   icon: const Icon(Icons.today_outlined),
-                  label: const Text('Bugün'),
                 ),
-                OutlinedButton.icon(
-                  key: const Key('reminder-all-day-tomorrow'),
+                _ReminderFormIconAction(
+                  actionKey: const Key('reminder-all-day-tomorrow'),
+                  label: 'Yarın • Tam gün',
                   onPressed: () => _selectAllDay(1),
                   icon: const Icon(Icons.event_outlined),
-                  label: const Text('Yarın • Tam gün'),
                 ),
               ],
             ),
@@ -671,20 +714,19 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
               ],
             ),
             const SizedBox(height: 20),
-            SizedBox(
-              height: 52,
-              child: FilledButton.icon(
-                key: const Key('submit-reminder'),
-                onPressed: _submitting ? null : _submit,
+            Align(
+              alignment: Alignment.centerRight,
+              child: _ReminderFormIconAction(
+                actionKey: const Key('submit-reminder'),
+                label: 'Hatırlatıcıyı kaydet',
+                kind: _ReminderFormIconActionKind.filled,
+                onPressed: _submitting || _loadingProjects ? null : _submit,
                 icon: _submitting
                     ? const SizedBox.square(
                         dimension: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.add_alert_outlined),
-                label: Text(
-                  _submitting ? 'Oluşturuluyor…' : 'Hatırlatıcı oluştur',
-                ),
+                    : const Icon(Icons.check_rounded),
               ),
             ),
           ],
@@ -774,13 +816,70 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
             ),
           ),
         const SizedBox(height: 8),
-        OutlinedButton.icon(
-          key: const Key('open-location-catalog-from-reminder'),
-          onPressed: _openLocationCatalog,
-          icon: const Icon(Icons.account_tree_outlined),
-          label: const Text('Mahal Kataloğu'),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _ReminderFormIconAction(
+            actionKey: const Key('open-location-catalog-from-reminder'),
+            label: 'Mahal Kataloğu',
+            onPressed: _openLocationCatalog,
+            icon: const Icon(Icons.account_tree_outlined),
+          ),
         ),
       ],
+    );
+  }
+}
+
+enum _ReminderFormIconActionKind { standard, filled }
+
+class _ReminderFormIconAction extends StatelessWidget {
+  const _ReminderFormIconAction({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.actionKey,
+    this.kind = _ReminderFormIconActionKind.standard,
+  });
+
+  final Key? actionKey;
+  final Widget icon;
+  final String label;
+  final VoidCallback? onPressed;
+  final _ReminderFormIconActionKind kind;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = IconButton.styleFrom(
+      minimumSize: const Size.square(40),
+      fixedSize: const Size.square(40),
+      maximumSize: const Size.square(40),
+      iconSize: 20,
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.standard,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+    final button = switch (kind) {
+      _ReminderFormIconActionKind.standard => IconButton.outlined(
+        key: actionKey,
+        tooltip: label,
+        style: style,
+        onPressed: onPressed,
+        icon: icon,
+      ),
+      _ReminderFormIconActionKind.filled => IconButton.filled(
+        key: actionKey,
+        tooltip: label,
+        style: style,
+        onPressed: onPressed,
+        icon: icon,
+      ),
+    };
+    return Semantics(
+      label: label,
+      button: true,
+      enabled: onPressed != null,
+      excludeSemantics: true,
+      child: button,
     );
   }
 }

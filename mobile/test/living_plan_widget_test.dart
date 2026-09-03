@@ -40,9 +40,26 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final entry = find.byKey(const Key('open-living-plan'));
-    await tester.ensureVisible(entry);
-    await tester.tap(entry);
+    final entry = find.byKey(const Key('dashboard-open-plan'));
+    expect(entry, findsOneWidget);
+    final dashboardScrollable = find.ancestor(
+      of: entry,
+      matching: find.byType(Scrollable),
+    );
+    expect(dashboardScrollable, findsOneWidget);
+    await tester.scrollUntilVisible(
+      entry,
+      240,
+      scrollable: dashboardScrollable,
+    );
+    await tester.pumpAndSettle();
+    final hitTestableEntry = entry.hitTestable();
+    if (hitTestableEntry.evaluate().isEmpty) {
+      await tester.drag(dashboardScrollable, const Offset(0, -80));
+      await tester.pumpAndSettle();
+    }
+    expect(hitTestableEntry, findsOneWidget);
+    await tester.tap(hitTestableEntry);
     await tester.pumpAndSettle();
 
     expect(find.text('7 Günlük Plan'), findsWidgets);
@@ -51,6 +68,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('A Blok'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('no project and missing snapshot stay fail-closed', (

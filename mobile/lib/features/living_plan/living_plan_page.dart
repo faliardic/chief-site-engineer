@@ -15,6 +15,8 @@ class LivingPlanPage extends StatefulWidget {
   const LivingPlanPage({
     required this.agenda,
     required this.livingPlan,
+    this.initialProjectId,
+    this.onProjectSelected,
     this.intelligence =
         const UnavailableConstructionLivingPlanIntelligenceApplication(),
     DateTime Function()? clock,
@@ -23,6 +25,8 @@ class LivingPlanPage extends StatefulWidget {
 
   final AgendaApplication agenda;
   final ConstructionLivingPlanApplicationPort livingPlan;
+  final String? initialProjectId;
+  final ValueChanged<String>? onProjectSelected;
   final ConstructionLivingPlanIntelligenceApplicationPort intelligence;
   final DateTime Function() clock;
 
@@ -47,6 +51,7 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
   @override
   void initState() {
     super.initState();
+    _projectId = widget.initialProjectId;
     _windowStart = _istanbulToday(widget.clock());
     _reload(includeProjects: true);
   }
@@ -66,7 +71,9 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
       }
       var selected = _projectId;
       if (selected == null || !projects.any((item) => item.id == selected)) {
-        selected = projects.isEmpty ? null : projects.first.id;
+        selected = widget.initialProjectId == null && projects.isNotEmpty
+            ? projects.first.id
+            : null;
       }
       if (selected == null) {
         if (!mounted) return;
@@ -132,6 +139,7 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
   Future<void> _selectProject(String? projectId) async {
     if (projectId == null || projectId == _projectId || _loading) return;
     setState(() => _projectId = projectId);
+    widget.onProjectSelected?.call(projectId);
     await _reload();
   }
 
@@ -350,36 +358,39 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 104),
             children: [
               if (_projects.isNotEmpty)
-                DropdownButtonFormField<String>(
+                KeyedSubtree(
                   key: const Key('living-plan-project-selector'),
-                  initialValue: projectId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Proje',
-                    border: OutlineInputBorder(),
+                  child: DropdownButtonFormField<String>(
+                    key: ValueKey('living-plan-project-${projectId ?? 'none'}'),
+                    initialValue: projectId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Proje',
+                      border: OutlineInputBorder(),
+                    ),
+                    selectedItemBuilder: (_) => [
+                      for (final project in _projects)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            project.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    items: [
+                      for (final project in _projects)
+                        DropdownMenuItem(
+                          value: project.id,
+                          child: Text(
+                            project.name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: _loading ? null : _selectProject,
                   ),
-                  selectedItemBuilder: (_) => [
-                    for (final project in _projects)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          project.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                  items: [
-                    for (final project in _projects)
-                      DropdownMenuItem(
-                        value: project.id,
-                        child: Text(
-                          project.name,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                  onChanged: _loading ? null : _selectProject,
                 ),
               const SizedBox(height: 12),
               _WindowControls(
@@ -425,6 +436,16 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
                 const _MessagePanel(
                   icon: Icons.folder_off_outlined,
                   message: 'Önce bir proje oluşturun.',
+                ),
+              ] else if (projectId == null) ...[
+                const SizedBox(height: 20),
+                const KeyedSubtree(
+                  key: Key('living-plan-project-context-unavailable'),
+                  child: _MessagePanel(
+                    icon: Icons.folder_off_outlined,
+                    message:
+                        'Dashboard projesi artık kullanılamıyor. Devam etmek için bir proje seçin.',
+                  ),
                 ),
               ] else ...[
                 if (!_hasTrustedSnapshot) ...[

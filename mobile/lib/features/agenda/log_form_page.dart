@@ -441,14 +441,11 @@ class _LogFormPageState extends State<LogFormPage> {
                     value == null ? 'Proje zorunludur.' : null,
               ),
               const SizedBox(height: 8),
-              SizedBox(
-                height: 48,
-                child: OutlinedButton.icon(
-                  key: const Key('create-project'),
-                  onPressed: _createProject,
-                  icon: const Icon(Icons.add_business_outlined),
-                  label: const Text('Yeni proje oluştur'),
-                ),
+              _formIconAction(
+                key: const Key('create-project'),
+                onPressed: _createProject,
+                icon: const Icon(Icons.add_business_outlined),
+                label: 'Yeni proje oluştur',
               ),
             ],
             const SizedBox(height: 12),
@@ -528,11 +525,11 @@ class _LogFormPageState extends State<LogFormPage> {
             ),
             if (widget.existing == null && widget.attachments != null) ...[
               const SizedBox(height: 8),
-              OutlinedButton.icon(
+              _formIconAction(
                 key: const Key('log-add-photo'),
                 onPressed: _submitting ? null : _pickPhoto,
                 icon: const Icon(Icons.add_a_photo_outlined),
-                label: const Text('Fotoğraf ekle'),
+                label: 'Fotoğraf ekle',
               ),
               for (var index = 0; index < _pendingPhotos.length; index += 1)
                 ListTile(
@@ -540,8 +537,8 @@ class _LogFormPageState extends State<LogFormPage> {
                   leading: const Icon(Icons.photo_outlined),
                   title: Text(_pendingPhotos[index].$1.name),
                   subtitle: const Text('Log kaydıyla birlikte eklenecek'),
-                  trailing: IconButton(
-                    tooltip: 'Seçimden kaldır',
+                  trailing: _formIconAction(
+                    label: 'Seçimden kaldır',
                     onPressed: () =>
                         setState(() => _pendingPhotos.removeAt(index)),
                     icon: const Icon(Icons.close),
@@ -586,25 +583,21 @@ class _LogFormPageState extends State<LogFormPage> {
               ),
             ],
             const SizedBox(height: 16),
-            SizedBox(
-              height: 52,
-              child: FilledButton.icon(
-                key: const Key('submit-log'),
-                onPressed: _submitting ? null : _submit,
-                icon: _submitting
-                    ? const SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.save_outlined),
-                label: Text(
-                  _submitting
-                      ? 'Kaydediliyor…'
-                      : widget.existing == null
-                      ? 'Logu kaydet'
-                      : 'Değişiklikleri kaydet',
-                ),
-              ),
+            _formIconAction(
+              key: const Key('submit-log'),
+              filled: true,
+              onPressed: _submitting ? null : _submit,
+              icon: _submitting
+                  ? const SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: _submitting
+                  ? 'Kaydediliyor…'
+                  : widget.existing == null
+                  ? 'Logu kaydet'
+                  : 'Değişiklikleri kaydet',
             ),
           ],
         ),
@@ -688,10 +681,11 @@ class _LogFormPageState extends State<LogFormPage> {
                     key: const Key('log-location-load-error'),
                   ),
                 ),
-                TextButton(
+                _formIconAction(
                   key: const Key('retry-log-locations'),
                   onPressed: _loadLocations,
-                  child: const Text('Yeniden dene'),
+                  icon: const Icon(Icons.refresh),
+                  label: 'Yeniden dene',
                 ),
               ],
             ),
@@ -713,18 +707,61 @@ class _LogFormPageState extends State<LogFormPage> {
             ),
           ),
         const SizedBox(height: 8),
-        SizedBox(
-          height: 48,
-          child: OutlinedButton.icon(
-            key: const Key('open-location-catalog-from-log'),
-            onPressed: _projectId == null ? null : _openLocationCatalog,
-            icon: const Icon(Icons.account_tree_outlined),
-            label: const Text('Mahal Kataloğu'),
-          ),
+        _formIconAction(
+          key: const Key('open-location-catalog-from-log'),
+          onPressed: _projectId == null ? null : _openLocationCatalog,
+          icon: const Icon(Icons.account_tree_outlined),
+          label: 'Mahal Kataloğu',
         ),
       ],
     );
   }
+}
+
+Widget _formIconAction({
+  Key? key,
+  required Widget icon,
+  required String label,
+  required VoidCallback? onPressed,
+  bool filled = false,
+}) {
+  final style = IconButton.styleFrom(
+    minimumSize: const Size.square(40),
+    fixedSize: const Size.square(40),
+    maximumSize: const Size.square(40),
+    iconSize: 20,
+    padding: EdgeInsets.zero,
+    visualDensity: VisualDensity.standard,
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  );
+  return Align(
+    alignment: AlignmentDirectional.centerStart,
+    widthFactor: 1,
+    heightFactor: 1,
+    child: Semantics(
+      container: true,
+      label: label,
+      button: true,
+      enabled: onPressed != null,
+      excludeSemantics: true,
+      onTap: onPressed,
+      child: filled
+          ? IconButton.filled(
+              key: key,
+              tooltip: label,
+              style: style,
+              onPressed: onPressed,
+              icon: icon,
+            )
+          : IconButton.outlined(
+              key: key,
+              tooltip: label,
+              style: style,
+              onPressed: onPressed,
+              icon: icon,
+            ),
+    ),
+  );
 }
 
 class _LocationOption {

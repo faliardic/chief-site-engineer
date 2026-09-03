@@ -1,328 +1,180 @@
-# CSE Minimum Yeterli Doğrulama Protokolü
+# CSE Minimum Yeterli Doğrulama Protokolü — One-Pass Validation v4
 
-**Belge türü:** Bağlayıcı Codex execution/validation addendum  
-**Geçerlilik tarihi:** 2026-07-23  
-**Kapsam:** Bütün CSE Issue, task, Codex run, test, build, cihaz kabulü ve completion evidence işlemleri
+**Belge türü:** Bağlayıcı validation ve evidence protokolü
+**Geçerlilik tarihi:** 2026-09-03
 
-Bu belge, `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` içindeki yürütme ve doğrulama kurallarını güvenlikten ödün vermeden risk-temelli hâle getirir. Çelişki halinde test/gate genişliği, retry bütçesi, süre bütçesi ve kanıt yeniden kullanımı konusunda bu protokol uygulanır.
+Doğru hedef maksimum test değil, değişen sözleşmenin riskini karşılayan minimum yeterli doğrulamadır.
 
-## 1. Temel ilke
+## 1. Execution ve kabul sahipliği
 
-> Doğru hedef, maksimum mümkün kanıt değil; değişen sözleşmenin riskini karşılayan minimum yeterli kanıttır.
+Repository-local terminal, automated test, analyzer ve build/APK hazırlığı Codex tarafından, yetkili görevin minimum yeterli kapsamıyla yürütülür. Fatih PowerShell/terminal/Git/Flutter/test/analyzer/build komutu çalıştırmaz; kendisine bu komutlar hazırlanmaz veya verilmez. Fatih yalnız manuel ürün/device kabulünü ve nihai görsel/davranış PASS/FAIL kararını verir. Emulator/ADB/device execution yalnız exact package, cihaz ve veri-koruma sınırıyla açık owner delegasyonunda yapılabilir; MAIN/Acceptance/Debug ve mevcut veri güvenliği sınırları korunur.
 
-Minimum yeterli doğrulama:
+Codex format, diff, `git diff --check` ve protected drift kontrolünü de yapar. Açık device delegasyonunda yalnız exact komutu çalıştırır; kapsam genişletmez ve retry yapmaz.
 
-- güvenlik kapılarını kaldırmaz;
-- veri kaybı riskini küçümsemez;
-- yalnız değişmeyen sözleşmelerin tekrar tekrar kanıtlanmasını engeller;
-- ortam arızasını feature kapsamına dönüştürmez;
-- kullanıcıya görünür işin süresini kontrol altında tutar.
+## 2. Validation sınıfları
 
-## 2. Validation class
+Non-CRITICAL varsayılanı `reproduce once -> fix -> one focused validation -> only-needed manual/device check -> owner merge gate` akışıdır. Aşağıdaki sınıf, tek focused automated validation'ın kapsamını belirler; docs işinde statik docs kontrolleri yeterlidir. Analyzer yalnız material ihtiyaçta eklenir. CRITICAL sınıfların zorunlu test, compatibility, device ve release kapıları bu sadeleştirmeyle atlanmaz.
 
-Her Issue ve `.cse/tasks/<issue_no>_task.md` aşağıdaki sınıflardan birini açıkça seçer.
+Doğrudan, tekrarlanabilir owner/device repro kanıtı varsa ilk adım karşılanmıştır. Source root cause yeterince belirlenmişse düzeltme öncesi deterministic automated FAIL aranmaz. Owner/device kanıtı, davranışı temsil edemeyen yapay harness'ten üstündür; widget/fake PASS, cihaz FAIL'ini geçersiz kılmaz. Bir başarısız repro denemesinden sonra source/runtime diagnosis veya mevcut en güçlü kanıta geçilir.
 
-### `docs`
+### docs
 
-Örnek:
+Minimum:
 
-- yalnız dokümantasyon;
-- roadmap, ADR, protocol, learning veya Issue kanıtı;
-- production davranışı yok.
-
-Minimum doğrulama:
-
-- değişen dosya kapsamı;
-- Markdown/JSON sözdizimi gerekiyorsa ilgili kontrol;
+- exact changed paths;
+- Markdown/JSON yapısı gerekiyorsa statik kontrol;
 - `git diff --check`;
-- protected production path diff'inin boşluğu.
+- production/test path drift yokluğu.
 
-Yapılmaz:
+Test/analyzer/build/device gerekmez.
 
-- full Python/Flutter suite;
-- APK/AAB build;
-- release gate;
-- emülatör/fiziksel cihaz kabulü.
+### narrow-ui
 
-### `narrow-ui`
+Minimum doğrulama (automated execution Codex, manuel kabul Fatih):
 
-Örnek:
+- değişen behavior için tek focused automated doğrulama;
+- analyzer yalnız değişen Dart sözleşmesi veya statik risk için material ihtiyaç varsa;
+- manuel/device kabul yalnız runtime'a özgü davranışta veya owner açıkça istediğinde; yalnız değişen yolun kontrolü.
 
-- yeni filtre veya buton;
-- label, layout, empty state;
-- presentation-only read-model;
-- mevcut application mutation'ının yeni yüzeyde kullanımı.
+Full suite her mikro adımda çalıştırılmaz.
 
-Minimum doğrulama:
+### domain
 
-1. ilgili unit/application testleri;
-2. ilgili widget testleri;
-3. static analyze/lint;
-4. gerekiyorsa tek debug build;
-5. yalnız değişen kullanıcı yolunun minimum cihaz doğrulaması.
+Minimum doğrulama (automated execution Codex, manuel kabul Fatih):
 
-Varsayılan olarak yapılmaz:
+- ilgili domain/application testleri;
+- etkilenen adapter/persistence testleri;
+- material cross-module analyzer;
+- milestone sonunda gerekli etkilenen/full suite;
+- yalnız runtime'a özgü davranışta veya owner açıkça istediğinde değişen kullanıcı yolunun manuel/device kabulü.
 
-- full release gate;
-- signed/unsigned AAB;
-- ARM64/16 KiB/signing tekrar kanıtı;
-- background/reboot acceptance;
-- backup/restore tatbikatı;
-- bütün Python repository suite.
+### persistence
 
-### `domain`
-
-Örnek:
-
-- reminder lifecycle;
-- iş paketi geçişi;
-- optimistic revision;
-- append-only event;
-- notification reschedule davranışı.
-
-Minimum doğrulama:
-
-1. odaklı domain/application testleri;
-2. ilgili persistence veya platform adapter testleri;
-3. etkilenen mobil/Python suite;
-4. bir kez full suite, yalnız risk matrisi gerektiriyorsa;
-5. ilgili minimum cihaz senaryosu.
-
-### `persistence`
-
-Örnek:
-
-- schema/migration;
-- backup/restore formatı;
-- attachment lifecycle;
-- atomik replace/rollback;
-- source-of-truth veri modeli.
-
-Minimum doğrulama:
+CRITICAL lane gerektirir:
 
 - migration fixture ve rollback;
 - integrity/FK/hash;
 - restore/round-trip;
 - full etkilenen suite;
-- veri koruyan gerçek cihaz veya gerçekçi integration kapısı;
-- Issue'da açıkça listelenen compatibility gate'leri.
+- veri koruyan integration/device gate;
+- explicit compatibility contract.
 
-### `release-critical`
+### release-critical
 
-Örnek:
+CRITICAL lane gerektirir. Signing, permission, application ID, platform/runtime, background/reboot veya store artifact'i için Issue'ya özel release gate uygulanır.
 
-- application ID/entrypoint;
-- signing;
-- Android API/NDK/16 KiB;
-- izinler/privacy;
-- release scripti;
-- background/reboot delivery motoru;
-- store artifact üretimi.
+## 3. Doğrulama merdiveni
 
-Minimum doğrulama bu sınıfta tam release gate ve ilgili acceptance zincirini içerebilir. Bu sınıf dar UI işi için kullanılamaz.
+Sınıfın zorunlu minimumunu karşılayan stop-on-success sırası:
 
-## 3. Issue talimat sözleşmesi
+1. diff/scope kontrolü;
+2. tek focused automated validation (docs sınıfında statik kontrol);
+3. analyzer/etkilenen suite — gerekiyorsa;
+4. full suite — milestone veya risk gerektiriyorsa;
+5. manuel/device ve gerekiyorsa build — runtime'a özgü davranış veya açık owner talebi varsa;
+6. release gate — yalnız CRITICAL/release.
 
-Her yeni teknik Issue aşağıdaki bloğu içerir:
+Sınıfın minimumu karşılandıysa sırf daha fazla güven hissi için sonraki basamak çalıştırılmaz. Gereken manuel/device kabul Fatih'in PASS/FAIL kapısıdır; Codex automated PASS bu kararı vermez. Non-CRITICAL işte bu kabul gerekmiyorsa gerekçesiyle `GEREKMİYOR` kaydedilir ve Codex automated PASS sonrası yetkili commit/push manuel PASS beklemez.
 
-```text
-Validation class:
-Changed contracts:
-Focused tests:
-Allowed broad gates:
-Reused evidence:
-Minimum physical-device acceptance:
-Retry budget:
-Time budget:
-Out of scope:
-Stop conditions:
-```
+## 4. Kanıt yeniden kullanımı
 
-Bu blok yoksa ChatGPT/Codex görevi geniş yorumlamaz. Önce bu alanları current Issue yorumunda netleştirir.
+Aşağıdaki contract değişmediyse son merged/validated kanıt yeniden kullanılabilir:
 
-## 4. Doğrulama merdiveni
-
-Doğrulama sırayla ve stop-on-success çalışır:
-
-1. **Diff/scope kontrolü**
-2. **Odaklı test**
-3. **Etkilenen suite**
-4. **Tek geniş suite** — yalnız gerekliyse
-5. **Tek build** — yalnız runtime/artifact gerekiyorsa
-6. **Release gate** — yalnız `release-critical` veya açık Issue izniyle
-7. **Minimum cihaz kabulü** — yalnız kullanıcıya görünür değişen yol
-
-Bir basamak yeterli kanıt verdiyse sırf daha fazla güven hissi için sonraki basamağa geçilmez.
-
-## 5. Kanıt yeniden kullanımı
-
-Aşağıdaki sözleşmeler değişmediyse son merged ve doğrulanmış kanıt yeniden kullanılır:
-
-- schema ve migration;
+- schema/migration;
 - backup formatı;
-- application/package ID;
-- signing;
-- ARM64 ve 16 KiB;
-- permission/privacy matrisi;
-- background delivery;
-- reboot reconciliation;
+- package/application ID;
+- signing/permission;
+- background/reboot;
 - restore/rollback;
-- entrypoint provenance.
+- entrypoint/artifact provenance.
 
-Kanıt yeniden kullanımı completion evidence içinde şu formatta yazılır:
+Aynı source revision üzerinde geçen test tekrar çalıştırılmaz. Kaynak değiştiğinde yalnız etkilenen test ve gerekli üst kapı yeniden çalıştırılır.
 
-```text
-Reused evidence:
-- Contract:
-- Source Issue/PR/commit:
-- Why still valid:
-```
+## 5. Mikro adım doğrulaması
 
-“Tekrar çalıştırılmadı” eksiklik değil, bilinçli risk-temelli karardır.
-
-## 6. Full gate kuralları
-
-- Aynı source revision üzerinde aynı full gate en fazla bir kez çalıştırılır.
-- Gate başarıyla geçtiyse, yalnız dokümantasyon veya cihaz kabul komutu değişti diye tekrar çalıştırılmaz.
-- Gate kullanıcı mesajıyla kesildiyse süreç/artifact durumu incelenir; geçerli kalan aşamalar yeniden çalıştırılmaz.
-- Ortam arızasında yalnız başarısız aşama tekrarlanır.
-- Source code gate sonrasında değiştiyse yalnız değişikliğin etkilediği aşama ve gerekli üst kapılar yeniden çalıştırılır.
-- Gate scriptinin kendisi feature branch içinde değiştirilirse bu artık `release-critical` kapsamdır; ayrı Issue gerekir.
-
-## 7. Retry ve süre bütçesi
-
-### Varsayılan bütçe
+Codex her mikro adım sonunda şunu teslim eder:
 
 ```text
-1 technical step = 1 primary Codex run
-blocking correction = at most 1 correction run
-same failed operation = at most 1 retry after exact fix
+Changed behavior:
+Changed paths:
+Static checks:
+Codex execution / result:
+Manual check: GEREKMİYOR (<gerekçe>) | PENDING | PASS | FAIL
+Expected result: <yalnız gereken manuel kontrol için>
 ```
 
-### Süre hedefleri
+Codex automated sonuçları ve exact hatayı raporlar. Fatih yalnız manuel ürün/device kabulü için `PASS` veya `FAIL` bildirir; kendisine terminal komutu verilmez.
 
-| Validation class | Hedef | Hard stop |
-| --- | ---: | ---: |
-| docs | 10–15 dk | 25 dk |
-| narrow-ui | 20–30 dk | 45 dk |
-| domain | 30–45 dk | 75 dk |
-| persistence | Issue'a özel | Issue'a özel |
-| release-critical | Issue'a özel | Issue'a özel |
+Non-CRITICAL publication:
 
-Hard stop geldiğinde:
+- Codex automated PASS ve manuel/device kabul GEREKMİYOR: yetkili commit/push yapılabilir.
+- Manuel/device kabul gerekiyorsa Codex automated PASS yanında Fatih PASS gerekir.
+- Gerekli doğrulama/kabul FAIL veya PENDING/PARTIAL: commit/push kapalı kalır; exact hata için same-scope correction kuralı uygulanır.
+- STANDARD işte normalde ilk teslimden sonra en fazla bir same-scope correction turu; sorun sürüyorsa escalation.
 
-- yeni yaklaşım zinciri başlatılmaz;
-- yeni full gate çalıştırılmaz;
-- kapsam genişletilmez;
-- tamamlanan kanıt, exact blocker ve kalan tek adım raporlanır;
-- gerekiyorsa ayrı blocker Issue açılır.
+CRITICAL publication ve owner Ready/merge/release kapıları değişmez.
 
-## 8. Ortam ve toolchain arızaları
+## 6. Süre bütçesi
 
-Feature sırasında bulunan şu tür sorunlar feature kapsamına sessizce alınmaz:
+Her Codex handoff'unda ChatGPT açık `Execution time budget: <süre>` verir. Süre; kapsam, risk, beklenen validation/build/device işi ve mevcut blocker'a göre atanır; global sabit süre varsayılanı yoktur.
 
-- Gradle daemon/file lock;
-- Flutter cache bozulması;
-- bundletool/apksigner stderr davranışı;
-- emulator disconnect;
-- PowerShell parser/regex/coordinate automation hatası;
-- release scripti eksikliği;
-- JDK/SDK/toolchain problemi.
+Repository-local terminal, automated test, analyzer, build ve açıkça devredilen emulator/ADB/device execution bu göreve özel bütçeye dahildir; owner manuel kabulü ayrı değerlendirilir. İnceleme, edit/fix, focused validation ve yetkili commit/push bütçeye sığıyorsa tek adımda birleştirilir.
 
-Yapılacaklar:
+Bütçe dolunca Codex durur:
 
-1. Feature kodu ile ortam hatasını ayır.
-2. Bir kez dar düzeltme/yeniden deneme yap.
-3. Devam ederse ayrı Issue aç.
-4. Mevcut feature branch'ine toolchain düzeltmesi ekleme.
-5. Kullanıcı açıkça scope genişletmedikçe feature acceptance'ı minimum manuel veya alternatif kanıtla tamamla.
+- yeni yaklaşım veya geniş gate başlatmaz;
+- kapsamı genişletmez;
+- çalışmayı güvenle korur; tamamlanan işi, exact blocker'ı ve kalan tek adımı raporlar.
 
-## 9. Fiziksel cihaz kabulü
+Gerekli yeni handoff'un bütçesini ChatGPT belirler. Süre bütçesi CRITICAL validation veya veri güvenliği kapılarını kaldırmaz.
 
-Fiziksel cihaz kontrolü yalnız değişen kullanıcı yolunu doğrular.
+## 7. Test tekrarları ve ortam hatası
 
-### `narrow-ui` için örnek yeterli kabul
+- Non-CRITICAL işte kararı değiştirmeyen diagnostic/test/harness döngüleri yasaktır; tek başarısız repro denemesinden sonra source/runtime diagnosis veya mevcut en güçlü kanıta geçilir.
+- Aynı failed operation exact düzeltme olmadan tekrarlanmaz.
+- Ortam/toolchain hatası feature kapsamına sessizce alınmaz.
+- Codex exact hata çıktısını kaydeder ve yalnız current scope içindeki dar source correction'ı hazırlar.
+- Toolchain, SDK, Gradle, signing veya device setup değişikliği ayrı karar ister.
 
-- yeni filtre/buton görünür;
-- doğru kayıtlar görünür;
-- yanlış kayıtlar görünmez;
-- kart detayı açılır;
-- ilgili mutasyon varsa tek dokunuşla çalışır;
-- uygulama açılır ve mevcut veri görünür.
+## 8. Fiziksel cihaz kabulü
 
-Değişmeyen alanlar için yeniden yapılmaz:
+Non-CRITICAL manuel/device kontrolü yalnız runtime'a özgü davranışta veya owner açıkça istediğinde, değişen kullanıcı yolunu bir kez doğrular. Gerekli kontrolün PASS/FAIL kararı Fatih'tedir. CRITICAL Issue'ya özel cihaz ve release kapıları aynen uygulanır.
 
-- reboot;
-- background notification delivery;
+Tekrarlanmaz:
+
+- değişmeyen reboot/background davranışı;
 - full backup/restore;
-- DB hash envanteri;
 - signing/permission matrisi;
-- production package temizliği.
+- production package temizliği;
+- kullanıcı verisi envanteri.
 
-ADB UI otomasyonu:
+MAIN/production ve gerçek kullanıcı verisine açık CRITICAL authority olmadan dokunulmaz.
 
-- minimum komut kullanır;
-- kullanıcı verisi içeriğini okumaz;
-- koordinat/regex hatasında en fazla bir düzeltme yapılır;
-- ikinci otomasyon hatasında kullanıcıdan tek ekran doğrulaması istenir;
-- otomasyon kanıtı uğruna 45 dakika sınırı aşılmaz.
+## 9. Completion
 
-## 10. Kapsam kontrolü
-
-Her 10–15 dakikada bir Codex şu kontrolü yapar:
+FAST:
 
 ```text
-Current goal:
-Current changed files:
-Current validation class:
-Still inside Issue scope: yes/no
-Broad gate already run: yes/no
-Elapsed time:
-Remaining single acceptance step:
+static checks: PASS|FAIL
+owner validation: GEREKMİYOR (<gerekçe>)|PENDING|PASS|FAIL
+commit/push: NOT_DONE|<sha>
 ```
 
-`Still inside Issue scope = no` ise edit durur. Yeni iş ayrı Issue olur.
+STANDARD kısa test özeti kullanır. CRITICAL detailed compatibility/provenance taşıyabilir.
 
-## 11. ChatGPT sorumluluğu
+Test edilmemiş behavior `VERIFIED`, `FIELD_ACCEPTED` veya `RELEASE_READY` diye sunulmaz.
 
-ChatGPT:
+## 10. Stop kriterleri
 
-- Issue'yu gereğinden geniş yazmaz;
-- risk sınıfını açıkça seçer;
-- izin verilen gate'leri listeler;
-- eski geçerli kanıtları Issue'ya bağlar;
-- kullanıcıya terminal/ADB adımlarını gereksiz yere yaptırmaz;
-- Codex'in 45 dakikayı aşan dar görevini normalleştirmez;
-- completion sonrası branch/PR/merge işini GitHub üzerinden yönetir.
+Codex şu durumlarda durur:
 
-## 12. Codex completion formatı
+- handoff'taki açık execution time budget doldu;
+- yeni CRITICAL trigger bulundu;
+- allowlist/scope genişlemesi gerekiyor;
+- kullanıcı verisi/destructive risk oluştu;
+- beklenmeyen dosya değişikliği var;
+- validation için yeni platform/signing/toolchain işi gerekiyor.
 
-```text
-Validation class:
-Elapsed time:
-Primary run count:
-Correction run count:
-Changed contracts:
-Focused tests run:
-Broad gates run:
-Broad gates intentionally not run:
-Reused evidence:
-Physical-device checks:
-Out-of-scope findings / new Issues:
-Commit / push:
-Remaining blocker:
-```
+## 11. Ana karar
 
-## 13. Stop kriterleri
-
-Aşağıdakilerden biri oluşursa Codex kendi kendine genişlemeyi durdurur:
-
-- dar görev 45 dakikayı geçti;
-- aynı full gate ikinci kez isteniyor ve source revision değişmedi;
-- ikinci ortam/otomasyon hatası oluştu;
-- release scripti değişikliği gerekiyor fakat Issue `release-critical` değil;
-- kullanıcı verisine yeni risk oluştu;
-- kapsam dışı dosya değişikliği gerekiyor;
-- acceptance için yeni sertifika/uninstall/data clear gerekiyor fakat açık izin yok.
-
-Bu stop, başarısızlık değil; kontrollü yürütme sonucudur.
+> Non-CRITICAL işte Codex tek focused validation ile ilerler; Fatih yalnız gereken manuel/device kabulünü verir. Göreve özel süre bütçesi, exact device delegasyonu ve veri güvenliği sınırları korunur. Aynı kanıt tekrar üretilmez; CRITICAL ve owner Ready/merge/release kapıları değişmez.

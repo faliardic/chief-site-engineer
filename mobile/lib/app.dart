@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
+import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
+import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
 import 'package:chief_site_engineer/features/agenda/phone_call_result_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_day_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_page.dart';
@@ -13,15 +15,73 @@ import 'package:chief_site_engineer/features/attachments/project_media_album_pag
 import 'package:chief_site_engineer/features/concrete/concrete_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
 import 'package:chief_site_engineer/features/daily_log/daily_log_page.dart';
+import 'package:chief_site_engineer/features/dashboard/project_dashboard_page.dart';
 import 'package:chief_site_engineer/features/inventory/inventory_page.dart';
 import 'package:chief_site_engineer/features/living_plan/living_plan_page.dart';
 import 'package:chief_site_engineer/features/material_requests/material_requests_page.dart';
 import 'package:chief_site_engineer/features/memory/memory_backup_page.dart';
+import 'package:chief_site_engineer/features/project_context/active_project_session.dart';
+import 'package:chief_site_engineer/features/projects/project_create_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
+import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+
+const _compactButtonStyle = ButtonStyle(
+  minimumSize: WidgetStatePropertyAll(Size(0, 40)),
+  padding: WidgetStatePropertyAll(
+    EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+  ),
+  visualDensity: VisualDensity.standard,
+  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+);
+
+ThemeData _buildCseTheme(Brightness brightness) {
+  const seed = Color(0xFF1E5D4E);
+  final base = ThemeData(
+    colorScheme: ColorScheme.fromSeed(seedColor: seed, brightness: brightness),
+    useMaterial3: true,
+  );
+  final textTheme = base.typography.englishLike
+      .merge(base.textTheme)
+      .apply(fontSizeFactor: 0.92);
+  return base.copyWith(
+    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    visualDensity: const VisualDensity(horizontal: -1, vertical: -1),
+    textTheme: textTheme,
+    filledButtonTheme: const FilledButtonThemeData(style: _compactButtonStyle),
+    elevatedButtonTheme: const ElevatedButtonThemeData(
+      style: _compactButtonStyle,
+    ),
+    outlinedButtonTheme: const OutlinedButtonThemeData(
+      style: _compactButtonStyle,
+    ),
+    textButtonTheme: const TextButtonThemeData(style: _compactButtonStyle),
+    iconButtonTheme: const IconButtonThemeData(
+      style: ButtonStyle(
+        minimumSize: WidgetStatePropertyAll(Size.square(40)),
+        visualDensity: VisualDensity.standard,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    ),
+    inputDecorationTheme: const InputDecorationThemeData(
+      isDense: true,
+      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    ),
+    appBarTheme: AppBarThemeData(
+      toolbarHeight: 52,
+      titleTextStyle: textTheme.titleLarge?.copyWith(
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      height: 64,
+      labelTextStyle: WidgetStatePropertyAll(textTheme.labelSmall),
+    ),
+  );
+}
 
 class CseApp extends StatelessWidget {
   const CseApp({
@@ -57,28 +117,14 @@ class CseApp extends StatelessWidget {
   }
 
   Widget _buildMaterialApp(String? fatalErrorCode) {
-    const seed = Color(0xFF1E5D4E);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: productName,
       locale: locale,
       supportedLocales: supportedLocales,
       localizationsDelegates: localizationsDelegates,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: seed),
-        materialTapTargetSize: MaterialTapTargetSize.padded,
-        visualDensity: VisualDensity.standard,
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: seed,
-          brightness: Brightness.dark,
-        ),
-        materialTapTargetSize: MaterialTapTargetSize.padded,
-        visualDensity: VisualDensity.standard,
-        useMaterial3: true,
-      ),
+      theme: _buildCseTheme(Brightness.light),
+      darkTheme: _buildCseTheme(Brightness.dark),
       themeMode: ThemeMode.system,
       builder: (context, child) {
         final label = environmentLabel;
@@ -235,11 +281,26 @@ class MobileShell extends StatefulWidget {
 
 class _MobileShellState extends State<MobileShell> {
   int _selectedIndex = 0;
+  final Set<int> _visitedPrimaryTabs = {0};
+  final _inventoryKey = GlobalKey<InventoryPageState>();
   StreamSubscription<String>? _notificationTapSubscription;
+  StreamSubscription<void>? _projectContextSubscription;
+  late final ActiveProjectSession _activeProjectSession;
+  List<MobileProject> _activeProjectOptions = const [];
+  Map<String, String> _activeProjectNames = const {};
+  int _projectContextGeneration = 0;
+  int _routeProjectValidationGeneration = 0;
+  int _dashboardContextEpoch = 0;
 
   @override
   void initState() {
     super.initState();
+    _activeProjectSession = ActiveProjectSession();
+    _activeProjectSession.addListener(_handleActiveProjectChanged);
+    _projectContextSubscription = widget.bootstrap.agenda.projectChanges.listen(
+      (_) => unawaited(_refreshActiveProjectOptions()),
+    );
+    unawaited(_refreshActiveProjectOptions());
     _notificationTapSubscription = widget.bootstrap.agenda.notificationTaps
         .listen(_openReminderFromNotification);
     final initial = widget.bootstrap.agenda.initialNotificationReminderId;
@@ -253,7 +314,227 @@ class _MobileShellState extends State<MobileShell> {
   @override
   void dispose() {
     _notificationTapSubscription?.cancel();
+    _projectContextSubscription?.cancel();
+    _activeProjectSession.removeListener(_handleActiveProjectChanged);
+    _activeProjectSession.dispose();
     super.dispose();
+  }
+
+  void _handleActiveProjectChanged() {
+    if (!mounted) return;
+    setState(() {});
+    final selectedProjectId = _activeProjectSession.selectedProjectId;
+    if (selectedProjectId != null &&
+        !_activeProjectNames.containsKey(selectedProjectId)) {
+      unawaited(_refreshActiveProjectOptions());
+    }
+  }
+
+  Future<void> _refreshActiveProjectOptions() async {
+    final generation = ++_projectContextGeneration;
+    try {
+      final projects = await widget.bootstrap.agenda.listProjects();
+      if (!mounted || generation != _projectContextGeneration) return;
+      final activeProjects = projects
+          .where((project) => !project.isArchived)
+          .toList(growable: false);
+      if (activeProjects.map((project) => project.id).toSet().length !=
+          activeProjects.length) {
+        throw StateError('Duplicate active project IDs');
+      }
+      setState(() {
+        _activeProjectOptions = activeProjects;
+        _activeProjectNames = {
+          for (final project in activeProjects) project.id: project.name,
+        };
+      });
+    } on Object {
+      if (!mounted || generation != _projectContextGeneration) return;
+      // A transient refresh must not make the visible context contradict the
+      // still-operational ActiveProjectSession selection. Keep the last
+      // successfully validated display cache until a later refresh succeeds.
+    }
+  }
+
+  String get _activeProjectLabel {
+    final selectedProjectId = _activeProjectSession.selectedProjectId;
+    if (selectedProjectId == null) return 'Proje seçilmedi';
+    return _activeProjectNames[selectedProjectId] ?? 'Proje seçilmedi';
+  }
+
+  bool get _showsActiveProjectIndicator =>
+      _selectedIndex == 1 ||
+      _selectedIndex == 2 ||
+      _selectedIndex == 3 ||
+      _selectedIndex == 4 ||
+      _selectedIndex == 5;
+
+  Future<void> _adoptRouteProjectSelection(
+    String projectId, {
+    bool refreshDashboard = true,
+  }) async {
+    final generation = ++_routeProjectValidationGeneration;
+    final cachedProjects = _activeProjectOptions;
+    if (cachedProjects.any((project) => project.id == projectId)) {
+      if (!mounted || generation != _routeProjectValidationGeneration) return;
+      if (!_activeProjectSession.select(projectId, cachedProjects)) return;
+      if (refreshDashboard) setState(() => _dashboardContextEpoch += 1);
+      return;
+    }
+    try {
+      final projects = await widget.bootstrap.agenda.listProjects();
+      if (!mounted || generation != _routeProjectValidationGeneration) return;
+      if (!_activeProjectSession.select(projectId, projects)) return;
+      if (refreshDashboard) setState(() => _dashboardContextEpoch += 1);
+    } on Object {
+      // Route-local selection remains local when fresh shell validation fails.
+    }
+  }
+
+  void _reportRouteProjectSelection(String projectId) {
+    unawaited(_adoptRouteProjectSelection(projectId));
+  }
+
+  void _selectAppBarProject(String projectId) {
+    if (!_activeProjectOptions.any((project) => project.id == projectId)) {
+      return;
+    }
+    if (_selectedIndex == 3) {
+      // Inventory reports back only after fresh project validation and its
+      // exact scoped load succeed. Failed/stale loads never retarget the shell.
+      unawaited(_inventoryKey.currentState?.selectProject(projectId));
+    } else {
+      _reportRouteProjectSelection(projectId);
+    }
+  }
+
+  void _reportAlbumProjectSelection(String projectId) {
+    unawaited(_adoptRouteProjectSelection(projectId, refreshDashboard: false));
+  }
+
+  Future<void> _openProjectAlbum(String projectId) async {
+    final catalog = widget.bootstrap.attachmentCatalog;
+    if (catalog == null) return;
+    final initialSessionProjectId = _activeProjectSession.selectedProjectId;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ProjectMediaAlbumPage(
+          catalog: catalog,
+          agenda: widget.bootstrap.agenda,
+          concrete: widget.bootstrap.concrete,
+          attachments: widget.bootstrap.concreteAttachments,
+          projectLocations: widget.bootstrap.projectLocations,
+          initialProjectId: projectId,
+          onProjectSelected: _reportAlbumProjectSelection,
+        ),
+      ),
+    );
+    if (!mounted ||
+        _activeProjectSession.selectedProjectId == initialSessionProjectId) {
+      return;
+    }
+    setState(() => _dashboardContextEpoch += 1);
+  }
+
+  void _showDashboardProjectSelection() {
+    _selectPrimaryTab(0);
+  }
+
+  Future<void> _openProjectCreate() async {
+    final project = await Navigator.of(context).push<MobileProject>(
+      MaterialPageRoute(
+        builder: (_) => ProjectCreatePage(agenda: widget.bootstrap.agenda),
+      ),
+    );
+    if (!mounted || project == null) return;
+
+    final activeProjects = [
+      for (final current in _activeProjectOptions)
+        if (current.id != project.id) current,
+      project,
+    ];
+    setState(() {
+      _activeProjectOptions = activeProjects;
+      _activeProjectNames = {
+        for (final current in activeProjects) current.id: current.name,
+      };
+      _selectedIndex = 0;
+      _visitedPrimaryTabs.add(0);
+      _dashboardContextEpoch += 1;
+    });
+    _activeProjectSession.select(project.id, activeProjects);
+  }
+
+  void _selectPrimaryTab(int index) {
+    if (!mounted ||
+        (_selectedIndex == index && _visitedPrimaryTabs.contains(index))) {
+      return;
+    }
+    setState(() {
+      _selectedIndex = index;
+      _visitedPrimaryTabs.add(index);
+    });
+  }
+
+  Widget _buildVisitedPrimaryTab(int index, Widget Function() builder) {
+    return _visitedPrimaryTabs.contains(index)
+        ? builder()
+        : const SizedBox.shrink();
+  }
+
+  Future<void> _openConcreteFromMore() async {
+    final concrete = widget.bootstrap.concrete;
+    final attachments = widget.bootstrap.concreteAttachments;
+    if (concrete == null || attachments == null) return;
+    final projectId = _activeProjectSession.selectedProjectId;
+    if (projectId == null) {
+      _showDashboardProjectSelection();
+      return;
+    }
+    if (!mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Beton Paketi')),
+          body: SafeArea(
+            child: ConcretePage(
+              concrete: concrete,
+              agenda: widget.bootstrap.agenda,
+              attachments: attachments,
+              projectLocations: widget.bootstrap.projectLocations,
+              initialProjectId: projectId,
+              onProjectSelected: _reportRouteProjectSelection,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openWorkforceFromMore() async {
+    final attendance = widget.bootstrap.attendance;
+    if (attendance == null) return;
+    final projectId = _activeProjectSession.selectedProjectId;
+    if (projectId == null) {
+      _showDashboardProjectSelection();
+      return;
+    }
+    if (!mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Sicil')),
+          body: SafeArea(
+            child: WorkforceDirectoryPage(
+              attendance: attendance,
+              agenda: widget.bootstrap.agenda,
+              initialProjectId: projectId,
+              onProjectSelected: _reportRouteProjectSelection,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _openReminderFromNotification(String reminderId) async {
@@ -265,7 +546,7 @@ class _MobileShellState extends State<MobileShell> {
       final attendance = widget.bootstrap.attendance;
       if (reminder.attendanceDayId != null && attendance != null) {
         if (!mounted) return;
-        setState(() => _selectedIndex = 4);
+        _selectPrimaryTab(4);
         await Navigator.of(context).push<void>(
           MaterialPageRoute(
             builder: (_) => AttendanceDayPage(
@@ -283,7 +564,7 @@ class _MobileShellState extends State<MobileShell> {
           concrete != null &&
           attachments != null) {
         if (!mounted) return;
-        setState(() => _selectedIndex = 5);
+        _selectPrimaryTab(5);
         await Navigator.of(context).push<void>(
           MaterialPageRoute(
             builder: (_) => ConcretePourDetailPage(
@@ -301,7 +582,7 @@ class _MobileShellState extends State<MobileShell> {
       // Invalid/stale notification payload falls back to reminder detail.
     }
     if (!mounted) return;
-    setState(() => _selectedIndex = 1);
+    _selectPrimaryTab(1);
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => ReminderDetailPage(
@@ -313,6 +594,176 @@ class _MobileShellState extends State<MobileShell> {
           reminderId: reminderId,
         ),
       ),
+    );
+  }
+
+  Future<void> _openPhoneCallResult(String initialProjectId) async {
+    final logId = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => PhoneCallResultPage(
+          agenda: widget.bootstrap.agenda,
+          contextSuggestions: widget.bootstrap.contextSuggestions,
+          projectLocations: widget.bootstrap.projectLocations,
+          initialProjectId: initialProjectId,
+          onProjectSelected: _reportRouteProjectSelection,
+        ),
+      ),
+    );
+    if (!mounted || logId == null) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => LogDetailPage(
+          agenda: widget.bootstrap.agenda,
+          projectLocations: widget.bootstrap.projectLocations,
+          attachments: widget.bootstrap.concreteAttachments,
+          concrete: widget.bootstrap.concrete,
+          concreteAttachments: widget.bootstrap.concreteAttachments,
+          logId: logId,
+        ),
+      ),
+    );
+  }
+
+  ProjectDashboardPage _buildDashboard() {
+    final bootstrap = widget.bootstrap;
+    final dailyLog = bootstrap.dailyLog;
+    final materials = bootstrap.materialRequests;
+    final catalog = bootstrap.attachmentCatalog;
+    final attendance = bootstrap.attendance;
+    final backup = bootstrap.backup;
+    final reconciliation = bootstrap.attachmentReconciliation;
+    return ProjectDashboardPage(
+      key: ValueKey('project-dashboard-context-$_dashboardContextEpoch'),
+      agenda: bootstrap.agenda,
+      dailyLog: dailyLog,
+      livingPlan: bootstrap.livingPlan,
+      materialRequests: materials,
+      session: _activeProjectSession,
+      onCreateProject: () => unawaited(_openProjectCreate()),
+      onAddReminder: (projectId, localDay) async {
+        final value = await Navigator.of(context).push<Object?>(
+          MaterialPageRoute(
+            builder: (_) => ReminderFormPage(
+              agenda: bootstrap.agenda,
+              contextSuggestions: bootstrap.contextSuggestions,
+              projectLocations: bootstrap.projectLocations,
+              preferredProjectId: projectId,
+            ),
+          ),
+        );
+        return value != null;
+      },
+      onAddAgenda: (projectId, localDay) async {
+        final value = await Navigator.of(context).push<Object?>(
+          MaterialPageRoute(
+            builder: (_) => LogFormPage(
+              agenda: bootstrap.agenda,
+              projectLocations: bootstrap.projectLocations,
+              attachments: bootstrap.concreteAttachments,
+              concrete: bootstrap.concrete,
+              concreteAttachments: bootstrap.concreteAttachments,
+              initialProjectId: projectId,
+              initialIstanbulDay: localDay,
+            ),
+          ),
+        );
+        return value != null;
+      },
+      onOpenToday: dailyLog == null
+          ? null
+          : (projectId) => unawaited(
+              Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => DailyLogPage(
+                    dailyLog: dailyLog,
+                    workChain: bootstrap.workChain,
+                    initialProjectId: projectId,
+                    onProjectSelected: _reportRouteProjectSelection,
+                  ),
+                ),
+              ),
+            ),
+      onOpenPlan: (projectId) => unawaited(
+        Navigator.of(context).push<void>(
+          MaterialPageRoute(
+            builder: (_) => LivingPlanPage(
+              agenda: bootstrap.agenda,
+              livingPlan: bootstrap.livingPlan,
+              intelligence: bootstrap.livingPlanIntelligence,
+              initialProjectId: projectId,
+              onProjectSelected: _reportRouteProjectSelection,
+            ),
+          ),
+        ),
+      ),
+      onOpenMaterials: materials == null
+          ? null
+          : (projectId) => unawaited(
+              Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => MaterialRequestsPage(
+                    application: materials,
+                    initialProjectId: projectId,
+                    onProjectSelected: _reportRouteProjectSelection,
+                  ),
+                ),
+              ),
+            ),
+      onOpenProjectAlbum: catalog == null
+          ? null
+          : (projectId) => unawaited(_openProjectAlbum(projectId)),
+      onOpenWorkforce: attendance == null
+          ? null
+          : (projectId) => unawaited(
+              Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => Scaffold(
+                    appBar: AppBar(title: const Text('Sicil')),
+                    body: SafeArea(
+                      child: WorkforceDirectoryPage(
+                        attendance: attendance,
+                        agenda: bootstrap.agenda,
+                        initialProjectId: projectId,
+                        onProjectSelected: _reportRouteProjectSelection,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+      onOpenPhoneCall: (projectId) =>
+          unawaited(_openPhoneCallResult(projectId)),
+      onOpenBackup: backup == null
+          ? null
+          : () => unawaited(
+              Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => MemoryBackupPage(backup: backup),
+                ),
+              ),
+            ),
+      onOpenCatalog: catalog == null
+          ? null
+          : (projectId) => unawaited(
+              Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => AttachmentCatalogPage(
+                    catalog: catalog,
+                    initialProjectId: projectId,
+                  ),
+                ),
+              ),
+            ),
+      onOpenAttachmentHealth: reconciliation == null
+          ? null
+          : () => unawaited(
+              Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      AttachmentHealthPage(reconciliation: reconciliation),
+                ),
+              ),
+            ),
     );
   }
 
@@ -338,58 +789,196 @@ class _MobileShellState extends State<MobileShell> {
   Widget build(BuildContext context) {
     final title = _destinations[_selectedIndex].label;
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(
+        title: Text(title),
+        actions: _showsActiveProjectIndicator
+            ? [
+                ActiveProjectControl(
+                  label: _activeProjectLabel,
+                  projects: _activeProjectOptions,
+                  onSelected: _selectAppBarProject,
+                ),
+              ]
+            : null,
+      ),
       body: SafeArea(
         child: IndexedStack(
           index: _selectedIndex,
           children: [
-            _HomePage(bootstrap: widget.bootstrap),
-            RemindersPage(
-              agenda: widget.bootstrap.agenda,
-              attendance: widget.bootstrap.attendance,
-              contextSuggestions: widget.bootstrap.contextSuggestions,
-              projectLocations: widget.bootstrap.projectLocations,
-            ),
-            AgendaPage(
-              agenda: widget.bootstrap.agenda,
-              projectLocations: widget.bootstrap.projectLocations,
-              attachments: widget.bootstrap.concreteAttachments,
-              concrete: widget.bootstrap.concrete,
-              concreteAttachments: widget.bootstrap.concreteAttachments,
-            ),
-            InventoryPage(
-              application: widget.bootstrap.inventory,
-              listProjects: widget.bootstrap.agenda.listProjects,
-              projectChanges: widget.bootstrap.agenda.projectChanges,
-            ),
-            if (widget.bootstrap.attendance case final attendance?)
-              AttendancePage(
-                attendance: attendance,
+            _buildDashboard(),
+            _buildVisitedPrimaryTab(
+              1,
+              () => RemindersPage(
                 agenda: widget.bootstrap.agenda,
-              )
-            else
-              const _PreparingPage(
-                icon: Icons.badge_outlined,
-                title: 'Puantaj',
+                attendance: widget.bootstrap.attendance,
+                contextSuggestions: widget.bootstrap.contextSuggestions,
+                projectLocations: widget.bootstrap.projectLocations,
+                preferredProjectId: _activeProjectSession.selectedProjectId,
               ),
-            _MorePage(bootstrap: widget.bootstrap),
+            ),
+            _buildVisitedPrimaryTab(
+              2,
+              () => AgendaPage(
+                agenda: widget.bootstrap.agenda,
+                projectLocations: widget.bootstrap.projectLocations,
+                attachments: widget.bootstrap.concreteAttachments,
+                concrete: widget.bootstrap.concrete,
+                concreteAttachments: widget.bootstrap.concreteAttachments,
+                activeProjectId: _activeProjectSession.selectedProjectId,
+              ),
+            ),
+            _buildVisitedPrimaryTab(
+              3,
+              () => InventoryPage(
+                key: _inventoryKey,
+                application: widget.bootstrap.inventory,
+                listProjects: widget.bootstrap.agenda.listProjects,
+                projectChanges: widget.bootstrap.agenda.projectChanges,
+                activeProjectId: _activeProjectSession.selectedProjectId,
+                isActive: _selectedIndex == 3,
+                onProjectSelected: _reportRouteProjectSelection,
+              ),
+            ),
+            _buildVisitedPrimaryTab(
+              4,
+              () => switch (widget.bootstrap.attendance) {
+                final attendance? => AttendancePage(
+                  attendance: attendance,
+                  agenda: widget.bootstrap.agenda,
+                  activeProjectId: _activeProjectSession.selectedProjectId,
+                  isActive: _selectedIndex == 4,
+                  onProjectSelected: _reportRouteProjectSelection,
+                ),
+                null => const _PreparingPage(
+                  icon: Icons.badge_outlined,
+                  title: 'Puantaj',
+                ),
+              },
+            ),
+            _buildVisitedPrimaryTab(
+              5,
+              () => _MorePage(
+                bootstrap: widget.bootstrap,
+                onOpenConcrete:
+                    widget.bootstrap.concrete != null &&
+                        widget.bootstrap.concreteAttachments != null
+                    ? () => unawaited(_openConcreteFromMore())
+                    : null,
+                onOpenWorkforce: widget.bootstrap.attendance == null
+                    ? null
+                    : () => unawaited(_openWorkforceFromMore()),
+              ),
+            ),
           ],
         ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
         destinations: _destinations,
-        onDestinationSelected: (index) =>
-            setState(() => _selectedIndex = index),
+        onDestinationSelected: _selectPrimaryTab,
+      ),
+    );
+  }
+}
+
+class ActiveProjectControl extends StatelessWidget {
+  const ActiveProjectControl({
+    required this.label,
+    required this.projects,
+    required this.onSelected,
+    super.key,
+  });
+
+  final String label;
+  final List<MobileProject> projects;
+  final ValueChanged<String> onSelected;
+
+  Future<void> _choose(BuildContext context) async {
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('active-project-chooser'),
+        title: const Text('Proje seç'),
+        content: SizedBox(
+          width: 360,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(dialogContext).height * 0.5,
+            ),
+            child: projects.isEmpty
+                ? const Text('Seçilebilir aktif proje yok.')
+                : ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final project in projects)
+                        ListTile(
+                          key: ValueKey('active-project-option-${project.id}'),
+                          title: Text(project.name),
+                          onTap: () =>
+                              Navigator.of(dialogContext).pop(project.id),
+                        ),
+                    ],
+                  ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Vazgeç'),
+          ),
+        ],
+      ),
+    );
+    if (context.mounted && selected != null) onSelected(selected);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: Center(
+        child: Tooltip(
+          message: 'Aktif proje: $label',
+          child: Semantics(
+            container: true,
+            label: 'Aktif proje: $label',
+            child: ActionChip(
+              key: const Key('active-project-indicator'),
+              onPressed: () => unawaited(_choose(context)),
+              avatar: const Icon(Icons.apartment_rounded, size: 18),
+              label: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: (MediaQuery.sizeOf(context).width * 0.35)
+                      .clamp(64.0, 132.0)
+                      .toDouble(),
+                ),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              visualDensity: VisualDensity.standard,
+              materialTapTargetSize: MaterialTapTargetSize.padded,
+            ),
+          ),
+        ),
       ),
     );
   }
 }
 
 class _MorePage extends StatelessWidget {
-  const _MorePage({required this.bootstrap});
+  const _MorePage({
+    required this.bootstrap,
+    required this.onOpenConcrete,
+    required this.onOpenWorkforce,
+  });
 
   final BootstrapSuccess bootstrap;
+  final VoidCallback? onOpenConcrete;
+  final VoidCallback? onOpenWorkforce;
 
   @override
   Widget build(BuildContext context) {
@@ -411,23 +1000,7 @@ class _MorePage extends StatelessWidget {
                   : 'Hazırlanıyor',
             ),
             trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: concrete != null && attachments != null
-                ? () => Navigator.of(context).push<void>(
-                    MaterialPageRoute(
-                      builder: (_) => Scaffold(
-                        appBar: AppBar(title: const Text('Beton Paketi')),
-                        body: SafeArea(
-                          child: ConcretePage(
-                            concrete: concrete,
-                            agenda: bootstrap.agenda,
-                            attachments: attachments,
-                            projectLocations: bootstrap.projectLocations,
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                : null,
+            onTap: onOpenConcrete,
           ),
         ),
         Card(
@@ -441,319 +1014,9 @@ class _MorePage extends StatelessWidget {
                   : 'Hazırlanıyor',
             ),
             trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: attendance != null
-                ? () => Navigator.of(context).push<void>(
-                    MaterialPageRoute(
-                      builder: (_) => Scaffold(
-                        appBar: AppBar(title: const Text('Sicil')),
-                        body: SafeArea(
-                          child: WorkforceDirectoryPage(
-                            attendance: attendance,
-                            agenda: bootstrap.agenda,
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                : null,
+            onTap: onOpenWorkforce,
           ),
         ),
-      ],
-    );
-  }
-}
-
-class _HomePage extends StatefulWidget {
-  const _HomePage({required this.bootstrap});
-
-  final BootstrapSuccess bootstrap;
-
-  @override
-  State<_HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<_HomePage> {
-  static const _fieldTips = <String>[
-    'Sahada görülen veya söylenenler, mümkün olduğunca anında kayda geçtiğinde unutulmaz.',
-    'Fotoğraf; neyi, nerede ve neden gösterdiğiyle birlikte anlam kazanır.',
-    'Gün sonu, önemli gelişmelerin rapor ve kayıtlara yansıdığını kontrol etme zamanıdır.',
-    'Açık işler zihinde değil, sistemde görünür kaldığında daha kolay takip edilir.',
-  ];
-
-  var _fieldTipIndex = 0;
-
-  void _showPreviousFieldTip() {
-    setState(() {
-      _fieldTipIndex =
-          (_fieldTipIndex - 1 + _fieldTips.length) % _fieldTips.length;
-    });
-  }
-
-  void _showNextFieldTip() {
-    setState(() {
-      _fieldTipIndex = (_fieldTipIndex + 1) % _fieldTips.length;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final fieldTip = _fieldTips[_fieldTipIndex];
-    final fieldTipPosition = '${_fieldTipIndex + 1} / ${_fieldTips.length}';
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        Text(
-          'Saha hafızanız cihazınızda.',
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Günlük kullanım internet, bilgisayar veya yerel ağ bağlantısı gerektirmez.',
-        ),
-        const SizedBox(height: 20),
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.offline_bolt_outlined),
-            title: const Text('Çevrim dışı temel hazır'),
-            subtitle: Text(
-              'Cihaz-içi SQLite • ${widget.bootstrap.environmentLabel} ortamı',
-            ),
-          ),
-        ),
-        const Card(
-          child: ListTile(
-            leading: Icon(Icons.lock_outline_rounded),
-            title: Text('Veri sınırı'),
-            subtitle: Text(
-              'Bulut eşitleme ve kullanıcı hesabı bu sürümde yoktur.',
-            ),
-          ),
-        ),
-        Card(
-          child: ListTile(
-            key: const Key('open-phone-call-result'),
-            leading: const Icon(Icons.phone_in_talk_outlined),
-            title: const Text('Görüşme sonucu'),
-            subtitle: const Text(
-              'Telefon görüşmesinin sonucunu Ajanda’ya hızlıca kaydet.',
-            ),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () async {
-              final logId = await Navigator.of(context).push<String>(
-                MaterialPageRoute(
-                  builder: (_) => PhoneCallResultPage(
-                    agenda: widget.bootstrap.agenda,
-                    contextSuggestions: widget.bootstrap.contextSuggestions,
-                    projectLocations: widget.bootstrap.projectLocations,
-                  ),
-                ),
-              );
-              if (!context.mounted || logId == null) return;
-              await Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => LogDetailPage(
-                    agenda: widget.bootstrap.agenda,
-                    projectLocations: widget.bootstrap.projectLocations,
-                    attachments: widget.bootstrap.concreteAttachments,
-                    concrete: widget.bootstrap.concrete,
-                    concreteAttachments: widget.bootstrap.concreteAttachments,
-                    logId: logId,
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        Card(
-          child: ListTile(
-            key: const Key('open-living-plan'),
-            leading: const Icon(Icons.calendar_view_week_outlined),
-            title: const Text('7 Günlük Plan'),
-            subtitle: const Text('Geciken işleri ve önündeki yedi günü yönet.'),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () => Navigator.of(context).push<void>(
-              MaterialPageRoute(
-                builder: (_) => LivingPlanPage(
-                  agenda: widget.bootstrap.agenda,
-                  livingPlan: widget.bootstrap.livingPlan,
-                  intelligence: widget.bootstrap.livingPlanIntelligence,
-                ),
-              ),
-            ),
-          ),
-        ),
-        if (widget.bootstrap.dailyLog case final dailyLog?)
-          Card(
-            child: ListTile(
-              key: const Key('open-daily-log'),
-              leading: const Icon(Icons.summarize_outlined),
-              title: const Text('Günlük Log'),
-              subtitle: const Text(
-                'Seçilen günün kaynak kayıtlarından salt-okunur taslak hazırla.',
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => DailyLogPage(
-                    dailyLog: dailyLog,
-                    workChain: widget.bootstrap.workChain,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        if (widget.bootstrap.materialRequests case final materialRequests?)
-          Card(
-            child: ListTile(
-              key: const Key('open-material-requests'),
-              leading: const Icon(Icons.inventory_2_outlined),
-              title: const Text('İstenecek Malzemeler'),
-              subtitle: const Text(
-                'Malzeme ihtiyaçlarını İhtiyaç var, İstendi ve Geldi akışında takip et.',
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      MaterialRequestsPage(application: materialRequests),
-                ),
-              ),
-            ),
-          ),
-        Card(
-          key: const Key('home-field-tip-card'),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.tips_and_updates_outlined),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Saha İpucu',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Semantics(
-                  key: const Key('field-tip-live-region'),
-                  label: 'Saha İpucu $fieldTipPosition: $fieldTip',
-                  liveRegion: true,
-                  child: Text(fieldTip, key: const Key('field-tip-text')),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    IconButton(
-                      key: const Key('previous-field-tip'),
-                      tooltip: 'Önceki saha ipucu',
-                      onPressed: _showPreviousFieldTip,
-                      icon: const Icon(Icons.arrow_back_rounded),
-                    ),
-                    Expanded(
-                      child: Text(
-                        fieldTipPosition,
-                        key: const Key('field-tip-position'),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    IconButton(
-                      key: const Key('next-field-tip'),
-                      tooltip: 'Sonraki saha ipucu',
-                      onPressed: _showNextFieldTip,
-                      icon: const Icon(Icons.arrow_forward_rounded),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (widget.bootstrap.backup case final backup?)
-          Card(
-            child: ListTile(
-              key: const Key('open-memory-backup'),
-              minVerticalPadding: 12,
-              leading: const Icon(Icons.settings_backup_restore_rounded),
-              title: const Text('Hafıza ve Yedekleme'),
-              subtitle: const Text(
-                'Parola korumalı tam mobil yedek oluştur veya geri yükle.',
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => MemoryBackupPage(backup: backup),
-                ),
-              ),
-            ),
-          ),
-        if (widget.bootstrap.attachmentCatalog case final catalog?)
-          Card(
-            child: ListTile(
-              key: const Key('open-project-media-album'),
-              minVerticalPadding: 12,
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Proje Albümü'),
-              subtitle: const Text(
-                'Projedeki fotoğraf ve videoları kaynak kayıtlarıyla görüntüle.',
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => ProjectMediaAlbumPage(
-                    catalog: catalog,
-                    agenda: widget.bootstrap.agenda,
-                    concrete: widget.bootstrap.concrete,
-                    attachments: widget.bootstrap.concreteAttachments,
-                    projectLocations: widget.bootstrap.projectLocations,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        if (widget.bootstrap.attachmentCatalog case final catalog?)
-          Card(
-            child: ListTile(
-              key: const Key('open-attachment-catalog'),
-              minVerticalPadding: 12,
-              leading: const Icon(Icons.folder_copy_outlined),
-              title: const Text('Dosya Kataloğu'),
-              subtitle: const Text(
-                'Projedeki dosyaları ve bağlı CSE kayıtlarını görüntüle.',
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => AttachmentCatalogPage(catalog: catalog),
-                ),
-              ),
-            ),
-          ),
-        if (widget.bootstrap.attachmentReconciliation
-            case final reconciliation?)
-          Card(
-            child: ListTile(
-              key: const Key('open-attachment-health'),
-              minVerticalPadding: 12,
-              leading: const Icon(Icons.health_and_safety_outlined),
-              title: const Text('Dosya sağlığı'),
-              subtitle: const Text(
-                'Eksik, bozuk veya kırık bağlantıları salt-okunur denetle.',
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      AttachmentHealthPage(reconciliation: reconciliation),
-                ),
-              ),
-            ),
-          ),
       ],
     );
   }
