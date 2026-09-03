@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:chief_site_engineer/app.dart';
+import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/construction_living_plan_application.dart';
 import 'package:chief_site_engineer/application/daily_log_application.dart';
 import 'package:chief_site_engineer/application/material_request_application.dart';
+import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/construction_living_plan_models.dart';
 import 'package:chief_site_engineer/domain/daily_log_models.dart';
@@ -515,6 +517,109 @@ void main() {
     expect(find.text('Açık malzeme ihtiyacı yok.'), findsOneWidget);
   });
 
+  testWidgets(
+    'post-create Dashboard shares the reload queue through failure and retry',
+    (tester) async {
+      _useTallSurface(tester);
+      final coordinator = MobileOperationCoordinator();
+      final reads = _ControlledDashboardReads();
+      final fixture = _Fixture(
+        projects: const [],
+        controlledReads: reads,
+        coordinator: coordinator,
+      );
+      addTearDown(fixture.dispose);
+      await tester.pumpWidget(fixture.app());
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('dashboard-no-project')), findsOneWidget);
+
+      // A projectChanges fan-out must wait for the current application read.
+      final reloadGate = Completer<void>();
+      final reload = coordinator.run(() => reloadGate.future);
+      fixture.agenda.projects = [_project('a', 'Yeni proje')];
+      fixture.agenda.emitProjectChange();
+      await tester.pump();
+      expect(reads.starts, isEmpty);
+      reloadGate.complete();
+      await reload;
+      await _pumpUntil(
+        tester,
+        () => reads.starts.contains('today:a'),
+        'First-project Today did not start after the reload.',
+      );
+      expect(fixture.session.selectedProjectId, 'a');
+
+      // A different primary screen must not open SQLite while Today owns it.
+      var reminderReadStarted = false;
+      final reminderGate = Completer<void>();
+      final reminderRead = coordinator.run(() async {
+        reminderReadStarted = true;
+        await reminderGate.future;
+      });
+      await tester.pump();
+      expect(reminderReadStarted, isFalse);
+      reads.complete('today:a', _dailyLogDay('a'));
+      await _pumpUntil(
+        tester,
+        () => reminderReadStarted,
+        'Queued reminder reload did not follow Today.',
+      );
+      expect(reads.starts, ['today:a']);
+      reminderGate.complete();
+      await reminderRead;
+      await _pumpUntil(
+        tester,
+        () => reads.starts.contains('plan:a'),
+        'Plan did not wait for the queued reminder reload.',
+      );
+
+      var agendaReadStarted = false;
+      final agendaRead = coordinator.run(() async {
+        agendaReadStarted = true;
+      });
+      await tester.pump();
+      expect(agendaReadStarted, isFalse);
+      reads.fail('plan:a', StateError('controlled_plan_failure'));
+      await _pumpUntil(
+        tester,
+        () => reads.starts.contains('materials:a'),
+        'Already-coordinated Materials must not deadlock on a nested queue.',
+      );
+      await agendaRead;
+      expect(agendaReadStarted, isTrue);
+      reads.complete('materials:a', const <MaterialRequest>[]);
+      await tester.pumpAndSettle();
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byKey(const Key('dashboard-plan-retry')), findsOneWidget);
+      expect(fixture.session.selectedProjectId, 'a');
+
+      await tester.tap(find.byKey(const Key('dashboard-plan-retry')));
+      await _pumpUntil(
+        tester,
+        () => reads.starts.where((value) => value == 'plan:a').length == 2,
+        'Plan retry did not start.',
+      );
+      var afterRetryStarted = false;
+      final afterRetry = coordinator.run(() async {
+        afterRetryStarted = true;
+      });
+      await tester.pump();
+      expect(afterRetryStarted, isFalse);
+      reads.complete('plan:a', const <ConstructionLivingPlanWindowItem>[]);
+      await tester.pumpAndSettle();
+      await afterRetry;
+      expect(afterRetryStarted, isTrue);
+      expect(reads.starts, ['today:a', 'plan:a', 'materials:a', 'plan:a']);
+      expect(reads.inFlight, 0);
+      expect(reads.maxInFlight, 1);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('Plan penceresinde kayıt yok.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('section failure settles and does not stop later reads', (
     tester,
   ) async {
@@ -666,10 +771,16 @@ class _Fixture {
   _Fixture({
     required List<MobileProject> projects,
     _ControlledDashboardReads? controlledReads,
-  }) : agenda = _AgendaFake(projects: projects),
+    MobileOperationCoordinator? coordinator,
+  }) : agenda = coordinator == null
+           ? _AgendaFake(projects: projects)
+           : _CoordinatedAgendaFake(
+               projects: projects,
+               coordinator: coordinator,
+             ),
        daily = _DailyFake(controlledReads),
        plan = _PlanFake(controlledReads),
-       materials = _MaterialFake(controlledReads);
+       materials = _MaterialFake(controlledReads, coordinator: coordinator);
 
   final _AgendaFake agenda;
   final _DailyFake daily;
@@ -728,6 +839,18 @@ class _AgendaFake extends FakeAgendaApplication {
   void disposeDashboardFake() => _dashboardProjectChanges.close();
 }
 
+class _CoordinatedAgendaFake extends _AgendaFake
+    implements CoordinatedAgendaApplication {
+  _CoordinatedAgendaFake({required super.projects, required this.coordinator});
+
+  @override
+  final MobileOperationCoordinator coordinator;
+
+  @override
+  Future<List<MobileProject>> listProjects() =>
+      coordinator.run(() => super.listProjects());
+}
+
 class _DailyFake implements DailyLogApplicationPort {
   _DailyFake(this.controlledReads);
 
@@ -776,8 +899,9 @@ class _PlanFake extends UnavailableConstructionLivingPlanApplication {
 }
 
 class _MaterialFake implements MaterialRequestApplicationPort {
-  _MaterialFake(this.controlledReads);
+  _MaterialFake(this.controlledReads, {this.coordinator});
 
+  final MobileOperationCoordinator? coordinator;
   final _ControlledDashboardReads? controlledReads;
   final List<String> calls = [];
 
@@ -785,7 +909,17 @@ class _MaterialFake implements MaterialRequestApplicationPort {
   Future<List<MaterialRequest>> listMaterialRequests({
     required String projectId,
     required MaterialRequestListKind kind,
-  }) async {
+  }) {
+    final queue = coordinator;
+    return queue == null
+        ? _readRequests(projectId, kind)
+        : queue.run(() => _readRequests(projectId, kind));
+  }
+
+  Future<List<MaterialRequest>> _readRequests(
+    String projectId,
+    MaterialRequestListKind kind,
+  ) async {
     calls.add(projectId);
     expect(kind, MaterialRequestListKind.open);
     final controlled = controlledReads;

@@ -1,94 +1,55 @@
-# CSE Repository Handoff Protocol
+# CSE Evidence Directory — Risk-Based Usage
 
-Bu dizin ChatGPT, GitHub, Codex ve proje sahibi arasındaki repository-native iş aktarım katmanıdır.
+`.cse` günlük workflow motoru değildir. Yalnız material izlenebilirlik veya kritik provenance gerektiğinde kullanılır.
 
-## Aktif ürün yürütmesi
+## Lane kullanımı
 
-- Kalıcı ürün ilkeleri: `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
-- Aktif V2 kapsamı: `docs/v2/CSE_V2_SCOPE.md`
-- Aktif sıra: `ROADMAP.md`
-- Parent ürün Epic'i: GitHub Issue `#385`
-- Machine state: `.cse/state/project_state.json`
+### FAST
 
-Tarihsel Step/Adım dosyaları yeniden adlandırılmaz. Yeni işler Issue numarasıyla yürür.
+- `.cse/tasks` oluşturulmaz.
+- `.cse/results` oluşturulmaz.
+- `.cse/state` güncellenmez.
+- Issue/PR/task/result ceremony üretilmez.
 
-## Standart akış
+Git diff/commit ve owner test sonucu yeterlidir.
 
-1. GitHub Issue kullanıcı problemini, V2 maddesini ve kabul sınırını tanımlar.
-2. Aynı anda yalnız bir production implementation Issue aktiftir.
-3. Yerel execution gerekiyorsa resmî repository kullanılır:
+### STANDARD
 
-   `V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer`
+Varsayılan olarak `.cse` dosyası yoktur.
 
-4. Editten önce `AGENTS.md` içindeki pre-read sırası uygulanır.
-5. Local `master`, `origin/master` ile fast-forward ve divergence `0 0` olacak şekilde doğrulanır.
-6. Branch yeni iş için `codex/issue-<issue_no>-<slug>`, docs-only iş için `docs/issue-<issue_no>-<slug>` biçimindedir.
-7. `.cse/tasks/<issue_no>_task.md` yalnız current Issue yetkisini yansıtır.
-8. Scope dışı kullanıcı değişikliği varsa reset/clean/stash/silme yapılmadan durulur.
-9. Değişen sözleşmeye uygun minimum yeterli doğrulama uygulanır.
-10. `.cse/results/<issue_no>_result.md` factual execution kanıtını yazar.
-11. Commit/push/Draft PR yalnız Issue yetkisiyle yapılır.
-12. Merge proje sahibinin kararındadır.
-13. Merge sonrası sonraki işe başlamadan local `master` yeniden fast-forward edilir.
+Yalnız uzun resume, bağımsız review veya material cross-module izlenebilirlik gerektiğinde kısa task/result kullanılabilir. Hedef 10–20 satırdır.
 
-## Kaynak rolleri
+### CRITICAL
 
-- `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`: kalıcı ürün amacı ve veri ilkeleri
-- `docs/v2/CSE_V2_SCOPE.md`: current V2 ürün kapsamı
-- `ROADMAP.md`: current V2 yürütme sırası
-- `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`: Git/GitHub/Codex güvenliği
-- `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`: doğrulama genişliği ve bütçesi
-- current GitHub Issue: aktif teknik kapsam
-- `.cse/tasks/`: yetkili execution sözleşmesi
-- `.cse/results/`: factual execution sonucu
-- `.cse/state/project_state.json`: son merged/finalized küçük machine-readable durum
+Task/result provenance kullanılabilir veya Issue tarafından zorunlu tutulabilir.
 
-README, stale state, eski Epic, Orchestrator/Bridge/Work Mode kayıtları, ZIP veya sohbet hafızası current GitHub + V2 kapsam gerçeğini override edemez.
+Örnek konular:
 
-## V2 görev minimumu
+- schema/migration;
+- backup/restore;
+- identity/revision/transaction/history;
+- user data ve destructive işlemler;
+- attachment/DWG file integrity;
+- security/permission/signing;
+- release artifact'i.
 
-Her production Issue en az şunları belirtir:
+## Kaynak sınırı
 
-- Parent Epic `#385`
-- V2 item ve wave
-- Depends on
-- validation class
-- changed contracts
-- exact allowed paths
-- schema impact
-- migration impact
-- backup compatibility impact
-- attachment impact
-- notification impact
-- focused tests
-- allowed broad gates
-- physical-device / field acceptance
-- retry budget
-- time budget
-- out of scope
-- stop conditions
+`.cse/state`, task/result, eski Step/Adım kayıtları veya handoff current GitHub master/Issue/PR gerçeğini override edemez.
 
-## Güvenlik
-
-- Gerçek kullanıcı data root'u açık Issue yetkisi olmadan okunmaz/değiştirilmez.
-- Ignored ZIP, `device-backups/`, `reports/` ve kullanıcı artifact'ları otomatik temizlenmez veya stage edilmez.
-- Migration eski kaydı sessizce kaybedemez.
-- Attachment kimliği ve source linkleri korunur.
-- Kullanıcı onayı olmadan resmî karar, otomatik kapanış veya kapsam dönüşümü yapılmaz.
-- Feature Issue içinde toolchain/release sorunu sessizce kapsam genişletilerek çözülmez.
+Henüz gerçekleşmemiş push, test, temiz worktree veya divergence sonucu yazılmaz. Kayıt yalnız gerçek evidence'a dayanır.
 
 ## Adlandırma
 
-Yeni dönem:
+Gerektiğinde:
 
-- Issue: `#NNN — <purpose>`
-- Branch: `codex/issue-NNN-<slug>` veya docs için `docs/issue-NNN-<slug>`
-- Task: `.cse/tasks/NNN_task.md`
-- Result: `.cse/results/NNN_result.md`
-- Draft PR: Issue amacını özetleyen kısa başlık
+```text
+.cse/tasks/<issue_no>_task.md
+.cse/results/<issue_no>_result.md
+```
 
-Legacy `Step NNN` / `step-NNN-*` kayıtları tarihsel kanıt olarak korunur.
+FAST için dosya oluşturma amacıyla sahte Issue numarası üretilmez.
 
-## İnsan kontrolü
+## Ana karar
 
-Bu protokol transport ve doğrulama disiplinini standardize eder; ürün kapsamı, merge, release ve kullanıcı verisi üzerinde nihai karar proje sahibindedir.
+> `.cse` kritik izlenebilirlik aracıdır; her mikro değişiklikte doldurulacak zorunlu form değildir.

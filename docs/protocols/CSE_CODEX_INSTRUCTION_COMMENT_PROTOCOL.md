@@ -1,284 +1,82 @@
-# CSE Codex Instruction Comment Protocol
+# CSE Codex Instruction Comment Protocol — Risk-Based v2
 
-**Belge türü:** Kalıcı execution handoff / GitHub comment standardı  
-**Geçerlilik tarihi:** 2026-08-26  
-**Kapsam:** ChatGPT → Codex execution, correction, review ve resume handoff'ları
+**Geçerlilik tarihi:** 2026-09-02
 
-Bu belge, CSE geliştirmesinde Codex'e verilecek çalışma talimatlarının yalnız sohbet içinde bırakılmamasını; ilgili GitHub Issue veya PR üzerinde kalıcı, self-contained ve yeniden bulunabilir bir comment olarak yayımlanmasını zorunlu kılar.
+GitHub comment bir amaç değil, kalıcı ve kritik handoff gerektiğinde kullanılan araçtır.
 
-## 1. Ana kural
+## 1. FAST
 
-Codex'e yeni bir execution, correction, review veya resume işi verilecekse ChatGPT varsayılan olarak:
+FAST işte GitHub instruction comment oluşturulmaz.
 
-1. current GitHub repository truth'u doğrular;
-2. gerekli Issue/PR, branch, HEAD, diff, review ve authority kayıtlarını okur;
-3. Codex'in çalışacağı eksiksiz talimatı ilgili GitHub Issue veya PR conversation'a tek bir açık comment olarak yazar;
-4. comment oluşturulduktan sonra kullanıcıya yalnız comment referans bilgisini verir:
-   - Issue/PR numarası;
-   - comment ID;
-   - doğrudan comment linki;
-   - gerekirse tek satırlık `Issue #... comment ...'i uygula` yönlendirmesi.
-
-Uzun Codex talimatının yalnız chat mesajında bırakılması normal çalışma biçimi değildir.
-
-## 2. Canonical handoff yüzeyi
-
-Execution/correction authority için tercih edilen yüzey current feature/correction **Issue**'sudur.
-
-Bağımsız source/diff review sonucu, review blocker'ı veya PR-specific değerlendirme **PR review/comment** yüzeyinde tutulabilir. Ancak bu review yeni bir source correction execution gerektiriyorsa correction authority ve Codex execution instruction current Issue üzerinde kalıcı comment olarak yayımlanır.
-
-GitHub comment bir handoff yüzeyidir; tracked ürün/policy belgelerinin veya Issue body'deki kalıcı scope'un yerine geçmez. Comment, bu kaynaklara referans verir ve current execution için onları somutlaştırır.
-
-## 3. Comment yayımlanmadan önce zorunlu doğrulama
-
-ChatGPT talimat comment'ini hazırlamadan hemen önce en az şunları doğrular:
-
-- current `master` / expected base SHA;
-- active Issue ve parent item;
-- açık PR ve Draft/Ready/merge durumu;
-- exact branch ve current HEAD;
-- relevant review blocker veya owner authority comment'leri;
-- current changed-path allowlist;
-- schema / migration / backup / version / permission gibi değişen sözleşmeler;
-- automated validation ve manual test authority;
-- Manual Test Register #479 durumu, ilgiliyse;
-- Ready/merge/Issue closure yetkisi.
-
-Stale sohbet metni, eski handoff veya önceki HEAD değeri current GitHub gerçeğini override edemez.
-
-## 4. Codex instruction comment zorunlu içeriği
-
-Comment mümkün olduğunca self-contained olmalı ve göreve göre aşağıdaki başlıkları taşımalıdır:
-
-### A. Authority ve başlangıç durumu
-
-- Issue / PR numarası
-- owner authority veya review blocker comment ID'leri
-- expected base
-- exact branch
-- expected current HEAD
-- Draft/Ready/merge durumu
-
-### B. Okunacak kaynaklar ve sıra
-
-Codex'e hangi GitHub Issue/PR/comment ve tracked dosyaları hangi sırayla okuyacağı açıkça yazılır.
-
-### C. Amaç veya blocker
-
-Teknik hedef kısa ve kesin biçimde yazılır. Correction ise düzeltilen exact invariant / bug belirtilir.
-
-### D. Exact allowlist
-
-- production paths
-- evidence paths
-- yalnız gerekiyorsa kullanılabilecek conditional paths
-
-Allowlist dışında dosya gerekiyorsa stop-and-report şartı açıkça yazılır.
-
-### E. Required behavior
-
-İş tamamlandığında hangi davranışın doğru olması gerektiği net biçimde tanımlanır.
-
-### F. Değişmemesi gereken contractlar
-
-Göreve uygun olarak örneğin:
-
-- schema
-- migration sınıfı
-- backup format
-- app version
-- pubspec/lock
-- platform/permission
-- stable identity
-- transaction/event/history
-- Reminder/notification
-- V2 item sınırı
-
-korunacak değerler açıkça yazılır.
-
-### G. Validation / test / build authority
-
-Tam olarak hangi komutların çalıştırılabileceği ve hangilerinin yasak olduğu yazılır.
-
-Örnek ayrım:
-
-- format
-- `flutter analyze --no-pub`
-- `git diff --check`
-- source audit
-- unit/widget/integration/full tests
-- APK/AAB
-- emulator/ADB/device
-
-Sayı veya retry budget varsa exact yazılır.
-
-### H. Stop conditions
-
-Örneğin:
-
-- analyzer fail
-- allowlist expansion
-- schema redesign ihtiyacı
-- platform permission ihtiyacı
-- destructive işlem
-- source truth belirsizliği
-
-olursa Codex'in kendi kendine kapsam genişletmeden duracağı belirtilir.
-
-### I. Publication / merge sınırı
-
-Talimat açıkça şunları sınıflandırır:
-
-- commit yetkisi
-- push yetkisi
-- Draft PR
-- Ready
-- merge
-- Issue closure
-- next V2 item
-- release/store
-
-Owner açıkça yetki vermedikçe Ready/merge otomatik yapılmaz.
-
-### J. Final evidence beklentisi
-
-Final Codex çıktısında en az:
-
-- final commit SHA
-- changed paths
-- validation sonuçları
-- schema/backup/version/platform etkisi
-- branch/PR durumu
-- manual test durumu
-- Ready/merge durumu
-- `execution_record`
-- `review_recommendation`
-
-istenir.
-
-## 5. Kullanıcıya verilecek kısa cevap
-
-Comment başarıyla oluşturulduktan sonra ChatGPT kullanıcıya uzun promptu yeniden yapıştırmak yerine kısa referans verir.
-
-Örnek:
+Chat içindeki kısa görev yeterlidir:
 
 ```text
-GitHub comment hazır.
-
-Issue: #492
-Comment ID: 5427823948
-Link: <direct comment link>
-
-Codex'e: “Issue #492 comment 5427823948'i uygula.”
+Goal:
+Allowed paths:
+Do not change:
+Execution time budget: <ChatGPT'nin bu görev için verdiği açık süre; her Codex handoff'unda zorunlu>
+Fatih validation:
+Commit/push boundary:
 ```
 
-Kullanıcı özellikle tam comment içeriğini isterse ayrıca gösterilebilir.
+Issue, comment ID, authority zinciri, routing YAML veya uzun evidence beklenmez.
 
-## 6. Fresh-chat davranışı
+## 2. STANDARD
 
-Yeni bir CSE sohbetinde kullanıcı yalnız:
+STANDARD işte:
+
+- tek Issue veya kısa self-contained task kullanılabilir;
+- resume/correction için mevcut Issue yeterliyse yeni comment yazılmaz;
+- kalıcı handoff gerekiyorsa 10–20 satırlık kısa comment kullanılır;
+- aynı scope correction için yeni owner authority/comment turu açılmaz.
+
+Minimum comment:
 
 ```text
-devam
+Base/branch:
+Goal:
+Allowed paths:
+Protected contracts:
+Execution time budget: <ChatGPT'nin bu görev için verdiği açık süre; her Codex handoff'unda zorunlu>
+Fatih validation:
+Stop conditions:
+Publication boundary:
 ```
 
-veya:
+## 3. CRITICAL
 
-```text
-GitHub'dan devam et
-```
+CRITICAL execution/correction/review handoff'u GitHub Issue veya PR üzerinde self-contained comment olarak yayımlanır.
 
-yazdığında ChatGPT:
+Comment gerektiği kadar şunları taşır:
 
-1. `CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md` okuma sırasını uygular;
-2. bu `CSE_CODEX_INSTRUCTION_COMMENT_PROTOCOL.md` belgesini zorunlu kaynak olarak okur;
-3. current master / Issue / PR / branch / review / Manual Test Register durumunu GitHub'dan çözer;
-4. Codex'in sıradaki execution'ı gerekiyorsa talimatı **önce GitHub comment olarak yayımlar**;
-5. kullanıcıya comment ID ve link bilgisini verir.
+- owner authority;
+- expected base/branch/head;
+- okunacak kritik kaynaklar;
+- exact allowlist;
+- required behavior;
+- identity/schema/backup/security gibi korunacak contractlar;
+- validation ve compatibility gate;
+- destructive/user-data sınırı;
+- stop conditions;
+- commit/push/Ready/merge/release sınırı;
+- final provenance beklentisi.
 
-Kullanıcıdan eski uzun promptu, completion bloğunu veya önceki sohbet handoff'unu yeniden taşıması istenmez.
+## 4. Kullanıcıya cevap
 
-## 7. `Codex nereye bakacak?` ve benzeri istekler
+Comment oluşturulduysa kullanıcıya:
 
-Kullanıcı:
+- Issue/PR;
+- comment ID/link;
+- tek cümlelik pratik amaç
 
-- `Codex nereye bakacak?`
-- `Codex'e talimat hazırla`
-- `devam et`
-- `correction ver`
-- `sıradaki işi Codex'e ver`
+verilir. Uzun comment tekrar chat'e yapıştırılmaz; kullanıcı isterse gösterilir.
 
-ve benzeri bir execution handoff istediğinde, current GitHub context yeterliyse varsayılan çıktı **chat-only prompt değil GitHub comment** olmalıdır.
+## 5. GitHub yazma erişimi yoksa
 
-ChatGPT comment'i kendisi oluşturabiliyorsa kullanıcıya kopyala-yapıştır yükü bırakmaz.
+Comment oluşturulduğu iddia edilmez. CRITICAL iş başlamaz; geçici chat taslağı canonical handoff sayılmaz.
 
-## 8. GitHub write kullanılamıyorsa
+FAST/uygun STANDARD iş, owner'ın current chat talimatıyla ve diğer güvenlik sınırları uygunsa devam edebilir.
 
-GitHub comment oluşturma işlemi gerçekten kullanılamıyor veya başarısız oluyorsa ChatGPT:
+## 6. Ana karar
 
-- comment'in oluşturulduğunu iddia etmez;
-- failure'ı açıkça belirtir;
-- gerekirse geçici chat taslağını verir;
-- sonraki fırsatta GitHub'a persist edilmesi gerektiğini belirtir.
-
-Chat-only taslak kalıcı canonical handoff sayılmaz.
-
-## 9. Correction ve re-review zinciri
-
-Bağımsız review blocker bulursa normal sıra:
-
-```text
-independent review
-→ blocker evidence
-→ owner/correction authority
-→ GitHub Codex instruction comment
-→ Codex narrow correction
-→ source gates
-→ correction commit/push
-→ independent re-review
-→ owner Ready/merge kararı
-```
-
-Blocker çözülmeden veya gerekli gate PASS olmadan ChatGPT Ready/merge'e atlamaz.
-
-## 10. Manuel test durumu
-
-Manual testler `PENDING` veya `DEFERRED` ise comment bunu exact durumuyla taşır. Test yapılmadıysa `PASS` yazılmaz.
-
-Owner `devam` diyerek testleri ertelemişse execution comment:
-
-```text
-manual_test_status: DEFERRED
-```
-
-olarak taşıyabilir; bu source blocker veya correction gate'ini otomatik kaldırmaz.
-
-## 11. Güvenlik
-
-Bu comment standardı mevcut CSE güvenlik sınırlarını genişletmez.
-
-Özellikle:
-
-- direct master technical edit yok;
-- force-push yok;
-- destructive data operation yok;
-- allowlist expansion self-authorized değil;
-- schema/backup/version/permission değişikliği ayrı açık authority ister;
-- Ready/merge/release/store owner authority ister.
-
-## 12. Başarı ölçütü
-
-Her Codex handoff için hedef:
-
-```text
-chat-only long instruction: 0
-GitHub-persisted execution comment: 1
-comment ID/link returned to owner: 1
-fresh-chat rediscovery without pasted handoff: yes
-stale HEAD/base silently reused: 0
-unauthorized Ready/merge: 0
-```
-
-## 13. Ana cümle
-
-> CSE'de Codex'e verilecek yürütme talimatı sohbet içinde kaybolmaz. ChatGPT current GitHub gerçeğini doğrular, eksiksiz instruction'ı ilgili Issue/PR'a comment olarak yazar ve kullanıcıya yalnız comment referansını verir; yeni sohbet de aynı standardı GitHub'dan yeniden öğrenir.
+> GitHub instruction comment FAST için yasak gereksiz törendir, STANDARD için koşullu araçtır, CRITICAL için kalıcı güvenlik sözleşmesidir.

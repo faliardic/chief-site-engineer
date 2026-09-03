@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="@color/cse_acceptance_icon_background"
+        android:pathData="M20,2 L88,2 Q106,2 106,20 L106,88 Q106,106 88,106 L20,106 Q2,106 2,88 L2,20 Q2,2 20,2 Z" />
+    <path
+        android:fillColor="#241600"
+        android:fillType="evenOdd"
+        android:pathData="M47,30 L61,30 L81,78 L67,78 L63,67 L45,67 L41,78 L27,78 Z M49,56 L59,56 L54,41 Z" />
+</vector>
