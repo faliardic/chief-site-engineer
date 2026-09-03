@@ -1,6 +1,17 @@
 ## CSE V2 PR Özeti
 
-Parent Issue: #
+### Issue disposition
+
+Completed implementation Issue:
+- `Closes #...`
+- `N/A — no single completed Issue`
+
+Parent / umbrella / acceptance / release tracking:
+- `Refs #...`
+- `N/A`
+
+`Closes` yalnız bu PR merge olduğunda ilgili Issue'nun bütün kabul koşulları tamamlanmış olacaksa kullanılır. Devam eden takip, parent, umbrella, manuel acceptance veya release Issue'ları `Refs` ile açık bırakılır.
+
 Parent V2 Epic: #385
 V2 item / wave:
 
@@ -44,8 +55,10 @@ Field/device acceptance:
 - [ ] No unintended export/build/user artifact committed
 - [ ] Historical evidence was not rewritten as current truth
 - [ ] User-data and destructive-operation boundaries were preserved
+- [ ] `Closes` / `Refs` disposition matches the actual completion state
 
 ### Merge sonrası
 
+- [ ] Owner'a bu merge ile kapanacak ve açık kalacak Issue'lar bildirildi
 - [ ] ROADMAP/CHANGELOG/project decision update is required only for actually merged product behavior
 - [ ] Next V2 item will not start automatically unless authorized

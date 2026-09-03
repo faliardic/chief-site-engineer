@@ -1,4 +1,4 @@
-# CSE Workflow Acceleration Protocol — v5
+# CSE Workflow Acceleration Protocol — v6
 
 **Belge türü:** Bağlayıcı execution, correction ve publication protokolü
 **Geçerlilik tarihi:** 2026-09-03
@@ -101,24 +101,28 @@ FAST/STANDARD bug ve küçük/orta feature işinin varsayılanı:
 
 ```text
 clean synchronized master
+→ one short-lived branch
 → mevcut kanıtı kullan veya bir kez reproduce et
 → fix / implement
 → format/diff-check + tek focused automated validation
 → yalnız gerekiyorsa Fatih manuel/device PASS
-→ small commit/push
+→ small commit + normal branch push
+→ current master ruleset PR istiyorsa minimal Draft PR
+→ owner-approved squash merge
+→ master sync
 → next task
 ```
 
 FAST için varsayılan olarak yoktur:
 
 - Issue;
-- remote feature branch;
-- PR;
 - GitHub instruction comment;
 - `.cse` task/result/state;
 - routing/execution YAML;
 - bağımsız review;
-- CI bekleme.
+- geniş CI, full suite veya cihaz kontrolü.
+
+Current GitHub `master` ruleset'i PR gerektiriyorsa tek kısa ömürlü branch ve tek minimal Draft PR kullanılır. Bu repository zorunluluğu FAST işi STANDARD'a yükseltmez ve ek Issue/evidence/review töreni doğurmaz.
 
 Codex automated PASS gerekir. Manuel/device kabul gerekiyorsa ayrıca Fatih PASS beklenir; gerekmiyorsa bu kapı publication'ı bekletmez. Gerekli kontrol FAIL/PENDING durumundayken yeni işe geçilmez.
 
@@ -205,6 +209,8 @@ format/diff-check
 Codex automated validation status
 Fatih manual acceptance status / GEREKMİYOR gerekçesi
 commit/push
+PR: GEREKMİYOR | <numara>
+Issue disposition: YOK | Closes #... | Refs #...
 ```
 
 STANDARD kısa Issue/PR summary kullanır.
@@ -213,16 +219,19 @@ CRITICAL tam provenance tutabilir.
 
 Aynı bilgi Issue, comment, task, result, state ve PR body içinde tekrarlanmaz.
 
-## 9. Publication
+## 9. Publication ve Issue disposition
 
-- FAST: Codex automated PASS ve yalnız gerekiyorsa Fatih manuel/device PASS sonrası normal commit/push.
+- FAST: Codex automated PASS ve yalnız gerekiyorsa Fatih manuel/device PASS sonrası tek kısa branch'te küçük commit ve normal push; current `master` ruleset'i PR istiyorsa tek minimal Draft PR ve owner-approved squash merge.
 - STANDARD: tek branch; gerekiyorsa tek Draft PR; squash merge varsayılanı.
 - CRITICAL: Issue'ya özel publication ve review zinciri.
 - Force-push yok.
 - Stacked PR yok.
 - APK mümkün olduğunda birleşik güncel master'dan üretilir.
+- Tek amaçlı implementation Issue'su PR merge'iyle bütünüyle tamamlanıyorsa PR body `Closes #...` kullanır.
+- Parent, umbrella, manuel acceptance, release veya devam işi içeren Issue'lar `Refs #...` kullanır ve açık kalır.
+- Owner merge onayı yalnız incelenen PR body'de açıkça `Closes` ile belirtilen Issue kapanışını da kapsar. Belirsizlikte `Refs` kullanılır ve otomatik closure yapılmaz.
 
-Owner `merge et`, `ready` veya eşdeğer açık karar verdiğinde ayrıca authority aranmaz; ancak test/critical blocker varsa ilerlenmez.
+Owner `merge et`, `ready` veya eşdeğer açık karar verdiğinde ayrıca authority aranmaz; ancak test/critical blocker varsa ilerlenmez. Merge öncesinde ChatGPT hangi Issue'ların kapanacağını ve hangilerinin açık kalacağını sade Türkçeyle belirtir.
 
 ## 10. Escalation
 
@@ -249,7 +258,9 @@ Yalnız STANDARD correction turu tükendiyse `STOP — CORRECTION ESCALATION` ku
 ## 11. Başarı ölçütleri
 
 - Her Codex handoff'unda ChatGPT-assigned explicit execution time budget: %100
-- FAST Issue/PR/`.cse`: 0
+- FAST Issue/`.cse`/routing YAML: 0
+- FAST publication current master ruleset uyumu: %100
+- FAST short-lived branch/minimal PR: ruleset gerektiriyorsa tam 1
 - Codex manuel ürün kabulü kararı: 0
 - Fatih'e terminal execution görevi/komutu verme: 0
 - exact owner delegasyonu olmadan Codex emulator/ADB/device invocation: 0
@@ -257,8 +268,9 @@ Yalnız STANDARD correction turu tükendiyse `STOP — CORRECTION ESCALATION` ku
 - stacked PR: 0
 - aynı anda production PR: en fazla 1
 - kararı değiştirmeyen diagnostic/test tekrarı: 0
+- tamamlanmış tekil Issue için açık `Closes`; devam eden takip için açık `Refs`: %100
 - CRITICAL işte ağır güvenlik süreci: %100
 
 ## 12. Ana karar
 
-> Non-CRITICAL varsayılanı one-pass teslim, göreve özel süre bütçesi, tek focused validation ve yalnız gereken manuel/device kabulüdür. Branch/PR/review riskle orantılıdır; owner Ready/merge kapısı ve CRITICAL veri/release güvenliği korunur.
+> Non-CRITICAL varsayılanı one-pass teslim, göreve özel süre bütçesi, tek focused validation ve yalnız gereken manuel/device kabulüdür. Publication current GitHub ruleset'inin izin verdiği en hafif branch/PR yoluyla yürür; bu zorunluluk FAST işi ağırlaştırmaz. Owner Ready/merge ve açıkça belirtilen Issue closure kapısı ile CRITICAL veri/release güvenliği korunur.
