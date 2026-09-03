@@ -88,8 +88,10 @@ FAST varsayılanı:
 - temiz ve senkron yerel `master`;
 - tek davranış;
 - ChatGPT'nin açıkça belirlediği göreve özel execution time budget;
-- Issue, remote branch, PR, `.cse` task/result ve routing YAML yok;
+- Issue, `.cse` task/result ve routing YAML yok;
+- current GitHub `master` ruleset'i PR istiyorsa tek kısa ömürlü branch ve tek minimal Draft PR; bu zorunluluk işi STANDARD'a yükseltmez;
 - Codex format, changed-path review, `git diff --check` ve minimum yeterli automated doğrulamayı yapar;
+- bağımsız review, geniş CI, full suite ve cihaz kontrolü yalnız somut ihtiyaç varsa;
 - test/analyzer/build execution Codex'te, manuel ürün/device kabulü Fatih'tedir;
 - gereken manuel/device kabulde Fatih `PASS` bildirmeden commit veya push yapılmaz; kabul gerekmiyorsa Codex automated PASS yeterlidir;
 - gerekli doğrulama/kabul FAIL/PENDING durumundayken yeni işe geçilmez.
@@ -150,9 +152,9 @@ Aynı source revision üzerinde geçen test tekrarlanmaz. Full suite her mikro a
 - Beklenmeyen tracked/untracked değişiklikte işlem durur; otomatik temizleme yapılmaz.
 - Ready, merge, Issue closure, release/store ve destructive production işlemleri owner onayı gerektirir.
 
-## 7. Git ve publication
+## 7. Git, publication ve Issue disposition
 
-- FAST: Codex automated PASS ve gerekiyorsa Fatih manuel/device PASS sonrası küçük commit ve normal push; gerekli doğrulama öncesi commit/push yok.
+- FAST: Codex automated PASS ve gerekiyorsa Fatih manuel/device PASS sonrası tek kısa branch'te küçük commit ve normal push; current `master` ruleset'i PR istiyorsa tek minimal Draft PR, owner-approved squash merge ve `master` sync.
 - STANDARD: en fazla bir aktif production branch/PR; squash merge varsayılanı.
 - CRITICAL: Issue'ya özel branch/PR/review zinciri.
 - Force-push yapılmaz.
@@ -160,6 +162,9 @@ Aynı source revision üzerinde geçen test tekrarlanmaz. Full suite her mikro a
 - Protokol kabul edildiğinde zaten açık olan legacy/stacked production PR'lar bir defalık geçiş kuyruğudur; yeni stack açma yetkisi vermez. Kuyruk çözülene kadar yeni production branch açılmaz; mevcut PR'lar current master'a birer birer uyarlanır ve Ready/merge/close yalnız owner kararıyla yürütülür.
 - Cihaz APK'sı mümkün olduğunda güncel birleşik master'dan üretilir.
 - Merge sonrası local master bir sonraki local işten önce `--ff-only` senkronlanır.
+- Tek amaçlı implementation Issue'su PR ile bütünüyle sonuçlanıyorsa PR body `Closes #...` kullanır.
+- Parent, umbrella, manuel acceptance, release veya devam işi içeren Issue'lar `Refs #...` kullanır ve açık kalır.
+- Owner merge onayı yalnız incelenen PR body'de açıkça `Closes` ile belirtilen Issue kapanışını da kapsar; belirsizlikte otomatik Issue closure yapılmaz.
 
 ## 8. Evidence ve çıktı
 
@@ -172,6 +177,8 @@ Codex kontrolleri: format / diff-check
 Codex automated validation: PENDING | PASS | FAIL
 Fatih manuel kabulü: GEREKMİYOR (<gerekçe>) | PENDING | PASS | FAIL
 Commit/push: yapılmadı | <sha>
+PR: GEREKMİYOR | <numara>
+Issue disposition: YOK | Closes #... | Refs #...
 ```
 
 STANDARD sonucu kısa Issue/PR kaydıdır. CRITICAL ayrıntılı provenance taşıyabilir.
@@ -188,4 +195,4 @@ SHA, branch, divergence, allowlist, YAML ve benzeri teknik kanıtlar bu açıkla
 
 ## 9. Ana karar
 
-> Non-CRITICAL işte göreve özel süre bütçesiyle one-pass teslim, tek focused validation ve yalnız gereken manuel kabul; gerçek veri/release riskinde tam güvenlik süreci. Ready/merge owner kapısında kalır.
+> Non-CRITICAL işte göreve özel süre bütçesiyle one-pass teslim, tek focused validation ve yalnız gereken manuel kabul; publication current GitHub ruleset'inin izin verdiği en hafif branch/PR yoluyla yürür. Gerçek veri/release riskinde tam güvenlik süreci uygulanır. Ready/merge ve açıkça belirtilen Issue closure owner kapısında kalır.
