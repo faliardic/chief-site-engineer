@@ -98,10 +98,12 @@ class InventorySketchEditorSnapshot {
   factory InventorySketchEditorSnapshot.recover(
     InventoryGeometry geometry, {
     InventorySketchEditorMode mode = InventorySketchEditorMode.draw,
+    bool resumeOpenPolyline = false,
   }) {
     final workingIndex =
         geometry.polylines.isNotEmpty &&
-            geometry.polylines.last.isIncompleteDraft
+            (geometry.polylines.last.isIncompleteDraft ||
+                (resumeOpenPolyline && !geometry.polylines.last.closed))
         ? geometry.polylines.length - 1
         : null;
     return InventorySketchEditorSnapshot._(

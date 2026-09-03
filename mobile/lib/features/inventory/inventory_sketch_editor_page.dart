@@ -518,7 +518,11 @@ class InventorySketchEditorController extends ChangeNotifier {
   void selectAt(Offset viewPoint, InventoryViewport viewport) {
     final current = editor;
     if (current == null) return;
-    final next = current.selectAt(viewPoint, viewport);
+    // A fresh edge tap after whole-block editing must leave whole selection.
+    final selectable = current.selection?.wholePolyline == true
+        ? current.withSelection(null)
+        : current;
+    final next = selectable.selectAt(viewPoint, viewport);
     if (identical(next, current) && next.selection == current.selection) return;
     editor = next;
     _notify();
@@ -1228,10 +1232,7 @@ class InventorySketchEditorController extends ChangeNotifier {
     _normalSaveEligibleGeneration = null;
     _forceDrainRequested = false;
     _pendingSave = null;
-    editor = InventorySketchEditorSnapshot.recover(
-      acknowledged,
-      mode: current.mode,
-    );
+    editor = _recoverEditor(acknowledged, mode: current.mode);
     _newBlocks = _acknowledgedNewBlocks;
     _existingBlockMappings = _acknowledgedExistingBlockMappings;
     _lifecycleActions = _acknowledgedLifecycleActions;
@@ -1572,11 +1573,24 @@ class InventorySketchEditorController extends ChangeNotifier {
       throw const InventoryFailure('inventory_projection_integrity_failed');
     }
     final sourceMappedIndexes = _sourceActiveMappings.values.toSet();
-    _lockedLegacyPolylines = List<InventoryPolyline>.unmodifiable([
-      for (var index = 0; index < legacyCount; index += 1)
-        if (!sourceMappedIndexes.contains(index))
+    final draftClassifiedIndexes = <int>{
+      ..._existingBlockMappings.values,
+      ...projection.draftNewBlocks.map((block) => block.polygonIndex),
+    };
+    final legacyCandidates = <InventoryPolyline>[
+      for (var index = 0; index < legacyGeometry.polylines.length; index += 1)
+        if (!(activeGeometry == null
+                ? draftClassifiedIndexes
+                : sourceMappedIndexes)
+            .contains(index))
           legacyGeometry.polylines[index],
-    ]);
+    ];
+    if (activeGeometry == null && legacyCount > legacyCandidates.length) {
+      throw const InventoryFailure('inventory_projection_integrity_failed');
+    }
+    _lockedLegacyPolylines = List<InventoryPolyline>.unmodifiable(
+      legacyCandidates.take(legacyCount),
+    );
     _lifecycleActions = const {};
     _acknowledgedLifecycleActions = const {};
     _newBlocks = projection.draftNewBlocks;
@@ -1584,7 +1598,7 @@ class InventorySketchEditorController extends ChangeNotifier {
     _undoBlockHistory = const [];
     _redoBlockHistory = const [];
     _freeLengthNextSegment = false;
-    editor = InventorySketchEditorSnapshot.recover(draft.geometry);
+    editor = _recoverEditor(draft.geometry);
     _autosaveTimer?.cancel();
     _autosaveTimer = null;
     _geometryGeneration = 0;
@@ -1593,6 +1607,19 @@ class InventorySketchEditorController extends ChangeNotifier {
     _finalizeBlockedByStaleRevision = false;
     _pendingSave = null;
   }
+
+  InventorySketchEditorSnapshot _recoverEditor(
+    InventoryGeometry geometry, {
+    InventorySketchEditorMode mode = InventorySketchEditorMode.draw,
+  }) => InventorySketchEditorSnapshot.recover(
+    geometry,
+    mode: mode,
+    // Only unfinalized drawing may resume; active legacy lines stay locked.
+    resumeOpenPolyline:
+        geometry.polylines.isNotEmpty &&
+        !geometry.polylines.last.closed &&
+        !_isLockedLegacyPolyline(geometry.polylines.last),
+  );
 
   bool _hasCompleteSpatialMetadata(InventoryGeometry geometry) {
     try {

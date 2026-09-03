@@ -2610,7 +2610,12 @@ class InventoryApplication
               classifiedPolygonIndexes.length !=
                   draftMappings.length + draftNewBlocks.length ||
               (draftLegacyPolygonCount != mappingAwareCount &&
-                  !legacyPrefixIsValid)) {
+                  !legacyPrefixIsValid &&
+                  !_hasOpenDraftSuffix(
+                    draft.geometry,
+                    classifiedPolygonIndexes,
+                    draftLegacyPolygonCount,
+                  ))) {
             throw const InventoryFailure(
               'inventory_projection_integrity_failed',
             );
@@ -4898,6 +4903,12 @@ class InventoryApplication
           }
         }
       }
+      if (_hasOpenDraftSuffix(draft.geometry, {
+        for (final mapping in existingMappings) mapping.polygonIndex,
+        for (final block in newBlocks) block.polygonIndex,
+      }, legacyPolygonCount)) {
+        throw const InventoryFailure('inventory_block_metadata_incomplete');
+      }
       final mappingAwareLegacyPolygonCount =
           draft.geometry.polylines.length -
           existingMappings.length -
@@ -5378,7 +5389,12 @@ class InventoryApplication
           legacyPolygonCount < 0 ||
           legacyPolygonCount > draft.geometry.polylines.length ||
           (legacyPolygonCount != targetMappingAwareCount &&
-              !targetLegacyPrefixIsValid)) {
+              !targetLegacyPrefixIsValid &&
+              !_hasOpenDraftSuffix(
+                draft.geometry,
+                targetClassifiedIndexes,
+                legacyPolygonCount,
+              ))) {
         throw const InventoryFailure('inventory_projection_integrity_failed');
       }
       final sourceLegacyPolylines = <InventoryPolyline>[
@@ -5396,6 +5412,10 @@ class InventoryApplication
           if (!targetClassifiedIndexes.contains(index))
             draft.geometry.polylines[index],
       ];
+      if (active == null &&
+          targetLegacyPolylines.length != legacyPolygonCount) {
+        throw const InventoryFailure('inventory_block_metadata_incomplete');
+      }
       if (active != null &&
           (sourceLegacyPolylines.length != targetLegacyPolylines.length ||
               [
@@ -6414,7 +6434,12 @@ class InventoryApplication
             (block) => block.polygonIndex >= currentLegacyPolygonCount,
           );
       if (currentLegacyPolygonCount != currentMappingAwareCount &&
-          !currentLegacyPrefixIsValid) {
+          !currentLegacyPrefixIsValid &&
+          !_hasOpenDraftSuffix(
+            draft.geometry,
+            currentClassifiedIndexes,
+            currentLegacyPolygonCount,
+          )) {
         throw const InventoryFailure('inventory_projection_integrity_failed');
       }
       if (requestedMappings == null && base != null) {
@@ -6503,8 +6528,10 @@ class InventoryApplication
           if (!targetClassifiedIndexes.contains(index))
             geometry.polylines[index],
       ];
+      // Autosave may append unfinished drawing after the exact active legacy
+      // geometry. It never turns that drawing into a finalized legacy line.
       if (base != null &&
-          (baseLegacyPolylines.length != targetLegacyPolylines.length ||
+          (targetLegacyPolylines.length < baseLegacyPolylines.length ||
               [
                 for (
                   var index = 0;
@@ -6515,7 +6542,10 @@ class InventoryApplication
                     baseLegacyPolylines[index],
                     targetLegacyPolylines[index],
                   ),
-              ].any((same) => !same))) {
+              ].any((same) => !same) ||
+              targetLegacyPolylines
+                  .skip(baseLegacyPolylines.length)
+                  .any((polyline) => polyline.closed))) {
         throw const InventoryFailure('inventory_legacy_geometry_immutable');
       }
       InventorySpatialContract.validateNonOverlappingPolygons([
@@ -6561,7 +6591,40 @@ class InventoryApplication
           'inventory_spatial_metadata_requires_geometry_change',
         );
       }
-      final legacyPolygonCount = targetLegacyPolylines.length;
+      // Existing metadata identifies migrated first-draft legacy lines even
+      // when they are open. New unfinished drawing must not gain that status.
+      final currentLegacyPolylines = <InventoryPolyline>[
+        for (var index = 0; index < draft.geometry.polylines.length; index += 1)
+          if (!currentClassifiedIndexes.contains(index))
+            draft.geometry.polylines[index],
+      ].take(currentLegacyPolygonCount).toList(growable: false);
+      if (base == null &&
+          (targetLegacyPolylines.length < currentLegacyPolylines.length ||
+              [
+                for (
+                  var index = 0;
+                  index < currentLegacyPolylines.length;
+                  index += 1
+                )
+                  _samePolyline(
+                    currentLegacyPolylines[index],
+                    targetLegacyPolylines[index],
+                  ),
+              ].any((same) => !same))) {
+        throw const InventoryFailure('inventory_legacy_geometry_immutable');
+      }
+      final legacyPolygonCount = base != null
+          ? baseLegacyPolylines.length
+          : currentLegacyPolylines.length +
+                targetLegacyPolylines
+                    .skip(currentLegacyPolylines.length)
+                    .takeWhile((polyline) => polyline.closed)
+                    .length;
+      if (targetLegacyPolylines
+          .skip(legacyPolygonCount)
+          .any((polyline) => polyline.closed)) {
+        throw const InventoryFailure('inventory_block_metadata_incomplete');
+      }
       final occurredAt = _canonicalNowAfter(sketch.updatedAt, draft.updatedAt);
       final timestamp = CseTimeCodec.encodeUtc(occurredAt);
       var targetDraftRevisionId = command.draftRevisionId;
@@ -6797,6 +6860,25 @@ class _LifecyclePlacementWrite {
   final bool archive;
   final InventoryPlacementCoordinates? target;
   final String? successorId;
+}
+
+// A count smaller than the unclassified geometry is valid only for an open
+// drawing suffix. Legacy lines retain their recorded classification, including
+// open lines imported by the existing schema migration.
+bool _hasOpenDraftSuffix(
+  InventoryGeometry geometry,
+  Set<int> classifiedIndexes,
+  int legacyPolygonCount,
+) {
+  final unclassified = <InventoryPolyline>[
+    for (var index = 0; index < geometry.polylines.length; index += 1)
+      if (!classifiedIndexes.contains(index)) geometry.polylines[index],
+  ];
+  return legacyPolygonCount >= 0 &&
+      legacyPolygonCount < unclassified.length &&
+      unclassified
+          .skip(legacyPolygonCount)
+          .every((polyline) => !polyline.closed);
 }
 
 bool _sameLifecyclePolyline(InventoryPolyline first, InventoryPolyline second) {

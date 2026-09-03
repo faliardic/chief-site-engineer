@@ -16,6 +16,237 @@ const _activeId = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1';
 final _time = DateTime.utc(2026, 8, 28, 6);
 
 void main() {
+  test(
+    'AT-602 recovery separates closed draft block metadata from open drawing',
+    () async {
+      final firstBlock = _blockDrafts().single;
+      final geometry = InventoryGeometry(
+        polylines: [
+          ..._closedBlockGeometry().polylines,
+          InventoryPolyline(
+            closed: false,
+            points: [_point(512, 512), _point(1024, 512), _point(1024, 1024)],
+          ),
+        ],
+      );
+      final fake = _FakeInventoryApplication.withDraft(
+        geometry,
+        draftNewBlocks: [firstBlock],
+        legacyPolygonCount: 0,
+      );
+      final controller = _controller(fake);
+      addTearDown(controller.dispose);
+      await controller.initialize();
+      expect(controller.loadStatus, InventorySketchLoadStatus.ready);
+      expect(controller.editor!.geometry.canonicalJson, geometry.canonicalJson);
+      expect(controller.editor!.workingPolylineIndex, 1);
+      expect(controller.isFinalizeEnabled, isFalse);
+      expect(controller.drawPoint(_point(512, 1024)), isTrue);
+      final secondBlock = controller.createBlockDraft(
+        displayName: 'B Blok',
+        floorCount: 1,
+      );
+      expect(controller.closeWorkingBlock(secondBlock), isTrue);
+      expect(controller.isFinalizeEnabled, isTrue);
+      _expectSameBlockIdentity(
+        controller.newBlocks.first,
+        firstBlock,
+        polygonIndex: 0,
+      );
+      expect(await controller.forceSave(), isTrue);
+      expect(fake.saveMutationCount, 1);
+      expect(fake.projection!.draftNewBlocks.map((block) => block.id), [
+        firstBlock.id,
+        secondBlock.id,
+      ]);
+      expect(fake.finalizeCalls, 0);
+    },
+  );
+
+  testWidgets(
+    'AT-602 touch selects, nudges whole block and returns to edge reshape',
+    (tester) async {
+      final blockId = _uuid(26000);
+      final geometry = InventoryGeometry(
+        polylines: [
+          InventoryPolyline(
+            closed: true,
+            points: [
+              _point(640, 512),
+              _point(2688, 512),
+              _point(2688, 2048),
+              _point(640, 2048),
+            ],
+          ),
+        ],
+      );
+      final fake = _FakeInventoryApplication.withMappedActive(
+        geometry: geometry,
+        blocks: [_blockRecord(id: blockId)],
+        floors: [_floorRecord(id: _uuid(26001), blockId: blockId)],
+        activeBlockPolygons: [
+          _blockPolygon(
+            revisionId: _activeId,
+            blockId: blockId,
+            polygonIndex: 0,
+          ),
+        ],
+      );
+      final pageKey = GlobalKey<InventorySketchEditorPageState>();
+      await _openEditor(
+        tester,
+        fake,
+        _OrientationRecorder(),
+        pageKey,
+        intent: InventorySketchLaunchIntent.editActive,
+      );
+      final controller = pageKey.currentState!.controller;
+      final canvas = find.byKey(const Key('inventory-sketch-canvas-gesture'));
+      Future<void> tapPoint(InventorySketchPoint point) async {
+        final state = tester.state<InventorySketchCanvasState>(
+          find.byType(InventorySketchCanvas),
+        );
+        await tester.tapAt(
+          tester.getTopLeft(canvas) + state.viewport!.virtualToView(point),
+        );
+        await tester.pump();
+      }
+
+      Future<void> tapControl(String key) async {
+        final control = find.byKey(Key(key));
+        await tester.ensureVisible(control);
+        await tester.pump();
+        expect(control.hitTestable(), findsOneWidget);
+        await tester.tap(control);
+        await tester.pump();
+      }
+
+      await tapControl('inventory-editor-mode-select');
+      await tapPoint(_point(1664, 512));
+      expect(controller.editor!.selection?.segmentIndex, 0);
+      await tapControl('inventory-editor-nudge-up');
+      expect(controller.editor!.geometry.polylines.single.points, [
+        _point(640, 448),
+        _point(2688, 448),
+        _point(2688, 2048),
+        _point(640, 2048),
+      ]);
+      await tapPoint(_point(1664, 448));
+      expect(controller.editor!.selection?.wholePolyline, isTrue);
+      await tapControl('inventory-editor-nudge-right');
+      expect(controller.editor!.geometry.polylines.single.points, [
+        _point(704, 448),
+        _point(2752, 448),
+        _point(2752, 2048),
+        _point(704, 2048),
+      ]);
+      await tapPoint(_point(2752, 1280));
+      expect(controller.editor!.selection?.wholePolyline, isFalse);
+      expect(controller.editor!.selection?.segmentIndex, 1);
+      await tapControl('inventory-editor-nudge-left');
+      final reshaped = controller.editor!.geometry.polylines.single;
+      expect(reshaped.points, [
+        _point(704, 448),
+        _point(2688, 448),
+        _point(2688, 2048),
+        _point(704, 2048),
+      ]);
+      expect(
+        () => InventorySpatialContract.validateBlockPolygon(reshaped),
+        returnsNormally,
+      );
+      expect(controller.existingBlockMappings.single.blockId, blockId);
+      expect(controller.lastErrorCode, isNull);
+      await tapControl('inventory-editor-back');
+      await tester.pumpAndSettle();
+      expect(
+        fake.projection!.draftRevision!.geometry.canonicalJson,
+        InventoryGeometry(polylines: [reshaped]).canonicalJson,
+      );
+      expect(fake.maximumConcurrentSaves, 1);
+      expect(
+        fake.projection!.activeRevision!.geometry.canonicalJson,
+        geometry.canonicalJson,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'AT-602 touch drawing autosaves, leaves and resumes exact open polygon',
+    (tester) async {
+      final fake = _FakeInventoryApplication.withDraft(
+        InventoryGeometry.emptyDraft(),
+      );
+      final orientations = _OrientationRecorder();
+      final firstKey = GlobalKey<InventorySketchEditorPageState>();
+      await _openEditor(tester, fake, orientations, firstKey);
+      Future<void> tapPoint(InventorySketchPoint point) async {
+        final canvas = find.byKey(const Key('inventory-sketch-canvas-gesture'));
+        final state = tester.state<InventorySketchCanvasState>(
+          find.byType(InventorySketchCanvas),
+        );
+        await tester.tapAt(
+          tester.getTopLeft(canvas) + state.viewport!.virtualToView(point),
+        );
+        await tester.pump();
+      }
+
+      final points = [_point(640, 512), _point(1664, 512), _point(1664, 1536)];
+      for (final point in points) {
+        await tapPoint(point);
+      }
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pumpAndSettle();
+      final first = firstKey.currentState!.controller;
+      final geometry = first.editor!.geometry.canonicalJson;
+      expect(first.editor!.geometry.polylines.single.points, points);
+      expect(first.saveStatus, InventorySketchSaveStatus.saved);
+      expect(first.isFinalizeEnabled, isFalse);
+      expect(first.newBlocks, isEmpty);
+      expect(fake.saveCalls, hasLength(1));
+      expect(fake.saveMutationCount, 1);
+      await tester.tap(find.byKey(const Key('inventory-editor-back')));
+      await tester.pumpAndSettle();
+      expect(fake.saveCalls, hasLength(1));
+      expect(fake.projection!.draftRevision!.geometry.canonicalJson, geometry);
+      final recoveredKey = GlobalKey<InventorySketchEditorPageState>();
+      await _openEditor(
+        tester,
+        fake,
+        orientations,
+        recoveredKey,
+        idFactory: _SequentialIds(27000).call,
+      );
+      final recovered = recoveredKey.currentState!.controller;
+      expect(recovered.editor!.geometry.canonicalJson, geometry);
+      expect(recovered.editor!.workingPolylineIndex, 0);
+      expect(recovered.editor!.undoDepth, 0);
+      expect(recovered.newBlocks, isEmpty);
+      expect(recovered.isFinalizeEnabled, isFalse);
+      await tapPoint(_point(640, 1536));
+      expect(recovered.workingPolyline!.points, [...points, _point(640, 1536)]);
+      expect(recovered.editor!.geometry.polylines, hasLength(1));
+      await tester.tap(find.byKey(const Key('inventory-editor-back')));
+      await tester.pumpAndSettle();
+      expect(fake.saveCalls, hasLength(2));
+      expect(
+        fake.saveCalls.map((command) => command.operationId).toSet(),
+        hasLength(2),
+      );
+      expect(fake.saveMutationCount, 2);
+      expect(fake.maximumConcurrentSaves, 1);
+      expect(fake.finalizeCalls, 0);
+      expect(fake.createCalls, 0);
+      expect(fake.projection!.draftNewBlocks, isEmpty);
+      expect(
+        fake.projection!.draftRevision!.geometry.polylines.single.closed,
+        isFalse,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   group('pure editor DRAW and history', () {
     test('start, add, open-end, close and one-point removal are exact', () {
       var editor = InventorySketchEditorSnapshot.recover(
@@ -3234,6 +3465,7 @@ Future<void> _openEditor(
   InventorySketchLaunchIntent intent =
       InventorySketchLaunchIntent.createOrRecover,
   ValueChanged<bool?>? onResult,
+  String Function()? idFactory,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -3257,7 +3489,7 @@ Future<void> _openEditor(
                           application: fake,
                           projectId: _projectId,
                           launchIntent: intent,
-                          idFactory: _SequentialIds(5000).call,
+                          idFactory: idFactory ?? _SequentialIds(5000).call,
                           orientationSetter: orientations.call,
                         ),
                       ),
