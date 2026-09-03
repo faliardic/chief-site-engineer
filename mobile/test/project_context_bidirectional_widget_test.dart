@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:chief_site_engineer/app.dart';
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/attachment_catalog_application.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/application/construction_living_plan_application.dart';
 import 'package:chief_site_engineer/application/daily_log_application.dart';
+import 'package:chief_site_engineer/application/inventory_application.dart';
 import 'package:chief_site_engineer/application/material_request_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
@@ -12,6 +15,7 @@ import 'package:chief_site_engineer/domain/attendance_models.dart';
 import 'package:chief_site_engineer/domain/concrete_models.dart';
 import 'package:chief_site_engineer/domain/construction_living_plan_models.dart';
 import 'package:chief_site_engineer/domain/daily_log_models.dart';
+import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/domain/material_request_models.dart';
 import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/features/agenda/phone_call_result_page.dart';
@@ -19,6 +23,8 @@ import 'package:chief_site_engineer/features/attendance/workforce_directory_page
 import 'package:chief_site_engineer/features/attachments/project_media_album_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_page.dart';
 import 'package:chief_site_engineer/features/daily_log/daily_log_page.dart';
+import 'package:chief_site_engineer/features/dashboard/project_dashboard_page.dart';
+import 'package:chief_site_engineer/features/inventory/inventory_page.dart';
 import 'package:chief_site_engineer/features/living_plan/living_plan_page.dart';
 import 'package:chief_site_engineer/features/material_requests/material_requests_page.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
@@ -45,6 +51,121 @@ const _projectB = MobileProject(
 );
 
 void main() {
+  testWidgets(
+    'Inventory AppBar selection commits shared A once only after success and preserves A in captures',
+    (tester) async {
+      final agenda = FakeAgendaApplication(
+        projects: const [_projectA, _projectB],
+      );
+      final inventory = _SelectionInventory();
+      final attendance = _TrackingAttendance();
+      await tester.pumpWidget(
+        CseApp(
+          bootstrap: Future.value(
+            BootstrapSuccess(
+              environmentLabel: 'Test',
+              smokeRecordId: 'issue-556-shell',
+              smokeRecordCreatedAt: '2026-09-02T08:00:00Z',
+              agenda: agenda,
+              inventory: inventory,
+              attendance: attendance,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(_dashboardProjectSelectionButton());
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
+      );
+      await tester.pumpAndSettle();
+      final session = tester
+          .widget<ProjectDashboardPage>(
+            find.byType(ProjectDashboardPage, skipOffstage: false),
+          )
+          .session;
+      final sharedChanges = <String?>[];
+      void observe() => sharedChanges.add(session.selectedProjectId);
+      session.addListener(observe);
+      await tester.tap(find.text('Envanter').last);
+      await tester.pumpAndSettle();
+      expect(inventory.projects, [_projectB.id]);
+      final pending = Completer<InventoryPrimarySketchProjection?>();
+      inventory.next = pending;
+      await _chooseSharedProject(tester, _projectA.id);
+      expect(inventory.projects, [_projectB.id, _projectA.id]);
+      expect(session.selectedProjectId, _projectB.id);
+      expect(sharedChanges, isEmpty);
+      pending.complete(null);
+      await tester.pumpAndSettle();
+      expect(session.selectedProjectId, _projectA.id);
+      expect(sharedChanges, [_projectA.id]);
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text(_projectA.name),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .state<InventoryPageState>(find.byType(InventoryPage))
+            .controller
+            .selectedProjectId,
+        _projectA.id,
+      );
+
+      final failure = Completer<InventoryPrimarySketchProjection?>();
+      inventory.next = failure;
+      await _chooseSharedProject(tester, _projectB.id);
+      failure.completeError(
+        const InventoryFailure('inventory_load_test_failure'),
+      );
+      await tester.pumpAndSettle();
+      expect(session.selectedProjectId, _projectA.id);
+      expect(sharedChanges, [_projectA.id]);
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text(_projectA.name),
+        ),
+        findsOneWidget,
+      );
+      final page = tester.state<InventoryPageState>(find.byType(InventoryPage));
+      expect(page.controller.selectedProjectId, _projectA.id);
+      expect(page.controller.lastErrorCode, 'inventory_load_test_failure');
+
+      final staleLocal = Completer<InventoryPrimarySketchProjection?>();
+      inventory.next = staleLocal;
+      await _chooseSharedProject(tester, _projectB.id);
+      await tester.tap(find.text('Hatırlatıcı').last);
+      await tester.pumpAndSettle();
+      staleLocal.complete(null);
+      await tester.pumpAndSettle();
+      expect(sharedChanges, [_projectA.id]);
+      expect(session.selectedProjectId, _projectA.id);
+      await tester.tap(find.byKey(const Key('quick-reminder')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<DropdownButtonFormField<String?>>(
+              find.byKey(const Key('reminder-project')),
+            )
+            .initialValue,
+        _projectA.id,
+      );
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expect(agenda.createReminderCalls, 0);
+      expect(attendance.ensureProjectIds, isEmpty);
+      expect(attendance.rollingCalls, 0);
+      expect(inventory.unexpectedCalls, isEmpty);
+      expect(tester.takeException(), isNull);
+      session.removeListener(observe);
+    },
+  );
+
   testWidgets(
     'core routes report only deliberate local selection and then read A',
     (tester) async {
@@ -359,7 +480,7 @@ void main() {
       final baselineEnsureDay = attendance.ensureDayCalls;
       final baselineRolling = attendance.rollingCalls;
 
-      await tester.tap(find.text('Proje seç'));
+      await tester.tap(_dashboardProjectSelectionButton());
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
@@ -497,7 +618,7 @@ void main() {
       expect(attendance.ensureProjectIds, isEmpty);
       expect(attendance.rollingCalls, 0);
 
-      await tester.tap(find.text('Proje seç'));
+      await tester.tap(_dashboardProjectSelectionButton());
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
@@ -646,6 +767,65 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+}
+
+Finder _dashboardProjectSelectionButton() {
+  final surface = find.byKey(const Key('dashboard-project-selection-required'));
+  expect(surface, findsOneWidget);
+  final button = find
+      .descendant(
+        of: surface,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is IconButton &&
+              widget.tooltip == 'Proje seç' &&
+              widget.onPressed != null,
+        ),
+      )
+      .hitTestable();
+  expect(button, findsOneWidget);
+  return button;
+}
+
+Future<void> _chooseSharedProject(WidgetTester tester, String id) async {
+  final control = find
+      .byKey(const Key('active-project-indicator'))
+      .hitTestable();
+  expect(control, findsOneWidget);
+  await tester.tap(control);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
+  final option = find
+      .byKey(ValueKey('active-project-option-$id'))
+      .hitTestable();
+  expect(option, findsOneWidget);
+  await tester.tap(option);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
+}
+
+class _SelectionInventory implements InventoryApplicationPort {
+  final List<String> projects = [];
+  final List<Symbol> unexpectedCalls = [];
+  Completer<InventoryPrimarySketchProjection?>? next;
+
+  @override
+  Future<InventoryPrimarySketchProjection?> loadPrimarySketch(
+    String projectId,
+  ) async {
+    projects.add(projectId);
+    final pending = next;
+    next = null;
+    return pending == null ? null : await pending.future;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    unexpectedCalls.add(invocation.memberName);
+    throw StateError(
+      'Unexpected Inventory operation: ${invocation.memberName}',
+    );
+  }
 }
 
 Future<void> _pumpPage(WidgetTester tester, Widget page) async {

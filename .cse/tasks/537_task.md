@@ -1,0 +1,24 @@
+# Issue 537 — Inventory stale autosave pending-command correction
+
+- Process lane: correction; validation class: Inventory persistence/editor lifecycle; review floor: independent R4.
+- Authority: https://github.com/faliardic/chief-site-engineer/issues/537#issuecomment-5505906105
+- Repository: V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer
+- Exact base: 89dffbe2b7caa44f50fb4426b5ebf9d1b5157dda
+- Branch: codex/issue-537-inventory-autosave-pending-correction
+- PR target: master; publication: Draft PR only.
+- Preflight: verify exact HEAD, clean tracked worktree/index, correct origin and schema 22 / backup 1 / version 0.1.0+1 before any production edit.
+- Current defect: `_drainSaves()` retains `_pendingSave` after failure; `_scheduleAutosave()` advances `_geometryGeneration` without invalidating a failed pending command from an older state; later valid geometry may replay stale command data and remain `Kaydedilemedi`.
+- Required invariant: a failed pending command may be reused only for the exact same geometry/mapping/lifecycle generation; advancing editor state must invalidate/replace the stale pending command before the next drain; newer state must build a fresh autosave command.
+- Preserve same-generation explicit retry idempotency and operation identity.
+- Prefer the smallest controller-local correction. Do not alter application, domain, storage, schema, backup or package contracts.
+- Exact production allowlist: mobile/lib/features/inventory/inventory_sketch_editor_page.dart.
+- Exact test allowlist: mobile/test/inventory_sketch_editor_test.dart.
+- Evidence allowlist: this file and .cse/results/537_result.md.
+- No InventoryPage, map, active-project, orientation, edge-toolbar or visual redesign work belongs in this correction.
+- Required regression: force a pending autosave failure; advance to a newer valid generation; prove the next command has fresh operation/current geometry and succeeds; separately prove unchanged-generation retry reuses the original operation identity.
+- Format touched Dart before validation.
+- Focused invocation exactly once: `flutter test --no-pub test/inventory_sketch_editor_test.dart` from `mobile/`.
+- If focused PASS, run the nine-file integrated Inventory closure invocation from #535 exactly once, then `flutter analyze --no-pub` exactly once.
+- Any FAIL: stop without blind retry or scope expansion; retain evidence and report the exact failure.
+- PASS gate: `git diff --check`, four-path allowlist, protected drift 0, schema 22 / backup 1 / version 0.1.0+1, minimal commit, normal push and one Draft PR.
+- Forbidden: build/APK/AAB, emulator/device/ADB, MAIN/prod/debug package operations, Ready, merge, #535 close, Slice 7 or DWG work.

@@ -1,6 +1,9 @@
 # Project Rules
 
-Bu dosya, Chief Site Engineer projesinde kalici kabul edilen proje kurallarini tutar.
+Bu dosya, Chief Site Engineer projesindeki öğrenme çıktılarının sınırını tanımlar.
 
-- Her yeni teknik terim, ilk gectigi learning dosyasinda ve gerekirse `learning/GLOSSARY.md` icinde sade Turkce ile tanimlanacaktir.
-- Learning dosyalari kisa ozet olmayacak. Her learning dosyasi, yapilan gelistirmeyi yazilim ogrenen kullaniciya adim adim ogretecek sekilde yazilacaktir. Kod bloklari uzerinden aciklama zorunludur: gercek uygulama kodu, test kodu, satir satir aciklama, teknik karar tablosu ve kod calisma akisi kullanilacaktir. Her yeni terim ilk gectigi yerde tanimlanacak, kalici terimler `learning/GLOSSARY.md` dosyasina eklenecektir. Anlatimda "sunu soyle yaptik ki su davranis calissin" mantigi kullanilacaktir.
+- Learning notu, glossary, podcast veya benzeri anlatım yalnız owner açıkça istediğinde ya da yeni ve kalıcı bir kavramı açıklamak belirgin öğrenme değeri sağladığında oluşturulur.
+- FAST işlerde learning, glossary, changelog veya podcast dosyası otomatik olarak üretilmez.
+- Öğrenme çıktısı production işini, kullanıcı doğrulamasını, commit/push veya merge akışını bloke etmez.
+- Bir öğrenme belgesi oluşturulursa sade Türkçe kullanılır; gerçek kod ve test örnekleri yalnız anlatımı gerçekten iyileştiriyorsa eklenir.
+- Güncel execution kuralları için repository kökündeki `AGENTS.md` ve onun yönlendirdiği kanonik protokoller esas alınır.

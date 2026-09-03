@@ -1,310 +1,181 @@
 # CSE Codex Repository Instructions
 
-Bu dosya repository kökünde bütün CSE çalışmalarına uygulanır.
+Bu dosya repository kökünde bütün CSE çalışmalarına uygulanır ve günlük execution için tek zorunlu giriş noktasıdır.
 
-## 1. Kaynak otoritesi
+## 1. Güncel gerçek ve kaynak otoritesi
 
-Bilgi türüne göre yetkili kaynaklar:
+- Güncel repository gerçeği: GitHub `master`, current Issue/PR/branch ve owner kararları.
+- Kalıcı ürün amacı ve veri ilkeleri: `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`.
+- Güncel ürün kapsamı ve sıra: `docs/v2/CSE_V2_SCOPE.md` ve `ROADMAP.md`.
+- Kritik Git ve veri güvenliği: `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`.
+- Lane ve publication ayrıntıları: `docs/protocols/CSE_WORKFLOW_ACCELERATION_PROTOCOL.md`.
+- Test/gate ayrıntıları: `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`.
 
-1. Kalıcı ürün amacı ve veri ilkeleri: `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
-2. Operasyon ve Git/Codex güvenliği: `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md`
-3. Model ve reasoning routing: `docs/protocols/CSE_MODEL_REASONING_ROUTING_POLICY.md`
-4. Risk-temelli validation: `docs/protocols/CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`
-5. **Varsayılan workflow lane, correction, local-vs-CI validation ve hızlandırılmış publication:** `docs/protocols/CSE_WORKFLOW_ACCELERATION_PROTOCOL.md`
-6. **Owner'a insan-diliyle raporlama ve teknik çıktı tercümesi:** `docs/protocols/CSE_OWNER_COMMUNICATION_STANDARD.md`
-7. Güncel ürün kapsamı ve sıra: `docs/v2/CSE_V2_SCOPE.md` ve `ROADMAP.md`
-8. Aktif görev: current GitHub Issue/PR ve owner scope kararları
-9. Kalıcı manuel test backlog'u: GitHub Issue `#479 — CSE Manual Test Register`
-10. Yerel yürütme kaydı: gerektiğinde `.cse/tasks/<issue_no>_task.md` ve `.cse/results/<issue_no>_result.md`
+Sabit master SHA, schema, app version, aktif Issue/PR veya roadmap ilerlemesi kalıcı protokollerde tutulmaz. Bunlar her görevde GitHub/repository üzerinden okunur.
 
-README, eski Epic/Issue ceremony'si, ZIP, handoff, podcast, `.cse/state`, Orchestrator, Bridge, Work Mode veya sohbet hafızası current GitHub ve kanonik kaynak gerçeğini override edemez.
+README, eski Issue/PR, `.cse/state`, task/result, ZIP, handoff, podcast veya sohbet hafızası current GitHub gerçeğini override edemez.
 
-Sabit master SHA, schema veya aktif Issue/PR bu kalıcı dosyada tutulmaz; current durum GitHub/repository üzerinden okunur.
+## 2. Yeni sohbet ve resume
 
-## 2. Zorunlu process lane
-
-Her yeni teknik Issue başlamadan önce yalnız bir lane seçilir:
-
-```text
-FAST
-STANDARD
-CRITICAL
-```
-
-Lane tanımları ve standing authority kuralları `CSE_WORKFLOW_ACCELERATION_PROTOCOL.md` içindedir.
-
-Temel kural:
-
-> Riski karşılayan en hafif lane seçilir. Ordinary UI/context/navigation işi sırf karmaşık veya çok dosyalı diye R4/CRITICAL yapılmaz.
-
-- `FAST`: dar UI/docs/navigation/presentation.
-- `STANDARD`: cross-module behavior/context/session, fakat persistence/release-critical contract yok.
-- `CRITICAL`: schema/migration/backup/restore/destructive/integrity/security/platform/release veya gerçek data-loss riski.
-
-Somut CRITICAL trigger yoksa ağır one-shot authority zinciri yazılmaz.
-
-## 3. Workflow önceliği
-
-`CSE_WORKFLOW_ACCELERATION_PROTOCOL.md`, workflow/test/retry/correction/evidence yoğunluğu konularında eski Issue/authority metinlerinden daha yeni standing owner kararıdır.
-
-FAST/STANDARD'da:
-
-- Issue body standing execution authority'dir;
-- aynı scope içinde yeni owner authority gerekmez;
-- format/test-harness/analyzer/same-contract source correction aynı implementation window içindedir;
-- geniş Flutter doğrulaması mümkün olduğunda PR CI'ya bırakılır;
-- review kısa PASS/BLOCKER formatındadır.
-
-Bu öncelik şunları **override etmez**:
-
-- product scope ve exact allowlist;
-- schema/migration/backup/version/permission/platform authority;
-- production/debug/gerçek kullanıcı veri koruması;
-- stable identity/transaction/event/history/integrity/security contract'ları;
-- Ready/merge/release için owner kararı.
-
-## 4. Yeni sohbet / resume
-
-### Yeni görev
-
-Bir kez oku:
+Yeni görevde zorunlu okuma:
 
 1. `AGENTS.md`
-2. `CSE_UNIFIED_PROJECT_SOURCE.md`
-3. `CSE_PROJECT_INSTRUCTIONS.md`
-4. `CSE_MODEL_REASONING_ROUTING_POLICY.md`
-5. `CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`
-6. `CSE_WORKFLOW_ACCELERATION_PROTOCOL.md`
-7. `CSE_OWNER_COMMUNICATION_STANDARD.md`
-8. `CSE_NEW_CHAT_GITHUB_BOOTSTRAP.md`
-9. `CSE_PROJECT_SOURCE_REGISTER.md`
-10. ürün işi ise `CSE_V2_SCOPE.md`
-11. `ROADMAP.md`
-12. current Issue/PR/branch/master
-13. ilgili Issue #479 manual test kayıtları
+2. current GitHub `master`, açık Issue/PR ve aktif görev
+3. yalnız değişen sözleşmenin gerektirdiği koşullu kaynak
 
-### Aynı Issue resume/correction
+Koşullu okuma:
 
-Ruleset hashleri değişmediyse uzun kaynakları tekrar okuma. Yalnız:
+- ürün/veri kararı: Unified Source;
+- ürün kapsamı/sırası: V2 Scope ve Roadmap;
+- Git veya kullanıcı verisi riski: Project Instructions;
+- test/gate kararı: Minimum Validation;
+- STANDARD/CRITICAL publication: Workflow Acceleration;
+- kritik model/review ihtiyacı: Model Routing;
+- kalıcı kritik handoff: Codex Instruction Comment Protocol.
 
-- current lane;
-- yeni Issue/PR yorumları;
-- branch/head/diff;
-- kalan correction budget;
-- ilgili manual test değişiklikleri
+Aynı görev resume ediliyorsa değişmeyen uzun kaynaklar tekrar okunmaz. Kullanıcı `devam` dediğinde current GitHub durumu bulunur ve sıradaki gerçek işlem yapılır.
 
-okunur.
+GitHub'a erişilemiyorsa güncel durum tahmin edilmez ve production işi başlatılmaz.
 
-Kullanıcı `devam` dediğinde aynı authority metni yeniden üretilmez; current lane'e göre doğrudan sıradaki gerçek işlem yapılır.
+Owner talebi AGENTS.md veya canonical çalışma kuralını değiştiriyorsa asıl teknik/ürün işi durur. Önce karar current GitHub authority olarak kaydedilir; en dar protokol değişikliği hazırlanır, review ve owner merge kapısından geçirilir. Master güncellenip güncel AGENTS.md yeniden okunduktan sonra asıl teknik işe dönülür. Bu sıra Ready/merge yetkisini kendiliğinden vermez.
 
-## 5. Değişmez güvenlik ilkeleri
+## 3. Zorunlu aktör yönlendirmesi ve sıradaki aksiyon
+
+ChatGPT/Work Mode her kullanıcı talebinde execution başlamadan önce sıradaki tek işi ve sorumlu aktörü belirler:
+
+- **ChatGPT:** current GitHub okuma, planlama, Issue/PR koordinasyonu, review ve owner-approved Ready/merge;
+- **Codex:** repository-local terminal, automated test, analyzer, build/APK hazırlığı, dosya değişikliği, format/diff ve local Git/commit/push;
+- **Fatih:** yalnız manuel ürün/device kabulü ve nihai görsel/davranış PASS/FAIL kararı; PowerShell/terminal komutu çalıştırmaz;
+- **Codex device exception:** Fatih exact package, cihaz ve veri-koruma sınırıyla açıkça devrederse emulator/ADB/device işlemi tek bir 5 dakikalık görev olarak Codex'e geçebilir. PASS/FAIL ve ürün kabulü Fatih'te kalır.
+
+Repository veya local execution gerekiyorsa ChatGPT, kullanıcının `Codex ile çalış` demesini beklemez. Açıkça `Sıradaki aktör: Codex` der ve current Issue/kuralları tekrar etmeyen, 10–15 satırı geçmeyen exact handoff verir. `CSE_PROJECT_INSTRUCTIONS.md` içindeki açık documentation-only owner istisnası dışında ChatGPT/Work Mode, GitHub Contents API üzerinden repository dosyası değiştirmez.
+
+ChatGPT'ın kendi yetkisindeki işlem mevcut owner kararıyla yapılabiliyorsa ayrıca `devam` istemeden yürütülür. Kullanıcıya teslim edilen her sonuç şu satırla biter:
+
+`Sıradaki aksiyon — <ChatGPT|Codex|Fatih|Yok>: <tek uygulanabilir talimat>.`
+
+Bir aksiyon tamamlandığında yalnız sonraki işin adı söylenmez; aynı yanıtta başlamaya hazır talimat da hazırlanır:
+
+- **Codex:** `Hazır Codex talimatı:` altında current kaynakları tekrar etmeyen, kopyalanabilir 10–15 satırlık exact görev;
+- **Fatih:** `Hazır Fatih talimatı:` altında yalnız kısa manuel ürün/device kontrolü ve beklenen sonuç; terminal komutu verilmez;
+- **ChatGPT:** mevcut owner yetkisi varsa sonraki koordinasyon işlemini kendiliğinden yürütür; yeni yetki gerekiyorsa yalnız gerekli tek onay cümlesini verir;
+- **Yok:** devam işi veya hazırlanacak talimat bulunmadığını açıklar.
+
+Kullanıcıdan sıradaki prompt'u yazması, `devam` demesi veya Codex talimatını ayrıca istemesi beklenmez. Hazır talimat, seçilen aktörün ek açıklama istemeden başlayabileceği kadar self-contained olur.
+
+Devam işi kalmadığında `Sıradaki aksiyon — Yok: İş tamamlandı.` yazılır; yapay yeni iş üretilmez.
+
+## 4. Zorunlu lane seçimi
+
+Her iş yalnız bir lane kullanır:
+
+### FAST
+
+Dar documentation, metin, icon, tooltip, spacing, layout, presentation, basit navigation veya persistence contract'ını değiştirmeyen küçük UI işi.
+
+FAST varsayılanı:
+
+- temiz ve senkron yerel `master`;
+- tek davranış;
+- en fazla 5 dakikalık Codex işlemi;
+- Issue, remote branch, PR, `.cse` task/result ve routing YAML yok;
+- Codex format, changed-path review, `git diff --check` ve minimum yeterli automated doğrulamayı yapar;
+- test/analyzer/build execution Codex'te, manuel ürün/device kabulü Fatih'tedir;
+- Fatih `PASS` bildirmeden commit veya push yapılmaz;
+- FAIL/PENDING durumunda yeni işe geçilmez.
+
+### STANDARD
+
+Birden fazla ekran/modül, session/project context veya persistence/release-critical olmayan orta ölçekli behavior değişikliği.
+
+STANDARD varsayılanı:
+
+- tek kısa Issue veya self-contained görev özeti;
+- tek kısa ömürlü branch;
+- 5 dakikalık Codex mikro adımları;
+- test/analyzer/build execution Codex'te, manuel ürün/device kabulü Fatih'te;
+- `.cse` ve routing YAML varsayılan olarak yok;
+- bağımsız diff review değer üretiyorsa tek Draft PR;
+- mevcut iş master'a alınmadan yeni production branch açılmaz;
+- stacked PR yasaktır.
+
+### CRITICAL
+
+Schema/migration, backup/restore, stable identity/revision, transaction/event/history, attachment veya kullanıcı dosyası bütünlüğü, destructive işlem, security/privacy, permission/signing/application ID, background/reboot, DWG conversion data-loss riski, gerçek kullanıcı data root'u veya release/store işi.
+
+CRITICAL varsayılanı:
+
+- exact Issue, allowlist ve stop conditions;
+- branch ve Draft PR;
+- gerekli `.cse` provenance;
+- Issue'ya özel validation/compatibility/device/release gate;
+- bağımsız derin review;
+- Ready/merge/release için owner kararı.
+
+Somut CRITICAL trigger yoksa iş ağır sürece yükseltilmez.
+
+## 5. Beş dakika ve test sahipliği
+
+Tek bir Codex execution/correction/commit işlemi 5 dakikayı geçmez.
+
+Beş dakika dolduğunda:
+
+- yeni yaklaşım başlatılmaz;
+- kapsam genişletilmez;
+- tamamlanan değişiklik, blocker ve kalan tek adım raporlanır.
+
+Repository-local terminal, automated test, analyzer ve build/APK hazırlığı Codex tarafından, yetkili görevin minimum yeterli kapsamıyla yürütülür. Fatih PowerShell/terminal/Git/Flutter/test/analyzer/build komutu çalıştırmaz; kendisine bu komutlar hazırlanmaz veya verilmez. Fatih yalnız manuel ürün/device kabulünü ve nihai görsel/davranış PASS/FAIL kararını verir. Emulator/ADB/device execution yalnız exact package, cihaz ve veri-koruma sınırıyla açık owner delegasyonunda yapılabilir; MAIN/Acceptance/Debug ve mevcut veri güvenliği sınırları korunur.
+
+Codex kaynak düzenleme, format, diff ve Git kapsam kontrollerini yapar; automated execution sonuçlarını raporlar. Fatih'e yalnız manuel kabul adımları verilir; nihai davranış kabulü Codex'e devredilmez.
+
+Aynı source revision üzerinde geçen test tekrarlanmaz. Full suite her mikro adımda değil, birleşik milestone veya release kapısında çalıştırılır.
+
+## 6. Değişmez güvenlik sınırları
 
 - CSE owner-only, local-first ve mobile-first kalır.
-- Aynı anda yalnız bir production implementation Issue'su aktiftir.
 - Gerçek kullanıcı data root'u açık CRITICAL authority olmadan okunmaz/değiştirilmez.
 - Production/debug paketleri sıradan automation tarafından başlatılmaz, temizlenmez veya mutate edilmez.
 - Stable identity, optimistic revision, append-only event/history, transaction, backup/restore ve attachment bütünlüğü korunur.
-- Force-push, destructive reset/clean/stash, hard-delete ve beklenmeyen kullanıcı değişikliğinin üzerine yazma varsayılan yasaktır.
-- Ready, merge, Issue/Epic closure, release/store ve destructive production işlemleri owner onayı gerektirir.
+- Force-push, destructive reset/clean/stash, hard-delete ve beklenmeyen kullanıcı değişikliğinin üzerine yazma yasaktır.
+- Beklenmeyen tracked/untracked değişiklikte işlem durur; otomatik temizleme yapılmaz.
+- Ready, merge, Issue closure, release/store ve destructive production işlemleri owner onayı gerektirir.
 
-## 6. Local validation vs PR CI
+## 7. Git ve publication
 
-Mobile PR'larında `.github/workflows/flutter_pr.yml` zaten format + analyze + full Flutter test çalıştırır.
+- FAST: user PASS sonrası küçük commit ve normal push; test öncesi commit/push yok.
+- STANDARD: en fazla bir aktif production branch/PR; squash merge varsayılanı.
+- CRITICAL: Issue'ya özel branch/PR/review zinciri.
+- Force-push yapılmaz.
+- Stacked PR oluşturulmaz.
+- Protokol kabul edildiğinde zaten açık olan legacy/stacked production PR'lar bir defalık geçiş kuyruğudur; yeni stack açma yetkisi vermez. Kuyruk çözülene kadar yeni production branch açılmaz; mevcut PR'lar current master'a birer birer uyarlanır ve Ready/merge/close yalnız owner kararıyla yürütülür.
+- Cihaz APK'sı mümkün olduğunda güncel birleşik master'dan üretilir.
+- Merge sonrası local master bir sonraki local işten önce `--ff-only` senkronlanır.
 
-Bu nedenle FAST/STANDARD local execution varsayılanı:
+## 8. Evidence ve çıktı
 
-- exact scope/allowlist;
-- changed-path diff review;
-- deterministic format/syntax;
-- `git diff --check`;
-- protected/schema/backup/version/platform drift;
-- STANDARD'da yalnız material fayda varsa tek dar targeted check.
-
-Local full Flutter suite + broad regression + analyzer zinciri, aynı kontroller PR CI'da çalışacaksa varsayılan olarak tekrarlanmaz.
-
-CI failure tek correction round'da topluca ele alınır. Her failure için yeni authority istenmez.
-
-CRITICAL işte Issue'a özel local/integration/device/release gate tanımlanabilir.
-
-## 7. Owner-led manuel test
-
-Uygulama davranışı ve field acceptance owner-led kalır.
-
-User-visible feature sonunda ChatGPT Issue #479'a stable test ID'leri ekler:
+FAST completion en fazla şu bilgileri taşır:
 
 ```text
-MT-<FEATURE_ISSUE>-001
-MT-<FEATURE_ISSUE>-002
-...
+Değişen davranış: <tek cümle>
+Değişen dosyalar: <liste>
+Codex kontrolleri: format / diff-check
+Codex automated validation: PENDING | PASS | FAIL
+Fatih manuel kabulü: PENDING | PASS | FAIL
+Commit/push: yapılmadı | <sha>
 ```
 
-Durumlar:
+STANDARD sonucu kısa Issue/PR kaydıdır. CRITICAL ayrıntılı provenance taşıyabilir.
 
-```text
-PENDING | PASS | FAIL | PARTIAL | DEFERRED | N/A
-```
+Aynı bilgi Issue, comment, task, result, state ve PR body içinde tekrar edilmez.
 
-Manual test `PENDING/DEFERRED` olması development progression'ını otomatik bloke etmez; ancak behavior `VERIFIED/FIELD_ACCEPTED/RELEASE_READY` diye sunulamaz.
+ChatGPT kullanıcıya teslim ettiği her yanıtta önce sade Türkçeyle şunları anlatır:
 
-## 8. Correction window
+- ne yaptığını;
+- bunun uygulama veya çalışma açısından ne anlama geldiğini;
+- işlemin başarılı mı, eksik mi, engelli mi olduğunu.
 
-FAST/STANDARD varsayılanı:
+SHA, branch, divergence, allowlist, YAML ve benzeri teknik kanıtlar bu açıklamadan sonra ikinci katmanda verilir. Teknik terim gerekliyse hemen günlük dilde karşılığı açıklanır. Ham Codex çıktısı ana cevap olarak kopyalanmaz; ChatGPT sonucu owner'ın tek okumada anlayacağı dile çevirir. Kısalık, anlaşılabilirliği bozacak kadar bilgi eksiltme gerekçesi değildir.
 
-```text
-primary implementation: 1
-same-scope correction rounds: 2
-environment-only retry: 1 after exact root cause
-new owner authority inside same scope: 0
-```
+## 9. Ana karar
 
-Correction round içinde aynı completed CI/review sonucundaki blocker'lar topluca düzeltilir.
-
-Yeni authority yalnız gerçek escalation için gerekir:
-
-- scope/allowlist genişlemesi;
-- yeni product/design kararı;
-- CRITICAL trigger;
-- user-data/destructive risk;
-- root cause'un scope içi correction'a indirgenememesi;
-- iki correction round'un tükenmesi.
-
-## 9. Evidence yoğunluğu
-
-Aynı bilgiyi Issue/task/result/PR/comment içinde tekrar tekrar yazma.
-
-- FAST: Issue + PR diff + CI ana evidence'dır; `.cse` ledger optional/brief.
-- STANDARD: gerekiyorsa 15-40 satırlık concise `.cse` summary.
-- CRITICAL: full chronology/provenance tutulabilir.
-
-Completion minimum:
-
-```yaml
-issue: NNN
-process_lane: FAST|STANDARD|CRITICAL
-base: <sha>
-head: <sha>
-changed_paths: [...]
-local_checks: [...]
-ci: PASS|FAIL|PENDING
-manual_tests: PENDING|...
-corrections_used: 0..2
-pr: <number>
-```
-
-## 10. Review
-
-FAST review:
-
-```text
-PASS
-```
-
-veya
-
-```text
-BLOCKER
-- exact defect
-- narrow correction
-```
-
-STANDARD review aynı şekilde kısa fakat cross-module source/diff odaklıdır.
-
-CRITICAL review R4 evidence kullanabilir.
-
-Format/harness/same-scope source defect FAST/STANDARD'da governance turu açmaz; correction budget kullanılır.
-
-## 11. GitHub publication
-
-- Production branch: `codex/issue-<issue_no>-<slug>`
-- Documentation branch: `docs/issue-<issue_no>-<slug>`
-- Yeni teknik iş doğrudan `master` üzerinde geliştirilmez.
-- PR önce Draft açılır.
-- FAST/STANDARD Draft PR sonrası PR CI broad gate'dir.
-- Manual test PENDING/DEFERRED iken owner kararıyla merge mümkündür.
-- Merge varsayılan squash merge'dir.
-- Owner `merge et`, `ready` veya eşdeğer açık talimat verdiğinde ayrıca authority aranmaz.
-
-## 12. Yerel yürütme
-
-Resmî repo:
-
-```text
-V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer
-```
-
-Local execution gerekiyorsa doğru root ve Git durumu doğrulanır. Beklenmeyen değişiklikte reset/clean/stash yapılmaz.
-
-STANDARD/CRITICAL local Codex task'ında concise task ledger kullanılabilir. FAST işlerde task ledger sırf ceremony için oluşturulmaz.
-
-## 13. Issue/task minimum alanları
-
-FAST/STANDARD:
-
-```text
-Process lane:
-Goal / changed contract:
-Expected base:
-Allowed paths:
-Protected / critical exclusions:
-Local checks:
-CI expectation:
-Manual test register:
-Correction budget: 2
-Publication boundary:
-```
-
-CRITICAL Issue riskin gerektirdiği ayrıntılı provenance/validation alanlarını ekler.
-
-## 14. Build / artifact
-
-APK/AAB her feature sonunda üretilmez.
-
-Build yalnız owner artifact/manual test istediğinde veya CRITICAL/release gate açıkça gerektirdiğinde çalıştırılır.
-
-Artifact varsa source commit, package ID, version, size ve SHA-256 kaydedilir.
-
-## 15. Owner iletişim standardı
-
-Bütün CSE ChatGPT/Codex çıktıları `docs/protocols/CSE_OWNER_COMMUNICATION_STANDARD.md` kuralına uyar.
-
-Owner'a önce **ürün ve pratik anlam** anlatılır; teknik jargon ikinci katmandır.
-
-Önemli durumlarda cevap şu soruları sade Türkçe ile kapsar:
-
-```text
-Ne yaptık?
-Sonuç ne?
-Sorun var mı?
-Risk ne?
-Benim önerim ne?
-Senden ne gerekiyor?
-```
-
-Kurallar:
-
-- salt YAML/execution record owner cevabı olamaz;
-- SHA, R4, harness, fixture, allowlist, invariant, CI/analyzer gibi terimler ana açıklama olamaz;
-- teknik terim gerekiyorsa pratik anlamı hemen tercüme edilir;
-- Codex blocker/completion metni owner'a doğrudan kopyalanmaz; ChatGPT önce ürün diline çevirir;
-- owner teknik ayrıntıyı okumadan projenin nerede olduğunu ve kendisinden ne beklendiğini anlayabilmelidir;
-- teknik evidence silinmez veya çarpıtılmaz; gerekirse ikinci katmanda verilir.
-
-## 16. Current migration
-
-Issue #547 ve sonraki ordinary UI/context işleri `CSE_WORKFLOW_ACCELERATION_PROTOCOL.md` uyarınca FAST/STANDARD'a taşınır.
-
-#547 varsayılanı:
-
-```yaml
-process_lane: STANDARD
-review_level: R3
-local_full_flutter_gate_required: false
-pr_ci_is_broad_gate: true
-same_scope_corrections_without_new_authority: 2
-```
-
-Product scope/allowlist/Attendance protection aynen korunur.
-
-## 17. Ana karar
-
-> CSE'nin varsayılan döngüsü Issue → implementation → Draft PR → CI → kısa review → owner merge'dür. Ağır fail-closed süreç yalnız gerçek CRITICAL risklerde kullanılır. Owner'a her zaman önce yapılan işin ürün/pratik anlamı sade Türkçeyle anlatılır; teknik jargon ve execution evidence ikinci katmandır.
+> Düşük riskte hızlı, Codex doğrulamalı ve owner kabullü master akışı; orta riskte tek kısa branch; gerçek veri/release riskinde tam güvenlik süreci. Güvenlik küçük UI işlerine değil, gerçekten zarar verebilecek sözleşmelere yoğunlaştırılır.
