@@ -3,7 +3,7 @@
 **Durum:** Güncel yürütme sırası
 **Tarih:** 3 Eylül 2026
 **V2 kapsam kaynağı:** `docs/v2/CSE_V2_SCOPE.md`
-**Güncel yön truth-sync:** Inventory v1 closure complete → DWG Viewer #523 next → release-readiness closure
+**Güncel yön truth-sync:** Inventory v1 closure complete → existing-feature quality + friction reduction → manual acceptance closure → release-readiness
 **Değişken repository gerçeği:** Güncel SHA/PR durumu GitHub `master` ve current Issue üzerinden doğrulanır.
 
 ## 1. Güncel ürün durumu
@@ -59,9 +59,11 @@ tamamlanıp kapatılmasıyla Inventory v1 closure'a ulaşmıştır. Issue #535 /
 PR #536 yalnız superseded tarihsel girişimdir ve current ancestry değildir.
 Issue #540 UI/UX Wave 0 ile loading blocker #580 tamamlanıp kapatılmıştır.
 Issue #586 implementation'ı PR #589 ile merge edilmiş ve Issue kapatılmıştır.
-Sıradaki ürün fazı DWG Viewer v1 / Issue #523'tür; bu sıra kaydı implementation
-başlangıcı veya yetkisi değildir. Public/store production release ilan
-edilmemiştir.
+3 Eylül 2026 owner kararıyla sıradaki yürütme dalgası mevcut özellik kalitesi,
+günlük akışlardaki sürtünmenin azaltılması, eksik manuel kabullerin kapatılması
+ve release-readiness'tır. DWG Viewer v1 / Issue #523 `POST-RELEASE / DEFERRED`
+gelecek entegrasyon hattıdır ve ilk genel yayının bağımlılığı değildir.
+Public/store production release ilan edilmemiştir.
 
 ## 2. Kaynak otoritesi
 
@@ -93,8 +95,10 @@ Proje/Mahal — complete
 → İş Zinciri — implemented / manual test deferred
 → Proje albümü Slice 1 — implemented / manual test pending
 → Inventory v1 closure — complete / Slice 7 #604 closed / #586 via PR #589 merged
-→ DWG Viewer v1 / Issue #523 — next product phase; implementation not authorized
+→ existing-feature quality + friction reduction
+→ missing manual acceptance closure
 → release-readiness closure
+→ DWG Viewer v1 / Issue #523 — post-release/deferred future integration; not a release dependency
 ```
 
 Temel kural:
@@ -359,18 +363,30 @@ Dalga 3 kapanış kapısı:
 
 Durum: `implemented — manual test pending; completion not declared`
 
-### Current priority — DWG Viewer v1 (Issue #523)
+### Current priority — frictionless release-readiness wave
 
 - Inventory Spatial v1 Slice 7 / Issue #604 completed/closed ile Inventory v1
   closure tamamlanmıştır.
 - UI/UX Wave 0 / Issue #540 ve loading blocker #580 completed/closed'dur.
 - Issue #586 edge controls, portrait sketch editor ve gesture auto-hide
   implementation'ı PR #589 ile merge edilmiş; Issue #586 completed/closed'dur.
-- DWG Viewer v1 / Issue #523 yalnız sıradaki ürün fazıdır. Bu roadmap kaydı
-  implementation'ın başladığı, tamamlandığı veya yetkilendirildiği anlamına
-  gelmez; yürütme ayrı owner authority gerektirir.
-- Sonraki faz release-readiness closure'dır; public/store release ayrıca owner
-  kararına bağlıdır.
+- Yeni büyük modül eklemek yerine existing-feature quality ve günlük akış
+  sadeliği iyileştirilir; görünür sürtünme noktaları azaltılır.
+- Issue #479 ve ilgili ürün kayıtlarındaki gerekli manual acceptance borcu
+  kapatılır.
+- Bağımsız veri, dashboard, minimum ortak arama, onboarding, telemetry,
+  gizlilik/KVKK ve diğer release-readiness kapıları tamamlanır.
+- Public/store release ayrıca owner kararına bağlıdır.
+
+### Future/post-release — DWG Viewer v1 (Issue #523)
+
+- Issue #523 `POST-RELEASE / DEFERRED` durumundadır; DWG Viewer ilk genel yayın
+  kapsamı veya bağımlılığı değildir.
+- DWG-001/002/003 teknik belgeleri gelecekteki entegrasyon temeli olarak
+  korunur.
+- Yeni CSE DWG implementation dilimi yalnız yeni açık owner kararıyla
+  başlayabilir; ayrı DWG ürün/engine Ar-Ge hattı aktif CSE release sırasını
+  bloke etmez.
 
 ### V2.12 — Günlük Log Çıktısı v2
 
@@ -454,8 +470,10 @@ Living 7-Day Plan — implemented / manual test pending; final completion yok
 → Issue #504 / PR #505 recovery surface — merged / owner recovery verification pending
 → Epic #506 / Issue #507 Inventory Map v1 contract — historical normative foundation
 → Inventory v1 closure — complete / Slice 7 #604 closed / #586 via PR #589 merged
-→ DWG Viewer v1 / Issue #523 — next product phase; implementation not authorized
+→ existing-feature quality + friction reduction
+→ missing manual acceptance closure
 → release-readiness closure
+→ DWG Viewer v1 / Issue #523 — post-release/deferred future integration; not a release dependency
 ```
 
 Items 1–4 complete'tir. Activity Catalog Runtime, typed Project Profile ve
@@ -494,9 +512,11 @@ tarihsel girişim olarak kalır ve current ancestry değildir. Issue #586'nın
 Inventory final UI/UX implementation'ı PR #589 ile merge edilmiş, Issue #586
 completed/closed'dur.
 
-Current product-development sırası Inventory v1 closure complete → DWG Viewer
-v1 / Issue #523 next → release-readiness closure'dır. Issue #523 açık sıradaki
-ürün fazını tanımlar; implementation complete, started veya authorized değildir.
+Current product-development sırası Inventory v1 closure complete →
+existing-feature quality + friction reduction → missing manual acceptance
+closure → release-readiness closure'dır. Issue #523 açık kalır fakat
+`POST-RELEASE / DEFERRED` gelecek entegrasyon hattıdır; ilk genel yayını bloke
+etmez ve yeni DWG implementation dilimi açık owner kararı olmadan başlamaz.
 Issue #501 recovery, Issue #502 external verified backup/update, Issue #503
 newer-live-data-safe restore ve Issue #499 MAIN-only owner-phone kuralları
 silinmez. V2.12 ve sonraki eski planlı ürün işleri ayrı owner resume kararına

@@ -5,7 +5,26 @@
 **Kapsam:** Önceki CSE ürün toplantıları + `CSE / Şefim — Bağımsız Ürün, Pazar ve Yayın Yeterliliği Araştırması` üzerine yapılan karar toplantısı  
 **Raporun referans snapshot'ı:** `master @ baa7beff186e3fee95f1fb439d92045d7ba1af4e`
 
+**Son bağlayıcı güncelleme:** 3 Eylül 2026 owner kararı
+
 > Bu dosya yalnızca ürün sahibi tarafından toplantıda açıkça onaylanan kararları kaydeder. Yeni ürün önerisi eklemez. Bağımsız araştırma raporunun önerileri, ürün sahibinin toplantıda verdiği kararlarla çelişiyorsa aşağıdaki kilitli kararlar geçerlidir.
+
+## 3 Eylül 2026 — Üstün gelen owner kararı
+
+Bu karar, aşağıdaki 30 Ağustos kararlarının DWG'yi ilk genel yayın için zorunlu
+kılan kısımlarını supersede eder:
+
+- CSE ilk genel yayınını DWG Viewer'ı beklemeden yapabilir; DWG ilk genel yayın
+  kapsamı veya kabul kapısı değildir.
+- Yakın dönem yönü **mevcut özellik kalitesi ve sürtünmenin azaltılması → eksik
+  manuel kabullerin kapatılması → release-readiness → genel yayın** olarak
+  kilitlenmiştir.
+- Issue #523 `POST-RELEASE / DEFERRED` durumundadır ve yeni açık owner kararı
+  olmadan CSE içinde yeni DWG implementation dilimi başlatılmaz.
+- Ayrı Android DWG ürün/engine Ar-Ge hattı CSE'nin yayın bağımlılığı değildir;
+  yeterince olgunlaştığında gelecekte CSE'ye entegre edilebilir.
+- DWG-001/002/003 teknik belgeleri gelecekteki entegrasyon temeli olarak
+  korunur.
 
 ## 1. Yayın stratejisi
 
@@ -22,11 +41,13 @@
 - Gelişmiş hızlı kayıt sistemi genel yayından sonraki ilk yüksek öncelikli geliştirmelerden biri olacak.
 - Mevcut kayıt ve Unutma Kutusu akışları çalışır durumda korunacak.
 
-## 3. İlk genel yayındaki DWG kapsamı
+## 3. Gelecek modül — DWG kapsamı
 
-İlk genel yayın için DWG kapsamı **Minimal Güvenilir Viewer + ölçüme hazır mimari** olarak kilitlenmiştir.
+DWG, CSE'nin ilk genel yayın kapsamında veya yayın kapısında değildir. Aşağıdaki
+viewer sınırı, yalnız Issue #523 daha sonra açık owner kararıyla yeniden
+etkinleştirilirse geçerli olacak gelecek modül kuralıdır.
 
-İlk sürümde kullanıcıya sunulacak zorunlu kapsam:
+Gelecekteki ilk DWG modülünde kullanıcıya sunulacak kapsam:
 
 - DWG açma,
 - pan,
@@ -42,7 +63,7 @@ Mimari ilkeler:
 - Original DWG immutable source-of-truth olacak.
 - Derived viewer/cache katmanı yeniden üretilebilir olacak.
 - Mimari daha sonra güvenilir iki nokta ölçümü, kalibrasyon ve trust-state eklenmesini engellemeyecek.
-- **Ölçüm ikinci faz özelliğidir ve ilk genel yayın kapısı değildir.**
+- **Ölçüm ikinci DWG fazı özelliğidir; CSE'nin ilk genel yayın kapısı değildir.**
 
 ## 4. Restore modeli
 
@@ -99,7 +120,10 @@ Envanteri feature flag ile gizleyerek yayımlama veya bilinen persistence riskiy
 ## 9. Teknik telemetry
 
 - Genel yayın öncesinde minimum teknik telemetry zorunlu olacak.
-- En az crash, ANR, fatal error ve kritik DWG conversion/runtime failure gibi teknik sorunlar izlenecek.
+- En az crash, ANR ve fatal error gibi aktif CSE runtime sorunları izlenecek.
+- DWG conversion/runtime failure telemetry, yalnız gelecek DWG modülü
+  etkinleştirildiğinde o modülün kuralıdır; CSE'nin ilk genel yayın kapısı
+  değildir.
 - Ayrıntılı ürün kullanım analitiği, modül kullanım sıklığı, D7/D30 retention, capture süreleri ve benzeri davranış analitiği ilk genel yayın için zorunlu değildir; yayın sonrasına bırakılacak.
 - Local-first ve veri minimizasyonu ilkeleri korunacak.
 
@@ -146,7 +170,10 @@ tamamen ücretli duvar arkasına kapatılmayacak.
 
 Bu maddelerin nihai paket sınırları ayrıca kararlaştırılacaktır.
 
-## 13. DWG için 30 günlük deneme
+## 13. Gelecek DWG modülü için 30 günlük deneme
+
+Bu deneme ve ilgili entitlement davranışı ilk genel yayında uygulanması gereken
+bir kapı değildir; yalnız gelecek DWG modülü etkinleştirildiğinde geçerlidir.
 
 - DWG için klasik kalıcı ücretsiz limit yerine **30 günlük deneme modeli** kullanılacak.
 - Deneme süresi uygulama kurulduğunda otomatik başlamayacak.
@@ -154,7 +181,10 @@ Bu maddelerin nihai paket sınırları ayrıca kararlaştırılacaktır.
 - Kullanıcı açık bir **“30 günlük DWG denemesini başlat”** onayı verecek.
 - Süre yalnız kullanıcı bu onayı verdikten sonra başlayacak.
 
-## 14. DWG denemesi bittikten sonra veri davranışı
+## 14. Gelecek DWG modülü — entitlement ve veri davranışı
+
+Bu güvenlik kuralları gelecek DWG modülünün trial/abonelik/entitlement yaşam
+döngüsünde korunur:
 
 - Deneme sırasında eklenen original DWG dosyaları silinmeyecek.
 - Proje/revizyon metadata'sı ve dosya bağlantıları korunacak.
@@ -182,4 +212,12 @@ Bu maddelerin nihai paket sınırları ayrıca kararlaştırılacaktır.
 
 ## Genel yayın için birleşik ilke
 
-CSE'nin ilk dış yayını genel yayın olacaktır; ancak genel yayın tarihi tek bir özelliğin, özellikle DWG Viewer'ın tamamlanmasına otomatik olarak bağlanmayacaktır. Genel yayın yalnız kilitli yayın kabul kapıları, veri güveni, Envanter kapanışı, tüm manuel kabul testleri, gerekli gerçek cihaz doğrulamaları, Ana Proje Dashboard'u, minimum proje içi ortak arama, onboarding, teknik telemetry ve gizlilik/KVKK gereklilikleri yeterli güven düzeyinde tamamlandıktan sonra yapılacaktır.
+CSE'nin ilk dış yayını genel yayın olacaktır ve DWG Viewer bu yayının kapsamı,
+bağımlılığı veya kabul kapısı değildir. Yakın dönem çalışma mevcut özelliklerin
+kalitesini yükseltmeye, günlük akışlardaki sürtünmeyi azaltmaya, görünür manuel
+kabul borcunu kapatmaya ve release-readiness'a odaklanır. Genel yayın yalnız
+kilitli bağımsız yayın kabul kapıları, veri güveni, Envanter kapanışı, tüm
+kullanıcıya görünür gerekli manuel kabul testleri, gerekli gerçek cihaz
+doğrulamaları, Ana Proje Dashboard'u, minimum proje içi ortak arama, onboarding,
+minimum teknik telemetry ve gizlilik/KVKK gereklilikleri yeterli güven düzeyinde
+tamamlandıktan sonra yapılacaktır.
