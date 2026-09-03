@@ -2,8 +2,8 @@
 
 **Belge türü:** Güncel ürün yürütme kapsamı
 **Durum:** Kanonik V2 kapsam ve sıra kaynağı
-**Tarih:** 30 Ağustos 2026
-**Güncel yön kaynağı:** Epic #539 / Issue #540 — UI/UX Release Readiness Wave 0
+**Tarih:** 3 Eylül 2026
+**Güncel yön kaynağı:** Inventory v1 closure complete → DWG Viewer #523 next → release-readiness closure
 **Değişken repository gerçeği:** Güncel SHA/PR durumu GitHub `master` ve current Issue üzerinden doğrulanır.
 
 ## 1. Belgenin rolü
@@ -51,8 +51,10 @@ yerine bu baseline üzerinde ilerler.
 
 Güncel V2 teknik durum V1 metadata'sından ayrıdır: Issue #527 revised Slice 6.1,
 Issue #529 correction'ı, Issue #531 Slice 6.2 ve Issue #533 / PR #534 Slice 6.3
-merged Inventory predecessor'larıdır. Issue #535 / Draft PR #536 deferred ve
-current execution base değildir. Current Issue #540 baseline'ı schema `22`,
+merged Inventory predecessor'larıdır. Issue #535 / Draft PR #536 superseded
+tarihsel girişimdir ve current execution base değildir. Inventory Spatial v1
+Slice 7 / Issue #604 repository, backup/restore, attachment ve owner field
+acceptance kapılarıyla completed/closed'dur. Güncel V2 baseline schema `22`,
 mobile version `0.1.0+1` ve backup format `1`dir.
 Exact güncel merge SHA kalıcı bu kapsam belgesine sabitlenmez; GitHub `master`
 üzerinden doğrulanır. Bu baseline,
@@ -104,10 +106,8 @@ Proje/Mahal, Saha Rehberi, Attachment ve Ajanda omurgası — complete
 → Inventory Map v1 Slices 1–5 and Issue #527 / PR #528 revised Slice 6.1 — merged predecessors
 → Issue #529 / PR #530 correction and Issue #531 / PR #532 Slice 6.2 — merged
 → Issue #533 / PR #534 Slice 6.3 block reshape/reconciliation/lifecycle — merged
-→ Issue #535 / Draft PR #536 — deferred / not execution base / device acceptance incomplete
-→ Epic #539 / Issue #540 UI/UX Release Readiness Wave 0 — current docs/source audit
-→ Project Dashboard / project context / navigation slices — next after independent review
-→ Minimal Reliable DWG Viewer — later high-priority release feature
+→ Inventory v1 closure — complete / Slice 7 #604 closed / #586 via PR #589 merged
+→ DWG Viewer v1 / Issue #523 — next product phase; implementation not authorized
 → release-readiness closure
 ```
 
@@ -415,13 +415,14 @@ Durum:
 - Slice 1 merged ve manual testleri Issue #479'da pending'dir.
 - V2.11 complete, verified veya release-ready ilan edilmemiştir.
 
-### Inventory Map v1 — historical work preserved / current line deferred
+### Inventory Map v1 — closure complete
 
-Epic #506 altındaki kroki tabanlı dayanıklı saha envanteri yakın geçmişteki
-product-development hattıdır. Merged contract ve production Slice çalışmaları
-ürün gerçeği olarak korunur; Issue #535 / Draft PR #536 deferred'dır ve device
-acceptance incomplete kalır. Bu erteleme Inventory'yi complete veya rejected
-yapmaz ve tarihsel 13 maddelik numaraları yeniden adlandırmaz.
+Epic #506 altındaki kroki tabanlı dayanıklı saha envanteri tamamlanmış ürün
+hattıdır. Merged contract ve production Slice çalışmaları ürün gerçeği olarak
+korunur. Issue #535 / Draft PR #536 superseded tarihsel girişimdir; current
+ancestry değildir ve sonraki tamamlanan Inventory çalışmalarını sınırlamaz.
+Inventory Spatial v1 Slice 7 / Issue #604 repository, backup/restore, attachment,
+isolated device ve owner field acceptance kapılarıyla completed/closed'dur.
 
 Kanonik Slice 0 sözleşmesi:
 
@@ -447,8 +448,9 @@ context ve exact-floor quick-create davranışını schema/storage değiştirmed
 merged temele eklemiştir. Issue #533 / PR #534 Slice 6.3 mapped-block reshape,
 placement reconciliation ve explicit detach/archive/reattach lifecycle
 davranışını schema/storage değiştirmeden merged temele eklemiştir. Issue #535 /
-Draft PR #536 current ancestry/source truth'u değildir; Slice 6.4/7, Ready,
-merge ve cihaz işlemleri Issue #540 authority'sinin dışındadır.
+Draft PR #536 current ancestry/source truth'u değildir. Sonraki Inventory UI
+implementation'ı Issue #586 / PR #589 ile merge edilmiş; Slice 7 / Issue #604
+kalıcı veri ve field acceptance kapanışını tamamlamıştır.
 
 Issue #527 owner-acceptance correction'ı normal yeni çizimi yatay/düşey
 segmentlerle sınırlar: ilk kenar dominant pointer axis'ini, sonraki kenarlar 90°
@@ -459,9 +461,11 @@ geometry okunmaya devam eder. Merged Slice 6.3 `Krokiyi güncelle` içinde yaln�
 mapped active block için bounded whole-nudge ve orthogonal edge reshape açar;
 unmapped legacy base kilitli kalır. Yeni orthogonal block append akışı korunur.
 
-Issue #527 owner-acceptance correction'ı editorü landscape
-full-screen canvas ve sağ compact icon-only, tooltip/Semantics etiketli toolbar
-olarak sunar. Global check/save action pending debounce'u force-save/drain eder,
+Issue #527 owner-acceptance correction'ı editorün güvenli full-screen canvas ve
+compact icon-only, tooltip/Semantics etiketli toolbar temelini kurar. Issue #586 /
+PR #589 current portrait sketch editor, çift edge control rail ve gesture-driven
+auto-hide davranışını merge etmiştir. Global check/save action pending
+debounce'u force-save/drain eder,
 finalize sonucunu doğrular ve Inventory'nin canonical map projection'ını aynı
 session'da yeniler. Block metadata action'ı lokal `Alanı ekle` olarak kalır;
 bir draft global finalize öncesinde birden fazla block biriktirebilir.
@@ -470,31 +474,26 @@ Agenda global safe-diagnostic correction'ı mergedir; Issue #531 bu davranışı
 değiştirmez.
 
 Issue #501, #502, #503 ve #499 P0 veri/owner-phone güvenlik kuralları korunur.
-Issue #540 veya UI/UX programı Inventory source devamı ya da owner-phone MAIN
-kurulum yetkisi üretmez. Owner'ın release kararındaki Inventory closure gate'i
-de ayrıca korunur.
+Inventory v1 closure bu bağımsız recovery, update ve MAIN-only güvenlik
+kapılarını veya release kararını kendiliğinden kapatmaz.
 
-### Current priority — UI/UX Release Readiness (Epic #539)
+### Current priority — DWG Viewer v1 (Issue #523)
 
-Issue #540 Wave 0 exact current-master Flutter yüzeyinin salt-okunur auditini,
-P0–P3 finding register'ını, dar implementation slices'ı ve planning truth-sync'i
-üretir. Production UI, domain/source-of-truth, schema, test, build, platform veya
-cihaz davranışı değiştirmez.
+Issue #540 UI/UX Wave 0 ve loading blocker #580 completed/closed'dur. Issue #586
+Inventory final UI/UX implementation'ı PR #589 ile merge edilmiş ve Issue
+completed/closed'dur. Inventory Spatial v1 Slice 7 / Issue #604 de
+completed/closed olduğundan Inventory v1 closure tamamlanmıştır.
 
 Current sıra:
 
 ```text
-UI/UX Release Readiness Wave 0 — current / docs-source audit
-→ Project Dashboard v1 — next after independent R4 review and owner authority
-→ project-context continuity
-→ navigation / project management-search / shared state polish
-→ Minimal Reliable DWG Viewer — later high-priority release feature
-→ Inventory + manual/device + onboarding/telemetry/privacy gates
+Inventory v1 closure — complete
+→ DWG Viewer v1 / Issue #523 — next product phase; implementation not authorized
 → release-readiness closure
 ```
 
-Kilitli yön, current source evidence ve Wave 1 implementation-ready boundary:
-`docs/v2/CSE_UI_UX_RELEASE_READINESS_AUDIT.md`.
+Issue #523'ün bu sırada yer alması implementation'ın başladığı, tamamlandığı veya
+yetkilendirildiği anlamına gelmez. Yürütme ayrı owner authority gerektirir.
 
 ### 12. Günlük Log Çıktısı v2
 
@@ -541,8 +540,8 @@ Kapanış kapısı:
 | 3 | Living 7-Day Plan; Günlük Log v1; İş Zinciri | Yaşayan yakın plan ve kaynaklı günlük akışı |
 | 4 | İstenecek Malzemeler; öneriler; telefon görüşmesi | Yardımcı akışların ana omurgaya bağlanması |
 | 5 | Proje albümü Slice 1 merged; Günlük Log v2 paused | V2.11 manual test/closure ve ayrı owner resume kararı |
-| Historical deferred line | Inventory Map v1 through Issue #533 / PR #534 | Merged work preserved; Issue #535/PR #536 deferred; device acceptance incomplete |
-| Current priority | UI/UX Release Readiness Wave 0 / Issue #540 | Current UI source audit, truth-sync, P0–P3 backlog ve Project Dashboard v1 handoff |
+| Completed product line | Inventory v1 through Slice 7 / Issue #604 | Repository, backup/restore, attachment, isolated device ve owner field acceptance closure complete |
+| Current priority | DWG Viewer v1 / Issue #523 | Next product phase only; implementation is not started, complete or authorized |
 | 6 | Mini hesap makinesi — paused | Ayrı owner resume kararı ve dar saha aracı kabulü |
 
 Aynı anda yalnız bir production implementation Issue'su aktif olur. Bir dalga
@@ -636,8 +635,8 @@ buffer'ındaki kanıtlanmış ekstra büyük kopyayı kaldırmıştır. Issue #4
 pending ve V2.11 complete değildir. Issue #504 / PR #505 recovery surface'i
 mergedir; owner recovery doğrulaması ve P0 Issues #501–#503 açık kalır.
 
-Current Issue #540 başlangıç facts schema `22`, backup format `1` ve version
-`0.1.0+1`dir; docs/source audit bunları değiştirmez. Exact current SHA ve son
+Current V2 facts schema `22`, backup format `1` ve version `0.1.0+1`dir; bu
+truth-sync bunları değiştirmez. Exact current SHA ve son
 PR kalıcı burada dondurulmaz; GitHub `master` current repository truth'udur.
 Her Issue task başlangıç snapshot'ını kendi task/result kanıtında ayrıca bağlar.
 
@@ -666,10 +665,8 @@ Living Plan MVP Core — merged / PR #463
 → Issue #529 / PR #530 transient project diagnostic correction — merged predecessor
 → Issue #531 / PR #532 Inventory Spatial v1 Slice 6.2 — merged predecessor
 → Issue #533 / PR #534 Inventory Spatial v1 Slice 6.3 — merged predecessor
-→ Issue #535 / Draft PR #536 — deferred / not execution base / device acceptance incomplete
-→ Epic #539 / Issue #540 UI/UX Release Readiness Wave 0 — current docs/source audit
-→ Project Dashboard / project context / navigation slices — next after independent R4 review
-→ Minimal Reliable DWG Viewer — later high-priority release feature
+→ Inventory v1 closure — complete / Slice 7 #604 closed / #586 via PR #589 merged
+→ DWG Viewer v1 / Issue #523 — next product phase; implementation not authorized
 → release-readiness closure
 ```
 
@@ -715,17 +712,18 @@ count/label ve strict-interior exact-floor quick create ekler. UI selection
 persist edilmez; schema/storage/migration değişmez. Issue #533 / PR #534 Slice
 6.3 mapped block whole-nudge/edge reshape, append-only placement reconciliation,
 explicit detach/archive ve same-identity reattach lifecycle'ını merged temele
-ekler; schema exact `22` kalır. Issue #535 / Draft PR #536 deferred'dır; Slice
-6.4 ve Slice 7 Issue #540 kapsamında başlamaz.
+ekler; schema exact `22` kalır. Issue #535 / Draft PR #536 superseded tarihsel
+girişimdir ve current ancestry değildir. Issue #586 / PR #589 current Inventory
+UI implementation'ını, Slice 7 / Issue #604 ise persistence ve field acceptance
+closure'ını tamamlamıştır.
 `docs/v2/CSE_INVENTORY_MAP_V1_CONTRACT.md` güncel normative sınırdır.
 
 Issue #501 recovery verification, Issue #502 external verified backup/update
 gate'i, Issue #503 newer-live-data-safe restore yönü ve Issue #499 owner-phone
 MAIN-only identity kuralı bütün owner-phone operasyonlarından önce gelir.
-Inventory source development ve Draft PR bunları kapatmaz. Current UI/UX
-programı Inventory continuation authority üretmez. Bağımsız Issue #540 review
-sonrasında ilk dar implementation adayı Project Dashboard v1'dir; project
-context ve navigation ayrı successor'lardır. Minimal Reliable DWG Viewer daha
-sonraki yüksek öncelikli release feature'dır. V2.12 ve sonraki eski planlı ürün
-işleri owner resume kararına kadar paused kalır. V2.5–V2.11 final completion
-ilanları ve public/store release ayrı owner kararlarına bağlıdır.
+Inventory closure bunları kapatmaz. Güncel ürün sırası Inventory v1 closure
+complete → DWG Viewer v1 / Issue #523 next → release-readiness closure'dır.
+Issue #523 implementation complete, started veya authorized değildir. V2.12 ve
+sonraki eski planlı ürün işleri owner resume kararına kadar paused kalır.
+V2.5–V2.11 final completion ilanları ve public/store release ayrı owner
+kararlarına bağlıdır.
