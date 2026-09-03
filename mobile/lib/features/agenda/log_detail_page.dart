@@ -341,21 +341,13 @@ class _LogDetailPageState extends State<LogDetailPage> {
             title: const Text('Ajanda kaydı'),
             actions: [
               if (detail != null && detail.managedConcretePourId == null)
-                Semantics(
-                  button: true,
+                _detailIconAction(
+                  key: const Key('detail-reminder-action'),
                   label: 'Hatırlatıcı oluştur',
-                  child: IconButton(
-                    key: const Key('detail-reminder-action'),
-                    tooltip: 'Hatırlatıcı oluştur',
-                    constraints: const BoxConstraints(
-                      minWidth: 48,
-                      minHeight: 48,
-                    ),
-                    onPressed: _mutating || detail.log.archivedAt != null
-                        ? null
-                        : () => _createReminder(detail.log),
-                    icon: const Icon(Icons.add_alarm_outlined),
-                  ),
+                  onPressed: _mutating || detail.log.archivedAt != null
+                      ? null
+                      : () => _createReminder(detail.log),
+                  icon: const Icon(Icons.add_alarm_outlined),
                 ),
             ],
           ),
@@ -483,13 +475,13 @@ class _LogDetailPageState extends State<LogDetailPage> {
             runSpacing: 8,
             children: [
               if (log.archivedAt == null)
-                OutlinedButton.icon(
+                _detailIconAction(
                   key: const Key('edit-agenda-log'),
                   onPressed: _mutating ? null : () => _edit(log),
                   icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Düzenle'),
+                  label: 'Düzenle',
                 ),
-              FilledButton.tonalIcon(
+              _detailIconAction(
                 key: Key(
                   log.archivedAt == null
                       ? 'archive-agenda-log'
@@ -501,7 +493,7 @@ class _LogDetailPageState extends State<LogDetailPage> {
                       ? Icons.delete_outline
                       : Icons.restore_outlined,
                 ),
-                label: Text(log.archivedAt == null ? 'Sil' : 'Geri getir'),
+                label: log.archivedAt == null ? 'Sil' : 'Geri getir',
               ),
             ],
           ),
@@ -515,9 +507,9 @@ class _LogDetailPageState extends State<LogDetailPage> {
               ),
             ),
             if (log.archivedAt == null && widget.attachments != null)
-              IconButton.filledTonal(
+              _detailIconAction(
                 key: const Key('detail-add-agenda-photo'),
-                tooltip: 'Fotoğraf ekle',
+                label: 'Fotoğraf ekle',
                 onPressed: _mutating ? null : () => _addPhoto(log),
                 icon: const Icon(Icons.add_a_photo_outlined),
               ),
@@ -526,9 +518,9 @@ class _LogDetailPageState extends State<LogDetailPage> {
                 widget.agenda is AgendaExistingAttachmentApplication)
               Padding(
                 padding: const EdgeInsets.only(left: 8),
-                child: IconButton.filledTonal(
+                child: _detailIconAction(
                   key: const Key('detail-link-existing-agenda-photo'),
-                  tooltip: 'Mevcut fotoğrafı bağla',
+                  label: 'Mevcut fotoğrafı bağla',
                   onPressed: _mutating ? null : () => _linkExistingPhoto(log),
                   icon: const Icon(Icons.add_link_rounded),
                 ),
@@ -571,8 +563,9 @@ class _LogDetailPageState extends State<LogDetailPage> {
                   ),
                 ),
                 trailing: log.archivedAt == null
-                    ? IconButton(
-                        tooltip: 'Fotoğrafı arşivle',
+                    ? _detailIconAction(
+                        key: Key('archive-agenda-photo-${photo.id}'),
+                        label: 'Fotoğrafı arşivle',
                         onPressed: _mutating
                             ? null
                             : () => _archivePhoto(log, photo),
@@ -671,6 +664,40 @@ class _LogDetailPageState extends State<LogDetailPage> {
     );
   }
 }
+
+Widget _detailIconAction({
+  Key? key,
+  required Widget icon,
+  required String label,
+  required VoidCallback? onPressed,
+}) => Align(
+  alignment: AlignmentDirectional.centerStart,
+  widthFactor: 1,
+  heightFactor: 1,
+  child: Semantics(
+    container: true,
+    label: label,
+    button: true,
+    enabled: onPressed != null,
+    excludeSemantics: true,
+    onTap: onPressed,
+    child: IconButton.filledTonal(
+      key: key,
+      tooltip: label,
+      style: IconButton.styleFrom(
+        minimumSize: const Size.square(40),
+        fixedSize: const Size.square(40),
+        maximumSize: const Size.square(40),
+        iconSize: 20,
+        padding: EdgeInsets.zero,
+        visualDensity: VisualDensity.standard,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      onPressed: onPressed,
+      icon: icon,
+    ),
+  ),
+);
 
 const _agendaUpdateFieldLabels = <String, String>{
   'observed_at': 'Olay zamanı',

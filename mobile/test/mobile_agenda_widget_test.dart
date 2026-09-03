@@ -11,9 +11,11 @@ import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attachment_models.dart';
 import 'package:chief_site_engineer/domain/concrete_models.dart';
+import 'package:chief_site_engineer/domain/project_location_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
+import 'package:chief_site_engineer/features/agenda/project_location_catalog_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_destination_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
@@ -263,7 +265,7 @@ void main() {
   });
 
   testWidgets(
-    'Ajanda works at 320 px with filters, long Turkish text and 44 px targets',
+    'Ajanda works at 320 px with filters, long Turkish text and 40 px actions',
     (tester) async {
       tester.view.physicalSize = const Size(320, 760);
       tester.view.devicePixelRatio = 1;
@@ -284,22 +286,33 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Ajanda').last);
+      // NavigationBar intentionally hides labels; tap the actual destination.
+      final navigationBar = find.byType(NavigationBar);
+      final agendaDestination = find.descendant(
+        of: navigationBar,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is NavigationDestination && widget.label == 'Ajanda',
+        ),
+      );
+      _expectControlFullyVisible(tester, agendaDestination, navigationBar);
+      await tester.tap(agendaDestination);
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('agenda-project-filter')), findsOneWidget);
       expect(find.byKey(const Key('agenda-category-filter')), findsOneWidget);
       expect(find.byKey(const Key('agenda-literal-search')), findsOneWidget);
       expect(find.byKey(const Key('agenda-sort-order')), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('agenda-log-$logId')),
-        240,
-        scrollable: _scrollableFor(find.byKey(const Key('agenda-day-list'))),
+      await _revealRouteControl(
+        tester,
+        control: find.byKey(const Key('agenda-log-$logId')),
+        list: find.byKey(const Key('agenda-day-list')),
+        scrollDelta: 240,
       );
       expect(find.textContaining('Uzun Türkçe açıklama'), findsOneWidget);
       expect(
-        tester.getSize(find.byKey(const Key('create-agenda-log'))).height,
-        greaterThanOrEqualTo(44),
+        tester.getSize(find.byKey(const Key('create-agenda-log'))),
+        const Size.square(40),
       );
       expect(tester.takeException(), isNull);
     },
@@ -396,7 +409,17 @@ void main() {
       await tester.pump();
 
       expect(fake.createLogCalls, 1);
-      expect(find.text('Kaydediliyor…'), findsOneWidget);
+      final submit = find.byKey(const Key('submit-log'));
+      expect(tester.getSize(submit), const Size.square(40));
+      expect(tester.widget<IconButton>(submit).onPressed, isNull);
+      expect(tester.widget<IconButton>(submit).tooltip, 'Kaydediliyor…');
+      expect(
+        find.descendant(
+          of: submit,
+          matching: find.byType(CircularProgressIndicator),
+        ),
+        findsOneWidget,
+      );
       final commandId = fake.lastLogCommand!.id;
       completer.complete(log());
       await tester.pumpAndSettle();
@@ -418,28 +441,39 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    final formListView = find.descendant(
+      of: find.byType(LogFormPage),
+      matching: find.byType(ListView),
+    );
+    expect(formListView, findsOneWidget);
     await tester.enterText(
       find.byKey(const Key('log-description')),
       'Çoklu saha fotoğrafı',
     );
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('log-add-photo')),
-      300,
-      scrollable: find.byType(Scrollable).last,
+    final addPhoto = find.byKey(const Key('log-add-photo'));
+    await _revealRouteControl(
+      tester,
+      control: addPhoto,
+      list: formListView,
+      scrollDelta: 300,
     );
-    await tester.tap(find.byKey(const Key('log-add-photo')));
+    await tester.tap(addPhoto);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Sistem fotoğraf seçici'));
+    final photoSource = find.widgetWithText(ListTile, 'Sistem fotoğraf seçici');
+    _expectControlFullyVisible(tester, photoSource, find.byType(BottomSheet));
+    await tester.tap(photoSource);
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('pending-log-photo-0')), findsOneWidget);
     expect(find.byKey(const Key('pending-log-photo-1')), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('submit-log')),
-      300,
-      scrollable: find.byType(Scrollable).last,
+    final submit = find.byKey(const Key('submit-log'));
+    await _revealRouteControl(
+      tester,
+      control: submit,
+      list: formListView,
+      scrollDelta: 300,
     );
-    await tester.tap(find.byKey(const Key('submit-log')));
+    await tester.tap(submit);
     await tester.pumpAndSettle();
 
     expect(fake.createLogCalls, 1);
@@ -528,9 +562,7 @@ void main() {
         matching: find.byType(ListView),
       );
       expect(formListView, findsOneWidget);
-      final formScrollable = find
-          .descendant(of: formListView, matching: find.byType(Scrollable))
-          .first;
+      final formScrollable = _routeListScrollable(tester, formListView);
       expect(formScrollable, findsOneWidget);
 
       const description = 'Beton dökümü yarın başlayacak.';
@@ -547,10 +579,14 @@ void main() {
         tester.state<FormFieldState<AgendaCategory>>(categoryField).value,
         AgendaCategory.generalNote,
       );
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('agenda-concrete-form-suggestion')),
-        300,
-        scrollable: formScrollable,
+      final selectConcreteCategoryAction = find.byKey(
+        const Key('agenda-concrete-select-category'),
+      );
+      await _revealRouteControl(
+        tester,
+        control: selectConcreteCategoryAction,
+        list: formListView,
+        scrollDelta: 300,
       );
       expect(
         tester
@@ -564,9 +600,7 @@ void main() {
             .height,
         greaterThanOrEqualTo(44),
       );
-      await tester.tap(
-        find.byKey(const Key('agenda-concrete-select-category')),
-      );
+      await tester.tap(selectConcreteCategoryAction);
       await tester.pump();
       await tester.scrollUntilVisible(
         find.byKey(const Key('log-category')),
@@ -586,29 +620,32 @@ void main() {
       );
       await tester.enterText(find.byKey(const Key('log-location')), location);
       await tester.enterText(find.byKey(const Key('log-notes')), notes);
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('log-add-photo')),
-        -300,
-        scrollable: formScrollable,
+      final addPhoto = find.byKey(const Key('log-add-photo'));
+      await _revealRouteControl(
+        tester,
+        control: addPhoto,
+        list: formListView,
+        scrollDelta: -300,
       );
-      await tester.tap(find.byKey(const Key('log-add-photo')));
+      await tester.tap(addPhoto);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Sistem fotoğraf seçici'));
+      final photoSource = find.widgetWithText(
+        ListTile,
+        'Sistem fotoğraf seçici',
+      );
+      _expectControlFullyVisible(tester, photoSource, find.byType(BottomSheet));
+      await tester.tap(photoSource);
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('pending-log-photo-0')), findsOneWidget);
 
       final openConcreteAction = find.byKey(
         const Key('agenda-concrete-form-open'),
       );
-      await tester.scrollUntilVisible(
-        openConcreteAction,
-        300,
-        scrollable: formScrollable,
-      );
-      await Scrollable.ensureVisible(
-        tester.element(openConcreteAction),
-        alignment: 0.5,
-        duration: Duration.zero,
+      await _revealRouteControl(
+        tester,
+        control: openConcreteAction,
+        list: formListView,
+        scrollDelta: 300,
       );
       await tester.pumpAndSettle();
       expect(openConcreteAction, findsOneWidget);
@@ -1367,7 +1404,7 @@ void main() {
 
       final reminderAction = find.byKey(const Key('detail-reminder-action'));
       expect(reminderAction, findsOneWidget);
-      expect(tester.getSize(reminderAction).height, greaterThanOrEqualTo(44));
+      expect(tester.getSize(reminderAction), const Size.square(40));
       expect(find.bySemanticsLabel('Hatırlatıcı oluştur'), findsOneWidget);
       expect(
         find.widgetWithText(FilledButton, 'Hatırlatıcı oluştur'),
@@ -1858,7 +1895,7 @@ void main() {
         'Bağlı hatırlatıcıyı aç',
       );
       expect(linkedReminderSemanticsNode, findsOneWidget);
-      expect(tester.getSize(indicator).shortestSide, greaterThanOrEqualTo(48));
+      expect(tester.getSize(indicator), const Size.square(40));
       expect(Theme.of(tester.element(indicator)).brightness, Brightness.dark);
       expect(tester.takeException(), isNull);
 
@@ -2035,6 +2072,512 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final brightness in Brightness.values) {
+    testWidgets(
+      'icon-first list preserves routes and state at 320/1.6 ${brightness.name}',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        try {
+          final fake = FakeAgendaApplication(
+            projects: [project()],
+            logs: [log()],
+          );
+          final locations = _IconLocations([project()]);
+          await _pumpIconSurface(
+            tester,
+            brightness,
+            AgendaPage(
+              agenda: fake,
+              projectLocations: locations,
+              activeProjectId: projectId,
+            ),
+          );
+          for (final entry in {
+            'create-agenda-project': 'Yeni proje oluştur',
+            'open-project-location-catalog': 'Mahal Kataloğu',
+            'previous-day': 'Önceki gün',
+            'agenda-today': 'Bugüne git',
+            'next-day': 'Sonraki gün',
+            'agenda-search': 'Ara',
+          }.entries) {
+            await _revealIcon(tester, find.byKey(Key(entry.key)));
+            _expectIcon(tester, find.byKey(Key(entry.key)), entry.value);
+          }
+          final today = fake.lastAgendaQuery!.istanbulDay;
+          for (final (key, day) in [
+            ('previous-day', CseTimeCodec.shiftIstanbulDay(today, -1)),
+            ('next-day', today),
+            ('next-day', CseTimeCodec.shiftIstanbulDay(today, 1)),
+            ('agenda-today', today),
+          ]) {
+            final action = find.byKey(Key(key));
+            await _revealIcon(tester, action);
+            final calls = fake.listAgendaCalls;
+            await tester.tapAt(tester.getTopLeft(action) + const Offset(2, 2));
+            await tester.pumpAndSettle();
+            expect(fake.listAgendaCalls, calls + 1);
+            expect(fake.lastAgendaQuery!.istanbulDay, day);
+            expect(
+              find.descendant(
+                of: find.byKey(const Key('selected-day')),
+                matching: find.text(day),
+              ),
+              findsOneWidget,
+            );
+          }
+          await _revealIcon(tester, find.byKey(const Key('selected-day')));
+          await tester.tap(find.byKey(const Key('selected-day')));
+          await tester.pumpAndSettle();
+          expect(find.byType(DatePickerDialog), findsOneWidget);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(fake.lastAgendaQuery!.istanbulDay, today);
+
+          await tester.tap(find.text('Arşivlenenler'));
+          await tester.pumpAndSettle();
+          expect(
+            fake.lastAgendaQuery!.archiveFilter,
+            AgendaArchiveFilter.archived,
+          );
+          expect(
+            tester
+                .widget<SegmentedButton<AgendaArchiveFilter>>(
+                  find.byKey(const Key('agenda-archive-filter')),
+                )
+                .selected,
+            {AgendaArchiveFilter.archived},
+          );
+          await tester.tap(find.text('Aktif'));
+          await tester.pumpAndSettle();
+          expect(
+            fake.lastAgendaQuery!.archiveFilter,
+            AgendaArchiveFilter.active,
+          );
+          for (final (key, value) in [
+            ('agenda-sort-order', 'En eski üstte'),
+            ('agenda-project-filter', project().name),
+            ('agenda-category-filter', AgendaCategory.inspection.label),
+          ]) {
+            final field = find.byKey(Key(key));
+            await _revealIcon(tester, field);
+            await tester.tap(field);
+            await tester.pumpAndSettle();
+            await tester.tap(find.text(value).last);
+            await tester.pumpAndSettle();
+            expect(
+              find.descendant(of: field, matching: find.text(value)),
+              findsOneWidget,
+            );
+          }
+          await _revealIcon(
+            tester,
+            find.byKey(const Key('agenda-literal-search')),
+          );
+          await tester.enterText(
+            find.byKey(const Key('agenda-literal-search')),
+            'saha',
+          );
+          await tester.tap(find.byKey(const Key('agenda-search')));
+          await tester.pumpAndSettle();
+          expect(fake.lastAgendaQuery!.literalSearch, 'saha');
+          expect(fake.lastAgendaQuery!.projectId, projectId);
+          expect(fake.lastAgendaQuery!.category, AgendaCategory.inspection);
+          expect(fake.lastAgendaQuery!.sortOrder, AgendaSortOrder.oldestFirst);
+          expect(find.text('saha'), findsOneWidget);
+
+          await _revealIcon(
+            tester,
+            find.byKey(const Key('create-agenda-project')),
+          );
+          await tester.tap(find.byKey(const Key('create-agenda-project')));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('agenda-project-name')), findsOneWidget);
+          await tester.tap(find.text('Vazgeç'));
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(const Key('open-project-location-catalog')),
+          );
+          await tester.pumpAndSettle();
+          expect(find.byType(ProjectLocationCatalogPage), findsOneWidget);
+          expect(
+            tester
+                .widget<ProjectLocationCatalogPage>(
+                  find.byType(ProjectLocationCatalogPage),
+                )
+                .initialProjectId,
+            projectId,
+          );
+          await tester.pageBack();
+          await tester.pumpAndSettle();
+          final create = find.byKey(const Key('create-agenda-log'));
+          expect(tester.getSize(create), const Size.square(40));
+          expect(create.hitTestable(), findsOneWidget);
+          expect(
+            tester.widget<FloatingActionButton>(create).tooltip,
+            'Ajanda kaydı ekle',
+          );
+          expect(
+            find.descendant(of: create, matching: find.byType(Text)),
+            findsNothing,
+          );
+          _expectButtonSemantics(tester, 'Ajanda kaydı ekle');
+          await tester.tap(create);
+          await tester.pumpAndSettle();
+          expect(find.byType(LogFormPage), findsOneWidget);
+          final form = tester.widget<LogFormPage>(find.byType(LogFormPage));
+          expect(form.initialProjectId, projectId);
+          expect(form.initialIstanbulDay, today);
+          await tester.pageBack();
+          await tester.pumpAndSettle();
+          expect(fake.createLogCalls, 0);
+          expect(fake.projects, hasLength(1));
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+
+    testWidgets(
+      'icon-first form keeps values validation and photo selection at 320/1.6 ${brightness.name}',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        try {
+          final fake = FakeAgendaApplication(projects: [project()]);
+          final locations = _IconLocations([project()])..fail = true;
+          await _pumpIconSurface(
+            tester,
+            brightness,
+            LogFormPage(
+              agenda: fake,
+              projectLocations: locations,
+              initialProjectId: projectId,
+              initialIstanbulDay: '2026-07-19',
+              attachments: SafeAttachmentPicker(
+                permissions: SafeCapabilityService(_GrantedPermission()),
+                picker: _ManySelectedPicker(),
+              ),
+            ),
+          );
+          expect(find.text(project().name), findsOneWidget);
+          expect(find.text('19.07.2026'), findsOneWidget);
+          final time = find.descendant(
+            of: find.byKey(const Key('log-time')),
+            matching: find.byType(Text),
+          );
+          expect(tester.widget<Text>(time).data, contains(':'));
+          await _revealIcon(tester, find.byKey(const Key('create-project')));
+          _expectIcon(
+            tester,
+            find.byKey(const Key('create-project')),
+            'Yeni proje oluştur',
+          );
+          await tester.tap(find.byKey(const Key('create-project')));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('new-project-name')), findsOneWidget);
+          await tester.tap(find.text('Vazgeç'));
+          await tester.pumpAndSettle();
+          final retry = find.byKey(const Key('retry-log-locations'));
+          await _revealIcon(tester, retry);
+          _expectIcon(tester, retry, 'Yeniden dene');
+          locations.fail = false;
+          final calls = locations.queries.length;
+          await tester.tap(retry);
+          await tester.pumpAndSettle();
+          expect(locations.queries, hasLength(calls + 1));
+          expect(locations.queries.last.projectId, projectId);
+          expect(
+            find.byKey(const Key('log-location-load-error')),
+            findsNothing,
+          );
+          final catalog = find.byKey(
+            const Key('open-location-catalog-from-log'),
+          );
+          await _revealIcon(tester, catalog);
+          _expectIcon(tester, catalog, 'Mahal Kataloğu');
+          await tester.tap(catalog);
+          await tester.pumpAndSettle();
+          expect(find.byType(ProjectLocationCatalogPage), findsOneWidget);
+          await tester.pageBack();
+          await tester.pumpAndSettle();
+          final submit = find.byKey(const Key('submit-log'));
+          await _revealIcon(tester, submit);
+          _expectIcon(tester, submit, 'Logu kaydet');
+          await tester.tap(submit);
+          await tester.pumpAndSettle();
+          expect(fake.createLogCalls, 0);
+          await _revealIcon(tester, find.byKey(const Key('log-description')));
+          expect(find.text('Kısa açıklama zorunludur.'), findsOneWidget);
+          await tester.enterText(
+            find.byKey(const Key('log-description')),
+            'Korunan taslak',
+          );
+          final addPhoto = find.byKey(const Key('log-add-photo'));
+          await _revealIcon(tester, addPhoto);
+          _expectIcon(tester, addPhoto, 'Fotoğraf ekle');
+          await tester.tap(addPhoto);
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Sistem fotoğraf seçici'));
+          await tester.pumpAndSettle();
+          final firstPhoto = find.byKey(const Key('pending-log-photo-0'));
+          await _revealIcon(tester, firstPhoto);
+          final remove = find.descendant(
+            of: firstPhoto,
+            matching: find.byType(IconButton),
+          );
+          _expectIcon(tester, remove, 'Seçimden kaldır', uniqueLabel: false);
+          expect(
+            find.descendant(of: firstPhoto, matching: find.text('bir.jpg')),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(
+              of: firstPhoto,
+              matching: find.text('Log kaydıyla birlikte eklenecek'),
+            ),
+            findsOneWidget,
+          );
+          await tester.tap(remove);
+          await tester.pumpAndSettle();
+          expect(find.text('bir.jpg'), findsNothing);
+          expect(find.text('iki.png'), findsOneWidget);
+          expect(find.byKey(const Key('pending-log-photo-1')), findsNothing);
+          await _revealIcon(tester, submit);
+          await tester.tap(submit);
+          await tester.pumpAndSettle();
+          expect(fake.createLogCalls, 1);
+          expect(fake.lastLogCommand!.description, 'Korunan taslak');
+          expect(fake.lastLogCommand!.projectId, projectId);
+          expect(
+            CseTimeCodec.istanbulDayKey(fake.lastLogCommand!.observedAt),
+            '2026-07-19',
+          );
+          expect(
+            fake.lastLogCommand!.photos.map((photo) => photo.originalFileName),
+            ['iki.png'],
+          );
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+
+    testWidgets(
+      'icon-first detail preserves edit archive restore and photos at 320/1.6 ${brightness.name}',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        try {
+          final fake = _IconAgenda(projects: [project()], logs: [log()]);
+          await _pumpIconSurface(
+            tester,
+            brightness,
+            LogDetailPage(
+              agenda: fake,
+              logId: logId,
+              attachments: SafeAttachmentPicker(
+                permissions: SafeCapabilityService(_GrantedPermission()),
+                picker: _SelectedPicker(),
+              ),
+            ),
+          );
+          _expectIcon(
+            tester,
+            find.byKey(const Key('detail-reminder-action')),
+            'Hatırlatıcı oluştur',
+          );
+          expect(find.text(log().description), findsOneWidget);
+          expect(find.text(project().name), findsOneWidget);
+          final edit = find.byKey(const Key('edit-agenda-log'));
+          await _revealIcon(tester, edit);
+          _expectIcon(tester, edit, 'Düzenle');
+          await tester.tap(edit);
+          await tester.pumpAndSettle();
+          expect(find.byType(LogFormPage), findsOneWidget);
+          expect(find.text('19.07.2026'), findsOneWidget);
+          await _revealIcon(tester, find.byKey(const Key('log-description')));
+          await tester.enterText(
+            find.byKey(const Key('log-description')),
+            'Güncellenmiş saha kontrolü',
+          );
+          final submit = find.byKey(const Key('submit-log'));
+          await _revealIcon(tester, submit);
+          _expectIcon(tester, submit, 'Değişiklikleri kaydet');
+          await tester.tap(submit);
+          await tester.pumpAndSettle();
+          expect(find.byType(LogDetailPage), findsOneWidget);
+          expect(fake.updates, hasLength(1));
+          final update = fake.updates.single;
+          expect(update.id, logId);
+          expect(update.expectedRevision, 1);
+          expect(update.projectId, projectId);
+          expect(update.observedAt, log().observedAt);
+          expect(update.category, log().category);
+          expect(update.location, log().location);
+          expect(update.notes, log().notes);
+          expect(update.description, 'Güncellenmiş saha kontrolü');
+          expect(fake.createLogCalls, 0);
+
+          final add = find.byKey(const Key('detail-add-agenda-photo'));
+          await _revealIcon(tester, add);
+          _expectIcon(tester, add, 'Fotoğraf ekle');
+          _expectIcon(
+            tester,
+            find.byKey(const Key('detail-link-existing-agenda-photo')),
+            'Mevcut fotoğrafı bağla',
+          );
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Sistem fotoğraf seçici'));
+          await tester.pumpAndSettle();
+          expect(fake.attached, hasLength(1));
+          expect(fake.attached.single.logId, logId);
+          expect(fake.attached.single.expectedLogRevision, 2);
+          expect(fake.attached.single.originalFileName, 'beton-hazirlik.jpg');
+          expect(fake.attached.single.bytes, [0xff, 0xd8, 0xff, 0xd9]);
+          final photoArchive = find.byKey(
+            Key('archive-agenda-photo-${fake.attached.single.id}'),
+          );
+          await _revealIcon(tester, photoArchive);
+          _expectIcon(tester, photoArchive, 'Fotoğrafı arşivle');
+          expect(find.text('beton-hazirlik.jpg'), findsOneWidget);
+          await tester.tap(photoArchive);
+          await tester.pumpAndSettle();
+          _expectTextConfirmation('Arşivle');
+          await tester.tap(find.widgetWithText(TextButton, 'Vazgeç'));
+          await tester.pumpAndSettle();
+          expect(fake.photoArchives, isEmpty);
+          await tester.tap(photoArchive);
+          await tester.pumpAndSettle();
+          await tester.tap(find.widgetWithText(FilledButton, 'Arşivle'));
+          await tester.pumpAndSettle();
+          expect(fake.photoArchives, hasLength(1));
+          expect(fake.photoArchives.single.logId, logId);
+          expect(fake.photoArchives.single.photoId, fake.attached.single.id);
+          expect(fake.photoArchives.single.expectedLogRevision, 2);
+          expect(fake.photoArchives.single.expectedPhotoRevision, 1);
+
+          final archive = find.byKey(const Key('archive-agenda-log'));
+          await _revealIcon(tester, archive);
+          _expectIcon(tester, archive, 'Sil');
+          await tester.tap(archive);
+          await tester.pumpAndSettle();
+          _expectTextConfirmation('Arşive taşı');
+          await tester.tap(find.widgetWithText(TextButton, 'Vazgeç'));
+          await tester.pumpAndSettle();
+          expect(fake.archives, isEmpty);
+          await tester.tap(archive);
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const Key('confirm-archive-log')));
+          await tester.pumpAndSettle();
+          expect(fake.archives, hasLength(1));
+          expect(fake.archives.single.id, logId);
+          expect(fake.archives.single.expectedRevision, 2);
+          expect(fake.archives.single.archive, isTrue);
+          _expectIcon(
+            tester,
+            find.byKey(const Key('detail-reminder-action')),
+            'Hatırlatıcı oluştur',
+            enabled: false,
+          );
+          final restore = find.byKey(const Key('restore-agenda-log'));
+          await _revealIcon(tester, restore);
+          _expectIcon(tester, restore, 'Geri getir');
+          await tester.tap(restore);
+          await tester.pumpAndSettle();
+          expect(fake.archives, hasLength(2));
+          expect(fake.archives.last.id, logId);
+          expect(fake.archives.last.expectedRevision, 3);
+          expect(fake.archives.last.archive, isFalse);
+          expect(fake.logs.single.archivedAt, isNull);
+          expect(fake.logs.single.description, 'Güncellenmiş saha kontrolü');
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+  }
+
+  for (final editing in [false, true]) {
+    testWidgets(
+      'icon save returns route result once while pending; editing=$editing',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        try {
+          final pending = Completer<AgendaLog>();
+          final fake = _IconAgenda(projects: [project()], logs: [log()]);
+          if (editing) {
+            fake.updateCompleter = pending;
+          } else {
+            fake.createLogCompleter = pending;
+          }
+          String? returnedDay;
+          await _pumpIconSurface(
+            tester,
+            Brightness.light,
+            Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () async {
+                    returnedDay = await Navigator.of(context).push<String>(
+                      MaterialPageRoute(
+                        builder: (_) => LogFormPage(
+                          agenda: fake,
+                          existing: editing ? log() : null,
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text('Formu aç'),
+                ),
+              ),
+            ),
+          );
+          await tester.tap(find.text('Formu aç'));
+          await tester.pumpAndSettle();
+          await _revealIcon(tester, find.byKey(const Key('log-description')));
+          await tester.enterText(
+            find.byKey(const Key('log-description')),
+            'Tek komut',
+          );
+          final submit = find.byKey(const Key('submit-log'));
+          await _revealIcon(tester, submit);
+          _expectIcon(
+            tester,
+            submit,
+            editing ? 'Değişiklikleri kaydet' : 'Logu kaydet',
+          );
+          await tester.tap(submit);
+          await tester.pump();
+          _expectIcon(tester, submit, 'Kaydediliyor…', enabled: false);
+          expect(
+            find.descendant(
+              of: submit,
+              matching: find.byType(CircularProgressIndicator),
+            ),
+            findsOneWidget,
+          );
+          await tester.tap(submit);
+          await tester.pump();
+          expect(fake.createLogCalls, editing ? 0 : 1);
+          expect(fake.updates, hasLength(editing ? 1 : 0));
+          expect(returnedDay, isNull);
+          pending.complete(log());
+          await tester.pumpAndSettle();
+          expect(returnedDay, '2026-07-19');
+          expect(find.byType(LogFormPage), findsNothing);
+          expect(find.text('Formu aç'), findsOneWidget);
+          expect(fake.createLogCalls, editing ? 0 : 1);
+          expect(fake.updates, hasLength(editing ? 1 : 0));
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+  }
+
   testWidgets('camera denial preserves pending log input and creates no row', (
     tester,
   ) async {
@@ -2070,6 +2613,282 @@ void main() {
     expect(fake.logs, isEmpty);
     expect(fake.createLogCalls, 0);
   });
+}
+
+Future<void> _pumpIconSurface(
+  WidgetTester tester,
+  Brightness brightness,
+  Widget home,
+) async {
+  tester.view.physicalSize = const Size(320, 900);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: ThemeData(brightness: brightness),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: const TextScaler.linear(1.6)),
+        child: child!,
+      ),
+      home: home,
+    ),
+  );
+  await tester.pumpAndSettle();
+  expect(tester.takeException(), isNull);
+}
+
+Finder _routeListScrollable(WidgetTester tester, Finder list) {
+  expect(list, findsOneWidget);
+  final viewport = find.descendant(of: list, matching: find.byType(Viewport));
+  expect(viewport, findsOneWidget);
+  // The list's Viewport belongs to its Scrollable, not an EditableText's.
+  final scrollable = find.descendant(
+    of: list,
+    matching: find.ancestor(of: viewport, matching: find.byType(Scrollable)),
+  );
+  expect(scrollable, findsOneWidget);
+  return scrollable;
+}
+
+Future<void> _revealRouteControl(
+  WidgetTester tester, {
+  required Finder control,
+  required Finder list,
+  required double scrollDelta,
+}) async {
+  final scrollable = _routeListScrollable(tester, list);
+  await tester.scrollUntilVisible(control, scrollDelta, scrollable: scrollable);
+  await Scrollable.ensureVisible(
+    tester.element(control),
+    alignment: 0.5,
+    duration: Duration.zero,
+  );
+  await tester.pumpAndSettle();
+  _expectControlFullyVisible(
+    tester,
+    control,
+    find.descendant(of: list, matching: find.byType(Viewport)),
+  );
+}
+
+void _expectControlFullyVisible(
+  WidgetTester tester,
+  Finder control,
+  Finder viewport,
+) {
+  expect(control, findsOneWidget);
+  expect(viewport, findsOneWidget);
+  final screen =
+      Offset.zero & (tester.view.physicalSize / tester.view.devicePixelRatio);
+  final visibleBounds = tester.getRect(viewport).intersect(screen);
+  final controlBounds = tester.getRect(control);
+  final reason =
+      'Unreachable control: $control; control=$controlBounds; viewport=$visibleBounds';
+  expect(
+    controlBounds.left,
+    greaterThanOrEqualTo(visibleBounds.left),
+    reason: reason,
+  );
+  expect(
+    controlBounds.top,
+    greaterThanOrEqualTo(visibleBounds.top),
+    reason: reason,
+  );
+  expect(
+    controlBounds.right,
+    lessThanOrEqualTo(visibleBounds.right),
+    reason: reason,
+  );
+  expect(
+    controlBounds.bottom,
+    lessThanOrEqualTo(visibleBounds.bottom),
+    reason: reason,
+  );
+  expect(control.hitTestable(), findsOneWidget, reason: reason);
+}
+
+Future<void> _revealIcon(WidgetTester tester, Finder target) async {
+  final scrollable = _scrollableFor(find.byType(ListView).first);
+  tester.state<ScrollableState>(scrollable).position.jumpTo(0);
+  await tester.pumpAndSettle();
+  await tester.scrollUntilVisible(target, 200, scrollable: scrollable);
+  await Scrollable.ensureVisible(tester.element(target), alignment: 0.5);
+  await tester.pumpAndSettle();
+  expect(target.hitTestable(), findsOneWidget);
+  expect(tester.takeException(), isNull);
+}
+
+void _expectIcon(
+  WidgetTester tester,
+  Finder action,
+  String label, {
+  bool enabled = true,
+  bool uniqueLabel = true,
+}) {
+  expect(action, findsOneWidget);
+  expect(tester.getSize(action), const Size.square(40));
+  if (enabled) expect(action.hitTestable(), findsOneWidget);
+  final button = tester.widget<IconButton>(action);
+  expect(button.tooltip, label);
+  expect(button.onPressed != null, enabled);
+  expect(
+    find.descendant(of: action, matching: find.byType(Text)),
+    findsNothing,
+  );
+  if (uniqueLabel) {
+    _expectButtonSemantics(tester, label, enabled: enabled);
+  } else {
+    final wrapper = find
+        .ancestor(
+          of: action,
+          matching: find.byWidgetPredicate(
+            (widget) => widget is Semantics && widget.properties.label == label,
+          ),
+        )
+        .first;
+    final data = tester.getSemantics(wrapper).getSemanticsData();
+    expect(data.flagsCollection.isButton, isTrue);
+    expect(data.hasAction(SemanticsAction.tap), enabled);
+  }
+}
+
+void _expectButtonSemantics(
+  WidgetTester tester,
+  String label, {
+  bool enabled = true,
+}) {
+  final semantics = find.bySemanticsLabel(label);
+  expect(semantics, findsOneWidget);
+  final data = tester.getSemantics(semantics).getSemanticsData();
+  expect(data.flagsCollection.isButton, isTrue);
+  expect(data.hasAction(SemanticsAction.tap), enabled);
+}
+
+void _expectTextConfirmation(String confirm) {
+  final dialog = find.byType(AlertDialog);
+  expect(dialog, findsOneWidget);
+  expect(
+    find.descendant(
+      of: dialog,
+      matching: find.widgetWithText(TextButton, 'Vazgeç'),
+    ),
+    findsOneWidget,
+  );
+  expect(
+    find.descendant(
+      of: dialog,
+      matching: find.widgetWithText(FilledButton, confirm),
+    ),
+    findsOneWidget,
+  );
+}
+
+class _IconLocations implements ProjectLocationApplication {
+  _IconLocations(this.projects);
+  final List<MobileProject> projects;
+  bool fail = false;
+  final queries = <ProjectLocationQuery>[];
+
+  @override
+  Stream<void> get projectChanges => const Stream.empty();
+  @override
+  Stream<void> get projectLocationChanges => const Stream.empty();
+  @override
+  Future<List<MobileProject>> listProjects() async => projects;
+  @override
+  Future<List<MobileProjectLocation>> listProjectLocations(
+    ProjectLocationQuery query,
+  ) async {
+    queries.add(query);
+    if (fail) throw StateError('synthetic location read failure');
+    return const [];
+  }
+
+  @override
+  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _IconAgenda extends FakeAgendaApplication
+    implements AttachmentCatalogHost, AgendaExistingAttachmentApplication {
+  _IconAgenda({required super.projects, required super.logs});
+  final updates = <UpdateAgendaLogCommand>[];
+  final archives = <MutateAgendaLogArchiveCommand>[];
+  final attached = <AttachAgendaPhotoCommand>[];
+  final photoArchives = <ArchiveAgendaPhotoCommand>[];
+  final photos = <AgendaLogPhoto>[];
+  Completer<AgendaLog>? updateCompleter;
+
+  @override
+  final AttachmentCatalogApplication attachmentCatalog = _FakeCatalog();
+
+  @override
+  Future<AgendaLogDetail> getAgendaLogDetail(String logId) async =>
+      AgendaLogDetail(
+        log: logs.singleWhere((log) => log.id == logId),
+        reminders: const [],
+        photos: List.unmodifiable(photos),
+      );
+
+  @override
+  Future<AgendaLog> updateAgendaLog(UpdateAgendaLogCommand command) async {
+    updates.add(command);
+    if (updateCompleter case final pending?) return pending.future;
+    return super.updateAgendaLog(command);
+  }
+
+  @override
+  Future<AgendaLogDetail> mutateAgendaLogArchive(
+    MutateAgendaLogArchiveCommand command,
+  ) async {
+    archives.add(command);
+    return super.mutateAgendaLogArchive(command);
+  }
+
+  @override
+  Future<AgendaLogDetail> attachAgendaPhoto(
+    AttachAgendaPhotoCommand command,
+  ) async {
+    attached.add(command);
+    photos.add(
+      AgendaLogPhoto(
+        id: command.id,
+        logId: command.logId,
+        projectId: projectId,
+        originalFileName: command.originalFileName,
+        mimeType: 'image/jpeg',
+        byteSize: command.bytes.length,
+        sha256: List.filled(64, 'a').join(),
+        relativePath: 'synthetic/photo.jpg',
+        description: null,
+        capturedAt: command.capturedAt,
+        revision: 1,
+        createdAt: command.capturedAt,
+        updatedAt: command.capturedAt,
+        archivedAt: null,
+        integrity: AgendaAttachmentIntegrity.ok,
+      ),
+    );
+    return getAgendaLogDetail(command.logId);
+  }
+
+  @override
+  Future<AgendaLogDetail> archiveAgendaPhoto(
+    ArchiveAgendaPhotoCommand command,
+  ) async {
+    photoArchives.add(command);
+    photos.removeWhere((photo) => photo.id == command.photoId);
+    return getAgendaLogDetail(command.logId);
+  }
+
+  @override
+  Future<AgendaLogDetail> linkExistingAgendaPhoto(
+    LinkExistingAgendaPhotoCommand command,
+  ) => throw StateError(
+    'link mutation is covered by the catalog round-trip test',
+  );
 }
 
 class _CatalogAgendaFake extends FakeAgendaApplication
