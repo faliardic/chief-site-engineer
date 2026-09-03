@@ -295,6 +295,63 @@ void main() {
     );
   });
 
+  testWidgets('586 map reports real pan and pinch boundaries only', (
+    tester,
+  ) async {
+    final fake = _FakeInventoryApplication.standard();
+    final controller = InventoryMapController(
+      application: fake,
+      projectId: _projectId,
+    );
+    addTearDown(controller.dispose);
+    expect(await controller.reload(), isTrue);
+    final interactions = <bool>[];
+    final creates = <InventoryPlacementTarget>[];
+    final opened = <String>[];
+    await _pumpMap(
+      tester,
+      controller,
+      onInteractionChanged: interactions.add,
+      onCreateTarget: creates.add,
+      onOpenAsset: opened.add,
+    );
+    final map = find.byType(InventoryMapView);
+    final state = tester.state<InventoryMapViewState>(map);
+    state.zoomIn();
+    await tester.pump();
+    expect(interactions, isEmpty);
+    final center = tester.getCenter(map);
+    final pan = await tester.startGesture(center);
+    await pan.moveBy(const Offset(60, 20));
+    await tester.pump();
+    expect(interactions, [true]);
+    await pan.up();
+    await tester.pump();
+    expect(interactions, [true, false]);
+    interactions.clear();
+    final a = await tester.startGesture(
+      center - const Offset(40, 0),
+      pointer: 2,
+    );
+    final b = await tester.startGesture(
+      center + const Offset(40, 0),
+      pointer: 3,
+    );
+    await a.moveBy(const Offset(-40, 0));
+    await b.moveBy(const Offset(40, 0));
+    await tester.pump();
+    expect(interactions.first, isTrue);
+    await a.up();
+    await b.up();
+    await tester.pump();
+    expect(interactions.last, isFalse);
+    expect(creates, isEmpty);
+    expect(opened, isEmpty);
+    expect(controller.pendingCreateTarget, isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('05 marker tap opens detail and never starts create', (
     tester,
   ) async {
@@ -1635,6 +1692,7 @@ Future<void> _pumpMap(
   ValueChanged<InventoryPlacementTarget>? onCreateTarget,
   ValueChanged<String>? onOpenAsset,
   ValueChanged<InventoryPlacementTarget>? onSelectTarget,
+  ValueChanged<bool>? onInteractionChanged,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -1648,6 +1706,7 @@ Future<void> _pumpMap(
             onCreateTarget: onCreateTarget ?? (_) {},
             onOpenAsset: onOpenAsset ?? (_) {},
             onSelectTarget: onSelectTarget,
+            onInteractionChanged: onInteractionChanged,
           ),
         ),
       ),

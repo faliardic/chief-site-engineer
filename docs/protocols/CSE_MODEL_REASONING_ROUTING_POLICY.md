@@ -1,185 +1,63 @@
-# CSE Model ve Reasoning Routing Policy
+# CSE Model ve Reasoning Routing Policy — v2
 
-**Policy version:** `CSE-MRP-1.0`
-**As-of:** 16 Ağustos 2026
-**Kaynak Issue:** #455
-**Durum:** Bağlayıcı model/reasoning/execution/orchestration routing sözleşmesi
+**Geçerlilik tarihi:** 2026-09-02
 
-Bu belge CSE görevlerinde ChatGPT ve Codex seçiminin nasıl kaydedileceğini,
-runtime kanıtının nasıl yorumlanacağını ve review floor'un nasıl korunacağını
-belirler. Ürün kapsamı, Git güvenliği ve validation genişliği kendi kanonik
-kaynaklarında kalır.
+Bu belge model ve reasoning seçimini yönlendirir; günlük işte metadata töreni üretmez. Güncel model adları ve availability kalıcı repository gerçeği değildir; execution yüzeyindeki mevcut seçeneklerden doğrulanır.
 
-## 1. Resmî ve değişken kaynaklar
+## 1. Risk tabanı
 
-16 Ağustos 2026 itibarıyla kullanılan resmî dayanaklar:
+| Lane | Önerilen reasoning | Review |
+|---|---|---|
+| FAST | High | Rutin source/diff kontrolü |
+| STANDARD | Extra High | Cross-module source/diff review gerektiğinde |
+| CRITICAL | Max | Bağımsız derin review |
 
-- [OpenAI model kataloğu](https://developers.openai.com/api/docs/models)
-- [Latest model guidance](https://developers.openai.com/api/docs/guides/latest-model)
+Dokümantasyon ve mekanik işte daha güçlü model seçmek zorunlu değildir. Contract, regression, parser/formatter, persistence veya data-integrity işinde daha hafif reasoning'e sessiz downgrade yapılmaz.
 
-Model adı, alias, selector görünürlüğü, desteklenen reasoning değeri,
-availability, deprecation ve retirement bilgisi değişkendir. Aşağıdaki
-durumlardan birinde yeni görev/config/scheduled work bu iki resmî kaynak ve
-varsa resmî deprecation kaynağı üzerinden yeniden doğrulanır:
+## 2. FAST ve STANDARD
 
-- selector veya API katalog etiketi bu belgeden farklıysa;
-- istenen model/effort görünmüyor veya çalışmıyorsa;
-- retirement/deprecation tarihi yazılacaksa;
-- kalıcı config ya da scheduled work yeni bir modele bağlanacaksa;
-- bu as-of tarihinden sonra katalog gerçeği hakkında karar verilecekse.
+FAST/STANDARD için varsayılan olarak şunlar yazılmaz:
 
-Güncel resmî kaynakla doğrulanmayan retirement tarihi politika gerçeği olarak
-yazılmaz. `gpt-5.5` yalnız açık comparison/reproduction ihtiyacıyla seçilebilir;
-yeni CSE işi için varsayılan değildir. Contract, regression veya kritik işte
-fast/lightweight varyant nihai executor ya da reviewer olamaz.
+- `model_routing` YAML;
+- requested/actual model karşılaştırma tablosu;
+- invocation evidence;
+- `execution_record`;
+- `review_recommendation`.
 
-## 2. Birbirinden bağımsız dört eksen
+Görev talimatında yalnız gerektiğinde şu kısa satır yeterlidir:
 
-| Eksen | CSE değerleri | Anlam |
-| --- | --- | --- |
-| Model | `gpt-5.6-sol \| gpt-5.6-terra \| gpt-5.6-luna` | İşin gereken yetenek/maliyet profili |
-| Reasoning effort | `high \| xhigh \| max` | Seçilen modelin düşünme derinliği |
-| Execution mode | `standard \| pro` | Yürütmenin standart veya pro reasoning modu |
-| Orchestration | `single-agent \| Ultra` | Tek executor veya açıkça yetkilendirilmiş multi-agent yürütme |
+```text
+Reasoning: High | Extra High
+Why: <tek cümle>
+```
 
-UI eşlemesi: `High -> high`, `Extra High -> xhigh`, `Max -> max`.
+Runtime model/effort görünmüyorsa FAST/STANDARD execution sırf bu nedenle bloke edilmez. Görünür gerçek mismatch kaliteyi etkiliyorsa durulur ve owner'a bildirilir.
 
-- `gpt-5.6-sol`: karmaşık, açık uçlu, kritik veya yüksek değerli iş.
-- `gpt-5.6-terra`: iyi tanımlı günlük üretim ve dokümantasyon işi.
-- `gpt-5.6-luna`: kesin tarifli, mekanik, tekrarlanabilir düşük riskli iş.
-- `pro`, model veya reasoning effort değildir; `ChatGPT Pro` planıyla da
-  karıştırılmaz.
-- `standard` varsayılandır. `pro` yalnız ölçülmüş kalite ihtiyacı, resmî
-  availability ve current Issue'daki açık seçim birlikte varsa kullanılır.
-- `Ultra`, reasoning effort değildir. Anlamlı bağımsız alt işlere bölünebilen
-  multi-agent yürütmedir ve açık paralel çalışma yetkisi olmadan seçilmez.
-- `max`, tek seçili modelde daha derin reasoning'dir; multi-agent anlamına
-  gelmez.
+## 3. CRITICAL
 
-Eski birleşik `Instant / Medium / High / Extra High / Pro Standard / Pro
-Extended` dizisi kullanılmaz.
+CRITICAL görev exact model/reasoning request, review floor ve görünür invocation evidence kullanabilir.
 
-## 3. CSE risk matrisi
-
-| Risk | İş | Codex | ChatGPT review floor |
-| --- | --- | --- | --- |
-| R0 | Mekanik, kesin, production kararı içermeyen | Luna / High | Luna veya Terra / High |
-| R1 | Docs-only, Issue/task, rutin Git preflight | Terra / High | Terra / High |
-| R2 | Dar, iyi tanımlı production değişikliği | Terra / Extra High | Sol / High; contract/regression ise Extra High |
-| R3 | Çoklu modül, domain, parser/formatter, validation, regression | Sol / Extra High | Sol / Extra High |
-| R4 | Persistence, migration, veri bütünlüğü, schedule engine, corpus omurgası, backup/restore, security | Sol / Max | Sol / Max |
-
-CSE teknik işlerinde minimum `high`; code/helper/contract/parser/formatter/
-validation/regression tabanı `xhigh`dır. R4 için `gpt-5.6-sol / max`
-değerlendirmesi zorunludur. Çoklu kanonik source-authority değişikliği, kod
-değiştirmese bile çelişki riski nedeniyle R3 olabilir.
-
-## 4. Üç kanıt katmanı ve görev başlangıcı
-
-Routing doğrulaması üç farklı kavramı karıştırmaz:
-
-1. **Routing request:** ChatGPT'nin current Issue ve task içinde kaydettiği
-   requested model, effort, mode ve orchestration seçimi.
-2. **Invocation evidence:** launch surface gösteriyorsa UI selector, API
-   request/config veya runner kaydı.
-3. **Runtime actual:** runtime expose ediyorsa gerçekten çalışan model ve
-   reasoning effort.
-
-Routing request önce current Issue'da bulunur. `.cse/tasks/<issue_no>_task.md`,
-ilk yetkili local edit olarak ve diğer substantive edit/test/build/commit
-işlemlerinden önce oluşturulur; Issue'daki request'i tekrarlar. Read-only
-preflight bu sırayı bozmaz.
+Minimum kayıt:
 
 ```yaml
 model_routing:
-  policy_version: "CSE-MRP-1.0"
-  task_risk: "R3"
-  orchestrator:
-    chatgpt_model: "gpt-5.6-sol"
-    chatgpt_reasoning_effort: "xhigh"
-  codex_model: "gpt-5.6-sol"
-  codex_reasoning_effort: "xhigh"
-  execution_mode: "standard"
-  orchestration: "single-agent"
-  selection_reason: "Exact görev riski ve değişen sözleşme."
-  routing_request_evidence: "Current Issue URL veya owner comment URL"
-  allowed_fallback: null
-  review_floor:
-    chatgpt_model: "gpt-5.6-sol"
-    chatgpt_reasoning_effort: "xhigh"
-  fail_closed_if_mismatch: true
+  lane: CRITICAL
+  requested_model: <current available model>
+  requested_reasoning: max
+  actual_model: <visible value or unknown>
+  actual_reasoning: <visible value or unknown>
+  review_floor: CRITICAL
 ```
 
-R3/R4 için otomatik fallback veya downgrade yasaktır. Launch surface selector,
-API config veya runner kaydını gösteriyorsa requested model/effort ile exact
-eşleşme zorunludur; görünür mismatch fail-closed durur.
+Görünür mismatch varsa fail-closed durulur. Runtime metadata görünmüyorsa `unknown` yazılır; değer tahmin edilmez. Bu belirsizlik review'da dikkate alınır fakat tek başına geçmiş kanıtı geçersiz kılmaz.
 
-Launch surface invocation evidence'i ve runtime actual metadata'yı
-göstermiyorsa değerler tahmin edilmez. Current Issue'da kayıtlı routing request
-ile execution `unverified` olarak tamamlanabilir; review floor en az bir risk
-kademesi yükseltilir. Metadata'yı göstermeyen bir surface, tek başına mismatch
-veya downgrade kanıtı değildir.
+## 4. Execution mode ve orchestration
 
-## 5. Runtime doğrulaması ve execution record
+- Tek executor varsayılandır.
+- Multi-agent/Ultra yalnız owner açıkça isterse ve bağımsız alt işler gerçekten paralel yürüyebiliyorsa kullanılır.
+- `pro`, model veya reasoning seviyesi değildir.
+- Reasoning seçimi 5 dakikalık Codex execution sınırını kaldırmaz.
 
-Her Codex sonucu ve `.cse/results/<issue_no>_result.md` şu bloğu taşır:
+## 5. Ana karar
 
-```yaml
-execution_record:
-  requested_model: "gpt-5.6-sol"
-  actual_model: "unknown"
-  requested_reasoning_effort: "xhigh"
-  actual_reasoning_effort: "unknown"
-  execution_mode: "standard"
-  orchestration: "single-agent"
-  routing_request_evidence: "Current Issue veya owner comment URL"
-  invocation_evidence: null
-  invocation_verification_status: "unverified"
-  mismatch_detected: null
-  runtime_verification_status: "unverified"
-```
-
-Runtime actual model/effort'i göstermiyorsa tahmin yapılmaz. Bu durumda exact
-değerler `unknown`, `mismatch_detected: null` ve
-`runtime_verification_status: unverified` olur. Metadata'nın gizli olması tek
-başına mismatch kanıtı veya downgrade yetkisi değildir.
-
-`routing_request_evidence` yalnız recorded request'in kaynağıdır; invocation
-kanıtı değildir. Launch surface invocation bilgisini göstermiyorsa
-`invocation_evidence: null` ve `invocation_verification_status: unverified`
-yazılır. Bu durumda review floor en az bir risk kademesi yükseltilir.
-
-`mismatch_detected: false` yalnız actual model ve actual effort görünür olup
-requested değerlerle exact eşitse yazılır. Görünür uyuşmazlıkta
-`mismatch_detected: true` yazılır ve fail-closed stop uygulanır.
-
-## 6. Review recommendation
-
-Her Codex sonucu ve `.cse/results/<issue_no>_result.md` ayrıca şu bloğu taşır:
-
-```yaml
-review_recommendation:
-  risk_observed: "R3"
-  recommended_chatgpt_model: "gpt-5.6-sol"
-  recommended_reasoning_effort: "xhigh"
-  recommended_mode: "standard"
-  recommendation_reason: "Canonical source-authority değişikliği."
-  must_review:
-    - "allowlist ve source-authority tutarlılığı"
-    - "runtime verification belirsizliği"
-  residual_uncertainty: "Runtime actual model/effort görünmüyor."
-  escalation_condition: "Unexpected diff, kanıt çelişkisi veya daha yüksek risk."
-```
-
-Codex recommendation görev başındaki review floor'u düşüremez; yalnız korur
-veya yükseltir:
-
-```text
-final_review = max(task review floor, Codex recommendation, observed actual risk)
-```
-
-Risk sırası `R0 < R1 < R2 < R3 < R4` kabul edilir. `BLOCKED`, `PARTIAL`,
-`UNVERIFIED`, test eksikliği, unexpected diff veya kanıt çelişkisi review'u en
-az bir risk kademesi yükseltir; R4 üst sınırdır. Codex PASS merge yetkisi
-değildir. ChatGPT diff/source/evidence review yapar; Ready ve merge yalnız
-ayrıca yetkilendirildiğinde ilerler.
+> Model yönlendirme kaliteyi destekler; FAST/STANDARD işlerde task/result/YAML üretim amacı hâline gelmez. Ayrıntılı routing evidence yalnız gerçek CRITICAL riskte tutulur.
