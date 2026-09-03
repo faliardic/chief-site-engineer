@@ -280,6 +280,7 @@ class MobileShell extends StatefulWidget {
 
 class _MobileShellState extends State<MobileShell> {
   int _selectedIndex = 0;
+  final Set<int> _visitedPrimaryTabs = {0};
   final _inventoryKey = GlobalKey<InventoryPageState>();
   StreamSubscription<String>? _notificationTapSubscription;
   StreamSubscription<void>? _projectContextSubscription;
@@ -435,7 +436,24 @@ class _MobileShellState extends State<MobileShell> {
   }
 
   void _showDashboardProjectSelection() {
-    if (mounted) setState(() => _selectedIndex = 0);
+    _selectPrimaryTab(0);
+  }
+
+  void _selectPrimaryTab(int index) {
+    if (!mounted ||
+        (_selectedIndex == index && _visitedPrimaryTabs.contains(index))) {
+      return;
+    }
+    setState(() {
+      _selectedIndex = index;
+      _visitedPrimaryTabs.add(index);
+    });
+  }
+
+  Widget _buildVisitedPrimaryTab(int index, Widget Function() builder) {
+    return _visitedPrimaryTabs.contains(index)
+        ? builder()
+        : const SizedBox.shrink();
   }
 
   Future<void> _openConcreteFromMore() async {
@@ -502,7 +520,7 @@ class _MobileShellState extends State<MobileShell> {
       final attendance = widget.bootstrap.attendance;
       if (reminder.attendanceDayId != null && attendance != null) {
         if (!mounted) return;
-        setState(() => _selectedIndex = 4);
+        _selectPrimaryTab(4);
         await Navigator.of(context).push<void>(
           MaterialPageRoute(
             builder: (_) => AttendanceDayPage(
@@ -520,7 +538,7 @@ class _MobileShellState extends State<MobileShell> {
           concrete != null &&
           attachments != null) {
         if (!mounted) return;
-        setState(() => _selectedIndex = 5);
+        _selectPrimaryTab(5);
         await Navigator.of(context).push<void>(
           MaterialPageRoute(
             builder: (_) => ConcretePourDetailPage(
@@ -538,7 +556,7 @@ class _MobileShellState extends State<MobileShell> {
       // Invalid/stale notification payload falls back to reminder detail.
     }
     if (!mounted) return;
-    setState(() => _selectedIndex = 1);
+    _selectPrimaryTab(1);
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => ReminderDetailPage(
@@ -595,7 +613,7 @@ class _MobileShellState extends State<MobileShell> {
       livingPlan: bootstrap.livingPlan,
       materialRequests: materials,
       session: _activeProjectSession,
-      onCreateProject: () => setState(() => _selectedIndex = 2),
+      onCreateProject: () => _selectPrimaryTab(2),
       onAddReminder: (projectId, localDay) async {
         final value = await Navigator.of(context).push<Object?>(
           MaterialPageRoute(
@@ -762,53 +780,68 @@ class _MobileShellState extends State<MobileShell> {
           index: _selectedIndex,
           children: [
             _buildDashboard(),
-            RemindersPage(
-              agenda: widget.bootstrap.agenda,
-              attendance: widget.bootstrap.attendance,
-              contextSuggestions: widget.bootstrap.contextSuggestions,
-              projectLocations: widget.bootstrap.projectLocations,
-              preferredProjectId: _activeProjectSession.selectedProjectId,
-            ),
-            AgendaPage(
-              agenda: widget.bootstrap.agenda,
-              projectLocations: widget.bootstrap.projectLocations,
-              attachments: widget.bootstrap.concreteAttachments,
-              concrete: widget.bootstrap.concrete,
-              concreteAttachments: widget.bootstrap.concreteAttachments,
-              activeProjectId: _activeProjectSession.selectedProjectId,
-            ),
-            InventoryPage(
-              key: _inventoryKey,
-              application: widget.bootstrap.inventory,
-              listProjects: widget.bootstrap.agenda.listProjects,
-              projectChanges: widget.bootstrap.agenda.projectChanges,
-              activeProjectId: _activeProjectSession.selectedProjectId,
-              isActive: _selectedIndex == 3,
-              onProjectSelected: _reportRouteProjectSelection,
-            ),
-            if (widget.bootstrap.attendance case final attendance?)
-              AttendancePage(
-                attendance: attendance,
+            _buildVisitedPrimaryTab(
+              1,
+              () => RemindersPage(
                 agenda: widget.bootstrap.agenda,
-                activeProjectId: _activeProjectSession.selectedProjectId,
-                isActive: _selectedIndex == 4,
-                onProjectSelected: _reportRouteProjectSelection,
-              )
-            else
-              const _PreparingPage(
-                icon: Icons.badge_outlined,
-                title: 'Puantaj',
+                attendance: widget.bootstrap.attendance,
+                contextSuggestions: widget.bootstrap.contextSuggestions,
+                projectLocations: widget.bootstrap.projectLocations,
+                preferredProjectId: _activeProjectSession.selectedProjectId,
               ),
-            _MorePage(
-              bootstrap: widget.bootstrap,
-              onOpenConcrete:
-                  widget.bootstrap.concrete != null &&
-                      widget.bootstrap.concreteAttachments != null
-                  ? () => unawaited(_openConcreteFromMore())
-                  : null,
-              onOpenWorkforce: widget.bootstrap.attendance == null
-                  ? null
-                  : () => unawaited(_openWorkforceFromMore()),
+            ),
+            _buildVisitedPrimaryTab(
+              2,
+              () => AgendaPage(
+                agenda: widget.bootstrap.agenda,
+                projectLocations: widget.bootstrap.projectLocations,
+                attachments: widget.bootstrap.concreteAttachments,
+                concrete: widget.bootstrap.concrete,
+                concreteAttachments: widget.bootstrap.concreteAttachments,
+                activeProjectId: _activeProjectSession.selectedProjectId,
+              ),
+            ),
+            _buildVisitedPrimaryTab(
+              3,
+              () => InventoryPage(
+                key: _inventoryKey,
+                application: widget.bootstrap.inventory,
+                listProjects: widget.bootstrap.agenda.listProjects,
+                projectChanges: widget.bootstrap.agenda.projectChanges,
+                activeProjectId: _activeProjectSession.selectedProjectId,
+                isActive: _selectedIndex == 3,
+                onProjectSelected: _reportRouteProjectSelection,
+              ),
+            ),
+            _buildVisitedPrimaryTab(
+              4,
+              () => switch (widget.bootstrap.attendance) {
+                final attendance? => AttendancePage(
+                  attendance: attendance,
+                  agenda: widget.bootstrap.agenda,
+                  activeProjectId: _activeProjectSession.selectedProjectId,
+                  isActive: _selectedIndex == 4,
+                  onProjectSelected: _reportRouteProjectSelection,
+                ),
+                null => const _PreparingPage(
+                  icon: Icons.badge_outlined,
+                  title: 'Puantaj',
+                ),
+              },
+            ),
+            _buildVisitedPrimaryTab(
+              5,
+              () => _MorePage(
+                bootstrap: widget.bootstrap,
+                onOpenConcrete:
+                    widget.bootstrap.concrete != null &&
+                        widget.bootstrap.concreteAttachments != null
+                    ? () => unawaited(_openConcreteFromMore())
+                    : null,
+                onOpenWorkforce: widget.bootstrap.attendance == null
+                    ? null
+                    : () => unawaited(_openWorkforceFromMore()),
+              ),
             ),
           ],
         ),
@@ -817,8 +850,7 @@ class _MobileShellState extends State<MobileShell> {
         selectedIndex: _selectedIndex,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
         destinations: _destinations,
-        onDestinationSelected: (index) =>
-            setState(() => _selectedIndex = index),
+        onDestinationSelected: _selectPrimaryTab,
       ),
     );
   }

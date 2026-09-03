@@ -227,6 +227,20 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     return completer.future;
   }
 
+  // The local pipeline orders Dashboard sections only. Today and Living Plan
+  // open independent SQLite connections, so they must also share Agenda's
+  // queue with the reloads triggered by projectChanges. Materials already owns
+  // that queue and must not be wrapped here (which would wait on itself).
+  Future<T> _readWithAgenda<T>(Future<T> Function() operation) {
+    final agenda = widget.agenda;
+    if (agenda is CoordinatedAgendaApplication) {
+      return (agenda as CoordinatedAgendaApplication).coordinator.run(
+        operation,
+      );
+    }
+    return operation();
+  }
+
   Future<void> _loadToday(String projectId) async {
     final application = widget.dailyLog;
     if (application == null) {
@@ -236,9 +250,8 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     final generation = ++_todayGeneration;
     setState(() => _today = const _SectionState.loading());
     try {
-      final value = await application.loadDay(
-        projectId: projectId,
-        localDay: _localDay,
+      final value = await _readWithAgenda(
+        () => application.loadDay(projectId: projectId, localDay: _localDay),
       );
       if (!_acceptSectionResult(projectId, generation, _todayGeneration)) {
         return;
@@ -257,9 +270,11 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     setState(() => _plan = const _SectionState.loading());
     final day = DateTime.parse(_localDay);
     try {
-      final value = await widget.livingPlan.loadSevenDayPlan(
-        projectId: projectId,
-        windowStart: DateTime(day.year, day.month, day.day),
+      final value = await _readWithAgenda(
+        () => widget.livingPlan.loadSevenDayPlan(
+          projectId: projectId,
+          windowStart: DateTime(day.year, day.month, day.day),
+        ),
       );
       if (!_acceptSectionResult(projectId, generation, _planGeneration)) {
         return;
