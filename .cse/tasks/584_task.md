@@ -2,7 +2,7 @@
 
 - Process lane: STANDARD; validation class: narrow-ui; review floor: independent R4.
 - Authority: https://github.com/faliardic/chief-site-engineer/issues/584#issuecomment-5504767715
-- Repository: V:\1_PROJECTS\2_ACTIVE\Python\chief-site-engineer
+- Repository: official repository verified; local path not published
 - Exact base: 187e6f66d5ae6753afa2080c78b340ffba188eee
 - Branch: codex/issue-584-agenda-icon-first
 - Stacked PR base: codex/issue-581-dashboard-project-create
