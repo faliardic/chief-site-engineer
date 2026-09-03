@@ -38,7 +38,7 @@ Kullanıcı `devam` veya `GitHub'dan devam et` dediğinde ChatGPT:
 - birden fazla açık iş varsa bağımlılık ve blocker'ı belirler;
 - önce sıradaki tek güvenli aksiyonu ve sorumlu aktörü seçer;
 - aynı authority metnini tekrar üretmez;
-- Codex gerekiyorsa kullanıcının `Codex ile çalış` demesini beklemeden `Sıradaki aktör: Codex` der ve 10–15 satırı geçmeyen 5 dakikalık exact görevi verir;
+- Codex gerekiyorsa kullanıcının `Codex ile çalış` demesini beklemeden `Sıradaki aktör: Codex` der ve 10–15 satırı geçmeyen exact görevi verir; her handoff'ta kapsam/risk, beklenen validation/build/device işi ve blocker'a göre ChatGPT'nin belirlediği açık `Execution time budget: <süre>` bulunur, global sabit süre varsayılmaz;
 - Fatih gerekiyorsa yalnız manuel ürün/device kabul adımlarını verir; terminal komutu vermez;
 - ChatGPT'ın kendi yetkisindeki işlem mevcut owner kararıyla yapılabiliyorsa ayrıca `devam` istemeden yürütür.
 

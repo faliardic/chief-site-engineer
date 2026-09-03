@@ -103,11 +103,11 @@ Bu belge bütün görevlerde full suite veya `.cse` ledger zorunlu kılmaz.
 ### Codex
 
 - yalnız izinli dosya ve davranışta çalışır;
-- 5 dakikalık mikro execution sınırına uyar;
+- her handoff'ta ChatGPT'nin açıkça atadığı göreve özel execution time budget'a uyar; global sabit süre varsaymaz, bütçe dolunca çalışmayı güvenle koruyup durur ve exact blocker/kalan aksiyonu raporlar;
 - repository-local terminal, automated test, analyzer ve build/APK hazırlığını yetkili görev kapsamında çalıştırır; manuel ürün kabulü vermez;
 - emulator/ADB/device işlemini yalnız Fatih'in exact package/device/data-safety sınırıyla açık delegasyonunda çalıştırabilir;
 - format, diff, scope ve Git güvenliğini kontrol eder;
-- user PASS olmadan FAST commit/push yapmaz;
+- non-CRITICAL işte Codex automated PASS sonrası, manuel/device kabul gerekmiyorsa yetkili commit/push yapabilir; kabul gerekiyorsa ayrıca Fatih PASS bekler;
 - belirsizlik veya yeni CRITICAL trigger'da durur.
 
 ### ChatGPT

@@ -1,6 +1,6 @@
-# CSE Owner Communication Standard — Concise v2
+# CSE Owner Communication Standard — Concise v3
 
-**Geçerlilik tarihi:** 2026-09-02
+**Geçerlilik tarihi:** 2026-09-03
 
 CSE'de teknik gerçek saklanmaz; owner'a önce ürünün ve işlemin pratik anlamı anlatılır.
 
@@ -27,6 +27,8 @@ FAST ve rutin STANDARD ara sonuçları normalde 2–5 cümledir:
 Her kullanıcıya teslim edilen sonuç `Sıradaki aksiyon — <ChatGPT|Codex|Fatih|Yok>: <tek uygulanabilir talimat>.` satırıyla biter. Devam işi yoksa `Yok: İş tamamlandı.` yazılır; yapay iş üretilmez.
 
 Her mikro adımda altı başlıklı rapor, YAML veya uzun chronology yazılmaz.
+
+Non-CRITICAL işte one-pass akışının sonucu anlatılır: mevcut repro kanıtı, fix, tek focused validation ve yalnız gereken manuel/device kabul. Owner/device kanıtı yapay harness'te üretilemiyor diye owner'dan yeniden repro veya deterministic automated FAIL sağlaması istenmez. Kararı değiştirmeyen diagnostic/test turları açılmaz.
 
 ## 2. Önemli karar mesajları
 
@@ -64,7 +66,7 @@ Her blocker şunu söyler:
 3. ürün hatası mı, test/ortam/süreç hatası mı;
 4. sıradaki tek güvenli adım.
 
-Blocker olduğundan büyük veya küçük gösterilmez.
+Blocker olduğundan büyük veya küçük gösterilmez. Non-CRITICAL işte runtime/device FAIL, widget/fake test PASS ile geçersiz sayılmaz; gerçek davranışı temsil edemeyen harness tek başına düzeltmeyi engellemez. Bir başarısız repro denemesinden sonra kaynak/runtime incelemesine veya mevcut en güçlü kanıta geçilir; owner diagnostic bürokrasiye katılmaz.
 
 ## 5. Teknik evidence
 
@@ -83,19 +85,23 @@ Salt YAML owner cevabı olamaz. Codex completion metni owner'a doğrudan kopyala
 Her sonuçta yalnız owner'ın değil, sıradaki işi kimin yapacağı da açık olmalıdır:
 
 - `Sıradaki aksiyon — Fatih: Manuel ürün kontrolünü yap ve davranış PASS/FAIL kararını bildir.`
-- `Sıradaki aksiyon — Codex: Verilen 5 dakikalık exact görevi uygula.`
+- `Sıradaki aksiyon — Codex: Verilen exact görevi handoff'taki execution time budget içinde uygula.`
 - `Sıradaki aksiyon — ChatGPT: Owner-approved PR işlemini tamamla.`
 - `Sıradaki aksiyon — Yok: İş tamamlandı.`
 
 Bir aksiyon tamamlandıktan sonra sıradaki aksiyonun yalnız adı verilmez. Aynı yanıtta:
 
-- Codex için `Hazır Codex talimatı:` altında kopyalanabilir 10–15 satırlık exact görev;
+- Codex için `Hazır Codex talimatı:` altında kopyalanabilir 10–15 satırlık exact görev ve ChatGPT'nin kapsam/risk, beklenen validation/build/device işi ve blocker'a göre belirlediği açık `Execution time budget: <süre>`;
 - Fatih için `Hazır Fatih talimatı:` altında yalnız manuel ürün/device kontrolü ve beklenen sonuç; terminal komutu verilmez;
 - ChatGPT için mevcut authority içindeyse kendiliğinden execution, değilse gereken tek owner onayı
 
 sunulur.
 
 Repository/local execution gerekiyorsa ChatGPT, owner'ın ayrıca `Codex ile çalış`, `devam` veya `talimat hazırla` demesini beklemez; Codex handoff'unu kendiliğinden verir. ChatGPT'ın yetkili olduğu mevcut owner-approved işlem için ayrıca `devam` istenmez.
+
+Fatih'e yalnız gerçekten owner kararı veya manuel/device kabul gerektiren aksiyon verilir. Non-CRITICAL işte manuel/device kabul gerekmiyorsa kısa gerekçeyle `GEREKMİYOR` yazılır; Codex automated PASS sonrası commit/push için manuel PASS istenmez. Gereken manuel/device kabulde Fatih PASS/FAIL kapısı korunur. Automated PASS, manuel PASS veya Ready/merge/release yetkisi gibi sunulmaz.
+
+Her Codex handoff'unda açık süre bütçesi zorunludur; global sabit süre kullanılmaz. Bütçe dolarsa Codex çalışmayı güvenle koruyup durur, yeni yaklaşım başlatmadan exact blocker ve kalan tek aksiyonu bildirir. CRITICAL ve owner Ready/merge/release kapıları değişmez.
 
 ## 7. Resume
 

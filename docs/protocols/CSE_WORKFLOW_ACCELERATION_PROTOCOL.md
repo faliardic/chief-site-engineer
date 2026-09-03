@@ -1,7 +1,7 @@
-# CSE Workflow Acceleration Protocol — v4
+# CSE Workflow Acceleration Protocol — v5
 
 **Belge türü:** Bağlayıcı execution, correction ve publication protokolü
-**Geçerlilik tarihi:** 2026-09-02
+**Geçerlilik tarihi:** 2026-09-03
 
 Amaç maksimum kanıt üretmek değil, değişen sözleşmenin riskini karşılayan en hafif süreçle güvenli ürünü hızla master'a taşımaktır.
 
@@ -65,18 +65,18 @@ Aşağıdakilerden biri vardır:
 
 Dosya sayısı, widget test karmaşıklığı, navigation veya callback tek başına CRITICAL gerekçesi değildir.
 
-## 2. Beş dakikalık execution
+## 2. Göreve özel execution time budget
 
-Her Codex invocation yalnız bir bounded outcome üretir ve 5 dakikada hard-stop olur.
+Her Codex handoff'u ChatGPT'nin kapsam, risk, beklenen validation/build/device işi ve mevcut blocker'a göre seçtiği açık `Execution time budget: <süre>` alanını içerir. Global sabit süre varsayılanı yoktur. Codex bu bütçe içinde tek bounded outcome üretir; yetkili inceleme, edit/fix, focused validation ve commit/push mümkünse aynı adımda tamamlanır.
 
 Süre dolduğunda:
 
 - yeni yöntem denenmez;
 - başka davranışa geçilmez;
 - kapsam genişletilmez;
-- tamamlanan iş, blocker ve kalan tek adım raporlanır.
+- Codex durur ve mevcut çalışmayı güvenle korur; tamamlanan iş, exact blocker ve kalan tek adım raporlanır.
 
-Büyük STANDARD/CRITICAL görevler birden fazla bağımsız 5 dakikalık mikro adıma bölünebilir. Aynı anda yalnız bir production adımı yürür.
+Görev ancak kapsam veya gerçek süre ihtiyacı gerektiriyorsa açık bütçeli alt adımlara bölünür. Codex bütçeyi kendiliğinden uzatmaz. Aynı anda yalnız bir production adımı yürür. Süre bütçesi CRITICAL veya publication kapılarını gevşetmez.
 
 ## 3. Execution ve kabul sahipliği
 
@@ -84,17 +84,29 @@ Repository-local terminal, automated test, analyzer ve build/APK hazırlığı C
 
 Codex source edit, format, changed-path review, `git diff --check`, protected drift ve minimum yeterli automated doğrulamayı yapar; sonuçları raporlar. Fatih'e yalnız manuel kabul adımları verilir.
 
+### Non-CRITICAL one-pass teslim
+
+FAST/STANDARD bug ve küçük/orta feature işinin varsayılanı:
+
+`reproduce once -> fix -> one focused validation -> only-needed manual/device check -> owner merge gate`
+
+- Mevcut doğrudan ve tekrarlanabilir owner/device repro kanıtı ilk adımı karşılar; sırf automated FAIL üretmek için yeniden repro aranmaz. Source root cause yeterince belirlenmişse düzeltme başlayabilir.
+- Bir başarısız repro denemesinden sonra source/runtime diagnosis veya mevcut en güçlü kanıta geçilir. Kararı değiştirmeyen diagnostic, harness ve test döngüleri yasaktır.
+- Owner/device kanıtı, gerçek davranışı temsil edemeyen yapay test harness'inden üstündür. Widget/fake test PASS'i cihaz FAIL'ini geçersiz kılmaz; harness'in hatayı üretememesi tek başına fix blocker'ı olmaz.
+- Düzeltme için tek focused automated validation çalıştırılır; docs-only işte minimum docs kontrolleri bu doğrulamayı karşılar. Analyzer yalnız material ihtiyaç varsa eklenir. Değişmeyen source üzerinde geçen test tekrarlanmaz.
+- Manuel/device kabul yalnız runtime'a özgü davranışta veya owner açıkça istediğinde, değişen yol için bir kez yapılır. Gerekmiyorsa gerekçesiyle `GEREKMİYOR` yazılır; Codex automated PASS sonrası yetkili commit/push manuel PASS beklemez.
+- Gereken manuel/device kabul Fatih'in PASS/FAIL kapısındadır. Gerekli validation/kabul FAIL veya PENDING ise commit/push yapılmaz; düzeltme §7'ye göre yürür. CRITICAL evidence ve owner Ready/merge/release kapıları korunur.
+
 ## 4. FAST akışı
 
 ```text
 clean synchronized master
-→ one micro edit
-→ format/diff-check
-→ Codex automated validation
-→ Fatih manuel kabulü
-→ PASS
+→ mevcut kanıtı kullan veya bir kez reproduce et
+→ fix / implement
+→ format/diff-check + tek focused automated validation
+→ yalnız gerekiyorsa Fatih manuel/device PASS
 → small commit/push
-→ next micro step
+→ next task
 ```
 
 FAST için varsayılan olarak yoktur:
@@ -108,17 +120,18 @@ FAST için varsayılan olarak yoktur:
 - bağımsız review;
 - CI bekleme.
 
-Fatih PASS bildirmeden commit/push yapılmaz. FAIL/PENDING durumunda yeni işe geçilmez.
+Codex automated PASS gerekir. Manuel/device kabul gerekiyorsa ayrıca Fatih PASS beklenir; gerekmiyorsa bu kapı publication'ı bekletmez. Gerekli kontrol FAIL/PENDING durumundayken yeni işe geçilmez.
 
 ## 5. STANDARD akışı
 
 ```text
 short task/Issue
 → one short-lived branch
-→ bounded micro edits
-→ Codex automated validation
-→ Fatih manuel kabulü
-→ concise evidence
+→ mevcut kanıtı kullan veya bir kez reproduce et
+→ fix / implement
+→ tek focused automated validation
+→ yalnız gerekiyorsa Fatih manuel/device PASS
+→ yetkili commit/push + concise evidence
 → optional single Draft PR/review
 → owner merge
 → master sync
@@ -131,6 +144,7 @@ Kurallar:
 - `.cse` ve routing YAML varsayılan değil;
 - Issue/PR sonucu 10–15 satırı hedefler;
 - bağımsız review yalnız material fayda varsa;
+- normalde ilk teslimden sonra en fazla bir same-scope correction turu; çözülmezse escalation;
 - current iş master'a alınmadan sonraki feature branch açılmaz.
 
 ### Protokol geçişi
@@ -139,7 +153,7 @@ Protokol kabul edildiğinde zaten açık olan legacy/stacked production PR'lar b
 
 - Kuyruk çözülene kadar yeni production branch açılmaz.
 - Mevcut PR'lar current master'a birer birer uyarlanır.
-- Her PR için test ve blocker kanıtı yeniden değerlendirilir.
+- Her PR için test ve blocker kanıtı bu one-pass politikasıyla yeniden değerlendirilir; değişmeyen source üzerinde geçen test tekrarlanmaz.
 - Ready, merge veya close işlemi owner'ın ayrı kararıyla yapılır.
 - Sabit PR numaraları bu kalıcı protokole yazılmaz.
 
@@ -164,11 +178,13 @@ Ready, merge, release/store ve destructive production işlemi owner onayı gerek
 
 FAST/STANDARD same-scope hata için yeni owner authority gerekmez.
 
-Her correction ayrı 5 dakikalık mikro adımdır. Aynı hata için:
+Correction mevcut yetkili kapsam ve execution time budget içine sığıyorsa aynı adımda tamamlanır; ayrı handoff gerekiyorsa ChatGPT açık yeni bütçe atar. STANDARD bug fix'te normalde ilk teslimden sonra en fazla bir same-scope correction turu yapılır; sorun sürüyorsa yeni diagnostic/test döngüsü yerine exact blocker ile escalation yapılır.
 
-- exact root cause belirlenir;
+Aynı hata için:
+
+- mevcut owner/device ve source kanıtıyla root cause yeterince belirlenir; deterministic automated FAIL önkoşulu konmaz;
 - tek dar correction yapılır;
-- Codex yalnız gerekli automated doğrulamayı çalıştırır; Fatih gerekiyorsa manuel kabulü yeniden değerlendirir.
+- Codex yalnız etkilenen focused doğrulamayı bir kez çalıştırır; analyzer ve Fatih'in manuel/device kabulü yalnız ihtiyaç varsa yeniden değerlendirilir.
 
 Yeni authority yalnız şu durumlarda gerekir:
 
@@ -187,7 +203,7 @@ changed behavior
 changed paths
 format/diff-check
 Codex automated validation status
-Fatih manual acceptance status
+Fatih manual acceptance status / GEREKMİYOR gerekçesi
 commit/push
 ```
 
@@ -199,7 +215,7 @@ Aynı bilgi Issue, comment, task, result, state ve PR body içinde tekrarlanmaz.
 
 ## 9. Publication
 
-- FAST: user PASS sonrası normal commit/push.
+- FAST: Codex automated PASS ve yalnız gerekiyorsa Fatih manuel/device PASS sonrası normal commit/push.
 - STANDARD: tek branch; gerekiyorsa tek Draft PR; squash merge varsayılanı.
 - CRITICAL: Issue'ya özel publication ve review zinciri.
 - Force-push yok.
@@ -217,7 +233,8 @@ Normal akış şu tetiklerden birinde durur:
 - destructive işlem;
 - beklenmeyen path değişikliği;
 - source truth belirsizliği;
-- çözümün mevcut scope'u aşması.
+- çözümün mevcut scope'u aşması;
+- STANDARD same-scope correction turu sonunda sorunun sürmesi.
 
 Mesaj kısa olur:
 
@@ -227,18 +244,21 @@ Trigger: <neden>
 Required decision: <tek karar>
 ```
 
+Yalnız STANDARD correction turu tükendiyse `STOP — CORRECTION ESCALATION` kullanılır; somut CRITICAL trigger yoksa lane yükseltilmez.
+
 ## 11. Başarı ölçütleri
 
-- FAST Codex işlemi 5 dakikanın altında: %100
+- Her Codex handoff'unda ChatGPT-assigned explicit execution time budget: %100
 - FAST Issue/PR/`.cse`: 0
 - Codex manuel ürün kabulü kararı: 0
 - Fatih'e terminal execution görevi/komutu verme: 0
 - exact owner delegasyonu olmadan Codex emulator/ADB/device invocation: 0
-- user PASS olmadan FAST commit/push: 0
+- gerekli automated veya manuel/device PASS olmadan non-CRITICAL commit/push: 0
 - stacked PR: 0
 - aynı anda production PR: en fazla 1
+- kararı değiştirmeyen diagnostic/test tekrarı: 0
 - CRITICAL işte ağır güvenlik süreci: %100
 
 ## 12. Ana karar
 
-> CSE'nin varsayılan döngüsü küçük işte mikro edit, Codex automated doğrulaması ve owner manuel kabulüdür. Branch/PR/review yalnız değişen risk bunu gerektirdiğinde kullanılır. Ağır süreç gerçek veri, integrity ve release riskine ayrılır.
+> Non-CRITICAL varsayılanı one-pass teslim, göreve özel süre bütçesi, tek focused validation ve yalnız gereken manuel/device kabulüdür. Branch/PR/review riskle orantılıdır; owner Ready/merge kapısı ve CRITICAL veri/release güvenliği korunur.
