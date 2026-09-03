@@ -1628,7 +1628,11 @@ class SqliteMobileBackupApplication
       database.rawQuery('''
         SELECT DISTINCT m.relative_path, m.byte_size, m.sha256
         FROM managed_attachments m
-        JOIN attachment_links l ON l.attachment_id = m.id
+        WHERE m.id IN (
+          SELECT attachment_id FROM attachment_links
+          UNION
+          SELECT attachment_id FROM inventory_asset_attachment_links
+        )
         ORDER BY m.relative_path ASC
       ''');
 
@@ -1639,13 +1643,17 @@ class SqliteMobileBackupApplication
     '''
       SELECT DISTINCT m.relative_path, m.byte_size, m.sha256
       FROM managed_attachments m
-      JOIN attachment_links l ON l.attachment_id = m.id
-      WHERE ? >= 13
-        OR l.legacy_source = 'agenda_log_attachments'
-        OR (
-          l.legacy_source = 'concrete_attachments'
-          AND l.archived_at IS NULL
-        )
+      WHERE m.id IN (
+        SELECT attachment_id FROM attachment_links l
+        WHERE ? >= 13
+          OR l.legacy_source = 'agenda_log_attachments'
+          OR (
+            l.legacy_source = 'concrete_attachments'
+            AND l.archived_at IS NULL
+          )
+        UNION
+        SELECT attachment_id FROM inventory_asset_attachment_links
+      )
       ORDER BY m.relative_path ASC
     ''',
     [sourceSchemaVersion],

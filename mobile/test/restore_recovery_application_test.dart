@@ -222,6 +222,60 @@ void main() {
     },
   );
 
+  test(
+    'Inventory-only recovery requires its managed file with exact size and hash',
+    () async {
+      const bytes = <int>[0xff, 0xd8, 0xff, 0xd9];
+      const relativePath = 'managed/60400000-0000-4000-8000-000000000001.jpg';
+      await _insertInventoryAttachmentGraph(
+        directories,
+        relativePath: relativePath,
+        bytes: bytes,
+      );
+      final recovery = MobileRestoreRecoveryApplication(
+        directories: directories,
+        databaseFactory: databaseFactoryFfi,
+        clock: _clock,
+      );
+      Matcher failure(String code) => throwsA(
+        isA<RestoreRecoveryFailure>().having(
+          (failure) => failure.code,
+          'code',
+          code,
+        ),
+      );
+      await expectLater(
+        recovery.validateActiveState(),
+        failure('active_attachment_missing'),
+      );
+      final file = File(path.join(directories.attachments.path, relativePath));
+      await file.parent.create(recursive: true);
+      await file.writeAsBytes(bytes, flush: true);
+      await expectLater(recovery.validateActiveState(), completes);
+
+      await file.writeAsBytes(bytes.sublist(0, 3), flush: true);
+      await expectLater(
+        recovery.validateActiveState(),
+        failure('active_attachment_corrupt'),
+      );
+      await file.writeAsBytes(const [1, 2, 3, 4], flush: true);
+      await expectLater(
+        recovery.validateActiveState(),
+        failure('active_attachment_corrupt'),
+      );
+      await file.writeAsBytes(bytes, flush: true);
+      await expectLater(recovery.validateActiveState(), completes);
+
+      final raw = await databaseFactoryFfi.openDatabase(
+        directories.databaseFile,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      expect(await raw.query('attachment_links'), isEmpty);
+      expect(await raw.query('inventory_asset_attachment_links'), hasLength(1));
+      await raw.close();
+    },
+  );
+
   test('migrated archived Concrete physical file remains optional', () async {
     final database = AppDatabase(
       path: directories.databaseFile,
@@ -383,6 +437,57 @@ Future<List<String>> _projectNames(String databasePath) async {
   try {
     final rows = await database.query('projects', orderBy: 'id ASC');
     return rows.map((row) => row['name']! as String).toList();
+  } finally {
+    await database.close();
+  }
+}
+
+Future<void> _insertInventoryAttachmentGraph(
+  AppDirectories directories, {
+  required String relativePath,
+  required List<int> bytes,
+}) async {
+  final database = AppDatabase(
+    path: directories.databaseFile,
+    factory: databaseFactoryFfi,
+    clock: _clock,
+  );
+  await database.open();
+  try {
+    await database.database.transaction((transaction) async {
+      await transaction.insert('inventory_assets', {
+        'id': 'inventory-recovery-asset',
+        'project_id': 'old-project',
+        'display_name': 'Recovery asset',
+        'normalized_name': 'recovery asset',
+        'category_code': 'EQUIPMENT',
+        'total_quantity': 1,
+        'status': 'AVAILABLE',
+        'revision': 1,
+        'created_at': '2026-07-19T18:00:00Z',
+        'updated_at': '2026-07-19T18:00:00Z',
+        'status_changed_at': '2026-07-19T18:00:00Z',
+      });
+      await transaction.insert('managed_attachments', {
+        'id': '60400000-0000-4000-8000-000000000001',
+        'relative_path': relativePath,
+        'mime_type': 'image/jpeg',
+        'byte_size': bytes.length,
+        'sha256': sha256.convert(bytes).toString(),
+        'created_at': '2026-07-19T18:00:00Z',
+      });
+      await transaction.insert('inventory_asset_attachment_links', {
+        'id': 'inventory-recovery-link',
+        'attachment_id': '60400000-0000-4000-8000-000000000001',
+        'asset_id': 'inventory-recovery-asset',
+        'project_id': 'old-project',
+        'role': 'inventory_photo',
+        'original_file_name': 'photo.jpg',
+        'revision': 1,
+        'created_at': '2026-07-19T18:00:00Z',
+        'updated_at': '2026-07-19T18:00:00Z',
+      });
+    });
   } finally {
     await database.close();
   }

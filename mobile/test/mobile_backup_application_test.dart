@@ -20,6 +20,9 @@ import 'package:chief_site_engineer/domain/construction_project_graph_models.dar
 import 'package:chief_site_engineer/domain/construction_schedule_models.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/domain/mobile_backup_models.dart';
+import 'package:chief_site_engineer/platform/attachment_gateway.dart';
+import 'package:chief_site_engineer/platform/capabilities.dart';
+import 'package:chief_site_engineer/platform/inventory_attachment_gateway.dart';
 import 'package:chief_site_engineer/platform/managed_attachment_store.dart';
 import 'package:chief_site_engineer/platform/mobile_backup_gateway.dart';
 import 'package:chief_site_engineer/platform/notification_gateway.dart';
@@ -176,8 +179,40 @@ void main() {
     'format 1 backup restores populated Inventory with exact replayable truth',
     () async {
       expect(AppDatabase.schemaVersion, 22);
-      final fixture = await _seedPopulatedInventory(directories);
+      final fixture = await _seedPopulatedInventory(
+        directories,
+        attachmentGateway: _inventoryPhotoGateway(directories),
+      );
       final sourceInventory = fixture.application;
+      final photoCommands = [
+        for (var index = 0; index < 2; index += 1)
+          AddOrReplaceInventoryAssetPhotoCommand(
+            operationId: _inventoryUuid(140 + index * 3),
+            projectId: fixture.projectId,
+            assetId: fixture.assetAId,
+            linkId: _inventoryUuid(141 + index * 3),
+            attachmentId: _inventoryUuid(142 + index * 3),
+            expectedAssetRevision: 6,
+            selection: InventoryPhotoSelection(
+              originalFileName: 'inventory-$index.jpg',
+              bytes: [0xff, 0xd8, 0xff, 0xd9, index],
+              source: InventoryPhotoSource.photoLibrary,
+            ),
+          ),
+      ];
+      final photoResults = [
+        for (final command in photoCommands)
+          await sourceInventory.addOrReplaceAssetPhoto(command),
+      ];
+      final sourceDatabase = await _openRaw(directories);
+      final sourceAttachments = await sourceDatabase.query(
+        'managed_attachments',
+        orderBy: 'id ASC',
+      );
+      // No generic attachment link can mask missing Inventory backup adoption.
+      expect(await sourceDatabase.query('attachment_links'), isEmpty);
+      await sourceDatabase.close();
+      expect(sourceAttachments, hasLength(2));
       final sourceRows = await _inventoryRowsSnapshot(directories);
       _expectInventoryStoredIntegrity(sourceRows);
       expect(
@@ -198,7 +233,19 @@ void main() {
         ),
         isTrue,
       );
-      expect(sourceRows['inventory_asset_attachment_links'], isEmpty);
+      final sourcePhotoLinks = sourceRows['inventory_asset_attachment_links']!;
+      expect(sourcePhotoLinks, hasLength(2));
+      expect(sourcePhotoLinks.first['archived_at'], isNotNull);
+      expect(sourcePhotoLinks.last['archived_at'], isNull);
+      for (var index = 0; index < photoCommands.length; index += 1) {
+        expect(sourcePhotoLinks[index]['id'], photoCommands[index].linkId);
+        expect(sourcePhotoLinks[index]['asset_id'], fixture.assetAId);
+        expect(sourcePhotoLinks[index]['project_id'], fixture.projectId);
+        expect(
+          sourcePhotoLinks[index]['attachment_id'],
+          photoCommands[index].attachmentId,
+        );
+      }
 
       final sourcePrimary = await sourceInventory.loadPrimarySketch(
         fixture.projectId,
@@ -251,7 +298,19 @@ void main() {
       expect(preflight.manifest.formatVersion, CseBackupCodec.formatVersion);
       expect(preflight.manifest.formatVersion, 1);
       expect(preflight.manifest.mobileSchemaVersion, AppDatabase.schemaVersion);
-      expect(preflight.manifest.attachments, isEmpty);
+      expect(created.summary.attachmentCount, 2);
+      expect(
+        preflight.manifest.attachments.map(
+          (item) => (item.logicalPath, item.byteSize, item.sha256),
+        ),
+        photoCommands.map(
+          (command) => (
+            'managed/${command.attachmentId}.jpg',
+            command.selection.bytes.length,
+            sha256.convert(command.selection.bytes).toString(),
+          ),
+        ),
+      );
 
       await sourceInventory.changeAssetStatus(
         ChangeInventoryAssetStatusCommand(
@@ -386,9 +445,111 @@ void main() {
         'ok',
       );
       expect(await active.rawQuery('PRAGMA foreign_key_check'), isEmpty);
-      expect(await active.query('inventory_asset_attachment_links'), isEmpty);
+      expect(
+        await active.query('managed_attachments', orderBy: 'id ASC'),
+        sourceAttachments,
+      );
+      expect(
+        await active.query(
+          'inventory_asset_attachment_links',
+          orderBy: 'id ASC',
+        ),
+        sourcePhotoLinks,
+      );
       await active.close();
       expect(await directories.staging.list().toList(), isEmpty);
+
+      // A clean target proves bytes are restored, not left over from the source.
+      final target = AppDirectories.fromSupportRoot(
+        Directory(path.join(temporaryRoot.path, 'inventory-clean-target')),
+        AppEnvironment.debug,
+      );
+      await target.ensureCreated();
+      await _bootstrapDatabase(target);
+      expect(await target.attachments.list().toList(), isEmpty);
+      final targetBackup = _application(
+        target,
+        gateway: _FakeFileGateway(target),
+      );
+      final targetPackage = await _stageIncomingPackage(
+        target,
+        File(created.absolutePath),
+      );
+      final targetPreflight = await targetBackup.preflightBackup(
+        targetPackage,
+        _password,
+      );
+      await targetBackup.restoreBackup(
+        RestoreMobileBackupCommand(
+          package: targetPackage,
+          password: _password,
+          expectedPackageSha256: targetPreflight.packageSha256,
+        ),
+      );
+      expect(await _inventoryRowsSnapshot(target), sourceRows);
+      final reopened = await _openRaw(target);
+      expect(
+        await reopened.query('managed_attachments', orderBy: 'id ASC'),
+        sourceAttachments,
+      );
+      expect(await reopened.rawQuery('PRAGMA foreign_key_check'), isEmpty);
+      expect(
+        (await reopened.rawQuery(
+          'PRAGMA integrity_check',
+        )).single.values.single,
+        'ok',
+      );
+      await reopened.close();
+      final photoGateway = _inventoryPhotoGateway(target);
+      for (final command in photoCommands) {
+        final content = await photoGateway.read(
+          relativePath: 'managed/${command.attachmentId}.jpg',
+          originalFileName: command.selection.originalFileName,
+          expectedSha256: sha256.convert(command.selection.bytes).toString(),
+          expectedMimeType: 'image/jpeg',
+          expectedByteSize: command.selection.bytes.length,
+        );
+        expect(content.bytes, command.selection.bytes);
+        expect(content.mimeType, 'image/jpeg');
+      }
+      final photoInventory = SqliteInventoryApplication(
+        databasePath: target.databaseFile,
+        databaseFactory: databaseFactoryFfi,
+        clock: _InventoryClock(DateTime.parse('2026-08-27T15:00:00Z')).call,
+        attachmentGateway: photoGateway,
+      );
+      expect(
+        (await photoInventory.loadActiveAssetPhoto(
+          projectId: fixture.projectId,
+          assetId: fixture.assetAId,
+        ))?.linkId,
+        photoCommands.last.linkId,
+      );
+      expect(
+        (await photoInventory.readAssetPhoto(
+          projectId: fixture.projectId,
+          assetId: fixture.assetAId,
+          linkId: photoCommands.last.linkId,
+        )).bytes,
+        photoCommands.last.selection.bytes,
+      );
+      for (var index = 0; index < photoCommands.length; index += 1) {
+        final replay = await photoInventory.addOrReplaceAssetPhoto(
+          photoCommands[index],
+        );
+        expect(
+          _inventoryMutationValues(replay),
+          _inventoryMutationValues(photoResults[index]),
+        );
+      }
+      expect(await _inventoryRowsSnapshot(target), sourceRows);
+      expect(
+        await target.attachments
+            .list(recursive: true)
+            .where((entity) => entity is File)
+            .length,
+        2,
+      );
     },
   );
 
@@ -2523,6 +2684,29 @@ const _inventoryTables = <String>[
   'inventory_asset_attachment_links',
 ];
 
+DeviceInventoryAttachmentGateway _inventoryPhotoGateway(
+  AppDirectories directories,
+) => DeviceInventoryAttachmentGateway(
+  picker: const SafeAttachmentPicker(
+    permissions: SafeCapabilityService(_UnusedInventoryPicker()),
+    picker: _UnusedInventoryPicker(),
+  ),
+  managedStore: DeviceManagedAttachmentStore(directories: directories),
+);
+
+class _UnusedInventoryPicker
+    implements AttachmentPickerPort, PermissionGateway {
+  const _UnusedInventoryPicker();
+
+  @override
+  Future<SelectedAttachment?> pick(AttachmentSource source) =>
+      throw StateError('Persistence tests must not invoke a device picker');
+
+  @override
+  Future<CapabilityStatus> request(DeviceCapability capability) =>
+      throw StateError('Persistence tests must not request device permissions');
+}
+
 class _InventoryRoundTripFixture {
   const _InventoryRoundTripFixture({
     required this.projectId,
@@ -2621,8 +2805,10 @@ List<InventoryBlockDraft> _inventoryBlockDrafts(
 }
 
 Future<_InventoryRoundTripFixture> _seedPopulatedInventory(
-  AppDirectories directories,
-) async {
+  AppDirectories directories, {
+  InventoryAttachmentGateway attachmentGateway =
+      const UnavailableInventoryAttachmentGateway(),
+}) async {
   final projectId = _inventoryUuid(1);
   final raw = await _openRaw(directories);
   await raw.insert('projects', {
@@ -2640,6 +2826,7 @@ Future<_InventoryRoundTripFixture> _seedPopulatedInventory(
     databaseFactory: databaseFactoryFfi,
     clock: clock.call,
     idFactory: _InventoryIds(5000).call,
+    attachmentGateway: attachmentGateway,
   );
   final sketchId = _inventoryUuid(10);
   final firstRevisionId = _inventoryUuid(11);
