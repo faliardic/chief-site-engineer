@@ -500,12 +500,7 @@ Finder _dashboardProjectSelectionButton() {
   final button = find
       .descendant(
         of: surface,
-        matching: find.byWidgetPredicate(
-          (widget) =>
-              widget is IconButton &&
-              widget.tooltip == 'Proje seç' &&
-              widget.onPressed != null,
-        ),
+        matching: find.widgetWithText(FilledButton, 'Proje seç'),
       )
       .hitTestable();
   expect(button, findsOneWidget);

@@ -415,7 +415,9 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         body:
             'Dashboard günlük saha kayıtlarını bir proje bağlamında gösterir.',
         actionIcon: Icons.add_business_rounded,
-        actionLabel: 'Proje kurulumuna git',
+        actionLabel: 'Yeni proje oluştur',
+        actionKey: const Key('dashboard-create-project'),
+        showActionLabel: true,
         onAction: widget.onCreateProject,
       );
     }
@@ -429,7 +431,13 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
             'Birden fazla aktif proje var. Seçim yapılmadan proje kayıtları okunmaz.',
         actionIcon: Icons.swap_horiz_rounded,
         actionLabel: 'Proje seç',
+        actionKey: const Key('dashboard-select-project'),
+        showActionLabel: true,
         onAction: _showProjectSelector,
+        secondaryActionIcon: Icons.add_business_rounded,
+        secondaryActionLabel: 'Yeni proje',
+        secondaryActionKey: const Key('dashboard-create-project'),
+        onSecondaryAction: widget.onCreateProject,
       );
     }
     return _buildDashboard(selected);
@@ -446,40 +454,55 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
           key: const Key('dashboard-project-header'),
           child: Padding(
             padding: const EdgeInsets.all(12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.apartment_rounded, size: 28),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Semantics(
-                    container: true,
-                    label: 'Aktif proje ${project.name}, bugün $dateLabel',
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Aktif proje',
-                          style: Theme.of(context).textTheme.labelLarge,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.apartment_rounded, size: 28),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Semantics(
+                        container: true,
+                        label: 'Aktif proje ${project.name}, bugün $dateLabel',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Aktif proje',
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              project.name,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(dateLabel, key: const Key('dashboard-date')),
+                          ],
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          project.name,
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(dateLabel, key: const Key('dashboard-date')),
-                      ],
+                      ),
                     ),
+                    if (_projects.length > 1)
+                      _DashboardIconAction(
+                        actionKey: const Key('dashboard-change-project'),
+                        icon: Icons.swap_horiz_rounded,
+                        label: 'Aktif projeyi değiştir',
+                        onPressed: _showProjectSelector,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.tonalIcon(
+                    key: const Key('dashboard-create-project'),
+                    onPressed: widget.onCreateProject,
+                    icon: const Icon(Icons.add_business_rounded),
+                    label: const Text('Yeni proje'),
                   ),
                 ),
-                if (_projects.length > 1)
-                  _DashboardIconAction(
-                    actionKey: const Key('dashboard-change-project'),
-                    icon: Icons.swap_horiz_rounded,
-                    label: 'Aktif projeyi değiştir',
-                    onPressed: _showProjectSelector,
-                  ),
               ],
             ),
           ),
@@ -743,8 +766,17 @@ class _ProjectStateSurface extends StatelessWidget {
     required this.actionIcon,
     required this.actionLabel,
     required this.onAction,
+    this.actionKey,
+    this.showActionLabel = false,
+    this.secondaryActionIcon,
+    this.secondaryActionLabel,
+    this.secondaryActionKey,
+    this.onSecondaryAction,
     super.key,
-  });
+  }) : assert(
+         onSecondaryAction == null ||
+             (secondaryActionIcon != null && secondaryActionLabel != null),
+       );
 
   final IconData icon;
   final String title;
@@ -752,9 +784,38 @@ class _ProjectStateSurface extends StatelessWidget {
   final IconData actionIcon;
   final String actionLabel;
   final VoidCallback onAction;
+  final Key? actionKey;
+  final bool showActionLabel;
+  final IconData? secondaryActionIcon;
+  final String? secondaryActionLabel;
+  final Key? secondaryActionKey;
+  final VoidCallback? onSecondaryAction;
 
   @override
   Widget build(BuildContext context) {
+    final Widget primaryAction = showActionLabel
+        ? FilledButton.icon(
+            key: actionKey,
+            onPressed: onAction,
+            icon: Icon(actionIcon),
+            label: Text(actionLabel),
+          )
+        : _DashboardIconAction(
+            actionKey: actionKey,
+            icon: actionIcon,
+            label: actionLabel,
+            kind: _DashboardIconActionKind.filled,
+            onPressed: onAction,
+          );
+    final secondaryCallback = onSecondaryAction;
+    final Widget? secondaryAction = secondaryCallback == null
+        ? null
+        : FilledButton.tonalIcon(
+            key: secondaryActionKey,
+            onPressed: secondaryCallback,
+            icon: Icon(secondaryActionIcon!),
+            label: Text(secondaryActionLabel!),
+          );
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -773,12 +834,15 @@ class _ProjectStateSurface extends StatelessWidget {
               const SizedBox(height: 6),
               Text(body, textAlign: TextAlign.center),
               const SizedBox(height: 12),
-              _DashboardIconAction(
-                icon: actionIcon,
-                label: actionLabel,
-                kind: _DashboardIconActionKind.filled,
-                onPressed: onAction,
-              ),
+              if (secondaryAction != null)
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [primaryAction, secondaryAction],
+                )
+              else
+                primaryAction,
             ],
           ),
         ),

@@ -35,7 +35,7 @@ void main() {
     expect(fixture.plan.calls, isEmpty);
     expect(fixture.materials.calls, isEmpty);
 
-    final setupAction = find.byTooltip('Proje kurulumuna git');
+    final setupAction = find.byKey(const Key('dashboard-create-project'));
     expect(setupAction, findsOneWidget);
     expect(
       find.descendant(
@@ -44,7 +44,13 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('Proje kurulumuna git'), findsNothing);
+    expect(
+      find.descendant(
+        of: setupAction,
+        matching: find.text('Yeni proje oluştur'),
+      ),
+      findsOneWidget,
+    );
     await tester.tap(setupAction);
     expect(setupCalls, 1);
   });
@@ -68,7 +74,7 @@ void main() {
     expect(fixture.plan.calls, isEmpty);
     expect(fixture.materials.calls, isEmpty);
 
-    final selectAction = find.byTooltip('Proje seç');
+    final selectAction = find.byKey(const Key('dashboard-select-project'));
     expect(selectAction, findsOneWidget);
     expect(
       find.descendant(
@@ -77,7 +83,11 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('Proje seç'), findsNothing);
+    expect(
+      find.descendant(of: selectAction, matching: find.text('Proje seç')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('dashboard-create-project')), findsOneWidget);
     await tester.tap(selectAction);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('dashboard-project-b')));
@@ -90,6 +100,57 @@ void main() {
     expect(fixture.materials.calls.single, 'b');
     expect(find.text('Güney'), findsOneWidget);
   });
+
+  testWidgets(
+    'unselected multiple projects keeps both actions usable at narrow scale',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      tester.binding.platformDispatcher.textScaleFactorTestValue = 1.6;
+      addTearDown(
+        tester.binding.platformDispatcher.clearTextScaleFactorTestValue,
+      );
+      final fixture = _Fixture(
+        projects: [_project('a', 'Kuzey'), _project('b', 'Güney')],
+      );
+      addTearDown(fixture.dispose);
+      var createCalls = 0;
+
+      await tester.pumpWidget(
+        fixture.app(onCreateProject: () => createCalls += 1),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('dashboard-project-selection-required')),
+        findsOneWidget,
+      );
+      final select = find.byKey(const Key('dashboard-select-project'));
+      final create = find.byKey(const Key('dashboard-create-project'));
+      expect(
+        find.descendant(of: select, matching: find.text('Proje seç')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: create, matching: find.text('Yeni proje')),
+        findsOneWidget,
+      );
+      expect(select.hitTestable(), findsOneWidget);
+      expect(create.hitTestable(), findsOneWidget);
+
+      await tester.tap(create);
+      await tester.pump();
+
+      expect(createCalls, 1);
+      expect(fixture.session.selectedProjectId, isNull);
+      expect(fixture.daily.calls, isEmpty);
+      expect(fixture.plan.calls, isEmpty);
+      expect(fixture.materials.calls, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'projectChanges invalidates stale selection without read leakage',
@@ -247,6 +308,11 @@ void main() {
     expect(find.bySemanticsLabel('Ajanda kaydı ekle'), findsOneWidget);
 
     final header = find.byKey(const Key('dashboard-project-header'));
+    final createProject = find.byKey(const Key('dashboard-create-project'));
+    expect(
+      find.descendant(of: createProject, matching: find.text('Yeni proje')),
+      findsOneWidget,
+    );
     final headerPaddings = tester.widgetList<Padding>(
       find.descendant(of: header, matching: find.byType(Padding)),
     );
@@ -345,7 +411,7 @@ void main() {
     'large-text Dashboard uses safe action fallback without overflow',
     (tester) async {
       final semantics = tester.ensureSemantics();
-      tester.view.physicalSize = const Size(390, 844);
+      tester.view.physicalSize = const Size(320, 844);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -381,6 +447,14 @@ void main() {
         find.bySemanticsLabel(RegExp('Aktif proje Çok Uzun Kuzey Projesi')),
         findsOneWidget,
       );
+      final createProject = find.byKey(const Key('dashboard-create-project'));
+      expect(
+        find.descendant(of: createProject, matching: find.text('Yeni proje')),
+        findsOneWidget,
+      );
+      expect(createProject.hitTestable(), findsOneWidget);
+      await tester.tap(createProject);
+      await tester.pump();
       expect(find.byType(ListView), findsWidgets);
       semantics.dispose();
       expect(tester.takeException(), isNull);
@@ -605,7 +679,16 @@ void main() {
 
       await tester.pumpWidget(fixture.app());
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Proje seç'));
+      final selectionRequired = find.byKey(
+        const Key('dashboard-project-selection-required'),
+      );
+      final selectProject = find.descendant(
+        of: selectionRequired,
+        matching: find.widgetWithText(FilledButton, 'Proje seç'),
+      );
+      expect(selectProject, findsOneWidget);
+      expect(selectProject.hitTestable(), findsOneWidget);
+      await tester.tap(selectProject);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('dashboard-project-a')));
       await tester.pump();

@@ -18,6 +18,7 @@ import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:chief_site_engineer/features/attendance/attendance_page.dart';
 import 'package:chief_site_engineer/features/dashboard/project_dashboard_page.dart';
 import 'package:chief_site_engineer/features/inventory/inventory_page.dart';
+import 'package:chief_site_engineer/features/projects/project_create_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -727,6 +728,259 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets(
+    'zero-project Dashboard creates directly without mounting Agenda',
+    (tester) async {
+      final agenda = _ShellProjectAgenda();
+      await tester.pumpWidget(
+        CseApp(
+          bootstrap: Future<BootstrapResult>.value(
+            BootstrapSuccess(
+              environmentLabel: 'Geliştirme',
+              smokeRecordId: 'dashboard-create-first-project',
+              smokeRecordCreatedAt: '2026-09-01T08:00:00Z',
+              agenda: agenda,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final create = find.byKey(const Key('dashboard-create-project'));
+      expect(find.text('Yeni proje oluştur'), findsOneWidget);
+      await tester.tap(create);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ProjectCreatePage), findsOneWidget);
+      expect(find.byType(AgendaPage, skipOffstage: false), findsNothing);
+      expect(agenda.listAgendaCalls, 0);
+      await tester.enterText(
+        find.byKey(const Key('project-name')),
+        '  İlk Saha Projesi  ',
+      );
+      await tester.tap(find.byKey(const Key('save-project')));
+      await tester.pumpAndSettle();
+
+      expect(agenda.createProjectCalls, 1);
+      expect(agenda.lastProjectCommand?.name, 'İlk Saha Projesi');
+      expect(find.byType(ProjectCreatePage), findsNothing);
+      expect(find.byType(AgendaPage, skipOffstage: false), findsNothing);
+      expect(agenda.listAgendaCalls, 0);
+      expect(find.text('İlk Saha Projesi'), findsWidgets);
+      final dashboard = tester.widget<ProjectDashboardPage>(
+        find.byType(ProjectDashboardPage),
+      );
+      expect(
+        dashboard.session.selectedProjectId,
+        agenda.lastProjectCommand?.id,
+      );
+      expect(
+        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+        0,
+      );
+    },
+  );
+
+  testWidgets(
+    'unselected multiple-project Dashboard opens create and returns unchanged',
+    (tester) async {
+      const first = MobileProject(
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        name: 'Birinci Proje',
+        createdAt: '2026-09-01T07:00:00Z',
+        updatedAt: '2026-09-01T07:00:00Z',
+        revision: 1,
+      );
+      const second = MobileProject(
+        id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        name: 'İkinci Proje',
+        createdAt: '2026-09-01T07:30:00Z',
+        updatedAt: '2026-09-01T07:30:00Z',
+        revision: 1,
+      );
+      final agenda = _ShellProjectAgenda(projects: const [first, second]);
+      await tester.pumpWidget(
+        CseApp(
+          bootstrap: Future<BootstrapResult>.value(
+            BootstrapSuccess(
+              environmentLabel: 'Geliştirme',
+              smokeRecordId: 'dashboard-create-without-selection',
+              smokeRecordCreatedAt: '2026-09-01T08:00:00Z',
+              agenda: agenda,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('dashboard-project-selection-required')),
+        findsOneWidget,
+      );
+      var dashboard = tester.widget<ProjectDashboardPage>(
+        find.byType(ProjectDashboardPage),
+      );
+      expect(dashboard.session.selectedProjectId, isNull);
+      final create = find.byKey(const Key('dashboard-create-project'));
+      expect(create, findsOneWidget);
+
+      await tester.tap(create);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ProjectCreatePage), findsOneWidget);
+      expect(find.byType(AgendaPage, skipOffstage: false), findsNothing);
+      expect(agenda.listAgendaCalls, 0);
+      expect(agenda.createProjectCalls, 0);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ProjectCreatePage), findsNothing);
+      expect(
+        find.byKey(const Key('dashboard-project-selection-required')),
+        findsOneWidget,
+      );
+      dashboard = tester.widget<ProjectDashboardPage>(
+        find.byType(ProjectDashboardPage),
+      );
+      expect(agenda.createProjectCalls, 0);
+      expect(dashboard.session.selectedProjectId, isNull);
+      expect(find.byType(AgendaPage, skipOffstage: false), findsNothing);
+      expect(agenda.listAgendaCalls, 0);
+      expect(
+        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+        0,
+      );
+      expect(find.byKey(const Key('dashboard-create-project')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'existing-project create cancels safely then makes second project active',
+    (tester) async {
+      const first = MobileProject(
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        name: 'Birinci Proje',
+        createdAt: '2026-09-01T07:00:00Z',
+        updatedAt: '2026-09-01T07:00:00Z',
+        revision: 1,
+      );
+      final agenda = _ShellProjectAgenda(projects: const [first]);
+      await tester.pumpWidget(
+        CseApp(
+          bootstrap: Future<BootstrapResult>.value(
+            BootstrapSuccess(
+              environmentLabel: 'Geliştirme',
+              smokeRecordId: 'dashboard-create-second-project',
+              smokeRecordCreatedAt: '2026-09-01T08:00:00Z',
+              agenda: agenda,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      var dashboard = tester.widget<ProjectDashboardPage>(
+        find.byType(ProjectDashboardPage),
+      );
+      expect(dashboard.session.selectedProjectId, first.id);
+      expect(find.text('Yeni proje'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('dashboard-create-project')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      dashboard = tester.widget<ProjectDashboardPage>(
+        find.byType(ProjectDashboardPage),
+      );
+      expect(agenda.createProjectCalls, 0);
+      expect(dashboard.session.selectedProjectId, first.id);
+      expect(agenda.projects, const [first]);
+
+      await tester.tap(find.byKey(const Key('dashboard-create-project')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('project-name')),
+        'İkinci Proje',
+      );
+      await tester.tap(find.byKey(const Key('save-project')));
+      await tester.pumpAndSettle();
+
+      dashboard = tester.widget<ProjectDashboardPage>(
+        find.byType(ProjectDashboardPage),
+      );
+      expect(agenda.createProjectCalls, 1);
+      expect(agenda.projects, hasLength(2));
+      expect(agenda.projects.first, same(first));
+      expect(agenda.projects.first.isArchived, isFalse);
+      expect(
+        dashboard.session.selectedProjectId,
+        agenda.lastProjectCommand?.id,
+      );
+      expect(find.text('İkinci Proje'), findsWidgets);
+      expect(
+        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+        0,
+      );
+    },
+  );
+
+  testWidgets('failed shell create preserves selection and retry succeeds', (
+    tester,
+  ) async {
+    const first = MobileProject(
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'Korunan Proje',
+      createdAt: '2026-09-01T07:00:00Z',
+      updatedAt: '2026-09-01T07:00:00Z',
+      revision: 1,
+    );
+    final agenda = _ShellProjectAgenda(projects: const [first])
+      ..projectCreateFailure = StateError('synthetic storage failure');
+    await tester.pumpWidget(
+      CseApp(
+        bootstrap: Future<BootstrapResult>.value(
+          BootstrapSuccess(
+            environmentLabel: 'Geliştirme',
+            smokeRecordId: 'dashboard-create-retry',
+            smokeRecordCreatedAt: '2026-09-01T08:00:00Z',
+            agenda: agenda,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('dashboard-create-project')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('project-name')),
+      'Retry Projesi',
+    );
+    final save = find.byKey(const Key('save-project'));
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+
+    expect(agenda.createProjectCalls, 1);
+    expect(find.byType(ProjectCreatePage), findsOneWidget);
+    expect(find.text('Proje oluşturulamadı.'), findsOneWidget);
+    var dashboard = tester.widget<ProjectDashboardPage>(
+      find.byType(ProjectDashboardPage, skipOffstage: false),
+    );
+    expect(dashboard.session.selectedProjectId, first.id);
+    expect(agenda.projects, const [first]);
+
+    agenda.projectCreateFailure = null;
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    dashboard = tester.widget<ProjectDashboardPage>(
+      find.byType(ProjectDashboardPage),
+    );
+    expect(agenda.createProjectCalls, 2);
+    expect(agenda.projects, hasLength(2));
+    expect(dashboard.session.selectedProjectId, agenda.lastProjectCommand?.id);
+    expect(find.text('Retry Projesi'), findsWidgets);
+  });
+
   testWidgets('database bootstrap failure is fail closed and user safe', (
     tester,
   ) async {
@@ -823,6 +1077,23 @@ Widget _localizedTestApp(Widget home) => MaterialApp(
   theme: ThemeData(platform: TargetPlatform.android),
   home: home,
 );
+
+class _ShellProjectAgenda extends FakeAgendaApplication {
+  _ShellProjectAgenda({List<MobileProject> projects = const []})
+    : super(projects: projects);
+
+  int createProjectCalls = 0;
+  CreateProjectCommand? lastProjectCommand;
+  Object? projectCreateFailure;
+
+  @override
+  Future<MobileProject> createProject(CreateProjectCommand command) async {
+    createProjectCalls += 1;
+    lastProjectCommand = command;
+    if (projectCreateFailure case final failure?) throw failure;
+    return super.createProject(command);
+  }
+}
 
 class _Owner580DiagnosticCoordinator extends MobileOperationCoordinator {
   final pending = <int, String>{};
