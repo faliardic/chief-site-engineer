@@ -279,6 +279,10 @@ class MobileRestoreRecoveryApplication {
         WHERE NOT EXISTS (
           SELECT 1 FROM attachment_links l WHERE l.attachment_id = m.id
         )
+        AND NOT EXISTS (
+          SELECT 1 FROM inventory_asset_attachment_links l
+          WHERE l.attachment_id = m.id
+        )
         LIMIT 1
       ''');
       if (orphanedPhysical.isNotEmpty) {
@@ -287,10 +291,14 @@ class MobileRestoreRecoveryApplication {
       final rows = await database.database.rawQuery('''
         SELECT DISTINCT m.relative_path, m.byte_size, m.sha256
         FROM managed_attachments m
-        JOIN attachment_links l ON l.attachment_id = m.id
-        WHERE l.legacy_source IS NULL
-          OR l.legacy_source != 'concrete_attachments'
-          OR l.archived_at IS NULL
+        WHERE m.id IN (
+          SELECT attachment_id FROM attachment_links l
+          WHERE l.legacy_source IS NULL
+            OR l.legacy_source != 'concrete_attachments'
+            OR l.archived_at IS NULL
+          UNION
+          SELECT attachment_id FROM inventory_asset_attachment_links
+        )
         ORDER BY m.relative_path ASC
       ''');
       for (final row in rows) {
