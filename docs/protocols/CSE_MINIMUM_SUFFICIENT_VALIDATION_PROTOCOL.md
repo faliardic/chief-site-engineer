@@ -1,7 +1,7 @@
-# CSE Minimum Yeterli Doğrulama Protokolü — Codex Execution / Owner Acceptance v3
+# CSE Minimum Yeterli Doğrulama Protokolü — One-Pass Validation v4
 
 **Belge türü:** Bağlayıcı validation ve evidence protokolü
-**Geçerlilik tarihi:** 2026-09-02
+**Geçerlilik tarihi:** 2026-09-03
 
 Doğru hedef maksimum test değil, değişen sözleşmenin riskini karşılayan minimum yeterli doğrulamadır.
 
@@ -12,6 +12,10 @@ Repository-local terminal, automated test, analyzer ve build/APK hazırlığı C
 Codex format, diff, `git diff --check` ve protected drift kontrolünü de yapar. Açık device delegasyonunda yalnız exact komutu çalıştırır; kapsam genişletmez ve retry yapmaz.
 
 ## 2. Validation sınıfları
+
+Non-CRITICAL varsayılanı `reproduce once -> fix -> one focused validation -> only-needed manual/device check -> owner merge gate` akışıdır. Aşağıdaki sınıf, tek focused automated validation'ın kapsamını belirler; docs işinde statik docs kontrolleri yeterlidir. Analyzer yalnız material ihtiyaçta eklenir. CRITICAL sınıfların zorunlu test, compatibility, device ve release kapıları bu sadeleştirmeyle atlanmaz.
+
+Doğrudan, tekrarlanabilir owner/device repro kanıtı varsa ilk adım karşılanmıştır. Source root cause yeterince belirlenmişse düzeltme öncesi deterministic automated FAIL aranmaz. Owner/device kanıtı, davranışı temsil edemeyen yapay harness'ten üstündür; widget/fake PASS, cihaz FAIL'ini geçersiz kılmaz. Bir başarısız repro denemesinden sonra source/runtime diagnosis veya mevcut en güçlü kanıta geçilir.
 
 ### docs
 
@@ -28,9 +32,9 @@ Test/analyzer/build/device gerekmez.
 
 Minimum doğrulama (automated execution Codex, manuel kabul Fatih):
 
-- değişen behavior için focused test veya kısa manuel senaryo;
-- Dart değiştiyse uygun analyzer komutu;
-- runtime görünürlüğü gerekiyorsa yalnız değişen yolun APK/device kontrolü.
+- değişen behavior için tek focused automated doğrulama;
+- analyzer yalnız değişen Dart sözleşmesi veya statik risk için material ihtiyaç varsa;
+- manuel/device kabul yalnız runtime'a özgü davranışta veya owner açıkça istediğinde; yalnız değişen yolun kontrolü.
 
 Full suite her mikro adımda çalıştırılmaz.
 
@@ -42,7 +46,7 @@ Minimum doğrulama (automated execution Codex, manuel kabul Fatih):
 - etkilenen adapter/persistence testleri;
 - material cross-module analyzer;
 - milestone sonunda gerekli etkilenen/full suite;
-- yalnız değişen kullanıcı yolunun cihaz kabulü.
+- yalnız runtime'a özgü davranışta veya owner açıkça istediğinde değişen kullanıcı yolunun manuel/device kabulü.
 
 ### persistence
 
@@ -61,16 +65,16 @@ CRITICAL lane gerektirir. Signing, permission, application ID, platform/runtime,
 
 ## 3. Doğrulama merdiveni
 
-Stop-on-success sırası:
+Sınıfın zorunlu minimumunu karşılayan stop-on-success sırası:
 
 1. diff/scope kontrolü;
-2. focused test veya manuel değişen-yol kontrolü;
+2. tek focused automated validation (docs sınıfında statik kontrol);
 3. analyzer/etkilenen suite — gerekiyorsa;
 4. full suite — milestone veya risk gerektiriyorsa;
-5. build/device — runtime davranışı gerekiyorsa;
+5. manuel/device ve gerekiyorsa build — runtime'a özgü davranış veya açık owner talebi varsa;
 6. release gate — yalnız CRITICAL/release.
 
-Bir basamak yeterli kanıt verdiyse sırf daha fazla güven hissi için sonraki basamak çalıştırılmaz.
+Sınıfın minimumu karşılandıysa sırf daha fazla güven hissi için sonraki basamak çalıştırılmaz. Gereken manuel/device kabul Fatih'in PASS/FAIL kapısıdır; Codex automated PASS bu kararı vermez. Non-CRITICAL işte bu kabul gerekmiyorsa gerekçesiyle `GEREKMİYOR` kaydedilir ve Codex automated PASS sonrası yetkili commit/push manuel PASS beklemez.
 
 ## 4. Kanıt yeniden kullanımı
 
@@ -95,32 +99,38 @@ Changed behavior:
 Changed paths:
 Static checks:
 Codex execution / result:
-Manual check:
-Expected result:
+Manual check: GEREKMİYOR (<gerekçe>) | PENDING | PASS | FAIL
+Expected result: <yalnız gereken manuel kontrol için>
 ```
 
 Codex automated sonuçları ve exact hatayı raporlar. Fatih yalnız manuel ürün/device kabulü için `PASS` veya `FAIL` bildirir; kendisine terminal komutu verilmez.
 
-- PASS: commit/push kapısını açar.
-- FAIL: commit/push yapılmaz; exact hata için yeni mikro correction hazırlanır.
-- PENDING/PARTIAL: FAST commit/push kapalı kalır.
+Non-CRITICAL publication:
+
+- Codex automated PASS ve manuel/device kabul GEREKMİYOR: yetkili commit/push yapılabilir.
+- Manuel/device kabul gerekiyorsa Codex automated PASS yanında Fatih PASS gerekir.
+- Gerekli doğrulama/kabul FAIL veya PENDING/PARTIAL: commit/push kapalı kalır; exact hata için same-scope correction kuralı uygulanır.
+- STANDARD işte normalde ilk teslimden sonra en fazla bir same-scope correction turu; sorun sürüyorsa escalation.
+
+CRITICAL publication ve owner Ready/merge/release kapıları değişmez.
 
 ## 6. Süre bütçesi
 
-Tek Codex işlemi için hard stop: **5 dakika**.
+Her Codex handoff'unda ChatGPT açık `Execution time budget: <süre>` verir. Süre; kapsam, risk, beklenen validation/build/device işi ve mevcut blocker'a göre atanır; global sabit süre varsayılanı yoktur.
 
-Repository-local terminal, automated test, analyzer ve build dahil bütün Codex execution bu 5 dakikalık hard-stop içindedir. Açıkça devredilen emulator/ADB/device execution da aynı sınıra tabidir; owner manuel kabulü ayrı değerlendirilir.
+Repository-local terminal, automated test, analyzer, build ve açıkça devredilen emulator/ADB/device execution bu göreve özel bütçeye dahildir; owner manuel kabulü ayrı değerlendirilir. İnceleme, edit/fix, focused validation ve yetkili commit/push bütçeye sığıyorsa tek adımda birleştirilir.
 
-5 dakika dolunca Codex:
+Bütçe dolunca Codex durur:
 
 - yeni yaklaşım veya geniş gate başlatmaz;
 - kapsamı genişletmez;
-- tamamlanan işi ve kalan tek adımı raporlar.
+- çalışmayı güvenle korur; tamamlanan işi, exact blocker'ı ve kalan tek adımı raporlar.
 
-STANDARD/CRITICAL görev birden fazla mikro adıma bölünebilir.
+Gerekli yeni handoff'un bütçesini ChatGPT belirler. Süre bütçesi CRITICAL validation veya veri güvenliği kapılarını kaldırmaz.
 
 ## 7. Test tekrarları ve ortam hatası
 
+- Non-CRITICAL işte kararı değiştirmeyen diagnostic/test/harness döngüleri yasaktır; tek başarısız repro denemesinden sonra source/runtime diagnosis veya mevcut en güçlü kanıta geçilir.
 - Aynı failed operation exact düzeltme olmadan tekrarlanmaz.
 - Ortam/toolchain hatası feature kapsamına sessizce alınmaz.
 - Codex exact hata çıktısını kaydeder ve yalnız current scope içindeki dar source correction'ı hazırlar.
@@ -128,7 +138,7 @@ STANDARD/CRITICAL görev birden fazla mikro adıma bölünebilir.
 
 ## 8. Fiziksel cihaz kabulü
 
-Cihaz kontrolü yalnız değişen kullanıcı yolunu doğrular.
+Non-CRITICAL manuel/device kontrolü yalnız runtime'a özgü davranışta veya owner açıkça istediğinde, değişen kullanıcı yolunu bir kez doğrular. Gerekli kontrolün PASS/FAIL kararı Fatih'tedir. CRITICAL Issue'ya özel cihaz ve release kapıları aynen uygulanır.
 
 Tekrarlanmaz:
 
@@ -146,7 +156,7 @@ FAST:
 
 ```text
 static checks: PASS|FAIL
-owner validation: PENDING|PASS|FAIL
+owner validation: GEREKMİYOR (<gerekçe>)|PENDING|PASS|FAIL
 commit/push: NOT_DONE|<sha>
 ```
 
@@ -158,7 +168,7 @@ Test edilmemiş behavior `VERIFIED`, `FIELD_ACCEPTED` veya `RELEASE_READY` diye 
 
 Codex şu durumlarda durur:
 
-- 5 dakika doldu;
+- handoff'taki açık execution time budget doldu;
 - yeni CRITICAL trigger bulundu;
 - allowlist/scope genişlemesi gerekiyor;
 - kullanıcı verisi/destructive risk oluştu;
@@ -167,4 +177,4 @@ Codex şu durumlarda durur:
 
 ## 11. Ana karar
 
-> Codex kaynak değişikliğini ve minimum yeterli automated execution'ı yapar; Fatih manuel ürün/device kabulünü verir. Device execution için exact owner delegasyonu ve veri güvenliği sınırları korunur. Aynı kanıt tekrar üretilmez, full gate yalnız risk veya milestone gerektirdiğinde çalışır.
+> Non-CRITICAL işte Codex tek focused validation ile ilerler; Fatih yalnız gereken manuel/device kabulünü verir. Göreve özel süre bütçesi, exact device delegasyonu ve veri güvenliği sınırları korunur. Aynı kanıt tekrar üretilmez; CRITICAL ve owner Ready/merge/release kapıları değişmez.

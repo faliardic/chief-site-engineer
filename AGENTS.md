@@ -46,9 +46,11 @@ ChatGPT/Work Mode her kullanıcı talebinde execution başlamadan önce sıradak
 - **ChatGPT:** current GitHub okuma, planlama, Issue/PR koordinasyonu, review ve owner-approved Ready/merge;
 - **Codex:** repository-local terminal, automated test, analyzer, build/APK hazırlığı, dosya değişikliği, format/diff ve local Git/commit/push;
 - **Fatih:** yalnız manuel ürün/device kabulü ve nihai görsel/davranış PASS/FAIL kararı; PowerShell/terminal komutu çalıştırmaz;
-- **Codex device exception:** Fatih exact package, cihaz ve veri-koruma sınırıyla açıkça devrederse emulator/ADB/device işlemi tek bir 5 dakikalık görev olarak Codex'e geçebilir. PASS/FAIL ve ürün kabulü Fatih'te kalır.
+- **Codex device exception:** Fatih exact package, cihaz ve veri-koruma sınırıyla açıkça devrederse emulator/ADB/device işlemi ChatGPT'nin göreve özel verdiği execution time budget içinde Codex'e geçebilir. PASS/FAIL ve ürün kabulü Fatih'te kalır.
 
 Repository veya local execution gerekiyorsa ChatGPT, kullanıcının `Codex ile çalış` demesini beklemez. Açıkça `Sıradaki aktör: Codex` der ve current Issue/kuralları tekrar etmeyen, 10–15 satırı geçmeyen exact handoff verir. `CSE_PROJECT_INSTRUCTIONS.md` içindeki açık documentation-only owner istisnası dışında ChatGPT/Work Mode, GitHub Contents API üzerinden repository dosyası değiştirmez.
+
+Her Codex handoff'u ChatGPT'nin göreve özel belirlediği açık `Execution time budget: <süre>` alanını taşır. Bütçe; kapsam, risk, beklenen validation/build/device işi ve mevcut blocker'a göre seçilir.
 
 ChatGPT'ın kendi yetkisindeki işlem mevcut owner kararıyla yapılabiliyorsa ayrıca `devam` istemeden yürütülür. Kullanıcıya teslim edilen her sonuç şu satırla biter:
 
@@ -69,6 +71,14 @@ Devam işi kalmadığında `Sıradaki aksiyon — Yok: İş tamamlandı.` yazıl
 
 Her iş yalnız bir lane kullanır:
 
+FAST/STANDARD için varsayılan one-pass akışı:
+
+`reproduce once -> fix -> one focused validation -> only-needed manual/device check -> owner merge gate`
+
+Doğrudan, tekrarlanabilir owner/device kanıtı ve yeterince belirlenmiş source root cause varsa düzeltme öncesi deterministic automated FAIL zorunlu değildir. Owner/device kanıtı, hatayı temsil edemeyen yapay test harness'inden üstündür; widget/fake test PASS'i cihazdaki hatayı geçersiz kılmaz. Bir başarısız repro denemesinden sonra source/runtime diagnosis veya mevcut en güçlü kanıta geçilir; kararı değiştirmeyen diagnostic/test döngüleri yapılmaz.
+
+Focused validation yeterliyse analyzer yalnız material ihtiyaçta, manuel/device kabul yalnız runtime'a özgü davranışta veya owner açıkça istediğinde yapılır. Manuel/device kabul gerekmeyen non-CRITICAL işte Codex automated PASS sonrası commit/push manuel PASS beklemez. Gereken kabulde Fatih PASS/FAIL kapısı korunur; gerekli kontrol FAIL/PENDING ise publication kapalı kalır. Ready/merge yetkisi bundan bağımsız owner kapısıdır. CRITICAL validation ve güvenlik kapıları aynen uygulanır.
+
 ### FAST
 
 Dar documentation, metin, icon, tooltip, spacing, layout, presentation, basit navigation veya persistence contract'ını değiştirmeyen küçük UI işi.
@@ -77,12 +87,12 @@ FAST varsayılanı:
 
 - temiz ve senkron yerel `master`;
 - tek davranış;
-- en fazla 5 dakikalık Codex işlemi;
+- ChatGPT'nin açıkça belirlediği göreve özel execution time budget;
 - Issue, remote branch, PR, `.cse` task/result ve routing YAML yok;
 - Codex format, changed-path review, `git diff --check` ve minimum yeterli automated doğrulamayı yapar;
 - test/analyzer/build execution Codex'te, manuel ürün/device kabulü Fatih'tedir;
-- Fatih `PASS` bildirmeden commit veya push yapılmaz;
-- FAIL/PENDING durumunda yeni işe geçilmez.
+- gereken manuel/device kabulde Fatih `PASS` bildirmeden commit veya push yapılmaz; kabul gerekmiyorsa Codex automated PASS yeterlidir;
+- gerekli doğrulama/kabul FAIL/PENDING durumundayken yeni işe geçilmez.
 
 ### STANDARD
 
@@ -92,7 +102,7 @@ STANDARD varsayılanı:
 
 - tek kısa Issue veya self-contained görev özeti;
 - tek kısa ömürlü branch;
-- 5 dakikalık Codex mikro adımları;
+- açık execution time budget içinde mümkünse inceleme, fix, focused validation ve yetkili commit/push tek adımda;
 - test/analyzer/build execution Codex'te, manuel ürün/device kabulü Fatih'te;
 - `.cse` ve routing YAML varsayılan olarak yok;
 - bağımsız diff review değer üretiyorsa tek Draft PR;
@@ -114,15 +124,15 @@ CRITICAL varsayılanı:
 
 Somut CRITICAL trigger yoksa iş ağır sürece yükseltilmez.
 
-## 5. Beş dakika ve test sahipliği
+## 5. Göreve özel süre bütçesi ve test sahipliği
 
-Tek bir Codex execution/correction/commit işlemi 5 dakikayı geçmez.
+Her Codex execution/correction/commit görevi, handoff'ta ChatGPT tarafından açıkça verilen execution time budget ile sınırlıdır. Global sabit süre varsayılanı yoktur. Yetkili kapsam ve süreye sığan inceleme, düzenleme, focused validation ve commit/push gereksiz ayrı mikro adımlara bölünmez; publication kapıları korunur.
 
-Beş dakika dolduğunda:
+Bütçe dolduğunda Codex durur:
 
 - yeni yaklaşım başlatılmaz;
 - kapsam genişletilmez;
-- tamamlanan değişiklik, blocker ve kalan tek adım raporlanır.
+- mevcut çalışma güvenle korunur; tamamlanan değişiklik, exact blocker ve kalan tek adım raporlanır.
 
 Repository-local terminal, automated test, analyzer ve build/APK hazırlığı Codex tarafından, yetkili görevin minimum yeterli kapsamıyla yürütülür. Fatih PowerShell/terminal/Git/Flutter/test/analyzer/build komutu çalıştırmaz; kendisine bu komutlar hazırlanmaz veya verilmez. Fatih yalnız manuel ürün/device kabulünü ve nihai görsel/davranış PASS/FAIL kararını verir. Emulator/ADB/device execution yalnız exact package, cihaz ve veri-koruma sınırıyla açık owner delegasyonunda yapılabilir; MAIN/Acceptance/Debug ve mevcut veri güvenliği sınırları korunur.
 
@@ -142,7 +152,7 @@ Aynı source revision üzerinde geçen test tekrarlanmaz. Full suite her mikro a
 
 ## 7. Git ve publication
 
-- FAST: user PASS sonrası küçük commit ve normal push; test öncesi commit/push yok.
+- FAST: Codex automated PASS ve gerekiyorsa Fatih manuel/device PASS sonrası küçük commit ve normal push; gerekli doğrulama öncesi commit/push yok.
 - STANDARD: en fazla bir aktif production branch/PR; squash merge varsayılanı.
 - CRITICAL: Issue'ya özel branch/PR/review zinciri.
 - Force-push yapılmaz.
@@ -160,7 +170,7 @@ Değişen davranış: <tek cümle>
 Değişen dosyalar: <liste>
 Codex kontrolleri: format / diff-check
 Codex automated validation: PENDING | PASS | FAIL
-Fatih manuel kabulü: PENDING | PASS | FAIL
+Fatih manuel kabulü: GEREKMİYOR (<gerekçe>) | PENDING | PASS | FAIL
 Commit/push: yapılmadı | <sha>
 ```
 
@@ -178,4 +188,4 @@ SHA, branch, divergence, allowlist, YAML ve benzeri teknik kanıtlar bu açıkla
 
 ## 9. Ana karar
 
-> Düşük riskte hızlı, Codex doğrulamalı ve owner kabullü master akışı; orta riskte tek kısa branch; gerçek veri/release riskinde tam güvenlik süreci. Güvenlik küçük UI işlerine değil, gerçekten zarar verebilecek sözleşmelere yoğunlaştırılır.
+> Non-CRITICAL işte göreve özel süre bütçesiyle one-pass teslim, tek focused validation ve yalnız gereken manuel kabul; gerçek veri/release riskinde tam güvenlik süreci. Ready/merge owner kapısında kalır.
