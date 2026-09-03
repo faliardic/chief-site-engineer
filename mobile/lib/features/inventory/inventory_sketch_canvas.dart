@@ -98,10 +98,14 @@ class InventorySketchEditorSnapshot {
   factory InventorySketchEditorSnapshot.recover(
     InventoryGeometry geometry, {
     InventorySketchEditorMode mode = InventorySketchEditorMode.draw,
+    // The editor supplies a metadata-based decision; generic callers retain
+    // the original one-point recovery when this is omitted.
+    bool? resumeOpenPolyline,
   }) {
     final workingIndex =
         geometry.polylines.isNotEmpty &&
-            geometry.polylines.last.isIncompleteDraft
+            !geometry.polylines.last.closed &&
+            (resumeOpenPolyline ?? geometry.polylines.last.isIncompleteDraft)
         ? geometry.polylines.length - 1
         : null;
     return InventorySketchEditorSnapshot._(

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:chief_site_engineer/application/inventory_application.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
+import 'package:chief_site_engineer/features/inventory/inventory_sketch_editor_page.dart';
 import 'package:chief_site_engineer/storage/app_database.dart';
 import 'package:crypto/crypto.dart' as hashes;
 import 'package:flutter_test/flutter_test.dart';
@@ -18,6 +19,754 @@ const _t0 = '2026-08-27T04:00:00Z';
 
 void main() {
   setUpAll(sqfliteFfiInit);
+
+  for (final editActive in [false, true]) {
+    test(
+      'AT-602 rejects multiple or nonterminal open drafts without writes ($editActive)',
+      () async {
+        final fixture = await _Fixture.create('single_open_suffix_$editActive');
+        addTearDown(fixture.close);
+        if (editActive) await _createFinalizedSketch(fixture, seed: 29000);
+        final controller = InventorySketchEditorController(
+          application: fixture.app,
+          projectId: _projectA,
+          launchIntent: editActive
+              ? InventorySketchLaunchIntent.editActive
+              : InventorySketchLaunchIntent.createOrRecover,
+          idFactory: _SequentialIds(29100).call,
+        );
+        addTearDown(controller.dispose);
+        await controller.initialize();
+        final before = (await fixture.app.loadPrimarySketch(_projectA))!;
+        final prefix = before.draftRevision!.geometry.polylines;
+        final open = InventoryPolyline(
+          closed: false,
+          points: [
+            InventorySketchPoint(x: 2560, y: 512),
+            InventorySketchPoint(x: 3072, y: 512),
+            InventorySketchPoint(x: 3072, y: 1024),
+          ],
+        );
+        final countsBefore = await _counts(fixture.db.database);
+        for (final openCount in [2, 3]) {
+          await expectLater(
+            fixture.app.autosaveSketchDraft(
+              AutosaveInventorySketchDraftCommand(
+                operationId: _uuid(29200 + openCount),
+                projectId: _projectA,
+                sketchId: before.sketch.id,
+                draftRevisionId: before.draftRevision!.id,
+                expectedSketchRevision: before.sketch.revision,
+                expectedContentRevision: before.draftRevision!.contentRevision,
+                geometry: InventoryGeometry(
+                  polylines: [...prefix, ...List.filled(openCount, open)],
+                ),
+                existingBlockMappings: controller.existingBlockMappings,
+              ),
+            ),
+            _fails('inventory_block_metadata_incomplete'),
+          );
+          expect(await _counts(fixture.db.database), countsBefore);
+        }
+        if (editActive) {
+          await expectLater(
+            fixture.app.autosaveSketchDraft(
+              AutosaveInventorySketchDraftCommand(
+                operationId: _uuid(29210),
+                projectId: _projectA,
+                sketchId: before.sketch.id,
+                draftRevisionId: before.draftRevision!.id,
+                expectedSketchRevision: before.sketch.revision,
+                expectedContentRevision: before.draftRevision!.contentRevision,
+                geometry: InventoryGeometry(polylines: [open, ...prefix]),
+                existingBlockMappings: [
+                  for (final mapping in controller.existingBlockMappings)
+                    InventoryExistingBlockMappingDraft(
+                      blockId: mapping.blockId,
+                      polygonIndex: mapping.polygonIndex + 1,
+                    ),
+                ],
+              ),
+            ),
+            _fails('inventory_block_metadata_incomplete'),
+          );
+          expect(await _counts(fixture.db.database), countsBefore);
+        }
+        final unchanged = (await fixture.app.loadPrimarySketch(_projectA))!;
+        expect(
+          unchanged.draftRevision!.geometry.canonicalJson,
+          before.draftRevision!.geometry.canonicalJson,
+        );
+        expect(
+          unchanged.draftRevision!.contentRevision,
+          before.draftRevision!.contentRevision,
+        );
+        expect(unchanged.sketch.revision, before.sketch.revision);
+
+        // Exercise both count formats on read: first-draft legacy count and the
+        // historical edit-draft prefix count that includes mapped active blocks.
+        final legacyCount = editActive
+            ? before.activeRevision!.geometry.polylines.length
+            : 0;
+        await _seedDraftGeometry(
+          fixture,
+          geometry: InventoryGeometry(polylines: [...prefix, open]),
+          legacyPolygonCount: legacyCount,
+        );
+        final single = (await fixture.app.loadPrimarySketch(_projectA))!;
+        expect(
+          single.draftRevision!.geometry.polylines.last.points,
+          open.points,
+        );
+        await _seedDraftGeometry(
+          fixture,
+          geometry: InventoryGeometry(polylines: [...prefix, open, open]),
+          legacyPolygonCount: legacyCount,
+        );
+        final malformedCounts = await _counts(fixture.db.database);
+        await expectLater(
+          fixture.app.loadPrimarySketch(_projectA),
+          _fails('inventory_projection_integrity_failed'),
+        );
+        await expectLater(
+          fixture.app.autosaveSketchDraft(
+            AutosaveInventorySketchDraftCommand(
+              operationId: _uuid(29220),
+              projectId: _projectA,
+              sketchId: single.sketch.id,
+              draftRevisionId: single.draftRevision!.id,
+              expectedSketchRevision: single.sketch.revision,
+              expectedContentRevision:
+                  single.draftRevision!.contentRevision + 1,
+              geometry: InventoryGeometry(polylines: [...prefix, open, open]),
+              existingBlockMappings: controller.existingBlockMappings,
+            ),
+          ),
+          _fails('inventory_projection_integrity_failed'),
+        );
+        expect(await _counts(fixture.db.database), malformedCounts);
+      },
+    );
+  }
+
+  for (final finalizedLegacy in [false, true]) {
+    test(
+      'AT-602 identical legacy and new open lines recover by durable index ($finalizedLegacy)',
+      () async {
+        final fixture = await _Fixture.create(
+          'identical_open_suffix_$finalizedLegacy',
+        );
+        addTearDown(fixture.close);
+        final sketchId = _uuid(29300);
+        final legacyId = _uuid(29301);
+        final legacy = InventoryGeometry(
+          polylines: [
+            InventoryPolyline(
+              closed: false,
+              points: [
+                InventorySketchPoint(x: 0, y: 0),
+                InventorySketchPoint(x: 64, y: 0),
+              ],
+            ),
+          ],
+        );
+        await fixture.app.createSketch(
+          CreateInventorySketchCommand(
+            operationId: _uuid(29302),
+            projectId: _projectA,
+            sketchId: sketchId,
+            draftRevisionId: legacyId,
+          ),
+        );
+        await _seedDraftGeometry(
+          fixture,
+          geometry: legacy,
+          legacyPolygonCount: 1,
+        );
+        if (finalizedLegacy) {
+          await fixture.app.finalizeSketch(
+            FinalizeInventorySketchCommand(
+              operationId: _uuid(29303),
+              projectId: _projectA,
+              sketchId: sketchId,
+              draftRevisionId: legacyId,
+              expectedSketchRevision: 1,
+              expectedContentRevision: 2,
+            ),
+          );
+          await fixture.app.startSketchEdit(
+            StartInventorySketchEditCommand(
+              operationId: _uuid(29304),
+              projectId: _projectA,
+              sketchId: sketchId,
+              activeRevisionId: legacyId,
+              newDraftRevisionId: _uuid(29305),
+              expectedSketchRevision: 2,
+            ),
+          );
+        }
+        final before = (await fixture.app.loadPrimarySketch(_projectA))!;
+        final identical = InventoryGeometry(
+          polylines: [
+            legacy.polylines.single,
+            InventoryGeometry.decode(legacy.canonicalJson).polylines.single,
+          ],
+        );
+        await fixture.app.autosaveSketchDraft(
+          AutosaveInventorySketchDraftCommand(
+            operationId: _uuid(29306),
+            projectId: _projectA,
+            sketchId: sketchId,
+            draftRevisionId: before.draftRevision!.id,
+            expectedSketchRevision: before.sketch.revision,
+            expectedContentRevision: before.draftRevision!.contentRevision,
+            geometry: identical,
+            existingBlockMappings: const [],
+          ),
+        );
+        final saved = (await fixture.app.loadPrimarySketch(_projectA))!;
+        expect(saved.draftLegacyPolygonCount, 1);
+        final savedCounts = await _counts(fixture.db.database);
+        await fixture.db.close();
+        await fixture.db.open();
+        final relaunchedApp = InventoryApplication(
+          database: fixture.db,
+          clock: fixture.clock.call,
+          idFactory: fixture.ids.call,
+        );
+        final recovered = InventorySketchEditorController(
+          application: relaunchedApp,
+          projectId: _projectA,
+          launchIntent: InventorySketchLaunchIntent.createOrRecover,
+          idFactory: _SequentialIds(29400).call,
+          autosaveDelay: const Duration(days: 1),
+        );
+        addTearDown(recovered.dispose);
+        await recovered.initialize();
+        expect(recovered.loadStatus, InventorySketchLoadStatus.ready);
+        expect(recovered.draftRevisionId, saved.draftRevision!.id);
+        expect(
+          recovered.editor!.geometry.canonicalJson,
+          identical.canonicalJson,
+        );
+        expect(recovered.editor!.workingPolylineIndex, 1);
+        expect(recovered.newBlocks, isEmpty);
+        expect(await recovered.finalizeDraft(), isFalse);
+        expect(await _counts(fixture.db.database), savedCounts);
+        final nextPoint = InventorySketchPoint(x: 64, y: 64);
+        expect(recovered.drawPoint(nextPoint), isTrue);
+        recovered.discardUnsaved();
+        expect(
+          recovered.editor!.geometry.canonicalJson,
+          identical.canonicalJson,
+        );
+        expect(recovered.editor!.workingPolylineIndex, 1);
+        expect(recovered.drawPoint(nextPoint), isTrue);
+        expect(await recovered.forceSave(), isTrue);
+        final continued = (await relaunchedApp.loadPrimarySketch(_projectA))!;
+        expect(
+          continued.draftRevision!.geometry.polylines.first.points,
+          legacy.polylines.single.points,
+        );
+        expect(continued.draftRevision!.geometry.polylines.last.points, [
+          ...legacy.polylines.single.points,
+          nextPoint,
+        ]);
+        expect(
+          continued.draftRevision!.geometry.polylines.last.closed,
+          isFalse,
+        );
+        expect(
+          continued.draftRevision!.contentRevision,
+          saved.draftRevision!.contentRevision + 1,
+        );
+        expect(continued.blocks, isEmpty);
+        expect(continued.floors, isEmpty);
+        expect(continued.draftNewBlocks, isEmpty);
+        if (finalizedLegacy) {
+          expect(continued.activeRevision!.id, legacyId);
+          expect(
+            continued.activeRevision!.geometry.canonicalJson,
+            legacy.canonicalJson,
+          );
+        }
+        final continuedCounts = await _counts(fixture.db.database);
+        await expectLater(
+          relaunchedApp.autosaveSketchDraft(
+            AutosaveInventorySketchDraftCommand(
+              operationId: _uuid(29500),
+              projectId: _projectA,
+              sketchId: sketchId,
+              draftRevisionId: continued.draftRevision!.id,
+              expectedSketchRevision: continued.sketch.revision,
+              expectedContentRevision: continued.draftRevision!.contentRevision,
+              geometry: InventoryGeometry(
+                polylines: [
+                  InventoryPolyline(
+                    closed: false,
+                    points: [
+                      InventorySketchPoint(x: 0, y: 0),
+                      InventorySketchPoint(x: 128, y: 0),
+                    ],
+                  ),
+                  continued.draftRevision!.geometry.polylines.last,
+                ],
+              ),
+              existingBlockMappings: const [],
+            ),
+          ),
+          _fails('inventory_legacy_geometry_immutable'),
+        );
+        expect(await _counts(fixture.db.database), continuedCounts);
+      },
+    );
+  }
+
+  for (final typedLifecycle in [false, true]) {
+    test(
+      'AT-602 migrated open legacy draft stays immutable and finalizable ($typedLifecycle)',
+      () async {
+        final fixture = await _Fixture.create(
+          'migrated_open_legacy_$typedLifecycle',
+        );
+        addTearDown(fixture.close);
+        final sketchId = _uuid(28000);
+        final draftId = _uuid(28001);
+        final legacy = InventoryGeometry(
+          polylines: [
+            InventoryPolyline(
+              closed: false,
+              points: [
+                InventorySketchPoint(x: 0, y: 0),
+                InventorySketchPoint(x: 64, y: 0),
+              ],
+            ),
+          ],
+        );
+        await fixture.app.createSketch(
+          CreateInventorySketchCommand(
+            operationId: _uuid(28002),
+            projectId: _projectA,
+            sketchId: sketchId,
+            draftRevisionId: draftId,
+          ),
+        );
+        // Exact post-migration representation: the existing open line is counted
+        // as legacy, unlike a newly autosaved open drawing (legacy count zero).
+        await fixture.db.database.transaction((transaction) async {
+          await transaction.update(
+            'inventory_sketch_revisions',
+            {
+              'geometry_json': legacy.canonicalJson,
+              'geometry_sha256': legacy.sha256,
+              'content_revision': 2,
+            },
+            where: 'id = ?',
+            whereArgs: [draftId],
+          );
+          final rows = await transaction.query(
+            'inventory_sketch_revision_spatial_drafts',
+            where: 'revision_id = ?',
+            whereArgs: [draftId],
+          );
+          await transaction.insert('inventory_sketch_revision_spatial_drafts', {
+            ...rows.single,
+            'content_revision': 2,
+            'legacy_polygon_count': 1,
+          });
+        });
+        final controller = InventorySketchEditorController(
+          application: fixture.app,
+          projectId: _projectA,
+          launchIntent: InventorySketchLaunchIntent.createOrRecover,
+          idFactory: _SequentialIds(28100).call,
+        );
+        addTearDown(controller.dispose);
+        await controller.initialize();
+        expect(controller.loadStatus, InventorySketchLoadStatus.ready);
+        expect(controller.workingPolyline, isNull);
+        expect(controller.isFinalizeEnabled, isTrue);
+        final countsBefore = await _counts(fixture.db.database);
+        await expectLater(
+          fixture.app.autosaveSketchDraft(
+            AutosaveInventorySketchDraftCommand(
+              operationId: _uuid(28003),
+              projectId: _projectA,
+              sketchId: sketchId,
+              draftRevisionId: draftId,
+              expectedSketchRevision: 1,
+              expectedContentRevision: 2,
+              geometry: InventoryGeometry(
+                polylines: [
+                  InventoryPolyline(
+                    closed: false,
+                    points: [
+                      InventorySketchPoint(x: 0, y: 0),
+                      InventorySketchPoint(x: 128, y: 0),
+                    ],
+                  ),
+                ],
+              ),
+              existingBlockMappings: const [],
+            ),
+          ),
+          _fails('inventory_legacy_geometry_immutable'),
+        );
+        expect(await _counts(fixture.db.database), countsBefore);
+        await fixture.app.finalizeSketch(
+          FinalizeInventorySketchCommand(
+            operationId: _uuid(28004),
+            projectId: _projectA,
+            sketchId: sketchId,
+            draftRevisionId: draftId,
+            expectedSketchRevision: 1,
+            expectedContentRevision: 2,
+            existingBlockIntents: typedLifecycle ? const [] : null,
+          ),
+        );
+        final finalized = (await fixture.app.loadPrimarySketch(_projectA))!;
+        expect(finalized.draftRevision, isNull);
+        expect(
+          finalized.activeRevision!.geometry.canonicalJson,
+          legacy.canonicalJson,
+        );
+        expect(finalized.activeRevision!.contentRevision, 2);
+        expect(finalized.blocks, isEmpty);
+        expect(finalized.floors, isEmpty);
+      },
+    );
+  }
+
+  for (final editActive in [false, true]) {
+    test(
+      'AT-602 open draft survives database restart and continues ($editActive)',
+      () async {
+        final fixture = await _Fixture.create('open_draft_$editActive');
+        addTearDown(fixture.close);
+        if (editActive) await _createFinalizedSketch(fixture, seed: 21000);
+        final first = InventorySketchEditorController(
+          application: fixture.app,
+          projectId: _projectA,
+          launchIntent: editActive
+              ? InventorySketchLaunchIntent.editActive
+              : InventorySketchLaunchIntent.createOrRecover,
+          idFactory: _SequentialIds(22000).call,
+          autosaveDelay: const Duration(days: 1),
+        );
+        var firstDisposed = false;
+        addTearDown(() {
+          if (!firstDisposed) first.dispose();
+        });
+        await first.initialize();
+        expect(first.loadStatus, InventorySketchLoadStatus.ready);
+        final before = (await fixture.app.loadPrimarySketch(_projectA))!;
+        final countsBefore = await _counts(fixture.db.database);
+        final points = [
+          InventorySketchPoint(x: 2560, y: 512),
+          InventorySketchPoint(x: 3072, y: 512),
+          InventorySketchPoint(x: 3072, y: 1024),
+        ];
+        for (final point in points) {
+          expect(first.drawPoint(point), isTrue);
+        }
+        final geometry = first.editor!.geometry;
+        final saving = first.forceSave();
+        expect(identical(first.forceSave(), saving), isTrue);
+        expect(await saving, isTrue);
+        expect(first.isFinalizeEnabled, isFalse);
+        final saved = (await fixture.app.loadPrimarySketch(_projectA))!;
+        expect(
+          saved.draftRevision!.geometry.canonicalJson,
+          geometry.canonicalJson,
+        );
+        expect(saved.draftRevision!.id, before.draftRevision!.id);
+        expect(
+          saved.draftRevision!.contentRevision,
+          before.draftRevision!.contentRevision + 1,
+        );
+        expect(saved.sketch.revision, before.sketch.revision + 1);
+        expect(saved.draftNewBlocks, isEmpty);
+        expect(saved.draftLegacyPolygonCount, 0);
+        final countsSaved = await _counts(fixture.db.database);
+        for (final table in [
+          'inventory_sketches',
+          'inventory_sketch_revisions',
+          'inventory_blocks',
+          'inventory_floors',
+        ]) {
+          expect(countsSaved[table], countsBefore[table], reason: table);
+        }
+        expect(await first.forceSave(), isTrue);
+        expect(await _counts(fixture.db.database), countsSaved);
+        final receipts = await fixture.db.database.query(
+          'inventory_command_receipts',
+          where: 'command_type = ?',
+          whereArgs: [InventoryCommandType.sketchDraftAutosave.storageValue],
+          orderBy: 'created_at DESC',
+          limit: 1,
+        );
+        await fixture.app.autosaveSketchDraft(
+          AutosaveInventorySketchDraftCommand(
+            operationId: receipts.single['id']! as String,
+            projectId: _projectA,
+            sketchId: before.sketch.id,
+            draftRevisionId: before.draftRevision!.id,
+            expectedSketchRevision: before.sketch.revision,
+            expectedContentRevision: before.draftRevision!.contentRevision,
+            geometry: geometry,
+            existingBlockMappings: first.existingBlockMappings,
+          ),
+        );
+        expect(await _counts(fixture.db.database), countsSaved);
+        first.dispose();
+        firstDisposed = true;
+        await fixture.db.close();
+        await fixture.db.open();
+        final relaunchedApp = InventoryApplication(
+          database: fixture.db,
+          clock: fixture.clock.call,
+          idFactory: fixture.ids.call,
+        );
+        final recovered = InventorySketchEditorController(
+          application: relaunchedApp,
+          projectId: _projectA,
+          launchIntent: InventorySketchLaunchIntent.createOrRecover,
+          idFactory: _SequentialIds(23000).call,
+          autosaveDelay: const Duration(days: 1),
+        );
+        addTearDown(recovered.dispose);
+        await recovered.initialize();
+        expect(recovered.loadStatus, InventorySketchLoadStatus.ready);
+        expect(recovered.sketchId, saved.sketch.id);
+        expect(recovered.draftRevisionId, saved.draftRevision!.id);
+        expect(
+          recovered.editor!.geometry.canonicalJson,
+          geometry.canonicalJson,
+        );
+        expect(
+          recovered.editor!.workingPolylineIndex,
+          geometry.polylines.length - 1,
+        );
+        expect(recovered.editor!.undoDepth, 0);
+        expect(recovered.newBlocks, isEmpty);
+        expect(await recovered.finalizeDraft(), isFalse);
+        for (final typedLifecycle in [false, true]) {
+          await expectLater(
+            relaunchedApp.finalizeSketch(
+              FinalizeInventorySketchCommand(
+                operationId: _uuid(24000 + (typedLifecycle ? 1 : 0)),
+                projectId: _projectA,
+                sketchId: saved.sketch.id,
+                draftRevisionId: saved.draftRevision!.id,
+                expectedSketchRevision: saved.sketch.revision,
+                expectedContentRevision: saved.draftRevision!.contentRevision,
+                existingBlockIntents: typedLifecycle
+                    ? [
+                        for (final mapping in saved.draftBlockPolygons)
+                          InventoryExistingBlockFinalizeIntent(
+                            blockId: mapping.blockId,
+                            action: InventoryExistingBlockAction.retainMapped,
+                            expectedBlockRevision: saved.blocks
+                                .singleWhere(
+                                  (block) => block.id == mapping.blockId,
+                                )
+                                .revision,
+                            targetPolygonIndex: mapping.polygonIndex,
+                          ),
+                      ]
+                    : null,
+              ),
+            ),
+            _fails(
+              editActive && typedLifecycle
+                  ? 'inventory_legacy_geometry_immutable'
+                  : 'inventory_block_metadata_incomplete',
+            ),
+          );
+        }
+        expect(await _counts(fixture.db.database), countsSaved);
+        final nextPoint = InventorySketchPoint(x: 2560, y: 1024);
+        expect(recovered.drawPoint(nextPoint), isTrue);
+        expect(recovered.workingPolyline!.points, [...points, nextPoint]);
+        expect(
+          recovered.editor!.geometry.polylines.length,
+          geometry.polylines.length,
+        );
+        final block = recovered.createBlockDraft(
+          displayName: 'Devam edilen blok',
+          floorCount: 1,
+        );
+        expect(recovered.closeWorkingBlock(block), isTrue);
+        expect(await recovered.finalizeDraft(), isTrue);
+        final finalized = (await relaunchedApp.loadPrimarySketch(_projectA))!;
+        expect(finalized.draftRevision, isNull);
+        expect(finalized.blocks.length, before.blocks.length + 1);
+        expect(finalized.blocks.last.id, block.id);
+        expect(
+          finalized.activeRevision!.geometry.polylines.last.closed,
+          isTrue,
+        );
+        expect(finalized.activeRevision!.geometry.polylines.last.points, [
+          ...points,
+          nextPoint,
+        ]);
+        if (editActive) {
+          expect(finalized.blocks.first.id, before.blocks.first.id);
+          for (final existingBlock in before.blocks) {
+            expect(
+              finalized.floors
+                  .where((floor) => floor.blockId == existingBlock.id)
+                  .map((floor) => (floor.id, floor.ordinal, floor.revision)),
+              before.floors
+                  .where((floor) => floor.blockId == existingBlock.id)
+                  .map((floor) => (floor.id, floor.ordinal, floor.revision)),
+            );
+          }
+          expect(
+            finalized.activeRevision!.geometry.polylines.first.points,
+            before.activeRevision!.geometry.polylines.first.points,
+          );
+        }
+      },
+    );
+  }
+
+  test(
+    'AT-602 open draft allowance retains exact finalized legacy geometry',
+    () async {
+      final fixture = await _Fixture.create('open_draft_legacy');
+      addTearDown(fixture.close);
+      final sketchId = _uuid(25000);
+      final activeId = _uuid(25001);
+      final legacy = _geometry();
+      await fixture.app.createSketch(
+        CreateInventorySketchCommand(
+          operationId: _uuid(25002),
+          projectId: _projectA,
+          sketchId: sketchId,
+          draftRevisionId: activeId,
+        ),
+      );
+      // An existing unclassified closed polygon represents pre-spatial legacy data.
+      await fixture.app.autosaveSketchDraft(
+        AutosaveInventorySketchDraftCommand(
+          operationId: _uuid(25003),
+          projectId: _projectA,
+          sketchId: sketchId,
+          draftRevisionId: activeId,
+          expectedSketchRevision: 1,
+          expectedContentRevision: 1,
+          geometry: legacy,
+        ),
+      );
+      await fixture.app.finalizeSketch(
+        FinalizeInventorySketchCommand(
+          operationId: _uuid(25004),
+          projectId: _projectA,
+          sketchId: sketchId,
+          draftRevisionId: activeId,
+          expectedSketchRevision: 2,
+          expectedContentRevision: 2,
+        ),
+      );
+      await fixture.app.startSketchEdit(
+        StartInventorySketchEditCommand(
+          operationId: _uuid(25005),
+          projectId: _projectA,
+          sketchId: sketchId,
+          activeRevisionId: activeId,
+          newDraftRevisionId: _uuid(25006),
+          expectedSketchRevision: 3,
+        ),
+      );
+      final open = InventoryPolyline(
+        closed: false,
+        points: [
+          InventorySketchPoint(x: 2560, y: 512),
+          InventorySketchPoint(x: 3072, y: 512),
+          InventorySketchPoint(x: 3072, y: 1024),
+        ],
+      );
+      await fixture.app.autosaveSketchDraft(
+        AutosaveInventorySketchDraftCommand(
+          operationId: _uuid(25007),
+          projectId: _projectA,
+          sketchId: sketchId,
+          draftRevisionId: _uuid(25006),
+          expectedSketchRevision: 4,
+          expectedContentRevision: 1,
+          geometry: InventoryGeometry(polylines: [...legacy.polylines, open]),
+          existingBlockMappings: const [],
+        ),
+      );
+      final before = await _counts(fixture.db.database);
+      final invalidCandidates = [
+        InventoryGeometry(polylines: [open]),
+        InventoryGeometry(polylines: [_rectangle(64, 0, 2112, 1536), open]),
+        InventoryGeometry(
+          polylines: [
+            InventoryPolyline(
+              closed: false,
+              points: legacy.polylines.single.points,
+            ),
+            open,
+          ],
+        ),
+        InventoryGeometry(
+          polylines: [...legacy.polylines, _rectangle(2560, 512, 3072, 1024)],
+        ),
+      ];
+      for (var index = 0; index < invalidCandidates.length; index += 1) {
+        await expectLater(
+          fixture.app.autosaveSketchDraft(
+            AutosaveInventorySketchDraftCommand(
+              operationId: _uuid(25100 + index),
+              projectId: _projectA,
+              sketchId: sketchId,
+              draftRevisionId: _uuid(25006),
+              expectedSketchRevision: 5,
+              expectedContentRevision: 2,
+              geometry: invalidCandidates[index],
+              existingBlockMappings: const [],
+            ),
+          ),
+          _fails('inventory_legacy_geometry_immutable'),
+        );
+        expect(await _counts(fixture.db.database), before);
+      }
+      final durable = (await fixture.app.loadPrimarySketch(_projectA))!;
+      expect(
+        durable.activeRevision!.geometry.canonicalJson,
+        legacy.canonicalJson,
+      );
+      expect(
+        durable.draftRevision!.geometry.polylines.last.points,
+        open.points,
+      );
+      final controller = InventorySketchEditorController(
+        application: fixture.app,
+        projectId: _projectA,
+        launchIntent: InventorySketchLaunchIntent.createOrRecover,
+        idFactory: _SequentialIds(25200).call,
+        autosaveDelay: const Duration(days: 1),
+      );
+      addTearDown(controller.dispose);
+      await controller.initialize();
+      expect(controller.loadStatus, InventorySketchLoadStatus.ready);
+      expect(controller.workingPolyline!.points, open.points);
+      expect(
+        controller.drawPoint(InventorySketchPoint(x: 2560, y: 1024)),
+        isTrue,
+      );
+      expect(await controller.forceSave(), isTrue);
+      expect(
+        (await fixture.app.loadPrimarySketch(
+          _projectA,
+        ))!.activeRevision!.geometry.canonicalJson,
+        legacy.canonicalJson,
+      );
+    },
+  );
 
   test('receipt replay, conflict, corruption, no-op, and rollback', () async {
     final fixture = await _Fixture.create('receipt');
@@ -3662,6 +4411,39 @@ Future<_FinalizedSketch> _createFinalizedSketch(
     activeRevisionId: draftId,
     sketchRevision: 3,
   );
+}
+
+// Seed a persisted draft snapshot for migration/corruption recovery checks.
+// Keep revision triggers and append-only spatial metadata intact.
+Future<void> _seedDraftGeometry(
+  _Fixture fixture, {
+  required InventoryGeometry geometry,
+  required int legacyPolygonCount,
+}) async {
+  final projection = (await fixture.app.loadPrimarySketch(_projectA))!;
+  final draft = projection.draftRevision!;
+  await fixture.db.database.transaction((transaction) async {
+    final rows = await transaction.query(
+      'inventory_sketch_revision_spatial_drafts',
+      where: 'revision_id = ? AND content_revision = ?',
+      whereArgs: [draft.id, draft.contentRevision],
+    );
+    await transaction.update(
+      'inventory_sketch_revisions',
+      {
+        'geometry_json': geometry.canonicalJson,
+        'geometry_sha256': geometry.sha256,
+        'content_revision': draft.contentRevision + 1,
+      },
+      where: 'id = ?',
+      whereArgs: [draft.id],
+    );
+    await transaction.insert('inventory_sketch_revision_spatial_drafts', {
+      ...rows.single,
+      'content_revision': draft.contentRevision + 1,
+      'legacy_polygon_count': legacyPolygonCount,
+    });
+  });
 }
 
 Future<void> _seedLegacyPrefixEditDraft(
