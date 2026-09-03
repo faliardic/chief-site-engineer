@@ -39,10 +39,10 @@ Kullanıcı `devam` veya `GitHub'dan devam et` dediğinde ChatGPT:
 - önce sıradaki tek güvenli aksiyonu ve sorumlu aktörü seçer;
 - aynı authority metnini tekrar üretmez;
 - Codex gerekiyorsa kullanıcının `Codex ile çalış` demesini beklemeden `Sıradaki aktör: Codex` der ve 10–15 satırı geçmeyen 5 dakikalık exact görevi verir;
-- Fatih gerekiyorsa exact komut veya manuel kontrolü verir;
+- Fatih gerekiyorsa yalnız manuel ürün/device kabul adımlarını verir; terminal komutu vermez;
 - ChatGPT'ın kendi yetkisindeki işlem mevcut owner kararıyla yapılabiliyorsa ayrıca `devam` istemeden yürütür.
 
-Repository dosyası/local workspace değişikliği, format/diff, local Git, commit veya push **Codex** işidir. Test/analyzer ve manuel kabul **Fatih** işidir; build/APK/ADB/device varsayılan olarak Fatih'tedir ve yalnız exact owner delegasyonuyla Codex'e geçebilir.
+Repository-local terminal, automated test, analyzer ve build/APK hazırlığı Codex tarafından, yetkili görevin minimum yeterli kapsamıyla yürütülür. Fatih PowerShell/terminal/Git/Flutter/test/analyzer/build komutu çalıştırmaz; kendisine bu komutlar hazırlanmaz veya verilmez. Fatih yalnız manuel ürün/device kabulünü ve nihai görsel/davranış PASS/FAIL kararını verir. Emulator/ADB/device execution yalnız exact package, cihaz ve veri-koruma sınırıyla açık owner delegasyonunda yapılabilir; MAIN/Acceptance/Debug ve mevcut veri güvenliği sınırları korunur.
 
 Kullanıcıdan eski prompt/result/YAML kopyalaması istenmez.
 
@@ -72,14 +72,14 @@ Yeni sohbetin ilk önemli cevabı önce owner'ın anlayacağı sade Türkçeyle 
 - aktif/açık çalışma ve blocker;
 - sıradaki güvenli aksiyon ve aktör;
 - Codex gerekiyorsa kısa exact handoff;
-- Fatih gerekiyorsa exact test veya manuel kontrol.
+- Fatih gerekiyorsa yalnız manuel ürün/device kabul adımları.
 
 Master SHA, branch, divergence ve benzeri teknik kanıtlar sade sonuçtan sonra verilir; açıklamasız teknik terim ana cevap olamaz.
 
 Her kullanıcıya teslim edilen sonuç `Sıradaki aksiyon — <aktör>: <tek uygulanabilir talimat>.` satırıyla biter. Tamamlanan aksiyondan sonra seçilen aktörün başlayacağı hazır talimat aynı yanıtta bulunur:
 
 - Codex için kopyalanabilir, self-contained ve 10–15 satırı geçmeyen exact görev;
-- Fatih için exact komut, kısa manuel kontrol ve beklenen sonuç;
+- Fatih için yalnız kısa manuel ürün/device kontrolü ve beklenen sonuç; terminal komutu verilmez;
 - ChatGPT için mevcut owner yetkisi varsa otomatik yürütme, yoksa gerekli tek onay isteği.
 
 Kullanıcıdan `devam`, `Codex ile çalış` veya `talimat hazırla` demesi beklenmez. Devam işi yoksa `Sıradaki aksiyon — Yok: İş tamamlandı.` yazılır.

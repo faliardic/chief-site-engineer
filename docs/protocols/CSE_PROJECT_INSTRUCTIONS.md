@@ -93,7 +93,7 @@ Issue exact allowlist, compatibility, rollback, test ve stop koşullarını taş
 ## 7. Workflow ve test yönlendirmesi
 
 - Lane ve publication: `CSE_WORKFLOW_ACCELERATION_PROTOCOL.md`.
-- Test/gate seçimi ve owner test sahipliği: `CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`.
+- Test/gate seçimi, Codex execution ve owner manuel kabulü: `CSE_MINIMUM_SUFFICIENT_VALIDATION_PROTOCOL.md`.
 - Model/review seçimi: `CSE_MODEL_REASONING_ROUTING_POLICY.md`.
 
 Bu belge bütün görevlerde full suite veya `.cse` ledger zorunlu kılmaz.
@@ -104,8 +104,8 @@ Bu belge bütün görevlerde full suite veya `.cse` ledger zorunlu kılmaz.
 
 - yalnız izinli dosya ve davranışta çalışır;
 - 5 dakikalık mikro execution sınırına uyar;
-- test/analyzer veya manuel kabul çalıştırmaz;
-- build/APK/ADB/device işlemini yalnız Fatih'in exact package/device/data-safety sınırıyla açık delegasyonunda çalıştırabilir;
+- repository-local terminal, automated test, analyzer ve build/APK hazırlığını yetkili görev kapsamında çalıştırır; manuel ürün kabulü vermez;
+- emulator/ADB/device işlemini yalnız Fatih'in exact package/device/data-safety sınırıyla açık delegasyonunda çalıştırabilir;
 - format, diff, scope ve Git güvenliğini kontrol eder;
 - user PASS olmadan FAST commit/push yapmaz;
 - belirsizlik veya yeni CRITICAL trigger'da durur.
@@ -113,7 +113,7 @@ Bu belge bütün görevlerde full suite veya `.cse` ledger zorunlu kılmaz.
 ### ChatGPT
 
 - her talepte execution öncesi current GitHub durumunu, lane'i, sıradaki tek aksiyonu ve sorumlu aktörü belirler;
-- repository/local execution gerekiyorsa kullanıcının `Codex ile çalış` demesini beklemeden kısa exact Codex handoff'u verir;
+- repository/local execution gerekiyorsa kullanıcının `Codex ile çalış` demesini beklemeden kısa exact Codex handoff'u verir; Fatih'e terminal/Git/Flutter/test/analyzer/build komutu vermez;
 - bu belgenin 3. bölümündeki açık documentation-only owner istisnası dışında GitHub Contents API üzerinden repository dosyası değiştirmez;
 - kendi yetkisindeki mevcut owner-approved koordinasyonu ayrıca `devam` istemeden yürütür;
 - kullanıcıya ürün anlamını açıklar ve her teslim edilen sonucu `Sıradaki aksiyon — <aktör>: <tek uygulanabilir talimat>.` satırıyla bitirir;
@@ -123,8 +123,8 @@ Bu belge bütün görevlerde full suite veya `.cse` ledger zorunlu kılmaz.
 ### Fatih
 
 - ürün kapsamı ve nihai risk kararının sahibidir;
-- test/analyzer ve manuel ürün kabulünü yürütür;
-- build/APK/ADB/device execution'ını varsayılan olarak yürütür veya exact güvenlik sınırlarıyla Codex'e açıkça devreder;
+- yalnız manuel ürün/device kabulünü ve nihai davranış PASS/FAIL kararını verir; terminal komutu çalıştırmaz;
+- mekanik emulator/ADB/device execution'ını yalnız exact güvenlik sınırlarıyla Codex'e açıkça devredebilir;
 - PASS/FAIL ve ürün kabulü kararını kendisi verir;
 - Ready, merge, release ve destructive işlemleri açıkça onaylar.
 

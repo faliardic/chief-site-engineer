@@ -37,14 +37,16 @@ Aynı görev resume ediliyorsa değişmeyen uzun kaynaklar tekrar okunmaz. Kulla
 
 GitHub'a erişilemiyorsa güncel durum tahmin edilmez ve production işi başlatılmaz.
 
+Owner talebi AGENTS.md veya canonical çalışma kuralını değiştiriyorsa asıl teknik/ürün işi durur. Önce karar current GitHub authority olarak kaydedilir; en dar protokol değişikliği hazırlanır, review ve owner merge kapısından geçirilir. Master güncellenip güncel AGENTS.md yeniden okunduktan sonra asıl teknik işe dönülür. Bu sıra Ready/merge yetkisini kendiliğinden vermez.
+
 ## 3. Zorunlu aktör yönlendirmesi ve sıradaki aksiyon
 
 ChatGPT/Work Mode her kullanıcı talebinde execution başlamadan önce sıradaki tek işi ve sorumlu aktörü belirler:
 
 - **ChatGPT:** current GitHub okuma, planlama, Issue/PR koordinasyonu, review ve owner-approved Ready/merge;
-- **Codex:** repository dosyası veya local workspace değişikliği, format/diff, local Git, commit/push;
-- **Fatih:** test, analyzer ve manuel ürün kabulü; build/APK/ADB/device işlemleri varsayılan olarak;
-- **Codex device exception:** Fatih exact package, cihaz ve veri-koruma sınırıyla açıkça devrederse build/APK/ADB/device işlemi tek bir 5 dakikalık görev olarak Codex'e geçebilir. PASS/FAIL ve ürün kabulü Fatih'te kalır.
+- **Codex:** repository-local terminal, automated test, analyzer, build/APK hazırlığı, dosya değişikliği, format/diff ve local Git/commit/push;
+- **Fatih:** yalnız manuel ürün/device kabulü ve nihai görsel/davranış PASS/FAIL kararı; PowerShell/terminal komutu çalıştırmaz;
+- **Codex device exception:** Fatih exact package, cihaz ve veri-koruma sınırıyla açıkça devrederse emulator/ADB/device işlemi tek bir 5 dakikalık görev olarak Codex'e geçebilir. PASS/FAIL ve ürün kabulü Fatih'te kalır.
 
 Repository veya local execution gerekiyorsa ChatGPT, kullanıcının `Codex ile çalış` demesini beklemez. Açıkça `Sıradaki aktör: Codex` der ve current Issue/kuralları tekrar etmeyen, 10–15 satırı geçmeyen exact handoff verir. `CSE_PROJECT_INSTRUCTIONS.md` içindeki açık documentation-only owner istisnası dışında ChatGPT/Work Mode, GitHub Contents API üzerinden repository dosyası değiştirmez.
 
@@ -55,7 +57,7 @@ ChatGPT'ın kendi yetkisindeki işlem mevcut owner kararıyla yapılabiliyorsa a
 Bir aksiyon tamamlandığında yalnız sonraki işin adı söylenmez; aynı yanıtta başlamaya hazır talimat da hazırlanır:
 
 - **Codex:** `Hazır Codex talimatı:` altında current kaynakları tekrar etmeyen, kopyalanabilir 10–15 satırlık exact görev;
-- **Fatih:** `Hazır Fatih talimatı:` altında exact komut, kısa manuel kontrol ve beklenen sonuç;
+- **Fatih:** `Hazır Fatih talimatı:` altında yalnız kısa manuel ürün/device kontrolü ve beklenen sonuç; terminal komutu verilmez;
 - **ChatGPT:** mevcut owner yetkisi varsa sonraki koordinasyon işlemini kendiliğinden yürütür; yeni yetki gerekiyorsa yalnız gerekli tek onay cümlesini verir;
 - **Yok:** devam işi veya hazırlanacak talimat bulunmadığını açıklar.
 
@@ -77,8 +79,8 @@ FAST varsayılanı:
 - tek davranış;
 - en fazla 5 dakikalık Codex işlemi;
 - Issue, remote branch, PR, `.cse` task/result ve routing YAML yok;
-- Codex yalnız format, changed-path review ve `git diff --check` yapar;
-- test/analyzer/build/device işlemlerini Fatih çalıştırır;
+- Codex format, changed-path review, `git diff --check` ve minimum yeterli automated doğrulamayı yapar;
+- test/analyzer/build execution Codex'te, manuel ürün/device kabulü Fatih'tedir;
 - Fatih `PASS` bildirmeden commit veya push yapılmaz;
 - FAIL/PENDING durumunda yeni işe geçilmez.
 
@@ -91,7 +93,7 @@ STANDARD varsayılanı:
 - tek kısa Issue veya self-contained görev özeti;
 - tek kısa ömürlü branch;
 - 5 dakikalık Codex mikro adımları;
-- test/analyzer/build/device işlemleri Fatih'te;
+- test/analyzer/build execution Codex'te, manuel ürün/device kabulü Fatih'te;
 - `.cse` ve routing YAML varsayılan olarak yok;
 - bağımsız diff review değer üretiyorsa tek Draft PR;
 - mevcut iş master'a alınmadan yeni production branch açılmaz;
@@ -122,21 +124,9 @@ Beş dakika dolduğunda:
 - kapsam genişletilmez;
 - tamamlanan değişiklik, blocker ve kalan tek adım raporlanır.
 
-Codex:
+Repository-local terminal, automated test, analyzer ve build/APK hazırlığı Codex tarafından, yetkili görevin minimum yeterli kapsamıyla yürütülür. Fatih PowerShell/terminal/Git/Flutter/test/analyzer/build komutu çalıştırmaz; kendisine bu komutlar hazırlanmaz veya verilmez. Fatih yalnız manuel ürün/device kabulünü ve nihai görsel/davranış PASS/FAIL kararını verir. Emulator/ADB/device execution yalnız exact package, cihaz ve veri-koruma sınırıyla açık owner delegasyonunda yapılabilir; MAIN/Acceptance/Debug ve mevcut veri güvenliği sınırları korunur.
 
-- test, analyzer veya manuel ürün kabulü çalıştırmaz;
-- build, emulator, ADB veya cihaz işlemini varsayılan olarak çalıştırmaz;
-- yalnız Fatih'in exact package/device/data-safety sınırıyla açıkça devrettiği build/APK/ADB/device görevini 5 dakikalık hard-stop içinde çalıştırabilir;
-- exact kullanıcı test komutunu ve manuel kontrolü verir;
-- yalnız kaynak düzenleme, format, diff ve Git kapsam kontrolünü yapar.
-
-Fatih:
-
-- focused/full testleri;
-- analyzer ve build'i;
-- APK/install ve cihaz kabulünü;
-- ürün davranışı ve görsel kabulü çalıştırır;
-- isterse exact build/APK/ADB/device execution'ını açık sınırlarla Codex'e devreder; PASS/FAIL ve kabul kararını devretmez.
+Codex kaynak düzenleme, format, diff ve Git kapsam kontrollerini yapar; automated execution sonuçlarını raporlar. Fatih'e yalnız manuel kabul adımları verilir; nihai davranış kabulü Codex'e devredilmez.
 
 Aynı source revision üzerinde geçen test tekrarlanmaz. Full suite her mikro adımda değil, birleşik milestone veya release kapısında çalıştırılır.
 
@@ -169,7 +159,8 @@ FAST completion en fazla şu bilgileri taşır:
 Değişen davranış: <tek cümle>
 Değişen dosyalar: <liste>
 Codex kontrolleri: format / diff-check
-Fatih testi: PENDING | PASS | FAIL
+Codex automated validation: PENDING | PASS | FAIL
+Fatih manuel kabulü: PENDING | PASS | FAIL
 Commit/push: yapılmadı | <sha>
 ```
 
@@ -187,4 +178,4 @@ SHA, branch, divergence, allowlist, YAML ve benzeri teknik kanıtlar bu açıkla
 
 ## 9. Ana karar
 
-> Düşük riskte hızlı ve owner-testli master akışı; orta riskte tek kısa branch; gerçek veri/release riskinde tam güvenlik süreci. Güvenlik küçük UI işlerine değil, gerçekten zarar verebilecek sözleşmelere yoğunlaştırılır.
+> Düşük riskte hızlı, Codex doğrulamalı ve owner kabullü master akışı; orta riskte tek kısa branch; gerçek veri/release riskinde tam güvenlik süreci. Güvenlik küçük UI işlerine değil, gerçekten zarar verebilecek sözleşmelere yoğunlaştırılır.
