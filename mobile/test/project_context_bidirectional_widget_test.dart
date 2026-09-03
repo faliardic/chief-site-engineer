@@ -777,8 +777,8 @@ Finder _dashboardProjectSelectionButton() {
         of: surface,
         matching: find.byWidgetPredicate(
           (widget) =>
-              widget is IconButton &&
-              widget.tooltip == 'Proje seç' &&
+              widget is FilledButton &&
+              widget.key == const Key('dashboard-select-project') &&
               widget.onPressed != null,
         ),
       )
