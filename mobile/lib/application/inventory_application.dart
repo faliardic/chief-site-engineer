@@ -2605,16 +2605,18 @@ class InventoryApplication
               draftNewBlocks.every(
                 (block) => block.polygonIndex >= draftLegacyPolygonCount,
               );
+          final unclassifiedLegacyCount = legacyPrefixIsValid
+              ? active!.geometry.polylines.length - activeMappings.length
+              : draftLegacyPolygonCount;
           if (draftLegacyPolygonCount < 0 ||
               draftLegacyPolygonCount > draft.geometry.polylines.length ||
               classifiedPolygonIndexes.length !=
                   draftMappings.length + draftNewBlocks.length ||
-              (draftLegacyPolygonCount != mappingAwareCount &&
-                  !legacyPrefixIsValid &&
+              (unclassifiedLegacyCount != mappingAwareCount &&
                   !_hasOpenDraftSuffix(
                     draft.geometry,
                     classifiedPolygonIndexes,
-                    draftLegacyPolygonCount,
+                    unclassifiedLegacyCount,
                   ))) {
             throw const InventoryFailure(
               'inventory_projection_integrity_failed',
@@ -5376,6 +5378,9 @@ class InventoryApplication
             (mapping) => mapping.polygonIndex < legacyPolygonCount,
           ) &&
           newBlocks.every((block) => block.polygonIndex >= legacyPolygonCount);
+      final unclassifiedLegacyCount = targetLegacyPrefixIsValid
+          ? active!.geometry.polylines.length - sourceMappings.length
+          : legacyPolygonCount;
       if ((active != null &&
               (sourceMappedIndexes.length != sourceMappings.length ||
                   sourceMappedIndexes.any(
@@ -5388,12 +5393,11 @@ class InventoryApplication
           ) ||
           legacyPolygonCount < 0 ||
           legacyPolygonCount > draft.geometry.polylines.length ||
-          (legacyPolygonCount != targetMappingAwareCount &&
-              !targetLegacyPrefixIsValid &&
+          (unclassifiedLegacyCount != targetMappingAwareCount &&
               !_hasOpenDraftSuffix(
                 draft.geometry,
                 targetClassifiedIndexes,
-                legacyPolygonCount,
+                unclassifiedLegacyCount,
               ))) {
         throw const InventoryFailure('inventory_projection_integrity_failed');
       }
@@ -6433,12 +6437,14 @@ class InventoryApplication
           currentDefinitions.every(
             (block) => block.polygonIndex >= currentLegacyPolygonCount,
           );
-      if (currentLegacyPolygonCount != currentMappingAwareCount &&
-          !currentLegacyPrefixIsValid &&
+      final unclassifiedLegacyCount = currentLegacyPrefixIsValid
+          ? base!.geometry.polylines.length - baseMappings.length
+          : currentLegacyPolygonCount;
+      if (unclassifiedLegacyCount != currentMappingAwareCount &&
           !_hasOpenDraftSuffix(
             draft.geometry,
             currentClassifiedIndexes,
-            currentLegacyPolygonCount,
+            unclassifiedLegacyCount,
           )) {
         throw const InventoryFailure('inventory_projection_integrity_failed');
       }
@@ -6620,9 +6626,12 @@ class InventoryApplication
                     .skip(currentLegacyPolylines.length)
                     .takeWhile((polyline) => polyline.closed)
                     .length;
-      if (targetLegacyPolylines
-          .skip(legacyPolygonCount)
-          .any((polyline) => polyline.closed)) {
+      if (targetLegacyPolylines.length != legacyPolygonCount &&
+          !_hasOpenDraftSuffix(
+            geometry,
+            targetClassifiedIndexes,
+            legacyPolygonCount,
+          )) {
         throw const InventoryFailure('inventory_block_metadata_incomplete');
       }
       final occurredAt = _canonicalNowAfter(sketch.updatedAt, draft.updatedAt);
@@ -6862,9 +6871,9 @@ class _LifecyclePlacementWrite {
   final String? successorId;
 }
 
-// A count smaller than the unclassified geometry is valid only for an open
-// drawing suffix. Legacy lines retain their recorded classification, including
-// open lines imported by the existing schema migration.
+// Exactly one new, unclassified open polyline may follow the legacy geometry.
+// It must be the final polygon index so the editor can resume that same line.
+// Migrated open legacy lines retain their recorded classification.
 bool _hasOpenDraftSuffix(
   InventoryGeometry geometry,
   Set<int> classifiedIndexes,
@@ -6875,10 +6884,10 @@ bool _hasOpenDraftSuffix(
       if (!classifiedIndexes.contains(index)) geometry.polylines[index],
   ];
   return legacyPolygonCount >= 0 &&
-      legacyPolygonCount < unclassified.length &&
-      unclassified
-          .skip(legacyPolygonCount)
-          .every((polyline) => !polyline.closed);
+      unclassified.length == legacyPolygonCount + 1 &&
+      geometry.polylines.isNotEmpty &&
+      !classifiedIndexes.contains(geometry.polylines.length - 1) &&
+      !geometry.polylines.last.closed;
 }
 
 bool _sameLifecyclePolyline(InventoryPolyline first, InventoryPolyline second) {

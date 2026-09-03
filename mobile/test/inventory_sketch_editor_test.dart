@@ -17,6 +17,106 @@ final _time = DateTime.utc(2026, 8, 28, 6);
 
 void main() {
   test(
+    'AT-602 identical open suffix uses legacy and block indexes on recovery and discard',
+    () async {
+      final legacy = _openGeometry().polylines.single;
+      final firstBlock = _blockDrafts().single;
+      final geometry = InventoryGeometry(
+        polylines: [
+          ..._closedBlockGeometry().polylines,
+          legacy,
+          _openGeometry().polylines.single,
+        ],
+      );
+      final fake = _FakeInventoryApplication.withDraft(
+        geometry,
+        draftNewBlocks: [firstBlock],
+        legacyPolygonCount: 1,
+      );
+      final controller = _controller(fake);
+      addTearDown(controller.dispose);
+      await controller.initialize();
+      expect(controller.loadStatus, InventorySketchLoadStatus.ready);
+      expect(controller.editor!.workingPolylineIndex, 2);
+      expect(controller.isFinalizeEnabled, isFalse);
+      expect(controller.drawPoint(_point(64, 64)), isTrue);
+      expect(controller.editor!.geometry.polylines[1].points, legacy.points);
+      controller.discardUnsaved();
+      expect(controller.editor!.geometry.canonicalJson, geometry.canonicalJson);
+      expect(controller.editor!.workingPolylineIndex, 2);
+
+      // Remove the classified prefix through selection, then discard. Recovery
+      // must use the acknowledged block indexes, not the unsaved shorter list.
+      controller.setMode(InventorySketchEditorMode.select);
+      final viewport = InventoryViewport.fit(const Size(4096, 3072));
+      final edge =
+          (viewport.virtualToView(_point(192, 64)) +
+              viewport.virtualToView(_point(128, 192))) /
+          2;
+      controller.selectAt(edge, viewport);
+      controller.selectAt(edge, viewport);
+      expect(controller.editor!.selection?.wholePolyline, isTrue);
+      expect(controller.editor!.selection?.polylineIndex, 0);
+      expect(controller.deleteSelection(), isTrue);
+      expect(controller.newBlocks, isEmpty);
+      expect(controller.editor!.workingPolylineIndex, 1);
+      controller.discardUnsaved();
+      expect(controller.editor!.workingPolylineIndex, 2);
+      expect(controller.editor!.geometry.canonicalJson, geometry.canonicalJson);
+      _expectSameBlockIdentity(
+        controller.newBlocks.single,
+        firstBlock,
+        polygonIndex: 0,
+      );
+      controller.setMode(InventorySketchEditorMode.draw);
+      expect(controller.drawPoint(_point(64, 64)), isTrue);
+      expect(controller.workingPolyline!.points, [
+        ...legacy.points,
+        _point(64, 64),
+      ]);
+      expect(await controller.forceSave(), isTrue);
+      expect(fake.saveMutationCount, 1);
+      expect(fake.maximumConcurrentSaves, 1);
+      expect(
+        fake.projection!.draftRevision!.geometry.polylines[1].points,
+        legacy.points,
+      );
+      expect(fake.projection!.draftNewBlocks.map((block) => block.id), [
+        firstBlock.id,
+      ]);
+      expect(fake.finalizeCalls, 0);
+    },
+  );
+
+  test(
+    'AT-602 one-point recovery respects explicit durable legacy classification',
+    () async {
+      final geometry = InventoryGeometry(
+        polylines: [
+          InventoryPolyline(closed: false, points: [_point(64, 64)]),
+        ],
+      );
+      for (final legacyCount in [0, 1]) {
+        final fake = _FakeInventoryApplication.withDraft(
+          geometry,
+          legacyPolygonCount: legacyCount,
+        );
+        final controller = _controller(fake);
+        addTearDown(controller.dispose);
+        await controller.initialize();
+        expect(controller.loadStatus, InventorySketchLoadStatus.ready);
+        expect(
+          controller.editor!.workingPolylineIndex,
+          legacyCount == 0 ? 0 : null,
+        );
+        expect(controller.isFinalizeEnabled, isFalse);
+        expect(fake.saveCalls, isEmpty);
+        expect(fake.finalizeCalls, 0);
+      }
+    },
+  );
+
+  test(
     'AT-602 recovery separates closed draft block metadata from open drawing',
     () async {
       final firstBlock = _blockDrafts().single;

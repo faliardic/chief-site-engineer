@@ -1232,10 +1232,10 @@ class InventorySketchEditorController extends ChangeNotifier {
     _normalSaveEligibleGeneration = null;
     _forceDrainRequested = false;
     _pendingSave = null;
-    editor = _recoverEditor(acknowledged, mode: current.mode);
     _newBlocks = _acknowledgedNewBlocks;
     _existingBlockMappings = _acknowledgedExistingBlockMappings;
     _lifecycleActions = _acknowledgedLifecycleActions;
+    editor = _recoverEditor(acknowledged, mode: current.mode);
     _undoBlockHistory = const [];
     _redoBlockHistory = const [];
     _freeLengthNextSegment = false;
@@ -1611,15 +1611,27 @@ class InventorySketchEditorController extends ChangeNotifier {
   InventorySketchEditorSnapshot _recoverEditor(
     InventoryGeometry geometry, {
     InventorySketchEditorMode mode = InventorySketchEditorMode.draw,
-  }) => InventorySketchEditorSnapshot.recover(
-    geometry,
-    mode: mode,
-    // Only unfinalized drawing may resume; active legacy lines stay locked.
-    resumeOpenPolyline:
-        geometry.polylines.isNotEmpty &&
-        !geometry.polylines.last.closed &&
-        !_isLockedLegacyPolyline(geometry.polylines.last),
-  );
+  }) {
+    final classifiedIndexes = <int>{
+      ..._existingBlockMappings.values,
+      ..._newBlocks.map((block) => block.polygonIndex),
+    };
+    // Legacy count comes from the durable first-draft metadata or active
+    // revision mappings. Geometry values cannot identify a new drawing: it
+    // may have exactly the same points as an existing open legacy line.
+    final drawingIndexes = <int>[
+      for (var index = 0; index < geometry.polylines.length; index += 1)
+        if (!classifiedIndexes.contains(index)) index,
+    ].skip(_lockedLegacyPolylines.length).toList(growable: false);
+    return InventorySketchEditorSnapshot.recover(
+      geometry,
+      mode: mode,
+      resumeOpenPolyline:
+          drawingIndexes.length == 1 &&
+          drawingIndexes.single == geometry.polylines.length - 1 &&
+          !geometry.polylines.last.closed,
+    );
+  }
 
   bool _hasCompleteSpatialMetadata(InventoryGeometry geometry) {
     try {
