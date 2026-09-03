@@ -1,6 +1,21 @@
-# Issue 584 — correction 1/2 PASS
+# Issue 584 — legacy transition PASS
 
-Current local validation: 38/38 PASS in the single authorized correction invocation. Production bytes were preserved. This result is finalized before commit/push; the final commit and Draft stacked PR are recorded in GitHub publication metadata.
+Current transition validation: 38/38 PASS in one focused invocation. The original Agenda production and test content is unchanged. Earlier implementation/correction evidence is retained below; the final merge commit is recorded in GitHub publication metadata.
+
+## Legacy transition — 2026-09-03
+
+- Authority: https://github.com/faliardic/chief-site-engineer/issues/584#issuecomment-5522033988 and owner continuation.
+- Local master was synchronized with --ff-only to e349ae2250b643153bff482db26791e4a659bdf0 before starting the normal merge into 438c51dd7e7d3700f0b32557ea81bd9c6a3c74d2.
+- The initial attempt stopped on three conflicts outside the original six paths. Resumed that same pending merge under the additional authority; no abort/restart or history rewrite.
+- Resolved mobile/lib/app.dart, mobile/test/global_active_project_context_widget_test.dart and mobile/test/widget_test.dart with exact master content. All three have zero net diff against master. No other conflicts remained.
+- Net scope against master: exactly the original three Agenda production files, mobile_agenda_widget_test.dart and the two #584 task/result files. All other paths, including #580 shared-queue/lazy-tab and #581 dedicated project-create/current active-project behavior, match master.
+- The three Agenda production files and mobile_agenda_widget_test.dart match the original PR head. No new product behavior, mutation-command, domain/application/storage, attachment/reminder or Concrete changes were introduced.
+- Executed once from mobile/: flutter test --no-pub test/mobile_agenda_widget_test.dart --reporter expanded.
+- Result: exit 0; 38/38 PASS; "All tests passed!" (00:13). No second invocation.
+- Pre/post-test format: four Dart files, zero changes. Diff-check and exact six-path scope: PASS; protected drift against master: NONE.
+- Log: C:\Users\Fatih\AppData\Local\Temp\cse-584-transition-focused-20260903.log.
+- No analyzer, full suite, build/APK, device or owner-data operation. Owner manual acceptance MT-584-001..006 remains DEFERRED by the 2026-09-02 decision, not PASS or field acceptance.
+- Publication gate satisfied for a normal merge commit and push to the existing branch. PR #585 must remain Draft with base codex/issue-581-dashboard-project-create; no retarget/Ready/merge. The earlier independent review applies to the original head, not automatically to this transition commit.
 
 ## Original implementation — FAIL CLOSED (historical record)
 

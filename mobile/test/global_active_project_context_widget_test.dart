@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:ui' show SemanticsAction;
 
 import 'package:chief_site_engineer/app.dart';
 import 'package:chief_site_engineer/application/attachment_catalog_application.dart';
+import 'package:chief_site_engineer/application/inventory_application.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attachment_models.dart';
+import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
+import 'package:chief_site_engineer/features/inventory/inventory_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -34,6 +38,152 @@ const _albumOnlyProject = AttachmentCatalogProject(
 );
 
 void main() {
+  testWidgets(
+    'Dashboard B opens exact Inventory B and hidden external A is adopted on return',
+    (tester) async {
+      final agenda = FakeAgendaApplication(
+        projects: const [_projectA, _projectB],
+      );
+      final inventory = _ContextInventory();
+      await _pumpShell(tester, agenda, inventory: inventory);
+      expect(inventory.projects, isEmpty);
+      await tester.tap(_dashboardProjectSelectionButton());
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
+      );
+      await tester.pumpAndSettle();
+      expect(inventory.projects, isEmpty);
+      await _openTab(tester, 'Envanter');
+      _expectIndicator(_projectB.name);
+      expect(inventory.projects, [_projectB.id]);
+      final inventoryPage = find.byType(InventoryPage);
+      final state = tester.state<InventoryPageState>(inventoryPage);
+      expect(state.controller.selectedProjectId, _projectB.id);
+      expect(state.controller.loadStatus, InventoryPageLoadStatus.noSketch);
+      expect(
+        find.descendant(
+          of: inventoryPage,
+          matching: find.byType(DropdownButtonFormField<String>),
+        ),
+        findsNothing,
+      );
+      expect(
+        tester.getTopLeft(find.byKey(const Key('inventory-page'))).dy,
+        tester.getBottomLeft(find.byType(AppBar)).dy,
+      );
+
+      await _openTab(tester, 'Daha');
+      await tester.tap(
+        find.byKey(const Key('active-project-indicator')).hitTestable(),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find
+            .byKey(ValueKey('active-project-option-${_projectA.id}'))
+            .hitTestable(),
+      );
+      await tester.pumpAndSettle();
+      _expectIndicator(_projectA.name);
+      expect(inventory.projects, [_projectB.id]);
+      await _openTab(tester, 'Envanter');
+      _expectIndicator(_projectA.name);
+      expect(inventory.projects, [_projectB.id, _projectA.id]);
+      expect(state.controller.selectedProjectId, _projectA.id);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'shared AppBar chooser stays textual bounded and usable at 320px large text',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 800);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 1.6;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final semantics = tester.ensureSemantics();
+      try {
+        const archived = MobileProject(
+          id: 'archived',
+          name: 'Arşivli proje',
+          createdAt: '2026-09-01T08:00:00Z',
+          updatedAt: '2026-09-01T08:00:00Z',
+          revision: 2,
+          archivedAt: '2026-09-02T08:00:00Z',
+        );
+        final agenda = FakeAgendaApplication(
+          projects: const [_projectA, _projectB, archived],
+        );
+        final inventory = _ContextInventory();
+        await _pumpShell(tester, agenda, inventory: inventory);
+        await _openTabIcon(tester, Icons.more_horiz_rounded);
+        final control = find
+            .byKey(const Key('active-project-indicator'))
+            .hitTestable();
+        expect(control, findsOneWidget);
+        expect(tester.getSize(control).height, greaterThanOrEqualTo(40));
+        _expectIndicator('Proje seçilmedi');
+        expect(find.byTooltip('Aktif proje: Proje seçilmedi'), findsOneWidget);
+        await tester.tap(control);
+        await tester.pumpAndSettle();
+        final chooser = find.byKey(const Key('active-project-chooser'));
+        expect(chooser, findsOneWidget);
+        final chooserSurface = find.descendant(
+          of: chooser,
+          matching: find.byWidgetPredicate(
+            (widget) => widget is Material && widget.type == MaterialType.card,
+          ),
+        );
+        expect(chooserSurface, findsOneWidget);
+        final logicalViewport =
+            tester.view.physicalSize / tester.view.devicePixelRatio;
+        final chooserSize = tester.getSize(chooserSurface);
+        debugPrint(
+          'Chooser Material surface: $chooserSize; logical viewport: '
+          '$logicalViewport; DPR: ${tester.view.devicePixelRatio}',
+        );
+        expect(chooserSize.width, lessThanOrEqualTo(logicalViewport.width));
+        expect(chooserSize.height, lessThan(logicalViewport.height));
+        expect(
+          find.byKey(const Key('active-project-option-archived')),
+          findsNothing,
+        );
+        final option = find
+            .byKey(ValueKey('active-project-option-${_projectB.id}'))
+            .hitTestable();
+        expect(option, findsOneWidget);
+        await tester.tap(option);
+        await tester.pumpAndSettle();
+        _expectIndicator(_projectB.name);
+        final controlSemantics = tester
+            .getSemantics(control)
+            .getSemanticsData();
+        expect(controlSemantics.label, contains(_projectB.name));
+        expect(controlSemantics.hasAction(SemanticsAction.tap), isTrue);
+        agenda.projects = const [_projectA, _projectB];
+        await _openTabIcon(tester, Icons.inventory_2_outlined);
+        _expectIndicator(_projectB.name);
+        expect(inventory.projects, [_projectB.id]);
+        expect(control, findsOneWidget);
+        await tester.tap(control);
+        await tester.pumpAndSettle();
+        final inventoryOption = find
+            .byKey(ValueKey('active-project-option-${_projectA.id}'))
+            .hitTestable();
+        expect(inventoryOption, findsOneWidget);
+        await tester.tap(inventoryOption);
+        await tester.pumpAndSettle();
+        _expectIndicator(_projectA.name);
+        expect(inventory.projects, [_projectB.id, _projectA.id]);
+        expect(tester.takeException(), isNull);
+      } finally {
+        semantics.dispose();
+      }
+    },
+  );
+
   testWidgets(
     'no active project stays visible and never becomes an implicit Agenda default',
     (tester) async {
@@ -79,7 +229,11 @@ void main() {
       );
 
       await _openTab(tester, 'Envanter');
-      expect(find.byKey(const Key('active-project-indicator')), findsNothing);
+      _expectIndicator('Proje seçilmedi');
+      expect(
+        find.byKey(const Key('inventory-project-selection-required')),
+        findsOneWidget,
+      );
       await _openTab(tester, 'Puantaj');
       _expectIndicator('Proje seçilmedi');
       await _openTab(tester, 'Daha');
@@ -98,16 +252,7 @@ void main() {
         projects: const [_projectA, _projectB],
       );
       await _pumpShell(tester, agenda);
-      final selectionRequired = find.byKey(
-        const Key('dashboard-project-selection-required'),
-      );
-      final selectProject = find.descendant(
-        of: selectionRequired,
-        matching: find.widgetWithText(FilledButton, 'Proje seç'),
-      );
-      expect(selectProject, findsOneWidget);
-      expect(selectProject.hitTestable(), findsOneWidget);
-      await tester.tap(selectProject);
+      await tester.tap(_dashboardProjectSelectionButton());
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
@@ -208,16 +353,7 @@ void main() {
         projects: const [_projectA, _projectB],
       );
       await _pumpShell(tester, agenda);
-      final selectionRequired = find.byKey(
-        const Key('dashboard-project-selection-required'),
-      );
-      final selectProject = find.descendant(
-        of: selectionRequired,
-        matching: find.widgetWithText(FilledButton, 'Proje seç'),
-      );
-      expect(selectProject, findsOneWidget);
-      expect(selectProject.hitTestable(), findsOneWidget);
-      await tester.tap(selectProject);
+      await tester.tap(_dashboardProjectSelectionButton());
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
@@ -280,16 +416,7 @@ void main() {
         isCatalogDiscoveryInFlight: () => catalog.discoveryInFlight,
       );
       await _pumpShell(tester, agenda, attachmentCatalog: catalog);
-      final selectionRequired = find.byKey(
-        const Key('dashboard-project-selection-required'),
-      );
-      final selectProject = find.descendant(
-        of: selectionRequired,
-        matching: find.widgetWithText(FilledButton, 'Proje seç'),
-      );
-      expect(selectProject, findsOneWidget);
-      expect(selectProject.hitTestable(), findsOneWidget);
-      await tester.tap(selectProject);
+      await tester.tap(_dashboardProjectSelectionButton());
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
@@ -348,6 +475,7 @@ Future<void> _pumpShell(
   WidgetTester tester,
   FakeAgendaApplication agenda, {
   AttachmentCatalogApplication? attachmentCatalog,
+  InventoryApplicationPort? inventory,
 }) async {
   await tester.pumpWidget(
     CseApp(
@@ -358,10 +486,35 @@ Future<void> _pumpShell(
           smokeRecordCreatedAt: '2026-08-31T08:00:00Z',
           agenda: agenda,
           attachmentCatalog: attachmentCatalog,
+          inventory: inventory ?? const UnavailableInventoryApplication(),
         ),
       ),
     ),
   );
+  await tester.pumpAndSettle();
+}
+
+Finder _dashboardProjectSelectionButton() {
+  final surface = find.byKey(const Key('dashboard-project-selection-required'));
+  expect(surface, findsOneWidget);
+  final button = find
+      .descendant(
+        of: surface,
+        matching: find.widgetWithText(FilledButton, 'Proje seç'),
+      )
+      .hitTestable();
+  expect(button, findsOneWidget);
+  return button;
+}
+
+Future<void> _openTabIcon(WidgetTester tester, IconData icon) async {
+  final navigation = find.byType(NavigationBar);
+  expect(navigation, findsOneWidget);
+  final destination = find
+      .descendant(of: navigation, matching: find.byIcon(icon))
+      .hitTestable();
+  expect(destination, findsOneWidget);
+  await tester.tap(destination);
   await tester.pumpAndSettle();
 }
 
@@ -428,6 +581,18 @@ Future<void> _submitReminder(WidgetTester tester) async {
   expect(hitTestableSubmit, findsOneWidget);
   await tester.tap(hitTestableSubmit);
   await tester.pumpAndSettle();
+}
+
+class _ContextInventory extends UnavailableInventoryApplication {
+  final List<String> projects = [];
+
+  @override
+  Future<InventoryPrimarySketchProjection?> loadPrimarySketch(
+    String projectId,
+  ) async {
+    projects.add(projectId);
+    return null;
+  }
 }
 
 class _ControlledAlbumCatalog implements AttachmentCatalogApplication {

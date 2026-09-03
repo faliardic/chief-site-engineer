@@ -1,185 +1,116 @@
-# CSE Owner Communication Standard
+# CSE Owner Communication Standard — Concise v3
 
-**Belge türü:** Bağlayıcı owner iletişim protokolü  
-**Geçerlilik tarihi:** 2026-08-31  
-**Kaynak owner kararı:** Issue #551  
-**Kapsam:** Bütün CSE ChatGPT/Codex durum, review, blocker, completion, merge, resume ve roadmap iletişimleri
+**Geçerlilik tarihi:** 2026-09-03
 
-Bu protokolün amacı ürün sahibinin teknik süreç içinde ne olduğunu anlayabilmesi, gerektiğinde müdahale edebilmesi ve karar verebilmesidir.
+CSE'de teknik gerçek saklanmaz; owner'a önce ürünün ve işlemin pratik anlamı anlatılır.
 
-> CSE'de teknik gerçek saklanmaz; fakat owner'a önce teknik jargon değil, ürünün ve işlemin pratik anlamı anlatılır.
+## 0. Her yanıtta anlaşılır dil
 
-## 1. Zorunlu iki katmanlı anlatım
+ChatGPT kullanıcıya teslim ettiği her sonuçta, teknik kaydı göstermeden önce sade Türkçeyle şunları açıklar:
 
-Owner'a verilen her önemli durum/sonuç mesajı iki katmanlı düşünülür.
+1. Ne yaptım?
+2. Bunun uygulama veya çalışma açısından anlamı ne?
+3. İşlem tamamlandı mı; sorun veya eksik var mı?
 
-### Katman 1 — İnsan diliyle zorunlu özet
+Owner'ın Git, Android veya test terimlerini çözerek sonucu çıkarması beklenmez. `fast-forward`, `divergence`, `head`, `allowlist`, `artifact` veya benzeri bir terim kullanılıyorsa günlük dilde karşılığı aynı yerde söylenir.
 
-Önce sade Türkçe kullanılır. Mümkün olduğunda şu sıra izlenir:
+Ham Codex çıktısı, YAML veya komut dökümü ana açıklamanın yerine geçmez. ChatGPT bunları kısa bir sonuca çevirir; teknik ayrıntıyı yalnız kanıt veya uygulama talimatı olarak ikinci katmanda verir. Dil sade olur ancak risk, başarısızlık veya eksik doğrulama yumuşatılmaz.
 
-1. **Ne yaptık?** — kullanıcı/ürün açısından yapılan iş.
-2. **Sonuç ne?** — şu anda ne çalışıyor veya iş hangi aşamada.
-3. **Sorun var mı?** — varsa gerçek problem, teknik olmayan dille.
-4. **Risk ne?** — düşük / orta / kritik ve kısa sebebi.
-5. **Benim önerim ne?** — devam / düzelt / merge / dur vb.
-6. **Senden ne gerekiyor?** — owner kararı/aksiyonu; gerekmiyorsa açıkça `Hiçbir şey`.
+## 1. Mikro mesajlar
 
-Bu başlıkların hepsi her mikro mesajda zorunlu değildir; fakat owner'ın bir karar vermesi, blocker anlaması veya proje durumunu takip etmesi gereken mesajlarda ilk katman bunları kapsamalıdır.
+FAST ve rutin STANDARD ara sonuçları normalde 2–5 cümledir:
 
-### Katman 2 — Teknik ayrıntı yalnız gerektiğinde
+- ne değişti;
+- sonuç veya blocker;
+- sıradaki tek aksiyon, sorumlu aktör ve uygulanabilir talimat.
 
-SHA, branch, R1/R2/R3/R4, CI, harness, fixture, allowlist, invariant, analyzer, schema, migration, divergence, exact head ve execution record gibi teknik ayrıntılar:
+Her kullanıcıya teslim edilen sonuç `Sıradaki aksiyon — <ChatGPT|Codex|Fatih|Yok>: <tek uygulanabilir talimat>.` satırıyla biter. Devam işi yoksa `Yok: İş tamamlandı.` yazılır; yapay iş üretilmez.
 
-- yalnız karar, audit, debug veya izlenebilirlik için anlamlıysa;
-- sade açıklamadan sonra;
-- mümkünse kısa bir `Teknik not` bölümünde
+Her mikro adımda altı başlıklı rapor, YAML veya uzun chronology yazılmaz.
 
-verilir.
+Non-CRITICAL işte one-pass akışının sonucu anlatılır: mevcut repro kanıtı, fix, tek focused validation ve yalnız gereken manuel/device kabul. Owner/device kanıtı yapay harness'te üretilemiyor diye owner'dan yeniden repro veya deterministic automated FAIL sağlaması istenmez. Kararı değiştirmeyen diagnostic/test turları açılmaz.
 
-Owner teknik ayrıntıyı okumadan da temel durumu anlayabilmelidir.
+## 2. Önemli karar mesajları
 
-## 2. Teknik terimi anında tercüme etme kuralı
-
-Bir teknik terim kullanmak gerekiyorsa pratik anlamı hemen söylenir.
-
-Örnekler:
-
-- `harness-only correction` → `yalnız test düzeneğini düzelt; uygulama koduna dokunma`.
-- `REPO_STATE_MISMATCH` → `yerel repo beklediğimiz Git durumunda değil; kodlamaya güvenle başlanamadı`.
-- `fail-closed` → `belirsizlikte ilerlemek yerine güvenli biçimde durduk`.
-- `R4 review` → `veri/ürün riski yüksek olduğu için daha derin kaynak incelemesi`.
-- `CI failed` → `GitHub'ın otomatik kontrolü geçmedi`.
-- `fixture error` → `uygulama değil, test için hazırlanan sahte veri/düzenek hata üretiyor`.
-- `allowlist` → `bu işte değiştirilmesine izin verilen dosyalar listesi`.
-
-Teknik terimin kendisini kullanmak zorunlu değilse sade Türkçe tercih edilir.
-
-## 3. Ürün anlamını teknik implementasyondan önce anlat
-
-Owner'a önce şu soru cevaplanır:
-
-> Bu değişiklik uygulamada neyi değiştirecek veya neden yapılıyor?
-
-Örnek:
-
-Yanlış başlangıç:
-
-> `ActiveProjectSession callback boundary corrected; 4/5 targeted tests pass.`
-
-Doğru başlangıç:
-
-> `B projesini seçtiğinde Beton, Albüm ve diğer proje ekranlarının tekrar A projesine dönmemesini sağlıyoruz. Kod tarafı tamamlandı; kalan problem uygulamada değil, son otomatik testin kendi düzeneğinde.`
-
-Teknik sayı ve test detayları bundan sonra verilebilir.
-
-## 4. Blocker anlatım standardı
-
-Her blocker owner'a şu üç şeyi açıkça söylemelidir:
-
-- **Ne engellendi?**
-- **Neden?**
-- **Bu ürün hatası mı, test/ortam/süreç hatası mı?**
-
-Örnek:
-
-> `Kodlama durmadı çünkü uygulamada yeni hata bulduk` demek yerine gerçek durum test harness ise `Uygulama tarafında yeni hata bulmadık; otomatik testin kendi hazırlığı bozuk olduğu için kontrol tamamlanamadı` denir.
-
-Owner'a teknik blocker'ı olduğundan daha büyük veya daha küçük gösterme.
-
-## 5. Risk anlatım standardı
-
-Risk, teknik sınıf adıyla değil pratik sonuçla açıklanır.
-
-- **Düşük:** UI/metin/test düzeneği gibi kullanıcı verisini tehlikeye atmayan değişiklik.
-- **Orta:** birden fazla ekran/akış etkileniyor fakat veri modeli veya destructive işlem yok.
-- **Kritik:** veri kaybı, migration, backup/restore, güvenlik, izin, release veya kullanıcı dosyası riski var.
-
-`R3`, `R4` gibi sınıflar yalnız teknik not olarak eklenir.
-
-## 6. Owner aksiyonu görünür olmalı
-
-Her karar noktasında mesajın sonunda owner'ın yapması gereken şey net olmalıdır.
-
-Örnekler:
-
-- `Senden gereken: Merge onayı.`
-- `Senden gereken: Bu davranışın A mı B mi olacağına karar vermen.`
-- `Senden gereken: Hiçbir şey; teknik düzeltme aynı kapsam içinde devam edebilir.`
-
-Owner'ın teknik rapordan aksiyonu kendisinin çıkarması beklenmez.
-
-## 7. Uzun execution record'ların yeri
-
-YAML, SHA listeleri, test tally, branch divergence ve benzeri kayıtlar audit/evidence için saklanabilir; ancak owner mesajının ana gövdesi olamaz.
-
-Bir execution record gerekiyorsa:
-
-1. önce insan diliyle özet;
-2. sonra kısa teknik kayıt;
-3. yalnız gerekli alanlar.
-
-Owner'a salt YAML veya salt Codex çıktısı ile cevap verilmez.
-
-## 8. Resume / `devam` davranışı
-
-Owner `devam`, `son durum`, `ne oldu`, `neden durdu` gibi kısa mesaj verdiğinde:
-
-- önce ürün dilinde current state anlatılır;
-- önceki teknik blokları owner'a tekrar yapıştırması istenmez;
-- current GitHub durumu gerektiğinde kendiliğinden okunur;
-- sıradaki gerçek iş ve owner aksiyonu net söylenir.
-
-## 9. Codex çıktısını tercüme etme sorumluluğu
-
-Codex teknik completion/blocker raporu üretirse ChatGPT bunu owner'a doğrudan kopyalamaz.
-
-ChatGPT:
-
-1. teknik sonucu okur;
-2. ürün anlamını çıkarır;
-3. hata türünü sınıflandırır: `ürün / test / ortam / süreç`;
-4. owner'a sade Türkçe özet verir;
-5. gerekiyorsa teknik ayrıntıyı ikinci katmanda ekler.
-
-## 10. Minimum owner mesaj şablonu
-
-Önemli durumlarda varsayılan şablon:
+Blocker, CRITICAL escalation, merge veya release kararında sade Türkçeyle şu sorular karşılanır:
 
 ```text
 Ne yaptık?
-<ürün diliyle 1-3 cümle>
-
 Sonuç ne?
-<mevcut gerçek durum>
-
 Sorun var mı?
-<yok / varsa sade açıklama>
-
 Risk ne?
-<Düşük / Orta / Kritik — kısa neden>
-
-Benim önerim
-<devam / düzelt / merge / dur>
-
-Senden gereken
-<karar/aksiyon veya Hiçbir şey>
+Benim önerim ne?
+Senden ne gerekiyor?
 ```
 
-Mesaj küçükse bu yapı daha kısa ve doğal biçimde birleştirilebilir.
+Başlıkların tamamı mekanik biçimde kullanılmak zorunda değildir; owner teknik ayrıntıyı okumadan durumu anlamalıdır.
 
-## 11. Teknik doğruluk korunur
+## 3. Teknik terimlerin tercümesi
 
-Sade anlatım:
+Teknik terim gerekiyorsa pratik anlamı hemen söylenir.
 
-- teknik gerçeği gizlemek;
-- blocker'ı küçümsemek;
-- test edilmemiş şeyi çalışıyor diye sunmak;
-- uncertainty'yi yok saymak
+Örnek:
 
-anlamına gelmez.
+- `harness-only correction`: yalnız test düzeneği değişecek;
+- `fail-closed`: belirsizlikte güvenli biçimde durduk;
+- `R4/CRITICAL review`: veri veya yayın riski nedeniyle derin inceleme;
+- `CI failed`: otomatik kontrol geçmedi;
+- `allowlist`: değiştirilebilecek dosyalar.
 
-Amaç doğruluğu azaltmak değil, doğruluğu **anlaşılır hale getirmektir**.
+## 4. Blocker standardı
 
-## 12. Ana karar
+Her blocker şunu söyler:
 
-> CSE'de owner'a önce ürünün ve işlemin pratik anlamı anlatılır. Teknik jargon ikinci katmandır. Owner, SHA/YAML/R4/harness bilgisi okumadan projenin nerede olduğunu, neyin yanlış gittiğini, riskin ne olduğunu ve kendisinden ne beklendiğini anlayabilmelidir.
+1. ne engellendi;
+2. neden;
+3. ürün hatası mı, test/ortam/süreç hatası mı;
+4. sıradaki tek güvenli adım.
+
+Blocker olduğundan büyük veya küçük gösterilmez. Non-CRITICAL işte runtime/device FAIL, widget/fake test PASS ile geçersiz sayılmaz; gerçek davranışı temsil edemeyen harness tek başına düzeltmeyi engellemez. Bir başarısız repro denemesinden sonra kaynak/runtime incelemesine veya mevcut en güçlü kanıta geçilir; owner diagnostic bürokrasiye katılmaz.
+
+## 5. Teknik evidence
+
+SHA, branch, test tally, schema, divergence ve YAML:
+
+- yalnız audit/debug/karar için anlamlıysa;
+- sade açıklamadan sonra;
+- mümkün olan en kısa biçimde
+
+verilir.
+
+Salt YAML owner cevabı olamaz. Codex completion metni owner'a doğrudan kopyalanmaz; ChatGPT ürün diline çevirir.
+
+## 6. Sıradaki aksiyon
+
+Her sonuçta yalnız owner'ın değil, sıradaki işi kimin yapacağı da açık olmalıdır:
+
+- `Sıradaki aksiyon — Fatih: Manuel ürün kontrolünü yap ve davranış PASS/FAIL kararını bildir.`
+- `Sıradaki aksiyon — Codex: Verilen exact görevi handoff'taki execution time budget içinde uygula.`
+- `Sıradaki aksiyon — ChatGPT: Owner-approved PR işlemini tamamla.`
+- `Sıradaki aksiyon — Yok: İş tamamlandı.`
+
+Bir aksiyon tamamlandıktan sonra sıradaki aksiyonun yalnız adı verilmez. Aynı yanıtta:
+
+- Codex için `Hazır Codex talimatı:` altında kopyalanabilir 10–15 satırlık exact görev ve ChatGPT'nin kapsam/risk, beklenen validation/build/device işi ve blocker'a göre belirlediği açık `Execution time budget: <süre>`;
+- Fatih için `Hazır Fatih talimatı:` altında yalnız manuel ürün/device kontrolü ve beklenen sonuç; terminal komutu verilmez;
+- ChatGPT için mevcut authority içindeyse kendiliğinden execution, değilse gereken tek owner onayı
+
+sunulur.
+
+Repository/local execution gerekiyorsa ChatGPT, owner'ın ayrıca `Codex ile çalış`, `devam` veya `talimat hazırla` demesini beklemez; Codex handoff'unu kendiliğinden verir. ChatGPT'ın yetkili olduğu mevcut owner-approved işlem için ayrıca `devam` istenmez.
+
+Fatih'e yalnız gerçekten owner kararı veya manuel/device kabul gerektiren aksiyon verilir. Non-CRITICAL işte manuel/device kabul gerekmiyorsa kısa gerekçeyle `GEREKMİYOR` yazılır; Codex automated PASS sonrası commit/push için manuel PASS istenmez. Gereken manuel/device kabulde Fatih PASS/FAIL kapısı korunur. Automated PASS, manuel PASS veya Ready/merge/release yetkisi gibi sunulmaz.
+
+Her Codex handoff'unda açık süre bütçesi zorunludur; global sabit süre kullanılmaz. Bütçe dolarsa Codex çalışmayı güvenle koruyup durur, yeni yaklaşım başlatmadan exact blocker ve kalan tek aksiyonu bildirir. CRITICAL ve owner Ready/merge/release kapıları değişmez.
+
+## 7. Resume
+
+Owner `devam`, `son durum` veya `neden durdu` dediğinde:
+
+- current GitHub durumu gerektiğinde kendiliğinden okunur;
+- eski uzun blokları yeniden taşıması istenmez;
+- mevcut durum ve sıradaki gerçek iş kısa anlatılır.
+
+## 8. Ana karar
+
+> Küçük iş küçük anlatılır. Büyük riskte gereken ayrıntı korunur. Owner her zaman projenin nerede olduğunu ve kendisinden ne beklendiğini teknik YAML okumadan anlayabilir.

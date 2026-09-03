@@ -1,4 +1,15 @@
 import 'dart:async';
+import 'dart:io';
+
+import 'package:chief_site_engineer/application/agenda_application.dart';
+import 'package:chief_site_engineer/application/attendance_application.dart';
+import 'package:chief_site_engineer/application/construction_living_plan_application.dart';
+import 'package:chief_site_engineer/application/daily_log_application.dart';
+import 'package:chief_site_engineer/application/inventory_application.dart';
+import 'package:chief_site_engineer/application/material_request_application.dart';
+import 'package:chief_site_engineer/core/mobile_operation_coordinator.dart';
+import 'package:chief_site_engineer/storage/app_database.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:chief_site_engineer/app.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
@@ -415,6 +426,227 @@ void main() {
       expect(agenda.listProjectsCalls, projectReadsAfterFirstVisits);
     },
   );
+
+  testWidgets(
+    'post-project-create returns Agenda and Dashboard to terminal state',
+    (tester) async {
+      final agenda = FakeAgendaApplication();
+      await tester.pumpWidget(
+        CseApp(
+          bootstrap: Future<BootstrapResult>.value(
+            BootstrapSuccess(
+              environmentLabel: 'Geliştirme',
+              smokeRecordId: 'post-project-create',
+              smokeRecordCreatedAt: '2026-09-03T02:00:00Z',
+              agenda: agenda,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('dashboard-no-project')), findsOneWidget);
+      tester
+          .widget<NavigationBar>(find.byType(NavigationBar))
+          .onDestinationSelected!(2);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('create-agenda-project')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('agenda-project-name')),
+        'Yeni Şantiye',
+      );
+      await tester.tap(find.byKey(const Key('save-agenda-project')));
+      await tester.pumpAndSettle(
+        const Duration(milliseconds: 100),
+        EnginePhase.sendSemanticsUpdate,
+        const Duration(seconds: 5),
+      );
+      expect(agenda.projects, hasLength(1));
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('Bu günde Ajanda kaydı yok.'), findsOneWidget);
+      tester
+          .widget<NavigationBar>(find.byType(NavigationBar))
+          .onDestinationSelected!(0);
+      await tester.pumpAndSettle(
+        const Duration(milliseconds: 100),
+        EnginePhase.sendSemanticsUpdate,
+        const Duration(seconds: 5),
+      );
+      expect(find.byKey(const Key('dashboard-project-header')), findsOneWidget);
+      expect(
+        tester
+            .widget<ProjectDashboardPage>(find.byType(ProjectDashboardPage))
+            .session
+            .selectedProjectId,
+        agenda.projects.single.id,
+      );
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      tester
+          .widget<NavigationBar>(find.byType(NavigationBar))
+          .onDestinationSelected!(2);
+      await tester.pumpAndSettle();
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('real SQLite first project after all six primary tabs settles', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      sqfliteFfiInit();
+      final root = await Directory.systemTemp.createTemp('cse_580_diagnostic_');
+      final databasePath = '${root.path}/diagnostic.sqlite';
+      final now = DateTime.utc(2026, 9, 3, 2);
+      final database = AppDatabase(
+        path: databasePath,
+        factory: databaseFactoryFfi,
+        clock: () => now,
+      );
+      await database.open();
+      await database.close();
+      final coordinator = _Owner580DiagnosticCoordinator();
+      final agenda = SqliteAgendaApplication(
+        databasePath: databasePath,
+        databaseFactory: databaseFactoryFfi,
+        clock: () => now,
+        coordinator: coordinator,
+      );
+      final events = <String>[];
+      final subscription = agenda.projectChanges.listen(
+        (_) => events.add('projectChanges'),
+      );
+      debugPrint('OWNER580 temporary database: $databasePath');
+      await tester.pumpWidget(
+        CseApp(
+          bootstrap: Future<BootstrapResult>.value(
+            BootstrapSuccess(
+              environmentLabel: 'Test',
+              smokeRecordId: 'owner580-real-sqlite',
+              smokeRecordCreatedAt: now.toIso8601String(),
+              agenda: agenda,
+              dailyLog: SqliteDailyLogApplication(
+                databasePath: databasePath,
+                databaseFactory: databaseFactoryFfi,
+              ),
+              livingPlan: SqliteConstructionLivingPlanApplication(
+                databasePath: databasePath,
+                databaseFactory: databaseFactoryFfi,
+                clock: () => now,
+              ),
+              materialRequests: SqliteMaterialRequestApplication(
+                databasePath: databasePath,
+                databaseFactory: databaseFactoryFfi,
+                clock: () => now,
+                coordinator: coordinator,
+              ),
+              inventory: SqliteInventoryApplication(
+                databasePath: databasePath,
+                databaseFactory: databaseFactoryFfi,
+                clock: () => now,
+              ),
+              attendance: SqliteAttendanceApplication(
+                databasePath: databasePath,
+                databaseFactory: databaseFactoryFfi,
+                clock: () => now,
+                agenda: agenda,
+                coordinator: coordinator,
+              ),
+              projectLocations: agenda,
+            ),
+          ),
+        ),
+      );
+      Future<void> settle(String phase) async {
+        final watch = Stopwatch()..start();
+        var quietFrames = 0;
+        while (watch.elapsed < const Duration(seconds: 8)) {
+          await tester.pump(const Duration(milliseconds: 50));
+          await Future<void>.delayed(const Duration(milliseconds: 30));
+          final loading =
+              find.byType(CircularProgressIndicator).evaluate().isNotEmpty ||
+              find.byType(LinearProgressIndicator).evaluate().isNotEmpty;
+          quietFrames = !loading && coordinator.pending.isEmpty
+              ? quietFrames + 1
+              : 0;
+          if (quietFrames >= 8) {
+            debugPrint('OWNER580 $phase terminal; events=$events');
+            return;
+          }
+        }
+        final ancestors = <String>[];
+        for (final element
+            in find.byType(CircularProgressIndicator).evaluate()) {
+          final chain = <String>[];
+          element.visitAncestorElements((ancestor) {
+            chain.add('${ancestor.widget.runtimeType}:${ancestor.widget.key}');
+            return chain.length < 16;
+          });
+          ancestors.add(chain.join(' > '));
+        }
+        debugPrint(
+          'OWNER580 $phase TIMEOUT loading=$ancestors events=$events pending=${coordinator.pending}',
+        );
+        debugPrint('OWNER580 trace=${coordinator.trace.join('\n')}');
+        fail(
+          'OWNER580 $phase did not settle: loading=$ancestors pending=${coordinator.pending}',
+        );
+      }
+
+      try {
+        await settle('cold Dashboard');
+        expect(find.byKey(const Key('dashboard-no-project')), findsOneWidget);
+        for (var index = 1; index < 6; index++) {
+          tester
+              .widget<NavigationBar>(find.byType(NavigationBar))
+              .onDestinationSelected!(index);
+          await settle('first visit tab $index');
+        }
+        expect(find.byType(RemindersPage, skipOffstage: false), findsOneWidget);
+        expect(find.byType(AgendaPage, skipOffstage: false), findsOneWidget);
+        expect(find.byType(InventoryPage, skipOffstage: false), findsOneWidget);
+        expect(
+          find.byType(AttendancePage, skipOffstage: false),
+          findsOneWidget,
+        );
+        tester
+            .widget<NavigationBar>(find.byType(NavigationBar))
+            .onDestinationSelected!(2);
+        await settle('return to Agenda');
+        await tester.tap(find.byKey(const Key('create-agenda-project')));
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.enterText(
+          find.byKey(const Key('agenda-project-name')),
+          'Owner diagnostic first project',
+        );
+        await tester.tap(find.byKey(const Key('save-agenda-project')));
+        await settle('first project created, visible Agenda');
+        expect(events, ['projectChanges']);
+        expect(find.text('Bu günde Ajanda kaydı yok.'), findsOneWidget);
+        tester
+            .widget<NavigationBar>(find.byType(NavigationBar))
+            .onDestinationSelected!(0);
+        await settle('Dashboard after first project');
+        expect(
+          find.byKey(const Key('dashboard-project-header')),
+          findsOneWidget,
+        );
+        expect(
+          tester
+              .widget<ProjectDashboardPage>(find.byType(ProjectDashboardPage))
+              .session
+              .selectedProjectId,
+          isNotNull,
+        );
+        expect(tester.takeException(), isNull);
+      } finally {
+        await subscription.cancel();
+        await tester.pumpWidget(const SizedBox.shrink());
+        debugPrint('OWNER580 final trace=${coordinator.trace.join('\n')}');
+        // Keep this isolated temporary database available for diagnosis if an operation is pending.
+      }
+    });
+  });
 
   testWidgets('Dashboard quick actions open exact existing capture routes', (
     tester,
@@ -860,5 +1092,39 @@ class _ShellProjectAgenda extends FakeAgendaApplication {
     lastProjectCommand = command;
     if (projectCreateFailure case final failure?) throw failure;
     return super.createProject(command);
+  }
+}
+
+class _Owner580DiagnosticCoordinator extends MobileOperationCoordinator {
+  final pending = <int, String>{};
+  final trace = <String>[];
+  int generation = 0;
+
+  @override
+  Future<T> run<T>(Future<T> Function() operation) {
+    final id = ++generation;
+    final caller = StackTrace.current
+        .toString()
+        .split('\n')
+        .where(
+          (line) =>
+              line.contains('/application/') ||
+              line.contains('/features/') ||
+              line.contains('/app.dart'),
+        )
+        .take(5)
+        .join(' | ');
+    pending[id] = 'queued $caller';
+    trace.add('$id queued $caller');
+    return super.run(() async {
+      pending[id] = 'running $caller';
+      trace.add('$id running');
+      try {
+        return await operation();
+      } finally {
+        trace.add('$id completed');
+        pending.remove(id);
+      }
+    });
   }
 }

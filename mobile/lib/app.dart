@@ -282,6 +282,7 @@ class MobileShell extends StatefulWidget {
 class _MobileShellState extends State<MobileShell> {
   int _selectedIndex = 0;
   final Set<int> _visitedPrimaryTabs = {0};
+  final _inventoryKey = GlobalKey<InventoryPageState>();
   StreamSubscription<String>? _notificationTapSubscription;
   StreamSubscription<void>? _projectContextSubscription;
   late final ActiveProjectSession _activeProjectSession;
@@ -337,6 +338,10 @@ class _MobileShellState extends State<MobileShell> {
       final activeProjects = projects
           .where((project) => !project.isArchived)
           .toList(growable: false);
+      if (activeProjects.map((project) => project.id).toSet().length !=
+          activeProjects.length) {
+        throw StateError('Duplicate active project IDs');
+      }
       setState(() {
         _activeProjectOptions = activeProjects;
         _activeProjectNames = {
@@ -360,6 +365,7 @@ class _MobileShellState extends State<MobileShell> {
   bool get _showsActiveProjectIndicator =>
       _selectedIndex == 1 ||
       _selectedIndex == 2 ||
+      _selectedIndex == 3 ||
       _selectedIndex == 4 ||
       _selectedIndex == 5;
 
@@ -387,6 +393,19 @@ class _MobileShellState extends State<MobileShell> {
 
   void _reportRouteProjectSelection(String projectId) {
     unawaited(_adoptRouteProjectSelection(projectId));
+  }
+
+  void _selectAppBarProject(String projectId) {
+    if (!_activeProjectOptions.any((project) => project.id == projectId)) {
+      return;
+    }
+    if (_selectedIndex == 3) {
+      // Inventory reports back only after fresh project validation and its
+      // exact scoped load succeed. Failed/stale loads never retarget the shell.
+      unawaited(_inventoryKey.currentState?.selectProject(projectId));
+    } else {
+      _reportRouteProjectSelection(projectId);
+    }
   }
 
   void _reportAlbumProjectSelection(String projectId) {
@@ -773,7 +792,13 @@ class _MobileShellState extends State<MobileShell> {
       appBar: AppBar(
         title: Text(title),
         actions: _showsActiveProjectIndicator
-            ? [_ActiveProjectIndicator(label: _activeProjectLabel)]
+            ? [
+                ActiveProjectControl(
+                  label: _activeProjectLabel,
+                  projects: _activeProjectOptions,
+                  onSelected: _selectAppBarProject,
+                ),
+              ]
             : null,
       ),
       body: SafeArea(
@@ -805,9 +830,13 @@ class _MobileShellState extends State<MobileShell> {
             _buildVisitedPrimaryTab(
               3,
               () => InventoryPage(
+                key: _inventoryKey,
                 application: widget.bootstrap.inventory,
                 listProjects: widget.bootstrap.agenda.listProjects,
                 projectChanges: widget.bootstrap.agenda.projectChanges,
+                activeProjectId: _activeProjectSession.selectedProjectId,
+                isActive: _selectedIndex == 3,
+                onProjectSelected: _reportRouteProjectSelection,
               ),
             ),
             _buildVisitedPrimaryTab(
@@ -853,10 +882,56 @@ class _MobileShellState extends State<MobileShell> {
   }
 }
 
-class _ActiveProjectIndicator extends StatelessWidget {
-  const _ActiveProjectIndicator({required this.label});
+class ActiveProjectControl extends StatelessWidget {
+  const ActiveProjectControl({
+    required this.label,
+    required this.projects,
+    required this.onSelected,
+    super.key,
+  });
 
   final String label;
+  final List<MobileProject> projects;
+  final ValueChanged<String> onSelected;
+
+  Future<void> _choose(BuildContext context) async {
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('active-project-chooser'),
+        title: const Text('Proje seç'),
+        content: SizedBox(
+          width: 360,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(dialogContext).height * 0.5,
+            ),
+            child: projects.isEmpty
+                ? const Text('Seçilebilir aktif proje yok.')
+                : ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final project in projects)
+                        ListTile(
+                          key: ValueKey('active-project-option-${project.id}'),
+                          title: Text(project.name),
+                          onTap: () =>
+                              Navigator.of(dialogContext).pop(project.id),
+                        ),
+                    ],
+                  ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Vazgeç'),
+          ),
+        ],
+      ),
+    );
+    if (context.mounted && selected != null) onSelected(selected);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -868,19 +943,24 @@ class _ActiveProjectIndicator extends StatelessWidget {
           child: Semantics(
             container: true,
             label: 'Aktif proje: $label',
-            child: Chip(
+            child: ActionChip(
               key: const Key('active-project-indicator'),
+              onPressed: () => unawaited(_choose(context)),
               avatar: const Icon(Icons.apartment_rounded, size: 18),
               label: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 132),
+                constraints: BoxConstraints(
+                  maxWidth: (MediaQuery.sizeOf(context).width * 0.35)
+                      .clamp(64.0, 132.0)
+                      .toDouble(),
+                ),
                 child: Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              visualDensity: VisualDensity.compact,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.standard,
+              materialTapTargetSize: MaterialTapTargetSize.padded,
             ),
           ),
         ),

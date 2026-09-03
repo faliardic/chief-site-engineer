@@ -23,3 +23,13 @@
 - PASS: diff --check, allowlist/protected/invariant checks, finalize result, commit/push this branch and create one Draft stacked PR.
 - No broad suite/analyze, builds, device commands, owner-data access, Ready or merge. No parent/post-merge synchronization writes.
 - Manual acceptance remains owner-led and PENDING; no field-acceptance claim.
+
+## Legacy transition — 2026-09-03
+
+- Authority: https://github.com/faliardic/chief-site-engineer/issues/584#issuecomment-5522033988 and owner continuation; execution time budget: 30 minutes.
+- Resume the existing merge of master e349ae2250b643153bff482db26791e4a659bdf0 into head 438c51dd7e7d3700f0b32557ea81bd9c6a3c74d2; no abort/restart or history rewrite.
+- Resolve app.dart, global_active_project_context_widget_test.dart and widget_test.dart using master content, with zero final diff in those paths. Another conflict or remaining diff is a STOP condition.
+- Final net scope against master is the original six #584 paths only; earlier conditional test scope does not apply to this transition.
+- Run mobile_agenda_widget_test.dart once with --no-pub; PASS plus format/diff/scope checks authorizes a normal merge commit and push. Keep PR #585 Draft and its existing base; no Ready/merge.
+- Preserve Agenda commands/domain/storage/attachment/reminder/Concrete behavior and master #580/#581 behavior. No analyzer, full suite, build or device work is planned.
+- Current owner manual disposition is MT-584-001..006 DEFERRED (2026-09-02), not PASS or field acceptance. Earlier PENDING entries above describe the original execution.

@@ -90,6 +90,36 @@ class InventoryPageController extends ChangeNotifier {
   bool _initialized = false;
   bool _disposed = false;
   int _generation = 0;
+  bool _isActive = true;
+  bool _hasSharedContext = false;
+  String? _sharedProjectId;
+
+  Future<void> updateProjectContext({
+    required String? activeProjectId,
+    required bool isActive,
+  }) async {
+    final changed = !_hasSharedContext || _sharedProjectId != activeProjectId;
+    final becameActive = !_isActive && isActive;
+    _hasSharedContext = true;
+    _sharedProjectId = activeProjectId;
+    _isActive = isActive;
+    if (!_initialized || _disposed) return;
+    if (!isActive) {
+      _generation += 1;
+      _clearProjectSession();
+      loadStatus = InventoryPageLoadStatus.idle;
+      _notify();
+      return;
+    }
+    final alreadyLoaded =
+        selectedProjectId == activeProjectId &&
+        (loadStatus == InventoryPageLoadStatus.ready ||
+            loadStatus == InventoryPageLoadStatus.noSketch);
+    if (becameActive || (changed && !alreadyLoaded)) {
+      _clearProjectSession();
+      await refreshProjects();
+    }
+  }
 
   List<InventoryAssetProjection> get visibleAssets {
     final query = _normalizeName(search);
@@ -332,7 +362,18 @@ class InventoryPageController extends ChangeNotifier {
   }
 
   Future<void> refreshProjects() async {
+    if (!_isActive || _disposed) return;
     final generation = ++_generation;
+    await _loadProjects(
+      generation,
+      requestedId: _hasSharedContext ? _sharedProjectId : selectedProjectId,
+    );
+  }
+
+  Future<void> _loadProjects(
+    int generation, {
+    required String? requestedId,
+  }) async {
     loadStatus = InventoryPageLoadStatus.loadingProjects;
     lastErrorCode = null;
     _notify();
@@ -346,7 +387,7 @@ class InventoryPageController extends ChangeNotifier {
         }
       }
       projects = List<MobileProject>.unmodifiable(loaded);
-      final selectedId = selectedProjectId;
+      final selectedId = requestedId;
       if (selectedId != null) {
         final selected = _projectOrNull(selectedId);
         if (selected == null) {
@@ -356,6 +397,7 @@ class InventoryPageController extends ChangeNotifier {
           _notify();
           return;
         }
+        selectedProjectId = selected.id;
         selectedProjectName = selected.name;
         await _loadInventory(selected.id, generation);
         return;
@@ -366,7 +408,7 @@ class InventoryPageController extends ChangeNotifier {
         _notify();
         return;
       }
-      if (projects.length == 1) {
+      if (projects.length == 1 && !_hasSharedContext) {
         final selected = projects.single;
         _clearProjectSession();
         selectedProjectId = selected.id;
@@ -390,23 +432,24 @@ class InventoryPageController extends ChangeNotifier {
     }
   }
 
-  Future<void> selectProject(String projectId) async {
-    final selected = _projectOrNull(projectId);
-    if (selected == null) {
-      _clearProjectSession(keepSelection: true);
-      selectedProjectId = projectId;
-      loadStatus = InventoryPageLoadStatus.failed;
-      lastErrorCode = 'inventory_project_unavailable';
-      _notify();
-      return;
-    }
+  Future<bool> selectProject(String projectId) async {
+    if (!_isActive || _disposed) return false;
     final generation = ++_generation;
+    final previousId = selectedProjectId;
+    final previousName = selectedProjectName;
     _clearProjectSession();
-    selectedProjectId = selected.id;
-    selectedProjectName = selected.name;
-    loadStatus = InventoryPageLoadStatus.loadingInventory;
+    // Validate again: an AppBar option can become unavailable while its chooser
+    // is open. Never pass that stale ID to the Inventory application.
+    await _loadProjects(generation, requestedId: projectId);
+    if (!_isCurrent(generation)) return false;
+    if (loadStatus == InventoryPageLoadStatus.ready ||
+        loadStatus == InventoryPageLoadStatus.noSketch) {
+      return true;
+    }
+    selectedProjectId = previousId;
+    selectedProjectName = previousName;
     _notify();
-    await _loadInventory(selected.id, generation);
+    return false;
   }
 
   Future<void> reloadSelected() => refreshProjects();
@@ -767,7 +810,8 @@ class InventoryPageController extends ChangeNotifier {
     }
   }
 
-  bool _isCurrent(int generation) => !_disposed && generation == _generation;
+  bool _isCurrent(int generation) =>
+      !_disposed && _isActive && generation == _generation;
 
   void _notify() {
     if (!_disposed) notifyListeners();
@@ -787,6 +831,9 @@ class InventoryPage extends StatefulWidget {
     required this.application,
     required this.listProjects,
     required this.projectChanges,
+    this.activeProjectId,
+    this.isActive = true,
+    this.onProjectSelected,
     this.controller,
     this.sketchEditorLauncher,
     this.assetDetailLauncher,
@@ -796,6 +843,9 @@ class InventoryPage extends StatefulWidget {
   final InventoryApplicationPort application;
   final InventoryProjectLoader listProjects;
   final Stream<void> projectChanges;
+  final String? activeProjectId;
+  final bool isActive;
+  final ValueChanged<String>? onProjectSelected;
   final InventoryPageController? controller;
   final InventorySketchEditorLauncher? sketchEditorLauncher;
   final InventoryAssetDetailLauncher? assetDetailLauncher;
@@ -803,6 +853,8 @@ class InventoryPage extends StatefulWidget {
   @override
   State<InventoryPage> createState() => InventoryPageState();
 }
+
+enum _InventoryToolPanel { search, block, floor, filters }
 
 class InventoryPageState extends State<InventoryPage> {
   final _mapKey = GlobalKey<InventoryMapViewState>();
@@ -814,6 +866,11 @@ class InventoryPageState extends State<InventoryPage> {
   InventoryAssetDetailController? _activeDetailController;
   Completer<InventoryPlacementTarget?>? _targetSelectionCompleter;
   _InventoryDetailTargetRequest? _targetSelectionRequest;
+  int _projectFlowGeneration = 0;
+  String? _observedProjectId;
+  InventoryPageView? _observedView;
+  Timer? _controlsIdleTimer;
+  bool _controlsHidden = false;
 
   InventoryMapController? get mapController => _mapController;
   InventoryMapViewState? get mapViewState => _mapKey.currentState;
@@ -833,6 +890,12 @@ class InventoryPageState extends State<InventoryPage> {
           listProjects: widget.listProjects,
           projectChanges: widget.projectChanges,
         );
+    unawaited(
+      controller.updateProjectContext(
+        activeProjectId: widget.activeProjectId,
+        isActive: widget.isActive,
+      ),
+    );
     controller.addListener(_refresh);
     final attached = controller;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -847,17 +910,55 @@ class InventoryPageState extends State<InventoryPage> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller == widget.controller &&
         oldWidget.application == widget.application) {
+      if (oldWidget.activeProjectId != widget.activeProjectId ||
+          oldWidget.isActive != widget.isActive) {
+        _resetControlsVisibility();
+        _projectFlowGeneration += 1;
+        _cancelPendingDetailTargetSelection();
+        unawaited(
+          controller.updateProjectContext(
+            activeProjectId: widget.activeProjectId,
+            isActive: widget.isActive,
+          ),
+        );
+      }
       return;
     }
     controller.removeListener(_refresh);
     if (_ownsController) controller.dispose();
+    _resetControlsVisibility();
     _replaceMapController(null);
     _search.clear();
     _attachController();
   }
 
+  Future<void> selectProject(String projectId) async {
+    if (!widget.isActive) return;
+    _cancelPendingDetailTargetSelection();
+    final attached = controller;
+    final loaded = await attached.selectProject(projectId);
+    if (!mounted ||
+        !widget.isActive ||
+        !identical(controller, attached) ||
+        !loaded ||
+        controller.selectedProjectId != projectId) {
+      return;
+    }
+    widget.onProjectSelected?.call(projectId);
+  }
+
   void _refresh() {
     if (!mounted) return;
+    if (_observedProjectId != controller.selectedProjectId ||
+        _observedView != controller.view ||
+        controller.loadStatus != InventoryPageLoadStatus.ready) {
+      _resetControlsVisibility();
+    }
+    _observedView = controller.view;
+    if (_observedProjectId != controller.selectedProjectId) {
+      _observedProjectId = controller.selectedProjectId;
+      _projectFlowGeneration += 1;
+    }
     _cancelPendingTargetForProjectBoundary();
     if (_search.text != controller.search) {
       _search.value = TextEditingValue(
@@ -917,6 +1018,7 @@ class InventoryPageState extends State<InventoryPage> {
 
   @override
   void dispose() {
+    _controlsIdleTimer?.cancel();
     final pendingTarget = _targetSelectionCompleter;
     if (pendingTarget != null && !pendingTarget.isCompleted) {
       pendingTarget.complete(null);
@@ -930,54 +1032,52 @@ class InventoryPageState extends State<InventoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return SizedBox.expand(
       key: const Key('inventory-page'),
-      children: [
-        _buildProjectSelector(),
-        Expanded(child: _buildBody()),
-      ],
+      child: widget.isActive ? _buildBody() : const SizedBox.shrink(),
     );
   }
 
-  Widget _buildProjectSelector() {
-    final selectedId = controller.selectedProjectId;
-    final selectableValue =
-        controller.projects.any((project) => project.id == selectedId)
-        ? selectedId
-        : null;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-      child: DropdownButtonFormField<String>(
-        key: ValueKey(
-          'inventory-project-${selectableValue ?? 'none'}-'
-          '${controller.projects.length}',
-        ),
-        initialValue: selectableValue,
-        isExpanded: true,
-        decoration: const InputDecoration(
-          labelText: 'Aktif proje',
-          border: OutlineInputBorder(),
-        ),
-        hint: Text(
-          controller.projects.length > 1
-              ? 'Proje seçin'
-              : 'Aktif proje gerekli',
-        ),
-        items: [
-          for (final project in controller.projects)
-            DropdownMenuItem(value: project.id, child: Text(project.name)),
-        ],
-        onChanged: controller.projects.isEmpty
-            ? null
-            : (value) {
-                if (value != null && value != controller.selectedProjectId) {
-                  _cancelPendingDetailTargetSelection();
-                  unawaited(controller.selectProject(value));
-                }
-              },
-      ),
-    );
+  void _resetControlsVisibility() {
+    _controlsIdleTimer?.cancel();
+    _controlsIdleTimer = null;
+    _controlsHidden = false;
   }
+
+  void _onMapInteraction(bool active) {
+    _controlsIdleTimer?.cancel();
+    if (!mounted ||
+        !widget.isActive ||
+        controller.view != InventoryPageView.map) {
+      return;
+    }
+    if (active) {
+      if (!_controlsHidden) setState(() => _controlsHidden = true);
+      return;
+    }
+    final projectId = controller.selectedProjectId;
+    _controlsIdleTimer = Timer(const Duration(milliseconds: 600), () {
+      if (!mounted ||
+          !widget.isActive ||
+          controller.selectedProjectId != projectId ||
+          controller.view != InventoryPageView.map) {
+        return;
+      }
+      setState(() => _controlsHidden = false);
+    });
+  }
+
+  Widget _gestureAwareControl(Widget child) => IgnorePointer(
+    ignoring: _controlsHidden,
+    child: ExcludeSemantics(
+      excluding: _controlsHidden,
+      child: AnimatedOpacity(
+        opacity: _controlsHidden ? 0 : 1,
+        duration: const Duration(milliseconds: 150),
+        child: child,
+      ),
+    ),
+  );
 
   Widget _buildBody() => switch (controller.loadStatus) {
     InventoryPageLoadStatus.idle ||
@@ -1020,52 +1120,6 @@ class InventoryPageState extends State<InventoryPage> {
     final visible = controller.visibleAssets;
     return Column(
       children: [
-        if (controller.view != InventoryPageView.floors) _filters(),
-        if (controller.sketch != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: OutlinedButton.icon(
-                key: const Key('inventory-update-sketch'),
-                onPressed: () => unawaited(
-                  _openSketchEditor(InventorySketchLaunchIntent.editActive),
-                ),
-                icon: const Icon(Icons.edit_outlined),
-                label: const Text('Krokiyi güncelle'),
-              ),
-            ),
-          ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SegmentedButton<InventoryPageView>(
-              key: const Key('inventory-view-switch'),
-              segments: const [
-                ButtonSegment(
-                  value: InventoryPageView.map,
-                  icon: Icon(Icons.map_outlined),
-                  label: Text('Kroki'),
-                ),
-                ButtonSegment(
-                  value: InventoryPageView.floors,
-                  icon: Icon(Icons.layers_outlined),
-                  label: Text('Katlar'),
-                ),
-                ButtonSegment(
-                  value: InventoryPageView.list,
-                  icon: Icon(Icons.view_list_outlined),
-                  label: Text('Liste'),
-                ),
-              ],
-              selected: {controller.view},
-              onSelectionChanged: (selection) {
-                if (selection.isNotEmpty) controller.setView(selection.single);
-              },
-            ),
-          ),
-        ),
         if (controller.lastDiagnosticCode case final code?)
           MaterialBanner(
             key: const Key('inventory-typed-diagnostic'),
@@ -1078,117 +1132,353 @@ class InventoryPageState extends State<InventoryPage> {
             ],
           ),
         Expanded(
-          child: switch (controller.view) {
-            InventoryPageView.map => _map(),
-            InventoryPageView.floors => _floors(),
-            InventoryPageView.list => _list(visible),
-          },
+          child: LayoutBuilder(
+            builder: (context, constraints) => Stack(
+              children: [
+                Positioned.fill(
+                  child: switch (controller.view) {
+                    InventoryPageView.map => _map(),
+                    InventoryPageView.floors => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 56),
+                      child: _floors(),
+                    ),
+                    InventoryPageView.list => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 56),
+                      child: _list(visible),
+                    ),
+                  },
+                ),
+                Positioned(
+                  left: 8,
+                  top: 8,
+                  bottom: _targetSelectionRequest == null
+                      ? 64
+                      : constraints.maxHeight / 2,
+                  child: _gestureAwareControl(
+                    SingleChildScrollView(child: _viewRail()),
+                  ),
+                ),
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  bottom: _targetSelectionRequest == null
+                      ? 64
+                      : constraints.maxHeight / 2,
+                  child: _gestureAwareControl(
+                    SingleChildScrollView(child: _toolRail()),
+                  ),
+                ),
+                if (controller.view == InventoryPageView.map &&
+                    controller.sketch != null &&
+                    controller.sketchDiagnosticCode == null &&
+                    _targetSelectionRequest == null)
+                  Positioned(
+                    right: 8,
+                    bottom: 8,
+                    child: _gestureAwareControl(
+                      _edgeButton(
+                        key: const Key('inventory-update-sketch'),
+                        label: 'Krokiyi güncelle',
+                        icon: Icons.edit_outlined,
+                        onPressed: () => unawaited(
+                          _openSketchEditor(
+                            InventorySketchLaunchIntent.editActive,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ],
     );
   }
 
-  Widget _filters() => SingleChildScrollView(
-    scrollDirection: Axis.horizontal,
-    padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-    child: Row(
-      children: [
-        _blockSelector(),
-        const SizedBox(width: 8),
-        _floorSelector(),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 220,
-          child: TextField(
-            key: const Key('inventory-search'),
-            controller: _search,
-            onChanged: controller.setSearch,
-            decoration: const InputDecoration(
-              labelText: 'Ada göre ara',
-              prefixIcon: Icon(Icons.search),
-              border: OutlineInputBorder(),
+  Widget _edgeButton({
+    required Key key,
+    required String label,
+    required IconData icon,
+    required VoidCallback? onPressed,
+    bool? selected,
+    bool marked = false,
+  }) => Semantics(
+    key: key,
+    label: label,
+    button: true,
+    selected: selected,
+    enabled: onPressed != null,
+    onTap: onPressed,
+    child: ExcludeSemantics(
+      child: Tooltip(
+        message: label,
+        child: SizedBox.square(
+          dimension: 44,
+          child: IconButton.filledTonal(
+            onPressed: onPressed,
+            style: IconButton.styleFrom(
+              backgroundColor: selected == true
+                  ? Theme.of(context).colorScheme.primaryContainer
+                  : null,
+            ),
+            icon: Badge(
+              isLabelVisible: marked || selected == true,
+              child: Icon(icon),
             ),
           ),
         ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 190,
-          child: DropdownButtonFormField<InventoryCategory?>(
-            key: ValueKey(
-              'inventory-category-${controller.categoryFilter?.name ?? 'all'}',
-            ),
-            initialValue: controller.categoryFilter,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Kategori',
-              border: OutlineInputBorder(),
-            ),
-            items: [
-              const DropdownMenuItem(value: null, child: Text('Tümü')),
-              for (final value in InventoryCategory.values)
-                DropdownMenuItem(
-                  value: value,
-                  child: Text(
-                    inventoryCategoryLabel(value),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-            ],
-            onChanged: controller.setCategoryFilter,
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 170,
-          child: DropdownButtonFormField<InventoryAssetStatus?>(
-            key: ValueKey(
-              'inventory-status-${controller.statusFilter?.name ?? 'all'}',
-            ),
-            initialValue: controller.statusFilter,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Durum',
-              border: OutlineInputBorder(),
-            ),
-            items: [
-              const DropdownMenuItem(value: null, child: Text('Tümü')),
-              for (final value in InventoryAssetStatus.values)
-                DropdownMenuItem(
-                  value: value,
-                  child: Text(
-                    inventoryAssetStatusLabel(value),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-            ],
-            onChanged: controller.setStatusFilter,
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 140,
-          child: DropdownButtonFormField<InventoryArchiveFilter>(
-            key: ValueKey('inventory-archive-${controller.archiveFilter.name}'),
-            initialValue: controller.archiveFilter,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Kayıt',
-              border: OutlineInputBorder(),
-            ),
-            items: [
-              for (final value in InventoryArchiveFilter.values)
-                DropdownMenuItem(
-                  value: value,
-                  child: Text(value.label, overflow: TextOverflow.ellipsis),
-                ),
-            ],
-            onChanged: (value) {
-              if (value != null) controller.setArchiveFilter(value);
-            },
-          ),
-        ),
-      ],
+      ),
     ),
+  );
+
+  Widget _viewRail() => Column(
+    key: const Key('inventory-view-switch'),
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      for (final view in InventoryPageView.values)
+        _edgeButton(
+          key: ValueKey('inventory-view-${view.name}'),
+          label: switch (view) {
+            InventoryPageView.map => 'Kroki',
+            InventoryPageView.floors => 'Katlar',
+            InventoryPageView.list => 'Liste',
+          },
+          icon: switch (view) {
+            InventoryPageView.map => Icons.map_outlined,
+            InventoryPageView.floors => Icons.layers_outlined,
+            InventoryPageView.list => Icons.view_list_outlined,
+          },
+          selected: controller.view == view,
+          onPressed: () => controller.setView(view),
+        ),
+    ],
+  );
+
+  Widget _toolRail() {
+    final block = controller.activeBlocks
+        .where((block) => block.id == controller.selectedBlockId)
+        .firstOrNull;
+    final floor = controller.selectedBlockFloors
+        .where((floor) => floor.id == controller.selectedFloorId)
+        .firstOrNull;
+    return Column(
+      key: const Key('inventory-right-rail'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Column(
+          key: const Key('inventory-context-tools'),
+          children: [
+            _edgeButton(
+              key: const Key('inventory-search-tool'),
+              label: controller.search.isEmpty
+                  ? 'Ada göre ara'
+                  : 'Ara: ${controller.search}',
+              icon: Icons.search,
+              marked: controller.search.isNotEmpty,
+              onPressed: () => _showToolPanel(_InventoryToolPanel.search),
+            ),
+            _edgeButton(
+              key: const Key('inventory-block-tool'),
+              label: 'Blok: ${block?.displayName ?? 'Tümü'}',
+              icon: Icons.domain_outlined,
+              marked: block != null,
+              onPressed: () => _showToolPanel(_InventoryToolPanel.block),
+            ),
+            _edgeButton(
+              key: const Key('inventory-floor-tool'),
+              label: block == null
+                  ? 'Kat: Önce blok seçin'
+                  : 'Kat: ${floor?.displayName ?? 'Tüm katlar'}',
+              icon: Icons.layers_outlined,
+              marked: floor != null,
+              onPressed: block == null
+                  ? null
+                  : () => _showToolPanel(_InventoryToolPanel.floor),
+            ),
+            _edgeButton(
+              key: const Key('inventory-filters-tool'),
+              label:
+                  'Filtreler: ${controller.categoryFilter == null ? 'Tümü' : inventoryCategoryLabel(controller.categoryFilter!)}, ${controller.statusFilter == null ? 'Tümü' : inventoryAssetStatusLabel(controller.statusFilter!)}, ${controller.archiveFilter.label}',
+              icon: Icons.filter_alt_outlined,
+              marked:
+                  controller.categoryFilter != null ||
+                  controller.statusFilter != null ||
+                  controller.archiveFilter != InventoryArchiveFilter.active,
+              onPressed: () => _showToolPanel(_InventoryToolPanel.filters),
+            ),
+          ],
+        ),
+        if (controller.view == InventoryPageView.map) ...[
+          const SizedBox(height: 16),
+          Column(
+            key: const Key('inventory-map-tools'),
+            children: [
+              _edgeButton(
+                key: const Key('inventory-map-zoom-in'),
+                label: 'Yaklaştır',
+                icon: Icons.add,
+                onPressed: () => _mapKey.currentState?.zoomIn(),
+              ),
+              _edgeButton(
+                key: const Key('inventory-map-zoom-out'),
+                label: 'Uzaklaştır',
+                icon: Icons.remove,
+                onPressed: () => _mapKey.currentState?.zoomOut(),
+              ),
+              _edgeButton(
+                key: const Key('inventory-map-fit'),
+                label: 'Tamamını göster',
+                icon: Icons.fit_screen,
+                onPressed: () => _mapKey.currentState?.fitCanvas(),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _showToolPanel(_InventoryToolPanel panel) async {
+    final attached = controller;
+    final projectId = controller.selectedProjectId;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('inventory-tool-panel'),
+        title: Text(switch (panel) {
+          _InventoryToolPanel.search => 'Ada göre ara',
+          _InventoryToolPanel.block => 'Blok',
+          _InventoryToolPanel.floor => 'Kat',
+          _InventoryToolPanel.filters => 'Filtreler',
+        }),
+        content: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(dialogContext).height * .55,
+          ),
+          child: SizedBox(
+            width: 320,
+            child: SingleChildScrollView(
+              child: AnimatedBuilder(
+                animation: attached,
+                builder: (context, _) {
+                  if (!mounted ||
+                      !widget.isActive ||
+                      !identical(controller, attached) ||
+                      controller.selectedProjectId != projectId) {
+                    return const Text('Proje bağlamı değişti. Paneli kapatın.');
+                  }
+                  return switch (panel) {
+                    _InventoryToolPanel.search => TextField(
+                      key: const Key('inventory-search'),
+                      controller: _search,
+                      onChanged: controller.setSearch,
+                      decoration: const InputDecoration(
+                        labelText: 'Ada göre ara',
+                        prefixIcon: Icon(Icons.search),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    _InventoryToolPanel.block => _blockSelector(),
+                    _InventoryToolPanel.floor => _floorSelector(),
+                    _InventoryToolPanel.filters => _filters(),
+                  };
+                },
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Kapat'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _filters() => Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      SizedBox(
+        width: 190,
+        child: DropdownButtonFormField<InventoryCategory?>(
+          key: ValueKey(
+            'inventory-category-${controller.categoryFilter?.name ?? 'all'}',
+          ),
+          initialValue: controller.categoryFilter,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Kategori',
+            border: OutlineInputBorder(),
+          ),
+          items: [
+            const DropdownMenuItem(value: null, child: Text('Tümü')),
+            for (final value in InventoryCategory.values)
+              DropdownMenuItem(
+                value: value,
+                child: Text(
+                  inventoryCategoryLabel(value),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+          onChanged: controller.setCategoryFilter,
+        ),
+      ),
+      const SizedBox(height: 12),
+      SizedBox(
+        width: 170,
+        child: DropdownButtonFormField<InventoryAssetStatus?>(
+          key: ValueKey(
+            'inventory-status-${controller.statusFilter?.name ?? 'all'}',
+          ),
+          initialValue: controller.statusFilter,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Durum',
+            border: OutlineInputBorder(),
+          ),
+          items: [
+            const DropdownMenuItem(value: null, child: Text('Tümü')),
+            for (final value in InventoryAssetStatus.values)
+              DropdownMenuItem(
+                value: value,
+                child: Text(
+                  inventoryAssetStatusLabel(value),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+          onChanged: controller.setStatusFilter,
+        ),
+      ),
+      const SizedBox(height: 12),
+      SizedBox(
+        width: 140,
+        child: DropdownButtonFormField<InventoryArchiveFilter>(
+          key: ValueKey('inventory-archive-${controller.archiveFilter.name}'),
+          initialValue: controller.archiveFilter,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Kayıt',
+            border: OutlineInputBorder(),
+          ),
+          items: [
+            for (final value in InventoryArchiveFilter.values)
+              DropdownMenuItem(
+                value: value,
+                child: Text(value.label, overflow: TextOverflow.ellipsis),
+              ),
+          ],
+          onChanged: (value) {
+            if (value != null) controller.setArchiveFilter(value);
+          },
+        ),
+      ),
+    ],
   );
 
   Widget _blockSelector() {
@@ -1293,6 +1583,7 @@ class InventoryPageState extends State<InventoryPage> {
             autoLoad: false,
             onCreateTarget: _openQuickCreate,
             onOpenAsset: _openAssetDetail,
+            onInteractionChanged: _onMapInteraction,
             onSelectTarget: _targetSelectionRequest == null
                 ? null
                 : _acceptDetailTarget,
@@ -1362,34 +1653,6 @@ class InventoryPageState extends State<InventoryPage> {
               ),
             ),
           ),
-        Positioned(
-          right: 12,
-          top: 12,
-          child: Column(
-            children: [
-              IconButton.filledTonal(
-                key: const Key('inventory-map-zoom-in'),
-                tooltip: 'Yaklaştır',
-                onPressed: () => _mapKey.currentState?.zoomIn(),
-                icon: const Icon(Icons.add),
-              ),
-              const SizedBox(height: 4),
-              IconButton.filledTonal(
-                key: const Key('inventory-map-zoom-out'),
-                tooltip: 'Uzaklaştır',
-                onPressed: () => _mapKey.currentState?.zoomOut(),
-                icon: const Icon(Icons.remove),
-              ),
-              const SizedBox(height: 4),
-              IconButton.filledTonal(
-                key: const Key('inventory-map-fit'),
-                tooltip: 'Tamamını göster',
-                onPressed: () => _mapKey.currentState?.fitCanvas(),
-                icon: const Icon(Icons.fit_screen),
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }
@@ -1521,7 +1784,8 @@ class InventoryPageState extends State<InventoryPage> {
     InventorySketchLaunchIntent launchIntent,
   ) async {
     final projectId = controller.selectedProjectId;
-    if (projectId == null) return;
+    if (projectId == null || !widget.isActive) return;
+    final flowGeneration = _projectFlowGeneration;
     final result = widget.sketchEditorLauncher != null
         ? await widget.sketchEditorLauncher!(context, projectId, launchIntent)
         : await Navigator.of(context).push<bool>(
@@ -1535,6 +1799,8 @@ class InventoryPageState extends State<InventoryPage> {
           );
     if (result == true &&
         mounted &&
+        widget.isActive &&
+        flowGeneration == _projectFlowGeneration &&
         controller.selectedProjectId == projectId) {
       await controller.reloadSelected();
     }
@@ -1546,7 +1812,8 @@ class InventoryPageState extends State<InventoryPage> {
     String? spatialContextLabel,
   }) async {
     final projectId = controller.selectedProjectId;
-    if (projectId == null) return;
+    if (projectId == null || !widget.isActive) return;
+    final flowGeneration = _projectFlowGeneration;
     final quickController = InventoryAssetQuickCreateController(
       application: widget.application,
       projectId: projectId,
@@ -1564,8 +1831,14 @@ class InventoryPageState extends State<InventoryPage> {
       ),
     );
     quickController.dispose();
+    if (!mounted ||
+        !widget.isActive ||
+        flowGeneration != _projectFlowGeneration ||
+        controller.selectedProjectId != projectId) {
+      return;
+    }
     _mapController?.clearCreateTarget();
-    if (createdId != null && mounted) await _openAssetDetail(createdId);
+    if (createdId != null) await _openAssetDetail(createdId);
   }
 
   Future<void> _openFloorQuickCreate(String blockId, String floorId) async {
@@ -1605,7 +1878,11 @@ class InventoryPageState extends State<InventoryPage> {
 
   Future<void> _openAssetDetail(String assetId) async {
     final projectId = controller.selectedProjectId;
-    if (projectId == null) return;
+    if (projectId == null || !widget.isActive) return;
+    final flowGeneration = _projectFlowGeneration;
+    bool isCurrent() =>
+        flowGeneration == _projectFlowGeneration &&
+        _canContinueDetailFlow(projectId);
     final launcher = widget.assetDetailLauncher;
     if (launcher != null) {
       await launcher(context, projectId, assetId);
@@ -1617,13 +1894,13 @@ class InventoryPageState extends State<InventoryPage> {
       projectId: projectId,
       assetId: assetId,
       reloadMapCanonical: controller.reloadSelected,
-      isProjectContextCurrent: () => _canContinueDetailFlow(projectId),
+      isProjectContextCurrent: isCurrent,
     );
     _activeDetailController = detailController;
     try {
-      while (_canContinueDetailFlow(projectId)) {
+      while (isCurrent()) {
         final request = await _showAssetDetail(detailController);
-        if (!_canContinueDetailFlow(projectId) || request == null) {
+        if (!isCurrent() || request == null) {
           break;
         }
         await _selectTargetForDetail(detailController, request);
@@ -1640,7 +1917,7 @@ class InventoryPageState extends State<InventoryPage> {
       _targetSelectionRequest = null;
       detailController.dispose();
     }
-    if (_canContinueDetailFlow(projectId)) {
+    if (isCurrent()) {
       await controller.reloadSelected();
     }
   }
@@ -1775,6 +2052,7 @@ class InventoryPageState extends State<InventoryPage> {
 
   bool _canContinueDetailFlow(String projectId) =>
       mounted &&
+      widget.isActive &&
       controller.selectedProjectId == projectId &&
       !(controller.loadStatus == InventoryPageLoadStatus.failed &&
           controller.lastErrorCode == 'inventory_project_unavailable');
