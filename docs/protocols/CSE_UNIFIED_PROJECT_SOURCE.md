@@ -556,13 +556,13 @@ Sabit yerel yol, SHA, schema, version, aktif Issue veya sıradaki iş bu belgede
 
 - Güncel GitHub durumunu inceler.
 - Uygun risk şeridini ve tek güvenli sonraki adımı belirler.
-- Codex'e dar, kesin ve en fazla beş dakikalık görev verir.
+- Codex'e dar ve kesin görev verir; her handoff'ta kapsam/risk, beklenen validation/build/device işi ve blocker'a göre açık `Execution time budget: <süre>` atar.
 - Kanıtı ve diff'i owner açısından sade biçimde raporlar.
 
 ### Codex
 
 - Yalnız açıkça yetkilendirilen mikro-adımı uygular.
-- Tek işlemde beş dakikalık hard stop'a uyar.
+- Her görevde ChatGPT'nin handoff'ta açıkça verdiği execution time budget'a uyar.
 - Repository-local terminal, automated test, analyzer ve build/APK hazırlığını yetkili görev kapsamında çalıştırır. Emulator/ADB/device execution yalnız exact package/device/data-safety owner delegasyonuyla yapılır; Fatih'e terminal komutu verilmez.
 - Beklenmeyen değişiklik, izin veya kapsam çelişkisinde fail-closed durur.
 - Ready, merge, Issue close veya branch silme yapmaz.
@@ -573,7 +573,7 @@ Sabit yerel yol, SHA, schema, version, aktif Issue veya sıradaki iş bu belgede
 
 Codex yalnız yerel dosya değişikliği, statik kontrol, commit/push veya başka mekanik repository işlemi gerektiğinde çağrılır. Planlama, GitHub incelemesi, ürün kararı ve salt-okunur analiz için yeni Codex turu zorunlu değildir.
 
-Bir görev beş dakikada güvenle tamamlanamayacaksa başlamadan mikro-adımlara ayrılır. Süre dolduğunda kapsam genişletilmez, retry zinciri başlatılmaz ve gerçekleşen durum dürüstçe raporlanır.
+Her Codex handoff'u ChatGPT'nin göreve özel belirlediği açık execution time budget'ı taşır; global sabit süre varsayılanı yoktur. Yetkili inceleme, edit/fix, focused validation ve commit/push bu bütçeye sığıyorsa tek adımda birleştirilir. Bütçe dolduğunda Codex durur, mevcut çalışmayı güvenle korur; kapsam genişletilmez, yeni yaklaşım veya retry zinciri başlatılmaz, exact blocker ve kalan tek aksiyon raporlanır. Süre bütçesi CRITICAL validation ve güvenlik kapılarını değiştirmez.
 
 ---
 
@@ -606,14 +606,16 @@ Birden fazla dosyaya yayılan veya inceleme değeri taşıyan işte tek kısa ö
 
 Schema, migration, backup, veri bütünlüğü, güvenlik, geniş mimari veya release-critical işlerde Issue, bağımsız branch, Draft PR, provenance ve owner review kapıları korunur.
 
-Ortak akış:
+Non-CRITICAL one-pass akışı:
 
-1. Güncel durum gözlenir.
-2. Owner kapsamı yetkilendirir.
-3. Codex tek mikro-adımı uygular ve statik kanıtı verir.
-4. Codex minimum yeterli automated doğrulamayı çalıştırır; Fatih manuel ürün/device kabulünü değerlendirir.
-5. PASS sonrası commit/push ayrı kısa işlem olarak yapılır.
-6. Ready/merge/close yalnız ayrı açık yetkiyle ilerler.
+1. Güncel durum ve owner'ın yetkilendirdiği kapsam doğrulanır; handoff'ta açık execution time budget bulunur.
+2. Mevcut doğrudan repro kanıtı kullanılır veya bir kez reproduce edilir; fix/implement yapılır.
+3. Codex statik kapsam kontrolünü ve tek focused automated validation'ı yapar; analyzer yalnız material ihtiyaçta eklenir.
+4. Manuel/device kabul yalnız runtime'a özgü davranışta veya owner açıkça istediğinde yapılır; gereken kabulde Fatih PASS/FAIL kararını verir.
+5. Automated PASS ve gerekiyorsa Fatih PASS sonrası yetkili commit/push aynı execution içinde yapılabilir; kabul gerekmiyorsa manuel PASS beklenmez.
+6. Ready/merge/close yalnız ayrı açık owner yetkisiyle ilerler.
+
+CRITICAL işlerde Issue'ya özel validation, owner kabulü ve publication kapıları aynen uygulanır.
 
 FAIL sonucunda yeni özelliğe geçilmez; yalnız exact hataya yönelik dar düzeltme ele alınır.
 
@@ -647,7 +649,9 @@ Codex automated execution yanında şu statik kontrolleri yapar:
 - protected drift;
 - riskli işlerde schema/backup/version değişimi.
 
-Codex tesliminde automated execution sonuçları ve Fatih için yalnız kısa manuel kabul adımları bulunur. PASS bildirilmeden commit/push yapılmaz. CI varsa ek güvenlik ağıdır; owner doğrulamasının yerine geçmez.
+Non-CRITICAL işte doğrudan, tekrarlanabilir owner/device repro kanıtı ve yeterince belirlenmiş source root cause varsa deterministic automated FAIL önkoşulu aranmaz. Owner/device kanıtı, davranışı temsil edemeyen yapay harness'ten üstündür; widget/fake PASS cihaz FAIL'ini geçersiz kılmaz. Bir başarısız repro denemesinden sonra source/runtime diagnosis veya mevcut en güçlü kanıta geçilir. Kararı değiştirmeyen diagnostic/test döngüleri ve değişmeyen source üzerinde geçen testi tekrarlamak yasaktır.
+
+Non-CRITICAL teslimde tek focused automated validation sonucu ve yalnız gerekiyorsa Fatih için kısa manuel/device kabul adımı bulunur. Non-CRITICAL işte bu kabul gerekmiyorsa gerekçesiyle `GEREKMİYOR` kaydedilir; automated PASS sonrası yetkili commit/push manuel PASS beklemez. Manuel/device kabul gerekiyorsa Fatih PASS/FAIL kapısı korunur; gerekli kontrol FAIL/PENDING ise commit/push yapılmaz. CRITICAL işlerde owner PASS ve Issue'ya özel validation/publication kapıları korunur. Ready/merge/release yine ayrı owner yetkisi ister. CI varsa ek güvenlik ağıdır; gereken owner doğrulamasının yerine geçmez.
 
 ---
 
@@ -667,7 +671,7 @@ Kayıtlar gerçekleşmemiş işi tamamlanmış gösteremez ve güncel GitHub dur
 ## 24. Branch, PR ve Merge
 
 - Stacked branch/PR oluşturulmaz.
-- FAST iş, owner PASS sonrasında doğrudan `master`a commit/push edilebilir.
+- FAST iş, Codex automated PASS ve yalnız gerekiyorsa Fatih manuel/device PASS sonrasında doğrudan `master`a commit/push edilebilir.
 - STANDARD tek bağımsız kısa branch/PR kullanır.
 - CRITICAL Draft PR, review ve provenance kapılarını kullanır.
 - Draft durumu merge yetkisi değildir.
@@ -721,7 +725,7 @@ Aşağıdaki tarihsel hükümler artık execution kuralı değildir:
 
 - her işte zorunlu Issue → branch → Draft PR zinciri;
 - test/analyzer/build execution'ının Fatih'e atanması;
-- beş dakikayı aşan sabit execution/test bütçeleri;
+- göreve özel ChatGPT bütçesi yerine sabit/global execution/test limitleri;
 - her adımda zorunlu `.cse` kaydı;
 - sabit aralıkta podcast veya learning dosyası;
 - her merge sonrası ayrı senkronizasyon turu;
@@ -762,17 +766,20 @@ Yakala
 -> Günlüğe al
 ```
 
-Execution döngüsü:
+Non-CRITICAL execution döngüsü:
 
 ```text
-Güncel durumu gözle
--> owner kapsamı yetkilendirir
--> Codex en fazla 5 dakikalık mikro-adımı uygular
--> Codex automated doğrulamayı çalıştırır
--> Fatih manuel ürün/device kabulünü verir
--> PASS sonrası kısa commit/push
--> gerekiyorsa ayrı owner onayıyla Ready/merge
+Güncel durumu ve owner'ın yetkilendirdiği kapsamı doğrula
+-> ChatGPT her handoff'a explicit execution time budget atar
+-> reproduce once (mevcut owner/device kanıtı yeterli olabilir)
+-> fix / implement
+-> one focused automated validation
+-> only-needed manual/device check (Fatih PASS/FAIL)
+-> automated PASS ve gerekiyorsa Fatih PASS sonrası yetkili commit/push
+-> owner merge gate (ayrı Ready/merge yetkisi)
 ```
+
+CRITICAL işlerde Issue'ya özel validation, kabul ve publication kapıları aynen korunur.
 
 Ürün ve veri güvenliği değişmez; execution yükü riskle orantılı tutulur.
 

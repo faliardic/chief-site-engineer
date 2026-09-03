@@ -56,7 +56,7 @@ Görünür mismatch varsa fail-closed durulur. Runtime metadata görünmüyorsa 
 - Tek executor varsayılandır.
 - Multi-agent/Ultra yalnız owner açıkça isterse ve bağımsız alt işler gerçekten paralel yürüyebiliyorsa kullanılır.
 - `pro`, model veya reasoning seviyesi değildir.
-- Reasoning seçimi 5 dakikalık Codex execution sınırını kaldırmaz.
+- Reasoning seçimi, her Codex handoff'unda ChatGPT'nin kapsam/risk, beklenen validation/build/device işi ve blocker'a göre açıkça verdiği execution time budget'ı kaldırmaz; global sabit süre varsayılanı yoktur.
 
 ## 5. Ana karar
 

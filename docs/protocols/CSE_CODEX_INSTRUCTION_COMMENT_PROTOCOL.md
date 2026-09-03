@@ -14,7 +14,7 @@ Chat içindeki kısa görev yeterlidir:
 Goal:
 Allowed paths:
 Do not change:
-5-minute stop:
+Execution time budget: <ChatGPT'nin bu görev için verdiği açık süre; her Codex handoff'unda zorunlu>
 Fatih validation:
 Commit/push boundary:
 ```
@@ -37,7 +37,7 @@ Base/branch:
 Goal:
 Allowed paths:
 Protected contracts:
-5-minute micro step:
+Execution time budget: <ChatGPT'nin bu görev için verdiği açık süre; her Codex handoff'unda zorunlu>
 Fatih validation:
 Stop conditions:
 Publication boundary:
