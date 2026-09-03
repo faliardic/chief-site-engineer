@@ -1,4 +1,4 @@
-# CSE Owner Communication Standard — Concise v3
+# CSE Owner Communication Standard — Concise v4
 
 **Geçerlilik tarihi:** 2026-09-03
 
@@ -45,6 +45,16 @@ Senden ne gerekiyor?
 
 Başlıkların tamamı mekanik biçimde kullanılmak zorunda değildir; owner teknik ayrıntıyı okumadan durumu anlamalıdır.
 
+Merge kararında ayrıca incelenen PR body'ye göre Issue disposition açıklanır:
+
+```text
+Bu merge ile:
+- #XXX otomatik kapanacak;
+- #YYY yalnız referans olarak kalacak ve açık kalacak.
+```
+
+Kapanacak Issue yoksa bu açıkça belirtilir. Belirsiz veya yanlış `Closes`/`Refs` kullanımı varsa merge öncesinde düzeltilir.
+
 ## 3. Teknik terimlerin tercümesi
 
 Teknik terim gerekiyorsa pratik anlamı hemen söylenir.
@@ -55,7 +65,9 @@ Teknik terim gerekiyorsa pratik anlamı hemen söylenir.
 - `fail-closed`: belirsizlikte güvenli biçimde durduk;
 - `R4/CRITICAL review`: veri veya yayın riski nedeniyle derin inceleme;
 - `CI failed`: otomatik kontrol geçmedi;
-- `allowlist`: değiştirilebilecek dosyalar.
+- `allowlist`: değiştirilebilecek dosyalar;
+- `Closes #...`: PR merge olduğunda belirtilen tekil Issue otomatik kapanacak;
+- `Refs #...`: PR Issue'yu ilişkilendirir ancak açık bırakır.
 
 ## 4. Blocker standardı
 
@@ -80,7 +92,7 @@ verilir.
 
 Salt YAML owner cevabı olamaz. Codex completion metni owner'a doğrudan kopyalanmaz; ChatGPT ürün diline çevirir.
 
-## 6. Sıradaki aksiyon
+## 6. Sıradaki aksiyon, publication ve Issue closure
 
 Her sonuçta yalnız owner'ın değil, sıradaki işi kimin yapacağı da açık olmalıdır:
 
@@ -103,6 +115,8 @@ Fatih'e yalnız gerçekten owner kararı veya manuel/device kabul gerektiren aks
 
 Her Codex handoff'unda açık süre bütçesi zorunludur; global sabit süre kullanılmaz. Bütçe dolarsa Codex çalışmayı güvenle koruyup durur, yeni yaklaşım başlatmadan exact blocker ve kalan tek aksiyonu bildirir. CRITICAL ve owner Ready/merge/release kapıları değişmez.
 
+Tek amaçlı implementation Issue'su incelenen PR body'de açıkça `Closes #...` ile belirtilmişse owner'ın `merge et` kararı o otomatik kapanışı da kapsar; ikinci bir Issue closure onayı istenmez. Parent, umbrella, manuel acceptance, release veya devam işi `Refs #...` ile açık kalır. PR body disposition'ı belirsizse merge edilmez.
+
 ## 7. Resume
 
 Owner `devam`, `son durum` veya `neden durdu` dediğinde:
@@ -113,4 +127,4 @@ Owner `devam`, `son durum` veya `neden durdu` dediğinde:
 
 ## 8. Ana karar
 
-> Küçük iş küçük anlatılır. Büyük riskte gereken ayrıntı korunur. Owner her zaman projenin nerede olduğunu ve kendisinden ne beklendiğini teknik YAML okumadan anlayabilir.
+> Küçük iş küçük anlatılır. Büyük riskte gereken ayrıntı korunur. Owner her zaman projenin nerede olduğunu, merge ile hangi Issue'nun kapanacağını ve kendisinden ne beklendiğini teknik YAML okumadan anlayabilir.

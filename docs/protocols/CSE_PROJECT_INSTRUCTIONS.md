@@ -1,7 +1,7 @@
 # CSE Proje Talimatları — Git ve Veri Güvenliği
 
 **Belge türü:** Bağlayıcı güvenlik ve repository protokolü
-**Güncelleme tarihi:** 2026-09-02
+**Güncelleme tarihi:** 2026-09-03
 
 Bu belge günlük workflow'u tekrar etmez. Günlük lane, süre, test sahipliği ve publication için `AGENTS.md` ile `CSE_WORKFLOW_ACCELERATION_PROTOCOL.md` uygulanır. Bu belge kritik Git, kullanıcı verisi ve repository güvenliği için yetkilidir.
 
@@ -55,7 +55,7 @@ CSE için otomatik alternatif clone/workspace production execution kaynağı yap
 
 Documentation-only policy/source güncellemesi, owner açıkça isterse authenticated GitHub yüzeyinde ayrı branch üzerinden yapılabilir. Bu istisna production kodu, test, schema, artifact veya kullanıcı verisi düzenleme yetkisi vermez. Sonraki local işten önce resmî repository `--ff-only` senkronlanır.
 
-## 4. Git güvenliği
+## 4. Git güvenliği ve Issue disposition
 
 - Force-push yoktur.
 - Destructive reset/clean/stash yoktur.
@@ -64,6 +64,10 @@ Documentation-only policy/source güncellemesi, owner açıkça isterse authenti
 - Hard-delete ve branch deletion otomatik yapılmaz.
 - Ignored ZIP, backup, report veya kullanıcı artifact'larına dokunulmaz.
 - Merge sonrası local master bir sonraki local değişiklikten önce `git pull --ff-only` ile senkronlanır.
+- Issue closure owner-controlled kalır.
+- Tek amaçlı ve tamamen tamamlanmış bir implementation Issue'su için PR body açıkça `Closes #...` kullanıyorsa, owner'ın o PR'a verdiği merge onayı otomatik Issue kapanışını da kapsar.
+- Parent, umbrella, manuel acceptance, release veya devam kapsamı bulunan Issue'lar `Refs #...` ile açık bırakılır.
+- Issue'nun tamamen tamamlandığı belirsizse `Refs` kullanılır; otomatik kapanış yapılmaz.
 
 ## 5. Kullanıcı verisi ve cihaz güvenliği
 
@@ -118,6 +122,7 @@ Bu belge bütün görevlerde full suite veya `.cse` ledger zorunlu kılmaz.
 - kendi yetkisindeki mevcut owner-approved koordinasyonu ayrıca `devam` istemeden yürütür;
 - kullanıcıya ürün anlamını açıklar ve her teslim edilen sonucu `Sıradaki aksiyon — <aktör>: <tek uygulanabilir talimat>.` satırıyla bitirir;
 - gereksiz Issue/comment/PR/metadata üretmez;
+- merge öncesinde incelenen PR body'ye göre hangi Issue'ların kapanacağını ve hangilerinin açık kalacağını açıklar;
 - kritik review ve merge kararını owner'a taşır.
 
 ### Fatih
@@ -126,8 +131,9 @@ Bu belge bütün görevlerde full suite veya `.cse` ledger zorunlu kılmaz.
 - yalnız manuel ürün/device kabulünü ve nihai davranış PASS/FAIL kararını verir; terminal komutu çalıştırmaz;
 - mekanik emulator/ADB/device execution'ını yalnız exact güvenlik sınırlarıyla Codex'e açıkça devredebilir;
 - PASS/FAIL ve ürün kabulü kararını kendisi verir;
-- Ready, merge, release ve destructive işlemleri açıkça onaylar.
+- Ready, merge, release ve destructive işlemleri açıkça onaylar;
+- incelenen PR body'de açıkça `Closes` ile belirtilen tekil Issue closure'ı, ilgili merge onayıyla birlikte yetkilendirebilir.
 
 ## 9. Ana karar
 
-> Repository ve kullanıcı verisi güvenliği değişmez. Günlük çalışma töreni bu belgeye değil `AGENTS.md` içindeki risk-temelli lane'e göre yürür; ağır süreç yalnız gerçek kritik sözleşmelerde uygulanır.
+> Repository ve kullanıcı verisi güvenliği değişmez. Günlük çalışma töreni bu belgeye değil `AGENTS.md` içindeki risk-temelli lane'e göre yürür; publication current GitHub ruleset'inin izin verdiği en hafif yolla yapılır ve Issue closure yalnız açık disposition ile owner kontrolünde kalır. Ağır süreç yalnız gerçek kritik sözleşmelerde uygulanır.
