@@ -173,6 +173,12 @@ abstract interface class AgendaApplication {
   Future<List<AppendOnlyEvent>> listReminderEvents(String reminderId);
 }
 
+/// Shares Agenda's data-root queue with readers that do not own a coordinator.
+/// Services already using this queue must not be enqueued a second time.
+abstract interface class CoordinatedAgendaApplication {
+  MobileOperationCoordinator get coordinator;
+}
+
 abstract interface class AgendaPhotoBatchApplication {
   Future<AgendaLogDetail> attachAgendaPhotos(AttachAgendaPhotosCommand command);
 }
@@ -275,6 +281,7 @@ typedef ReminderTransactionHook =
 class SqliteAgendaApplication
     implements
         AgendaApplication,
+        CoordinatedAgendaApplication,
         AgendaPhotoBatchApplication,
         AgendaPhoneCallCaptureApplication,
         AgendaPhotoExportApplication,
@@ -307,6 +314,7 @@ class SqliteAgendaApplication
   final String databasePath;
   final DatabaseFactory databaseFactory;
   final UtcClock clock;
+  @override
   final MobileOperationCoordinator coordinator;
   final ReminderNotificationGateway notificationGateway;
   final AgendaAttachmentStore attachmentStore;
