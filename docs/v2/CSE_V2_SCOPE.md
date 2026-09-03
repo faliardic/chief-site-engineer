@@ -3,7 +3,7 @@
 **Belge türü:** Güncel ürün yürütme kapsamı
 **Durum:** Kanonik V2 kapsam ve sıra kaynağı
 **Tarih:** 3 Eylül 2026
-**Güncel yön kaynağı:** Inventory v1 closure complete → DWG Viewer #523 next → release-readiness closure
+**Güncel yön kaynağı:** Inventory v1 closure complete → existing-feature quality + friction reduction → manual acceptance closure → release-readiness
 **Değişken repository gerçeği:** Güncel SHA/PR durumu GitHub `master` ve current Issue üzerinden doğrulanır.
 
 ## 1. Belgenin rolü
@@ -81,6 +81,12 @@ V2'nin amacı yeni modül sayısını büyütmek değil, sahadaki bilgiyi bir ke
 yakalayıp doğru proje, mahal, kişi, dosya, iş ve günlük bağlamında tekrar
 kullanılabilir hâle getirmektir.
 
+3 Eylül 2026 owner kararıyla yakın dönem hedefi yeni bir büyük modül eklemek
+değil; mevcut özelliklerin kalitesini yükseltmek, günlük akışları
+sürtünmesizleştirmek, görünür manuel kabul borcunu kapatmak ve release-readiness
+kapılarını tamamlamaktır. DWG Viewer / Issue #523 `POST-RELEASE / DEFERRED`
+durumundadır ve ilk genel yayının bağımlılığı değildir.
+
 Ana yön:
 
 ```text
@@ -107,8 +113,10 @@ Proje/Mahal, Saha Rehberi, Attachment ve Ajanda omurgası — complete
 → Issue #529 / PR #530 correction and Issue #531 / PR #532 Slice 6.2 — merged
 → Issue #533 / PR #534 Slice 6.3 block reshape/reconciliation/lifecycle — merged
 → Inventory v1 closure — complete / Slice 7 #604 closed / #586 via PR #589 merged
-→ DWG Viewer v1 / Issue #523 — next product phase; implementation not authorized
+→ existing-feature quality + friction reduction
+→ missing manual acceptance closure
 → release-readiness closure
+→ DWG Viewer v1 / Issue #523 — post-release/deferred future integration; not a release dependency
 ```
 
 CSE teknik olarak derin, operasyonel olarak sade kalır: binlerce inşaat
@@ -477,7 +485,7 @@ Issue #501, #502, #503 ve #499 P0 veri/owner-phone güvenlik kuralları korunur.
 Inventory v1 closure bu bağımsız recovery, update ve MAIN-only güvenlik
 kapılarını veya release kararını kendiliğinden kapatmaz.
 
-### Current priority — DWG Viewer v1 (Issue #523)
+### Current priority — existing-feature quality and release-readiness
 
 Issue #540 UI/UX Wave 0 ve loading blocker #580 completed/closed'dur. Issue #586
 Inventory final UI/UX implementation'ı PR #589 ile merge edilmiş ve Issue
@@ -488,12 +496,22 @@ Current sıra:
 
 ```text
 Inventory v1 closure — complete
-→ DWG Viewer v1 / Issue #523 — next product phase; implementation not authorized
+→ existing-feature quality + friction reduction
+→ missing manual acceptance closure
 → release-readiness closure
 ```
 
-Issue #523'ün bu sırada yer alması implementation'ın başladığı, tamamlandığı veya
-yetkilendirildiği anlamına gelmez. Yürütme ayrı owner authority gerektirir.
+Bu dönem yeni bir büyük modül ekleme dönemi değildir. Mevcut özelliklerin günlük
+kullanım kalitesi, akış sadeliği ve sürtünme noktaları iyileştirilir; Issue
+#479'da ve ilgili ürün kayıtlarında görünür kalan gerekli manuel kabul borcu
+kapatılır; bağımsız release-readiness kapıları tamamlanır.
+
+### Future/post-release — DWG Viewer v1 (Issue #523)
+
+Issue #523 `POST-RELEASE / DEFERRED` durumundadır. DWG Viewer ilk genel yayın
+kapsamı, sırası veya bağımlılığı değildir. CSE içindeki DWG-001/002/003 teknik
+belgeleri gelecekteki entegrasyon temeli olarak korunur; yeni DWG implementation
+dilimi yalnız yeni açık owner kararıyla başlayabilir.
 
 ### 12. Günlük Log Çıktısı v2
 
@@ -541,7 +559,8 @@ Kapanış kapısı:
 | 4 | İstenecek Malzemeler; öneriler; telefon görüşmesi | Yardımcı akışların ana omurgaya bağlanması |
 | 5 | Proje albümü Slice 1 merged; Günlük Log v2 paused | V2.11 manual test/closure ve ayrı owner resume kararı |
 | Completed product line | Inventory v1 through Slice 7 / Issue #604 | Repository, backup/restore, attachment, isolated device ve owner field acceptance closure complete |
-| Current priority | DWG Viewer v1 / Issue #523 | Next product phase only; implementation is not started, complete or authorized |
+| Current priority | Existing-feature quality; friction reduction; manual acceptance closure; release-readiness | Improve and close existing user-visible flows before general release |
+| Future/post-release | DWG Viewer v1 / Issue #523 | Deferred future integration; not a first-release dependency |
 | 6 | Mini hesap makinesi — paused | Ayrı owner resume kararı ve dar saha aracı kabulü |
 
 Aynı anda yalnız bir production implementation Issue'su aktif olur. Bir dalga
@@ -666,8 +685,10 @@ Living Plan MVP Core — merged / PR #463
 → Issue #531 / PR #532 Inventory Spatial v1 Slice 6.2 — merged predecessor
 → Issue #533 / PR #534 Inventory Spatial v1 Slice 6.3 — merged predecessor
 → Inventory v1 closure — complete / Slice 7 #604 closed / #586 via PR #589 merged
-→ DWG Viewer v1 / Issue #523 — next product phase; implementation not authorized
+→ existing-feature quality + friction reduction
+→ missing manual acceptance closure
 → release-readiness closure
+→ DWG Viewer v1 / Issue #523 — post-release/deferred future integration; not a release dependency
 ```
 
 Issue #466 / PR #467 nullable actual-progress source-of-truth foundation'ını
@@ -722,8 +743,10 @@ Issue #501 recovery verification, Issue #502 external verified backup/update
 gate'i, Issue #503 newer-live-data-safe restore yönü ve Issue #499 owner-phone
 MAIN-only identity kuralı bütün owner-phone operasyonlarından önce gelir.
 Inventory closure bunları kapatmaz. Güncel ürün sırası Inventory v1 closure
-complete → DWG Viewer v1 / Issue #523 next → release-readiness closure'dır.
-Issue #523 implementation complete, started veya authorized değildir. V2.12 ve
-sonraki eski planlı ürün işleri owner resume kararına kadar paused kalır.
-V2.5–V2.11 final completion ilanları ve public/store release ayrı owner
-kararlarına bağlıdır.
+complete → existing-feature quality + friction reduction → missing manual
+acceptance closure → release-readiness closure'dır. Issue #523
+`POST-RELEASE / DEFERRED` gelecek entegrasyon hattıdır; ilk genel yayının
+bağımlılığı değildir ve yeni DWG implementation dilimi açık owner kararı
+olmadan başlamaz. V2.12 ve sonraki eski planlı ürün işleri owner resume kararına
+kadar paused kalır. V2.5–V2.11 final completion ilanları ve public/store release
+ayrı owner kararlarına bağlıdır.
