@@ -412,6 +412,257 @@ void main() {
   );
 
   testWidgets(
+    'draft-only primary exposes recovery and non-finalized exit stays read-only',
+    (tester) async {
+      final preserved = _draftOnlySketch(_projectA);
+      final inventory = _FakeInventory()..sketches[_projectA] = preserved;
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      addTearDown(source.dispose);
+      var launches = 0;
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        sketchEditorLauncher: (context, projectId, launchIntent) async {
+          launches += 1;
+          expect(projectId, _projectA);
+          expect(launchIntent, InventorySketchLaunchIntent.createOrRecover);
+          return false;
+        },
+      );
+
+      final controller = tester
+          .state<InventoryPageState>(find.byType(InventoryPage))
+          .controller;
+      expect(controller.loadStatus, InventoryPageLoadStatus.recoverableDraft);
+      expect(controller.lastErrorCode, isNull);
+      expect(
+        find.byKey(const Key('inventory-recoverable-draft')),
+        findsOneWidget,
+      );
+      expect(find.text('Krokiye devam et'), findsOneWidget);
+      expect(find.byKey(const Key('inventory-add-sketch')), findsNothing);
+      expect(find.text('Envanter güvenle yüklenemedi.'), findsNothing);
+      expect(inventory.primaryReads, 1);
+      expect(inventory.listReads, 1);
+      expect(inventory.mutations, 0);
+
+      await tester.tap(find.byKey(const Key('inventory-recover-sketch')));
+      await tester.pumpAndSettle();
+
+      expect(launches, 1);
+      expect(inventory.primaryReads, 1);
+      expect(inventory.listReads, 1);
+      expect(controller.loadStatus, InventoryPageLoadStatus.recoverableDraft);
+      expect(controller.sketch, same(preserved));
+      expect(controller.sketch!.sketch.id, _sketchA);
+      expect(controller.sketch!.draftRevision!.id, _revisionA);
+      await controller.reloadSelected();
+      await tester.pumpAndSettle();
+      expect(controller.loadStatus, InventoryPageLoadStatus.recoverableDraft);
+      expect(controller.sketch, same(preserved));
+      expect(inventory.sketches[_projectA], same(preserved));
+      expect(inventory.mutations, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'draft recovery finalized result reloads the same project into ready state',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _draftOnlySketch(_projectA);
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      addTearDown(source.dispose);
+      var launches = 0;
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        sketchEditorLauncher: (context, projectId, launchIntent) async {
+          launches += 1;
+          expect(projectId, _projectA);
+          expect(launchIntent, InventorySketchLaunchIntent.createOrRecover);
+          inventory.sketches[_projectA] = _sketch(_projectA);
+          return true;
+        },
+      );
+
+      await tester.tap(find.byKey(const Key('inventory-recover-sketch')));
+      await tester.pumpAndSettle();
+
+      final controller = tester
+          .state<InventoryPageState>(find.byType(InventoryPage))
+          .controller;
+      expect(launches, 1);
+      expect(inventory.primaryProjectIds, [_projectA, _projectA]);
+      expect(inventory.listReads, 2);
+      expect(inventory.mutations, 0);
+      expect(controller.selectedProjectId, _projectA);
+      expect(controller.loadStatus, InventoryPageLoadStatus.ready);
+      expect(controller.sketch!.sketch.id, _sketchA);
+      expect(controller.sketch!.activeRevision!.id, _revisionA);
+      expect(find.byKey(const Key('inventory-recover-sketch')), findsNothing);
+      expect(
+        find.byKey(const Key('inventory-update-sketch')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(find.byType(InventoryMapView), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'draft project adoption waits for validation and does not reload on shared echo',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _draftOnlySketch(_projectA)
+        ..sketches[_projectB] = _sketch(_projectB);
+      final source = _ProjectSource()
+        ..projects = [
+          _project(_projectA, 'Proje A'),
+          _project(_projectB, 'Proje B'),
+        ];
+      final shared = ValueNotifier<String?>(_projectB);
+      final callbacks = <String>[];
+      addTearDown(shared.dispose);
+      addTearDown(source.dispose);
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        sharedProject: shared,
+        onProjectSelected: callbacks.add,
+      );
+      final pending = Completer<List<InventoryAssetProjection>>();
+      inventory.assetResponses[_projectA] = [pending.future];
+      await _chooseInventoryProject(tester, _projectA, settle: false);
+      expect(inventory.assetProjectIds, [_projectB, _projectA]);
+      expect(shared.value, _projectB);
+      expect(callbacks, isEmpty);
+
+      pending.complete([]);
+      await tester.pumpAndSettle();
+      final controller = tester
+          .state<InventoryPageState>(find.byType(InventoryPage))
+          .controller;
+      expect(controller.loadStatus, InventoryPageLoadStatus.recoverableDraft);
+      expect(controller.selectedProjectId, _projectA);
+      expect(shared.value, _projectA);
+      expect(callbacks, [_projectA]);
+      expect(inventory.primaryProjectIds, [_projectB, _projectA]);
+      expect(inventory.assetProjectIds, [_projectB, _projectA]);
+      expect(find.text('Krokiye devam et'), findsOneWidget);
+
+      inventory.sketches[_projectB] = _draftOnlySketch(
+        _projectB,
+        draftProjectId: _projectA,
+      );
+      await _chooseInventoryProject(tester, _projectB);
+      expect(controller.loadStatus, InventoryPageLoadStatus.failed);
+      expect(controller.lastErrorCode, 'inventory_sketch_draft_unavailable');
+      expect(controller.selectedProjectId, _projectA);
+      expect(shared.value, _projectA);
+      expect(callbacks, [_projectA]);
+      expect(inventory.mutations, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'late finalized draft return cannot reload a different shared project',
+    (tester) async {
+      final inventory = _FakeInventory()
+        ..sketches[_projectA] = _draftOnlySketch(_projectA)
+        ..sketches[_projectB] = _sketch(_projectB);
+      final source = _ProjectSource()
+        ..projects = [
+          _project(_projectA, 'Proje A'),
+          _project(_projectB, 'Proje B'),
+        ];
+      final shared = ValueNotifier<String?>(_projectA);
+      final result = Completer<bool>();
+      addTearDown(shared.dispose);
+      addTearDown(source.dispose);
+      var launches = 0;
+      await _pumpPage(
+        tester,
+        inventory: inventory,
+        source: source,
+        sharedProject: shared,
+        sketchEditorLauncher: (context, projectId, launchIntent) {
+          launches += 1;
+          expect(projectId, _projectA);
+          expect(launchIntent, InventorySketchLaunchIntent.createOrRecover);
+          return result.future;
+        },
+      );
+      await tester.tap(find.byKey(const Key('inventory-recover-sketch')));
+      await tester.pump();
+      expect(launches, 1);
+      shared.value = _projectB;
+      await tester.pumpAndSettle();
+      inventory.sketches[_projectA] = _sketch(_projectA);
+      result.complete(true);
+      await tester.pumpAndSettle();
+
+      final controller = tester
+          .state<InventoryPageState>(find.byType(InventoryPage))
+          .controller;
+      expect(controller.loadStatus, InventoryPageLoadStatus.ready);
+      expect(controller.selectedProjectId, _projectB);
+      expect(controller.sketch!.sketch.id, _sketchB);
+      expect(shared.value, _projectB);
+      expect(inventory.primaryProjectIds, [_projectA, _projectB]);
+      expect(inventory.assetProjectIds, [_projectA, _projectB]);
+      expect(inventory.mutations, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final invalid in <String, InventoryPrimarySketchProjection>{
+    'missing draft': _draftOnlySketch(_projectA, omitDraft: true),
+    'missing draft pointer': _draftOnlySketch(
+      _projectA,
+      omitDraftPointer: true,
+    ),
+    'wrong draft project': _draftOnlySketch(
+      _projectA,
+      draftProjectId: _projectB,
+    ),
+    'wrong draft sketch': _draftOnlySketch(_projectA, draftSketchId: _sketchB),
+    'wrong draft revision': _draftOnlySketch(_projectA, draftId: _revisionB),
+    'wrong draft state': _draftOnlySketch(
+      _projectA,
+      draftState: InventorySketchRevisionState.active,
+    ),
+    'unexpected active revision': _draftOnlySketch(
+      _projectA,
+      includeActive: true,
+    ),
+  }.entries) {
+    test('malformed draft-only primary fails closed: ${invalid.key}', () async {
+      final inventory = _FakeInventory()..sketches[_projectA] = invalid.value;
+      final source = _ProjectSource()
+        ..projects = [_project(_projectA, 'Proje A')];
+      final controller = _controller(inventory, source);
+      addTearDown(controller.dispose);
+      addTearDown(source.dispose);
+
+      await controller.initialize();
+
+      expect(controller.loadStatus, InventoryPageLoadStatus.failed);
+      expect(controller.lastErrorCode, 'inventory_sketch_draft_unavailable');
+      expect(controller.sketch, isNull);
+      expect(inventory.primaryReads, 1);
+      expect(inventory.listReads, 0);
+      expect(inventory.mutations, 0);
+    });
+  }
+
+  testWidgets(
     'ready sketch update is map-only, launches edit-active, and reloads successor',
     (tester) async {
       final inventory = _FakeInventory()
@@ -2360,6 +2611,54 @@ InventoryPrimarySketchProjection _sketch(
         ordinal: 1,
       ),
     ],
+  );
+}
+
+InventoryPrimarySketchProjection _draftOnlySketch(
+  String projectId, {
+  String? draftProjectId,
+  String? draftSketchId,
+  String? draftId,
+  InventorySketchRevisionState draftState = InventorySketchRevisionState.draft,
+  bool omitDraft = false,
+  bool omitDraftPointer = false,
+  bool includeActive = false,
+}) {
+  final sketchId = projectId == _projectA ? _sketchA : _sketchB;
+  final draftRevisionId = projectId == _projectA ? _revisionA : _revisionB;
+  final geometry = InventoryGeometry(polylines: const []);
+  return InventoryPrimarySketchProjection(
+    sketch: InventorySketchRecord(
+      id: sketchId,
+      projectId: projectId,
+      displayName: 'Saha krokisi',
+      isPrimary: true,
+      activeRevisionId: null,
+      draftRevisionId: omitDraftPointer ? null : draftRevisionId,
+      revision: 1,
+      createdAt: _now,
+      updatedAt: _now,
+      archivedAt: null,
+    ),
+    activeRevision: includeActive ? _sketch(projectId).activeRevision : null,
+    draftRevision: omitDraft
+        ? null
+        : InventorySketchRevisionRecord(
+            id: draftId ?? draftRevisionId,
+            sketchId: draftSketchId ?? sketchId,
+            projectId: draftProjectId ?? projectId,
+            revisionNumber: 1,
+            baseRevisionId: null,
+            state: draftState,
+            geometry: geometry,
+            geometrySha256: geometry.sha256,
+            contentRevision: 1,
+            createdAt: _now,
+            updatedAt: _now,
+            finalizedAt: null,
+            supersededAt: null,
+            abandonedAt: null,
+          ),
   );
 }
 

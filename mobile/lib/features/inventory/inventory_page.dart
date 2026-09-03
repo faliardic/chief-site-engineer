@@ -31,11 +31,14 @@ enum InventoryPageLoadStatus {
   projectSelectionRequired,
   loadingInventory,
   noSketch,
+  recoverableDraft,
   ready,
   failed,
 }
 
 enum InventoryPageView { map, floors, list }
+
+enum _InventorySketchProjectionState { active, recoverableDraft }
 
 class InventoryAssetSpatialContext {
   const InventoryAssetSpatialContext({
@@ -114,7 +117,8 @@ class InventoryPageController extends ChangeNotifier {
     final alreadyLoaded =
         selectedProjectId == activeProjectId &&
         (loadStatus == InventoryPageLoadStatus.ready ||
-            loadStatus == InventoryPageLoadStatus.noSketch);
+            loadStatus == InventoryPageLoadStatus.noSketch ||
+            loadStatus == InventoryPageLoadStatus.recoverableDraft);
     if (becameActive || (changed && !alreadyLoaded)) {
       _clearProjectSession();
       await refreshProjects();
@@ -443,7 +447,8 @@ class InventoryPageController extends ChangeNotifier {
     await _loadProjects(generation, requestedId: projectId);
     if (!_isCurrent(generation)) return false;
     if (loadStatus == InventoryPageLoadStatus.ready ||
-        loadStatus == InventoryPageLoadStatus.noSketch) {
+        loadStatus == InventoryPageLoadStatus.noSketch ||
+        loadStatus == InventoryPageLoadStatus.recoverableDraft) {
       return true;
     }
     selectedProjectId = previousId;
@@ -641,6 +646,7 @@ class InventoryPageController extends ChangeNotifier {
     assets = const [];
     _notify();
     InventoryPrimarySketchProjection? loadedSketch;
+    _InventorySketchProjectionState? sketchState;
     String? geometryFailure;
     try {
       try {
@@ -655,7 +661,7 @@ class InventoryPageController extends ChangeNotifier {
         return;
       }
       if (loadedSketch != null) {
-        _verifySketch(projectId, loadedSketch);
+        sketchState = _verifySketch(projectId, loadedSketch);
       }
       final loadedAssets = await application.listAssets(
         projectId: projectId,
@@ -666,6 +672,11 @@ class InventoryPageController extends ChangeNotifier {
       sketch = loadedSketch;
       assets = List<InventoryAssetProjection>.unmodifiable(loadedAssets);
       _revalidateSpatialSelection();
+      if (sketchState == _InventorySketchProjectionState.recoverableDraft) {
+        loadStatus = InventoryPageLoadStatus.recoverableDraft;
+        _notify();
+        return;
+      }
       sketchDiagnosticCode = geometryFailure;
       if (geometryFailure != null) {
         view = InventoryPageView.list;
@@ -683,16 +694,15 @@ class InventoryPageController extends ChangeNotifier {
     }
   }
 
-  void _verifySketch(String projectId, InventoryPrimarySketchProjection value) {
+  _InventorySketchProjectionState _verifySketch(
+    String projectId,
+    InventoryPrimarySketchProjection value,
+  ) {
+    final sketch = value.sketch;
     final active = value.activeRevision;
-    if (value.sketch.projectId != projectId ||
-        !value.sketch.isPrimary ||
-        value.sketch.archivedAt != null ||
-        value.sketch.activeRevisionId == null ||
-        value.sketch.activeRevisionId != active?.id ||
-        active?.projectId != projectId ||
-        active?.sketchId != value.sketch.id ||
-        active?.state != InventorySketchRevisionState.active) {
+    if (sketch.projectId != projectId ||
+        !sketch.isPrimary ||
+        sketch.archivedAt != null) {
       throw const InventoryFailure('inventory_active_revision_unavailable');
     }
     final blockIds = <String>{};
@@ -709,11 +719,55 @@ class InventoryPageController extends ChangeNotifier {
         throw const InventoryFailure('inventory_projection_integrity_failed');
       }
     }
+    if (sketch.activeRevisionId == null) {
+      final draft = value.draftRevision;
+      if (active != null ||
+          sketch.draftRevisionId == null ||
+          draft == null ||
+          sketch.draftRevisionId != draft.id ||
+          draft.projectId != projectId ||
+          draft.sketchId != sketch.id ||
+          draft.state != InventorySketchRevisionState.draft ||
+          value.activeBlockPolygons.isNotEmpty) {
+        throw const InventoryFailure('inventory_sketch_draft_unavailable');
+      }
+      final polygonIndices = <int>{};
+      final mappedBlockIds = <String>{};
+      for (final mapping in value.draftBlockPolygons) {
+        if (mapping.projectId != projectId ||
+            mapping.sketchId != sketch.id ||
+            mapping.revisionId != draft.id ||
+            !blockIds.contains(mapping.blockId) ||
+            mapping.polygonIndex < 0 ||
+            mapping.polygonIndex >= draft.geometry.polylines.length ||
+            !mappedBlockIds.add(mapping.blockId) ||
+            !polygonIndices.add(mapping.polygonIndex)) {
+          throw const InventoryFailure('inventory_projection_integrity_failed');
+        }
+      }
+      for (final block in value.draftNewBlocks) {
+        block.validate(draft.geometry);
+        if (!polygonIndices.add(block.polygonIndex)) {
+          throw const InventoryFailure('inventory_projection_integrity_failed');
+        }
+      }
+      if (value.draftLegacyPolygonCount < 0 ||
+          value.draftLegacyPolygonCount > draft.geometry.polylines.length) {
+        throw const InventoryFailure('inventory_projection_integrity_failed');
+      }
+      return _InventorySketchProjectionState.recoverableDraft;
+    }
+    if (sketch.activeRevisionId != active?.id ||
+        active?.projectId != projectId ||
+        active?.sketchId != sketch.id ||
+        active?.state != InventorySketchRevisionState.active) {
+      throw const InventoryFailure('inventory_active_revision_unavailable');
+    }
     final mappedBlockIds = <String>{};
     final mappedPolygonIndices = <int>{};
     for (final mapping in value.activeBlockPolygons) {
       if (mapping.projectId != projectId ||
-          mapping.sketchId != value.sketch.id ||
+          mapping.sketchId != sketch.id ||
           mapping.revisionId != active!.id ||
           !blockIds.contains(mapping.blockId) ||
           mapping.polygonIndex < 0 ||
@@ -730,6 +784,7 @@ class InventoryPageController extends ChangeNotifier {
     )) {
       throw const InventoryFailure('inventory_projection_integrity_failed');
     }
+    return _InventorySketchProjectionState.active;
   }
 
   void _verifyAssetIdentities(
@@ -1098,6 +1153,7 @@ class InventoryPageState extends State<InventoryPage> {
       detail: 'Kroki ve Liste yalnız seçtiğiniz aktif projeyi gösterir.',
     ),
     InventoryPageLoadStatus.noSketch => _noSketch(),
+    InventoryPageLoadStatus.recoverableDraft => _recoverableDraft(),
     InventoryPageLoadStatus.ready => _ready(),
     InventoryPageLoadStatus.failed => _failure(),
   };
@@ -1113,6 +1169,21 @@ class InventoryPageState extends State<InventoryPage> {
       ),
       icon: const Icon(Icons.add_rounded),
       label: const Text('Kroki ekle'),
+    ),
+  );
+
+  Widget _recoverableDraft() => _message(
+    key: const Key('inventory-recoverable-draft'),
+    icon: Icons.edit_note_rounded,
+    title: 'Yarım kalan kroki taslağı bulundu.',
+    detail: 'Mevcut taslağı değiştirmeden kaldığınız yerden devam edin.',
+    action: FilledButton.icon(
+      key: const Key('inventory-recover-sketch'),
+      onPressed: () => unawaited(
+        _openSketchEditor(InventorySketchLaunchIntent.createOrRecover),
+      ),
+      icon: const Icon(Icons.edit_outlined),
+      label: const Text('Krokiye devam et'),
     ),
   );
 
