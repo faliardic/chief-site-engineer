@@ -170,4 +170,4 @@ A missing, corrupt, incompatible, or source-mismatched derived PDF should cause 
 
 ## 10. Handoff to later DWG work
 
-DWG-003 can use this audit to evaluate conversion/renderer and large-file constraints without reopening the immutable-original decision. DWG-004 can define the minimum schema/cache implementation only after converter/cache-key inputs are known. Any implementation must preserve the identity separation and backup boundary proved above.
+DWG-003 defines the provider-independent conversion boundary without selecting or implementing a PDF renderer. DWG-004 performs the real-DWG-to-vector-PDF technology spike and records the conversion go/no-go decision. DWG-005 defines the converter diagnostics contract. DWG-006 defines the durable source record, DWG-007 defines the derived cache record, and DWG-008 defines the cache lifecycle. PDF renderer selection and implementation belong to a later viewer phase. All later work must preserve the identity separation and backup boundary proved above.
