@@ -3,7 +3,7 @@
 **Durum:** Güncel yürütme sırası
 **Tarih:** 4 Eylül 2026
 **V2 kapsam kaynağı:** `docs/v2/CSE_V2_SCOPE.md`
-**Güncel yön truth-sync:** Inventory v1 closure complete → #616 evidence baseline → #617 frictionless release-readiness program → #618 UI/UX system contract → Phase 1 adaptive/accessibility foundation → phased release gates
+**Güncel yön truth-sync:** Inventory v1 closure complete → #616 evidence baseline → #617 frictionless release-readiness program → #618 UI/UX contract merged → Phase 1 adaptive/accessibility foundation complete → Phase 2 Step 10 remaining narrow surfaces
 **Değişken repository gerçeği:** Güncel SHA/PR durumu GitHub `master` ve current Issue üzerinden doğrulanır.
 
 ## 1. Güncel ürün durumu
@@ -61,11 +61,13 @@ Issue #540 UI/UX Wave 0 ile loading blocker #580 tamamlanıp kapatılmıştır.
 Issue #586 implementation'ı PR #589 ile merge edilmiş ve Issue kapatılmıştır.
 4 Eylül 2026 owner kararıyla #616 sanitize evidence paketi manuel kabul PASS'i
 değil, yeterli ürün değerlendirme baseline'ıdır. Issue #617 güncel frictionless
-release-readiness programı; Issue #618 ise production davranışı değiştirmeyen
-kanonik UI/UX sistem sözleşmesi ve truth-sync adımıdır. #618 merge edilmeden
-production UI işi başlamaz. Merge sonrasındaki ilk dar implementation yönü,
-final compact destination seti owner review'uyla seçildikten sonra Phase 1
-adaptive/accessibility foundation'dır. DWG Viewer v1 / Issue #523
+release-readiness programıdır; Issue #618 kanonik UI/UX sistem sözleşmesi olarak
+merge edilmiştir. Phase 1 adaptive/accessibility foundation tamamlanmıştır.
+Phase 2 Step 8 form/primary-action standardı UXF-013 / PR #645 ve UXF-014 / PR
+#647, Step 9 Agenda search/filter dilimi UXF-015 / PR #649 ile tamamlanmıştır.
+Step 10 başlamış; Agenda + Reminder retryable read-error standardı UXF-016 / PR
+#651 ile tamamlanmış, Step 10'un kalan dar yüzeyleri açık kalmıştır. DWG Viewer
+v1 / Issue #523
 `POST-RELEASE / DEFERRED` gelecek entegrasyon hattıdır ve ilk genel yayının
 bağımlılığı değildir. Public/store production release ilan edilmemiştir.
 
@@ -103,9 +105,13 @@ Proje/Mahal — complete
 → Inventory v1 closure — complete / Slice 7 #604 closed / #586 via PR #589 merged
 → Issue #616 — evidence baseline accepted; manual acceptance PASS değil
 → Issue #617 — current frictionless release-readiness program
-→ Issue #618 — canonical UI/UX contract + Roadmap/V2 Scope truth-sync
-→ Phase 1 — adaptive/accessibility foundation; compact destination set owner-reviewed
-→ Phases 2–5 — shared interactions, daily core, people/safety, supporting modules
+→ Issue #618 — canonical UI/UX contract merged
+→ Phase 1 — adaptive/accessibility foundation complete
+→ Phase 2 Step 8 — form/primary-action standard complete / UXF-013 #645 + UXF-014 #647
+→ Phase 2 Step 9 — Agenda search/filter slice complete / UXF-015 #649
+→ Phase 2 Step 10 — started; Agenda + Reminder retryable read-error slice complete / UXF-016 #651
+→ Current next — Step 10 remaining narrow empty/loading/error/success surfaces; then Step 11 history/event language
+→ Phases 3–5 — daily core, people/safety, supporting modules
 → Phase 6 — independent recovery/backup/search/onboarding/telemetry/privacy gates
 → Phase 7 — integrated quality + missing evidence/manual acceptance closure
 → Phase 8 — release candidate + explicit owner release decision
@@ -384,14 +390,20 @@ Durum: `implemented — manual test pending; completion not declared`
 - Issue #616'nın 82 ekranlık sanitize paketi evidence baseline olarak kabul
   edilmiştir; manuel kabul PASS'i değildir ve eksik akışlar evidence debt'tir.
 - Issue #617 güncel frictionless release-readiness program otoritesidir.
-- Issue #618 yalnız kanonik
+- Issue #618 kanonik
   `docs/v2/CSE_FRICTIONLESS_UI_UX_SYSTEM_CONTRACT.md` ve Roadmap/V2 Scope
-  truth-sync'ini kapsar; production UI işini complete veya authorized yapmaz.
-- #618 merge sonrasında ilk dar Phase 1 kararı final compact navigation
-  destination setinin owner review'uyla seçilmesidir; ardından adaptive shell,
-  ortak aktif proje ve accessibility foundation ayrı Issue/PR'larla ilerler.
-- Sonraki fazlar shared interaction, daily core, people/safety ve supporting
-  modules sırasını izler. Issue #479 manual acceptance borcu ile recovery,
+  truth-sync'iyle merge edilmiştir.
+- Phase 1 adaptive shell, ortak aktif proje ve accessibility foundation
+  tamamlanmıştır.
+- Phase 2 Step 8 form/primary-action standardı UXF-013 / PR #645 ve UXF-014 /
+  PR #647; Step 9 Agenda search/filter dilimi UXF-015 / PR #649 ile
+  tamamlanmıştır.
+- Phase 2 Step 10 başlamıştır. Agenda + Reminder retryable read-error standardı
+  UXF-016 / PR #651 ile tamamlanmıştır; bu yalnız Step 10'un ilk dar dilimidir,
+  Step 10'un tamamlandığı anlamına gelmez.
+- Güncel sonraki yön Step 10 empty/loading/error/success standardının kalan dar
+  yüzeyleri, ardından Step 11 history/event language'dır. Issue #479 manual
+  acceptance borcu ile recovery,
   backup, ortak arama, onboarding, telemetry, gizlilik/KVKK ve bütünleşik
   kalite/release-candidate kapıları korunur.
 - Public/store release ayrıca owner kararına bağlıdır.
@@ -490,9 +502,13 @@ Living 7-Day Plan — implemented / manual test pending; final completion yok
 → Inventory v1 closure — complete / Slice 7 #604 closed / #586 via PR #589 merged
 → Issue #616 — evidence baseline accepted; manual acceptance PASS değil
 → Issue #617 — current frictionless release-readiness program
-→ Issue #618 — canonical UI/UX contract + Roadmap/V2 Scope truth-sync
-→ Phase 1 — adaptive/accessibility foundation; compact destination set owner-reviewed
-→ Phases 2–5 — shared interactions, daily core, people/safety, supporting modules
+→ Issue #618 — canonical UI/UX contract merged
+→ Phase 1 — adaptive/accessibility foundation complete
+→ Phase 2 Step 8 — form/primary-action standard complete / UXF-013 #645 + UXF-014 #647
+→ Phase 2 Step 9 — Agenda search/filter slice complete / UXF-015 #649
+→ Phase 2 Step 10 — started; Agenda + Reminder retryable read-error slice complete / UXF-016 #651
+→ Current next — Step 10 remaining narrow empty/loading/error/success surfaces; then Step 11 history/event language
+→ Phases 3–5 — daily core, people/safety, supporting modules
 → Phase 6 — independent release gates, including recovery/backup
 → Phase 7 — integrated quality + missing evidence/manual acceptance closure
 → Phase 8 — release candidate + explicit owner release decision
@@ -535,11 +551,13 @@ tarihsel girişim olarak kalır ve current ancestry değildir. Issue #586'nın
 Inventory final UI/UX implementation'ı PR #589 ile merge edilmiş, Issue #586
 completed/closed'dur.
 
-Current product-development otoritesi #617'dir. #616 evidence baseline'ından
-sonra #618 kanonik UI/UX sözleşmesi ve truth-sync'i gelir; merge sonrasında
-owner-reviewed compact destination kararıyla Phase 1 adaptive/accessibility
-foundation başlar ve Phase 2–8 sırası izlenir. Bu docs adımı hiçbir production
-UI davranışını complete veya authorized ilan etmez. Issue #523 açık kalır fakat
+Current product-development otoritesi #617'dir. #618 kanonik UI/UX sözleşmesi
+merge edilmiş ve Phase 1 adaptive/accessibility foundation tamamlanmıştır.
+Phase 2 Step 8 UXF-013 / PR #645 ile UXF-014 / PR #647, Step 9 UXF-015 / PR
+#649 ile tamamlanmıştır. Step 10'un Agenda + Reminder retryable read-error dilimi
+UXF-016 / PR #651 ile tamamlanmış; güncel sonraki yön Step 10'un kalan dar
+empty/loading/error/success yüzeyleri, ardından Step 11 history/event
+language'dır. Step 10'un tamamı henüz bitmiş değildir. Issue #523 açık kalır fakat
 `POST-RELEASE / DEFERRED` gelecek entegrasyon hattıdır; ilk genel yayını bloke
 etmez ve yeni DWG implementation dilimi açık owner kararı olmadan başlamaz.
 Issue #501 recovery, Issue #502 external verified backup/update, Issue #503
