@@ -37,13 +37,13 @@ Aynı görev resume ediliyorsa değişmeyen uzun kaynaklar tekrar okunmaz. Kulla
 
 GitHub'a erişilemiyorsa güncel durum tahmin edilmez ve production işi başlatılmaz.
 
-Owner talebi AGENTS.md veya canonical çalışma kuralını değiştiriyorsa asıl teknik/ürün işi durur. Önce karar current GitHub authority olarak kaydedilir; en dar protokol değişikliği hazırlanır, review ve owner merge kapısından geçirilir. Master güncellenip güncel AGENTS.md yeniden okunduktan sonra asıl teknik işe dönülür. Bu sıra Ready/merge yetkisini kendiliğinden vermez.
+Owner talebi AGENTS.md veya canonical çalışma kuralını değiştiriyorsa asıl teknik/ürün işi durur. Önce karar current GitHub authority olarak kaydedilir; en dar protokol değişikliği hazırlanır, review ve publication güvenlik kapılarından geçirilir. Master güncellenip güncel AGENTS.md yeniden okunduktan sonra asıl teknik işe dönülür.
 
 ## 3. Zorunlu aktör yönlendirmesi ve sıradaki aksiyon
 
 ChatGPT/Work Mode her kullanıcı talebinde execution başlamadan önce sıradaki tek işi ve sorumlu aktörü belirler:
 
-- **ChatGPT:** current GitHub okuma, planlama, Issue/PR koordinasyonu, review ve owner-approved Ready/merge;
+- **ChatGPT:** current GitHub okuma, planlama, Issue/PR koordinasyonu, review, gate doğrulaması ve standing owner yetkisiyle otomatik Ready/squash merge;
 - **Codex:** repository-local terminal, automated test, analyzer, build/APK hazırlığı, dosya değişikliği, format/diff ve local Git/commit/push;
 - **Fatih:** yalnız manuel ürün/device kabulü ve nihai görsel/davranış PASS/FAIL kararı; PowerShell/terminal komutu çalıştırmaz;
 - **Codex device exception:** Fatih exact package, cihaz ve veri-koruma sınırıyla açıkça devrederse emulator/ADB/device işlemi ChatGPT'nin göreve özel verdiği execution time budget içinde Codex'e geçebilir. PASS/FAIL ve ürün kabulü Fatih'te kalır.
@@ -73,11 +73,11 @@ Her iş yalnız bir lane kullanır:
 
 FAST/STANDARD için varsayılan one-pass akışı:
 
-`reproduce once -> fix -> one focused validation -> only-needed manual/device check -> owner merge gate`
+`reproduce once -> fix -> one focused validation -> only-needed manual/device check -> gated automatic Ready/squash merge`
 
 Doğrudan, tekrarlanabilir owner/device kanıtı ve yeterince belirlenmiş source root cause varsa düzeltme öncesi deterministic automated FAIL zorunlu değildir. Owner/device kanıtı, hatayı temsil edemeyen yapay test harness'inden üstündür; widget/fake test PASS'i cihazdaki hatayı geçersiz kılmaz. Bir başarısız repro denemesinden sonra source/runtime diagnosis veya mevcut en güçlü kanıta geçilir; kararı değiştirmeyen diagnostic/test döngüleri yapılmaz.
 
-Focused validation yeterliyse analyzer yalnız material ihtiyaçta, manuel/device kabul yalnız runtime'a özgü davranışta veya owner açıkça istediğinde yapılır. Manuel/device kabul gerekmeyen non-CRITICAL işte Codex automated PASS sonrası commit/push manuel PASS beklemez. Gereken kabulde Fatih PASS/FAIL kapısı korunur; gerekli kontrol FAIL/PENDING ise publication kapalı kalır. Ready/merge yetkisi bundan bağımsız owner kapısıdır. CRITICAL validation ve güvenlik kapıları aynen uygulanır.
+Focused validation yeterliyse analyzer yalnız material ihtiyaçta, manuel/device kabul yalnız runtime'a özgü davranışta veya owner açıkça istediğinde yapılır. Manuel/device kabul gerekmeyen non-CRITICAL işte Codex automated PASS sonrası commit/push manuel PASS beklemez. Gereken kabulde Fatih PASS/FAIL kapısı korunur; gerekli kontrol FAIL/PENDING ise publication kapalı kalır. Required review ile task-specific validation/manual kapıları PASS veya açıkça GEREKMİYOR olduktan ve blocker, REQUEST_CHANGES, scope/allowlist/base/head drift, conflict veya mergeability sorunu bulunmadıktan sonra ChatGPT standing owner yetkisiyle PR'yi ayrıca Fatih'e sormadan otomatik Ready yapar ve squash merge eder. CRITICAL PR'de bu yetki ancak Issue'ya özel bütün validation/compatibility/manual kapıları geçtikten sonra kullanılır; release/store ve destructive production/device/data işlemleri ayrı açık owner onayı ister.
 
 ### FAST
 
@@ -122,7 +122,7 @@ CRITICAL varsayılanı:
 - gerekli `.cse` provenance;
 - Issue'ya özel validation/compatibility/device/release gate;
 - bağımsız derin review;
-- Ready/merge/release için owner kararı.
+- Issue'ya özel bütün validation/compatibility/manual kapıları sonrası standing yetkiyle otomatik Ready/squash merge; release/store ve destructive işlemler için ayrı owner kararı.
 
 Somut CRITICAL trigger yoksa iş ağır sürece yükseltilmez.
 
@@ -150,21 +150,23 @@ Aynı source revision üzerinde geçen test tekrarlanmaz. Full suite her mikro a
 - Stable identity, optimistic revision, append-only event/history, transaction, backup/restore ve attachment bütünlüğü korunur.
 - Force-push, destructive reset/clean/stash, hard-delete ve beklenmeyen kullanıcı değişikliğinin üzerine yazma yasaktır.
 - Beklenmeyen tracked/untracked değişiklikte işlem durur; otomatik temizleme yapılmaz.
-- Ready, merge, Issue closure, release/store ve destructive production işlemleri owner onayı gerektirir.
+- Gerekli review/validation/manual kapısı FAIL/PENDING iken veya blocker, REQUEST_CHANGES, scope/allowlist/base/head drift, conflict ya da mergeability sorunu varken Ready/merge yapılmaz.
+- Gate'ler PASS/GEREKMİYOR olduğunda ChatGPT standing owner yetkisiyle Ready/squash merge'i otomatik yürütür; Fatih bu standing yetkiyi sonraki bir owner talimatıyla iptal edebilir veya askıya alabilir.
+- Release/store ve destructive production/device/data işlemleri standing Ready/merge yetkisinin dışındadır ve ayrı açık owner onayı gerektirir.
 
 ## 7. Git, publication ve Issue disposition
 
-- FAST: Codex automated PASS ve gerekiyorsa Fatih manuel/device PASS sonrası tek kısa branch'te küçük commit ve normal push; current `master` ruleset'i PR istiyorsa tek minimal Draft PR, owner-approved squash merge ve `master` sync.
+- FAST: Codex automated PASS ve gerekiyorsa Fatih manuel/device PASS sonrası tek kısa branch'te küçük commit ve normal push; current `master` ruleset'i PR istiyorsa tek minimal Draft PR, required review/gate PASS sonrası ChatGPT'nin otomatik Ready/squash merge'i ve `master` sync.
 - STANDARD: en fazla bir aktif production branch/PR; squash merge varsayılanı.
 - CRITICAL: Issue'ya özel branch/PR/review zinciri.
 - Force-push yapılmaz.
 - Stacked PR oluşturulmaz.
-- Protokol kabul edildiğinde zaten açık olan legacy/stacked production PR'lar bir defalık geçiş kuyruğudur; yeni stack açma yetkisi vermez. Kuyruk çözülene kadar yeni production branch açılmaz; mevcut PR'lar current master'a birer birer uyarlanır ve Ready/merge/close yalnız owner kararıyla yürütülür.
+- Protokol kabul edildiğinde zaten açık olan legacy/stacked production PR'lar bir defalık geçiş kuyruğudur; yeni stack açma yetkisi vermez. Kuyruk çözülene kadar yeni production branch açılmaz; mevcut PR'lar current master'a birer birer uyarlanır ve her biri required review/validation/manual ve drift/mergeability kapılarından geçmeden Ready/merge edilmez.
 - Cihaz APK'sı mümkün olduğunda güncel birleşik master'dan üretilir.
 - Merge sonrası local master bir sonraki local işten önce `--ff-only` senkronlanır.
 - Tek amaçlı implementation Issue'su PR ile bütünüyle sonuçlanıyorsa PR body `Closes #...` kullanır.
 - Parent, umbrella, manuel acceptance, release veya devam işi içeren Issue'lar `Refs #...` kullanır ve açık kalır.
-- Owner merge onayı yalnız incelenen PR body'de açıkça `Closes` ile belirtilen Issue kapanışını da kapsar; belirsizlikte otomatik Issue closure yapılmaz.
+- Standing merge yetkisi, yalnız incelenen PR body'de açıkça `Closes` ile belirtilen tek amaçlı Issue'nun merge ile otomatik kapanışını da kapsar; belirsizlikte `Refs` kullanılır ve otomatik Issue closure yapılmaz.
 
 ## 8. Evidence ve çıktı
 
@@ -195,4 +197,4 @@ SHA, branch, divergence, allowlist, YAML ve benzeri teknik kanıtlar bu açıkla
 
 ## 9. Ana karar
 
-> Non-CRITICAL işte göreve özel süre bütçesiyle one-pass teslim, tek focused validation ve yalnız gereken manuel kabul; publication current GitHub ruleset'inin izin verdiği en hafif branch/PR yoluyla yürür. Gerçek veri/release riskinde tam güvenlik süreci uygulanır. Ready/merge ve açıkça belirtilen Issue closure owner kapısında kalır.
+> Non-CRITICAL işte göreve özel süre bütçesiyle one-pass teslim, tek focused validation ve yalnız gereken manuel kabul; publication current GitHub ruleset'inin izin verdiği en hafif branch/PR yoluyla yürür. Required gate'ler geçince ChatGPT standing owner yetkisiyle Ready/squash merge'i ve açık `Closes` disposition'ını otomatik yürütür; gerçek veri/release ve destructive işlem riskinde ayrı owner onayıyla tam güvenlik süreci uygulanır.
