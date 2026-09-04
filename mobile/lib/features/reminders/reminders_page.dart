@@ -46,6 +46,7 @@ class _RemindersPageState extends State<RemindersPage> {
   List<MobileReminder> _items = const [];
   bool _loading = true;
   String? _error;
+  String? _readError;
   final Set<String> _tomorrowBusy = {};
   final Set<String> _restoreBusy = {};
   bool _detailNavigationBusy = false;
@@ -109,6 +110,7 @@ class _RemindersPageState extends State<RemindersPage> {
     setState(() {
       _loading = true;
       _error = null;
+      _readError = null;
       _preservingDetailReload = restoreOffset != null;
     });
     try {
@@ -143,10 +145,15 @@ class _RemindersPageState extends State<RemindersPage> {
       setState(() {
         _loading = false;
         _preservingDetailReload = false;
-        _error = 'Hatırlatıcılar güvenli biçimde okunamadı.';
+        _readError = 'Hatırlatıcılar güvenli biçimde okunamadı.';
       });
     }
     _restoreScrollOffset(restoreOffset);
+  }
+
+  Future<void> _retryRead() async {
+    if (_loading) return;
+    await _reload();
   }
 
   double? get _currentScrollOffset =>
@@ -357,6 +364,22 @@ class _RemindersPageState extends State<RemindersPage> {
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Text(_error!),
+              ),
+            )
+          else if (_readError != null)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    Text(_readError!, textAlign: TextAlign.center),
+                    const SizedBox(height: 12),
+                    _ReadRetryAction(
+                      actionKey: const Key('reminder-read-error-retry'),
+                      onPressed: _loading ? null : _retryRead,
+                    ),
+                  ],
+                ),
               ),
             )
           else if (_primaryView == _ReminderPrimaryView.today)
@@ -635,6 +658,30 @@ class _RemindersPageState extends State<RemindersPage> {
 }
 
 enum _ReminderIconActionKind { standard, filled, tonal, outlined }
+
+class _ReadRetryAction extends StatelessWidget {
+  const _ReadRetryAction({required this.actionKey, required this.onPressed});
+
+  final Key actionKey;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Tekrar dene',
+      button: true,
+      enabled: onPressed != null,
+      excludeSemantics: true,
+      onTap: onPressed,
+      child: FilledButton(
+        key: actionKey,
+        style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+        onPressed: onPressed,
+        child: const Text('Tekrar dene'),
+      ),
+    );
+  }
+}
 
 class _ReminderIconAction extends StatelessWidget {
   const _ReminderIconAction({
