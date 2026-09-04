@@ -20,6 +20,7 @@ import 'package:chief_site_engineer/features/inventory/inventory_page.dart';
 import 'package:chief_site_engineer/features/living_plan/living_plan_page.dart';
 import 'package:chief_site_engineer/features/material_requests/material_requests_page.dart';
 import 'package:chief_site_engineer/features/memory/memory_backup_page.dart';
+import 'package:chief_site_engineer/features/project_context/active_project_control.dart';
 import 'package:chief_site_engineer/features/project_context/active_project_session.dart';
 import 'package:chief_site_engineer/features/projects/project_create_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
@@ -28,6 +29,8 @@ import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+
+export 'package:chief_site_engineer/features/project_context/active_project_control.dart';
 
 const _compactButtonStyle = ButtonStyle(
   minimumSize: WidgetStatePropertyAll(Size(0, 40)),
@@ -362,12 +365,6 @@ class _MobileShellState extends State<MobileShell> {
     return _activeProjectNames[selectedProjectId] ?? 'Proje seçilmedi';
   }
 
-  bool get _showsActiveProjectIndicator =>
-      _selectedIndex == 1 ||
-      _selectedIndex == 2 ||
-      _selectedIndex == 3 ||
-      _selectedIndex == 4;
-
   Future<void> _adoptRouteProjectSelection(
     String projectId, {
     bool refreshDashboard = true,
@@ -394,6 +391,10 @@ class _MobileShellState extends State<MobileShell> {
     unawaited(_adoptRouteProjectSelection(projectId));
   }
 
+  void _reportPrimaryProjectSelection(String projectId) {
+    unawaited(_adoptRouteProjectSelection(projectId, refreshDashboard: false));
+  }
+
   void _selectAppBarProject(String projectId) {
     if (!_activeProjectOptions.any((project) => project.id == projectId)) {
       return;
@@ -403,7 +404,7 @@ class _MobileShellState extends State<MobileShell> {
       // exact scoped load succeed. Failed/stale loads never retarget the shell.
       unawaited(_inventoryKey.currentState?.selectProject(projectId));
     } else {
-      _reportRouteProjectSelection(projectId);
+      _reportPrimaryProjectSelection(projectId);
     }
   }
 
@@ -762,15 +763,13 @@ class _MobileShellState extends State<MobileShell> {
         return Scaffold(
           appBar: AppBar(
             title: Text(title),
-            actions: _showsActiveProjectIndicator
-                ? [
-                    ActiveProjectControl(
-                      label: _activeProjectLabel,
-                      projects: _activeProjectOptions,
-                      onSelected: _selectAppBarProject,
-                    ),
-                  ]
-                : null,
+            actions: [
+              ActiveProjectControl(
+                label: _activeProjectLabel,
+                projects: _activeProjectOptions,
+                onSelected: _selectAppBarProject,
+              ),
+            ],
           ),
           body: SafeArea(
             child: Row(
@@ -835,7 +834,7 @@ class _MobileShellState extends State<MobileShell> {
                           activeProjectId:
                               _activeProjectSession.selectedProjectId,
                           isActive: _selectedIndex == 3,
-                          onProjectSelected: _reportRouteProjectSelection,
+                          onProjectSelected: _reportPrimaryProjectSelection,
                         ),
                       ),
                       _buildVisitedPrimaryTab(
@@ -847,7 +846,7 @@ class _MobileShellState extends State<MobileShell> {
                             activeProjectId:
                                 _activeProjectSession.selectedProjectId,
                             isActive: _selectedIndex == 4,
-                            onProjectSelected: _reportRouteProjectSelection,
+                            onProjectSelected: _reportPrimaryProjectSelection,
                           ),
                           null => const _PreparingPage(
                             icon: Icons.badge_outlined,
@@ -871,93 +870,6 @@ class _MobileShellState extends State<MobileShell> {
                 ),
         );
       },
-    );
-  }
-}
-
-class ActiveProjectControl extends StatelessWidget {
-  const ActiveProjectControl({
-    required this.label,
-    required this.projects,
-    required this.onSelected,
-    super.key,
-  });
-
-  final String label;
-  final List<MobileProject> projects;
-  final ValueChanged<String> onSelected;
-
-  Future<void> _choose(BuildContext context) async {
-    final selected = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        key: const Key('active-project-chooser'),
-        title: const Text('Proje seç'),
-        content: SizedBox(
-          width: 360,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.sizeOf(dialogContext).height * 0.5,
-            ),
-            child: projects.isEmpty
-                ? const Text('Seçilebilir aktif proje yok.')
-                : ListView(
-                    shrinkWrap: true,
-                    children: [
-                      for (final project in projects)
-                        ListTile(
-                          key: ValueKey('active-project-option-${project.id}'),
-                          title: Text(project.name),
-                          onTap: () =>
-                              Navigator.of(dialogContext).pop(project.id),
-                        ),
-                    ],
-                  ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Vazgeç'),
-          ),
-        ],
-      ),
-    );
-    if (context.mounted && selected != null) onSelected(selected);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 12),
-      child: Center(
-        child: Tooltip(
-          message: 'Aktif proje: $label',
-          child: Semantics(
-            container: true,
-            label: 'Aktif proje: $label',
-            child: ActionChip(
-              key: const Key('active-project-indicator'),
-              onPressed: () => unawaited(_choose(context)),
-              avatar: const Icon(Icons.apartment_rounded, size: 18),
-              label: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: (MediaQuery.sizeOf(context).width * 0.35)
-                      .clamp(64.0, 132.0)
-                      .toDouble(),
-                ),
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              visualDensity: VisualDensity.standard,
-              materialTapTargetSize: MaterialTapTargetSize.padded,
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

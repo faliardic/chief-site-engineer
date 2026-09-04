@@ -75,11 +75,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(_dashboardProjectSelectionButton());
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
-      );
+      await _chooseSharedProject(tester, _projectB.id);
       await tester.pumpAndSettle();
       final session = tester
           .widget<ProjectDashboardPage>(
@@ -481,11 +477,7 @@ void main() {
       final baselineEnsureDay = attendance.ensureDayCalls;
       final baselineRolling = attendance.rollingCalls;
 
-      await tester.tap(_dashboardProjectSelectionButton());
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
-      );
+      await _chooseSharedProject(tester, _projectB.id);
       await tester.pumpAndSettle();
       expect(attendance.ensureDayCalls, 0);
       expect(attendance.rollingCalls, 0);
@@ -618,11 +610,7 @@ void main() {
       expect(attendance.ensureProjectIds, isEmpty);
       expect(attendance.rollingCalls, 0);
 
-      await tester.tap(_dashboardProjectSelectionButton());
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
-      );
+      await _chooseSharedProject(tester, _projectB.id);
       await tester.pumpAndSettle();
       expect(attendance.ensureProjectIds, isEmpty);
       expect(attendance.rollingCalls, 0);
@@ -649,11 +637,7 @@ void main() {
 
       await tester.tap(find.text('Ana Sayfa').last);
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('dashboard-change-project')));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(ValueKey('dashboard-project-${_projectA.id}')),
-      );
+      await _chooseSharedProject(tester, _projectA.id);
       await tester.pumpAndSettle();
       expect(attendance.ensureProjectIds, [_projectB.id]);
       expect(attendance.rollingCalls, 1);
@@ -749,6 +733,9 @@ void main() {
         find.byKey(const Key('dashboard-project-selection-required')),
         findsOneWidget,
       );
+      expect(find.byKey(const Key('active-project-indicator')), findsOneWidget);
+      expect(find.byKey(const Key('dashboard-select-project')), findsNothing);
+      expect(find.byKey(const Key('dashboard-change-project')), findsNothing);
       expect(find.byKey(const Key('dashboard-concrete-package')), findsNothing);
       expect(
         find.byKey(const Key('dashboard-workforce-directory')),
@@ -824,19 +811,6 @@ void main() {
     expect(find.text('Daha', skipOffstage: false), findsNothing);
     expect(tester.takeException(), isNull);
   });
-}
-
-Finder _dashboardProjectSelectionButton() {
-  final surface = find.byKey(const Key('dashboard-project-selection-required'));
-  expect(surface, findsOneWidget);
-  final button = find
-      .descendant(
-        of: surface,
-        matching: find.widgetWithText(FilledButton, 'Proje seç'),
-      )
-      .hitTestable();
-  expect(button, findsOneWidget);
-  return button;
 }
 
 Future<void> _chooseSharedProject(WidgetTester tester, String id) async {

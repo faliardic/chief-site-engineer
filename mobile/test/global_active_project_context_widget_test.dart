@@ -47,12 +47,7 @@ void main() {
       final inventory = _ContextInventory();
       await _pumpShell(tester, agenda, inventory: inventory);
       expect(inventory.projects, isEmpty);
-      await tester.tap(_dashboardProjectSelectionButton());
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
-      );
-      await tester.pumpAndSettle();
+      await _chooseSharedProject(tester, _projectB.id);
       expect(inventory.projects, isEmpty);
       await _openTab(tester, 'Envanter');
       _expectIndicator(_projectB.name);
@@ -192,7 +187,9 @@ void main() {
       );
       await _pumpShell(tester, agenda);
 
-      expect(find.byKey(const Key('active-project-indicator')), findsNothing);
+      _expectIndicator('Proje seçilmedi');
+      expect(find.byKey(const Key('dashboard-select-project')), findsNothing);
+      expect(find.byKey(const Key('dashboard-change-project')), findsNothing);
 
       await _openTab(tester, 'Hatırlatıcı');
       _expectIndicator('Proje seçilmedi');
@@ -252,12 +249,7 @@ void main() {
         projects: const [_projectA, _projectB],
       );
       await _pumpShell(tester, agenda);
-      await tester.tap(_dashboardProjectSelectionButton());
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
-      );
-      await tester.pumpAndSettle();
+      await _chooseSharedProject(tester, _projectB.id);
 
       await _openTab(tester, 'Hatırlatıcı');
       _expectIndicator(_projectB.name);
@@ -331,13 +323,10 @@ void main() {
       await _openTab(tester, 'Hatırlatıcı');
       _expectIndicator(_projectB.name);
       await _openTab(tester, 'Ana Sayfa');
-      expect(find.byKey(const Key('active-project-indicator')), findsNothing);
-      await tester.tap(find.byKey(const Key('dashboard-change-project')));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(ValueKey('dashboard-project-${_projectA.id}')),
-      );
-      await tester.pumpAndSettle();
+      _expectIndicator(_projectB.name);
+      expect(find.byKey(const Key('dashboard-select-project')), findsNothing);
+      expect(find.byKey(const Key('dashboard-change-project')), findsNothing);
+      await _chooseSharedProject(tester, _projectA.id);
       await _openTab(tester, 'Hatırlatıcı');
       _expectIndicator(_projectA.name);
 
@@ -353,12 +342,7 @@ void main() {
         projects: const [_projectA, _projectB],
       );
       await _pumpShell(tester, agenda);
-      await tester.tap(_dashboardProjectSelectionButton());
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
-      );
-      await tester.pumpAndSettle();
+      await _chooseSharedProject(tester, _projectB.id);
       await _openTab(tester, 'Hatırlatıcı');
       _expectIndicator(_projectB.name);
 
@@ -416,12 +400,7 @@ void main() {
         isCatalogDiscoveryInFlight: () => catalog.discoveryInFlight,
       );
       await _pumpShell(tester, agenda, attachmentCatalog: catalog);
-      await tester.tap(_dashboardProjectSelectionButton());
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(ValueKey('dashboard-project-${_projectB.id}')),
-      );
-      await tester.pumpAndSettle();
+      await _chooseSharedProject(tester, _projectB.id);
 
       await _openDashboardTool(tester, const Key('dashboard-project-album'));
       expect(catalog.scopedCalls, [_projectB.id]);
@@ -494,17 +473,19 @@ Future<void> _pumpShell(
   await tester.pumpAndSettle();
 }
 
-Finder _dashboardProjectSelectionButton() {
-  final surface = find.byKey(const Key('dashboard-project-selection-required'));
-  expect(surface, findsOneWidget);
-  final button = find
-      .descendant(
-        of: surface,
-        matching: find.widgetWithText(FilledButton, 'Proje seç'),
-      )
+Future<void> _chooseSharedProject(WidgetTester tester, String id) async {
+  final control = find
+      .byKey(const Key('active-project-indicator'))
       .hitTestable();
-  expect(button, findsOneWidget);
-  return button;
+  expect(control, findsOneWidget);
+  await tester.tap(control);
+  await tester.pumpAndSettle();
+  final option = find
+      .byKey(ValueKey('active-project-option-$id'))
+      .hitTestable();
+  expect(option, findsOneWidget);
+  await tester.tap(option);
+  await tester.pumpAndSettle();
 }
 
 Future<void> _openTabIcon(WidgetTester tester, IconData icon) async {
@@ -550,6 +531,7 @@ Future<void> _openDashboardTool(WidgetTester tester, Key key) async {
 }
 
 void _expectIndicator(String label) {
+  expect(find.byType(ActiveProjectControl), findsOneWidget);
   final indicator = find.byKey(const Key('active-project-indicator'));
   expect(indicator, findsOneWidget);
   expect(
