@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/application/concrete_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
@@ -56,10 +58,20 @@ class _LogFormPageState extends State<LogFormPage> {
   bool _loadingProjects = true;
   bool _loadingLocations = false;
   bool _submitting = false;
+  bool _allowPop = false;
+  bool _exitDialogOpen = false;
   String? _error;
   String? _locationError;
   int _locationLoadGeneration = 0;
   final List<(SelectedAttachment, String, String, String)> _pendingPhotos = [];
+  late String _baselineDescription;
+  late String _baselineLocation;
+  late String _baselineNotes;
+  String? _baselineProjectId;
+  String? _baselineLocationId;
+  late DateTime _baselineDate;
+  late TimeOfDay _baselineTime;
+  late AgendaCategory _baselineCategory;
 
   @override
   void initState() {
@@ -85,6 +97,7 @@ class _LogFormPageState extends State<LogFormPage> {
       _location.text = current.location ?? '';
       _notes.text = current.notes ?? '';
     }
+    _captureInitialBaseline();
     _description.addListener(_onSignalInputChanged);
     _notes.addListener(_onSignalInputChanged);
     _loadProjects();
@@ -148,9 +161,13 @@ class _LogFormPageState extends State<LogFormPage> {
     try {
       final projects = await widget.agenda.listProjects();
       if (!mounted) return;
+      final selectedProjectId =
+          _projectId ?? (projects.isEmpty ? null : projects.first.id);
+      final projectWasDirty = _projectId != _baselineProjectId;
       setState(() {
         _projects = projects;
-        _projectId ??= projects.isEmpty ? null : projects.first.id;
+        _projectId = selectedProjectId;
+        if (!projectWasDirty) _baselineProjectId = selectedProjectId;
         _loadingProjects = false;
       });
       await _loadLocations();
@@ -215,10 +232,12 @@ class _LogFormPageState extends State<LogFormPage> {
       final selectionIsActive = locations.any(
         (location) => location.id == _locationId,
       );
+      final locationWasDirty = _locationId != _baselineLocationId;
       setState(() {
         _locations = locations;
         if (!selectionIsActive && !canKeepArchivedLink) {
           _locationId = null;
+          if (!locationWasDirty) _baselineLocationId = null;
         }
         _loadingLocations = false;
       });
@@ -251,6 +270,69 @@ class _LogFormPageState extends State<LogFormPage> {
         _location.clear();
       }
     });
+  }
+
+  void _captureInitialBaseline() {
+    _baselineDescription = _description.text;
+    _baselineLocation = _location.text;
+    _baselineNotes = _notes.text;
+    _baselineProjectId = _projectId;
+    _baselineLocationId = _locationId;
+    _baselineDate = _date;
+    _baselineTime = _time;
+    _baselineCategory = _category;
+  }
+
+  bool get _isDirty =>
+      _description.text != _baselineDescription ||
+      _location.text != _baselineLocation ||
+      _notes.text != _baselineNotes ||
+      _projectId != _baselineProjectId ||
+      _locationId != _baselineLocationId ||
+      _date != _baselineDate ||
+      _time != _baselineTime ||
+      _category != _baselineCategory ||
+      _pendingPhotos.isNotEmpty;
+
+  void _rebuildForUserEdit(String _) {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _handlePopAttempt(Object? result) async {
+    if (_submitting || !_isDirty || _exitDialogOpen) return;
+    _exitDialogOpen = true;
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('unsaved-changes-dialog'),
+        title: const Text('Kaydedilmemiş değişiklikler'),
+        content: const Text(
+          'Yaptığınız değişiklikler kaydedilmedi. Formdan çıkmak istiyor musunuz?',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('stay-on-form'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Formda kal'),
+          ),
+          TextButton(
+            key: const Key('discard-form'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Kaydetmeden çık'),
+          ),
+        ],
+      ),
+    );
+    _exitDialogOpen = false;
+    if (!mounted || discard != true) return;
+    await _popWithGuardBypass(result);
+  }
+
+  Future<void> _popWithGuardBypass(Object? result) async {
+    if (!mounted) return;
+    setState(() => _allowPop = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) Navigator.of(context).pop(result);
   }
 
   Future<void> _openLocationCatalog() async {
@@ -327,7 +409,9 @@ class _LogFormPageState extends State<LogFormPage> {
               ),
             );
       if (!mounted) return;
-      Navigator.pop(context, CseTimeCodec.istanbulDayKey(created.observedAt));
+      await _popWithGuardBypass(
+        CseTimeCodec.istanbulDayKey(created.observedAt),
+      );
     } on AgendaValidationFailure catch (error) {
       if (mounted) setState(() => _error = error.message);
     } on TimeContractViolation {
@@ -393,6 +477,16 @@ class _LogFormPageState extends State<LogFormPage> {
 
   @override
   Widget build(BuildContext context) {
+    return PopScope<Object?>(
+      canPop: _allowPop || (!_submitting && !_isDirty),
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) unawaited(_handlePopAttempt(result));
+      },
+      child: _buildForm(),
+    );
+  }
+
+  Widget _buildForm() {
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -554,6 +648,7 @@ class _LogFormPageState extends State<LogFormPage> {
                   labelText: 'Mahal (opsiyonel)',
                   border: OutlineInputBorder(),
                 ),
+                onChanged: _rebuildForUserEdit,
               )
             else
               _buildStableLocationField(),
