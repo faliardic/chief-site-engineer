@@ -274,6 +274,9 @@ void main() {
         onOpenToday: (projectId) => opened.add(('today', projectId)),
         onOpenPlan: (projectId) => opened.add(('plan', projectId)),
         onOpenMaterials: (projectId) => opened.add(('materials', projectId)),
+        onOpenConcrete: (projectId) => opened.add(('concrete', projectId)),
+        onOpenProjectAlbum: (projectId) => opened.add(('album', projectId)),
+        onOpenWorkforce: (projectId) => opened.add(('workforce', projectId)),
       ),
     );
     await tester.pumpAndSettle();
@@ -375,12 +378,38 @@ void main() {
     expect(find.text('7 Günlük Plan'), findsOneWidget);
     expect(find.text('İstenecek Malzemeler'), findsOneWidget);
 
-    final album = find.byKey(const Key('dashboard-project-album'));
+    const toolKeys = [
+      Key('dashboard-concrete-package'),
+      Key('dashboard-project-album'),
+      Key('dashboard-workforce-directory'),
+    ];
+    final workforce = find.byKey(toolKeys.last);
     await tester.scrollUntilVisible(
-      album,
+      workforce,
       300,
       scrollable: find.byType(Scrollable).first,
     );
+    final toolOffsets = [
+      for (final key in toolKeys) tester.getTopLeft(find.byKey(key)).dy,
+    ];
+    expect(toolOffsets, orderedEquals(toolOffsets.toList()..sort()));
+
+    for (final key in toolKeys) {
+      final tool = find.byKey(key);
+      await tester.ensureVisible(tool);
+      await tester.tap(tool);
+      await tester.pump();
+    }
+    expect(opened, [
+      ('today', 'a'),
+      ('plan', 'a'),
+      ('materials', 'a'),
+      ('concrete', 'a'),
+      ('album', 'a'),
+      ('workforce', 'a'),
+    ]);
+
+    final album = find.byKey(const Key('dashboard-project-album'));
     final tile = tester.widget<ListTile>(
       find.descendant(of: album, matching: find.byType(ListTile)),
     );
@@ -399,7 +428,7 @@ void main() {
     expect(
       find.descendant(
         of: album,
-        matching: find.text('Bu kurulumda hazır değil.'),
+        matching: find.text('Fotoğraf ve videoları kaynaklarıyla görüntüle.'),
       ),
       findsOneWidget,
     );
@@ -795,6 +824,9 @@ class _Fixture {
     DashboardProjectAction? onOpenToday,
     DashboardProjectAction? onOpenPlan,
     DashboardProjectAction? onOpenMaterials,
+    DashboardProjectAction? onOpenConcrete,
+    DashboardProjectAction? onOpenProjectAlbum,
+    DashboardProjectAction? onOpenWorkforce,
     Brightness brightness = Brightness.light,
   }) => MaterialApp(
     locale: CseApp.locale,
@@ -814,6 +846,9 @@ class _Fixture {
         onOpenToday: onOpenToday,
         onOpenPlan: onOpenPlan,
         onOpenMaterials: onOpenMaterials,
+        onOpenConcrete: onOpenConcrete,
+        onOpenProjectAlbum: onOpenProjectAlbum,
+        onOpenWorkforce: onOpenWorkforce,
         clock: () => DateTime.utc(2026, 8, 30, 9),
       ),
     ),

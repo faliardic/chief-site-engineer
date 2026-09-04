@@ -73,7 +73,7 @@ void main() {
         tester.getBottomLeft(find.byType(AppBar)).dy,
       );
 
-      await _openTab(tester, 'Daha');
+      await _openTab(tester, 'Hatırlatıcı');
       await tester.tap(
         find.byKey(const Key('active-project-indicator')).hitTestable(),
       );
@@ -118,7 +118,7 @@ void main() {
         );
         final inventory = _ContextInventory();
         await _pumpShell(tester, agenda, inventory: inventory);
-        await _openTabIcon(tester, Icons.more_horiz_rounded);
+        await _openTabIcon(tester, Icons.notifications_none_rounded);
         final control = find
             .byKey(const Key('active-project-indicator'))
             .hitTestable();
@@ -236,7 +236,7 @@ void main() {
       );
       await _openTab(tester, 'Puantaj');
       _expectIndicator('Proje seçilmedi');
-      await _openTab(tester, 'Daha');
+      await _openTab(tester, 'Hatırlatıcı');
       _expectIndicator('Proje seçilmedi');
 
       expect(agenda.createReminderCalls, 0);
@@ -328,9 +328,9 @@ void main() {
       await tester.pumpAndSettle();
       _expectIndicator(_projectB.name);
 
-      await _openTab(tester, 'Daha');
+      await _openTab(tester, 'Hatırlatıcı');
       _expectIndicator(_projectB.name);
-      await _openTab(tester, 'Başlangıç');
+      await _openTab(tester, 'Ana Sayfa');
       expect(find.byKey(const Key('active-project-indicator')), findsNothing);
       await tester.tap(find.byKey(const Key('dashboard-change-project')));
       await tester.pumpAndSettle();
@@ -338,7 +338,7 @@ void main() {
         find.byKey(ValueKey('dashboard-project-${_projectA.id}')),
       );
       await tester.pumpAndSettle();
-      await _openTab(tester, 'Daha');
+      await _openTab(tester, 'Hatırlatıcı');
       _expectIndicator(_projectA.name);
 
       expect(agenda.createLogCalls, 0);
@@ -464,7 +464,7 @@ void main() {
       _expectIndicator(_projectA.name);
       await _openTab(tester, 'Ajanda');
       _expectIndicator(_projectA.name);
-      await _openTab(tester, 'Daha');
+      await _openTab(tester, 'Puantaj');
       _expectIndicator(_projectA.name);
       expect(tester.takeException(), isNull);
     },
@@ -508,7 +508,9 @@ Finder _dashboardProjectSelectionButton() {
 }
 
 Future<void> _openTabIcon(WidgetTester tester, IconData icon) async {
-  final navigation = find.byType(NavigationBar);
+  final navigation = find.byType(NavigationBar).evaluate().isNotEmpty
+      ? find.byType(NavigationBar)
+      : find.byType(NavigationRail);
   expect(navigation, findsOneWidget);
   final destination = find
       .descendant(of: navigation, matching: find.byIcon(icon))

@@ -22,6 +22,7 @@ import 'package:chief_site_engineer/features/agenda/phone_call_result_page.dart'
 import 'package:chief_site_engineer/features/attendance/workforce_directory_page.dart';
 import 'package:chief_site_engineer/features/attachments/project_media_album_page.dart';
 import 'package:chief_site_engineer/features/concrete/concrete_page.dart';
+import 'package:chief_site_engineer/features/concrete/concrete_pour_detail_page.dart';
 import 'package:chief_site_engineer/features/daily_log/daily_log_page.dart';
 import 'package:chief_site_engineer/features/dashboard/project_dashboard_page.dart';
 import 'package:chief_site_engineer/features/inventory/inventory_page.dart';
@@ -489,11 +490,8 @@ void main() {
       expect(attendance.ensureDayCalls, 0);
       expect(attendance.rollingCalls, 0);
 
-      await tester.tap(find.text('Daha').last);
-      await tester.pumpAndSettle();
       agenda.failNextProjectDiscovery = true;
-      await tester.tap(find.byKey(const Key('more-concrete-package')));
-      await tester.pumpAndSettle();
+      await _openDashboardTool(tester, const Key('dashboard-concrete-package'));
       expect(concrete.projectCalls, isEmpty);
       expect(find.byKey(const Key('concrete-project-retry')), findsOneWidget);
       await tester.tap(find.byKey(const Key('concrete-project-retry')));
@@ -513,8 +511,10 @@ void main() {
 
       final workforceMemberBaseline = attendance.memberProjectCalls.length;
       agenda.failNextProjectDiscovery = true;
-      await tester.tap(find.byKey(const Key('more-workforce-directory')));
-      await tester.pumpAndSettle();
+      await _openDashboardTool(
+        tester,
+        const Key('dashboard-workforce-directory'),
+      );
       expect(attendance.memberProjectCalls.length, workforceMemberBaseline);
       expect(
         find.byKey(const Key('workforce-directory-project-retry')),
@@ -532,7 +532,7 @@ void main() {
       await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Başlangıç').last);
+      await tester.tap(find.text('Ana Sayfa').last);
       await tester.pumpAndSettle();
 
       await _openDashboardTool(
@@ -647,7 +647,7 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(find.text('Başlangıç').last);
+      await tester.tap(find.text('Ana Sayfa').last);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('dashboard-change-project')));
       await tester.pumpAndSettle();
@@ -721,7 +721,7 @@ void main() {
   );
 
   testWidgets(
-    'More with two projects and no session redirects without scoped work',
+    'Dashboard with two projects requires selection before scoped tools',
     (tester) async {
       final agenda = _PhoneAgenda(projects: const [_projectA, _projectB]);
       final concrete = _ConcreteFake();
@@ -744,29 +744,86 @@ void main() {
       await tester.pumpAndSettle();
       final directoryBaseline = attendance.directoryProjectCalls.length;
 
-      await tester.tap(find.text('Daha').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('more-concrete-package')));
-      await tester.pumpAndSettle();
       expect(concrete.projectCalls, isEmpty);
       expect(
         find.byKey(const Key('dashboard-project-selection-required')),
         findsOneWidget,
       );
-
-      await tester.tap(find.text('Daha').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('more-workforce-directory')));
-      await tester.pumpAndSettle();
-      expect(attendance.directoryProjectCalls.length, directoryBaseline);
+      expect(find.byKey(const Key('dashboard-concrete-package')), findsNothing);
       expect(
-        find.byKey(const Key('dashboard-project-selection-required')),
-        findsOneWidget,
+        find.byKey(const Key('dashboard-workforce-directory')),
+        findsNothing,
       );
+      expect(attendance.directoryProjectCalls.length, directoryBaseline);
       expect(agenda.captureCalls, 0);
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('concrete notification anchors the five-tab shell on Ana Sayfa', (
+    tester,
+  ) async {
+    final taps = StreamController<String>.broadcast();
+    addTearDown(taps.close);
+    final reminder = MobileReminder(
+      id: 'notification-reminder',
+      projectId: _projectA.id,
+      projectName: _projectA.name,
+      sourceLogId: null,
+      concretePourId: 'pour-from-notification',
+      title: 'Beton detayı',
+      kind: ReminderKind.action,
+      status: ReminderStatus.active,
+      nextAttentionAt: '2026-09-04T08:00:00Z',
+      createdAt: '2026-09-04T07:00:00Z',
+      updatedAt: '2026-09-04T07:00:00Z',
+      revision: 1,
+    );
+    final agenda = FakeAgendaApplication(
+      projects: const [_projectA],
+      reminderDetail: reminder,
+      notificationTapStream: taps.stream,
+    );
+    await tester.pumpWidget(
+      CseApp(
+        bootstrap: Future.value(
+          BootstrapSuccess(
+            environmentLabel: 'Test',
+            smokeRecordId: 'issue-620-concrete-notification',
+            smokeRecordCreatedAt: '2026-09-04T07:00:00Z',
+            agenda: agenda,
+            concrete: _ConcreteFake(),
+            concreteAttachments: _picker(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ajanda').last);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<NavigationRail>(find.byType(NavigationRail)).selectedIndex,
+      2,
+    );
+
+    taps.add(reminder.id);
+    await tester.pumpAndSettle();
+
+    final detail = tester.widget<ConcretePourDetailPage>(
+      find.byType(ConcretePourDetailPage),
+    );
+    expect(detail.pourId, 'pour-from-notification');
+    expect(
+      tester
+          .widget<NavigationRail>(
+            find.byType(NavigationRail, skipOffstage: false),
+          )
+          .selectedIndex,
+      0,
+    );
+    expect(find.text('Daha', skipOffstage: false), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Finder _dashboardProjectSelectionButton() {
@@ -775,12 +832,7 @@ Finder _dashboardProjectSelectionButton() {
   final button = find
       .descendant(
         of: surface,
-        matching: find.byWidgetPredicate(
-          (widget) =>
-              widget is IconButton &&
-              widget.tooltip == 'Proje seç' &&
-              widget.onPressed != null,
-        ),
+        matching: find.widgetWithText(FilledButton, 'Proje seç'),
       )
       .hitTestable();
   expect(button, findsOneWidget);
