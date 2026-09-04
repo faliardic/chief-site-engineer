@@ -410,9 +410,7 @@ void main() {
 
       expect(fake.createLogCalls, 1);
       final submit = find.byKey(const Key('submit-log'));
-      expect(tester.getSize(submit), const Size.square(48));
-      expect(tester.widget<IconButton>(submit).onPressed, isNull);
-      expect(tester.widget<IconButton>(submit).tooltip, 'Kaydediliyor…');
+      _expectPrimaryFormAction(tester, submit, 'Kaydediliyor…', enabled: false);
       expect(
         find.descendant(
           of: submit,
@@ -2302,7 +2300,7 @@ void main() {
           await tester.pumpAndSettle();
           final submit = find.byKey(const Key('submit-log'));
           await _revealIcon(tester, submit);
-          _expectIcon(tester, submit, 'Logu kaydet');
+          _expectPrimaryFormAction(tester, submit, 'Kaydet');
           await tester.tap(submit);
           await tester.pumpAndSettle();
           expect(fake.createLogCalls, 0);
@@ -2402,7 +2400,7 @@ void main() {
           );
           final submit = find.byKey(const Key('submit-log'));
           await _revealIcon(tester, submit);
-          _expectIcon(tester, submit, 'Değişiklikleri kaydet');
+          _expectPrimaryFormAction(tester, submit, 'Kaydet');
           await tester.tap(submit);
           await tester.pumpAndSettle();
           expect(find.byType(LogDetailPage), findsOneWidget);
@@ -2543,14 +2541,15 @@ void main() {
           );
           final submit = find.byKey(const Key('submit-log'));
           await _revealIcon(tester, submit);
-          _expectIcon(
-            tester,
-            submit,
-            editing ? 'Değişiklikleri kaydet' : 'Logu kaydet',
-          );
+          _expectPrimaryFormAction(tester, submit, 'Kaydet');
           await tester.tap(submit);
           await tester.pump();
-          _expectIcon(tester, submit, 'Kaydediliyor…', enabled: false);
+          _expectPrimaryFormAction(
+            tester,
+            submit,
+            'Kaydediliyor…',
+            enabled: false,
+          );
           expect(
             find.descendant(
               of: submit,
@@ -2719,6 +2718,41 @@ Future<void> _revealIcon(WidgetTester tester, Finder target) async {
   await tester.pumpAndSettle();
   expect(target.hitTestable(), findsOneWidget);
   expect(tester.takeException(), isNull);
+}
+
+void _expectPrimaryFormAction(
+  WidgetTester tester,
+  Finder action,
+  String label, {
+  bool enabled = true,
+}) {
+  expect(action, findsOneWidget);
+  expect(tester.widget(action), isA<FilledButton>());
+  expect(
+    find.descendant(of: action, matching: find.byType(IconButton)),
+    findsNothing,
+  );
+  final renderedSize = tester.getSize(action);
+  expect(renderedSize.width, greaterThanOrEqualTo(48));
+  expect(renderedSize.height, greaterThanOrEqualTo(48));
+  expect(
+    find.descendant(of: action, matching: find.text(label)),
+    findsOneWidget,
+  );
+  final semantics = find
+      .ancestor(
+        of: action,
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Semantics && widget.properties.label == label,
+        ),
+      )
+      .first;
+  final properties = tester.widget<Semantics>(semantics).properties;
+  expect(tester.getSize(semantics), renderedSize);
+  expect(properties.button, isTrue);
+  expect(properties.enabled, enabled);
+  expect(properties.onTap != null, enabled);
+  expect(tester.widget<FilledButton>(action).onPressed != null, enabled);
 }
 
 void _expectIcon(
