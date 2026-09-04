@@ -1079,8 +1079,7 @@ Widget _localizedTestApp(Widget home) => MaterialApp(
 );
 
 class _ShellProjectAgenda extends FakeAgendaApplication {
-  _ShellProjectAgenda({List<MobileProject> projects = const []})
-    : super(projects: projects);
+  _ShellProjectAgenda({super.projects = const []});
 
   int createProjectCalls = 0;
   CreateProjectCommand? lastProjectCommand;

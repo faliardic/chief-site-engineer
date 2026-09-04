@@ -2606,7 +2606,7 @@ class InventoryApplication
                 (block) => block.polygonIndex >= draftLegacyPolygonCount,
               );
           final unclassifiedLegacyCount = legacyPrefixIsValid
-              ? active!.geometry.polylines.length - activeMappings.length
+              ? active.geometry.polylines.length - activeMappings.length
               : draftLegacyPolygonCount;
           if (draftLegacyPolygonCount < 0 ||
               draftLegacyPolygonCount > draft.geometry.polylines.length ||
@@ -5379,7 +5379,7 @@ class InventoryApplication
           ) &&
           newBlocks.every((block) => block.polygonIndex >= legacyPolygonCount);
       final unclassifiedLegacyCount = targetLegacyPrefixIsValid
-          ? active!.geometry.polylines.length - sourceMappings.length
+          ? active.geometry.polylines.length - sourceMappings.length
           : legacyPolygonCount;
       if ((active != null &&
               (sourceMappedIndexes.length != sourceMappings.length ||
@@ -6438,7 +6438,7 @@ class InventoryApplication
             (block) => block.polygonIndex >= currentLegacyPolygonCount,
           );
       final unclassifiedLegacyCount = currentLegacyPrefixIsValid
-          ? base!.geometry.polylines.length - baseMappings.length
+          ? base.geometry.polylines.length - baseMappings.length
           : currentLegacyPolygonCount;
       if (unclassifiedLegacyCount != currentMappingAwareCount &&
           !_hasOpenDraftSuffix(
