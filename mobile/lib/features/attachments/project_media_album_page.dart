@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:chief_site_engineer/application/agenda_application.dart';
@@ -19,6 +20,7 @@ class ProjectMediaAlbumPage extends StatefulWidget {
     this.projectLocations,
     this.initialProjectId,
     this.onProjectSelected,
+    this.appBarProjectControlBuilder,
     super.key,
   });
 
@@ -29,6 +31,8 @@ class ProjectMediaAlbumPage extends StatefulWidget {
   final ProjectLocationApplication? projectLocations;
   final String? initialProjectId;
   final ValueChanged<String>? onProjectSelected;
+  final Widget Function(ValueChanged<String> onSelected)?
+  appBarProjectControlBuilder;
 
   @override
   State<ProjectMediaAlbumPage> createState() => _ProjectMediaAlbumPageState();
@@ -45,6 +49,8 @@ class _ProjectMediaAlbumPageState extends State<ProjectMediaAlbumPage> {
   String _contextFilter = _allContexts;
   DateTimeRange? _dateRange;
   bool _openingMedia = false;
+  bool _projectSelectionFailed = false;
+  int _projectSelectionGeneration = 0;
 
   @override
   void initState() {
@@ -54,6 +60,8 @@ class _ProjectMediaAlbumPageState extends State<ProjectMediaAlbumPage> {
   }
 
   void _reload() {
+    _projectSelectionGeneration += 1;
+    _projectSelectionFailed = false;
     _view = _load(_selectedProjectId);
   }
 
@@ -69,9 +77,23 @@ class _ProjectMediaAlbumPageState extends State<ProjectMediaAlbumPage> {
         projects.isNotEmpty) {
       selectedProjectId = projects.first.id;
     }
-    final items = selectedProjectId == null
-        ? const <ProjectAttachmentCatalogItem>[]
-        : await widget.catalog.listProjectAttachments(selectedProjectId);
+    if (selectedProjectId == null) {
+      return _AlbumView(
+        projects: projects,
+        selectedProjectId: null,
+        items: const [],
+      );
+    }
+    return _loadDiscoveredProject(projects, selectedProjectId);
+  }
+
+  Future<_AlbumView> _loadDiscoveredProject(
+    List<AttachmentCatalogProject> projects,
+    String selectedProjectId,
+  ) async {
+    final items = await widget.catalog.listProjectAttachments(
+      selectedProjectId,
+    );
     return _AlbumView(
       projects: projects,
       selectedProjectId: selectedProjectId,
@@ -79,17 +101,45 @@ class _ProjectMediaAlbumPageState extends State<ProjectMediaAlbumPage> {
     );
   }
 
-  void _selectProject(String? projectId) {
-    if (projectId == null || projectId == _selectedProjectId) return;
-    setState(() {
-      _selectedProjectId = projectId;
-      _mediaFilter = _AlbumMediaFilter.all;
-      _sourceFilter = null;
-      _contextFilter = _allContexts;
-      _dateRange = null;
-      _reload();
-    });
-    widget.onProjectSelected?.call(projectId);
+  void _selectProject(String projectId) {
+    if (projectId == _selectedProjectId) return;
+    unawaited(_validateAndSelectProject(projectId));
+  }
+
+  Future<void> _validateAndSelectProject(String projectId) async {
+    final generation = ++_projectSelectionGeneration;
+    try {
+      final projects = await widget.catalog.listProjects();
+      if (!mounted || generation != _projectSelectionGeneration) return;
+      if (!projects.any((project) => project.id == projectId)) {
+        setState(() {
+          _projectSelectionFailed = false;
+          _view = Future.value(
+            _AlbumView(
+              projects: projects,
+              selectedProjectId: null,
+              items: const [],
+            ),
+          );
+        });
+        return;
+      }
+      setState(() {
+        _projectSelectionFailed = false;
+        _selectedProjectId = projectId;
+        _mediaFilter = _AlbumMediaFilter.all;
+        _sourceFilter = null;
+        _contextFilter = _allContexts;
+        _dateRange = null;
+        _view = _loadDiscoveredProject(projects, projectId);
+      });
+      widget.onProjectSelected?.call(projectId);
+    } on Object {
+      if (!mounted || generation != _projectSelectionGeneration) return;
+      setState(() {
+        _projectSelectionFailed = true;
+      });
+    }
   }
 
   Future<void> _refresh() async {
@@ -334,6 +384,8 @@ class _ProjectMediaAlbumPageState extends State<ProjectMediaAlbumPage> {
       appBar: AppBar(
         title: const Text('Proje Albümü'),
         actions: [
+          if (widget.appBarProjectControlBuilder case final builder?)
+            builder(_selectProject),
           IconButton(
             key: const Key('refresh-project-media-album'),
             tooltip: 'Albümü yenile',
@@ -345,10 +397,7 @@ class _ProjectMediaAlbumPageState extends State<ProjectMediaAlbumPage> {
       body: FutureBuilder<_AlbumView>(
         future: _view,
         builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
+          if (_projectSelectionFailed || snapshot.hasError) {
             return Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -365,6 +414,9 @@ class _ProjectMediaAlbumPageState extends State<ProjectMediaAlbumPage> {
                 ),
               ],
             );
+          }
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
           }
           final view = snapshot.requireData;
           final contextOptions = _contextOptions(view.items);
@@ -468,25 +520,6 @@ class _ProjectMediaAlbumPageState extends State<ProjectMediaAlbumPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        DropdownButtonFormField<String>(
-          key: ValueKey('album-project-${view.selectedProjectId}'),
-          initialValue: view.selectedProjectId,
-          isExpanded: true,
-          decoration: const InputDecoration(
-            labelText: 'Proje',
-            border: OutlineInputBorder(),
-          ),
-          items: view.projects
-              .map(
-                (project) => DropdownMenuItem(
-                  value: project.id,
-                  child: Text(project.name),
-                ),
-              )
-              .toList(growable: false),
-          onChanged: view.projects.isEmpty ? null : _selectProject,
-        ),
-        const SizedBox(height: 12),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

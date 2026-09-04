@@ -311,6 +311,7 @@ void main() {
           agenda: agenda,
           initialProjectId: 'stale',
           onProjectSelected: callbacks.add,
+          appBarProjectControlBuilder: _buildAlbumProjectControl,
         ),
       );
       expect(catalog.scopedCalls, isEmpty);
@@ -318,11 +319,8 @@ void main() {
         find.byKey(const Key('project-media-album-context-unavailable')),
         findsOneWidget,
       );
-      await _chooseProject(
-        tester,
-        find.byKey(const ValueKey('album-project-null')),
-        _projectA.name,
-      );
+      expect(find.byKey(const ValueKey('album-project-null')), findsNothing);
+      await _chooseSharedProject(tester, _projectA.id);
       expect(catalog.scopedCalls, [_projectA.id]);
       expect(callbacks, [_projectA.id]);
 
@@ -411,6 +409,7 @@ void main() {
           agenda: FakeAgendaApplication(projects: const [_projectA, _projectB]),
           initialProjectId: _projectB.id,
           onProjectSelected: callbacks.add,
+          appBarProjectControlBuilder: _buildAlbumProjectControl,
         ),
       );
       expect(catalog.scopedCalls, isEmpty);
@@ -635,20 +634,25 @@ void main() {
 
       await _openDashboardTool(tester, const Key('dashboard-project-album'));
       expect(catalog.scopedCalls.first, _projectB.id);
+      final albumState = tester.state(find.byType(ProjectMediaAlbumPage));
       expect(
-        tester
-            .widget<DropdownButtonFormField<String>>(
-              find.byKey(ValueKey('album-project-${_projectB.id}')),
-            )
-            .initialValue,
-        _projectB.id,
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.byType(ActiveProjectControl),
+        ),
+        findsOneWidget,
       );
-      await _chooseProject(
-        tester,
+      expect(
         find.byKey(ValueKey('album-project-${_projectB.id}')),
-        _projectA.name,
+        findsNothing,
       );
+      await _chooseSharedProject(tester, _projectA.id);
       expect(catalog.scopedCalls.last, _projectA.id);
+      expect(session.selectedProjectId, _projectA.id);
+      expect(
+        tester.state(find.byType(ProjectMediaAlbumPage)),
+        same(albumState),
+      );
       expect(attendance.ensureDayCalls, baselineEnsureDay);
       expect(attendance.rollingCalls, baselineRolling);
       await tester.tap(find.byType(BackButton));
@@ -947,6 +951,13 @@ Future<void> _pumpPage(WidgetTester tester, Widget page) async {
   await tester.pumpWidget(MaterialApp(home: page));
   await tester.pumpAndSettle();
 }
+
+Widget _buildAlbumProjectControl(ValueChanged<String> onSelected) =>
+    ActiveProjectControl(
+      label: _projectA.name,
+      projects: const [_projectA, _projectB],
+      onSelected: onSelected,
+    );
 
 Future<void> _chooseProject(
   WidgetTester tester,
