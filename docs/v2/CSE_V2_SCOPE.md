@@ -3,7 +3,7 @@
 **Belge türü:** Güncel ürün yürütme kapsamı
 **Durum:** Kanonik V2 kapsam ve sıra kaynağı
 **Tarih:** 4 Eylül 2026
-**Güncel yön kaynağı:** Inventory v1 closure complete → #616 evidence baseline → #617 frictionless release-readiness program → #618 UI/UX system contract → Phase 1 adaptive/accessibility foundation → phased release gates
+**Güncel yön kaynağı:** Inventory v1 closure complete → #616 evidence baseline → #617 frictionless release-readiness program → #618 UI/UX contract merged → Phase 1 adaptive/accessibility foundation complete → Phase 2 Step 10 remaining narrow surfaces
 **Değişken repository gerçeği:** Güncel SHA/PR durumu GitHub `master` ve current Issue üzerinden doğrulanır.
 
 ## 1. Belgenin rolü
@@ -85,11 +85,14 @@ kullanılabilir hâle getirmektir.
 4 Eylül 2026 owner kararıyla Issue #617 yakın dönem frictionless
 release-readiness program otoritesidir. Issue #616'nın sanitize paketi ürün
 değerlendirmesi için evidence baseline'dır; manuel kabul PASS'i değildir.
-Issue #618 production davranışı değiştirmeden ortak UI/UX sözleşmesini kurar ve
-bu belgeyle Roadmap'i programa senkronlar. #618 merge edilmeden production UI
-işi başlamaz; merge sonrasındaki ilk dar yön, final compact destination setinin
-owner review'uyla seçilmesinden sonra Phase 1 adaptive/accessibility
-foundation'dır. DWG Viewer / Issue #523 `POST-RELEASE / DEFERRED` durumundadır
+Issue #618 ortak UI/UX sözleşmesi ve ilk truth-sync olarak merge edilmiştir.
+Phase 1 adaptive/accessibility foundation tamamlanmıştır. Phase 2 Step 8
+form/primary-action standardı UXF-013 / PR #645 ve UXF-014 / PR #647, Step 9
+Agenda search/filter dilimi UXF-015 / PR #649 ile tamamlanmıştır. Step 10
+başlamış; Agenda + Reminder retryable read-error standardı UXF-016 / PR #651 ile
+tamamlanmıştır. Step 10'un tamamı bitmemiştir; güncel sonraki yön kalan dar
+empty/loading/error/success yüzeyleri, ardından Step 11 history/event
+language'dır. DWG Viewer / Issue #523 `POST-RELEASE / DEFERRED` durumundadır
 ve ilk genel yayının bağımlılığı değildir.
 
 Ana yön:
@@ -120,9 +123,13 @@ Proje/Mahal, Saha Rehberi, Attachment ve Ajanda omurgası — complete
 → Inventory v1 closure — complete / Slice 7 #604 closed / #586 via PR #589 merged
 → Issue #616 — evidence baseline accepted; manual acceptance PASS değil
 → Issue #617 — current frictionless release-readiness program
-→ Issue #618 — canonical UI/UX contract + Roadmap/V2 Scope truth-sync
-→ Phase 1 — adaptive/accessibility foundation; compact destination set owner-reviewed
-→ Phases 2–5 — shared interactions, daily core, people/safety, supporting modules
+→ Issue #618 — canonical UI/UX contract merged
+→ Phase 1 — adaptive/accessibility foundation complete
+→ Phase 2 Step 8 — form/primary-action standard complete / UXF-013 #645 + UXF-014 #647
+→ Phase 2 Step 9 — Agenda search/filter slice complete / UXF-015 #649
+→ Phase 2 Step 10 — started; Agenda + Reminder retryable read-error slice complete / UXF-016 #651
+→ Current next — Step 10 remaining narrow empty/loading/error/success surfaces; then Step 11 history/event language
+→ Phases 3–5 — daily core, people/safety, supporting modules
 → Phase 6 — independent recovery/backup/search/onboarding/telemetry/privacy gates
 → Phase 7 — integrated quality + missing evidence/manual acceptance closure
 → Phase 8 — release candidate + explicit owner release decision
@@ -508,20 +515,25 @@ Current sıra:
 Inventory v1 closure — complete
 → Issue #616 — evidence baseline accepted; manual acceptance PASS değil
 → Issue #617 — current program authority
-→ Issue #618 — canonical UI/UX contract + Roadmap/V2 Scope truth-sync
-→ Phase 1 — adaptive/accessibility foundation; compact destination set owner-reviewed
-→ Phases 2–5 — shared UI and module alignment
+→ Issue #618 — canonical UI/UX contract merged
+→ Phase 1 — adaptive/accessibility foundation complete
+→ Phase 2 Step 8 — form/primary-action standard complete / UXF-013 #645 + UXF-014 #647
+→ Phase 2 Step 9 — Agenda search/filter slice complete / UXF-015 #649
+→ Phase 2 Step 10 — started; Agenda + Reminder retryable read-error slice complete / UXF-016 #651
+→ Current next — Step 10 remaining narrow empty/loading/error/success surfaces; then Step 11 history/event language
+→ Phases 3–5 — daily core, people/safety, supporting modules
 → Phase 6 — independent release gates, including recovery/backup
 → Phase 7 — integrated quality + missing evidence/manual acceptance closure
 → Phase 8 — release candidate + explicit owner release decision
 ```
 
-Bu dönem yeni bir büyük modül ekleme dönemi değildir. Kanonik UI/UX sözleşmesi
-`docs/v2/CSE_FRICTIONLESS_UI_UX_SYSTEM_CONTRACT.md` bütün sonraki dar dilimleri
-yönetir. #618 yalnız dokümantasyon ve truth-sync'tir; hiçbir production UI
-işini complete veya authorized ilan etmez. Merge sonrasında ilk owner-reviewed
-ürün kararı final compact navigation destination setidir. Issue #479'da ve
-ilgili ürün kayıtlarında görünür kalan manuel kabul borcu ile recovery, backup,
+Bu dönem yeni bir büyük modül ekleme dönemi değildir. Merge edilmiş kanonik
+UI/UX sözleşmesi `docs/v2/CSE_FRICTIONLESS_UI_UX_SYSTEM_CONTRACT.md` bütün dar
+dilimleri yönetir. Phase 1 tamamlanmış; Phase 2 Step 8 ve Step 9 kapanmış, Step
+10 ise Agenda + Reminder retryable read-error diliminin UXF-016 / PR #651 ile
+tamamlanmasıyla başlamıştır. Sıradaki dar yön Step 10'un kalan yüzeyleri,
+ardından Step 11 history/event language'dır. Issue #479'da ve ilgili ürün
+kayıtlarında görünür kalan manuel kabul borcu ile recovery, backup,
 arama, onboarding, telemetry, privacy/KVKK ve release kapıları korunur.
 
 ### Future/post-release — DWG Viewer v1 (Issue #523)
@@ -577,7 +589,7 @@ Kapanış kapısı:
 | 4 | İstenecek Malzemeler; öneriler; telefon görüşmesi | Yardımcı akışların ana omurgaya bağlanması |
 | 5 | Proje albümü Slice 1 merged; Günlük Log v2 paused | V2.11 manual test/closure ve ayrı owner resume kararı |
 | Completed product line | Inventory v1 through Slice 7 / Issue #604 | Repository, backup/restore, attachment, isolated device ve owner field acceptance closure complete |
-| Current priority | #617 frictionless release-readiness program; #618 contract/truth-sync; then Phase 1 adaptive/accessibility foundation | Contract merge does not authorize production; compact destinations require owner review |
+| Current priority | #617 frictionless release-readiness program; #618 contract and Phase 1 complete; Phase 2 Step 10 remaining narrow surfaces | Step 8/9 complete; UXF-016 / #651 completes only Agenda + Reminder read-error slice, not all Step 10 |
 | Future/post-release | DWG Viewer v1 / Issue #523 | Deferred future integration; not a first-release dependency |
 | 6 | Mini hesap makinesi — paused | Ayrı owner resume kararı ve dar saha aracı kabulü |
 
@@ -705,9 +717,13 @@ Living Plan MVP Core — merged / PR #463
 → Inventory v1 closure — complete / Slice 7 #604 closed / #586 via PR #589 merged
 → Issue #616 — evidence baseline accepted; manual acceptance PASS değil
 → Issue #617 — current frictionless release-readiness program
-→ Issue #618 — canonical UI/UX contract + Roadmap/V2 Scope truth-sync
-→ Phase 1 — adaptive/accessibility foundation; compact destination set owner-reviewed
-→ Phases 2–5 — shared interactions, daily core, people/safety, supporting modules
+→ Issue #618 — canonical UI/UX contract merged
+→ Phase 1 — adaptive/accessibility foundation complete
+→ Phase 2 Step 8 — form/primary-action standard complete / UXF-013 #645 + UXF-014 #647
+→ Phase 2 Step 9 — Agenda search/filter slice complete / UXF-015 #649
+→ Phase 2 Step 10 — started; Agenda + Reminder retryable read-error slice complete / UXF-016 #651
+→ Current next — Step 10 remaining narrow empty/loading/error/success surfaces; then Step 11 history/event language
+→ Phases 3–5 — daily core, people/safety, supporting modules
 → Phase 6 — independent release gates, including recovery/backup
 → Phase 7 — integrated quality + missing evidence/manual acceptance closure
 → Phase 8 — release candidate + explicit owner release decision
@@ -765,10 +781,11 @@ closure'ını tamamlamıştır.
 Issue #501 recovery verification, Issue #502 external verified backup/update
 gate'i, Issue #503 newer-live-data-safe restore yönü ve Issue #499 owner-phone
 MAIN-only identity kuralı bütün owner-phone operasyonlarından önce gelir.
-Inventory closure bunları kapatmaz. Güncel ürün sırası Inventory v1 closure
-complete → #616 evidence baseline → #617 program → #618 sözleşme/truth-sync →
-owner-reviewed compact destination kararı → Phase 1–8'dir. #618 hiçbir
-production UI işini complete veya authorized ilan etmez. Issue #523
+Inventory closure bunları kapatmaz. Güncel ürün sırası #618 merged contract ve
+tamamlanan Phase 1'den sonra Phase 2 Step 10'un kalan dar
+empty/loading/error/success yüzeyleri, ardından Step 11 history/event language
+olarak ilerler. UXF-016 / PR #651 yalnız Agenda + Reminder retryable read-error
+dilimini tamamlar; Step 10'un tamamını kapatmaz. Issue #523
 `POST-RELEASE / DEFERRED` gelecek entegrasyon hattıdır; ilk genel yayının
 bağımlılığı değildir ve yeni DWG implementation dilimi açık owner kararı
 olmadan başlamaz. V2.12 ve sonraki eski planlı ürün işleri owner resume kararına
