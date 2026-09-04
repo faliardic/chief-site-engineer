@@ -7,7 +7,7 @@ import 'support/fake_agenda_application.dart';
 
 void main() {
   testWidgets(
-    'root themes share compact sizing and preserve accessibility scaling',
+    'root themes share accessible sizing and preserve typography scaling',
     (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
@@ -61,7 +61,7 @@ void main() {
 
 void _expectCompactTheme(ThemeData light, ThemeData dark) {
   const density = VisualDensity(horizontal: -1, vertical: -1);
-  const buttonMinimum = Size(0, 40);
+  const buttonMinimum = Size.square(48);
   const buttonPadding = EdgeInsets.symmetric(horizontal: 16, vertical: 8);
   const states = <WidgetState>{};
 
@@ -69,8 +69,8 @@ void _expectCompactTheme(ThemeData light, ThemeData dark) {
   expect(dark.brightness, Brightness.dark);
   expect(light.useMaterial3, isTrue);
   expect(dark.useMaterial3, isTrue);
-  expect(light.materialTapTargetSize, MaterialTapTargetSize.shrinkWrap);
-  expect(dark.materialTapTargetSize, MaterialTapTargetSize.shrinkWrap);
+  expect(light.materialTapTargetSize, MaterialTapTargetSize.padded);
+  expect(dark.materialTapTargetSize, MaterialTapTargetSize.padded);
   expect(light.visualDensity, density);
   expect(dark.visualDensity, density);
 
@@ -95,20 +95,28 @@ void _expectCompactTheme(ThemeData light, ThemeData dark) {
     expect(darkStyle.padding!.resolve(states), buttonPadding);
     expect(lightStyle.visualDensity, VisualDensity.standard);
     expect(darkStyle.visualDensity, VisualDensity.standard);
-    expect(lightStyle.tapTargetSize, MaterialTapTargetSize.shrinkWrap);
-    expect(darkStyle.tapTargetSize, MaterialTapTargetSize.shrinkWrap);
+    expect(lightStyle.tapTargetSize, MaterialTapTargetSize.padded);
+    expect(darkStyle.tapTargetSize, MaterialTapTargetSize.padded);
   }
 
   expect(
     light.iconButtonTheme.style!.minimumSize!.resolve(states),
-    const Size.square(40),
+    const Size.square(48),
   );
   expect(
     dark.iconButtonTheme.style!.minimumSize!.resolve(states),
-    const Size.square(40),
+    const Size.square(48),
   );
   expect(light.iconButtonTheme.style!.visualDensity, VisualDensity.standard);
   expect(dark.iconButtonTheme.style!.visualDensity, VisualDensity.standard);
+  expect(
+    light.iconButtonTheme.style!.tapTargetSize,
+    MaterialTapTargetSize.padded,
+  );
+  expect(
+    dark.iconButtonTheme.style!.tapTargetSize,
+    MaterialTapTargetSize.padded,
+  );
 
   expect(light.inputDecorationTheme.isDense, isTrue);
   expect(dark.inputDecorationTheme.isDense, isTrue);
