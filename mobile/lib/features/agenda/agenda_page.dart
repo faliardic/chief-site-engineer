@@ -311,10 +311,169 @@ class _AgendaPageState extends State<AgendaPage> {
     });
   }
 
-  Future<void> _changeSortOrder(AgendaSortOrder? value) async {
-    if (value == null || value == _sortOrder) return;
-    setState(() => _sortOrder = value);
+  _AgendaFilterSelection get _filters => _AgendaFilterSelection(
+    archiveFilter: _archiveFilter,
+    sortOrder: _sortOrder,
+    projectId: _projectId,
+    category: _category,
+  );
+
+  bool get _hasActiveFilters =>
+      _archiveFilter != AgendaArchiveFilter.active ||
+      _sortOrder != AgendaSortOrder.newestFirst ||
+      _projectId != null ||
+      _category != null;
+
+  Future<void> _showFilters() async {
+    var archiveFilter = _archiveFilter;
+    var sortOrder = _sortOrder;
+    var projectId = _projectId;
+    var category = _category;
+    final selection = await showModalBottomSheet<_AgendaFilterSelection>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          key: const Key('agenda-filter-sheet'),
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            children: [
+              Text('Filtreler', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 16),
+              SegmentedButton<AgendaArchiveFilter>(
+                key: const Key('agenda-archive-filter'),
+                segments: const [
+                  ButtonSegment(
+                    value: AgendaArchiveFilter.active,
+                    icon: Icon(Icons.event_note_outlined),
+                    label: Text('Aktif'),
+                  ),
+                  ButtonSegment(
+                    value: AgendaArchiveFilter.archived,
+                    icon: Icon(Icons.archive_outlined),
+                    label: Text('Arşivlenenler'),
+                  ),
+                ],
+                selected: {archiveFilter},
+                onSelectionChanged: (values) =>
+                    setSheetState(() => archiveFilter = values.single),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<AgendaSortOrder>(
+                key: const Key('agenda-sort-order'),
+                initialValue: sortOrder,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Sıralama',
+                  border: OutlineInputBorder(),
+                ),
+                items: AgendaSortOrder.values
+                    .map(
+                      (order) => DropdownMenuItem(
+                        value: order,
+                        child: Text(order.label),
+                      ),
+                    )
+                    .toList(growable: false),
+                onChanged: (value) {
+                  if (value != null) {
+                    setSheetState(() => sortOrder = value);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String?>(
+                key: const Key('agenda-project-filter'),
+                initialValue: projectId,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Proje filtresi',
+                  border: OutlineInputBorder(),
+                ),
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('Tüm projeler'),
+                  ),
+                  ..._projects.map(
+                    (project) => DropdownMenuItem(
+                      value: project.id,
+                      child: Text(
+                        project.name,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
+                onChanged: (value) => setSheetState(() => projectId = value),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<AgendaCategory?>(
+                key: const Key('agenda-category-filter'),
+                initialValue: category,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Tür filtresi',
+                  border: OutlineInputBorder(),
+                ),
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('Tüm türler'),
+                  ),
+                  ...AgendaCategory.values.map(
+                    (item) =>
+                        DropdownMenuItem(value: item, child: Text(item.label)),
+                  ),
+                ],
+                onChanged: (value) => setSheetState(() => category = value),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  TextButton(
+                    key: const Key('agenda-filter-cancel'),
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    child: const Text('Vazgeç'),
+                  ),
+                  FilledButton(
+                    key: const Key('agenda-filter-apply'),
+                    onPressed: () => Navigator.of(sheetContext).pop(
+                      _AgendaFilterSelection(
+                        archiveFilter: archiveFilter,
+                        sortOrder: sortOrder,
+                        projectId: projectId,
+                        category: category,
+                      ),
+                    ),
+                    child: const Text('Uygula'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted || selection == null) return;
+    await _applyFilters(selection);
+  }
+
+  Future<void> _applyFilters(_AgendaFilterSelection selection) async {
+    if (selection == _filters) return;
+    final sortChanged = selection.sortOrder != _sortOrder;
+    setState(() {
+      _archiveFilter = selection.archiveFilter;
+      _sortOrder = selection.sortOrder;
+      _projectId = selection.projectId;
+      _category = selection.category;
+    });
     await _reload();
+    if (!sortChanged) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
       final position = _scrollController.position;
@@ -323,6 +482,51 @@ class _AgendaPageState extends State<AgendaPage> {
       }
     });
   }
+
+  Future<void> _clearArchiveFilter() => _applyFilters(
+    _AgendaFilterSelection(
+      archiveFilter: AgendaArchiveFilter.active,
+      sortOrder: _sortOrder,
+      projectId: _projectId,
+      category: _category,
+    ),
+  );
+
+  Future<void> _clearSortOrder() => _applyFilters(
+    _AgendaFilterSelection(
+      archiveFilter: _archiveFilter,
+      sortOrder: AgendaSortOrder.newestFirst,
+      projectId: _projectId,
+      category: _category,
+    ),
+  );
+
+  Future<void> _clearProjectFilter() => _applyFilters(
+    _AgendaFilterSelection(
+      archiveFilter: _archiveFilter,
+      sortOrder: _sortOrder,
+      projectId: null,
+      category: _category,
+    ),
+  );
+
+  Future<void> _clearCategoryFilter() => _applyFilters(
+    _AgendaFilterSelection(
+      archiveFilter: _archiveFilter,
+      sortOrder: _sortOrder,
+      projectId: _projectId,
+      category: null,
+    ),
+  );
+
+  Future<void> _clearAllFilters() => _applyFilters(
+    const _AgendaFilterSelection(
+      archiveFilter: AgendaArchiveFilter.active,
+      sortOrder: AgendaSortOrder.newestFirst,
+      projectId: null,
+      category: null,
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -394,95 +598,6 @@ class _AgendaPageState extends State<AgendaPage> {
               ],
             ),
             const SizedBox(height: 12),
-            SegmentedButton<AgendaArchiveFilter>(
-              key: const Key('agenda-archive-filter'),
-              segments: const [
-                ButtonSegment(
-                  value: AgendaArchiveFilter.active,
-                  icon: Icon(Icons.event_note_outlined),
-                  label: Text('Aktif'),
-                ),
-                ButtonSegment(
-                  value: AgendaArchiveFilter.archived,
-                  icon: Icon(Icons.archive_outlined),
-                  label: Text('Arşivlenenler'),
-                ),
-              ],
-              selected: {_archiveFilter},
-              onSelectionChanged: (values) {
-                setState(() => _archiveFilter = values.single);
-                _reload();
-              },
-            ),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<AgendaSortOrder>(
-              key: const Key('agenda-sort-order'),
-              initialValue: _sortOrder,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Sıralama',
-                border: OutlineInputBorder(),
-              ),
-              items: AgendaSortOrder.values
-                  .map(
-                    (order) => DropdownMenuItem(
-                      value: order,
-                      child: Text(order.label),
-                    ),
-                  )
-                  .toList(growable: false),
-              onChanged: (value) => unawaited(_changeSortOrder(value)),
-            ),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String?>(
-              key: const Key('agenda-project-filter'),
-              initialValue: _projectId,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Proje filtresi',
-                border: OutlineInputBorder(),
-              ),
-              items: [
-                const DropdownMenuItem(
-                  value: null,
-                  child: Text('Tüm projeler'),
-                ),
-                ..._projects.map(
-                  (project) => DropdownMenuItem(
-                    value: project.id,
-                    child: Text(project.name, overflow: TextOverflow.ellipsis),
-                  ),
-                ),
-              ],
-              onChanged: (value) {
-                setState(() => _projectId = value);
-                _reload();
-              },
-            ),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<AgendaCategory?>(
-              key: const Key('agenda-category-filter'),
-              initialValue: _category,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Tür filtresi',
-                border: OutlineInputBorder(),
-              ),
-              items: [
-                const DropdownMenuItem(value: null, child: Text('Tüm türler')),
-                ...AgendaCategory.values.map(
-                  (category) => DropdownMenuItem(
-                    value: category,
-                    child: Text(category.label),
-                  ),
-                ),
-              ],
-              onChanged: (value) {
-                setState(() => _category = value);
-                _reload();
-              },
-            ),
-            const SizedBox(height: 8),
             TextField(
               key: const Key('agenda-literal-search'),
               controller: _searchController,
@@ -503,6 +618,66 @@ class _AgendaPageState extends State<AgendaPage> {
               onSubmitted: (_) => _reload(),
               onTapOutside: (_) => _searchFocusNode.unfocus(),
             ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Semantics(
+                label: 'Filtreler',
+                button: true,
+                enabled: true,
+                excludeSemantics: true,
+                onTap: _showFilters,
+                child: OutlinedButton.icon(
+                  key: const Key('agenda-filter-action'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                  ),
+                  onPressed: _showFilters,
+                  icon: const Icon(Icons.filter_list_outlined),
+                  label: const Text('Filtreler'),
+                ),
+              ),
+            ),
+            if (_hasActiveFilters) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (_archiveFilter != AgendaArchiveFilter.active)
+                    _filterSummary(
+                      key: const Key('agenda-filter-summary-archive'),
+                      label: 'Durum: Arşivlenenler',
+                      onDeleted: () => unawaited(_clearArchiveFilter()),
+                    ),
+                  if (_sortOrder != AgendaSortOrder.newestFirst)
+                    _filterSummary(
+                      key: const Key('agenda-filter-summary-sort'),
+                      label: 'Sıralama: ${_sortOrder.label}',
+                      onDeleted: () => unawaited(_clearSortOrder()),
+                    ),
+                  if (_projectId case final projectId?)
+                    _filterSummary(
+                      key: const Key('agenda-filter-summary-project'),
+                      label:
+                          'Proje: ${_projects.where((project) => project.id == projectId).map((project) => project.name).firstOrNull ?? projectId}',
+                      onDeleted: () => unawaited(_clearProjectFilter()),
+                    ),
+                  if (_category case final category?)
+                    _filterSummary(
+                      key: const Key('agenda-filter-summary-category'),
+                      label: 'Tür: ${category.label}',
+                      onDeleted: () => unawaited(_clearCategoryFilter()),
+                    ),
+                  TextButton(
+                    key: const Key('agenda-clear-all-filters'),
+                    onPressed: _clearAllFilters,
+                    child: const Text('Tüm filtreleri temizle'),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 12),
             if (_loading && !_preservingDetailReload)
               const Center(
@@ -618,6 +793,43 @@ class _AgendaPageState extends State<AgendaPage> {
       ),
     );
   }
+}
+
+Widget _filterSummary({
+  required Key key,
+  required String label,
+  required VoidCallback onDeleted,
+}) => InputChip(
+  key: key,
+  label: Text(label),
+  onDeleted: onDeleted,
+  deleteButtonTooltipMessage: '$label filtresini temizle',
+);
+
+class _AgendaFilterSelection {
+  const _AgendaFilterSelection({
+    required this.archiveFilter,
+    required this.sortOrder,
+    required this.projectId,
+    required this.category,
+  });
+
+  final AgendaArchiveFilter archiveFilter;
+  final AgendaSortOrder sortOrder;
+  final String? projectId;
+  final AgendaCategory? category;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _AgendaFilterSelection &&
+      other.archiveFilter == archiveFilter &&
+      other.sortOrder == sortOrder &&
+      other.projectId == projectId &&
+      other.category == category;
+
+  @override
+  int get hashCode =>
+      Object.hash(archiveFilter, sortOrder, projectId, category);
 }
 
 Widget _listIconAction({
