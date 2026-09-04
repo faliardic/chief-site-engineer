@@ -2,8 +2,8 @@
 
 **Belge türü:** Güncel ürün yürütme kapsamı
 **Durum:** Kanonik V2 kapsam ve sıra kaynağı
-**Tarih:** 3 Eylül 2026
-**Güncel yön kaynağı:** Inventory v1 closure complete → existing-feature quality + friction reduction → manual acceptance closure → release-readiness
+**Tarih:** 4 Eylül 2026
+**Güncel yön kaynağı:** Inventory v1 closure complete → #616 evidence baseline → #617 frictionless release-readiness program → #618 UI/UX system contract → Phase 1 adaptive/accessibility foundation → phased release gates
 **Değişken repository gerçeği:** Güncel SHA/PR durumu GitHub `master` ve current Issue üzerinden doğrulanır.
 
 ## 1. Belgenin rolü
@@ -16,6 +16,7 @@ Kaynak otoritesi bilgi türüne göre ayrılır:
 | Bilgi türü | Yetkili kaynak |
 | --- | --- |
 | Kalıcı ürün amacı ve veri ilkeleri | `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md` |
+| UI/UX sistem sözleşmesi | `docs/v2/CSE_FRICTIONLESS_UI_UX_SYSTEM_CONTRACT.md` |
 | Güncel V2 ürün kapsamı ve bağımlılıkları | Bu belge |
 | Ayrıntılı yürütme sırası | `ROADMAP.md` |
 | Operasyon ve güvenlik kuralları | `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` |
@@ -81,11 +82,15 @@ V2'nin amacı yeni modül sayısını büyütmek değil, sahadaki bilgiyi bir ke
 yakalayıp doğru proje, mahal, kişi, dosya, iş ve günlük bağlamında tekrar
 kullanılabilir hâle getirmektir.
 
-3 Eylül 2026 owner kararıyla yakın dönem hedefi yeni bir büyük modül eklemek
-değil; mevcut özelliklerin kalitesini yükseltmek, günlük akışları
-sürtünmesizleştirmek, görünür manuel kabul borcunu kapatmak ve release-readiness
-kapılarını tamamlamaktır. DWG Viewer / Issue #523 `POST-RELEASE / DEFERRED`
-durumundadır ve ilk genel yayının bağımlılığı değildir.
+4 Eylül 2026 owner kararıyla Issue #617 yakın dönem frictionless
+release-readiness program otoritesidir. Issue #616'nın sanitize paketi ürün
+değerlendirmesi için evidence baseline'dır; manuel kabul PASS'i değildir.
+Issue #618 production davranışı değiştirmeden ortak UI/UX sözleşmesini kurar ve
+bu belgeyle Roadmap'i programa senkronlar. #618 merge edilmeden production UI
+işi başlamaz; merge sonrasındaki ilk dar yön, final compact destination setinin
+owner review'uyla seçilmesinden sonra Phase 1 adaptive/accessibility
+foundation'dır. DWG Viewer / Issue #523 `POST-RELEASE / DEFERRED` durumundadır
+ve ilk genel yayının bağımlılığı değildir.
 
 Ana yön:
 
@@ -113,9 +118,14 @@ Proje/Mahal, Saha Rehberi, Attachment ve Ajanda omurgası — complete
 → Issue #529 / PR #530 correction and Issue #531 / PR #532 Slice 6.2 — merged
 → Issue #533 / PR #534 Slice 6.3 block reshape/reconciliation/lifecycle — merged
 → Inventory v1 closure — complete / Slice 7 #604 closed / #586 via PR #589 merged
-→ existing-feature quality + friction reduction
-→ missing manual acceptance closure
-→ release-readiness closure
+→ Issue #616 — evidence baseline accepted; manual acceptance PASS değil
+→ Issue #617 — current frictionless release-readiness program
+→ Issue #618 — canonical UI/UX contract + Roadmap/V2 Scope truth-sync
+→ Phase 1 — adaptive/accessibility foundation; compact destination set owner-reviewed
+→ Phases 2–5 — shared interactions, daily core, people/safety, supporting modules
+→ Phase 6 — independent recovery/backup/search/onboarding/telemetry/privacy gates
+→ Phase 7 — integrated quality + missing evidence/manual acceptance closure
+→ Phase 8 — release candidate + explicit owner release decision
 → DWG Viewer v1 / Issue #523 — post-release/deferred future integration; not a release dependency
 ```
 
@@ -485,7 +495,7 @@ Issue #501, #502, #503 ve #499 P0 veri/owner-phone güvenlik kuralları korunur.
 Inventory v1 closure bu bağımsız recovery, update ve MAIN-only güvenlik
 kapılarını veya release kararını kendiliğinden kapatmaz.
 
-### Current priority — existing-feature quality and release-readiness
+### Current priority — #617 frictionless release-readiness program
 
 Issue #540 UI/UX Wave 0 ve loading blocker #580 completed/closed'dur. Issue #586
 Inventory final UI/UX implementation'ı PR #589 ile merge edilmiş ve Issue
@@ -496,15 +506,23 @@ Current sıra:
 
 ```text
 Inventory v1 closure — complete
-→ existing-feature quality + friction reduction
-→ missing manual acceptance closure
-→ release-readiness closure
+→ Issue #616 — evidence baseline accepted; manual acceptance PASS değil
+→ Issue #617 — current program authority
+→ Issue #618 — canonical UI/UX contract + Roadmap/V2 Scope truth-sync
+→ Phase 1 — adaptive/accessibility foundation; compact destination set owner-reviewed
+→ Phases 2–5 — shared UI and module alignment
+→ Phase 6 — independent release gates, including recovery/backup
+→ Phase 7 — integrated quality + missing evidence/manual acceptance closure
+→ Phase 8 — release candidate + explicit owner release decision
 ```
 
-Bu dönem yeni bir büyük modül ekleme dönemi değildir. Mevcut özelliklerin günlük
-kullanım kalitesi, akış sadeliği ve sürtünme noktaları iyileştirilir; Issue
-#479'da ve ilgili ürün kayıtlarında görünür kalan gerekli manuel kabul borcu
-kapatılır; bağımsız release-readiness kapıları tamamlanır.
+Bu dönem yeni bir büyük modül ekleme dönemi değildir. Kanonik UI/UX sözleşmesi
+`docs/v2/CSE_FRICTIONLESS_UI_UX_SYSTEM_CONTRACT.md` bütün sonraki dar dilimleri
+yönetir. #618 yalnız dokümantasyon ve truth-sync'tir; hiçbir production UI
+işini complete veya authorized ilan etmez. Merge sonrasında ilk owner-reviewed
+ürün kararı final compact navigation destination setidir. Issue #479'da ve
+ilgili ürün kayıtlarında görünür kalan manuel kabul borcu ile recovery, backup,
+arama, onboarding, telemetry, privacy/KVKK ve release kapıları korunur.
 
 ### Future/post-release — DWG Viewer v1 (Issue #523)
 
@@ -559,7 +577,7 @@ Kapanış kapısı:
 | 4 | İstenecek Malzemeler; öneriler; telefon görüşmesi | Yardımcı akışların ana omurgaya bağlanması |
 | 5 | Proje albümü Slice 1 merged; Günlük Log v2 paused | V2.11 manual test/closure ve ayrı owner resume kararı |
 | Completed product line | Inventory v1 through Slice 7 / Issue #604 | Repository, backup/restore, attachment, isolated device ve owner field acceptance closure complete |
-| Current priority | Existing-feature quality; friction reduction; manual acceptance closure; release-readiness | Improve and close existing user-visible flows before general release |
+| Current priority | #617 frictionless release-readiness program; #618 contract/truth-sync; then Phase 1 adaptive/accessibility foundation | Contract merge does not authorize production; compact destinations require owner review |
 | Future/post-release | DWG Viewer v1 / Issue #523 | Deferred future integration; not a first-release dependency |
 | 6 | Mini hesap makinesi — paused | Ayrı owner resume kararı ve dar saha aracı kabulü |
 
@@ -685,9 +703,14 @@ Living Plan MVP Core — merged / PR #463
 → Issue #531 / PR #532 Inventory Spatial v1 Slice 6.2 — merged predecessor
 → Issue #533 / PR #534 Inventory Spatial v1 Slice 6.3 — merged predecessor
 → Inventory v1 closure — complete / Slice 7 #604 closed / #586 via PR #589 merged
-→ existing-feature quality + friction reduction
-→ missing manual acceptance closure
-→ release-readiness closure
+→ Issue #616 — evidence baseline accepted; manual acceptance PASS değil
+→ Issue #617 — current frictionless release-readiness program
+→ Issue #618 — canonical UI/UX contract + Roadmap/V2 Scope truth-sync
+→ Phase 1 — adaptive/accessibility foundation; compact destination set owner-reviewed
+→ Phases 2–5 — shared interactions, daily core, people/safety, supporting modules
+→ Phase 6 — independent release gates, including recovery/backup
+→ Phase 7 — integrated quality + missing evidence/manual acceptance closure
+→ Phase 8 — release candidate + explicit owner release decision
 → DWG Viewer v1 / Issue #523 — post-release/deferred future integration; not a release dependency
 ```
 
@@ -743,8 +766,9 @@ Issue #501 recovery verification, Issue #502 external verified backup/update
 gate'i, Issue #503 newer-live-data-safe restore yönü ve Issue #499 owner-phone
 MAIN-only identity kuralı bütün owner-phone operasyonlarından önce gelir.
 Inventory closure bunları kapatmaz. Güncel ürün sırası Inventory v1 closure
-complete → existing-feature quality + friction reduction → missing manual
-acceptance closure → release-readiness closure'dır. Issue #523
+complete → #616 evidence baseline → #617 program → #618 sözleşme/truth-sync →
+owner-reviewed compact destination kararı → Phase 1–8'dir. #618 hiçbir
+production UI işini complete veya authorized ilan etmez. Issue #523
 `POST-RELEASE / DEFERRED` gelecek entegrasyon hattıdır; ilk genel yayının
 bağımlılığı değildir ve yeni DWG implementation dilimi açık owner kararı
 olmadan başlamaz. V2.12 ve sonraki eski planlı ürün işleri owner resume kararına

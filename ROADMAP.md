@@ -1,9 +1,9 @@
 # CSE V2 — Kanonik Ürün Yol Haritası
 
 **Durum:** Güncel yürütme sırası
-**Tarih:** 3 Eylül 2026
+**Tarih:** 4 Eylül 2026
 **V2 kapsam kaynağı:** `docs/v2/CSE_V2_SCOPE.md`
-**Güncel yön truth-sync:** Inventory v1 closure complete → existing-feature quality + friction reduction → manual acceptance closure → release-readiness
+**Güncel yön truth-sync:** Inventory v1 closure complete → #616 evidence baseline → #617 frictionless release-readiness program → #618 UI/UX system contract → Phase 1 adaptive/accessibility foundation → phased release gates
 **Değişken repository gerçeği:** Güncel SHA/PR durumu GitHub `master` ve current Issue üzerinden doğrulanır.
 
 ## 1. Güncel ürün durumu
@@ -59,16 +59,22 @@ tamamlanıp kapatılmasıyla Inventory v1 closure'a ulaşmıştır. Issue #535 /
 PR #536 yalnız superseded tarihsel girişimdir ve current ancestry değildir.
 Issue #540 UI/UX Wave 0 ile loading blocker #580 tamamlanıp kapatılmıştır.
 Issue #586 implementation'ı PR #589 ile merge edilmiş ve Issue kapatılmıştır.
-3 Eylül 2026 owner kararıyla sıradaki yürütme dalgası mevcut özellik kalitesi,
-günlük akışlardaki sürtünmenin azaltılması, eksik manuel kabullerin kapatılması
-ve release-readiness'tır. DWG Viewer v1 / Issue #523 `POST-RELEASE / DEFERRED`
-gelecek entegrasyon hattıdır ve ilk genel yayının bağımlılığı değildir.
-Public/store production release ilan edilmemiştir.
+4 Eylül 2026 owner kararıyla #616 sanitize evidence paketi manuel kabul PASS'i
+değil, yeterli ürün değerlendirme baseline'ıdır. Issue #617 güncel frictionless
+release-readiness programı; Issue #618 ise production davranışı değiştirmeyen
+kanonik UI/UX sistem sözleşmesi ve truth-sync adımıdır. #618 merge edilmeden
+production UI işi başlamaz. Merge sonrasındaki ilk dar implementation yönü,
+final compact destination seti owner review'uyla seçildikten sonra Phase 1
+adaptive/accessibility foundation'dır. DWG Viewer v1 / Issue #523
+`POST-RELEASE / DEFERRED` gelecek entegrasyon hattıdır ve ilk genel yayının
+bağımlılığı değildir. Public/store production release ilan edilmemiştir.
 
 ## 2. Kaynak otoritesi
 
 - Kalıcı ürün amacı ve veri ilkeleri:
   `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
+- UI/UX sistem sözleşmesi:
+  `docs/v2/CSE_FRICTIONLESS_UI_UX_SYSTEM_CONTRACT.md`
 - Güncel V2 kapsamı:
   `docs/v2/CSE_V2_SCOPE.md`
 - Güncel yürütme sırası:
@@ -95,9 +101,14 @@ Proje/Mahal — complete
 → İş Zinciri — implemented / manual test deferred
 → Proje albümü Slice 1 — implemented / manual test pending
 → Inventory v1 closure — complete / Slice 7 #604 closed / #586 via PR #589 merged
-→ existing-feature quality + friction reduction
-→ missing manual acceptance closure
-→ release-readiness closure
+→ Issue #616 — evidence baseline accepted; manual acceptance PASS değil
+→ Issue #617 — current frictionless release-readiness program
+→ Issue #618 — canonical UI/UX contract + Roadmap/V2 Scope truth-sync
+→ Phase 1 — adaptive/accessibility foundation; compact destination set owner-reviewed
+→ Phases 2–5 — shared interactions, daily core, people/safety, supporting modules
+→ Phase 6 — independent recovery/backup/search/onboarding/telemetry/privacy gates
+→ Phase 7 — integrated quality + missing evidence/manual acceptance closure
+→ Phase 8 — release candidate + explicit owner release decision
 → DWG Viewer v1 / Issue #523 — post-release/deferred future integration; not a release dependency
 ```
 
@@ -370,12 +381,19 @@ Durum: `implemented — manual test pending; completion not declared`
 - UI/UX Wave 0 / Issue #540 ve loading blocker #580 completed/closed'dur.
 - Issue #586 edge controls, portrait sketch editor ve gesture auto-hide
   implementation'ı PR #589 ile merge edilmiş; Issue #586 completed/closed'dur.
-- Yeni büyük modül eklemek yerine existing-feature quality ve günlük akış
-  sadeliği iyileştirilir; görünür sürtünme noktaları azaltılır.
-- Issue #479 ve ilgili ürün kayıtlarındaki gerekli manual acceptance borcu
-  kapatılır.
-- Bağımsız veri, dashboard, minimum ortak arama, onboarding, telemetry,
-  gizlilik/KVKK ve diğer release-readiness kapıları tamamlanır.
+- Issue #616'nın 82 ekranlık sanitize paketi evidence baseline olarak kabul
+  edilmiştir; manuel kabul PASS'i değildir ve eksik akışlar evidence debt'tir.
+- Issue #617 güncel frictionless release-readiness program otoritesidir.
+- Issue #618 yalnız kanonik
+  `docs/v2/CSE_FRICTIONLESS_UI_UX_SYSTEM_CONTRACT.md` ve Roadmap/V2 Scope
+  truth-sync'ini kapsar; production UI işini complete veya authorized yapmaz.
+- #618 merge sonrasında ilk dar Phase 1 kararı final compact navigation
+  destination setinin owner review'uyla seçilmesidir; ardından adaptive shell,
+  ortak aktif proje ve accessibility foundation ayrı Issue/PR'larla ilerler.
+- Sonraki fazlar shared interaction, daily core, people/safety ve supporting
+  modules sırasını izler. Issue #479 manual acceptance borcu ile recovery,
+  backup, ortak arama, onboarding, telemetry, gizlilik/KVKK ve bütünleşik
+  kalite/release-candidate kapıları korunur.
 - Public/store release ayrıca owner kararına bağlıdır.
 
 ### Future/post-release — DWG Viewer v1 (Issue #523)
@@ -470,9 +488,14 @@ Living 7-Day Plan — implemented / manual test pending; final completion yok
 → Issue #504 / PR #505 recovery surface — merged / owner recovery verification pending
 → Epic #506 / Issue #507 Inventory Map v1 contract — historical normative foundation
 → Inventory v1 closure — complete / Slice 7 #604 closed / #586 via PR #589 merged
-→ existing-feature quality + friction reduction
-→ missing manual acceptance closure
-→ release-readiness closure
+→ Issue #616 — evidence baseline accepted; manual acceptance PASS değil
+→ Issue #617 — current frictionless release-readiness program
+→ Issue #618 — canonical UI/UX contract + Roadmap/V2 Scope truth-sync
+→ Phase 1 — adaptive/accessibility foundation; compact destination set owner-reviewed
+→ Phases 2–5 — shared interactions, daily core, people/safety, supporting modules
+→ Phase 6 — independent release gates, including recovery/backup
+→ Phase 7 — integrated quality + missing evidence/manual acceptance closure
+→ Phase 8 — release candidate + explicit owner release decision
 → DWG Viewer v1 / Issue #523 — post-release/deferred future integration; not a release dependency
 ```
 
@@ -512,9 +535,11 @@ tarihsel girişim olarak kalır ve current ancestry değildir. Issue #586'nın
 Inventory final UI/UX implementation'ı PR #589 ile merge edilmiş, Issue #586
 completed/closed'dur.
 
-Current product-development sırası Inventory v1 closure complete →
-existing-feature quality + friction reduction → missing manual acceptance
-closure → release-readiness closure'dır. Issue #523 açık kalır fakat
+Current product-development otoritesi #617'dir. #616 evidence baseline'ından
+sonra #618 kanonik UI/UX sözleşmesi ve truth-sync'i gelir; merge sonrasında
+owner-reviewed compact destination kararıyla Phase 1 adaptive/accessibility
+foundation başlar ve Phase 2–8 sırası izlenir. Bu docs adımı hiçbir production
+UI davranışını complete veya authorized ilan etmez. Issue #523 açık kalır fakat
 `POST-RELEASE / DEFERRED` gelecek entegrasyon hattıdır; ilk genel yayını bloke
 etmez ve yeni DWG implementation dilimi açık owner kararı olmadan başlamaz.
 Issue #501 recovery, Issue #502 external verified backup/update, Issue #503
