@@ -44,9 +44,13 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
   String? _projectId;
   late DateTime _windowStart;
   bool _loading = true;
+  bool _readInFlight = false;
+  bool _preservingReload = false;
   bool _mutating = false;
   bool _hasTrustedSnapshot = false;
   String? _safeError;
+  _LivingPlanReadContext? _contentContext;
+  bool _retryIncludesProjects = false;
 
   @override
   void initState() {
@@ -57,10 +61,17 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
   }
 
   Future<void> _reload({bool includeProjects = false}) async {
-    if (!mounted) return;
+    if (!mounted || _readInFlight) return;
+    final requestedContext = _readContext(_projectId, _windowStart);
+    final preserveContent =
+        requestedContext != null && requestedContext == _contentContext;
+    var retryIncludesProjects = includeProjects;
     setState(() {
+      _readInFlight = true;
       _loading = true;
+      _preservingReload = preserveContent;
       _safeError = null;
+      if (!preserveContent) _clearPlanContent();
     });
     try {
       var projects = _projects;
@@ -68,6 +79,7 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
         projects = (await widget.agenda.listProjects())
             .where((project) => !project.isArchived)
             .toList(growable: false);
+        retryIncludesProjects = false;
       }
       var selected = _projectId;
       if (selected == null || !projects.any((item) => item.id == selected)) {
@@ -80,16 +92,27 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
         setState(() {
           _projects = projects;
           _projectId = null;
-          _items = const [];
-          _suggestions = const [];
-          _intelligence = const {};
-          _hasTrustedSnapshot = false;
+          _clearPlanContent();
+          _readInFlight = false;
           _loading = false;
+          _preservingReload = false;
+          _retryIncludesProjects = false;
         });
         return;
       }
 
       final windowStart = _canonicalCalendarDay(_windowStart);
+      final context = _LivingPlanReadContext(selected, windowStart);
+      if (!mounted) return;
+      setState(() {
+        _projects = projects;
+        _projectId = selected;
+        _windowStart = windowStart;
+        if (_preservingReload && _contentContext != context) {
+          _preservingReload = false;
+          _clearPlanContent();
+        }
+      });
       final items = await widget.livingPlan.loadSevenDayPlan(
         projectId: selected,
         windowStart: windowStart,
@@ -121,20 +144,38 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
       setState(() {
         _projects = projects;
         _projectId = selected;
+        _windowStart = windowStart;
         _items = items;
         _suggestions = suggestions;
         _intelligence = intelligence;
         _hasTrustedSnapshot = hasTrustedSnapshot;
+        _contentContext = context;
+        _readInFlight = false;
         _loading = false;
+        _preservingReload = false;
+        _retryIncludesProjects = false;
       });
     } on Object {
       if (!mounted) return;
       setState(() {
+        _readInFlight = false;
         _loading = false;
+        _preservingReload = false;
+        _retryIncludesProjects = retryIncludesProjects;
         _safeError = 'Plan güvenli biçimde okunamadı. Kayıtlar değiştirilmedi.';
       });
     }
   }
+
+  void _clearPlanContent() {
+    _items = const [];
+    _suggestions = const [];
+    _intelligence = const {};
+    _hasTrustedSnapshot = false;
+    _contentContext = null;
+  }
+
+  Future<void> _retryRead() => _reload(includeProjects: _retryIncludesProjects);
 
   Future<void> _selectProject(String? projectId) async {
     if (projectId == null || projectId == _projectId || _loading) return;
@@ -192,7 +233,7 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
     Future<ConstructionLivingPlanItem> Function() operation, {
     required String successMessage,
   }) async {
-    if (_mutating) return;
+    if (_mutating || _loading) return;
     setState(() => _mutating = true);
     try {
       await operation();
@@ -336,6 +377,8 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
   @override
   Widget build(BuildContext context) {
     final projectId = _projectId;
+    final currentContext = _readContext(projectId, _windowStart);
+    final hasCurrentContent = currentContext == _contentContext;
     return Scaffold(
       appBar: AppBar(title: const Text('7 Günlük Plan')),
       floatingActionButton: FloatingActionButton.extended(
@@ -419,52 +462,65 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
                   ),
                 ),
               ),
-              if (_loading) ...[
+              if (_loading && !_preservingReload) ...[
                 const SizedBox(height: 28),
                 Semantics(
                   label: '7 günlük plan yükleniyor',
                   child: const Center(child: CircularProgressIndicator()),
                 ),
-              ] else if (_safeError case final error?) ...[
-                const SizedBox(height: 20),
-                _MessagePanel(
-                  icon: Icons.error_outline_rounded,
-                  message: error,
-                ),
-              ] else if (_projects.isEmpty) ...[
-                const SizedBox(height: 20),
-                const _MessagePanel(
-                  icon: Icons.folder_off_outlined,
-                  message: 'Önce bir proje oluşturun.',
-                ),
-              ] else if (projectId == null) ...[
-                const SizedBox(height: 20),
-                const KeyedSubtree(
-                  key: Key('living-plan-project-context-unavailable'),
-                  child: _MessagePanel(
-                    icon: Icons.folder_off_outlined,
-                    message:
-                        'Dashboard projesi artık kullanılamıyor. Devam etmek için bir proje seçin.',
-                  ),
-                ),
               ] else ...[
-                if (!_hasTrustedSnapshot) ...[
-                  const SizedBox(height: 12),
-                  const _MessagePanel(
-                    icon: Icons.event_busy_outlined,
-                    message:
-                        'Bu proje için güvenilir öneri programı henüz hazırlanmadı.',
+                if (_preservingReload) ...[
+                  const SizedBox(height: 8),
+                  Semantics(
+                    key: const Key('living-plan-preserving-reload'),
+                    label: '7 günlük plan yenileniyor',
+                    child: LinearProgressIndicator(),
                   ),
                 ],
-                if (_items.isEmpty) ...[
-                  const SizedBox(height: 12),
-                  const _MessagePanel(
-                    icon: Icons.playlist_add_rounded,
-                    message:
-                        'Bu pencerede planlanmış imalat yok. İmalat ekleyebilirsiniz.',
+                if (_safeError case final error?) ...[
+                  const SizedBox(height: 20),
+                  _LivingPlanReadErrorPanel(
+                    message: error,
+                    onRetry: _retryRead,
                   ),
-                ] else
-                  ..._buildSections(),
+                ],
+                if (_safeError == null || hasCurrentContent) ...[
+                  if (_projects.isEmpty) ...[
+                    const SizedBox(height: 20),
+                    const _MessagePanel(
+                      icon: Icons.folder_off_outlined,
+                      message: 'Önce bir proje oluşturun.',
+                    ),
+                  ] else if (projectId == null) ...[
+                    const SizedBox(height: 20),
+                    const KeyedSubtree(
+                      key: Key('living-plan-project-context-unavailable'),
+                      child: _MessagePanel(
+                        icon: Icons.folder_off_outlined,
+                        message:
+                            'Dashboard projesi artık kullanılamıyor. Devam etmek için bir proje seçin.',
+                      ),
+                    ),
+                  ] else ...[
+                    if (!_hasTrustedSnapshot) ...[
+                      const SizedBox(height: 12),
+                      const _MessagePanel(
+                        icon: Icons.event_busy_outlined,
+                        message:
+                            'Bu proje için güvenilir öneri programı henüz hazırlanmadı.',
+                      ),
+                    ],
+                    if (_items.isEmpty) ...[
+                      const SizedBox(height: 12),
+                      const _MessagePanel(
+                        icon: Icons.playlist_add_rounded,
+                        message:
+                            'Bu pencerede planlanmış imalat yok. İmalat ekleyebilirsiniz.',
+                      ),
+                    ] else
+                      ..._buildSections(),
+                  ],
+                ],
               ],
             ],
           ),
@@ -517,7 +573,7 @@ class _LivingPlanPageState extends State<LivingPlanPage> {
         _LivingPlanItemCard(
           entry: entry,
           intelligence: _intelligence[entry.item.id],
-          busy: _mutating,
+          busy: _mutating || _loading,
           onStart: () => _start(entry.item),
           onComplete: () => _complete(entry.item),
           onDefer: () => _defer(entry.item),
@@ -1445,6 +1501,68 @@ class _MessagePanel extends StatelessWidget {
   );
 }
 
+class _LivingPlanReadErrorPanel extends StatelessWidget {
+  const _LivingPlanReadErrorPanel({
+    required this.message,
+    required this.onRetry,
+  });
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.error_outline_rounded),
+              const SizedBox(width: 12),
+              Expanded(child: Text(message)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Semantics(
+            container: true,
+            label: '7 günlük planı yeniden yükle',
+            button: true,
+            enabled: true,
+            onTap: onRetry,
+            excludeSemantics: true,
+            child: FilledButton.icon(
+              key: const Key('living-plan-read-error-retry'),
+              style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Tekrar dene'),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _LivingPlanReadContext {
+  const _LivingPlanReadContext(this.projectId, this.windowStart);
+
+  final String projectId;
+  final DateTime windowStart;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _LivingPlanReadContext &&
+      other.projectId == projectId &&
+      other.windowStart == windowStart;
+
+  @override
+  int get hashCode => Object.hash(projectId, windowStart);
+}
+
 String _mutationFailureMessage(String code) => switch (code) {
   'living_plan_stale_revision' =>
     'Kayıt başka bir işlemde değişti; plan yenilendi.',
@@ -1546,6 +1664,11 @@ DateTime _istanbulToday(DateTime now) {
 
 DateTime _canonicalCalendarDay(DateTime value) =>
     DateTime.utc(value.year, value.month, value.day);
+
+_LivingPlanReadContext? _readContext(String? projectId, DateTime windowStart) =>
+    projectId == null
+    ? null
+    : _LivingPlanReadContext(projectId, _canonicalCalendarDay(windowStart));
 
 bool _sameDate(DateTime left, DateTime right) =>
     left.year == right.year &&
