@@ -410,7 +410,7 @@ void main() {
 
       expect(fake.createLogCalls, 1);
       final submit = find.byKey(const Key('submit-log'));
-      expect(tester.getSize(submit), const Size.square(40));
+      expect(tester.getSize(submit), const Size.square(48));
       expect(tester.widget<IconButton>(submit).onPressed, isNull);
       expect(tester.widget<IconButton>(submit).tooltip, 'Kaydediliyor…');
       expect(
@@ -1404,7 +1404,7 @@ void main() {
 
       final reminderAction = find.byKey(const Key('detail-reminder-action'));
       expect(reminderAction, findsOneWidget);
-      expect(tester.getSize(reminderAction), const Size.square(40));
+      expect(tester.getSize(reminderAction), const Size.square(48));
       expect(find.bySemanticsLabel('Hatırlatıcı oluştur'), findsOneWidget);
       expect(
         find.widgetWithText(FilledButton, 'Hatırlatıcı oluştur'),
@@ -1895,7 +1895,7 @@ void main() {
         'Bağlı hatırlatıcıyı aç',
       );
       expect(linkedReminderSemanticsNode, findsOneWidget);
-      expect(tester.getSize(indicator), const Size.square(40));
+      expect(tester.getSize(indicator), const Size.square(48));
       expect(Theme.of(tester.element(indicator)).brightness, Brightness.dark);
       expect(tester.takeException(), isNull);
 
@@ -2729,7 +2729,8 @@ void _expectIcon(
   bool uniqueLabel = true,
 }) {
   expect(action, findsOneWidget);
-  expect(tester.getSize(action), const Size.square(40));
+  final renderedSize = tester.getSize(action);
+  expect(renderedSize, const Size.square(48));
   if (enabled) expect(action.hitTestable(), findsOneWidget);
   final button = tester.widget<IconButton>(action);
   expect(button.tooltip, label);
@@ -2738,17 +2739,18 @@ void _expectIcon(
     find.descendant(of: action, matching: find.byType(Text)),
     findsNothing,
   );
+  final wrapper = find
+      .ancestor(
+        of: action,
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Semantics && widget.properties.label == label,
+        ),
+      )
+      .first;
+  expect(tester.getSize(wrapper), renderedSize);
   if (uniqueLabel) {
     _expectButtonSemantics(tester, label, enabled: enabled);
   } else {
-    final wrapper = find
-        .ancestor(
-          of: action,
-          matching: find.byWidgetPredicate(
-            (widget) => widget is Semantics && widget.properties.label == label,
-          ),
-        )
-        .first;
     final data = tester.getSemantics(wrapper).getSemanticsData();
     expect(data.flagsCollection.isButton, isTrue);
     expect(data.hasAction(SemanticsAction.tap), enabled);

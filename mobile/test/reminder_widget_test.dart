@@ -130,7 +130,7 @@ Future<void> openAgendaReminderSyncDialog(WidgetTester tester) async {
     300,
     scrollable: find.byType(Scrollable).first,
   );
-  expect(tester.getSize(action), const Size.square(40));
+  _expectAccessibleIconTarget(tester, action, 'Ajanda’dan güncelle');
   expect(
     _iconButtonByKey(tester, const Key('sync-agenda-to-reminder')).tooltip,
     'Ajanda’dan güncelle',
@@ -1185,7 +1185,7 @@ void main() {
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(tester.getSize(trash), const Size.square(40));
+    expect(tester.getSize(trash), const Size.square(48));
     expect(
       _iconButtonByKey(tester, const Key('trash-reminder')).tooltip,
       'Sil',
@@ -1207,7 +1207,7 @@ void main() {
     expect(find.byKey(const Key('reminder-trashed-at')), findsOneWidget);
     final restore = find.byKey(const Key('restore-reminder'));
     expect(restore, findsOneWidget);
-    expect(tester.getSize(restore), const Size.square(40));
+    expect(tester.getSize(restore), const Size.square(48));
     expect(
       _iconButtonByKey(tester, const Key('restore-reminder')).tooltip,
       'Geri yükle',
@@ -1464,7 +1464,7 @@ void main() {
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(tester.getSize(action), const Size.square(40));
+    expect(tester.getSize(action), const Size.square(48));
     expect(
       _iconButtonByKey(tester, const Key('open-source-agenda-log')).tooltip,
       'Kaynak Ajanda kaydına dön',
@@ -2286,7 +2286,7 @@ void main() {
         scrollable: find.byType(Scrollable).first,
       );
       expect(source, findsOneWidget);
-      expect(tester.getSize(source), const Size.square(40));
+      expect(tester.getSize(source), const Size.square(48));
       expect(
         _iconButtonByKey(
           tester,
@@ -2874,7 +2874,7 @@ void main() {
         scrollable: find.byType(Scrollable).first,
       );
       expect(action, findsOneWidget);
-      expect(tester.getSize(action), const Size.square(40));
+      expect(tester.getSize(action), const Size.square(48));
       expect(
         _iconButtonByKey(tester, Key(quickAction.key)).tooltip,
         quickAction.label,
@@ -3395,7 +3395,7 @@ void main() {
       );
       expect(complete, findsOneWidget);
       await tester.ensureVisible(complete);
-      expect(tester.getSize(complete), const Size.square(40));
+      expect(tester.getSize(complete), const Size.square(48));
       expect(
         _iconButtonByKey(tester, const Key('complete-reminder')).tooltip,
         'Tamamla',
@@ -3405,7 +3405,7 @@ void main() {
       expect(find.byKey(const Key('start-waiting')), findsNothing);
       final tomorrow = find.byKey(const Key('snooze-tomorrow'));
       await tester.ensureVisible(tomorrow);
-      expect(tester.getSize(tomorrow), const Size.square(40));
+      expect(tester.getSize(tomorrow), const Size.square(48));
       expect(
         _iconButtonByKey(tester, const Key('snooze-tomorrow')).tooltip,
         "Yarın 08:00'a ertele",
@@ -3427,7 +3427,7 @@ void main() {
       ]) {
         final finder = find.byKey(action.$1);
         if (finder.evaluate().isEmpty) continue;
-        expect(tester.getSize(finder), const Size.square(40));
+        expect(tester.getSize(finder), const Size.square(48));
         expect(_iconButtonByKey(tester, action.$1).tooltip, action.$2);
         expect(find.text(action.$2), findsNothing);
       }
@@ -3472,7 +3472,7 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(tester.getSize(notificationSettings), const Size.square(40));
+    expect(tester.getSize(notificationSettings), const Size.square(48));
     expect(
       _iconButtonByKey(tester, const Key('open-notification-settings')).tooltip,
       'Bildirim ayarları',
@@ -3486,7 +3486,7 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(tester.getSize(batterySettings), const Size.square(40));
+    expect(tester.getSize(batterySettings), const Size.square(48));
     expect(
       _iconButtonByKey(tester, const Key('open-battery-settings')).tooltip,
       'Batarya ayarları',
@@ -3499,7 +3499,7 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(tester.getSize(retry), const Size.square(40));
+    expect(tester.getSize(retry), const Size.square(48));
     expect(
       _iconButtonByKey(tester, const Key('retry-reminder-delivery')).tooltip,
       'Yeniden doğrula',
@@ -3553,7 +3553,7 @@ void main() {
 
     final reopen = find.byKey(const Key('reopen-reminder'));
     expect(reopen, findsOneWidget);
-    expect(tester.getSize(reopen), const Size.square(40));
+    expect(tester.getSize(reopen), const Size.square(48));
     expect(
       _iconButtonByKey(tester, const Key('reopen-reminder')).tooltip,
       'Yeniden aç',
