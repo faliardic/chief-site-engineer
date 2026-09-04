@@ -685,9 +685,9 @@ Widget _detailIconAction({
       key: key,
       tooltip: label,
       style: IconButton.styleFrom(
-        minimumSize: const Size.square(40),
-        fixedSize: const Size.square(40),
-        maximumSize: const Size.square(40),
+        minimumSize: const Size.square(48),
+        fixedSize: const Size.square(48),
+        maximumSize: const Size.square(48),
         iconSize: 20,
         padding: EdgeInsets.zero,
         visualDensity: VisualDensity.standard,
