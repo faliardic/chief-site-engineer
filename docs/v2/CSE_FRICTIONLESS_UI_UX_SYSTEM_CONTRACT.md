@@ -17,6 +17,8 @@ sürtünmeyle çalışan tek bir kişisel saha asistanında birleştirerek ilerl
 Kalıcı ürün ve veri ilkelerinde
 `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`, kilitli ürün davranışlarında
 `docs/post_v2_locked_feature_decisions.md`, güncel program sırasında Issue #617,
+4 Eylül 2026 visual-first ürün ve sıra kararlarında
+`docs/v2/CSE_VISUAL_FIRST_OWNER_DECISIONS_2026-09-04.md`,
 V2 kapsam ve yürütme sırasında `docs/v2/CSE_V2_SCOPE.md` ile `ROADMAP.md`
 yetkilidir. Aktif production diliminin exact kapsamı ayrıca kendi GitHub
 Issue'sundan gelir.
@@ -42,7 +44,8 @@ Bütün ekran, ortak bileşen ve akış kararları şu ilkelerden birlikte geçe
 5. Aynı bilgi kullanıcıya ikinci kez girdirilmez.
 6. Eylem ihtiyaç duyulan bağlamda bulunur; kullanıcı menü avına zorlanmaz.
 7. Aktif proje bütün proje-bağımlı ekranlarda kesintisiz ortak bağlamdır.
-8. Dashboard bir menü değil, canlı proje kontrol merkezidir.
+8. Home, seçili projenin düzenlenebilir Project Profile yüzeyidir; diğer
+   modüllere kompakt `Araçlar` girişiyle ulaşılır.
 9. İpuçları kullanım talimatı değil, özelliğin saha faydasının kısa
    açıklamasıdır.
 10. Görsel dil sade, kontrollü, modern ve düşünülmüş olmalıdır.
@@ -92,6 +95,18 @@ Bütün ekran, ortak bileşen ve akış kararları şu ilkelerden birlikte geçe
 - Aktif proje değiştirmek navigation/context işlemidir; yalnız bu işlem
   nedeniyle source kayıt, revision, event/history veya dosya bağı değişmez.
 
+### 4.1. Home / Project Profile
+
+- Home seçili projenin düzenlenebilir Project Profile yüzeyidir; eski canlı
+  kontrol merkezi yönü current değildir.
+- Proje adı, toplam kat, toplam alan ve YİBF no gibi varsayılan bilgiler; owner
+  tanımlı ek alanlar ve yeniden sıralanabilir bilgi bloklarıyla birlikte
+  dokunarak düzenlenebilir bir profil dili kullanır.
+- Diğer modüller kompakt `Araçlar` girişinden erişilir; profil yüzeyi modül
+  menüsü veya bakım paneliyle doldurulmaz.
+- Persistence/schema, field type, validation, migration ve reorder saklama
+  ayrıntıları ayrı yetkili production diliminde seçilir.
+
 ## 5. Erişilebilirlik ve etkileşim hedefi
 
 - Telefon ve tabletlerde her birincil veya kritik kontrolün gerçek, görünür ve
@@ -126,6 +141,21 @@ Bütün ekran, ortak bileşen ve akış kararları şu ilkelerden birlikte geçe
 - Aynı önemde birden çok birincil eylem yarıştırılmaz; ikincil ve tertiary
   eylemler görsel hiyerarşide geride kalır.
 
+### 6.1. Sağ ekran-tool rail dili
+
+- Reminder, Ajanda, Puantaj, Beton ve Saha Rehberi gibi ekranlarda tekrarlanan
+  ikincil ekran araçları başparmakla erişilebilir sağ dikey tool rail içinde
+  toplanır.
+- Rail, primary navigation yerine geçmez; birincil form eylemlerini veya
+  destructive kararları icon-only yapmaz.
+- Birincil eylemler görünür/metinli, destructive eylemler açık risk ve gereken
+  confirmation diliyle kalır.
+- Inventory açık istisnadır: canvas alanını tüketen sağ rail kaldırılır;
+  context, filtre ve harita araçları kompakt üst alana taşınır. Soldaki
+  Kroki/Katlar/Liste rail'i korunur.
+- Inventory sketch selection ve D-pad davranışının ayrıntıları ayrı production
+  dilimidir; bu sözleşme hareket adımı, seçim modeli veya persistence seçmez.
+
 ## 7. Formlar ve progressive disclosure
 
 - Zorunlu alanlar önce gelir; opsiyonel ayrıntılar ilk yakalamayı geciktirmez.
@@ -140,6 +170,8 @@ Bütün ekran, ortak bileşen ve akış kararları şu ilkelerden birlikte geçe
   loading durumu açıktır.
 - Aktif proje veya mevcut kayıt bağlamı forma yeniden yazdırılmaz. Deliberate
   override varsa mevcut değer görünür ve değişiklik açık kullanıcı işlemidir.
+- Agenda Log, Reminder ve New Project formları ferah progressive-disclosure
+  yüzeyleri olarak tasarlanır; küçük ve sıkışık kutu yığınına dönüştürülmez.
 
 ## 8. Arama, filtre ve list-detail
 
@@ -156,6 +188,10 @@ Bütün ekran, ortak bileşen ve akış kararları şu ilkelerden birlikte geçe
 - Expanded list-detail yalnız navigation maliyetini gerçekten azaltıyor ve
   seçili kayıt bağlamını açık tutuyorsa kullanılır; compact akışın kaynak
   davranışını değiştirmez.
+- Ajanda üstte aylık/haftalık takvim geçişi sunar; güne dokunmak o günün
+  kayıtlarını gösterir. Arama ve filtre aynı ekran-tool dilinin parçasıdır.
+- Sicil'de kişi adına dokunmak en az ad, taşeron/firma, meslek, başlangıç
+  tarihi, toplam puantaj ve notları gösteren profil özetini açar.
 
 ## 9. Empty, loading, error, success ve history dili
 
@@ -218,7 +254,7 @@ kanıtla ölçer:
 | Kullanıcıya görünen internal event code | 0 |
 | Etiketsiz primary navigation destination | 0 |
 | Kritik eylem alanı | Görünür alan = hit-test = Semantics; en az `48×48 dp` |
-| Dashboard'da günlük içeriğe rakip bakım araçları | 0 |
+| Project Profile'da proje bilgisine rakip modül/araç kalabalığı | 0 |
 
 Bu hedefler dokümantasyonla tamamlanmış sayılmaz; ilgili production diliminin
 validation ve gerekiyorsa owner manuel kabul kapısında kanıtlanır.
@@ -234,52 +270,45 @@ Issue #617 ve bu sözleşme yalnız çelişen hükümleri supersede eder:
 | #571 | İkincil ikonlarda tutarlı sözlük, Tooltip ve Semantics | Etiketleri gizleyen ana navigation ve agresif icon-first primary action |
 | #584 | Merged Ajanda işlevleri, key/callback/domain ve confirmation davranışı | `40×40` icon-only save/create/edit/archive varsayılanı |
 
+4 Eylül 2026 visual-first owner kararı ayrıca önceki `Dashboard = canlı proje
+kontrol merkezi` yönünü Project Profile/Home ile ve kalan Step 10/11 görünmez
+polish işlerini görsel dönüşümden önce zorunlu kılan sırayı visual-first
+dalga ile supersede eder. UXF-002..018'in merged altyapısı korunur.
+
 Mevcut merged işlevler geri alınmaz; sonraki dar dilimler bunları bu sözleşmeye
 uyarlar. Tarihsel Issue/PR/test/manuel kabul kanıtı silinmez veya geriye dönük
 yeniden yazılmaz. Çelişki olmayan ürün ve veri sözleşmeleri yürürlükte kalır.
 
 ## 14. Fazlı implementation haritası
 
-Sıra Issue #617'deki program sırasıdır:
+UXF-002..018 ile adaptive/accessibility foundation ve tamamlanan ortak
+interaction dilimleri geçerli merged temeldir. Güncel sıra:
 
-1. **Phase 0 — Contract and baseline:** #616 evidence baseline; bu kanonik
-   sözleşme; Roadmap/V2 Scope truth-sync.
-2. **Phase 1 — Adaptive and accessible foundation:** adaptive compact bar /
-   expanded rail shell; owner-reviewed final compact destination set; ortak
-   aktif-proje bileşeni; edge-to-edge, predictive Back ve resize/orientation
-   state retention; `48×48`, Semantics, scaling, focus ve Tooltip ortakları.
-3. **Phase 2 — Shared interaction system:** primary action/form; search/filter;
-   empty/loading/error/success; kullanıcı diliyle history/event sistemi.
-4. **Phase 3 — Daily core:** canlı Dashboard; Hatırlatıcı + Unutma Kutusu;
-   Ajanda ve Ajanda→Hatırlatıcı prefill; Living Plan; Daily Log ve Work Chain
-   hedefli kanıtı.
-5. **Phase 4 — People and field safety:** Sicil/Saha Rehberi; Puantaj; İSG model
-   audit ve tracking yüzeyi; KKD hızlı seçim. Otomatik personel kodu tutulursa
-   ayrı yetkili CRITICAL dilimdir.
-6. **Phase 5 — Supporting modules:** Beton completion/detail/edit; Materials
-   ortak pattern uyumu; Album/files/backup/Settings yerleşimi; Inventory için
-   yalnız küçük tutarlılık ve erişilebilirlik uyumu, redesign yok.
-7. **Phase 6 — Independent release gates:** minimum ortak arama; kısa onboarding;
-   minimum crash/ANR/fatal telemetry; privacy/KVKK/store beyanları;
-   recovery/backup owner kabulü.
-8. **Phase 7 — Integrated quality:** compact/medium/expanded matrisi;
-   phone/tablet, portrait/landscape/split-screen; TalkBack, yüksek text scale,
-   focus ve grayscale; eksik #616 kanıtı ve gerekli manuel kabul borcu;
-   bütünleşik günlük saha şefi senaryosu.
-9. **Phase 8 — Release candidate:** birleşik automated milestone kapıları,
+1. **Project Profile / Home visual transformation:** Home, seçili projenin
+   düzenlenebilir Project Profile yüzeyine dönüşür; modüller kompakt `Araçlar`
+   girişinden erişilir.
+2. **Shared visual language and screen tools:** ortak yüzey/boşluk/hiyerarşi ve
+   genel sağ tool-rail dili; Inventory için kompakt üst araç alanı istisnası.
+3. **High-friction forms and screens:** Agenda Log, Reminder, New Project,
+   Ajanda gün görünümü, Personel profili ve Puantaj sadeleştirmesi ayrı dar
+   dilimlerle ele alınır.
+4. **Return to release debt:** kalan empty/loading/error/success,
+   history/event, adaptive/accessibility, recovery/backup, arama/onboarding,
+   telemetry/privacy ve bütünleşik kalite kapıları.
+5. **Release candidate:** birleşik automated milestone kapıları,
    analyze/build/artifact provenance; owner phone/tablet release-candidate
    kabulü; açık owner genel yayın kararı.
 
 Her production adımı tek dar Issue/PR olarak yürür; aynı anda yalnız bir
-production implementation Issue'su aktiftir ve stacked PR açılmaz. Phase 0'ın
-tamamlanması Phase 1 production değişikliğine kendiliğinden yetki vermez.
+production implementation Issue'su aktiftir ve stacked PR açılmaz. Bu
+truth-sync sonraki production değişikliğine kendiliğinden yetki vermez.
 
 ## 15. İlk sonraki karar ve korunacak kapılar
 
-Bu sözleşme merge edildikten sonraki ilk product/implementation kararı, Phase 1
-Adaptive CSE Shell için final compact destination üyeliğinin owner review'uyla
-seçilmesidir. Ardından adaptive shell ve accessibility foundation ayrı dar
-Issue'larla yürür.
+İlk sonraki production dalgası Project Profile/Home görsel dönüşümüdür.
+Project Profile'ın persistence/schema modeli, ek alan tipleri ve reorder saklama
+biçimi; Inventory D-pad adımı; cetvel kalibrasyonu; bildirim snooze süresi ve
+Puantaj→Ajanda senkron semantiği ayrı yetkili dilimler olmadan belirlenmez.
 
 DWG Viewer / Issue #523 `POST-RELEASE / DEFERRED` kalır ve ilk genel yayının
 bağımlılığı değildir. Issue #479'daki manuel kabul borcu; #501, #502 ve #503
