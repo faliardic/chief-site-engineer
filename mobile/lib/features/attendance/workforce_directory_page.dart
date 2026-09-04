@@ -23,10 +23,10 @@ class WorkforceDirectoryPage extends StatefulWidget {
   final ValueChanged<String>? onProjectSelected;
 
   @override
-  State<WorkforceDirectoryPage> createState() => _WorkforceDirectoryPageState();
+  State<WorkforceDirectoryPage> createState() => WorkforceDirectoryPageState();
 }
 
-class _WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
+class WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
   final TextEditingController _search = TextEditingController();
   StreamSubscription<void>? _projectSubscription;
   List<MobileProject> _projects = const [];
@@ -151,16 +151,19 @@ class _WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
     }
   }
 
-  Future<void> _selectProject(String? id) async {
-    if (id == null || id == _project?.id || _loading) return;
-    final project = _projects.firstWhere((item) => item.id == id);
+  Future<void> selectProject(String projectId) async {
+    if (projectId == _project?.id || _loading) return;
+    final project = _projects
+        .where((candidate) => candidate.id == projectId)
+        .firstOrNull;
+    if (project == null) return;
     setState(() {
-      _projectIdToValidate = id;
+      _projectIdToValidate = projectId;
       _project = project;
       _subcontractorId = null;
       _teamId = null;
     });
-    widget.onProjectSelected?.call(id);
+    widget.onProjectSelected?.call(projectId);
     await _loadDirectory(project);
   }
 
@@ -278,25 +281,6 @@ class _WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
             ),
           )
         else ...[
-          DropdownButtonFormField<String>(
-            key: ValueKey('workforce-directory-project-${project?.id}'),
-            initialValue: project?.id,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Proje',
-              border: OutlineInputBorder(),
-            ),
-            items: _projects
-                .map(
-                  (item) => DropdownMenuItem(
-                    value: item.id,
-                    child: Text(item.name, overflow: TextOverflow.ellipsis),
-                  ),
-                )
-                .toList(growable: false),
-            onChanged: _loading ? null : _selectProject,
-          ),
-          const SizedBox(height: 8),
           if (project != null)
             Text(
               'Görünen proje: ${project.name}',
@@ -309,7 +293,7 @@ class _WorkforceDirectoryPageState extends State<WorkforceDirectoryPage> {
               child: Padding(
                 padding: EdgeInsets.all(16),
                 child: Text(
-                  'Başlangıç projesi artık kullanılamıyor. Devam etmek için bir proje seçin.',
+                  'Başlangıç projesi artık kullanılamıyor. Aktif projeyi üst çubuktan seçin.',
                 ),
               ),
             ),
