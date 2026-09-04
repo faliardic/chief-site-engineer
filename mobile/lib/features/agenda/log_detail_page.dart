@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:chief_site_engineer/application/agenda_application.dart';
@@ -42,9 +43,12 @@ class LogDetailPage extends StatefulWidget {
 }
 
 class _LogDetailPageState extends State<LogDetailPage> {
-  late Future<AgendaLogDetail> _detail;
+  AgendaLogDetail? _detail;
+  bool _loading = true;
+  bool _readInFlight = false;
   bool _mutating = false;
   String? _error;
+  String? _readError;
 
   AttachmentCatalogApplication? get _attachmentCatalog =>
       widget.agenda is AttachmentCatalogHost
@@ -58,7 +62,39 @@ class _LogDetailPageState extends State<LogDetailPage> {
   }
 
   void _reload() {
-    _detail = widget.agenda.getAgendaLogDetail(widget.logId);
+    if (_readInFlight) return;
+    _readInFlight = true;
+    _loading = true;
+    _readError = null;
+    unawaited(_loadDetail());
+  }
+
+  Future<void> _loadDetail() async {
+    try {
+      final detail = await widget.agenda.getAgendaLogDetail(widget.logId);
+      if (mounted) {
+        setState(() {
+          _detail = detail;
+          _loading = false;
+          _readError = null;
+        });
+      }
+    } on Object {
+      if (mounted) {
+        setState(() {
+          _detail = null;
+          _loading = false;
+          _readError = 'Ajanda kaydı güvenli biçimde okunamadı.';
+        });
+      }
+    } finally {
+      _readInFlight = false;
+    }
+  }
+
+  void _retryRead() {
+    if (_readInFlight) return;
+    setState(_reload);
   }
 
   Future<void> _createReminder(AgendaLog log) async {
@@ -332,44 +368,58 @@ class _LogDetailPageState extends State<LogDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<AgendaLogDetail>(
-      future: _detail,
-      builder: (context, snapshot) {
-        final detail = snapshot.data;
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Ajanda kaydı'),
-            actions: [
-              if (detail != null && detail.managedConcretePourId == null)
-                _detailIconAction(
-                  key: const Key('detail-reminder-action'),
-                  label: 'Hatırlatıcı oluştur',
-                  onPressed: _mutating || detail.log.archivedAt != null
-                      ? null
-                      : () => _createReminder(detail.log),
-                  icon: const Icon(Icons.add_alarm_outlined),
-                ),
-            ],
-          ),
-          body: _body(snapshot),
-        );
-      },
+    final detail = _detail;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Ajanda kaydı'),
+        actions: [
+          if (detail != null && detail.managedConcretePourId == null)
+            _detailIconAction(
+              key: const Key('detail-reminder-action'),
+              label: 'Hatırlatıcı oluştur',
+              onPressed: _mutating || detail.log.archivedAt != null
+                  ? null
+                  : () => _createReminder(detail.log),
+              icon: const Icon(Icons.add_alarm_outlined),
+            ),
+        ],
+      ),
+      body: _body(),
     );
   }
 
-  Widget _body(AsyncSnapshot<AgendaLogDetail> snapshot) {
-    if (snapshot.connectionState != ConnectionState.done) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (snapshot.hasError || !snapshot.hasData) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text('Ajanda kaydı güvenli biçimde okunamadı.'),
+  Widget _body() {
+    if (_loading) {
+      return Center(
+        child: Semantics(
+          container: true,
+          label: 'Ajanda kaydı yükleniyor',
+          child: const ExcludeSemantics(child: CircularProgressIndicator()),
         ),
       );
     }
-    final detail = snapshot.requireData;
+    if (_readError != null || _detail == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Ajanda kaydı güvenli biçimde okunamadı.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              _DetailReadRetryAction(
+                actionKey: const Key('agenda-detail-read-error-retry'),
+                onPressed: _readInFlight ? null : _retryRead,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    final detail = _detail!;
     final log = detail.log;
     final history = _agendaUpdateHistory(detail.events);
     return ListView(
@@ -871,6 +921,34 @@ class _DetailRow extends StatelessWidget {
           const SizedBox(height: 2),
           SelectableText(value),
         ],
+      ),
+    );
+  }
+}
+
+class _DetailReadRetryAction extends StatelessWidget {
+  const _DetailReadRetryAction({
+    required this.actionKey,
+    required this.onPressed,
+  });
+
+  final Key actionKey;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: 'Tekrar dene',
+      button: true,
+      enabled: onPressed != null,
+      excludeSemantics: true,
+      onTap: onPressed,
+      child: FilledButton(
+        key: actionKey,
+        style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+        onPressed: onPressed,
+        child: const Text('Tekrar dene'),
       ),
     );
   }

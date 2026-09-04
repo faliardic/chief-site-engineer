@@ -43,10 +43,12 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
   ReminderDeliveryDiagnostic? _deliveryDiagnostic;
   Future<ReminderSourceAgendaMedia>? _sourceAgendaMedia;
   bool _loading = true;
+  bool _readInFlight = false;
   bool _mutating = false;
   bool _syncDialogOpen = false;
   bool _scheduleFlowOpen = false;
   String? _error;
+  String? _readError;
 
   @override
   void initState() {
@@ -55,9 +57,12 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
   }
 
   Future<void> _reload({String? errorAfterReload}) async {
+    if (_readInFlight) return;
+    _readInFlight = true;
     setState(() {
       _loading = true;
       _error = null;
+      _readError = null;
       _sourceAgendaDetail = null;
       _sourceAgendaMedia = null;
     });
@@ -97,15 +102,20 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
               : _loadSourceAgendaMedia(sourceLogId);
           _loading = false;
           _error = errorAfterReload;
+          _readError = null;
         });
       }
     } on Object {
       if (mounted) {
         setState(() {
+          _detail = null;
           _loading = false;
-          _error = 'Hatırlatıcı güvenli biçimde okunamadı.';
+          _error = null;
+          _readError = 'Hatırlatıcı güvenli biçimde okunamadı.';
         });
       }
+    } finally {
+      _readInFlight = false;
     }
   }
 
@@ -1100,7 +1110,32 @@ class _ReminderDetailPageState extends State<ReminderDetailPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Hatırlatıcı detayı')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: Semantics(
+                container: true,
+                label: 'Hatırlatıcı yükleniyor',
+                child: const ExcludeSemantics(
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+            )
+          : _readError != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_readError!, textAlign: TextAlign.center),
+                    const SizedBox(height: 12),
+                    _DetailReadRetryAction(
+                      actionKey: const Key('reminder-detail-read-error-retry'),
+                      onPressed: _readInFlight ? null : _reload,
+                    ),
+                  ],
+                ),
+              ),
+            )
           : _detail == null
           ? Center(
               child: Padding(
@@ -1835,6 +1870,34 @@ class _ReminderRow extends StatelessWidget {
           const SizedBox(height: 2),
           SelectableText(value),
         ],
+      ),
+    );
+  }
+}
+
+class _DetailReadRetryAction extends StatelessWidget {
+  const _DetailReadRetryAction({
+    required this.actionKey,
+    required this.onPressed,
+  });
+
+  final Key actionKey;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: 'Tekrar dene',
+      button: true,
+      enabled: onPressed != null,
+      excludeSemantics: true,
+      onTap: onPressed,
+      child: FilledButton(
+        key: actionKey,
+        style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+        onPressed: onPressed,
+        child: const Text('Tekrar dene'),
       ),
     );
   }
