@@ -1,7 +1,7 @@
 # CSE Proje Talimatları — Git ve Veri Güvenliği
 
 **Belge türü:** Bağlayıcı güvenlik ve repository protokolü
-**Güncelleme tarihi:** 2026-09-03
+**Güncelleme tarihi:** 2026-09-04
 
 Bu belge günlük workflow'u tekrar etmez. Günlük lane, süre, test sahipliği ve publication için `AGENTS.md` ile `CSE_WORKFLOW_ACCELERATION_PROTOCOL.md` uygulanır. Bu belge kritik Git, kullanıcı verisi ve repository güvenliği için yetkilidir.
 
@@ -60,14 +60,17 @@ Documentation-only policy/source güncellemesi, owner açıkça isterse authenti
 - Force-push yoktur.
 - Destructive reset/clean/stash yoktur.
 - Beklenmeyen kullanıcı değişikliği silinmez veya üzerine yazılmaz.
-- Branch/ref yalnız fast-forward veya owner-approved squash merge ile ilerletilir.
+- Branch/ref yalnız fast-forward veya geçerli owner yetkisi kapsamında gate'leri geçmiş squash merge ile ilerletilir.
 - Hard-delete ve branch deletion otomatik yapılmaz.
 - Ignored ZIP, backup, report veya kullanıcı artifact'larına dokunulmaz.
 - Merge sonrası local master bir sonraki local değişiklikten önce `git pull --ff-only` ile senkronlanır.
-- Issue closure owner-controlled kalır.
-- Tek amaçlı ve tamamen tamamlanmış bir implementation Issue'su için PR body açıkça `Closes #...` kullanıyorsa, owner'ın o PR'a verdiği merge onayı otomatik Issue kapanışını da kapsar.
+- Issue closure açık owner disposition'ıyla kontrol edilir.
+- Tek amaçlı ve tamamen tamamlanmış bir implementation Issue'su için PR body açıkça `Closes #...` kullanıyorsa, standing merge yetkisi otomatik Issue kapanışını da kapsar.
 - Parent, umbrella, manuel acceptance, release veya devam kapsamı bulunan Issue'lar `Refs #...` ile açık bırakılır.
 - Issue'nun tamamen tamamlandığı belirsizse `Refs` kullanılır; otomatik kapanış yapılmaz.
+- Standing owner yetkisi yalnız PR Ready/squash merge içindir. Required herhangi bir gate FAIL/PENDING iken Ready/merge yapılmaz. Required source/diff review ile task-specific validation ve gerekli manual/device acceptance PASS veya açıkça GEREKMİYOR ise; blocker, REQUEST_CHANGES, scope/allowlist/base/head drift, conflict ve mergeability sorunu yoksa ChatGPT ayrıca Fatih'e sormadan Ready ve squash merge işlemlerini yürütür.
+- CRITICAL PR'lerde bu yetki ancak Issue'ya özel bütün validation/compatibility/manual kapıları geçtikten sonra kullanılabilir. Release/store ve destructive production/device/data işlemleri ayrı açık owner onayı ister.
+- Fatih standing Ready/merge yetkisini sonraki bir owner talimatıyla iptal edebilir veya askıya alabilir.
 
 ## 5. Kullanıcı verisi ve cihaz güvenliği
 
@@ -123,7 +126,7 @@ Bu belge bütün görevlerde full suite veya `.cse` ledger zorunlu kılmaz.
 - kullanıcıya ürün anlamını açıklar ve her teslim edilen sonucu `Sıradaki aksiyon — <aktör>: <tek uygulanabilir talimat>.` satırıyla bitirir;
 - gereksiz Issue/comment/PR/metadata üretmez;
 - merge öncesinde incelenen PR body'ye göre hangi Issue'ların kapanacağını ve hangilerinin açık kalacağını açıklar;
-- kritik review ve merge kararını owner'a taşır.
+- required review/validation/manual ve drift/mergeability kapılarını fail-closed doğrular; gate'ler geçince standing owner yetkisiyle Ready/squash merge'i otomatik yürütür.
 
 ### Fatih
 
@@ -131,9 +134,10 @@ Bu belge bütün görevlerde full suite veya `.cse` ledger zorunlu kılmaz.
 - yalnız manuel ürün/device kabulünü ve nihai davranış PASS/FAIL kararını verir; terminal komutu çalıştırmaz;
 - mekanik emulator/ADB/device execution'ını yalnız exact güvenlik sınırlarıyla Codex'e açıkça devredebilir;
 - PASS/FAIL ve ürün kabulü kararını kendisi verir;
-- Ready, merge, release ve destructive işlemleri açıkça onaylar;
-- incelenen PR body'de açıkça `Closes` ile belirtilen tekil Issue closure'ı, ilgili merge onayıyla birlikte yetkilendirebilir.
+- standing yetki yürürlükteyken required gate'leri geçen PR'ler için ChatGPT'den yeni Ready/merge onayı istenmez; Fatih bu yetkiyi sonraki owner talimatıyla iptal edebilir veya askıya alabilir;
+- release/store ve destructive production/device/data işlemlerini ayrı açıkça onaylar;
+- incelenen PR body'de açıkça `Closes` ile belirtilen tekil Issue closure'ını standing merge yetkisi kapsamında bırakır; `Refs` Issue'lar açık kalır.
 
 ## 9. Ana karar
 
-> Repository ve kullanıcı verisi güvenliği değişmez. Günlük çalışma töreni bu belgeye değil `AGENTS.md` içindeki risk-temelli lane'e göre yürür; publication current GitHub ruleset'inin izin verdiği en hafif yolla yapılır ve Issue closure yalnız açık disposition ile owner kontrolünde kalır. Ağır süreç yalnız gerçek kritik sözleşmelerde uygulanır.
+> Repository ve kullanıcı verisi güvenliği değişmez. Günlük çalışma töreni bu belgeye değil `AGENTS.md` içindeki risk-temelli lane'e göre yürür; required gate'ler geçince standing owner yetkisi Ready/squash merge ve açık `Closes` disposition'ı için otomatik uygulanır. Release/store, destructive işlemler ve gerçek kritik sözleşmeler ayrı owner onayıyla ağır güvenlik sürecinde kalır.
