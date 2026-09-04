@@ -62,9 +62,28 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   late DateTime _deadlineDate;
   TimeOfDay _deadlineTime = const TimeOfDay(hour: 17, minute: 0);
   bool _submitting = false;
+  bool _allowPop = false;
+  bool _exitDialogOpen = false;
   bool _loadingProjects = true;
   String? _error;
   StreamSubscription<void>? _projectSubscription;
+  late String _baselineTitle;
+  late String _baselineDescription;
+  late String _baselineLocation;
+  late String _baselineRelatedPerson;
+  late String _baselineCondition;
+  String? _baselineProjectId;
+  String? _baselineLocationId;
+  late ReminderKind _baselineKind;
+  late ReminderScheduleKind _baselineSchedule;
+  String? _baselineQuickSchedulePreviewAt;
+  late DateTime _baselineCustomDate;
+  late TimeOfDay _baselineCustomTime;
+  late bool _baselineAllDay;
+  late bool _baselineImportant;
+  late bool _baselineHasDeadline;
+  late DateTime _baselineDeadlineDate;
+  late TimeOfDay _baselineDeadlineTime;
 
   @override
   void initState() {
@@ -80,6 +99,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
     );
     _customDate = DateTime(local.year, local.month, local.day + 1);
     _deadlineDate = _customDate;
+    _captureInitialBaseline();
     _projectSubscription = widget.agenda.projectChanges.listen(
       (_) => unawaited(_handleProjectChanges()),
     );
@@ -110,24 +130,42 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
               !projects.any((project) => project.id == _projectId)
           ? null
           : _projectId;
+      final projectWasDirty = _projectId != _baselineProjectId;
+      final locationWasDirty =
+          _locationId != _baselineLocationId ||
+          _location.text != _baselineLocation;
       setState(() {
         _projects = projects;
         _projectId = selected;
+        if (!projectWasDirty) _baselineProjectId = selected;
         if (selected == null) {
           _locationId = null;
           _location.clear();
+          if (!locationWasDirty) {
+            _baselineLocationId = null;
+            _baselineLocation = '';
+          }
         }
         _loadingProjects = false;
       });
     } on Object {
       // Standalone capture remains available without a project.
       if (!mounted || generation != _projectLoadGeneration) return;
+      final projectWasDirty = _projectId != _baselineProjectId;
+      final locationWasDirty =
+          _locationId != _baselineLocationId ||
+          _location.text != _baselineLocation;
       setState(() {
         _projects = const [];
         if (widget.log == null) {
           _projectId = null;
           _locationId = null;
           _location.clear();
+          if (!projectWasDirty) _baselineProjectId = null;
+          if (!locationWasDirty) {
+            _baselineLocationId = null;
+            _baselineLocation = '';
+          }
         }
         _loadingProjects = false;
       });
@@ -154,11 +192,13 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
           _locationId != null &&
           widget.log?.locationId == _locationId &&
           widget.log?.stableLocationName != null;
+      final locationWasDirty = _locationId != _baselineLocationId;
       setState(() {
         _locations = values;
         if (!values.any((item) => item.id == _locationId) &&
             !canKeepSourceArchived) {
           _locationId = null;
+          if (!locationWasDirty) _baselineLocationId = null;
         }
         _loadingLocations = false;
       });
@@ -213,10 +253,12 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   }
 
   void _selectContextSuggestion(ContextSuggestion suggestion) {
-    _relatedPerson.text = suggestion.displayValue;
-    _relatedPerson.selection = TextSelection.collapsed(
-      offset: suggestion.displayValue.length,
-    );
+    setState(() {
+      _relatedPerson.text = suggestion.displayValue;
+      _relatedPerson.selection = TextSelection.collapsed(
+        offset: suggestion.displayValue.length,
+      );
+    });
     _scheduleSuggestionLoad(suggestion.displayValue);
   }
 
@@ -245,6 +287,101 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
     _relatedPerson.dispose();
     _condition.dispose();
     super.dispose();
+  }
+
+  void _captureInitialBaseline() {
+    _baselineTitle = _title.text;
+    _baselineDescription = _description.text;
+    _baselineLocation = _location.text;
+    _baselineRelatedPerson = _relatedPerson.text;
+    _baselineCondition = _condition.text;
+    _baselineProjectId = _projectId;
+    _baselineLocationId = _locationId;
+    _baselineKind = _kind;
+    _baselineSchedule = _schedule;
+    _baselineQuickSchedulePreviewAt = _quickSchedulePreviewAt;
+    _baselineCustomDate = _customDate;
+    _baselineCustomTime = _customTime;
+    _baselineAllDay = _allDay;
+    _baselineImportant = _isImportant;
+    _baselineHasDeadline = _hasDeadline;
+    _baselineDeadlineDate = _deadlineDate;
+    _baselineDeadlineTime = _deadlineTime;
+  }
+
+  bool get _isDirty {
+    final customDateChanged =
+        (_schedule == ReminderScheduleKind.custom ||
+            _allDay ||
+            _baselineSchedule == ReminderScheduleKind.custom ||
+            _baselineAllDay) &&
+        _customDate != _baselineCustomDate;
+    final customTimeChanged =
+        ((_schedule == ReminderScheduleKind.custom && !_allDay) ||
+            (_baselineSchedule == ReminderScheduleKind.custom &&
+                !_baselineAllDay)) &&
+        _customTime != _baselineCustomTime;
+    final deadlineChanged =
+        (_hasDeadline || _baselineHasDeadline) &&
+        (_deadlineDate != _baselineDeadlineDate ||
+            _deadlineTime != _baselineDeadlineTime);
+    return _title.text != _baselineTitle ||
+        _description.text != _baselineDescription ||
+        _location.text != _baselineLocation ||
+        _relatedPerson.text != _baselineRelatedPerson ||
+        _condition.text != _baselineCondition ||
+        _projectId != _baselineProjectId ||
+        _locationId != _baselineLocationId ||
+        _kind != _baselineKind ||
+        _schedule != _baselineSchedule ||
+        _quickSchedulePreviewAt != _baselineQuickSchedulePreviewAt ||
+        customDateChanged ||
+        customTimeChanged ||
+        _allDay != _baselineAllDay ||
+        _isImportant != _baselineImportant ||
+        _hasDeadline != _baselineHasDeadline ||
+        deadlineChanged;
+  }
+
+  void _rebuildForUserEdit(String _) {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _handlePopAttempt(Object? result) async {
+    if (_submitting || !_isDirty || _exitDialogOpen) return;
+    _exitDialogOpen = true;
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('unsaved-changes-dialog'),
+        title: const Text('Kaydedilmemiş değişiklikler'),
+        content: const Text(
+          'Yaptığınız değişiklikler kaydedilmedi. Formdan çıkmak istiyor musunuz?',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('stay-on-form'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Formda kal'),
+          ),
+          TextButton(
+            key: const Key('discard-form'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Kaydetmeden çık'),
+          ),
+        ],
+      ),
+    );
+    _exitDialogOpen = false;
+    if (!mounted || discard != true) return;
+    await _popWithGuardBypass(result);
+  }
+
+  Future<void> _popWithGuardBypass(Object? result) async {
+    if (!mounted) return;
+    setState(() => _allowPop = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) Navigator.of(context).pop(result);
   }
 
   Future<void> _submit() async {
@@ -334,9 +471,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
           ),
         );
       }
-      if (mounted) {
-        Navigator.pop(context, reminder);
-      }
+      await _popWithGuardBypass(reminder);
     } on AgendaValidationFailure catch (error) {
       if (mounted) {
         setState(() => _error = error.message);
@@ -380,6 +515,16 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
 
   @override
   Widget build(BuildContext context) {
+    return PopScope<Object?>(
+      canPop: _allowPop || (!_submitting && !_isDirty),
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) unawaited(_handlePopAttempt(result));
+      },
+      child: _buildForm(),
+    );
+  }
+
+  Widget _buildForm() {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.log == null ? 'Unutma' : 'Hatırlatıcı oluştur'),
@@ -421,6 +566,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
               validator: (value) => value == null || value.trim().isEmpty
                   ? 'Hatırlatıcı metni zorunludur.'
                   : null,
+              onChanged: _rebuildForUserEdit,
             ),
             DropdownButtonFormField<ReminderKind>(
               key: const Key('reminder-kind'),
@@ -584,6 +730,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
                     labelText: 'Açıklama',
                     border: OutlineInputBorder(),
                   ),
+                  onChanged: _rebuildForUserEdit,
                 ),
                 const SizedBox(height: 12),
                 if ((widget.log?.projectId ?? _projectId) == null)
@@ -594,6 +741,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
                       labelText: 'Mahál',
                       border: OutlineInputBorder(),
                     ),
+                    onChanged: _rebuildForUserEdit,
                   )
                 else
                   _buildStableLocationField(),
@@ -601,7 +749,10 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
                 TextField(
                   key: const Key('reminder-related-person'),
                   controller: _relatedPerson,
-                  onChanged: _scheduleSuggestionLoad,
+                  onChanged: (value) {
+                    _rebuildForUserEdit(value);
+                    _scheduleSuggestionLoad(value);
+                  },
                   decoration: const InputDecoration(
                     labelText: 'İlgili kişi / Firma',
                     border: OutlineInputBorder(),
@@ -655,6 +806,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
                     labelText: 'Koşul/not',
                     border: OutlineInputBorder(),
                   ),
+                  onChanged: _rebuildForUserEdit,
                 ),
                 SwitchListTile(
                   key: const Key('reminder-important'),
