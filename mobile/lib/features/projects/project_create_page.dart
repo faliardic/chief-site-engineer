@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/core/record_id.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
@@ -15,7 +17,11 @@ class ProjectCreatePage extends StatefulWidget {
 class _ProjectCreatePageState extends State<ProjectCreatePage> {
   final TextEditingController _nameController = TextEditingController();
   bool _saving = false;
+  bool _allowPop = false;
+  bool _exitDialogOpen = false;
   String? _error;
+
+  bool get _isDirty => _nameController.text.isNotEmpty;
 
   @override
   void dispose() {
@@ -40,7 +46,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
         CreateProjectCommand(id: RecordId.randomUuid(), name: name),
       );
       if (!mounted) return;
-      Navigator.of(context).pop(project);
+      await _popWithGuardBypass(project);
     } on AgendaValidationFailure catch (error) {
       if (!mounted) return;
       setState(() {
@@ -56,10 +62,50 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     }
   }
 
+  Future<void> _handlePopAttempt(Object? result) async {
+    if (_saving || !_isDirty || _exitDialogOpen) return;
+    _exitDialogOpen = true;
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('unsaved-changes-dialog'),
+        title: const Text('Kaydedilmemiş değişiklikler'),
+        content: const Text(
+          'Yaptığınız değişiklikler kaydedilmedi. Formdan çıkmak istiyor musunuz?',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('stay-on-form'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Formda kal'),
+          ),
+          TextButton(
+            key: const Key('discard-form'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Kaydetmeden çık'),
+          ),
+        ],
+      ),
+    );
+    _exitDialogOpen = false;
+    if (!mounted || discard != true) return;
+    await _popWithGuardBypass(result);
+  }
+
+  Future<void> _popWithGuardBypass(Object? result) async {
+    if (!mounted) return;
+    setState(() => _allowPop = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) Navigator.of(context).pop(result);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: !_saving,
+    return PopScope<Object?>(
+      canPop: _allowPop || (!_saving && !_isDirty),
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) unawaited(_handlePopAttempt(result));
+      },
       child: Scaffold(
         key: const Key('project-create-page'),
         appBar: AppBar(title: const Text('Yeni Proje')),
@@ -77,6 +123,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
                   labelText: 'Proje adı',
                   border: OutlineInputBorder(),
                 ),
+                onChanged: (_) => setState(() {}),
                 onSubmitted: _saving ? null : (_) => _save(),
               ),
               if (_error case final error?) ...[
@@ -88,15 +135,32 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
                 ),
               ],
               const SizedBox(height: 16),
-              FilledButton(
-                key: const Key('save-project'),
-                onPressed: _saving ? null : _save,
-                child: _saving
-                    ? const SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Kaydet'),
+              Semantics(
+                label: _saving ? 'Kaydediliyor…' : 'Kaydet',
+                button: true,
+                enabled: !_saving,
+                excludeSemantics: true,
+                onTap: _saving ? null : _save,
+                child: FilledButton(
+                  key: const Key('save-project'),
+                  style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+                  onPressed: _saving ? null : _save,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_saving) ...[
+                        const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Flexible(
+                        child: Text(_saving ? 'Kaydediliyor…' : 'Kaydet'),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),

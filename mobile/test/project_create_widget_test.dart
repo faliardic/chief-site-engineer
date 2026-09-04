@@ -9,6 +9,36 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'support/fake_agenda_application.dart';
 
+void _expectPrimaryAction(
+  WidgetTester tester,
+  String label, {
+  bool enabled = true,
+}) {
+  final save = find.byKey(const Key('save-project'));
+  expect(save, findsOneWidget);
+  expect(tester.widget(save), isA<FilledButton>());
+  expect(find.descendant(of: save, matching: find.text(label)), findsOneWidget);
+
+  final size = tester.getSize(save);
+  expect(size.width, greaterThanOrEqualTo(48));
+  expect(size.height, greaterThanOrEqualTo(48));
+
+  final semantics = find
+      .ancestor(
+        of: save,
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Semantics && widget.properties.label == label,
+        ),
+      )
+      .first;
+  final properties = tester.widget<Semantics>(semantics).properties;
+  expect(tester.getSize(semantics), size);
+  expect(properties.button, isTrue);
+  expect(properties.enabled, enabled);
+  expect(properties.onTap != null, enabled);
+  expect(tester.widget<FilledButton>(save).onPressed != null, enabled);
+}
+
 void main() {
   testWidgets('valid name is trimmed, created once, and returned by route', (
     tester,
@@ -21,12 +51,19 @@ void main() {
     expect(find.byKey(const Key('project-create-page')), findsOneWidget);
     expect(find.text('Yeni Proje'), findsOneWidget);
     expect(find.text('Proje adı'), findsOneWidget);
+    _expectPrimaryAction(tester, 'Kaydet');
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('project-name')))
+          .textInputAction,
+      TextInputAction.done,
+    );
 
     await tester.enterText(
       find.byKey(const Key('project-name')),
       '  Kuzey Şantiyesi  ',
     );
-    await tester.tap(find.byKey(const Key('save-project')));
+    await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
 
     expect(agenda.createProjectCalls, 1);
@@ -72,6 +109,7 @@ void main() {
     await tester.pump();
 
     expect(agenda.createProjectCalls, 1);
+    _expectPrimaryAction(tester, 'Kaydediliyor…', enabled: false);
     expect(
       find.descendant(
         of: save,
@@ -88,6 +126,7 @@ void main() {
     await tester.tap(find.byType(BackButton));
     await tester.pump();
     expect(find.byKey(const Key('project-create-page')), findsOneWidget);
+    expect(find.byKey(const Key('unsaved-changes-dialog')), findsNothing);
     expect(result.value, isNull);
     expect(agenda.createProjectCalls, 1);
 
@@ -95,12 +134,14 @@ void main() {
     await navigator.maybePop();
     await tester.pump();
     expect(find.byKey(const Key('project-create-page')), findsOneWidget);
+    expect(find.byKey(const Key('unsaved-changes-dialog')), findsNothing);
     expect(result.value, isNull);
     expect(agenda.createProjectCalls, 1);
 
     await tester.binding.handlePopRoute();
     await tester.pump();
     expect(find.byKey(const Key('project-create-page')), findsOneWidget);
+    expect(find.byKey(const Key('unsaved-changes-dialog')), findsNothing);
     expect(result.value, isNull);
     expect(agenda.createProjectCalls, 1);
 
@@ -135,6 +176,13 @@ void main() {
     expect(agenda.createProjectCalls, 1);
     expect(find.byKey(const Key('project-create-page')), findsOneWidget);
     expect(find.text('Aynı adlı aktif proje zaten bulunuyor.'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('project-name')))
+          .controller!
+          .text,
+      'Tekrar Projesi',
+    );
     expect(result.value, isNull);
 
     agenda.failure = StateError('storage details must stay hidden');
@@ -143,6 +191,13 @@ void main() {
     expect(agenda.createProjectCalls, 2);
     expect(find.text('Proje oluşturulamadı.'), findsOneWidget);
     expect(find.textContaining('storage details'), findsNothing);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('project-name')))
+          .controller!
+          .text,
+      'Tekrar Projesi',
+    );
 
     agenda.failure = null;
     await tester.tap(save);
@@ -165,7 +220,62 @@ void main() {
     expect(find.byKey(const Key('project-create-page')), findsNothing);
   });
 
-  testWidgets('back remains available after create failure', (tester) async {
+  testWidgets(
+    'dirty back confirms once and preserves exact state when staying',
+    (tester) async {
+      final agenda = _ProjectCreateAgenda();
+      final result = ValueNotifier<MobileProject?>(null);
+      addTearDown(result.dispose);
+      await _openPage(tester, agenda, result);
+
+      final page = find.byType(ProjectCreatePage);
+      final originalState = tester.state(page);
+      const changedText = 'Korunacak Proje';
+      await tester.enterText(
+        find.byKey(const Key('project-name')),
+        changedText,
+      );
+      await tester.pump();
+
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('unsaved-changes-dialog')), findsOneWidget);
+      expect(find.text('Kaydedilmemiş değişiklikler'), findsOneWidget);
+
+      final popScope = tester.widget<PopScope<Object?>>(
+        find.descendant(of: page, matching: find.byType(PopScope<Object?>)),
+      );
+      popScope.onPopInvokedWithResult!(false, null);
+      await tester.pump();
+      expect(find.byKey(const Key('unsaved-changes-dialog')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('stay-on-form')));
+      await tester.pumpAndSettle();
+      expect(tester.state(page), same(originalState));
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('project-name')))
+            .controller!
+            .text,
+        changedText,
+      );
+      expect(agenda.createProjectCalls, 0);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('unsaved-changes-dialog')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('discard-form')));
+      await tester.pumpAndSettle();
+
+      expect(page, findsNothing);
+      expect(result.value, isNull);
+      expect(agenda.createProjectCalls, 0);
+    },
+  );
+
+  testWidgets('create failure preserves input and keeps dirty guard active', (
+    tester,
+  ) async {
     final agenda = _ProjectCreateAgenda()
       ..failure = const AgendaValidationFailure(
         'Aynı adlı aktif proje zaten bulunuyor.',
@@ -183,7 +293,31 @@ void main() {
 
     expect(agenda.createProjectCalls, 1);
     expect(find.byKey(const Key('project-create-error')), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('project-name')))
+          .controller!
+          .text,
+      'Başarısız Proje',
+    );
     await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('unsaved-changes-dialog')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('stay-on-form')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('project-create-page')), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('project-name')))
+          .controller!
+          .text,
+      'Başarısız Proje',
+    );
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('discard-form')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('project-create-page')), findsNothing);
@@ -206,17 +340,21 @@ void main() {
     final result = ValueNotifier<MobileProject?>(null);
     addTearDown(result.dispose);
     await _openPage(tester, agenda, result);
+    expect(tester.takeException(), isNull);
 
     await tester.enterText(
       find.byKey(const Key('project-name')),
       'Dar Ekran Projesi',
     );
+    expect(tester.takeException(), isNull);
     final save = find.byKey(const Key('save-project'));
     await tester.scrollUntilVisible(
       save,
       120,
       scrollable: find.byType(Scrollable).last,
     );
+    expect(tester.takeException(), isNull);
+    _expectPrimaryAction(tester, 'Kaydet');
     expect(save.hitTestable(), findsOneWidget);
     await tester.tap(save);
     await tester.pumpAndSettle();
