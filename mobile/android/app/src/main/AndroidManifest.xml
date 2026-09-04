@@ -27,6 +27,7 @@
         android:icon="${appIcon}"
         android:roundIcon="${appRoundIcon}"
         android:allowBackup="false"
+        android:enableOnBackInvokedCallback="true"
         android:fullBackupContent="false"
         android:usesCleartextTraffic="false">
         <activity
