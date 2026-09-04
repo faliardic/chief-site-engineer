@@ -366,8 +366,7 @@ class _MobileShellState extends State<MobileShell> {
       _selectedIndex == 1 ||
       _selectedIndex == 2 ||
       _selectedIndex == 3 ||
-      _selectedIndex == 4 ||
-      _selectedIndex == 5;
+      _selectedIndex == 4;
 
   Future<void> _adoptRouteProjectSelection(
     String projectId, {
@@ -436,10 +435,6 @@ class _MobileShellState extends State<MobileShell> {
     setState(() => _dashboardContextEpoch += 1);
   }
 
-  void _showDashboardProjectSelection() {
-    _selectPrimaryTab(0);
-  }
-
   Future<void> _openProjectCreate() async {
     final project = await Navigator.of(context).push<MobileProject>(
       MaterialPageRoute(
@@ -482,15 +477,10 @@ class _MobileShellState extends State<MobileShell> {
         : const SizedBox.shrink();
   }
 
-  Future<void> _openConcreteFromMore() async {
+  Future<void> _openConcrete(String projectId) async {
     final concrete = widget.bootstrap.concrete;
     final attachments = widget.bootstrap.concreteAttachments;
     if (concrete == null || attachments == null) return;
-    final projectId = _activeProjectSession.selectedProjectId;
-    if (projectId == null) {
-      _showDashboardProjectSelection();
-      return;
-    }
     if (!mounted) return;
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
@@ -502,32 +492,6 @@ class _MobileShellState extends State<MobileShell> {
               agenda: widget.bootstrap.agenda,
               attachments: attachments,
               projectLocations: widget.bootstrap.projectLocations,
-              initialProjectId: projectId,
-              onProjectSelected: _reportRouteProjectSelection,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _openWorkforceFromMore() async {
-    final attendance = widget.bootstrap.attendance;
-    if (attendance == null) return;
-    final projectId = _activeProjectSession.selectedProjectId;
-    if (projectId == null) {
-      _showDashboardProjectSelection();
-      return;
-    }
-    if (!mounted) return;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => Scaffold(
-          appBar: AppBar(title: const Text('Sicil')),
-          body: SafeArea(
-            child: WorkforceDirectoryPage(
-              attendance: attendance,
-              agenda: widget.bootstrap.agenda,
               initialProjectId: projectId,
               onProjectSelected: _reportRouteProjectSelection,
             ),
@@ -564,7 +528,7 @@ class _MobileShellState extends State<MobileShell> {
           concrete != null &&
           attachments != null) {
         if (!mounted) return;
-        _selectPrimaryTab(5);
+        _selectPrimaryTab(0);
         await Navigator.of(context).push<void>(
           MaterialPageRoute(
             builder: (_) => ConcretePourDetailPage(
@@ -709,6 +673,10 @@ class _MobileShellState extends State<MobileShell> {
                 ),
               ),
             ),
+      onOpenConcrete:
+          bootstrap.concrete == null || bootstrap.concreteAttachments == null
+          ? null
+          : (projectId) => unawaited(_openConcrete(projectId)),
       onOpenProjectAlbum: catalog == null
           ? null
           : (projectId) => unawaited(_openProjectAlbum(projectId)),
@@ -768,7 +736,7 @@ class _MobileShellState extends State<MobileShell> {
   }
 
   static const _destinations = <NavigationDestination>[
-    NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Başlangıç'),
+    NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Ana Sayfa'),
     NavigationDestination(
       icon: Icon(Icons.notifications_none_rounded),
       label: 'Hatırlatıcı',
@@ -782,102 +750,127 @@ class _MobileShellState extends State<MobileShell> {
       label: 'Envanter',
     ),
     NavigationDestination(icon: Icon(Icons.badge_outlined), label: 'Puantaj'),
-    NavigationDestination(icon: Icon(Icons.more_horiz_rounded), label: 'Daha'),
   ];
 
   @override
   Widget build(BuildContext context) {
     final title = _destinations[_selectedIndex].label;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-        actions: _showsActiveProjectIndicator
-            ? [
-                ActiveProjectControl(
-                  label: _activeProjectLabel,
-                  projects: _activeProjectOptions,
-                  onSelected: _selectAppBarProject,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useRail = constraints.maxWidth >= 600;
+        final useExtendedRail = constraints.maxWidth >= 840;
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(title),
+            actions: _showsActiveProjectIndicator
+                ? [
+                    ActiveProjectControl(
+                      label: _activeProjectLabel,
+                      projects: _activeProjectOptions,
+                      onSelected: _selectAppBarProject,
+                    ),
+                  ]
+                : null,
+          ),
+          body: SafeArea(
+            child: Row(
+              children: [
+                if (useRail)
+                  NavigationRail(
+                    selectedIndex: _selectedIndex,
+                    extended: useExtendedRail,
+                    labelType: useExtendedRail
+                        ? null
+                        : NavigationRailLabelType.all,
+                    scrollable: true,
+                    destinations: [
+                      for (final destination in _destinations)
+                        NavigationRailDestination(
+                          icon: destination.icon,
+                          selectedIcon: destination.selectedIcon,
+                          label: Text(destination.label),
+                        ),
+                    ],
+                    onDestinationSelected: _selectPrimaryTab,
+                  ),
+                Expanded(
+                  key: const ValueKey('primary-shell-content'),
+                  child: IndexedStack(
+                    index: _selectedIndex,
+                    children: [
+                      _buildDashboard(),
+                      _buildVisitedPrimaryTab(
+                        1,
+                        () => RemindersPage(
+                          agenda: widget.bootstrap.agenda,
+                          attendance: widget.bootstrap.attendance,
+                          contextSuggestions:
+                              widget.bootstrap.contextSuggestions,
+                          projectLocations: widget.bootstrap.projectLocations,
+                          preferredProjectId:
+                              _activeProjectSession.selectedProjectId,
+                        ),
+                      ),
+                      _buildVisitedPrimaryTab(
+                        2,
+                        () => AgendaPage(
+                          agenda: widget.bootstrap.agenda,
+                          projectLocations: widget.bootstrap.projectLocations,
+                          attachments: widget.bootstrap.concreteAttachments,
+                          concrete: widget.bootstrap.concrete,
+                          concreteAttachments:
+                              widget.bootstrap.concreteAttachments,
+                          activeProjectId:
+                              _activeProjectSession.selectedProjectId,
+                        ),
+                      ),
+                      _buildVisitedPrimaryTab(
+                        3,
+                        () => InventoryPage(
+                          key: _inventoryKey,
+                          application: widget.bootstrap.inventory,
+                          listProjects: widget.bootstrap.agenda.listProjects,
+                          projectChanges:
+                              widget.bootstrap.agenda.projectChanges,
+                          activeProjectId:
+                              _activeProjectSession.selectedProjectId,
+                          isActive: _selectedIndex == 3,
+                          onProjectSelected: _reportRouteProjectSelection,
+                        ),
+                      ),
+                      _buildVisitedPrimaryTab(
+                        4,
+                        () => switch (widget.bootstrap.attendance) {
+                          final attendance? => AttendancePage(
+                            attendance: attendance,
+                            agenda: widget.bootstrap.agenda,
+                            activeProjectId:
+                                _activeProjectSession.selectedProjectId,
+                            isActive: _selectedIndex == 4,
+                            onProjectSelected: _reportRouteProjectSelection,
+                          ),
+                          null => const _PreparingPage(
+                            icon: Icons.badge_outlined,
+                            title: 'Puantaj',
+                          ),
+                        },
+                      ),
+                    ],
+                  ),
                 ),
-              ]
-            : null,
-      ),
-      body: SafeArea(
-        child: IndexedStack(
-          index: _selectedIndex,
-          children: [
-            _buildDashboard(),
-            _buildVisitedPrimaryTab(
-              1,
-              () => RemindersPage(
-                agenda: widget.bootstrap.agenda,
-                attendance: widget.bootstrap.attendance,
-                contextSuggestions: widget.bootstrap.contextSuggestions,
-                projectLocations: widget.bootstrap.projectLocations,
-                preferredProjectId: _activeProjectSession.selectedProjectId,
-              ),
+              ],
             ),
-            _buildVisitedPrimaryTab(
-              2,
-              () => AgendaPage(
-                agenda: widget.bootstrap.agenda,
-                projectLocations: widget.bootstrap.projectLocations,
-                attachments: widget.bootstrap.concreteAttachments,
-                concrete: widget.bootstrap.concrete,
-                concreteAttachments: widget.bootstrap.concreteAttachments,
-                activeProjectId: _activeProjectSession.selectedProjectId,
-              ),
-            ),
-            _buildVisitedPrimaryTab(
-              3,
-              () => InventoryPage(
-                key: _inventoryKey,
-                application: widget.bootstrap.inventory,
-                listProjects: widget.bootstrap.agenda.listProjects,
-                projectChanges: widget.bootstrap.agenda.projectChanges,
-                activeProjectId: _activeProjectSession.selectedProjectId,
-                isActive: _selectedIndex == 3,
-                onProjectSelected: _reportRouteProjectSelection,
-              ),
-            ),
-            _buildVisitedPrimaryTab(
-              4,
-              () => switch (widget.bootstrap.attendance) {
-                final attendance? => AttendancePage(
-                  attendance: attendance,
-                  agenda: widget.bootstrap.agenda,
-                  activeProjectId: _activeProjectSession.selectedProjectId,
-                  isActive: _selectedIndex == 4,
-                  onProjectSelected: _reportRouteProjectSelection,
+          ),
+          bottomNavigationBar: useRail
+              ? null
+              : NavigationBar(
+                  selectedIndex: _selectedIndex,
+                  labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+                  destinations: _destinations,
+                  onDestinationSelected: _selectPrimaryTab,
                 ),
-                null => const _PreparingPage(
-                  icon: Icons.badge_outlined,
-                  title: 'Puantaj',
-                ),
-              },
-            ),
-            _buildVisitedPrimaryTab(
-              5,
-              () => _MorePage(
-                bootstrap: widget.bootstrap,
-                onOpenConcrete:
-                    widget.bootstrap.concrete != null &&
-                        widget.bootstrap.concreteAttachments != null
-                    ? () => unawaited(_openConcreteFromMore())
-                    : null,
-                onOpenWorkforce: widget.bootstrap.attendance == null
-                    ? null
-                    : () => unawaited(_openWorkforceFromMore()),
-              ),
-            ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
-        destinations: _destinations,
-        onDestinationSelected: _selectPrimaryTab,
-      ),
+        );
+      },
     );
   }
 }
@@ -965,59 +958,6 @@ class ActiveProjectControl extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _MorePage extends StatelessWidget {
-  const _MorePage({
-    required this.bootstrap,
-    required this.onOpenConcrete,
-    required this.onOpenWorkforce,
-  });
-
-  final BootstrapSuccess bootstrap;
-  final VoidCallback? onOpenConcrete;
-  final VoidCallback? onOpenWorkforce;
-
-  @override
-  Widget build(BuildContext context) {
-    final concrete = bootstrap.concrete;
-    final attachments = bootstrap.concreteAttachments;
-    final attendance = bootstrap.attendance;
-    return ListView(
-      key: const Key('more-page'),
-      padding: const EdgeInsets.all(16),
-      children: [
-        Card(
-          child: ListTile(
-            key: const Key('more-concrete-package'),
-            leading: const Icon(Icons.foundation_outlined),
-            title: const Text('Beton Paketi'),
-            subtitle: Text(
-              concrete != null && attachments != null
-                  ? 'Beton dökümü kayıtlarını aç.'
-                  : 'Hazırlanıyor',
-            ),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: onOpenConcrete,
-          ),
-        ),
-        Card(
-          child: ListTile(
-            key: const Key('more-workforce-directory'),
-            leading: const Icon(Icons.contacts_outlined),
-            title: const Text('Sicil'),
-            subtitle: Text(
-              attendance != null
-                  ? 'Saha Rehberi ve sicili aç.'
-                  : 'Hazırlanıyor',
-            ),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: onOpenWorkforce,
-          ),
-        ),
-      ],
     );
   }
 }

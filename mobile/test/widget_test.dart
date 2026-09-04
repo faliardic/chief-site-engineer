@@ -231,8 +231,12 @@ void main() {
   });
 
   testWidgets(
-    'mobile shell exposes exact six Slice 4 destinations and Daha hub',
+    'compact shell exposes exact five continuously labeled destinations',
     (tester) async {
+      tester.view.physicalSize = const Size(599, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final semantics = tester.ensureSemantics();
       await tester.pumpWidget(
         CseApp(
@@ -250,19 +254,18 @@ void main() {
 
       expect(find.byKey(const Key('dashboard-no-project')), findsOneWidget);
       const expectedLabels = [
-        'Başlangıç',
+        'Ana Sayfa',
         'Hatırlatıcı',
         'Ajanda',
         'Envanter',
         'Puantaj',
-        'Daha',
       ];
       final navigationFinder = find.byType(NavigationBar);
       final navigation = tester.widget<NavigationBar>(navigationFinder);
-      expect(navigation.destinations, hasLength(6));
+      expect(navigation.destinations, hasLength(5));
       expect(
         navigation.labelBehavior,
-        NavigationDestinationLabelBehavior.alwaysHide,
+        NavigationDestinationLabelBehavior.alwaysShow,
       );
       expect(
         navigation.destinations
@@ -281,9 +284,9 @@ void main() {
           find.ancestor(of: labelText, matching: find.byType(FadeTransition)),
         );
         expect(
-          labelFades.any((fade) => fade.opacity.value == 0),
+          labelFades.every((fade) => fade.opacity.value > 0),
           isTrue,
-          reason: '$label NavigationBar label must be visually hidden.',
+          reason: '$label NavigationBar label must remain visible.',
         );
         expect(
           find.descendant(
@@ -306,18 +309,8 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(
-        find.descendant(
-          of: navigationFinder,
-          matching: find.byIcon(Icons.more_horiz_rounded),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('more-page')), findsOneWidget);
-      expect(find.byKey(const Key('more-concrete-package')), findsOneWidget);
-      expect(find.byKey(const Key('more-workforce-directory')), findsOneWidget);
-      expect(find.text('Beton Paketi'), findsOneWidget);
-      expect(find.text('Sicil'), findsOneWidget);
+      expect(find.text('Daha'), findsNothing);
+      expect(find.byIcon(Icons.more_horiz_rounded), findsNothing);
 
       await tester.tap(
         find.descendant(
@@ -369,10 +362,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('dashboard-no-project')), findsOneWidget);
 
-      final navigation = find.byType(NavigationBar);
       Future<void> openTab(IconData icon) async {
         await tester.tap(
-          find.descendant(of: navigation, matching: find.byIcon(icon)),
+          find.descendant(
+            of: _primaryNavigation(),
+            matching: find.byIcon(icon),
+          ),
         );
         await tester.pumpAndSettle();
       }
@@ -406,7 +401,6 @@ void main() {
         findsOneWidget,
       );
 
-      await openTab(Icons.more_horiz_rounded);
       final projectReadsAfterFirstVisits = agenda.listProjectsCalls;
       await openTab(Icons.notifications_none_rounded);
       expect(
@@ -445,9 +439,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('dashboard-no-project')), findsOneWidget);
-      tester
-          .widget<NavigationBar>(find.byType(NavigationBar))
-          .onDestinationSelected!(2);
+      _selectPrimaryDestination(tester, 2);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('create-agenda-project')));
       await tester.pumpAndSettle();
@@ -464,9 +456,7 @@ void main() {
       expect(agenda.projects, hasLength(1));
       expect(find.byType(CircularProgressIndicator), findsNothing);
       expect(find.text('Bu günde Ajanda kaydı yok.'), findsOneWidget);
-      tester
-          .widget<NavigationBar>(find.byType(NavigationBar))
-          .onDestinationSelected!(0);
+      _selectPrimaryDestination(tester, 0);
       await tester.pumpAndSettle(
         const Duration(milliseconds: 100),
         EnginePhase.sendSemanticsUpdate,
@@ -481,16 +471,14 @@ void main() {
         agenda.projects.single.id,
       );
       expect(find.byType(CircularProgressIndicator), findsNothing);
-      tester
-          .widget<NavigationBar>(find.byType(NavigationBar))
-          .onDestinationSelected!(2);
+      _selectPrimaryDestination(tester, 2);
       await tester.pumpAndSettle();
       expect(find.byType(CircularProgressIndicator), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
 
-  testWidgets('real SQLite first project after all six primary tabs settles', (
+  testWidgets('real SQLite first project after all five primary tabs settles', (
     tester,
   ) async {
     await tester.runAsync(() async {
@@ -596,10 +584,8 @@ void main() {
       try {
         await settle('cold Dashboard');
         expect(find.byKey(const Key('dashboard-no-project')), findsOneWidget);
-        for (var index = 1; index < 6; index++) {
-          tester
-              .widget<NavigationBar>(find.byType(NavigationBar))
-              .onDestinationSelected!(index);
+        for (var index = 1; index < 5; index++) {
+          _selectPrimaryDestination(tester, index);
           await settle('first visit tab $index');
         }
         expect(find.byType(RemindersPage, skipOffstage: false), findsOneWidget);
@@ -609,9 +595,7 @@ void main() {
           find.byType(AttendancePage, skipOffstage: false),
           findsOneWidget,
         );
-        tester
-            .widget<NavigationBar>(find.byType(NavigationBar))
-            .onDestinationSelected!(2);
+        _selectPrimaryDestination(tester, 2);
         await settle('return to Agenda');
         await tester.tap(find.byKey(const Key('create-agenda-project')));
         await tester.pump(const Duration(milliseconds: 300));
@@ -623,9 +607,7 @@ void main() {
         await settle('first project created, visible Agenda');
         expect(events, ['projectChanges']);
         expect(find.text('Bu günde Ajanda kaydı yok.'), findsOneWidget);
-        tester
-            .widget<NavigationBar>(find.byType(NavigationBar))
-            .onDestinationSelected!(0);
+        _selectPrimaryDestination(tester, 0);
         await settle('Dashboard after first project');
         expect(
           find.byKey(const Key('dashboard-project-header')),
@@ -774,10 +756,7 @@ void main() {
         dashboard.session.selectedProjectId,
         agenda.lastProjectCommand?.id,
       );
-      expect(
-        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
-        0,
-      );
+      expect(_selectedPrimaryIndex(tester), 0);
     },
   );
 
@@ -846,10 +825,7 @@ void main() {
       expect(dashboard.session.selectedProjectId, isNull);
       expect(find.byType(AgendaPage, skipOffstage: false), findsNothing);
       expect(agenda.listAgendaCalls, 0);
-      expect(
-        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
-        0,
-      );
+      expect(_selectedPrimaryIndex(tester), 0);
       expect(find.byKey(const Key('dashboard-create-project')), findsOneWidget);
     },
   );
@@ -917,10 +893,7 @@ void main() {
         agenda.lastProjectCommand?.id,
       );
       expect(find.text('İkinci Proje'), findsWidgets);
-      expect(
-        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
-        0,
-      );
+      expect(_selectedPrimaryIndex(tester), 0);
     },
   );
 
@@ -998,6 +971,7 @@ void main() {
     expect(find.textContaining('Yeni kayıt yazılmadı.'), findsNothing);
     expect(find.text('Tanı kodu: startup_failed'), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
+    expect(find.byType(NavigationRail), findsNothing);
   });
 
   testWidgets('fatal errors replace raw exceptions with a safe diagnostic', (
@@ -1077,6 +1051,35 @@ Widget _localizedTestApp(Widget home) => MaterialApp(
   theme: ThemeData(platform: TargetPlatform.android),
   home: home,
 );
+
+Finder _primaryNavigation() {
+  final bar = find.byType(NavigationBar);
+  if (bar.evaluate().isNotEmpty) return bar;
+  final rail = find.byType(NavigationRail);
+  expect(rail, findsOneWidget);
+  return rail;
+}
+
+void _selectPrimaryDestination(WidgetTester tester, int index) {
+  final bar = find.byType(NavigationBar);
+  if (bar.evaluate().isNotEmpty) {
+    tester.widget<NavigationBar>(bar).onDestinationSelected!(index);
+    return;
+  }
+  tester
+      .widget<NavigationRail>(find.byType(NavigationRail))
+      .onDestinationSelected!(index);
+}
+
+int _selectedPrimaryIndex(WidgetTester tester) {
+  final bar = find.byType(NavigationBar);
+  if (bar.evaluate().isNotEmpty) {
+    return tester.widget<NavigationBar>(bar).selectedIndex;
+  }
+  return tester
+      .widget<NavigationRail>(find.byType(NavigationRail))
+      .selectedIndex!;
+}
 
 class _ShellProjectAgenda extends FakeAgendaApplication {
   _ShellProjectAgenda({super.projects = const []});

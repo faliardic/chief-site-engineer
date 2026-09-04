@@ -29,6 +29,7 @@ class ProjectDashboardPage extends StatefulWidget {
     this.onOpenToday,
     this.onOpenPlan,
     this.onOpenMaterials,
+    this.onOpenConcrete,
     this.onOpenProjectAlbum,
     this.onOpenWorkforce,
     this.onOpenPhoneCall,
@@ -50,6 +51,7 @@ class ProjectDashboardPage extends StatefulWidget {
   final DashboardProjectAction? onOpenToday;
   final DashboardProjectAction? onOpenPlan;
   final DashboardProjectAction? onOpenMaterials;
+  final DashboardProjectAction? onOpenConcrete;
   final DashboardProjectAction? onOpenProjectAlbum;
   final DashboardProjectAction? onOpenWorkforce;
   final DashboardProjectAction? onOpenPhoneCall;
@@ -579,6 +581,15 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         const SizedBox(height: 8),
         Text('Proje araçları', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 4),
+        _DashboardActionTile(
+          key: const Key('dashboard-concrete-package'),
+          icon: Icons.foundation_outlined,
+          title: 'Beton Paketi',
+          enabledSubtitle: 'Beton dökümü kayıtlarını aç.',
+          onTap: widget.onOpenConcrete == null
+              ? null
+              : () => widget.onOpenConcrete!(project.id),
+        ),
         _DashboardActionTile(
           key: const Key('dashboard-project-album'),
           icon: Icons.photo_library_outlined,
