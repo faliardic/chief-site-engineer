@@ -33,12 +33,12 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 export 'package:chief_site_engineer/features/project_context/active_project_control.dart';
 
 const _compactButtonStyle = ButtonStyle(
-  minimumSize: WidgetStatePropertyAll(Size(0, 40)),
+  minimumSize: WidgetStatePropertyAll(Size(48, 48)),
   padding: WidgetStatePropertyAll(
     EdgeInsets.symmetric(horizontal: 16, vertical: 8),
   ),
   visualDensity: VisualDensity.standard,
-  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  tapTargetSize: MaterialTapTargetSize.padded,
 );
 
 ThemeData _buildCseTheme(Brightness brightness) {
@@ -51,7 +51,7 @@ ThemeData _buildCseTheme(Brightness brightness) {
       .merge(base.textTheme)
       .apply(fontSizeFactor: 0.92);
   return base.copyWith(
-    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    materialTapTargetSize: MaterialTapTargetSize.padded,
     visualDensity: const VisualDensity(horizontal: -1, vertical: -1),
     textTheme: textTheme,
     filledButtonTheme: const FilledButtonThemeData(style: _compactButtonStyle),
@@ -64,9 +64,9 @@ ThemeData _buildCseTheme(Brightness brightness) {
     textButtonTheme: const TextButtonThemeData(style: _compactButtonStyle),
     iconButtonTheme: const IconButtonThemeData(
       style: ButtonStyle(
-        minimumSize: WidgetStatePropertyAll(Size.square(40)),
+        minimumSize: WidgetStatePropertyAll(Size.square(48)),
         visualDensity: VisualDensity.standard,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        tapTargetSize: MaterialTapTargetSize.padded,
       ),
     ),
     inputDecorationTheme: const InputDecorationThemeData(
