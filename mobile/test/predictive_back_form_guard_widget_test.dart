@@ -79,6 +79,55 @@ void main() {
     );
   });
 
+  testWidgets('kind-only Reminder edit is guarded and preserves exact state', (
+    tester,
+  ) async {
+    final harness = await _openForm(
+      tester,
+      (_) => ReminderFormPage(agenda: FakeAgendaApplication()),
+    );
+    final formFinder = find.byType(ReminderFormPage);
+    final originalState = tester.state(formFinder);
+    final kindFinder = find.byKey(const Key('reminder-kind'));
+
+    await tester.tap(kindFinder);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ReminderKind.recheck.label).last);
+    await tester.pumpAndSettle();
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('unsaved-changes-dialog')), findsOneWidget);
+    expect(find.text('Kaydedilmemiş değişiklikler'), findsOneWidget);
+
+    final popScope = tester.widget<PopScope<Object?>>(
+      find.descendant(of: formFinder, matching: find.byType(PopScope<Object?>)),
+    );
+    popScope.onPopInvokedWithResult!(false, null);
+    await tester.pump();
+    expect(find.byKey(const Key('unsaved-changes-dialog')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('stay-on-form')));
+    await tester.pumpAndSettle();
+    expect(tester.state(formFinder), same(originalState));
+    expect(
+      tester.state<FormFieldState<ReminderKind>>(kindFinder).value,
+      ReminderKind.recheck,
+    );
+    expect(harness.observer.formPops, 0);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('unsaved-changes-dialog')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('discard-form')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ReminderFormPage), findsNothing);
+    expect(harness.result, isNull);
+    expect(harness.completions, 1);
+    expect(harness.observer.formPops, 1);
+  });
+
   testWidgets('submit-in-flight blocks Back and success keeps route results', (
     tester,
   ) async {

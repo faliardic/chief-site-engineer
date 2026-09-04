@@ -74,6 +74,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   late String _baselineCondition;
   String? _baselineProjectId;
   String? _baselineLocationId;
+  late ReminderKind _baselineKind;
   late ReminderScheduleKind _baselineSchedule;
   String? _baselineQuickSchedulePreviewAt;
   late DateTime _baselineCustomDate;
@@ -296,6 +297,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
     _baselineCondition = _condition.text;
     _baselineProjectId = _projectId;
     _baselineLocationId = _locationId;
+    _baselineKind = _kind;
     _baselineSchedule = _schedule;
     _baselineQuickSchedulePreviewAt = _quickSchedulePreviewAt;
     _baselineCustomDate = _customDate;
@@ -330,6 +332,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
         _condition.text != _baselineCondition ||
         _projectId != _baselineProjectId ||
         _locationId != _baselineLocationId ||
+        _kind != _baselineKind ||
         _schedule != _baselineSchedule ||
         _quickSchedulePreviewAt != _baselineQuickSchedulePreviewAt ||
         customDateChanged ||
