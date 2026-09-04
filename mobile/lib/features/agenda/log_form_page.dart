@@ -678,21 +678,33 @@ class _LogFormPageState extends State<LogFormPage> {
               ),
             ],
             const SizedBox(height: 16),
-            _formIconAction(
-              key: const Key('submit-log'),
-              filled: true,
-              onPressed: _submitting ? null : _submit,
-              icon: _submitting
-                  ? const SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.save_outlined),
-              label: _submitting
-                  ? 'Kaydediliyor…'
-                  : widget.existing == null
-                  ? 'Logu kaydet'
-                  : 'Değişiklikleri kaydet',
+            Align(
+              alignment: Alignment.centerRight,
+              child: Semantics(
+                label: _submitting ? 'Kaydediliyor…' : 'Kaydet',
+                button: true,
+                enabled: !_submitting,
+                excludeSemantics: true,
+                onTap: _submitting ? null : _submit,
+                child: FilledButton.icon(
+                  key: const Key('submit-log'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                  onPressed: _submitting ? null : _submit,
+                  icon: _submitting
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save_outlined),
+                  label: Text(_submitting ? 'Kaydediliyor…' : 'Kaydet'),
+                ),
+              ),
             ),
           ],
         ),

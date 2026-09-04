@@ -332,6 +332,40 @@ void _expectAccessibleIconTarget(
   expect(tester.getSize(semantics), renderedSize);
 }
 
+void _expectPrimaryFormAction(
+  WidgetTester tester,
+  Finder finder,
+  String label, {
+  bool enabled = true,
+}) {
+  expect(finder, findsOneWidget);
+  expect(tester.widget(finder), isA<FilledButton>());
+  expect(
+    find.descendant(of: finder, matching: find.byType(IconButton)),
+    findsNothing,
+  );
+  final renderedSize = tester.getSize(finder);
+  expect(renderedSize.width, greaterThanOrEqualTo(48));
+  expect(renderedSize.height, greaterThanOrEqualTo(48));
+  expect(
+    find.descendant(of: finder, matching: find.text(label)),
+    findsOneWidget,
+  );
+  final semantics = find
+      .ancestor(
+        of: finder,
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Semantics && widget.properties.label == label,
+        ),
+      )
+      .first;
+  final properties = tester.widget<Semantics>(semantics).properties;
+  expect(tester.getSize(semantics), renderedSize);
+  expect(properties.button, isTrue);
+  expect(properties.enabled, enabled);
+  expect(tester.widget<FilledButton>(finder).onPressed != null, enabled);
+}
+
 void main() {
   testWidgets('preferred project is initial only and cancel creates nothing', (
     tester,
@@ -518,11 +552,7 @@ void main() {
         300,
         scrollable: find.byType(Scrollable).first,
       );
-      _expectAccessibleIconTarget(tester, submit, 'Hatırlatıcıyı kaydet');
-      expect(
-        _iconButtonByKey(tester, const Key('submit-reminder')).tooltip,
-        'Hatırlatıcıyı kaydet',
-      );
+      _expectPrimaryFormAction(tester, submit, 'Kaydet');
       expect(tester.takeException(), isNull);
     }
     semantics.dispose();
@@ -2038,18 +2068,7 @@ void main() {
       await tester.ensureVisible(submit);
       await tester.tap(submit);
       await tester.pump();
-      expect(tester.getSize(submit), const Size.square(48));
-      expect(
-        _iconButtonByKey(tester, const Key('submit-reminder')).onPressed,
-        isNull,
-      );
-      expect(
-        _semanticsByKey(
-          tester,
-          const Key('submit-reminder'),
-        ).properties.enabled,
-        isFalse,
-      );
+      _expectPrimaryFormAction(tester, submit, 'Kaydediliyor…', enabled: false);
       expect(
         find.descendant(
           of: submit,
