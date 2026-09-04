@@ -1,5 +1,6 @@
 import 'package:chief_site_engineer/app.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
+import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
 import 'package:flutter/material.dart';
@@ -52,65 +53,87 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('selected and visited tab state survives bar and rail resizes', (
-    tester,
-  ) async {
-    _configureView(tester, const Size(599, 800));
-    await _pumpShell(tester);
+  testWidgets(
+    'portrait-landscape resize preserves selected, visited and project state',
+    (tester) async {
+      const project = MobileProject(
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        name: 'Kuzey Şantiyesi',
+        createdAt: '2026-09-04T07:00:00Z',
+        updatedAt: '2026-09-04T07:00:00Z',
+        revision: 1,
+      );
+      _configureView(tester, const Size(390, 844));
+      await _pumpShell(
+        tester,
+        agenda: FakeAgendaApplication(projects: const [project]),
+      );
 
-    final compactNavigation = find.byType(NavigationBar);
-    await tester.tap(
-      find.descendant(
-        of: compactNavigation,
-        matching: find.text('Hatırlatıcı'),
-      ),
-    );
-    await tester.pumpAndSettle();
-    final reminderState = tester.state(
-      find.byType(RemindersPage, skipOffstage: false),
-    );
+      await tester.tap(find.byKey(const Key('active-project-indicator')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(ValueKey('active-project-option-${project.id}')),
+      );
+      await tester.pumpAndSettle();
+      _expectActiveProject(tester, project.name);
 
-    await _resize(tester, const Size(600, 800));
-    var rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.selectedIndex, 1);
-    expect(
-      tester.state(find.byType(RemindersPage, skipOffstage: false)),
-      same(reminderState),
-    );
+      final compactNavigation = find.byType(NavigationBar);
+      await tester.tap(
+        find.descendant(
+          of: compactNavigation,
+          matching: find.text('Hatırlatıcı'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final reminderState = tester.state(
+        find.byType(RemindersPage, skipOffstage: false),
+      );
 
-    rail.onDestinationSelected!(2);
-    await tester.pumpAndSettle();
-    final agendaState = tester.state(
-      find.byType(AgendaPage, skipOffstage: false),
-    );
+      await _resize(tester, const Size(840, 390));
+      var rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+      expect(rail.selectedIndex, 1);
+      expect(
+        tester.state(find.byType(RemindersPage, skipOffstage: false)),
+        same(reminderState),
+      );
+      _expectActiveProject(tester, project.name);
 
-    await _resize(tester, const Size(840, 800));
-    rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.selectedIndex, 2);
-    expect(
-      tester.state(find.byType(RemindersPage, skipOffstage: false)),
-      same(reminderState),
-    );
-    expect(
-      tester.state(find.byType(AgendaPage, skipOffstage: false)),
-      same(agendaState),
-    );
+      rail.onDestinationSelected!(2);
+      await tester.pumpAndSettle();
+      final agendaState = tester.state(
+        find.byType(AgendaPage, skipOffstage: false),
+      );
 
-    await _resize(tester, const Size(599, 800));
-    expect(
-      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
-      2,
-    );
-    expect(
-      tester.state(find.byType(RemindersPage, skipOffstage: false)),
-      same(reminderState),
-    );
-    expect(
-      tester.state(find.byType(AgendaPage, skipOffstage: false)),
-      same(agendaState),
-    );
-    expect(tester.takeException(), isNull);
-  });
+      await _resize(tester, const Size(390, 844));
+      expect(
+        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+        2,
+      );
+      expect(
+        tester.state(find.byType(RemindersPage, skipOffstage: false)),
+        same(reminderState),
+      );
+      expect(
+        tester.state(find.byType(AgendaPage, skipOffstage: false)),
+        same(agendaState),
+      );
+      _expectActiveProject(tester, project.name);
+
+      await _resize(tester, const Size(840, 390));
+      rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+      expect(rail.selectedIndex, 2);
+      expect(
+        tester.state(find.byType(RemindersPage, skipOffstage: false)),
+        same(reminderState),
+      );
+      expect(
+        tester.state(find.byType(AgendaPage, skipOffstage: false)),
+        same(agendaState),
+      );
+      _expectActiveProject(tester, project.name);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('large compact text and short landscape remain overflow-free', (
     tester,
@@ -151,7 +174,10 @@ Future<void> _resize(WidgetTester tester, Size size) async {
   await tester.pumpAndSettle();
 }
 
-Future<void> _pumpShell(WidgetTester tester) async {
+Future<void> _pumpShell(
+  WidgetTester tester, {
+  FakeAgendaApplication? agenda,
+}) async {
   await tester.pumpWidget(
     CseApp(
       bootstrap: Future.value(
@@ -159,12 +185,19 @@ Future<void> _pumpShell(WidgetTester tester) async {
           environmentLabel: 'Test',
           smokeRecordId: 'issue-620-adaptive-shell',
           smokeRecordCreatedAt: '2026-09-04T07:00:00Z',
-          agenda: FakeAgendaApplication(),
+          agenda: agenda ?? FakeAgendaApplication(),
         ),
       ),
     ),
   );
   await tester.pumpAndSettle();
+}
+
+void _expectActiveProject(WidgetTester tester, String name) {
+  final control = tester.widget<ActiveProjectControl>(
+    find.byType(ActiveProjectControl),
+  );
+  expect(control.label, name);
 }
 
 void _expectNarrowRail(WidgetTester tester) {

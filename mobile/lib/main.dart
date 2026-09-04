@@ -4,6 +4,7 @@ import 'package:chief_site_engineer/app.dart';
 import 'package:chief_site_engineer/bootstrap/app_bootstrap.dart';
 import 'package:chief_site_engineer/core/time/cse_time_codec.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 const cseNormalEntrypointMarker = 'CSE_ENTRYPOINT_NORMAL_LIB_MAIN_DART_V1';
@@ -13,6 +14,7 @@ Future<void> main() async {
   await runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       debugPrint(cseNormalEntrypointMarker);
       CseTimeCodec.initialize();
       FlutterError.onError = (_) {
