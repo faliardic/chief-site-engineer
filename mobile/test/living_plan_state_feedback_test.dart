@@ -37,20 +37,33 @@ void main() {
   testWidgets(
     'primary read error exposes one accessible retry and can recover',
     (tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 700));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
       final livingPlan = _ControlledLivingPlanApplication()
         ..enqueue(() async => throw StateError('initial read failed'));
-      await _pumpAndSettle(tester, livingPlan: livingPlan);
+      await _pumpAndSettle(
+        tester,
+        livingPlan: livingPlan,
+        textScaler: const TextScaler.linear(1.6),
+      );
 
       final retry = find.byKey(const Key('living-plan-read-error-retry'));
+      final errorMessage = find.text(
+        'Plan güvenli biçimde okunamadı. Kayıtlar değiştirilmedi.',
+      );
       expect(retry, findsOneWidget);
       expect(find.text('Tekrar dene'), findsOneWidget);
       expect(
         find.bySemanticsLabel('7 günlük planı yeniden yükle'),
         findsOneWidget,
       );
+      await _scrollUntilHitTestable(tester, retry);
+      expect(errorMessage.hitTestable(), findsOneWidget);
+      expect(retry.hitTestable(), findsOneWidget);
       final size = tester.getSize(retry);
       expect(size.width, greaterThanOrEqualTo(48));
       expect(size.height, greaterThanOrEqualTo(48));
+      expect(tester.takeException(), isNull);
 
       livingPlan.enqueue(() async => [_item('recovered', 'Kurtarılan plan')]);
       await tester.tap(retry);
@@ -60,6 +73,7 @@ void main() {
         findsOneWidget,
       );
       expect(retry, findsNothing);
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -113,10 +127,16 @@ void main() {
   testWidgets('same-context refresh preserves last-good plan and replaces it', (
     tester,
   ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     final livingPlan = _ControlledLivingPlanApplication(
       items: [_item('old', 'Mevcut plan')],
     );
-    await _pumpAndSettle(tester, livingPlan: livingPlan);
+    await _pumpAndSettle(
+      tester,
+      livingPlan: livingPlan,
+      textScaler: const TextScaler.linear(1.6),
+    );
     final gate = Completer<List<ConstructionLivingPlanWindowItem>>();
     livingPlan.enqueue(() => gate.future);
     final refresh = tester
@@ -128,15 +148,34 @@ void main() {
     await tester.pump();
 
     expect(livingPlan.reads, hasLength(2));
-    expect(find.byKey(const Key('living-plan-item-old')), findsOneWidget);
     expect(
       find.byKey(const Key('living-plan-preserving-reload')),
       findsOneWidget,
     );
+    final preserving = find.byKey(const Key('living-plan-preserving-reload'));
+    await _scrollUntilHitTestable(tester, preserving);
+    expect(preserving.hitTestable(), findsOneWidget);
+    await _scrollUntilHitTestable(
+      tester,
+      find.byKey(const Key('living-plan-item-old')),
+    );
+    expect(
+      find.byKey(const Key('living-plan-item-old')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
     gate.complete([_item('new', 'Güncel plan')]);
     await tester.pumpAndSettle();
+    await _scrollUntilHitTestable(
+      tester,
+      find.byKey(const Key('living-plan-item-new')),
+    );
     expect(find.byKey(const Key('living-plan-item-old')), findsNothing);
-    expect(find.byKey(const Key('living-plan-item-new')), findsOneWidget);
+    expect(
+      find.byKey(const Key('living-plan-item-new')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(
@@ -301,7 +340,7 @@ void main() {
   testWidgets(
     'degradation remains distinct and compact no-project empty grouped states survive',
     (tester) async {
-      await tester.binding.setSurfaceSize(const Size(320, 1600));
+      await tester.binding.setSurfaceSize(const Size(320, 700));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
       await _pumpAndSettle(
@@ -314,11 +353,12 @@ void main() {
         find.text('Bu proje için güvenilir öneri programı henüz hazırlanmadı.'),
         findsOneWidget,
       );
-      await tester.drag(
-        find.byKey(const Key('living-plan-scroll')),
-        const Offset(0, -400),
+      await _scrollUntilHitTestable(
+        tester,
+        find.text(
+          'Bu pencerede planlanmış imalat yok. İmalat ekleyebilirsiniz.',
+        ),
       );
-      await tester.pumpAndSettle();
       expect(
         find.text(
           'Bu pencerede planlanmış imalat yok. İmalat ekleyebilirsiniz.',
@@ -345,11 +385,10 @@ void main() {
         find.byKey(const Key('living-plan-section-overdue')),
         findsOneWidget,
       );
-      await tester.drag(
-        find.byKey(const Key('living-plan-scroll')),
-        const Offset(0, -500),
+      await _scrollUntilHitTestable(
+        tester,
+        find.byKey(const Key('living-plan-section-day-0')),
       );
-      await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('living-plan-section-day-0')),
         findsOneWidget,
@@ -365,10 +404,24 @@ void main() {
         projects: const [],
         textScaler: const TextScaler.linear(1.6),
       );
+      await _scrollUntilHitTestable(
+        tester,
+        find.text('Önce bir proje oluşturun.'),
+      );
       expect(find.text('Önce bir proje oluşturun.'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
+}
+
+Future<void> _scrollUntilHitTestable(WidgetTester tester, Finder target) async {
+  final scroll = find.byKey(const Key('living-plan-scroll'));
+  for (var attempt = 0; attempt < 12; attempt += 1) {
+    if (target.hitTestable().evaluate().isNotEmpty) return;
+    await tester.drag(scroll, const Offset(0, -180));
+    await tester.pump();
+  }
+  expect(target.hitTestable(), findsOneWidget);
 }
 
 Future<void> _pumpPage(
