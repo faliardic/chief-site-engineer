@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:chief_site_engineer/application/agenda_application.dart';
 import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/features/agenda/agenda_page.dart';
+import 'package:chief_site_engineer/features/agenda/log_detail_page.dart';
+import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminders_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -191,6 +193,124 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'Agenda detail return preserves content and query while reloading',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 760);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final logs = List.generate(24, _agendaLog);
+      final agenda = _ScriptedAgenda(projects: const [_project], logs: logs);
+      await tester.pumpWidget(MaterialApp(home: AgendaPage(agenda: agenda)));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('next-day')));
+      await tester.pumpAndSettle();
+      final search = find.byKey(const Key('agenda-literal-search'));
+      await tester.enterText(search, 'korunacak arama');
+      tester.widget<TextField>(search).onSubmitted!('korunacak arama');
+      await tester.pumpAndSettle();
+      final expectedQuery = agenda.lastAgendaQuery!;
+
+      final target = logs[18];
+      final targetFinder = find.byKey(Key('agenda-log-${target.id}'));
+      await tester.scrollUntilVisible(
+        targetFinder,
+        420,
+        scrollable: _scrollableWithin(const Key('agenda-day-list')),
+      );
+      final before = _scrollOffset(tester, const Key('agenda-day-list'));
+      expect(before, greaterThan(300));
+
+      await tester.tap(targetFinder);
+      await tester.pumpAndSettle();
+      expect(find.byType(LogDetailPage), findsOneWidget);
+      final delayedReload = Completer<List<AgendaLog>>();
+      agenda.agendaGate = delayedReload;
+      await tester.pageBack();
+      await tester.pump(const Duration(milliseconds: 350));
+
+      expect(targetFinder, findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byKey(const Key('agenda-read-error-retry')), findsNothing);
+      expect(
+        _scrollOffset(tester, const Key('agenda-day-list')),
+        closeTo(before, 4),
+      );
+      _expectAgendaQuery(agenda.lastAgendaQuery!, expectedQuery);
+
+      delayedReload.complete(logs);
+      await tester.pumpAndSettle();
+      expect(targetFinder, findsOneWidget);
+      expect(
+        _scrollOffset(tester, const Key('agenda-day-list')),
+        closeTo(before, 4),
+      );
+      _expectAgendaQuery(agenda.lastAgendaQuery!, expectedQuery);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Reminder detail return preserves content and group while reloading',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 760);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final reminders = List.generate(24, _reminder);
+      final agenda = _ScriptedReminderAgenda(reminders: reminders);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: RemindersPage(agenda: agenda)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('reminder-primary-other')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('reminder-other-upcoming')));
+      await tester.pumpAndSettle();
+
+      final target = reminders[18];
+      final targetFinder = find.byKey(Key('reminder-${target.id}'));
+      await tester.scrollUntilVisible(
+        targetFinder,
+        420,
+        scrollable: _scrollableWithin(const Key('reminder-list')),
+      );
+      final before = _scrollOffset(tester, const Key('reminder-list'));
+      expect(before, greaterThan(300));
+
+      await tester.tap(targetFinder);
+      await tester.pumpAndSettle();
+      expect(find.byType(ReminderDetailPage), findsOneWidget);
+      final delayedReload = Completer<List<MobileReminder>>();
+      agenda.reminderGate = delayedReload;
+      await tester.binding.handlePopRoute();
+      await tester.pump(const Duration(milliseconds: 350));
+
+      expect(targetFinder, findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byKey(const Key('reminder-read-error-retry')), findsNothing);
+      expect(agenda.lastReminderGroup, ReminderViewGroup.upcoming);
+      expect(
+        _scrollOffset(tester, const Key('reminder-list')),
+        closeTo(before, 4),
+      );
+
+      delayedReload.complete(reminders);
+      await tester.pumpAndSettle();
+      expect(targetFinder, findsOneWidget);
+      expect(agenda.lastReminderGroup, ReminderViewGroup.upcoming);
+      expect(
+        _scrollOffset(tester, const Key('reminder-list')),
+        closeTo(before, 4),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('initial read failures expose retry instead of empty state', (
     tester,
   ) async {
@@ -311,6 +431,13 @@ Future<void> _selectDropdown(WidgetTester tester, Key key, String label) async {
   await tester.pumpAndSettle();
 }
 
+Finder _scrollableWithin(Key listKey) => find
+    .descendant(of: find.byKey(listKey), matching: find.byType(Scrollable))
+    .first;
+
+double _scrollOffset(WidgetTester tester, Key listKey) =>
+    tester.state<ScrollableState>(_scrollableWithin(listKey)).position.pixels;
+
 class _ScriptedAgenda extends FakeAgendaApplication {
   _ScriptedAgenda({super.projects, super.logs});
 
@@ -396,6 +523,20 @@ const _log = AgendaLog(
   revision: 1,
 );
 
+AgendaLog _agendaLog(int index) => AgendaLog(
+  id: 'aaaaaaaa-aaaa-4aaa-8aaa-${index.toString().padLeft(12, '0')}',
+  projectId: _projectId,
+  projectName: _project.name,
+  observedAt: '2026-07-19T07:30:00Z',
+  createdAt: '2026-07-19T08:00:00Z',
+  updatedAt: '2026-07-19T08:00:00Z',
+  category: AgendaCategory.inspection,
+  description: 'Korunacak Ajanda kaydı $index',
+  location: null,
+  notes: null,
+  revision: 1,
+);
+
 const _activeReminder = MobileReminder(
   id: _reminderId,
   projectId: null,
@@ -424,5 +565,20 @@ const _trashedReminder = MobileReminder(
   createdAt: '2026-07-19T08:00:00Z',
   updatedAt: '2026-07-19T08:00:00Z',
   trashedAt: '2026-07-20T08:00:00Z',
+  revision: 1,
+);
+
+MobileReminder _reminder(int index) => MobileReminder(
+  id: 'bbbbbbbb-bbbb-4bbb-8bbb-${index.toString().padLeft(12, '0')}',
+  projectId: null,
+  projectName: null,
+  sourceLogId: null,
+  captureText: 'Korunacak hatırlatıcı $index',
+  title: 'Korunacak hatırlatıcı $index',
+  kind: ReminderKind.action,
+  status: ReminderStatus.active,
+  nextAttentionAt: '2026-07-22T06:00:00Z',
+  createdAt: '2026-07-19T08:00:00Z',
+  updatedAt: '2026-07-19T08:00:00Z',
   revision: 1,
 );
