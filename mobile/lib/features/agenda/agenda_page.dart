@@ -50,6 +50,7 @@ class _AgendaPageState extends State<AgendaPage> {
   AgendaSortOrder _sortOrder = AgendaSortOrder.newestFirst;
   bool _loading = true;
   String? _error;
+  String? _readError;
   StreamSubscription<void>? _projectSubscription;
   bool _detailNavigationBusy = false;
   bool _preservingDetailReload = false;
@@ -117,6 +118,7 @@ class _AgendaPageState extends State<AgendaPage> {
     setState(() {
       _loading = true;
       _error = null;
+      _readError = null;
       _preservingDetailReload = restoreOffset != null;
     });
     try {
@@ -171,7 +173,7 @@ class _AgendaPageState extends State<AgendaPage> {
       setState(() {
         _loading = false;
         _preservingDetailReload = false;
-        _error = 'Ajanda kayıtları güvenli biçimde okunamadı.';
+        _readError = 'Ajanda kayıtları güvenli biçimde okunamadı.';
       });
     }
     if (!mounted || generation != _reloadGeneration) return;
@@ -528,6 +530,11 @@ class _AgendaPageState extends State<AgendaPage> {
     ),
   );
 
+  Future<void> _retryRead() async {
+    if (_loading) return;
+    await _reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -688,6 +695,15 @@ class _AgendaPageState extends State<AgendaPage> {
               )
             else if (_error != null)
               _MessageCard(icon: Icons.error_outline, message: _error!)
+            else if (_readError != null)
+              _MessageCard(
+                icon: Icons.error_outline,
+                message: _readError!,
+                action: _ReadRetryAction(
+                  actionKey: const Key('agenda-read-error-retry'),
+                  onPressed: _loading ? null : _retryRead,
+                ),
+              )
             else if (_logs.isEmpty)
               const _MessageCard(
                 icon: Icons.event_available_outlined,
@@ -867,10 +883,11 @@ Widget _listIconAction({
 );
 
 class _MessageCard extends StatelessWidget {
-  const _MessageCard({required this.icon, required this.message});
+  const _MessageCard({required this.icon, required this.message, this.action});
 
   final IconData icon;
   final String message;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -882,8 +899,36 @@ class _MessageCard extends StatelessWidget {
             Icon(icon, size: 44),
             const SizedBox(height: 8),
             Text(message, textAlign: TextAlign.center),
+            if (action case final action?) ...[
+              const SizedBox(height: 12),
+              action,
+            ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ReadRetryAction extends StatelessWidget {
+  const _ReadRetryAction({required this.actionKey, required this.onPressed});
+
+  final Key actionKey;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Tekrar dene',
+      button: true,
+      enabled: onPressed != null,
+      excludeSemantics: true,
+      onTap: onPressed,
+      child: FilledButton(
+        key: actionKey,
+        style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+        onPressed: onPressed,
+        child: const Text('Tekrar dene'),
       ),
     );
   }
