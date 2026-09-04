@@ -972,6 +972,7 @@ void main() {
     expect(find.text('Tanı kodu: startup_failed'), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
     expect(find.byType(NavigationRail), findsNothing);
+    expect(find.byKey(const Key('active-project-indicator')), findsNothing);
   });
 
   testWidgets('fatal errors replace raw exceptions with a safe diagnostic', (
@@ -990,6 +991,7 @@ void main() {
     expect(find.text('Tanı kodu: uncaught_async_error'), findsOneWidget);
     expect(find.textContaining('Exception'), findsNothing);
     expect(find.textContaining('StackTrace'), findsNothing);
+    expect(find.byKey(const Key('active-project-indicator')), findsNothing);
   });
 
   for (final brightness in Brightness.values) {

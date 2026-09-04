@@ -102,6 +102,7 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   @override
   void initState() {
     super.initState();
+    widget.session.addListener(_handleActiveProjectChanged);
     _projectSubscription = widget.agenda.projectChanges.listen(
       (_) => unawaited(_loadProjects()),
     );
@@ -111,7 +112,18 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
   @override
   void dispose() {
     _projectSubscription?.cancel();
+    widget.session.removeListener(_handleActiveProjectChanged);
     super.dispose();
+  }
+
+  void _handleActiveProjectChanged() {
+    if (!mounted || _projectStatus != _ProjectLoadStatus.ready) return;
+    final selected = widget.session.selectedProject(_projects);
+    if (selected == null) {
+      _clearSections();
+      return;
+    }
+    _loadAll(selected.id);
   }
 
   String get _localDay {
@@ -340,45 +352,6 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
     );
   }
 
-  void _selectProject(String projectId) {
-    if (!widget.session.select(projectId, _projects)) return;
-    setState(() {});
-    _loadAll(projectId);
-  }
-
-  Future<void> _showProjectSelector() async {
-    final projectId = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          padding: const EdgeInsets.only(bottom: 12),
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-              child: Text(
-                'Aktif proje seç',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
-            for (final project in _projects)
-              ListTile(
-                key: ValueKey('dashboard-project-${project.id}'),
-                leading: const Icon(Icons.apartment_rounded),
-                title: Text(project.name),
-                trailing: widget.session.selectedProjectId == project.id
-                    ? const Icon(Icons.check_rounded)
-                    : null,
-                onTap: () => Navigator.pop(context, project.id),
-              ),
-          ],
-        ),
-      ),
-    );
-    if (projectId != null && mounted) _selectProject(projectId);
-  }
-
   Future<void> _runCapture(DashboardCaptureAction? action) async {
     final projectId = widget.session.selectedProjectId;
     if (action == null || projectId == null) return;
@@ -429,17 +402,12 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
         key: const Key('dashboard-project-selection-required'),
         icon: Icons.rule_folder_outlined,
         title: 'Çalışacağınız projeyi seçin',
-        body:
-            'Birden fazla aktif proje var. Seçim yapılmadan proje kayıtları okunmaz.',
-        actionIcon: Icons.swap_horiz_rounded,
-        actionLabel: 'Proje seç',
-        actionKey: const Key('dashboard-select-project'),
+        body: 'Birden fazla aktif proje var. Aktif projeyi üst çubuktan seçin.',
+        actionIcon: Icons.add_business_rounded,
+        actionLabel: 'Yeni proje',
+        actionKey: const Key('dashboard-create-project'),
         showActionLabel: true,
-        onAction: _showProjectSelector,
-        secondaryActionIcon: Icons.add_business_rounded,
-        secondaryActionLabel: 'Yeni proje',
-        secondaryActionKey: const Key('dashboard-create-project'),
-        onSecondaryAction: widget.onCreateProject,
+        onAction: widget.onCreateProject,
       );
     }
     return _buildDashboard(selected);
@@ -486,13 +454,6 @@ class _ProjectDashboardPageState extends State<ProjectDashboardPage> {
                         ),
                       ),
                     ),
-                    if (_projects.length > 1)
-                      _DashboardIconAction(
-                        actionKey: const Key('dashboard-change-project'),
-                        icon: Icons.swap_horiz_rounded,
-                        label: 'Aktif projeyi değiştir',
-                        onPressed: _showProjectSelector,
-                      ),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -779,15 +740,8 @@ class _ProjectStateSurface extends StatelessWidget {
     required this.onAction,
     this.actionKey,
     this.showActionLabel = false,
-    this.secondaryActionIcon,
-    this.secondaryActionLabel,
-    this.secondaryActionKey,
-    this.onSecondaryAction,
     super.key,
-  }) : assert(
-         onSecondaryAction == null ||
-             (secondaryActionIcon != null && secondaryActionLabel != null),
-       );
+  });
 
   final IconData icon;
   final String title;
@@ -797,10 +751,6 @@ class _ProjectStateSurface extends StatelessWidget {
   final VoidCallback onAction;
   final Key? actionKey;
   final bool showActionLabel;
-  final IconData? secondaryActionIcon;
-  final String? secondaryActionLabel;
-  final Key? secondaryActionKey;
-  final VoidCallback? onSecondaryAction;
 
   @override
   Widget build(BuildContext context) {
@@ -817,15 +767,6 @@ class _ProjectStateSurface extends StatelessWidget {
             label: actionLabel,
             kind: _DashboardIconActionKind.filled,
             onPressed: onAction,
-          );
-    final secondaryCallback = onSecondaryAction;
-    final Widget? secondaryAction = secondaryCallback == null
-        ? null
-        : FilledButton.tonalIcon(
-            key: secondaryActionKey,
-            onPressed: secondaryCallback,
-            icon: Icon(secondaryActionIcon!),
-            label: Text(secondaryActionLabel!),
           );
     return Center(
       child: SingleChildScrollView(
@@ -845,15 +786,7 @@ class _ProjectStateSurface extends StatelessWidget {
               const SizedBox(height: 6),
               Text(body, textAlign: TextAlign.center),
               const SizedBox(height: 12),
-              if (secondaryAction != null)
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [primaryAction, secondaryAction],
-                )
-              else
-                primaryAction,
+              primaryAction,
             ],
           ),
         ),

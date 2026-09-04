@@ -58,9 +58,8 @@ void main() {
   testWidgets('multiple projects fail closed until exact explicit selection', (
     tester,
   ) async {
-    final fixture = _Fixture(
-      projects: [_project('a', 'Kuzey'), _project('b', 'Güney')],
-    );
+    final projects = [_project('a', 'Kuzey'), _project('b', 'Güney')];
+    final fixture = _Fixture(projects: projects);
     addTearDown(fixture.dispose);
 
     await tester.pumpWidget(fixture.app());
@@ -74,23 +73,10 @@ void main() {
     expect(fixture.plan.calls, isEmpty);
     expect(fixture.materials.calls, isEmpty);
 
-    final selectAction = find.byKey(const Key('dashboard-select-project'));
-    expect(selectAction, findsOneWidget);
-    expect(
-      find.descendant(
-        of: selectAction,
-        matching: find.byIcon(Icons.swap_horiz_rounded),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: selectAction, matching: find.text('Proje seç')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('dashboard-select-project')), findsNothing);
+    expect(find.byKey(const Key('dashboard-change-project')), findsNothing);
     expect(find.byKey(const Key('dashboard-create-project')), findsOneWidget);
-    await tester.tap(selectAction);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('dashboard-project-b')));
+    expect(fixture.session.select('b', projects), isTrue);
     await tester.pumpAndSettle();
 
     expect(fixture.session.selectedProjectId, 'b');
@@ -102,7 +88,7 @@ void main() {
   });
 
   testWidgets(
-    'unselected multiple projects keeps both actions usable at narrow scale',
+    'unselected multiple projects keeps only new-project action at narrow scale',
     (tester) async {
       tester.view.physicalSize = const Size(320, 844);
       tester.view.devicePixelRatio = 1;
@@ -127,17 +113,13 @@ void main() {
         find.byKey(const Key('dashboard-project-selection-required')),
         findsOneWidget,
       );
-      final select = find.byKey(const Key('dashboard-select-project'));
       final create = find.byKey(const Key('dashboard-create-project'));
-      expect(
-        find.descendant(of: select, matching: find.text('Proje seç')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('dashboard-select-project')), findsNothing);
+      expect(find.byKey(const Key('dashboard-change-project')), findsNothing);
       expect(
         find.descendant(of: create, matching: find.text('Yeni proje')),
         findsOneWidget,
       );
-      expect(select.hitTestable(), findsOneWidget);
       expect(create.hitTestable(), findsOneWidget);
 
       await tester.tap(create);
@@ -700,51 +682,24 @@ void main() {
     (tester) async {
       _useTallSurface(tester);
       final reads = _ControlledDashboardReads();
-      final fixture = _Fixture(
-        projects: [_project('a', 'Kuzey'), _project('b', 'Güney')],
-        controlledReads: reads,
-      );
+      final projects = [_project('a', 'Kuzey'), _project('b', 'Güney')];
+      final fixture = _Fixture(projects: projects, controlledReads: reads);
       addTearDown(fixture.dispose);
+      expect(fixture.session.select('a', projects), isTrue);
 
       await tester.pumpWidget(fixture.app());
-      await tester.pumpAndSettle();
-      final selectionRequired = find.byKey(
-        const Key('dashboard-project-selection-required'),
-      );
-      final selectProject = find.descendant(
-        of: selectionRequired,
-        matching: find.widgetWithText(FilledButton, 'Proje seç'),
-      );
-      expect(selectProject, findsOneWidget);
-      expect(selectProject.hitTestable(), findsOneWidget);
-      await tester.tap(selectProject);
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('dashboard-project-a')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byKey(const Key('dashboard-select-project')), findsNothing);
+      expect(find.byKey(const Key('dashboard-change-project')), findsNothing);
       await _pumpUntil(
         tester,
         () => reads.starts.contains('today:a'),
         'Project A Today read did not start.',
       );
 
-      final changeProject = find.byKey(const Key('dashboard-change-project'));
-      expect(
-        tester.widget<IconButton>(changeProject).tooltip,
-        'Aktif projeyi değiştir',
-      );
-      expect(
-        find.descendant(
-          of: changeProject,
-          matching: find.byIcon(Icons.swap_horiz_rounded),
-        ),
-        findsOneWidget,
-      );
-      expect(find.text('Değiştir'), findsNothing);
-      await tester.tap(changeProject);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.tap(find.byKey(const ValueKey('dashboard-project-b')));
+      expect(find.byKey(const Key('dashboard-change-project')), findsNothing);
+      expect(fixture.session.select('b', projects), isTrue);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
@@ -956,7 +911,7 @@ class _MaterialFake implements MaterialRequestApplicationPort {
     MaterialRequestListKind kind,
   ) async {
     calls.add(projectId);
-    expect(kind, MaterialRequestListKind.open);
+    expectSync(kind, MaterialRequestListKind.open);
     final controlled = controlledReads;
     if (controlled != null) {
       return controlled.wait<List<MaterialRequest>>('materials:$projectId');
@@ -975,7 +930,11 @@ class _ControlledDashboardReads {
   int maxInFlight = 0;
 
   Future<T> wait<T>(String label) async {
-    expect(_pending.containsKey(label), isFalse, reason: 'duplicate $label');
+    expectSync(
+      _pending.containsKey(label),
+      isFalse,
+      reason: 'duplicate $label',
+    );
     starts.add(label);
     inFlight += 1;
     if (inFlight > maxInFlight) maxInFlight = inFlight;
