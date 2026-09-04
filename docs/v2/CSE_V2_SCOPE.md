@@ -3,7 +3,7 @@
 **Belge türü:** Güncel ürün yürütme kapsamı
 **Durum:** Kanonik V2 kapsam ve sıra kaynağı
 **Tarih:** 4 Eylül 2026
-**Güncel yön kaynağı:** Inventory v1 closure complete → #616 evidence baseline → #617 frictionless release-readiness program → #618 UI/UX contract merged → Phase 1 adaptive/accessibility foundation complete → Phase 2 Step 10 remaining narrow surfaces
+**Güncel yön kaynağı:** Inventory v1 closure complete → #616 evidence baseline → #617 frictionless release-readiness program → UXF-002..018 complete → #657 visual-first truth-sync → Project Profile/Home visual transformation
 **Değişken repository gerçeği:** Güncel SHA/PR durumu GitHub `master` ve current Issue üzerinden doğrulanır.
 
 ## 1. Belgenin rolü
@@ -17,6 +17,7 @@ Kaynak otoritesi bilgi türüne göre ayrılır:
 | --- | --- |
 | Kalıcı ürün amacı ve veri ilkeleri | `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md` |
 | UI/UX sistem sözleşmesi | `docs/v2/CSE_FRICTIONLESS_UI_UX_SYSTEM_CONTRACT.md` |
+| Visual-first owner ürün ve sıra kararları | `docs/v2/CSE_VISUAL_FIRST_OWNER_DECISIONS_2026-09-04.md` |
 | Güncel V2 ürün kapsamı ve bağımlılıkları | Bu belge |
 | Ayrıntılı yürütme sırası | `ROADMAP.md` |
 | Operasyon ve güvenlik kuralları | `docs/protocols/CSE_PROJECT_INSTRUCTIONS.md` |
@@ -86,13 +87,15 @@ kullanılabilir hâle getirmektir.
 release-readiness program otoritesidir. Issue #616'nın sanitize paketi ürün
 değerlendirmesi için evidence baseline'dır; manuel kabul PASS'i değildir.
 Issue #618 ortak UI/UX sözleşmesi ve ilk truth-sync olarak merge edilmiştir.
-Phase 1 adaptive/accessibility foundation tamamlanmıştır. Phase 2 Step 8
-form/primary-action standardı UXF-013 / PR #645 ve UXF-014 / PR #647, Step 9
-Agenda search/filter dilimi UXF-015 / PR #649 ile tamamlanmıştır. Step 10
-başlamış; Agenda + Reminder retryable read-error standardı UXF-016 / PR #651 ile
-tamamlanmıştır. Step 10'un tamamı bitmemiştir; güncel sonraki yön kalan dar
-empty/loading/error/success yüzeyleri, ardından Step 11 history/event
-language'dır. DWG Viewer / Issue #523 `POST-RELEASE / DEFERRED` durumundadır
+UXF-002..018 tamamlanmıştır: adaptive/accessibility foundation, ortak aktif
+proje, form/primary-action, Agenda search/filter ve dar retryable read-error /
+preserving reload altyapıları merged temeldir. Kalan görünmez
+empty/loading/error/success, history/event, adaptive/accessibility ve recovery
+borcu silinmez; ancak #657 visual-first owner kararıyla görsel dönüşümün
+ardından release borcu olarak geri döner. Güncel sonraki production dalgası
+Project Profile/Home görsel dönüşümüdür; ardından ortak görsel dil/sağ ekran
+tool rail ve yüksek sürtünmeli formlar/ekranlar gelir. DWG Viewer / Issue #523
+`POST-RELEASE / DEFERRED` durumundadır
 ve ilk genel yayının bağımlılığı değildir.
 
 Ana yön:
@@ -127,9 +130,13 @@ Proje/Mahal, Saha Rehberi, Attachment ve Ajanda omurgası — complete
 → Phase 1 — adaptive/accessibility foundation complete
 → Phase 2 Step 8 — form/primary-action standard complete / UXF-013 #645 + UXF-014 #647
 → Phase 2 Step 9 — Agenda search/filter slice complete / UXF-015 #649
-→ Phase 2 Step 10 — started; Agenda + Reminder retryable read-error slice complete / UXF-016 #651
-→ Current next — Step 10 remaining narrow empty/loading/error/success surfaces; then Step 11 history/event language
-→ Phases 3–5 — daily core, people/safety, supporting modules
+→ Phase 2 Step 10 — UXF-016..018 retryable error/detail/reload slices complete; remaining debt preserved
+→ UXF-002..018 — completed foundation; no rollback
+→ Issue #657 — visual-first owner decision truth-sync
+→ Current next — Project Profile/Home visual transformation
+→ Then — shared visual language/right-side screen-tool rail; Inventory top-tool exception
+→ Then — high-friction forms/screens
+→ Return — remaining empty/loading/error/success, history/event, adaptive/accessibility and recovery release debt
 → Phase 6 — independent recovery/backup/search/onboarding/telemetry/privacy gates
 → Phase 7 — integrated quality + missing evidence/manual acceptance closure
 → Phase 8 — release candidate + explicit owner release decision
@@ -519,22 +526,30 @@ Inventory v1 closure — complete
 → Phase 1 — adaptive/accessibility foundation complete
 → Phase 2 Step 8 — form/primary-action standard complete / UXF-013 #645 + UXF-014 #647
 → Phase 2 Step 9 — Agenda search/filter slice complete / UXF-015 #649
-→ Phase 2 Step 10 — started; Agenda + Reminder retryable read-error slice complete / UXF-016 #651
-→ Current next — Step 10 remaining narrow empty/loading/error/success surfaces; then Step 11 history/event language
-→ Phases 3–5 — daily core, people/safety, supporting modules
+→ Phase 2 Step 10 — UXF-016..018 retryable error/detail/reload slices complete; remaining debt preserved
+→ UXF-002..018 — completed foundation; no rollback
+→ Issue #657 — visual-first owner decision truth-sync
+→ Current next — Project Profile/Home visual transformation
+→ Then — shared visual language/right-side screen-tool rail; Inventory top-tool exception
+→ Then — high-friction forms/screens
+→ Return — remaining empty/loading/error/success, history/event, adaptive/accessibility and recovery release debt
 → Phase 6 — independent release gates, including recovery/backup
 → Phase 7 — integrated quality + missing evidence/manual acceptance closure
 → Phase 8 — release candidate + explicit owner release decision
 ```
 
 Bu dönem yeni bir büyük modül ekleme dönemi değildir. Merge edilmiş kanonik
-UI/UX sözleşmesi `docs/v2/CSE_FRICTIONLESS_UI_UX_SYSTEM_CONTRACT.md` bütün dar
-dilimleri yönetir. Phase 1 tamamlanmış; Phase 2 Step 8 ve Step 9 kapanmış, Step
-10 ise Agenda + Reminder retryable read-error diliminin UXF-016 / PR #651 ile
-tamamlanmasıyla başlamıştır. Sıradaki dar yön Step 10'un kalan yüzeyleri,
-ardından Step 11 history/event language'dır. Issue #479'da ve ilgili ürün
-kayıtlarında görünür kalan manuel kabul borcu ile recovery, backup,
-arama, onboarding, telemetry, privacy/KVKK ve release kapıları korunur.
+UI/UX sözleşmesi ile
+`docs/v2/CSE_VISUAL_FIRST_OWNER_DECISIONS_2026-09-04.md` bütün dar dilimleri
+birlikte yönetir. UXF-002..018 tamamlanmış ve korunmuş temeldir. Sıradaki dar
+yön Project Profile/Home görsel dönüşümü; ardından ortak görsel dil ve genel
+sağ ekran-tool rail, sonra yüksek sürtünmeli form/ekran dilimleridir. Inventory
+genel sağ rail dilinin açık istisnasıdır: sağ rail yerine kompakt üst araç
+alanı kullanır, soldaki Kroki/Katlar/Liste rail'i korunur. Kalan Step 10/11,
+adaptive/accessibility ve recovery borcu görsel dalgadan sonra release kapısı
+olarak geri döner. Issue #479'da ve ilgili ürün kayıtlarında görünür kalan
+manuel kabul borcu ile backup, arama, onboarding, telemetry, privacy/KVKK ve
+release kapıları korunur.
 
 ### Future/post-release — DWG Viewer v1 (Issue #523)
 
@@ -589,7 +604,7 @@ Kapanış kapısı:
 | 4 | İstenecek Malzemeler; öneriler; telefon görüşmesi | Yardımcı akışların ana omurgaya bağlanması |
 | 5 | Proje albümü Slice 1 merged; Günlük Log v2 paused | V2.11 manual test/closure ve ayrı owner resume kararı |
 | Completed product line | Inventory v1 through Slice 7 / Issue #604 | Repository, backup/restore, attachment, isolated device ve owner field acceptance closure complete |
-| Current priority | #617 frictionless release-readiness program; #618 contract and Phase 1 complete; Phase 2 Step 10 remaining narrow surfaces | Step 8/9 complete; UXF-016 / #651 completes only Agenda + Reminder read-error slice, not all Step 10 |
+| Current priority | #617 frictionless release-readiness; UXF-002..018 complete; #657 visual-first direction | Project Profile/Home → shared visual language/right tool rail with Inventory exception → high-friction forms/screens → preserved release debt |
 | Future/post-release | DWG Viewer v1 / Issue #523 | Deferred future integration; not a first-release dependency |
 | 6 | Mini hesap makinesi — paused | Ayrı owner resume kararı ve dar saha aracı kabulü |
 
@@ -721,9 +736,13 @@ Living Plan MVP Core — merged / PR #463
 → Phase 1 — adaptive/accessibility foundation complete
 → Phase 2 Step 8 — form/primary-action standard complete / UXF-013 #645 + UXF-014 #647
 → Phase 2 Step 9 — Agenda search/filter slice complete / UXF-015 #649
-→ Phase 2 Step 10 — started; Agenda + Reminder retryable read-error slice complete / UXF-016 #651
-→ Current next — Step 10 remaining narrow empty/loading/error/success surfaces; then Step 11 history/event language
-→ Phases 3–5 — daily core, people/safety, supporting modules
+→ Phase 2 Step 10 — UXF-016..018 retryable error/detail/reload slices complete; remaining debt preserved
+→ UXF-002..018 — completed foundation; no rollback
+→ Issue #657 — visual-first owner decision truth-sync
+→ Current next — Project Profile/Home visual transformation
+→ Then — shared visual language/right-side screen-tool rail; Inventory top-tool exception
+→ Then — high-friction forms/screens
+→ Return — remaining empty/loading/error/success, history/event, adaptive/accessibility and recovery release debt
 → Phase 6 — independent release gates, including recovery/backup
 → Phase 7 — integrated quality + missing evidence/manual acceptance closure
 → Phase 8 — release candidate + explicit owner release decision
@@ -781,11 +800,13 @@ closure'ını tamamlamıştır.
 Issue #501 recovery verification, Issue #502 external verified backup/update
 gate'i, Issue #503 newer-live-data-safe restore yönü ve Issue #499 owner-phone
 MAIN-only identity kuralı bütün owner-phone operasyonlarından önce gelir.
-Inventory closure bunları kapatmaz. Güncel ürün sırası #618 merged contract ve
-tamamlanan Phase 1'den sonra Phase 2 Step 10'un kalan dar
-empty/loading/error/success yüzeyleri, ardından Step 11 history/event language
-olarak ilerler. UXF-016 / PR #651 yalnız Agenda + Reminder retryable read-error
-dilimini tamamlar; Step 10'un tamamını kapatmaz. Issue #523
+Inventory closure bunları kapatmaz. UXF-002..018 completed foundation olarak
+korunur. Güncel ürün sırası #657 doğrultusunda Project Profile/Home görsel
+dönüşümü, ortak görsel dil ve genel sağ screen-tool rail, Inventory kompakt üst
+araç istisnası ve yüksek sürtünmeli form/ekran dilimleriyle ilerler. Kalan
+empty/loading/error/success, history/event, adaptive/accessibility ve recovery
+borcu silinmez; visual-first dalganın ardından release kapısı olarak geri
+döner. Issue #523
 `POST-RELEASE / DEFERRED` gelecek entegrasyon hattıdır; ilk genel yayının
 bağımlılığı değildir ve yeni DWG implementation dilimi açık owner kararı
 olmadan başlamaz. V2.12 ve sonraki eski planlı ürün işleri owner resume kararına

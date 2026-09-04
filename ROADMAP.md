@@ -3,7 +3,7 @@
 **Durum:** Güncel yürütme sırası
 **Tarih:** 4 Eylül 2026
 **V2 kapsam kaynağı:** `docs/v2/CSE_V2_SCOPE.md`
-**Güncel yön truth-sync:** Inventory v1 closure complete → #616 evidence baseline → #617 frictionless release-readiness program → #618 UI/UX contract merged → Phase 1 adaptive/accessibility foundation complete → Phase 2 Step 10 remaining narrow surfaces
+**Güncel yön truth-sync:** Inventory v1 closure complete → #616 evidence baseline → #617 frictionless release-readiness program → UXF-002..018 complete → #657 visual-first truth-sync → Project Profile/Home visual transformation
 **Değişken repository gerçeği:** Güncel SHA/PR durumu GitHub `master` ve current Issue üzerinden doğrulanır.
 
 ## 1. Güncel ürün durumu
@@ -62,11 +62,14 @@ Issue #586 implementation'ı PR #589 ile merge edilmiş ve Issue kapatılmışt�
 4 Eylül 2026 owner kararıyla #616 sanitize evidence paketi manuel kabul PASS'i
 değil, yeterli ürün değerlendirme baseline'ıdır. Issue #617 güncel frictionless
 release-readiness programıdır; Issue #618 kanonik UI/UX sistem sözleşmesi olarak
-merge edilmiştir. Phase 1 adaptive/accessibility foundation tamamlanmıştır.
-Phase 2 Step 8 form/primary-action standardı UXF-013 / PR #645 ve UXF-014 / PR
-#647, Step 9 Agenda search/filter dilimi UXF-015 / PR #649 ile tamamlanmıştır.
-Step 10 başlamış; Agenda + Reminder retryable read-error standardı UXF-016 / PR
-#651 ile tamamlanmış, Step 10'un kalan dar yüzeyleri açık kalmıştır. DWG Viewer
+merge edilmiştir. UXF-002..018 tamamlanmıştır; adaptive/accessibility, ortak
+aktif proje, form/primary-action, Agenda search/filter ve retryable
+error/detail/reload altyapısı geçerli merged temeldir. #657 visual-first owner
+kararı kalan empty/loading/error/success ve history/event borcunu silmeden
+görsel dönüşümün ardına alır. Güncel sonraki production dalgası Project
+Profile/Home görsel dönüşümü; ardından ortak görsel dil/sağ ekran-tool rail ve
+yüksek sürtünmeli form/ekran dilimleridir. Inventory genel sağ rail dilinin
+kompakt üst araç alanı istisnasıdır. DWG Viewer
 v1 / Issue #523
 `POST-RELEASE / DEFERRED` gelecek entegrasyon hattıdır ve ilk genel yayının
 bağımlılığı değildir. Public/store production release ilan edilmemiştir.
@@ -77,6 +80,8 @@ bağımlılığı değildir. Public/store production release ilan edilmemiştir.
   `docs/protocols/CSE_UNIFIED_PROJECT_SOURCE.md`
 - UI/UX sistem sözleşmesi:
   `docs/v2/CSE_FRICTIONLESS_UI_UX_SYSTEM_CONTRACT.md`
+- Visual-first owner ürün ve sıra kararları:
+  `docs/v2/CSE_VISUAL_FIRST_OWNER_DECISIONS_2026-09-04.md`
 - Güncel V2 kapsamı:
   `docs/v2/CSE_V2_SCOPE.md`
 - Güncel yürütme sırası:
@@ -109,9 +114,13 @@ Proje/Mahal — complete
 → Phase 1 — adaptive/accessibility foundation complete
 → Phase 2 Step 8 — form/primary-action standard complete / UXF-013 #645 + UXF-014 #647
 → Phase 2 Step 9 — Agenda search/filter slice complete / UXF-015 #649
-→ Phase 2 Step 10 — started; Agenda + Reminder retryable read-error slice complete / UXF-016 #651
-→ Current next — Step 10 remaining narrow empty/loading/error/success surfaces; then Step 11 history/event language
-→ Phases 3–5 — daily core, people/safety, supporting modules
+→ Phase 2 Step 10 — UXF-016..018 retryable error/detail/reload slices complete; remaining debt preserved
+→ UXF-002..018 — completed foundation; no rollback
+→ Issue #657 — visual-first owner decision truth-sync
+→ Current next — Project Profile/Home visual transformation
+→ Then — shared visual language/right-side screen-tool rail; Inventory top-tool exception
+→ Then — high-friction forms/screens
+→ Return — remaining empty/loading/error/success, history/event, adaptive/accessibility and recovery release debt
 → Phase 6 — independent recovery/backup/search/onboarding/telemetry/privacy gates
 → Phase 7 — integrated quality + missing evidence/manual acceptance closure
 → Phase 8 — release candidate + explicit owner release decision
@@ -393,19 +402,22 @@ Durum: `implemented — manual test pending; completion not declared`
 - Issue #618 kanonik
   `docs/v2/CSE_FRICTIONLESS_UI_UX_SYSTEM_CONTRACT.md` ve Roadmap/V2 Scope
   truth-sync'iyle merge edilmiştir.
-- Phase 1 adaptive shell, ortak aktif proje ve accessibility foundation
-  tamamlanmıştır.
-- Phase 2 Step 8 form/primary-action standardı UXF-013 / PR #645 ve UXF-014 /
-  PR #647; Step 9 Agenda search/filter dilimi UXF-015 / PR #649 ile
-  tamamlanmıştır.
-- Phase 2 Step 10 başlamıştır. Agenda + Reminder retryable read-error standardı
-  UXF-016 / PR #651 ile tamamlanmıştır; bu yalnız Step 10'un ilk dar dilimidir,
-  Step 10'un tamamlandığı anlamına gelmez.
-- Güncel sonraki yön Step 10 empty/loading/error/success standardının kalan dar
-  yüzeyleri, ardından Step 11 history/event language'dır. Issue #479 manual
-  acceptance borcu ile recovery,
-  backup, ortak arama, onboarding, telemetry, gizlilik/KVKK ve bütünleşik
-  kalite/release-candidate kapıları korunur.
+- UXF-002..018; adaptive shell, ortak aktif proje, accessibility,
+  form/primary-action, search/filter ve retryable error/detail/reload
+  altyapısını tamamlamıştır. Bu merged temel geri alınmaz.
+- Issue #657 ve
+  `docs/v2/CSE_VISUAL_FIRST_OWNER_DECISIONS_2026-09-04.md`, görünür dönüşümü
+  kalan görünmez polish borcundan önceye alır.
+- Güncel sonraki dalga Project Profile/Home görsel dönüşümüdür. Home artık
+  live-control-center Dashboard değil, seçili projenin düzenlenebilir profilidir;
+  modüllere kompakt `Araçlar` girişiyle ulaşılır.
+- Sonraki dalgalar ortak görsel dil/genel sağ ekran-tool rail ve yüksek
+  sürtünmeli form/ekranlardır. Inventory sağ rail kullanmaz; kompakt üst araç
+  alanı istisnasını ve soldaki Kroki/Katlar/Liste rail'ini korur.
+- Kalan empty/loading/error/success, history/event, adaptive/accessibility,
+  recovery, Issue #479 manual acceptance, backup, ortak arama, onboarding,
+  telemetry, gizlilik/KVKK ve bütünleşik kalite/release-candidate kapıları
+  silinmez; visual-first dalganın ardından geri döner.
 - Public/store release ayrıca owner kararına bağlıdır.
 
 ### Future/post-release — DWG Viewer v1 (Issue #523)
@@ -506,9 +518,13 @@ Living 7-Day Plan — implemented / manual test pending; final completion yok
 → Phase 1 — adaptive/accessibility foundation complete
 → Phase 2 Step 8 — form/primary-action standard complete / UXF-013 #645 + UXF-014 #647
 → Phase 2 Step 9 — Agenda search/filter slice complete / UXF-015 #649
-→ Phase 2 Step 10 — started; Agenda + Reminder retryable read-error slice complete / UXF-016 #651
-→ Current next — Step 10 remaining narrow empty/loading/error/success surfaces; then Step 11 history/event language
-→ Phases 3–5 — daily core, people/safety, supporting modules
+→ Phase 2 Step 10 — UXF-016..018 retryable error/detail/reload slices complete; remaining debt preserved
+→ UXF-002..018 — completed foundation; no rollback
+→ Issue #657 — visual-first owner decision truth-sync
+→ Current next — Project Profile/Home visual transformation
+→ Then — shared visual language/right-side screen-tool rail; Inventory top-tool exception
+→ Then — high-friction forms/screens
+→ Return — remaining empty/loading/error/success, history/event, adaptive/accessibility and recovery release debt
 → Phase 6 — independent release gates, including recovery/backup
 → Phase 7 — integrated quality + missing evidence/manual acceptance closure
 → Phase 8 — release candidate + explicit owner release decision
@@ -552,12 +568,13 @@ Inventory final UI/UX implementation'ı PR #589 ile merge edilmiş, Issue #586
 completed/closed'dur.
 
 Current product-development otoritesi #617'dir. #618 kanonik UI/UX sözleşmesi
-merge edilmiş ve Phase 1 adaptive/accessibility foundation tamamlanmıştır.
-Phase 2 Step 8 UXF-013 / PR #645 ile UXF-014 / PR #647, Step 9 UXF-015 / PR
-#649 ile tamamlanmıştır. Step 10'un Agenda + Reminder retryable read-error dilimi
-UXF-016 / PR #651 ile tamamlanmış; güncel sonraki yön Step 10'un kalan dar
-empty/loading/error/success yüzeyleri, ardından Step 11 history/event
-language'dır. Step 10'un tamamı henüz bitmiş değildir. Issue #523 açık kalır fakat
+merge edilmiş, UXF-002..018 tamamlanmış altyapı olarak korunmuştur. #657
+visual-first owner kararına göre güncel sonraki yön Project Profile/Home görsel
+dönüşümü; ardından ortak görsel dil/genel sağ screen-tool rail, Inventory
+kompakt üst araç istisnası ve yüksek sürtünmeli form/ekran dilimleridir. Kalan
+empty/loading/error/success, history/event, adaptive/accessibility ve recovery
+borcu görsel dalgadan sonra release kapısı olarak geri döner. Issue #523 açık
+kalır fakat
 `POST-RELEASE / DEFERRED` gelecek entegrasyon hattıdır; ilk genel yayını bloke
 etmez ve yeni DWG implementation dilimi açık owner kararı olmadan başlamaz.
 Issue #501 recovery, Issue #502 external verified backup/update, Issue #503
