@@ -426,6 +426,7 @@ class _MobileShellState extends State<MobileShell> {
           projectLocations: widget.bootstrap.projectLocations,
           initialProjectId: projectId,
           onProjectSelected: _reportAlbumProjectSelection,
+          appBarProjectControlBuilder: _buildRouteProjectControl,
         ),
       ),
     );

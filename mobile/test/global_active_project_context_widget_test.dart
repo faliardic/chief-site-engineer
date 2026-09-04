@@ -9,6 +9,8 @@ import 'package:chief_site_engineer/domain/agenda_models.dart';
 import 'package:chief_site_engineer/domain/attachment_models.dart';
 import 'package:chief_site_engineer/domain/inventory_models.dart';
 import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
+import 'package:chief_site_engineer/features/attachments/project_media_album_page.dart';
+import 'package:chief_site_engineer/features/dashboard/project_dashboard_page.dart';
 import 'package:chief_site_engineer/features/inventory/inventory_page.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_form_page.dart';
 import 'package:flutter/material.dart';
@@ -392,7 +394,7 @@ void main() {
   );
 
   testWidgets(
-    'Album adopts cached A without overlapping discovery and rejects stale ID',
+    'Album validates shared switches in place and rejects failed or stale catalog discovery',
     (tester) async {
       final catalog = _ControlledAlbumCatalog();
       final agenda = _OverlapTrackingAgenda(
@@ -401,32 +403,117 @@ void main() {
       );
       await _pumpShell(tester, agenda, attachmentCatalog: catalog);
       await _chooseSharedProject(tester, _projectB.id);
+      final session = tester
+          .widget<ProjectDashboardPage>(
+            find.byType(ProjectDashboardPage, skipOffstage: false),
+          )
+          .session;
 
       await _openDashboardTool(tester, const Key('dashboard-project-album'));
       expect(catalog.scopedCalls, [_projectB.id]);
+      final albumState = tester.state(find.byType(ProjectMediaAlbumPage));
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.byType(ActiveProjectControl),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(ValueKey('album-project-${_projectB.id}')),
+        findsNothing,
+      );
 
       final discoveryBaseline = agenda.listProjectsCalls;
+      final scopedBaseline = catalog.scopedCalls.length;
       final localReload = Completer<List<AttachmentCatalogProject>>();
       catalog.nextDiscovery = localReload;
-      await tester.tap(find.byKey(ValueKey('album-project-${_projectB.id}')));
+      await tester.tap(
+        find.byKey(const Key('active-project-indicator')).hitTestable(),
+      );
       await tester.pumpAndSettle();
-      await tester.tap(find.text(_projectA.name).last);
+      await tester.tap(
+        find
+            .byKey(ValueKey('active-project-option-${_projectA.id}'))
+            .hitTestable(),
+      );
       await tester.pump();
 
       expect(catalog.discoveryInFlight, isTrue);
+      expect(session.selectedProjectId, _projectB.id);
+      expect(catalog.scopedCalls.length, scopedBaseline);
       expect(agenda.listProjectsCalls, discoveryBaseline);
       expect(agenda.overlappingProjectDiscoveryCalls, 0);
 
       localReload.complete(catalog.projects);
       await tester.pumpAndSettle();
       expect(catalog.scopedCalls.last, _projectA.id);
+      expect(session.selectedProjectId, _projectA.id);
+      expect(
+        tester.state(find.byType(ProjectMediaAlbumPage)),
+        same(albumState),
+      );
+      _expectIndicator(_projectA.name);
+      expect(agenda.listProjectsCalls, discoveryBaseline);
 
-      final staleValidationBaseline = agenda.listProjectsCalls;
-      await tester.tap(find.byKey(ValueKey('album-project-${_projectA.id}')));
+      await tester.tap(
+        find.byKey(const Key('active-project-indicator')).hitTestable(),
+      );
       await tester.pumpAndSettle();
-      await tester.tap(find.text(_albumOnlyProject.name).last);
+      expect(
+        find.byKey(ValueKey('active-project-option-${_albumOnlyProject.id}')),
+        findsNothing,
+      );
+      await tester.tap(find.text('Vazgeç'));
       await tester.pumpAndSettle();
-      expect(agenda.listProjectsCalls, staleValidationBaseline + 1);
+
+      catalog.projects = [
+        AttachmentCatalogProject(id: _projectA.id, name: _projectA.name),
+        _albumOnlyProject,
+      ];
+      final staleScopedBaseline = catalog.scopedCalls.length;
+      await _chooseSharedProject(tester, _projectB.id);
+      expect(session.selectedProjectId, _projectA.id);
+      expect(catalog.scopedCalls.length, staleScopedBaseline);
+      expect(
+        find.byKey(const Key('project-media-album-context-unavailable')),
+        findsOneWidget,
+      );
+      expect(
+        tester.state(find.byType(ProjectMediaAlbumPage)),
+        same(albumState),
+      );
+
+      catalog.projects = [
+        AttachmentCatalogProject(id: _projectA.id, name: _projectA.name),
+        AttachmentCatalogProject(id: _projectB.id, name: _projectB.name),
+        _albumOnlyProject,
+      ];
+      final failedDiscovery = Completer<List<AttachmentCatalogProject>>();
+      catalog.nextDiscovery = failedDiscovery;
+      final failedScopedBaseline = catalog.scopedCalls.length;
+      await tester.tap(
+        find.byKey(const Key('active-project-indicator')).hitTestable(),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find
+            .byKey(ValueKey('active-project-option-${_projectB.id}'))
+            .hitTestable(),
+      );
+      await tester.pump();
+      failedDiscovery.completeError(StateError('synthetic catalog failure'));
+      await tester.pumpAndSettle();
+      expect(session.selectedProjectId, _projectA.id);
+      expect(catalog.scopedCalls.length, failedScopedBaseline);
+      expect(
+        find.byKey(const Key('project-media-album-error')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('project-media-album-retry')));
+      await tester.pumpAndSettle();
+      expect(catalog.scopedCalls.last, _projectA.id);
+      expect(session.selectedProjectId, _projectA.id);
       expect(agenda.overlappingProjectDiscoveryCalls, 0);
 
       await tester.tap(find.byType(BackButton));
@@ -580,7 +667,7 @@ class _ContextInventory extends UnavailableInventoryApplication {
 }
 
 class _ControlledAlbumCatalog implements AttachmentCatalogApplication {
-  final List<AttachmentCatalogProject> projects = const [
+  List<AttachmentCatalogProject> projects = const [
     AttachmentCatalogProject(
       id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       name: 'Kuzey',
