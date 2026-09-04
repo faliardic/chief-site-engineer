@@ -269,8 +269,8 @@ void main() {
     final agendaRect = tester.getRect(agenda);
     expect(reminderRect.top, closeTo(agendaRect.top, 0.01));
     expect(reminderRect.right, lessThan(agendaRect.left));
-    expect(reminderRect.height, inInclusiveRange(40, 42));
-    expect(agendaRect.height, inInclusiveRange(40, 42));
+    _expectAccessibleIconTarget(tester, reminder, 'Unutma ekle');
+    _expectAccessibleIconTarget(tester, agenda, 'Ajanda kaydı ekle');
     expect(tester.widget<IconButton>(reminder).tooltip, 'Unutma ekle');
     expect(tester.widget<IconButton>(agenda).tooltip, 'Ajanda kaydı ekle');
     expect(
@@ -450,8 +450,8 @@ void main() {
       final agendaRect = tester.getRect(agenda);
       expect(reminderRect.top, closeTo(agendaRect.top, 0.01));
       expect(reminderRect.right, lessThan(agendaRect.left));
-      expect(reminderRect.height, inInclusiveRange(40, 42));
-      expect(agendaRect.height, inInclusiveRange(40, 42));
+      _expectAccessibleIconTarget(tester, reminder, 'Unutma ekle');
+      _expectAccessibleIconTarget(tester, agenda, 'Ajanda kaydı ekle');
       expect(find.bySemanticsLabel('Unutma ekle'), findsOneWidget);
       expect(find.bySemanticsLabel('Ajanda kaydı ekle'), findsOneWidget);
       expect(
@@ -749,6 +749,25 @@ void main() {
       expect(find.byType(LinearProgressIndicator), findsNothing);
     },
   );
+}
+
+void _expectAccessibleIconTarget(
+  WidgetTester tester,
+  Finder finder,
+  String semanticsLabel,
+) {
+  final renderedSize = tester.getSize(finder);
+  expect(renderedSize, const Size.square(48));
+  final semantics = find
+      .ancestor(
+        of: finder,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Semantics && widget.properties.label == semanticsLabel,
+        ),
+      )
+      .first;
+  expect(tester.getSize(semantics), renderedSize);
 }
 
 class _Fixture {
