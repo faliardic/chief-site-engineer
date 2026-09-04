@@ -23,7 +23,7 @@ const _member3 = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd3';
 
 void main() {
   testWidgets(
-    'Sicil is appended without changing existing navigation indices',
+    'Saha Rehberi opens from Dashboard with the shared project control',
     (tester) async {
       await _setPhoneSize(tester);
       final attendance = FakeAttendanceApplication();
@@ -49,19 +49,19 @@ void main() {
         navigation.destinations.cast<NavigationDestination>().map(
           (item) => item.label,
         ),
-        [
-          'Başlangıç',
-          'Hatırlatıcı',
-          'Ajanda',
-          'Puantaj',
-          'Beton Paketi',
-          'Sicil',
-        ],
+        ['Ana Sayfa', 'Hatırlatıcı', 'Ajanda', 'Envanter', 'Puantaj'],
       );
 
-      await tester.tap(find.text('Sicil').last);
-      await tester.pumpAndSettle();
+      await _openDashboardTool(
+        tester,
+        const Key('dashboard-workforce-directory'),
+      );
       expect(find.byKey(const Key('workforce-directory')), findsOneWidget);
+      expect(find.byType(ActiveProjectControl), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('workforce-directory-project-$_project1')),
+        findsNothing,
+      );
       expect(find.text('Görünen proje: Proje Bir'), findsOneWidget);
     },
   );
@@ -86,15 +86,36 @@ void main() {
 
     expect(find.text('Ayşe Usta'), findsOneWidget);
     expect(find.text('Zeynep Mimar'), findsNothing);
-    await tester.tap(
+    expect(
       find.byKey(const ValueKey('workforce-directory-project-$_project1')),
+      findsNothing,
     );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Proje İki').last);
+    await tester.enterText(
+      find.byKey(const Key('workforce-directory-search')),
+      'ZEYNEP',
+    );
+    await tester.tap(find.text('Arşiv'));
+    await tester.pump();
+    final state = tester.state<WorkforceDirectoryPageState>(
+      find.byType(WorkforceDirectoryPage),
+    );
+    await state.selectProject(_project2);
     await tester.pumpAndSettle();
     expect(find.text('Ayşe Usta'), findsNothing);
-    expect(find.text('Zeynep Mimar'), findsOneWidget);
+    expect(find.text('Zeynep Mimar'), findsNothing);
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const Key('workforce-directory-search')),
+          )
+          .controller!
+          .text,
+      'ZEYNEP',
+    );
     expect(find.text('Görünen proje: Proje İki'), findsOneWidget);
+    await tester.tap(find.text('Aktif'));
+    await tester.pump();
+    expect(find.text('Zeynep Mimar'), findsOneWidget);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -397,6 +418,31 @@ Future<void> _setPhoneSize(WidgetTester tester) async {
     tester.view.resetDevicePixelRatio();
     tester.view.resetPhysicalSize();
   });
+}
+
+Future<void> _openDashboardTool(WidgetTester tester, Key key) async {
+  final list = find.byKey(const Key('project-dashboard-list'));
+  final scrollable = find.descendant(
+    of: list,
+    matching: find.byType(Scrollable),
+  );
+  final state = tester.state<ScrollableState>(scrollable.first);
+  state.position.jumpTo(state.position.minScrollExtent);
+  await tester.pump();
+  final target = find.byKey(key);
+  while (target.evaluate().isEmpty &&
+      state.position.pixels < state.position.maxScrollExtent) {
+    state.position.jumpTo(
+      (state.position.pixels + 240)
+          .clamp(state.position.minScrollExtent, state.position.maxScrollExtent)
+          .toDouble(),
+    );
+    await tester.pump();
+  }
+  expect(target, findsOneWidget);
+  await tester.ensureVisible(target);
+  await tester.tap(target);
+  await tester.pumpAndSettle();
 }
 
 const _firstProject = MobileProject(

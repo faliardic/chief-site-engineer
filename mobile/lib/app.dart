@@ -478,21 +478,76 @@ class _MobileShellState extends State<MobileShell> {
         : const SizedBox.shrink();
   }
 
+  Widget _buildRouteProjectControl(ValueChanged<String> onSelected) {
+    return ListenableBuilder(
+      listenable: _activeProjectSession,
+      builder: (context, child) => ActiveProjectControl(
+        label: _activeProjectLabel,
+        projects: _activeProjectOptions,
+        onSelected: onSelected,
+      ),
+    );
+  }
+
   Future<void> _openConcrete(String projectId) async {
     final concrete = widget.bootstrap.concrete;
     final attachments = widget.bootstrap.concreteAttachments;
     if (concrete == null || attachments == null) return;
     if (!mounted) return;
+    final pageKey = GlobalKey<ConcretePageState>();
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => Scaffold(
-          appBar: AppBar(title: const Text('Beton Paketi')),
+          appBar: AppBar(
+            title: const Text('Beton Paketi'),
+            actions: [
+              _buildRouteProjectControl((selectedProjectId) {
+                final pageState = pageKey.currentState;
+                if (pageState != null) {
+                  unawaited(pageState.selectProject(selectedProjectId));
+                }
+              }),
+            ],
+          ),
           body: SafeArea(
             child: ConcretePage(
+              key: pageKey,
               concrete: concrete,
               agenda: widget.bootstrap.agenda,
               attachments: attachments,
               projectLocations: widget.bootstrap.projectLocations,
+              initialProjectId: projectId,
+              onProjectSelected: _reportRouteProjectSelection,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openWorkforce(String projectId) async {
+    final attendance = widget.bootstrap.attendance;
+    if (attendance == null || !mounted) return;
+    final pageKey = GlobalKey<WorkforceDirectoryPageState>();
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(
+            title: const Text('Sicil'),
+            actions: [
+              _buildRouteProjectControl((selectedProjectId) {
+                final pageState = pageKey.currentState;
+                if (pageState != null) {
+                  unawaited(pageState.selectProject(selectedProjectId));
+                }
+              }),
+            ],
+          ),
+          body: SafeArea(
+            child: WorkforceDirectoryPage(
+              key: pageKey,
+              attendance: attendance,
+              agenda: widget.bootstrap.agenda,
               initialProjectId: projectId,
               onProjectSelected: _reportRouteProjectSelection,
             ),
@@ -683,23 +738,7 @@ class _MobileShellState extends State<MobileShell> {
           : (projectId) => unawaited(_openProjectAlbum(projectId)),
       onOpenWorkforce: attendance == null
           ? null
-          : (projectId) => unawaited(
-              Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => Scaffold(
-                    appBar: AppBar(title: const Text('Sicil')),
-                    body: SafeArea(
-                      child: WorkforceDirectoryPage(
-                        attendance: attendance,
-                        agenda: bootstrap.agenda,
-                        initialProjectId: projectId,
-                        onProjectSelected: _reportRouteProjectSelection,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+          : (projectId) => unawaited(_openWorkforce(projectId)),
       onOpenPhoneCall: (projectId) =>
           unawaited(_openPhoneCallResult(projectId)),
       onOpenBackup: backup == null

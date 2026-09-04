@@ -259,11 +259,11 @@ void main() {
         find.byKey(const Key('concrete-project-context-unavailable')),
         findsOneWidget,
       );
-      await _chooseProject(
-        tester,
-        find.byKey(const Key('concrete-project-filter')),
-        _projectA.name,
-      );
+      expect(find.byKey(const Key('concrete-project-filter')), findsNothing);
+      await tester
+          .state<ConcretePageState>(find.byType(ConcretePage))
+          .selectProject(_projectA.id);
+      await tester.pumpAndSettle();
       expect(concrete.projectCalls, [_projectA.id]);
       expect(callbacks, [_projectA.id]);
 
@@ -287,11 +287,16 @@ void main() {
         ),
         findsOneWidget,
       );
-      await _chooseProject(
-        tester,
+      expect(
         find.byKey(const ValueKey('workforce-directory-project-null')),
-        _projectA.name,
+        findsNothing,
       );
+      await tester
+          .state<WorkforceDirectoryPageState>(
+            find.byType(WorkforceDirectoryPage),
+          )
+          .selectProject(_projectA.id);
+      await tester.pumpAndSettle();
       expect(attendance.memberProjectCalls, [_projectA.id]);
       expect(attendance.subcontractorProjectCalls, [_projectA.id]);
       expect(attendance.teamProjectCalls, [_projectA.id]);
@@ -440,7 +445,7 @@ void main() {
   );
 
   testWidgets(
-    'shell routes exact B and adopts Album A without hidden Attendance mutation',
+    'shared project tools validate and switch in place before Album adoption',
     (tester) async {
       final agenda = _PhoneAgenda(projects: const [_projectA, _projectB]);
       final daily = _DailyFake.fromMobile(const [_projectA, _projectB]);
@@ -479,24 +484,57 @@ void main() {
 
       await _chooseSharedProject(tester, _projectB.id);
       await tester.pumpAndSettle();
+      final session = tester
+          .widget<ProjectDashboardPage>(
+            find.byType(ProjectDashboardPage, skipOffstage: false),
+          )
+          .session;
       expect(attendance.ensureDayCalls, 0);
       expect(attendance.rollingCalls, 0);
 
       agenda.failNextProjectDiscovery = true;
       await _openDashboardTool(tester, const Key('dashboard-concrete-package'));
+      final concreteState = tester.state<ConcretePageState>(
+        find.byType(ConcretePage),
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.byType(ActiveProjectControl),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('concrete-project-filter')), findsNothing);
       expect(concrete.projectCalls, isEmpty);
       expect(find.byKey(const Key('concrete-project-retry')), findsOneWidget);
+      await _chooseSharedProject(tester, _projectA.id);
+      expect(session.selectedProjectId, _projectB.id);
+      expect(concrete.projectCalls, isEmpty);
+      expect(
+        tester.state<ConcretePageState>(find.byType(ConcretePage)),
+        same(concreteState),
+      );
       await tester.tap(find.byKey(const Key('concrete-project-retry')));
       await tester.pumpAndSettle();
       expect(concrete.projectCalls.first, _projectB.id);
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Kod, mahal, blok, kat veya aks ara'),
+        'korunan beton araması',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Takipte'));
+      await tester.pumpAndSettle();
+      final concreteDay = concrete.queries.last.istanbulDay;
+      await _chooseSharedProject(tester, _projectA.id);
+      expect(session.selectedProjectId, _projectA.id);
+      expect(concrete.queries.last.projectId, _projectA.id);
+      expect(concrete.queries.last.literalSearch, 'korunan beton araması');
+      expect(concrete.queries.last.group, ConcretePourGroup.followUp);
+      expect(concrete.queries.last.istanbulDay, concreteDay);
       expect(
-        tester
-            .widget<DropdownButtonFormField<MobileProject>>(
-              find.byKey(const Key('concrete-project-filter')),
-            )
-            .initialValue
-            ?.id,
-        _projectB.id,
+        tester.state<ConcretePageState>(find.byType(ConcretePage)),
+        same(concreteState),
       );
       await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
@@ -507,19 +545,70 @@ void main() {
         tester,
         const Key('dashboard-workforce-directory'),
       );
+      final workforceState = tester.state<WorkforceDirectoryPageState>(
+        find.byType(WorkforceDirectoryPage),
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.byType(ActiveProjectControl),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(ValueKey('workforce-directory-project-${_projectA.id}')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(ValueKey('workforce-directory-project-${_projectB.id}')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('workforce-directory-project-null')),
+        findsNothing,
+      );
       expect(attendance.memberProjectCalls.length, workforceMemberBaseline);
       expect(
         find.byKey(const Key('workforce-directory-project-retry')),
         findsOneWidget,
       );
+      await _chooseSharedProject(tester, _projectB.id);
+      expect(session.selectedProjectId, _projectA.id);
+      expect(attendance.memberProjectCalls.length, workforceMemberBaseline);
       await tester.tap(
         find.byKey(const Key('workforce-directory-project-retry')),
       );
       await tester.pumpAndSettle();
       expect(attendance.memberProjectCalls.length, workforceMemberBaseline + 1);
+      expect(attendance.memberProjectCalls.last, _projectA.id);
+      expect(attendance.subcontractorProjectCalls.last, _projectA.id);
+      expect(attendance.teamProjectCalls.last, _projectA.id);
+      await tester.enterText(
+        find.byKey(const Key('workforce-directory-search')),
+        'korunan rehber araması',
+      );
+      await tester.tap(find.text('Arşiv'));
+      await tester.pump();
+      await _chooseSharedProject(tester, _projectB.id);
+      expect(session.selectedProjectId, _projectB.id);
       expect(attendance.memberProjectCalls.last, _projectB.id);
       expect(attendance.subcontractorProjectCalls.last, _projectB.id);
       expect(attendance.teamProjectCalls.last, _projectB.id);
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const Key('workforce-directory-search')),
+            )
+            .controller!
+            .text,
+        'korunan rehber araması',
+      );
+      expect(
+        tester.state<WorkforceDirectoryPageState>(
+          find.byType(WorkforceDirectoryPage),
+        ),
+        same(workforceState),
+      );
       expect(find.text('Görünen proje: ${_projectB.name}'), findsOneWidget);
       await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
@@ -983,9 +1072,11 @@ class _MaterialFake implements MaterialRequestApplicationPort {
 
 class _ConcreteFake implements ConcreteApplication {
   final List<String> projectCalls = [];
+  final List<ConcretePourQuery> queries = [];
 
   @override
   Future<List<ConcretePour>> listPours(ConcretePourQuery query) async {
+    queries.add(query);
     if (query.projectId case final projectId?) projectCalls.add(projectId);
     return const [];
   }

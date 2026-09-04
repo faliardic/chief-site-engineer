@@ -27,6 +27,13 @@ const project = MobileProject(
   updatedAt: '2026-07-19T07:00:00Z',
   revision: 1,
 );
+const secondProject = MobileProject(
+  id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab',
+  name: 'İkinci Proje',
+  createdAt: '2026-07-19T07:00:00Z',
+  updatedAt: '2026-07-19T07:00:00Z',
+  revision: 1,
+);
 const concreteClass = ProjectConcreteClass(
   id: concreteClassId,
   projectId: projectId,
@@ -66,7 +73,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Beton paketleri'), findsOneWidget);
-      expect(find.byKey(const Key('concrete-project-filter')), findsOneWidget);
+      expect(find.byKey(const Key('concrete-project-filter')), findsNothing);
       expect(find.byKey(const Key('concrete-day-filter')), findsOneWidget);
       expect(find.text('2026-07-18'), findsOneWidget);
       expect(concrete.lastListQuery?.projectId, projectId);
@@ -100,9 +107,52 @@ void main() {
       expect(find.text('Yeni döküm'), findsOneWidget);
       expect(find.textContaining('BT-001'), findsOneWidget);
       expect(find.text('Bugün'), findsOneWidget);
+      expect(find.byKey(const Key('concrete-project-filter')), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('project command preserves date search and group filters', (
+    tester,
+  ) async {
+    final concrete = _FakeConcrete();
+    final selectedProjects = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ConcretePage(
+            concrete: concrete,
+            agenda: _FakeAgenda(projects: const [project, secondProject]),
+            attachments: _picker(),
+            initialProjectId: project.id,
+            initialIstanbulDay: '2026-07-19',
+            onProjectSelected: selectedProjects.add,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Kod, mahal, blok, kat veya aks ara'),
+      'KORUNAN ARAMA',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Dökümde'));
+    await tester.pumpAndSettle();
+    final state = tester.state<ConcretePageState>(find.byType(ConcretePage));
+
+    await state.selectProject(secondProject.id);
+    await tester.pumpAndSettle();
+
+    expect(selectedProjects, [secondProject.id]);
+    expect(concrete.lastListQuery?.projectId, secondProject.id);
+    expect(concrete.lastListQuery?.istanbulDay, '2026-07-19');
+    expect(concrete.lastListQuery?.literalSearch, 'KORUNAN ARAMA');
+    expect(concrete.lastListQuery?.group, ConcretePourGroup.inProgress);
+    expect(find.byKey(const Key('concrete-project-filter')), findsNothing);
+  });
 
   testWidgets(
     'Beton detail return keeps project group search and scroll with fresh card',
@@ -252,11 +302,7 @@ void main() {
         300,
         scrollable: formScrollable,
       );
-      tester
-          .widget<FilledButton>(
-            createButton,
-          )
-          .onPressed!();
+      tester.widget<FilledButton>(createButton).onPressed!();
       await tester.pump();
       await tester.scrollUntilVisible(
         codeField,
@@ -748,9 +794,7 @@ void main() {
         expect(finder, findsOneWidget);
       }
 
-      final laboratoryAction = find.text(
-        'Laboratuvar randevusunu güncelle',
-      );
+      final laboratoryAction = find.text('Laboratuvar randevusunu güncelle');
       await tester.ensureVisible(laboratoryAction);
       await tester.drag(detailScrollable, const Offset(0, 120));
       await tester.pumpAndSettle();
@@ -1160,11 +1204,15 @@ class _FakeConcrete implements ConcreteApplication {
 }
 
 class _FakeAgenda implements AgendaApplication {
+  _FakeAgenda({this.projects = const [project]});
+
+  final List<MobileProject> projects;
+
   @override
   Stream<void> get projectChanges => const Stream<void>.empty();
 
   @override
-  Future<List<MobileProject>> listProjects() async => const [project];
+  Future<List<MobileProject>> listProjects() async => projects;
 
   @override
   Future<AgendaLogDetail> getAgendaLogDetail(String logId) async =>

@@ -31,10 +31,10 @@ class ConcretePage extends StatefulWidget {
   final ValueChanged<String>? onProjectSelected;
 
   @override
-  State<ConcretePage> createState() => _ConcretePageState();
+  State<ConcretePage> createState() => ConcretePageState();
 }
 
-class _ConcretePageState extends State<ConcretePage> {
+class ConcretePageState extends State<ConcretePage> {
   final ScrollController _scrollController = ScrollController();
   final _search = TextEditingController();
   List<MobileProject> _projects = const [];
@@ -145,8 +145,12 @@ class _ConcretePageState extends State<ConcretePage> {
     _restoreScrollOffset(restoreOffset);
   }
 
-  Future<void> _selectProject(MobileProject? project) async {
-    if (project == null || project.id == _project?.id || _loading) return;
+  Future<void> selectProject(String projectId) async {
+    if (projectId == _project?.id || _loading) return;
+    final project = _projects
+        .where((candidate) => candidate.id == projectId)
+        .firstOrNull;
+    if (project == null) return;
     setState(() {
       _projectIdToValidate = project.id;
       _project = project;
@@ -238,39 +242,14 @@ class _ConcretePageState extends State<ConcretePage> {
         controller: _scrollController,
         padding: const EdgeInsets.all(16),
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<MobileProject>(
-                  key: const Key('concrete-project-filter'),
-                  initialValue: _project,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Proje',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: _projects
-                      .map(
-                        (item) => DropdownMenuItem(
-                          value: item,
-                          child: Text(
-                            item.name,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      )
-                      .toList(growable: false),
-                  onChanged: _loading ? null : _selectProject,
-                ),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                key: const Key('concrete-day-filter'),
-                onPressed: _pickDate,
-                icon: const Icon(Icons.calendar_today_outlined),
-                label: Text(_day),
-              ),
-            ],
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              key: const Key('concrete-day-filter'),
+              onPressed: _pickDate,
+              icon: const Icon(Icons.calendar_today_outlined),
+              label: Text(_day),
+            ),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -362,7 +341,7 @@ class _ConcretePageState extends State<ConcretePage> {
               child: Padding(
                 padding: EdgeInsets.all(16),
                 child: Text(
-                  'Başlangıç projesi artık kullanılamıyor. Devam etmek için bir proje seçin.',
+                  'Başlangıç projesi artık kullanılamıyor. Aktif projeyi üst çubuktan seçin.',
                 ),
               ),
             )
