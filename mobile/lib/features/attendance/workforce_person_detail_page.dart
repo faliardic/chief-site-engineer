@@ -343,7 +343,6 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
                           ),
                         ),
                       ),
-                    _Summary(detail: detail),
                     Expanded(
                       child: TabBarView(
                         children: [
@@ -360,31 +359,43 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
     );
   }
 
-  Widget _general(WorkforcePersonDetail detail) => ListView(
-    padding: const EdgeInsets.all(12),
-    children: [
-      _row('Durum', detail.member.isActive ? 'Aktif' : 'Pasif'),
-      _row('Taşeron', detail.member.subcontractorName ?? 'Tanımsız'),
-      _row('Ekip', detail.member.teamName),
-      _row('Meslek/pozisyon', detail.member.roleName),
-      if (detail.member.personnelCode != null)
-        _row('Personel kodu', detail.member.personnelCode!),
-      if (detail.member.phone != null) _row('Telefon', detail.member.phone!),
-      if (detail.member.address != null) _row('Adres', detail.member.address!),
-      if (detail.member.startedOn != null)
-        _row('İşe başlama tarihi', detail.member.startedOn!),
-      if (detail.member.note != null) _row('Not', detail.member.note!),
-      _attendanceSummary(detail.attendanceSummary),
-      const Card(
-        child: Padding(
-          padding: EdgeInsets.all(12),
-          child: Text(
-            'Puantaj kayıtları bu personelin değişmeyen kimliği üzerinden tutulur; '
-            'taşeron veya ekip değişikliği geçmiş günleri yeniden yazmaz.',
-          ),
+  Widget _general(WorkforcePersonDetail detail) => SingleChildScrollView(
+    key: const PageStorageKey('workforce-person-general'),
+    padding: const EdgeInsets.all(16),
+    child: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 840),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _Summary(detail: detail),
+            const SizedBox(height: 16),
+            _row(
+              'Ekip',
+              detail.member.teamName.trim().isEmpty
+                  ? 'Belirtilmedi'
+                  : detail.member.teamName,
+            ),
+            if (detail.member.personnelCode != null)
+              _row('Personel kodu', detail.member.personnelCode!),
+            if (detail.member.phone != null)
+              _row('Telefon', detail.member.phone!),
+            if (detail.member.address != null)
+              _row('Adres', detail.member.address!),
+            _attendanceSummary(detail.attendanceSummary),
+            const Card(
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: Text(
+                  'Puantaj kayıtları bu personelin değişmeyen kimliği üzerinden tutulur; '
+                  'taşeron veya ekip değişikliği geçmiş günleri yeniden yazmaz.',
+                ),
+              ),
+            ),
+          ],
         ),
       ),
-    ],
+    ),
   );
 
   Widget _attendanceSummary(WorkforceAttendanceSummary summary) {
@@ -500,25 +511,100 @@ class _Summary extends StatelessWidget {
   final WorkforcePersonDetail detail;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-    child: Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: [
-        Chip(label: Text(detail.member.isActive ? 'Aktif' : 'Pasif')),
-        Chip(
-          label: Text(detail.member.subcontractorName ?? 'Tanımsız taşeron'),
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final missing = detail.missingComplianceCount > 0;
+    return Card(
+      key: const Key('workforce-person-profile'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Personel profili', style: theme.textTheme.labelLarge),
+            const SizedBox(height: 8),
+            Text(detail.member.fullName, style: theme.textTheme.headlineSmall),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Chip(
+                label: Text(detail.member.isActive ? 'Aktif' : 'Pasif'),
+              ),
+            ),
+            const SizedBox(height: 16),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns =
+                    constraints.maxWidth >= 600 &&
+                        MediaQuery.textScalerOf(context).scale(14) <= 21
+                    ? 2
+                    : 1;
+                final width =
+                    (constraints.maxWidth - (columns - 1) * 24) / columns;
+                return Wrap(
+                  spacing: 24,
+                  runSpacing: 20,
+                  children: [
+                    for (final field in [
+                      (
+                        'İşveren / firma',
+                        _value(detail.member.subcontractorName),
+                      ),
+                      ('Meslek', _value(detail.member.roleName)),
+                      ('Başlangıç tarihi', _value(detail.member.startedOn)),
+                      (
+                        'Toplam puantaj',
+                        '${detail.attendanceSummary.personDayEquivalentTotal.toStringAsFixed(1)} kişi-gün',
+                      ),
+                    ])
+                      SizedBox(
+                        width: width,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(field.$1, style: theme.textTheme.labelLarge),
+                            const SizedBox(height: 4),
+                            Text(field.$2, style: theme.textTheme.bodyLarge),
+                          ],
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+            Text('Not', style: theme.textTheme.labelLarge),
+            const SizedBox(height: 4),
+            Text(_value(detail.member.note), style: theme.textTheme.bodyLarge),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Divider(),
+            ),
+            Text(
+              missing ? 'İSG EKSİĞİ VAR' : 'İSG TAM',
+              style: theme.textTheme.titleMedium,
+            ),
+            if (missing) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  key: const Key('profile-open-compliance'),
+                  onPressed: () =>
+                      DefaultTabController.of(context).animateTo(1),
+                  child: const Text('İSG ekranına git'),
+                ),
+              ),
+            ],
+          ],
         ),
-        Chip(label: Text(detail.member.teamName)),
-        Chip(label: Text('İSG eksik ${detail.missingComplianceCount}')),
-        Chip(label: Text('geçerli ${detail.validComplianceCount}')),
-        Chip(label: Text('yaklaşan ${detail.expiringComplianceCount}')),
-        Chip(label: Text('geçmiş ${detail.expiredComplianceCount}')),
-        Chip(label: Text('aktif KKD ${detail.activePpeCount}')),
-      ],
-    ),
-  );
+      ),
+    );
+  }
+
+  String _value(String? value) =>
+      value == null || value.trim().isEmpty ? 'Belirtilmedi' : value;
 }
 
 const _gap = SizedBox(height: 10);
