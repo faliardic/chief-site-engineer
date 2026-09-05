@@ -277,10 +277,12 @@ Future<void> _pumpReminderFormRoute(
 Future<void> _submitReminderFormThroughUi(WidgetTester tester) async {
   final submit = find.byKey(const Key('submit-reminder'));
   expect(submit, findsOneWidget);
-  final formScrollable = find.ancestor(
-    of: submit,
-    matching: find.byType(Scrollable),
-  );
+  final formScrollable = find
+      .descendant(
+        of: find.byKey(const Key('reminder-form-scroll')),
+        matching: find.byType(Scrollable),
+      )
+      .first;
   expect(formScrollable, findsOneWidget);
   await tester.scrollUntilVisible(submit, 200, scrollable: formScrollable);
   await tester.pumpAndSettle();
@@ -767,14 +769,10 @@ void main() {
           const Key('submit-reminder'),
           skipOffstage: false,
         );
-        final formListView = find.ancestor(
-          of: submit,
-          matching: find.byType(ListView),
-        );
-        final formScrollable = find.ancestor(
-          of: submit,
-          matching: find.byType(Scrollable),
-        );
+        final formListView = find.byKey(const Key('reminder-form-scroll'));
+        final formScrollable = find
+            .descendant(of: formListView, matching: find.byType(Scrollable))
+            .first;
         expect(formListView, findsOneWidget);
         expect(formScrollable, findsOneWidget);
         expect(
@@ -789,7 +787,9 @@ void main() {
         await tester.pumpAndSettle();
 
         bool submitIsFullyInViewport() {
-          final viewport = tester.getRect(formScrollable);
+          final viewport = tester.getRect(
+            find.byKey(const Key('reminder-form-viewport')),
+          );
           final submitRect = tester.getRect(submit);
           return submitRect.left >= viewport.left &&
               submitRect.right <= viewport.right &&
@@ -802,7 +802,9 @@ void main() {
           correction < 6 && !submitIsFullyInViewport();
           correction += 1
         ) {
-          final viewport = tester.getRect(formScrollable);
+          final viewport = tester.getRect(
+            find.byKey(const Key('reminder-form-viewport')),
+          );
           final submitRect = tester.getRect(submit);
           final dragDy = submitRect.bottom > viewport.bottom - 1
               ? -math.max(submitRect.bottom - viewport.bottom + 24, 32.0)
