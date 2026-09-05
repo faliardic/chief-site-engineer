@@ -344,7 +344,8 @@ void main() {
         matching: find.text('Değişiklik geçmişi (1)'),
       ),
     );
-    expect(find.text('fixture_event'), findsOneWidget);
+    expect(find.text('Puantaj kaydı güncellendi'), findsOneWidget);
+    expect(find.textContaining('fixture_event'), findsNothing);
   });
 }
 

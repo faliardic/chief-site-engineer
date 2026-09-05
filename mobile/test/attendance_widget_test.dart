@@ -21,6 +21,146 @@ const memberId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const reminderId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 
 void main() {
+  for (final width in [320.0, 390.0]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'history uses Turkish labels and preserves order and time at $width px $scale text',
+        (tester) async {
+          await _setPhoneSize(tester, Size(width, 780));
+          const descriptions = [
+            ('attendance_day.created', 'Puantaj günü oluşturuldu'),
+            ('attendance_entry.upserted', 'Personel puantajı güncellendi'),
+            ('attendance_entry.removed', 'Personel kaydı kaldırıldı'),
+            ('attendance_day.note_updated', 'Günlük not güncellendi'),
+            ('attendance_day.completed', 'Gün tamamlandı'),
+            ('attendance_day.no_work', 'Çalışma yok olarak işaretlendi'),
+            ('attendance_day.reopened', 'Gün yeniden açıldı'),
+            ('attendance_day.csv_exported', 'CSV dışa aktarıldı'),
+            (
+              'attendance_day.reminder_linked',
+              'Puantaj hatırlatıcısı bağlandı',
+            ),
+            ('fixture_event', 'Puantaj kaydı güncellendi'),
+            ('legacy.unrecognized_event', 'Puantaj kaydı güncellendi'),
+          ];
+          // Sparse sequences and nonchronological times detect UI reordering.
+          final events = List<AttendanceEvent>.unmodifiable([
+            for (var index = 0; index < descriptions.length; index++)
+              AttendanceEvent(
+                id: 'history-event-$index',
+                attendanceDayId: dayId,
+                sequence: 10 + index * 3,
+                eventType: descriptions[index].$1,
+                occurredAt: index.isEven
+                    ? '2026-09-05T22:10:00Z'
+                    : '2026-09-05T08:10:00Z',
+                payloadJson:
+                    '{"internal":"history_payload_should_stay_private"}',
+              ),
+          ]);
+          final initial = _detail();
+          final detail = AttendanceDayDetail(
+            day: initial.day,
+            entries: initial.entries,
+            events: events,
+            totals: initial.totals,
+            teamSummaries: initial.teamSummaries,
+            linkedReminder: initial.linkedReminder,
+          );
+          final attendance = FakeAttendanceApplication(detail: detail);
+          await tester.pumpWidget(
+            MaterialApp(
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: TextScaler.linear(scale)),
+                child: child!,
+              ),
+              home: AttendanceDayPage(
+                attendance: attendance,
+                agenda: FakeAgendaApplication(),
+                dayId: dayId,
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final history = find.byKey(const Key('attendance-event-history'));
+          final header = find.descendant(
+            of: history,
+            matching: find.text('Değişiklik geçmişi (11)'),
+          );
+          expect(header, findsOneWidget);
+          expect(find.text(descriptions.first.$2), findsNothing);
+          await Scrollable.ensureVisible(
+            tester.element(header),
+            alignment: 0.5,
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(header);
+          await tester.pumpAndSettle();
+
+          final tiles = tester
+              .widgetList<ListTile>(
+                find.descendant(of: history, matching: find.byType(ListTile)),
+              )
+              .toList();
+          expect(tiles.length, descriptions.length + 1);
+          final rows = tiles.skip(1).toList();
+          expect(
+            rows.map((row) => (row.title! as Text).data),
+            descriptions.map((description) => description.$2),
+          );
+          for (var index = 0; index < rows.length; index++) {
+            expect(
+              (rows[index].subtitle! as Text).data,
+              index.isEven ? '06.09.2026 01:10:00' : '05.09.2026 11:10:00',
+            );
+            expect(find.textContaining(descriptions[index].$1), findsNothing);
+            final row = find.byWidget(rows[index]);
+            await Scrollable.ensureVisible(tester.element(row), alignment: 0.5);
+            await tester.pumpAndSettle();
+            expect(row.hitTestable(), findsOneWidget);
+            expect(tester.getRect(row).left, greaterThanOrEqualTo(0));
+            expect(tester.getRect(row).right, lessThanOrEqualTo(width));
+            expect(tester.takeException(), isNull);
+          }
+          expect(find.text('Puantaj kaydı güncellendi'), findsNWidgets(2));
+          expect(find.textContaining(RegExp(r'#\d+')), findsNothing);
+          expect(find.textContaining('attendance_'), findsNothing);
+          expect(
+            find.textContaining('history_payload_should_stay_private'),
+            findsNothing,
+          );
+
+          await Scrollable.ensureVisible(
+            tester.element(header),
+            alignment: 0.5,
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(header);
+          await tester.pumpAndSettle();
+          expect(find.text(descriptions.first.$2), findsNothing);
+          await tester.tap(header);
+          await tester.pumpAndSettle();
+          expect(find.text(descriptions.first.$2), findsOneWidget);
+          expect(find.text('Puantaj kaydı güncellendi'), findsNWidgets(2));
+          expect(attendance.detail, same(detail));
+          expect(attendance.detail!.events, same(events));
+          expect(
+            events.map((event) => event.sequence),
+            List.generate(descriptions.length, (index) => 10 + index * 3),
+          );
+          expect(
+            events.map((event) => event.eventType),
+            descriptions.map((description) => description.$1),
+          );
+          expect(attendance.saveCalls, 0);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   testWidgets('Puantaj navigation and daily editor work at 320 px', (
     tester,
   ) async {
