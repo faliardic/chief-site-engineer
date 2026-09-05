@@ -266,6 +266,30 @@ class _RemindersPageState extends State<RemindersPage> {
     await _reload();
   }
 
+  Future<void> _openCreate(ReminderScheduleKind initialSchedule) async {
+    final created = await Navigator.of(context).push<MobileReminder>(
+      MaterialPageRoute(
+        builder: (_) => ReminderFormPage(
+          agenda: widget.agenda,
+          contextSuggestions: widget.contextSuggestions,
+          projectLocations: widget.projectLocations,
+          preferredProjectId: widget.preferredProjectId,
+          initialSchedule: initialSchedule,
+        ),
+      ),
+    );
+    if (created == null || !mounted) return;
+    setState(() {
+      if (created.status == ReminderStatus.inbox) {
+        _primaryView = _ReminderPrimaryView.other;
+        _otherGroup = ReminderViewGroup.inbox;
+      } else {
+        _primaryView = _ReminderPrimaryView.today;
+      }
+    });
+    await _reload();
+  }
+
   IconData _otherIcon(ReminderViewGroup group) => switch (group) {
     ReminderViewGroup.upcoming => Icons.event_note_outlined,
     ReminderViewGroup.inbox => Icons.inbox_outlined,
@@ -284,38 +308,20 @@ class _RemindersPageState extends State<RemindersPage> {
         controller: _scrollController,
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 88),
         children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: _ReminderIconAction(
-              actionKey: const Key('quick-reminder'),
-              icon: Icons.add_alert_outlined,
-              label: 'Unutma ekle',
-              kind: _ReminderIconActionKind.filled,
-              onPressed: () async {
-                final created = await Navigator.of(context)
-                    .push<MobileReminder>(
-                      MaterialPageRoute(
-                        builder: (_) => ReminderFormPage(
-                          agenda: widget.agenda,
-                          contextSuggestions: widget.contextSuggestions,
-                          projectLocations: widget.projectLocations,
-                          preferredProjectId: widget.preferredProjectId,
-                        ),
-                      ),
-                    );
-                if (created != null && mounted) {
-                  setState(() {
-                    if (created.status == ReminderStatus.inbox) {
-                      _primaryView = _ReminderPrimaryView.other;
-                      _otherGroup = ReminderViewGroup.inbox;
-                    } else {
-                      _primaryView = _ReminderPrimaryView.today;
-                    }
-                  });
-                  await _reload();
-                }
-              },
-            ),
+          FilledButton.icon(
+            key: const Key('new-reminder'),
+            style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+            onPressed: () => _openCreate(ReminderScheduleKind.in15Minutes),
+            icon: const Icon(Icons.add_alert_outlined),
+            label: const Text('Yeni hatırlatıcı'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            key: const Key('quick-inbox-reminder'),
+            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+            onPressed: () => _openCreate(ReminderScheduleKind.inbox),
+            icon: const Icon(Icons.inbox_outlined),
+            label: const Text('Unutma Kutusu'),
           ),
           const SizedBox(height: 12),
           Wrap(

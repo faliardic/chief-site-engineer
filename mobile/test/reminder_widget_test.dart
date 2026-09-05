@@ -625,7 +625,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Unutma icon actions stay accessible on compact text scales', (
+  testWidgets('daily create actions stay labeled on compact text scales', (
     tester,
   ) async {
     final semantics = tester.ensureSemantics();
@@ -638,7 +638,7 @@ void main() {
     );
     final agenda = FakeAgendaApplication();
 
-    for (final textScale in <double>[1, 1.6]) {
+    for (final textScale in <double>[1, 2]) {
       tester.binding.platformDispatcher.textScaleFactorTestValue = textScale;
       await tester.pumpWidget(
         MaterialApp(
@@ -647,32 +647,29 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      final quick = find.byKey(const Key('quick-reminder'));
-      expect(quick, findsOneWidget);
-      _expectAccessibleIconTarget(tester, quick, 'Unutma ekle');
-      expect(
-        _iconButtonByKey(tester, const Key('quick-reminder')).tooltip,
-        'Unutma ekle',
-      );
-      expect(
-        _iconButtonByKey(tester, const Key('quick-reminder')).isSelected,
-        isNull,
-      );
-      expect(
-        _semanticsByKey(
-          tester,
-          const Key('quick-reminder'),
-        ).properties.selected,
-        isNull,
-      );
+      final create = find.byKey(const Key('new-reminder'));
+      final inbox = find.byKey(const Key('quick-inbox-reminder'));
+      expect(create, findsOneWidget);
+      expect(inbox, findsOneWidget);
+      expect(tester.widget(create), isA<FilledButton>());
+      expect(tester.widget(inbox), isA<OutlinedButton>());
+      expect(tester.getSize(create).height, greaterThanOrEqualTo(48));
+      expect(tester.getSize(inbox).height, greaterThanOrEqualTo(48));
+      expect(create.hitTestable(), findsOneWidget);
+      expect(inbox.hitTestable(), findsOneWidget);
+      expect(find.text('Yeni hatırlatıcı'), findsOneWidget);
+      expect(find.text('Unutma Kutusu'), findsOneWidget);
       expect(
         find.descendant(
-          of: quick,
+          of: create,
           matching: find.byIcon(Icons.add_alert_outlined),
         ),
         findsOneWidget,
       );
-      expect(find.text('+ Unutma'), findsNothing);
+      expect(
+        find.descendant(of: inbox, matching: find.byIcon(Icons.inbox_outlined)),
+        findsOneWidget,
+      );
 
       await tester.pumpWidget(
         MaterialApp(
@@ -681,7 +678,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Unutma'), findsOneWidget);
+      expect(find.text('Yeni hatırlatıcı'), findsOneWidget);
       expect(find.byKey(const Key('reminder-title')), findsOneWidget);
       _expectAccessibleIconTarget(
         tester,
@@ -1232,7 +1229,10 @@ void main() {
     await tester.tap(inboxAction);
     await tester.pumpAndSettle();
     expect(agenda.lastReminderGroup, ReminderViewGroup.inbox);
-    expect(find.text('Unutma Kutusu'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('reminder-other-title'))).data,
+      'Unutma Kutusu',
+    );
 
     await tester.tap(find.byKey(const Key('reminder-primary-other')));
     await tester.pumpAndSettle();

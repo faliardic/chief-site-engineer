@@ -18,6 +18,7 @@ class ReminderFormPage extends StatefulWidget {
     this.projectLocations,
     this.log,
     this.preferredProjectId,
+    this.initialSchedule = ReminderScheduleKind.in15Minutes,
     super.key,
   });
 
@@ -26,6 +27,7 @@ class ReminderFormPage extends StatefulWidget {
   final ProjectLocationApplication? projectLocations;
   final AgendaLog? log;
   final String? preferredProjectId;
+  final ReminderScheduleKind initialSchedule;
 
   @override
   State<ReminderFormPage> createState() => _ReminderFormPageState();
@@ -52,7 +54,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   Timer? _suggestionDebounce;
   int _suggestionLoadGeneration = 0;
   ReminderKind _kind = ReminderKind.action;
-  ReminderScheduleKind _schedule = ReminderScheduleKind.in15Minutes;
+  late ReminderScheduleKind _schedule;
   String? _quickSchedulePreviewAt;
   late DateTime _customDate;
   TimeOfDay _customTime = const TimeOfDay(hour: 9, minute: 0);
@@ -90,6 +92,7 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
     super.initState();
     _title = TextEditingController(text: widget.log?.description ?? '');
     _projectId = widget.log?.projectId ?? widget.preferredProjectId;
+    _schedule = widget.initialSchedule;
     _locationId = widget.log?.locationId;
     if (_locationId == null) _location.text = widget.log?.location ?? '';
     _recordId = RecordId.randomUuid();
@@ -527,7 +530,13 @@ class _ReminderFormPageState extends State<ReminderFormPage> {
   Widget _buildForm() {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.log == null ? 'Unutma' : 'Hatırlatıcı oluştur'),
+        title: Text(
+          widget.log != null
+              ? 'Hatırlatıcı oluştur'
+              : widget.initialSchedule == ReminderScheduleKind.inbox
+              ? 'Unutma Kutusu'
+              : 'Yeni hatırlatıcı',
+        ),
       ),
       body: Form(
         key: _formKey,
