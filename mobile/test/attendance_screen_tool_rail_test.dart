@@ -112,6 +112,7 @@ void main() {
           expect(find.text(AttendanceDayStatus.draft.label), findsOneWidget);
           expect(find.text('Puantaj gününü aç'), findsOneWidget);
           expect(find.text('2 aktif ekip • 7 aktif personel'), findsOneWidget);
+          expect(_key('attendance-workforce-prerequisite'), findsNothing);
           expect(find.text('Ekip A'), findsNothing);
           expect(attendance.commands.length, 1);
           expect(attendance.rolling, 1);
@@ -121,6 +122,105 @@ void main() {
           semantics.dispose();
         }
       });
+    }
+  }
+
+  for (final width in [320.0, 390.0]) {
+    for (final counts in <List<ActiveTeamCount>>[
+      const [],
+      const [
+        ActiveTeamCount(
+          teamId: 'team-a',
+          teamName: 'Ekip A',
+          subcontractorName: 'Firma',
+          activePersonCount: 0,
+        ),
+      ],
+    ]) {
+      testWidgets(
+        'empty draft prerequisite at $width with ${counts.length} teams',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          try {
+            final attendance = _Attendance()..teamCountsOverride = counts;
+            final agenda = FakeAgendaApplication(projects: [_project]);
+            await _pump(
+              tester,
+              attendance,
+              agenda: agenda,
+              size: Size(width, 360),
+              scale: 2,
+            );
+            expect(_key('attendance-workforce-prerequisite'), findsOneWidget);
+            expect(
+              find.textContaining('Bu projede aktif personel yok.'),
+              findsOneWidget,
+            );
+            final setup = _key('attendance-setup-workforce');
+            await tester.ensureVisible(setup);
+            await tester.pumpAndSettle();
+            expect(setup.hitTestable(), findsOneWidget);
+            expect(tester.getSize(setup).width, greaterThanOrEqualTo(48));
+            expect(tester.getSize(setup).height, greaterThanOrEqualTo(48));
+            final data = tester.getSemantics(setup).getSemanticsData();
+            expect(data.label, 'Personel yönetimini aç');
+            expect(data.flagsCollection.isButton, isTrue);
+            expect(tester.takeException(), isNull);
+            expect(agenda.listProjectsCalls, 1);
+            expect(attendance.commands.length, 1);
+            expect(attendance.rolling, 1);
+            expect(attendance.detailReads, [attendance.commands.single.id]);
+            expect(attendance.teamReads, ['project-a']);
+            expect(attendance.workforceReads, isEmpty);
+            expect(
+              tester.widget<InkWell>(_key('open-attendance-day')).onTap,
+              isNotNull,
+            );
+
+            await _tap(tester, 'attendance-setup-workforce');
+            final management = tester.widget<WorkforcePage>(
+              find.byType(WorkforcePage),
+            );
+            expect(management.project.id, 'project-a');
+            expect(management.attendance, same(attendance));
+            expect(attendance.commands.length, 1);
+            expect(attendance.workforceReads, ['members:project-a']);
+            attendance.teamCountsOverride = const [
+              ActiveTeamCount(
+                teamId: 'team-a',
+                teamName: 'Ekip A',
+                subcontractorName: 'Firma',
+                activePersonCount: 1,
+              ),
+            ];
+            await tester.pageBack();
+            await tester.pumpAndSettle();
+            expect(_key('attendance-workforce-prerequisite'), findsNothing);
+            expect(
+              find.text('1 aktif ekip • 1 aktif personel'),
+              findsOneWidget,
+            );
+            expect(attendance.commands.length, 2);
+            expect(attendance.commands.last.id, attendance.commands.first.id);
+            expect(
+              attendance.commands.last.eventId,
+              attendance.commands.first.eventId,
+            );
+            expect(
+              attendance.commands.last.localDate,
+              attendance.commands.first.localDate,
+            );
+            expect(attendance.rolling, 2);
+            expect(attendance.detailReads.length, 2);
+            expect(attendance.teamReads, ['project-a', 'project-a']);
+            expect(agenda.listProjectsCalls, 1);
+            expect(attendance.saveCalls, 0);
+            expect(tester.takeException(), isNull);
+          } finally {
+            semantics.dispose();
+          }
+        },
+      );
     }
   }
 
@@ -228,6 +328,7 @@ void main() {
         findsOneWidget,
       );
       expect(attendance.commands, isEmpty);
+      expect(_key('attendance-workforce-prerequisite'), findsNothing);
       expect(
         tester.widget<IconButton>(_key('manage-workforce')).onPressed,
         isNull,
@@ -249,6 +350,7 @@ void main() {
       expect(failing.commands.length, 1);
       expect(failing.rolling, 0);
       expect(failing.teamReads, isEmpty);
+      expect(_key('attendance-workforce-prerequisite'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -268,6 +370,7 @@ Future<void> _pump(
   double scale = 1,
   List<MobileProject> projects = const [_project],
   bool settle = true,
+  FakeAgendaApplication? agenda,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -284,7 +387,7 @@ Future<void> _pump(
       home: Scaffold(
         body: AttendancePage(
           attendance: attendance,
-          agenda: FakeAgendaApplication(projects: projects),
+          agenda: agenda ?? FakeAgendaApplication(projects: projects),
           activeProjectId: 'project-a',
           isActive: true,
         ),
@@ -295,6 +398,8 @@ Future<void> _pump(
 }
 
 class _Attendance extends FakeAttendanceApplication {
+  List<ActiveTeamCount>? teamCountsOverride;
+  final workforceReads = <String>[];
   final commands = <EnsureAttendanceDayCommand>[];
   final teamReads = <String>[];
   final detailReads = <String>[];
@@ -339,19 +444,59 @@ class _Attendance extends FakeAttendanceApplication {
   @override
   Future<List<ActiveTeamCount>> listActiveTeamCounts(String projectId) async {
     teamReads.add(projectId);
-    return const [
-      ActiveTeamCount(
-        teamId: 'team-a',
-        teamName: 'Ekip A',
-        subcontractorName: 'Firma',
-        activePersonCount: 3,
-      ),
-      ActiveTeamCount(
-        teamId: 'team-b',
-        teamName: 'Ekip B',
-        subcontractorName: 'Firma',
-        activePersonCount: 4,
-      ),
-    ];
+    return teamCountsOverride ??
+        const [
+          ActiveTeamCount(
+            teamId: 'team-a',
+            teamName: 'Ekip A',
+            subcontractorName: 'Firma',
+            activePersonCount: 3,
+          ),
+          ActiveTeamCount(
+            teamId: 'team-b',
+            teamName: 'Ekip B',
+            subcontractorName: 'Firma',
+            activePersonCount: 4,
+          ),
+        ];
   }
+
+  @override
+  Future<List<Subcontractor>> listSubcontractors(
+    String projectId, {
+    bool includeArchived = false,
+  }) {
+    workforceReads.add('employers:$projectId');
+    return super.listSubcontractors(
+      projectId,
+      includeArchived: includeArchived,
+    );
+  }
+
+  @override
+  Future<List<WorkforceMember>> listMembers(
+    String projectId, {
+    bool includeInactive = false,
+  }) {
+    workforceReads.add('members:$projectId');
+    return super.listMembers(projectId, includeInactive: includeInactive);
+  }
+
+  @override
+  Future<List<WorkforceTeam>> listTeams(
+    String projectId, {
+    String? subcontractorId,
+    bool includeArchived = false,
+  }) {
+    workforceReads.add('teams:$projectId');
+    return super.listTeams(
+      projectId,
+      subcontractorId: subcontractorId,
+      includeArchived: includeArchived,
+    );
+  }
+
+  @override
+  Future<WorkforcePersonDetail> getPersonDetail(String memberId) =>
+      throw StateError('Unexpected compliance/person detail read');
 }
