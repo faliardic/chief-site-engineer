@@ -88,7 +88,16 @@ void main() {
     );
     final formFinder = find.byType(ReminderFormPage);
     final originalState = tester.state(formFinder);
+    final optional = find.byKey(const Key('reminder-optional-details'));
+    await tester.scrollUntilVisible(
+      optional,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(optional);
+    await tester.pumpAndSettle();
     final kindFinder = find.byKey(const Key('reminder-kind'));
+    await tester.ensureVisible(kindFinder);
 
     await tester.tap(kindFinder);
     await tester.pumpAndSettle();
