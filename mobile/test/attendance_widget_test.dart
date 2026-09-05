@@ -774,17 +774,24 @@ void main() {
     expect(find.byKey(const Key('workforce-person-profile')), findsOneWidget);
     expect(find.text('İSG TAM'), findsOneWidget);
     expect(find.text('İSG eksik 0'), findsNothing);
-    expect(find.text('Genel / Puantaj'), findsOneWidget);
-    expect(find.text('İSG belgeleri'), findsOneWidget);
-    expect(find.text('KKD zimmetleri'), findsOneWidget);
-    await tester.drag(find.byType(TabBar), const Offset(-180, 0));
+    expect(tester.widgetList<Tab>(find.byType(Tab)).map((tab) => tab.text), [
+      'Profil',
+      'Puantaj',
+      'İSG',
+      'KKD',
+    ]);
+    expect(find.byKey(const Key('workforce-attendance-summary')), findsNothing);
+    await tester.tap(find.widgetWithText(Tab, 'Puantaj'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('İSG belgeleri'));
+    expect(find.text('Henüz Puantaj geçmişi yok.'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+    await tester.ensureVisible(find.widgetWithText(Tab, 'İSG'));
+    await tester.tap(find.widgetWithText(Tab, 'İSG'));
     await tester.pumpAndSettle();
     expect(find.text('İSG belgesi ekle'), findsOneWidget);
-    await tester.drag(find.byType(TabBar), const Offset(-140, 0));
+    await tester.ensureVisible(find.widgetWithText(Tab, 'KKD'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('KKD zimmetleri'));
+    await tester.tap(find.widgetWithText(Tab, 'KKD'));
     await tester.pumpAndSettle();
     expect(find.text('KKD zimmeti ekle'), findsOneWidget);
     expect(tester.takeException(), isNull);

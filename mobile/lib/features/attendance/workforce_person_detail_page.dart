@@ -313,16 +313,17 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
   Widget build(BuildContext context) {
     final detail = _detail;
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: Text(detail?.member.fullName ?? 'Personel detayı'),
           bottom: const TabBar(
             isScrollable: true,
             tabs: [
-              Tab(text: 'Genel / Puantaj'),
-              Tab(text: 'İSG belgeleri'),
-              Tab(text: 'KKD zimmetleri'),
+              Tab(text: 'Profil'),
+              Tab(text: 'Puantaj'),
+              Tab(text: 'İSG'),
+              Tab(text: 'KKD'),
             ],
           ),
         ),
@@ -346,7 +347,8 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
                     Expanded(
                       child: TabBarView(
                         children: [
-                          _general(detail),
+                          _profile(detail),
+                          _attendance(detail),
                           _compliance(detail),
                           _ppe(detail),
                         ],
@@ -359,7 +361,7 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
     );
   }
 
-  Widget _general(WorkforcePersonDetail detail) => SingleChildScrollView(
+  Widget _profile(WorkforcePersonDetail detail) => SingleChildScrollView(
     key: const PageStorageKey('workforce-person-general'),
     padding: const EdgeInsets.all(16),
     child: Center(
@@ -382,6 +384,21 @@ class _WorkforcePersonDetailPageState extends State<WorkforcePersonDetailPage> {
               _row('Telefon', detail.member.phone!),
             if (detail.member.address != null)
               _row('Adres', detail.member.address!),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  Widget _attendance(WorkforcePersonDetail detail) => SingleChildScrollView(
+    key: const PageStorageKey('workforce-person-attendance'),
+    padding: const EdgeInsets.all(16),
+    child: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 840),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
             _attendanceSummary(detail.attendanceSummary),
             const Card(
               child: Padding(
@@ -553,10 +570,6 @@ class _Summary extends StatelessWidget {
                       ),
                       ('Meslek', _value(detail.member.roleName)),
                       ('Başlangıç tarihi', _value(detail.member.startedOn)),
-                      (
-                        'Toplam puantaj',
-                        '${detail.attendanceSummary.personDayEquivalentTotal.toStringAsFixed(1)} kişi-gün',
-                      ),
                     ])
                       SizedBox(
                         width: width,
@@ -592,7 +605,7 @@ class _Summary extends StatelessWidget {
                 child: TextButton(
                   key: const Key('profile-open-compliance'),
                   onPressed: () =>
-                      DefaultTabController.of(context).animateTo(1),
+                      DefaultTabController.of(context).animateTo(2),
                   child: const Text('İSG ekranına git'),
                 ),
               ),

@@ -47,7 +47,11 @@ void main() {
           lessThanOrEqualTo(tester.getRect(rail).left),
         );
         final actions = tester.widget<ScreenToolRail>(rail).actions;
-        expect(actions.map((action) => action.label), ['Ara', 'Filtreler']);
+        expect(actions.map((action) => action.label), [
+          'Ara',
+          'Filtreler',
+          'Sicili yönet',
+        ]);
         expect(
           tester.getTopLeft(find.byKey(actions.first.key)).dy,
           lessThan(tester.getTopLeft(find.byKey(actions.last.key)).dy),
@@ -76,12 +80,10 @@ void main() {
         expect(find.byType(DropdownButtonFormField<String>), findsNothing);
         final manage = find.byKey(const Key('manage-workforce-directory'));
         expect(manage.hitTestable(), findsOneWidget);
-        expect(tester.getSize(manage).height, greaterThanOrEqualTo(48));
-        expect(
-          find.descendant(of: manage, matching: find.text('Sicili yönet')),
-          findsOneWidget,
-        );
-        expect(find.descendant(of: rail, matching: manage), findsNothing);
+        expect(tester.getSize(manage), const Size.square(48));
+        expect(tester.widget<IconButton>(manage).tooltip, 'Sicili yönet');
+        expect(find.descendant(of: rail, matching: manage), findsOneWidget);
+        expect(find.byType(FilledButton), findsNothing);
         await tester.tap(
           find.byKey(const Key('workforce-directory-search-action')),
         );
@@ -339,7 +341,7 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(
         tester
-            .widget<FilledButton>(
+            .widget<IconButton>(
               find.byKey(const Key('manage-workforce-directory')),
             )
             .onPressed,

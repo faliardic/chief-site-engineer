@@ -152,6 +152,25 @@ void main() {
     await tester.pumpAndSettle();
     final search = find.byKey(const Key('workforce-directory-search'));
 
+    final card = find.byKey(const Key('workforce-directory-member-$_member1'));
+    final name = find.descendant(of: card, matching: find.text('Ayşe Usta'));
+    final role = find.descendant(of: card, matching: find.text('Demirci'));
+    final secondary = find.descendant(
+      of: card,
+      matching: find.textContaining('555 01'),
+    );
+    expect(name, findsOneWidget);
+    expect(role, findsOneWidget);
+    expect(secondary, findsOneWidget);
+    expect(tester.getTopLeft(name).dy, lessThan(tester.getTopLeft(role).dy));
+    expect(
+      tester.getBottomLeft(role).dy,
+      lessThanOrEqualTo(tester.getTopLeft(secondary).dy),
+    );
+    for (final value in ['Beton AŞ', 'Gece Ekibi', 'Aktif']) {
+      expect(tester.widget<Text>(secondary).data, contains(value));
+    }
+
     for (final query in [
       'AYŞE',
       '555 01',
@@ -259,13 +278,12 @@ void main() {
       find.descendant(of: profile, matching: find.text('Mehmet Arşiv')),
       findsOneWidget,
     );
-    expect(
-      find.descendant(of: profile, matching: find.text('3.5 kişi-gün')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('workforce-attendance-summary')), findsNothing);
+    expect(find.text('Pasif'), findsWidgets);
+    await tester.tap(find.widgetWithText(Tab, 'Puantaj'));
+    await tester.pumpAndSettle();
     expect(find.text('Toplam 3.5 kişi-gün'), findsOneWidget);
     expect(find.textContaining('Son kayıt: 2026-08-08'), findsOneWidget);
-    expect(find.text('Pasif'), findsWidgets);
   });
 
   testWidgets('member profile edit exposes values and explicit clear flags', (
