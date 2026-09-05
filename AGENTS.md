@@ -193,6 +193,13 @@ ChatGPT kullanıcıya teslim ettiği her yanıtta önce sade Türkçeyle şunlar
 - bunun uygulama veya çalışma açısından ne anlama geldiğini;
 - işlemin başarılı mı, eksik mi, engelli mi olduğunu.
 
+Bağlayıcı anlatım kuralı:
+
+- Fatih'e verilen her bilgi, durum özeti, test sonucu, blocker açıklaması, Codex sonucu ve teknik karar her zaman onun tek okumada anlayacağı sade Türkçeyle anlatılır.
+- Yanıt teknik jargonla başlamaz. Teknik terim gerekiyorsa aynı cümlede veya hemen ardından günlük dilde ne anlama geldiği açıklanır.
+- SHA, branch, divergence, allowlist, test harness, YAML ve benzeri teknik kanıtlar ana anlatımın yerine geçmez; sade açıklamadan sonra ikinci katmanda verilir.
+- Fatih açıkça ham teknik çıktı istemedikçe ham Codex/test çıktısı ana cevap olarak kopyalanmaz; sonuç önce anlamı ve etkisiyle açıklanır.
+
 SHA, branch, divergence, allowlist, YAML ve benzeri teknik kanıtlar bu açıklamadan sonra ikinci katmanda verilir. Teknik terim gerekliyse hemen günlük dilde karşılığı açıklanır. Ham Codex çıktısı ana cevap olarak kopyalanmaz; ChatGPT sonucu owner'ın tek okumada anlayacağı dile çevirir. Kısalık, anlaşılabilirliği bozacak kadar bilgi eksiltme gerekçesi değildir.
 
 ## 9. Ana karar
