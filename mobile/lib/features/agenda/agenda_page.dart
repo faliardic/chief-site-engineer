@@ -10,6 +10,7 @@ import 'package:chief_site_engineer/features/agenda/log_form_page.dart';
 import 'package:chief_site_engineer/features/agenda/project_location_catalog_page.dart';
 import 'package:chief_site_engineer/features/owned_text_input_dialog.dart';
 import 'package:chief_site_engineer/features/reminders/reminder_detail_page.dart';
+import 'package:chief_site_engineer/features/screen_tool_rail.dart';
 import 'package:chief_site_engineer/platform/attachment_gateway.dart';
 import 'package:flutter/material.dart';
 
@@ -39,6 +40,7 @@ class _AgendaPageState extends State<AgendaPage> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  final GlobalKey _searchFieldKey = GlobalKey();
   late String _selectedDay;
   List<MobileProject> _projects = const [];
   List<AgendaLog> _logs = const [];
@@ -535,275 +537,324 @@ class _AgendaPageState extends State<AgendaPage> {
     await _reload();
   }
 
+  Future<void> _revealSearch() async {
+    if (_searchFieldKey.currentContext == null &&
+        _scrollController.hasClients) {
+      await _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    }
+    if (!mounted) return;
+    _searchFocusNode.requestFocus();
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    final fieldContext = _searchFieldKey.currentContext;
+    if (fieldContext != null && fieldContext.mounted) {
+      await Scrollable.ensureVisible(
+        fieldContext,
+        duration: const Duration(milliseconds: 200),
+        alignment: 0,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: _reload,
-        child: ListView(
-          key: const Key('agenda-day-list'),
-          controller: _scrollController,
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
+      body: SafeArea(
+        top: false,
+        bottom: false,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _listIconAction(
-                  key: const Key('create-agenda-project'),
-                  onPressed: _createProject,
-                  icon: const Icon(Icons.create_new_folder_outlined),
-                  label: 'Yeni proje oluştur',
-                ),
-                if (widget.projectLocations != null)
-                  _listIconAction(
-                    key: const Key('open-project-location-catalog'),
-                    onPressed: _openProjectLocationCatalog,
-                    icon: const Icon(Icons.account_tree_outlined),
-                    label: 'Mahal Kataloğu',
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                _listIconAction(
-                  key: const Key('previous-day'),
-                  onPressed: () => _moveDay(-1),
-                  icon: const Icon(Icons.chevron_left),
-                  label: 'Önceki gün',
-                ),
-                _listIconAction(
-                  key: const Key('agenda-today'),
-                  onPressed: () {
-                    setState(() {
-                      _selectedDay = CseTimeCodec.istanbulDayKey(
-                        CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
-                      );
-                    });
-                    _reload();
-                  },
-                  icon: const Icon(Icons.today_outlined),
-                  label: 'Bugüne git',
-                ),
-                OutlinedButton.icon(
-                  key: const Key('selected-day'),
-                  onPressed: _selectDate,
-                  icon: const Icon(Icons.calendar_month_outlined),
-                  label: Text(_selectedDay),
-                ),
-                _listIconAction(
-                  key: const Key('next-day'),
-                  onPressed: () => _moveDay(1),
-                  icon: const Icon(Icons.chevron_right),
-                  label: 'Sonraki gün',
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              key: const Key('agenda-literal-search'),
-              controller: _searchController,
-              focusNode: _searchFocusNode,
-              decoration: InputDecoration(
-                labelText: 'Literal ara',
-                hintText: 'Açıklama, mahal, not veya proje',
-                border: const OutlineInputBorder(),
-                suffixIcon: _listIconAction(
-                  key: const Key('agenda-search'),
-                  onPressed: _reload,
-                  icon: const Icon(Icons.search),
-                  label: 'Ara',
-                ),
-              ),
-              textInputAction: TextInputAction.search,
-              onChanged: (value) => _search = value,
-              onSubmitted: (_) => _reload(),
-              onTapOutside: (_) => _searchFocusNode.unfocus(),
-            ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: Semantics(
-                label: 'Filtreler',
-                button: true,
-                enabled: true,
-                excludeSemantics: true,
-                onTap: _showFilters,
-                child: OutlinedButton.icon(
-                  key: const Key('agenda-filter-action'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(0, 48),
-                  ),
-                  onPressed: _showFilters,
-                  icon: const Icon(Icons.filter_list_outlined),
-                  label: const Text('Filtreler'),
-                ),
-              ),
-            ),
-            if (_hasActiveFilters) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  if (_archiveFilter != AgendaArchiveFilter.active)
-                    _filterSummary(
-                      key: const Key('agenda-filter-summary-archive'),
-                      label: 'Durum: Arşivlenenler',
-                      onDeleted: () => unawaited(_clearArchiveFilter()),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _reload,
+                child: ListView(
+                  key: const Key('agenda-day-list'),
+                  controller: _scrollController,
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(12, 8, 4, 16),
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _listIconAction(
+                          key: const Key('previous-day'),
+                          onPressed: () => _moveDay(-1),
+                          icon: const Icon(Icons.chevron_left),
+                          label: 'Önceki gün',
+                        ),
+                        _listIconAction(
+                          key: const Key('agenda-today'),
+                          onPressed: () {
+                            setState(() {
+                              _selectedDay = CseTimeCodec.istanbulDayKey(
+                                CseTimeCodec.encodeUtc(DateTime.now().toUtc()),
+                              );
+                            });
+                            _reload();
+                          },
+                          icon: const Icon(Icons.today_outlined),
+                          label: 'Bugüne git',
+                        ),
+                        OutlinedButton.icon(
+                          key: const Key('selected-day'),
+                          onPressed: _selectDate,
+                          icon: const Icon(Icons.calendar_month_outlined),
+                          label: Text(_selectedDay),
+                        ),
+                        _listIconAction(
+                          key: const Key('next-day'),
+                          onPressed: () => _moveDay(1),
+                          icon: const Icon(Icons.chevron_right),
+                          label: 'Sonraki gün',
+                        ),
+                      ],
                     ),
-                  if (_sortOrder != AgendaSortOrder.newestFirst)
-                    _filterSummary(
-                      key: const Key('agenda-filter-summary-sort'),
-                      label: 'Sıralama: ${_sortOrder.label}',
-                      onDeleted: () => unawaited(_clearSortOrder()),
-                    ),
-                  if (_projectId case final projectId?)
-                    _filterSummary(
-                      key: const Key('agenda-filter-summary-project'),
-                      label:
-                          'Proje: ${_projects.where((project) => project.id == projectId).map((project) => project.name).firstOrNull ?? projectId}',
-                      onDeleted: () => unawaited(_clearProjectFilter()),
-                    ),
-                  if (_category case final category?)
-                    _filterSummary(
-                      key: const Key('agenda-filter-summary-category'),
-                      label: 'Tür: ${category.label}',
-                      onDeleted: () => unawaited(_clearCategoryFilter()),
-                    ),
-                  TextButton(
-                    key: const Key('agenda-clear-all-filters'),
-                    onPressed: _clearAllFilters,
-                    child: const Text('Tüm filtreleri temizle'),
-                  ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 12),
-            if (_loading && !_preservingDetailReload)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: CircularProgressIndicator(),
-                ),
-              )
-            else if (_error != null)
-              _MessageCard(icon: Icons.error_outline, message: _error!)
-            else if (_readError != null)
-              _MessageCard(
-                icon: Icons.error_outline,
-                message: _readError!,
-                action: _ReadRetryAction(
-                  actionKey: const Key('agenda-read-error-retry'),
-                  onPressed: _loading ? null : _retryRead,
-                ),
-              )
-            else if (_logs.isEmpty)
-              const _MessageCard(
-                icon: Icons.event_available_outlined,
-                message: 'Bu günde Ajanda kaydı yok.',
-              )
-            else
-              ..._logs.map((log) {
-                final linkedReminder = _linkedReminders[log.id];
-                final VoidCallback? openLinkedReminder = linkedReminder == null
-                    ? null
-                    : () => _openLinkedReminder(linkedReminder);
-                return Card(
-                  key: Key('agenda-log-${log.id}'),
-                  child: InkWell(
-                    onTap: () => _openDetail(log),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                CseTimeCodec.istanbulTimeLabel(log.observedAt),
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  log.category.label,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              if (openLinkedReminder != null)
-                                _listIconAction(
-                                  key: Key(
-                                    'agenda-log-linked-reminder-${log.id}',
-                                  ),
-                                  label: 'Bağlı hatırlatıcıyı aç',
-                                  onPressed: openLinkedReminder,
-                                  icon: const Icon(
-                                    Icons.notifications_active_outlined,
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            log.description,
-                            maxLines: 4,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            [
-                              log.projectName,
-                              if (log.displayLocation != null)
-                                log.displayLocation!,
-                            ].join(' • '),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (log.archivedAt != null) ...[
-                            const SizedBox(height: 8),
-                            const Row(
-                              children: [
-                                Icon(Icons.archive_outlined, size: 18),
-                                SizedBox(width: 6),
-                                Expanded(
-                                  child: Text('Arşivde • geri getirilebilir'),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
+                    const SizedBox(height: 12),
+                    KeyedSubtree(
+                      key: _searchFieldKey,
+                      child: TextField(
+                        key: const Key('agenda-literal-search'),
+                        controller: _searchController,
+                        focusNode: _searchFocusNode,
+                        decoration: InputDecoration(
+                          labelText: 'Literal ara',
+                          hintText: 'Açıklama, mahal, not veya proje',
+                          border: const OutlineInputBorder(),
+                        ),
+                        textInputAction: TextInputAction.search,
+                        onChanged: (value) => _search = value,
+                        onSubmitted: (_) => _reload(),
+                        onTapOutside: (_) => _searchFocusNode.unfocus(),
                       ),
                     ),
+                    if (_hasActiveFilters) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          if (_archiveFilter != AgendaArchiveFilter.active)
+                            _filterSummary(
+                              key: const Key('agenda-filter-summary-archive'),
+                              label: 'Durum: Arşivlenenler',
+                              onDeleted: () => unawaited(_clearArchiveFilter()),
+                            ),
+                          if (_sortOrder != AgendaSortOrder.newestFirst)
+                            _filterSummary(
+                              key: const Key('agenda-filter-summary-sort'),
+                              label: 'Sıralama: ${_sortOrder.label}',
+                              onDeleted: () => unawaited(_clearSortOrder()),
+                            ),
+                          if (_projectId case final projectId?)
+                            _filterSummary(
+                              key: const Key('agenda-filter-summary-project'),
+                              label:
+                                  'Proje: ${_projects.where((project) => project.id == projectId).map((project) => project.name).firstOrNull ?? projectId}',
+                              onDeleted: () => unawaited(_clearProjectFilter()),
+                            ),
+                          if (_category case final category?)
+                            _filterSummary(
+                              key: const Key('agenda-filter-summary-category'),
+                              label: 'Tür: ${category.label}',
+                              onDeleted: () =>
+                                  unawaited(_clearCategoryFilter()),
+                            ),
+                          TextButton(
+                            key: const Key('agenda-clear-all-filters'),
+                            onPressed: _clearAllFilters,
+                            child: const Text('Tüm filtreleri temizle'),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    if (_loading && !_preservingDetailReload)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else if (_error != null)
+                      _MessageCard(icon: Icons.error_outline, message: _error!)
+                    else if (_readError != null)
+                      _MessageCard(
+                        icon: Icons.error_outline,
+                        message: _readError!,
+                        action: _ReadRetryAction(
+                          actionKey: const Key('agenda-read-error-retry'),
+                          onPressed: _loading ? null : _retryRead,
+                        ),
+                      )
+                    else if (_logs.isEmpty)
+                      const _MessageCard(
+                        icon: Icons.event_available_outlined,
+                        message: 'Bu günde Ajanda kaydı yok.',
+                      )
+                    else
+                      ..._logs.map((log) {
+                        final linkedReminder = _linkedReminders[log.id];
+                        final VoidCallback? openLinkedReminder =
+                            linkedReminder == null
+                            ? null
+                            : () => _openLinkedReminder(linkedReminder);
+                        return Card(
+                          key: Key('agenda-log-${log.id}'),
+                          child: InkWell(
+                            onTap: () => _openDetail(log),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        CseTimeCodec.istanbulTimeLabel(
+                                          log.observedAt,
+                                        ),
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleMedium,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          log.category.label,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      if (openLinkedReminder != null)
+                                        _listIconAction(
+                                          key: Key(
+                                            'agenda-log-linked-reminder-${log.id}',
+                                          ),
+                                          label: 'Bağlı hatırlatıcıyı aç',
+                                          onPressed: openLinkedReminder,
+                                          icon: const Icon(
+                                            Icons.notifications_active_outlined,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    log.description,
+                                    maxLines: 4,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    [
+                                      log.projectName,
+                                      if (log.displayLocation != null)
+                                        log.displayLocation!,
+                                    ].join(' • '),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (log.archivedAt != null) ...[
+                                    const SizedBox(height: 8),
+                                    const Row(
+                                      children: [
+                                        Icon(Icons.archive_outlined, size: 18),
+                                        SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            'Arşivde • geri getirilebilir',
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                  ],
+                ),
+              ),
+            ),
+            ScreenToolRail(
+              key: const Key('agenda-screen-tool-rail'),
+              actions: [
+                ScreenToolAction(
+                  key: const Key('agenda-search'),
+                  label: 'Ara',
+                  icon: Icons.search,
+                  onPressed: _revealSearch,
+                ),
+                ScreenToolAction(
+                  key: const Key('agenda-filter-action'),
+                  label: 'Filtreler',
+                  icon: Icons.filter_list_outlined,
+                  onPressed: _showFilters,
+                ),
+                ScreenToolAction(
+                  key: const Key('create-agenda-project'),
+                  label: 'Yeni proje',
+                  icon: Icons.create_new_folder_outlined,
+                  onPressed: _createProject,
+                ),
+                if (widget.projectLocations != null)
+                  ScreenToolAction(
+                    key: const Key('open-project-location-catalog'),
+                    label: 'Mahal Kataloğu',
+                    icon: Icons.account_tree_outlined,
+                    onPressed: _openProjectLocationCatalog,
                   ),
-                );
-              }),
+              ],
+            ),
           ],
         ),
       ),
-      floatingActionButton: Semantics(
-        container: true,
-        button: true,
-        enabled: true,
-        label: 'Ajanda kaydı ekle',
-        excludeSemantics: true,
-        onTap: _openCreateLog,
-        child: SizedBox.square(
-          dimension: 40,
-          child: FloatingActionButton.small(
-            key: const Key('create-agenda-log'),
-            onPressed: _openCreateLog,
-            tooltip: 'Ajanda kaydı ekle',
-            child: const Icon(Icons.note_add_outlined),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        child: Semantics(
+          container: true,
+          button: true,
+          enabled: true,
+          label: 'Ajanda kaydı ekle',
+          excludeSemantics: true,
+          onTap: _openCreateLog,
+          child: Tooltip(
+            message: 'Ajanda kaydı ekle',
+            child: FilledButton(
+              key: const Key('create-agenda-log'),
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+              onPressed: _openCreateLog,
+              child: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.note_add_outlined),
+                    SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Ajanda kaydı ekle',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),

@@ -448,7 +448,7 @@ void main() {
   });
 
   testWidgets(
-    'Ajanda works at 320 px with filters, long Turkish text and 40 px actions',
+    'Ajanda works at 320 px with filters, long Turkish text and labeled primary action',
     (tester) async {
       tester.view.physicalSize = const Size(320, 760);
       tester.view.devicePixelRatio = 1;
@@ -501,8 +501,8 @@ void main() {
       );
       expect(find.textContaining('Uzun Türkçe açıklama'), findsOneWidget);
       expect(
-        tester.getSize(find.byKey(const Key('create-agenda-log'))),
-        const Size.square(40),
+        tester.getSize(find.byKey(const Key('create-agenda-log'))).height,
+        greaterThanOrEqualTo(48),
       );
       expect(tester.takeException(), isNull);
     },
@@ -2029,8 +2029,12 @@ void main() {
       final indicator = find.byKey(
         Key('agenda-log-linked-reminder-${linkedLog.id}'),
       );
-      await tester.ensureVisible(indicator);
-      await tester.pumpAndSettle();
+      await _revealRouteControl(
+        tester,
+        control: indicator,
+        list: find.byKey(const Key('agenda-day-list')),
+        scrollDelta: 240,
+      );
 
       expect(indicator, findsOneWidget);
       expect(find.byIcon(Icons.notifications_active_outlined), findsOneWidget);
@@ -2257,7 +2261,7 @@ void main() {
             ),
           );
           for (final entry in {
-            'create-agenda-project': 'Yeni proje oluştur',
+            'create-agenda-project': 'Yeni proje',
             'open-project-location-catalog': 'Mahal Kataloğu',
             'previous-day': 'Önceki gün',
             'agenda-today': 'Bugüne git',
@@ -2350,7 +2354,12 @@ void main() {
             find.byKey(const Key('agenda-literal-search')),
             'saha',
           );
+          final callsBeforeFocus = fake.listAgendaCalls;
           await tester.tap(find.byKey(const Key('agenda-search')));
+          await tester.pumpAndSettle();
+          expect(fake.listAgendaCalls, callsBeforeFocus);
+          expect(_agendaSearchHasFocus(tester), isTrue);
+          await tester.testTextInput.receiveAction(TextInputAction.search);
           await tester.pumpAndSettle();
           expect(fake.lastAgendaQuery!.literalSearch, 'saha');
           expect(fake.lastAgendaQuery!.projectId, projectId);
@@ -2383,16 +2392,9 @@ void main() {
           await tester.pageBack();
           await tester.pumpAndSettle();
           final create = find.byKey(const Key('create-agenda-log'));
-          expect(tester.getSize(create), const Size.square(40));
+          _expectPrimaryFormAction(tester, create, 'Ajanda kaydı ekle');
           expect(create.hitTestable(), findsOneWidget);
-          expect(
-            tester.widget<FloatingActionButton>(create).tooltip,
-            'Ajanda kaydı ekle',
-          );
-          expect(
-            find.descendant(of: create, matching: find.byType(Text)),
-            findsNothing,
-          );
+          expect(find.byTooltip('Ajanda kaydı ekle'), findsOneWidget);
           _expectButtonSemantics(tester, 'Ajanda kaydı ekle');
           await tester.tap(create);
           await tester.pumpAndSettle();
