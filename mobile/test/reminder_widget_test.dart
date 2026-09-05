@@ -369,6 +369,146 @@ void _expectPrimaryFormAction(
 }
 
 void main() {
+  for (final width in [320.0, 390.0]) {
+    testWidgets(
+      'history uses Turkish labels and preserves order and time at ${width.toInt()} px with 2x text',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 780);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        const descriptions = [
+          ('created', 'Hatırlatıcı oluşturuldu'),
+          ('scheduled', 'Hatırlatıcı planlandı'),
+          ('rescheduled', 'Hatırlatıcı yeniden planlandı'),
+          ('details_updated', 'Hatırlatıcı bilgileri güncellendi'),
+          ('waiting_started', 'Beklemeye alındı'),
+          ('legacy_waiting_normalized', 'Bekleme kaydı güncellendi'),
+          ('snoozed', 'Hatırlatıcı ertelendi'),
+          ('completed', 'Hatırlatıcı tamamlandı'),
+          ('cancelled', 'Hatırlatıcı iptal edildi'),
+          ('reopened', 'Hatırlatıcı yeniden açıldı'),
+          ('moved_to_inbox', 'Unutma Kutusu’na taşındı'),
+          ('trashed', 'Geri Dönüşüm Kutusu’na taşındı'),
+          ('restored_from_trash', 'Geri yüklendi'),
+          ('notification_scheduled', 'Bildirim planlandı'),
+          ('notification_cancelled', 'Bildirim planı kaldırıldı'),
+          ('fixture_unknown_event', 'Hatırlatıcı kaydı güncellendi'),
+        ];
+        final events = List<AppendOnlyEvent>.unmodifiable([
+          for (var index = 0; index < descriptions.length; index++)
+            AppendOnlyEvent(
+              id: widgetReminderId(index + 700),
+              recordId: reminderId,
+              projectId: agendaProjectId,
+              eventType: descriptions[index].$1,
+              occurredAt: index.isEven
+                  ? '2026-09-05T22:10:00Z'
+                  : '2026-09-05T08:10:00Z',
+              payloadJson: '{"internal":"history_payload_should_stay_private"}',
+              sequence: 10 + index * 3,
+            ),
+        ]);
+        final item = reminder(
+          projectId: agendaProjectId,
+          projectName: 'Şantiye A',
+        );
+        final detail = ReminderDetail(
+          reminder: item,
+          events: events,
+          notification: NotificationBinding(
+            reminderId: reminderId,
+            platformNotificationId: 1,
+            scheduledFor: item.nextAttentionAt,
+            syncState: NotificationSyncState.scheduled,
+            lastSyncedAt: item.updatedAt,
+            safeErrorCode: null,
+          ),
+        );
+        final agenda = _HistoryReminderAgenda(detail);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: MediaQuery(
+              data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+              child: ReminderDetailPage(agenda: agenda, reminderId: reminderId),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final scrollable = find
+            .descendant(
+              of: find.byKey(const Key('reminder-detail')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        final renderedLabels = <String?>[];
+        var previousOffset = -1.0;
+        for (var index = 0; index < events.length; index++) {
+          final event = events[index];
+          final row = find.byKey(Key('reminder-history-event-${event.id}'));
+          await tester.scrollUntilVisible(
+            row,
+            260,
+            scrollable: scrollable,
+            maxScrolls: 30,
+          );
+          await tester.pumpAndSettle();
+          expect(row, findsOneWidget);
+          final tile = tester.widget<ListTile>(row);
+          renderedLabels.add((tile.title! as Text).data);
+          expect(
+            (tile.subtitle! as Text).data,
+            index.isEven ? '06.09.2026 01:10:00' : '05.09.2026 11:10:00',
+          );
+          expect(
+            find.descendant(
+              of: row,
+              matching: find.byIcon(Icons.history_outlined),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(of: row, matching: find.byType(CircleAvatar)),
+            findsNothing,
+          );
+          expect(
+            find.descendant(of: row, matching: find.text('${event.sequence}')),
+            findsNothing,
+          );
+          expect(find.textContaining(event.eventType), findsNothing);
+          expect(tester.getRect(row).left, greaterThanOrEqualTo(0));
+          expect(tester.getRect(row).right, lessThanOrEqualTo(width));
+          final offset = tester
+              .state<ScrollableState>(scrollable)
+              .position
+              .pixels;
+          expect(offset, greaterThanOrEqualTo(previousOffset));
+          previousOffset = offset;
+          expect(tester.takeException(), isNull);
+        }
+        expect(
+          renderedLabels,
+          descriptions.map((description) => description.$2),
+        );
+        expect(find.text('Hatırlatıcı kaydı güncellendi'), findsOneWidget);
+        expect(find.textContaining('fixture_unknown_event'), findsNothing);
+        expect(
+          find.textContaining('history_payload_should_stay_private'),
+          findsNothing,
+        );
+        expect(agenda.lifecycleDetail, same(detail));
+        expect(agenda.lifecycleDetail.events, same(events));
+        expect(
+          events.map((event) => event.sequence),
+          List.generate(events.length, (index) => 10 + index * 3),
+        );
+        expect(agenda.mutateReminderCalls, 0);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('preferred project is initial only and cancel creates nothing', (
     tester,
   ) async {
@@ -3751,6 +3891,22 @@ Finder _reminderScrollableFinder() => find
 
 double _reminderScrollOffset(WidgetTester tester) =>
     _reminderScrollable(tester).position.pixels;
+
+class _HistoryReminderAgenda extends FakeAgendaApplication {
+  _HistoryReminderAgenda(this.lifecycleDetail)
+    : super(
+        reminders: [lifecycleDetail.reminder],
+        reminderDetail: lifecycleDetail.reminder,
+      );
+
+  final ReminderDetail lifecycleDetail;
+
+  @override
+  Future<ReminderDetail> getReminderLifecycleDetail(String reminderId) async {
+    reminderLifecycleDetailCalls += 1;
+    return lifecycleDetail;
+  }
+}
 
 class _DelayedReminderAgenda extends FakeAgendaApplication {
   _DelayedReminderAgenda(List<MobileReminder> reminders)
