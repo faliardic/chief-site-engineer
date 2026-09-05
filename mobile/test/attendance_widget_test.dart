@@ -195,6 +195,8 @@ void main() {
       await tester.tap(find.text(_project().name).last);
       await tester.pumpAndSettle();
       expect(reportedProjects, isEmpty);
+      expect(find.byKey(const Key('attendance-retry')), findsNothing);
+      expect(find.textContaining('Önceki seçim korundu'), findsOneWidget);
       expect(
         tester.state<FormFieldState<String>>(projectField).value,
         _secondProject().id,
@@ -772,6 +774,8 @@ void main() {
       attendance.delayedDetailReload = delayedReload;
       await tester.pageBack();
       await tester.pump(const Duration(milliseconds: 350));
+      expect(find.byKey(const Key('open-attendance-day')), findsOneWidget);
+      expect(find.byKey(const Key('attendance-refreshing')), findsOneWidget);
       delayedReload.complete(attendance.detail!);
       await tester.pumpAndSettle();
 

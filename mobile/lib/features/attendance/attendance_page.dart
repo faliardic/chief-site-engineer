@@ -10,6 +10,7 @@ import 'package:chief_site_engineer/features/attendance/attendance_day_page.dart
 import 'package:chief_site_engineer/features/attendance/attendance_settings_page.dart';
 import 'package:chief_site_engineer/features/attendance/workforce_page.dart';
 import 'package:chief_site_engineer/features/screen_tool_rail.dart';
+import 'package:chief_site_engineer/features/projects/project_create_page.dart';
 import 'package:flutter/material.dart';
 
 class AttendancePage extends StatefulWidget {
@@ -40,6 +41,10 @@ class _AttendancePageState extends State<AttendancePage> {
   AttendanceDayDetail? _detail;
   late String _localDate;
   bool _loading = false;
+  bool _projectsDiscovered = false;
+  bool _projectReadFailed = false;
+  bool _dayReadFailed = false;
+  bool _creatingProject = false;
   String? _error;
   List<ActiveTeamCount> _teamCounts = const [];
   StreamSubscription<void>? _projectSubscription;
@@ -88,9 +93,17 @@ class _AttendancePageState extends State<AttendancePage> {
   Future<void> _loadProjects() async {
     if (!widget.isActive) return;
     final generation = ++_projectLoadGeneration;
+    final preserveDetail =
+        _detail != null && _project?.id == widget.activeProjectId;
     setState(() {
       _loading = true;
       _error = null;
+      _projectReadFailed = false;
+      _dayReadFailed = false;
+      if (!preserveDetail) {
+        _detail = null;
+        _teamCounts = const [];
+      }
     });
     try {
       final discoveredProjects = await widget.agenda.listProjects();
@@ -109,26 +122,33 @@ class _AttendancePageState extends State<AttendancePage> {
                 .where((candidate) => candidate.id == activeProjectId)
                 .firstOrNull;
       setState(() {
+        _projectsDiscovered = true;
+        if (_project?.id != project?.id) {
+          _detail = null;
+          _teamCounts = const [];
+        }
         _projects = projects;
         _project = project;
         _projectFieldGeneration += 1;
-        _detail = null;
-        _teamCounts = const [];
       });
       if (project != null) await _loadDay(project: project);
-    } on Object catch (error) {
+    } on Object {
       if (!mounted ||
           !widget.isActive ||
           generation != _projectLoadGeneration) {
         return;
       }
       setState(() {
-        _projects = const [];
-        _project = null;
-        _projectFieldGeneration += 1;
-        _detail = null;
-        _teamCounts = const [];
-        _error = _message(error, 'Projeler açılamadı.');
+        _projectsDiscovered = false;
+        _projectReadFailed = true;
+        if (!preserveDetail) {
+          _projects = const [];
+          _project = null;
+          _projectFieldGeneration += 1;
+          _detail = null;
+          _teamCounts = const [];
+        }
+        _error = 'Projeler açılamadı. Lütfen tekrar deneyin.';
       });
     } finally {
       if (mounted && widget.isActive && generation == _projectLoadGeneration) {
@@ -145,6 +165,8 @@ class _AttendancePageState extends State<AttendancePage> {
     setState(() {
       _loading = true;
       _error = null;
+      _dayReadFailed = false;
+      _projectReadFailed = false;
     });
     try {
       final key = '${selectedProject.id}:$_localDate';
@@ -177,9 +199,13 @@ class _AttendancePageState extends State<AttendancePage> {
       });
       _restoreScrollOffset(restoreOffset);
       return true;
-    } on Object catch (error) {
+    } on Object {
       if (mounted && widget.isActive && generation == _dayLoadGeneration) {
-        setState(() => _error = _message(error, 'Puantaj günü açılamadı.'));
+        setState(() {
+          _dayReadFailed = true;
+          _error = 'Puantaj günü açılamadı.';
+        });
+        _restoreScrollOffset(restoreOffset);
       }
       return false;
     } finally {
@@ -214,7 +240,42 @@ class _AttendancePageState extends State<AttendancePage> {
       _projectFieldGeneration += 1;
       _detail = previousDetail;
       _teamCounts = previousTeamCounts;
+      _dayReadFailed = false;
+      _error =
+          'Proje açılamadı. Önceki seçim korundu. Yeniden proje seçerek deneyebilirsiniz.';
     });
+  }
+
+  Future<void> _retryRead() async {
+    if (_loading || !widget.isActive) return;
+    final offset = _currentScrollOffset;
+    if (_projectReadFailed) {
+      await _loadProjects();
+      _restoreScrollOffset(offset);
+    } else if (_dayReadFailed) {
+      await _loadDay(restoreOffset: offset);
+    }
+  }
+
+  Future<void> _createProject() async {
+    if (_creatingProject || _loading || !widget.isActive) return;
+    setState(() => _creatingProject = true);
+    try {
+      final project = await Navigator.of(context).push<MobileProject>(
+        MaterialPageRoute(
+          builder: (_) => ProjectCreatePage(agenda: widget.agenda),
+        ),
+      );
+      if (!mounted || !widget.isActive || project == null) return;
+      final onSelected = widget.onProjectSelected;
+      if (onSelected != null) {
+        onSelected(project.id);
+      } else {
+        await _loadProjects();
+      }
+    } finally {
+      if (mounted) setState(() => _creatingProject = false);
+    }
   }
 
   Future<void> _shiftDay(int delta) async {
@@ -347,16 +408,33 @@ class _AttendancePageState extends State<AttendancePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (_projects.isEmpty && !_loading)
-                        const Card(
+                      if (_projectsDiscovered && _projects.isEmpty && !_loading)
+                        Card(
+                          key: const Key('attendance-no-project'),
                           child: Padding(
-                            padding: EdgeInsets.all(16),
-                            child: Text(
-                              'Puantaj için önce Ajanda bölümünden bir proje oluşturun.',
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                const Text(
+                                  'Puantaj için önce Ajanda bölümünden bir proje oluşturun.',
+                                ),
+                                const SizedBox(height: 12),
+                                FilledButton(
+                                  key: const Key('attendance-create-project'),
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: const Size(48, 48),
+                                  ),
+                                  onPressed: _creatingProject
+                                      ? null
+                                      : _createProject,
+                                  child: const Text('Yeni proje oluştur'),
+                                ),
+                              ],
                             ),
                           ),
                         )
-                      else ...[
+                      else if (_projects.isNotEmpty) ...[
                         KeyedSubtree(
                           key: const Key('attendance-project'),
                           child: DropdownButtonFormField<String>(
@@ -440,25 +518,50 @@ class _AttendancePageState extends State<AttendancePage> {
                       if (_error != null)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Text(
-                            _error!,
-                            key: const Key('attendance-page-error'),
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                            ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                _error!,
+                                key: const Key('attendance-page-error'),
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                              ),
+                              if (_projectReadFailed || _dayReadFailed) ...[
+                                const SizedBox(height: 8),
+                                OutlinedButton(
+                                  key: const Key('attendance-retry'),
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize: const Size(48, 48),
+                                  ),
+                                  onPressed: _loading ? null : _retryRead,
+                                  child: const Text('Tekrar dene'),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
-                      if (_loading)
+                      if (detail != null)
+                        SizedBox(
+                          height: 4,
+                          child: _loading
+                              ? const LinearProgressIndicator(
+                                  key: Key('attendance-refreshing'),
+                                )
+                              : null,
+                        ),
+                      if (_loading && detail == null)
                         const Padding(
                           padding: EdgeInsets.all(24),
                           child: Center(child: CircularProgressIndicator()),
-                        )
-                      else if (detail != null)
+                        ),
+                      if (detail != null)
                         Card(
                           color: Theme.of(context).colorScheme.primaryContainer,
                           child: InkWell(
                             key: const Key('open-attendance-day'),
-                            onTap: _openDay,
+                            onTap: _loading ? null : _openDay,
                             child: Padding(
                               padding: const EdgeInsets.all(16),
                               child: Column(
@@ -535,9 +638,6 @@ class _AttendancePageState extends State<AttendancePage> {
       ],
     );
   }
-
-  String _message(Object error, String fallback) =>
-      error is AgendaValidationFailure ? error.message : fallback;
 }
 
 class _EnsureIds {
