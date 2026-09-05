@@ -29,6 +29,7 @@ class _DailyLogPageState extends State<DailyLogPage> {
   List<DailyLogProject> _projects = const [];
   String? _projectIdToValidate;
   String? _selectedProjectId;
+  String? _projectIdToAdopt;
   DailyLogDay? _day;
   String? _errorCode;
   var _loading = true;
@@ -120,6 +121,14 @@ class _DailyLogPageState extends State<DailyLogPage> {
         _errorCode = _failureCode(error);
         _loading = false;
       });
+      return;
+    }
+    // The read (including connection cleanup) must settle before notifying the
+    // shared session: adoption starts Home's profile read and rebuilds Home.
+    if (_projectIdToAdopt == projectId &&
+        (ModalRoute.of(context)?.isCurrent ?? true)) {
+      _projectIdToAdopt = null;
+      widget.onProjectSelected?.call(projectId);
     }
   }
 
@@ -130,8 +139,8 @@ class _DailyLogPageState extends State<DailyLogPage> {
     setState(() {
       _projectIdToValidate = projectId;
       _selectedProjectId = projectId;
+      _projectIdToAdopt = projectId;
     });
-    widget.onProjectSelected?.call(projectId);
     await _loadDay();
   }
 
