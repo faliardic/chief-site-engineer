@@ -694,7 +694,7 @@ void main() {
   testWidgets(
     'Puantaj day detail return keeps project day and scroll after async reload',
     (tester) async {
-      await _setPhoneSize(tester, const Size(320, 760));
+      await _setPhoneSize(tester, const Size(320, 360));
       final attendance = _DelayedAttendanceApplication(
         detail: _detail(),
         teamCounts: List.generate(
@@ -712,6 +712,12 @@ void main() {
         MediaQuery(
           data: const MediaQueryData(textScaler: TextScaler.linear(1.5)),
           child: MaterialApp(
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: const TextScaler.linear(2)),
+              child: child!,
+            ),
             theme: ThemeData(brightness: Brightness.dark),
             home: Scaffold(
               body: AttendancePage(
@@ -742,6 +748,12 @@ void main() {
         420,
         scrollable: _attendanceScrollableFinder(),
       );
+      await tester.pumpAndSettle();
+      await Scrollable.ensureVisible(
+        tester.element(detailCard),
+        alignment: 0.5,
+      );
+      await tester.pumpAndSettle();
       final before = _attendanceScrollOffset(tester);
       expect(before, greaterThan(300));
 
@@ -757,7 +769,7 @@ void main() {
 
       expect(_attendanceScrollOffset(tester), closeTo(before, 4));
       expect(find.text(AttendanceDayStatus.completed.label), findsOneWidget);
-      expect(find.text('CSE264 sentetik ekip 23 — 24 kişi'), findsOneWidget);
+      expect(find.text('24 aktif ekip • 300 aktif personel'), findsOneWidget);
       tester
           .state<ScrollableState>(_attendanceScrollableFinder())
           .position
