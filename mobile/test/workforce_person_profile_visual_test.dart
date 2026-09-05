@@ -285,6 +285,17 @@ void main() {
           tester,
           find.text('Gerekçe: Kullanıcının gerekçesi single'),
         );
+        if (scenario.$3 == null) {
+          expect(
+            find.descendant(
+              of: find.byKey(const Key('compliance-single')),
+              matching: find.text('Son geçerlilik tarihi girilmemiş'),
+            ),
+            scenario.$1 == ComplianceSourceStatus.valid
+                ? findsOneWidget
+                : findsNothing,
+          );
+        }
         expect(attendance.calls, ['read:person-1']);
       },
     );
@@ -354,9 +365,10 @@ void main() {
             for (final text in [
               'Belge numarası: ${record.documentNumber}',
               'Düzenlenme tarihi: ${record.issuedDate}',
-              record.expiryDate == null
-                  ? 'Son geçerlilik tarihi girilmemiş'
-                  : 'Son geçerlilik tarihi: ${record.expiryDate}',
+              if (record.expiryDate != null)
+                'Son geçerlilik tarihi: ${record.expiryDate}'
+              else if (record.sourceStatus == ComplianceSourceStatus.valid)
+                'Son geçerlilik tarihi girilmemiş',
               'Not: ${record.note}',
               'Gerekçe: ${record.reason}',
             ]) {
@@ -366,6 +378,16 @@ void main() {
               );
               await _revealCompliance(tester, field);
               expect(field.hitTestable(), findsOneWidget);
+            }
+            if (record.expiryDate == null &&
+                record.sourceStatus != ComplianceSourceStatus.valid) {
+              expect(
+                find.descendant(
+                  of: card,
+                  matching: find.text('Son geçerlilik tarihi girilmemiş'),
+                ),
+                findsNothing,
+              );
             }
             for (final action in ['edit', 'archive']) {
               final control = find.byKey(
